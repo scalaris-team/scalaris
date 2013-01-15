@@ -115,12 +115,11 @@ public class TransactionSingleOpTest {
      *
      * @throws NotFoundException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      */
     @Test(expected=NotFoundException.class)
     public void testRead_NotFound() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+            UnknownException, NotFoundException {
         final String key = "_Read_NotFound";
         final TransactionSingleOp conn = new TransactionSingleOp();
         try {
@@ -135,12 +134,11 @@ public class TransactionSingleOpTest {
      *
      * @throws NotFoundException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      */
     @Test(expected=ConnectionException.class)
     public void testRead_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException {
+            UnknownException, NotFoundException {
         final String key = "_Read_NotConnected";
         final TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
@@ -152,14 +150,13 @@ public class TransactionSingleOpTest {
      * closed connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test(expected=ConnectionException.class)
     public void testWriteString_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_WriteString_NotConnected";
         final TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
@@ -172,14 +169,13 @@ public class TransactionSingleOpTest {
      * distinct key for each value. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test
     public void testWriteString1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_WriteString1_";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -204,14 +200,13 @@ public class TransactionSingleOpTest {
      * single key for all the values. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
      */
     @Test
     public void testWriteString2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_WriteString2";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -233,7 +228,6 @@ public class TransactionSingleOpTest {
      * closed connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -242,7 +236,7 @@ public class TransactionSingleOpTest {
      */
     @Test(expected=ConnectionException.class)
     public void testWriteList_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_WriteList_NotConnected";
         final TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
@@ -258,7 +252,6 @@ public class TransactionSingleOpTest {
      * distinct key for each value. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -266,8 +259,8 @@ public class TransactionSingleOpTest {
      * @since 3.2
      */
     @Test
-    public void testWriteList1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+    public void testWriteList1() throws ConnectionException, UnknownException,
+            NotFoundException, AbortException {
         final String key = "_WriteList1_";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -300,7 +293,6 @@ public class TransactionSingleOpTest {
      * key for all the values. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -308,8 +300,8 @@ public class TransactionSingleOpTest {
      * @since 3.2
      */
     @Test
-    public void testWriteList2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+    public void testWriteList2() throws ConnectionException, UnknownException,
+            NotFoundException, AbortException {
         final String key = "_WriteList2";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -339,7 +331,6 @@ public class TransactionSingleOpTest {
      * with a closed connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -349,7 +340,8 @@ public class TransactionSingleOpTest {
      */
     @Test(expected=ConnectionException.class)
     public void testTestAndSetList_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetList_NotConnected";
         final TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
@@ -365,7 +357,6 @@ public class TransactionSingleOpTest {
      * Tries test_and_set with a non-existing key.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -375,7 +366,8 @@ public class TransactionSingleOpTest {
      */
     @Test(expected=NotFoundException.class)
     public void testTestAndSetList_NotFound() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetList_NotFound";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -398,7 +390,6 @@ public class TransactionSingleOpTest {
      * knowing the correct old value. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -408,7 +399,8 @@ public class TransactionSingleOpTest {
      */
     @Test
     public void testTestAndSetList1a() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetList1a";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -454,7 +446,6 @@ public class TransactionSingleOpTest {
      * knowing the wrong old value. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -463,7 +454,7 @@ public class TransactionSingleOpTest {
      */
     @Test
     public void testTestAndSetList1b() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_TestAndSetList1b";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -513,7 +504,6 @@ public class TransactionSingleOpTest {
      * using a single key for all the values. Tries to read the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -523,7 +513,8 @@ public class TransactionSingleOpTest {
      */
     @Test
     public void testTestAndSetList2a() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetList2a";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -566,7 +557,6 @@ public class TransactionSingleOpTest {
      * the data afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -575,7 +565,7 @@ public class TransactionSingleOpTest {
      */
     @Test
     public void testTestAndSetList2b() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_TestAndSetList2b";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -616,7 +606,6 @@ public class TransactionSingleOpTest {
      * with a closed connection.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -626,7 +615,8 @@ public class TransactionSingleOpTest {
      */
     @Test(expected=ConnectionException.class)
     public void testTestAndSetString_NotConnected() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException,
+            KeyChangedException {
         final String key = "_TestAndSetString_NotConnected";
         final TransactionSingleOp conn = new TransactionSingleOp();
         conn.closeConnection();
@@ -639,7 +629,6 @@ public class TransactionSingleOpTest {
      * Tries test_and_set with a non-existing key.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -649,7 +638,7 @@ public class TransactionSingleOpTest {
      */
     @Test(expected=NotFoundException.class)
     public void testTestAndSetString_NotFound() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException, KeyChangedException {
         final String key = "_TestAndSetString_NotFound";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -669,7 +658,6 @@ public class TransactionSingleOpTest {
      * knowing the correct old value. Tries to read the string afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -679,7 +667,7 @@ public class TransactionSingleOpTest {
      */
     @Test
     public void testTestAndSetString1() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException, KeyChangedException {
+            UnknownException, NotFoundException, AbortException, KeyChangedException {
         final String key = "_TestAndSetString1";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -712,7 +700,6 @@ public class TransactionSingleOpTest {
      * knowing the wrong old value. Tries to read the string afterwards.
      *
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
@@ -721,7 +708,7 @@ public class TransactionSingleOpTest {
      */
     @Test
     public void testTestAndSetString2() throws ConnectionException,
-            TimeoutException, UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException {
         final String key = "_TestAndSetString2";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -758,10 +745,10 @@ public class TransactionSingleOpTest {
      * @throws ConnectionException
      * @throws UnknownException
      * @throws AbortException
-     * @throws TimeoutException
      */
     @Test
-    public void testReqList_Empty() throws ConnectionException, UnknownException, TimeoutException, AbortException {
+    public void testReqList_Empty() throws ConnectionException,
+            UnknownException, AbortException {
         final TransactionSingleOp t = new TransactionSingleOp();
         try {
             t.req_list(new RequestList());
@@ -777,11 +764,11 @@ public class TransactionSingleOpTest {
      * @throws ConnectionException
      * @throws UnknownException
      * @throws AbortException
-     * @throws TimeoutException
      * @throws NotFoundException
      */
     @Test
-    public void testReqList1() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException {
+    public void testReqList1() throws ConnectionException, UnknownException,
+            AbortException, NotFoundException {
         final String key = "_ReqList1_";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -847,12 +834,12 @@ public class TransactionSingleOpTest {
      *
      * @throws ConnectionException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      * @throws NotFoundException
      */
     @Test
-    public void testReadLargeList1() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException {
+    public void testReadLargeList1() throws ConnectionException,
+            UnknownException, AbortException, NotFoundException {
         testReadLargeList(false, "_ReadLargeList1");
     }
 
@@ -861,12 +848,12 @@ public class TransactionSingleOpTest {
      *
      * @throws ConnectionException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      * @throws NotFoundException
      */
     @Test
-    public void testReadLargeList2() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException {
+    public void testReadLargeList2() throws ConnectionException,
+            UnknownException, AbortException, NotFoundException {
         testReadLargeList(true, "_ReadLargeList2");
     }
 
@@ -879,15 +866,14 @@ public class TransactionSingleOpTest {
      *            the key to append to the {@link #testTime}
      *
      * @throws ConnectionException
-     * @throws TimeoutException
      * @throws AbortException
      * @throws UnknownException
      * @throws ClassCastException
      * @throws NotFoundException
      */
     protected void testReadLargeList(final boolean compressed, final String key)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException, ClassCastException, NotFoundException {
+            throws ConnectionException, AbortException, UnknownException,
+            ClassCastException, NotFoundException {
         final ArrayList<String> expected = new ArrayList<String>(testData.length * 100);
         for (int i = 0; i < 100; ++i) {
             expected.addAll(Arrays.asList(testData));
@@ -912,13 +898,13 @@ public class TransactionSingleOpTest {
      *
      * @throws ConnectionException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      * @throws NotFoundException
      * @throws IOException
      */
     @Test
-    public void testReadLargeString1() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+    public void testReadLargeString1() throws ConnectionException,
+            UnknownException, AbortException, NotFoundException, IOException {
         testReadLargeString(1, "_testReadLargeString1");
     }
 
@@ -927,13 +913,13 @@ public class TransactionSingleOpTest {
      *
      * @throws ConnectionException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      * @throws NotFoundException
      * @throws IOException
      */
     @Test
-    public void testReadLargeString2() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+    public void testReadLargeString2() throws ConnectionException,
+            UnknownException, AbortException, NotFoundException, IOException {
         testReadLargeString(2, "_testReadLargeString2");
     }
 
@@ -943,13 +929,13 @@ public class TransactionSingleOpTest {
      *
      * @throws ConnectionException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      * @throws NotFoundException
      * @throws IOException
      */
     @Test
-    public void testReadLargeString3() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+    public void testReadLargeString3() throws ConnectionException,
+            UnknownException, AbortException, NotFoundException, IOException {
         testReadLargeString(3, "_testReadLargeString3");
     }
 
@@ -959,13 +945,13 @@ public class TransactionSingleOpTest {
      *
      * @throws ConnectionException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      * @throws NotFoundException
      * @throws IOException
      */
     @Test
-    public void testReadLargeString4() throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+    public void testReadLargeString4() throws ConnectionException,
+            UnknownException, AbortException, NotFoundException, IOException {
         testReadLargeString(4, "_testReadLargeString4");
     }
 
@@ -980,12 +966,13 @@ public class TransactionSingleOpTest {
      *
      * @throws ConnectionException
      * @throws UnknownException
-     * @throws TimeoutException
      * @throws AbortException
      * @throws NotFoundException
      * @throws IOException
      */
-    protected void testReadLargeString(final int compression, final String key) throws ConnectionException, UnknownException, TimeoutException, AbortException, NotFoundException, IOException {
+    protected void testReadLargeString(final int compression, final String key)
+            throws ConnectionException, UnknownException, AbortException,
+            NotFoundException, IOException {
         final StringBuilder sb = new StringBuilder(testData.length * 8 * 100);
         for (int i = 0; i < 100; ++i) {
             for (final String data : testData) {

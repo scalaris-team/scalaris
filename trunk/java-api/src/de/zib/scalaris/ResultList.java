@@ -74,8 +74,6 @@ public abstract class ResultList {
      *
      * @return the stored value
      *
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws UnknownException
@@ -84,7 +82,7 @@ public abstract class ResultList {
      * @since 3.13
      */
     public abstract ErlangValue processReadAt(final int pos)
-            throws TimeoutException, NotFoundException, UnknownException;
+            throws NotFoundException, UnknownException;
 
     /**
      * Processes the result at the given position which originated from
@@ -93,8 +91,6 @@ public abstract class ResultList {
      * @param pos
      *            the position in the result list (starting at 0)
      *
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if the commit of the write failed (if there was a commit)
      * @throws UnknownException
@@ -102,8 +98,8 @@ public abstract class ResultList {
      *
      * @since 3.13
      */
-    public abstract void processWriteAt(final int pos) throws TimeoutException,
-            AbortException, UnknownException;
+    public abstract void processWriteAt(final int pos) throws AbortException,
+            UnknownException;
 
     /**
      * Processes the result at the given position which originated from
@@ -112,8 +108,6 @@ public abstract class ResultList {
      * @param pos
      *            the position in the result list (starting at 0)
      *
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotAListException
      *             if the previously stored value was no list
      * @throws AbortException
@@ -124,8 +118,7 @@ public abstract class ResultList {
      * @since 3.13
      */
     public abstract void processAddDelOnListAt(final int pos)
-            throws TimeoutException, NotAListException, AbortException,
-            UnknownException;
+            throws NotAListException, AbortException, UnknownException;
 
     /**
      * Processes the result at the given position which originated from
@@ -134,8 +127,6 @@ public abstract class ResultList {
      * @param pos
      *            the position in the result list (starting at 0)
      *
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotANumberException
      *             if the previously stored value was not a number
      * @throws AbortException
@@ -146,8 +137,7 @@ public abstract class ResultList {
      * @since 3.13
      */
     public abstract void processAddOnNrAt(final int pos)
-            throws TimeoutException, NotANumberException, AbortException,
-            UnknownException;
+            throws NotANumberException, AbortException, UnknownException;
 
     /**
      * Processes the result at the given position which originated from
@@ -156,8 +146,6 @@ public abstract class ResultList {
      * @param pos
      *            the position in the result list (starting at 0)
      *
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch/write the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws KeyChangedException
@@ -170,8 +158,8 @@ public abstract class ResultList {
      * @since 3.13
      */
     public abstract void processTestAndSetAt(final int pos)
-            throws TimeoutException, NotFoundException, KeyChangedException,
-            AbortException, UnknownException;
+            throws NotFoundException, KeyChangedException, AbortException,
+            UnknownException;
 
     @Override
     public String toString() {

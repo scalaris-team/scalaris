@@ -19,7 +19,6 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
 
@@ -73,10 +72,6 @@ public class TransactionSingleOpWriteExample {
         } catch (final ConnectionException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed: " + e.getMessage());
-        } catch (final TimeoutException e) {
-            System.out.println("      write(" + otpKey.stringValue() + ", "
-                    + otpValue.stringValue() + ") failed with timeout: "
-                    + e.getMessage());
         } catch (final AbortException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed with abort: "
@@ -97,9 +92,6 @@ public class TransactionSingleOpWriteExample {
         } catch (final ConnectionException e) {
             System.out.println("      write(" + key + ", " + value
                     + ") failed: " + e.getMessage());
-        } catch (final TimeoutException e) {
-            System.out.println("      write(" + key + ", " + value
-                    + ") failed with timeout: " + e.getMessage());
         } catch (final AbortException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed with abort: "

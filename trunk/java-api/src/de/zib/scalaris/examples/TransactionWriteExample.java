@@ -21,7 +21,6 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
 
@@ -98,10 +97,6 @@ public class TransactionWriteExample {
                     System.out.println("      write(" + otpKey.stringValue()
                             + ", " + otpValue.stringValue() + ") failed: "
                             + e.getMessage());
-                } catch (final TimeoutException e) {
-                    System.out.println("      write(" + otpKey.stringValue()
-                            + ", " + otpValue.stringValue()
-                            + ") failed with timeout: " + e.getMessage());
                 } catch (final UnknownException e) {
                     System.out.println("      write(" + otpKey.stringValue()
                             + ", " + otpValue.stringValue()
@@ -120,9 +115,6 @@ public class TransactionWriteExample {
                 } catch (final ConnectionException e) {
                     System.out.println("      write(" + key + ", " + value
                             + ") failed: " + e.getMessage());
-                } catch (final TimeoutException e) {
-                    System.out.println("      write(" + key + ", " + value
-                            + ") failed with timeout: " + e.getMessage());
                 } catch (final UnknownException e) {
                     System.out.println("      write(" + key + ", " + value
                             + ") failed with unknown: " + e.getMessage());
@@ -133,9 +125,6 @@ public class TransactionWriteExample {
             transaction.commit();
             System.out.println("done");
         } catch (final ConnectionException e) {
-            System.out.println("failed: " + e.getMessage());
-            return;
-        } catch (final TimeoutException e) {
             System.out.println("failed: " + e.getMessage());
             return;
         } catch (final AbortException e) {

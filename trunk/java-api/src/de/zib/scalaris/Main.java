@@ -152,8 +152,6 @@ public class Main {
                 System.out.println("read(" + key + ") == " + value);
             } catch (final ConnectionException e) {
                 printException("read failed with connection error", e, verbose);
-            } catch (final TimeoutException e) {
-                printException("read failed with timeout", e, verbose);
             } catch (final NotFoundException e) {
                 printException("read failed with not found", e, verbose);
             } catch (final UnknownException e) {
@@ -170,8 +168,6 @@ public class Main {
                 System.out.println("write(" + key + ", " + value + "): ok");
             } catch (final ConnectionException e) {
                 printException("write failed with connection error", e, verbose);
-            } catch (final TimeoutException e) {
-                printException("write failed with timeout", e, verbose);
             } catch (final AbortException e) {
                 printException("write failed with abort", e, verbose);
             } catch (final UnknownException e) {
@@ -189,8 +185,6 @@ public class Main {
                 System.out.println("testAndSet(" + key + ", " + oldValue + ", " + newValue + "): ok");
             } catch (final ConnectionException e) {
                 printException("testAndSet failed with connection error", e, verbose);
-            } catch (final TimeoutException e) {
-                printException("testAndSet failed with timeout", e, verbose);
             } catch (final AbortException e) {
                 printException("testAndSet failed with abort", e, verbose);
             } catch (final UnknownException e) {
@@ -229,8 +223,6 @@ public class Main {
                 System.out.println("subscribe(" + topic + ", " + url + "): ok");
             } catch (final ConnectionException e) {
                 printException("subscribe failed with connection error", e, verbose);
-            } catch (final TimeoutException e) {
-                printException("subscribe failed with timeout", e, verbose);
             } catch (final AbortException e) {
                 printException("write failed with abort", e, verbose);
             } catch (final UnknownException e) {
@@ -247,8 +239,6 @@ public class Main {
                 System.out.println("unsubscribe(" + topic + ", " + url + "): ok");
             } catch (final ConnectionException e) {
                 printException("unsubscribe failed with connection error", e, verbose);
-            } catch (final TimeoutException e) {
-                printException("unsubscribe failed with timeout", e, verbose);
             } catch (final NotFoundException e) {
                 printException("unsubscribe failed with not found", e, verbose);
             } catch (final AbortException e) {

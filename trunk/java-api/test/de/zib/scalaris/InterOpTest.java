@@ -188,8 +188,6 @@ public class InterOpTest {
             }
         } catch (final ConnectionException e) {
             System.out.println("failed with connection error");
-        } catch (final TimeoutException e) {
-            System.out.println("failed with timeout");
         } catch (final AbortException e) {
             System.out.println("failed with abort");
         } catch (final NotFoundException e) {

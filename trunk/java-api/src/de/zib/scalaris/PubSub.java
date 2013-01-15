@@ -208,15 +208,13 @@ public class PubSub {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if the commit of the subscribe failed
      * @throws UnknownException
      *             if any other error occurs
      */
-    public void subscribe(final OtpErlangString topic, final OtpErlangString url) throws ConnectionException,
-            TimeoutException, AbortException, UnknownException {
+    public void subscribe(final OtpErlangString topic, final OtpErlangString url)
+            throws ConnectionException, AbortException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_pubsub", "subscribe",
                 new OtpErlangObject[] { topic, url });
         CommonErlangObjects.processResult_commit(received_raw, false);
@@ -235,15 +233,13 @@ public class PubSub {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if the commit of the subscribe failed
      * @throws UnknownException
      *             if any other error occurs
      */
-    public void subscribe(final String topic, final String url) throws ConnectionException,
-            TimeoutException, AbortException, UnknownException {
+    public void subscribe(final String topic, final String url)
+            throws ConnectionException, AbortException, UnknownException {
         subscribe(new OtpErlangString(topic), new OtpErlangString(url));
     }
 
@@ -263,8 +259,6 @@ public class PubSub {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotFoundException
      *             if the topic does not exist or the given subscriber is not
      *             subscribed to the given topic
@@ -273,9 +267,9 @@ public class PubSub {
      * @throws UnknownException
      *             if any other error occurs
      */
-    public void unsubscribe(final OtpErlangString topic, final OtpErlangString url)
-            throws ConnectionException, TimeoutException, NotFoundException,
-            AbortException, UnknownException {
+    public void unsubscribe(final OtpErlangString topic,
+            final OtpErlangString url) throws ConnectionException,
+            NotFoundException, AbortException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_pubsub", "unsubscribe",
                 new OtpErlangObject[] { topic, url });
         try {
@@ -315,8 +309,6 @@ public class PubSub {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws NotFoundException
      *             if the topic does not exist or the given subscriber is not
      *             subscribed to the given topic
@@ -326,8 +318,8 @@ public class PubSub {
      *             if any other error occurs
      */
     public void unsubscribe(final String topic, final String url)
-            throws ConnectionException, TimeoutException, NotFoundException,
-            AbortException, UnknownException {
+            throws ConnectionException, NotFoundException, AbortException,
+            UnknownException {
         unsubscribe(new OtpErlangString(topic), new OtpErlangString(url));
     }
 

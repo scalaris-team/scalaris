@@ -32,8 +32,6 @@
  *     String value = sc.read("key").stringValue();
  *   } catch (ConnectionException e) {
  *     System.err.println("read failed: " + e.getMessage());
- *   } catch (TimeoutException e) {
- *     System.err.println("read failed with timeout: " + e.getMessage());
  *   } catch (NotFoundException e) {
  *     System.err.println("read failed with not found: " + e.getMessage());
  *   } catch (ClassCastException e) {
@@ -66,8 +64,6 @@
  *     transaction.commit();
  *   } catch (ConnectionException e) {
  *     System.err.println("read failed: " + e.getMessage());
- *   } catch (TimeoutException e) {
- *     System.err.println("read failed with timeout: " + e.getMessage());
  *   } catch (NotFoundException e) {
  *     System.err.println("read failed with not found: " + e.getMessage());
  *   } catch (UnknownException e) {
@@ -95,8 +91,6 @@
  *     PubSub value = sc.subscribe("topic", "http://localhost:8000");
  *   } catch (ConnectionException e) {
  *     System.err.println("read failed: " + e.getMessage());
- *   } catch (TimeoutException e) {
- *     System.err.println("read failed with timeout: " + e.getMessage());
  *   } catch (AbortException e) {
  *     System.err.println("read failed with timeout: " + e.getMessage());
  *   } catch (UnknownException e) {

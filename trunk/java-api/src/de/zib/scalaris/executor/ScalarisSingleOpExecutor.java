@@ -18,7 +18,6 @@ package de.zib.scalaris.executor;
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.RequestList;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.TransactionSingleOp.ResultList;
 import de.zib.scalaris.UnknownException;
@@ -49,8 +48,7 @@ public class ScalarisSingleOpExecutor extends ScalarisOpExecutor {
 
     @Override
     protected ResultList executeRequests(final RequestList requests)
-            throws ConnectionException, TimeoutException, AbortException,
-            UnknownException {
+            throws ConnectionException, AbortException, UnknownException {
         return scalaris_single.req_list((TransactionSingleOp.RequestList) requests);
     }
 

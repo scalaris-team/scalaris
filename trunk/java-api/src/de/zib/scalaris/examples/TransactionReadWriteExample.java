@@ -21,7 +21,6 @@ import com.ericsson.otp.erlang.OtpErlangString;
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.UnknownException;
 
@@ -193,11 +192,7 @@ public class TransactionReadWriteExample {
                 System.out.print("    Committing transaction... ");
                 transaction.commit();
                 System.out.println("done");
-            } catch (final TimeoutException e) {
-                // read/write operation
-                transaction.abort();
-                System.out.println("    Transaction aborted due to timeout: "
-                        + e.getMessage());
+
             } catch (final NotFoundException e) {
                 // read/write operation
                 transaction.abort();
@@ -317,11 +312,6 @@ public class TransactionReadWriteExample {
                 transaction.commit();
                 System.out.println("done");
 
-            } catch (final TimeoutException e) {
-                // read/write operation
-                transaction.abort();
-                System.out.println("    Transaction aborted due to timeout: "
-                        + e.getMessage());
             } catch (final NotFoundException e) {
                 // read/write operation
                 transaction.abort();
@@ -358,13 +348,11 @@ public class TransactionReadWriteExample {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws UnknownException
      *             if any other error occurs
      */
-    private static void otpWrite(final Transaction transaction, final String key,
-            final String value) throws ConnectionException, TimeoutException,
+    private static void otpWrite(final Transaction transaction,
+            final String key, final String value) throws ConnectionException,
             UnknownException {
         System.out.println("    `write(OtpErlangString, OtpErlangString)`...");
         final OtpErlangString otpKey = new OtpErlangString(key);
@@ -377,11 +365,6 @@ public class TransactionReadWriteExample {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed: " + e.getMessage());
             throw new ConnectionException(e);
-        } catch (final TimeoutException e) {
-            System.out.println("      write(" + otpKey.stringValue() + ", "
-                    + otpValue.stringValue() + ") failed with timeout: "
-                    + e.getMessage());
-            throw new TimeoutException(e);
         } catch (final UnknownException e) {
             System.out.println("      write(" + otpKey.stringValue() + ", "
                     + otpValue.stringValue() + ") failed with unknown: "
@@ -405,13 +388,11 @@ public class TransactionReadWriteExample {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws UnknownException
      *             if any other error occurs
      */
-    private static void write(final Transaction transaction, final String key, final String value)
-            throws ConnectionException, TimeoutException, UnknownException {
+    private static void write(final Transaction transaction, final String key,
+            final String value) throws ConnectionException, UnknownException {
         System.out.println("    `write(String, String)`...");
         try {
             transaction.write(key, value);
@@ -421,10 +402,6 @@ public class TransactionReadWriteExample {
             System.out.println("      write(" + key + ", " + value
                     + ") failed: " + e.getMessage());
             throw new ConnectionException(e);
-        } catch (final TimeoutException e) {
-            System.out.println("      write(" + key + ", " + value
-                    + ") failed with timeout: " + e.getMessage());
-            throw new TimeoutException(e);
         } catch (final UnknownException e) {
             System.out.println("      write(" + key + ", " + value
                     + ") failed with unknown: " + e.getMessage());
@@ -446,15 +423,13 @@ public class TransactionReadWriteExample {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws UnknownException
      *             if any other error occurs
      */
-    private static String otpRead(final Transaction transaction, final String key)
-            throws ConnectionException, TimeoutException, UnknownException,
+    private static String otpRead(final Transaction transaction,
+            final String key) throws ConnectionException, UnknownException,
             NotFoundException {
         System.out.println("    `OtpErlangString read(OtpErlangString)`...");
         final OtpErlangString otpKey = new OtpErlangString(key);
@@ -468,10 +443,6 @@ public class TransactionReadWriteExample {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed: " + e.getMessage());
             throw new ConnectionException(e);
-        } catch (final TimeoutException e) {
-            System.out.println("      read(" + otpKey.stringValue()
-                    + ") failed with timeout: " + e.getMessage());
-            throw new TimeoutException(e);
         } catch (final UnknownException e) {
             System.out.println("      read(" + otpKey.stringValue()
                     + ") failed with unknown: " + e.getMessage());
@@ -501,16 +472,13 @@ public class TransactionReadWriteExample {
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws UnknownException
      *             if any other error occurs
      */
     private static String read(final Transaction transaction, final String key)
-            throws ConnectionException, TimeoutException, UnknownException,
-            NotFoundException {
+            throws ConnectionException, UnknownException, NotFoundException {
         System.out.println("    `String read(String)`...");
         String value;
         try {
@@ -521,10 +489,6 @@ public class TransactionReadWriteExample {
             System.out.println("      read(" + key + ") failed: "
                     + e.getMessage());
             throw new ConnectionException(e);
-        } catch (final TimeoutException e) {
-            System.out.println("      read(" + key + ") failed with timeout: "
-                    + e.getMessage());
-            throw new TimeoutException(e);
         } catch (final UnknownException e) {
             System.out.println("      read(" + key + ") failed with unknown: "
                     + e.getMessage());

@@ -239,16 +239,14 @@ public class TransactionSingleOp extends
          *
          * @return the stored value
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to fetch the value
          * @throws NotFoundException
          *             if the requested key does not exist
          * @throws UnknownException
          *             if any other error occurs
          */
         @Override
-        public ErlangValue processReadAt(final int pos) throws TimeoutException,
-                NotFoundException, UnknownException {
+        public ErlangValue processReadAt(final int pos)
+                throws NotFoundException, UnknownException {
             return new ErlangValue(
                     ReadOp.processResult_read(results.elementAt(pos), compressed));
         }
@@ -260,16 +258,14 @@ public class TransactionSingleOp extends
          * @param pos
          *            the position in the result list (starting at 0)
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
          * @throws AbortException
          *             if the commit of the write failed
          * @throws UnknownException
          *             if any other error occurs
          */
         @Override
-        public void processWriteAt(final int pos) throws TimeoutException,
-                AbortException, UnknownException {
+        public void processWriteAt(final int pos) throws AbortException,
+                UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
             WriteOp.processResult_write(results.elementAt(pos), compressed);
         }
@@ -281,8 +277,6 @@ public class TransactionSingleOp extends
          * @param pos
          *            the position in the result list (starting at 0)
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
          * @throws NotAListException
          *             if the previously stored value was no list
          * @throws AbortException
@@ -293,8 +287,8 @@ public class TransactionSingleOp extends
          * @since 3.9
          */
         @Override
-        public void processAddDelOnListAt(final int pos) throws TimeoutException,
-                NotAListException, AbortException, UnknownException {
+        public void processAddDelOnListAt(final int pos)
+                throws NotAListException, AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
             AddDelOnListOp.processResult_addDelOnList(results.elementAt(pos), compressed);
         }
@@ -306,8 +300,6 @@ public class TransactionSingleOp extends
          * @param pos
          *            the position in the result list (starting at 0)
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to write the value
          * @throws NotANumberException
          *             if the previously stored value was not a number
          * @throws AbortException
@@ -318,8 +310,8 @@ public class TransactionSingleOp extends
          * @since 3.9
          */
         @Override
-        public void processAddOnNrAt(final int pos) throws TimeoutException,
-                NotANumberException, AbortException, UnknownException {
+        public void processAddOnNrAt(final int pos) throws NotANumberException,
+                AbortException, UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
             AddOnNrOp.processResult_addOnNr(results.elementAt(pos), compressed);
         }
@@ -331,8 +323,6 @@ public class TransactionSingleOp extends
          * @param pos
          *            the position in the result list (starting at 0)
          *
-         * @throws TimeoutException
-         *             if a timeout occurred while trying to fetch/write the value
          * @throws NotFoundException
          *             if the requested key does not exist
          * @throws KeyChangedException
@@ -345,8 +335,8 @@ public class TransactionSingleOp extends
          * @since 3.8
          */
         @Override
-        public void processTestAndSetAt(final int pos) throws TimeoutException,
-                NotFoundException, KeyChangedException, AbortException,
+        public void processTestAndSetAt(final int pos)
+                throws NotFoundException, KeyChangedException, AbortException,
                 UnknownException {
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
             TestAndSetOp.processResult_testAndSet(results.elementAt(pos), compressed);
@@ -365,8 +355,6 @@ public class TransactionSingleOp extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to write the value
      * @throws AbortException
      *             if a commit failed (if there was one)
      * @throws UnknownException
@@ -376,8 +364,8 @@ public class TransactionSingleOp extends
      *
      * @since 3.18
      */
-    public ResultList req_list(final TransactionSingleOpOperation op) throws ConnectionException,
-            TimeoutException, AbortException, UnknownException {
+    public ResultList req_list(final TransactionSingleOpOperation op)
+            throws ConnectionException, AbortException, UnknownException {
         return super.req_list(op);
     }
 
