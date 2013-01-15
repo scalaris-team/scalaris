@@ -20,6 +20,8 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
+import de.zib.scalaris.operations.CommitOp;
+
 /**
  * Provides methods to subscribe to topics and publish data.
  *
@@ -217,7 +219,7 @@ public class PubSub {
             throws ConnectionException, AbortException, UnknownException {
         final OtpErlangObject received_raw = connection.doRPC("api_pubsub", "subscribe",
                 new OtpErlangObject[] { topic, url });
-        CommonErlangObjects.processResult_commit(received_raw, false);
+        CommitOp.processResult_commit(received_raw, false);
     }
 
     /**

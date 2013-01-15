@@ -28,6 +28,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 
 import de.zib.scalaris.operations.AddDelOnListOp;
 import de.zib.scalaris.operations.AddOnNrOp;
+import de.zib.scalaris.operations.CommitOp;
 import de.zib.scalaris.operations.Operation;
 import de.zib.scalaris.operations.ReadOp;
 import de.zib.scalaris.operations.TestAndSetOp;
@@ -347,7 +348,7 @@ public class Transaction extends
          */
         public void processCommitAt(final int pos) throws AbortException,
                 UnknownException {
-            CommonErlangObjects.processResult_commit(results.elementAt(pos), compressed);
+            CommitOp.processResult_commit(results.elementAt(pos), compressed);
         }
     }
 
