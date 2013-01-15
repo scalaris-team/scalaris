@@ -90,11 +90,11 @@
  *     PubSub sc = new PubSub();
  *     PubSub value = sc.subscribe("topic", "http://localhost:8000");
  *   } catch (ConnectionException e) {
- *     System.err.println("read failed: " + e.getMessage());
+ *     System.err.println("subscribe failed: " + e.getMessage());
  *   } catch (AbortException e) {
- *     System.err.println("read failed with timeout: " + e.getMessage());
+ *     System.err.println("subscribe failed with timeout: " + e.getMessage());
  *   } catch (UnknownException e) {
- *     System.err.println("read failed with unknown: " + e.getMessage());
+ *     System.err.println("subscribe failed with unknown: " + e.getMessage());
  *   }
  * </code>
  * </pre>
@@ -119,13 +119,13 @@
  *     long deleted = sc.delete("key");
  *     DeleteResult delRes = sc.getLastDeleteResult();
  *   } catch (ConnectionException e) {
- *     System.err.println("read failed: " + e.getMessage());
+ *     System.err.println("delete failed: " + e.getMessage());
  *   } catch (TimeoutException e) {
- *     System.err.println("read failed with timeout: " + e.getMessage());
+ *     System.err.println("delete failed with timeout: " + e.getMessage());
  *   } catch (NodeNotFoundException e) {
- *     System.err.println("read failed with node not found: " + e.getMessage());
+ *     System.err.println("delete failed with node not found: " + e.getMessage());
  *   } catch (UnknownException e) {
- *     System.err.println("read failed with unknown: " + e.getMessage());
+ *     System.err.println("delete failed with unknown: " + e.getMessage());
  *   }
  * </code>
  * </pre>
