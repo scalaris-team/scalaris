@@ -34,9 +34,14 @@ all()   -> [
             test_renew_with_concurrent_aux_change_invalid_merge_stopped,
             test_renew_with_concurrent_aux_change_valid_merge,
             test_split,
-            test_split_with_concurrent_renew
+            test_split_with_concurrent_renew,
+            test_split_but_lease_already_exists
+            %test_split_with_owner_change_in_step1,
+            %test_split_with_owner_change_in_step2,
+            %test_split_with_owner_change_in_step3,
+            %test_split_with_aux_change_in_step1
            ].
-suite() -> [ {timetrap, {seconds, 400}} ].
+suite() -> [ {timetrap, {seconds, 4}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -204,6 +209,46 @@ test_split_with_concurrent_renew(_Config) ->
                                   WaitLeftLeaseF, WaitRightLeaseF),
     true.
 
+test_split_but_lease_already_exists(_Config) ->
+    ContentCheck =
+        fun (Current, _WriteFilter, _Next) ->
+                case Current == prbr_bottom of
+                    true ->
+                        {true, null};
+                    false ->
+                        {false, lease_already_exists}
+                end
+        end,
+    CreateLeaseF =
+        fun(RightId, _Lease) ->
+                New = l_on_cseq:set_version(
+                        l_on_cseq:set_epoch(
+                          l_on_cseq:create_lease(RightId),
+                          47),
+                        11),
+                DB = l_on_cseq:get_db_for_id(RightId),
+                rbrcseq:qwrite(DB, self(), RightId,
+                               ContentCheck,
+                               New),
+                receive
+                    {qwrite_done, _ReqId, _Round, _} -> ok
+                end
+        end,
+    WaitLeftLeaseF = fun (Id, Lease) ->
+                             OldEpoch = l_on_cseq:get_epoch(Lease),
+                             OldVersion = l_on_cseq:get_version(Lease),
+                             wait_for_lease_version(Id, OldEpoch, OldVersion)
+                     end,
+    WaitRightLeaseF = fun (Id) ->
+                             wait_for_lease_version(Id, 47, 11)
+                      end,
+    test_split_helper_for_1_step(_Config,
+                                 CreateLeaseF,
+                                 WaitLeftLeaseF, WaitRightLeaseF),
+    true.
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % split helper
@@ -214,7 +259,7 @@ test_split_helper_for_4_steps(_Config,
                               ModifyBeforeStep3, ModifyBeforeStep4,
                               WaitLeftLease, WaitRightLease) ->
     % intercept lease renew
-    %{l_on_cseq, renew, Old} = intercept_lease_renew(),
+    {l_on_cseq, renew, _Old} = intercept_lease_renew(),
     %Id = l_on_cseq:get_id(Old),
     % prepeare split
     DHTNode = pid_groups:find_a(dht_node),
@@ -254,6 +299,56 @@ test_split_helper_for_4_steps(_Config,
     split_helper_do_step(split_reply_step2, ModifyBeforeStep3, RightId),
     % step4
     split_helper_do_step(split_reply_step3, ModifyBeforeStep4, LeftId),
+    % wait for result
+    ct:pal("wait left"),
+    WaitLeftLease(LeftId, L),
+    ct:pal("wait right"),
+    WaitRightLease(RightId).
+
+test_split_helper_for_1_step(_Config,
+                             ModifyBeforeStep1,
+                             WaitLeftLease, WaitRightLease) ->
+    % intercept lease renew
+    {l_on_cseq, renew, _Old} = intercept_lease_renew(),
+    %Id = l_on_cseq:get_id(Old),
+    % prepeare split
+    DHTNode = pid_groups:find_a(dht_node),
+    pid_groups:join(pid_groups:group_with(dht_node)),
+    comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
+    L = receive
+                 {get_state_response, List} ->
+                     hd(List)
+             end,
+    Range = l_on_cseq:get_range(L),
+    [R1, R2] = intervals:split(Range, 2),
+    LeftId = id(R1),
+    RightId = id(R2),
+    %ct:pal("~p", [[R1, R2]]),
+    %ct:pal("~p", [[LeftId, RightId, Id]]),
+    intercept_split_request(),                                   % install intercepts
+    intercept_split_reply(split_reply_step1),                    %
+    intercept_split_reply(split_reply_step2),                    %
+    intercept_split_reply(split_reply_step3),                    %
+
+    %ct:pal("start with step1"),
+    %
+    % step1
+    %
+    l_on_cseq:lease_split(L, R1, R2),                            % trigger step
+    StartMsg = receive                                           % intercept msg
+                   M = {l_on_cseq, split, _, _, _} ->
+                       M
+               end,
+    {l_on_cseq, split, Lease, _R1, _R2} = StartMsg,
+    ModifyBeforeStep1(RightId, Lease),                           % modify world
+    gen_component:bp_del(DHTNode, block_split_request),
+    comm:send_local(DHTNode, StartMsg),                          % release msg
+    ReplyMsg = receive
+                   M2 = {l_on_cseq, split_reply_step1, Lease, _R1, _R2, _Resp} ->
+                       M2
+               end,
+    gen_component:bp_del(DHTNode, split_reply_step1),
+    watch_message(DHTNode, ReplyMsg),                            % release msg
     % wait for result
     ct:pal("wait left"),
     WaitLeftLease(LeftId, L),
@@ -343,11 +438,13 @@ wait_for_simple_update(Id, Old, _New) ->
     OldEpoch   = l_on_cseq:get_epoch(Old),
     wait_for_lease_version(Id, OldEpoch, OldVersion+2).
 
-wait_for_delete(_Id, _Old, _New) ->
+wait_for_delete(Id, _Old, _New) ->
     DHTNode = pid_groups:find_a(dht_node),
     wait_for(fun () ->
                      L = get_dht_node_state(DHTNode, lease_list),
-                     L == []
+                     lists:all(fun(Lease) ->
+                                       l_on_cseq:get_id(Lease) =/= Id
+                               end, L)
              end).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -355,6 +452,16 @@ wait_for_delete(_Id, _Old, _New) ->
 % intercepting and blocking
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+watch_message(Pid, Message) ->
+    gen_component:bp_set_cond(Pid, block_message(self(), Message), watch_message),
+    comm:send_local(Pid, Message),
+    receive
+        {saw_message} ->
+            gen_component:bp_step(Pid),
+            gen_component:bp_del(Pid, watch_message),
+            gen_component:bp_cont(Pid)
+    end.
 
 intercept_split_request() ->
     DHTNode = pid_groups:find_a(dht_node),
@@ -378,6 +485,17 @@ intercept_lease_renew() ->
     gen_component:bp_set_cond(DHTNode, block_trigger(self()), block_trigger),
     gen_component:bp_del(DHTNode, block_renew),
     Msg.
+
+block_message(Pid, WatchedMessage) ->
+    fun (Message, _State) ->
+            case Message of
+                WatchedMessage ->
+                    comm:send_local(Pid, {saw_message}),
+                    true;
+                _ ->
+                    false
+            end
+    end.
 
 block_split_request(Pid) ->
     fun (Message, _State) ->
