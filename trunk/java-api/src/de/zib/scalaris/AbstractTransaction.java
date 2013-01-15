@@ -165,9 +165,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
     public ErlangValue read(final OtpErlangString key)
             throws ConnectionException, NotFoundException, UnknownException {
         try {
-            final ReqL requests = newReqList();
-            requests.addOp(new ReadOp(key));
-            final ResL result = req_list(requests);
+            final ResL result = req_list(new ReadOp(key));
             if (result.size() == 1) {
                 return result.processReadAt(0);
             }
@@ -224,9 +222,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      */
     public void write(final OtpErlangString key, final OtpErlangObject value)
             throws ConnectionException, AbortException, UnknownException {
-        final ReqL requests = newReqList();
-        requests.addOp(new WriteOp(key, value));
-        final ResL result = req_list(requests);
+        final ResL result = req_list(new WriteOp(key, value));
         if (result.size() == 1) {
             result.processWriteAt(0);
         } else {
@@ -290,9 +286,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
             final OtpErlangList toAdd, final OtpErlangList toRemove)
             throws ConnectionException, NotAListException, AbortException,
             UnknownException {
-        final ReqL reqs = newReqList();
-        reqs.addOp(new AddDelOnListOp(key, toAdd, toRemove));
-        final ResL result = req_list(reqs);
+        final ResL result = req_list(new AddDelOnListOp(key, toAdd, toRemove));
         if (result.size() == 1) {
             result.processAddDelOnListAt(0);
         } else {
@@ -427,9 +421,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      */
     protected void addOnNr_(final AddOnNrOp op) throws ConnectionException,
             NotANumberException, AbortException, UnknownException {
-        final ReqL reqs = newReqList();
-        reqs.addOp(op);
-        final ResL result = req_list(reqs);
+        final ResL result = req_list(op);
         if (result.size() == 1) {
             result.processAddOnNrAt(0);
         } else {
@@ -505,9 +497,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
             final OtpErlangObject oldValue, final OtpErlangObject newValue)
             throws ConnectionException, NotFoundException, KeyChangedException,
             AbortException, UnknownException {
-        final ReqL reqs = newReqList();
-        reqs.addOp(new TestAndSetOp(key, oldValue, newValue));
-        final ResL result = req_list(reqs);
+        final ResL result = req_list(new TestAndSetOp(key, oldValue, newValue));
         if (result.size() == 1) {
             result.processTestAndSetAt(0);
         } else {
