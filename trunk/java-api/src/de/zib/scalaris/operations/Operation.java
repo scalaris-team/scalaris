@@ -18,11 +18,18 @@ package de.zib.scalaris.operations;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 
+import de.zib.scalaris.AbortException;
+import de.zib.scalaris.KeyChangedException;
+import de.zib.scalaris.NotAListException;
+import de.zib.scalaris.NotANumberException;
+import de.zib.scalaris.NotFoundException;
+import de.zib.scalaris.UnknownException;
+
 /**
  * Generic interface for operations which can be added to a request list.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.14
+ * @version 3.18
  * @since 3.14
  */
 public interface Operation {
@@ -42,4 +49,44 @@ public interface Operation {
       * @return the key or <tt>null</tt>
       */
     abstract public OtpErlangString getKey();
+
+    /**
+     * Sets the raw erlang result value. It can be processed using
+     * {@link #processResult()}.
+     *
+     * @param resultRaw
+     *            the result
+     * @param compressed
+     *            whether the value inside the result is compressed or not
+     *
+     * @since 3.18
+     */
+    public abstract void setResult(final OtpErlangObject resultRaw,
+            final boolean compressed);
+
+    /**
+     * Processes the result set by {@link #setResult(OtpErlangObject, boolean)}.
+     *
+     * Note: the created value is not cached!
+     *
+     * @return a (potentially) read value (may be <tt>null</tt>)
+     *
+     * @throws NotFoundException
+     *             if the requested key does not exist
+     * @throws KeyChangedException
+     *             if the key did not match <tt>old_value</tt>
+     * @throws NotANumberException
+     *             if the previously stored value was not a number
+     * @throws NotAListException
+     *             if the previously stored value was no list
+     * @throws AbortException
+     *             if a commit failed
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @since 3.18
+     */
+    public abstract Object processResult() throws NotFoundException,
+            KeyChangedException, NotANumberException, NotAListException,
+            AbortException, UnknownException;
 }

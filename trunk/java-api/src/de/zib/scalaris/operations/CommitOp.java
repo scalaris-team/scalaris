@@ -32,6 +32,16 @@ public class CommitOp implements TransactionOperation {
         return null;
     }
 
+    public void setResult(final OtpErlangObject resultRaw, final boolean compressed) {
+        this.resultRaw = resultRaw;
+        this.resultCompressed = compressed;
+    }
+
+    public Object processResult() throws AbortException, UnknownException {
+        processResult_commit(resultRaw, resultCompressed);
+        return null;
+    }
+
     @Override
     public String toString() {
         return "commit()";

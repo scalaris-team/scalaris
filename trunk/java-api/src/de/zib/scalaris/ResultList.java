@@ -15,7 +15,14 @@
  */
 package de.zib.scalaris;
 
+import java.util.List;
+
 import com.ericsson.otp.erlang.OtpErlangList;
+import com.ericsson.otp.erlang.OtpErlangObject;
+
+import de.zib.scalaris.RequestList;
+import de.zib.scalaris.operations.Operation;
+import de.zib.scalaris.operations.ReadOp;
 
 /**
  * Generic result list.
@@ -25,12 +32,7 @@ import com.ericsson.otp.erlang.OtpErlangList;
  * @since 3.5
  */
 public abstract class ResultList {
-    protected OtpErlangList results = new OtpErlangList();
-
-    /**
-     * Whether to compress the transfer of values.
-     */
-    protected final boolean compressed;
+    final protected List<Operation> operations;
 
     /**
      * Default constructor.
@@ -40,10 +42,24 @@ public abstract class ResultList {
      * @param compressed
      *            whether the value part in the term is encoded, i.e. compressed
      *            into an Erlang binary, or not
+     * @param requests
+     *            request list which created this result list
+     *
+     * @throws UnknownException
+     *             if the result list size does not match the request list size
      */
-    protected ResultList(final OtpErlangList results, final boolean compressed) {
-        this.results = results;
-        this.compressed = compressed;
+    protected ResultList(final OtpErlangList results, final boolean compressed,
+            final RequestList requests) throws UnknownException {
+        if (results.arity() != requests.size()) {
+            throw new UnknownException("Result list size different from request list size!");
+        }
+        this.operations = requests.getRequests();
+
+        // assign the results to their appropriate operations
+        for (int i = 0; i < results.arity(); ++i) {
+            final OtpErlangObject result = results.elementAt(i);
+            this.operations.get(i).setResult(result, compressed);
+        }
     }
 
     /**
@@ -52,17 +68,26 @@ public abstract class ResultList {
      * @return total number of results
      */
     public int size() {
-        return results.arity();
+        return operations.size();
     }
 
     /**
-     * Gets the raw results.
-     * (for internal use only)
+     * Returns the operation at the specified position for e.g. further result
+     * processing.
      *
-     * @return results as returned by erlang
+     * @param index
+     *            index of the operation/result to return
+     *
+     * @return the operation at the specified position
+     *
+     * @throws IndexOutOfBoundsException
+     *             if the index is out of range (
+     *             <tt>index &lt; 0 || index &gt;= size()</tt>)
+     *
+     * @since 3.18
      */
-    OtpErlangList getResults() {
-        return results;
+    public Operation get(final int index) {
+        return operations.get(index);
     }
 
     /**
@@ -81,8 +106,10 @@ public abstract class ResultList {
      *
      * @since 3.13
      */
-    public abstract ErlangValue processReadAt(final int pos)
-            throws NotFoundException, UnknownException;
+    public ErlangValue processReadAt(final int pos) throws NotFoundException,
+            UnknownException {
+        return ((ReadOp) get(pos)).processResult();
+    }
 
     /**
      * Processes the result at the given position which originated from
@@ -161,8 +188,9 @@ public abstract class ResultList {
             throws NotFoundException, KeyChangedException, AbortException,
             UnknownException;
 
-    @Override
-    public String toString() {
-        return results.toString();
-    }
+    // TODO
+//    @Override
+//    public String toString() {
+//        return results.toString();
+//    }
 }
