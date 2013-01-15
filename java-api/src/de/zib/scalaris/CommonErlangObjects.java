@@ -188,7 +188,7 @@ public final class CommonErlangObjects {
      *
      * @since 3.12
      */
-    static final void checkResult_failAbort(final OtpErlangTuple received,
+    public static final void checkResult_failAbort(final OtpErlangTuple received,
             final boolean compressed) throws AbortException, UnknownException {
         try {
             if (received.elementAt(0).equals(CommonErlangObjects.failAtom)
@@ -201,44 +201,6 @@ public final class CommonErlangObjects {
         } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received);
-        }
-    }
-
-    /**
-     * Processes the <tt>received_raw</tt> term from erlang interpreting it as
-     * a result from a commit operation.
-     *
-     * NOTE: this method should not be called manually by an application and may
-     * change without prior notice!
-     *
-     * @param received_raw
-     *             the object to process
-     * @param compressed
-     *            whether the transfer of values is compressed or not
-     *
-     * @throws AbortException
-     *             if the commit of the commit failed
-     * @throws UnknownException
-     *             if any other error occurs
-     */
-    static final void processResult_commit(final OtpErlangObject received_raw,
-            final boolean compressed) throws AbortException,
-            UnknownException {
-        /*
-         * possible return values:
-         *  {ok} | {fail, abort, KeyList}
-         */
-        try {
-            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
-            if (received.equals(CommonErlangObjects.okTupleAtom)) {
-                return;
-            } else {
-                checkResult_failAbort(received, compressed);
-            }
-            throw new UnknownException(received_raw);
-        } catch (final ClassCastException e) {
-            // e.printStackTrace();
-            throw new UnknownException(e, received_raw);
         }
     }
 }

@@ -27,10 +27,10 @@ import com.ericsson.otp.erlang.OtpErlangString;
 
 import de.zib.scalaris.operations.AddDelOnListOp;
 import de.zib.scalaris.operations.AddOnNrOp;
+import de.zib.scalaris.operations.CommitOp;
 import de.zib.scalaris.operations.Operation;
 import de.zib.scalaris.operations.ReadOp;
 import de.zib.scalaris.operations.TestAndSetOp;
-import de.zib.scalaris.operations.TransactionOperation;
 import de.zib.scalaris.operations.WriteOp;
 
 /**
@@ -43,18 +43,6 @@ import de.zib.scalaris.operations.WriteOp;
 public abstract class RequestList {
     protected final List<Operation> requests = new ArrayList<Operation>(5);
     private boolean isCommit = false;
-
-    protected static class CommitOp implements TransactionOperation {
-        public CommitOp() {
-        }
-
-        public OtpErlangObject getErlang(final boolean compressed) {
-            return CommonErlangObjects.commitTupleAtom;
-        }
-        public OtpErlangString getKey() {
-            return null;
-        }
-    }
 
     /**
      * Default constructor.
