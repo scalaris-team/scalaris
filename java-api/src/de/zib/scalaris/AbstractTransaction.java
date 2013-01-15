@@ -101,7 +101,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      *
      * @since 3.18
      */
-    public ResL req_list(final Operation op) throws ConnectionException,
+    protected ResL req_list(final Operation op) throws ConnectionException,
             TimeoutException, AbortException, UnknownException {
         final ReqL reqList = newReqList();
         reqList.addOp(op);
