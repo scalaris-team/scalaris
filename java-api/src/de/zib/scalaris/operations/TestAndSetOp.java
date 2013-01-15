@@ -92,7 +92,7 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
      * result from a test_and_set operation.
      *
      * NOTE: this method should not be called manually by an application and may
-     * change without notice!
+     * change without prior notice!
      *
      * @param received_raw
      *            the object to process

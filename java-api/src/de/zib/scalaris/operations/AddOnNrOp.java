@@ -109,7 +109,7 @@ public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOpera
      * result from an add_on_nr operation.
      *
      * NOTE: this method should not be called manually by an application and may
-     * change without notice!
+     * change without prior notice!
      *
      * @param received_raw
      *            the object to process

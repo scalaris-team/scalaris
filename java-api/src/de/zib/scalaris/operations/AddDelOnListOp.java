@@ -90,7 +90,7 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
      * result from a add_del_on_list operation.
      *
      * NOTE: this method should not be called manually by an application and may
-     * change without notice!
+     * change without prior notice!
      *
      * @param received_raw
      *            the object to process
