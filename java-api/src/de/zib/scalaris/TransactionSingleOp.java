@@ -22,7 +22,6 @@ import com.ericsson.otp.erlang.OtpErlangString;
 import de.zib.scalaris.operations.AddDelOnListOp;
 import de.zib.scalaris.operations.AddOnNrOp;
 import de.zib.scalaris.operations.Operation;
-import de.zib.scalaris.operations.ReadOp;
 import de.zib.scalaris.operations.TestAndSetOp;
 import de.zib.scalaris.operations.TransactionSingleOpOperation;
 import de.zib.scalaris.operations.WriteOp;
@@ -225,30 +224,12 @@ public class TransactionSingleOp extends
          * @param compressed
          *            whether the value part in the term is encoded, i.e.
          *            compressed into an Erlang binary, or not
+         * @param requests
+         *            request list which created this result list
          */
-        ResultList(final OtpErlangList results, final boolean compressed) {
-            super(results, compressed);
-        }
-
-        /**
-         * Processes the result at the given position which originated from a read
-         * request and returns the value that has been read.
-         *
-         * @param pos
-         *            the position in the result list (starting at 0)
-         *
-         * @return the stored value
-         *
-         * @throws NotFoundException
-         *             if the requested key does not exist
-         * @throws UnknownException
-         *             if any other error occurs
-         */
-        @Override
-        public ErlangValue processReadAt(final int pos)
-                throws NotFoundException, UnknownException {
-            return new ErlangValue(
-                    ReadOp.processResult_read(results.elementAt(pos), compressed));
+        ResultList(final OtpErlangList results, final boolean compressed,
+                final RequestList requests) {
+            super(results, compressed, requests);
         }
 
         /**
@@ -266,8 +247,7 @@ public class TransactionSingleOp extends
         @Override
         public void processWriteAt(final int pos) throws AbortException,
                 UnknownException {
-            CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
-            WriteOp.processResult_write(results.elementAt(pos), compressed);
+            ((WriteOp) get(pos)).processResultSingle();
         }
 
         /**
@@ -289,8 +269,7 @@ public class TransactionSingleOp extends
         @Override
         public void processAddDelOnListAt(final int pos)
                 throws NotAListException, AbortException, UnknownException {
-            CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
-            AddDelOnListOp.processResult_addDelOnList(results.elementAt(pos), compressed);
+            ((AddDelOnListOp) get(pos)).processResultSingle();
         }
 
         /**
@@ -312,8 +291,7 @@ public class TransactionSingleOp extends
         @Override
         public void processAddOnNrAt(final int pos) throws NotANumberException,
                 AbortException, UnknownException {
-            CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
-            AddOnNrOp.processResult_addOnNr(results.elementAt(pos), compressed);
+            ((AddOnNrOp) get(pos)).processResultSingle();
         }
 
         /**
@@ -338,8 +316,7 @@ public class TransactionSingleOp extends
         public void processTestAndSetAt(final int pos)
                 throws NotFoundException, KeyChangedException, AbortException,
                 UnknownException {
-            CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
-            TestAndSetOp.processResult_testAndSet(results.elementAt(pos), compressed);
+            ((TestAndSetOp) get(pos)).processResultSingle();
         }
     }
 
@@ -393,7 +370,7 @@ public class TransactionSingleOp extends
     public ResultList req_list(final RequestList req)
             throws ConnectionException, UnknownException {
         if (req.isEmpty()) {
-            return new ResultList(new OtpErlangList(), compressed);
+            return new ResultList(new OtpErlangList(), compressed, req);
         }
         final OtpErlangObject received_raw = connection.doRPC(module(), "req_list_commit_each",
                     new OtpErlangObject[] { req.getErlangReqList(compressed) });
@@ -402,7 +379,7 @@ public class TransactionSingleOp extends
              * possible return values:
              *  [api_tx:result()]
              */
-            return new ResultList((OtpErlangList) received_raw, compressed);
+            return new ResultList((OtpErlangList) received_raw, compressed, req);
         } catch (final ClassCastException e) {
             // e.printStackTrace();
             throw new UnknownException(e, received_raw);

@@ -166,10 +166,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
             throws ConnectionException, NotFoundException, UnknownException {
         try {
             final ResL result = req_list(new ReadOp(key));
-            if (result.size() == 1) {
-                return result.processReadAt(0);
-            }
-            throw new UnknownException(result.getResults());
+            return result.processReadAt(0);
         } catch (final AbortException e) {
             // should not occur (we did not commit anything)
             throw new UnknownException(e);
@@ -223,11 +220,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
     public void write(final OtpErlangString key, final OtpErlangObject value)
             throws ConnectionException, AbortException, UnknownException {
         final ResL result = req_list(new WriteOp(key, value));
-        if (result.size() == 1) {
-            result.processWriteAt(0);
-        } else {
-            throw new UnknownException(result.getResults());
-        }
+        result.processWriteAt(0);
     }
 
     /**
@@ -287,11 +280,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
             throws ConnectionException, NotAListException, AbortException,
             UnknownException {
         final ResL result = req_list(new AddDelOnListOp(key, toAdd, toRemove));
-        if (result.size() == 1) {
-            result.processAddDelOnListAt(0);
-        } else {
-            throw new UnknownException(result.getResults());
-        }
+        result.processAddDelOnListAt(0);
     }
 
     /**
@@ -422,11 +411,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
     protected void addOnNr_(final AddOnNrOp op) throws ConnectionException,
             NotANumberException, AbortException, UnknownException {
         final ResL result = req_list(op);
-        if (result.size() == 1) {
-            result.processAddOnNrAt(0);
-        } else {
-            throw new UnknownException(result.getResults());
-        }
+        result.processAddOnNrAt(0);
     }
 
     /**
@@ -498,11 +483,7 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
             throws ConnectionException, NotFoundException, KeyChangedException,
             AbortException, UnknownException {
         final ResL result = req_list(new TestAndSetOp(key, oldValue, newValue));
-        if (result.size() == 1) {
-            result.processTestAndSetAt(0);
-        } else {
-            throw new UnknownException(result.getResults());
-        }
+        result.processTestAndSetAt(0);
     }
 
     /**

@@ -20,6 +20,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
+import de.zib.scalaris.AbortException;
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.KeyChangedException;
@@ -38,6 +39,8 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
     final protected OtpErlangString key;
     final protected OtpErlangObject oldValue;
     final protected OtpErlangObject newValue;
+    protected OtpErlangObject resultRaw = null;
+    protected boolean resultCompressed = false;
 
     /**
      * Constructor
@@ -82,68 +85,56 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
         return key;
     }
 
-    @Override
-    public String toString() {
-        return "test_and_set(" + key + ", " + oldValue + ", " + newValue + ")";
+    public void setResult(final OtpErlangObject resultRaw, final boolean compressed) {
+        this.resultRaw = resultRaw;
+        this.resultCompressed = compressed;
     }
 
-    /**
-     * Processes the <tt>received_raw</tt> term from erlang interpreting it as a
-     * result from a test_and_set operation.
-     *
-     * NOTE: this method should not be called manually by an application and may
-     * change without prior notice!
-     *
-     * @param received_raw
-     *            the object to process
-     * @param compressed
-     *            whether the transfer of values is compressed or not
-     *
-     * @throws NotFoundException
-     *             if the requested key does not exist
-     * @throws KeyChangedException
-     *             if the key did not match <tt>old_value</tt>
-     * @throws UnknownException
-     *             if any other error occurs
-     *
-     * @since 3.8
-     */
-    public static final void processResult_testAndSet(
-            final OtpErlangObject received_raw, final boolean compressed)
-            throws NotFoundException, KeyChangedException,
-            UnknownException {
+    public Object processResult() throws NotFoundException,
+            KeyChangedException, UnknownException {
         /*
          * possible return values:
          *  {ok} | {fail, not_found | {key_changed, RealOldValue}
          */
         try {
-            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            final OtpErlangTuple received = (OtpErlangTuple) resultRaw;
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
-                return;
+                return null;
             } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
                 final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.notFoundAtom)) {
-                    throw new NotFoundException(received_raw);
+                    throw new NotFoundException(resultRaw);
                 } else {
                     final OtpErlangTuple reason_tpl = (OtpErlangTuple) reason;
                     if (reason_tpl.elementAt(0).equals(
                             CommonErlangObjects.keyChangedAtom)
                             && (reason_tpl.arity() == 2)) {
                         OtpErlangObject result = reason_tpl.elementAt(1);
-                        if (compressed) {
+                        if (resultCompressed) {
                             result = CommonErlangObjects.decode(result);
                         }
                         throw new KeyChangedException(new ErlangValue(result));
                     }
                 }
             }
-            throw new UnknownException(received_raw);
+            throw new UnknownException(resultRaw);
         } catch (final ClassCastException e) {
             // e.printStackTrace();
-            throw new UnknownException(e, received_raw);
+            throw new UnknownException(e, resultRaw);
         } catch (final OtpErlangDecodeException e) {
             // e.printStackTrace();
-            throw new UnknownException(e, received_raw);
+            throw new UnknownException(e, resultRaw);
         }
+    }
+
+    public Object processResultSingle() throws AbortException,
+            NotFoundException, KeyChangedException, UnknownException {
+        CommonErlangObjects.checkResult_failAbort(resultRaw, resultCompressed);
+        return processResult();
+    }
+
+    @Override
+    public String toString() {
+        return "test_and_set(" + key + ", " + oldValue + ", " + newValue + ")";
     }
 }

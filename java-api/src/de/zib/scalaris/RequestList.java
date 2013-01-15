@@ -42,7 +42,7 @@ import de.zib.scalaris.operations.WriteOp;
  */
 public abstract class RequestList {
     protected final List<Operation> requests = new ArrayList<Operation>(5);
-    private boolean isCommit = false;
+    private CommitOp commitOp = null;
 
     /**
      * Default constructor.
@@ -83,7 +83,7 @@ public abstract class RequestList {
      *             "commit" in a request list and no request after that
      */
     public RequestList addOp(final Operation op) throws UnsupportedOperationException {
-        if (isCommit) {
+        if (isCommit()) {
             throw new UnsupportedOperationException(
                     "No further request supported after a commit!");
         }
@@ -378,8 +378,9 @@ public abstract class RequestList {
      *             "commit" in a request list and no request after that
      */
     public RequestList addCommit() throws UnsupportedOperationException {
-        addOp(new CommitOp());
-        isCommit = true;
+        final CommitOp op = new CommitOp();
+        addOp(op);
+        this.commitOp = op;
         return this;
     }
 
@@ -410,7 +411,16 @@ public abstract class RequestList {
      *         <tt>false</tt> otherwise
      */
     public boolean isCommit() {
-        return isCommit;
+        return commitOp != null;
+    }
+
+    /**
+     * Returns the commit operation (if present).
+     *
+     * @return the commit operation or <tt>null</tt> if there is none
+     */
+    public CommitOp getCommit() {
+        return commitOp;
     }
 
     /**

@@ -19,6 +19,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
+import de.zib.scalaris.AbortException;
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.UnknownException;
@@ -33,6 +34,9 @@ import de.zib.scalaris.UnknownException;
 public class WriteOp implements TransactionOperation, TransactionSingleOpOperation {
     final protected OtpErlangString key;
     final protected OtpErlangObject value;
+    protected OtpErlangObject resultRaw = null;
+    protected boolean resultCompressed = false;
+
     /**
      * Constructor
      *
@@ -68,41 +72,35 @@ public class WriteOp implements TransactionOperation, TransactionSingleOpOperati
         return key;
     }
 
-    @Override
-    public String toString() {
-        return "write(" + key + ", " + value + ")";
+    public void setResult(final OtpErlangObject resultRaw, final boolean compressed) {
+        this.resultRaw = resultRaw;
+        this.resultCompressed = compressed;
     }
 
-    /**
-     * Processes the <tt>received_raw</tt> term from erlang interpreting it as a
-     * result from a write operation.
-     *
-     * NOTE: this method should not be called manually by an application and may
-     * change without prior notice!
-     *
-     * @param received_raw
-     *            the object to process
-     * @param compressed
-     *            whether the transfer of values is compressed or not
-     *
-     * @throws UnknownException
-     *             if any other error occurs
-     */
-    public static final void processResult_write(final OtpErlangObject received_raw,
-            final boolean compressed) throws UnknownException {
+    public Object processResult() throws UnknownException {
         /*
          * possible return values:
          *  {ok}
          */
         try {
-            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            final OtpErlangTuple received = (OtpErlangTuple) resultRaw;
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
-                return;
+                return null;
             }
-            throw new UnknownException(received_raw);
+            throw new UnknownException(resultRaw);
         } catch (final ClassCastException e) {
             // e.printStackTrace();
-            throw new UnknownException(e, received_raw);
+            throw new UnknownException(e, resultRaw);
         }
+    }
+
+    public Object processResultSingle() throws AbortException, UnknownException {
+        CommonErlangObjects.checkResult_failAbort(resultRaw, resultCompressed);
+        return processResult();
+    }
+
+    @Override
+    public String toString() {
+        return "write(" + key + ", " + value + ")";
     }
 }

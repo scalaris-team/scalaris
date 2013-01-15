@@ -30,7 +30,6 @@ import de.zib.scalaris.operations.AddDelOnListOp;
 import de.zib.scalaris.operations.AddOnNrOp;
 import de.zib.scalaris.operations.CommitOp;
 import de.zib.scalaris.operations.Operation;
-import de.zib.scalaris.operations.ReadOp;
 import de.zib.scalaris.operations.TestAndSetOp;
 import de.zib.scalaris.operations.TransactionOperation;
 import de.zib.scalaris.operations.WriteOp;
@@ -228,30 +227,12 @@ public class Transaction extends
          * @param compressed
          *            whether the value part in the term is encoded, i.e.
          *            compressed into an Erlang binary, or not
+         * @param requests
+         *            request list which created this result list
          */
-        ResultList(final OtpErlangList results, final boolean compressed) {
-            super(results, compressed);
-        }
-
-        /**
-         * Processes the result at the given position which originated from a read
-         * request and returns the value that has been read.
-         *
-         * @param pos
-         *            the position in the result list (starting at 0)
-         *
-         * @return the stored value
-         *
-         * @throws NotFoundException
-         *             if the requested key does not exist
-         * @throws UnknownException
-         *             if any other error occurs
-         */
-        @Override
-        public ErlangValue processReadAt(final int pos)
-                throws NotFoundException, UnknownException {
-            return new ErlangValue(
-                    ReadOp.processResult_read(results.elementAt(pos), compressed));
+        ResultList(final OtpErlangList results, final boolean compressed,
+                final RequestList requests) {
+            super(results, compressed, requests);
         }
 
         /**
@@ -266,7 +247,7 @@ public class Transaction extends
          */
         @Override
         public void processWriteAt(final int pos) throws UnknownException {
-            WriteOp.processResult_write(results.elementAt(pos), compressed);
+            ((WriteOp) get(pos)).processResult();
         }
 
         /**
@@ -286,7 +267,7 @@ public class Transaction extends
         @Override
         public void processAddDelOnListAt(final int pos)
                 throws NotAListException, UnknownException {
-            AddDelOnListOp.processResult_addDelOnList(results.elementAt(pos), compressed);
+            ((AddDelOnListOp) get(pos)).processResult();
         }
 
         /**
@@ -306,7 +287,7 @@ public class Transaction extends
         @Override
         public void processAddOnNrAt(final int pos) throws NotANumberException,
                 UnknownException {
-            AddOnNrOp.processResult_addOnNr(results.elementAt(pos), compressed);
+            ((AddOnNrOp) get(pos)).processResult();
         }
 
         /**
@@ -328,7 +309,7 @@ public class Transaction extends
         @Override
         public void processTestAndSetAt(final int pos)
                 throws NotFoundException, KeyChangedException, UnknownException {
-            TestAndSetOp.processResult_testAndSet(results.elementAt(pos), compressed);
+            ((TestAndSetOp) get(pos)).processResult();
         }
 
         /**
@@ -348,7 +329,7 @@ public class Transaction extends
          */
         public void processCommitAt(final int pos) throws AbortException,
                 UnknownException {
-            CommitOp.processResult_commit(results.elementAt(pos), compressed);
+            ((CommitOp) get(pos)).processResult();
         }
     }
 
@@ -554,7 +535,7 @@ public class Transaction extends
     public ResultList req_list(final RequestList req)
             throws ConnectionException, AbortException, UnknownException {
         if (req.isEmpty()) {
-            return new ResultList(new OtpErlangList(), compressed);
+            return new ResultList(new OtpErlangList(), compressed, req);
         }
         OtpErlangObject received_raw = null;
         final OtpErlangList erlangReqList = req.getErlangReqList(compressed);
@@ -573,15 +554,11 @@ public class Transaction extends
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
             transLog.merge(received.elementAt(0));
             if (received.arity() == 2) {
-                final ResultList result = new ResultList((OtpErlangList) received.elementAt(1), compressed);
+                final ResultList result = new ResultList((OtpErlangList) received.elementAt(1), compressed, req);
                 if (req.isCommit()) {
-                    if (result.size() >= 1) {
-                        result.processCommitAt(result.size() - 1);
-                        // transaction was successful: reset transaction log
-                        transLog.reset();
-                    } else {
-                        throw new UnknownException(result.getResults());
-                    }
+                    req.getCommit().processResult();
+                    // transaction was successful: reset transaction log
+                    transLog.reset();
                 }
                 return result;
             }

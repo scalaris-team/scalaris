@@ -22,6 +22,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
+import de.zib.scalaris.AbortException;
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.NotAListException;
@@ -38,6 +39,8 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
     final protected OtpErlangString key;
     final protected OtpErlangObject toAdd;
     final protected OtpErlangObject toRemove;
+    protected OtpErlangObject resultRaw = null;
+    protected boolean resultCompressed = false;
     /**
      * Constructor
      *
@@ -80,51 +83,42 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
         return key;
     }
 
-    @Override
-    public String toString() {
-        return "add_del_on_list(" + key + ", " + toAdd + ", " + toRemove + ")";
+    public void setResult(final OtpErlangObject resultRaw, final boolean compressed) {
+        this.resultRaw = resultRaw;
+        this.resultCompressed = compressed;
     }
 
-    /**
-     * Processes the <tt>received_raw</tt> term from erlang interpreting it as a
-     * result from a add_del_on_list operation.
-     *
-     * NOTE: this method should not be called manually by an application and may
-     * change without prior notice!
-     *
-     * @param received_raw
-     *            the object to process
-     * @param compressed
-     *            whether the transfer of values is compressed or not
-     *
-     * @throws NotAListException
-     *             if the previously stored value was no list
-     * @throws UnknownException
-     *             if any other error occurs
-     *
-     * @since 3.8
-     */
-    public static final void processResult_addDelOnList(
-            final OtpErlangObject received_raw, final boolean compressed)
-            throws NotAListException, UnknownException {
+    public Object processResult() throws UnknownException,
+            NotAListException {
         /*
          * possible return values:
          *  {ok} | {fail, not_a_list}.
          */
         try {
-            final OtpErlangTuple received = (OtpErlangTuple) received_raw;
+            final OtpErlangTuple received = (OtpErlangTuple) resultRaw;
             if (received.equals(CommonErlangObjects.okTupleAtom)) {
-                return;
+                return null;
             } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
                 final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.notAListAtom)) {
-                    throw new NotAListException(received_raw);
+                    throw new NotAListException(resultRaw);
                 }
             }
-            throw new UnknownException(received_raw);
+            throw new UnknownException(resultRaw);
         } catch (final ClassCastException e) {
             // e.printStackTrace();
-            throw new UnknownException(e, received_raw);
+            throw new UnknownException(e, resultRaw);
         }
+    }
+
+    public Object processResultSingle() throws AbortException,
+            NotAListException, UnknownException {
+        CommonErlangObjects.checkResult_failAbort(resultRaw, resultCompressed);
+        return processResult();
+    }
+
+    @Override
+    public String toString() {
+        return "add_del_on_list(" + key + ", " + toAdd + ", " + toRemove + ")";
     }
 }

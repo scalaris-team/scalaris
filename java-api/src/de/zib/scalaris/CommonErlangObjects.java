@@ -158,7 +158,7 @@ public final class CommonErlangObjects {
      *
      * @since 3.8
      */
-    static final void checkResult_failAbort(final OtpErlangObject received_raw,
+    public static final void checkResult_failAbort(final OtpErlangObject received_raw,
             final boolean compressed) throws AbortException, UnknownException {
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
