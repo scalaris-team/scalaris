@@ -1,5 +1,5 @@
 /**
- *  Copyright 2012 Zuse Institute Berlin
+ *  Copyright 2013 Zuse Institute Berlin
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -17,12 +17,20 @@ package de.zib.scalaris.operations;
 
 import java.math.BigInteger;
 
+import com.ericsson.otp.erlang.OtpErlangDecodeException;
 import com.ericsson.otp.erlang.OtpErlangInt;
+import com.ericsson.otp.erlang.OtpErlangList;
+import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
+import com.ericsson.otp.erlang.OtpErlangRangeException;
 import com.ericsson.otp.erlang.OtpErlangString;
 import com.ericsson.otp.erlang.OtpErlangTuple;
 
 import de.zib.scalaris.CommonErlangObjects;
+import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.NotAListException;
+import de.zib.scalaris.NotFoundException;
+import de.zib.scalaris.UnknownException;
 
 /**
  * Operation reading a sublist from a value.
@@ -55,7 +63,56 @@ import de.zib.scalaris.CommonErlangObjects;
  * @version 3.18
  * @since 3.18
  */
-public class ReadSublistOp extends ReadOp {
+public class ReadSublistOp extends PartialReadOp {
+    /**
+     * Result type of sublist operations.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     * @version 3.18
+     * @since 3.18
+     */
+    public static class Result {
+        /**
+         * The retrieved sublist.
+         */
+        public final ErlangValue subList;
+        /**
+         * The length of the whole list stored in Scalaris.
+         */
+        public final int listLength;
+
+        protected Result(final OtpErlangTuple result, final boolean compressed)
+                throws OtpErlangDecodeException, UnknownException {
+            // {SubList, ListLength}
+            if (result.arity() != 2) {
+                throw new UnknownException(result);
+            }
+            final OtpErlangList subListOtp = ErlangValue.otpObjectToOtpList(result.elementAt(0));
+            if (compressed) {
+                subList = new ErlangValue(
+                        CommonErlangObjects.decode(subListOtp));
+            } else {
+                subList = new ErlangValue(subListOtp);
+            }
+            final OtpErlangLong listLengthOtp = (OtpErlangLong) result.elementAt(1);
+            try {
+                listLength = listLengthOtp.intValue();
+            } catch (final OtpErlangRangeException e) {
+                throw new UnknownException("Unsupported list length ("
+                        + listLengthOtp + ")");
+            }
+        }
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#toString()
+         */
+        @Override
+        public String toString() {
+            return "{subList: " + subList.toString() + ", listLength: "
+                    + listLength + "}";
+        }
+    }
+
     final protected OtpErlangInt start;
     final protected OtpErlangInt length;
 
@@ -96,12 +153,49 @@ public class ReadSublistOp extends ReadOp {
         this.length = new OtpErlangInt(length);
     }
 
-    @Override
     public OtpErlangObject getErlang(final boolean compressed) {
         return new OtpErlangTuple(new OtpErlangObject[] {
                 CommonErlangObjects.readAtom, key,
                 new OtpErlangTuple(new OtpErlangObject[] {
                         CommonErlangObjects.sublistAtom, start, length }) });
+    }
+
+    public Result processResult() throws NotFoundException, NotAListException,
+            UnknownException {
+        /*
+         * possible return values:
+         *  {ok, {SubList, ListLength}} | {fail, not_found | not_a_list}
+         */
+        try {
+            final OtpErlangTuple received = (OtpErlangTuple) resultRaw;
+            final OtpErlangObject state = received.elementAt(0);
+            if (received.arity() != 2) {
+                throw new UnknownException(resultRaw);
+            }
+            if (state.equals(CommonErlangObjects.okAtom)) {
+                final OtpErlangTuple result = (OtpErlangTuple) received.elementAt(1);
+                return new Result(result, resultCompressed);
+            } else if (state.equals(CommonErlangObjects.failAtom)) {
+                final OtpErlangObject reason = received.elementAt(1);
+                if (reason.equals(CommonErlangObjects.notFoundAtom)) {
+                    throw new NotFoundException(resultRaw);
+                } else if (reason.equals(CommonErlangObjects.notAListAtom)) {
+                    throw new NotAListException(resultRaw);
+                }
+            }
+            throw new UnknownException(resultRaw);
+        } catch (final ClassCastException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, resultRaw);
+        } catch (final OtpErlangDecodeException e) {
+            // e.printStackTrace();
+            throw new UnknownException(e, resultRaw);
+        }
+    }
+
+    public Result processResultSingle() throws NotFoundException,
+            NotAListException, UnknownException {
+        return processResult();
     }
 
     @Override
