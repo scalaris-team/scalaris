@@ -192,6 +192,10 @@ commit_req(Request) ->
         {add_del_on_list, Key, ToAdd, ToRemove} -> add_del_on_list(Key, ToAdd, ToRemove);
         {add_on_nr, Key, ToAdd} -> add_on_nr(Key, ToAdd);
         {test_and_set, Key, Old, New} -> test_and_set(Key, Old, New);
+        {read, _Key, _Op} = Req ->
+            ReqList = [Req],
+            {_TLog, [Res]} = req_list(tx_tlog:empty(), ReqList),
+            Res;
         _ -> {fail, abort, []}
     end.
 
