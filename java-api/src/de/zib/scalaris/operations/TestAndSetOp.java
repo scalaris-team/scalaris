@@ -24,7 +24,6 @@ import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.KeyChangedException;
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
@@ -78,6 +77,7 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
                 compressed ? CommonErlangObjects.encode(oldValue) : oldValue,
                 compressed ? CommonErlangObjects.encode(newValue) : newValue });
     }
+
     public OtpErlangString getKey() {
         return key;
     }
@@ -99,8 +99,6 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
      * @param compressed
      *            whether the transfer of values is compressed or not
      *
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch/write the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws KeyChangedException
@@ -112,11 +110,11 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
      */
     public static final void processResult_testAndSet(
             final OtpErlangObject received_raw, final boolean compressed)
-            throws TimeoutException, NotFoundException, KeyChangedException,
+            throws NotFoundException, KeyChangedException,
             UnknownException {
         /*
          * possible return values:
-         *  {ok} | {fail, timeout | not_found | {key_changed, RealOldValue}
+         *  {ok} | {fail, not_found | {key_changed, RealOldValue}
          */
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
@@ -124,9 +122,7 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
                 return;
             } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
                 final OtpErlangObject reason = received.elementAt(1);
-                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
-                    throw new TimeoutException(received_raw);
-                } else if (reason.equals(CommonErlangObjects.notFoundAtom)) {
+                if (reason.equals(CommonErlangObjects.notFoundAtom)) {
                     throw new NotFoundException(received_raw);
                 } else {
                     final OtpErlangTuple reason_tpl = (OtpErlangTuple) reason;

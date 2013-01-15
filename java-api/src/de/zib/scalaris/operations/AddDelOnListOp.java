@@ -25,7 +25,6 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.NotAListException;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
@@ -76,6 +75,7 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
                 compressed ? CommonErlangObjects.encode(toAdd) : toAdd,
                 compressed ? CommonErlangObjects.encode(toRemove) : toRemove });
     }
+
     public OtpErlangString getKey() {
         return key;
     }
@@ -97,8 +97,6 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
      * @param compressed
      *            whether the transfer of values is compressed or not
      *
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch the value
      * @throws NotAListException
      *             if the previously stored value was no list
      * @throws UnknownException
@@ -108,10 +106,10 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
      */
     public static final void processResult_addDelOnList(
             final OtpErlangObject received_raw, final boolean compressed)
-            throws TimeoutException, NotAListException, UnknownException {
+            throws NotAListException, UnknownException {
         /*
          * possible return values:
-         *  {ok} | {fail, timeout} | {fail, not_a_list}.
+         *  {ok} | {fail, not_a_list}.
          */
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
@@ -119,9 +117,7 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
                 return;
             } else if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
                 final OtpErlangObject reason = received.elementAt(1);
-                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
-                    throw new TimeoutException(received_raw);
-                } else if (reason.equals(CommonErlangObjects.notAListAtom)) {
+                if (reason.equals(CommonErlangObjects.notAListAtom)) {
                     throw new NotAListException(received_raw);
                 }
             }

@@ -291,9 +291,7 @@ public class PubSub {
                 if (received.elementAt(0).equals(CommonErlangObjects.failAtom) && (received.arity() == 2)) {
                     // {fail, timeout | not_found}
                     final OtpErlangObject failReason = received.elementAt(1);
-                    if (failReason.equals(CommonErlangObjects.timeoutAtom)) {
-                        throw new TimeoutException(received_raw);
-                    } else if (failReason.equals(CommonErlangObjects.notFoundAtom)) {
+                    if (failReason.equals(CommonErlangObjects.notFoundAtom)) {
                         throw new NotFoundException(received_raw);
                     }
                 }
