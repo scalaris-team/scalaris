@@ -143,6 +143,9 @@ public final class CommonErlangObjects {
      * Processes the <tt>received_raw</tt> term from erlang and if it is a
      * <tt>{fail, abort, KeyList}</tt>, issues an {@link AbortException}.
      *
+     * NOTE: this method should not be called manually by an application and may
+     * change without prior notice!
+     *
      * @param received_raw
      *            the object to process
      * @param compressed
@@ -169,6 +172,9 @@ public final class CommonErlangObjects {
     /**
      * Processes the <tt>received_raw</tt> term from erlang and if it is a
      * <tt>{fail, abort, KeyList}</tt>, issues an {@link AbortException}.
+     *
+     * NOTE: this method should not be called manually by an application and may
+     * change without prior notice!
      *
      * @param received
      *            the object to process
@@ -201,6 +207,9 @@ public final class CommonErlangObjects {
     /**
      * Processes the <tt>received_raw</tt> term from erlang interpreting it as
      * a result from a commit operation.
+     *
+     * NOTE: this method should not be called manually by an application and may
+     * change without prior notice!
      *
      * @param received_raw
      *             the object to process

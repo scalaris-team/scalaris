@@ -78,7 +78,7 @@ public class WriteOp implements TransactionOperation, TransactionSingleOpOperati
      * result from a write operation.
      *
      * NOTE: this method should not be called manually by an application and may
-     * change without notice!
+     * change without prior notice!
      *
      * @param received_raw
      *            the object to process
