@@ -332,8 +332,6 @@ public class TransactionSingleOp extends
      *             if the connection is not active or a communication error
      *             occurs or an exit signal was received or the remote node
      *             sends a message containing an invalid cookie
-     * @throws AbortException
-     *             if a commit failed (if there was one)
      * @throws UnknownException
      *             if any other error occurs
      *
@@ -342,8 +340,13 @@ public class TransactionSingleOp extends
      * @since 3.18
      */
     public ResultList req_list(final TransactionSingleOpOperation op)
-            throws ConnectionException, AbortException, UnknownException {
-        return super.req_list(op);
+            throws ConnectionException, UnknownException {
+        try {
+            return super.req_list(op);
+        } catch (final AbortException e) {
+            // should not occur!
+            throw new UnknownException(e);
+        }
     }
 
     /**
