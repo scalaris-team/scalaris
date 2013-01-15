@@ -37,12 +37,14 @@
 -export([lease_takeover/1]).
 -export([lease_split/3]).
 -export([lease_merge/2]).
-% or unit tests
+% for unit tests
 -export([lease_update/2]).
+-export([create_lease/1]).
+-export([get_db_for_id/1]).
 
 % lease accessors
 -export([get_version/1,set_version/2,
-         get_epoch/1,
+         get_epoch/1, set_epoch/2,
          new_timeout/0, set_timeout/1,
          get_id/1,
          set_owner/2,
@@ -433,7 +435,7 @@ on({l_on_cseq, merge_reply_step4, _L1, {qwrite_deny, _ReqId, _Round, _L2, _Reaso
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split, Lease, R1, R2}, State) ->
     Id = id(R2),
-    io:format("split first step: creating second lease ~p~n", [Id]),
+    ct:pal("split first step: creating second lease ~p~n", [Id]),
     New = #lease{id      = id(R2),
                  epoch   = 1,
                  owner   = comm:this(),
@@ -451,7 +453,6 @@ on({l_on_cseq, split, Lease, R1, R2}, State) ->
 
 on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2,
     {qwrite_deny, _ReqId, _Round, Lease, {content_check_failed, Reason}}}, State) ->
-    % @todo error handling
     ct:pal("split first step failed: ~p~n", [Reason]),
     case Reason of
         lease_already_exists ->
@@ -938,6 +939,17 @@ add_first_lease_to_db(Id, State) ->
           end || X <- ?RT:get_replica_keys(Id) ],
     dht_node_state:set_lease_list(State, [Lease]).
 
+-spec create_lease(?RT:key()) -> lease_t().
+create_lease(Id) ->
+    #lease{id      = Id,
+           epoch   = 1,
+           owner   = comm:this(),
+           range   = intervals:all(),
+           aux     = empty,
+           version = 1,
+           timeout = new_timeout()
+          }.
+
 -spec get_db_for_id(?RT:key()) -> atom().
 get_db_for_id(Id) ->
     erlang:list_to_existing_atom(
@@ -956,6 +968,9 @@ set_version(Lease, Version) -> Lease#lease{version=Version}.
 
 -spec get_epoch(lease_t()) -> non_neg_integer().
 get_epoch(#lease{epoch=Epoch}) -> Epoch.
+
+-spec set_epoch(lease_t(), non_neg_integer()) -> lease_t().
+set_epoch(Lease, Epoch) -> Lease#lease{epoch=Epoch}.
 
 -spec set_timeout(lease_t()) -> lease_t().
 set_timeout(Lease) -> Lease#lease{timeout=new_timeout()}.
