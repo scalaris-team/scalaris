@@ -219,7 +219,7 @@ public final class CommonErlangObjects {
             UnknownException {
         /*
          * possible return values:
-         *  {ok} | {fail, abort, KeyList} | {fail, timeout}
+         *  {ok} | {fail, abort, KeyList}
          */
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
@@ -227,11 +227,6 @@ public final class CommonErlangObjects {
                 return;
             } else {
                 checkResult_failAbort(received, compressed);
-                if (received.elementAt(0).equals(CommonErlangObjects.failAtom)
-                        && (received.arity() == 2)
-                        && received.elementAt(1).equals(CommonErlangObjects.timeoutAtom)) {
-                    throw new TimeoutException(received_raw);
-                }
             }
             throw new UnknownException(received_raw);
         } catch (final ClassCastException e) {

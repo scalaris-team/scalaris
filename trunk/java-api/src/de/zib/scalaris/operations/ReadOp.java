@@ -22,7 +22,6 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
 
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.NotFoundException;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.UnknownException;
 
 /**
@@ -57,6 +56,7 @@ public class ReadOp implements TransactionOperation, TransactionSingleOpOperatio
         return new OtpErlangTuple(new OtpErlangObject[] {
                 CommonErlangObjects.readAtom, key });
     }
+
     public OtpErlangString getKey() {
         return key;
     }
@@ -80,8 +80,6 @@ public class ReadOp implements TransactionOperation, TransactionSingleOpOperatio
      *
      * @return the contained value
      *
-     * @throws TimeoutException
-     *             if a timeout occurred while trying to fetch the value
      * @throws NotFoundException
      *             if the requested key does not exist
      * @throws UnknownException
@@ -89,10 +87,10 @@ public class ReadOp implements TransactionOperation, TransactionSingleOpOperatio
      */
     public static final OtpErlangObject processResult_read(
             final OtpErlangObject received_raw, final boolean compressed)
-            throws TimeoutException, NotFoundException, UnknownException {
+            throws NotFoundException, UnknownException {
         /*
          * possible return values:
-         *  {ok, Value} | {fail, timeout | not_found}
+         *  {ok, Value} | {fail, not_found}
          */
         try {
             final OtpErlangTuple received = (OtpErlangTuple) received_raw;
@@ -108,9 +106,7 @@ public class ReadOp implements TransactionOperation, TransactionSingleOpOperatio
                 return result;
             } else if (state.equals(CommonErlangObjects.failAtom)) {
                 final OtpErlangObject reason = received.elementAt(1);
-                if (reason.equals(CommonErlangObjects.timeoutAtom)) {
-                    throw new TimeoutException(received_raw);
-                } else if (reason.equals(CommonErlangObjects.notFoundAtom)) {
+                if (reason.equals(CommonErlangObjects.notFoundAtom)) {
                     throw new NotFoundException(received_raw);
                 }
             }
