@@ -107,7 +107,7 @@ import de.zib.scalaris.operations.WriteOp;
  * state. The number of automatic retries is adjustable (default: 3).
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.14
+ * @version 3.18
  * @since 2.0
  */
 public class TransactionSingleOp extends
@@ -157,7 +157,7 @@ public class TransactionSingleOp extends
          *
          * @since 3.18
          */
-        protected RequestList(final Operation op) {
+        protected RequestList(final TransactionSingleOpOperation op) {
             super(op);
         }
 
@@ -351,6 +351,34 @@ public class TransactionSingleOp extends
             CommonErlangObjects.checkResult_failAbort(results.elementAt(pos), compressed);
             TestAndSetOp.processResult_testAndSet(results.elementAt(pos), compressed);
         }
+    }
+
+    /**
+     * Executes the given operation.
+     *
+     * @param op
+     *            the operation to execute
+     *
+     * @return results list containing a single result of the given operation
+     *
+     * @throws ConnectionException
+     *             if the connection is not active or a communication error
+     *             occurs or an exit signal was received or the remote node
+     *             sends a message containing an invalid cookie
+     * @throws TimeoutException
+     *             if a timeout occurred while trying to write the value
+     * @throws AbortException
+     *             if a commit failed (if there was one)
+     * @throws UnknownException
+     *             if any other error occurs
+     *
+     * @see #req_list(RequestList)
+     *
+     * @since 3.18
+     */
+    public ResultList req_list(final TransactionSingleOpOperation op) throws ConnectionException,
+            TimeoutException, AbortException, UnknownException {
+        return super.req_list(op);
     }
 
     /**
