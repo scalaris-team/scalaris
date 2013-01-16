@@ -255,11 +255,11 @@ first_req_for_key(Key, [Req | RTail] = SReqList, TmpReq, HaveValue) ->
        true -> {TmpReq, SReqList}
     end.
 
-%% @doc Strips the tlog from read values (sets those values to '$empty').
+%% @doc Strips the tlog from read values (sets those values to ?value_dropped).
 -spec cleanup(tlog()) -> tlog().
 cleanup(TLog) ->
     [ case get_entry_operation(TLogEntry) of
-          ?read -> set_entry_value(TLogEntry, '$empty');
+          ?read -> drop_value(TLogEntry);
           ?write -> TLogEntry
       end || TLogEntry <- TLog ].
 
