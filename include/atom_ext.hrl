@@ -138,3 +138,6 @@
 
 -define(sublist_atom, sublist).
 -define(sublist, ?int_or_atom(83, ?sublist_atom)).
+
+-define(ok_atom, ok).
+-define(ok, ?int_or_atom(84, ?ok_atom)).

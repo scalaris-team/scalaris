@@ -111,27 +111,27 @@ extract_from_value_feeder(Value, Version, Op) ->
 
 %% @doc Performs the requested operation in the dht_node context.
 -spec extract_from_value
-        (?DB:value(), ?DB:version(), Op::?read) -> Result::{ok, ?DB:value(), ?DB:version()};
+        (?DB:value(), ?DB:version(), Op::?read) -> Result::{?ok, ?DB:value(), ?DB:version()};
         (?DB:value(), ?DB:version(), Op::?random_from_list)
-            -> Result::{ok, {RandomElement::?DB:value(), ListLen::pos_integer()}, ?DB:version()}
+            -> Result::{?ok, {RandomElement::?DB:value(), ListLen::pos_integer()}, ?DB:version()}
                      | {fail, empty_list | not_a_list, ?DB:version()};
         (?DB:value(), ?DB:version(), Op::{?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
-            -> Result::{ok, ?DB:value(), ?DB:version()} | {fail, not_a_list, ?DB:version()};
-        (?DB:value(), ?DB:version(), Op::?write) -> Result::{ok, ?value_dropped, ?DB:version()};
+            -> Result::{?ok, ?DB:value(), ?DB:version()} | {fail, not_a_list, ?DB:version()};
+        (?DB:value(), ?DB:version(), Op::?write) -> Result::{?ok, ?value_dropped, ?DB:version()};
         (empty_val, -1, Op::?read | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
-            -> Result::{ok, empty_val, -1};
-        (empty_val, -1, Op::?write) -> Result::{ok, ?value_dropped, -1}.
+            -> Result::{?ok, empty_val, -1};
+        (empty_val, -1, Op::?write) -> Result::{?ok, ?value_dropped, -1}.
 extract_from_value(Value, Version, ?read) ->
-    {ok, Value, Version};
+    {?ok, Value, Version};
 extract_from_value(_Value, Version, ?write) ->
-    {ok, ?value_dropped, Version};
+    {?ok, ?value_dropped, Version};
 extract_from_value(empty_val, Version, _Op) ->
-    {ok, empty_val, Version}; % will be handled later
+    {?ok, empty_val, Version}; % will be handled later
 extract_from_value(ValueEnc, Version, ?random_from_list) ->
     Value = rdht_tx:decode_value(ValueEnc),
     case Value of
         [_|_]     -> {RandVal, Len} = util:randomelem_and_length(Value),
-                     {ok, {rdht_tx:encode_value(RandVal), Len}, Version};
+                     {?ok, {rdht_tx:encode_value(RandVal), Len}, Version};
         []        -> {fail, empty_list, Version};
         _         -> {fail, not_a_list, Version}
     end;
@@ -139,7 +139,7 @@ extract_from_value(ValueEnc, Version, {?sublist, Start, Len}) ->
     Value = rdht_tx:decode_value(ValueEnc),
     if is_list(Value) ->
            {SubList, ListLen} = util:sublist(Value, Start, Len),
-           {ok, {rdht_tx:encode_value(SubList), ListLen}, Version};
+           {?ok, {rdht_tx:encode_value(SubList), ListLen}, Version};
        true ->
            {fail, not_a_list, Version}
     end.

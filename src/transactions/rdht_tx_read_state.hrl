@@ -30,7 +30,7 @@
                    state_is_newly_decided/1
                   ]}).
 
--type result() :: {ok | fail, ?DB:value() | 0 | atom(), -1 | ?DB:version()}. % {ok|fail, Val|FailReason, Vers}
+-type result() :: {?ok | fail, ?DB:value() | 0 | atom(), -1 | ?DB:version()}. % {?ok|fail, Val|FailReason, Vers}
 -type read_state() ::
                   { ID               :: rdht_tx:req_id(),
                     ClientPid        :: pid() | unknown,
@@ -45,7 +45,7 @@
 
 -spec state_new(rdht_tx:req_id()) -> read_state().
 state_new(Id) ->
-    {Id, unknown, unknown, 0, 0, {ok, 0, -1}, false, false, ?read}.
+    {Id, unknown, unknown, 0, 0, {?ok, 0, -1}, false, false, ?read}.
 
 -spec state_get_id(read_state()) -> rdht_tx:req_id().
 state_get_id(State) ->              element(1, State).
@@ -88,7 +88,7 @@ state_get_numreplied(State) ->
     state_get_numok(State) + state_get_numfailed(State).
 
 -spec state_add_reply(read_state(),
-                Result::{ok, ?DB:value(), ?DB:version()} | {ok, empty_val, -1} | {fail, atom(), ?DB:version()},
+                Result::{?ok, ?DB:value(), ?DB:version()} | {?ok, empty_val, -1} | {fail, atom(), ?DB:version()},
                 non_neg_integer(), non_neg_integer()) -> read_state().
 state_add_reply(State, Result, MajOk, MajDeny) ->
     ?TRACE("state_add_reply state res majok majdeny ~p ~p ~p ~p ~p~n", [State, Result, MajOk, MajDeny]),
@@ -110,7 +110,7 @@ state_update_decided(State, MajOk, MajDeny) ->
     {Ok_Fail, _Val, Vers} = state_get_result(State),
     if Vers =/= -1 ->
            OK = state_get_numok(State) >= MajOk,
-           if OK andalso Ok_Fail =:= ok -> %% OK andalso (not Abort) ->
+           if OK andalso Ok_Fail =:= ?ok -> %% OK andalso (not Abort) ->
                   state_set_decided(State, ?value);
               OK -> state_set_decided(State, {fail, abort});
               true ->
