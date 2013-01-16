@@ -348,14 +348,14 @@ init([]) ->
 
 -spec on(comm:message(), state()) -> state().
 %% reply triggered by api_dht_raw:unreliable_get_key/3
-on({?read_op_with_id_reply, Id, Result},
+on({?read_op_with_id_reply, Id, Ok_Fail, Val_Reason, Vers},
    {Reps, MajOk, MajDeny, Table} = State) ->
     ?TRACE("~p rdht_tx_read:on(get_key_with_id_reply) ID ~p~n", [self(), Id]),
     Entry = get_entry(Id, Table),
     %% @todo inform sender when its entry is outdated?
     %% @todo inform former sender on outdated entry when we
     %% get a newer entry?
-    TmpEntry = state_add_reply(Entry, Result, MajOk, MajDeny),
+    TmpEntry = state_add_reply(Entry, {Ok_Fail, Val_Reason, Vers}, MajOk, MajDeny),
     _ = case state_get_client(TmpEntry) of
             unknown ->
                 %% when we get a client, we will inform it
