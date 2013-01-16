@@ -221,8 +221,8 @@ on({?get_key, Source_PID, SourceId, HashedKey}, State) ->
 on({?read_op, Source_PID, SourceId, HashedKey, Op}, State) ->
     DB = dht_node_state:get(State, db),
     {ok, Value, Version} = ?DB:read(DB, HashedKey),
-    Result = rdht_tx_read:extract_from_value(Value, Version, Op),
-    Msg = {?read_op_with_id_reply, SourceId, Result},
+    {Ok_Fail, Val_Reason, Vers} = rdht_tx_read:extract_from_value(Value, Version, Op),
+    Msg = {?read_op_with_id_reply, SourceId, Ok_Fail, Val_Reason, Vers},
     comm:send(Source_PID, Msg),
     State;
 
