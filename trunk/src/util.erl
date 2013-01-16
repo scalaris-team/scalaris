@@ -1404,7 +1404,8 @@ extint2atom(X) when is_integer(X) ->
         ?init_TP -> ?init_TP_atom;
         ?tp_do_commit_abort_fwd -> ?tp_do_commit_abort_fwd_atom;
         ?random_from_list -> ?random_from_list_atom;
-        ?sublist -> ?sublist_atom
+        ?sublist -> ?sublist_atom;
+        ?ok -> ?ok_atom
     end.
 
 -spec sets_map(Fun :: fun((A :: any()) -> B :: any()), Set :: set()) -> [any()].
