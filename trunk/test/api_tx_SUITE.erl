@@ -572,12 +572,12 @@ prop_random_from_list(Key, Value) ->
     _ = api_tx:write(Key,  [Value]),
     ?equals_pattern(
         api_tx:req_list([{read, Key, random_from_list}]),
-        {[{?read, Key, Version, ?partial_value, '$empty'}],
+        {[{?read, Key, Version, ?partial_value, ?value_dropped}],
          [{ok, { Value, 1 } }]} when is_integer(Version) andalso Version >= 0),
     ValueEnc = rdht_tx:encode_value(Value),
     ?equals_pattern(
         api_txc:req_list([{read, Key, random_from_list}]),
-        {[{?read, Key, Version, ?partial_value, '$empty'}],
+        {[{?read, Key, Version, ?partial_value, ?value_dropped}],
          [{ok, { ValueEnc, 1 } }]} when is_integer(Version) andalso Version >= 0),
     true.
 
