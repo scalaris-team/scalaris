@@ -118,15 +118,14 @@ extract_from_value_feeder(Value, Version, Op) ->
         (?DB:value(), ?DB:version(), Op::{?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
             -> Result::{?ok, ?DB:value(), ?DB:version()} | {fail, not_a_list, ?DB:version()};
         (?DB:value(), ?DB:version(), Op::?write) -> Result::{?ok, ?value_dropped, ?DB:version()};
-        (empty_val, -1, Op::?read | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
-            -> Result::{?ok, empty_val, -1};
-        (empty_val, -1, Op::?write) -> Result::{?ok, ?value_dropped, -1}.
+        (empty_val, -1, Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+            -> Result::{?ok, ?value_dropped, -1}.
+extract_from_value(empty_val, Version = -1, _Op) ->
+    {?ok, ?value_dropped, Version}; % will be handled later
 extract_from_value(Value, Version, ?read) ->
     {?ok, Value, Version};
 extract_from_value(_Value, Version, ?write) ->
     {?ok, ?value_dropped, Version};
-extract_from_value(empty_val, Version, _Op) ->
-    {?ok, empty_val, Version}; % will be handled later
 extract_from_value(ValueEnc, Version, ?random_from_list) ->
     Value = rdht_tx:decode_value(ValueEnc),
     case Value of
