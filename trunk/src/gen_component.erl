@@ -1,4 +1,4 @@
-%% @copyright 2007-2012 Zuse Institute Berlin
+%% @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -690,7 +690,8 @@ on_gc_msg({'$gen_component', bp, breakpoint, cont} = Msg,
     loop(UState, NewGCState).
 
 
--spec on_bp(comm:message(), user_state(), gc_state()) -> gc_state().
+-spec on_bp(comm:message(), user_state(), gc_state()) ->
+                   gc_state() | {drop_single, gc_state()}.
 on_bp(_Msg, _UState, GCState)
   when (false =:= element(?BP_ACTIVE, GCState))
        andalso ([] =:= element(?BPS, GCState)) ->
