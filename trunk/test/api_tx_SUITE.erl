@@ -40,6 +40,7 @@ all()   -> [
             write2_read2,
             multi_write,
             write_test_race_mult_rings,
+            read_write_2old,
             tester_encode_decode,
             random_write_read,
             tester_read_not_existing,
@@ -394,6 +395,20 @@ write_test(Config) ->
     ?equals_pattern_w_note(FirstWriteTime, X when X =< 1000000,
        "We need more than a second to become operational?!"),
     ?equals_pattern(SecondWriteTime, X when X =< 1000000).
+
+-spec read_write_2old(Config::[tuple()]) -> ok.
+read_write_2old(_Config) ->
+    Key = "read_write_2old_a",
+    GSelf = comm:make_global(self()),
+    ?equals_w_note(api_tx:write(Key, 1), {ok}, "write_1_a"),
+    wait_for_dht_entries(4),
+    [HK1, HK2, _HK3, _HK4] = ?RT:get_replica_keys(?RT:hash_key(Key)),
+    _ = [comm:send_local(DhtNode, {delete_keys, GSelf, [HK1, HK2]}) || DhtNode <- pid_groups:find_all(dht_node)],
+    receive {delete_keys_reply} -> ok end,
+    receive {delete_keys_reply} -> ok end,
+    
+    ?equals(api_tx:write(Key, 2), {ok}),
+    ok.
 
 -spec prop_encode_decode(Value::client_value()) -> boolean().
 prop_encode_decode(Value) ->
@@ -1107,3 +1122,15 @@ req_list_parallelism(_Config) ->
                 [AvgTxReadRes, Partitions, AvgTxReadResPart]))};
         true -> ok
     end.
+
+%% @doc Wait until (exactly) the given number of DHT entries are stored.
+%%      This may be necessary, to make sure (late) write messages have arrived
+%%      at the original nodes.
+%%      Note: DHT entries = 4 * client entries!
+-spec wait_for_dht_entries(Count::non_neg_integer()) -> ok.
+wait_for_dht_entries(Count) ->
+    util:wait_for(
+      fun() ->
+              {Status, Values} = api_dht_raw:range_read(0, 0),
+              Status =:= ok andalso erlang:length(Values) =:= Count
+      end).
