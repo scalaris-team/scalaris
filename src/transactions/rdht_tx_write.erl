@@ -1,4 +1,4 @@
-%% @copyright 2009-2012 Zuse Institute Berlin
+%% @copyright 2009-2013 Zuse Institute Berlin
 %%                 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -114,7 +114,10 @@ validate(DB, RTLogEntry) ->
 
 %%%    case RTVers > DBVers of
 %%%        true ->
-%%%            %% This trick would need the old value in the rtlog.
+%%%            %% This trick would need the old value in the rtlog
+%%%            %% in case of rollback and to serve read requests
+%%%            %% properly (version and value have to be changed
+%%%            %% atomically as a pair).
 %%%            %% DB is outdated, in workphase a quorum responded with a
 %%%            %% newer version, so a newer version was committed
 %%%            %% reset all locks, set version and set writelock
