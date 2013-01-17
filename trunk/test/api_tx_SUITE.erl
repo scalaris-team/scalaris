@@ -459,11 +459,13 @@ read_write_2old_locked(_Config) ->
 read_write_notfound(_Config) ->
     Key = "read_write_notfound_test_a",
     HashedKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
+    read_write_notfound_test(Key, HashedKeys, none, single),
+    read_write_notfound_test(Key, HashedKeys, none, req_list),
     _ = [read_write_notfound_test(Key, HashedKeys, HK, single) || HK <- HashedKeys],
     _ = [read_write_notfound_test(Key, HashedKeys, HK, req_list) || HK <- HashedKeys],
     ok.
 
--spec read_write_notfound_test(Key::client_key(), HashedKeys::?RT:key(), HashedKeyToExclude::?RT:key(), Mode::single | req_list) -> ok.
+-spec read_write_notfound_test(Key::client_key(), HashedKeys::?RT:key() | none, HashedKeyToExclude::?RT:key(), Mode::single | req_list) -> ok.
 read_write_notfound_test(Key, HashedKeys, HashedKeyToExclude, Mode) ->
     Note = io_lib:format("Key: ~p, Hashed: ~p, Excl.: ~p, Mode: ~p",
                          [Key, HashedKeys, HashedKeyToExclude, Mode]),
@@ -477,6 +479,10 @@ read_write_notfound_test(Key, HashedKeys, HashedKeyToExclude, Mode) ->
          end || DhtNode <- pid_groups:find_all(dht_node)],
     
     % test
+    case HashedKeyToExclude of
+        none -> ok;
+        _    -> drop_read_op_on_key(HashedKeyToExclude)
+    end,
     case Mode of
         single ->
             ct:pal("read"),
@@ -502,12 +508,48 @@ read_write_notfound_test(Key, HashedKeys, HashedKeyToExclude, Mode) ->
 %%     end,
     
     % cleanup
+    stop_drop_read_op_on_key(HashedKeyToExclude),
     _ = [begin
              comm:send_local(DhtNode, {delete_keys, comm:make_global(self()), HashedKeys}),
              receive {delete_keys_reply} -> ok end
          end || DhtNode <- pid_groups:find_all(dht_node)],
     wait_for_dht_entries(0),
     ok.
+
+drop_read_op_on_key(HashedKey) ->
+    ct:pal("Silencing key ~p~n", [HashedKey]),
+    Self = self(),
+    SkipHashedKeyFun =
+        fun (Message, _State) ->
+                 case Message of
+                     {?read_op, _Source_PID, _SourceId, HashedKey, _Op} ->
+                         ct:pal("Detected read, dropping it ~p, key ~p~n",
+                                [self(), HashedKey]),
+                         comm:send_local(Self, {drop_read_op_on_key, HashedKey, done}),
+                         drop_single;
+                     {?read_op, _Source_PID, _SourceId, HashedKey2, _Op} ->
+                         ct:pal("Detected read ~p, key ~p~n",
+                                [self(), HashedKey2]),
+                         false;
+                     _ ->
+%%                          ct:pal("Let pass ~p~n", [Message]),
+                         false
+                 end
+        end,
+    
+    _ = [gen_component:bp_set_cond(DhtNode, SkipHashedKeyFun, drop_read_op_on_key)
+        || DhtNode <- pid_groups:find_all(dht_node)],
+    ok.
+
+stop_drop_read_op_on_key(HashedKey) ->
+    ct:pal("Reactivating ~p~n", [HashedKey]),
+    _ = [gen_component:bp_del(DhtNode, drop_read_op_on_key)
+        || DhtNode <- pid_groups:find_all(dht_node)],
+    cleanup_drop_read_op_on_key(HashedKey).
+
+cleanup_drop_read_op_on_key(HashedKey) ->
+    receive {drop_read_op_on_key, HashedKey, done} -> cleanup_drop_read_op_on_key(HashedKey)
+    after 0 -> ok end.
 
 -spec prop_encode_decode(Value::client_value()) -> boolean().
 prop_encode_decode(Value) ->
