@@ -91,7 +91,7 @@ state_get_numreplied(State) ->
                 Result::{?ok, ?DB:value(), ?DB:version()} | {?ok, empty_val, -1} | {fail, atom(), ?DB:version()},
                 non_neg_integer(), non_neg_integer()) -> read_state().
 state_add_reply(State, Result, MajOk, MajDeny) ->
-    ?TRACE("state_add_reply state res majok majdeny ~p ~p ~p ~p ~p~n", [State, Result, MajOk, MajDeny]),
+    ?TRACE("state_add_reply state res majok majdeny ~p ~p ~p ~p ~n", [State, Result, MajOk, MajDeny]),
     Vers = element(3, Result),
     OldVers = element(3, state_get_result(State)),
     TmpState = if Vers > OldVers -> state_set_result(State, Result);
