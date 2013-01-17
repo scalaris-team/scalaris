@@ -42,6 +42,7 @@ all()   -> [
             write_test_race_mult_rings,
             read_write_2old,
             read_write_2old_locked,
+            read_write_notfound,
             tester_encode_decode,
             random_write_read,
             tester_read_not_existing,
@@ -452,6 +453,60 @@ read_write_2old_locked(_Config) ->
     
     % now try to write
     ?equals_w_note(api_tx:write(Key, 3), {ok}, "write_3_a"),
+    ok.
+
+-spec read_write_notfound(Config::[tuple()]) -> ok.
+read_write_notfound(_Config) ->
+    Key = "read_write_notfound_test_a",
+    HashedKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
+    _ = [read_write_notfound_test(Key, HashedKeys, HK, single) || HK <- HashedKeys],
+    _ = [read_write_notfound_test(Key, HashedKeys, HK, req_list) || HK <- HashedKeys],
+    ok.
+
+-spec read_write_notfound_test(Key::client_key(), HashedKeys::?RT:key(), HashedKeyToExclude::?RT:key(), Mode::single | req_list) -> ok.
+read_write_notfound_test(Key, HashedKeys, HashedKeyToExclude, Mode) ->
+    Note = io_lib:format("Key: ~p, Hashed: ~p, Excl.: ~p, Mode: ~p",
+                         [Key, HashedKeys, HashedKeyToExclude, Mode]),
+    % init
+    [HK1, HK2, _HK3, _HK4] = HashedKeys, 
+    ?equals_w_note(api_tx:write(Key, 1), {ok}, Note ++ " (write_0_a)"),
+    wait_for_dht_entries(4),
+    _ = [begin
+             comm:send_local(DhtNode, {delete_keys, comm:make_global(self()), [HK1, HK2]}),
+             receive {delete_keys_reply} -> ok end
+         end || DhtNode <- pid_groups:find_all(dht_node)],
+    
+    % test
+    case Mode of
+        single ->
+            ct:pal("read"),
+            {T1, R1} = api_tx:read(api_tx:new_tlog(), Key),
+            ct:pal("write ~p", [T1]),
+            {T2, R2} = api_tx:write(T1, Key, 2),
+            ct:pal("commit ~p", [T2]),
+            R3 = api_tx:commit(T2),
+            ok;
+        req_list ->
+            ct:pal("req_list"),
+            {_T1, [R1, R2, R3]} = api_tx:req_list(api_tx:new_tlog(), [{read, Key}, {write, Key, 2}, {commit}]),
+            ok
+    end,
+    
+    ?equals_w_note(R2, {ok}, Note ++ " (write result)"),
+    % the following should be true but is not at the moment:
+%%     case R1 of
+%%         {fail, not_found} ->
+%%             ?equals_pattern_w_note(R3, {fail, abort, _}, Note ++ " (commit result)");
+%%         {ok, 1} ->
+%%             ?equals_pattern_w_note(R3, {ok}, Note ++ " (commit result)")
+%%     end,
+    
+    % cleanup
+    _ = [begin
+             comm:send_local(DhtNode, {delete_keys, comm:make_global(self()), HashedKeys}),
+             receive {delete_keys_reply} -> ok end
+         end || DhtNode <- pid_groups:find_all(dht_node)],
+    wait_for_dht_entries(0),
     ok.
 
 -spec prop_encode_decode(Value::client_value()) -> boolean().
