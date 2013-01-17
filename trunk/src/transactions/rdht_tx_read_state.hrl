@@ -109,16 +109,18 @@ state_update_decided(State, MajOk, MajDeny) ->
            [State, MajOk, MajDeny]),
     {Ok_Fail, _Val, Vers} = state_get_result(State),
     if Vers =/= -1 ->
-           OK = state_get_numok(State) >= MajOk,
-           if OK andalso Ok_Fail =:= ?ok -> %% OK andalso (not Abort) ->
-                  state_set_decided(State, ?value);
-              OK -> state_set_decided(State, {fail, abort});
-              true ->
-                  Abort = state_get_numfailed(State) >= MajDeny,
-                  if Abort -> %% (not OK) andalso Abort
+           NumReplied = state_get_numreplied(State),
+           % if majority replied, we can given an answer!
+           if NumReplied >= MajOk ->
+                  NumAbort = state_get_numfailed(State),
+                  if NumAbort >= MajDeny ->
                          state_set_decided(State, {fail, not_found});
-                     true -> State
-                  end
+                     Ok_Fail =:= ?ok ->
+                         state_set_decided(State, ?value);
+                     true ->
+                         state_set_decided(State, {fail, abort})
+                  end;
+              true -> State
            end;
        true ->
            case state_get_numreplied(State) of
