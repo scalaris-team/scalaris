@@ -127,7 +127,7 @@ validate(DB, RTLogEntry) ->
 %%%            NewDB = ?DB:set_entry(DB, T3Entry),
 %%%            {NewDB, ?prepared};
 %%%        false ->
-    case ((RTVers =:= DBVers)
+    case ((RTVers >= DBVers)
           andalso (not db_entry:is_locked(DBEntry))) of
         true ->
             %% set locks on entry
