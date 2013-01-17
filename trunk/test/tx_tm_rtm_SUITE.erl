@@ -163,7 +163,7 @@ abort_prepared(Key, Op, PreOps, ExpectedOutcome) ->
               NewDBEntry =
                   case PreOp of
                       readlock -> db_entry:inc_readlock(DBEntry);
-                      writelock -> db_entry:set_writelock(DBEntry);
+                      writelock -> db_entry:set_writelock(DBEntry, db_entry:get_version(DBEntry));
                       versiondec -> db_entry:set_version(DBEntry, db_entry:get_version(DBEntry) -1);
                       versioninc -> db_entry:inc_version(DBEntry);
                       none -> DBEntry

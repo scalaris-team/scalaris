@@ -253,7 +253,7 @@ on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
     DoUpdate = Exists
         andalso EntryVersion =/= -1
         andalso EntryVersion < NewVersion
-        andalso not db_entry:get_writelock(Entry)
+        andalso db_entry:get_writelock(Entry) =:= false
         andalso dht_node_state:is_responsible(Key, State),
     DoRegen = not Exists
         andalso dht_node_state:is_responsible(Key, State),
