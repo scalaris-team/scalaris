@@ -153,7 +153,7 @@ split_data(_Config) ->
                      db_entry:new(5, "Value5", 5)],
                     intervals:union(intervals:new('[', 1, 3, ')'),
                                     intervals:new(4))),
-    prop_split_data([db_entry:set_writelock(db_entry:new(1, "Value1", 1)),
+    prop_split_data([db_entry:set_writelock(db_entry:new(1, "Value1", 1), 1),
                      db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
                      db_entry:new(3, "Value3", 3),
                      db_entry:new(4, "Value4", 4),
@@ -205,7 +205,7 @@ update_entries(_Config) ->
                                 db_entry:new(3, "Value3", 2),
                                 db_entry:new(4, "Value4", 2),
                                 db_entry:new(5, "Value5", 2)]),
-    prop_update_entries_helper([db_entry:set_writelock(db_entry:new(1, "Value1", 1)),
+    prop_update_entries_helper([db_entry:set_writelock(db_entry:new(1, "Value1", 1), 1),
                                 db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
                                 db_entry:new(3, "Value3", 1),
                                 db_entry:new(4, "Value4", 1),
@@ -215,7 +215,7 @@ update_entries(_Config) ->
                                 db_entry:new(3, "Value3", 2),
                                 db_entry:new(4, "Value4", 2),
                                 db_entry:new(5, "Value5", 2)],
-                               [db_entry:set_writelock(db_entry:new(1, "Value1", 1)),
+                               [db_entry:set_writelock(db_entry:new(1, "Value1", 1), 1),
                                 db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
                                 db_entry:new(3, "Value3", 2),
                                 db_entry:new(4, "Value4", 2),
@@ -277,7 +277,7 @@ prop_set_entry(DBEntry) ->
                 {ok, db_entry:get_value(DBEntry), db_entry:get_version(DBEntry)},
                 not IsNullEntry, "check_entry_set_entry_1"),
     case not db_entry:is_empty(DBEntry) andalso
-             not (db_entry:get_writelock(DBEntry) andalso db_entry:get_readlock(DBEntry) > 0) andalso
+             not (db_entry:get_writelock(DBEntry) =/= false andalso db_entry:get_readlock(DBEntry) > 0) andalso
              db_entry:get_version(DBEntry) >= 0 of
         true -> check_db(DB2, {true, []}, 1, [DBEntry], "check_db_set_entry_0");
         _ when IsNullEntry ->
@@ -312,7 +312,7 @@ prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
                         {ok, db_entry:get_value(DBEntry2), db_entry:get_version(DBEntry2)},
                         not IsNullEntry, "check_entry_update_entry_1"),
             case not db_entry:is_empty(DBEntry2) andalso
-                     not (db_entry:get_writelock(DBEntry2) andalso db_entry:get_readlock(DBEntry2) > 0) andalso
+                     not (db_entry:get_writelock(DBEntry2) =/= false andalso db_entry:get_readlock(DBEntry2) > 0) andalso
                      db_entry:get_version(DBEntry2) >= 0 of
                 true -> check_db(DB3, {true, []}, 1, [DBEntry2], "check_db_update_entry_0");
                 _ when IsNullEntry ->
@@ -355,7 +355,7 @@ prop_delete_entry2(DBEntry1, DBEntry2) ->
                 {ok, db_entry:get_value(DBEntry1), db_entry:get_version(DBEntry1)},
                 not IsNullEntry, "check_entry_delete_entry2_1"),
             case not db_entry:is_empty(DBEntry1) andalso
-                     not (db_entry:get_writelock(DBEntry1) andalso db_entry:get_readlock(DBEntry1) > 0) andalso
+                     not (db_entry:get_writelock(DBEntry1) =/= false andalso db_entry:get_readlock(DBEntry1) > 0) andalso
                      db_entry:get_version(DBEntry1) >= 0 of
                 true -> check_db(DB3, {true, []}, 1, [DBEntry1], "check_db_delete_entry2_1a");
                 _ when IsNullEntry ->
@@ -417,7 +417,7 @@ prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
                 DBA1 = ?db_equals_pattern(?TEST_DB:delete(DB2, Key), locks_set),
                 check_entry(DBA1, Key, DBEntry, {ok, Value, Version}, true, "check_entry_delete_1a"),
                 case not db_entry:is_empty(DBEntry) andalso
-                         not (db_entry:get_writelock(DBEntry) andalso db_entry:get_readlock(DBEntry) > 0) andalso
+                         not (db_entry:get_writelock(DBEntry) =/= false andalso db_entry:get_readlock(DBEntry) > 0) andalso
                          db_entry:get_version(DBEntry) >= 0 of
                     true -> check_db(DBA1, {true, []}, 1, [DBEntry], "check_db_delete_1ax");
                     _    -> check_db(DBA1, {false, [DBEntry]}, 1, [DBEntry], "check_db_delete_1ay")
@@ -427,7 +427,7 @@ prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
                         DBTmp = ?db_equals_pattern(?TEST_DB:delete(DBA1, Key2), undef),
                         check_entry(DBTmp, Key, DBEntry, {ok, Value, Version}, true, "check_entry_delete_2a"),
                         case not db_entry:is_empty(DBEntry) andalso
-                                 not (db_entry:get_writelock(DBEntry) andalso db_entry:get_readlock(DBEntry) > 0) andalso
+                                 not (db_entry:get_writelock(DBEntry) =/= false andalso db_entry:get_readlock(DBEntry) > 0) andalso
                                  db_entry:get_version(DBEntry) >= 0 of
                             true -> check_db(DBTmp, {true, []}, 1, [DBEntry], "check_db_delete_2ax");
                             _    -> check_db(DBTmp, {false, [DBEntry]}, 1, [DBEntry], "check_db_delete_2ay")
@@ -523,7 +523,7 @@ prop_get_entries3_2(Data, Range) ->
     DB2 = ?TEST_DB:add_data(DB, UniqueData),
     
     FilterFun = fun(A) -> (not db_entry:is_empty(A)) andalso
-                              (not db_entry:get_writelock(A)) andalso
+                              db_entry:get_writelock(A) =:= false andalso
                               intervals:in(db_entry:get_key(A), Range)
                 end,
     ValueFun = fun(DBEntry) -> {db_entry:get_key(DBEntry),
@@ -1353,7 +1353,7 @@ check_entry(DB, Key, ExpDBEntry, ExpRead, ExpExists, Note) ->
 create_db_entry(Key, Value, WriteLock, ReadLock, Version) ->
     E1 = db_entry:new(Key, Value, Version),
     E2 = case WriteLock of
-             true -> db_entry:set_writelock(E1);
+             true -> db_entry:set_writelock(E1, db_entry:get_version(E1));
              _    -> E1
          end,
     _E3 = inc_readlock(E2, ReadLock).

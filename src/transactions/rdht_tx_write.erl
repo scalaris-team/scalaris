@@ -112,30 +112,23 @@ validate(DB, RTLogEntry) ->
     RTVers = tx_tlog:get_entry_version(RTLogEntry),
     DBVers = db_entry:get_version(DBEntry),
 
-%%%    case RTVers > DBVers of
-%%%        true ->
-%%%            %% This trick would need the old value in the rtlog
-%%%            %% in case of rollback and to serve read requests
-%%%            %% properly (version and value have to be changed
-%%%            %% atomically as a pair).
-%%%            %% DB is outdated, in workphase a quorum responded with a
-%%%            %% newer version, so a newer version was committed
-%%%            %% reset all locks, set version and set writelock
-%%%            T1Entry = db_entry:reset_locks(DBEntry),
-%%%            T2Entry = db_entry:set_version(T1, RTVers),
-%%%            T3Entry = db_entry:set_writelock(T2, true),
-%%%            NewDB = ?DB:set_entry(DB, T3Entry),
-%%%            {NewDB, ?prepared};
-%%%        false ->
-    case ((RTVers >= DBVers)
-          andalso (not db_entry:is_locked(DBEntry))) of
-        true ->
-            %% set locks on entry
-            NewEntry = db_entry:set_writelock(DBEntry),
-            NewDB = ?DB:set_entry(DB, NewEntry),
-            {NewDB, ?prepared};
-        false ->
-            {DB, ?abort}
+    %% Note: RTVers contains the latest version in the system (if not outdated).
+    %%       We can not update the DB entry's version with it though since this
+    %%       would need the old value in the rtlog in case of rollback and to
+    %%       serve read requests properly (version and value have to be changed
+    %%       atomically as a pair).
+    ReadLocks = db_entry:get_readlock(DBEntry),
+    WriteLock = db_entry:get_writelock(DBEntry),
+    if RTVers >= DBVers andalso ReadLocks =:= 0 andalso
+           (WriteLock =:= false orelse WriteLock < RTVers) ->
+           %% set locks on entry (use RTVers for write locks to allow proper
+           %% handling of outdated commit and abort messages - only clean up
+           %% if the write lock version matches!)
+           NewEntry = db_entry:set_writelock(DBEntry, RTVers),
+           NewDB = ?DB:set_entry(DB, NewEntry),
+           {NewDB, ?prepared};
+       true ->
+           {DB, ?abort}
     end.
 
 -spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
@@ -144,8 +137,11 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
     DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
     %% perform op
     RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
-    DBVers = db_entry:get_version(DBEntry),
-    if DBVers =< RTLogVers ->
+    % Note: WriteLock is always >= DBVers! - old check:
+%%     DBVers = db_entry:get_version(DBEntry),
+%%     if DBVers =< RTLogVers ->
+    WriteLock = db_entry:get_writelock(DBEntry),
+    if WriteLock =:= RTLogVers -> % op that created the write lock?
            T2DBEntry = db_entry:set_value(
                          DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
            T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
@@ -164,12 +160,14 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
         ?prepared ->
             DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
             RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
-            DBVers = db_entry:get_version(DBEntry),
-            case RTLogVers of
-                DBVers ->
-                    NewEntry = db_entry:unset_writelock(DBEntry),
-                    ?DB:set_entry(DB, NewEntry);
-                _ -> DB
+            % Note: WriteLock is always >= DBVers! - old check:
+%%             DBVers = db_entry:get_version(DBEntry),
+%%             if RTLogVers =:= DBVers ->
+            WriteLock = db_entry:get_writelock(DBEntry),
+            if WriteLock =:= RTLogVers -> % op that created the write lock?
+                   NewEntry = db_entry:unset_writelock(DBEntry),
+                   ?DB:set_entry(DB, NewEntry);
+               true -> DB
             end;
         ?abort ->
             DB

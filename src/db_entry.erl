@@ -26,7 +26,7 @@
          get_key/1,
          get_value/1, set_value/2,
          get_readlock/1, inc_readlock/1, dec_readlock/1,
-         get_writelock/1, set_writelock/1, unset_writelock/1,
+         get_writelock/1, set_writelock/2, unset_writelock/1,
          get_version/1, inc_version/1, set_version/2,
          reset_locks/1, is_locked/1,
          is_empty/1, is_null/1]).
@@ -37,10 +37,15 @@
 
 % note: do not make opaque so DB implementations can rely on an entry() being a
 % tuple as defined here
--type entry() :: {Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
-                  ReadLock::non_neg_integer(), Version::?DB:version()} |
-                 {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::boolean(),
-                  ReadLock::non_neg_integer(), Version::-1}.
+% note: WriteLock is either false or the version (>= Version) that a write
+% operation is working on (this allows proper cleanup - see rdht_tx_write)
+-type entry_ex() ::
+          {Key::?RT:key(), Value::?DB:value(), WriteLock::false | ?DB:version(),
+           ReadLock::non_neg_integer(), Version::?DB:version()}.
+-type entry_empty() ::
+          {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::false | -1 | ?DB:version(),
+           ReadLock::non_neg_integer(), Version::-1}.
+-type entry() :: entry_ex() | entry_empty().
 
 -spec new(Key::?RT:key()) -> {?RT:key(), empty_val, false, 0, -1}.
 new(Key) -> {Key, empty_val, false, 0, -1}.
@@ -59,24 +64,14 @@ get_value(DBEntry) -> element(2, DBEntry).
 -spec set_value(DBEntry::entry(), Value::?DB:value()) -> entry().
 set_value(DBEntry, Value) -> setelement(2, DBEntry, Value).
 
--spec get_writelock(DBEntry::entry()) -> WriteLock::boolean().
+-spec get_writelock(DBEntry::entry()) -> WriteLock::false | -1 | ?DB:version().
 get_writelock(DBEntry) -> element(3, DBEntry).
 
--spec set_writelock(DBEntry::entry(), WriteLock::boolean()) -> entry().
+-spec set_writelock(entry_ex(), false | ?DB:version()) -> entry_ex();
+                   (entry_empty(), false | -1 | ?DB:version()) -> entry_empty().
 set_writelock(DBEntry, WriteLock) -> setelement(3, DBEntry, WriteLock).
 
--spec set_writelock(DBEntry::entry()) ->
-    {Key::?RT:key(), Value::?DB:value(), WriteLock::true,
-     ReadLock::non_neg_integer(), Version::?DB:version()} |
-    {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::true,
-     ReadLock::non_neg_integer(), Version::-1}.
-set_writelock(DBEntry) -> set_writelock(DBEntry, true).
-
--spec unset_writelock(DBEntry::entry()) ->
-    {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
-     ReadLock::non_neg_integer(), Version::?DB:version()} |
-    {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::false,
-     ReadLock::non_neg_integer(), Version::-1}.
+-spec unset_writelock(DBEntry::entry()) -> entry().
 unset_writelock(DBEntry) -> set_writelock(DBEntry, false).
 
 -spec get_readlock(DBEntry::entry()) -> ReadLock::non_neg_integer().
@@ -115,7 +110,7 @@ reset_locks(DBEntry) ->
 
 -spec is_locked(DBEntry::entry()) -> boolean().
 is_locked(DBEntry) ->
-    get_readlock(DBEntry) > 0 orelse get_writelock(DBEntry).
+    get_readlock(DBEntry) > 0 orelse get_writelock(DBEntry) =/= false.
 
 %% @doc Returns whether the item is an empty_val item with version -1.
 %%      Note: The number of read or write locks does not matter here!

@@ -147,7 +147,7 @@ check_db(DB) ->
     Data = get_data(DB),
     ValidFun = fun(DBEntry) ->
                        not db_entry:is_empty(DBEntry) andalso
-                           not (db_entry:get_writelock(DBEntry) andalso
+                           not (db_entry:get_writelock(DBEntry) =/= false andalso
                                     db_entry:get_readlock(DBEntry) > 0) andalso
                            db_entry:get_version(DBEntry) >= 0
                end,

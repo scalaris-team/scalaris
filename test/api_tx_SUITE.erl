@@ -41,6 +41,7 @@ all()   -> [
             multi_write,
             write_test_race_mult_rings,
             read_write_2old,
+            read_write_2old_locked,
             tester_encode_decode,
             random_write_read,
             tester_read_not_existing,
@@ -408,6 +409,49 @@ read_write_2old(_Config) ->
     receive {delete_keys_reply} -> ok end,
     
     ?equals(api_tx:write(Key, 2), {ok}),
+    ok.
+
+-spec read_write_2old_locked(Config::[tuple()]) -> ok.
+read_write_2old_locked(_Config) ->
+    Key = "read_write_2old_a",
+    GSelf = comm:make_global(self()),
+    ?equals_w_note(api_tx:write(Key, 1), {ok}, "write_1_a"),
+    wait_for_dht_entries(4),
+    [HK1, HK2, _HK3, _HK4] = ?RT:get_replica_keys(?RT:hash_key(Key)),
+
+    % get HK1, HK2 entries
+    api_dht_raw:unreliable_lookup(HK1, {get_key_entry, GSelf, HK1}),
+    api_dht_raw:unreliable_lookup(HK2, {get_key_entry, GSelf, HK2}),
+    receive {get_key_entry_reply, Entry1} ->
+                ?assert_w_note(not db_entry:is_empty(Entry1), io_lib:format("~p", [Entry1]))
+    end,
+    receive {get_key_entry_reply, Entry2} ->
+                ?assert_w_note(not db_entry:is_empty(Entry2), io_lib:format("~p", [Entry2]))
+    end,
+    ?equals(db_entry:get_version(Entry1), db_entry:get_version(Entry2)),
+    OldVersion = db_entry:get_version(Entry1),
+    
+    % write new value
+    ?equals_w_note(api_tx:write(Key, 2), {ok}, "write_2_a"),
+    util:wait_for(
+      fun() ->
+              {Status, Values} = api_dht_raw:range_read(0, 0),
+              Status =:= ok andalso
+                  lists:all(fun(E) ->
+                                    db_entry:get_version(E) =:= (OldVersion + 1)
+                            end, Values)
+      end),
+    
+    % set two outdated, locked entries:
+    Entry1L = db_entry:set_writelock(Entry1, OldVersion - 1),
+    Entry2L = db_entry:set_writelock(Entry2, OldVersion - 1),
+    api_dht_raw:unreliable_lookup(db_entry:get_key(Entry1L), {set_key_entry, GSelf, Entry1L}),
+    api_dht_raw:unreliable_lookup(db_entry:get_key(Entry2L), {set_key_entry, GSelf, Entry2L}),
+    receive {set_key_entry_reply, Entry1L} -> ok end,
+    receive {set_key_entry_reply, Entry2L} -> ok end,
+    
+    % now try to write
+    ?equals_w_note(api_tx:write(Key, 3), {ok}, "write_3_a"),
     ok.
 
 -spec prop_encode_decode(Value::client_value()) -> boolean().
