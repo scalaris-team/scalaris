@@ -144,7 +144,7 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
             T2DBEntry = db_entry:set_value(
                           DBEntry, tx_tlog:get_entry_value(RTLogEntry), RTLogVers + 1),
             NewEntry =
-                if WriteLock =< RTLogVers ->
+                if WriteLock =/= false andalso WriteLock =< RTLogVers ->
                         %% op that created the write lock or outdated WL?
                         db_entry:reset_locks(T2DBEntry);
                    true -> T2DBEntry
@@ -167,7 +167,7 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
 %%             DBVers = db_entry:get_version(DBEntry),
 %%             if RTLogVers =:= DBVers ->
             WriteLock = db_entry:get_writelock(DBEntry),
-            if WriteLock =< RTLogVers ->
+            if WriteLock =/= false andalso WriteLock =< RTLogVers ->
                     %% op that created the write lock or outdated WL?
                     NewEntry = db_entry:unset_writelock(DBEntry),
                     ?DB:set_entry(DB, NewEntry);
