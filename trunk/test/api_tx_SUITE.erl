@@ -457,22 +457,20 @@ read_write_2old_locked(_Config) ->
 
 -spec read_write_notfound(Config::[tuple()]) -> ok.
 read_write_notfound(_Config) ->
-    Key = "read_write_notfound_test_a",
-    HashedKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
-    read_write_notfound_test(Key, HashedKeys, none, single),
-    read_write_notfound_test(Key, HashedKeys, none, req_list),
-    _ = [read_write_notfound_test(Key, HashedKeys, HK, single) || HK <- HashedKeys],
-    _ = [read_write_notfound_test(Key, HashedKeys, HK, req_list) || HK <- HashedKeys],
+    Key = "read_write_notfound_test",
+    [read_write_notfound_test(Key ++ lists:flatten(io_lib:format("_~p_~p", [X, M])), X, M)
+       || X <- [none | lists:seq(1,4)],
+          M <- [single, req_list]],
     ok.
 
--spec read_write_notfound_test(Key::client_key(), HashedKeys::?RT:key() | none, HashedKeyToExclude::?RT:key(), Mode::single | req_list) -> ok.
-read_write_notfound_test(Key, HashedKeys, HashedKeyToExclude, Mode) ->
+-spec read_write_notfound_test(Key::client_key(), HashedKeyToExclude::1..4 | none, Mode::single | req_list) -> ok.
+read_write_notfound_test(Key, HashedKeyToExclude, Mode) ->
+    [HK1, HK2, _HK3, _HK4] = HashedKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     Note = io_lib:format("Key: ~p, Hashed: ~p, Excl.: ~p, Mode: ~p",
                          [Key, HashedKeys, HashedKeyToExclude, Mode]),
-    % init
-    [HK1, HK2, _HK3, _HK4] = HashedKeys, 
+    % init 
     ?equals_w_note(api_tx:write(Key, 1), {ok}, Note ++ " (write_0_a)"),
-    wait_for_dht_entries(4),
+    wait_for_dht_entries(HashedKeys),
     _ = [begin
              comm:send_local(DhtNode, {delete_keys, comm:make_global(self()), [HK1, HK2]}),
              receive {delete_keys_reply} -> ok end
@@ -509,11 +507,6 @@ read_write_notfound_test(Key, HashedKeys, HashedKeyToExclude, Mode) ->
     
     % cleanup
     stop_drop_read_op_on_key(HashedKeyToExclude),
-    _ = [begin
-             comm:send_local(DhtNode, {delete_keys, comm:make_global(self()), HashedKeys}),
-             receive {delete_keys_reply} -> ok end
-         end || DhtNode <- pid_groups:find_all(dht_node)],
-    wait_for_dht_entries(0),
     ok.
 
 drop_read_op_on_key(HashedKey) ->
@@ -1268,10 +1261,21 @@ req_list_parallelism(_Config) ->
 %%      This may be necessary, to make sure (late) write messages have arrived
 %%      at the original nodes.
 %%      Note: DHT entries = 4 * client entries!
--spec wait_for_dht_entries(Count::non_neg_integer()) -> ok.
-wait_for_dht_entries(Count) ->
+-spec wait_for_dht_entries(Count::non_neg_integer() | [?RT:key()]) -> ok.
+wait_for_dht_entries(Count) when is_integer(Count) andalso Count >= 0 ->
     util:wait_for(
       fun() ->
               {Status, Values} = api_dht_raw:range_read(0, 0),
               Status =:= ok andalso erlang:length(Values) =:= Count
+      end);
+wait_for_dht_entries(HashedKeys) when is_list(HashedKeys) ->
+    GSelf = comm:make_global(self()),
+    util:wait_for(
+      fun() ->
+              Entries = [begin
+                             api_dht_raw:unreliable_lookup(HK, {get_key_entry, GSelf, HK}),
+                             receive {get_key_entry_reply, Entry} -> Entry end
+                         end || HK <- HashedKeys],
+              NonEmptyEntries = [E || E <- Entries, not db_entry:is_empty(E)],
+              length(NonEmptyEntries) =:= length(HashedKeys)
       end).
