@@ -208,19 +208,21 @@ calc_w_outcome(Key, PreOps) ->
     if (4 =:= NumVersionInc) -> {ok};
        (4 =:= NumVersionDec) -> {ok};
        (4 =:= NumNone) -> {ok};
+       (1 =:= NumVersionInc) -> ok_or_abort; % Inc+2xAny => OK, RL|WL+2xAny => ABORT, None+2xAny => OK
        (1 =:= NumReadlock andalso NumNone =:= 3) -> {ok};
        (1 =:= NumWritelock andalso NumNone =:= 3) -> {ok};
+       (1 =:= NumVersionDec andalso NumNone =:= 2) -> ok_or_abort; % Dec+2xNone => OK, RL|WL+2xNone => ABORT 
        (1 =:= NumVersionDec andalso NumNone =:= 3) -> {ok};
-       (1 =:= NumVersionInc andalso 3 =:= NumNone) -> ok_or_abort;
+       
+       (2 =< NumVersionInc) -> {ok};
+       (2 =:= NumVersionDec andalso NumNone =:= 1) -> {ok};
+       (2 =:= NumVersionDec andalso NumNone =:= 2) -> {ok};
 
-       (3 =:= NumVersionDec andalso 1 =:= NumReadlock) -> ok_or_abort;
-       (3 =:= NumVersionDec andalso 1 =:= NumWritelock) -> ok_or_abort;
-       (3 =:= NumVersionDec andalso 1 =:= NumVersionInc) -> ok_or_abort;
+       % RL|WL+2xDec => ABORT, 3xDec => OK
+       (3 =:= NumVersionDec andalso 0 =:= NumNone) -> ok_or_abort;
+       
+       % RMaj with 3xDec + Validate on 3xDec => OK, RMaj with 3xDec, Validate on 2xDec+None => ABORT
        (3 =:= NumVersionDec andalso 1 =:= NumNone) -> ok_or_abort;
-       (3 =:= NumVersionInc andalso 1 =:= NumReadlock) -> ok_or_abort;
-       (3 =:= NumVersionInc andalso 1 =:= NumVersionDec) -> {ok};
-       (3 =:= NumVersionInc andalso 1 =:= NumNone) -> {ok};
-       (3 =:= NumVersionInc andalso 1 =:= NumWritelock) -> {ok};
 
        true -> {fail, abort, [Key]}
     end.
@@ -260,19 +262,20 @@ calc_rmc_outcome(Key, PreOps) ->
 
 calc_wmc_outcome(Key, PreOps) ->
     NumReadlock =   length([ X || X <- PreOps, X =:= readlock ]),
-    NumWritelock =  length([ X || X <- PreOps, X =:= writelock ]),
+    %NumWritelock =  length([ X || X <- PreOps, X =:= writelock ]),
     NumVersionDec = length([ X || X <- PreOps, X =:= versiondec ]),
     NumVersionInc = length([ X || X <- PreOps, X =:= versioninc ]),
     NumNone =       length([ X || X <- PreOps, X =:= none ]),
 
-    if (NumVersionInc >= 2) -> {fail, abort, [Key]};
-       (NumVersionDec >= 2) -> {fail, abort, [Key]};
+    if ((NumNone + NumVersionDec) =:= 4) -> {ok};
+       % The following should be 'ok_or_abort', because 4th is RL|WL|Inc and
+       % therefore if 4th in Maj => ABORT, else OK.
+       % However, the current code waits for 3 prepared or 2 abort decisions
+       % and only the latter can occur!
+       ((NumNone + NumVersionDec) =:= 3) -> {ok}; 
+
+       (NumVersionInc >= 2) -> {fail, abort, [Key]};
        (NumReadlock >= 2) -> {fail, abort, [Key]};
-       (NumReadlock =:= 1 andalso NumNone =:= 3) -> {ok};
-       (NumWritelock =:= 1 andalso NumNone =:= 3) -> {ok};
-       (NumVersionDec =:= 1 andalso NumNone =:= 3) -> {ok};
-       (NumNone =:= 4) -> {ok};
-       (NumVersionInc =:= 1 andalso NumNone =:= 3) -> {ok};
 
        true -> {fail, abort, [Key]}
     end.
