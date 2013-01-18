@@ -24,12 +24,15 @@
 
 -export([new/1, new/3,
          get_key/1,
-         get_value/1, set_value/2,
+         get_value/1, set_value/3,
          get_readlock/1, inc_readlock/1, dec_readlock/1,
          get_writelock/1, set_writelock/2, unset_writelock/1,
-         get_version/1, inc_version/1, set_version/2,
+         get_version/1,
          reset_locks/1, is_locked/1,
          is_empty/1, is_null/1]).
+
+% only for unit tests:
+-export([inc_version/1, dec_version/1]).
 
 -ifdef(with_export_type_support).
 -export_type([entry/0]).
@@ -61,8 +64,9 @@ get_key(DBEntry) -> element(1, DBEntry).
 -spec get_value(DBEntry::entry()) -> ?DB:value().
 get_value(DBEntry) -> element(2, DBEntry).
 
--spec set_value(DBEntry::entry(), Value::?DB:value()) -> entry().
-set_value(DBEntry, Value) -> setelement(2, DBEntry, Value).
+-spec set_value(DBEntry::entry(), Value::?DB:value(), Version::?DB:version()) -> entry().
+set_value(DBEntry, Value, Version) ->
+    setelement(2, setelement(5, DBEntry, Version), Value).
 
 -spec get_writelock(DBEntry::entry()) -> WriteLock::false | -1 | ?DB:version().
 get_writelock(DBEntry) -> element(3, DBEntry).
@@ -94,10 +98,10 @@ dec_readlock(DBEntry) ->
 get_version(DBEntry) -> element(5, DBEntry).
 
 -spec inc_version(DBEntry::entry()) -> entry().
-inc_version(DBEntry) -> set_version(DBEntry, get_version(DBEntry) + 1).
+inc_version(DBEntry) -> setelement(5, DBEntry, get_version(DBEntry) + 1).
 
--spec set_version(DBEntry::entry(), Version::?DB:version()) -> entry().
-set_version(DBEntry, Version) -> setelement(5, DBEntry, Version).
+-spec dec_version(DBEntry::entry()) -> entry().
+dec_version(DBEntry) -> setelement(5, DBEntry, get_version(DBEntry) - 1).
 
 -spec reset_locks(DBEntry::entry()) ->
     {Key::?RT:key(), Value::?DB:value(), WriteLock::false,

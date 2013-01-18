@@ -164,7 +164,7 @@ abort_prepared(Key, Op, PreOps, ExpectedOutcome) ->
                   case PreOp of
                       readlock -> db_entry:inc_readlock(DBEntry);
                       writelock -> db_entry:set_writelock(DBEntry, db_entry:get_version(DBEntry));
-                      versiondec -> db_entry:set_version(DBEntry, db_entry:get_version(DBEntry) -1);
+                      versiondec -> db_entry:dec_version(DBEntry);
                       versioninc -> db_entry:inc_version(DBEntry);
                       none -> DBEntry
                   end,
@@ -286,11 +286,8 @@ init_new_db_key(Value) ->
     Keys = ?RT:get_replica_keys(?RT:hash_key(NewKey)),
     _ = [ begin
               E1 = db_entry:new(Key),
-              %% inc twice, so decversion is ok
-              E2 = db_entry:inc_version(E1),
-              E3 = db_entry:inc_version(E2),
-              %% set a value
-              E4 = db_entry:set_value(E3, Value),
+              %% set a value, version += 2 (so decversion is ok)
+              E4 = db_entry:set_value(E1, Value, db_entry:get_version(E1) + 2),
               api_dht_raw:unreliable_lookup(db_entry:get_key(E4),
                                        {set_key_entry, comm:this(), E4}),
               receive {set_key_entry_reply, E4} -> ok end

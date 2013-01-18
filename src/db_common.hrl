@@ -53,8 +53,7 @@ write(DB, Key, Value, Version) ->
             NewEntry = db_entry:new(Key, Value, Version),
             set_entry_(DB, NewEntry);
         _ ->
-            NewEntry = db_entry:set_value(
-                         db_entry:set_version(DBEntry, Version), Value),
+            NewEntry = db_entry:set_value(DBEntry, Value, Version),
             update_entry_(DB, NewEntry)
     end.
 

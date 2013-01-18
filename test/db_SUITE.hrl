@@ -797,7 +797,7 @@ prop_changed_keys_update_entry(Data, ChangesInterval, UpdateVal) ->
                              end, lists:reverse(Data)),
     UpdateElement = util:randomelem(UniqueData),
     Old = ?TEST_DB:get_entry2(DB2, db_entry:get_key(UpdateElement)),
-    UpdatedElement = db_entry:inc_version(db_entry:set_value(UpdateElement, UpdateVal)),
+    UpdatedElement = db_entry:set_value(UpdateElement, UpdateVal, db_entry:get_version(UpdateElement) + 1),
     
     case element(1, Old) of
         false -> % element does not exist, i.e. was a null entry, -> cannot update
