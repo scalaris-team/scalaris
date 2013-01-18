@@ -119,7 +119,7 @@ validate(DB, RTLogEntry) ->
     %%       atomically as a pair).
     ReadLocks = db_entry:get_readlock(DBEntry),
     WriteLock = db_entry:get_writelock(DBEntry),
-    if RTVers >= DBVers andalso ReadLocks =:= 0 andalso
+    if ((RTVers =:= DBVers andalso ReadLocks =:= 0) orelse RTVers > DBVers) andalso
            (WriteLock =:= false orelse WriteLock < RTVers) ->
            %% set locks on entry (use RTVers for write locks to allow proper
            %% handling of outdated commit and abort messages - only clean up
