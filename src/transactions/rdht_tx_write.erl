@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(rdht_tx_write).
 -author('schintke@onscale.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
@@ -137,18 +137,22 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
     DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
     %% perform op
     RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
-    % Note: WriteLock is always >= DBVers! - old check:
-%%     DBVers = db_entry:get_version(DBEntry),
-%%     if DBVers =< RTLogVers ->
+    %% Note: if false =/= WriteLock -> WriteLock is always >= own DBVers!
+    DBVers = db_entry:get_version(DBEntry),
     WriteLock = db_entry:get_writelock(DBEntry),
-    if WriteLock =:= RTLogVers -> % op that created the write lock?
-           T2DBEntry = db_entry:set_value(
-                         DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
-           T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
-           NewEntry = db_entry:reset_locks(T3DBEntry),
-           ?DB:set_entry(DB, NewEntry);
+    if DBVers =< RTLogVers ->
+            T2DBEntry = db_entry:set_value(
+                          DBEntry, tx_tlog:get_entry_value(RTLogEntry)),
+            T3DBEntry = db_entry:set_version(T2DBEntry, RTLogVers + 1),
+            NewEntry =
+                if WriteLock =< RTLogVers ->
+                        %% op that created the write lock or outdated WL?
+                        db_entry:reset_locks(T3DBEntry);
+                   true -> T3DBEntry
+                end,
+            ?DB:set_entry(DB, NewEntry);
        true ->
-           DB %% outdated commit
+            DB %% outdated commit
     end.
 
 -spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
@@ -164,9 +168,10 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
 %%             DBVers = db_entry:get_version(DBEntry),
 %%             if RTLogVers =:= DBVers ->
             WriteLock = db_entry:get_writelock(DBEntry),
-            if WriteLock =:= RTLogVers -> % op that created the write lock?
-                   NewEntry = db_entry:unset_writelock(DBEntry),
-                   ?DB:set_entry(DB, NewEntry);
+            if WriteLock =< RTLogVers ->
+                    %% op that created the write lock or outdated WL?
+                    NewEntry = db_entry:unset_writelock(DBEntry),
+                    ?DB:set_entry(DB, NewEntry);
                true -> DB
             end;
         ?abort ->
