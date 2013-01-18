@@ -260,7 +260,7 @@ on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
     {NewState, NewEntry} =
         if
             DoUpdate ->
-                UpdEntry = db_entry:set_version(db_entry:set_value(Entry, NewValue), NewVersion),
+                UpdEntry = db_entry:set_value(Entry, NewValue, NewVersion),
                 NewDB = ?DB:update_entry(dht_node_state:get(State, db), UpdEntry),
                 {dht_node_state:set_db(State, NewDB), UpdEntry};
             DoRegen ->
