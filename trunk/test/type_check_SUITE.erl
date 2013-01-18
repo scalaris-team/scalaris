@@ -369,7 +369,11 @@ tester_type_check_util(_Config) ->
              {send_local, 2}, {send_local_after, 3}, %% cannot send msgs
              {unpack_cookie, 2} %% cannot create correct envelopes
            ], []},
-          {db_entry, [], []},
+          {db_entry,
+           [ {inc_version, 1}, % WL -1 is only allowed for empty_val
+             {dec_version, 1}, % WL -1 is only allowed for empty_val
+             {set_value, 3} % WL -1 is only allowed for empty_val
+           ], []},
           %% {fix_queue, [], []}, %% queue as builtin type not supported yet
 
           %% {histogram, [], []}, %% error in add?
