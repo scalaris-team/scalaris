@@ -82,41 +82,50 @@
 -type lease_t() :: #lease{}.
 -type lease_list() :: [lease_t()].
 
--type renewal_failed_reason() :: lease_does_not_exist
-                               | epoch_or_version_mismatch
-                               | owner_changed
-                               | range_changed
-                               | aux_changed
-                               | timeout_is_not_newer_than_current_lease
-                               | timeout_is_not_in_the_future.
+-type generic_failed_reason() :: lease_does_not_exist
+                               | unexpected_owner
+                               | unexpected_aux
+                               | unexpected_range
+                               | unexpected_timeout
+                               | unexpected_epoch
+                               | unexpected_version
+                               | timeout_is_not_newer_than_current_lease.
+
+%-type renewal_failed_reason() :: lease_does_not_exist
+%                               | unexpected_owner
+%                               | unexpected_aux
+%                               | unexpected_range
+%                               | unexpected_epoch
+%                               | unexpected_version
+%                               | timeout_is_not_newer_than_current_lease.
 
 -type update_failed_reason() :: lease_does_not_exist
                               | epoch_or_version_mismatch.
 
 -type split_step1_failed_reason() :: lease_already_exists.
--type split_step2_failed_reason() :: lease_does_not_exist
-                                   | epoch_or_version_mismatch
-                                   | owner_changed
-                                   | range_unchanged
-                                   | aux_unchanged
-                                   | timeout_is_not_newer_than_current_lease
-                                   | timeout_is_not_in_the_future.
-
--type split_step3_failed_reason() :: lease_does_not_exist
-                                   | epoch_or_version_mismatch
-                                   | owner_changed
-                                   | range_changed
-                                   | aux_unchanged
-                                   | timeout_is_not_newer_than_current_lease
-                                   | timeout_is_not_in_the_future.
-
--type split_step4_failed_reason() :: lease_does_not_exist
-                                   | epoch_or_version_mismatch
-                                   | owner_changed
-                                   | range_changed
-                                   | aux_unchanged
-                                   | timeout_is_not_newer_than_current_lease
-                                   | timeout_is_not_in_the_future.
+%-type split_step2_failed_reason() :: lease_does_not_exist
+%                                   | epoch_or_version_mismatch
+%                                   | owner_changed
+%                                   | range_unchanged
+%                                   | aux_unchanged
+%                                   | timeout_is_not_newer_than_current_lease
+%                                   | timeout_is_not_in_the_future.
+%
+%-type split_step3_failed_reason() :: lease_does_not_exist
+%                                   | epoch_or_version_mismatch
+%                                   | owner_changed
+%                                   | range_changed
+%                                   | aux_unchanged
+%                                   | timeout_is_not_newer_than_current_lease
+%                                   | timeout_is_not_in_the_future.
+%
+%-type split_step4_failed_reason() :: lease_does_not_exist
+%                                   | epoch_or_version_mismatch
+%                                   | owner_changed
+%                                   | range_changed
+%                                   | aux_unchanged
+%                                   | timeout_is_not_newer_than_current_lease
+%                                   | timeout_is_not_in_the_future.
 
 -spec delta() -> pos_integer().
 delta() -> 10.
@@ -167,8 +176,11 @@ lease_merge(Lease1, Lease2) ->
 -spec lease_update(lease_t(), lease_t()) -> ok.
 lease_update(Old, New) ->
     comm:send_local(pid_groups:get_my(dht_node),
-                    {l_on_cseq, update, Old, New}),
-    ok.
+                    {l_on_cseq, update, Old, New, self()}),
+    receive
+        {l_on_cseq, update_success, Old, New} ->
+            ok
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -182,11 +194,11 @@ lease_update(Old, New) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
-on({l_on_cseq, renew, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
+on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}},
    State) ->
     ct:pal("renew ~p~n", [Old]),
     New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
-    ContentCheck = is_valid_renewal(OldEpoch, OldVersion),
+    ContentCheck = generic_content_check(Old),
     DB = get_db_for_id(Id),
 %% @todo New passed for debugging only:
     Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New}),
@@ -210,30 +222,22 @@ on({l_on_cseq, renew_reply,
                 _ ->
                     remove_lease_from_dht_node_state(Value, State)
             end;
-        epoch_or_version_mismatch ->
-            lease_renew(Value),
-            State;
-        owner_changed ->
-            remove_lease_from_dht_node_state(Value, State);
-        range_changed ->
-            lease_renew(Value),
-            State;
-        aux_changed ->
-            %case of
+        unexpected_owner   -> remove_lease_from_dht_node_state(Value, State);
+        unexpected_aux     ->
             case get_aux(Value) of
-                empty -> lease_renew(Value), State;
+                empty                  -> lease_renew(Value), State;
                 {invalid, split, _, _} -> lease_renew(Value), State;
                 {invalid, merge, _, _} -> lease_renew(Value), State;
                 {invalid, merge, stopped} ->
                     remove_lease_from_dht_node_state(Value, State);
-                {valid, split, _, _} -> lease_renew(Value), State;
-                {valid, merge, _, _} -> lease_renew(Value), State
+                {valid, split, _, _}   -> lease_renew(Value), State;
+                {valid, merge, _, _}   -> lease_renew(Value), State
             end;
-            % @todo log message
+        unexpected_range   -> lease_renew(Value), State;
+        unexpected_timeout -> lease_renew(Value), State;
+        unexpected_epoch   -> lease_renew(Value), State;
+        unexpected_version -> lease_renew(Value), State;
         timeout_is_not_newer_than_current_lease ->
-            lease_renew(Value),
-            State;
-        timeout_is_not_in_the_future ->
             lease_renew(Value),
             State
     end;
@@ -243,25 +247,27 @@ on({l_on_cseq, renew_reply,
 % lease update (only for unit tests
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, update, _Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
-    New}, State) ->
+on({l_on_cseq, update, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
+    New, Caller}, State) ->
     %io:format("renew ~p~n", [Old]),
     ContentCheck = is_valid_update(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     %% @todo New passed for debugging only:
-    Self = comm:reply_as(self(), 3, {l_on_cseq, update_reply, '_', New}),
+    Self = comm:reply_as(self(), 3, {l_on_cseq, update_reply, '_', Old, New, Caller}),
     rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
     State;
 
-on({l_on_cseq, update_reply, {qwrite_done, _ReqId, _Round, Value}, _New}, State) ->
+on({l_on_cseq, update_reply, {qwrite_done, _ReqId, _Round, Value},
+    Old, New, Caller}, State) ->
     io:format("successful update~n", []),
+    comm:send_local(Caller, {l_on_cseq, update_success, Old, New}),
     update_lease_in_dht_node_state(Value, State);
 
 on({l_on_cseq, update_reply,
     {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}}, New},
    State) ->
     % @todo retry
-    io:format("update denied: ~p ~p ~p~n", [Reason, Value, New]),
+    ct:pal("update denied: ~p ~p ~p~n", [Reason, Value, New]),
     case Reason of
         lease_does_not_exist ->
             % @todo log message
@@ -464,16 +470,16 @@ on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2,
 % lease split (step2)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch,version=OldVersion}, R1, R2,
+on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch}, R1, R2,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
-    io:format("split second step: updating L1~n", []),
+    ct:pal("split second step: updating L1~n", []),
     New = Lease#lease{
             epoch   = OldEpoch + 1,
             range   = R1,
             aux     = {valid, split, R1, R2},
             version = 0,
             timeout = new_timeout()},
-    ContentCheck = is_valid_split_step2(OldEpoch, OldVersion),
+    ContentCheck = generic_content_check(Lease),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 6, {l_on_cseq, split_reply_step2, L2, R1, R2, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -486,18 +492,22 @@ on({l_on_cseq, split_reply_step2, L2, R1, R2,
     ct:pal("split second step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> State; %@todo
-        owner_changed -> State; %@todo
-        range_unchanged -> State; %@todo
-        aux_unchanged -> State; %@todo
+        unexpected_owner     -> remove_lease_from_dht_node_state(Lease, State); %@todo
+        unexpected_range     -> State; %@todo
+        unexpected_aux       -> State; %@todo
+        unexpected_timeout ->
+            % retry
+            gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2,
+                                          {qwrite_done, fake_reqid, fake_round, L2}});
         timeout_is_not_newer_than_current_lease ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
-        timeout_is_not_in_the_future ->
+        unexpected_epoch ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
-        epoch_or_version_mismatch ->
+        unexpected_version ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2,
                                           {qwrite_done, fake_reqid, fake_round, L2}})
@@ -509,7 +519,7 @@ on({l_on_cseq, split_reply_step2, L2, R1, R2,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step2,
-    L2 = #lease{id=Id,epoch=OldEpoch,version=OldVersion}, R1, R2,
+    L2 = #lease{id=Id,epoch=OldEpoch}, R1, R2,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
     io:format("split third step: renew L2 ~p~n", [Id]),
     New = L2#lease{
@@ -517,7 +527,7 @@ on({l_on_cseq, split_reply_step2,
             aux     = empty,
             version = 0,
             timeout = new_timeout()},
-    ContentCheck = is_valid_split_step3(OldEpoch, OldVersion),
+    ContentCheck = generic_content_check(L2),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 6, {l_on_cseq, split_reply_step3, L1, R1, R2, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -531,18 +541,22 @@ on({l_on_cseq, split_reply_step3, L1, R1, R2,
     ct:pal("split third step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> State; %@todo
-        owner_changed -> State; %@todo
-        range_unchanged -> State; %@todo
-        aux_unchanged -> State; %@todo
+        unexpected_owner     -> remove_lease_from_dht_node_state(L2, State); %@todo
+        unexpected_range     -> State; %@todo
+        unexpected_aux       -> State; %@todo
+        unexpected_timeout ->
+            % retry
+            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2,
+                                          {qwrite_done, fake_reqid, fake_round, L1}});
         timeout_is_not_newer_than_current_lease ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2,
                                           {qwrite_done, fake_reqid, fake_round, L1}});
-        timeout_is_not_in_the_future ->
+        unexpected_epoch ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2,
                                           {qwrite_done, fake_reqid, fake_round, L1}});
-        epoch_or_version_mismatch ->
+        unexpected_version ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2,
                                           {qwrite_done, fake_reqid, fake_round, L1}})
@@ -554,7 +568,7 @@ on({l_on_cseq, split_reply_step3, L1, R1, R2,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step3,
-    L1 = #lease{id=Id,epoch=OldEpoch,version=OldVersion}, R1, R2,
+    L1 = #lease{id=Id,epoch=OldEpoch}, R1, R2,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
     io:format("split fourth step: renew L1~n", []),
     New = L1#lease{
@@ -562,7 +576,7 @@ on({l_on_cseq, split_reply_step3,
             aux     = empty,
             version = 0,
             timeout = new_timeout()},
-    ContentCheck = is_valid_split_step4(OldEpoch, OldVersion),
+    ContentCheck = generic_content_check(L1),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 6, {l_on_cseq, split_reply_step4, L2, R1, R2, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -581,23 +595,26 @@ on({l_on_cseq, split_reply_step4, L2, R1, R2,
     ct:pal("split fourth step: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> State; %@todo
-        owner_changed -> State; %@todo
-        range_unchanged -> State; %@todo
-        aux_unchanged -> State; %@todo
+        unexpected_owner     -> remove_lease_from_dht_node_state(L1, State); %@todo
+        unexpected_range     -> State; %@todo
+        unexpected_aux       -> State; %@todo
+        unexpected_timeout ->
+            % retry
+            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2,
+                                          {qwrite_done, fake_reqid, fake_round, L2}});
         timeout_is_not_newer_than_current_lease ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
-        timeout_is_not_in_the_future ->
+        unexpected_epoch ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
-        epoch_or_version_mismatch ->
+        unexpected_version ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2,
                                           {qwrite_done, fake_reqid, fake_round, L2}})
     end;
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -617,47 +634,66 @@ on({l_on_cseq, renew_leases}, State) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec is_valid_renewal(non_neg_integer(), non_neg_integer()) ->
-    fun ((any(), any(), any()) -> {boolean(), renewal_failed_reason() | null}). %% content check
-is_valid_renewal(CurrentEpoch, CurrentVersion) ->
-    This = comm:make_global(pid_groups:get_my(dht_node)),
+-spec generic_content_check(lease_t()) ->
+    fun ((any(), any(), any()) -> {boolean(), generic_failed_reason() | null}). %% content check
+generic_content_check(#lease{owner=OldOwner,aux = OldAux,range=OldRange,
+                             epoch=OldEpoch,version=OldVersion,timeout=OldTimeout}) ->
     fun (prbr_bottom, _WriteFilter, _Next) ->
             {false, lease_does_not_exist};
-        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
-            {false, owner_changed};
-        (#lease{owner = O0}, _, _)                     when O0 =/= This->
-            {false, owner_changed};
-        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =/= Aux1->
-            {false, aux_changed};
-        (#lease{range = R0}, _, #lease{range = R1})    when R0 =/= R1->
-            {false, range_changed};
-        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
-            {false, epoch_or_version_mismatch};
-        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
-            {false, epoch_or_version_mismatch};
+        (#lease{owner = O0}, _, _)    when O0 =/= OldOwner->
+            {false, unexpected_owner};
+        (#lease{aux = Aux0}, _, _)    when Aux0 =/= OldAux->
+            {false, unexpected_aux};
+        (#lease{range = R0}, _, _)    when R0 =/= OldRange->
+            {false, unexpected_range};
+        (#lease{timeout = T0}, _, _)                   when T0 =/= OldTimeout->
+            {false, unexpected_timeout};
+        (#lease{epoch = E0}, _, _)                     when E0 =/= OldEpoch ->
+            {false, unexpected_epoch};
+        (#lease{version = V0}, _, _)                   when V0 =/= OldVersion->
+            {false, unexpected_version};
         (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
             {false, timeout_is_not_newer_than_current_lease};
-        (_Current, _WriteFilter, Next) ->
-            case (os:timestamp() <  Next#lease.timeout) of
-                false ->
-                    {false, timeout_is_not_in_the_future};
-                true ->
-                    {true, null}
-            end
+        (_, _, _) ->
+            {true, null}
     end.
+
+%-spec is_valid_renewal(lease_t()) ->
+%    fun ((any(), any(), any()) -> {boolean(), renewal_failed_reason() | null}). %% content check
+%is_valid_renewal(#lease{owner=OldOwner,aux = OldAux,range=OldRange,
+%                        epoch=OldEpoch,version=OldVersion}) ->
+%    fun (prbr_bottom, _WriteFilter, _Next) ->
+%            {false, lease_does_not_exist};
+%        (#lease{owner = O0}, _, _)    when O0 =/= OldOwner->
+%            {false, unexpected_owner};
+%        (#lease{aux = Aux0}, _, _)    when Aux0 =/= OldAux->
+%            {false, unexpected_aux};
+%        (#lease{range = R0}, _, _)    when R0 =/= OldRange->
+%            {false, unexpected_range};
+%        (#lease{epoch = E0}, _, _)                     when E0 =/= OldEpoch ->
+%            {false, unexpected_epoch};
+%        (#lease{version = V0}, _, _)                   when V0 =/= OldVersion->
+%            {false, unexpected_version};
+%        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
+%            {false, timeout_is_not_newer_than_current_lease}
+%    end.
 
 -spec is_valid_update(non_neg_integer(), non_neg_integer()) ->
     fun ((any(), any(), any()) -> {boolean(), update_failed_reason() | null}). %% content check
 is_valid_update(CurrentEpoch, CurrentVersion) ->
-    fun (prbr_bottom, _WriteFilter, _Next) ->
-            {false, lease_does_not_exist};
-        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
+    fun (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
+            ct:pal("is_valid_update: expected ~p, got ~p", [CurrentEpoch, E0]),
             {false, epoch_or_version_mismatch};
         (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
+            ct:pal("is_valid_update: expected ~p, got ~p", [CurrentVersion, V0]),
             {false, epoch_or_version_mismatch};
         (_Current, _WriteFilter, _Next) ->
             {true, null}
     end.
+
+%(prbr_bottom, _WriteFilter, _Next) ->
+%            {false, lease_does_not_exist};
+
 
 -spec is_valid_handover(non_neg_integer(), non_neg_integer()) ->
     fun ((any(), any(), any()) -> {boolean(), null}). %% content check
@@ -763,92 +799,93 @@ is_valid_split_step1() ->
             end
     end.
 
--spec is_valid_split_step2(non_neg_integer(), non_neg_integer()) ->
-    fun ((any(), any(), any()) -> {boolean(), split_step2_failed_reason() | null}). %% content check
-is_valid_split_step2(CurrentEpoch, CurrentVersion) ->
-    This = comm:make_global(pid_groups:get_my(dht_node)),
-    fun (prbr_bottom, _WriteFilter, _Next) ->
-            {false, lease_does_not_exist};
-        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
-            {false, owner_changed};
-        (#lease{owner = O0}, _, _)                     when O0 =/= This->
-            {false, owner_changed};
-        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =:= Aux1->
-            {false, aux_unchanged};
-        (#lease{range = R0}, _, #lease{range = R1})    when R0 =:= R1->
-            {false, range_unchanged};
-        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
-            {false, epoch_or_version_mismatch};
-        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
-            {false, epoch_or_version_mismatch};
-        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
-            {false, timeout_is_not_newer_than_current_lease};
-        (_Current, _WriteFilter, Next) ->
-            case (os:timestamp() <  Next#lease.timeout) of
-                false ->
-                    {false, timeout_is_not_in_the_future};
-                true ->
-                    {true, null}
-            end
-    end.
-
--spec is_valid_split_step3(non_neg_integer(), non_neg_integer()) ->
-    fun ((any(), any(), any()) -> {boolean(), split_step3_failed_reason() | null}). %% content check
-is_valid_split_step3(CurrentEpoch, CurrentVersion) ->
-    This = comm:make_global(pid_groups:get_my(dht_node)),
-    fun  (prbr_bottom, _WriteFilter, _Next) ->
-            {false, lease_does_not_exist};
-        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
-            {false, owner_changed};
-        (#lease{owner = O0}, _, _)                     when O0 =/= This->
-            {false, owner_changed};
-        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =:= Aux1->
-            {false, aux_unchanged};
-        (#lease{range = R0}, _, #lease{range = R1})    when R0 =/= R1->
-            {false, range_changed};
-        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
-            {false, epoch_or_version_mismatch};
-        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
-            {false, epoch_or_version_mismatch};
-        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
-            {false, timeout_is_not_newer_than_current_lease};
-        (_Current, _WriteFilter, Next) ->
-            case (os:timestamp() <  Next#lease.timeout) of
-                false ->
-                    {false, timeout_is_not_in_the_future};
-                true ->
-                    {true, null}
-            end
-    end.
-
--spec is_valid_split_step4(non_neg_integer(), non_neg_integer()) ->
-    fun ((any(), any(), any()) -> {boolean(), split_step4_failed_reason() | null}). %% content check
-is_valid_split_step4(CurrentEpoch, CurrentVersion) ->
-    This = comm:make_global(pid_groups:get_my(dht_node)),
-    fun (prbr_bottom, _WriteFilter, _Next) ->
-            {false, lease_does_not_exist};
-        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
-            {false, owner_changed};
-        (#lease{owner = O0}, _, _)                     when O0 =/= This->
-            {false, owner_changed};
-        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =:= Aux1->
-            {false, aux_unchanged};
-        (#lease{range = R0}, _, #lease{range = R1})    when R0 =/= R1->
-            {false, range_changed};
-        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
-            {false, epoch_or_version_mismatch};
-        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
-            {false, epoch_or_version_mismatch};
-        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
-            {false, timeout_is_not_newer_than_current_lease};
-        (_Current, _WriteFilter, Next) ->
-            case (os:timestamp() <  Next#lease.timeout) of
-                false ->
-                    {false, timeout_is_not_in_the_future};
-                true ->
-                    {true, null}
-            end
-    end.
+%-spec is_valid_split_step2(non_neg_integer(), non_neg_integer()) ->
+%    fun ((any(), any(), any()) -> {boolean(), split_step2_failed_reason() | null}). %% content check
+%is_valid_split_step2(CurrentEpoch, CurrentVersion) ->
+%    This = comm:make_global(pid_groups:get_my(dht_node)),
+%    fun (prbr_bottom, _WriteFilter, _Next) ->
+%            {false, lease_does_not_exist};
+%        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
+%            {false, owner_changed};
+%        (#lease{owner = O0}, _, _)                     when O0 =/= This->
+%            {false, owner_changed};
+%        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =:= Aux1->
+%            {false, aux_unchanged};
+%        (#lease{range = R0}, _, #lease{range = R1})    when R0 =:= R1->
+%            {false, range_unchanged};
+%        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
+%            {false, epoch_or_version_mismatch};
+%        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
+%            {false, epoch_or_version_mismatch};
+%        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
+%            {false, timeout_is_not_newer_than_current_lease};
+%        (_Current, _WriteFilter, Next) ->
+%            case (os:timestamp() <  Next#lease.timeout) of
+%                false ->
+%                    {false, timeout_is_not_in_the_future};
+%                true ->
+%                    {true, null}
+%            end
+%    end.
+%
+%-spec is_valid_split_step3(lease_t()) ->
+%    fun ((any(), any(), any()) -> {boolean(), split_step3_failed_reason() | null}). %% content check
+%is_valid_split_step3(#lease{owner=OldOwner,aux = OldAux,range=OldRange,
+%                        epoch=OldEpoch,version=OldVersion}) ->
+%    This = comm:make_global(pid_groups:get_my(dht_node)),
+%    fun  (prbr_bottom, _WriteFilter, _Next) ->
+%            {false, lease_does_not_exist};
+%        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
+%            {false, owner_changed};
+%        (#lease{owner = O0}, _, _)                     when O0 =/= This->
+%            {false, owner_changed};
+%        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =:= Aux1->
+%            {false, aux_unchanged};
+%        (#lease{range = R0}, _, #lease{range = R1})    when R0 =/= R1->
+%            {false, range_changed};
+%        (#lease{epoch = E0}, _, _)                     when E0 =/= OldEpoch ->
+%            {false, epoch_or_version_mismatch};
+%        (#lease{version = V0}, _, _)                   when V0 =/= OldVersion->
+%            {false, epoch_or_version_mismatch};
+%        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
+%            {false, timeout_is_not_newer_than_current_lease};
+%        (_Current, _WriteFilter, Next) ->
+%            case (os:timestamp() <  Next#lease.timeout) of
+%                false ->
+%                    {false, timeout_is_not_in_the_future};
+%                true ->
+%                    {true, null}
+%            end
+%    end.
+%
+%-spec is_valid_split_step4(non_neg_integer(), non_neg_integer()) ->
+%    fun ((any(), any(), any()) -> {boolean(), split_step4_failed_reason() | null}). %% content check
+%is_valid_split_step4(CurrentEpoch, CurrentVersion) ->
+%    This = comm:make_global(pid_groups:get_my(dht_node)),
+%    fun (prbr_bottom, _WriteFilter, _Next) ->
+%            {false, lease_does_not_exist};
+%        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
+%            {false, owner_changed};
+%        (#lease{owner = O0}, _, _)                     when O0 =/= This->
+%            {false, owner_changed};
+%        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =:= Aux1->
+%            {false, aux_unchanged};
+%        (#lease{range = R0}, _, #lease{range = R1})    when R0 =/= R1->
+%            {false, range_changed};
+%        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
+%            {false, epoch_or_version_mismatch};
+%        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
+%            {false, epoch_or_version_mismatch};
+%        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
+%            {false, timeout_is_not_newer_than_current_lease};
+%        (_Current, _WriteFilter, Next) ->
+%            case (os:timestamp() <  Next#lease.timeout) of
+%                false ->
+%                    {false, timeout_is_not_in_the_future};
+%                true ->
+%                    {true, null}
+%            end
+%    end.
 
 -spec standard_check(prbr_bottom | lease_t(), lease_t(),
                      non_neg_integer(), non_neg_integer()) -> boolean().
@@ -1055,14 +1092,6 @@ split_test() ->
     end,
     ok.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% TODO
-%
-% - fix merge protocol
-% - improve error handling for deny in renewal
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -1099,5 +1128,23 @@ split_test() ->
 %          5. Are the values of the epoch and version fields as expected?
 %          6. Is the proposed timeout newer than the current one and is it in
 %             the future (for debugging only)?
+%          7. Only, now it may check for debug purposes whether the proposed
+%             changes are acceptable.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% TODO
+%
+% - fix merge protocol
+% - improve error handling for deny in renewal
+% - do i need to check for timeout_is_not_in_the_future?
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%        (_Current, _WriteFilter, Next) ->
+%            case (os:timestamp() <  Next#lease.timeout) of
+%                false ->
+%                    {false, timeout_is_not_in_the_future};
+%                true ->
+%                    {true, null}
+%            end
