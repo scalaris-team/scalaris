@@ -81,32 +81,18 @@ end_per_testcase(_TestCase, _Config) ->
     ok.
 
 transactions_1_failure_4_nodes_read(_) ->
-    ?equals_w_note(api_tx:write("0", 1), {ok}, "write_0_a"),
-    ?equals_w_note(api_tx:read("0"), {ok, 1}, "read_0_a"),
-    % wait for late write messages to arrive at the original nodes
-    % if all writes have arrived, a range read should return 4 values
-    util:wait_for(
-      fun() ->
-              {Status, Values} = api_dht_raw:range_read(0, 0),
-              Status =:= ok andalso erlang:length(Values) =:= 4
-      end),
-    _ = api_vm:kill_nodes(1),
-    unittest_helper:check_ring_size(3),
-    unittest_helper:wait_for_stable_ring(),
-    unittest_helper:wait_for_stable_ring_deep(),
-    ?equals_w_note(api_tx:read("0"), {ok, 1}, "read_0_b"),
-    ?equals_w_note(api_tx:write("0", 2), {ok}, "write_0_b"),
-    ?equals_w_note(api_tx:read("0"), {ok, 2}, "read_0_c"),
-    ok.
+    transactions_X_failures_4_nodes_read(1, ok, ok).
 
 transactions_2_failures_4_nodes_read(_) ->
-    transactions_more_failures_4_nodes_read(2).
+    transactions_X_failures_4_nodes_read(2, ok_or_abort, ok).
 
 transactions_3_failures_4_nodes_read(_) ->
-    transactions_more_failures_4_nodes_read(3).
+    transactions_X_failures_4_nodes_read(3, abort, ok_or_abort).
 
--spec transactions_more_failures_4_nodes_read(FailedNodes::2 | 3) -> ok.
-transactions_more_failures_4_nodes_read(FailedNodes) ->
+-spec transactions_X_failures_4_nodes_read(
+        FailedNodes::1..3, RAfterFail::ok | abort | ok_or_abort,
+        WAfterFail::ok | abort | ok_or_abort) -> ok.
+transactions_X_failures_4_nodes_read(FailedNodes, RAfterFail, WAfterFail) ->
     ?equals_w_note(api_tx:write("0", 1), {ok}, "write_0_a"),
     ?equals_w_note(api_tx:read("0"), {ok, 1}, "read_0_a"),
     % wait for late write messages to arrive at the original nodes
@@ -120,10 +106,26 @@ transactions_more_failures_4_nodes_read(FailedNodes) ->
     unittest_helper:check_ring_size(4 - FailedNodes),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:wait_for_stable_ring_deep(),
-    ?equals_w_note(api_tx:read("0"), {fail, not_found}, "read_0_b"),
-    ?equals_w_note(api_tx:write("0", 2), {fail, abort, ["0"]}, "write_0_b"),
-    ?equals_w_note(api_tx:read("0"), {fail, not_found}, "read_0_c"),
-    ok.
+    
+    RAfterFailRes = api_tx:read("0"),
+    case RAfterFail of
+        ok    -> ?equals_w_note(RAfterFailRes, {ok, 1}, "read_0_b");
+        abort -> ?equals_w_note(RAfterFailRes, {fail, not_found}, "read_0_b");
+        ok_or_abort -> ok
+    end,
+    
+    WAfterFailRes = api_tx:write("0", 2),
+    case WAfterFail of
+        ok    -> ?equals_w_note(WAfterFailRes, {ok}, "write_0_b");
+        abort -> ?equals_w_note(WAfterFailRes, {fail, abort, ["0"]}, "write_0_b");
+        ok_or_abort -> ok
+    end,
+
+    RAfterWAfterFailRes = api_tx:read("0"),
+    case WAfterFailRes of
+        {ok} -> ?equals_w_note(RAfterWAfterFailRes, {ok, 2}, "read_0_c");
+        _    -> ?equals_w_note(RAfterWAfterFailRes, {fail, not_found}, "read_0_c")
+    end.
 
 transactions_1_failure_4_nodes_networksplit_write(_) ->
     % pause some dht_node:
