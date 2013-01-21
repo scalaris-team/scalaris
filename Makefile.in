@@ -1,4 +1,4 @@
-# Copyright 2007-2012 Zuse Institute Berlin
+# Copyright 2007-2013 Zuse Institute Berlin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -452,7 +452,7 @@ doc: .make-doc
 
 .make-doc: $(SOURCEPATHS_ERL)
 	$(ERL) -noshell -run edoc_run application "'$(APP_NAME)'" \
-	'"."' '[{def, {vsn, "$(VERSION)"}}, no_packages, {preprocess, true}, {includes, ["include", "contrib/yaws/include", "contrib/log4erl/include"]}, {macros, [@EDOCMACROS@]}]'
+	'"."' '[{def, {vsn, "$(VERSION)"}}, no_packages, {preprocess, true}, {includes, ["include", "contrib/yaws/include", "contrib/log4erl/include"]}, {sort_functions, false}, {pretty_printer, erl_pp}, {macros, [@EDOCMACROS@]}]'
 	@touch .make-doc
 
 docs: doc java-doc
