@@ -86,9 +86,6 @@ out(Arg) ->
 
 <div id='graph' style='width:800px;height:400px;float:left;'></div>
 <div id='legend'></div>
-<div id='distance'>
-    <p></p>
-</div>
 <br />
 
 <div id="loading"><p>Loading map...</p></div>
