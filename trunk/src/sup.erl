@@ -146,7 +146,7 @@ trycall(Prefix, Module, Func, Args, DefaultReturnValue) ->
             DefaultReturnValue;
           X:Y ->
             io:format("~p:~p failed with ~p:~p ~p~n",
-                      [Module, Func, X, Y, util:get_stacktrace()]),
+                      [Module, Func, X, Y, erlang:get_stacktrace()]),
             DefaultReturnValue
     end.
 
