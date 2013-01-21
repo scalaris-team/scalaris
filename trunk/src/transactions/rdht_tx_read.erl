@@ -329,7 +329,7 @@ start_link(DHTNodeGroup) ->
                              [],
                              [{pid_groups_join_as, DHTNodeGroup, ?MODULE}]).
 
--type state() :: {integer(), integer(), integer(), atom()}.
+-type state() :: {pos_integer(), pos_integer(), pos_integer(), atom()}.
 
 %% initialize: return initial state.
 -spec init([]) -> state().
@@ -361,12 +361,7 @@ on({?read_op_with_id_reply, Id, Ok_Fail, Val_Reason, Vers},
                 %% when we get a client, we will inform it
                 pdb:set(TmpEntry, Table);
             Client ->
-                NewEntry =
-                    case state_is_newly_decided(TmpEntry) of
-                        true  -> inform_client(Client, TmpEntry);
-                        false -> TmpEntry
-                    end,
-                set_or_delete_if_all_replied(NewEntry, Reps, Table)
+                set_and_inform_client_if_ready(Client, TmpEntry, Reps, Table)
         end,
     State;
 
@@ -377,12 +372,7 @@ on({client_is, Id, Pid, Key, Op}, {Reps, _MajOk, _MajDeny, Table} = State) ->
     Tmp0Entry = state_set_op(Entry, Op),
     Tmp1Entry = state_set_client(Tmp0Entry, Pid),
     TmpEntry = state_set_key(Tmp1Entry, Key),
-    _ = case state_is_newly_decided(TmpEntry) of
-            true ->
-                Tmp2Entry = inform_client(Pid, TmpEntry),
-                set_or_delete_if_all_replied(Tmp2Entry, Reps, Table);
-            false -> pdb:set(TmpEntry, Table)
-        end,
+    set_and_inform_client_if_ready(Pid, TmpEntry, Reps, Table),
 %    State;
 %
 %%% triggered periodically
@@ -419,23 +409,31 @@ get_entry(Id, Table) ->
 %         _ -> ok
 %     end.
 
--spec inform_client(pid(), read_state()) ->
-                           read_state().
-inform_client(Client, Entry) ->
-    % if partial read and decided is ?value -> set to ?partial_value!
-    % ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
-    Op = state_get_op(Entry),
-    Entry2 = if Op =:= ?read -> Entry;
-                true ->
-                    case state_get_decided(Entry) of
-                        ?value -> state_set_decided(Entry, ?partial_value);
-                        _ -> Entry
-                    end
-             end,
-    Id = state_get_id(Entry2),
-    Msg = msg_reply(Id, make_tlog_entry(Entry2)),
-    comm:send_local(Client, Msg),
-    state_set_client_informed(Entry2).
+%% @doc Informs the client if a decision has been taken and the client is not
+%%      informed yet. Also sets the state into the pdb.
+-spec set_and_inform_client_if_ready(pid(), read_state(), Reps::pos_integer(),
+                                     Table::atom()) -> ok.
+set_and_inform_client_if_ready(Client, Entry, Reps, Table) ->
+    _ = case state_is_newly_decided(Entry) of
+            true ->
+                % if partial read and decided is ?value -> set to ?partial_value!
+                % ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
+                Op = state_get_op(Entry),
+                Entry2 = if Op =:= ?read -> Entry;
+                            true ->
+                                case state_get_decided(Entry) of
+                                    ?value -> state_set_decided(Entry, ?partial_value);
+                                    _ -> Entry
+                                end
+                         end,
+                Id = state_get_id(Entry2),
+                Msg = msg_reply(Id, make_tlog_entry(Entry2)),
+                comm:send_local(Client, Msg),
+                Entry3 = state_set_client_informed(Entry2),
+                set_or_delete_if_all_replied(Entry3, Reps, Table);
+            false -> pdb:set(Entry, Table)
+        end,
+    ok.
 
 %% -spec make_tlog_entry_feeder(
 %%         {read_state(), ?RT:key()})
