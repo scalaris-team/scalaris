@@ -40,8 +40,10 @@
 -export([start_link/2]).
 -export([on/2, init/1]).
 -export([on_init/2]).
--export([get_my/2]).
 -export([check_config/0]).
+
+%% functions for dht_node
+-export([get_my/2]).
 
 -ifdef(with_export_type_support).
 -export_type([rtms/0]).
