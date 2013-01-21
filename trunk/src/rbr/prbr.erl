@@ -1,4 +1,4 @@
-% @copyright 2012 Zuse Institute Berlin,
+% @copyright 2012-2013 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -107,8 +107,8 @@ msg_read_reply(Client, YourRound, Val, LastWriteRound) ->
     comm:send(Client, {read_reply, YourRound, Val, LastWriteRound}).
 
 -spec msg_write_reply(comm:mypid(), any(), r_with_id()) -> ok.
-msg_write_reply(Client, Key, R_write) ->
-    comm:send(Client, {write_reply, Key, R_write}).
+msg_write_reply(Client, Key, Round_for_write) ->
+    comm:send(Client, {write_reply, Key, Round_for_write}).
 
 -spec msg_write_deny(comm:mypid(), any(), r_with_id()) -> ok.
 msg_write_deny(Client, Key, NewerRound) ->
