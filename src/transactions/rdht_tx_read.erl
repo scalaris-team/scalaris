@@ -429,6 +429,20 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
                    Op = state_get_op(Entry),
                    if Vers =/= -1 ->
                           NumAbort = state_get_numfailed(Entry),
+                          % note: MajDeny =:= 2, so 2 times not_found results
+                          % in {fail, not_found} although the 3rd reply may have
+                          % contained an actual value. This is to make sure that
+                          % if 'a' is written, then 'b' and then 'c', no matter 
+                          % what happens during the write of 'c', 'a' is never
+                          % read again!
+                          % Example: b is written       => (a, b, b, b), then
+                          %          c is being written => (a, b+wl, b+wl, c)
+                          %          (crash during write), then
+                          %          churn happens,     => (a, not_found, not_found, c)
+                          %          => could read (a, not_found, not_found)
+                          %             but should not return a!
+                          % note: 2 failures are normally not supported but we
+                          % want to be on the safe side here
                           Entry2 =
                               if NumAbort >= MajDeny andalso Op =:= ?write ->
                                      % note: report not_found but keep the last
