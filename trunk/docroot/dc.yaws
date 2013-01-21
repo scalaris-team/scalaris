@@ -88,6 +88,9 @@ out(Arg) ->
 <br />
 
 <div id='stats'></div>
+<div id="loading">
+    <p>Loading map..</p>
+</div>
 <script src='dc.js'></script>
 "};
         _ -> {ehtml, {p, [], "DC Clustering disabled. Enable clustering in <tt>scalaris.local.cfg</tt> (change to: <tt>{dc_clustering_enable, true}.</tt>)."}}

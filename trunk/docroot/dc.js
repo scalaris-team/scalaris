@@ -2,6 +2,7 @@ var DC = {
     previous_point: null
     , get_map: function(map) {
         $.get(map, function(data) {
+            $("div#loading > p").text("Received data, setting up chart..");
             data = JSON.parse(data);
 
             // flot styling and data conversion
@@ -70,6 +71,8 @@ var DC = {
                     .append("<ul></ul>");
                 $("#stats ul").append(append.join("\n"));
             }
+
+            $("div#loading > p").text("");
 
             // finally create the plot
             $.plot($("#graph"), nodes, {
