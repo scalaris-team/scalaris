@@ -169,6 +169,7 @@ var DC = {
                     }
                 } else {
                     previousClickedPoint = null;
+                    $("#distanceLine").remove();
                     redraw();
                 }
             });
