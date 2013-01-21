@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -28,6 +28,50 @@
 
 test_cases() ->
     [
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
+     join_lookup,
      tester_join_at,
      add_9, rm_5, add_9_rm_5,
      add_2x3_load,
@@ -92,6 +136,23 @@ join_parameters_list() ->
      {join_known_hosts_timeout, 100},
      {join_timeout, 3000},
      {join_get_number_of_samples_timeout, 100}].
+
+%% check whether we may loose some lookup when join is finished and
+%% slide operations are still going on.
+join_lookup(Config) ->
+    Keys = ?RT:get_replica_keys(0),
+
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+    %% do as less as possible between make_ring and sending the lookups
+    This = comm:this(),
+    [ comm:send_local(pid_groups:find_a(dht_node), {?lookup_aux, X, 0,
+                     {ping, This}}) || X <- Keys ],
+
+    %% got all 4 replies? ok
+    [ receive {pong} -> ok end || X <- Keys ],
+
+    unittest_helper:stop_ring().
 
 add_9(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
