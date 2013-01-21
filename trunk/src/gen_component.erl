@@ -46,7 +46,7 @@
 -ifdef(with_ct).
 -define(SPAWNED(MODULE), tester_scheduler:gen_component_spawned(MODULE)).
 -define(INITIALIZED(MODULE), tester_scheduler:gen_component_initialized(MODULE)).
--define(CALLING_RECEIVE(MODULE), tester_scheduler:gen_component_calling_receive(MpingDULE)).
+-define(CALLING_RECEIVE(MODULE), tester_scheduler:gen_component_calling_receive(MODULE)).
 -else.
 -define(SPAWNED(MODULE), ok).
 -define(INITIALIZED(MODULE), ok).
