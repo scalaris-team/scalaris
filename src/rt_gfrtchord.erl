@@ -97,7 +97,10 @@ maximum_entries() -> 64.
 -spec init(nodelist:neighborhood()) -> rt().
 init(Neighbors) -> 
     % trigger a random lookup after initializing the table
-    comm:send_local(self(), {trigger_random_lookup}),
+    case config:read(rt_frtchord_al) of
+        true -> comm:send_local(self(), {trigger_random_lookup});
+        false -> ok
+    end,
 
     % ask the successor node for its routing table
     Msg = {?send_to_group_member, routing_table, {get_rt, comm:this()}},
@@ -401,7 +404,7 @@ handle_custom_message({trigger_random_lookup}, State) ->
     Key = get_random_key_from_generator(SourceNodeId, PredId, SuccId),
 
     % schedule the next random lookup
-    Interval = config:read(active_learning_lookup_interval),
+    Interval = config:read(rt_frtchord_al_interval),
     msg_delay:send_local(Interval, self(), {trigger_random_lookup}),
 
     api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, routing_table,
