@@ -355,24 +355,24 @@ on({?read_op_with_id_reply, Id, Ok_Fail, Val_Reason, Vers},
     %% @todo inform sender when its entry is outdated?
     %% @todo inform former sender on outdated entry when we
     %% get a newer entry?
-    TmpEntry = state_add_reply(Entry, {Ok_Fail, Val_Reason, Vers}, MajOk, MajDeny),
+    TmpEntry = state_add_reply(Entry, {Ok_Fail, Val_Reason, Vers}),
     _ = case state_get_client(TmpEntry) of
             unknown ->
                 %% when we get a client, we will inform it
                 pdb:set(TmpEntry, Table);
             Client ->
-                set_and_inform_client_if_ready(Client, TmpEntry, Reps, Table)
+                decide_set_and_inform_client_if_ready(Client, TmpEntry, Reps, MajOk, MajDeny, Table)
         end,
     State;
 
 %% triggered by ?MODULE:work_phase/3
-on({client_is, Id, Pid, Key, Op}, {Reps, _MajOk, _MajDeny, Table} = State) ->
+on({client_is, Id, Pid, Key, Op}, {Reps, MajOk, MajDeny, Table} = State) ->
     ?TRACE("~p rdht_tx_read:on(client_is)~n", [self()]),
     Entry = get_entry(Id, Table),
     Tmp0Entry = state_set_op(Entry, Op),
     Tmp1Entry = state_set_client(Tmp0Entry, Pid),
     TmpEntry = state_set_key(Tmp1Entry, Key),
-    set_and_inform_client_if_ready(Pid, TmpEntry, Reps, Table),
+    decide_set_and_inform_client_if_ready(Pid, TmpEntry, Reps, MajOk, MajDeny, Table),
 %    State;
 %
 %%% triggered periodically
@@ -409,31 +409,74 @@ get_entry(Id, Table) ->
 %         _ -> ok
 %     end.
 
-%% @doc Informs the client if a decision has been taken and the client is not
+%% @doc Takes a decision (if possible) and informs the client once a decision
+%%      has been taken and the client is not
 %%      informed yet. Also sets the state into the pdb.
--spec set_and_inform_client_if_ready(pid(), read_state(), Reps::pos_integer(),
+-spec decide_set_and_inform_client_if_ready(pid(), read_state(), Reps::pos_integer(),
+                                     MajOk::pos_integer(), MajDeny::pos_integer(),
                                      Table::atom()) -> ok.
-set_and_inform_client_if_ready(Client, Entry, Reps, Table) ->
-    _ = case state_is_newly_decided(Entry) of
-            true ->
-                % if partial read and decided is ?value -> set to ?partial_value!
-                % ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
-                Op = state_get_op(Entry),
-                Entry2 = if Op =:= ?read -> Entry;
-                            true ->
-                                case state_get_decided(Entry) of
-                                    ?value -> state_set_decided(Entry, ?partial_value);
-                                    _ -> Entry
-                                end
-                         end,
-                Id = state_get_id(Entry2),
-                Msg = msg_reply(Id, make_tlog_entry(Entry2)),
-                comm:send_local(Client, Msg),
-                Entry3 = state_set_client_informed(Entry2),
-                set_or_delete_if_all_replied(Entry3, Reps, Table);
-            false -> pdb:set(Entry, Table)
-        end,
-    ok.
+decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table) ->
+    case state_is_client_informed(Entry) of
+        false ->
+            % false = state_get_decided(Entry), % should always be true here!
+            NumReplied = state_get_numreplied(Entry),
+            
+            % if majority replied, we can given an answer!
+            % (but: need all Reps replicas for not_found)
+            if NumReplied >= MajOk ->
+                   {Ok_Fail, _Val, Vers} = state_get_result(Entry),
+                   % ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
+                   Op = state_get_op(Entry),
+                   if Vers =/= -1 ->
+                          NumAbort = state_get_numfailed(Entry),
+                          Entry2 =
+                              if NumAbort >= MajDeny andalso Op =:= ?write ->
+                                     % note: report not_found but keep the last
+                                     % reported version so that write operations
+                                     % can be executed (the not_found is not
+                                     % reported to the user so we can do this!)
+                                     state_set_decided(Entry, {fail, not_found});
+                                 NumAbort >= MajDeny ->
+                                     % note: not_found is reported to the user,
+                                     % so we also need to report the according
+                                     % result, especially the version!
+                                     Entry1 = state_set_decided(Entry, {fail, not_found}),
+                                     state_set_result(Entry1, {?ok, empty_val, -1});
+                                 Ok_Fail =:= ?ok andalso Op =:= ?read ->
+                                     state_set_decided(Entry, ?value);
+                                 Ok_Fail =:= ?ok ->
+                                     % all other read ops are partial reads!
+                                     state_set_decided(Entry, ?partial_value);
+                                 true ->
+                                     ct:pal("Fail, abort: ~p", [_Val]),
+                                     state_set_decided(Entry, {fail, abort})
+                              end,
+                          % a decision was taken in any of the cases
+                          % -> inform the client
+                          set_and_inform_client(Client, Entry2, Reps, Table);
+                      true ->
+                          if NumReplied =:= Reps ->
+                                 % all replied with -1
+                                 Entry2 = state_set_decided(Entry, {fail, not_found}),
+                                 set_and_inform_client(Client, Entry2, Reps, Table);
+                             true -> pdb:set(Entry, Table)
+                          end
+                   end;
+               true -> pdb:set(Entry, Table)
+            end;
+        true -> pdb:set(Entry, Table)
+    end.
+
+%% @doc Informs the client, updates the read state accordingly and sets it in
+%%      the pdb.
+-spec set_and_inform_client(pid(), read_state(), Reps::pos_integer(),
+                                     Table::atom()) -> ok.
+set_and_inform_client(Client, Entry, Reps, Table) ->
+    Id = state_get_id(Entry),
+    Msg = msg_reply(Id, make_tlog_entry(Entry)),
+    comm:send_local(Client, Msg),
+    Entry2 = state_set_client_informed(Entry),
+    set_or_delete_if_all_replied(Entry2, Reps, Table).
 
 %% -spec make_tlog_entry_feeder(
 %%         {read_state(), ?RT:key()})
