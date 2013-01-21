@@ -341,7 +341,9 @@ tm_crash(_) ->
 
     _ = [ erlang:exit(Pid, kill) || Pid <- Pids ],
 
-    _ = [ gen_component:bp_del(X, tm_crash) || X <- TMs ],
+    %% would need asynchronous cleanup, but the ring is stopped
+    %% anyway, so we skip the cleanup here.
+    _ = [ gen_component:bp_del_async(X, tm_crash) || X <- TMs ],
 
     [ gen_component:bp_cont(X) || X <- TMs ],
     ok.

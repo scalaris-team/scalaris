@@ -1,4 +1,4 @@
-% @copyright 2008-2012 Zuse Institute Berlin
+% @copyright 2008-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -180,9 +180,11 @@ pause_node(DhtNodeSupPid) ->
     DhtNodePid = pid_groups:pid_of(GroupName, dht_node),
     ct:log("Pausing pid ~p~n", [DhtNodePid]),
     DhtNodeSupChilds = unittest_helper:get_all_children(DhtNodeSupPid),
-    _ = [begin
-             gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),
-             gen_component:bp_barrier(Pid)
+    _ = [case gen_component:is_gen_component(Pid) of
+             true ->
+                 gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),
+                 gen_component:bp_barrier(Pid);
+             false -> ok
          end || Pid <- DhtNodeSupChilds],
 
     [ comm:send_local(fd, {unittest_report_down, comm:make_global(X)})
@@ -197,8 +199,13 @@ unpause_node({GroupName, DhtNodeSupChilds}) ->
     DhtNodePid = pid_groups:pid_of(GroupName, dht_node),
     ct:pal("Restarting pid ~p~n", [DhtNodePid]),
     % restart the node again:
-    _ = [begin
-             gen_component:bp_del(Pid, sleep),
-             gen_component:bp_cont(Pid)
+    _ = [case gen_component:is_gen_component(Pid) of
+             true ->
+                 %% all have to reached a breakpoint, otherwise this
+                 %% blocks because of the bp_barrier...
+                 %% we do this by sending ping messages
+                 gen_component:bp_del_async(Pid, sleep),
+                 gen_component:bp_cont(Pid);
+             false -> ok
          end || Pid <- DhtNodeSupChilds],
     ok.

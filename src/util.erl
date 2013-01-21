@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -147,8 +147,9 @@ supervisor_terminate_childs(SupPid) ->
     _ = [ begin
               case Self =/= Pid andalso gen_component:is_gen_component(Pid) of
                   true ->
-                      gen_component:bp_set_cond(Pid, fun(_M, _S) -> true end,
-                                                about_to_kill);
+                      gen_component:bp_set_cond_async(
+                        Pid, fun(_M, _S) -> true end,
+                        about_to_kill);
                   _ -> ok
               end
           end ||  {_Id, Pid, _Type, _Module} <- ChildSpecs,
