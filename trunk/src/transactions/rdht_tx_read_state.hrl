@@ -26,8 +26,7 @@
                    state_get_result/1, state_set_result/2,
                    state_get_decided/1, state_set_decided/2,
                    state_is_client_informed/1, state_set_client_informed/1,
-                   state_get_numreplied/1,
-                   state_is_newly_decided/1
+                   state_get_numreplied/1
                   ]}).
 
 -type result() :: {?ok | fail, ?DB:value() | 0 | atom(), -1 | ?DB:version()}. % {?ok|fail, Val|FailReason, Vers}
@@ -88,49 +87,16 @@ state_get_numreplied(State) ->
     state_get_numok(State) + state_get_numfailed(State).
 
 -spec state_add_reply(read_state(),
-                Result::{?ok, ?DB:value(), ?DB:version()} | {?ok, empty_val, -1} | {fail, atom(), ?DB:version()},
-                non_neg_integer(), non_neg_integer()) -> read_state().
-state_add_reply(State, Result, MajOk, MajDeny) ->
-    ?TRACE("state_add_reply state res majok majdeny ~p ~p ~p ~p ~n", [State, Result, MajOk, MajDeny]),
+                      Result::{?ok, ?DB:value(), ?DB:version()} | {?ok, empty_val, -1} |
+                          {fail, atom(), ?DB:version()})
+        -> read_state().
+state_add_reply(State, Result) ->
+    ?TRACE("state_add_reply state res majok majdeny ~p ~p ~n", [State, Result]),
     Vers = element(3, Result),
     OldVers = element(3, state_get_result(State)),
     TmpState = if Vers > OldVers -> state_set_result(State, Result);
                   true           -> State
                end,
-    NewState = if Vers >= 0 -> state_inc_numok(TmpState);
-                  true      -> state_inc_numfailed(TmpState)
-               end,
-    state_update_decided(NewState, MajOk, MajDeny).
-
--spec state_update_decided(read_state(), non_neg_integer(),
-                     non_neg_integer()) -> read_state().
-state_update_decided(State, MajOk, MajDeny) ->
-    ?TRACE("state_update_decided state maj ~p ~p ~p~n",
-           [State, MajOk, MajDeny]),
-    {Ok_Fail, _Val, Vers} = state_get_result(State),
-    if Vers =/= -1 ->
-           NumReplied = state_get_numreplied(State),
-           % if majority replied, we can given an answer!
-           if NumReplied >= MajOk ->
-                  NumAbort = state_get_numfailed(State),
-                  if NumAbort >= MajDeny ->
-                         state_set_decided(State, {fail, not_found});
-                     Ok_Fail =:= ?ok ->
-                         state_set_decided(State, ?value);
-                     true ->
-                         state_set_decided(State, {fail, abort})
-                  end;
-              true -> State
-           end;
-       true ->
-           case state_get_numreplied(State) of
-               4 -> state_set_decided(State, {fail, not_found}); % all replied with -1
-               _ -> State
-           end
+    if Vers >= 0 -> state_inc_numok(TmpState);
+       true      -> state_inc_numfailed(TmpState)
     end.
-
--spec state_is_newly_decided(read_state()) -> boolean().
-state_is_newly_decided(State) ->
-    ?TRACE("state_is_newly_decided State ~p ~n", [State]),
-    (false =/= state_get_decided(State))
-        andalso (not state_is_client_informed(State)).

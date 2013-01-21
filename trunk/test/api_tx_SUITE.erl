@@ -498,12 +498,12 @@ read_write_notfound_test(Key, HashedKeyToExclude, Mode) ->
     
     ?equals_w_note(R2, {ok}, Note ++ " (write result)"),
     % the following should be true but is not at the moment:
-%%     case R1 of
-%%         {fail, not_found} ->
-%%             ?equals_pattern_w_note(R3, {fail, abort, _}, Note ++ " (commit result)");
-%%         {ok, 1} ->
-%%             ?equals_pattern_w_note(R3, {ok}, Note ++ " (commit result)")
-%%     end,
+    case R1 of
+        {fail, not_found} ->
+            ?equals_pattern_w_note(R3, {fail, abort, _}, Note ++ " (commit result)");
+        {ok, 1} ->
+            ?equals_pattern_w_note(R3, {ok}, Note ++ " (commit result)")
+    end,
     
     % cleanup
     stop_drop_read_op_on_key(HashedKeyToExclude),
