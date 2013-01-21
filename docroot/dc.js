@@ -75,25 +75,35 @@ var DC = {
             $("div#loading > p").text("");
 
             // finally create the plot
-            $.plot($("#graph"), nodes, {
-                series: {
-                    points: {show:true}
-                    , hoverable: true
-                    , clickable: true
+            function redraw(additional_sets) {
+                var data = nodes.slice(); // copy array
+                if (additional_sets) {
+                    data.unshift(additional_sets);
                 }
-                , grid: {
-                    hoverable: true
-                    , clickable: true
-                }
-                , legend: {
-                    show: true
-                    , labelFormatter: function(label, series) {
-                        return label.host;
-                    }
-                    , container: $("#legend")
-                }
-            });
 
+                $.plot($("#graph"), data, {
+                    series: {
+                        points: {show:true}
+                        , hoverable: true
+                        , clickable: true
+                    }
+                    , grid: {
+                        hoverable: true
+                        , clickable: true
+                    }
+                    , legend: {
+                        show: true
+                        , labelFormatter: function(label, series) {
+                            return label.host;
+                        }
+                        , container: $("#legend")
+                    }
+                });
+            }
+
+            redraw();
+
+            var previous_point;
             $("#graph").bind("plothover", function(event, pos, item) {
                 if (item) {
                     if (previousPoint !== item.dataIndex) {
@@ -105,15 +115,16 @@ var DC = {
 
                         var label;
 
-                        if (item.series.info.name !== undefined) {
-                            label = item.series.info.name + "@" + item.series.info.host;
-                        } else {
-                            // for centroids
-                            label = DC.formatCentroidLabel(item.series.info.host
-                                                           , item.series.info.radius);
+                        if (item.series.info) {
+                            if (item.series.info.name !== undefined) {
+                                label = item.series.info.name + "@" + item.series.info.host;
+                            } else {
+                                // for centroids
+                                label = DC.formatCentroidLabel(item.series.info.host
+                                                               , item.series.info.radius);
+                            }
+                            DC.showTooltip(item.pageX, item.pageY, label);
                         }
-
-                        DC.showTooltip(item.pageX, item.pageY, label);
                     }
                 } else {
                     $("#tooltip").remove();
@@ -126,22 +137,39 @@ var DC = {
                 if(item) {
                     if (previousClickedPoint !== item) {
                         if (previousClickedPoint) {
-                            var x = item.datapoint[0].toFixed(2),
-                                y = item.datapoint[1].toFixed(2);
-                            var prev_x = previousClickedPoint.datapoint[0].toFixed(2),
-                                prev_y = previousClickedPoint.datapoint[1].toFixed(2);
+                            var x = parseFloat(item.datapoint[0].toFixed(2)),
+                                y = parseFloat(item.datapoint[1].toFixed(2));
+                            var prev_x = parseFloat(previousClickedPoint.item.datapoint[0].toFixed(2)),
+                                prev_y = parseFloat(previousClickedPoint.item.datapoint[1].toFixed(2));
 
                             /* connect points */
                             /* calculate distance */
                             var distance = Math.sqrt(Math.pow(x-prev_x,2) + Math.pow(y-prev_y,2));
 
-                            $("div#distance > p").text(distance);
+                            line_between_nodes = {
+                                data: [[x,y],[prev_x, prev_y]]
+                                , lines: {show: true}
+                                , points: {
+                                    show: false
+                                    , radius: 0
+                                }
+                            };
+                            redraw(line_between_nodes);
+
+                            $("#distanceLine").remove();
+                            DC.showTooltip((pos.pageX+previousClickedPoint.pos.pageX)/2,
+                                (pos.pageY+previousClickedPoint.pos.pageY)/2, distance,
+                                "distanceLine"
+                                );
                         }
-                        previousClickedPoint = item;
+                        previousClickedPoint = {
+                            item: item
+                            , pos: pos
+                        };
                     }
                 } else {
-                    $("#distance > p").text();
                     previousClickedPoint = null;
+                    redraw();
                 }
             });
         });
@@ -160,8 +188,11 @@ var DC = {
     , formatCentroidLabel: function(host, radius){
         return "<p><b>" + host + "</b><br/>radius: " + radius + "</p>";
     }
-    , showTooltip: function (x, y, contents) {
-        $('<div id="tooltip">' + contents + '</div>').css({
+    , showTooltip: function (x, y, contents, id) {
+        if (!id){
+            id = "tooltip";
+        }
+        $('<div id="' + id + '">' + contents + '</div>').css({
             position: 'absolute',
             display: 'none',
             top: y + 5,
