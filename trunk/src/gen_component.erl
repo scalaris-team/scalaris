@@ -46,7 +46,7 @@
 -ifdef(with_ct).
 -define(SPAWNED(MODULE), tester_scheduler:gen_component_spawned(MODULE)).
 -define(INITIALIZED(MODULE), tester_scheduler:gen_component_initialized(MODULE)).
--define(CALLING_RECEIVE(MODULE), tester_scheduler:gen_component_calling_receive(MODULE)).
+-define(CALLING_RECEIVE(MODULE), tester_scheduler:gen_component_calling_receive(MpingDULE)).
 -else.
 -define(SPAWNED(MODULE), ok).
 -define(INITIALIZED(MODULE), ok).
@@ -61,7 +61,8 @@
          get_state/1, get_state/2,
          get_component_state/1, get_component_state/2,
          change_handler/2, post_op/2]).
--export([bp_set/3, bp_set_cond/3, bp_del/2]).
+-export([bp_set/3, bp_set_cond/3, bp_set_cond_async/3,
+         bp_del/2, bp_del_async/2]).
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
 
 -ifdef(with_export_type_support).
@@ -75,9 +76,9 @@
         | {'$gen_component', bp, breakpoint, cont}
         | {'$gen_component', bp, msg_in_bp_waiting, pid()}
         | {'$gen_component', bp, barrier}
-        | {'$gen_component', bp, bp_set_cond, fun(), bp_name()}
-        | {'$gen_component', bp, bp_set, comm:msg_tag(), bp_name()}
-        | {'$gen_component', bp, bp_del, bp_name()}.
+        | {'$gen_component', bp, bp_set_cond, fun(), bp_name(), pid() | none}
+        | {'$gen_component', bp, bp_set, comm:msg_tag(), bp_name(), pid() | none}
+        | {'$gen_component', bp, bp_del, bp_name(), pid() | none}.
 
 -type gc_msg() ::
           bp_msg()
@@ -228,7 +229,8 @@ post_op(UState, Msg) ->
 %% requests regarding breakpoint processing
 -spec bp_set(pid(), comm:msg_tag(), bp_name()) -> ok.
 bp_set(Pid, MsgTag, BPName) ->
-    Pid ! {'$gen_component', bp, bp_set, MsgTag, BPName},
+    Pid ! Msg = {'$gen_component', bp, bp_set, MsgTag, BPName, self()},
+    receive Msg -> ok end,
     ok.
 
 %% @doc Module:Function(Message, State, Params) will be evaluated to decide
@@ -238,15 +240,34 @@ bp_set(Pid, MsgTag, BPName) ->
                       | fun((comm:message(), State::any()) -> boolean()),
                   bp_name()) -> ok.
 bp_set_cond(Pid, {_Module, _Function, _Params = 2} = Cond, BPName) ->
-    Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName},
+    Pid ! Msg = {'$gen_component', bp, bp_set_cond, Cond, BPName, self()},
+    receive Msg -> ok end,
     ok;
 bp_set_cond(Pid, Cond, BPName) when is_function(Cond, 2) ->
-    Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName},
+    Pid ! Msg = {'$gen_component', bp, bp_set_cond, Cond, BPName, self()},
+    receive Msg -> ok end,
+    ok.
+
+-spec bp_set_cond_async(pid(),
+                        Cond::{module(), atom(), 2}
+                            | fun((comm:message(), State::any()) -> boolean()),
+                        bp_name()) -> ok.
+bp_set_cond_async(Pid, {_Module, _Function, _Params = 2} = Cond, BPName) ->
+    Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName, none},
+    ok;
+bp_set_cond_async(Pid, Cond, BPName) when is_function(Cond, 2) ->
+    Pid ! {'$gen_component', bp, bp_set_cond, Cond, BPName, none},
     ok.
 
 -spec bp_del(pid(), bp_name()) -> ok.
 bp_del(Pid, BPName) ->
-    Pid ! {'$gen_component', bp, bp_del, BPName},
+    Pid ! Msg = {'$gen_component', bp, bp_del, BPName, self()},
+    receive Msg -> ok end,
+    ok.
+
+-spec bp_del_async(pid(), bp_name()) -> ok.
+bp_del_async(Pid, BPName) ->
+    Pid ! {'$gen_component', bp, bp_del, BPName, none},
     ok.
 
 -spec bp_step(pid()) -> {module(), On::atom(), comm:message()}.
@@ -656,24 +677,30 @@ on_gc_msg({'$gen_component', get_component_state, Pid}, UState, GCState) ->
       Pid, {'$gen_component', get_component_state_response,
             {gc_mod(GCState), gc_hand(GCState), GCState}}),
     loop(UState, GCState);
-on_gc_msg({'$gen_component', bp, bp_set_cond, Cond, BPName} = Msg, UState, GCState) ->
+on_gc_msg({'$gen_component', bp, bp_set_cond, Cond, BPName, Pid} = Msg, UState, GCState) ->
     NewGCState =
         case gc_bpqueue(GCState) of
-            [] -> gc_bp_set_cond(GCState, Cond, BPName);
+            [] ->
+                case Pid of none -> ok; _ -> Pid ! Msg, ok end,
+                gc_bp_set_cond(GCState, Cond, BPName);
             _ -> gc_bp_hold_back(GCState, Msg)
         end,
     loop(UState, NewGCState);
-on_gc_msg({'$gen_component', bp, bp_set, MsgTag, BPName} = Msg, UState, GCState) ->
+on_gc_msg({'$gen_component', bp, bp_set, MsgTag, BPName, Pid} = Msg, UState, GCState) ->
     NewGCState =
         case gc_bpqueue(GCState) of
-            [] -> gc_bp_set(GCState, MsgTag, BPName);
+            [] ->
+                Pid ! Msg,
+                gc_bp_set(GCState, MsgTag, BPName);
             _ -> gc_bp_hold_back(GCState, Msg)
         end,
     loop(UState, NewGCState);
-on_gc_msg({'$gen_component', bp, bp_del, BPName} = Msg, UState, GCState) ->
+on_gc_msg({'$gen_component', bp, bp_del, BPName, Pid} = Msg, UState, GCState) ->
     NewGCState =
         case gc_bpqueue(GCState) of
-            [] -> gc_bp_del(GCState, BPName);
+            [] ->
+                case Pid of none -> ok; _ -> Pid ! Msg, ok end,
+                gc_bp_del(GCState, BPName);
             _ -> gc_bp_hold_back(GCState, Msg)
         end,
     loop(UState, NewGCState);
@@ -795,30 +822,36 @@ on_bp_req_in_bp(Msg, State,
     %% we are in breakpoint. Consume this bp message
     wait_for_bp_leave(Msg, State, true);
 on_bp_req_in_bp(Msg, State,
-                {'$gen_component', bp, bp_set_cond, Cond, BPName} = BPMsg,
+                {'$gen_component', bp, bp_set_cond, Cond, BPName, Pid} = BPMsg,
                 IsFromQueue) ->
     NextState =
         case gc_bpqueue(State) of
             [_H|_T] when not IsFromQueue -> gc_bp_hold_back(State, BPMsg);
-            _ -> gc_bp_set_cond(State, Cond, BPName)
+            _ ->
+                case Pid of none -> ok; _ -> Pid ! Msg, ok end,
+                gc_bp_set_cond(State, Cond, BPName)
         end,
     wait_for_bp_leave(Msg, NextState, true);
 on_bp_req_in_bp(Msg, State,
-                {'$gen_component', bp, bp_set, MsgTag, BPName} = BPMsg,
+                {'$gen_component', bp, bp_set, MsgTag, BPName, Pid} = BPMsg,
                 IsFromQueue) ->
     NextState =
         case gc_bpqueue(State) of
             [_H|_T] when not IsFromQueue -> gc_bp_hold_back(State, BPMsg);
-            _ -> gc_bp_set(State, MsgTag, BPName)
+            _ ->
+                Pid ! BPMsg,
+                gc_bp_set(State, MsgTag, BPName)
         end,
     wait_for_bp_leave(Msg, NextState, true);
 on_bp_req_in_bp(Msg, State,
-                {'$gen_component', bp, bp_del, BPName}= BPMsg,
+                {'$gen_component', bp, bp_del, BPName, Pid}= BPMsg,
                 IsFromQueue)->
     NextState =
         case gc_bpqueue(State) of
             [_H|_T] when not IsFromQueue -> gc_bp_hold_back(State, BPMsg);
-            _ -> gc_bp_del(State, BPName)
+            _ ->
+                case Pid of none -> ok; _ -> Pid ! BPMsg, ok end,
+                gc_bp_del(State, BPName)
         end,
     wait_for_bp_leave(Msg, NextState, true);
 on_bp_req_in_bp(Msg, State,
