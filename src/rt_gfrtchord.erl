@@ -335,7 +335,11 @@ check_config() ->
                                             erlang:is_integer(Mask2) end,
                                 "{int(), int()}");
             _ -> false
-        end.
+        end and
+    config:cfg_is_bool(rt_frtchord_al) and
+    config:cfg_is_greater_than_equal(rt_frtchord_al_interval, 0) and
+    config:cfg_is_bool(rt_frtchord_should_dump)
+    .
 
 %% @doc Generate a random key from the pdf as defined in (Nagao, Shudo, 2011)
 %% TODO I floor the key for now; the key generator should return ints, but returns
