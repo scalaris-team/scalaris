@@ -3505,12 +3505,13 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for unit-test runner" >&5
 $as_echo_n "checking for unit-test runner... " >&6; }
-#if test -n "$RUN_TEST_FOUND" -a -n "$CT_TEST_FOUND" ; then
+if test -n "$RUN_TEST_FOUND" -a -n "$CT_TEST_FOUND" ; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: neither run_test nor ct_run found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests" >&5
 $as_echo "neither run_test nor ct_run found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests" >&6; }
-#else
-#  AC_MSG_RESULT([$RUN_TEST])
-#fi
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $RUN_TEST" >&5
+$as_echo "$RUN_TEST" >&6; }
+fi
 
 ERLANG_TOKE_FLAGS=
 if test "x$TOKEPREFIX" != xno; then :
