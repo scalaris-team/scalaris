@@ -151,11 +151,20 @@ AC_ERLANG_CHECK_LIB(edoc, , AC_MSG_NOTICE([erlang-edoc not found - you won't be 
 AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
               [AC_SUBST(RUN_TEST,[$ERLANG_LIB_DIR_common_test/priv/bin/run_test])],
               [AC_CHECK_FILE($ac_cv_erlang_root_dir/bin/run_test,
-              [AC_SUBST(RUN_TEST,[$ac_cv_erlang_root_dir/bin/run_test])],
-              [AC_PATH_PROG([RUN_TEST],[run_test])
-               if test -z $ac_cv_path_RUN_TEST ; then
-                  AC_MSG_NOTICE([run_test not found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests])
-               fi])])
+                       [AC_SUBST(RUN_TEST,[$ac_cv_erlang_root_dir/bin/run_test])],
+                       [AC_PATH_PROG([RUN_TEST],[run_test],RUN_TEST_FOUND=false)])])
+AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/ct_run,
+              [AC_SUBST(RUN_TEST,[$ERLANG_LIB_DIR_common_test/priv/bin/ct_run])],
+              [AC_CHECK_FILE($ac_cv_erlang_root_dir/bin/ct_run,
+                       [AC_SUBST(RUN_TEST,[$ac_cv_erlang_root_dir/bin/ct_run])],
+                       [AC_PATH_PROG([RUN_TEST],[ct_run],CT_TEST_FOUND=false)])])
+
+AC_MSG_CHECKING([for unit-test runner])
+if test -n "$RUN_TEST_FOUND" -a -n "$CT_TEST_FOUND" ; then
+  AC_MSG_RESULT([neither run_test nor ct_run found - on erlang < R14 consider running install.sh in the common_test directory otherwise you won't be able to run the unit tests])
+else
+  AC_MSG_RESULT([$RUN_TEST])
+fi
 
 ERLANG_TOKE_FLAGS=
 AS_IF([test "x$TOKEPREFIX" != xno],
