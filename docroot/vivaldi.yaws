@@ -88,6 +88,7 @@ out(Arg) ->
 <div id='legend'></div>
 <br />
 
+<div id="loading"><p>Loading map...</p></div>
 <script src="dc.js"></script>
 
 <hr />
