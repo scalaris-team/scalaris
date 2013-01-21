@@ -83,6 +83,7 @@ var DC = {
                 }
                 , grid: {
                     hoverable: true
+                    , clickable: true
                 }
                 , legend: {
                     show: true
@@ -100,7 +101,7 @@ var DC = {
 
                         $("#tooltip").remove();
                         var x = item.datapoint[0].toFixed(2),
-                        y = item.datapoint[1].toFixed(2);
+                            y = item.datapoint[1].toFixed(2);
 
                         var label;
 
@@ -109,19 +110,38 @@ var DC = {
                         } else {
                             // for centroids
                             label = DC.formatCentroidLabel(item.series.info.host
-                                                       ,item.series.info.radius
-                            );
+                                                           , item.series.info.radius);
                         }
 
-                        DC.showTooltip(item.pageX
-                            , item.pageY
-                            , label
-                            );
+                        DC.showTooltip(item.pageX, item.pageY, label);
                     }
-                }
-                else {
+                } else {
                     $("#tooltip").remove();
                     previousPoint = null;            
+                }
+            });
+
+            var previousClickedPoint = null;
+            $("#graph").bind("plotclick", function(event, pos, item){
+                if(item) {
+                    if (previousClickedPoint !== item) {
+                        if (previousClickedPoint) {
+                            var x = item.datapoint[0].toFixed(2),
+                                y = item.datapoint[1].toFixed(2);
+                            var prev_x = previousClickedPoint.datapoint[0].toFixed(2),
+                                prev_y = previousClickedPoint.datapoint[1].toFixed(2);
+
+                            /* connect points */
+                            /* calculate distance */
+                            var distance = Math.sqrt(Math.pow(x-prev_x,2) + Math.pow(y-prev_y,2));
+
+                            $("div#distance > p").text(distance);
+                        }
+                        previousClickedPoint = item;
+                    }
+                } else {
+                    $("#distance > p").text();
+                    previousClickedPoint = null;
                 }
             });
         });
