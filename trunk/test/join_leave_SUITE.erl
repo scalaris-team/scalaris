@@ -150,7 +150,7 @@ join_lookup(Config) ->
                      {ping, This}}) || X <- Keys ],
 
     %% got all 4 replies? ok
-    [ receive {pong} -> ok end || X <- Keys ],
+    [ receive {pong} -> ok end || _ <- Keys ],
 
     unittest_helper:stop_ring().
 
