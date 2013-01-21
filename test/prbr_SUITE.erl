@@ -1,4 +1,4 @@
-%% @copyright 2012 Zuse Institute Berlin
+%% @copyright 2012, 2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@
 -include("client_types.hrl").
 
 all()   -> [
+            rbr_consistency,%,
             tester_type_check_l_on_cseq,
             tester_type_check_rbr
            ].
@@ -41,17 +42,61 @@ end_per_suite(Config) ->
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
+        rbr_consistency ->
+            %% stop ring from previous test case (it may have run into a timeout
+            unittest_helper:stop_ring(),
+            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+            unittest_helper:make_ring_with_ids(?RT:get_replica_keys(0),
+                                               [{config, [{log_path, PrivDir}]}]),
+            %% necessary for the consistency check:
+            unittest_helper:check_ring_size_fully_joined(4),
+
+            Config;
         _ ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_ring(1,
+                                      [{config, [{log_path, PrivDir},
+                                                 {leases, true}]}]),
             Config
     end.
 
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
+
+rbr_consistency(_Config) ->
+    %% create an rbr entry
+    %% update 1 to 3 of its replicas
+    %% perform read in all quorum permutations
+    %% (intercept read on a single dht node)
+    %% output must be the old value or the new value
+    %% if the new value was seen once, the old must not be readable again
+
+    Nodes = pid_groups:find_all(dht_node),
+    Key = "a",
+
+    %% initialize key
+    kv_on_cseq:write(Key, 1),
+
+    %% select a replica
+    Replicas = ?RT:get_replica_keys(?RT:hash_key(Key)),
+
+    [ begin
+          New = N+100,
+          Old = case N of
+                    1 -> 1;
+                    _ -> N+99
+                end,
+
+          modify_rbr_at_key(R, N+100),
+
+          %% intercept and drop a message at r1
+          lists:foldl(read_quorum_without(Key), {Old, New}, Nodes)
+      end || {R,N} <- lists:zip(Replicas, lists:seq(1,4))],
+
+    ok.
 
 tester_type_check_rbr(_Config) ->
     Count = 1000,
@@ -111,3 +156,69 @@ tester_type_check_l_on_cseq(_Config) ->
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
       || {Mod, Excl, ExclPriv} <- Modules ],
     true.
+
+modify_rbr_at_key(R, N) ->
+    %% get a valid round number
+    comm:send_local(pid_groups:find_a(dht_node),
+                    {?lookup_aux, R, 0,
+                     {prbr, read, kv, comm:this(),
+                      R, unittest_rbr_consistency1,
+                      fun prbr:noop_read_filter/1}}),
+    receive
+        {read_reply, AssignedRound, _, _} ->
+            ok
+    end,
+    %% perform a write
+    comm:send_local(pid_groups:find_a(dht_node),
+                    {?lookup_aux, R, 0,
+                     {prbr, write, kv, comm:this(),
+                      R, AssignedRound, {[], false, N+1, N}, null,
+                      fun prbr:noop_write_filter/3}}),
+    receive
+        {write_reply, R, _} ->
+            ok
+    end.
+
+drop_prbr_read_request(Client, Tag) ->
+    fun (Message, _State) ->
+            case Message of
+%%                {prbr, _, kv, ReqClient, Key, _Round, _RF} ->
+                _ when element(1, Message) =:= prbr
+                       andalso element(3, Message) =:= kv ->
+                    ct:pal("Detected read, dropping it ~p, key ~p~n",
+                           [self(), element(5, Message)]),
+                    comm:send_local(Client, {Tag, done}),
+                    drop_single;
+                _ when element(1, Message) =:= prbr ->
+                    false;
+                _ -> false
+            end
+    end.
+
+read_quorum_without(Key) ->
+    fun (X, {Old, New}) ->
+            gen_component:bp_set_cond(
+              X,
+              drop_prbr_read_request(self(), drop_prbr_read),
+              drop_prbr_read),
+
+            {ok, Val} = kv_on_cseq:read(Key),
+            receive
+                {drop_prbr_read, done} ->
+                    gen_component:bp_del(X, drop_prbr_read),
+                    ok
+            end,
+            cleanup({drop_prbr_read, done}),
+            case Val of
+                Old ->
+                    {Old, New}; %% valid for next read
+                New ->
+                    {New, New}; %% old is no longer acceptable
+                _ -> ?equals(Val, New)
+            end
+    end.
+
+cleanup(Msg) ->
+    receive Msg -> cleanup(Msg)
+    after 0 -> ok
+    end.
