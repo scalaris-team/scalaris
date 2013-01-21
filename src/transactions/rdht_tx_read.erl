@@ -462,7 +462,6 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
                                      % all other read ops are partial reads!
                                      state_set_decided(Entry, ?partial_value);
                                  true ->
-                                     ct:pal("Fail, abort: ~p", [_Val]),
                                      state_set_decided(Entry, {fail, abort})
                               end,
                           % a decision was taken in any of the cases
