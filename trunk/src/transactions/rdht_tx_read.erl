@@ -40,7 +40,7 @@
 -export([check_config/0]).
 
 % feeder for tester
--export([extract_from_value_feeder/3, extract_from_tlog_feeder/4]).
+-export([extract_from_tlog_feeder/4]).
 
 -include("rdht_tx_read_state.hrl").
 
@@ -95,29 +95,14 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
         || RKey <- RKeys ],
     ok.
 
--spec extract_from_value_feeder
-        (?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
-            -> {?DB:value(), ?DB:version(), Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}};
-        (empty_val, -1, Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
-            -> {empty_val, -1, Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}}.
-extract_from_value_feeder(empty_val = Value, Version, Op) ->
-    {Value, Version, Op};
-extract_from_value_feeder(Value, Version, ?random_from_list = Op) ->
-    {rdht_tx:encode_value(Value), Version, Op}; % need a valid encoded value!
-extract_from_value_feeder(Value, Version, {?sublist, _Start, _Len} = Op) ->
-    {rdht_tx:encode_value(Value), Version, Op}; % need a valid encoded value!
-extract_from_value_feeder(Value, Version, Op) ->
-    {Value, Version, Op}.
-
 %% @doc Performs the requested operation in the dht_node context.
 -spec extract_from_value
-        (?DB:value(), ?DB:version(), Op::?read) -> Result::{?ok, ?DB:value(), ?DB:version()};
-        (?DB:value(), ?DB:version(), Op::?random_from_list)
-            -> Result::{?ok, {RandomElement::?DB:value(), ListLen::pos_integer()}, ?DB:version()}
-                     | {fail, empty_list | not_a_list, ?DB:version()};
-        (?DB:value(), ?DB:version(), Op::{?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
-            -> Result::{?ok, ?DB:value(), ?DB:version()} | {fail, not_a_list, ?DB:version()};
-        (?DB:value(), ?DB:version(), Op::?write) -> Result::{?ok, ?value_dropped, ?DB:version()};
+        (rdht_tx:encoded_value(), ?DB:version(), Op::?read) -> Result::{?ok, rdht_tx:encoded_value(), ?DB:version()};
+        (rdht_tx:encoded_value(), ?DB:version(), Op::?random_from_list)
+            -> Result::{?ok, rdht_tx:encoded_value(), ?DB:version()} | {fail, empty_list | not_a_list, ?DB:version()};
+        (rdht_tx:encoded_value(), ?DB:version(), Op::{?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+            -> Result::{?ok, rdht_tx:encoded_value(), ?DB:version()} | {fail, not_a_list, ?DB:version()};
+        (rdht_tx:encoded_value(), ?DB:version(), Op::?write) -> Result::{?ok, ?value_dropped, ?DB:version()};
         (empty_val, -1, Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
             -> Result::{?ok, ?value_dropped, -1}.
 extract_from_value(empty_val, Version = -1, _Op) ->
@@ -224,6 +209,12 @@ extract_from_tlog(Entry, Key, Op, EnDecode) ->
         % -> at the moment, though, any other failure can only contain a full
         %    value since reads only fail with not_found and other ops write a
         %    full value
+        % NOTE: this is not true any more! e.g. add_on_nr may fail with {fail, abort}
+        % -> this will lead to wrong results for partial read ops, e.g. the following
+        %    will result in {fail,not_a_list} which is not correct:
+        %    api_tx:write("a",  [42])
+        %    {T1, _} = api_tx:req_list([{add_on_nr,"a",[{[[]],[{1.977014147676681}],[]}]}]).
+        %    {T2, _} = api_tx:req_list(T1, [{read,"a",random_from_list}]).
         {fail, Reason} when is_atom(Reason) ->
             extract_partial_from_full(Entry, Key, Op, EnDecode)
     end.

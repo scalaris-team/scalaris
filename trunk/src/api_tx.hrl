@@ -42,16 +42,27 @@
 -type read_random_from_list_request() :: {read, client_key(), random_from_list}.
 -type read_sublist_request() :: {read, client_key(), {sublist, Start::pos_integer() | neg_integer(), Len::integer()}}.
 -type write_request() :: {write, client_key(), client_value()}.
+-type write_request_enc() :: {write, client_key(), rdht_tx:encoded_value()}.
 -type add_del_on_list_request() ::
           {add_del_on_list, client_key(),
            client_value(),  %% abort when not ToAdd::[client_value()],
            client_value()}.  %% abort when not ToRemove::[client_value()]}
+-type add_del_on_list_request_enc() ::
+          {add_del_on_list, client_key(),
+           rdht_tx:encoded_value(),   %% abort when not decoded to [client_value()],
+           rdht_tx:encoded_value()}.  %% abort when not decoded to [client_value()]}
 -type add_on_nr_request() ::
           {add_on_nr, client_key(),
            client_value()}. %% abort when not number()}
+-type add_on_nr_request_enc() ::
+          {add_on_nr, client_key(),
+           rdht_tx:encoded_value()}. %% abort when not decoded to number()}
 -type test_and_set_request() ::
           {test_and_set, client_key(),
            Old::client_value(), New::client_value()}.
+-type test_and_set_request_enc() ::
+          {test_and_set, client_key(),
+           Old::rdht_tx:encoded_value(), New::rdht_tx:encoded_value()}.
 
 -type request_on_key() ::
           read_request()
@@ -61,7 +72,16 @@
         | add_del_on_list_request()
         | add_on_nr_request()
         | test_and_set_request().
+-type request_on_key_enc() ::
+          read_request()
+        | read_random_from_list_request()
+        | read_sublist_request()
+        | write_request_enc()
+        | add_del_on_list_request_enc()
+        | add_on_nr_request_enc()
+        | test_and_set_request_enc().
 -type request() :: request_on_key() | {commit}.
+-type request_enc() :: request_on_key_enc() | {commit}.
 
 -type read_result() :: {ok, client_value()} | {fail, not_found}.
 -type read_random_from_list_result() :: {ok, RandomValue_ListLen_MaybeEncoded::client_value()} | {fail, not_found | empty_list | not_a_list}.

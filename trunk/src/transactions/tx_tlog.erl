@@ -68,14 +68,14 @@
             Key     :: tlog_key(),
             Version :: non_neg_integer() | -1,
             Status  :: tx_status(), % note: only partial reads allow ?partial_value
-            Value   :: any()
+            Value   :: rdht_tx:encoded_value() | ?value_dropped
           }.
 -type tlog_entry_write() ::
           { Op      :: ?write,
             Key     :: tlog_key(),
             Version :: non_neg_integer() | -1,
             Status  :: ?value | {fail, abort | not_found | empty_list | not_a_list}, % no ?partial_value allowed!
-            Value   :: any()
+            Value   :: rdht_tx:encoded_value() | ?value_dropped
           }.
 -type tlog_entry() :: tlog_entry_read() | tlog_entry_write().
 %% -opaque tlog() :: [tlog_entry()]. % creates a false warning in add_or_update_status_by_key/3
@@ -266,7 +266,7 @@ cleanup(TLog) ->
 %% Operations on Elements of TransLogs (public)
 -spec new_entry(tx_op(), client_key() | ?RT:key(),
                 non_neg_integer() | -1,
-                tx_status(), any()) -> tlog_entry().
+                tx_status(), rdht_tx:encoded_value()) -> tlog_entry().
 new_entry(Op, Key, Vers, Status, Val) ->
     {Op, Key, Vers, Status, Val}.
 
@@ -291,10 +291,10 @@ get_entry_status(Element)    -> element(4, Element).
 -spec set_entry_status(tlog_entry(), tx_status()) -> tlog_entry().
 set_entry_status(Element, Val) -> setelement(4, Element, Val).
 
--spec get_entry_value(tlog_entry()) -> any().
+-spec get_entry_value(tlog_entry()) -> rdht_tx:encoded_value().
 get_entry_value(Element)     -> element(5, Element).
 
--spec set_entry_value(tlog_entry(), any()) -> tlog_entry().
+-spec set_entry_value(tlog_entry(), rdht_tx:encoded_value()) -> tlog_entry().
 set_entry_value(Element, Val)     -> setelement(5, Element, Val).
 
 -spec drop_value(tlog_entry()) -> tlog_entry().

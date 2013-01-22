@@ -63,6 +63,8 @@ tester_type_check_api(_Config) ->
     Count = 1000,
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
+    tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
+    tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
     Modules =
         [ {api_dht, [], []},
           {api_dht_raw,
@@ -80,6 +82,8 @@ tester_type_check_api(_Config) ->
         ],
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
       || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_type_checker({typedef, rdht_tx, encoded_value}),
+    tester:unregister_value_creator({typedef, rdht_tx, encoded_value}),
     true.
 
 tester_type_check_config(_Config) ->
@@ -266,6 +270,8 @@ tester_type_check_paxos(_Config) ->
 tester_type_check_tx(_Config) ->
     Count = 1000,
     config:write(no_print_ring_data, true),
+    tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
+    tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
     Modules =
         [ {rdht_tx,
            [ {decode_value, 1} ], %% not every binary is an erlterm
@@ -353,6 +359,8 @@ tester_type_check_tx(_Config) ->
         ],
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
       || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_type_checker({typedef, rdht_tx, encoded_value}),
+    tester:unregister_value_creator({typedef, rdht_tx, encoded_value}),
     true.
 
 tester_type_check_util(_Config) ->

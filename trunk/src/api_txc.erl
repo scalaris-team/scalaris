@@ -26,6 +26,7 @@
 
 -ifdef(with_export_type_support).
 -export_type([request/0, request_on_key/0,
+              request_enc/0, request_on_key_enc/0,
               read_request/0, read_random_from_list_request/0,
               read_sublist_request/0,
               write_request/0,
