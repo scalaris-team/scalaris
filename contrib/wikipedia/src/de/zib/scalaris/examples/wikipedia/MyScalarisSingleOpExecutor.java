@@ -22,7 +22,6 @@ import com.ericsson.otp.erlang.OtpErlangException;
 import de.zib.scalaris.AbortException;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.RequestList;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.TransactionSingleOp.ResultList;
 import de.zib.scalaris.UnknownException;
@@ -72,7 +71,7 @@ public class MyScalarisSingleOpExecutor extends ScalarisSingleOpExecutor {
      */
     @Override
     protected ResultList executeRequests(RequestList requests)
-            throws ConnectionException, TimeoutException, AbortException,
+            throws ConnectionException, AbortException,
             UnknownException {
         ScalarisDataHandler.addInvolvedKeys(involvedKeys, requests.getRequests());
         return super.executeRequests(requests);
