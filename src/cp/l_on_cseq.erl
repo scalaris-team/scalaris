@@ -33,7 +33,7 @@
 -export([on/2]).
 
 -export([lease_renew/1]).
--export([lease_handover/2]).
+-export([lease_handover/3]).
 -export([lease_takeover/1]).
 -export([lease_split/3]).
 -export([lease_merge/2]).
@@ -47,7 +47,7 @@
          get_epoch/1, set_epoch/2,
          new_timeout/0, set_timeout/1,
          get_id/1,
-         set_owner/2,
+         get_owner/1, set_owner/2,
          get_aux/1, set_aux/2,
          get_range/1, set_range/2]).
 
@@ -143,11 +143,11 @@ lease_renew(Lease) ->
                     {l_on_cseq, renew, Lease}),
     ok.
 
--spec lease_handover(lease_t(), comm:mypid()) -> ok.
-lease_handover(Lease, NewOwner) ->
+-spec lease_handover(lease_t(), comm:mypid(), comm:mypid()) -> ok.
+lease_handover(Lease, NewOwner, ReplyTo) ->
     % @todo precondition: i am owner of Lease
     comm:send_local(pid_groups:get_my(dht_node),
-                    {l_on_cseq, handover, Lease, NewOwner}),
+                    {l_on_cseq, handover, Lease, NewOwner, ReplyTo}),
     ok.
 
 -spec lease_takeover(lease_t()) -> ok.
@@ -283,27 +283,56 @@ on({l_on_cseq, update_reply,
 % lease handover
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, handover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
-    NewOwner}, State) ->
+on({l_on_cseq, handover, Old = #lease{id=Id, epoch=OldEpoch},
+    NewOwner, ReplyTo}, State) ->
     New = Old#lease{epoch   = OldEpoch + 1,
                     owner   = NewOwner,
                     version = 0,
                     timeout = new_timeout()},
-    ContentCheck = is_valid_handover(OldEpoch, OldVersion),
+    ContentCheck = generic_content_check(Old),
     DB = get_db_for_id(Id),
-    Self = comm:reply_as(self(), 3, {l_on_cseq, handover_reply, '_'}),
+    Self = comm:reply_as(self(), 3, {l_on_cseq, handover_reply, '_', ReplyTo,
+                                     NewOwner, New}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
     State;
 
-on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
+on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value}, ReplyTo,
+    _NewOwner, _New}, State) ->
     % @todo if success update lease in State
-    State;
+    ct:pal("successful handover~n", []),
+    comm:send(ReplyTo, {handover, success, Value}),
+    update_lease_in_dht_node_state(Value, State);
 
-on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, _Value, _Reason}}, State) ->
-    % @todo if success update lease in State
-    State;
+on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
+                                {content_check_failed, Reason}},
+    ReplyTo, NewOwner, New}, State) ->
+    ct:pal("handover denied: ~p ~p ~p~n", [Reason, Value, New]),
+    case Reason of
+        lease_does_not_exist ->
+            comm:send(ReplyTo, {handover, failed, Value}),
+            case Value of %@todo is this necessary?
+                prbr_bottom ->
+                    State;
+                _ ->
+                    remove_lease_from_dht_node_state(Value, State)
+            end;
+        unexpected_owner   ->
+            comm:send(ReplyTo, {handover, failed, Value}),
+            remove_lease_from_dht_node_state(Value, State);
+        unexpected_aux     ->
+            %ct:pal("sending {handover, failed, Value}"),
+            comm:send(ReplyTo, {handover, failed, Value}), State;
+        unexpected_range   ->
+            comm:send(ReplyTo, {handover, failed, Value}), State;
+        unexpected_timeout -> lease_handover(Value, NewOwner, ReplyTo), State;
+        unexpected_epoch   -> lease_handover(Value, NewOwner, ReplyTo), State;
+        unexpected_version -> lease_handover(Value, NewOwner, ReplyTo), State;
+        timeout_is_not_newer_than_current_lease ->
+            lease_handover(Value, NewOwner, ReplyTo),
+            State
+    end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -695,21 +724,21 @@ is_valid_update(CurrentEpoch, CurrentVersion) ->
 %            {false, lease_does_not_exist};
 
 
--spec is_valid_handover(non_neg_integer(), non_neg_integer()) ->
-    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
-is_valid_handover(Epoch, Version) ->
-    fun (Current, _WriteFilter, Next) ->
-            Res = standard_check(Current, Next, Epoch, Version)
-            %% checks for debugging
-                andalso (Current#lease.epoch+1 == Next#lease.epoch)
-                andalso (Current#lease.owner == comm:make_global(pid_groups:get_my(dht_node)))
-                andalso (Current#lease.owner =/= Next#lease.owner)
-                andalso (Current#lease.range == Next#lease.range)
-                andalso (Current#lease.aux == Next#lease.aux)
-                andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout),
-            {Res, null}
-    end.
+%-spec is_valid_handover(non_neg_integer(), non_neg_integer()) ->
+%    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
+%is_valid_handover(Epoch, Version) ->
+%    fun (Current, _WriteFilter, Next) ->
+%            Res = standard_check(Current, Next, Epoch, Version)
+%            %% checks for debugging
+%                andalso (Current#lease.epoch+1 == Next#lease.epoch)
+%                andalso (Current#lease.owner == comm:make_global(pid_groups:get_my(dht_node)))
+%                andalso (Current#lease.owner =/= Next#lease.owner)
+%                andalso (Current#lease.range == Next#lease.range)
+%                andalso (Current#lease.aux == Next#lease.aux)
+%                andalso (Current#lease.timeout < Next#lease.timeout)
+%                andalso (os:timestamp() <  Next#lease.timeout),
+%            {Res, null}
+%    end.
 
 -spec is_valid_takeover(non_neg_integer(), non_neg_integer()) ->
     fun ((any(), any(), any()) -> {boolean(), null}). %% content check
@@ -1014,6 +1043,9 @@ set_timeout(Lease) -> Lease#lease{timeout=new_timeout()}.
 
 -spec get_id(lease_t()) -> ?RT:key().
 get_id(#lease{id=Id}) -> Id.
+
+-spec get_owner(lease_t()) -> comm:mypid() | nil.
+get_owner(#lease{owner=Owner}) -> Owner.
 
 -spec set_owner(lease_t(), comm:mypid()) -> lease_t().
 set_owner(L, NewOwner) -> L#lease{owner=NewOwner}.

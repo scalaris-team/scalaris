@@ -39,7 +39,11 @@ all()   -> [
             test_split_with_owner_change_in_step1,
             test_split_with_owner_change_in_step2,
             test_split_with_owner_change_in_step3,
-            test_split_with_aux_change_in_step1
+            test_split_with_aux_change_in_step1,
+            test_handover,
+            test_handover_with_concurrent_renew,
+            test_handover_with_concurrent_aux_change,
+            test_handover_with_concurrent_owner_change
            ].
 suite() -> [ {timetrap, {seconds, 4}} ].
 
@@ -298,7 +302,6 @@ test_split_with_owner_change_in_step2(Config) ->
     NullF = fun (_Id, _Lease) -> ok end,
     WaitLeftLeaseF = fun (Id, Lease) ->
                              OldEpoch = l_on_cseq:get_epoch(Lease),
-                             OldVersion = l_on_cseq:get_version(Lease),
                              wait_for_lease_version(Id, OldEpoch + 1, 0)
                      end,
     WaitRightLeaseF = fun wait_for_delete/1,
@@ -351,6 +354,90 @@ test_split_with_aux_change_in_step1(_Config) ->
     test_split_helper_for_2_steps(_Config,
                                   NullF, ChangeOwnerF,
                                   WaitLeftLeaseF, WaitRightLeaseF),
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% handover unit tests
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_handover(_Config) ->
+    ModifyF = fun(Old) -> Old end,
+    WaitF = fun (Id, _Lease) ->
+                    wait_for_lease_owner(Id, comm:this()),
+                    receive
+                        {handover, success, _} -> ok
+                    end
+            end,
+    test_handover_helper(_Config, ModifyF, WaitF),
+    true.
+
+test_handover_with_concurrent_renew(_Config) ->
+    ModifyF = fun(Old) ->
+                      l_on_cseq:set_version(
+                        l_on_cseq:set_epoch(Old, l_on_cseq:get_epoch(Old)+1),
+                        0)
+                      end,
+    WaitF = fun (Id, _Lease) ->
+                    wait_for_lease_owner(Id, comm:this()),
+                    receive
+                        {handover, success, _} -> ok
+                    end
+            end,
+    test_handover_helper(_Config, ModifyF, WaitF),
+    true.
+
+test_handover_with_concurrent_aux_change(_Config) ->
+    ModifyF = fun(Old) ->
+                      l_on_cseq:set_aux(
+                        l_on_cseq:set_version(
+                          l_on_cseq:set_epoch(Old, l_on_cseq:get_epoch(Old)+1),
+                          0),
+                        {valid, merge, foo, bar})
+                      end,
+    WaitF = fun (_Id, _Lease) ->
+                    receive
+                        {handover, failed, _} -> ok
+                    end
+            end,
+    test_handover_helper(_Config, ModifyF, WaitF),
+    true.
+
+test_handover_with_concurrent_owner_change(_Config) ->
+    ModifyF = fun(Old) ->
+                      l_on_cseq:set_owner(
+                        l_on_cseq:set_version(
+                          l_on_cseq:set_epoch(Old, l_on_cseq:get_epoch(Old)+1),
+                          0),
+                        comm:this())
+                      end,
+    WaitF = fun (_Id, _Lease) ->
+                    receive
+                        {handover, failed, _} -> ok
+                    end
+            end,
+    test_handover_helper(_Config, ModifyF, WaitF),
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% handover helper
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+test_handover_helper(_Config, ModifyF, WaitF) ->
+    pid_groups:join(pid_groups:group_with(dht_node)),
+
+    % intercept lease renew
+    {l_on_cseq, renew, Old} = intercept_lease_renew(),
+    Id = l_on_cseq:get_id(Old),
+    % now we update the lease
+    New = ModifyF(Old),
+    l_on_cseq:lease_update(Old, New),
+    wait_for_lease(New),
+    % now the error handling of lease_handover is going to be tested
+    l_on_cseq:lease_handover(Old, comm:this(), comm:this()),
+    WaitF(Id, Old),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -536,6 +623,12 @@ wait_for_lease_version(Id, Epoch, Version) ->
                           andalso Version == l_on_cseq:get_version(Lease)
                           end).
 
+wait_for_lease_owner(Id, NewOwner) ->
+    wait_for_lease_helper(Id,
+                          fun (Lease) ->
+                                  NewOwner   == l_on_cseq:get_owner(Lease)
+                          end).
+
 wait_for_lease_helper(Id, F) ->
     wait_for(fun () ->
                      case l_on_cseq:read(Id) of
@@ -559,7 +652,6 @@ wait_for_simple_update(Id, Old) ->
     wait_for_lease_version(Id, OldEpoch, OldVersion+2).
 
 wait_for_epoch_update(Id, Old) ->
-    OldVersion = l_on_cseq:get_version(Old),
     OldEpoch   = l_on_cseq:get_epoch(Old),
     wait_for_lease_version(Id, OldEpoch+1, 1).
 
