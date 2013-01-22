@@ -28,7 +28,7 @@
 
 all()   -> [
             rbr_consistency,%,
-            tester_type_check_l_on_cseq,
+            %tester_type_check_l_on_cseq,
             tester_type_check_rbr
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
