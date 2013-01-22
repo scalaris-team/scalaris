@@ -62,7 +62,10 @@ work_phase(ClientPid, ReqId, Request) ->
 
 %% @doc Get a result entry for a write from the given TLog entry.
 %%      Update the TLog entry accordingly.
--spec extract_from_tlog(tx_tlog:tlog_entry(), client_key(), client_value(), EnDecode::boolean()) ->
+-spec extract_from_tlog
+        (tx_tlog:tlog_entry(), client_key(), client_value(), EnDecode::true) ->
+                       {tx_tlog:tlog_entry(), api_tx:write_result()};
+        (tx_tlog:tlog_entry(), client_key(), rdht_tx:encoded_value(), EnDecode::false) ->
                        {tx_tlog:tlog_entry(), api_tx:write_result()}.
 extract_from_tlog(Entry, _Key, Value1, EnDecode) ->
     Value = ?IIF(EnDecode, rdht_tx:encode_value(Value1), Value1),

@@ -29,7 +29,7 @@
                    state_get_numreplied/1
                   ]}).
 
--type result() :: {?ok | fail, ?DB:value() | 0 | atom(), -1 | ?DB:version()}. % {?ok|fail, Val|FailReason, Vers}
+-type result() :: {?ok | fail, rdht_tx:encoded_value() | 0 | atom(), -1 | ?DB:version()}. % {?ok|fail, Val|FailReason, Vers}
 -type read_state() ::
                   { ID               :: rdht_tx:req_id(),
                     ClientPid        :: pid() | unknown,
@@ -87,7 +87,7 @@ state_get_numreplied(State) ->
     state_get_numok(State) + state_get_numfailed(State).
 
 -spec state_add_reply(read_state(),
-                      Result::{?ok, ?DB:value(), ?DB:version()} | {?ok, empty_val, -1} |
+                      Result::{?ok, rdht_tx:encoded_value(), ?DB:version()} | {?ok, empty_val, -1} |
                           {fail, atom(), ?DB:version()})
         -> read_state().
 state_add_reply(State, Result) ->

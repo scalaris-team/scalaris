@@ -29,7 +29,7 @@
 
 -export([req_list/3]).
 -export([check_config/0]).
--export([encode_value/1, decode_value/1]).
+-export([encode_value/1, decode_value/1, is_encoded_value/1]).
 -export([req_props/1,
          req_get_key/1, req_get_op/1]).
 
@@ -40,14 +40,17 @@
 -include("client_types.hrl").
 
 -ifdef(with_export_type_support).
--export_type([req_id/0, request_on_key/0]).
+-export_type([req_id/0, request_on_key/0, encoded_value/0]).
 -endif.
 
 -type req_id() :: uid:global_uid().
 -type request_on_key() :: api_tx:request_on_key().
 
+-type encoded_value() :: atom() | boolean() | number() | binary().
+
 %% @doc Perform several requests inside a transaction.
--spec req_list(tx_tlog:tlog(), [api_tx:request()], EnDecode::boolean()) -> {tx_tlog:tlog(), [api_tx:result()]}.
+-spec req_list(tx_tlog:tlog(), [api_tx:request()], EnDecode::true)      -> {tx_tlog:tlog(), [api_tx:result()]};
+              (tx_tlog:tlog(), [api_tx:request_enc()], EnDecode::false) -> {tx_tlog:tlog(), [api_tx:result()]}.
 req_list([], [{commit}], _EnDecode) -> {[], [{ok}]};
 req_list(TLog, ReqList, EnDecode) ->
     %% PRE: TLog is sorted by key, implicitly given, as
@@ -221,23 +224,34 @@ do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
 do_reqs_on_tlog_iter(TLog, [], Acc, _EnDecode) ->
     {tx_tlog:cleanup(TLog), lists:reverse(Acc)}.
 
+-spec is_encoded_value(term()) -> boolean().
+is_encoded_value(Value) when is_atom(Value) -> true;
+is_encoded_value(Value) when is_boolean(Value) -> true;
+is_encoded_value(Value) when is_number(Value) -> true;
+is_encoded_value(Value) when is_binary(Value) ->
+    try decode_value(Value) of _ -> true
+    catch error:badarg -> false
+    end;
+is_encoded_value(_) -> false.
+
 %% @doc Encode the given client value to its internal representation which is
 %%      compressed for all values except atom, boolean, number or binary.
--spec encode_value(client_value()) -> ?DB:value().
-encode_value(Value) when
-      is_atom(Value) orelse
-      is_boolean(Value) orelse
-      is_number(Value) ->
-    Value; %%  {nav}
-encode_value(Value) when
-      is_binary(Value) ->
+-spec encode_value(client_value()) -> encoded_value().
+encode_value(Value) when is_atom(Value) -> Value;
+encode_value(Value) when is_boolean(Value) -> Value;
+encode_value(Value) when is_number(Value) -> Value;
+encode_value(Value) when is_binary(Value) ->
     %% do not compress a binary
     erlang:term_to_binary(Value, [{minor_version, 1}]);
 encode_value(Value) ->
     erlang:term_to_binary(Value, [{compressed, 6}, {minor_version, 1}]).
 
 %% @doc Decodes the given internal representation of a client value.
--spec decode_value(?DB:value()) -> client_value().
+%%      TODO: use the stronger variant (commented out for the bug in rdht_tx_read:extract_from_tlog/4)
+-spec decode_value(encoded_value()) -> client_value().
+%% decode_value(Value) when is_atom(Value) -> Value;
+%% decode_value(Value) when is_boolean(Value) -> Value;
+%% decode_value(Value) when is_number(Value) -> Value;
 decode_value(Value) when is_binary(Value) -> erlang:binary_to_term(Value);
 decode_value(Value)                       -> Value.
 
