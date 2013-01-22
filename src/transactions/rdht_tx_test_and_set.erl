@@ -84,5 +84,5 @@ extract_from_tlog(Entry0, Key, Old, New, EnDecode) ->
             {tx_tlog:set_entry_status(Entry, ?fail),
              {fail, {key_changed, RealOldValue}}};
         {fail, not_found} = X ->
-            {Entry, X}
+            {tx_tlog:set_entry_status(Entry, ?fail), X}
     end.
