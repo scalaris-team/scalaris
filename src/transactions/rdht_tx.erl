@@ -45,10 +45,9 @@
 
 -type req_id() :: uid:global_uid().
 -type request_on_key() :: api_tx:request_on_key().
--type results() :: [ api_tx:result() ].
 
 %% @doc Perform several requests inside a transaction.
--spec req_list(tx_tlog:tlog(), [api_tx:request()], EnDecode::boolean()) -> {tx_tlog:tlog(), results()}.
+-spec req_list(tx_tlog:tlog(), [api_tx:request()], EnDecode::boolean()) -> {tx_tlog:tlog(), [api_tx:result()]}.
 req_list([], [{commit}], _EnDecode) -> {[], [{ok}]};
 req_list(TLog, ReqList, EnDecode) ->
     %% PRE: TLog is sorted by key, implicitly given, as
@@ -107,12 +106,12 @@ rl_chk_and_encode([Req | RL], Acc, OKorAbort) ->
 
 %% @doc Fill all fields with {fail, abort} information.
 -spec tlog_and_results_to_abort(tx_tlog:tlog(), [api_tx:request()]) ->
-                                       {tx_tlog:tlog(), results()}.
+                                       {tx_tlog:tlog(), [api_tx:result()]}.
 tlog_and_results_to_abort(TLog, ReqList) ->
     tlog_and_results_to_abort_iter(TLog, ReqList, []).
 
--spec tlog_and_results_to_abort_iter(tx_tlog:tlog(), [api_tx:request()], results())
-        -> {tx_tlog:tlog(), results()}.
+-spec tlog_and_results_to_abort_iter(tx_tlog:tlog(), [api_tx:request()], [api_tx:result()])
+        -> {tx_tlog:tlog(), [api_tx:result()]}.
 tlog_and_results_to_abort_iter(TLog, [], AccRes) ->
     {TLog, lists:reverse(AccRes)};
 tlog_and_results_to_abort_iter(TLog, [Req | ReqListT], AccRes) ->
@@ -194,15 +193,15 @@ collect_replies(TLog, []) ->
 
 %% @doc Perform all operations on the TLog and generate list of results.
 -spec do_reqs_on_tlog(tx_tlog:tlog(), [request_on_key()], EnDecode::boolean()) ->
-                             {tx_tlog:tlog(), results()}.
+                             {tx_tlog:tlog(), [api_tx:result()]}.
 do_reqs_on_tlog(TLog, ReqList, EnDecode) ->
     do_reqs_on_tlog_iter(TLog, ReqList, [], EnDecode).
 
 %% @doc Helper to perform all operations on the TLog and generate list
 %%      of results.
 %%      TODO: sort the req list similar to the tlog list and parse through both at the same time!
--spec do_reqs_on_tlog_iter(tx_tlog:tlog(), [request_on_key()], results(), EnDecode::boolean()) ->
-                                  {tx_tlog:tlog(), results()}.
+-spec do_reqs_on_tlog_iter(tx_tlog:tlog(), [request_on_key()], [api_tx:result()], EnDecode::boolean())
+        -> {tx_tlog:tlog(), [api_tx:result()]}.
 do_reqs_on_tlog_iter(TLog, [Req | ReqTail], Acc, EnDecode) ->
     Key = req_get_key(Req),
     Entry = tx_tlog:find_entry_by_key(TLog, Key),
