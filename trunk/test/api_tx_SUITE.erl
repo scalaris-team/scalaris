@@ -854,7 +854,7 @@ prop_tlog_test_and_set2(TLog0, Key, Existing, RealOldValue, OldValue, NewValue) 
            ?equals(Result1, {fail, not_found}),
            ?equals(Result2, {fail, not_found}),
            Result3 = api_tx:commit(TLog2),
-           ?equals(Result3, {ok}), % TODO: should be abort since test_and_set was unsuccessful!
+           ?equals(Result3, {fail, abort, [Key]}),
            ?equals(api_tx:read(Key), {fail, not_found});
        RealOldValue =:= OldValue ->
            ?equals(Result1, {ok}),
@@ -999,7 +999,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                                     ?equals(tx_tlog:get_entry_value_type(NewEntry), ?value_dropped),
                                     ?equals(NRes, [{fail, not_found}]);
                                 {test_and_set, _Key, _Old, _New} ->
-                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?ok), % TODO: should be ?fail since test_and_set was unsuccessful! 
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?fail), 
                                     ?equals(tx_tlog:get_entry_value_type(NewEntry), ?value_dropped),
                                     ?equals(NRes, [{fail, not_found}]);
                                 {add_on_nr, _Key, X} when NRes =:= [{ok}] ->
