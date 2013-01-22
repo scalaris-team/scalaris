@@ -723,11 +723,11 @@ prop_random_from_list(Key, Value) ->
         api_tx:req_list([{read, Key, random_from_list}]),
         {[{?read, Key, Version, ?partial_value, ?value_dropped}],
          [{ok, { Value, 1 } }]} when is_integer(Version) andalso Version >= 0),
-    ValueEnc = rdht_tx:encode_value(Value),
+    ValueEnc = rdht_tx:encode_value({Value, 1}),
     ?equals_pattern(
         api_txc:req_list([{read, Key, random_from_list}]),
         {[{?read, Key, Version, ?partial_value, ?value_dropped}],
-         [{ok, { ValueEnc, 1 } }]} when is_integer(Version) andalso Version >= 0),
+         [{ok, ValueEnc}]} when is_integer(Version) andalso Version >= 0),
     true.
 
 tester_random_from_list(_Config) ->

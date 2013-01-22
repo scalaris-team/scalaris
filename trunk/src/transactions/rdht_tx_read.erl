@@ -129,16 +129,16 @@ extract_from_value(_Value, Version, ?write) ->
 extract_from_value(ValueEnc, Version, ?random_from_list) ->
     Value = rdht_tx:decode_value(ValueEnc),
     case Value of
-        [_|_]     -> {RandVal, Len} = util:randomelem_and_length(Value),
-                     {?ok, {rdht_tx:encode_value(RandVal), Len}, Version};
+        [_|_]     -> RandVal_ListLen = util:randomelem_and_length(Value),
+                     {?ok, rdht_tx:encode_value(RandVal_ListLen), Version};
         []        -> {fail, empty_list, Version};
         _         -> {fail, not_a_list, Version}
     end;
 extract_from_value(ValueEnc, Version, {?sublist, Start, Len}) ->
     Value = rdht_tx:decode_value(ValueEnc),
     if is_list(Value) ->
-           {SubList, ListLen} = util:sublist(Value, Start, Len),
-           {?ok, {rdht_tx:encode_value(SubList), ListLen}, Version};
+           SubList_ListLen = util:sublist(Value, Start, Len),
+           {?ok, rdht_tx:encode_value(SubList_ListLen), Version};
        true ->
            {fail, not_a_list, Version}
     end.
@@ -162,7 +162,7 @@ extract_from_tlog_feeder(Entry, Key, random_from_list = Op, {EnDecode, ListLengt
     NewEntry =
         case tx_tlog:get_entry_status(Entry) of
             ?partial_value -> % need partial value according to random_from_list op!
-                PartialValue = {tx_tlog:get_entry_value(Entry), ListLength},
+                PartialValue = rdht_tx:encode_value({tx_tlog:get_entry_value(Entry), ListLength}),
                 tx_tlog:set_entry_value(Entry, PartialValue);
             _ -> Entry
         end,
@@ -171,7 +171,7 @@ extract_from_tlog_feeder(Entry, Key, {sublist, _Start, _Len} = Op, {EnDecode, Li
     NewEntry =
         case tx_tlog:get_entry_status(Entry) of
             ?partial_value -> % need partial value according to sublist op!
-                PartialValue = {[tx_tlog:get_entry_value(Entry)], ListLength},
+                PartialValue = rdht_tx:encode_value({[tx_tlog:get_entry_value(Entry)], ListLength}),
                 tx_tlog:set_entry_value(Entry, PartialValue);
             _ -> Entry
         end,
@@ -201,11 +201,11 @@ extract_from_tlog(Entry, Key, Op, EnDecode) ->
             ClientVal =
                 case Op of
                     random_from_list ->
-                        {RandVal, ListLen} = EncodedVal = tx_tlog:get_entry_value(Entry),
-                        ?IIF(EnDecode, {rdht_tx:decode_value(RandVal), ListLen}, EncodedVal);
+                        EncodedVal = tx_tlog:get_entry_value(Entry),
+                        ?IIF(EnDecode, rdht_tx:decode_value(EncodedVal), EncodedVal);
                     {sublist, _Start, _Len} ->
-                        {SubList, ListLen} = EncodedVal = tx_tlog:get_entry_value(Entry),
-                        ?IIF(EnDecode, {rdht_tx:decode_value(SubList), ListLen}, EncodedVal)
+                        EncodedVal = tx_tlog:get_entry_value(Entry),
+                        ?IIF(EnDecode, rdht_tx:decode_value(EncodedVal), EncodedVal)
                 end,
             {Entry, {ok, ClientVal}};
         ?value ->
@@ -239,11 +239,11 @@ extract_partial_from_full(Entry, _Key, random_from_list, EnDecode) ->
     Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
     case Value of
         [_|_]     ->
-            {RandVal, Len} = DecodedVal = util:randomelem_and_length(Value),
+            DecodedVal = util:randomelem_and_length(Value),
             % note: if not EnDecode is given, an encoded value is
             % expected like the original value!
             {Entry,
-             {ok, ?IIF(not EnDecode, {rdht_tx:encode_value(RandVal), Len}, DecodedVal)}};
+             {ok, ?IIF(not EnDecode, rdht_tx:encode_value(DecodedVal), DecodedVal)}};
         _ ->
             Res = case Value of
                       []        -> {fail, empty_list};
@@ -254,11 +254,11 @@ extract_partial_from_full(Entry, _Key, random_from_list, EnDecode) ->
 extract_partial_from_full(Entry, _Key, {sublist, Start, Len}, EnDecode) ->
     Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
     if is_list(Value) ->
-           {SubList, ListLen} = DecodedVal = util:sublist(Value, Start, Len),
+           DecodedVal = util:sublist(Value, Start, Len),
            % note: if not EnDecode is given, an encoded value is
            % expected like the original value!
            {Entry,
-            {ok, ?IIF(not EnDecode, {rdht_tx:encode_value(SubList), ListLen}, DecodedVal)}};
+            {ok, ?IIF(not EnDecode, rdht_tx:encode_value(DecodedVal), DecodedVal)}};
        true ->
            {tx_tlog:set_entry_status(Entry, {fail, abort}),
             {fail, not_a_list}}

@@ -64,8 +64,8 @@
 -type request() :: request_on_key() | {commit}.
 
 -type read_result() :: {ok, client_value()} | {fail, not_found}.
--type read_random_from_list_result() :: {ok, {RandomValue::client_value(), ListLength::pos_integer()}} | {fail, not_found | empty_list | not_a_list}.
--type read_sublist_result() :: {ok, {SubListMaybeEncoded::[client_value()] | binary(), ListLength::non_neg_integer()}} | {fail, not_found | not_a_list}.
+-type read_random_from_list_result() :: {ok, RandomValue_ListLen_MaybeEncoded::client_value()} | {fail, not_found | empty_list | not_a_list}.
+-type read_sublist_result() :: {ok, SubList_ListLen_MaybeEncoded::client_value()} | {fail, not_found | not_a_list}.
 -type write_result() :: {ok}.
 -type listop_result() :: write_result() | {fail, not_a_list}.
 -type numberop_result() :: write_result() | {fail, not_a_number}.

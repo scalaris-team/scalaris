@@ -19,7 +19,6 @@ import java.math.BigInteger;
 
 import com.ericsson.otp.erlang.OtpErlangDecodeException;
 import com.ericsson.otp.erlang.OtpErlangInt;
-import com.ericsson.otp.erlang.OtpErlangList;
 import com.ericsson.otp.erlang.OtpErlangLong;
 import com.ericsson.otp.erlang.OtpErlangObject;
 import com.ericsson.otp.erlang.OtpErlangRangeException;
@@ -81,19 +80,20 @@ public class ReadSublistOp extends PartialReadOp {
          */
         public final int listLength;
 
-        protected Result(final OtpErlangTuple result, final boolean compressed)
+        protected Result(final OtpErlangObject result0, final boolean compressed)
                 throws OtpErlangDecodeException, UnknownException {
             // {SubList, ListLength}
+            OtpErlangTuple result;
+            if (compressed) {
+                result = (OtpErlangTuple) CommonErlangObjects.decode(result0);
+            } else {
+                result = (OtpErlangTuple) result0;
+            }
+
             if (result.arity() != 2) {
                 throw new UnknownException(result);
             }
-            final OtpErlangList subListOtp = ErlangValue.otpObjectToOtpList(result.elementAt(0));
-            if (compressed) {
-                subList = new ErlangValue(
-                        CommonErlangObjects.decode(subListOtp));
-            } else {
-                subList = new ErlangValue(subListOtp);
-            }
+            subList = new ErlangValue(ErlangValue.otpObjectToOtpList(result.elementAt(0)));
             final OtpErlangLong listLengthOtp = (OtpErlangLong) result.elementAt(1);
             try {
                 listLength = listLengthOtp.intValue();
@@ -173,8 +173,7 @@ public class ReadSublistOp extends PartialReadOp {
                 throw new UnknownException(resultRaw);
             }
             if (state.equals(CommonErlangObjects.okAtom)) {
-                final OtpErlangTuple result = (OtpErlangTuple) received.elementAt(1);
-                return new Result(result, resultCompressed);
+                return new Result(received.elementAt(1), resultCompressed);
             } else if (state.equals(CommonErlangObjects.failAtom)) {
                 final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.notFoundAtom)) {

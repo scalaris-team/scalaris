@@ -54,19 +54,20 @@ public class ReadRandomFromListOp extends PartialReadOp {
          */
         public final int listLength;
 
-        protected Result(final OtpErlangTuple result, final boolean compressed)
-                throws OtpErlangDecodeException, UnknownException {
+        protected Result(final OtpErlangObject result0, final boolean compressed)
+                throws OtpErlangDecodeException, UnknownException, ClassCastException {
             // {RandomValue, ListLength}
+            OtpErlangTuple result;
+            if (compressed) {
+                result = (OtpErlangTuple) CommonErlangObjects.decode(result0);
+            } else {
+                result = (OtpErlangTuple) result0;
+            }
+
             if (result.arity() != 2) {
                 throw new UnknownException(result);
             }
-            final OtpErlangObject randomElementOtp = result.elementAt(0);
-            if (compressed) {
-                randomElement = new ErlangValue(
-                        CommonErlangObjects.decode(randomElementOtp));
-            } else {
-                randomElement = new ErlangValue(randomElementOtp);
-            }
+            randomElement = new ErlangValue(result.elementAt(0));
             final OtpErlangLong listLengthOtp = (OtpErlangLong) result.elementAt(1);
             try {
                 listLength = listLengthOtp.intValue();
@@ -124,8 +125,7 @@ public class ReadRandomFromListOp extends PartialReadOp {
                 throw new UnknownException(resultRaw);
             }
             if (state.equals(CommonErlangObjects.okAtom)) {
-                final OtpErlangTuple result = (OtpErlangTuple) received.elementAt(1);
-                return new Result(result, resultCompressed);
+                return new Result(received.elementAt(1), resultCompressed);
             } else if (state.equals(CommonErlangObjects.failAtom)) {
                 final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.notFoundAtom)) {
