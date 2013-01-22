@@ -393,11 +393,17 @@ public class ScalarisDataHandler {
         final String statName = "RANDOM_PAGE";
         
         final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(ScalarisOpType.PAGE_LIST);
-        final ErlangConverter<List<ErlangValue>> conv = new ErlangConverter<List<ErlangValue>>() {
+        final ErlangConverter<List<ErlangValue>> listConv = new ErlangConverter<List<ErlangValue>>() {
             @Override
             public List<ErlangValue> convert(ErlangValue v)
                     throws ClassCastException {
                 return v.listValue();
+            }
+        };
+        final ErlangConverter<ErlangValue> elemConv = new ErlangConverter<ErlangValue>() {
+            @Override
+            public ErlangValue convert(ErlangValue v) {
+                return v;
             }
         };
         final List<String> scalarisKeys = Arrays.asList(getPageListKey(0));
@@ -414,7 +420,7 @@ public class ScalarisDataHandler {
                 new TransactionSingleOp(connection), involvedKeys);
 
         final ScalarisReadRandomListEntryOp1<ErlangValue> readOp = new ScalarisReadRandomListEntryOp1<ErlangValue>(
-                scalarisKeys, optimisation, conv, true, random);
+                scalarisKeys, optimisation, elemConv, listConv, true, random);
         executor.addOp(readOp);
         try {
             executor.run();
