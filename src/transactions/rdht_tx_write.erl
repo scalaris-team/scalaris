@@ -56,8 +56,9 @@ work_phase(ClientPid, ReqId, Request) ->
     %% Find rdht_tx_write process
     RdhtTxWritePid = pid_groups:find_a(?MODULE),
     % hash key here so that any error during the process is thrown in the client's context
-    HashedKey = ?RT:hash_key(element(2, Request)),
-    comm:send_local(RdhtTxWritePid, {start_work_phase, ReqId, ClientPid, HashedKey, Request}).
+    Key = element(2, Request),
+    HashedKey = ?RT:hash_key(Key),
+    comm:send_local(RdhtTxWritePid, {start_work_phase, ReqId, ClientPid, HashedKey, Key}).
 
 %% @doc Get a result entry for a write from the given TLog entry.
 %%      Update the TLog entry accordingly.
@@ -194,24 +195,23 @@ init([]) ->
                      [set, private, named_table]).
 
 -spec on(comm:message(), pdb:tableid()) -> pdb:tableid().
-on({start_work_phase, ReqId, ClientPid, HashedKey, Request}, TableName) ->
+on({start_work_phase, ReqId, ClientPid, HashedKey, Key}, TableName) ->
     %% PRE: No entry for key in TLog
     %% build translog entry from quorum read
-    rdht_tx_read:work_phase_key(self(), ReqId, element(2, Request), HashedKey, ?write),
-    pdb:set({ReqId, ClientPid, element(3, Request)}, TableName),
+    rdht_tx_read:work_phase_key(self(), ReqId, Key, HashedKey, ?write),
+    pdb:set({ReqId, ClientPid}, TableName),
     TableName;
 
 %% reply triggered by rdht_tx_write:work_phase/3
 on({rdht_tx_read_reply, Id, TLogEntry}, TableName) ->
-    {Id, ClientPid, WriteValue} = pdb:take(Id, TableName),
-    NewTLogEntry = update_tlog_entry(TLogEntry, WriteValue),
+    {Id, ClientPid} = pdb:take(Id, TableName),
+    NewTLogEntry = update_tlog_entry(TLogEntry),
     Msg = msg_reply(Id, NewTLogEntry),
     comm:send_local(ClientPid, Msg),
     TableName.
 
--spec update_tlog_entry_feeder(tx_tlog:tlog_entry(), client_value())
-        -> {tx_tlog:tlog_entry(), client_value()}.
-update_tlog_entry_feeder(TLogEntry, WriteValue) ->
+-spec update_tlog_entry_feeder(tx_tlog:tlog_entry()) -> {tx_tlog:tlog_entry()}.
+update_tlog_entry_feeder(TLogEntry) ->
     NewEntry =
         case tx_tlog:get_entry_status(TLogEntry) of
             ?value -> % only ?partial_value allowed here
@@ -224,21 +224,20 @@ update_tlog_entry_feeder(TLogEntry, WriteValue) ->
                 tx_tlog:set_entry_status(TLogEntry, {fail, not_found});
             _ -> TLogEntry
         end,
-    {NewEntry, WriteValue}.
+    {NewEntry}.
 
--spec update_tlog_entry(tx_tlog:tlog_entry(), client_value())
-        -> tx_tlog:tlog_entry().
-update_tlog_entry(TLogEntry, WriteValue) ->
+-spec update_tlog_entry(tx_tlog:tlog_entry()) -> tx_tlog:tlog_entry().
+update_tlog_entry(TLogEntry) ->
     %% we keep always the read version and expect equivalence during
     %% validation and increment then in case of write.
     T2 = tx_tlog:set_entry_operation(TLogEntry, ?write),
     case tx_tlog:get_entry_status(TLogEntry) of
         ?partial_value -> % we issue a partial read, so this is the only result (except for failures) we expect!
             T3 = tx_tlog:set_entry_status(T2, ?value),
-            tx_tlog:set_entry_value(T3, WriteValue);
+            tx_tlog:set_entry_value(T3, ?value_dropped);
         {fail, not_found} ->
             T3 = tx_tlog:set_entry_status(T2, ?value),
-            tx_tlog:set_entry_value(T3, WriteValue)
+            tx_tlog:set_entry_value(T3, ?value_dropped)
 %        {fail, timeout} ->
 %            tx_tlog:new_entry(?write, Key, Version, {fail, timeout},
 %                               WriteValue)

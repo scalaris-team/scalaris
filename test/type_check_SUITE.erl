@@ -301,7 +301,7 @@ tester_type_check_tx(_Config) ->
              {validate, 2},
              {work_phase, 3}
            ],
-           [ {update_tlog_entry, 2} %% tested via feeder
+           [ {update_tlog_entry, 1} %% tested via feeder
            ]},
           {rdht_tx_add_del_on_list,
            [ {extract_from_tlog, 5}, %% tested via feeder
