@@ -19,11 +19,12 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--compile({inline, [new_entry/5,
+-compile({inline, [new_entry/5, new_entry/6,
                    get_entry_operation/1, set_entry_operation/2,
                    get_entry_key/1,       set_entry_key/2,
                    get_entry_status/1,    set_entry_status/2,
-                   get_entry_value/1,     set_entry_value/2,
+                   get_entry_value/1,     set_entry_value/3,
+                   get_entry_value_type/1,
                    drop_value/1,
                    get_entry_version/1
                   ]}).
@@ -43,43 +44,68 @@
 -export([merge/2, first_req_per_key_not_in_tlog/2, cleanup/1]).
 
 %% Operations on entries of TLogs
--export([new_entry/5]).
+-export([new_entry/5, new_entry/6]).
 -export([get_entry_operation/1, set_entry_operation/2]).
 -export([get_entry_key/1,       set_entry_key/2]).
 -export([get_entry_status/1,    set_entry_status/2]).
--export([get_entry_value/1,     set_entry_value/2]).
+-export([get_entry_value/1,     set_entry_value/3,
+         get_entry_value_type/1]).
 -export([drop_value/1]).
 -export([get_entry_version/1]).
 
 -ifdef(with_export_type_support).
 -export_type([tlog/0, tlog_entry/0]).
+-export_type([tlog_ext/0, tlog_entry_ext/0]).
 -export_type([tx_status/0]).
 -export_type([tx_op/0]).
 -endif.
 
--type tx_status() :: ?value | ?partial_value | {fail, abort | not_found | empty_list | not_a_list}.
+-type tx_status() :: ?ok | ?fail. % TODO: add 'undefined'?!
 -type tx_op()     :: ?read | ?write.
+% note: from all the value types, only ?value and ?value_dropped remain in the
+%       user tlog - the rest are intermediate states!
+-type value_type_r() :: ?value | ?partial_value | ?not_found | {?fail, atom() | integer()} | ?value_dropped.
+-type value_type_w() :: ?value | {?fail, atom() | integer()} | ?value_dropped.
 
--type tlog_key() :: client_key(). %%| ?RT:key().
-%% TLogEntry: {Operation, Key, Status, Value, Version}
+-type tlog_key() :: client_key() | ?RT:key().
+%% TLogEntry: {Operation, Key, Version, Status, Value}
 %% Sample: {?read,"key3",?value,"value3",0}
 -type tlog_entry_read() ::
-          { Op      :: ?read,
-            Key     :: tlog_key(),
-            Version :: non_neg_integer() | -1,
-            Status  :: tx_status(), % note: only partial reads allow ?partial_value
-            Value   :: rdht_tx:encoded_value() | ?value_dropped
+          { Op        :: ?read,
+            Key       :: tlog_key(),
+            Version   :: non_neg_integer() | -1,
+            Status    :: tx_status(),
+            % note: only partial reads allow ?partial_value:
+            ValueType :: value_type_r(),
+            Value     :: rdht_tx:encoded_value() | ?value_dropped % ?value_dropped if ValueType =:= ?not_found or {?fail, _} or ?value_dropped
           }.
 -type tlog_entry_write() ::
-          { Op      :: ?write,
-            Key     :: tlog_key(),
-            Version :: non_neg_integer() | -1,
-            Status  :: ?value | {fail, abort | not_found | empty_list | not_a_list}, % no ?partial_value allowed!
-            Value   :: rdht_tx:encoded_value() | ?value_dropped
+          { Op        :: ?write,
+            Key       :: tlog_key(),
+            Version   :: non_neg_integer() | -1,
+            Status    :: tx_status(),
+            ValueType :: value_type_w(),
+            Value     :: rdht_tx:encoded_value() | ?value_dropped % ?value_dropped if ValueType =:= ?not_found or {?fail, _} or ?value_dropped
           }.
 -type tlog_entry() :: tlog_entry_read() | tlog_entry_write().
+-type tlog_entry_ext() ::
+          { Op        :: ?read,
+            Key       :: client_key(),
+            Version   :: non_neg_integer() | -1,
+            Status    :: tx_status(),
+            ValueType :: ?value_dropped,
+            Value     :: ?value_dropped
+          }
+        | { Op        :: ?write,
+            Key       :: client_key(),
+            Version   :: non_neg_integer() | -1,
+            Status    :: tx_status(),
+            ValueType :: ?value,
+            Value     :: rdht_tx:encoded_value()
+          }.
 %% -opaque tlog() :: [tlog_entry()]. % creates a false warning in add_or_update_status_by_key/3
 -type tlog() :: [tlog_entry()].
+-type tlog_ext() :: [tlog_entry_ext()].
 
 % @doc create an empty list
 -spec empty() -> tlog().
@@ -90,7 +116,8 @@ add_entry(TransLog, Entry) -> [ Entry | TransLog ].
 
 -spec add_or_update_status_by_key(tlog(), tlog_key(), tx_status()) -> tlog().
 add_or_update_status_by_key([], Key, Status) ->
-    [new_entry(?write, Key, _Vers = 0, Status, _Val = 0)];
+    Entry = new_entry(?read, Key, _Vers = 0, _ValType = ?value_dropped, _Val = ?value_dropped),
+    [set_entry_status(Entry, Status)];
 add_or_update_status_by_key([Entry | T], Key, Status)
   when element(2, Entry) =:= Key ->
     [set_entry_status(Entry, Status) | T];
@@ -110,17 +137,13 @@ find_entry_by_key(TLog, Key) ->
 
 -spec entry_is_sane_for_commit(tlog_entry(), boolean()) -> boolean().
 entry_is_sane_for_commit(Entry, Acc) ->
-    Acc andalso
-        not (is_tuple(get_entry_status(Entry))
-             andalso fail =:= element(1, get_entry_status(Entry))
-             andalso not_found =/= element(2, get_entry_status(Entry))
-            ).
+    Acc andalso get_entry_status(Entry) =:= ?ok.
 
 -spec is_sane_for_commit(tlog()) -> boolean().
 is_sane_for_commit(TLog) ->
     lists:foldl(fun entry_is_sane_for_commit/2, true, TLog).
 
--spec get_insane_keys(tlog()) -> [client_key()].
+-spec get_insane_keys(tlog_ext()) -> [client_key()].
 get_insane_keys(TLog) ->
     lists:foldl(fun(X, Acc) ->
                         case entry_is_sane_for_commit(X, true) of
@@ -158,15 +181,16 @@ merge_tlogs_iter([TEntry | TTail] = SortedTLog,
                    RTVersion = get_entry_version(RTEntry),
                    NewTLogEntry =
                        if TVersion =:= RTVersion ->
-                              Val = get_entry_value(RTEntry),
-                              TEntry2 = set_entry_value(TEntry, Val),
-                              TStatus = get_entry_status(TEntry),
-                              if TStatus =:= ?value orelse TStatus =:= ?partial_value ->
+                              {ValType, Val} = get_entry_value(RTEntry),
+                              TEntry2 = set_entry_value(TEntry, ValType, Val),
+                              TStatus = get_entry_status(TEntry2),
+                              if TStatus =:= ?ok ->
+                                      % overwrite with new status which may be failed!
                                      set_entry_status(TEntry2, get_entry_status(RTEntry));
                                  true -> TEntry2
                               end;
                           true ->
-                              set_entry_status(RTEntry, {fail, abort})
+                              set_entry_status(RTEntry, ?fail)
                        end,
                    merge_tlogs_iter(TTail, RTTail, [NewTLogEntry | Acc]);
                _ ->
@@ -264,11 +288,17 @@ cleanup(TLog) ->
       end || TLogEntry <- TLog ].
 
 %% Operations on Elements of TransLogs (public)
--spec new_entry(tx_op(), client_key() | ?RT:key(),
-                non_neg_integer() | -1,
-                tx_status(), rdht_tx:encoded_value()) -> tlog_entry().
-new_entry(Op, Key, Vers, Status, Val) ->
-    {Op, Key, Vers, Status, Val}.
+-spec new_entry(tx_op(), ?RT:key(), non_neg_integer() | -1,
+                value_type_r() | value_type_w(), rdht_tx:encoded_value())
+            -> tlog_entry().
+new_entry(Op, Key, Vers, ValType, Val) ->
+    {Op, Key, Vers, ?ok, ValType, Val}.
+
+-spec new_entry(tx_op(), ?RT:key(), non_neg_integer() | -1,
+                tx_status(), value_type_r() | value_type_w(), rdht_tx:encoded_value())
+            -> tlog_entry().
+new_entry(Op, Key, Vers, Status, ValType, Val) ->
+    {Op, Key, Vers, Status, ValType, Val}.
 
 -spec get_entry_operation(tlog_entry()) -> tx_op().
 get_entry_operation(Element) -> element(1, Element).
@@ -291,11 +321,17 @@ get_entry_status(Element)    -> element(4, Element).
 -spec set_entry_status(tlog_entry(), tx_status()) -> tlog_entry().
 set_entry_status(Element, Val) -> setelement(4, Element, Val).
 
--spec get_entry_value(tlog_entry()) -> rdht_tx:encoded_value().
-get_entry_value(Element)     -> element(5, Element).
+-spec get_entry_value_type(tlog_entry()) -> value_type_r() | value_type_w().
+get_entry_value_type(Element)  -> element(5, Element).
 
--spec set_entry_value(tlog_entry(), rdht_tx:encoded_value()) -> tlog_entry().
-set_entry_value(Element, Val)     -> setelement(5, Element, Val).
+-spec get_entry_value(tlog_entry()) -> {value_type_r() | value_type_w(), rdht_tx:encoded_value()}.
+get_entry_value(Element)       -> {element(5, Element), element(6, Element)}.
+
+-spec set_entry_value(tlog_entry(), value_type_r() | value_type_w(), rdht_tx:encoded_value()) -> tlog_entry().
+set_entry_value(Element, ValType, Val) ->
+    setelement(6, setelement(5, Element, ValType), Val).
 
 -spec drop_value(tlog_entry()) -> tlog_entry().
-drop_value(Element)     -> setelement(5, Element, ?value_dropped).
+drop_value(Element) ->
+    % TODO: keep ?not_found value type so a future op does not have to go to DB?
+    set_entry_value(Element, ?value_dropped, ?value_dropped).

@@ -99,66 +99,74 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
 -spec extract_from_value
         (rdht_tx:encoded_value(), ?DB:version(), Op::?read) -> Result::{?ok, rdht_tx:encoded_value(), ?DB:version()};
         (rdht_tx:encoded_value(), ?DB:version(), Op::?random_from_list)
-            -> Result::{?ok, rdht_tx:encoded_value(), ?DB:version()} | {fail, empty_list | not_a_list, ?DB:version()};
+            -> Result::{?ok, rdht_tx:encoded_value(), ?DB:version()} | {?fail, ?empty_list | ?not_a_list, ?DB:version()};
         (rdht_tx:encoded_value(), ?DB:version(), Op::{?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
-            -> Result::{?ok, rdht_tx:encoded_value(), ?DB:version()} | {fail, not_a_list, ?DB:version()};
+            -> Result::{?ok, rdht_tx:encoded_value(), ?DB:version()} | {?fail, ?not_a_list, ?DB:version()};
         (rdht_tx:encoded_value(), ?DB:version(), Op::?write) -> Result::{?ok, ?value_dropped, ?DB:version()};
-        (empty_val, -1, Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
-            -> Result::{?ok, ?value_dropped, -1}.
-extract_from_value(empty_val, Version = -1, _Op) ->
-    {?ok, ?value_dropped, Version}; % will be handled later
+        (empty_val, -1, Op::?read | ?write) -> Result::{?ok, ?value_dropped, -1};
+        (empty_val, -1, Op::?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
+            -> Result::{?fail, ?not_found, -1}.
+extract_from_value(empty_val, Version = -1, ?read) ->
+    {?ok, ?value_dropped, Version};
 extract_from_value(Value, Version, ?read) ->
     {?ok, Value, Version};
+extract_from_value(empty_val, Version = -1, ?write) ->
+    {?ok, ?value_dropped, Version};
 extract_from_value(_Value, Version, ?write) ->
     {?ok, ?value_dropped, Version};
+extract_from_value(empty_val, Version = -1, ?random_from_list) ->
+    {?fail, ?not_found, Version};
 extract_from_value(ValueEnc, Version, ?random_from_list) ->
     Value = rdht_tx:decode_value(ValueEnc),
     case Value of
         [_|_]     -> RandVal_ListLen = util:randomelem_and_length(Value),
                      {?ok, rdht_tx:encode_value(RandVal_ListLen), Version};
-        []        -> {fail, empty_list, Version};
-        _         -> {fail, not_a_list, Version}
+        []        -> {?fail, ?empty_list, Version};
+        _         -> {?fail, ?not_a_list, Version}
     end;
+extract_from_value(empty_val, Version = -1, {?sublist, _Start, _Len}) ->
+    {?fail, ?not_found, Version};
 extract_from_value(ValueEnc, Version, {?sublist, Start, Len}) ->
     Value = rdht_tx:decode_value(ValueEnc),
     if is_list(Value) ->
            SubList_ListLen = util:sublist(Value, Start, Len),
            {?ok, rdht_tx:encode_value(SubList_ListLen), Version};
        true ->
-           {fail, not_a_list, Version}
+           {?fail, ?not_a_list, Version}
     end.
 
 -spec extract_from_tlog_feeder(
         tx_tlog:tlog_entry(), client_key(),
         Op::read | random_from_list | {sublist, Start::pos_integer() | neg_integer(), Len::integer()},
-        {EnDecode::boolean(), ListLength::pos_integer()})
+        EnDecode::boolean())
         -> {tx_tlog:tlog_entry(), client_key(),
             Op::read | random_from_list | {sublist, Start::pos_integer() | neg_integer(), Len::integer()},
             EnDecode::boolean()}.
-extract_from_tlog_feeder(Entry, Key, read = Op, {EnDecode, _ListLength}) ->
+extract_from_tlog_feeder(Entry, Key, read = Op, EnDecode) ->
+    {ValType, EncVal} = tx_tlog:get_entry_value(Entry),
     NewEntry =
-        case tx_tlog:get_entry_status(Entry) of
-            ?partial_value -> % only ?value allowed here
-                tx_tlog:set_entry_status(Entry, ?value);
-            _ -> Entry
+        % transform unknow value types to a valid ?value type (this is allowed for any entry operation):
+        case not lists:member(ValType, [?value, ?not_found]) of
+            true -> tx_tlog:set_entry_value(Entry, ?value, EncVal);
+            _    -> Entry
         end,
     {NewEntry, Key, Op, EnDecode};
-extract_from_tlog_feeder(Entry, Key, random_from_list = Op, {EnDecode, ListLength}) ->
+extract_from_tlog_feeder(Entry, Key, random_from_list = Op, EnDecode) ->
+    {ValType, EncVal} = tx_tlog:get_entry_value(Entry),
     NewEntry =
-        case tx_tlog:get_entry_status(Entry) of
-            ?partial_value -> % need partial value according to random_from_list op!
-                PartialValue = rdht_tx:encode_value({tx_tlog:get_entry_value(Entry), ListLength}),
-                tx_tlog:set_entry_value(Entry, PartialValue);
-            _ -> Entry
+        % transform unknow value types to a valid ?value type (this is allowed for any entry operation):
+        case not lists:member(ValType, [?value, ?not_found, {?fail, ?empty_list}, {?fail, ?not_a_list}]) of
+            true -> tx_tlog:set_entry_value(Entry, ?value, EncVal);
+            _    -> Entry
         end,
     {NewEntry, Key, Op, EnDecode};
-extract_from_tlog_feeder(Entry, Key, {sublist, _Start, _Len} = Op, {EnDecode, ListLength}) ->
+extract_from_tlog_feeder(Entry, Key, {sublist, _Start, _Len} = Op, EnDecode) ->
+    {ValType, EncVal} = tx_tlog:get_entry_value(Entry),
     NewEntry =
-        case tx_tlog:get_entry_status(Entry) of
-            ?partial_value -> % need partial value according to sublist op!
-                PartialValue = rdht_tx:encode_value({[tx_tlog:get_entry_value(Entry)], ListLength}),
-                tx_tlog:set_entry_value(Entry, PartialValue);
-            _ -> Entry
+        % transform unknow value types to a valid ?value type (this is allowed for any entry operation):
+        case not lists:member(ValType, [?value, ?not_found, {?fail, ?not_a_list}]) of
+            true -> tx_tlog:set_entry_value(Entry, ?value, EncVal);
+            _    -> Entry
         end,
     {NewEntry, Key, Op, EnDecode}.
 
@@ -171,88 +179,63 @@ extract_from_tlog_feeder(Entry, Key, {sublist, _Start, _Len} = Op, {EnDecode, Li
         (tx_tlog:tlog_entry(), client_key(), Op::{sublist, Start::pos_integer() | neg_integer(), Len::integer()}, EnDecode::boolean())
             -> {tx_tlog:tlog_entry(), api_tx:read_sublist_result()}.
 extract_from_tlog(Entry, _Key, read, EnDecode) ->
-    Res = case tx_tlog:get_entry_status(Entry) of
-              ?value -> {ok, tx_tlog:get_entry_value(Entry)};
-              {fail, not_found} = R -> R; %% not_found
-              %% try reading from a failed entry (type mismatch was the reason?)
-              {fail, Reason} when is_atom(Reason) -> {ok, tx_tlog:get_entry_value(Entry)}
+    {ValType, EncVal} = tx_tlog:get_entry_value(Entry),
+    Res = case ValType of
+              ?value -> {ok, ?IIF(EnDecode, rdht_tx:decode_value(EncVal), EncVal)};
+              ?not_found -> {fail, not_found}
           end,
-    {Entry, ?IIF(EnDecode, rdht_tx:decode_result(Res), Res)};
-extract_from_tlog(Entry, Key, Op, EnDecode) ->
-    case tx_tlog:get_entry_status(Entry) of
+    {Entry, Res};
+extract_from_tlog(Entry, _Key, Op, EnDecode) ->
+    {ValType, EncVal} = tx_tlog:get_entry_value(Entry),
+    % note: Value and ValType can either contain the partial read or a failure
+    %       from the requested op - nothing else is possible since otherwise a
+    %       full read would have been executed! 
+    case ValType of
         ?partial_value ->
-            % this MUST BE the partial value from this op!
-            % (otherwise a full read would have been executed)
             ClientVal =
                 case Op of
                     random_from_list ->
-                        EncodedVal = tx_tlog:get_entry_value(Entry),
-                        ?IIF(EnDecode, rdht_tx:decode_value(EncodedVal), EncodedVal);
+                        ?IIF(EnDecode, rdht_tx:decode_value(EncVal), EncVal);
                     {sublist, _Start, _Len} ->
-                        EncodedVal = tx_tlog:get_entry_value(Entry),
-                        ?IIF(EnDecode, rdht_tx:decode_value(EncodedVal), EncodedVal)
+                        ?IIF(EnDecode, rdht_tx:decode_value(EncVal), EncVal)
                 end,
             {Entry, {ok, ClientVal}};
         ?value ->
-            extract_partial_from_full(Entry, Key, Op, EnDecode);
-        {fail, not_found} = R -> {Entry, R}; %% not_found
-        % note: the following two error states depend on the actual op, if a
-        %       state is not defined for an op, the generic handler below must
-        %       be used!
-        {fail, empty_list} = R when Op =:= random_from_list -> {Entry, R};
-        {fail, not_a_list} = R -> {Entry, R};
-        %% try reading from a failed entry (type mismatch was the reason?)
-        % any other failure should work like ?value or ?partial_value since it
-        % is from another operation and thus independent from this one
-        % -> there is no other potential failure at the moment though
-        % TODO: don't know whether it is a partial or full value!!
-        % -> at the moment, though, any other failure can only contain a full
-        %    value since reads only fail with not_found and other ops write a
-        %    full value
-        % NOTE: this is not true any more! e.g. add_on_nr may fail with {fail, abort}
-        % -> this will lead to wrong results for partial read ops, e.g. the following
-        %    will result in {fail,not_a_list} which is not correct:
-        %    api_tx:write("a",  [42])
-        %    {T1, _} = api_tx:req_list([{add_on_nr,"a",[{[[]],[{1.977014147676681}],[]}]}]).
-        %    {T2, _} = api_tx:req_list(T1, [{read,"a",random_from_list}]).
-        {fail, Reason} when is_atom(Reason) ->
-            extract_partial_from_full(Entry, Key, Op, EnDecode)
-    end.
-
-%% @doc Helper for extract_from_tlog/4, applying the partial read op on a tlog
-%%      entry with a full value.
--spec extract_partial_from_full
-        (tx_tlog:tlog_entry(), client_key(), Op::random_from_list, EnDecode::boolean())
-            -> {tx_tlog:tlog_entry(), api_tx:read_random_from_list_result()};
-        (tx_tlog:tlog_entry(), client_key(), Op::{sublist, Start::pos_integer() | neg_integer(), Len::integer()}, EnDecode::boolean())
-            -> {tx_tlog:tlog_entry(), api_tx:read_sublist_result()}.
-extract_partial_from_full(Entry, _Key, random_from_list, EnDecode) ->
-    Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
-    case Value of
-        [_|_]     ->
-            DecodedVal = util:randomelem_and_length(Value),
-            % note: if not EnDecode is given, an encoded value is
-            % expected like the original value!
-            {Entry,
-             {ok, ?IIF(not EnDecode, rdht_tx:encode_value(DecodedVal), DecodedVal)}};
-        _ ->
-            Res = case Value of
-                      []        -> {fail, empty_list};
-                      _         -> {fail, not_a_list}
-                  end,
-            {tx_tlog:set_entry_status(Entry, {fail, abort}), Res}
-    end;
-extract_partial_from_full(Entry, _Key, {sublist, Start, Len}, EnDecode) ->
-    Value = rdht_tx:decode_value(tx_tlog:get_entry_value(Entry)),
-    if is_list(Value) ->
-           DecodedVal = util:sublist(Value, Start, Len),
-           % note: if not EnDecode is given, an encoded value is
-           % expected like the original value!
-           {Entry,
-            {ok, ?IIF(not EnDecode, rdht_tx:encode_value(DecodedVal), DecodedVal)}};
-       true ->
-           {tx_tlog:set_entry_status(Entry, {fail, abort}),
-            {fail, not_a_list}}
+            case Op of
+                random_from_list ->
+                    Value = rdht_tx:decode_value(EncVal),
+                    case Value of
+                        [_|_] ->
+                            DecodedVal = util:randomelem_and_length(Value),
+                            % note: if not EnDecode is given, an encoded value is
+                            % expected like the original value!
+                            ResVal = ?IIF(not EnDecode, rdht_tx:encode_value(DecodedVal),
+                                          DecodedVal),
+                            {Entry, {ok, ResVal}};
+                        _ ->
+                            Res = case Value of
+                                      []        -> {fail, empty_list};
+                                      _         -> {fail, not_a_list}
+                                  end,
+                            {tx_tlog:set_entry_status(Entry, ?fail), Res}
+                    end;
+                {sublist, Start, Len} ->
+                    Value = rdht_tx:decode_value(EncVal),
+                    if is_list(Value) ->
+                           DecodedVal = util:sublist(Value, Start, Len),
+                           % note: if not EnDecode is given, an encoded value is
+                           % expected like the original value!
+                            ResVal = ?IIF(not EnDecode, rdht_tx:encode_value(DecodedVal),
+                                          DecodedVal),
+                           {Entry, {ok, ResVal}};
+                       true ->
+                           {tx_tlog:set_entry_status(Entry, ?fail),
+                            {fail, not_a_list}}
+                    end
+            end;
+        ?not_found -> {Entry, {fail, not_found}};
+        {?fail, ?empty_list} when Op =:= random_from_list -> {Entry, {fail, empty_list}};
+        {?fail, ?not_a_list} -> {Entry, {fail, not_a_list}}
     end.
 
 %% May make several ones from a single TransLog item (item replication)
@@ -415,10 +398,10 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
             % if majority replied, we can given an answer!
             % (but: need all Reps replicas for not_found)
             if NumReplied >= MajOk ->
-                   {Ok_Fail, _Val, Vers} = state_get_result(Entry),
+                   {Ok_Fail, Val_Reason, Vers} = state_get_result(Entry),
                    % ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
                    Op = state_get_op(Entry),
-                   if Vers =/= -1 ->
+                   if Vers >= 0 ->
                           NumAbort = state_get_numfailed(Entry),
                           % note: MajDeny =:= 2, so 2 times not_found results
                           % in {fail, not_found} although the 3rd reply may have
@@ -436,33 +419,41 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
                           % want to be on the safe side here
                           Entry2 =
                               if NumAbort >= MajDeny andalso Op =:= ?write ->
-                                     % note: report not_found but keep the last
-                                     % reported version so that write operations
-                                     % can be executed (the not_found is not
-                                     % reported to the user so we can do this!)
-                                     state_set_decided(Entry, {fail, not_found});
+                                     % note: there is no error for write ops so
+                                     % far (the user does not get a value) but
+                                     % we can send our known version for write
+                                     % ops to be committed
+                                     ValType = ?value_dropped,
+                                     state_set_decided(Entry, Ok_Fail);
                                  NumAbort >= MajDeny ->
                                      % note: not_found is reported to the user,
-                                     % so we also need to report the according
+                                     % but we know there is a newer version
+                                     % -> decide for fail
+                                     % also make sure to report the according
                                      % result, especially the version!
-                                     Entry1 = state_set_decided(Entry, {fail, not_found}),
-                                     state_set_result(Entry1, {?ok, empty_val, -1});
-                                 Ok_Fail =:= ?ok andalso Op =:= ?read ->
-                                     state_set_decided(Entry, ?value);
+                                     Entry1 = state_set_decided(Entry, ?fail),
+                                     ValType = ?not_found,
+                                     state_set_result(Entry1, {Ok_Fail, empty_val, -1});
                                  Ok_Fail =:= ?ok ->
-                                     % all other read ops are partial reads!
-                                     state_set_decided(Entry, ?partial_value);
-                                 true ->
-                                     state_set_decided(Entry, {fail, abort})
+                                     ValType = if Op =:= ?read -> ?value;
+                                                  true         -> ?partial_value
+                                               end,
+                                     state_set_decided(Entry, Ok_Fail);
+                                 Ok_Fail =:= ?fail ->
+                                     ValType = {?fail, Val_Reason},
+                                     state_set_decided(Entry, Ok_Fail)
                               end,
                           % a decision was taken in any of the cases
                           % -> inform the client
-                          set_and_inform_client(Client, Entry2, Reps, Table);
+                          set_and_inform_client(Client, Entry2, Reps, Table, ValType);
                       true ->
                           if NumReplied =:= Reps ->
                                  % all replied with -1
-                                 Entry2 = state_set_decided(Entry, {fail, not_found}),
-                                 set_and_inform_client(Client, Entry2, Reps, Table);
+                                 ValType = if Op =:= ?write -> ?value_dropped;
+                                              true          -> ?not_found
+                                           end,
+                                 Entry2 = state_set_decided(Entry, Ok_Fail),
+                                 set_and_inform_client(Client, Entry2, Reps, Table, ValType);
                              true -> pdb:set(Entry, Table)
                           end
                    end;
@@ -473,32 +464,41 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
 
 %% @doc Informs the client, updates the read state accordingly and sets it in
 %%      the pdb.
--spec set_and_inform_client(pid(), read_state(), Reps::pos_integer(),
-                                     Table::atom()) -> ok.
-set_and_inform_client(Client, Entry, Reps, Table) ->
+-spec set_and_inform_client(pid(), read_state_decided(), Reps::pos_integer(),
+                            Table::atom(), ValType::?value | ?partial_value | ?not_found | ?value_dropped)
+        -> ok.
+set_and_inform_client(Client, Entry, Reps, Table, ValType) ->
     Id = state_get_id(Entry),
-    Msg = msg_reply(Id, make_tlog_entry(Entry)),
+    Msg = msg_reply(Id, make_tlog_entry(Entry, ValType)),
     comm:send_local(Client, Msg),
     Entry2 = state_set_client_informed(Entry),
     set_or_delete_if_all_replied(Entry2, Reps, Table).
 
-%% -spec make_tlog_entry_feeder(
-%%         {read_state(), ?RT:key()})
-%%                             -> {read_state()}.
-%% make_tlog_entry_feeder({State, Key}) ->
-%%     %% when make_tlog_entry is called, the key of the state is never
-%%     %% 'unknown'
-%%     {state_set_key(State, Key)}.
+-spec make_tlog_entry_feeder(
+        read_state_decided(), {ValType::?value | ?partial_value | ?not_found | ?value_dropped, ?RT:key()})
+        -> {read_state_decided(), ?value | ?partial_value | ?not_found | ?value_dropped}.
+make_tlog_entry_feeder(Entry, {ValType, Key}) ->
+    %% when make_tlog_entry is called, the key of the state is never
+    %% 'unknown'
+    {state_set_key(Entry, Key), ValType}.
 
--spec make_tlog_entry(read_state()) ->
-                                tx_tlog:tlog_entry().
-make_tlog_entry(Entry) ->
-    {_, Val, Vers} = state_get_result(Entry),
+%% @doc Creates a tlog entry from a read state.
+%% Pre: a decision must be present in the read state
+-spec make_tlog_entry(read_state_decided(), ValType::?value | ?partial_value | ?not_found | ?value_dropped)
+        -> tx_tlog:tlog_entry().
+make_tlog_entry(Entry, ValType) ->
+    {_, Val0, Vers} = state_get_result(Entry),
     Key = state_get_key(Entry),
     Status = state_get_decided(Entry),
-    tx_tlog:new_entry(?read, Key, Vers, Status, Val).
+    Val = case ValType of
+              ?value_dropped -> ?value_dropped;
+              ?not_found     -> ?value_dropped;
+              {?fail, _}     -> ?value_dropped;
+              _              -> Val0
+          end,
+    tx_tlog:new_entry(?read, Key, Vers, Status, ValType, Val).
 
--spec set_or_delete_if_all_replied(read_state(),
+-spec set_or_delete_if_all_replied(read_state_decided(),
                                    pos_integer(), atom()) -> ok.
 set_or_delete_if_all_replied(Entry, Reps, Table) ->
     ?TRACE("rdht_tx_read:delete_if_all_replied Reps: ~p =?= ~p, ClientInformed: ~p Client: ~p~n",

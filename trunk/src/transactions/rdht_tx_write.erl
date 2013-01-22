@@ -69,31 +69,10 @@ work_phase(ClientPid, ReqId, Request) ->
                        {tx_tlog:tlog_entry(), api_tx:write_result()}.
 extract_from_tlog(Entry, _Key, Value1, EnDecode) ->
     Value = ?IIF(EnDecode, rdht_tx:encode_value(Value1), Value1),
-    NewEntryAndResult =
-        fun(FEntry, FValue) ->
-                case tx_tlog:get_entry_operation(FEntry) of
-                    ?write ->
-                        {tx_tlog:set_entry_value(FEntry, FValue), {ok}};
-                    ?read ->
-                        E1 = tx_tlog:set_entry_operation(FEntry, ?write),
-                        E2 = tx_tlog:set_entry_value(E1, FValue),
-                        E3 = tx_tlog:set_entry_status(E2, ?value),
-                        {E3, {ok}}
-            end
-        end,
-    case tx_tlog:get_entry_status(Entry) of
-        ?value ->
-            NewEntryAndResult(Entry, Value);
-        ?partial_value ->
-            NewEntryAndResult(Entry, Value);
-        {fail, not_found} ->
-            E1 = tx_tlog:set_entry_operation(Entry, ?write),
-            E2 = tx_tlog:set_entry_value(E1, Value),
-            E3 = tx_tlog:set_entry_status(E2, ?value),
-            {E3, {ok}};
-        {fail, Reason} when is_atom(Reason) ->
-            % in this case, the result of the write is still OK!
-            {Entry, {ok}}
+    E1 = tx_tlog:set_entry_value(Entry, ?value, Value),
+    case tx_tlog:get_entry_operation(E1) of
+        ?write -> {E1, {ok}};
+        ?read  -> {tx_tlog:set_entry_operation(E1, ?write), {ok}}
     end.
 
 %% May make several ones from a single TransLog item (item replication)
@@ -145,8 +124,8 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
     DBVers = db_entry:get_version(DBEntry),
     WriteLock = db_entry:get_writelock(DBEntry),
     if DBVers =< RTLogVers ->
-            T2DBEntry = db_entry:set_value(
-                          DBEntry, tx_tlog:get_entry_value(RTLogEntry), RTLogVers + 1),
+            {?value, Value} = tx_tlog:get_entry_value(RTLogEntry),
+            T2DBEntry = db_entry:set_value(DBEntry, Value, RTLogVers + 1),
             NewEntry =
                 if WriteLock =/= false andalso WriteLock =< RTLogVers ->
                         %% op that created the write lock or outdated WL?
@@ -213,38 +192,14 @@ on({rdht_tx_read_reply, Id, TLogEntry}, TableName) ->
     comm:send_local(ClientPid, Msg),
     TableName.
 
--spec update_tlog_entry_feeder(tx_tlog:tlog_entry()) -> {tx_tlog:tlog_entry()}.
-update_tlog_entry_feeder(TLogEntry) ->
-    NewEntry =
-        case tx_tlog:get_entry_status(TLogEntry) of
-            ?value -> % only ?partial_value allowed here
-                E2 = tx_tlog:set_entry_status(TLogEntry, ?partial_value),
-                % since ?partial_value is not allowed after write ops, set ?read here
-                % -> we would not go into the dht op if it was a write! 
-                tx_tlog:set_entry_operation(E2, ?read);
-            {fail, _} ->
-                % the only failure that could happen here!
-                tx_tlog:set_entry_status(TLogEntry, {fail, not_found});
-            _ -> TLogEntry
-        end,
-    {NewEntry}.
-
 -spec update_tlog_entry(tx_tlog:tlog_entry()) -> tx_tlog:tlog_entry().
 update_tlog_entry(TLogEntry) ->
     %% we keep always the read version and expect equivalence during
     %% validation and increment then in case of write.
     T2 = tx_tlog:set_entry_operation(TLogEntry, ?write),
-    case tx_tlog:get_entry_status(TLogEntry) of
-        ?partial_value -> % we issue a partial read, so this is the only result (except for failures) we expect!
-            T3 = tx_tlog:set_entry_status(T2, ?value),
-            tx_tlog:set_entry_value(T3, ?value_dropped);
-        {fail, not_found} ->
-            T3 = tx_tlog:set_entry_status(T2, ?value),
-            tx_tlog:set_entry_value(T3, ?value_dropped)
-%        {fail, timeout} ->
-%            tx_tlog:new_entry(?write, Key, Version, {fail, timeout},
-%                               WriteValue)
-    end.
+    % should always be true (a partial read for the version never fails)!
+    % ?ok =:= tx_tlog:get_entry_status(T2),
+    tx_tlog:set_entry_value(T2, ?value, ?value_dropped).
 
 %% @doc Checks whether used config parameters exist and are valid.
 -spec check_config() -> true.

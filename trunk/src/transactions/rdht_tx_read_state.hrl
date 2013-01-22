@@ -29,22 +29,36 @@
                    state_get_numreplied/1
                   ]}).
 
--type result() :: {?ok | fail, rdht_tx:encoded_value() | 0 | atom(), -1 | ?DB:version()}. % {?ok|fail, Val|FailReason, Vers}
+% {?ok|fail, Val|FailReason, Vers}
+-type result() :: {?ok | ?fail,
+                   rdht_tx:encoded_value() | 0 | ?not_found | ?empty_list | ?not_a_list,
+                   -1 | ?DB:version()}.
 -type read_state() ::
                   { ID               :: rdht_tx:req_id(),
                     ClientPid        :: pid() | unknown,
                     Key              :: ?RT:key() | unknown,
                     NumOk            :: non_neg_integer(),
                     NumFail          :: non_neg_integer(),
-                    Result           :: result(),
+                    Result           :: result() | {?fail, 0, -2},
                     IsDecided        :: tx_tlog:tx_status() | false,
+                    IsClientInformed :: boolean(),
+                    Op               :: ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
+                  }.
+-type read_state_decided() ::
+                  { ID               :: rdht_tx:req_id(),
+                    ClientPid        :: pid() | unknown,
+                    Key              :: ?RT:key() | unknown,
+                    NumOk            :: non_neg_integer(),
+                    NumFail          :: non_neg_integer(),
+                    Result           :: result(),
+                    IsDecided        :: tx_tlog:tx_status(),
                     IsClientInformed :: boolean(),
                     Op               :: ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
                   }.
 
 -spec state_new(rdht_tx:req_id()) -> read_state().
 state_new(Id) ->
-    {Id, unknown, unknown, 0, 0, {?ok, 0, -1}, false, false, ?read}.
+    {Id, unknown, unknown, 0, 0, {?fail, 0, -2}, false, false, ?read}.
 
 -spec state_get_id(read_state()) -> rdht_tx:req_id().
 state_get_id(State) ->              element(1, State).
@@ -65,7 +79,7 @@ state_inc_numok(State) ->           setelement(4, State, element(4, State) + 1).
 state_get_numfailed(State) ->       element(5, State).
 -spec state_inc_numfailed(read_state()) -> read_state().
 state_inc_numfailed(State) ->       setelement(5, State, element(5, State) + 1).
--spec state_get_result(read_state()) -> result().
+-spec state_get_result(read_state()) -> result() | {?fail, 0, -2}.
 state_get_result(State) ->          element(6, State).
 -spec state_set_result(read_state(), result()) -> read_state().
 state_set_result(State, Val) ->     setelement(6, State, Val).
@@ -88,7 +102,7 @@ state_get_numreplied(State) ->
 
 -spec state_add_reply(read_state(),
                       Result::{?ok, rdht_tx:encoded_value(), ?DB:version()} | {?ok, empty_val, -1} |
-                          {fail, atom(), ?DB:version()})
+                          {?fail, ?not_found | ?empty_list | ?not_a_list, ?DB:version()})
         -> read_state().
 state_add_reply(State, Result) ->
     ?TRACE("state_add_reply state res majok majdeny ~p ~p ~n", [State, Result]),

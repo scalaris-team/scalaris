@@ -141,3 +141,15 @@
 
 -define(ok_atom, ok).
 -define(ok, ?int_or_atom(84, ?ok_atom)).
+
+-define(fail_atom, fail).
+-define(fail, ?int_or_atom(85, ?fail_atom)).
+
+-define(not_found_atom, not_found).
+-define(not_found, ?int_or_atom(86, ?not_found_atom)).
+
+-define(empty_list_atom, empty_list).
+-define(empty_list, ?int_or_atom(87, ?empty_list_atom)).
+
+-define(not_a_list_atom, not_a_list).
+-define(not_a_list, ?int_or_atom(88, ?not_a_list_atom)).

@@ -47,11 +47,14 @@ work_phase(ClientPid, ReqId, Request) ->
         (tx_tlog:tlog_entry(), client_key(), rdht_tx:encoded_value(), rdht_tx:encoded_value(), EnDecode::false)
         -> {tx_tlog:tlog_entry(), client_key(), rdht_tx:encoded_value(), rdht_tx:encoded_value(), EnDecode::false}.
 extract_from_tlog_feeder(Entry, Key, Old, New, EnDecode) ->
+    % the result in the tlog is essentially a read op
+    % -> similar to rdht_tx_read:extract_from_tlog_feeder/4
+    {ValType, EncVal} = tx_tlog:get_entry_value(Entry),
     NewEntry =
-        case tx_tlog:get_entry_status(Entry) of
-            ?partial_value -> % only ?value allowed here
-                tx_tlog:set_entry_status(Entry, ?value);
-            _ -> Entry
+        % transform unknow value types to a valid ?value type:
+        case not lists:member(ValType, [?value, ?not_found]) of
+            true -> tx_tlog:set_entry_value(Entry, ?value, EncVal);
+            _    -> Entry
         end,
     {NewEntry, Key, Old, New, EnDecode}.
 
@@ -74,11 +77,11 @@ extract_from_tlog(Entry0, Key, Old, New, EnDecode) ->
             if Res0Decoded =:= OldDecoded ->
                    rdht_tx_write:extract_from_tlog(Entry, Key, New, EnDecode);
                true ->
-                   {tx_tlog:set_entry_status(Entry, {fail, abort}),
+                   {tx_tlog:set_entry_status(Entry, ?fail),
                     {fail, {key_changed, RealOldValue}}}
             end;
         {ok, RealOldValue} ->
-            {tx_tlog:set_entry_status(Entry, {fail, abort}),
+            {tx_tlog:set_entry_status(Entry, ?fail),
              {fail, {key_changed, RealOldValue}}};
         {fail, not_found} = X ->
             {Entry, X}

@@ -49,8 +49,8 @@
 -type encoded_value() :: atom() | boolean() | number() | binary().
 
 %% @doc Perform several requests inside a transaction.
--spec req_list(tx_tlog:tlog(), [api_tx:request()], EnDecode::true)      -> {tx_tlog:tlog(), [api_tx:result()]};
-              (tx_tlog:tlog(), [api_tx:request_enc()], EnDecode::false) -> {tx_tlog:tlog(), [api_tx:result()]}.
+-spec req_list(tx_tlog:tlog_ext(), [api_tx:request()], EnDecode::true)      -> {tx_tlog:tlog_ext(), [api_tx:result()]};
+              (tx_tlog:tlog_ext(), [api_tx:request_enc()], EnDecode::false) -> {tx_tlog:tlog_ext(), [api_tx:result()]}.
 req_list([], [{commit}], _EnDecode) -> {[], [{ok}]};
 req_list(TLog, ReqList, EnDecode) ->
     %% PRE: TLog is sorted by key, implicitly given, as
@@ -131,7 +131,7 @@ tlog_and_results_to_abort_iter(TLog, [Req | ReqListT], AccRes) ->
                       test_and_set -> {ok}
                   end,
             NewTLog = tx_tlog:add_or_update_status_by_key(
-                        TLog, req_get_key(Req), {fail, abort}),
+                        TLog, req_get_key(Req), ?fail),
             tlog_and_results_to_abort_iter(NewTLog, ReqListT, [Res | AccRes])
     end.
 

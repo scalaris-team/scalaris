@@ -104,38 +104,38 @@
         | commit_result().
 
 %% @doc Get an empty transaction log to start a new transaction.
--spec new_tlog() -> tx_tlog:tlog().
+-spec new_tlog() -> tx_tlog:tlog_ext().
 new_tlog() -> tx_tlog:empty().
 
 %% @doc Perform several requests starting a new transaction.
--spec req_list([request()]) -> {tx_tlog:tlog(), [result()]}.
+-spec req_list([request()]) -> {tx_tlog:tlog_ext(), [result()]}.
 req_list(ReqList) ->
     req_list(new_tlog(), ReqList).
 
 %% @doc Perform a read inside a transaction.
--spec read(tx_tlog:tlog(), client_key())
-          -> {tx_tlog:tlog(), read_result()}.
+-spec read(tx_tlog:tlog_ext(), client_key())
+          -> {tx_tlog:tlog_ext(), read_result()}.
 read(TLog, Key) ->
     {NewTLog, [Result]} = req_list(TLog, [{read, Key}]),
     {NewTLog, Result}.
 
 %% @doc Perform a write inside a transaction.
--spec write(tx_tlog:tlog(), client_key(), client_value())
-           -> {tx_tlog:tlog(), write_result()}.
+-spec write(tx_tlog:tlog_ext(), client_key(), client_value())
+           -> {tx_tlog:tlog_ext(), write_result()}.
 write(TLog, Key, Value) ->
     {NewTLog, [Result]} = req_list(TLog, [{write, Key, Value}]),
     {NewTLog, Result}.
 
 %% @doc Perform a add_del_on_list operation inside a transaction.
--spec add_del_on_list(tx_tlog:tlog(), client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
-           -> {tx_tlog:tlog(), listop_result()}.
+-spec add_del_on_list(tx_tlog:tlog_ext(), client_key(), ToAdd::[client_value()], ToRemove::[client_value()])
+           -> {tx_tlog:tlog_ext(), listop_result()}.
 add_del_on_list(TLog, Key, ToAdd, ToRemove) ->
     {NewTLog, [Result]} = req_list(TLog, [{add_del_on_list, Key, ToAdd, ToRemove}]),
     {NewTLog, Result}.
 
 %% @doc Perform a add_del_on_list operation inside a transaction.
--spec add_on_nr(tx_tlog:tlog(), client_key(), ToAdd::number())
-           -> {tx_tlog:tlog(), numberop_result()}.
+-spec add_on_nr(tx_tlog:tlog_ext(), client_key(), ToAdd::number())
+           -> {tx_tlog:tlog_ext(), numberop_result()}.
 add_on_nr(TLog, Key, ToAdd) ->
     {NewTLog, [Result]} = req_list(TLog, [{add_on_nr, Key, ToAdd}]),
     {NewTLog, Result}.
@@ -143,14 +143,14 @@ add_on_nr(TLog, Key, ToAdd) ->
 %% @doc Atomically compare and set a value for a key inside a transaction.
 %%      If the value stored at Key is the same as OldValue, then NewValue will
 %%      be stored.
--spec test_and_set(tx_tlog:tlog(), Key::client_key(), OldValue::client_value(), NewValue::client_value())
-        -> {tx_tlog:tlog(), testandset_result()}.
+-spec test_and_set(tx_tlog:tlog_ext(), Key::client_key(), OldValue::client_value(), NewValue::client_value())
+        -> {tx_tlog:tlog_ext(), testandset_result()}.
 test_and_set(TLog, Key, OldValue, NewValue) ->
     {NewTLog, [Result]} = req_list(TLog, [{test_and_set, Key, OldValue, NewValue}]),
     {NewTLog, Result}.
 
 %% @doc Finish a transaction and materialize it atomically on the DHT.
--spec commit(tx_tlog:tlog()) -> commit_result().
+-spec commit(tx_tlog:tlog_ext()) -> commit_result().
 commit(TLog) ->
     {_NewTLog, [Result]} = req_list(TLog, [{commit}]),
     Result.
