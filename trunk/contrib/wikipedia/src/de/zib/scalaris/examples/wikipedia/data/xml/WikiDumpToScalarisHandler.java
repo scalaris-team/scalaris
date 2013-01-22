@@ -29,7 +29,6 @@ import de.zib.scalaris.AbortException;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
-import de.zib.scalaris.TimeoutException;
 import de.zib.scalaris.Transaction;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
@@ -184,8 +183,6 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             scalaris_single.write(key, siteinfo);
         } catch (ConnectionException e) {
             error("write of " + key + " failed with connection error");
-        } catch (TimeoutException e) {
-            error("write of " + key + " failed with timeout");
         } catch (AbortException e) {
             error("write of " + key + " failed with abort");
         } catch (UnknownException e) {
@@ -347,8 +344,6 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
                 }
             } catch (ConnectionException e) {
                 importer.error("write of " + note + " failed with connection error");
-            } catch (TimeoutException e) {
-                importer.error("write of " + note + " failed with timeout");
             } catch (AbortException e) {
                 importer.error("write of " + note + " failed with abort");
             }
