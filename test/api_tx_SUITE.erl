@@ -215,14 +215,14 @@ commit_1(_Config) ->
     {ReadTLog, _} = api_tx:read(api_tx:new_tlog(), "commit_1_B"),
     ?equals(api_tx:commit(ReadTLog), {ok}),
 
-    %% commit a timedout TLog
+    %% commit a failed TLog
     TimeoutReadTLog =
-        [ tx_tlog:set_entry_status(X, {fail, timeout}) || X <- ReadTLog ],
+        [ tx_tlog:set_entry_status(X, ?fail) || X <- ReadTLog ],
     ?equals(api_tx:commit(TimeoutReadTLog), {fail, abort, ["commit_1_B"]}),
 
     {WriteTLog2, _} = api_tx:write(api_tx:new_tlog(), "commit_1_C", 7),
     TimeoutWriteTLog =
-        [ tx_tlog:set_entry_status(X, {fail, timeout}) || X <- WriteTLog2 ],
+        [ tx_tlog:set_entry_status(X, ?fail) || X <- WriteTLog2 ],
     ?equals(api_tx:commit(TimeoutWriteTLog), {fail, abort, ["commit_1_C"]}),
 
     %% commit a non-existing tlog
@@ -721,12 +721,12 @@ prop_random_from_list(Key, Value) ->
     _ = api_tx:write(Key,  [Value]),
     ?equals_pattern(
         api_tx:req_list([{read, Key, random_from_list}]),
-        {[{?read, Key, Version, ?partial_value, ?value_dropped}],
+        {[{?read, Key, Version, ?ok, ?value_dropped, ?value_dropped}],
          [{ok, { Value, 1 } }]} when is_integer(Version) andalso Version >= 0),
     ValueEnc = rdht_tx:encode_value({Value, 1}),
     ?equals_pattern(
         api_txc:req_list([{read, Key, random_from_list}]),
-        {[{?read, Key, Version, ?partial_value, ?value_dropped}],
+        {[{?read, Key, Version, ?ok, ?value_dropped, ?value_dropped}],
          [{ok, ValueEnc}]} when is_integer(Version) andalso Version >= 0),
     true.
 
@@ -854,7 +854,7 @@ prop_tlog_test_and_set2(TLog0, Key, Existing, RealOldValue, OldValue, NewValue) 
            ?equals(Result1, {fail, not_found}),
            ?equals(Result2, {fail, not_found}),
            Result3 = api_tx:commit(TLog2),
-           ?equals(Result3, {ok}),
+           ?equals(Result3, {ok}), % TODO: should be abort since test_and_set was unsuccessful!
            ?equals(api_tx:read(Key), {fail, not_found});
        RealOldValue =:= OldValue ->
            ?equals(Result1, {ok}),
@@ -915,225 +915,206 @@ tester_req_list(_Config) ->
                           {read,[677315]}]),
     tester:test(?MODULE, prop_tester_req_list, 1, 5000).
 
-check_op_on_tlog([], _Req, _NTLog, _NRes, _RingVal) -> true;
-check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
-    OldEntry = hd(TLog),
-    NewEntry = hd(NTLog),
-    %% Version is same.
-    case tx_tlog:get_entry_status(OldEntry) of
-        {fail, not_found} ->
-            case element(1, Req) of
-                write ->
-                    ?equals(tx_tlog:get_entry_status(NewEntry), ?value),
-                    ?equals(tx_tlog:get_entry_value(NewEntry),
-                            rdht_tx:encode_value(element(3, Req))),
-                    ?equals(NRes, [{ok}]);
-                read ->
-                    ?equals(tx_tlog:get_entry_status(NewEntry),
-                            {fail, not_found}),
-                    ?equals(NRes, [{fail, not_found}]);
-                test_and_set ->
-                    ?equals(tx_tlog:get_entry_status(NewEntry),
-                            {fail, not_found}),
-                    ?equals(NRes, [{fail, not_found}]);
-                add_on_nr ->
-                    %% Check value content
-                    case NRes of
-                        [{ok}] ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    ?value); %% will create the value
-                        [{fail, not_a_number}] ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    {fail, abort})
-                        end;
-                add_del_on_list ->
-                    %% Check value content
-                    case NRes of
-                        [{ok}] ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    ?value); %% will create the value
-                        [{fail, not_a_list}] ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    {fail, abort})
+%% @doc Compares Res with ExpRes for the given request Req. Takes care of not
+%%      comparing results from reading random values, e.g. random_from_list.
+%%      If ORes (1-element list) has failed, Res (1|2-element list) should also
+%%      be the same as ExpRes (1|2-element list).
+-spec same_result_if_not_random(Req::api_tx:request_on_key(), ORes::[api_tx:result(),...],
+                                Res::[api_tx:result(),...], ExpRes::[api_tx:result(),...],
+                                Note::iolist()) -> ok.
+same_result_if_not_random(Req, [ORes], Res, ExpRes, Note) ->
+    case Req of
+        {read, _Key0, ReadOp}
+          when ReadOp =:= random_from_list orelse
+                   (is_tuple(ReadOp) andalso element(1, ReadOp) =:= sublist) ->
+            case ORes of
+                {fail, _} ->
+                    ?equals_w_note(Res, ExpRes, Note);
+                {ok, {_RandomVal, ListLength}} ->
+                    % can only guarantee the list length here
+                    case length(ExpRes) of
+                        2 -> ?equals_pattern_w_note(Res, [{ok}, {ok, {_, ListLength}}], Note);
+                        1 -> ?equals_pattern_w_note(Res, [{ok, {_, ListLength}}], Note)
                     end
             end;
-        {fail, Reason} = Fail when is_atom(Reason) ->
-            % despite the status being 'abort', the operation's result
-            % should be the same as if there was no abort!
-            TmpTLogEntry = tx_tlog:set_entry_status(OldEntry, ?value),
-            Note = io_lib:format("Entry: ~.0p, Req: ~.0p, RingVal: ~.0p", [OldEntry, Req, RingVal]),
-            case Req of
-                {read, _Key, random_from_list} ->
-                    case NRes of
-                        [{ok, {RandomVal, ListLength}}] ->
-                            NewValue =
-                                case tx_tlog:get_entry_operation(OldEntry) of
-                                    ?read -> RingVal;
-                                    ?write -> rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))
-                                end,
-                            ?assert_w_note(lists:member(RandomVal, NewValue), Note),
-                            ?equals_w_note(ListLength, length(NewValue), Note),
-                            ?equals_pattern_w_note(element(2, api_tx:req_list([TmpTLogEntry], [Req])), [{ok, _}], Note);
-                        [{fail, _}] ->
-                            % the fail may be from this op or a previous one (can't distinguish here)
-                            ok
-                    end;
-                {read, _Key, {sublist, _Start, Len}} ->
-                    case NRes of
-                        [{ok, {SubList, ListLength}}] ->
-                            NoteWSubList = Note ++ io_lib:format(", SubList: ~.0p", [SubList]),
-                            ?assert_w_note(length(SubList) =< erlang:abs(Len), NoteWSubList),
-                            NewValue =
-                                case tx_tlog:get_entry_operation(OldEntry) of
-                                    ?read -> RingVal;
-                                    ?write -> rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))
-                                end,
-                            ?equals_w_note(lists:subtract(SubList, NewValue), [], NoteWSubList),
-                            ?equals_w_note(ListLength, length(NewValue), NoteWSubList),
-                            ?equals_pattern_w_note(element(2, api_tx:req_list([TmpTLogEntry], [Req])), [{ok, _}], NoteWSubList);
-                        [{fail, _}] ->
-                            % the fail may be from this op or a previous one (can't distinguish here)
-                            ok
-                    end;
-                _ ->
-                    case element(1, hd(NRes)) of
-                        ok when RingVal =/= none ->
-                            % old entry failed but op was successfull anyway...
-                            % then the result should be the same as if executed on a successul entry
-                            % (a not_found may however yield {fail, not_found})
-                            ?equals_w_note(NRes, element(2, api_tx:req_list([TmpTLogEntry], [Req])), Note);
-                        _ ->
-                            % the fail may be from this op or a previous one (can't distinguish here)
-                            ok
-                    end
-            end,
-            % status must remain!
-            ?equals(Fail, tx_tlog:get_entry_status(NewEntry));
-        Status when Status =:= ?value orelse Status =:= ?partial_value ->
-            % result must be the same as if executed alone
-            % note: previous write may have changed the value!
-            {ExpResAlone, ReqsAlone} =
-                case tx_tlog:get_entry_operation(OldEntry) of
-                    ?read -> {NRes, [Req]};
-                    ?write ->
-                        ValueAfterWrite = rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry)),
-                        {[{ok}, hd(NRes)], [{write, element(2, Req), ValueAfterWrite}, Req]}
-                end,
-            case Req of
-                {read, _Key0, ReadOp} when ReadOp =:= random_from_list
-                  orelse (is_tuple(ReadOp) andalso element(1, ReadOp) =:= sublist) ->
-                    case NRes of
-                        [{fail, _}] ->
-                            ?equals(ExpResAlone, element(2, api_tx:req_list(ReqsAlone)));
-                        [{ok, {_RandomVal, _ListLength}}] ->
-                            % the only thing guaranteed here is that it must also be {ok, _}
-                            case length(ExpResAlone) of
-                                2 -> ?equals_pattern(element(2, api_tx:req_list(ReqsAlone)), [{ok}, {ok, _}]);
-                                1 -> ?equals_pattern(element(2, api_tx:req_list(ReqsAlone)), [{ok, _}])
-                            end
-                    end;
-                _ ->
-                    ?equals(ExpResAlone, element(2, api_tx:req_list(ReqsAlone)))
-            end,
-            % further tests for the individual requests' properties
-            case Req of
-                {write, _Key, Value} ->
-                    ?equals(tx_tlog:get_entry_status(NewEntry),
-                            ?value),
-                    ?equals(tx_tlog:get_entry_value(NewEntry),
-                            rdht_tx:encode_value(Value)),
-                    ?equals(NRes, [{ok}]);
-                {read, _Key} ->
-                    if Status =:= ?partial_value ->
-                           ?equals([tx_tlog:set_entry_status(OldEntry, ?value) | tl(TLog)], NTLog);
-                       Status =:= ?value ->
-                           ?equals(TLog, NTLog)
-                    end,
-                    case tx_tlog:get_entry_operation(OldEntry) of
-                        ?read ->
-                            ?equals(NRes, [{ok, RingVal}]);
-                        ?write ->
-                            ?equals(NRes, [{ok, rdht_tx:decode_value(tx_tlog:get_entry_value(NewEntry))}])
-                    end;
-                {test_and_set, _Key, _Old, _New} ->
-                    case hd(NRes) of
-                        {ok} ->
-                            ?equals(?value,
-                                    tx_tlog:get_entry_status(NewEntry));
-                        {fail, {key_changed, _X}} ->
-                            ?equals({fail, abort},
-                                    tx_tlog:get_entry_status(NewEntry)),
-                            ?equals(tx_tlog:get_entry_value(OldEntry),
-                                    tx_tlog:get_entry_value(NewEntry))
-                    end;
-                {add_on_nr, _Key, _X} ->
-                    case hd(NRes) of
-                        {ok} ->
-                            ?equals(?value,
-                                    tx_tlog:get_entry_status(NewEntry));
-                        {fail, not_a_number} ->
-                            ?equals({fail, abort},
-                                    tx_tlog:get_entry_status(NewEntry)),
-                            ?equals(tx_tlog:get_entry_value(OldEntry),
-                                    tx_tlog:get_entry_value(NewEntry))
-                    end;
-                {add_del_on_list, _Key, _ToAdd, _ToRemove} ->
-                    case hd(NRes) of
-                        {ok} ->
-                            ?equals(?value,
-                                    tx_tlog:get_entry_status(NewEntry));
-                        {fail, not_a_list} ->
-                            ?equals({fail, abort},
-                                    tx_tlog:get_entry_status(NewEntry)),
-                            ?equals(tx_tlog:get_entry_value(OldEntry),
-                                    tx_tlog:get_entry_value(NewEntry))
-                    end;
-                {read, _Key, random_from_list} ->
-                    case hd(NRes) of
-                        {ok, {RandomVal, ListLength}} ->
-                            NewValue =
-                                case tx_tlog:get_entry_operation(OldEntry) of
-                                    ?read -> RingVal;
-                                    ?write -> rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))
-                                end,
-                            Note = io_lib:format("RandomVal: ~p (~p), StoredVal: ~p (~p)",
-                                                 [RandomVal, ListLength, NewValue, length(NewValue)]),
-                            ?assert_w_note(lists:member(RandomVal, NewValue), Note),
-                            ?equals_w_note(ListLength, length(NewValue), Note),
-                            ?equals_pattern(tx_tlog:get_entry_status(NewEntry),
-                                    X when X =:= ?value orelse X =:= ?partial_value);
-                        {fail, Reason} when Reason =:= empty_list orelse Reason =:= not_a_list ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    {fail, abort}),
-                            ?equals(tx_tlog:get_entry_value(NewEntry),
-                                    tx_tlog:get_entry_value(OldEntry))
-                    end;
-                {read, _Key, {sublist, _Start, Len}} ->
-                    case hd(NRes) of
-                        {ok, {SubList, ListLength}} ->
-                            NewValue =
-                                case tx_tlog:get_entry_operation(OldEntry) of
-                                    ?read -> RingVal;
-                                    ?write -> rdht_tx:decode_value(tx_tlog:get_entry_value(OldEntry))
-                                end,
-                            Note = io_lib:format("SubList: ~p (~p), StoredVal: ~p (~p)",
-                                                 [SubList, ListLength, NewValue, length(NewValue)]),
-                            ?assert_w_note(length(SubList) =< erlang:abs(Len), Note),
-                            ?equals_w_note(lists:subtract(SubList, NewValue), [], Note),
-                            ?equals_w_note(ListLength, length(NewValue), Note),
+        _ ->
+            ?equals_w_note(Res, ExpRes, Note)
+    end.
+
+-spec check_op_on_tlog(tx_tlog:tlog(), api_tx:request_on_key(), tx_tlog:tlog(),
+                       [api_tx:result(),...], none | client_value) -> true | no_return().
+check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
+    ReqKey = element(2, Req),
+    case tx_tlog:find_entry_by_key(TLog, ReqKey) of
+        false ->
+            % TODO: implement some checks here, e.g. create OldEntry as read op and continue with the checks below
+            true;
+        OldEntry ->
+            NewEntry = tx_tlog:find_entry_by_key(NTLog, ReqKey),
+            ?assert_w_note(NewEntry =/= false, io_lib:format("NewEntry: ~.0p", [NewEntry])),
+            Note = io_lib:format("Entry: ~.0p, Res: ~.0p, Req: ~.0p, RingVal: ~.0p", [OldEntry, NRes, Req, RingVal]),
+            case tx_tlog:get_entry_status(OldEntry) of
+                ?fail ->
+                    % despite the status 'failed', the operation's result
+                    % should be the same as if there was no failure!
+                    TLog2 = [tx_tlog:set_entry_status(OldEntry, ?ok)],
+                    {NTLog2, NRes2} = api_tx:req_list(TLog2, [Req]),
+                    same_result_if_not_random(Req, NRes, NRes2, NRes, Note),
+                    % while we are at it, check the op on an ok TLog, too:
+                    check_op_on_tlog(TLog2, Req, NTLog2, NRes2, RingVal),
+                    % status must not change between OldEntry and NewEntry!
+                    ?equals(?fail, tx_tlog:get_entry_status(NewEntry));
+                ?ok ->
+                    
+                    % result must be the same as if executed alone
+                    % note: previous write may have changed the value!
+                    {ExpResAlone, ReqsAlone} =
+                        case tx_tlog:get_entry_operation(OldEntry) of
+                            ?read -> {NRes, [Req]};
+                            ?write ->
+                                ValueAfterWrite = rdht_tx:decode_value(element(2, tx_tlog:get_entry_value(OldEntry))),
+                                {[{ok}, hd(NRes)], [{write, ReqKey, ValueAfterWrite}, Req]}
+                        end,
+                    {_, NRes2} = api_tx:req_list(ReqsAlone),
+                    same_result_if_not_random(Req, NRes, NRes2, ExpResAlone, Note),
+                    
+                    {_, OReadRes} = api_tx:read(TLog, ReqKey),
+                    case OReadRes of
+                        {fail, not_found} ->
+                            % no write can result in not_found:
+                            ?equals(tx_tlog:get_entry_operation(OldEntry), ?read),
+                            ?assert(RingVal =:= none),
+                            case Req of
+                                {write, _Key, Value} ->
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                    ?equals(tx_tlog:get_entry_value(NewEntry),
+                                            {?value, rdht_tx:encode_value(Value)}),
+                                    ?equals(NRes, [{ok}]);
+                                {read, _Key, _} -> % random_from_list | {sublist, _Start, Len}
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?fail),
+                                    ?equals(tx_tlog:get_entry_value_type(NewEntry), ?value_dropped),
+                                    ?equals(NRes, [{fail, not_found}]);
+                                {read, _Key} ->
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                    ?equals(tx_tlog:get_entry_value_type(NewEntry), ?value_dropped),
+                                    ?equals(NRes, [{fail, not_found}]);
+                                {test_and_set, _Key, _Old, _New} ->
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?ok), % TODO: should be ?fail since test_and_set was unsuccessful! 
+                                    ?equals(tx_tlog:get_entry_value_type(NewEntry), ?value_dropped),
+                                    ?equals(NRes, [{fail, not_found}]);
+                                {add_on_nr, _Key, X} when NRes =:= [{ok}] ->
+                                    % check value content (op will create the value)
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                    ?equals(tx_tlog:get_entry_value(NewEntry),
+                                            {?value, rdht_tx:encode_value(X)}),
+                                    ?equals(NRes, [{ok}]);
+                                {add_on_nr, _Key, _X} when NRes =:= [{fail, not_a_number}] ->
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?fail),
+                                    ?equals(tx_tlog:get_entry_value_type(NewEntry), ?value_dropped);
+                                {add_del_on_list, _Key, ToAdd, ToDel} when NRes =:= [{ok}] ->
+                                    % check value content (op will create the value)
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                    ?equals(tx_tlog:get_entry_value(NewEntry),
+                                            {?value, rdht_tx:encode_value(util:minus_first(ToAdd, ToDel))}),
+                                    ?equals(NRes, [{ok}]);
+                                {add_del_on_list, _Key, _ToAdd, _ToRemove} when NRes =:= [{fail, not_a_list}] ->
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?fail),
+                                    ?equals(tx_tlog:get_entry_value_type(NewEntry), ?value_dropped)
+                            end;
+                        {ok, OValue} ->
                             case tx_tlog:get_entry_operation(OldEntry) of
                                 ?read ->
-                                    ?equals(tx_tlog:get_entry_status(NewEntry),
-                                            ?partial_value);
+                                    % ?assert(RingVal =/= none) % 'none' may be the value used
+                                    % (anyway, we check the value below so this check is not important)
+                                    ?equals(OValue, RingVal);
                                 ?write ->
-                                    ?equals(tx_tlog:get_entry_status(NewEntry),
-                                            ?value)
-                            end;
-                        {fail, not_a_list} ->
-                            ?equals(tx_tlog:get_entry_status(NewEntry),
-                                    {fail, abort}),
-                            ?equals(tx_tlog:get_entry_value(NewEntry),
-                                    tx_tlog:get_entry_value(OldEntry))
+                                    ?equals({?value, rdht_tx:encode_value(OValue)},
+                                            tx_tlog:get_entry_value(OldEntry))
+                            end,
+                            case NRes of
+                                [OkTpl] when is_tuple(OkTpl) andalso element(1, OkTpl) =:= ok ->
+                                    case Req of
+                                        {write, _Key, Value} ->
+                                            ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                            ?equals(tx_tlog:get_entry_value(NewEntry),
+                                                    {?value, rdht_tx:encode_value(Value)}),
+                                            ?equals(NRes, [{ok}]);
+                                        {read, _Key} ->
+                                            ?equals(OldEntry, NewEntry),
+                                            ?equals_pattern(tx_tlog:get_entry_value_type(NewEntry),
+                                                            XType when XType =:= ?value_dropped orelse XType =:= ?value),
+                                            ?equals(NRes, [{ok, OValue}]);
+                                        {test_and_set, _Key, _Old, New} ->
+                                            ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                            ?equals(tx_tlog:get_entry_value(NewEntry),
+                                                    {?value, rdht_tx:encode_value(New)}),
+                                            ?equals(NRes, [{ok}]);
+                                        {add_on_nr, _Key, X} when X == 0 -> % no-op (int or float)
+                                            ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                            ?equals(tx_tlog:get_entry_value(NewEntry),
+                                                    tx_tlog:get_entry_value(OldEntry)),
+                                            ?equals(NRes, [{ok}]);
+                                        {add_on_nr, _Key, X} ->
+                                            ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                            ?equals(tx_tlog:get_entry_value(NewEntry),
+                                                    {?value, rdht_tx:encode_value(OValue + X)}),
+                                            ?equals(NRes, [{ok}]);
+                                        {add_del_on_list, _Key, ToAdd, ToDel} when ToAdd =:= [] andalso ToDel =:= [] -> % no-op
+                                            ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                            ?equals(tx_tlog:get_entry_value(NewEntry),
+                                                    tx_tlog:get_entry_value(OldEntry)),
+                                            ?equals(NRes, [{ok}]);
+                                        {add_del_on_list, _Key, ToAdd, ToDel} ->
+                                            ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                            NValue = util:minus_first(lists:append(ToAdd, OValue), ToDel),
+                                            ?equals(tx_tlog:get_entry_value(NewEntry),
+                                                    {?value, rdht_tx:encode_value(NValue)}),
+                                            ?equals(NRes, [{ok}]);
+                                        {read, _Key, random_from_list} ->
+                                            ?equals_pattern(NRes, [{ok, {_RandomValX, _ListLengthX}}]),
+                                            ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                            [{ok, {RandomVal, ListLengthX}}] = NRes,
+                                            Note2 = io_lib:format("RandomVal: ~p (~p), StoredVal: ~p (~p)",
+                                                                 [RandomVal, ListLengthX, OValue, length(OValue)]),
+                                            ?assert_w_note(lists:member(RandomVal, OValue), Note2),
+                                            ?equals_w_note(ListLengthX, length(OValue), Note2),
+                                            ?equals_pattern(tx_tlog:get_entry_value_type(NewEntry),
+                                                            XType when XType =:= ?value_dropped orelse XType =:= ?value);
+                                        {read, _Key, {sublist, _Start, Len}} ->
+                                            ?equals_pattern(NRes, [{ok, {_SubListX, _ListLengthX}}]),
+                                            ?equals(tx_tlog:get_entry_status(NewEntry), ?ok),
+                                            [{ok, {SubList, ListLengthX}}] = NRes,
+                                            Note2 = io_lib:format("SubList: ~p (~p), StoredVal: ~p (~p)",
+                                                                 [SubList, ListLengthX, OValue, length(OValue)]),
+                                            ?assert_w_note(length(SubList) =< erlang:abs(Len), Note2),
+                                            ?equals_w_note(lists:subtract(SubList, OValue), [], Note2),
+                                            ?equals_w_note(ListLengthX, length(OValue), Note2),
+                                            ?equals_pattern(tx_tlog:get_entry_value_type(NewEntry),
+                                                            XType when XType =:= ?value_dropped orelse XType =:= ?value)
+                                    end;
+                                [{fail, Reason}] ->
+                                    case Req of
+                                        {write, _Key, _Value} ->
+                                            ?ct_fail("a write should never fail without a commit", []);
+                                        {read, _Key} ->
+                                            ?ct_fail("a read should not fail on an existing value", []);
+                                        {test_and_set, _Key, _Old, _New} ->
+                                            ?equals(Reason, {key_changed, OValue});
+                                        {add_on_nr, _Key, _X} ->
+                                            ?equals(Reason, not_a_number);
+                                        {add_del_on_list, _Key, _ToAdd, _ToDel} ->
+                                            ?equals(Reason, not_a_list);
+                                        {read, _Key, random_from_list} ->
+                                            ?equals_pattern(Reason, X when X =:= empty_list orelse X =:= not_a_list);
+                                        {read, _Key, {sublist, _Start, _Len}} ->
+                                            ?equals(Reason, not_a_list)
+                                    end,
+                                    % note: all ops except read fail the transaction if the op fails
+                                    %       a read never gets to this point though so we can check it here
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?fail),
+                                    ?equals(tx_tlog:get_entry_value(NewEntry),
+                                            tx_tlog:get_entry_value(OldEntry))
+                            end
                     end
             end
     end.
@@ -1145,6 +1126,7 @@ check_commit(TLog, CommitRes, RingVal) ->
     Key = tx_tlog:get_entry_key(TEntry),
     case CommitRes of
         {ok} ->
+            ?equals(?ok, tx_tlog:get_entry_status(TEntry)),
             case tx_tlog:get_entry_operation(TEntry) of
                 ?read ->
                     NewRingVal = case api_tx:read(Key) of
@@ -1153,14 +1135,13 @@ check_commit(TLog, CommitRes, RingVal) ->
                                  end,
                     ?equals(RingVal, NewRingVal);
                 ?write ->
-                    ?equals(?value, tx_tlog:get_entry_status(TEntry)),
                     {ok, NewRingVal} = api_tx:read(Key),
-                    ?equals(rdht_tx:decode_value(
-                              tx_tlog:get_entry_value(TEntry)),
-                            NewRingVal)
+                    ?equals(tx_tlog:get_entry_value(TEntry),
+                            {?value, rdht_tx:encode_value(NewRingVal)})
             end;
         {fail, abort, _} ->
-            ?equals({fail, abort}, tx_tlog:get_entry_status(TEntry)),
+            % no concurrency in the test case, so the commit result should depend on the entry's tx status!
+            ?equals(?fail, tx_tlog:get_entry_status(TEntry)),
             NewRingVal = case api_tx:read(Key) of
                              {fail, not_found} -> none;
                              {ok, NewVal} -> NewVal

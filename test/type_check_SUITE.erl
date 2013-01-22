@@ -295,9 +295,7 @@ tester_type_check_tx(_Config) ->
            ],
            [ {quorum_read, 4}, %% needs collector pid
              {inform_client, 2}, %% needs collector pid
-             %% split tlog types for client and rt:keys
-             %% use feeder to avoid unknown as key
-             {make_tlog_entry, 1}
+             {make_tlog_entry, 2} %% tested via feeder
            ]},
           {rdht_tx_write,
            [ {abort, 3},
@@ -306,9 +304,7 @@ tester_type_check_tx(_Config) ->
              {validate_prefilter, 1}, %% TODO: not a list error
              {validate, 2},
              {work_phase, 3}
-           ],
-           [ {update_tlog_entry, 1} %% tested via feeder
-           ]},
+           ], []},
           {rdht_tx_add_del_on_list,
            [ {extract_from_tlog, 5}, %% tested via feeder
              {work_phase, 3}
@@ -323,11 +319,11 @@ tester_type_check_tx(_Config) ->
            ], []},
           {tx_op_beh,[], []},
           {tx_tlog,
-           [ {add_or_update_status_by_key, 3}, %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
-             {new_entry, 5}, %% split tlog types for client and rt:keys
+           [ {new_entry, 5}, %% TODO: some combinations of value types are not allowed
+             {new_entry, 6}, %% TODO: some combinations of value types are not allowed
              {set_entry_key, 2}, %% split tlog types for client and rt:keys
              {set_entry_operation, 2}, %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
-             {set_entry_status, 2} %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
+             {set_entry_value, 3} %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
            ],
            [ {first_req_for_key, 4} %% no type spec available (a 1-element list may not be specified anyway)
            ]},

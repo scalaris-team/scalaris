@@ -47,11 +47,14 @@ work_phase(ClientPid, ReqId, Request) ->
         (tx_tlog:tlog_entry(), client_key(), rdht_tx:encoded_value(), rdht_tx:encoded_value(), EnDecode::false)
         -> {tx_tlog:tlog_entry(), client_key(), rdht_tx:encoded_value(), rdht_tx:encoded_value(), EnDecode::false}.
 extract_from_tlog_feeder(Entry, Key, ToAdd, ToDel, EnDecode) ->
+    % the result in the tlog is essentially a read op
+    % -> similar to rdht_tx_read:extract_from_tlog_feeder/4
+    {ValType, EncVal} = tx_tlog:get_entry_value(Entry),
     NewEntry =
-        case tx_tlog:get_entry_status(Entry) of
-            ?partial_value -> % only ?value allowed here
-                tx_tlog:set_entry_status(Entry, ?value);
-            _ -> Entry
+        % transform unknow value types to a valid ?value type:
+        case not lists:member(ValType, [?value, ?not_found]) of
+            true -> tx_tlog:set_entry_value(Entry, ?value, EncVal);
+            _    -> Entry
         end,
     {NewEntry, Key, ToAdd, ToDel, EnDecode}.
 
@@ -66,9 +69,8 @@ extract_from_tlog(Entry, _Key, ToAdd, ToDel, true) when
       (not erlang:is_list(ToAdd)) orelse
       (not erlang:is_list(ToDel)) ->
     %% input type error
-    {tx_tlog:set_entry_status(Entry, {fail, abort}), {fail, not_a_list}};
+    {tx_tlog:set_entry_status(Entry, ?fail), {fail, not_a_list}};
 extract_from_tlog(Entry0, Key, ToAdd, ToDel, true) ->
-    Status = tx_tlog:get_entry_status(Entry0),
     {Entry, Res0} = rdht_tx_read:extract_from_tlog(Entry0, Key, read, true),
     case Res0 of
         {ok, OldValue} when erlang:is_list(OldValue) ->
@@ -76,21 +78,15 @@ extract_from_tlog(Entry0, Key, ToAdd, ToDel, true) ->
             case ToAdd =:= [] andalso ToDel =:= [] of
                 true -> {Entry, {ok}}; % no op
                 _ ->
-                    case ?value =:= Status
-                        orelse {fail, not_found} =:= Status of
-                        true ->
-                            NewValue1 = lists:append(ToAdd, OldValue),
-                            NewValue2 = util:minus_first(NewValue1, ToDel),
-                            rdht_tx_write:extract_from_tlog(Entry, Key, NewValue2, true);
-                        false -> %% TLog has abort, report ok for this op.
-                            {Entry, {ok}}
-                    end
+                    NewValue1 = lists:append(ToAdd, OldValue),
+                    NewValue2 = util:minus_first(NewValue1, ToDel),
+                    rdht_tx_write:extract_from_tlog(Entry, Key, NewValue2, true)
             end;
         {fail, not_found} -> %% key creation
             NewValue2 = util:minus_first(ToAdd, ToDel),
             rdht_tx_write:extract_from_tlog(Entry, Key, NewValue2, true);
         {ok, _} -> %% value is not a list
-            {tx_tlog:set_entry_status(Entry, {fail, abort}),
+            {tx_tlog:set_entry_status(Entry, ?fail),
              {fail, not_a_list}}
     end;
 extract_from_tlog(Entry, Key, ToAdd, ToDel, false) ->

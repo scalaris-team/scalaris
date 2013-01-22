@@ -47,11 +47,14 @@ work_phase(ClientPid, ReqId, Request) ->
         (tx_tlog:tlog_entry(), client_key(), rdht_tx:encoded_value(), EnDecode::false)
         -> {tx_tlog:tlog_entry(), client_key(), rdht_tx:encoded_value(), EnDecode::false}.
 extract_from_tlog_feeder(Entry, Key, X, EnDecode) ->
+    % the result in the tlog is essentially a read op
+    % -> similar to rdht_tx_read:extract_from_tlog_feeder/4
+    {ValType, EncVal} = tx_tlog:get_entry_value(Entry),
     NewEntry =
-        case tx_tlog:get_entry_status(Entry) of
-            ?partial_value -> % only ?value allowed here
-                tx_tlog:set_entry_status(Entry, ?value);
-            _ -> Entry
+        % transform unknow value types to a valid ?value type:
+        case not lists:member(ValType, [?value, ?not_found]) of
+            true -> tx_tlog:set_entry_value(Entry, ?value, EncVal);
+            _    -> Entry
         end,
     {NewEntry, Key, X, EnDecode}.
 
@@ -64,10 +67,9 @@ extract_from_tlog_feeder(Entry, Key, X, EnDecode) ->
             -> {tx_tlog:tlog_entry(), api_tx:numberop_result()}.
 extract_from_tlog(Entry, _Key, X, true) when (not erlang:is_number(X)) ->
     %% check type of input data
-    {tx_tlog:set_entry_status(Entry, {fail, abort}),
+    {tx_tlog:set_entry_status(Entry, ?fail),
      {fail, not_a_number}};
 extract_from_tlog(Entry0, Key, X, true) ->
-    Status = tx_tlog:get_entry_status(Entry0),
     {Entry, Res0} = rdht_tx_read:extract_from_tlog(Entry0, Key, read, true),
     case Res0 of
         {ok, OldValue} when erlang:is_number(OldValue) ->
@@ -75,19 +77,13 @@ extract_from_tlog(Entry0, Key, X, true) ->
             case X == 0 of %% also accepts 0.0
                 true -> {Entry, {ok}}; % no op
                 _ ->
-                    case ?value =:= Status orelse
-                        {fail, not_found} =:= Status of
-                        true ->
-                            NewValue = OldValue + X,
-                            rdht_tx_write:extract_from_tlog(Entry, Key, NewValue, true);
-                        false -> %% TLog has abort, report ok for this op.
-                            {Entry, {ok}}
-                    end
+                    NewValue = OldValue + X,
+                    rdht_tx_write:extract_from_tlog(Entry, Key, NewValue, true)
             end;
         {fail, not_found} -> %% key creation
             rdht_tx_write:extract_from_tlog(Entry, Key, X, true);
         {ok, _} -> %% value is not a number
-            {tx_tlog:set_entry_status(Entry, {fail, abort}),
+            {tx_tlog:set_entry_status(Entry, ?fail),
              {fail, not_a_number}}
     end;
 extract_from_tlog(Entry, Key, X, false) ->
