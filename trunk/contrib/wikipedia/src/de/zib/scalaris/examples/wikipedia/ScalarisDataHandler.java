@@ -31,7 +31,6 @@ import de.zib.scalaris.ErlangValue.ListElementConverter;
 import de.zib.scalaris.ScalarisVM;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
@@ -403,57 +402,42 @@ public class ScalarisDataHandler {
         };
         final List<String> scalarisKeys = Arrays.asList(getPageListKey(0));
         
-        if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
-            List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
-            
-            if (connection == null) {
-                return new ValueResult<NormalisedTitle>(false, involvedKeys,
-                        "no connection to Scalaris", true, statName,
-                        System.currentTimeMillis() - timeAtStart);
-            }
-            
-            final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
-                    new TransactionSingleOp(connection), involvedKeys);
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
 
-            final ScalarisReadRandomListEntryOp1<ErlangValue> readOp = new ScalarisReadRandomListEntryOp1<ErlangValue>(
-                    scalarisKeys, optimisation, conv, true, random);
-            executor.addOp(readOp);
-            try {
-                executor.run();
-            } catch (Exception e) {
-                return new ValueResult<NormalisedTitle>(false, involvedKeys,
-                        e.getClass().getCanonicalName() + " reading page list at \""
-                                + involvedKeys.toString() + "\" from Scalaris: "
-                                + e.getMessage(), e instanceof ConnectionException,
-                        statName, System.currentTimeMillis() - timeAtStart);
-            }
-            
-            // return if successful, otherwise fall back and read the whole list
-            // as with no optimisation
-            if (readOp.getValue() != null) {
-                return new ValueResult<NormalisedTitle>(involvedKeys,
-                        NormalisedTitle.fromNormalised(readOp.getValue()
-                                .stringValue()), statName,
-                        System.currentTimeMillis() - timeAtStart);
-            }
+        if (connection == null) {
+            return new ValueResult<NormalisedTitle>(false, involvedKeys,
+                    "no connection to Scalaris", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
         }
-        
-        ValueResult<List<ErlangValue>> result = getPageList3(connection,
-                ScalarisOpType.PAGE_LIST, scalarisKeys,
-                true, timeAtStart, statName,
-                conv);
-        ValueResult<NormalisedTitle> vResult;
-        if (result.success) {
-            String randomTitle = result.value.get(
-                    random.nextInt(result.value.size())).stringValue();
-            vResult = new ValueResult<NormalisedTitle>(result.involvedKeys,
-                    NormalisedTitle.fromNormalised(randomTitle));
+
+        final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
+                new TransactionSingleOp(connection), involvedKeys);
+
+        final ScalarisReadRandomListEntryOp1<ErlangValue> readOp = new ScalarisReadRandomListEntryOp1<ErlangValue>(
+                scalarisKeys, optimisation, conv, true, random);
+        executor.addOp(readOp);
+        try {
+            executor.run();
+        } catch (Exception e) {
+            return new ValueResult<NormalisedTitle>(false, involvedKeys,
+                    e.getClass().getCanonicalName() + " reading page list at \""
+                            + involvedKeys.toString() + "\" from Scalaris: "
+                            + e.getMessage(), e instanceof ConnectionException,
+                            statName, System.currentTimeMillis() - timeAtStart);
+        }
+
+        // return if successful, otherwise fall back and read the whole list
+        // as with no optimisation
+        if (readOp.getValue() != null) {
+            return new ValueResult<NormalisedTitle>(involvedKeys,
+                    NormalisedTitle.fromNormalised(readOp.getValue()
+                            .stringValue()), statName,
+                            System.currentTimeMillis() - timeAtStart);
         } else {
-            vResult = new ValueResult<NormalisedTitle>(false,
-                    result.involvedKeys, result.message, result.connect_failed);
+            return new ValueResult<NormalisedTitle>(false, involvedKeys,
+                    "unable to retrieve random page (no articles?)", false,
+                    statName, System.currentTimeMillis() - timeAtStart);
         }
-        vResult.stats = result.stats;
-        return vResult;
     }
 
     /**
