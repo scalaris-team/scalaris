@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 public class Options {
     
     private final static Options instance = new Options();
-    protected static final Pattern CONFIG_SINGLE_OPTIMISATION = Pattern.compile("([a-zA-Z_0-9]*):([a-zA-Z_0-9]*)\\(([a-zA-Z_0-9,]*)\\)");
+    protected static final Pattern CONFIG_SINGLE_OPTIMISATION = Pattern.compile("([a-zA-Z_0-9]*):([a-zA-Z_0-9]*)(?:\\(([a-zA-Z_0-9,]*)\\))?");
 
     /**
      * The name of the server (part of the URL), e.g. <tt>en.wikipedia.org</tt>.
@@ -362,23 +362,17 @@ public class Options {
                 if (matcher.matches()) {
                     final String operationStr = matcher.group(1);
                     if (operationStr.equals("ALL")) {
+                        Optimisation optimisation = parseOptimisationString(matcher);
+                        if (optimisation == null) {
+                            // fall back if not parsed correctly:
+                            optimisation = new APPEND_INCREMENT();
+                        }
                         for (ScalarisOpType op : ScalarisOpType.values()) {
-                            options.OPTIMISATIONS.put(op, new APPEND_INCREMENT());
+                            options.OPTIMISATIONS.put(op, optimisation);
                         }
                     } else {
                         ScalarisOpType operation = ScalarisOpType.fromString(operationStr);
-                        String optimisationStr = matcher.group(2);
-                        String[] parameters = matcher.group(3).split(",");
-                        Optimisation optimisation = null;
-                        if (optimisationStr.equals("TRADITIONAL")) {
-                            optimisation = new Options.TRADITIONAL();
-                        } else if (optimisationStr.equals("APPEND_INCREMENT")) {
-                            optimisation = new Options.APPEND_INCREMENT();
-                        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_RANDOM")) {
-                            optimisation = new Options.APPEND_INCREMENT_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
-                        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_HASH")) {
-                            optimisation = new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
-                        }
+                        Optimisation optimisation = parseOptimisationString(matcher);
                         if (optimisation != null) {
                             options.OPTIMISATIONS.put(operation, optimisation);
                         }
@@ -392,5 +386,39 @@ public class Options {
         if (SCALARIS_NODE_DISCOVERY != null) {
             options.SCALARIS_NODE_DISCOVERY = Integer.parseInt(SCALARIS_NODE_DISCOVERY);
         }
+    }
+
+    /**
+     * Parses an optimisation string into an {@link Optimisation} object.
+     * 
+     * @param matcher
+     *            matcher (1st group: group of keys to apply to, 2nd group:
+     *            optimisation class, 3rd group: optimisation parameters
+     * 
+     * @return an {@link Optimisation} implementation or <tt>null</tt> if no
+     *         matching optimisation was found
+     * @throws NumberFormatException
+     *             if an integer parameter was wrong
+     */
+    public static Optimisation parseOptimisationString(final Matcher matcher)
+            throws NumberFormatException {
+        String optimisationStr = matcher.group(2);
+        System.out.println(optimisationStr);
+        String parameterStr = matcher.group(3);
+        Optimisation optimisation = null;
+        if (optimisationStr.equals("TRADITIONAL") && parameterStr == null) {
+            optimisation = new Options.TRADITIONAL();
+        } else if (optimisationStr.equals("APPEND_INCREMENT") && parameterStr == null) {
+            optimisation = new Options.APPEND_INCREMENT();
+        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_RANDOM") && parameterStr != null) {
+            String[] parameters = parameterStr.split(",");
+            optimisation = new Options.APPEND_INCREMENT_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_HASH") && parameterStr != null) {
+            String[] parameters = parameterStr.split(",");
+            optimisation = new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
+        } else {
+            System.err.println("unknown optimisation found: " + matcher.group());
+        }
+        return optimisation;
     }
 }
