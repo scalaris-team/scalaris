@@ -187,6 +187,30 @@ public class Options {
     }
 
     /**
+     * Indicates that the new partial reads for random elements of a list
+     * {@link de.zib.scalaris.operations.ReadRandomFromListOp} and sublists
+     * {@link de.zib.scalaris.operations.ReadSublistOp} should be used.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static interface IPartialRead {
+    }
+
+    /**
+     * Indicates that the new append and increment operations of Scalaris should
+     * be used, i.e.
+     * {@link de.zib.scalaris.Transaction#addDelOnList(String, java.util.List, java.util.List)}
+     * and {@link de.zib.scalaris.Transaction#addOnNr(String, Object)} as well
+     * as partial reads for random elements of a list
+     * {@link de.zib.scalaris.operations.ReadRandomFromListOp} and sublists
+     * {@link de.zib.scalaris.operations.ReadSublistOp}.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT_PARTIALREAD extends APPEND_INCREMENT implements IPartialRead {
+    }
+
+    /**
      * Indicates that the new append and increment operations of Scalaris should
      * be used and list values should be distributed among several partions, i.e.
      * buckets.
@@ -410,6 +434,8 @@ public class Options {
             optimisation = new Options.TRADITIONAL();
         } else if (optimisationStr.equals("APPEND_INCREMENT") && parameterStr == null) {
             optimisation = new Options.APPEND_INCREMENT();
+        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD") && parameterStr == null) {
+            optimisation = new Options.APPEND_INCREMENT_PARTIALREAD();
         } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_RANDOM") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
             optimisation = new Options.APPEND_INCREMENT_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
