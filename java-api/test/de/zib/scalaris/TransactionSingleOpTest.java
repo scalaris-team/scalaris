@@ -15,8 +15,8 @@
  */
 package de.zib.scalaris;
 
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -35,6 +35,7 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 import de.zib.scalaris.TransactionSingleOp.RequestList;
 import de.zib.scalaris.TransactionSingleOp.ResultList;
 import de.zib.scalaris.operations.ReadOp;
+import de.zib.scalaris.operations.ReadRandomFromListOp;
 import de.zib.scalaris.operations.WriteOp;
 
 /**
@@ -172,10 +173,11 @@ public class TransactionSingleOpTest {
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
+     * @throws EmptyListException
      */
     @Test
     public void testWriteString1() throws ConnectionException,
-            UnknownException, NotFoundException, AbortException {
+            UnknownException, NotFoundException, AbortException, EmptyListException {
         final String key = "_WriteString1_";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -224,6 +226,108 @@ public class TransactionSingleOpTest {
     }
 
     /**
+     * Test method for {@link TransactionSingleOp#write(String, Integer)} with a
+     * closed connection.
+     *
+     * @throws UnknownException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     */
+    @Test(expected=ConnectionException.class)
+    public void testWriteNumber_NotConnected() throws ConnectionException,
+            UnknownException, NotFoundException, AbortException {
+        final String key = "_WriteString_NotConnected";
+        final TransactionSingleOp conn = new TransactionSingleOp();
+        conn.closeConnection();
+        conn.write(testTime + key, 0);
+    }
+
+    /**
+     * Test method for {@link TransactionSingleOp#write(String, Integer)},
+     * {@link TransactionSingleOp#read(String)} and {@link ReadRandomFromListOp}
+     * . Writes integers and uses a distinct key for each value. Tries to read
+     * the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws EmptyListException
+     */
+    @Test
+    public void testWriteNumber1() throws ConnectionException,
+            UnknownException, NotFoundException, AbortException, EmptyListException {
+        final String key = "_WriteString1_";
+        final TransactionSingleOp conn = new TransactionSingleOp();
+
+        try {
+            for (int i = 0; i < testData.length; ++i) {
+                conn.write(testTime + key + i, i);
+            }
+
+            // now try to read the data:
+            for (int i = 0; i < testData.length; ++i) {
+                final int actual = conn.read(testTime + key + i).intValue();
+                assertEquals(i, actual);
+
+                final ReadRandomFromListOp op = new ReadRandomFromListOp(testTime + key + i);
+                final ResultList resultList = conn.req_list(op);
+                assertEquals(op, resultList.get(0));
+                try {
+                    final ReadRandomFromListOp.Result randResult = op.processResultSingle();
+                    assertTrue("Trying to read random list entry from non-list should fail: " + randResult, false);
+                } catch (final NotAListException e) {
+                    // ok
+                }
+            }
+        } finally {
+            conn.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for {@link TransactionSingleOp#write(String, Integer)},
+     * {@link TransactionSingleOp#read(String)} and {@link ReadRandomFromListOp}
+     * . Writes strings and uses a single key for all the values. Tries to read
+     * the data afterwards.
+     *
+     * @throws UnknownException
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws AbortException
+     * @throws EmptyListException
+     */
+    @Test
+    public void testWriteNumber2() throws ConnectionException,
+            UnknownException, NotFoundException, AbortException, EmptyListException {
+        final String key = "_WriteString2";
+        final TransactionSingleOp conn = new TransactionSingleOp();
+
+        try {
+            for (int i = 0; i < testData.length; ++i) {
+                conn.write(testTime + key, i);
+            }
+
+            // now try to read the data:
+            final int actual = conn.read(testTime + key).intValue();
+            assertEquals(testData.length - 1, actual);
+
+            final ReadRandomFromListOp op = new ReadRandomFromListOp(testTime + key);
+            final ResultList resultList = conn.req_list(op);
+            assertEquals(op, resultList.get(0));
+            try {
+                final ReadRandomFromListOp.Result randResult = op.processResultSingle();
+                assertTrue("Trying to read random list entry from non-list should fail: " + randResult, false);
+            } catch (final NotAListException e) {
+                // ok
+            }
+        } finally {
+            conn.closeConnection();
+        }
+    }
+
+    /**
      * Test method for {@link TransactionSingleOp#write(String, List)} with a
      * closed connection.
      *
@@ -247,40 +351,64 @@ public class TransactionSingleOpTest {
     }
 
     /**
-     * Test method for {@link TransactionSingleOp#write(String, List)} and
-     * {@link TransactionSingleOp#read(String)}. Writes lists and uses a
-     * distinct key for each value. Tries to read the data afterwards.
+     * Test method for {@link TransactionSingleOp#write(String, List)},
+     * {@link TransactionSingleOp#read(String)} and {@link ReadRandomFromListOp}
+     * . Writes lists and uses a distinct key for each value. Tries to read the
+     * data afterwards.
      *
      * @throws UnknownException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
+     * @throws NotAListException
+     * @throws EmptyListException
      *
      * @since 3.2
      */
     @Test
     public void testWriteList1() throws ConnectionException, UnknownException,
-            NotFoundException, AbortException {
+            NotFoundException, AbortException, EmptyListException, NotAListException {
         final String key = "_WriteList1_";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
         try {
-            for (int i = 0; i < (testData.length - 1); i += 2) {
+            for (int i = 0; i < (testData.length - 1); ++i) {
                 final ArrayList<String> list = new ArrayList<String>();
-                list.add(testData[i]);
-                list.add(testData[i + 1]);
+                if ((i % 2) == 0) {
+                    list.add(testData[i]);
+                    list.add(testData[i + 1]);
+                }
                 conn.write(testTime + key + i, list);
             }
 
             // now try to read the data:
 
-            for (int i = 0; i < (testData.length - 1); i += 2) {
+            for (int i = 0; i < (testData.length - 1); ++i) {
                 final ArrayList<String> expected = new ArrayList<String>();
-                expected.add(testData[i]);
-                expected.add(testData[i + 1]);
+                if ((i % 2) == 0) {
+                    expected.add(testData[i]);
+                    expected.add(testData[i + 1]);
+                }
                 final List<String> actual = conn.read(testTime + key + i).stringListValue();
-
                 assertEquals(expected, actual);
+
+                final ReadRandomFromListOp op = new ReadRandomFromListOp(testTime + key + i);
+                final ResultList resultList = conn.req_list(op);
+                assertEquals(op, resultList.get(0));
+                try {
+                    final ReadRandomFromListOp.Result randResult = op.processResultSingle();
+                    if ((i % 2) == 0) {
+                        assertEquals(expected.size(), randResult.listLength);
+                        assertTrue(expected.toString() + ".contains(" + randResult.randomElement + ")",
+                                expected.contains(randResult.randomElement.stringValue()));
+                    } else {
+                        assertTrue("Trying to read random list entry from an empty list should fail: " + randResult, false);
+                    }
+                } catch (final EmptyListException e) {
+                    if ((i % 2) == 0) {
+                        assertTrue("Got EmptyListException on non-empty list: " + e, false);
+                    }
+                }
             }
         } finally {
             conn.closeConnection();
@@ -288,20 +416,23 @@ public class TransactionSingleOpTest {
     }
 
     /**
-     * Test method for {@link TransactionSingleOp#write(String, List)} and
-     * {@link TransactionSingleOp#read(String)}. Writes lists and uses a single
-     * key for all the values. Tries to read the data afterwards.
+     * Test method for {@link TransactionSingleOp#write(String, List)},
+     * {@link TransactionSingleOp#read(String)} and {@link ReadRandomFromListOp}
+     * . Writes lists and uses a single key for all the values. Tries to read
+     * the data afterwards.
      *
      * @throws UnknownException
      * @throws ConnectionException
      * @throws NotFoundException
      * @throws AbortException
+     * @throws NotAListException
+     * @throws EmptyListException
      *
      * @since 3.2
      */
     @Test
     public void testWriteList2() throws ConnectionException, UnknownException,
-            NotFoundException, AbortException {
+            NotFoundException, AbortException, EmptyListException, NotAListException {
         final String key = "_WriteList2";
         final TransactionSingleOp conn = new TransactionSingleOp();
 
@@ -318,8 +449,15 @@ public class TransactionSingleOpTest {
 
             final List<String> actual = conn.read(testTime + key).stringListValue();
             final List<String> expected = list;
-
             assertEquals(expected, actual);
+
+            final ReadRandomFromListOp op = new ReadRandomFromListOp(testTime + key);
+            final ResultList resultList = conn.req_list(op);
+            assertEquals(op, resultList.get(0));
+            final ReadRandomFromListOp.Result randResult = op.processResultSingle();
+            assertEquals(expected.size(), randResult.listLength);
+            assertTrue(expected.toString() + ".contains(" + randResult.randomElement + ")",
+                    expected.contains(randResult.randomElement.stringValue()));
         } finally {
             conn.closeConnection();
         }
@@ -1024,5 +1162,52 @@ public class TransactionSingleOpTest {
         } finally {
             conn.closeConnection();
         }
+    }
+
+    /**
+     * Test method for {@link ReadRandomFromListOp}.
+     *
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws EmptyListException
+     * @throws NotAListException
+     * @throws UnknownException
+     */
+    @Test(expected=NotFoundException.class)
+    public void testReadRandomFromList_NotFound() throws ConnectionException,
+            NotFoundException, EmptyListException, NotAListException,
+            UnknownException {
+        final String key = "_ReadRandomFromList_NotFound";
+        final TransactionSingleOp conn = new TransactionSingleOp();
+        try {
+            final ReadRandomFromListOp op = new ReadRandomFromListOp(testTime + key);
+            final ResultList resultList = conn.req_list(op);
+            assertEquals(op, resultList.get(0));
+            op.processResultSingle();
+        } finally {
+            conn.closeConnection();
+        }
+    }
+
+    /**
+     * Test method for {@link TransactionSingleOp#read(String)} with a closed connection.
+     *
+     * @throws ConnectionException
+     * @throws NotFoundException
+     * @throws EmptyListException
+     * @throws NotAListException
+     * @throws UnknownException
+     */
+    @Test(expected=ConnectionException.class)
+    public void testReadRandomFromListOp_NotConnected()
+            throws ConnectionException, NotFoundException, EmptyListException,
+            NotAListException, UnknownException {
+        final String key = "_ReadRandomFromListOp_NotConnected";
+        final TransactionSingleOp conn = new TransactionSingleOp();
+        conn.closeConnection();
+        final ReadRandomFromListOp op = new ReadRandomFromListOp(testTime + key);
+        final ResultList resultList = conn.req_list(op);
+        assertEquals(op, resultList.get(0));
+        op.processResultSingle();
     }
 }
