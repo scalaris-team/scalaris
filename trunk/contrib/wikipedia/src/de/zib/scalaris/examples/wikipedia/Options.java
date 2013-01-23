@@ -173,6 +173,10 @@ public class Options {
      * @author Nico Kruber, kruber@zib.de
      */
     public static class TRADITIONAL implements Optimisation {
+        @Override
+        public String toString() {
+            return "TRADITIONAL";
+        }
     }
 
     /**
@@ -184,6 +188,10 @@ public class Options {
      * @author Nico Kruber, kruber@zib.de
      */
     public static class APPEND_INCREMENT implements Optimisation {
+        @Override
+        public String toString() {
+            return "APPEND_INCREMENT";
+        }
     }
 
     /**
@@ -208,6 +216,10 @@ public class Options {
      * @author Nico Kruber, kruber@zib.de
      */
     public static class APPEND_INCREMENT_PARTIALREAD extends APPEND_INCREMENT implements IPartialRead {
+        @Override
+        public String toString() {
+            return "APPEND_INCREMENT_PARTIALREAD";
+        }
     }
 
     /**
@@ -287,6 +299,11 @@ public class Options {
                 return "";
             }
         }
+        
+        @Override
+        public String toString() {
+            return "APPEND_INCREMENT_BUCKETS_RANDOM(" + buckets + ")";
+        }
     }
 
     /**
@@ -323,6 +340,11 @@ public class Options {
             } else {
                 return "";
             }
+        }
+        
+        @Override
+        public String toString() {
+            return "APPEND_INCREMENT_BUCKETS_WITH_HASH(" + buckets + ")";
         }
     }
     
