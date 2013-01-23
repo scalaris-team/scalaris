@@ -58,4 +58,12 @@ public abstract class PartialReadOp implements TransactionOperation,
         this.resultRaw = resultRaw;
         this.resultCompressed = compressed;
     }
+
+    public OtpErlangObject getResult() {
+        return this.resultRaw;
+    }
+
+    public boolean getResultCompressed() {
+        return this.resultCompressed;
+    }
 }

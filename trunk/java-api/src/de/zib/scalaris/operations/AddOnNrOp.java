@@ -107,6 +107,14 @@ public class AddOnNrOp implements TransactionOperation, TransactionSingleOpOpera
         this.resultCompressed = compressed;
     }
 
+    public OtpErlangObject getResult() {
+        return this.resultRaw;
+    }
+
+    public boolean getResultCompressed() {
+        return this.resultCompressed;
+    }
+
     public Object processResult() throws UnknownException,
             NotANumberException {
         /*

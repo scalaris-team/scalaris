@@ -66,6 +66,27 @@ public interface Operation {
             final boolean compressed);
 
     /**
+     * Gets the (raw Erlang) result set via
+     * {@link #setResult(OtpErlangObject, boolean)}.
+     *
+     * @return the result object or <tt>null</tt> if not set
+     *
+     * @since 3.18
+     */
+    public abstract OtpErlangObject getResult();
+
+    /**
+     * Determines if the result set via
+     * {@link #setResult(OtpErlangObject, boolean)} is compressed or not.
+     *
+     * @return <tt>true</tt> if compressed, <tt>false</tt> otherwise, undefined
+     *         if no result was set
+     *
+     * @since 3.18
+     */
+    public abstract boolean getResultCompressed();
+
+    /**
      * Processes the result set by {@link #setResult(OtpErlangObject, boolean)}.
      *
      * Note: the created value is not cached!
