@@ -28,7 +28,6 @@
 
 all()   -> [
             rbr_consistency,%,
-            %tester_type_check_l_on_cseq,
             tester_type_check_rbr
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
@@ -132,27 +131,6 @@ tester_type_check_rbr(_Config) ->
           }
 
         ],
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
-    true.
-
-tester_type_check_l_on_cseq(_Config) ->
-    Count = 1000,
-    config:write(no_print_ring_data, true),
-    %% [{modulename, [excludelist = {fun, arity}]}]
-    Modules =
-        [ {l_on_cseq,
-           [ {add_first_lease_to_db, 2}, %% cannot create DB refs for State
-             {on, 2}, %% cannot create dht_node_state
-             {split_test, 0} %% requires 1-node-ring
-           ],
-           [ {read, 2}, %% cannot create pids
-             {update_lease_in_dht_node_state, 2}, %% gb_trees not supported by type_checker
-             {remove_lease_from_dht_node_state, 2} %% gb_trees not supported by type_checker
-           ]}
-        ],
-    %% join a dht_node group to be able to call lease trigger functions
-    pid_groups:join(pid_groups:group_with(dht_node)),
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
       || {Mod, Excl, ExclPriv} <- Modules ],
     true.

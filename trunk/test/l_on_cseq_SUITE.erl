@@ -24,28 +24,80 @@
 -include("unittest.hrl").
 -include("client_types.hrl").
 
-all()   -> [
-            test_renew_with_concurrent_renew,
-            test_renew_with_concurrent_owner_change,
-            test_renew_with_concurrent_range_change,
-            test_renew_with_concurrent_aux_change_invalid_split,
-            test_renew_with_concurrent_aux_change_valid_split,
-            test_renew_with_concurrent_aux_change_invalid_merge,
-            test_renew_with_concurrent_aux_change_invalid_merge_stopped,
-            test_renew_with_concurrent_aux_change_valid_merge,
-            test_split,
-            test_split_with_concurrent_renew,
-            test_split_but_lease_already_exists,
-            test_split_with_owner_change_in_step1,
-            test_split_with_owner_change_in_step2,
-            test_split_with_owner_change_in_step3,
-            test_split_with_aux_change_in_step1,
-            test_handover,
-            test_handover_with_concurrent_renew,
-            test_handover_with_concurrent_aux_change,
-            test_handover_with_concurrent_owner_change
-           ].
+groups() ->
+    [{tester_tests, [sequence], [
+                              tester_type_check_l_on_cseq
+                              ]},
+     {renew_tests, [sequence], [
+                             test_renew_with_concurrent_renew,
+                             test_renew_with_concurrent_owner_change,
+                             test_renew_with_concurrent_range_change,
+                             test_renew_with_concurrent_aux_change_invalid_split,
+                             test_renew_with_concurrent_aux_change_valid_split,
+                             test_renew_with_concurrent_aux_change_invalid_merge,
+                             test_renew_with_concurrent_aux_change_invalid_merge_stopped,
+                             test_renew_with_concurrent_aux_change_valid_merge
+                             ]},
+     {split_tests, [sequence], [
+                             test_split,
+                             test_split_with_concurrent_renew,
+                             test_split_but_lease_already_exists,
+                             test_split_with_owner_change_in_step1,
+                             test_split_with_owner_change_in_step2,
+                             test_split_with_owner_change_in_step3,
+                             test_split_with_aux_change_in_step1
+                            ]},
+     {handover_tests, [sequence], [
+                                test_handover,
+                                test_handover_with_concurrent_renew,
+                                test_handover_with_concurrent_aux_change,
+                                test_handover_with_concurrent_owner_change
+                                ]}
+    ].
+
+all() ->
+    [
+     {group, tester_tests},
+     {group, renew_tests},
+     {group, split_tests},
+     {group, handover_tests}
+     ].
+
+%all()   -> [
+%            tester_type_check_l_on_cseq,
+%            %test_renew_with_concurrent_renew,
+%            %test_renew_with_concurrent_owner_change,
+%            %test_renew_with_concurrent_range_change,
+%            %test_renew_with_concurrent_aux_change_invalid_split,
+%            %test_renew_with_concurrent_aux_change_valid_split,
+%            %test_renew_with_concurrent_aux_change_invalid_merge,
+%            %test_renew_with_concurrent_aux_change_invalid_merge_stopped,
+%            %test_renew_with_concurrent_aux_change_valid_merge,
+%            test_split,
+%            test_split_with_concurrent_renew,
+%            test_split_but_lease_already_exists,
+%            test_split_with_owner_change_in_step1,
+%            test_split_with_owner_change_in_step2,
+%            test_split_with_owner_change_in_step3,
+%            test_split_with_aux_change_in_step1,
+%            test_handover,
+%            test_handover_with_concurrent_renew,
+%            test_handover_with_concurrent_aux_change,
+%            test_handover_with_concurrent_owner_change
+%           ].
+%
+
 suite() -> [ {timetrap, {seconds, 4}} ].
+
+group(tester_tests) ->
+    [{timetrap, {seconds, 400}}];
+group(renew_tests) ->
+    [{timetrap, {seconds, 4}}];
+group(split_tests) ->
+    [{timetrap, {seconds, 4}}];
+group(handover_tests) ->
+    [{timetrap, {seconds, 4}}].
+
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -68,6 +120,31 @@ init_per_testcase(TestCase, Config) ->
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
+
+tester_type_check_l_on_cseq(_Config) ->
+    Count = 1000,
+    config:write(no_print_ring_data, true),
+    %% [{modulename, [excludelist = {fun, arity}]}]
+    Modules =
+        [ {l_on_cseq,
+           [ {add_first_lease_to_db, 2}, %% cannot create DB refs for State
+             {lease_renew, 1}, %% sends messages
+             {lease_handover, 3}, %% sends messages
+             {lease_takeover, 1}, %% sends messages
+             {lease_split, 4}, %% sends messages
+             {lease_merge, 2}, %% sends messages
+             {on, 2} %% cannot create dht_node_state
+           ],
+           [ {read, 2}, %% cannot create pids
+             {update_lease_in_dht_node_state, 2}, %% gb_trees not supported by type_checker
+             {remove_lease_from_dht_node_state, 2} %% gb_trees not supported by type_checker
+           ]}
+        ],
+    %% join a dht_node group to be able to call lease trigger functions
+    pid_groups:join(pid_groups:group_with(dht_node)),
+    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+      || {Mod, Excl, ExclPriv} <- Modules ],
+    true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -202,9 +279,10 @@ test_split(_Config) ->
     WaitRightLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 2, 0)
                       end,
+    FinalWaitF = fun wait_for_split_success_msg/0,
     test_split_helper_for_4_steps(_Config,
                                   NullF, NullF,NullF, NullF,
-                                  WaitLeftLeaseF, WaitRightLeaseF),
+                                  WaitLeftLeaseF, WaitRightLeaseF, FinalWaitF),
     true.
 
 test_split_with_concurrent_renew(_Config) ->
@@ -222,9 +300,10 @@ test_split_with_concurrent_renew(_Config) ->
     WaitRightLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 2, 0)
                       end,
+    FinalWaitF = fun wait_for_split_success_msg/0,
     test_split_helper_for_4_steps(_Config,
                                   NullF, RenewLeaseF, RenewLeaseF, RenewLeaseF,
-                                  WaitLeftLeaseF, WaitRightLeaseF),
+                                  WaitLeftLeaseF, WaitRightLeaseF, FinalWaitF),
     true.
 
 test_split_but_lease_already_exists(_Config) ->
@@ -260,9 +339,10 @@ test_split_but_lease_already_exists(_Config) ->
     WaitRightLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 47, 11)
                       end,
+    FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_1_step(_Config,
                                  CreateLeaseF,
-                                 WaitLeftLeaseF, WaitRightLeaseF),
+                                 WaitLeftLeaseF, WaitRightLeaseF, FinalWaitF),
     true.
 
 test_split_with_owner_change_in_step1(_Config) ->
@@ -282,9 +362,10 @@ test_split_with_owner_change_in_step1(_Config) ->
     WaitRightLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 1, 0)
                       end,
+    FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_2_steps(_Config,
                                   NullF, ChangeOwnerF,
-                                  WaitLeftLeaseF, WaitRightLeaseF),
+                                  WaitLeftLeaseF, WaitRightLeaseF, FinalWaitF),
     true.
 
 test_split_with_owner_change_in_step2(Config) ->
@@ -305,9 +386,10 @@ test_split_with_owner_change_in_step2(Config) ->
                              wait_for_lease_version(Id, OldEpoch + 1, 0)
                      end,
     WaitRightLeaseF = fun wait_for_delete/1,
+    FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_3_steps(Config,
                                   NullF, NullF, ChangeOwnerF,
-                                  WaitLeftLeaseF, WaitRightLeaseF),
+                                  WaitLeftLeaseF, WaitRightLeaseF, FinalWaitF),
     true.
 
 test_split_with_owner_change_in_step3(Config) ->
@@ -327,9 +409,10 @@ test_split_with_owner_change_in_step3(Config) ->
                              wait_for_lease_version(Id, 2, 0)
                      end,
     WaitLeftLeaseF = fun wait_for_delete/2,
+    FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_4_steps(Config,
                                   NullF, NullF, NullF, ChangeOwnerF,
-                                  WaitLeftLeaseF, WaitRightLeaseF),
+                                  WaitLeftLeaseF, WaitRightLeaseF, FinalWaitF),
     true.
 
 test_split_with_aux_change_in_step1(_Config) ->
@@ -351,9 +434,10 @@ test_split_with_aux_change_in_step1(_Config) ->
     WaitRightLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 1, 0)
                       end,
+    FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_2_steps(_Config,
                                   NullF, ChangeOwnerF,
-                                  WaitLeftLeaseF, WaitRightLeaseF),
+                                  WaitLeftLeaseF, WaitRightLeaseF, FinalWaitF),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -467,33 +551,37 @@ test_split_prepare() ->
     intercept_split_reply(split_reply_step4),                    %
 
     % step1
-    l_on_cseq:lease_split(L, R1, R2),                            % trigger step
+    l_on_cseq:lease_split(L, R1, R2, comm:this()),               % trigger step
+    ct:pal("intercepting msg"),
     StartMsg = receive                                           % intercept msg
-                   M = {l_on_cseq, split, _, _, _} ->
+                   M = {l_on_cseq, split, _, _, _, _} ->
                        M
                end,
-    {l_on_cseq, split, Lease, _R1, _R2} = StartMsg,
+    ct:pal("intercepted msg"),
+    {l_on_cseq, split, Lease, _R1, _R2, _ReplyTo} = StartMsg,
     {Lease, LeftId, RightId, StartMsg}.
 
 
 test_split_helper_for_1_step(_Config,
                              ModifyBeforeStep1,
-                             WaitLeftLease, WaitRightLease) ->
+                             WaitLeftLease, WaitRightLease, FinalWaitF) ->
     DHTNode = pid_groups:find_a(dht_node),
     {Lease, LeftId, RightId, StartMsg} = test_split_prepare(),
     ModifyBeforeStep1(RightId, Lease),                           % modify world
     gen_component:bp_del(DHTNode, block_split_request),
+    gen_component:bp_del(DHTNode, split_reply_step1),
     comm:send_local(DHTNode, StartMsg),                          % release msg
     % wait for result
     ct:pal("wait left"),
     WaitLeftLease(LeftId, Lease),
     ct:pal("wait right"),
-    WaitRightLease(RightId).
+    WaitRightLease(RightId),
+    FinalWaitF().
 
 test_split_helper_for_2_steps(_Config,
                               ModifyBeforeStep1,
                               ModifyBeforeStep2,
-                              WaitLeftLease, WaitRightLease) ->
+                              WaitLeftLease, WaitRightLease, FinalWaitF) ->
     DHTNode = pid_groups:find_a(dht_node),
     {Lease, LeftId, RightId, StartMsg} = test_split_prepare(),
     ct:pal("0"),
@@ -507,13 +595,14 @@ test_split_helper_for_2_steps(_Config,
     ct:pal("wait left"),
     WaitLeftLease(LeftId, Lease),
     ct:pal("wait right"),
-    WaitRightLease(RightId).
+    WaitRightLease(RightId),
+    FinalWaitF().
 
 test_split_helper_for_3_steps(_Config,
                               ModifyBeforeStep1,
                               ModifyBeforeStep2,
                               ModifyBeforeStep3,
-                              WaitLeftLease, WaitRightLease) ->
+                              WaitLeftLease, WaitRightLease, FinalWaitF) ->
     DHTNode = pid_groups:find_a(dht_node),
     {Lease, LeftId, RightId, StartMsg} = test_split_prepare(),
     ModifyBeforeStep1(RightId, Lease),                           % modify world
@@ -528,14 +617,15 @@ test_split_helper_for_3_steps(_Config,
     ct:pal("wait left"),
     WaitLeftLease(LeftId, Lease),
     ct:pal("wait right"),
-    WaitRightLease(RightId).
+    WaitRightLease(RightId),
+    FinalWaitF().
 
 test_split_helper_for_4_steps(_Config,
                               ModifyBeforeStep1,
                               ModifyBeforeStep2,
                               ModifyBeforeStep3,
                               ModifyBeforeStep4,
-                              WaitLeftLease, WaitRightLease) ->
+                              WaitLeftLease, WaitRightLease, FinalWaitF) ->
     DHTNode = pid_groups:find_a(dht_node),
     {Lease, LeftId, RightId, StartMsg} = test_split_prepare(),
     ModifyBeforeStep1(RightId, Lease),                           % modify world
@@ -552,13 +642,14 @@ test_split_helper_for_4_steps(_Config,
     ct:pal("wait left"),
     WaitLeftLease(LeftId, Lease),
     ct:pal("wait right"),
-    WaitRightLease(RightId).
+    WaitRightLease(RightId),
+    FinalWaitF().
 
 split_helper_do_step(StepTag, ModifyBeforeStep, Id) ->
     ct:pal("doing ~p", [StepTag]),
     DHTNode = pid_groups:find_a(dht_node),
     ReplyMsg = receive
-                   M = {l_on_cseq, StepTag, Lease, _R1, _R2, _Resp} ->
+                   M = {l_on_cseq, StepTag, Lease, _R1, _R2, _ReplyTo, _Resp} ->
                        M
                end,
     ModifyBeforeStep(Id, Lease),
@@ -567,12 +658,26 @@ split_helper_do_step(StepTag, ModifyBeforeStep, Id) ->
 
 wait_for_split_message(StepTag) ->
     DHTNode = pid_groups:find_a(dht_node),
+    ct:pal("waiting for ~p", [StepTag]),
     receive
-        M = {l_on_cseq, StepTag, _Lease, _R1, _R2, _Resp} ->
-            %ct:pal("got ~p", [M]),
+        M = {l_on_cseq, StepTag, _Lease, _R1, _R2, _ReplyTo, _Resp} ->
+            ct:pal("got ~p", [M]),
+            gen_component:bp_del(DHTNode, StepTag),
             watch_message(DHTNode, M)
     end.
 
+wait_for_split_success_msg() ->
+    ct:pal("wait_for_split_success_msg()"),
+    receive
+        {split, success, _} ->
+            ok
+    end.
+
+wait_for_split_fail_msg() ->
+    receive
+        {split, fail, _} ->
+            ok
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -726,7 +831,7 @@ block_message(Pid, WatchedMessage) ->
 block_split_request(Pid) ->
     fun (Message, _State) ->
             case Message of
-                {l_on_cseq, split, _Lease, _R1, _R2} ->
+                {l_on_cseq, split, _Lease, _R1, _R2, _ReplyTo} ->
                     comm:send_local(Pid, Message),
                     drop_single;
                 _ ->
@@ -737,7 +842,7 @@ block_split_request(Pid) ->
 block_split_reply(Pid, StepTag) ->
     fun (Message, _State) ->
             case Message of
-                {l_on_cseq, StepTag, _Lease, _R1, _R2, _Resp} ->
+                {l_on_cseq, StepTag, _Lease, _R1, _R2, _ReplyTo, _Resp} ->
                     comm:send_local(Pid, Message),
                     drop_single;
                 _ ->

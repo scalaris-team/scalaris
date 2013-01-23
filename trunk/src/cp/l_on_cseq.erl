@@ -35,7 +35,7 @@
 -export([lease_renew/1]).
 -export([lease_handover/3]).
 -export([lease_takeover/1]).
--export([lease_split/3]).
+-export([lease_split/4]).
 -export([lease_merge/2]).
 % for unit tests
 -export([lease_update/2]).
@@ -56,8 +56,6 @@
 -ifdef(with_export_type_support).
 -export_type([lease_list/0]).
 -endif.
-
--export([split_test/0]).
 
 %% filters and checks for rbr_cseq operations
 %% consistency
@@ -158,11 +156,11 @@ lease_takeover(Lease) ->
     ok.
 
 -spec lease_split(lease_t(), intervals:interval(),
-                  intervals:interval()) -> ok.
-lease_split(Lease, R1, R2) ->
+                  intervals:interval(), comm:mypid()) -> ok.
+lease_split(Lease, R1, R2, ReplyTo) ->
     % @todo precondition: i am owner of Lease and id(R2) == id(Lease)
     comm:send_local(pid_groups:get_my(dht_node),
-                    {l_on_cseq, split, Lease, R1, R2}),
+                    {l_on_cseq, split, Lease, R1, R2, ReplyTo}),
     ok.
 
 -spec lease_merge(lease_t(), lease_t()) -> ok.
@@ -468,7 +466,7 @@ on({l_on_cseq, merge_reply_step4, _L1, {qwrite_deny, _ReqId, _Round, _L2, _Reaso
 % lease split (step1)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, split, Lease, R1, R2}, State) ->
+on({l_on_cseq, split, Lease, R1, R2, ReplyTo}, State) ->
     Id = id(R2),
     ct:pal("split first step: creating second lease ~p~n", [Id]),
     New = #lease{id      = id(R2),
@@ -480,17 +478,18 @@ on({l_on_cseq, split, Lease, R1, R2}, State) ->
                  timeout = new_timeout()},
     ContentCheck = is_valid_split_step1(),
     DB = get_db_for_id(Id),
-    Self = comm:reply_as(self(), 6, {l_on_cseq, split_reply_step1, Lease, R1, R2, '_'}),
+    Self = comm:reply_as(self(), 7, {l_on_cseq, split_reply_step1, Lease, R1, R2, ReplyTo, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
     State;
 
-on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2,
+on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, Lease, {content_check_failed, Reason}}}, State) ->
     ct:pal("split first step failed: ~p~n", [Reason]),
     case Reason of
         lease_already_exists ->
+            comm:send(ReplyTo, {split, fail, Lease}),
             remove_lease_from_dht_node_state(Lease, State)
     end;
 
@@ -499,7 +498,7 @@ on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2,
 % lease split (step2)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch}, R1, R2,
+on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch}, R1, R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
     ct:pal("split second step: updating L1~n", []),
     New = Lease#lease{
@@ -510,31 +509,32 @@ on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch}, R1, R2,
             timeout = new_timeout()},
     ContentCheck = generic_content_check(Lease),
     DB = get_db_for_id(Id),
-    Self = comm:reply_as(self(), 6, {l_on_cseq, split_reply_step2, L2, R1, R2, '_'}),
+    Self = comm:reply_as(self(), 7, {l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
     update_lease_in_dht_node_state(L2, State);
 
-on({l_on_cseq, split_reply_step2, L2, R1, R2,
+on({l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, Lease, {content_check_failed, Reason}}}, State) ->
     ct:pal("split second step failed: ~p~n", [Reason]),
     case Reason of
-        lease_does_not_exist -> State; %@todo
-        unexpected_owner     -> remove_lease_from_dht_node_state(Lease, State); %@todo
-        unexpected_range     -> State; %@todo
-        unexpected_aux       -> State; %@todo
+        lease_does_not_exist -> comm:send(ReplyTo, {split, fail, Lease}), State; %@todo
+        unexpected_owner     -> comm:send(ReplyTo, {split, fail, Lease}),
+                                remove_lease_from_dht_node_state(Lease, State); %@todo
+        unexpected_range     -> comm:send(ReplyTo, {split, fail, Lease}), State; %@todo
+        unexpected_aux       -> comm:send(ReplyTo, {split, fail, Lease}), State; %@todo
         unexpected_timeout ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
         timeout_is_not_newer_than_current_lease ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
         unexpected_epoch ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
         unexpected_version ->
             % retry
@@ -548,9 +548,9 @@ on({l_on_cseq, split_reply_step2, L2, R1, R2,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step2,
-    L2 = #lease{id=Id,epoch=OldEpoch}, R1, R2,
+    L2 = #lease{id=Id,epoch=OldEpoch}, R1, R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
-    io:format("split third step: renew L2 ~p~n", [Id]),
+    ct:pal("split third step: renew L2 ~p~n", [Id]),
     New = L2#lease{
             epoch   = OldEpoch + 1,
             aux     = empty,
@@ -558,36 +558,37 @@ on({l_on_cseq, split_reply_step2,
             timeout = new_timeout()},
     ContentCheck = generic_content_check(L2),
     DB = get_db_for_id(Id),
-    Self = comm:reply_as(self(), 6, {l_on_cseq, split_reply_step3, L1, R1, R2, '_'}),
+    Self = comm:reply_as(self(), 7, {l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
     update_lease_in_dht_node_state(L1, State);
 
-on({l_on_cseq, split_reply_step3, L1, R1, R2,
+on({l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, Reason}}}, State) ->
     % @todo
     ct:pal("split third step failed: ~p~n", [Reason]),
     case Reason of
-        lease_does_not_exist -> State; %@todo
-        unexpected_owner     -> remove_lease_from_dht_node_state(L2, State); %@todo
-        unexpected_range     -> State; %@todo
-        unexpected_aux       -> State; %@todo
+        lease_does_not_exist -> comm:send(ReplyTo, {split, fail, L2}), State; %@todo
+        unexpected_owner     -> comm:send(ReplyTo, {split, fail, L2}),
+                                remove_lease_from_dht_node_state(L2, State); %@todo
+        unexpected_range     -> comm:send(ReplyTo, {split, fail, L2}), State; %@todo
+        unexpected_aux       -> comm:send(ReplyTo, {split, fail, L2}), State; %@todo
         unexpected_timeout ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L1}});
         timeout_is_not_newer_than_current_lease ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L1}});
         unexpected_epoch ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L1}});
         unexpected_version ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L1}})
     end;
 
@@ -597,9 +598,9 @@ on({l_on_cseq, split_reply_step3, L1, R1, R2,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step3,
-    L1 = #lease{id=Id,epoch=OldEpoch}, R1, R2,
+    L1 = #lease{id=Id,epoch=OldEpoch}, R1, R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
-    io:format("split fourth step: renew L1~n", []),
+    ct:pal("split fourth step: renew L1~n", []),
     New = L1#lease{
             epoch   = OldEpoch + 1,
             aux     = empty,
@@ -607,41 +608,44 @@ on({l_on_cseq, split_reply_step3,
             timeout = new_timeout()},
     ContentCheck = generic_content_check(L1),
     DB = get_db_for_id(Id),
-    Self = comm:reply_as(self(), 6, {l_on_cseq, split_reply_step4, L2, R1, R2, '_'}),
+    Self = comm:reply_as(self(), 7, {l_on_cseq, split_reply_step4, L2, R1, R2, ReplyTo, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
     update_lease_in_dht_node_state(L2, State);
 
-on({l_on_cseq, split_reply_step4, _L2, _R1, _R2,
+on({l_on_cseq, split_reply_step4, _L2, _R1, _R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
     ct:pal("successful split~n", []),
+    ct:pal("successful split ~p~n", [ReplyTo]),
+    comm:send(ReplyTo, {split, success, L1}),
     update_lease_in_dht_node_state(L1, State);
 
-on({l_on_cseq, split_reply_step4, L2, R1, R2,
+on({l_on_cseq, split_reply_step4, L2, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, L1, {content_check_failed, Reason}}}, State) ->
     % @todo
     ct:pal("split fourth step: ~p~n", [Reason]),
     case Reason of
-        lease_does_not_exist -> State; %@todo
-        unexpected_owner     -> remove_lease_from_dht_node_state(L1, State); %@todo
-        unexpected_range     -> State; %@todo
-        unexpected_aux       -> State; %@todo
+        lease_does_not_exist -> comm:send(ReplyTo, {split, fail, L1}), State;
+        unexpected_owner     -> comm:send(ReplyTo, {split, fail, L1}),
+                                remove_lease_from_dht_node_state(L1, State);
+        unexpected_range     -> comm:send(ReplyTo, {split, fail, L1}), State;
+        unexpected_aux       -> comm:send(ReplyTo, {split, fail, L1}), State;
         unexpected_timeout ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
         timeout_is_not_newer_than_current_lease ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
         unexpected_epoch ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L2}});
         unexpected_version ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2,
+            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
                                           {qwrite_done, fake_reqid, fake_round, L2}})
     end;
 
@@ -1094,36 +1098,6 @@ id(X) ->
             {_, Id, _, _} = intervals:get_bounds(X),
             Id
     end.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% testing
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec split_test() -> ok.
-split_test() ->
-    Group = pid_groups:group_with(dht_node),
-    pid_groups:join_as(Group, ?MODULE),
-    DHTNode = pid_groups:get_my(dht_node),
-    comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
-    L = receive
-                 {get_state_response, List} ->
-                     hd(List)
-             end,
-    Range = L#lease.range,
-    io:format("lease_list length: ~p~n", [length(List)]),
-    io:format("splitting lease: ~p~n", [L]),
-    Res = intervals:split(Range, 2),
-    case Res of
-        [R1, R2] ->
-            io:format("split ~p into ~p and ~p~n", [Range, R1, R2]),
-            lease_split(L, R1, R2);
-        _ ->
-            io:format("cannot split ~p further.~n", [Range])
-    end,
-    ok.
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
