@@ -90,6 +90,14 @@ public class TestAndSetOp implements TransactionOperation, TransactionSingleOpOp
         this.resultCompressed = compressed;
     }
 
+    public OtpErlangObject getResult() {
+        return this.resultRaw;
+    }
+
+    public boolean getResultCompressed() {
+        return this.resultCompressed;
+    }
+
     public Object processResult() throws NotFoundException,
             KeyChangedException, UnknownException {
         /*

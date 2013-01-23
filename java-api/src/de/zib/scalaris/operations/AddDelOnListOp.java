@@ -88,6 +88,14 @@ public class AddDelOnListOp implements TransactionOperation, TransactionSingleOp
         this.resultCompressed = compressed;
     }
 
+    public OtpErlangObject getResult() {
+        return this.resultRaw;
+    }
+
+    public boolean getResultCompressed() {
+        return this.resultCompressed;
+    }
+
     public Object processResult() throws UnknownException,
             NotAListException {
         /*

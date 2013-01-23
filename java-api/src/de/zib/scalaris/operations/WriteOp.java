@@ -77,6 +77,14 @@ public class WriteOp implements TransactionOperation, TransactionSingleOpOperati
         this.resultCompressed = compressed;
     }
 
+    public OtpErlangObject getResult() {
+        return this.resultRaw;
+    }
+
+    public boolean getResultCompressed() {
+        return this.resultCompressed;
+    }
+
     public Object processResult() throws UnknownException {
         /*
          * possible return values:

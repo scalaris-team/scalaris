@@ -188,9 +188,19 @@ public abstract class ResultList {
             throws NotFoundException, KeyChangedException, AbortException,
             UnknownException;
 
-    // TODO
-//    @Override
-//    public String toString() {
-//        return results.toString();
-//    }
+    @Override
+    public String toString() {
+        int i = 1;
+        final StringBuilder sb = new StringBuilder();
+        sb.append('[');
+        for (final Operation op : operations) {
+            sb.append(op.getResult().toString());
+            if (i != operations.size()) {
+                sb.append(", ");
+            }
+            ++i;
+        }
+        sb.append(']');
+        return sb.toString();
+    }
 }

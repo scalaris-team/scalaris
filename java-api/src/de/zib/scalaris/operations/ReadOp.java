@@ -74,6 +74,14 @@ public class ReadOp implements TransactionOperation, TransactionSingleOpOperatio
         this.resultCompressed = compressed;
     }
 
+    public OtpErlangObject getResult() {
+        return this.resultRaw;
+    }
+
+    public boolean getResultCompressed() {
+        return this.resultCompressed;
+    }
+
     public ErlangValue processResult() throws NotFoundException,
             UnknownException {
         /*
