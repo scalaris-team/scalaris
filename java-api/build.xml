@@ -28,7 +28,7 @@
   <!-- version of the jakarta-commons-cli jar file to bundle and compile against (jakarta-commons-cli-<version>.jar) -->
   <property name="jakarta.commons.cli.version" value="1.2" />
   <!-- debug level to use during compilation -->
-  <property name="debuglevel" value="source,lines" />
+  <property name="debuglevel" value="source,lines,vars" />
   <!-- ########## Build configuration (end) ########## -->
 
   <!-- ########## Run configuration (begin) ########## -->
