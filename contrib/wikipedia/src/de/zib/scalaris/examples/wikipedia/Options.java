@@ -307,6 +307,26 @@ public class Options {
     }
 
     /**
+     * Indicates that the new append, increment and partial read operations of
+     * Scalaris should be used and list values should be randomly distributed
+     * among several partions, i.e. buckets.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM extends
+            APPEND_INCREMENT_BUCKETS_RANDOM implements IPartialRead {
+        /**
+         * Constructor.
+         * 
+         * @param buckets
+         *            number of available buckets
+         */
+        public APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM(int buckets) {
+            super(buckets);
+        }
+    }
+    
+    /**
      * Indicates that the new append and increment operations of Scalaris should
      * be used and list values should be distributed among several partions, i.e.
      * buckets, depending on the value's hash.
@@ -345,6 +365,26 @@ public class Options {
         @Override
         public String toString() {
             return "APPEND_INCREMENT_BUCKETS_WITH_HASH(" + buckets + ")";
+        }
+    }
+
+    /**
+     * Indicates that the new append, increment and partial read operations of
+     * Scalaris should be used and list values should be distributed among
+     * several partions, i.e. buckets, depending on the value's hash.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH extends
+    APPEND_INCREMENT_BUCKETS_WITH_HASH implements IPartialRead {
+        /**
+         * Constructor.
+         * 
+         * @param buckets
+         *            number of available buckets
+         */
+        public APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH(int buckets) {
+            super(buckets);
         }
     }
     
@@ -460,9 +500,15 @@ public class Options {
         } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_RANDOM") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
             optimisation = new Options.APPEND_INCREMENT_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM") && parameterStr != null) {
+            String[] parameters = parameterStr.split(",");
+            optimisation = new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
         } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_HASH") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
             optimisation = new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH") && parameterStr != null) {
+            String[] parameters = parameterStr.split(",");
+            optimisation = new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
         } else {
             System.err.println("unknown optimisation found: " + matcher.group());
         }
