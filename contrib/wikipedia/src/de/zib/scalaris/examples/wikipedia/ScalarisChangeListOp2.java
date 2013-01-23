@@ -69,7 +69,7 @@ public abstract class ScalarisChangeListOp2 implements ScalarisOp {
         results.processAddDelOnListAt(firstOp + checkedOps);
         ++checkedOps;
         if (countKey != null) {
-            results.processAddDelOnListAt(firstOp + checkedOps);
+            results.processAddOnNrAt(firstOp + checkedOps);
             ++checkedOps;
         }
         return checkedOps;
