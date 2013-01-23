@@ -187,7 +187,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      *            servlet config
      */
     protected void readOptionsFromConfig(ServletConfig config) {
-        Options.parseOptions(Options.getInstance(),
+        final Options options = Options.getInstance();
+        Options.parseOptions(options,
                 config.getInitParameter("SERVERNAME"),
                 config.getInitParameter("SERVERPATH"),
                 config.getInitParameter("WIKI_USE_BACKLINKS"),
@@ -198,6 +199,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 config.getInitParameter("WIKI_OPTIMISATIONS"),
                 config.getInitParameter("LOG_USER_REQS"),
                 config.getInitParameter("SCALARIS_NODE_DISCOVERY"));
+        System.out.println("Effective optimisations: " + options.OPTIMISATIONS.toString());
     }
     
     /**
