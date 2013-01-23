@@ -427,7 +427,6 @@ public class Options {
     public static Optimisation parseOptimisationString(final Matcher matcher)
             throws NumberFormatException {
         String optimisationStr = matcher.group(2);
-        System.out.println(optimisationStr);
         String parameterStr = matcher.group(3);
         Optimisation optimisation = null;
         if (optimisationStr.equals("TRADITIONAL") && parameterStr == null) {
