@@ -8,6 +8,7 @@ import java.util.TreeMap;
 
 import com.ericsson.otp.erlang.OtpErlangException;
 
+import de.zib.scalaris.EmptyListException;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
@@ -146,6 +147,8 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
                     if (failNotFound) {
                         throw e;
                     }
+                } catch (EmptyListException e) {
+                    // this is ok - we simply ignore this partition
                 }
             }
             if (listLen != 0) {
