@@ -9,7 +9,7 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
+import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisOp;
 import de.zib.scalaris.operations.ReadOp;
@@ -39,9 +39,8 @@ public class ScalarisReadNumberOp1 implements ScalarisOp {
     public ScalarisReadNumberOp1(final Collection<String> keys,
             final Optimisation optimisation, boolean failNotFound) {
         this.keys = keys;
-        if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
-            APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
-            this.buckets = optimisation2.getBuckets();
+        if (optimisation instanceof IBuckets) {
+            this.buckets = ((IBuckets) optimisation).getBuckets();
         } else {
             this.buckets = 1;
         }

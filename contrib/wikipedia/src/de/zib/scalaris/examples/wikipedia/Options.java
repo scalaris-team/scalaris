@@ -215,7 +215,8 @@ public class Options {
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    public static class APPEND_INCREMENT_PARTIALREAD extends APPEND_INCREMENT implements IPartialRead {
+    public static class APPEND_INCREMENT_PARTIALREAD extends APPEND_INCREMENT
+            implements IPartialRead {
         @Override
         public String toString() {
             return "APPEND_INCREMENT_PARTIALREAD";
@@ -223,13 +224,28 @@ public class Options {
     }
 
     /**
-     * Indicates that the new append and increment operations of Scalaris should
-     * be used and list values should be distributed among several partions, i.e.
-     * buckets.
+     * Indicates that the optimisation partitions data into buckets.
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    public static abstract class APPEND_INCREMENT_BUCKETS implements Optimisation {
+    public static interface IBuckets {
+        /**
+         * Gets the number of available buckets
+         * 
+         * @return number of buckets
+         */
+        public abstract int getBuckets();
+    }
+
+    /**
+     * Indicates that the new append and increment operations of Scalaris should
+     * be used and list values should be distributed among several partitions,
+     * i.e. buckets.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static abstract class APPEND_INCREMENT_BUCKETS implements
+            Optimisation, IBuckets {
         final protected int buckets;
         
         /**
@@ -242,11 +258,6 @@ public class Options {
             this.buckets = buckets;
         }
 
-        /**
-         * Gets the number of available buckets
-         * 
-         * @return number of buckets
-         */
         public int getBuckets() {
             return buckets;
         }
@@ -266,11 +277,12 @@ public class Options {
     /**
      * Indicates that the new append and increment operations of Scalaris should
      * be used and list values should be randomly distributed among several
-     * partions, i.e. buckets.
+     * partitions, i.e. buckets.
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    public static class APPEND_INCREMENT_BUCKETS_RANDOM extends APPEND_INCREMENT_BUCKETS {
+    public static class APPEND_INCREMENT_BUCKETS_RANDOM extends
+            APPEND_INCREMENT_BUCKETS {
         final static protected Random rand = new Random();
         /**
          * Constructor.
@@ -309,7 +321,7 @@ public class Options {
     /**
      * Indicates that the new append, increment and partial read operations of
      * Scalaris should be used and list values should be randomly distributed
-     * among several partions, i.e. buckets.
+     * among several partitions, i.e. buckets.
      * 
      * @author Nico Kruber, kruber@zib.de
      */
@@ -328,12 +340,13 @@ public class Options {
     
     /**
      * Indicates that the new append and increment operations of Scalaris should
-     * be used and list values should be distributed among several partions, i.e.
-     * buckets, depending on the value's hash.
+     * be used and list values should be distributed among several partitions,
+     * i.e. buckets, depending on the value's hash.
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    public static class APPEND_INCREMENT_BUCKETS_WITH_HASH extends APPEND_INCREMENT_BUCKETS {
+    public static class APPEND_INCREMENT_BUCKETS_WITH_HASH extends
+            APPEND_INCREMENT_BUCKETS {
         /**
          * Constructor.
          * 
@@ -371,12 +384,12 @@ public class Options {
     /**
      * Indicates that the new append, increment and partial read operations of
      * Scalaris should be used and list values should be distributed among
-     * several partions, i.e. buckets, depending on the value's hash.
+     * several partitions, i.e. buckets, depending on the value's hash.
      * 
      * @author Nico Kruber, kruber@zib.de
      */
     public static class APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH extends
-    APPEND_INCREMENT_BUCKETS_WITH_HASH implements IPartialRead {
+            APPEND_INCREMENT_BUCKETS_WITH_HASH implements IPartialRead {
         /**
          * Constructor.
          * 
