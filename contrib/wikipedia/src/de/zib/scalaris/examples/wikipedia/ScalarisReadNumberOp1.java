@@ -33,8 +33,8 @@ public class ScalarisReadNumberOp1 implements ScalarisOp {
      * @param optimisation
      *            the list optimisation to use
      * @param failNotFound
-     *            whether to re-throw the {@link NotFoundException} if a list
-     *            key was not found
+     *            whether to re-throw the {@link NotFoundException} if no list
+     *            key was found
      */
     public ScalarisReadNumberOp1(final Collection<String> keys,
             final Optimisation optimisation, boolean failNotFound) {
@@ -95,14 +95,18 @@ public class ScalarisReadNumberOp1 implements ScalarisOp {
     protected int checkRead(int firstOp, final ResultList results) throws OtpErlangException,
             UnknownException {
         for (@SuppressWarnings("unused") String key : keys) {
+            int notFound = 0;
+            NotFoundException lastNotFound = null;
             for (int i = 0; i < buckets; ++i) {
                 try {
                     value = value.add(results.processReadAt(firstOp++).bigIntValue());
                 } catch (NotFoundException e) {
-                    if (failNotFound) {
-                        throw e;
-                    }
+                    ++notFound;
+                    lastNotFound = e;
                 }
+            }
+            if (failNotFound && notFound == buckets) {
+                throw lastNotFound;
             }
         }
         return keys.size() * buckets;
