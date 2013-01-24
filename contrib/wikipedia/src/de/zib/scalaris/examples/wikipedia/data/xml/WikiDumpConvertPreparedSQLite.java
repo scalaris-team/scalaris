@@ -465,6 +465,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
      * @throws FileNotFoundException
      */
     public void convertObjects() throws RuntimeException, FileNotFoundException {
+        importStart();
         try {
             try {
                 // BEWARE: keep in sync with ScalarisDataHandler!
