@@ -359,16 +359,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         @Override
         public void run() {
             // split lists:
-            final int buckets = optimisation.getBuckets();
-            HashMap<String, List<ErlangValue>> newLists = new HashMap<String, List<ErlangValue>>(buckets);
-            if (buckets > 1) {
-                for (int i = 0; i < buckets; ++i) {
-                    newLists.put(":" + i, new ArrayList<ErlangValue>());
-                }
-            } else {
-                newLists.put("", new ArrayList<ErlangValue>());
-            }
-
+            HashMap<String, List<ErlangValue>> newLists = new HashMap<String, List<ErlangValue>>(optimisation.getBuckets());
             for (ErlangValue obj : value) {
                 String keyAppend2;
                 if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
@@ -379,7 +370,10 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     throw new RuntimeException("unsupported optimisation: " + optimisation);
                 }
                 List<ErlangValue> valueAtKey2 = newLists.get(keyAppend2);
-                assert(valueAtKey2 != null);
+                if (valueAtKey2 == null) {
+                    valueAtKey2 = new ArrayList<ErlangValue>();
+                    newLists.put(keyAppend2, valueAtKey2);
+                }
                 valueAtKey2.add(obj);
             }
 
