@@ -411,6 +411,7 @@ public class ScalarisDataHandler {
         final List<String> scalarisKeys = Arrays.asList(getPageListKey(0));
         
         if (optimisation instanceof IBuckets) {
+            // try reading from one bucket only...
             List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
             
             if (connection == null) {
@@ -423,7 +424,7 @@ public class ScalarisDataHandler {
                     new TransactionSingleOp(connection), involvedKeys);
 
             final ScalarisReadRandomListEntryOp1<ErlangValue> readOp = new ScalarisReadRandomListEntryOp1<ErlangValue>(
-                    scalarisKeys, optimisation, elemConv, listConv, true, random);
+                    scalarisKeys, optimisation, elemConv, listConv, false, random);
             executor.addOp(readOp);
             try {
                 executor.run();
@@ -445,6 +446,7 @@ public class ScalarisDataHandler {
             }
         }
         
+        // read all buckets
         ValueResult<List<ErlangValue>> result = getPageList3(connection,
                 ScalarisOpType.PAGE_LIST, scalarisKeys,
                 true, timeAtStart, statName,
