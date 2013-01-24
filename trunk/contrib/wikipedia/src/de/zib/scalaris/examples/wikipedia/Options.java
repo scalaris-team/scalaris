@@ -461,6 +461,36 @@ public class Options {
             return "APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(" + buckets + ")";
         }
     }
+
+    /**
+     * Indicates that the new append, increment and partial read operations of
+     * Scalaris should be used and list values should be distributed among
+     * several partitions, i.e. buckets, using one of the buckets for a single
+     * (big) list and the others as a small write cache for the big one.
+     * Supports only list add operations (no removal!)
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM
+            extends APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM
+            implements IPartialRead {
+        /**
+         * Constructor.
+         * 
+         * @param buckets
+         *            number of available buckets
+         */
+        public APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(
+                int buckets) {
+            super(buckets);
+        }
+
+        @Override
+        public String toString() {
+            return "APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM("
+                    + buckets + ")";
+        }
+    }
     
     /**
      * Parses the given option strings into their appropriate properties.
@@ -586,6 +616,9 @@ public class Options {
         } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
             optimisation = new Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(Integer.parseInt(parameters[0]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM") && parameterStr != null) {
+            String[] parameters = parameterStr.split(",");
+            optimisation = new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(Integer.parseInt(parameters[0]));
         } else {
             System.err.println("unknown optimisation found: " + matcher.group());
         }
