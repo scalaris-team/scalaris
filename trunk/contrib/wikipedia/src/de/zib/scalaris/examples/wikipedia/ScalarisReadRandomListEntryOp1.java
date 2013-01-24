@@ -14,9 +14,9 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
-import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
+import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.IPartialRead;
+import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisOp;
 import de.zib.scalaris.operations.ReadOp;
 import de.zib.scalaris.operations.ReadRandomFromListOp;
@@ -60,8 +60,8 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
             final Optimisation optimisation, ErlangConverter<T> elemConv, ErlangConverter<List<T>> listConv,
             boolean failNotFound, Random random) {
         this.keys = keys;
-        if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
-            this.buckets = ((APPEND_INCREMENT_BUCKETS) optimisation).getBuckets();
+        if (optimisation instanceof IBuckets) {
+            this.buckets = ((IBuckets) optimisation).getBuckets();
         } else {
             this.buckets = 1;
         }
