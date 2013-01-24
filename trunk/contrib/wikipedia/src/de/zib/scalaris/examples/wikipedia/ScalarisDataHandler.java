@@ -31,6 +31,7 @@ import de.zib.scalaris.ErlangValue.ListElementConverter;
 import de.zib.scalaris.ScalarisVM;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
@@ -409,42 +410,57 @@ public class ScalarisDataHandler {
         };
         final List<String> scalarisKeys = Arrays.asList(getPageListKey(0));
         
-        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        if (optimisation instanceof IBuckets) {
+            List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+            
+            if (connection == null) {
+                return new ValueResult<NormalisedTitle>(false, involvedKeys,
+                        "no connection to Scalaris", true, statName,
+                        System.currentTimeMillis() - timeAtStart);
+            }
+            
+            final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
+                    new TransactionSingleOp(connection), involvedKeys);
 
-        if (connection == null) {
-            return new ValueResult<NormalisedTitle>(false, involvedKeys,
-                    "no connection to Scalaris", true, statName,
-                    System.currentTimeMillis() - timeAtStart);
+            final ScalarisReadRandomListEntryOp1<ErlangValue> readOp = new ScalarisReadRandomListEntryOp1<ErlangValue>(
+                    scalarisKeys, optimisation, elemConv, listConv, true, random);
+            executor.addOp(readOp);
+            try {
+                executor.run();
+            } catch (Exception e) {
+                return new ValueResult<NormalisedTitle>(false, involvedKeys,
+                        e.getClass().getCanonicalName() + " reading page list at \""
+                                + involvedKeys.toString() + "\" from Scalaris: "
+                                + e.getMessage(), e instanceof ConnectionException,
+                        statName, System.currentTimeMillis() - timeAtStart);
+            }
+            
+            // return if successful, otherwise fall back and read the whole list
+            // as with no optimisation
+            if (readOp.getValue() != null) {
+                return new ValueResult<NormalisedTitle>(involvedKeys,
+                        NormalisedTitle.fromNormalised(readOp.getValue()
+                                .stringValue()), statName,
+                        System.currentTimeMillis() - timeAtStart);
+            }
         }
-
-        final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
-                new TransactionSingleOp(connection), involvedKeys);
-
-        final ScalarisReadRandomListEntryOp1<ErlangValue> readOp = new ScalarisReadRandomListEntryOp1<ErlangValue>(
-                scalarisKeys, optimisation, elemConv, listConv, true, random);
-        executor.addOp(readOp);
-        try {
-            executor.run();
-        } catch (Exception e) {
-            return new ValueResult<NormalisedTitle>(false, involvedKeys,
-                    e.getClass().getCanonicalName() + " reading page list at \""
-                            + involvedKeys.toString() + "\" from Scalaris: "
-                            + e.getMessage(), e instanceof ConnectionException,
-                            statName, System.currentTimeMillis() - timeAtStart);
-        }
-
-        // return if successful, otherwise fall back and read the whole list
-        // as with no optimisation
-        if (readOp.getValue() != null) {
-            return new ValueResult<NormalisedTitle>(involvedKeys,
-                    NormalisedTitle.fromNormalised(readOp.getValue()
-                            .stringValue()), statName,
-                            System.currentTimeMillis() - timeAtStart);
+        
+        ValueResult<List<ErlangValue>> result = getPageList3(connection,
+                ScalarisOpType.PAGE_LIST, scalarisKeys,
+                true, timeAtStart, statName,
+                listConv);
+        ValueResult<NormalisedTitle> vResult;
+        if (result.success) {
+            String randomTitle = result.value.get(
+                    random.nextInt(result.value.size())).stringValue();
+            vResult = new ValueResult<NormalisedTitle>(result.involvedKeys,
+                    NormalisedTitle.fromNormalised(randomTitle));
         } else {
-            return new ValueResult<NormalisedTitle>(false, involvedKeys,
-                    "unable to retrieve random page (no articles?)", false,
-                    statName, System.currentTimeMillis() - timeAtStart);
+            vResult = new ValueResult<NormalisedTitle>(false,
+                    result.involvedKeys, result.message, result.connect_failed);
         }
+        vResult.stats = result.stats;
+        return vResult;
     }
 
     /**
