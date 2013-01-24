@@ -461,8 +461,11 @@ public class ScalarisDataHandler {
             vResult = new ValueResult<NormalisedTitle>(false,
                     result.involvedKeys, result.message, result.connect_failed);
         }
-        vResult.stats = result.stats;
         vResult.involvedKeys.addAll(involvedKeys);
+        // do not use the result stats as we select a random entry from the list
+        // and this counts, too!
+        // vResult.stats = result.stats;
+        vResult.addStat(statName, System.currentTimeMillis() - timeAtStart);
         return vResult;
     }
 
