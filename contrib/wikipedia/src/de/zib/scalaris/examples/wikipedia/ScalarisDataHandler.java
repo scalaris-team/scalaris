@@ -31,7 +31,6 @@ import de.zib.scalaris.ErlangValue.ListElementConverter;
 import de.zib.scalaris.ScalarisVM;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
@@ -416,15 +415,15 @@ public class ScalarisDataHandler {
                     "no connection to Scalaris", true, statName,
                     System.currentTimeMillis() - timeAtStart);
         }
-        
-        if (optimisation instanceof IBuckets) {
-            // try reading from one bucket only...
-            
+
+        // first try reading from one bucket only, if it fails, try to read from all
+        for (boolean readOnlyOneBucket : new boolean[] {true, false}) {
             final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
                     new TransactionSingleOp(connection), involvedKeys);
 
             final ScalarisReadRandomListEntryOp1<ErlangValue> readOp = new ScalarisReadRandomListEntryOp1<ErlangValue>(
-                    scalarisKeys, optimisation, elemConv, listConv, false, random);
+                    scalarisKeys, optimisation, readOnlyOneBucket, elemConv,
+                    listConv, false, random);
             executor.addOp(readOp);
             try {
                 executor.run();
@@ -445,28 +444,9 @@ public class ScalarisDataHandler {
                         System.currentTimeMillis() - timeAtStart);
             }
         }
-        
-        // read all buckets
-        ValueResult<List<ErlangValue>> result = getPageList3(connection,
-                ScalarisOpType.PAGE_LIST, scalarisKeys,
-                true, timeAtStart, statName,
-                listConv);
-        ValueResult<NormalisedTitle> vResult;
-        if (result.success) {
-            String randomTitle = result.value.get(
-                    random.nextInt(result.value.size())).stringValue();
-            vResult = new ValueResult<NormalisedTitle>(result.involvedKeys,
-                    NormalisedTitle.fromNormalised(randomTitle));
-        } else {
-            vResult = new ValueResult<NormalisedTitle>(false,
-                    result.involvedKeys, result.message, result.connect_failed);
-        }
-        vResult.involvedKeys.addAll(involvedKeys);
-        // do not use the result stats as we select a random entry from the list
-        // and this counts, too!
-        // vResult.stats = result.stats;
-        vResult.addStat(statName, System.currentTimeMillis() - timeAtStart);
-        return vResult;
+        return new ValueResult<NormalisedTitle>(false, involvedKeys,
+                "unable to retrieve random page (no articles?)", false,
+                statName, System.currentTimeMillis() - timeAtStart);
     }
 
     /**
