@@ -35,6 +35,8 @@ import com.almworks.sqlite4java.SQLiteStatement;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
+import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
@@ -339,13 +341,13 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         protected final String countKey;
         protected final List<ErlangValue> value;
         protected final SQLiteStatement stWrite;
-        protected final Options.APPEND_INCREMENT_BUCKETS optimisation;
+        protected final IBuckets optimisation;
         private final WikiDump importer;
         
         public SQLiteWriteBucketListJob(WikiDump importer, String key,
                 List<ErlangValue> value, String countKey,
                 SQLiteStatement stWrite,
-                Options.APPEND_INCREMENT_BUCKETS optimisation) {
+                IBuckets optimisation) {
             this.importer = importer;
             this.key = key;
             this.value = value;
@@ -357,14 +359,27 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         @Override
         public void run() {
             // split lists:
-            HashMap<String, List<ErlangValue>> newLists = new HashMap<String, List<ErlangValue>>(optimisation.getBuckets());
-            for (ErlangValue obj : value) {
-                final String keyAppend2 = optimisation.getBucketString(obj);
-                List<ErlangValue> valueAtKey2 = newLists.get(keyAppend2);
-                if (valueAtKey2 == null) {
-                    valueAtKey2 = new ArrayList<ErlangValue>();
-                    newLists.put(keyAppend2, valueAtKey2);
+            final int buckets = optimisation.getBuckets();
+            HashMap<String, List<ErlangValue>> newLists = new HashMap<String, List<ErlangValue>>(buckets);
+            if (buckets > 1) {
+                for (int i = 0; i < buckets; ++i) {
+                    newLists.put(":" + i, new ArrayList<ErlangValue>());
                 }
+            } else {
+                newLists.put("", new ArrayList<ErlangValue>());
+            }
+
+            for (ErlangValue obj : value) {
+                String keyAppend2;
+                if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+                    keyAppend2 = ((APPEND_INCREMENT_BUCKETS) optimisation).getBucketString(obj);
+                } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+                    keyAppend2 = ((APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation).getBucketString(false);
+                } else {
+                    throw new RuntimeException("unsupported optimisation: " + optimisation);
+                }
+                List<ErlangValue> valueAtKey2 = newLists.get(keyAppend2);
+                assert(valueAtKey2 != null);
                 valueAtKey2.add(obj);
             }
 
@@ -406,12 +421,12 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         protected final String key;
         protected final int value;
         protected final SQLiteStatement stWrite;
-        protected final Options.APPEND_INCREMENT_BUCKETS optimisation;
+        protected final IBuckets optimisation;
         private final WikiDump importer;
         
         public SQLiteWriteBucketCounterJob(WikiDump importer, String key,
                 int value, SQLiteStatement stWrite,
-                Options.APPEND_INCREMENT_BUCKETS optimisation) {
+                IBuckets optimisation) {
             this.importer = importer;
             this.key = key;
             this.value = value;
@@ -433,7 +448,14 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 try {
                     // write count (if available)
                     final String key2 = key + ":" + i;
-                    final int curValue = (i == optimisation.getBuckets() - 1) ? rest : avg;
+                    int curValue;
+                    if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+                        curValue = (i == optimisation.getBuckets() - 1) ? rest : avg;
+                    } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+                        curValue = (i == 0) ? rest : 0;
+                    } else {
+                        throw new RuntimeException("unsupported optimisation: " + optimisation);
+                    }
                     rest -= curValue;
                     try {
                         stWrite.reset();
@@ -571,11 +593,11 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                         println("unknown key: " + key);
                     }
 
-                    APPEND_INCREMENT_BUCKETS optimisation2 = null;
+                    IBuckets optimisation2 = null;
                     if (opType != null) {
                         final Optimisation optimisation = dbWriteOptions.OPTIMISATIONS.get(opType);
-                        if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
-                            optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
+                        if (optimisation instanceof IBuckets) {
+                            optimisation2 = (IBuckets) optimisation;
                         } else {
                             copyValue = true;
                         }
@@ -583,7 +605,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     
                     if (copyValue) {
                         if (listOrCount == ListOrCountOp.LIST) {
-                            addSQLiteJob(new SQLiteCopyList(this, key, value, countKey, stWrite));
+                            addSQLiteJob(new SQLiteCopyList(this, key, value, key, stWrite));
                         } else {
                             addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
                         }

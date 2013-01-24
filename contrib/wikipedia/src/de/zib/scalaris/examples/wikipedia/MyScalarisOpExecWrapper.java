@@ -8,6 +8,8 @@ import java.util.Map.Entry;
 
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisIncrementOp1;
 import de.zib.scalaris.executor.ScalarisIncrementOp2;
@@ -97,6 +99,10 @@ public class MyScalarisOpExecWrapper {
             final APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
             final String key2 = key + optimisation2.getBucketString(toAdd);
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+            final APPEND_INCREMENT_BUCKETS_WITH_WCACHE optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
+            final String key2 = key + optimisation2.getBucketString(true);
+            executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
         } else {
             executor.addOp(new ScalarisIncrementOp1<T>(key, toAdd));
         }
@@ -165,6 +171,19 @@ public class MyScalarisOpExecWrapper {
                 }
                 executor.addOp(new ScalarisListAppendRemoveOp2<T>(key2, toAdd2, toRemove2, entry.getValue()));
             }
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+            final APPEND_INCREMENT_BUCKETS_WITH_WCACHE optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
+            final String bucketStr = optimisation2.getBucketString(true);
+            final String key2 = key + bucketStr;
+            String countKey2 = null;
+            if (countKey != null) {
+                countKey2 = countKey + bucketStr;
+            }
+            if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM
+                    && !toRemove.isEmpty()) {
+                System.err.println("deleting entries is not supported with APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM");
+            }
+            executor.addOp(new ScalarisListAppendRemoveOp2<T>(key2, toAdd, toRemove, countKey2));
         } else {
             executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, toAdd, toRemove, countKey));
         }
