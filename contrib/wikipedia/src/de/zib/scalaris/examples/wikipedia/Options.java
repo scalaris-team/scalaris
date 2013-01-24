@@ -336,6 +336,11 @@ public class Options {
         public APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM(int buckets) {
             super(buckets);
         }
+        
+        @Override
+        public String toString() {
+            return "APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM(" + buckets + ")";
+        }
     }
     
     /**
@@ -398,6 +403,11 @@ public class Options {
          */
         public APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH(int buckets) {
             super(buckets);
+        }
+        
+        @Override
+        public String toString() {
+            return "APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH(" + buckets + ")";
         }
     }
     
