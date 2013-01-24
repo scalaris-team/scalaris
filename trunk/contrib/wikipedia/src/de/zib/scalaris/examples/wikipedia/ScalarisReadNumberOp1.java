@@ -72,12 +72,8 @@ public class ScalarisReadNumberOp1 implements ScalarisOp {
      */
     protected int prepareRead(final RequestList requests) {
         for (String key : keys) {
-            if (buckets > 1) {
-                for (int i = 0; i < buckets; ++i) {
-                    requests.addOp(new ReadOp(key + ":" + i));
-                }
-            } else {
-                requests.addOp(new ReadOp(key));
+            for (int i = 0; i < buckets; ++i) {
+                requests.addOp(new ReadOp(key + ":" + i));
             }
         }
         return 0;

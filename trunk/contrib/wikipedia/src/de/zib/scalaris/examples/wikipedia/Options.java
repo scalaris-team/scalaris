@@ -296,11 +296,7 @@ public class Options {
 
         @Override
         public <T> String getBucketString(final T value) {
-            if (buckets > 1) {
-                return ":" + rand.nextInt(buckets);
-            } else {
-                return "";
-            }
+            return ":" + rand.nextInt(buckets);
         }
         
         @Override
@@ -355,11 +351,7 @@ public class Options {
         
         @Override
         public <T> String getBucketString(final T value) {
-            if (buckets > 1) {
-                return ":" + Math.abs((value.hashCode() % buckets));
-            } else {
-                return "";
-            }
+            return ":" + Math.abs((value.hashCode() % buckets));
         }
         
         @Override
@@ -457,14 +449,10 @@ public class Options {
 
         @Override
         public <T> String getBucketString(boolean useWriteCache) {
-            if (buckets > 1) {
-                if (useWriteCache) {
-                    return ":" + (rand.nextInt(buckets - 1) + 1);
-                } else {
-                    return ":" + 0;
-                }
+            if (useWriteCache && buckets > 1) {
+                return ":" + (rand.nextInt(buckets - 1) + 1);
             } else {
-                return "";
+                return ":" + 0;
             }
         }
         

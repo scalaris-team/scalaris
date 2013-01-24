@@ -97,18 +97,10 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
      */
     protected int prepareRead(final RequestList requests) {
         for (String key : keys) {
-            if (buckets > 1) {
-                if (usePartialReads) {
-                    requests.addOp(new ReadRandomFromListOp(key + ":" + random.nextInt(buckets)));
-                } else {
-                    requests.addOp(new ReadOp(key + ":" + random.nextInt(buckets)));
-                }
+            if (usePartialReads) {
+                requests.addOp(new ReadRandomFromListOp(key + ":" + random.nextInt(buckets)));
             } else {
-                if (usePartialReads) {
-                    requests.addOp(new ReadRandomFromListOp(key));
-                } else {
-                    requests.addOp(new ReadOp(key));
-                }
+                requests.addOp(new ReadOp(key + ":" + random.nextInt(buckets)));
             }
         }
         return 0;
