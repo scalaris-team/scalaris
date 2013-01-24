@@ -409,16 +409,16 @@ public class ScalarisDataHandler {
             }
         };
         final List<String> scalarisKeys = Arrays.asList(getPageListKey(0));
+        List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+        
+        if (connection == null) {
+            return new ValueResult<NormalisedTitle>(false, involvedKeys,
+                    "no connection to Scalaris", true, statName,
+                    System.currentTimeMillis() - timeAtStart);
+        }
         
         if (optimisation instanceof IBuckets) {
             // try reading from one bucket only...
-            List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
-            
-            if (connection == null) {
-                return new ValueResult<NormalisedTitle>(false, involvedKeys,
-                        "no connection to Scalaris", true, statName,
-                        System.currentTimeMillis() - timeAtStart);
-            }
             
             final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
                     new TransactionSingleOp(connection), involvedKeys);
@@ -462,6 +462,7 @@ public class ScalarisDataHandler {
                     result.involvedKeys, result.message, result.connect_failed);
         }
         vResult.stats = result.stats;
+        vResult.involvedKeys.addAll(involvedKeys);
         return vResult;
     }
 
