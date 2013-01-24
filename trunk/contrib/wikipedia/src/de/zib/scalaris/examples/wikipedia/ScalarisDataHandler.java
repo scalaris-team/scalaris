@@ -38,6 +38,7 @@ import de.zib.scalaris.examples.wikipedia.bliki.NormalisedTitle;
 import de.zib.scalaris.examples.wikipedia.data.Contribution;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
 import de.zib.scalaris.operations.Operation;
+import de.zib.scalaris.operations.PartialReadOp;
 import de.zib.scalaris.operations.ReadOp;
 
 /**
@@ -535,6 +536,8 @@ public class ScalarisDataHandler {
             final OtpErlangString key = op.getKey();
             if (key != null) {
                 if (op instanceof ReadOp) {
+                    involvedKeys.add(new InvolvedKey(InvolvedKey.OP.READ, key.stringValue()));
+                } else if (op instanceof PartialReadOp) {
                     involvedKeys.add(new InvolvedKey(InvolvedKey.OP.READ, key.stringValue()));
                 } else {
                     involvedKeys.add(new InvolvedKey(InvolvedKey.OP.WRITE, key.stringValue()));
