@@ -176,7 +176,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             final double speed = (((double) importedKeys) * 1000) / timeTaken;
             NumberFormat nf = NumberFormat.getNumberInstance(Locale.ENGLISH);
             nf.setGroupingUsed(true);
-            println("Finished conversion (" + nf.format(speed) + " pages/s)");
+            println("Finished conversion (" + nf.format(speed) + " keys/s)");
         }
     }
 
@@ -611,6 +611,9 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                             default:
                                 break;
                         }
+                    }
+                    if ((importedKeys % PRINT_SCALARIS_KV_PAIRS_EVERY) == 0) {
+                        println("processed keys: " + importedKeys);
                     }
                 }
             } finally {
