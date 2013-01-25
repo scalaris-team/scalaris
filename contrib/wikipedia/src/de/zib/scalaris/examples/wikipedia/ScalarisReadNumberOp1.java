@@ -24,6 +24,7 @@ public class ScalarisReadNumberOp1 implements ScalarisOp {
     final int buckets;
     final boolean failNotFound;
     BigInteger value = BigInteger.ZERO;
+    final private Optimisation optimisation;
 
     /**
      * Creates a new number read operation.
@@ -45,6 +46,7 @@ public class ScalarisReadNumberOp1 implements ScalarisOp {
             this.buckets = 1;
         }
         this.failNotFound = failNotFound;
+        this.optimisation = optimisation;
     }
 
     public int workPhases() {
@@ -72,8 +74,12 @@ public class ScalarisReadNumberOp1 implements ScalarisOp {
      */
     protected int prepareRead(final RequestList requests) {
         for (String key : keys) {
-            for (int i = 0; i < buckets; ++i) {
-                requests.addOp(new ReadOp(key + ":" + i));
+            if (!(optimisation instanceof IBuckets)) {
+                requests.addOp(new ReadOp(key));
+            } else {
+                for (int i = 0; i < buckets; ++i) {
+                    requests.addOp(new ReadOp(key + ":" + i));
+                }
             }
         }
         return 0;

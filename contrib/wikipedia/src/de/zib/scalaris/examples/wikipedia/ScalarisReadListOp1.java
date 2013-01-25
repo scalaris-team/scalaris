@@ -29,6 +29,7 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
     final ErlangConverter<List<T>> conv;
     final boolean failNotFound;
     final List<T> value = new ArrayList<T>();
+    final private Optimisation optimisation;
 
     /**
      * Creates a new list read operation.
@@ -55,6 +56,7 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
         }
         this.conv = conv;
         this.failNotFound = failNotFound;
+        this.optimisation = optimisation;
     }
 
     public int workPhases() {
@@ -82,8 +84,12 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
      */
     protected int prepareRead(final RequestList requests) {
         for (String key : keys) {
-            for (int i = 0; i < buckets; ++i) {
-                requests.addOp(new ReadOp(key + ":" + i));
+            if (!(optimisation instanceof IBuckets)) {
+                requests.addOp(new ReadOp(key));
+            } else {
+                for (int i = 0; i < buckets; ++i) {
+                    requests.addOp(new ReadOp(key + ":" + i));
+                }
             }
         }
         return 0;
