@@ -74,34 +74,62 @@ var DC = {
 
             $("div#loading > p").text("");
 
+            var plot_options = {
+                series: {
+                    points: {show:true}
+                    , hoverable: true
+                    , clickable: true
+                }
+                , grid: {
+                    hoverable: true
+                    , clickable: true
+                }
+                , legend: {
+                    show: true
+                    , labelFormatter: function(label, series) {
+                        return label.host;
+                    }
+                    , container: $("#legend")
+                }
+                , selection: {
+                    mode: "xy"
+                }
+            };
+
             // finally create the plot
-            function redraw(additional_sets) {
+            function redraw(options) {
+                var additional_sets,
+                    ranges;
+
+                if (options){
+                    additional_sets = options.additional_sets;
+                    ranges = options.ranges;
+                }
+                
                 var data = nodes.slice(); // copy array
                 if (additional_sets) {
                     data.unshift(additional_sets);
                 }
 
-                $.plot($("#graph"), data, {
-                    series: {
-                        points: {show:true}
-                        , hoverable: true
-                        , clickable: true
-                    }
-                    , grid: {
-                        hoverable: true
-                        , clickable: true
-                    }
-                    , legend: {
-                        show: true
-                        , labelFormatter: function(label, series) {
-                            return label.host;
+                if (ranges) {
+                    $.extend(plot_options,
+                        {
+                            xaxis: {min: ranges.xaxis.from, max: ranges.xaxis.to}
+                            , yaxis: {min: ranges.yaxis.from, max: ranges.yaxis.to}
                         }
-                        , container: $("#legend")
-                    }
-                });
+                    );
+                }
+
+                $.plot($("#graph"), data, plot_options);
             }
 
             redraw();
+
+            /* Eventhandler for clicks and selections */
+
+            $("#graph").bind("plotselected", function (event, ranges) {
+                redraw({ranges: ranges});
+            });
 
             var previous_point;
             $("#graph").bind("plothover", function(event, pos, item) {
@@ -154,7 +182,7 @@ var DC = {
                                     , radius: 0
                                 }
                             };
-                            redraw(line_between_nodes);
+                            redraw({additional_sets: line_between_nodes});
 
                             $("#distanceLine").remove();
                             DC.showTooltip((pos.pageX+previousClickedPoint.pos.pageX)/2,
