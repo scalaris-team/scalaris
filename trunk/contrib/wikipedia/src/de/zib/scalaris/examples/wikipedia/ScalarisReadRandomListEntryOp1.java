@@ -108,7 +108,9 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
     protected int prepareRead(final RequestList requests) {
         for (String key : keys) {
             HashSet<String> bucketKeys = new HashSet<String>(readOnlyOneBucket ? 2 : buckets);
-            if (!readOnlyOneBucket) {
+            if (!(optimisation instanceof IBuckets)) {
+                bucketKeys.add(key);
+            } else if (!readOnlyOneBucket) {
                 for (int i = 0; i < buckets; ++i) {
                     bucketKeys.add(key + ":" + 0);
                 }
