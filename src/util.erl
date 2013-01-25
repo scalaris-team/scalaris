@@ -81,6 +81,9 @@
 % RRD helpers which don't belong to the rrd datastructure
 -export([ rrd_combine_timing_slots/3
          , rrd_combine_timing_slots/4
+         , rrd_combine_gauge_slots/3
+         , rrd_combine_gauge_slots/4
+         , rrd_combine_slots/6
     ]).
 
 % feeder for tester
@@ -1431,7 +1434,7 @@ sets_map(Fun, Set) ->
         Max :: number()
     } | undefined.
 rrd_combine_timing_slots(DB, CurrentTS, Interval) ->
-    rrd_combine_timing_slots(DB, CurrentTS, Interval, 0). % Epsilon = 10ms
+    rrd_combine_timing_slots(DB, CurrentTS, Interval, 0). % Epsilon = 0ms
 
 -spec rrd_combine_timing_slots(DB :: rrd:rrd()
                                , CurrentTS :: erlang_timestamp()
@@ -1442,6 +1445,57 @@ rrd_combine_timing_slots(DB, CurrentTS, Interval) ->
         Max :: number()
     } | undefined.
 rrd_combine_timing_slots(DB, CurrentTS, Interval, Epsilon) ->
+    InitialValue = fun({SlotSum,SlotSquared,SlotCount,SlotMin,SlotMax,_}) ->
+            { SlotSum
+             , SlotSquared
+             , SlotCount
+             , SlotMin
+             , SlotMax
+            }
+    end,
+    UpdateValue = fun({Sum, SquaresSum, Count, Min, Max} = _Acc,
+                      {SlotSum,SlotSquared,SlotCount,SlotMin,SlotMax,_}) ->
+            { Sum+SlotSum
+             , SquaresSum + SlotSquared
+             , Count + SlotCount
+             , erlang:min(Min, SlotMin)
+             , erlang:max(Max, SlotMax)
+            }
+    end,
+    rrd_combine_slots(DB, CurrentTS, Interval, Epsilon, InitialValue, UpdateValue)
+    .
+
+%% @doc This function does the same as rrd_combine_timing_slots, but for RRDs of type
+%% gauge. It sums up slots until enough slots have been read.
+-spec rrd_combine_gauge_slots(DB :: rrd:rrd()
+                               , CurrentTS :: erlang_timestamp()
+                               , Interval :: non_neg_integer()) -> Value :: number() | undefined.
+rrd_combine_gauge_slots(DB, CurrentTS, Interval) ->
+    rrd_combine_gauge_slots(DB, CurrentTS, Interval, 0). % Epsilon = 0ms
+
+-spec rrd_combine_gauge_slots(DB :: rrd:rrd()
+                               , CurrentTS :: erlang_timestamp()
+                               , Interval :: non_neg_integer()
+                               , Epsilon :: non_neg_integer()) -> Value :: number() | undefined.
+rrd_combine_gauge_slots(DB, CurrentTS, Interval, Epsilon) ->
+    InitialValue = fun(Value) -> Value
+    end,
+    UpdateValue = fun(AccValue, CurrentValue) -> AccValue + CurrentValue
+    end,
+    rrd_combine_slots(DB, CurrentTS, Interval, Epsilon, InitialValue, UpdateValue)
+    .
+
+%% @doc Accumulates data over RRD slots. This function allows to reduce a number of slots
+%% into a single accumulator value. The amount of slots is determined by Interval and
+%% Epsilon: it reads as many slots as needed to cover the last Interval - Epsilon us.
+-spec rrd_combine_slots(DB :: rrd:rrd()
+                        , CurrentTS :: erlang_timestamp()
+                        , Interval :: non_neg_integer()
+                        , Epsilon :: non_neg_integer()
+                        , InitialValue :: fun((rrd:data_type()) -> term())
+                        , UpdateValue :: fun((rrd:data_type()) -> term())
+                       ) -> term() | undefined.
+rrd_combine_slots(DB, CurrentTS, Interval, Epsilon, InitialValue, UpdateValue) ->
     Slots = rrd:dump(DB),
     CalcStepLength = fun(Current, From, To) ->
             case timer:now_diff(Current,From) >= 0
@@ -1453,35 +1507,27 @@ rrd_combine_timing_slots(DB, CurrentTS, Interval, Epsilon) ->
     end,
     Acc = lists:foldl(
             fun
-                (_, {RemainingUS,_,_,_,_,_} = Acc) when (RemainingUS - Epsilon) =< 0 ->
+                (_, {RemainingUS, _} = Acc) when (RemainingUS - Epsilon) =< 0 ->
                     Acc
                     ;
-                ({From, To, {SlotSum,SlotSquared,SlotCount,SlotMin,SlotMax,_}},
-                 {RemainingUS, Sum, SquaresSum, Count, Min, Max}) ->
+                ({From, To, Value},
+                 {RemainingUS, Acc}) ->
                     StepLength = CalcStepLength(CurrentTS, From, To),
                     {
                         RemainingUS - StepLength
-                        , Sum+SlotSum
-                        , SquaresSum + SlotSquared
-                        , Count + SlotCount
-                        , erlang:min(Min, SlotMin)
-                        , erlang:max(Max, SlotMax)
+                        , UpdateValue(Acc, Value)
                     }
                     ;
-                ({From, To, {SlotSum,SlotSquared,SlotCount,SlotMin,SlotMax,_}},
+                ({From, To, Value},
                  {RemainingUS}) ->
                     StepLength = CalcStepLength(CurrentTS, From, To),
                     {
                         RemainingUS - StepLength
-                        , SlotSum
-                        , SlotSquared
-                        , SlotCount
-                        , SlotMin
-                        , SlotMax
+                        , InitialValue(Value)
                     }
             end, {Interval}, Slots),
     case Acc of
-        {_, Sum, SquaresSum, Count, Min, Max} -> {Sum,SquaresSum,Count,Min,Max};
+        {_, Results} -> Results;
         {Interval} -> undefined
     end
     .

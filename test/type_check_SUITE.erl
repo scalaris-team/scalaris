@@ -461,8 +461,11 @@ tester_type_check_util(_Config) ->
              {wait_for_process_to_die, 1}, %% could wait forever
              {wait_for_table_to_disappear, 2}, %% cannot create tids
              {zipfoldl, 5}, %% cannot create funs
-             {rrd_combine_timing_slots,3}, %% values too big
-             {rrd_combine_timing_slots,4} %% values too big
+             {rrd_combine_timing_slots, 3}, %% values too big
+             {rrd_combine_timing_slots, 4}, %% values too big
+             {rrd_combine_gauge_slots, 3}, %% values too big
+             {rrd_combine_gauge_slots, 4}, %% values too big
+             {rrd_combine_slots, 6} %% values too big
            ],
            [ {dump_extract_from_list,2}, %% wrong spec
              {dumpXNoSort,2}, %% needs fun
