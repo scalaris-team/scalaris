@@ -4,6 +4,7 @@ var DC = {
         $.get(map, function(data) {
             $("div#loading > p").text("Received data, setting up chart..");
             data = JSON.parse(data);
+            $("#zoom_out").prop("disabled", true);
 
             // flot styling and data conversion
             var dc = 0
@@ -118,6 +119,7 @@ var DC = {
                             , yaxis: {min: ranges.yaxis.from, max: ranges.yaxis.to}
                         }
                     );
+                    $("#zoom_out").prop("disabled", false);
                 }
 
                 $.plot($("#graph"), data, plot_options);
@@ -126,6 +128,13 @@ var DC = {
             redraw();
 
             /* Eventhandler for clicks and selections */
+
+            $("#zoom_out").click(function() {
+               $(this).prop("disabled", true);
+               delete plot_options.xaxis;
+               delete plot_options.yaxis;
+               redraw();
+            });
 
             $("#graph").bind("plotselected", function (event, ranges) {
                 redraw({ranges: ranges});

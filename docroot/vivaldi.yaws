@@ -85,11 +85,14 @@ out(Arg) ->
       <div class="middleleft">
 <h2>Vivaldi Map</h2>
 
-<div id='graph' style='width:800px;height:400px;float:left;'></div>
-<div id='legend'></div>
+<div id='plot'>
+    <div id="loading"><p>Loading map...</p></div>
+    <div id='graph' style='width:800px;height:400px;float:left;'></div>
+    <div id='legend' style='float:left'></div>
+</div>
+<div class="clear"></div>
+<button id='zoom_out'>Zoom out</button>
 <br />
-
-<div id="loading"><p>Loading map...</p></div>
 <script src="dc.js"></script>
 
 <hr />
