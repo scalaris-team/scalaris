@@ -35,6 +35,9 @@ all() ->
      rrd_combine_timing_slots_handle_empty_rrd,
      rrd_combine_timing_slots_simple,
      rrd_combine_timing_slots_subset,
+     rrd_combine_gauge_slots_handle_empty_rrd,
+     rrd_combine_gauge_slots_simple,
+     rrd_combine_gauge_slots_subset,
      sublist, tester_sublist3
  ].
 
@@ -385,5 +388,50 @@ rrd_combine_timing_slots_subset(_Config) ->
                },
     ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval, 10), ExpectedBigEpsilon),
     ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval, 100), ExpectedBigEpsilon),
+    ok
+    .
+
+rrd_combine_gauge_slots_handle_empty_rrd(_Config) ->
+    DB0 = rrd:create(10, 10, gauge, {0,0,0}),
+    Dump = rrd:dump(DB0),
+    ?equals(Dump, []),
+    ?equals(util:rrd_combine_gauge_slots(DB0, 0, 10), undefined),
+    ok
+    .
+
+rrd_combine_gauge_slots_simple(_Config) ->
+    Adds = [{20, 1}, {25, 3}, {30, 30}, {42, 42}],
+    DB0 = rrd:create(10, 10, gauge, {0,0,0}),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    ?equals(rrd:dump(DB1),
+            [{{0,0,40}, {0,0,50}, 42},
+             {{0,0,30}, {0,0,40}, 30},
+             {{0,0,20}, {0,0,30}, 3}]),
+    CurrentTS = {0,0,44}, % assume we are currently in the last slot
+
+    Expected = 75,
+    ?equals(util:rrd_combine_gauge_slots(DB1, CurrentTS, 100), Expected),
+    ?equals(util:rrd_combine_gauge_slots(DB1, CurrentTS, 100, 10), Expected),
+    ok
+    .
+
+rrd_combine_gauge_slots_subset(_Config) ->
+    % combine the newest two slots due to the interval
+    Adds = [{20, 1}, {25, 3}, {30, 30}, {42, 42}],
+    DB0 = rrd:create(10, 10, gauge, {0,0,0}),
+    DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
+    ?equals(rrd:dump(DB1),
+            [{{0,0,40}, {0,0,50}, 42},
+             {{0,0,30}, {0,0,40}, 30},
+             {{0,0,20}, {0,0,30}, 3}]),
+
+    CurrentTS = {0,0,44}, % assume we are currently in the last slot
+    Interval = 10, % overlap at most two slots
+
+    ?equals(util:rrd_combine_gauge_slots(DB1, CurrentTS, Interval), 72),
+    ?equals(util:rrd_combine_gauge_slots(DB1, CurrentTS, Interval, 5), 72),
+    ?equals(util:rrd_combine_gauge_slots(DB1, CurrentTS, Interval, 10), 42), % exits immediately
+    ?equals(util:rrd_combine_gauge_slots(DB1, CurrentTS, Interval, 100), 42),
+    ?equals(util:rrd_combine_gauge_slots(DB1, CurrentTS, 20, 1), 75),
     ok
     .
