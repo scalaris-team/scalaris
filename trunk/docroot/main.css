@@ -370,3 +370,7 @@ circle.node {
     float:left;
     list-style-position:inside;
 }
+
+.clear {
+    clear: both;
+}
