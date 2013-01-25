@@ -1,4 +1,4 @@
-%  @copyright 2011, 2012 Zuse Institute Berlin
+%  @copyright 2011-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -118,14 +118,29 @@ kill_node(Name) ->
 %% @doc Kills multiple nodes.
 -spec kill_nodes(Count::non_neg_integer()) -> Ok::[pid_groups:groupname()].
 kill_nodes(Count) when is_integer(Count) andalso Count >= 0 ->
-    Ok = admin:del_nodes(Count, false),
-    wait_for_nodes_to_disappear(Ok),
-    Ok.
+    %% spawn to be sure that all nodes are killed, even when killing
+    %% ourselves.
+    Pid = self(),
+    spawn(
+      fun() ->
+              Ok = admin:del_nodes(Count, false),
+              wait_for_nodes_to_disappear(Ok),
+              Pid ! {kill_nodes_done, Ok}
+            end),
+    receive {kill_nodes_done, Result} -> Result end.
+
 -spec kill_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
 kill_nodes_by_name(Names) when is_list(Names) ->
-    Result = {Ok, _NotFound} = admin:del_nodes_by_name(Names, false),
-    wait_for_nodes_to_disappear(Ok),
-    Result.
+    %% spawn to be sure that all nodes are killed, even when killing
+    %% ourselves.
+    Pid = self(),
+    spawn(
+      fun() ->
+              Result = {Ok, _NotFound} = admin:del_nodes_by_name(Names, false),
+              wait_for_nodes_to_disappear(Ok),
+              Pid ! {kill_nodes_done, Result}
+            end),
+    receive {kill_nodes_done, Result} -> Result end.
 
 %% @doc Gets connection info for a random subset of known nodes by the cyclon
 %%      processes of the dht_node processes in this VM.
