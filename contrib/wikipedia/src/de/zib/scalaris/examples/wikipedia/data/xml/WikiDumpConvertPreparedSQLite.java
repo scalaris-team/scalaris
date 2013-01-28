@@ -54,7 +54,7 @@ import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
  */
 public class WikiDumpConvertPreparedSQLite implements WikiDump {
     private static final int PRINT_SCALARIS_KV_PAIRS_EVERY = 5000;
-    protected ArrayBlockingQueue<Runnable> sqliteJobs = new ArrayBlockingQueue<Runnable>(PRINT_SCALARIS_KV_PAIRS_EVERY);
+    protected ArrayBlockingQueue<Runnable> sqliteJobs = new ArrayBlockingQueue<Runnable>(10);
     SQLiteWorker sqliteWorker = new SQLiteWorker();
     protected boolean errorDuringImport = false;
     
@@ -339,18 +339,18 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     static class SQLiteWriteBucketListJob implements Runnable {
         protected final String key;
         protected final String countKey;
-        protected final List<ErlangValue> value;
+        protected byte[] valueBytes;
         protected final SQLiteStatement stWrite;
         protected final IBuckets optimisation;
         private final WikiDump importer;
         
         public SQLiteWriteBucketListJob(WikiDump importer, String key,
-                List<ErlangValue> value, String countKey,
+                byte[] value, String countKey,
                 SQLiteStatement stWrite,
                 IBuckets optimisation) {
             this.importer = importer;
             this.key = key;
-            this.value = value;
+            this.valueBytes = value;
             this.stWrite = stWrite;
             this.optimisation = optimisation;
             this.countKey = countKey;
@@ -358,6 +358,15 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         
         @Override
         public void run() {
+            List<ErlangValue> value;
+            try {
+                value = WikiDumpPrepareSQLiteForScalarisHandler
+                        .objectFromBytes2(valueBytes).listValue();
+                valueBytes = null;
+            } catch (Exception e) {
+                importer.error("write of " + key + " failed (error: " + e.toString() + ")");
+                return;
+            }
             // split lists:
             HashMap<String, List<ErlangValue>> newLists = new HashMap<String, List<ErlangValue>>(optimisation.getBuckets());
             for (ErlangValue obj : value) {
@@ -371,7 +380,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 }
                 List<ErlangValue> valueAtKey2 = newLists.get(keyAppend2);
                 if (valueAtKey2 == null) {
-                    valueAtKey2 = new ArrayList<ErlangValue>();
+                    valueAtKey2 = new ArrayList<ErlangValue>(value.size() / optimisation.getBuckets());
                     newLists.put(keyAppend2, valueAtKey2);
                 }
                 valueAtKey2.add(obj);
@@ -606,12 +615,9 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     } else if (optimisation2 != null) {
                         switch (listOrCount) {
                             case LIST:
-                            addSQLiteJob(new SQLiteWriteBucketListJob(this,
-                                    key,
-                                    WikiDumpPrepareSQLiteForScalarisHandler
-                                            .objectFromBytes2(value)
-                                            .listValue(), countKey, stWrite,
-                                    optimisation2));
+                                addSQLiteJob(new SQLiteWriteBucketListJob(this,
+                                        key, value, countKey, stWrite,
+                                        optimisation2));
                                 break;
                             case COUNTER:
                                 if (optimisation2.getBuckets() > 1) {

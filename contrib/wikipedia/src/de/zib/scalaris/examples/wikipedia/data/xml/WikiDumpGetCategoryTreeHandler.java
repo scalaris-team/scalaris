@@ -60,7 +60,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
     protected SQLiteStatement stWriteRedirects = null;
     protected SQLiteStatement stWriteLinks = null;
     protected long nextPageId = 0l;
-    protected ArrayBlockingQueue<SQLiteJob> sqliteJobs = new ArrayBlockingQueue<SQLiteJob>(PRINT_PAGES_EVERY);
+    protected ArrayBlockingQueue<SQLiteJob> sqliteJobs = new ArrayBlockingQueue<SQLiteJob>(100);
     SQLiteWorker sqliteWorker = new SQLiteWorker();
     
     /**
