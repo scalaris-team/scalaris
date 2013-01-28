@@ -365,7 +365,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
                     keyAppend2 = ((APPEND_INCREMENT_BUCKETS) optimisation).getBucketString(obj);
                 } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
-                    keyAppend2 = ((APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation).getBucketString(false);
+                    keyAppend2 = ((APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation).getReadBucketString();
                 } else {
                     throw new RuntimeException("unsupported optimisation: " + optimisation);
                 }

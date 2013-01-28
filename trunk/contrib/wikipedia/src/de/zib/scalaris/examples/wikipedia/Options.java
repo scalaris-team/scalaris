@@ -388,48 +388,57 @@ public class Options {
     /**
      * Indicates that the new append and increment operations of Scalaris should
      * be used and list values should be distributed among several partitions,
-     * i.e. buckets, using one of the buckets for a single (big) list and the
-     * others as a small write cache for the big one.
+     * i.e. buckets, using a set of read-buckets and another set as a small
+     * write cache (write-buckets).
      * 
      * @author Nico Kruber, kruber@zib.de
      */
     public static abstract class APPEND_INCREMENT_BUCKETS_WITH_WCACHE implements
             Optimisation, IBuckets {
-        final protected int buckets;
+        final protected int readBuckets;
+        final protected int writeBuckets;
         
         /**
          * Constructor.
          * 
-         * @param buckets
-         *            number of available buckets
+         * @param readBuckets
+         *            number of available read buckets
+         * @param writeBuckets
+         *            number of available read buckets
          */
-        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE(int buckets) {
-            this.buckets = buckets;
+        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE(int readBuckets, int writeBuckets) {
+            assert (readBuckets >= 1 && writeBuckets >= 1);
+            this.readBuckets = readBuckets;
+            this.writeBuckets = writeBuckets;
         }
 
         public int getBuckets() {
-            return buckets;
+            return readBuckets + writeBuckets;
         }
         
         /**
-         * Gets the string to append to the key in order to point to the bucket
-         * for the given value.
-         * 
-         * @param useWriteCache
-         *            if <tt>true</tt>, returns a key for a write-cache bucket,
-         *            otherwise returns the key to the big list
+         * Gets the string to append to the key in order to point to a
+         * read-bucket for the given value.
          * 
          * @return the bucket string, e.g. ":0"
          */
-        abstract public <T> String getBucketString(boolean useWriteCache);
+        abstract public <T> String getReadBucketString();
+        
+        /**
+         * Gets the string to append to the key in order to point to a
+         * read-bucket for the given value.
+         * 
+         * @return the bucket string, e.g. ":0"
+         */
+        abstract public <T> String getWriteBucketString();
     }
 
     /**
      * Indicates that the new append and increment operations of Scalaris should
      * be used and list values should be distributed among several partitions,
-     * i.e. buckets, using one of the buckets for a single (big) list and the
-     * others as a small write cache for the big one. Supports only list add
-     * operations (no removal!)
+     * i.e. buckets, using a set of read-buckets and another set as a small
+     * write cache (write-buckets). Supports only list add operations (no
+     * removal!)
      * 
      * @author Nico Kruber, kruber@zib.de
      */
@@ -440,34 +449,37 @@ public class Options {
         /**
          * Constructor.
          * 
-         * @param buckets
-         *            number of available buckets
+         * @param readBuckets
+         *            number of available read buckets
+         * @param writeBuckets
+         *            number of available read buckets
          */
-        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(int buckets) {
-            super(buckets);
+        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(int readBuckets, int writeBuckets) {
+            super(readBuckets, writeBuckets);
         }
 
         @Override
-        public <T> String getBucketString(boolean useWriteCache) {
-            if (useWriteCache && buckets > 1) {
-                return ":" + (rand.nextInt(buckets - 1) + 1);
-            } else {
-                return ":" + 0;
-            }
+        public <T> String getReadBucketString() {
+            return ":" + (rand.nextInt(readBuckets));
+        }
+
+        @Override
+        public <T> String getWriteBucketString() {
+            return ":" + (rand.nextInt(writeBuckets) + readBuckets);
         }
         
         @Override
         public String toString() {
-            return "APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(" + buckets + ")";
+            return "APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(" + readBuckets + "," + writeBuckets + ")";
         }
     }
 
     /**
      * Indicates that the new append, increment and partial read operations of
      * Scalaris should be used and list values should be distributed among
-     * several partitions, i.e. buckets, using one of the buckets for a single
-     * (big) list and the others as a small write cache for the big one.
-     * Supports only list add operations (no removal!)
+     * several partitions, i.e. buckets, using a set of read-buckets and another
+     * set as a small write cache (write-buckets). Supports only list add
+     * operations (no removal!)
      * 
      * @author Nico Kruber, kruber@zib.de
      */
@@ -477,18 +489,20 @@ public class Options {
         /**
          * Constructor.
          * 
-         * @param buckets
-         *            number of available buckets
+         * @param readBuckets
+         *            number of available read buckets
+         * @param writeBuckets
+         *            number of available read buckets
          */
         public APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(
-                int buckets) {
-            super(buckets);
+                int readBuckets, int writeBuckets) {
+            super(readBuckets, writeBuckets);
         }
 
         @Override
         public String toString() {
             return "APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM("
-                    + buckets + ")";
+                    + readBuckets + "," + writeBuckets + ")";
         }
     }
     
@@ -594,34 +608,32 @@ public class Options {
             throws NumberFormatException {
         String optimisationStr = matcher.group(2);
         String parameterStr = matcher.group(3);
-        Optimisation optimisation = null;
         if (optimisationStr.equals("TRADITIONAL") && parameterStr == null) {
-            optimisation = new Options.TRADITIONAL();
+            return new Options.TRADITIONAL();
         } else if (optimisationStr.equals("APPEND_INCREMENT") && parameterStr == null) {
-            optimisation = new Options.APPEND_INCREMENT();
+            return new Options.APPEND_INCREMENT();
         } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD") && parameterStr == null) {
-            optimisation = new Options.APPEND_INCREMENT_PARTIALREAD();
+            return new Options.APPEND_INCREMENT_PARTIALREAD();
         } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_RANDOM") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            optimisation = new Options.APPEND_INCREMENT_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
+            return new Options.APPEND_INCREMENT_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
         } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            optimisation = new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
+            return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
         } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_HASH") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            optimisation = new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
+            return new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
         } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            optimisation = new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
+            return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
         } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            optimisation = new Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(Integer.parseInt(parameters[0]));
+            return new Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(Integer.parseInt(parameters[0]), Integer.parseInt(parameters[1]));
         } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM") && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            optimisation = new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(Integer.parseInt(parameters[0]));
-        } else {
-            System.err.println("unknown optimisation found: " + matcher.group());
+            return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(Integer.parseInt(parameters[0]), Integer.parseInt(parameters[1]));
         }
-        return optimisation;
+        System.err.println("unknown optimisation found: " + matcher.group());
+        return null;
     }
 }
