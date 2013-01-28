@@ -544,12 +544,12 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                         opType = ScalarisOpType.ARTICLE_COUNT;
                         listOrCount = ListOrCountOp.COUNTER;
                     } else if (revMatcher.matches()) {
+                        opType = ScalarisOpType.REVISION;
                         copyValue = true;
                     } else if (pageMatcher.matches()) {
                         opType = ScalarisOpType.PAGE;
                         copyValue = true;
                     } else if (revListMatcher.matches()) {
-                        opType = ScalarisOpType.REVISION;
                         countKey = null;
                         opType = ScalarisOpType.SHORTREV_LIST;
                         listOrCount = ListOrCountOp.LIST;
