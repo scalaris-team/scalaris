@@ -63,31 +63,7 @@ all() ->
      {group, handover_tests}
      ].
 
-%all()   -> [
-%            tester_type_check_l_on_cseq,
-%            %test_renew_with_concurrent_renew,
-%            %test_renew_with_concurrent_owner_change,
-%            %test_renew_with_concurrent_range_change,
-%            %test_renew_with_concurrent_aux_change_invalid_split,
-%            %test_renew_with_concurrent_aux_change_valid_split,
-%            %test_renew_with_concurrent_aux_change_invalid_merge,
-%            %test_renew_with_concurrent_aux_change_invalid_merge_stopped,
-%            %test_renew_with_concurrent_aux_change_valid_merge,
-%            test_split,
-%            test_split_with_concurrent_renew,
-%            test_split_but_lease_already_exists,
-%            test_split_with_owner_change_in_step1,
-%            test_split_with_owner_change_in_step2,
-%            test_split_with_owner_change_in_step3,
-%            test_split_with_aux_change_in_step1,
-%            test_handover,
-%            test_handover_with_concurrent_renew,
-%            test_handover_with_concurrent_aux_change,
-%            test_handover_with_concurrent_owner_change
-%           ].
-%
-
-suite() -> [ {timetrap, {seconds, 4}} ].
+suite() -> [ {timetrap, {seconds, 120}} ].
 
 group(tester_tests) ->
     [{timetrap, {seconds, 400}}];
