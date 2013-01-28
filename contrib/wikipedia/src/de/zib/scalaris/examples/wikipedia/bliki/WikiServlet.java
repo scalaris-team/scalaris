@@ -1264,7 +1264,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             handleViewPageNotExisting(request, response, title, connection, page);
             return;
         }
-        
+
+        page.setTitle(title);
         if (result.success) {
             page.setNotice(getParam_notice(request));
             page.setRevisions(result.revisions);
@@ -1273,7 +1274,6 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
 
             page.setError(getParam_error(request));
-            page.setTitle(title);
             if (!result.revisions.isEmpty()) { 
                 page.setVersion(result.revisions.get(0).getId());
             }
