@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import de.zib.scalaris.AbortException;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.NotFoundException;
@@ -510,12 +511,16 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             try {
                 executor.getExecutor().run();
             } catch (Exception e) {
-                return new SavePageResult(false, involvedKeys,
+                SavePageResult result = new SavePageResult(false, involvedKeys,
                         e.getClass().getCanonicalName() + " writing page \"" + title0
                                 + "\" to Scalaris: " + e.getMessage(),
                         e instanceof ConnectionException, oldPage, newPage,
                         newShortRevs, pageEdits, statName,
                         System.currentTimeMillis() - timeAtStart);
+                if (e instanceof AbortException) {
+                    result.failedKeys.addAll(((AbortException) e).getFailedKeys());
+                }
+                return result;
             }
         } while (false);
         
