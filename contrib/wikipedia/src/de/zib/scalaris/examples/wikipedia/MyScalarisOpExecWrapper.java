@@ -101,7 +101,7 @@ public class MyScalarisOpExecWrapper {
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
         } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
             final APPEND_INCREMENT_BUCKETS_WITH_WCACHE optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
-            final String key2 = key + optimisation2.getBucketString(true);
+            final String key2 = key + optimisation2.getWriteBucketString();
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
         } else {
             executor.addOp(new ScalarisIncrementOp1<T>(key, toAdd));
@@ -173,7 +173,7 @@ public class MyScalarisOpExecWrapper {
             }
         } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
             final APPEND_INCREMENT_BUCKETS_WITH_WCACHE optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
-            final String bucketStr = optimisation2.getBucketString(true);
+            final String bucketStr = optimisation2.getWriteBucketString();
             final String key2 = key + bucketStr;
             String countKey2 = null;
             if (countKey != null) {
