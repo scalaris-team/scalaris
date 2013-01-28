@@ -599,7 +599,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     
                     if (copyValue) {
                         if (listOrCount == ListOrCountOp.LIST) {
-                            addSQLiteJob(new SQLiteCopyList(this, key, value, key, stWrite));
+                            addSQLiteJob(new SQLiteCopyList(this, key, value, countKey, stWrite));
                         } else {
                             addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
                         }
