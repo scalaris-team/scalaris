@@ -1492,8 +1492,8 @@ rrd_combine_gauge_slots(DB, CurrentTS, Interval, Epsilon) ->
                         , CurrentTS :: erlang_timestamp()
                         , Interval :: non_neg_integer()
                         , Epsilon :: non_neg_integer()
-                        , InitialValue :: fun((rrd:data_type()) -> term())
-                        , UpdateValue :: fun((rrd:data_type()) -> term())
+                        , InitialValue :: fun((rrd:data_type()) -> Acc)
+                        , UpdateValue :: fun((Acc, rrd:data_type()) -> Acc)
                        ) -> term() | undefined.
 rrd_combine_slots(DB, CurrentTS, Interval, Epsilon, InitialValue, UpdateValue) ->
     Slots = rrd:dump(DB),
