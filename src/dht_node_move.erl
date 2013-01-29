@@ -1583,9 +1583,10 @@ make_slide_leave(State, SourcePid) ->
     MoveFullId = uid:get_global_uid(),
     InitNode = dht_node_state:get(State, node),
     OtherNode = dht_node_state:get(State, succ),
+    PredNode = dht_node_state:get(State, pred),
     log:log(info, "[ Node ~.0p ] starting leave (succ: ~.0p)~n", [InitNode, OtherNode]),
     setup_slide(State, {leave, 'send'}, MoveFullId, InitNode,
-                OtherNode, node:id(OtherNode), leave,
+                OtherNode, node:id(PredNode), leave,
                 unknown, SourcePid, nomsg, {none}).
 
 %% @doc Send a  node change update message to this module inside the dht_node.
