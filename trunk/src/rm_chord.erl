@@ -31,7 +31,7 @@
 -type(custom_message() ::
     {rm_trigger} |
     {rm, get_succlist, Source_Pid::comm:mypid()} |
-    {{get_node_details_response, NodeDetails::node_details:node_details()}, rm} |
+    {rm, {get_node_details_response, NodeDetails::node_details:node_details()}} |
     {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
 
 -define(SEND_OPTIONS, [{channel, prio}, quiet]).
