@@ -1406,10 +1406,19 @@ get_slide(State, MoveFullId) ->
 -spec can_slide_succ(State::dht_node_state:state(), TargetId::?RT:key(), Type::slide_op:type()) -> boolean().
 can_slide_succ(State, TargetId, Type) ->
     SlidePred = dht_node_state:get(State, slide_pred),
+    DBRange = dht_node_state:get(State, db_range),
     dht_node_state:get(State, slide_succ) =:= null andalso
+        % 1) TargetId not interfering with SlidePred?
         (SlidePred =:= null orelse
              (not intervals:in(TargetId, slide_op:get_interval(SlidePred)) andalso
                   not (slide_op:is_leave(Type) andalso slide_op:is_leave(SlidePred)))
+        ) andalso
+        % 2) no left-over DBRange (from sending data to successor) waiting for RM-update
+        % -> we need to integrate this range into my_range first in order to proceed
+        %    (most code does not look at db_range and only uses my_range to create intervals!)
+        (DBRange =:= [] orelse
+             (SlidePred =/= null andalso
+                  element(2, hd(DBRange)) =:= slide_op:get_id(SlidePred))
         ).
 
 %% @doc Returns whether a slide with the predecessor is possible for the given
@@ -1418,10 +1427,22 @@ can_slide_succ(State, TargetId, Type) ->
 -spec can_slide_pred(State::dht_node_state:state(), TargetId::?RT:key(), Type::slide_op:type()) -> boolean().
 can_slide_pred(State, TargetId, _Type) ->
     SlideSucc = dht_node_state:get(State, slide_succ),
+    DBRange = dht_node_state:get(State, db_range),
     dht_node_state:get(State, slide_pred) =:= null andalso
+        % 1) TargetId not interfering with SlideSucc?
+        % 2) no left-over DBRange (from sending data to successor) waiting for RM-update
+        % -> we need to integrate this range into my_range first in order to proceed
+        %    (most code does not look at db_range and only uses my_range to create intervals!)
         (SlideSucc =:= null orelse
              (not intervals:in(TargetId, slide_op:get_interval(SlideSucc)) andalso
                   not slide_op:is_leave(SlideSucc))
+        ) andalso
+        % 2) no left-over DBRange (from sending data to successor) waiting for RM-update
+        % -> we need to integrate this range into my_range first in order to proceed
+        %    (most code does not look at db_range and only uses my_range to create intervals!)
+        (DBRange =:= [] orelse
+             (SlideSucc =/= null andalso
+                  element(2, hd(DBRange)) =:= slide_op:get_id(SlideSucc))
         ).
 
 %% @doc Sends the source pid the given message if it is not 'null'.
