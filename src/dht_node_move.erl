@@ -970,7 +970,14 @@ request_data(State, SlideOp) ->
 %%      interval and changes the slide operation's phase to wait_for_data_ack.
 -spec send_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 send_data(State, SlideOp) ->
-    MovingInterval = slide_op:get_interval(SlideOp),
+    % last part of a leave? -> transfer all DB entries!
+    % since in this case there is no other slide, we can safely use intervals:all()
+    MovingInterval =
+        case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp)
+                 andalso slide_op:get_next_op(SlideOp) =:= {none} of
+            true  -> intervals:all();
+            false -> slide_op:get_interval(SlideOp)
+        end,
     OldDB = dht_node_state:get(State, db),
     MovingData = ?DB:get_entries(OldDB, MovingInterval),
     NewDB = ?DB:record_changes(OldDB, MovingInterval),
@@ -1024,7 +1031,14 @@ try_send_delta_to_pred(State, SlideOp) ->
 %% @see send_delta2/5
 -spec send_delta(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 send_delta(State, SlideOp) ->
-    SlideOpInterval = slide_op:get_interval(SlideOp),
+    % last part of a leave? -> transfer all DB entries!
+    % since in this case there is no other slide, we can safely use intervals:all()
+    SlideOpInterval =
+        case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp)
+                 andalso slide_op:get_next_op(SlideOp) =:= {none} of
+            true  -> intervals:all();
+            false -> slide_op:get_interval(SlideOp)
+        end,
     % send delta (values of keys that have changed during the move)
     OldDB = dht_node_state:get(State, db),
     {ChangedData, DeletedKeys} = ?DB:get_changes(OldDB, SlideOpInterval),
