@@ -352,6 +352,7 @@ details(State, Which) ->
                     hostname    -> node_details:set(NodeDetails, hostname, net_adm:localhost());
                     message_log -> node_details:set(NodeDetails, message_log, ok);
                     memory      -> node_details:set(NodeDetails, memory, erlang:memory(total));
+                    is_leaving  -> node_details:set(NodeDetails, Elem, rm_loop:has_left(dht_node_state:get(State, rm_state)));
                     Tag         -> node_details:set(NodeDetails, Tag, get(State, Tag))
                 end
         end,

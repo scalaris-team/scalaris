@@ -190,8 +190,12 @@ on({rm, buffer_response, OtherNeighbors},
     {NewNeighborhood, NewRandViewSize, Interval, TriggerState, Cache, Churn};
 
 % we asked another node we wanted to add for its node object -> now add it
+% (if it is not in the process of leaving the system)
 on({rm, {get_node_details_response, NodeDetails}}, State) ->
-    update_nodes(State, [node_details:get(NodeDetails, node)], [], null);
+    case node_details:get(NodeDetails, is_leaving) of
+        false -> update_nodes(State, [node_details:get(NodeDetails, node)], [], null);
+        true  -> State
+    end;
 
 on(_, _State) -> unknown_event.
 
@@ -326,8 +330,10 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
     ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_'}),
     case comm:is_valid(ThisWithCookie) of
         true ->
-            _ = [comm:send(node:pidX(Node), {get_node_details, ThisWithCookie, [node]}, ?SEND_OPTIONS)
-                 || Node <- NewNodes],
+            _ = [begin
+                     Msg = {get_node_details, ThisWithCookie, [node, is_leaving]},
+                     comm:send(node:pidX(Node), Msg, ?SEND_OPTIONS)
+                 end || Node <- NewNodes],
             ok;
         false -> ok
     end,
