@@ -40,11 +40,14 @@ test_cases() ->
 
 all() ->
 %%     unittest_helper:create_ct_all(test_cases()).
-    unittest_helper:create_ct_all([join_lookup]) ++ test_cases().
+    unittest_helper:create_ct_all([join_lookup]) ++
+        unittest_helper:create_ct_all([add_3_rm_3_data]) ++
+        test_cases().
 
 groups() ->
 %%     unittest_helper:create_ct_groups(test_cases(), [{add_9_rm_5, [sequence, {repeat_until_any_fail, forever}]}]).
-    unittest_helper:create_ct_groups([join_lookup], [{join_lookup, [sequence, {repeat_until_any_fail, 30}]}]).
+    unittest_helper:create_ct_groups([join_lookup], [{join_lookup, [sequence, {repeat_until_any_fail, 30}]}]) ++
+    unittest_helper:create_ct_groups([add_3_rm_3_data], [{add_3_rm_3_data, [sequence, {repeat_until_any_fail, 30}]}]).
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
@@ -140,6 +143,28 @@ add_9_rm_5_test() ->
     check_size(10),
     _ = api_vm:kill_nodes(5),
     check_size(5).
+
+add_3_rm_3_data(Config) ->
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    unittest_helper: make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
+    _ = api_vm:add_nodes(3),
+    unittest_helper:check_ring_size_fully_joined(4),
+    RandomKeys = [randoms:getRandomString() || _ <- lists:seq(1,25)],
+    _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),
+    % note: there may be hash collisions -> count the number of unique DB entries!
+    RandomHashedKeys = lists:append([?RT:get_replica_keys(?RT:hash_key(K)) || K <- RandomKeys]),
+    ExpLoad = length(lists:usort(RandomHashedKeys)),
+    % wait for late write messages to arrive at the original nodes
+    % if all writes have arrived, a range read should return 4 values
+    util:wait_for(
+      fun() ->
+              {Status, Values} = api_dht_raw:range_read(0, 0),
+              Status =:= ok andalso erlang:length(Values) =:= ExpLoad
+      end),
+    ct:pal("######## starting graceful leave ########"),
+    _ = api_vm:shutdown_nodes(3),
+    unittest_helper:check_ring_load(ExpLoad),
+    unittest_helper:stop_ring().
 
 add_2x3_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
