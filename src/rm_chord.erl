@@ -31,7 +31,7 @@
 -type(custom_message() ::
     {rm_trigger} |
     {rm, get_succlist, Source_Pid::comm:mypid()} |
-    {rm, {get_node_details_response, NodeDetails::node_details:node_details()}} |
+    {rm, {get_node_details_response, NodeDetails::node_details:node_details()}, from_succ | from_node} |
     {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
 
 -define(SEND_OPTIONS, [{channel, prio}, quiet]).
@@ -75,7 +75,7 @@ on({rm_trigger}, {Neighborhood, TriggerState}) ->
     case nodelist:has_real_succ(Neighborhood) of
         true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
                           {get_node_details,
-                           comm:reply_as(comm:this(), 2, {rm, '_'}), [pred]},
+                           comm:reply_as(comm:this(), 2, {rm, '_', from_succ}), [pred]},
                           ?SEND_OPTIONS);
         _    -> ok
     end,
@@ -89,22 +89,61 @@ on({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
     State;
 
 % got node_details from our successor
-on({rm, {get_node_details_response, NodeDetails}},
-   {OldNeighborhood, TriggerState})  ->
+on({rm, {get_node_details_response, NodeDetails}, from_succ}, State)  ->
     SuccsPred = node_details:get(NodeDetails, pred),
-    NewNeighborhood = nodelist:add_nodes(OldNeighborhood, [SuccsPred],
-                                         predListLength(), succListLength()),
-    get_successorlist(node:pidX(nodelist:succ(NewNeighborhood))),
-    {NewNeighborhood, TriggerState};
+    comm:send(node:pidX(SuccsPred),
+              {get_node_details,
+               comm:reply_as(comm:this(), 2, {rm, '_', from_node}), [node, is_leaving]},
+              ?SEND_OPTIONS),
+    State;
+
+% we asked another node we wanted to add for its node object -> now add it
+% (if it is not in the process of leaving the system)
+on({rm, {get_node_details_response, NodeDetails}, from_node},
+   {OldNeighborhood, TriggerState} = State)  ->
+    case node_details:get(NodeDetails, is_leaving) of
+        false ->
+            Node = node_details:get(NodeDetails, node),
+            NewNeighborhood = nodelist:add_nodes(OldNeighborhood, [Node],
+                                                 predListLength(), succListLength()),
+            OldSucc = nodelist:succ(OldNeighborhood),
+            NewSucc = nodelist:succ(NewNeighborhood),
+            %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
+            case OldSucc =/= NewSucc of
+                true ->
+                    get_successorlist(node:pidX(NewSucc)),
+                    rm_loop:notify_new_pred(node:pidX(NewSucc),
+                                            nodelist:node(NewNeighborhood));
+                false -> ok
+            end,
+            {NewNeighborhood, TriggerState};
+        true  -> State
+    end;
 
 on({rm, get_succlist_response, Succ, SuccsSuccList},
-   {OldNeighborhood, TriggerState}) ->
+   {OldNeighborhood, _TriggerState} = State) ->
+    
     NewNeighborhood = nodelist:add_nodes(OldNeighborhood, [Succ | SuccsSuccList],
                                          predListLength(), succListLength()),
-    %% @TODO if(length(NewSuccs) < succListLength() / 2) do something right now
-    rm_loop:notify_new_pred(node:pidX(nodelist:succ(NewNeighborhood)),
-                            nodelist:node(NewNeighborhood)),
-    {NewNeighborhood, TriggerState};
+    OldView = nodelist:to_list(OldNeighborhood),
+    NewView = nodelist:to_list(NewNeighborhood),
+    ViewOrd = fun(A, B) ->
+                      nodelist:succ_ord_node(A, B, nodelist:node(OldNeighborhood))
+              end,
+    {_, _, NewNodes} = util:ssplit_unique(OldView, NewView, ViewOrd),
+    
+    % TODO: add a local cache of contacted nodes in order not to contact them again
+    ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_', from_node}),
+    case comm:is_valid(ThisWithCookie) of
+        true ->
+            _ = [begin
+                     Msg = {get_node_details, ThisWithCookie, [node, is_leaving]},
+                     comm:send(node:pidX(Node), Msg, ?SEND_OPTIONS)
+                 end || Node <- NewNodes],
+            ok;
+        false -> ok
+    end,
+    State;
 
 on(_, _State) -> unknown_event.
 

@@ -39,7 +39,7 @@
 
 -type(node_details_name() :: predlist | pred | node | my_range | succ |
                              succlist | load | hostname | rt_size |
-                             message_log | memory | new_key).
+                             message_log | memory | new_key | is_leaving).
 
 -record(node_details, {predlist = ?required(node_details, predlist) :: nodelist:non_empty_snodelist(),
                        node     = ?required(node_details, node)     :: node:node_type(),
@@ -60,7 +60,8 @@
      {rt_size, rt_size()} |
      {message_log, message_log()} |
      {memory, memory()} |
-     {new_key, ?RT:key()}]).
+     {new_key, ?RT:key()} |
+     {is_leaving, boolean()}]).
 
 -opaque(node_details() :: node_details_record() | node_details_list()).
 
@@ -102,6 +103,7 @@ to_list(NodeDetails) when is_list(NodeDetails) ->
           (node_details(), pred, node:node_type()) -> node_details();
           (node_details(), node, node:node_type()) -> node_details();
           (node_details(), my_range, intervals:interval()) -> node_details();
+          (node_details(), is_leaving, boolean()) -> node_details();
           (node_details(), succ, node:node_type()) -> node_details();
           (node_details(), succlist, nodelist:non_empty_snodelist()) -> node_details();
           (node_details(), load, load()) -> node_details();
@@ -124,6 +126,7 @@ set(NodeDetails, Key, Value) when is_record(NodeDetails, node_details) ->
         pred -> NodeDetails#node_details{predlist = [Value]};
         % list members:
         my_range -> [{Key, Value} | to_list(NodeDetails)];
+        is_leaving -> [{Key, Value} | to_list(NodeDetails)];
         message_log -> [{Key, Value} | to_list(NodeDetails)];
         new_key -> [{Key, Value} | to_list(NodeDetails)]
     end;
@@ -151,6 +154,7 @@ contains(NodeDetails, Key) when is_list(NodeDetails) ->
 -spec get(node_details(), predlist | succlist) -> nodelist:non_empty_snodelist();
           (node_details(), pred | node | succ) -> node:node_type();
           (node_details(), my_range) -> intervals:interval();
+          (node_details(), is_leaving) -> boolean();
           (node_details(), load) -> load();
           (node_details(), hostname) -> hostname();
           (node_details(), rt_size) -> rt_size();
@@ -181,6 +185,7 @@ get(NodeDetails, Key) when is_list(NodeDetails) ->
 -spec get_list(node_details_list(), predlist | succlist) -> nodelist:non_empty_snodelist();
               (node_details_list(), pred | node | succ) -> node:node_type();
               (node_details_list(), my_range) -> intervals:interval();
+              (node_details_list(), is_leaving) -> boolean();
               (node_details_list(), load) -> load();
               (node_details_list(), hostname) -> hostname();
               (node_details_list(), rt_size) -> rt_size();
