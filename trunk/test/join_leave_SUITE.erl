@@ -64,17 +64,9 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
-        % note: the craceful leave tests only work if transactions are
-        % transferred to new TMs if the TM dies or the bench_server restarts
-        % the transactions
-        add_1_rm_1_load ->
-            {skip, "graceful leave not fully supported yet"};
-        add_3_rm_1_load ->
-            {skip, "graceful leave not fully supported yet"};
-        add_3_rm_2_load ->
-            {skip, "graceful leave not fully supported yet"};
-        add_3_rm_3_load ->
-            {skip, "graceful leave not fully supported yet"};
+        % note: graceful leave tests only work for less than 4 nodes leaving,
+        % otherwise transactions need to be transferred to new TMs if the TM
+        % dies or (alternatively) the bench_server restarts the transactions
         _ ->
             % stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
