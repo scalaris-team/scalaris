@@ -76,7 +76,7 @@
                         | {get_rt_reply, RT::rt_t()}
                         | {trigger_random_lookup}
                         | {rt_get_node, From :: comm:mypid()}
-                        | {rt_get_node_response, NewNode :: node:node_type()}
+                        | {rt_learn_node, NewNode :: node:node_type()}
                         .
 
 %% userdevguide-end rt_frtchord:types
