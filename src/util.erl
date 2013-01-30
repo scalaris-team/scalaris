@@ -156,8 +156,8 @@ supervisor_terminate_childs(SupPid) ->
                   _ -> ok
               end
           end ||  {_Id, Pid, _Type, _Module} <- ChildSpecs,
-                  Pid =/= undefined ],
-    _ = [ begin
+                  Pid =/= undefined, is_process_alive(Pid) ],
+    _ = [ try
               case Type of
                   supervisor ->
                       supervisor_terminate_childs(Pid);
@@ -168,8 +168,15 @@ supervisor_terminate_childs(SupPid) ->
               wait_for_process_to_die(Pid),
               _ = [ wait_for_table_to_disappear(Pid, Tab) || Tab <- Tables ],
               supervisor:delete_child(SupPid, Id)
+          catch
+              % child may not exist any more due to a parallel process terminating it
+              exit:{killed, _} -> ok;
+              exit:{noproc, _} -> ok;
+              % exit reason may encapsulate a previous failure
+              exit:{{killed, _}, _} -> ok;
+              exit:{{noproc, _}, _} -> ok
           end ||  {Id, Pid, Type, _Module} <- ChildSpecs,
-                  Pid =/= undefined ],
+                  Pid =/= undefined, is_process_alive(Pid) ],
     ok.
 
 -spec wait_for(fun(() -> any())) -> ok.
@@ -191,7 +198,7 @@ wait_for_process_to_die(Name) when is_atom(Name) ->
                          Pid       -> not is_process_alive(Pid)
                      end
              end);
-wait_for_process_to_die(Pid) ->
+wait_for_process_to_die(Pid) when is_pid(Pid) ->
     wait_for(fun() -> not is_process_alive(Pid) end).
 
 -spec wait_for_table_to_disappear(Pid::pid(), tid() | atom()) -> ok.
