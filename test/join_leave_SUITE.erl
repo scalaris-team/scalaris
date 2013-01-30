@@ -101,9 +101,7 @@ join_lookup(Config) ->
                      {ping, This}}) || X <- Keys ],
 
     %% got all 4 replies? ok
-    [ receive {pong} -> ok end || _ <- Keys ],
-
-    unittest_helper:stop_ring().
+    [ receive {pong} -> ok end || _ <- Keys ].
 
 add_9(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -155,8 +153,7 @@ add_3_rm_3_data(Config) ->
       end),
     ct:pal("######## starting graceful leave ########"),
     _ = api_vm:shutdown_nodes(3),
-    unittest_helper:check_ring_load(ExpLoad),
-    unittest_helper:stop_ring().
+    unittest_helper:check_ring_load(ExpLoad).
 
 add_2x3_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
