@@ -34,7 +34,6 @@ import de.zib.scalaris.operations.ReadRandomFromListOp;
 public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
     final Collection<String> keys;
     final HashMap<String, Integer> opsPerKey;
-    final int buckets;
     final ErlangConverter<List<T>> listConv;
     final ErlangConverter<T> elemConv;
     final boolean failNotFound;
@@ -69,11 +68,6 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
             boolean failNotFound, Random random) {
         this.keys = keys;
         this.opsPerKey = new HashMap<String, Integer>(keys.size());
-        if (optimisation instanceof IBuckets) {
-            this.buckets = ((IBuckets) optimisation).getBuckets();
-        } else {
-            this.buckets = 1;
-        }
         this.listConv = listConv;
         this.elemConv = elemConv;
         this.failNotFound = failNotFound;
@@ -106,6 +100,12 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
      * @return <tt>0</tt> (no operation processed since no results are used)
      */
     protected int prepareRead(final RequestList requests) {
+        int buckets;
+        if (optimisation instanceof IBuckets) {
+            buckets = ((IBuckets) optimisation).getBuckets();
+        } else {
+            buckets = 1;
+        }
         for (String key : keys) {
             HashSet<String> bucketKeys = new HashSet<String>(readOnlyOneBucket ? 2 : buckets);
             if (!(optimisation instanceof IBuckets)) {
@@ -115,9 +115,11 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
                     bucketKeys.add(key + ":" + 0);
                 }
             } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
-                // read the main key and a single write cache
-                bucketKeys.add(key + ":" + 0);
-                bucketKeys.add(key + ":" + (random.nextInt(buckets - 1) + 1));
+                APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;
+                // read a single read-bucket and a single write-bucket
+                int readBuckets = optimisation2.getReadBuckets();
+                bucketKeys.add(key + ":" + random.nextInt(readBuckets));
+                bucketKeys.add(key + ":" + (random.nextInt(buckets - readBuckets) + readBuckets));
             } else {
                 bucketKeys.add(key + ":" + random.nextInt(buckets));
             }
