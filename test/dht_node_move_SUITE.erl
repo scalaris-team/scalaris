@@ -265,6 +265,7 @@ reply_with_send_error(Msg, State) ->
                      Target = node:pidX(slide_op:get_node(Slide)),
                      FailMsgCookie =
                          case element(2, Msg) of
+                             slide_abort   -> {timeouts, 0};
                              delta_ack     -> {timeouts, 0};
                              slide         -> element(4, Msg);
                              slide_get_mte -> element(4, Msg);
