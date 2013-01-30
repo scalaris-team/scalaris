@@ -138,18 +138,6 @@ color(Pid) ->
 format_coordinate([X,Y]) ->
     io_lib:format("[~p,~p]", [X,Y]).
 
--spec format_node({
-            Pid::comm:mypid(),
-            Coord::[vivaldi:network_coordinate(), ...],
-            Hostname::node_details:hostname()
-            })
-    -> string().
-format_node({Pid, Hostname, Coords}) ->
-    io_lib:format("{\"name\":\"~p\",\"coords\":~s,\"host\":\"~s\"}", [comm:make_local(Pid),
-                                                                      format_coordinate(Coords),
-                                                                      Hostname])
-    .
-
 % @doc Format Nodes as returned by getVivaldiMap() into JSON.
 -spec format_nodes([{{comm:mypid(), node_details:hostname()}
                      , vivaldi:network_coordinate()}]) -> string().
@@ -159,14 +147,13 @@ format_nodes(Nodes) ->
         fun({{NodeName, NodeHost}, Coords}, Acc) ->
             Key = webhelpers:color(NodeName),
             PriorValue = gb_trees:lookup(Key, Acc),
-            case PriorValue of
-                none ->
-                    gb_trees:enter(Key,
-                       [format_node({NodeName, NodeHost, Coords})], Acc);
-                {value, V} ->
-                    gb_trees:enter(Key,
-                       [format_node({NodeName, NodeHost, Coords}) | V], Acc)
-            end
+            V = case PriorValue of
+                none -> [];
+                {value, PV} -> PV
+            end,
+            gb_trees:enter(Key, [io_lib:format("{\"name\":\"~p\",\"coords\":~s,\"host\":\"~s\"}"
+                                               , [comm:make_local(NodeName),format_coordinate(Coords),NodeHost]) | V]
+                           , Acc)
     end, gb_trees:empty(), Nodes),
 
     "[" ++ util:gb_trees_foldl(fun(Color, DCNodes, Acc) ->
