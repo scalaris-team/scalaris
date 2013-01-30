@@ -140,8 +140,11 @@ sleep(Pid, Time) -> Pid ! {'$gen_component', sleep, Time}, ok.
 
 -spec is_gen_component(Pid::pid()) -> boolean().
 is_gen_component(Pid) ->
-    Call = element(2, erlang:process_info(Pid, initial_call)),
-    gen_component =:= element(1, Call).
+    case erlang:process_info(Pid, initial_call) of
+        undefined -> false; % process not alive
+        PInfo -> Call = element(2, PInfo),
+                 gen_component =:= element(1, Call)
+    end.
 
 -spec runnable(Pid::pid()) -> boolean().
 runnable(Pid) ->
