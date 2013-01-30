@@ -346,11 +346,11 @@ rrd_combine_timing_slots_simple(_Config) ->
              {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3, {histogram,0,[],0}}}]),
     CurrentTS = {0,0,44}, % assume we are currently in the last slot
 
-    Expected = {1 + 3 + 30 + 42 % sum
-                , 1*1 + 3*3 + 30*30 + 42*42 % squares' sum
-                , 2 + 1 + 1 % count
-                , 1 % min
-                , 42 % max
+    Expected = {1 + 3 + 30 + 42, % sum
+                1*1 + 3*3 + 30*30 + 42*42, % squares' sum
+                2 + 1 + 1, % count
+                1, % min
+                42 % max
                },
     ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, 100), Expected),
     ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, 100, 10), Expected),
@@ -370,22 +370,12 @@ rrd_combine_timing_slots_subset(_Config) ->
     CurrentTS = {0,0,44}, % assume we are currently in the last slot
     Interval = 10, % overlap at most two slots
 
-    ExpectedSmallEpsilon = {42 + 30
-                , 42*42 + 30*30
-                , 1 + 1
-                , 30
-                , 42
-               },
+    ExpectedSmallEpsilon = {42 + 30, 42*42 + 30*30, 1 + 1, 30, 42},
     ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval), ExpectedSmallEpsilon),
     ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval, 5), ExpectedSmallEpsilon),
 
     % epsilon is big enough to do it only once
-    ExpectedBigEpsilon = {42
-                , 42*42
-                , 1
-                , 42
-                , 42
-               },
+    ExpectedBigEpsilon = {42, 42*42, 1, 42, 42},
     ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval, 10), ExpectedBigEpsilon),
     ?equals(util:rrd_combine_timing_slots(DB1, CurrentTS, Interval, 100), ExpectedBigEpsilon),
     ok
