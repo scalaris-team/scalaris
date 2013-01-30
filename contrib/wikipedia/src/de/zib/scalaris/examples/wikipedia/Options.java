@@ -416,6 +416,15 @@ public class Options {
         public int getBuckets() {
             return readBuckets + writeBuckets;
         }
+
+        /**
+         * Gets the number of read-buckets.
+         * 
+         * @return number of buckets not used for the write cache
+         */
+        public int getReadBuckets() {
+            return readBuckets;
+        }
         
         /**
          * Gets the string to append to the key in order to point to a
