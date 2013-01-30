@@ -35,7 +35,7 @@ import com.almworks.sqlite4java.SQLiteStatement;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
-import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY;
 import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
@@ -373,8 +373,8 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 String keyAppend2;
                 if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
                     keyAppend2 = ((APPEND_INCREMENT_BUCKETS) optimisation).getBucketString(obj);
-                } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
-                    keyAppend2 = ((APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation).getReadBucketString();
+                } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
+                    keyAppend2 = ((APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation).getReadBucketString();
                 } else {
                     throw new RuntimeException("unsupported optimisation: " + optimisation);
                 }
@@ -454,7 +454,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     int curValue;
                     if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
                         curValue = (i == optimisation.getBuckets() - 1) ? rest : avg;
-                    } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+                    } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
                         curValue = (i == 0) ? rest : 0;
                     } else {
                         throw new RuntimeException("unsupported optimisation: " + optimisation);

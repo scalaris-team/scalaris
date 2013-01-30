@@ -8,7 +8,7 @@ import java.util.Map.Entry;
 
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
-import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisIncrementOp1;
@@ -99,8 +99,8 @@ public class MyScalarisOpExecWrapper {
             final APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
             final String key2 = key + optimisation2.getBucketString(toAdd);
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
-        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
-            final APPEND_INCREMENT_BUCKETS_WITH_WCACHE optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
+            final APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;
             final String key2 = key + optimisation2.getWriteBucketString();
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
         } else {
@@ -171,8 +171,8 @@ public class MyScalarisOpExecWrapper {
                 }
                 executor.addOp(new ScalarisListAppendRemoveOp2<T>(key2, toAdd2, toRemove2, entry.getValue()));
             }
-        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
-            final APPEND_INCREMENT_BUCKETS_WITH_WCACHE optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
+            final APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;
             final String bucketStr = optimisation2.getWriteBucketString();
             final String key2 = key + bucketStr;
             String countKey2 = null;

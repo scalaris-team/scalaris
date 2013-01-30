@@ -393,7 +393,7 @@ public class Options {
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    public static abstract class APPEND_INCREMENT_BUCKETS_WITH_WCACHE implements
+    public static abstract class APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY implements
             Optimisation, IBuckets {
         final protected int readBuckets;
         final protected int writeBuckets;
@@ -406,7 +406,7 @@ public class Options {
          * @param writeBuckets
          *            number of available read buckets
          */
-        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE(int readBuckets, int writeBuckets) {
+        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY(int readBuckets, int writeBuckets) {
             assert (readBuckets >= 1 && writeBuckets >= 1);
             this.readBuckets = readBuckets;
             this.writeBuckets = writeBuckets;
@@ -426,7 +426,7 @@ public class Options {
         
         /**
          * Gets the string to append to the key in order to point to a
-         * read-bucket for the given value.
+         * write-bucket for the given value.
          * 
          * @return the bucket string, e.g. ":0"
          */
@@ -443,7 +443,7 @@ public class Options {
      * @author Nico Kruber, kruber@zib.de
      */
     public static class APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM extends
-            APPEND_INCREMENT_BUCKETS_WITH_WCACHE {
+            APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY {
         final static protected Random rand = new Random();
 
         /**
@@ -452,7 +452,7 @@ public class Options {
          * @param readBuckets
          *            number of available read buckets
          * @param writeBuckets
-         *            number of available read buckets
+         *            number of available write buckets
          */
         public APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(int readBuckets, int writeBuckets) {
             super(readBuckets, writeBuckets);
@@ -492,7 +492,7 @@ public class Options {
          * @param readBuckets
          *            number of available read buckets
          * @param writeBuckets
-         *            number of available read buckets
+         *            number of available write buckets
          */
         public APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(
                 int readBuckets, int writeBuckets) {

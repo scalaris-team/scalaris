@@ -16,7 +16,7 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY;
 import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.IPartialRead;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
@@ -114,7 +114,7 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
                 for (int i = 0; i < buckets; ++i) {
                     bucketKeys.add(key + ":" + 0);
                 }
-            } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+            } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
                 // read the main key and a single write cache
                 bucketKeys.add(key + ":" + 0);
                 bucketKeys.add(key + ":" + (random.nextInt(buckets - 1) + 1));
