@@ -444,7 +444,13 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             // however, it does not matter which counter is how large
             // -> make all bucket counters (almost) the same value
             
-            final int avg = value / optimisation.getBuckets();
+            int avg = value;
+            if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+                avg = value / optimisation.getBuckets();
+            } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
+                APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;
+                avg = value / optimisation2.getReadBuckets();
+            }
             int rest = value; 
             
             for (int i = 0; i < optimisation.getBuckets(); ++i) {
@@ -455,7 +461,8 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
                         curValue = (i == optimisation.getBuckets() - 1) ? rest : avg;
                     } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
-                        curValue = (i == 0) ? rest : 0;
+                        APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;
+                        curValue = (i == optimisation2.getReadBuckets() - 1) ? rest : avg;
                     } else {
                         throw new RuntimeException("unsupported optimisation: " + optimisation);
                     }
