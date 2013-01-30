@@ -262,15 +262,9 @@ stop_ring(Pid) ->
             ok
         end
     catch
-        throw:Term ->
-            ct:pal("exception in stop_ring: ~p~n", [Term]),
-            throw(Term);
-        exit:Reason ->
-            ct:pal("exception in stop_ring: ~p~n", [Reason]),
-            throw(Reason);
-        error:Reason ->
-            ct:pal("exception in stop_ring: ~p ~p~n", [Reason, erlang:get_stacktrace()]),
-            throw(Reason)
+        Level:Reason ->
+            ct:pal("~s in stop_ring: ~p~n~.0p", [Level, Reason, erlang:get_stacktrace()]),
+            erlang:Level(Reason)
     end.
 
 -spec stop_pid_groups() -> ok.
