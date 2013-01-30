@@ -393,8 +393,8 @@ public class Options {
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    public static abstract class APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY implements
-            Optimisation, IBuckets {
+    public static abstract class APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY
+            implements Optimisation, IBuckets {
         final protected int readBuckets;
         final protected int writeBuckets;
         
@@ -406,7 +406,8 @@ public class Options {
          * @param writeBuckets
          *            number of available read buckets
          */
-        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY(int readBuckets, int writeBuckets) {
+        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY(int readBuckets,
+                int writeBuckets) {
             assert (readBuckets >= 1 && writeBuckets >= 1);
             this.readBuckets = readBuckets;
             this.writeBuckets = writeBuckets;
@@ -454,7 +455,8 @@ public class Options {
          * @param writeBuckets
          *            number of available write buckets
          */
-        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(int readBuckets, int writeBuckets) {
+        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(
+                int readBuckets, int writeBuckets) {
             super(readBuckets, writeBuckets);
         }
 
@@ -470,7 +472,8 @@ public class Options {
         
         @Override
         public String toString() {
-            return "APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(" + readBuckets + "," + writeBuckets + ")";
+            return "APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM("
+                    + readBuckets + "," + writeBuckets + ")";
         }
     }
 
@@ -610,28 +613,44 @@ public class Options {
         String parameterStr = matcher.group(3);
         if (optimisationStr.equals("TRADITIONAL") && parameterStr == null) {
             return new Options.TRADITIONAL();
-        } else if (optimisationStr.equals("APPEND_INCREMENT") && parameterStr == null) {
+        } else if (optimisationStr.equals("APPEND_INCREMENT")
+                && parameterStr == null) {
             return new Options.APPEND_INCREMENT();
-        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD") && parameterStr == null) {
+        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD")
+                && parameterStr == null) {
             return new Options.APPEND_INCREMENT_PARTIALREAD();
-        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_RANDOM") && parameterStr != null) {
+        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_RANDOM")
+                && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            return new Options.APPEND_INCREMENT_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
-        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM") && parameterStr != null) {
+            return new Options.APPEND_INCREMENT_BUCKETS_RANDOM(
+                    Integer.parseInt(parameters[0]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM")
+                && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM(Integer.parseInt(parameters[0]));
-        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_HASH") && parameterStr != null) {
+            return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM(
+                    Integer.parseInt(parameters[0]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_HASH")
+                && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            return new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
-        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH") && parameterStr != null) {
+            return new Options.APPEND_INCREMENT_BUCKETS_WITH_HASH(
+                    Integer.parseInt(parameters[0]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH")
+                && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH(Integer.parseInt(parameters[0]));
-        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM") && parameterStr != null) {
+            return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH(
+                    Integer.parseInt(parameters[0]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM")
+                && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            return new Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(Integer.parseInt(parameters[0]), Integer.parseInt(parameters[1]));
-        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM") && parameterStr != null) {
+            return new Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(
+                    Integer.parseInt(parameters[0]),
+                    Integer.parseInt(parameters[1]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM")
+                && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
-            return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(Integer.parseInt(parameters[0]), Integer.parseInt(parameters[1]));
+            return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(
+                    Integer.parseInt(parameters[0]),
+                    Integer.parseInt(parameters[1]));
         }
         System.err.println("unknown optimisation found: " + matcher.group());
         return null;
