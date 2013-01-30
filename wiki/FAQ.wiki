@@ -74,9 +74,10 @@ We build RPM and DEB packages for all tagged Scalaris versions as well as snapsh
 Available packages are listed in the following table:
 
 || *Distribution* || *Version* || *Download* ||
-|| Arch Linux || || stable: [http://aur.archlinux.org/packages.php?ID=56694]<br>unstable: [http://aur.archlinux.org/packages.php?ID=56695] ||
+|| Arch Linux || || stable: [http://aur.archlinux.org/packages.php?ID=56694]<br>unstable: [http://aur.archlinux.org/packages.php?ID=56695]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris/ArchLinux/] ||
 || Fedora || 16 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Fedora_16/] ||
 || Fedora || 17 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_17/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Fedora_17/] ||
+|| Fedora || 18 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Fedora_18/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Fedora_18/] ||
 || Mandriva || 2010 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Mandriva_2010/] ||
 || Mandriva || 2010.1 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2010.1/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Mandriva_2010.1/] ||
 || Mandriva || 2011 || stable: [http://download.opensuse.org/repositories/home:/scalaris/Mandriva_2011/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Mandriva_2011/] ||
@@ -100,6 +101,7 @@ Available packages are listed in the following table:
 || Ubuntu || 11.04 (Natty Narwhal) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_11.04/] ||
 || Ubuntu || 11.10 (Oneiric Ocelot) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_11.10/] ||
 || Ubuntu || 12.04 (Precise Pangolin) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_12.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_12.04/] ||
+|| Ubuntu || 12.10 (Quantal Quetzal) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_12.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_12.10/] ||
 
 For those distributions which provide a recent-enough Erlang version, we build the packages using their Erlang package and recommend using the same version that came with the distribution. In this case we do not provide Erlang packages in our repository.
 
