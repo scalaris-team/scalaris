@@ -11,6 +11,7 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
 import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisOp;
@@ -111,7 +112,18 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
         for (int x = 0; x < keys.size(); ++x) {
             for (int i = 0; i < buckets; ++i) {
                 try {
-                    value.addAll(conv.convert(results.processReadAt(firstOp++)));
+                    final List<T> list = conv.convert(results.processReadAt(firstOp++));
+                    if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+                        APPEND_INCREMENT_BUCKETS_WITH_WCACHE opt2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
+                        // read buckets + write-add buckets are added to the list
+                        if (i < (opt2.getReadBuckets() + opt2.getWriteBuckets())) {
+                            value.addAll(list);
+                        } else {
+                            value.removeAll(list);
+                        }
+                    } else {
+                        value.addAll(list);
+                    }
                 } catch (NotFoundException e) {
                     ++notFound;
                     lastNotFound = e;

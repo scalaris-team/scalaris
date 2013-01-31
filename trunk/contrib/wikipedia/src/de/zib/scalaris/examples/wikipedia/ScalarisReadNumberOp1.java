@@ -9,6 +9,7 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
 import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisOp;
@@ -40,7 +41,11 @@ public class ScalarisReadNumberOp1 implements ScalarisOp {
     public ScalarisReadNumberOp1(final Collection<String> keys,
             final Optimisation optimisation, boolean failNotFound) {
         this.keys = keys;
-        if (optimisation instanceof IBuckets) {
+        if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+            APPEND_INCREMENT_BUCKETS_WITH_WCACHE opt2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
+            // counters only exist in the read and write-add buckets
+            this.buckets = opt2.getReadBuckets() + opt2.getWriteBuckets();
+        } else if (optimisation instanceof IBuckets) {
             this.buckets = ((IBuckets) optimisation).getBuckets();
         } else {
             this.buckets = 1;

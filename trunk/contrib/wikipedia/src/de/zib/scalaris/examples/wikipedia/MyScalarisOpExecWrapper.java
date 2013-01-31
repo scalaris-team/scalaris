@@ -8,6 +8,7 @@ import java.util.Map.Entry;
 
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
@@ -184,6 +185,59 @@ public class MyScalarisOpExecWrapper {
                 System.err.println("deleting entries is not supported with APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM");
             }
             executor.addOp(new ScalarisListAppendRemoveOp2<T>(key2, toAdd, toRemove, countKey2));
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+            final APPEND_INCREMENT_BUCKETS_WITH_WCACHE optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
+            final HashMap<String, String> countKeys = new HashMap<String, String>(2 * (toAdd.size() + toRemove.size()));
+            final LinkedMultiHashMap<String, T> kvAdd = new LinkedMultiHashMap<String, T>();
+            final LinkedMultiHashMap<String, T> kvRemove = new LinkedMultiHashMap<String, T>();
+            // note: assume that getWriteBucketAddString(X) and
+            // getWriteBucketDeleteString(Y) never point to the same key 
+            for (T t : toAdd) {
+                // add to add write-bucket
+                final String bucketStrAdd = optimisation2.getWriteBucketAddString(t);
+                final String keyAdd2 = key + bucketStrAdd;
+                if (countKey != null) {
+                    countKeys.put(keyAdd2, countKey + bucketStrAdd);
+                } else {
+                    countKeys.put(keyAdd2, null);
+                }
+                kvAdd.put1(keyAdd2, t);
+                // also need to remove the key from the delete write-bucket (if present!)
+                final String bucketStrDel = optimisation2.getWriteBucketDeleteString(t);
+                final String keyDel2 = key + bucketStrDel;
+                // we only count in the add write-buckets!
+                countKeys.put(keyDel2, null);
+                kvRemove.put1(keyDel2, t);
+            }
+            for (T t : toRemove) {
+                // add to delete write-bucket
+                final String bucketStrDel = optimisation2.getWriteBucketDeleteString(t);
+                final String keyDel2 = key + bucketStrDel;
+                // we only count in the add bucket counters!
+                countKeys.put(keyDel2, null);
+                kvAdd.put1(keyDel2, t);
+                // also need to remove the key from the add write-bucket (if present!)
+                final String bucketStrAdd = optimisation2.getWriteBucketAddString(t);
+                final String keyAdd2 = key + bucketStrAdd;
+                if (countKey != null) {
+                    countKeys.put(keyAdd2, countKey + bucketStrAdd);
+                } else {
+                    countKeys.put(keyAdd2, null);
+                }
+                kvRemove.put1(keyAdd2, t);
+            }
+            for (Entry<String, String> entry : countKeys.entrySet()) {
+                final String key2 = entry.getKey();
+                List<T> toAdd2 = kvAdd.get(key2);
+                if (toAdd2 == null) {
+                    toAdd2 = new ArrayList<T>(0);
+                }
+                List<T> toRemove2 = kvRemove.get(key2);
+                if (toRemove2 == null) {
+                    toRemove2 = new ArrayList<T>(0);
+                }
+                executor.addOp(new ScalarisListAppendRemoveOp2<T>(key2, toAdd2, toRemove2, entry.getValue()));
+            }
         } else {
             executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, toAdd, toRemove, countKey));
         }
