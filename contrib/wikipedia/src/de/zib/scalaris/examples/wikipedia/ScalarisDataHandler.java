@@ -261,7 +261,9 @@ public class ScalarisDataHandler {
 
     /**
      * Retrieves a list of pages from Scalaris.
+     * 
      * @param <T>
+     *            list type
      * 
      * @param connection
      *            the connection to Scalaris
@@ -270,8 +272,8 @@ public class ScalarisDataHandler {
      * @param scalaris_keys
      *            the keys under which the page list is stored in Scalaris
      * @param failNotFound
-     *            whether the operation should fail if the key is not found or
-     *            not (the value contains null if not failed!)
+     *            whether the operation should fail if no key is found (in which
+     *            case the value is <tt>null</tt>) or not
      * @param timeAtStart
      *            the start time of the method using this method
      * @param statName

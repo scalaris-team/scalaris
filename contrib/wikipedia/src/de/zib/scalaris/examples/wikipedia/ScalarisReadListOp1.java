@@ -106,9 +106,9 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
      */
     protected int checkRead(int firstOp, final ResultList results) throws OtpErlangException,
             UnknownException {
-        for (@SuppressWarnings("unused") String key : keys) {
-            int notFound = 0;
-            NotFoundException lastNotFound = null;
+        int notFound = 0;
+        NotFoundException lastNotFound = null;
+        for (int x = 0; x < keys.size(); ++x) {
             for (int i = 0; i < buckets; ++i) {
                 try {
                     value.addAll(conv.convert(results.processReadAt(firstOp++)));
@@ -117,9 +117,9 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
                     lastNotFound = e;
                 }
             }
-            if (failNotFound && notFound == buckets) {
-                throw lastNotFound;
-            }
+        }
+        if (failNotFound && notFound == (keys.size() * buckets)) {
+            throw lastNotFound;
         }
         return keys.size() * buckets;
     }
