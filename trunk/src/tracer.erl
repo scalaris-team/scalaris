@@ -36,17 +36,13 @@
 -spec start() -> ok.
 start() ->
     spawn(?MODULE, tracer, [self()]),
-    receive
-        {done} -> ok
-    end,
+    receive ?SCALARIS_RECV({done}, ok) end,
     ok.
 
 -spec start_perf() -> ok.
 start_perf() ->
     spawn(?MODULE, tracer_perf, [self()]),
-    receive
-        {done} -> ok
-    end,
+    receive ?SCALARIS_RECV({done}, ok) end,
     ok.
 
 -spec tracer(Pid::comm:erl_local_pid()) -> no_return().
@@ -66,10 +62,15 @@ tracer_perf(Pid) ->
 -spec loop() -> no_return().
 loop() ->
     receive
-        {trace, Pid, send_to_non_existing_process, Msg, To} ->
-            log:log(error,"send_to_non_existing_process: ~p -> ~p (~p)", [Pid, To, Msg]),
-            loop();
-        {trace, Pid, exit, Reason} ->
+        ?SCALARIS_RECV(
+            {trace, Pid, send_to_non_existing_process, Msg, To}, %% ->
+            begin
+                log:log(error,"send_to_non_existing_process: ~p -> ~p (~p)", [Pid, To, Msg]),
+                loop()
+            end
+          );
+        ?SCALARIS_RECV(
+            {trace, Pid, exit, Reason}, %% ->
             case Reason of
                 normal ->
                     loop();
@@ -81,12 +82,17 @@ loop() ->
                     %io:format("~p~n", [dump()]),
                     %log:log(warn,"EXIT: ~p | ~p", [Pid, Reason]),
                     loop()
-            end;
-        {trace, Pid, spawn, Pid2, {M, F, Args}} ->
-            %io:format(" SPAWN: ~p -> ~p in ~p~n", [Pid, Pid2, {M, F, Args}]),
-            %log:log(debug "[ TRACER ] SPAWN: ~p -> ~p in ~p", [Pid, Pid2, {M, F, Args}]),
-            ets:insert(tracer, {Pid, Pid2, {M, F, Args}}),
-            loop();
+            end
+          );
+        ?SCALARIS_RECV(
+            {trace, Pid, spawn, Pid2, {M, F, Args}}, %% ->
+            begin
+                %io:format(" SPAWN: ~p -> ~p in ~p~n", [Pid, Pid2, {M, F, Args}]),
+                %log:log(debug "[ TRACER ] SPAWN: ~p -> ~p in ~p", [Pid, Pid2, {M, F, Args}]),
+                ets:insert(tracer, {Pid, Pid2, {M, F, Args}}),
+                loop()
+            end
+          );
         _X ->
             loop()
     end.
@@ -94,22 +100,30 @@ loop() ->
 -spec loop_perf() -> no_return().
 loop_perf() ->
     receive
-        {trace_ts, Pid, in, _, TS} ->
-            case ets:lookup(tracer_perf, Pid) of
-                [] ->
-                    ets:insert(tracer_perf, {Pid, TS, 0});
-                [{Pid, _, Sum}] ->
-                    ets:insert(tracer_perf, {Pid, TS, Sum})
-            end,
-            loop_perf();
-        {trace_ts, Pid, out, _, TS} ->
-            case ets:lookup(tracer_perf, Pid) of
-                [] ->
-                    ets:insert(tracer_perf, {Pid, ok, 0});
-                [{Pid, In, Sum}] ->
-                    ets:insert(tracer_perf, {Pid, ok, timer:now_diff(TS, In) + Sum})
-            end,
-            loop_perf();
+        ?SCALARIS_RECV(
+            {trace_ts, Pid, in, _, TS}, %% ->
+            begin
+                case ets:lookup(tracer_perf, Pid) of
+                    [] ->
+                        ets:insert(tracer_perf, {Pid, TS, 0});
+                    [{Pid, _, Sum}] ->
+                        ets:insert(tracer_perf, {Pid, TS, Sum})
+                end,
+                loop_perf()
+            end
+          );
+        ?SCALARIS_RECV(
+            {trace_ts, Pid, out, _, TS}, %% ->
+            begin
+                case ets:lookup(tracer_perf, Pid) of
+                    [] ->
+                        ets:insert(tracer_perf, {Pid, ok, 0});
+                    [{Pid, In, Sum}] ->
+                        ets:insert(tracer_perf, {Pid, ok, timer:now_diff(TS, In) + Sum})
+                end,
+                loop_perf()
+            end
+          );
         _X ->
             io:format("unknown message: ~p~n", [_X]),
             loop_perf()

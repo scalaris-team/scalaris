@@ -178,15 +178,20 @@ insert_db(KVV) ->
     _ = lists:foldl(
           fun(Node, ActKVV) ->
                   comm:send(Node, {get_state, comm:this(), my_range}),
-                  NRange = receive
-                               {get_state_response, Range} -> Range
-                           end,
+                  % note: receive wrapped in anonymous functions to allow
+                  %       ?SCALARIS_RECV in multiple receive statements
+                  NRange = fun() -> receive
+                               ?SCALARIS_RECV(
+                                   {get_state_response, Range}, %% ->
+                                   Range
+                                 )
+                           end end(),
                   {NKVV, RestKVV} = lists:partition(
                                       fun(Entry) ->
                                               intervals:in(db_entry:get_key(Entry), NRange)
                                       end, ActKVV),
                   comm:send(Node, {add_data, comm:this(), NKVV}),
-                  receive {add_data_reply} -> ok end,
+                  fun() -> receive ?SCALARIS_RECV({add_data_reply}, ok) end end(),
                   RestKVV
           end,
           KVV, Nodes),
@@ -196,7 +201,7 @@ insert_db(KVV) ->
 remove_keys(Keys) ->
     _ = [begin
              comm:send(Node, {delete_keys, comm:this(), Keys}),
-             receive {delete_keys_reply} -> ok end
+             receive ?SCALARIS_RECV({delete_keys_reply}, ok) end
          end || Node <- get_node_list()],
     ok.
 
@@ -353,5 +358,8 @@ select_random_keys(Keys, Count, Acc) ->
 get_node_list() ->
     mgmt_server:node_list(),
     receive
-        {get_list_response, List} -> List
+        ?SCALARIS_RECV(
+            {get_list_response, List}, %% ->
+            List
+          )
     end.

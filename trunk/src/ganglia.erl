@@ -105,8 +105,10 @@ monitor_vivaldi_errors(Group, Idx) ->
         Vivaldi ->
             comm:send_local(Vivaldi, {get_coordinate, comm:this()}),
             receive
-                {vivaldi_get_coordinate_response, _, Error} ->
+                ?SCALARIS_RECV(
+                    {vivaldi_get_coordinate_response, _, Error}, %% ->
                     gmetric(both, lists:flatten(io_lib:format("vivaldi_error_~p", [Idx])), "float", Error, "error")
+                  )
             end
     end.
 
@@ -155,8 +157,10 @@ fetch_local_load() ->
 get_load(Pid) ->
     comm:send_local(Pid, {get_node_details, comm:this(), [load]}),
     receive
-        {get_node_details_response, Details} ->
+        ?SCALARIS_RECV(
+            {get_node_details_response, Details}, %% ->
             node_details:get(Details, load)
+          )
     after 2000 ->
             0
     end.

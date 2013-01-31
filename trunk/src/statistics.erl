@@ -83,7 +83,7 @@ get_memory({failed, _}) ->
 get_ring_details() ->
     mgmt_server:node_list(),
     Nodes = receive
-                {get_list_response, N} -> N
+                ?SCALARIS_RECV({get_list_response, N}, N)
             after 2000 ->
                 log:log(error,"[ ST ] Timeout getting node list from mgmt server"),
                 throw('mgmt_server_timeout')
@@ -170,10 +170,12 @@ get_node_details([_|_] = Pids, Ring, TimeInMS) ->
     case Continue of
         continue ->
             receive
-                {ok, {get_node_details_response, Details}, Pid} ->
+                ?SCALARIS_RECV(
+                    {ok, {get_node_details_response, Details}, Pid}, %% ->
                     get_node_details(lists:delete(Pid, Pids),
                                      [{ok, Details} | Ring],
                                      TimeInMS)
+                  )
             after
                 10 ->
                     get_node_details(Pids, Ring, TimeInMS + 10)
@@ -224,8 +226,11 @@ is_valid({failed, _}) ->
 getMonitorData(Monitor, Keys) ->
     comm:send_local(Monitor, {get_rrds, Keys, comm:this()}),
     receive
-        {get_rrds_response, DataL} -> [Data || Data = {_Process, _Key, Value} <- DataL,
-                                               Value =/= undefined]
+        ?SCALARIS_RECV(
+            {get_rrds_response, DataL}, %% ->
+            [Data || Data = {_Process, _Key, Value} <- DataL,
+                     Value =/= undefined]
+          )
     end.
 
 -spec monitor_timing_dump_fun_exists(rrd:rrd(), From_us::rrd:internal_time(), To_us::rrd:internal_time(), Value::term())

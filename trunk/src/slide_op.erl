@@ -394,7 +394,7 @@ cancel_timer2(SlideOp) ->
         true ->
             _ = erlang:cancel_timer(TimerRef),
             % consume potential timeout message
-            receive Msg -> ok
+            receive ?SCALARIS_RECV(Msg, ok)
                 after 0 -> ok
             end;
         _ -> ok

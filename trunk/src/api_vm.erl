@@ -127,7 +127,7 @@ kill_nodes(Count) when is_integer(Count) andalso Count >= 0 ->
               wait_for_nodes_to_disappear(Ok),
               Pid ! {kill_nodes_done, Ok}
             end),
-    receive {kill_nodes_done, Result} -> Result end.
+    receive ?SCALARIS_RECV({kill_nodes_done, Result}, Result) end.
 
 -spec kill_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
 kill_nodes_by_name(Names) when is_list(Names) ->
@@ -140,7 +140,7 @@ kill_nodes_by_name(Names) when is_list(Names) ->
               wait_for_nodes_to_disappear(Ok),
               Pid ! {kill_nodes_done, Result}
             end),
-    receive {kill_nodes_done, Result} -> Result end.
+    receive ?SCALARIS_RECV({kill_nodes_done, Result}, Result) end.
 
 %% @doc Gets connection info for a random subset of known nodes by the cyclon
 %%      processes of the dht_node processes in this VM.

@@ -30,9 +30,13 @@ start(Gap) ->
 -spec loop(Gap::pos_integer(), [pid()]) -> ok.
 loop(Gap, Pids) ->
     receive
-        {load_stop} ->
-            _ = [erlang:exit(Pid, kill) || Pid <- Pids],
-            ok
+        ?SCALARIS_RECV(
+            {load_stop}, %%->
+            begin
+                _ = [erlang:exit(Pid, kill) || Pid <- Pids],
+                ok
+            end
+          )
     after Gap ->
             Pid = spawn_new(),
             loop(Gap, [Pid | Pids])

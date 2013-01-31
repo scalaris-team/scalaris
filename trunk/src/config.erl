@@ -74,9 +74,7 @@ read(Key) ->
 -spec write(atom(), any()) -> ok.
 write(Key, Value) ->
     comm:send_local(config, {write, self(), Key, Value}),
-    receive
-        {write_done} -> ok
-    end.
+    receive ?SCALARIS_RECV({write_done}, ok) end.
 
 %% gen_server setup
 
@@ -143,10 +141,14 @@ init(Files, Owner) ->
 -spec loop() -> no_return().
 loop() ->
     receive
-        {write, Pid, Key, Value} ->
-            ets:insert(config_ets, {Key, Value}),
-            comm:send_local(Pid, {write_done}),
-            loop();
+        ?SCALARIS_RECV(
+            {write, Pid, Key, Value}, %% ->
+            begin
+                ets:insert(config_ets, {Key, Value}),
+                comm:send_local(Pid, {write_done}),
+                loop()
+            end
+          );
         %% handle sys:suspend messages
         {system, From, Msg} ->
             sys:handle_system_msg(Msg, From, self(), config, [], no_state);

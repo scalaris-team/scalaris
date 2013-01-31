@@ -184,8 +184,10 @@ proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
 get_rrds(MonitorPid, Keys) ->
     comm:send_local(MonitorPid, {get_rrds, Keys, comm:this()}),
     receive
-        {get_rrds_response, Response} ->
+        ?SCALARIS_RECV(
+            {get_rrds_response, Response}, %% ->
             Response
+          )
     after
         2000 ->
             []
@@ -365,7 +367,7 @@ get_rrd_keys() ->
 get_rrd_keys(MonitorPid) ->
     comm:send_local(MonitorPid, {get_rrd_keys, self()}),
     receive
-        {get_rrd_keys, Keys} -> Keys
+        ?SCALARIS_RECV({get_rrd_keys, Keys}, Keys)
     after 2000 ->
             timeout
     end
