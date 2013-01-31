@@ -2,7 +2,6 @@ package de.zib.scalaris.examples.wikipedia;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -33,7 +32,7 @@ import de.zib.scalaris.operations.ReadRandomFromListOp;
  */
 public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
     final Collection<String> keys;
-    final HashMap<String, Integer> opsPerKey;
+    final int bucketsPerKey;
     final ErlangConverter<List<T>> listConv;
     final ErlangConverter<T> elemConv;
     final boolean failNotFound;
@@ -67,13 +66,23 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
             final Optimisation optimisation, boolean readOnlyOneBucket, ErlangConverter<T> elemConv, ErlangConverter<List<T>> listConv,
             boolean failNotFound, Random random) {
         this.keys = keys;
-        this.opsPerKey = new HashMap<String, Integer>(keys.size());
         this.listConv = listConv;
         this.elemConv = elemConv;
         this.failNotFound = failNotFound;
         this.random = random;
         this.optimisation = optimisation;
         this.readOnlyOneBucket = readOnlyOneBucket;
+
+        // keep in sync with prepareRead()!
+        if (!(optimisation instanceof IBuckets)) {
+            this.bucketsPerKey = 1;
+        } else if (!readOnlyOneBucket) {
+            this.bucketsPerKey = ((IBuckets) optimisation).getBuckets();
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
+            this.bucketsPerKey = 2;
+        } else {
+            this.bucketsPerKey = 1;
+        }
     }
 
     public int workPhases() {
@@ -100,18 +109,12 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
      * @return <tt>0</tt> (no operation processed since no results are used)
      */
     protected int prepareRead(final RequestList requests) {
-        int buckets;
-        if (optimisation instanceof IBuckets) {
-            buckets = ((IBuckets) optimisation).getBuckets();
-        } else {
-            buckets = 1;
-        }
         for (String key : keys) {
-            HashSet<String> bucketKeys = new HashSet<String>(readOnlyOneBucket ? 2 : buckets);
+            HashSet<String> bucketKeys = new HashSet<String>(bucketsPerKey);
             if (!(optimisation instanceof IBuckets)) {
                 bucketKeys.add(key);
             } else if (!readOnlyOneBucket) {
-                for (int i = 0; i < buckets; ++i) {
+                for (int i = 0; i < bucketsPerKey; ++i) {
                     bucketKeys.add(key + ":" + i);
                 }
             } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
@@ -119,17 +122,16 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
                 // read a single read-bucket and a single write-bucket
                 int readBuckets = optimisation2.getReadBuckets();
                 bucketKeys.add(key + ":" + random.nextInt(readBuckets));
-                bucketKeys.add(key + ":" + (random.nextInt(buckets - readBuckets) + readBuckets));
+                bucketKeys.add(key + ":" + (random.nextInt(bucketsPerKey - readBuckets) + readBuckets));
             } else {
-                bucketKeys.add(key + ":" + random.nextInt(buckets));
+                bucketKeys.add(key + ":" + random.nextInt(bucketsPerKey));
             }
+            assert(bucketsPerKey == bucketKeys.size());
             if (optimisation instanceof IPartialRead) {
-                opsPerKey.put(key, bucketKeys.size());
                 for (String bucketKey : bucketKeys) {
                     requests.addOp(new ReadRandomFromListOp(bucketKey));
                 }
             } else {
-                opsPerKey.put(key, bucketKeys.size());
                 for (String bucketKey : bucketKeys) {
                     requests.addOp(new ReadOp(bucketKey));
                 }
@@ -164,11 +166,8 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
              */
             TreeMap<Integer, T> valueMap = new TreeMap<Integer, T>();
             Integer listLen = 0;
-            int numberOfOps = 0;
-            for (String key : keys) {
-                int opsForKey = this.opsPerKey.get(key);
-                numberOfOps += opsForKey;
-                for (int i = 0; i < opsForKey; ++i) {
+            for (int x = 0; x < keys.size(); ++x) {
+                for (int i = 0; i < bucketsPerKey; ++i) {
                     try {
                         ReadRandomFromListOp.Result res = ((ReadRandomFromListOp) results.get(firstOp++)).processResult();
                         listLen += res.listLength;
@@ -181,7 +180,7 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
                     }
                 }
             }
-            if (failNotFound && notFound == numberOfOps) {
+            if (failNotFound && notFound == (keys.size() * bucketsPerKey)) {
                 throw lastNotFound;
             }
             if (listLen != 0) {
@@ -194,11 +193,8 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
             }
         } else {
             List<T> valueList = new ArrayList<T>();
-            int numberOfOps = 0;
-            for (String key : keys) {
-                int opsForKey = this.opsPerKey.get(key);
-                numberOfOps += opsForKey;
-                for (int i = 0; i < opsForKey; ++i) {
+            for (int x = 0; x < keys.size(); ++x) {
+                for (int i = 0; i < bucketsPerKey; ++i) {
                     try {
                         valueList.addAll(listConv.convert(results.processReadAt(firstOp++)));
                     } catch (NotFoundException e) {
@@ -207,7 +203,7 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
                     }
                 }
             }
-            if (failNotFound && notFound == numberOfOps) {
+            if (failNotFound && notFound == (keys.size() * bucketsPerKey)) {
                 throw lastNotFound;
             }
             if (!valueList.isEmpty()) {
