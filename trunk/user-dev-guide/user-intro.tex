@@ -1,17 +1,70 @@
 \chapter{Introduction}
 
-\scalaris{} is a scalable, transactional, distributed key-value store based on
-the peer-to-peer principle. It can be used to build scalable Web 2.0
-services. The concept of \scalaris{} is quite simple: Its architecture consists
-of three layers.
+\scalaris{} is a scalable, transactional, distributed key-value store based
+on the peer-to-peer principle. It can be used to build scalable Web 2.0
+services. The concept of \scalaris{} is quite simple: Its architecture
+consists of three layers.
 
 It provides self-management and scalability by replicating services and data
 among peers. Without system interruption it scales from a few PCs to
 thousands of servers. Servers can be added or removed on the fly without any
 service downtime.
 
+\definecolor{layer_bg}{RGB}{55,96,146}
+\definecolor{layer_bluefont}{RGB}{31,73,128}
 \begin{center}
-\includegraphics[width=0.7\linewidth]{layers}
+\begin{tikzpicture}
+ [pre/.style={<-,shorten <=1pt,>=stealth,semithick},
+  post/.style={->,shorten >=1pt,>=stealth,semithick},
+  layer/.style={rectangle,fill=layer_bg,text=white,
+  drop shadow={opacity=0.4},
+  minimum width=7cm,
+  minimum height=1.4cm,
+  align=center},
+  layer_desc/.style={text width=3.5cm,align=left},
+  bend angle=60]
+\sffamily
+
+  %% define the layers without text to support the fitting bounding box
+  \node[layer] (tx_layer) at (0,2.7) {};
+  \node[layer,below=0.2 of tx_layer, minimum height=0.8cm] (rep_layer) {};
+  \node[layer,below=0.2 of rep_layer] (ov_layer) {};
+
+  \node[draw,color=layer_bg,fit=(tx_layer) (rep_layer) (ov_layer),
+        inner sep=0.3cm,drop shadow, fill=white] {};
+
+  %% draw the layers on top
+  \node[above=0.4 of tx_layer, text=layer_bg]
+    {\textbf{\color{layer_bluefont}{Web 2.0 Application}}};
+  \node[layer] at (0,2.7) {Transaction Layer};
+  \node[layer,below=0.2 of tx_layer, minimum height=0.8cm] {Replication Layer};
+  \node[layer,below=0.2 of rep_layer] {P2P Layer};
+
+  \node[above right=0.3 and 0.9 of tx_layer]
+     {\smaller layer implements~\ldots};
+  \node[layer_desc,right=0.9 of tx_layer] (tx_layer_desc)
+     {\smaller \ldots~strong consistency, \phantom{\ldots~}atomicity, isolation};
+  \node[layer_desc,right=0.9 of rep_layer] (rep_layer_desc)
+     {\smaller \ldots~availability};
+  \node[layer_desc,right=0.9 of ov_layer] (ov_layer_desc)
+     {\smaller \ldots~scalability};
+
+  \node[shape=single arrow,right=0.15 of tx_layer,fill=layer_bg,
+        shape border rotate=180, single arrow head extend=1.2mm,
+        minimum height=0.55cm,
+        minimum width=0.2cm] {};
+  \node[shape=single arrow,right=0.15 of rep_layer,fill=layer_bg,
+        shape border rotate=180, single arrow head extend=1.2mm,
+        minimum height=0.55cm,
+        minimum width=0.2cm] {};
+  \node[shape=single arrow,right=0.15 of ov_layer,fill=layer_bg,
+        shape border rotate=180, single arrow head extend=1.2mm,
+        minimum height=0.55cm,
+        minimum width=0.2cm] {};
+
+  \node[inner sep=0, below=0.6 of ov_layer]
+     {\textbf{\color{layer_bluefont}{Standard Internet Nodes for Data Storage}}};
+\end{tikzpicture}
 \end{center}
 
 \scalaris{} takes care of:
@@ -25,10 +78,10 @@ service downtime.
 \end{itemize}
 
 The \scalaris{} project was initiated by Zuse Institute Berlin and onScale
-solutions and was partly funded by the EU projects Selfman and
-XtreemOS. Additional information (papers, videos) can be found at
-\url{http://www.zib.de/CSR/Projects/scalaris} and
-\url{http://www.onscale.de/scalarix.html}.
+solutions and was partly funded by the EU projects Selfman, XtreemOS,
+Contrail and 4CaaST. Additional information (papers, videos) can be found at
+\url{http://www.zib.de/de/pvs/projekte/projektdetails/article/scalaris.html}
+and \url{http://www.onscale.de/scalarix.html}.
 
 \section{Brewer's CAP Theorem}
 
