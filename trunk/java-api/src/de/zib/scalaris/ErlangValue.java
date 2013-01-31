@@ -58,7 +58,9 @@ public class ErlangValue {
 
     /**
      * Creates a new object from a given set of Java types. The following types
-     * are supported: native types:
+     * are supported:
+     *
+     * <h2>native types</h2>
      * <ul>
      * <li>{@link Boolean} - {@link OtpErlangBoolean}</li>
      * <li>{@link Long} - {@link OtpErlangLong}</li>
@@ -68,14 +70,16 @@ public class ErlangValue {
      * <li>{@link String} - {@link OtpErlangString}</li>
      * <li><tt>byte[]</tt> - {@link OtpErlangBinary}</li>
      * </ul>
-     * composite types:
+     *
+     * <h2>composite types</h2>
      * <ul>
-     * <li>{@link List}&lt;Object&gt; with one of the native types -
-     * {@link OtpErlangList}</li>
+     * <li>{@link List}&lt;Object&gt; with one of the native types except
+     * <tt>byte[]</tt> or another (supported) list/map - {@link OtpErlangList}</li>
      * <li>{@link Map}&lt;String, Object&gt; representing a JSON object -
      * {@link OtpErlangTuple}</li>
      * </ul>
-     * custom types:
+     *
+     * <h2>custom types</h2>
      * <ul>
      * <li>{@link OtpErlangObject} - an arbitrary erlang value</li>
      * <li>{@link ErlangValue}</li>

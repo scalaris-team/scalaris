@@ -73,7 +73,8 @@ officially supported.
 encodings on different systems, we suggest to only use ASCII characters.
 
 For \emph{values} we distinguish between \emph{native}, \emph{composite}
-and \emph{custom} types.
+and \emph{custom} types (refer to Table~\ref{tab.api.supported_types} for the
+mapping to the language-specific types of each API).
 
 \emph{Native} types are
 \begin{itemize}
@@ -86,17 +87,18 @@ and \emph{custom} types.
 
 \emph{Composite} types are
 \begin{itemize}
-  \item lists of native types \emph{(except binary objects!)}
-  \item JavaScript Object Notation (JSON)\footnote{see \url{http://json.org/}}
+  \item lists of the following elements:
+  \begin{itemize}
+    \item native types \emph{(except binary objects!)},
+    \item composite types
+  \end{itemize}
+  \item objects in JavaScript Object Notation (JSON)\footnote{see \url{http://json.org/}}
 \end{itemize}
 
 \emph{Custom} types include any Erlang term not covered by the previous types.
 Special care needs to be taken using custom types as they may not be accessible
 through every API or may be misinterpreted by an API. The use of them is
 discouraged.
-
-Table~\ref{tab.api.supported_types} shows the mapping of supported types to the
-language-specific types of each API.
 
 \begin{table}
   \centering
