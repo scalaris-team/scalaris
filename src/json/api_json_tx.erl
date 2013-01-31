@@ -225,8 +225,13 @@ json_to_value({struct, PropList}) ->
     end,
     case Type of
         "as_bin" -> base64:decode(Value);
-        "as_is"  -> case Value of
-                        {array, List} -> List;
-                        _ -> Value
-                    end
+        "as_is"  -> json_array_to_value(Value)
     end.
+
+%% @doc Converts {array, List} to List recursively. If the given value is not a
+%%      JSON list the value is returned unchanged.
+-spec json_array_to_value(value()) -> client_value().
+json_array_to_value({array, List}) when is_list(List) ->
+    [json_array_to_value(X) || X <- List];
+json_array_to_value(Value) ->
+    Value.

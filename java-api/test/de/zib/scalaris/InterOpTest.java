@@ -580,6 +580,28 @@ public class InterOpTest {
 //        key = basekey + "_list_0_foo_1.5_<<0123>>"; value = list5;
 //        failed += read_or_write(sc, key, value, mode);
 
+        final ArrayList<Object> list6 = new ArrayList<Object>();
+        list6.add(0);
+        list6.add("foo");
+        list6.add(1.5);
+        list6.add(false);
+        list6.add(list4);
+        key = basekey + "_list_0_foo_1.5_false_list4"; value = list6;
+        failed += read_or_write(sc, key, value, mode);
+
+        final LinkedHashMap<String, Integer> map1 = new LinkedHashMap<String, Integer>();
+        map1.put("x", 0);
+        map1.put("y", 1);
+        final ArrayList<Object> list7 = new ArrayList<Object>();
+        list7.add(0);
+        list7.add("foo");
+        list7.add(1.5);
+        list7.add(false);
+        list7.add(list4);
+        list7.add(map1);
+        key = basekey + "_list_0_foo_1.5_false_list4_map_x=0_y=1"; value = list7;
+        failed += read_or_write(sc, key, value, mode);
+
         return failed;
     }
 
