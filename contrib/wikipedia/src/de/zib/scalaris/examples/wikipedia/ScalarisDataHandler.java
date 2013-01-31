@@ -200,11 +200,19 @@ public class ScalarisDataHandler {
             ValueResult<List<Contribution>> result = getPageList3(connection,
                     ScalarisOpType.CONTRIBUTION,
                     Arrays.asList(getContributionListKey(contributor)), false,
-                    timeAtStart, statName, new ErlangConverter<List<Contribution>>() {
+                    timeAtStart, statName,
+                    new ErlangConverter<List<Contribution>>() {
                         @Override
                         public List<Contribution> convert(ErlangValue v)
                                 throws ClassCastException {
                             return v.jsonListValue(Contribution.class);
+                        }
+                    },
+                    new ErlangConverter<Contribution>() {
+                        @Override
+                        public Contribution convert(ErlangValue v)
+                                throws ClassCastException {
+                            return v.jsonValue(Contribution.class);
                         }
                     });
             if (result.success && result.value == null) {
@@ -240,19 +248,29 @@ public class ScalarisDataHandler {
             Connection connection, ScalarisOpType opType,
             Collection<String> scalaris_keys, boolean failNotFound,
             final long timeAtStart, String statName) {
-        ValueResult<List<NormalisedTitle>> result = getPageList3(connection, opType,
-                scalaris_keys, failNotFound, timeAtStart, statName,
+        ValueResult<List<NormalisedTitle>> result = getPageList3(connection,
+                opType, scalaris_keys, failNotFound, timeAtStart, statName,
                 new ErlangConverter<List<NormalisedTitle>>() {
-            @Override
-            public List<NormalisedTitle> convert(ErlangValue v)
-                    throws ClassCastException {
-                return v.listValue(new ListElementConverter<NormalisedTitle>() {
-                    public NormalisedTitle convert(final int i, final ErlangValue v) {
-                        return NormalisedTitle.fromNormalised(v.stringValue());
+                    @Override
+                    public List<NormalisedTitle> convert(ErlangValue v)
+                            throws ClassCastException {
+                        return v.listValue(new ListElementConverter<NormalisedTitle>() {
+                            public NormalisedTitle convert(final int i,
+                                    final ErlangValue v) {
+                                return NormalisedTitle.fromNormalised(v
+                                        .stringValue());
+                            }
+                        });
+                    }
+                },
+                new ErlangConverter<NormalisedTitle>() {
+                    @Override
+                    public NormalisedTitle convert(ErlangValue v)
+                            throws ClassCastException {
+                        return NormalisedTitle.fromNormalised(v
+                                        .stringValue());
                     }
                 });
-            }
-        });
         if (result.success && result.value == null) {
             result.value = new ArrayList<NormalisedTitle>(0);
         }
@@ -278,12 +296,19 @@ public class ScalarisDataHandler {
      *            the start time of the method using this method
      * @param statName
      *            name for the time measurement statistics
+     * @param listConv
+     *            converter to make an {@link ErlangValue} to a {@link List} of
+     *            <tt>T</tt>
+     * @param elemConv
+     *            converter to make an {@link ErlangValue} to a <tt>T</tt>
      * 
      * @return a result object with the page list on success
      */
-    protected final static <T> ValueResult<List<T>> getPageList3(Connection connection,
-            ScalarisOpType opType, Collection<String> scalaris_keys,
-            boolean failNotFound, final long timeAtStart, String statName, ErlangConverter<List<T>> conv) {
+    protected final static <T> ValueResult<List<T>> getPageList3(
+            Connection connection, ScalarisOpType opType,
+            Collection<String> scalaris_keys, boolean failNotFound,
+            final long timeAtStart, String statName,
+            ErlangConverter<List<T>> listConv, ErlangConverter<T> elemConv) {
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         
         if (connection == null) {
@@ -295,8 +320,9 @@ public class ScalarisDataHandler {
         final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
                 new TransactionSingleOp(connection), involvedKeys);
 
-        final ScalarisReadListOp1<T> readOp = new ScalarisReadListOp1<T>(scalaris_keys,
-                Options.getInstance().OPTIMISATIONS.get(opType), conv, failNotFound);
+        final ScalarisReadListOp1<T> readOp = new ScalarisReadListOp1<T>(
+                scalaris_keys, Options.getInstance().OPTIMISATIONS.get(opType),
+                listConv, elemConv, failNotFound);
         executor.addOp(readOp);
         try {
             executor.run();

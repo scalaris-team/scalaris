@@ -13,7 +13,9 @@ import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
 import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
+import de.zib.scalaris.examples.wikipedia.Options.IReadBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE.WriteCacheDiff;
 import de.zib.scalaris.executor.ScalarisOp;
 import de.zib.scalaris.operations.ReadOp;
 
@@ -27,7 +29,8 @@ import de.zib.scalaris.operations.ReadOp;
 public class ScalarisReadListOp1<T> implements ScalarisOp {
     final Collection<String> keys;
     final int buckets;
-    final ErlangConverter<List<T>> conv;
+    final ErlangConverter<List<T>> listConv;
+    final ErlangConverter<T> elemConv;
     final boolean failNotFound;
     final List<T> value = new ArrayList<T>();
     final private Optimisation optimisation;
@@ -39,23 +42,26 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
      *            the keys under which the list is stored in Scalaris
      * @param optimisation
      *            the list optimisation to use
-     * @param conv
+     * @param listConv
      *            converter to make an {@link ErlangValue} to a {@link List} of
      *            <tt>T</tt>
+     * @param elemConv
+     *            converter to make an {@link ErlangValue} to a <tt>T</tt>
      * @param failNotFound
      *            whether to re-throw the {@link NotFoundException} if no list
      *            key was found
      */
     public ScalarisReadListOp1(final Collection<String> keys,
-            final Optimisation optimisation,
-            ErlangConverter<List<T>> conv, boolean failNotFound) {
+            final Optimisation optimisation, ErlangConverter<List<T>> listConv,
+            ErlangConverter<T> elemConv, boolean failNotFound) {
         this.keys = keys;
         if (optimisation instanceof IBuckets) {
             this.buckets = ((IBuckets) optimisation).getBuckets();
         } else {
             this.buckets = 1;
         }
-        this.conv = conv;
+        this.listConv = listConv;
+        this.elemConv = elemConv;
         this.failNotFound = failNotFound;
         this.optimisation = optimisation;
     }
@@ -109,19 +115,20 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
             UnknownException {
         int notFound = 0;
         NotFoundException lastNotFound = null;
+        ErlangConverter<WriteCacheDiff<T>> writeCacheDiffConv = null;
+        if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+            writeCacheDiffConv = APPEND_INCREMENT_BUCKETS_WITH_WCACHE.getDiffConv(elemConv);
+        }
         for (int x = 0; x < keys.size(); ++x) {
             for (int i = 0; i < buckets; ++i) {
                 try {
-                    final List<T> list = conv.convert(results.processReadAt(firstOp++));
-                    if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
-                        APPEND_INCREMENT_BUCKETS_WITH_WCACHE opt2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
-                        // read buckets + write-add buckets are added to the list
-                        if (i < (opt2.getReadBuckets() + opt2.getWriteBuckets())) {
-                            value.addAll(list);
-                        } else {
-                            value.removeAll(list);
-                        }
+                    ErlangValue result = results.processReadAt(firstOp++);
+                    if (writeCacheDiffConv != null && i >= ((IReadBuckets) optimisation).getReadBuckets()) {
+                        WriteCacheDiff<T> diff = writeCacheDiffConv.convert(result);
+                        value.addAll(diff.toAdd);
+                        value.removeAll(diff.toDelete);
                     } else {
+                        final List<T> list = listConv.convert(result);
                         value.addAll(list);
                     }
                 } catch (NotFoundException e) {

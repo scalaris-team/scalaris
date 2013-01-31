@@ -15,10 +15,17 @@
  */
 package de.zib.scalaris.examples.wikipedia;
 
+import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import de.zib.scalaris.ErlangValue;
 
 
 /**
@@ -534,10 +541,14 @@ public class Options {
      * i.e. buckets, using a set of read-buckets and another set as a small
      * write cache (write-buckets). In contrast to
      * {@link APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY} this class also
-     * supports add and delete operations by using two sets of write buckets:
-     * one for storing values which have been added with respect to the read
-     * buckets, another for storing values which have been deleted with respect
-     * to the read buckets.
+     * supports add and delete operations by tagging values with
+     * {@link #makeAdd(Object)} and {@link #makeDelete(Object)}, respectively,
+     * when writing to any of the write buckets.
+     * 
+     * Make sure to only use the tagged values when writing values to a write
+     * bucket! Use {@link #getDiffConv(ErlangConverter)} to get a converter that
+     * creates a {@link WriteCacheDiff} object which can then be used to create
+     * a global view of the whole stored list including the write cache.
      * 
      * @author Nico Kruber, kruber@zib.de
      */
@@ -563,7 +574,7 @@ public class Options {
         }
 
         public int getBuckets() {
-            return readBuckets + (2 * writeBuckets);
+            return readBuckets + writeBuckets;
         }
 
         public int getReadBuckets() {
@@ -608,29 +619,105 @@ public class Options {
         }
 
         /**
-         * Gets the string to append to the key in order to point to an
-         * adding write-bucket for the given value.
+         * Gets the string to append to the key in order to point to a
+         * write-bucket for the given value.
          * 
          * @param value
          *            the value to check the bucket for
          * 
          * @return the bucket string, e.g. ":0"
          */
-        public <T> String getWriteBucketAddString(final T value) {
+        public <T> String getWriteBucketString(final T value) {
             return ":" + hashToBucket(value, writeBuckets, readBuckets);
+        }
+        
+        /**
+         * Tags this value as an "add" operation to be written to the write
+         * cache.
+         * 
+         * @param value
+         *            the value to tag
+         * 
+         * @return the value to use when writing to the write cache
+         */
+        public final <T> Object makeAdd(final T value) {
+            return Arrays.asList(1, value);
         }
 
         /**
-         * Gets the string to append to the key in order to point to a
-         * deleting write-bucket for the given value.
+         * Tags this value as a "delete" operation to be written to the write
+         * cache.
          * 
          * @param value
-         *            the value to check the bucket for
+         *            the value to tag
          * 
-         * @return the bucket string, e.g. ":0"
+         * @return the value to use when writing to the write cache
          */
-        public <T> String getWriteBucketDeleteString(final T value) {
-            return ":" + hashToBucket(value, writeBuckets, readBuckets + writeBuckets);
+        public final <T> Object makeDelete(final T value) {
+            return Arrays.asList(-1, value);
+        }
+        
+        /**
+         * Result object that represents the write cache.
+         * 
+         * @param <T>
+         *            the element type
+         * 
+         * @see APPEND_INCREMENT_BUCKETS_WITH_WCACHE#getDiffConv(ErlangConverter)
+         */
+        public static class WriteCacheDiff<T> {
+            /**
+             * List of elements to add to the read-buckets.
+             */
+            final public List<T> toAdd;
+            /**
+             * List of elements to remove from the read-buckets.
+             */
+            final public Set<T> toDelete;
+            
+            protected WriteCacheDiff(List<T> toAdd, Set<T> toDelete) {
+                this.toAdd = toAdd;
+                this.toDelete = toDelete;
+            }
+        }
+        
+        /**
+         * Gets a converter to use for simplified access to the write cache.
+         * 
+         * @param elemConv
+         *            converter for a single entry of the list
+         * 
+         * @return a converter that converts the write cache to a
+         *         {@link WriteCacheDiff} object
+         */
+        public static <T> ErlangConverter<WriteCacheDiff<T>> getDiffConv(final ErlangConverter<T> elemConv) {
+            return new ErlangConverter<Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE.WriteCacheDiff<T>>() {
+                @Override
+                public WriteCacheDiff<T> convert(ErlangValue v)
+                        throws ClassCastException {
+                    final List<T> toAdd = new LinkedList<T>();
+                    final Set<T> toDelete = new HashSet<T>();
+                    for(ErlangValue elem : v.listValue()) {
+                        List<ErlangValue> diffObj = elem.listValue();
+                        if (diffObj.size() != 2) {
+                            throw new ClassCastException();
+                        }
+                        int tag = diffObj.get(0).intValue();
+                        T value = elemConv.convert(diffObj.get(1));
+                        switch (tag) {
+                            case 1:
+                                toAdd.add(value);
+                                break;
+                            case -1:
+                                toDelete.add(value);
+                                break;
+                            default:
+                                throw new ClassCastException();
+                        }
+                    }
+                    return new WriteCacheDiff<T>(toAdd, toDelete);
+                }
+            };
         }
     }
 
