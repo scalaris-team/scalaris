@@ -1,5 +1,6 @@
 package de.zib.scalaris.examples.wikipedia;
 
+import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -15,6 +16,7 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY;
 import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.IPartialRead;
@@ -44,6 +46,9 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
     /**
      * Creates a new (random) list entry read operation.
      * 
+     * Note: {@link APPEND_INCREMENT_BUCKETS_WITH_WCACHE} is not supported at
+     * the moment!
+     * 
      * @param keys
      *            the keys under which the list is stored in Scalaris
      * @param optimisation
@@ -63,8 +68,13 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
      *            the random number generator to use
      */
     public ScalarisReadRandomListEntryOp1(final Collection<String> keys,
-            final Optimisation optimisation, boolean readOnlyOneBucket, ErlangConverter<T> elemConv, ErlangConverter<List<T>> listConv,
+            final Optimisation optimisation, boolean readOnlyOneBucket,
+            ErlangConverter<T> elemConv, ErlangConverter<List<T>> listConv,
             boolean failNotFound, Random random) {
+        if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+            throw new InvalidParameterException(
+                    "APPEND_INCREMENT_BUCKETS_WITH_WCACHE not supported");
+        }
         this.keys = keys;
         this.listConv = listConv;
         this.elemConv = elemConv;

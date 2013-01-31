@@ -238,6 +238,21 @@ public class Options {
     }
 
     /**
+     * Indicates that the optimisation partitions data into buckets split into
+     * read-buckets and other buckets.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static interface IReadBuckets extends IBuckets {
+        /**
+         * Gets the number of available read-buckets.
+         * 
+         * @return number of buckets not used for the write caches etc.
+         */
+        public abstract int getReadBuckets();
+    }
+
+    /**
      * Indicates that the new append and increment operations of Scalaris should
      * be used and list values should be distributed among several partitions,
      * i.e. buckets.
@@ -394,7 +409,7 @@ public class Options {
      * @author Nico Kruber, kruber@zib.de
      */
     public static abstract class APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY
-            implements Optimisation, IBuckets {
+            implements Optimisation, IReadBuckets {
         final protected int readBuckets;
         final protected int writeBuckets;
         
@@ -417,15 +432,10 @@ public class Options {
             return readBuckets + writeBuckets;
         }
 
-        /**
-         * Gets the number of read-buckets.
-         * 
-         * @return number of buckets not used for the write cache
-         */
         public int getReadBuckets() {
             return readBuckets;
         }
-        
+
         /**
          * Gets the string to append to the key in order to point to a
          * read-bucket for the given value.
@@ -517,6 +527,153 @@ public class Options {
                     + readBuckets + "," + writeBuckets + ")";
         }
     }
+
+    /**
+     * Indicates that the new append and increment operations of Scalaris should
+     * be used and list values should be distributed among several partitions,
+     * i.e. buckets, using a set of read-buckets and another set as a small
+     * write cache (write-buckets). In contrast to
+     * {@link APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY} this class also
+     * supports add and delete operations by using two sets of write buckets:
+     * one for storing values which have been added with respect to the read
+     * buckets, another for storing values which have been deleted with respect
+     * to the read buckets.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static abstract class APPEND_INCREMENT_BUCKETS_WITH_WCACHE implements
+            Optimisation, IReadBuckets {
+        final protected int readBuckets;
+        final protected int writeBuckets;
+
+        /**
+         * Constructor.
+         * 
+         * @param readBuckets
+         *            number of available read buckets
+         * @param writeBuckets
+         *            number of available write buckets for new/deleted elements
+         *            (compared to the data in the read buckets);
+         *            two different write buckets of this size will be used
+         */
+        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE(int readBuckets, int writeBuckets) {
+            assert (readBuckets >= 1 && writeBuckets >= 1);
+            this.readBuckets = readBuckets;
+            this.writeBuckets = writeBuckets;
+        }
+
+        public int getBuckets() {
+            return readBuckets + (2 * writeBuckets);
+        }
+
+        public int getReadBuckets() {
+            return readBuckets;
+        }
+
+        /**
+         * Gets the number write buckets.
+         * 
+         * @return number of buckets to use for each write bucket type (add and
+         *         del)
+         */
+        public int getWriteBuckets() {
+            return writeBuckets;
+        }
+
+        /**
+         * Hashes the given value to a bucket.
+         * 
+         * @param value
+         *            the value to check the bucket for
+         * @param buckets
+         *            number of available buckets for this hash operation
+         * @param offset
+         *            first bucket number
+         * 
+         * @return the bucket, e.g. 0
+         */
+        abstract protected <T> int hashToBucket(T value, int buckets, int offset);
+
+        /**
+         * Gets the string to append to the key in order to point to a
+         * read-bucket for the given value.
+         * 
+         * @param value
+         *            the value to check the bucket for
+         * 
+         * @return the bucket string, e.g. ":0"
+         */
+        public <T> String getReadBucketString(final T value) {
+            return ":" + hashToBucket(value, readBuckets, 0);
+        }
+
+        /**
+         * Gets the string to append to the key in order to point to an
+         * adding write-bucket for the given value.
+         * 
+         * @param value
+         *            the value to check the bucket for
+         * 
+         * @return the bucket string, e.g. ":0"
+         */
+        public <T> String getWriteBucketAddString(final T value) {
+            return ":" + hashToBucket(value, writeBuckets, readBuckets);
+        }
+
+        /**
+         * Gets the string to append to the key in order to point to a
+         * deleting write-bucket for the given value.
+         * 
+         * @param value
+         *            the value to check the bucket for
+         * 
+         * @return the bucket string, e.g. ":0"
+         */
+        public <T> String getWriteBucketDeleteString(final T value) {
+            return ":" + hashToBucket(value, writeBuckets, readBuckets + writeBuckets);
+        }
+    }
+
+    /**
+     * Indicates that the new append and increment operations of Scalaris should
+     * be used and list values should be distributed among several partitions,
+     * i.e. buckets, using a set of read-buckets and another set as a small
+     * write cache (write-buckets) for added and removed values. The values will
+     * be added to the write cache based on their hash.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT_BUCKETS_WITH_WCACHE_HASH extends
+            APPEND_INCREMENT_BUCKETS_WITH_WCACHE {
+        final static protected Random rand = new Random();
+
+        /**
+         * Constructor.
+         * 
+         * @param readBuckets
+         *            number of available read buckets
+         * @param writeBuckets
+         *            number of available write buckets for new/deleted elements
+         *            (compared to the data in the read buckets);
+         *            two different write buckets of this size will be used
+         */
+        public APPEND_INCREMENT_BUCKETS_WITH_WCACHE_HASH(int readBuckets,
+                int writeBuckets) {
+            super(readBuckets, writeBuckets);
+        }
+
+        @Override
+        protected <T> int hashToBucket(T value, int buckets, int offset) {
+            return Math.abs((value.hashCode() % buckets)) + offset;
+        }
+
+        @Override
+        public String toString() {
+            return "APPEND_INCREMENT_BUCKETS_WITH_WCACHE_HASH(" + readBuckets
+                    + "," + writeBuckets + ")";
+        }
+    }
+
     
     /**
      * Parses the given option strings into their appropriate properties.
@@ -658,6 +815,11 @@ public class Options {
                 && parameterStr != null) {
             String[] parameters = parameterStr.split(",");
             return new Options.APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(
+                    Integer.parseInt(parameters[0]),
+                    Integer.parseInt(parameters[1]));
+        } else if (optimisationStr.equals("APPEND_INCREMENT_BUCKETS_WITH_WCACHE_HASH") && parameterStr != null) {
+            String[] parameters = parameterStr.split(",");
+            return new Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_HASH(
                     Integer.parseInt(parameters[0]),
                     Integer.parseInt(parameters[1]));
         }

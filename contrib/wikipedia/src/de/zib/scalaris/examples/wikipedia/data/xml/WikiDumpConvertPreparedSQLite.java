@@ -35,8 +35,10 @@ import com.almworks.sqlite4java.SQLiteStatement;
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY;
 import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
+import de.zib.scalaris.examples.wikipedia.Options.IReadBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.STORE_CONTRIB_TYPE;
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
@@ -369,8 +371,8 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             }
             // split lists:
             int bucketsToUse;
-            if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
-                bucketsToUse = ((APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation).getReadBuckets();
+            if (optimisation instanceof IReadBuckets) {
+                bucketsToUse = ((IReadBuckets) optimisation).getReadBuckets();
             } else {
                 bucketsToUse = optimisation.getBuckets();
             }
@@ -381,6 +383,8 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     keyAppend2 = ((APPEND_INCREMENT_BUCKETS) optimisation).getBucketString(obj);
                 } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
                     keyAppend2 = ((APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation).getReadBucketString();
+                } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+                    keyAppend2 = ((APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation).getReadBucketString(obj);
                 } else {
                     throw new RuntimeException("unsupported optimisation: " + optimisation);
                 }
@@ -456,9 +460,8 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             int avg = value;
             if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
                 avg = value / optimisation.getBuckets();
-            } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
-                APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;
-                avg = value / optimisation2.getReadBuckets();
+            } else if (optimisation instanceof IReadBuckets) {
+                avg = value / ((IReadBuckets) optimisation).getReadBuckets();
             }
             int rest = value; 
             
@@ -469,8 +472,8 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                     int curValue;
                     if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
                         curValue = (i == optimisation.getBuckets() - 1) ? rest : avg;
-                    } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
-                        APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;
+                    } else if (optimisation instanceof IReadBuckets) {
+                        IReadBuckets optimisation2 = (IReadBuckets) optimisation;
                         curValue = (i == optimisation2.getReadBuckets() - 1) ? rest : avg;
                     } else {
                         throw new RuntimeException("unsupported optimisation: " + optimisation);
