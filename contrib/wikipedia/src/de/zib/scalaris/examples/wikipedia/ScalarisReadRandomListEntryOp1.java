@@ -112,7 +112,7 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
                 bucketKeys.add(key);
             } else if (!readOnlyOneBucket) {
                 for (int i = 0; i < buckets; ++i) {
-                    bucketKeys.add(key + ":" + 0);
+                    bucketKeys.add(key + ":" + i);
                 }
             } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
                 APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;
