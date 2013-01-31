@@ -176,8 +176,10 @@ lease_update(Old, New) ->
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, update, Old, New, self()}),
     receive
-        {l_on_cseq, update_success, Old, New} ->
+        ?SCALARIS_RECV(
+            {l_on_cseq, update_success, Old, New}, %% ->
             ok
+          )
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

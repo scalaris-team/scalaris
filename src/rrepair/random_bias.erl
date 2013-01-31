@@ -66,22 +66,26 @@ create_distribution_fun(State) ->
     Pid = spawn(fun() -> generator(State) end),
     fun() ->
             comm:send_local(Pid, {next, self()}),
-            receive 
-                {last_response, V} -> {last, V};
-                {next_response, V} -> {ok, V}
+            receive
+                ?SCALARIS_RECV({last_response, V}, {last, V});
+                ?SCALARIS_RECV({next_response, V}, {ok, V})
             end
     end.
 
 -spec generator(generator_state()) -> ok.
 generator({ DS, CalcFun, NextFun }) ->
     receive
-        {next, Pid} ->
-            V = CalcFun(DS),
-            case NextFun(DS) of
-                exit -> comm:send_local(Pid, {last_response, V});
-                NewDS -> comm:send_local(Pid, {next_response, V}),
-                         generator({NewDS, CalcFun, NextFun})
-            end            
+        ?SCALARIS_RECV(
+            {next, Pid}, %% ->
+            begin
+                V = CalcFun(DS),
+                case NextFun(DS) of
+                    exit -> comm:send_local(Pid, {last_response, V});
+                    NewDS -> comm:send_local(Pid, {next_response, V}),
+                             generator({NewDS, CalcFun, NextFun})
+                end
+            end
+          )          
     end.
 
 -spec calc_normal(X::float(), M::float(), E::float()) -> float().

@@ -58,8 +58,10 @@ has_first_quorum() ->
             proposer:start_paxosid(MyProposer, PaxosId,
                                    Acceptors, Proposal, Majority, MaxProposers, Rank),
             receive
-                {learner_decide, client_cookie, PaxosId, {leader, TheLeader}} ->
+                ?SCALARIS_RECV(
+                    {learner_decide, client_cookie, PaxosId, {leader, TheLeader}}, %%->
                     TheLeader =:= MyServicePerVM
+                  )
             end
     end.
 

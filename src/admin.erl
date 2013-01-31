@@ -144,10 +144,14 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
                     Self = comm:reply_as(self(), 3, {leave_result, UId, '_'}),
                     comm:send_local(DhtNode, {leave, Self}),
                     receive
-                        {leave_result, UId, {move, result, leave, ok}} ->
-                            ok;
-                        {leave_result, UId, {move, result, leave, leave_no_partner_found}} ->
+                        ?SCALARIS_RECV(
+                            {leave_result, UId, {move, result, leave, ok}}, %% ->
+                            ok
+                          );
+                        ?SCALARIS_RECV(
+                            {leave_result, UId, {move, result, leave, leave_no_partner_found}}, %% ->
                             {error, no_partner_found}
+                          )
                     end
             end;
         false ->
@@ -226,7 +230,10 @@ check_ring_deep_foldl(_, Previous) ->
 number_of_nodes() ->
     mgmt_server:number_of_nodes(),
     receive
-        {get_list_length_response, X} -> X
+        ?SCALARIS_RECV(
+            {get_list_length_response, X}, %% ->
+            X
+          )
     after
         5000 -> timeout
     end.
@@ -246,8 +253,10 @@ get_dump() ->
          || Server <- Servers],
     %% list({Map, StartTime})
     Dumps = [receive
-                 {get_comm_layer_dump_response, Dump} ->
-                     Dump
+                ?SCALARIS_RECV(
+                    {get_comm_layer_dump_response, Dump}, %% ->
+                    Dump
+                  )
              end || _ <- Servers],
     StartTime = lists:min([Start || {_, _, Start} <- Dumps]),
     GetKeys =
@@ -323,13 +332,21 @@ start() ->
 
 loop() ->
     receive
-        {halt, N} ->
-            init:stop(N),
-            receive nothing -> ok end;
-        {get_comm_layer_dump, Sender} ->
-            comm:send(Sender, {get_comm_layer_dump_response,
+        ?SCALARIS_RECV(
+            {halt, N}, %% ->
+            begin
+                init:stop(N),
+                receive nothing -> ok end % wait forever
+            end
+          );
+        ?SCALARIS_RECV(
+            {get_comm_layer_dump, Sender}, %% ->
+            begin
+                comm:send(Sender, {get_comm_layer_dump_response,
                                   comm_logger:dump()}),
-            loop()
+                loop()
+            end
+          )
     end.
 
 % @doc contact mgmt server and list the known ip addresses
@@ -337,8 +354,10 @@ loop() ->
 nodes() ->
     mgmt_server:node_list(),
     Nodes = receive
-                {get_list_response, List} ->
+                ?SCALARIS_RECV(
+                    {get_list_response, List}, %% ->
                     lists:usort([IP || {IP, _, _} <- List])
+                  )
             end,
     Nodes.
 
@@ -350,17 +369,23 @@ nodes() ->
 print_ages() ->
     mgmt_server:node_list(),
     _ = receive
-            {get_list_response, List} ->
+            ?SCALARIS_RECV(
+                {get_list_response, List}, %% ->
                 [ comm:send(Node, {get_ages, self()}, [{group_member, cyclon}]) || Node <- List ]
+              )
         end,
     worker_loop().
 
 -spec worker_loop() -> ok.
 worker_loop() ->
     receive
-        {cy_ages, Ages} ->
-            io:format("~p~n", [Ages]),
-            worker_loop()
+        ?SCALARIS_RECV(
+            {cy_ages, Ages}, %% ->
+            begin
+                io:format("~p~n", [Ages]),
+                worker_loop()
+            end
+          )
         after 400 ->
             ok
     end.
@@ -370,8 +395,10 @@ worker_loop() ->
 check_routing_tables(Port) ->
     mgmt_server:node_list(),
     _ = receive
-            {get_list_response, List} ->
+            ?SCALARIS_RECV(
+                {get_list_response, List}, %% ->
                 [ comm:send(Node, {check, Port}, [{group_member, routing_table}]) || Node <- List ]
+              )
         end,
     ok.
 

@@ -136,9 +136,11 @@ add(GrpName, PidName, Pid) ->
     comm:send_local(pid_groups_manager(),
                     {pid_groups_add, GrpName, PidName, Pid, self()}),
     receive
-        {pid_groups_add_done} -> ok;
-        {pid_groups_add_done, OldGroup, OldName} ->
+        ?SCALARIS_RECV({pid_groups_add_done}, ok);
+        ?SCALARIS_RECV(
+            {pid_groups_add_done, OldGroup, OldName}, %% ->
             throw({Pid, already_registered_as, OldGroup, OldName, was_trying, GrpName, PidName})
+          )
     end.
 
 
@@ -322,12 +324,16 @@ pids_to_names(Pids, Timeout) ->
          case erlang:is_reference(Ref) of
              false -> pid_to_name(Ref);
              _     -> receive
-                          {ok, {group_and_name_of_response, Name}, Pid} ->
-                              _ = erlang:cancel_timer(Ref),
-                              receive {timeout, Pid} -> ok
-                                  after 0 -> ok
-                              end,
-                              pid_to_name(Name);
+                          ?SCALARIS_RECV(
+                              {ok, {group_and_name_of_response, Name}, Pid}, %% ->
+                              begin
+                                  _ = erlang:cancel_timer(Ref),
+                                  receive {timeout, Pid} -> ok
+                                      after 0 -> ok
+                                  end,
+                                  pid_to_name(Name)
+                              end
+                            );
                           {timeout, Pid} ->
                               lists:flatten(
                                 io_lib:format("~.0p (timeout)", [Pid]))
@@ -381,13 +387,13 @@ members_by_name_as_json(GrpName) ->
 hide(GrpName) ->
     comm:send_local(pid_groups_manager(),
                     {pid_groups_hide, GrpName, self()}),
-    receive {pid_groups_hide_done, GrpName} -> ok end.
+    receive ?SCALARIS_RECV({pid_groups_hide_done, GrpName}, ok) end.
 
 -spec unhide(groupname()) -> ok.
 unhide(GrpName) ->
     comm:send_local(pid_groups_manager(),
                     {pid_groups_unhide, GrpName, self()}),
-    receive {pid_groups_unhide_done, GrpName} -> ok end.
+    receive ?SCALARIS_RECV({pid_groups_unhide_done, GrpName}, ok) end.
 
 %%
 %% pid_groups manager process (gen_component)

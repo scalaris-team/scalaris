@@ -83,9 +83,11 @@ on({get_chunk_response, {_, DBList}},
                  fun({Key, Ver}, Acc) -> 
                          _ = [api_dht_raw:unreliable_lookup(K, {get_key_entry, comm:this(), K}) 
                                 || K <- ?RT:get_replica_keys(Key), K =/= Key],
-                         V1 = db_entry:get_version(receive {get_key_entry_reply, E1} -> E1 end),
-                         V2 = db_entry:get_version(receive {get_key_entry_reply, E2} -> E2 end),
-                         V3 = db_entry:get_version(receive {get_key_entry_reply, E3} -> E3 end),
+                         % note: receive wrapped in anonymous functions to allow
+                         %       ?SCALARIS_RECV in multiple receive statements
+                         V1 = db_entry:get_version(fun() -> receive ?SCALARIS_RECV({get_key_entry_reply, E1}, E1) end end()),
+                         V2 = db_entry:get_version(fun() -> receive ?SCALARIS_RECV({get_key_entry_reply, E2}, E2) end end()),
+                         V3 = db_entry:get_version(fun() -> receive ?SCALARIS_RECV({get_key_entry_reply, E3}, E3) end end()),
                          case Ver =:= lists:max([V1, V2, V3]) of
                              true -> Acc;
                              false -> Acc + 1

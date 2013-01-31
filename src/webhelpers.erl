@@ -103,9 +103,11 @@ get_vivaldi(Pids, Coords, TimeInMS) ->
     case Continue of
         continue ->
             receive
-                {{vivaldi_get_coordinate_response, Coordinate, _Confidence}, Pid} ->
+                ?SCALARIS_RECV(
+                    {{vivaldi_get_coordinate_response, Coordinate, _Confidence}, Pid}, %% ->
                     get_vivaldi(lists:delete(Pid, Pids), [Coordinate | Coords],
                                 TimeInMS)
+                  )
             after
                 10 ->
                     get_vivaldi(Pids, Coords, TimeInMS + 10)
@@ -179,26 +181,28 @@ getDCClustersAndNodes() ->
             comm:send_local(ClusteringProcess, {query_my, local_epoch, This}),
             comm:send_local(ClusteringProcess, {query_my, radius, This}),
             
-            Centroids = receive
-                {query_clustering_response, Cs} -> Cs
+            % note: receive wrapped in anonymous functions to allow
+            %       ?SCALARIS_RECV in multiple receive statements
+            Centroids = fun() -> receive
+                ?SCALARIS_RECV({query_clustering_response, Cs}, Cs)
             after 2000 ->
                     log:log(error,"[ WH ] Timeout getting query_clustering_response from dc_clustering"),
                     throw('dc_clustering_timeout')
-            end,
+            end end(),
 
-            Epoch = receive
-                {query_my_response, local_epoch, E} -> E
+            Epoch = fun() -> receive
+                ?SCALARIS_RECV({query_my_response, local_epoch, E}, E)
             after 2000 ->
                     log:log(error,"[ WH ] Timeout getting local_epoch from dc_clustering"),
                     throw('dc_clustering_timeout')
-            end,
+            end end(),
 
-            Radius = receive
-                {query_my_response, radius, R} -> R
+            Radius = fun() -> receive
+                ?SCALARIS_RECV({query_my_response, radius, R}, R)
             after 2000 ->
                     log:log(error,"[ WH ] Timeout getting radius from dc_clustering"),
                     throw('dc_clustering_timeout')
-            end,
+            end end(),
             
             Nodes = getVivaldiMap(),
             
@@ -567,8 +571,11 @@ getGossip() ->
     GossipPids = pid_groups:find_all(gossip),
     [begin
          comm:send_local(Pid, {get_values_best, self()}),
-         receive {gossip_get_values_best_response, BestValues} ->
-                     {pid_groups:pid_to_name(Pid), BestValues}
+         receive
+             ?SCALARIS_RECV(
+                 {gossip_get_values_best_response, BestValues}, %% ->
+                 {pid_groups:pid_to_name(Pid), BestValues}
+               )
          end
      end || Pid <- GossipPids].
 
