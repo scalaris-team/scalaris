@@ -368,7 +368,13 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 return;
             }
             // split lists:
-            HashMap<String, List<ErlangValue>> newLists = new HashMap<String, List<ErlangValue>>(optimisation.getBuckets());
+            int bucketsToUse;
+            if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
+                bucketsToUse = ((APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation).getReadBuckets();
+            } else {
+                bucketsToUse = optimisation.getBuckets();
+            }
+            HashMap<String, List<ErlangValue>> newLists = new HashMap<String, List<ErlangValue>>(bucketsToUse);
             for (ErlangValue obj : value) {
                 String keyAppend2;
                 if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
@@ -380,7 +386,10 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 }
                 List<ErlangValue> valueAtKey2 = newLists.get(keyAppend2);
                 if (valueAtKey2 == null) {
-                    valueAtKey2 = new ArrayList<ErlangValue>(value.size() / optimisation.getBuckets());
+                    // ideal size of each bucket: value.size() / bucketsToUse
+                    // ->  add 10% to include variance without having to increase the array list
+                    valueAtKey2 = new ArrayList<ErlangValue>(value.size() / bucketsToUse
+                            + ((value.size() / bucketsToUse) / 10));
                     newLists.put(keyAppend2, valueAtKey2);
                 }
                 valueAtKey2.add(obj);
