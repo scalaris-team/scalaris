@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Random;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.concurrent.Executors;
@@ -56,8 +57,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 
-import com.skjegstad.utils.BloomFilter;
-
 import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.InvolvedKey;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
@@ -67,6 +66,7 @@ import de.zib.scalaris.examples.wikipedia.RevisionResult;
 import de.zib.scalaris.examples.wikipedia.SavePageResult;
 import de.zib.scalaris.examples.wikipedia.ValueResult;
 import de.zib.scalaris.examples.wikipedia.WikiServletContext;
+import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel.SpecialPage;
 import de.zib.scalaris.examples.wikipedia.bliki.WikiPageListBean.FormType;
 import de.zib.scalaris.examples.wikipedia.data.Contributor;
@@ -119,7 +119,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     
     protected List<WikiEventHandler> eventHandlers = new LinkedList<WikiEventHandler>();
     
-    protected BloomFilter<NormalisedTitle> existingPages = new BloomFilter<NormalisedTitle>(MyWikiModel.existingPagesFPR, 100);
+    protected ExistingPagesCache existingPages = ExistingPagesCache.createCache(100);
 
     protected static final EnumMap<SpecialPage, String> SPECIAL_SUFFIX_EN = MyWikiModel.SPECIAL_SUFFIX.get("en");
     protected EnumMap<SpecialPage, String> SPECIAL_SUFFIX_LANG;
@@ -194,6 +194,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 config.getInitParameter("WIKI_USE_BACKLINKS"),
                 config.getInitParameter("WIKI_SAVEPAGE_RETRIES"),
                 config.getInitParameter("WIKI_SAVEPAGE_RETRY_DELAY"),
+                config.getInitParameter("WIKI_PAGES_CACHE_IMPL"),
                 config.getInitParameter("WIKI_REBUILD_PAGES_CACHE"),
                 config.getInitParameter("WIKI_STORE_CONTRIBUTIONS"),
                 config.getInitParameter("WIKI_OPTIMISATIONS"),
@@ -514,7 +515,16 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         if (req_search.isEmpty()) {
             result = new ValueResult<List<NormalisedTitle>>(new ArrayList<InvolvedKey>(0), new ArrayList<NormalisedTitle>(0));
         } else {
-            result = getPageList(nsId, connection);
+            if (existingPages.hasFullList()) {
+                final long timeAtStart = System.currentTimeMillis();
+                final String statName = "page list:" + nsId;
+                final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+                final Set<NormalisedTitle> pages = existingPages.getList(NamespaceEnum.fromId(nsId));
+                result = new ValueResult<List<NormalisedTitle>>(involvedKeys, new ArrayList<NormalisedTitle>(pages),
+                        statName, System.currentTimeMillis() - timeAtStart);
+            } else {
+                result = getPageList(nsId, connection);
+            }
         }
         page.setNamespaceId(nsId);
         page.addStats(result.stats);
@@ -570,7 +580,16 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             page.setFromPage(req_from);
             page.setToPage(req_to);
-            result = getPageList(nsId, connection);
+            if (existingPages.hasFullList()) {
+                final long timeAtStart = System.currentTimeMillis();
+                final String statName = "page list:" + nsId;
+                final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+                final Set<NormalisedTitle> pages = existingPages.getList(NamespaceEnum.fromId(nsId));
+                result = new ValueResult<List<NormalisedTitle>>(involvedKeys, new ArrayList<NormalisedTitle>(pages),
+                        statName, System.currentTimeMillis() - timeAtStart);
+            } else {
+                result = getPageList(nsId, connection);
+            }
         }
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
@@ -617,7 +636,16 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         } else {
             page.setShowAllPages(true);
             page.setPrefix(req_prefix);
-            result = getPageList(nsId, connection);
+            if (existingPages.hasFullList()) {
+                final long timeAtStart = System.currentTimeMillis();
+                final String statName = "page list:" + nsId;
+                final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+                final Set<NormalisedTitle> pages = existingPages.getList(NamespaceEnum.fromId(nsId));
+                result = new ValueResult<List<NormalisedTitle>>(involvedKeys, new ArrayList<NormalisedTitle>(pages),
+                        statName, System.currentTimeMillis() - timeAtStart);
+            } else {
+                result = getPageList(nsId, connection);
+            }
         }
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
@@ -750,7 +778,31 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             HttpServletResponse response, String title, Connection connection,
             WikiPageBean page) throws IOException, ServletException {
         page.setTitle(title);
-        ValueResult<NormalisedTitle> result = getRandomArticle(connection, new Random());
+        final Random random = new Random();
+        ValueResult<NormalisedTitle> result;
+        if (existingPages.hasFullList()) {
+            final long timeAtStart = System.currentTimeMillis();
+            final String statName = "RANDOM_PAGE";
+            final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
+            final Set<NormalisedTitle> pages = existingPages.getList(NamespaceEnum.MAIN_NAMESPACE_KEY);
+            final int randIdx = random.nextInt(pages.size());
+            // no real other option to get a random element from a set :(
+            int i = 0;
+            NormalisedTitle randValue = null;
+            for (Iterator<NormalisedTitle> iterator = pages.iterator(); iterator.hasNext();) {
+                if (i == randIdx) {
+                    randValue = iterator.next();
+                    break;
+                } else {
+                    iterator.next();
+                }
+                ++i;
+            }
+            result = new ValueResult<NormalisedTitle>(involvedKeys, randValue,
+                    statName, System.currentTimeMillis() - timeAtStart);
+        } else {
+            result = getRandomArticle(connection, random);
+        }
         page.addStats(result.stats);
         page.getInvolvedKeys().addAll(result.involvedKeys);
         final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&service_user=" + page.getServiceUser();
@@ -2250,7 +2302,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                     if (result.success) {
                         List<NormalisedTitle> pages = result.value;
                         pages.addAll(specialPages);
-                        BloomFilter<NormalisedTitle> filter = MyWikiModel.createBloomFilter(pages);
+                        ExistingPagesCache filter = ExistingPagesCache.createCache(pages);
                         existingPages = filter;
                     }
                 } finally {

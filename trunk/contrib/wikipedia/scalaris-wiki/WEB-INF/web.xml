@@ -40,6 +40,11 @@
             <param-value>10</param-value>
         </init-param>
         <init-param>
+            <param-name>WIKI_PAGES_CACHE_IMPL</param-name>
+            <!-- available implementations: BLOOM | FULL_SET -->
+            <param-value>FULL_SET</param-value>
+        </init-param>
+        <init-param>
             <param-name>WIKI_REBUILD_PAGES_CACHE</param-name>
             <param-value>600</param-value>
         </init-param>
