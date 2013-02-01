@@ -42,8 +42,6 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang.StringEscapeUtils;
 
-import com.skjegstad.utils.BloomFilter;
-
 import de.zib.scalaris.examples.wikipedia.InvolvedKey;
 import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
@@ -157,11 +155,7 @@ public class MyWikiModel extends WikiModel {
      */
     protected final List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
     
-    /**
-     * False positive rate of the bloom filter for the existing pages checks.
-     */
-    public static final double existingPagesFPR = 0.1;
-    protected BloomFilter<NormalisedTitle> existingPages = null;
+    protected ExistingPagesCache existingPages = ExistingPagesCache.NULL_CACHE;
 
     protected Map<NormalisedTitle, String> pageCache = new HashMap<NormalisedTitle, String>();
 
@@ -688,7 +682,7 @@ public class MyWikiModel extends WikiModel {
             appendInterWikiLink(nsTitle[0], nsTitle[1], topicDescription, nsTitle[1].isEmpty() && topicDescription.equals(topic0));
         } else {
             boolean pageExists = true;
-            if (existingPages != null) {
+            if (existingPages.hasContains()) {
                 pageExists = existingPages.contains(normalisePageTitle(topic0));
             }
             super.appendInternalLink(topic0, hashSection, topicDescription, cssClass, parseRecursive, pageExists);
@@ -915,32 +909,16 @@ public class MyWikiModel extends WikiModel {
     }
     
     /**
-     * Creates a bloom filter containing all given elements.
-     * 
-     * @param elements the elements to put into the filter
-     * 
-     * @return the bloom filter
-     */
-    public static BloomFilter<NormalisedTitle> createBloomFilter(
-            Collection<? extends NormalisedTitle> elements) {
-        BloomFilter<NormalisedTitle> result = new BloomFilter<NormalisedTitle>(
-                existingPagesFPR,
-                Math.max(100, elements.size() + Math.max(10, elements.size() / 10)));
-        result.addAll(elements);
-        return result;
-    }
-
-    /**
      * @return the existingPages
      */
-    public BloomFilter<NormalisedTitle> getExistingPages() {
+    public ExistingPagesCache getExistingPages() {
         return existingPages;
     }
 
     /**
      * @param existingPages the existingPages to set
      */
-    public void setExistingPages(BloomFilter<NormalisedTitle> existingPages) {
+    public void setExistingPages(ExistingPagesCache existingPages) {
         this.existingPages = existingPages;
     }
     

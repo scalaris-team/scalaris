@@ -26,6 +26,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import de.zib.scalaris.ErlangValue;
+import de.zib.scalaris.examples.wikipedia.bliki.ExistingPagesCache;
+import de.zib.scalaris.examples.wikipedia.bliki.ExistingPagesCache.ExistingPagesCacheBloom;
+import de.zib.scalaris.examples.wikipedia.bliki.ExistingPagesCache.ExistingPagesCacheFull;
 
 
 /**
@@ -68,16 +71,23 @@ public class Options {
     public int WIKI_SAVEPAGE_RETRY_DELAY = 10;
     
     /**
-     * How often to re-create the bloom filter with the existing pages (in
-     * seconds). The bloom filter will be disabled if a value less than or equal
+     * Which implementation to use for the pages cache.
+     * 
+     * @see #WIKI_REBUILD_PAGES_CACHE
+     */
+    public Class<? extends ExistingPagesCache> WIKI_PAGES_CACHE_IMPL = ExistingPagesCacheBloom.class;
+    
+    /**
+     * How often to re-create the pages cache with the existing pages (in
+     * seconds). The pages cache will be disabled if a value less than or equal
      * to 0 is provided.
+     * 
+     * @see #WIKI_PAGES_CACHE_IMPL
      */
     public int WIKI_REBUILD_PAGES_CACHE = 10 * 60;
     
     /**
-     * How often to re-create the bloom filter with the existing pages (in
-     * seconds). The bloom filter will be disabled if a value less than or equal
-     * to 0 is provided.
+     * Whether and how to store user contributions in the DB.
      */
     public STORE_CONTRIB_TYPE WIKI_STORE_CONTRIBUTIONS = STORE_CONTRIB_TYPE.OUTSIDE_TX;
     
@@ -777,6 +787,8 @@ public class Options {
      *            {@link Options#WIKI_SAVEPAGE_RETRIES}
      * @param WIKI_SAVEPAGE_RETRY_DELAY
      *            {@link Options#WIKI_SAVEPAGE_RETRY_DELAY}
+     * @param WIKI_PAGES_CACHE_IMPL
+     *            {@link Options#WIKI_PAGES_CACHE_IMPL}
      * @param WIKI_REBUILD_PAGES_CACHE
      *            {@link Options#WIKI_REBUILD_PAGES_CACHE}
      * @param WIKI_STORE_CONTRIBUTIONS
@@ -792,6 +804,7 @@ public class Options {
             final String WIKI_USE_BACKLINKS,
             final String WIKI_SAVEPAGE_RETRIES,
             final String WIKI_SAVEPAGE_RETRY_DELAY,
+            final String WIKI_PAGES_CACHE_IMPL,
             final String WIKI_REBUILD_PAGES_CACHE,
             final String WIKI_STORE_CONTRIBUTIONS, final String OPTIMISATIONS,
             final String LOG_USER_REQS, final String SCALARIS_NODE_DISCOVERY) {
@@ -809,6 +822,15 @@ public class Options {
         }
         if (WIKI_SAVEPAGE_RETRY_DELAY != null) {
             options.WIKI_SAVEPAGE_RETRY_DELAY = Integer.parseInt(WIKI_SAVEPAGE_RETRY_DELAY);
+        }
+        if (WIKI_PAGES_CACHE_IMPL != null) {
+            if (WIKI_PAGES_CACHE_IMPL.equals("BLOOM")) {
+                options.WIKI_PAGES_CACHE_IMPL = ExistingPagesCacheBloom.class;
+            } else if (WIKI_PAGES_CACHE_IMPL.equals("FULL_SET")) {
+                options.WIKI_PAGES_CACHE_IMPL = ExistingPagesCacheFull.class;
+            } else {
+                System.err.println("unknown WIKI_PAGES_CACHE_IMPL found: " + WIKI_PAGES_CACHE_IMPL);
+            }
         }
         if (WIKI_REBUILD_PAGES_CACHE != null) {
             options.WIKI_REBUILD_PAGES_CACHE = Integer.parseInt(WIKI_REBUILD_PAGES_CACHE);
