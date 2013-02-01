@@ -197,8 +197,8 @@ make_ring(Size) ->
 %%      a {config, [{Key, Value},...]} option.
 -spec make_ring(Size::pos_integer(), Options::kv_opts()) -> pid().
 make_ring(Size, Options) ->
-    % allow at most 1s for each node to come up
-    TimeTrap = test_server:timetrap(Size * 1000),
+    % allow at most 1s for each node to come up (+1s for init)
+    TimeTrap = test_server:timetrap(1000 + Size * 1000),
     _ = fix_cwd(),
     error_logger:tty(true),
     case ets:info(config_ets) of
