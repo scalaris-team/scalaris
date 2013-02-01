@@ -239,7 +239,14 @@ to_pid_list(RT) -> [node:pidX(N) || N <- internal_to_list(RT)].
 %% userdevguide-begin rt_frtchord:get_size
 %% @doc Returns the size of the routing table.
 -spec get_size(rt() | external_rt()) -> non_neg_integer().
-get_size(#rt_t{} = RT) -> gb_trees:size(get_rt_tree(RT));
+get_size(#rt_t{} = RT) ->
+    util:gb_trees_foldl(
+        fun(_Key, Val, Acc) ->
+                Acc + case entry_type(Val) of
+                    normal -> 1; % TODO must include group nodes in GFRT
+                    _else -> 0
+                end
+        end, 0, get_rt_tree(RT));
 get_size(RT) -> gb_trees:size(RT). % size of external rt
 %% userdevguide-end rt_frtchord:get_size
 
@@ -388,14 +395,11 @@ handle_custom_message({get_rt_reply, RT}, State) ->
                             false -> add_normal_entry(rt_entry_node(Entry), Acc)
                         end
                 end,
-                LocalRT, get_rt_tree(RT)
-            )
-            ;
+                LocalRT, get_rt_tree(RT));
 
         false -> LocalRT
     end,
-    rt_loop:set_rt(State, NewRT)
-    ;
+    rt_loop:set_rt(State, NewRT);
 
 % lookup a random key chosen with a pdf:
 % x = sourcenode + d(s,succ)*(d(s,pred)/d(s,succ))^rnd
@@ -435,8 +439,7 @@ handle_custom_message({trigger_random_lookup}, State) ->
         false ->
             RT
     end,
-    NewState = rt_loop:set_rt(State, NewRT),
-    NewState
+    rt_loop:set_rt(State, NewRT)
     ;
 
 handle_custom_message({rt_get_node, From}, State) ->
@@ -554,20 +557,19 @@ next_hop(State, Id) ->
 %% @doc Converts the internal RT to the external RT used by the dht_node.
 %% The external routing table is optimized to speed up ?RT:next_hop/2. For this, it is
 %%  only a gb_tree with keys being node ids and values being of type node:node_type().
+%%  TODO merge the Neighborhood into the external RT
 -spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
-export_rt_to_dht_node(InternalRT, _Neighbors) ->
+export_rt_to_dht_node(RT, _Neighbors) ->
     % From each rt_entry, we extract only the field "node" and add it to the tree
     % under the node id. The source node is filtered.
-    OldTree = get_rt_tree(InternalRT),
-    RTExt = util:gb_trees_foldl(fun(_K, V, Acc) ->
+    util:gb_trees_foldl(
+        fun(_K, V, Acc) ->
                 case entry_type(V) of
                     source -> Acc;
                     _Else -> Node = rt_entry_node(V),
-                             gb_trees:enter(node:id(Node), Node, Acc)
+                        gb_trees:enter(node:id(Node), Node, Acc)
                 end
-        end,
-        gb_trees:empty(), OldTree),
-    RTExt
+        end, gb_trees:empty(),get_rt_tree(RT))
     .
 %% userdevguide-end rt_frtchord:export_rt_to_dht_node
 
@@ -818,15 +820,14 @@ entry_learning_and_filtering(Entry, Type, RT) ->
 
     SizeOfRT = get_size(IntermediateRT),
     MaxEntries = maximum_entries(),
-    case SizeOfRT >= MaxEntries of
+    case SizeOfRT > MaxEntries of
         true ->
             NewRT = entry_filtering(IntermediateRT),
             %% only delete the subscription if the newly added node was not filtered;
             %otherwise, there isn't a subscription yet
             case rt_lookup_node(node:id(Entry), NewRT) of
                 none -> ok;
-                _Else ->
-                    update_fd(RT, NewRT)
+                _Else -> update_fd(RT, NewRT)
             end,
             NewRT
             ;
