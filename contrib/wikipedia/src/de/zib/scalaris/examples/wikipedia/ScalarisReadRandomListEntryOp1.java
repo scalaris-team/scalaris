@@ -132,9 +132,9 @@ public class ScalarisReadRandomListEntryOp1<T> implements ScalarisOp {
                 // read a single read-bucket and a single write-bucket
                 int readBuckets = optimisation2.getReadBuckets();
                 bucketKeys.add(key + ":" + random.nextInt(readBuckets));
-                bucketKeys.add(key + ":" + (random.nextInt(bucketsPerKey - readBuckets) + readBuckets));
+                bucketKeys.add(key + ":" + (random.nextInt(optimisation2.getBuckets() - readBuckets) + readBuckets));
             } else {
-                bucketKeys.add(key + ":" + random.nextInt(bucketsPerKey));
+                bucketKeys.add(key + ":" + random.nextInt(((IBuckets) optimisation).getBuckets()));
             }
             assert(bucketsPerKey == bucketKeys.size());
             if (optimisation instanceof IPartialRead) {
