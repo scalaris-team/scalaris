@@ -235,17 +235,21 @@ filter_dead_node(RT, DeadPid) ->
 to_pid_list(RT) -> [node:pidX(N) || N <- internal_to_list(RT)].
 %% userdevguide-end rt_frtchord:to_pid_list
 
-%% userdevguide-begin rt_frtchord:get_size
-%% @doc Returns the size of the routing table.
--spec get_size(rt() | external_rt()) -> non_neg_integer().
-get_size(#rt_t{} = RT) ->
+%% @doc Get the size of the RT excluding entries which are not tagged as normal entries.
+-spec get_size_without_special_nodes(rt()) -> non_neg_integer().
+get_size_without_special_nodes(#rt_t{} = RT) ->
     util:gb_trees_foldl(
         fun(_Key, Val, Acc) ->
                 Acc + case entry_type(Val) of
                     normal -> 1; % TODO must include group nodes in GFRT
                     _else -> 0
                 end
-        end, 0, get_rt_tree(RT));
+        end, 0, get_rt_tree(RT)).
+
+%% userdevguide-begin rt_frtchord:get_size
+%% @doc Returns the size of the routing table.
+-spec get_size(rt() | external_rt()) -> non_neg_integer().
+get_size(#rt_t{} = RT) -> gb_trees:size(get_rt_tree(RT));
 get_size(RT) -> gb_trees:size(RT). % size of external rt
 %% userdevguide-end rt_frtchord:get_size
 
@@ -816,7 +820,7 @@ entry_learning(Entry, Type, RT) ->
 entry_learning_and_filtering(Entry, Type, RT) ->
     IntermediateRT = entry_learning(Entry, Type, RT),
 
-    SizeOfRT = get_size(IntermediateRT),
+    SizeOfRT = get_size_without_special_nodes(IntermediateRT),
     MaxEntries = maximum_entries(),
     case SizeOfRT > MaxEntries of
         true ->
