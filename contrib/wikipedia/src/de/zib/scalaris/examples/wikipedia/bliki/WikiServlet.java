@@ -1,5 +1,5 @@
 /**
- *  Copyright 2007-2011 Zuse Institute Berlin
+ *  Copyright 2007-2013 Zuse Institute Berlin
  *
  *   Licensed under the Apache License, Version 2.0 (the "License");
  *   you may not use this file except in compliance with the License.
@@ -1659,7 +1659,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         StringBuilder content = new StringBuilder();
         content.append("<h2 id=\"mw-version-license\"> <span class=\"mw-headline\" id=\"License\">License</span></h2>\n");
         content.append("<div>\n");
-        content.append("<p>This wiki is powered by <b><a href=\"http://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris</a></b>, copyright © 2011 Zuse Institute Berlin</p>\n");
+        content.append("<p>This wiki is powered by <b><a href=\"http://code.google.com/p/scalaris/\" class=\"external text\" rel=\"nofollow\">Scalaris</a></b>, copyright © 2013 Zuse Institute Berlin</p>\n");
         content.append("<p>\n");
         content.append(" Licensed under the Apache License, Version 2.0 (the \"License\");</br>\n");
         content.append(" you may not use this software except in compliance with the License.</br>\n");
