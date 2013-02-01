@@ -435,7 +435,7 @@ public class ScalarisDataHandler {
                 return v;
             }
         };
-        final List<String> scalarisKeys = Arrays.asList(getPageListKey(0));
+        final List<String> scalarisKeys = Arrays.asList(getPageListKey(NamespaceEnum.MAIN_NAMESPACE_KEY.getId()));
         List<InvolvedKey> involvedKeys = new ArrayList<InvolvedKey>();
         
         if (connection == null) {
