@@ -76,7 +76,7 @@
 
 % enable logging of message statistics at the granularity of erlang messages
 -define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), ok).
-%% -define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), comm_logger:log(SNDRCV, {CHANNEL, comm:get_msg_tag(MESSAGE)}, byte_size(term_to_binary(MESSAGE)))).
+%% -define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), comm_logger:log(SNDRCV, {CHANNEL, comm:get_msg_tag(MESSAGE)}, erlang:external_size(MESSAGE))).
 
 
 % enable native register for all processes in gen_component or disable
