@@ -27,10 +27,10 @@
 -include("scalaris.hrl").
 
 % exports for unit tests
--export([check_rt_integrity/1
-        , check_well_connectedness/1
-        , get_random_key_from_generator/3
-    ]).
+-export([check_rt_integrity/1,
+         check_well_connectedness/1,
+         get_random_key_from_generator/3
+        ]).
 
 % Make dialyzer stop complaining about unused functions
 % The following functions are only used when ?RT == rt_frtchord. Dialyzer should not
@@ -112,8 +112,7 @@ init(Neighbors) ->
         true -> set_should_dump(EmptyRT);
         _ -> EmptyRT
     end,
-    update_entries(Neighbors, RT)
-    .
+    update_entries(Neighbors, RT).
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(client_key()) -> key().
@@ -460,6 +459,10 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
     rt_loop:set_rt(State, NewRT)
     ;
 
+handle_custom_message({send_rt, From}, State) ->
+    comm:send_local(From, {send_rt_response, rt_loop:get_rt(State)}),
+    State;
+
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_frtchord:handle_custom_message
 
@@ -500,18 +503,27 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
     end
     .
 
+%% @doc Filter the source node's pid from a list of pids.
+-spec filter_source_pid(RT :: rt(), ListOfPids :: [pid()]) -> [pid()].
+filter_source_pid(RT,ListOfPids) ->
+    SourcePid = node:pidX(rt_entry_node(get_source_node(RT))),
+    [P || P <- ListOfPids, P =/= SourcePid].
+
 %% @doc Set up a set of subscriptions from a routing table
 -spec add_fd(RT :: rt())  -> ok.
 add_fd(#rt_t{} = RT) ->
     NewPids = to_pid_list(RT),
-    fd:subscribe(NewPids).
+    % Filter the source node from the Pids, as we don't need an FD for that node. If the
+    % source node crashes (which is the process calling this function), we are done
+    % for.
+    fd:subscribe(filter_source_pid(RT, NewPids)).
 
 %% @doc Update subscriptions
 -spec update_fd(OldRT :: rt(), NewRT :: rt()) -> ok.
 update_fd(OldRT, OldRT) -> ok;
 update_fd(#rt_t{} = OldRT, #rt_t{} = NewRT) ->
-    OldPids = to_pid_list(OldRT),
-    NewPids = to_pid_list(NewRT),
+    OldPids = filter_source_pid(OldRT, to_pid_list(OldRT)),
+    NewPids = filter_source_pid(NewRT, to_pid_list(NewRT)),
     fd:update_subscriptions(OldPids, NewPids).
 
 %% userdevguide-end rt_frtchord:check
@@ -557,7 +569,6 @@ next_hop(State, Id) ->
 %% @doc Converts the internal RT to the external RT used by the dht_node.
 %% The external routing table is optimized to speed up ?RT:next_hop/2. For this, it is
 %%  only a gb_tree with keys being node ids and values being of type node:node_type().
-%%  TODO merge the Neighborhood into the external RT
 -spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
 export_rt_to_dht_node(RT, _Neighbors) ->
     % From each rt_entry, we extract only the field "node" and add it to the tree
@@ -675,21 +686,13 @@ sticky_entry_to_normal_node(EntryKey, RT) ->
     Node = #rt_entry{type=sticky} = rt_get_node(EntryKey, RT),
     NewNode = Node#rt_entry{type=normal},
     UpdatedTree = gb_trees:enter(EntryKey, NewNode, get_rt_tree(RT)),
-    RT#rt_t{nodes=UpdatedTree}
-    .
+    RT#rt_t{nodes=UpdatedTree}.
 
 
--spec rt_entry_from(Node::node:node_type()
-                    , Type :: entry_type()
-                    , PredId :: key_t()
-                    , SuccId :: key_t()
-                   ) -> rt_entry().
+-spec rt_entry_from(Node::node:node_type(), Type :: entry_type(),
+                    PredId :: key_t(), SuccId :: key_t()) -> rt_entry().
 rt_entry_from(Node, Type, PredId, SuccId) ->
-    #rt_entry{
-        node=Node
-        , type=Type
-        , adjacent_fingers={PredId, SuccId}
-    }.
+    #rt_entry{node=Node , type=Type , adjacent_fingers={PredId, SuccId}}.
 
 % @doc Create an rt_entry and return the entry together with the Pred und Succ node, where
 % the adjacent fingers are changed for each node.
@@ -698,22 +701,17 @@ rt_entry_from(Node, Type, PredId, SuccId) ->
 create_entry(Node, Type, RT) ->
     NodeId = node:id(Node),
     Tree = get_rt_tree(RT),
-    % search the adjacent fingers using the routing table
-    PredLookup = util:gb_trees_largest_smaller_than(NodeId, Tree),
-    RTSize = get_size(RT),
-    case PredLookup of
-        nil when RTSize =:= 0 -> % this is the first entry of the RT
+    FirstNode = node:id(Node) =:= get_source_id(RT),
+    case util:gb_trees_largest_smaller_than(NodeId, Tree)of
+        nil when FirstNode -> % this is the first entry of the RT
             NewEntry = rt_entry_from(Node, Type, NodeId, NodeId),
-            {NewEntry, NewEntry, NewEntry}
-            ;
+            {NewEntry, NewEntry, NewEntry};
         nil -> % largest finger
             {_PredId, Pred} = gb_trees:largest(Tree),
-            get_adjacent_fingers_from(Pred, Node, Type, RT)
-            ;
+            get_adjacent_fingers_from(Pred, Node, Type, RT);
         {value, _PredId, Pred} ->
             get_adjacent_fingers_from(Pred, Node, Type, RT)
-    end
-    .
+    end.
 
 % Get the tuple of adjacent finger ids with Node being in the middle:
 % {Predecessor, Node, Successor}
@@ -728,8 +726,8 @@ get_adjacent_fingers_from(Pred, Node, Type, RT) ->
     case PredId =:= SuccId of
         false ->
             {set_adjacent_succ(Pred, NodeId),
-                NewEntry,
-                set_adjacent_pred(Succ, NodeId)
+             NewEntry,
+             set_adjacent_pred(Succ, NodeId)
             };
         true ->
             AdjacentNode = set_adjacent_fingers(Pred, NodeId, NodeId),
@@ -901,8 +899,7 @@ set_should_dump(RT) ->
 get_sticky_entries(#rt_t{nodes=Nodes}) ->
     util:gb_trees_foldl(fun(_K, #rt_entry{type=sticky} = E, Acc) -> [E|Acc];
                       (_,_,Acc) -> Acc
-                  end, [], Nodes)
-    .
+                  end, [], Nodes).
 
 % @doc Check if a node exists in the routing table
 -spec entry_exists(EntryKey :: key(), rt()) -> boolean().
@@ -916,14 +913,12 @@ entry_exists(EntryKey, #rt_t{nodes=Nodes}) ->
 %-spec add_entry(Node :: node:node_type(), Type :: entry_type(), RT :: rt()) -> rt().
 -spec add_entry(node:node_type(),'normal' | 'source' | 'sticky',rt()) -> rt().
 add_entry(Node, Type, RT) ->
-    entry_learning_and_filtering(Node, Type, RT)
-    .
+    entry_learning_and_filtering(Node, Type, RT).
 
 % @doc Add a sticky entry to the routing table
 -spec add_sticky_entry(Entry :: node:node_type(), rt()) -> rt().
 add_sticky_entry(Entry, RT) ->
-   add_entry(Entry, sticky, RT)
-   .
+   add_entry(Entry, sticky, RT).
 
 % @doc Add the source entry to the routing table
 -spec add_source_entry(Entry :: node:node_type(), rt()) -> rt().
@@ -932,14 +927,12 @@ add_source_entry(Entry, #rt_t{source=undefined} = RT) ->
     % only learn; the RT must be empty, so there is no filtering needed afterwards
     NewRT = entry_learning(Entry, source, IntermediateRT),
     add_fd(NewRT),
-    NewRT
-    .
+    NewRT.
 
 % @doc Add a normal entry to the routing table
 -spec add_normal_entry(Entry :: node:node_type(), rt()) -> rt().
 add_normal_entry(Entry, RT) ->
-    add_entry(Entry, normal, RT)
-    .
+    add_entry(Entry, normal, RT).
 
 % @doc Get the inner node:node_type() of a rt_entry
 -spec rt_entry_node(N :: rt_entry()) -> node:node_type().
