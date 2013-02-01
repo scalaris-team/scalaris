@@ -258,14 +258,16 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      * Starts the service updating the bloom filter for existing pages.
      */
     protected void startExistingPagesUpdate() {
-        if (Options.getInstance().WIKI_REBUILD_PAGES_CACHE > 0) {
+        final int rebuildDelay = Options.getInstance().WIKI_REBUILD_PAGES_CACHE;
+        if (rebuildDelay > 0) {
+            updateExistingPages();
             ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
             ses.scheduleWithFixedDelay(new Runnable() {
                 @Override
                 public void run() {
                     updateExistingPages();
                 }
-            }, 0, Options.getInstance().WIKI_REBUILD_PAGES_CACHE, TimeUnit.SECONDS);
+            }, rebuildDelay, rebuildDelay, TimeUnit.SECONDS);
         }
     }
     
