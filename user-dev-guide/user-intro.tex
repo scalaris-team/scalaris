@@ -14,56 +14,58 @@ service downtime.
 \definecolor{layer_bluefont}{RGB}{31,73,128}
 \begin{center}
 \begin{tikzpicture}
- [pre/.style={<-,shorten <=1pt,>=stealth,semithick},
-  post/.style={->,shorten >=1pt,>=stealth,semithick},
-  layer/.style={rectangle,fill=layer_bg,text=white,
+ [layer/.style={rectangle,fill=layer_bg,text=white,
   drop shadow={opacity=0.4},
   minimum width=7cm,
   minimum height=1.4cm,
   align=center},
-  layer_desc/.style={text width=3.5cm,align=left},
-  bend angle=60]
+  layer_desc/.style={text width=3.5cm,align=left}]
 \sffamily
 
-  %% define the layers without text to support the fitting bounding box
-  \node[layer] (tx_layer) at (0,2.7) {};
-  \node[layer,below=0.2 of tx_layer, minimum height=0.8cm] (rep_layer) {};
-  \node[layer,below=0.2 of rep_layer] (ov_layer) {};
+  %% draw the layers
+  \node[layer] (tx_layer) at (0,2.7)
+     {Transaction Layer};
+  \node[layer,below=0.2 of tx_layer, minimum height=0.8cm] (rep_layer)
+     {Replication Layer};
+  \node[layer,below=0.2 of rep_layer] (ov_layer)
+     {P2P Layer};
 
+  %% fitting the underlying bounding box
+  \begin{pgfonlayer}{background}
   \node[draw,color=layer_bg,fit=(tx_layer) (rep_layer) (ov_layer),
         inner sep=0.3cm,drop shadow, fill=white] {};
+  \end{pgfonlayer}
 
-  %% draw the layers on top
+  %% text above the box
   \node[above=0.4 of tx_layer, text=layer_bg]
-    {\textbf{\color{layer_bluefont}{Web 2.0 Application}}};
-  \node[layer] at (0,2.7) {Transaction Layer};
-  \node[layer,below=0.2 of tx_layer, minimum height=0.8cm] {Replication Layer};
-  \node[layer,below=0.2 of rep_layer] {P2P Layer};
+     {\textbf{\color{layer_bluefont}{Web 2.0 Application}}};
 
+  %% text below the box
+  \node[inner sep=0, below=0.6 of ov_layer]
+     {\textbf{\color{layer_bluefont}{Standard Internet Nodes for Data Storage}}};
+
+  %% description on the right side
   \node[above right=0.3 and 0.9 of tx_layer]
      {\smaller layer implements~\ldots};
   \node[layer_desc,right=0.9 of tx_layer] (tx_layer_desc)
-     {\smaller \ldots~strong consistency, \phantom{\ldots~}atomicity, isolation};
+     {\smaller \ldots~strong consistency,
+      \phantom{\ldots~}atomicity, isolation};
   \node[layer_desc,right=0.9 of rep_layer] (rep_layer_desc)
      {\smaller \ldots~availability};
   \node[layer_desc,right=0.9 of ov_layer] (ov_layer_desc)
      {\smaller \ldots~scalability};
 
-  \node[shape=single arrow,right=0.15 of tx_layer,fill=layer_bg,
-        shape border rotate=180, single arrow head extend=1.2mm,
-        minimum height=0.55cm,
-        minimum width=0.2cm] {};
-  \node[shape=single arrow,right=0.15 of rep_layer,fill=layer_bg,
-        shape border rotate=180, single arrow head extend=1.2mm,
-        minimum height=0.55cm,
-        minimum width=0.2cm] {};
-  \node[shape=single arrow,right=0.15 of ov_layer,fill=layer_bg,
-        shape border rotate=180, single arrow head extend=1.2mm,
-        minimum height=0.55cm,
-        minimum width=0.2cm] {};
-
-  \node[inner sep=0, below=0.6 of ov_layer]
-     {\textbf{\color{layer_bluefont}{Standard Internet Nodes for Data Storage}}};
+  %% arrows
+  \begin{scope}[every node/.style={single arrow,
+              fill=layer_bg,
+              shape border rotate=180,
+              single arrow head extend=1.2mm,
+              minimum height=0.55cm,
+              minimum width=0.2cm}]
+    \node[right=0.15 of tx_layer] {};
+    \node[right=0.15 of rep_layer] {};
+    \node[right=0.15 of ov_layer] {};
+  \end{scope}
 \end{tikzpicture}
 \end{center}
 

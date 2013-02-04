@@ -18,7 +18,7 @@
 \newcommand{\doccreator}{LaTeX2e and pdfLaTeX with hyperref-package}
 \newcommand{\docproducer}{}
 \newcommand{\dockeywords}{\scalaris{}, P2P, DHT, Manual}
-\newcommand{\doccopyright}{Copyright 2007-2012 Zuse Institute Berlin and onScale solutions}
+\newcommand{\doccopyright}{Copyright 2007-2013 Zuse Institute Berlin}
 \newcommand{\doclicenseurl}{http://www.apache.org/licenses/LICENSE-2.0}
 \newcommand{\docversion}{\input{../VERSION}}
 
@@ -58,6 +58,7 @@
 \usetikzlibrary{shadows}
 \usetikzlibrary{fit}
 \usetikzlibrary{shapes.arrows}
+\usetikzlibrary{backgrounds}
 
 \renewcommand{\headrulewidth}{0pt}    % Width of head rule
 \renewcommand{\footrulewidth}{0.3pt}  % Width of head rule
@@ -113,6 +114,7 @@
 
 %\definecolor{rltblue}{rgb}{0,0,0.75}
 \definecolor{rltblue}{HTML}{1F4980}
+\definecolor{rltred}{HTML}{80491F}
 \definecolor{lightgray}{gray}{0.9}
 
 \setlength{\parindent}{0pt}
@@ -120,17 +122,17 @@
 % 31 73 128 blue
 
 \definecolor{lightyellow}{rgb}{1.0, 1.0, 0.5}
-\definecolor{codebackground}{rgb}{0.9,0.95,1.0}
+\definecolor{codebackground}{HTML}{EEEEEE}
 \definecolor{commandinput}{rgb}{0.8,0.8,1}
 
 %\thicklines
 \lstset{
   basicstyle=\scriptsize\ttfamily,
   backgroundcolor=\color{codebackground},
-  keywordstyle=\color{blue}\bfseries,
+  keywordstyle=\color{rltblue}\bfseries,
   % underlined bold black keywords
   identifierstyle=\bfseries, % nothing happens
-  commentstyle=\color{red}\bfseries, % white comments
+  commentstyle=\color{rltred}\bfseries, % white comments
   stringstyle=\sffamily, % typewriter type for strings
   showstringspaces=false,
   xleftmargin=3pt,
