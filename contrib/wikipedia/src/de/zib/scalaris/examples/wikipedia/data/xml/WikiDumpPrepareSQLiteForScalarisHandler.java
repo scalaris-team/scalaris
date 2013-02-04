@@ -34,7 +34,6 @@ import com.ericsson.otp.erlang.OtpErlangObject;
 
 import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.ErlangValue;
-import de.zib.scalaris.examples.wikipedia.MultiHashMap;
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandler;
 import de.zib.scalaris.examples.wikipedia.ScalarisDataHandlerNormalised;
@@ -44,6 +43,7 @@ import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
+import de.zib.tools.MultiHashMap;
 
 /**
  * Provides abilities to read an xml wiki dump file and prepare its contents

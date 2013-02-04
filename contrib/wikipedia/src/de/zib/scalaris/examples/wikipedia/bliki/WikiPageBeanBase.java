@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import de.zib.scalaris.examples.wikipedia.InvolvedKey;
-import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
+import de.zib.tools.LinkedMultiHashMap;
 
 /**
  * Bean with common content to display in a jsp. 

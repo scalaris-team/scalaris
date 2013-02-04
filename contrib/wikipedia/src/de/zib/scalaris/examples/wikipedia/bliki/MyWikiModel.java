@@ -43,8 +43,8 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang.StringEscapeUtils;
 
 import de.zib.scalaris.examples.wikipedia.InvolvedKey;
-import de.zib.scalaris.examples.wikipedia.LinkedMultiHashMap;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
+import de.zib.tools.LinkedMultiHashMap;
 
 /**
  * Wiki model fixing some bugs of {@link WikiModel} and adding some
