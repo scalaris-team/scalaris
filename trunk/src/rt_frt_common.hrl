@@ -51,12 +51,14 @@
 -export([check_rt_integrity/1, check_well_connectedness/1]).
 
 % Make dialyzer stop complaining about unused functions
-% The following functions are only used when ?RT == rt_frt_helpers. Dialyzer should not
+% The following functions are only used when ?RT == rt_frtchord. Dialyzer should not
 % complain when they are not called.
 -export([get_num_active_learning_lookups/1,
          set_num_active_learning_lookups/2,
-         inc_num_active_learning_lookups/1,
-         should_dump/1]).
+         inc_num_active_learning_lookups/1]).
+
+% Make dialyzer stop complaining about wrong types in unused functions
+-export([rt_lookup_node/2, add_normal_entry/2]).
 
 % Functions which are to be implemented in modules including this header
 -export([allowed_nodes/1, frt_check_config/0, rt_entry_info/4]).
@@ -92,7 +94,6 @@
 -record(rt_t, {
         source = undefined :: key_t() | undefined
         , num_active_learning_lookups = 0 :: non_neg_integer()
-        , should_dump = false :: boolean() % set by configuration parameter rt_frtchord_should_dump
         , nodes = gb_trees:empty() :: gb_tree()
     }).
 
@@ -124,18 +125,10 @@ init(Neighbors) ->
         true -> comm:send_local(self(), {trigger_random_lookup});
         false -> ok
     end,
-
     % ask the successor node for its routing table
     Msg = {?send_to_group_member, routing_table, {get_rt, comm:this()}},
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
-    % create an initial RT consisting of the neighbors
-    EmptyRT = add_source_entry(nodelist:node(Neighbors), #rt_t{}),
-
-    RT = case config:read(rt_frtchord_should_dump) of
-        true -> set_should_dump(EmptyRT);
-        _ -> EmptyRT
-    end,
-    update_entries(Neighbors, RT).
+    update_entries(Neighbors, add_source_entry(nodelist:node(Neighbors), #rt_t{})).
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(client_key()) -> key().
@@ -371,8 +364,7 @@ check_config() ->
         end and
     config:cfg_is_bool(rt_frtchord_al) and
     config:cfg_is_greater_than_equal(rt_frtchord_al_interval, 0) and
-    config:cfg_is_bool(rt_frtchord_should_dump) and
-    ?RT:frt_check_config()
+    frt_check_config()
     .
 
 %% @doc Generate a random key from the pdf as defined in (Nagao, Shudo, 2011)
@@ -433,7 +425,7 @@ handle_custom_message({get_rt_reply, RT}, State) ->
 % where rnd is chosen uniformly from [0,1)
 handle_custom_message({trigger_random_lookup}, State) ->
     RT = rt_loop:get_rt(State),
-    SourceNode = get_source_node(RT),
+    SourceNode = ?RT:get_source_node(RT),
     SourceNodeId = entry_nodeid(SourceNode),
     {PredId, SuccId} = adjacent_fingers(SourceNode),
     Key = get_random_key_from_generator(SourceNodeId, PredId, SuccId),
@@ -444,29 +436,7 @@ handle_custom_message({trigger_random_lookup}, State) ->
 
     api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, routing_table,
                                         {rt_get_node, comm:this()}}),
-
-    % For evaluating FRTChord, we dump the RT at specific nodes to check if their RT
-    % approaches the best RT.
-    NewRT = case should_dump(RT) of
-        true ->
-            IncRT = inc_num_active_learning_lookups(RT),
-            % Dump RT if the number of active learning lookups is either 25 or 100. If so,
-            % dump the RT to text files in ebin
-            NumActiveLearningLookups = get_num_active_learning_lookups(IncRT),
-            _ = if NumActiveLearningLookups =:= 25 orelse
-               NumActiveLearningLookups =:= 100 ->
-                    CSV = dump_to_csv(IncRT),
-                    % Filename comes from ActiveLearningLookups_Number
-                    file:write_file(io_lib:format("all_~p.dump", [NumActiveLearningLookups]), CSV)
-                    ;
-                true ->
-                    ok
-            end,
-            IncRT;
-        false ->
-            RT
-    end,
-    rt_loop:set_rt(State, NewRT)
+    State
     ;
 
 handle_custom_message({rt_get_node, From}, State) ->
@@ -477,9 +447,9 @@ handle_custom_message({rt_get_node, From}, State) ->
 
 handle_custom_message({rt_learn_node, NewNode}, State) ->
     OldRT = rt_loop:get_rt(State),
-    NewRT = case rt_lookup_node(node:id(NewNode), OldRT) of
-        none -> RT = add_normal_entry(NewNode, OldRT),
-                check(OldRT, RT, rt_loop:get_neighb(State), true),
+    NewRT = case ?RT:rt_lookup_node(node:id(NewNode), OldRT) of
+        none -> RT = ?RT:add_normal_entry(NewNode, OldRT),
+                ?RT:check(OldRT, RT, rt_loop:get_neighb(State), true),
                 RT;
         _Else ->  OldRT
     end,
@@ -656,7 +626,7 @@ sorted_nodelist(ListOfNodes, SourceNode) ->
 
 -spec entry_filtering(rt()) -> rt().
 entry_filtering(#rt_t{} = RT) ->
-    entry_filtering(RT, ?RT:allowed_nodes(RT)).
+    entry_filtering(RT, allowed_nodes(RT)).
 
 -spec entry_filtering(rt(),[#rt_entry{type :: 'normal'}]) -> rt().
 entry_filtering(RT, []) -> RT; % only sticky entries and the source node given; nothing to do
@@ -718,7 +688,7 @@ sticky_entry_to_normal_node(EntryKey, RT) ->
                     PredId :: key_t(), SuccId :: key_t()) -> rt_entry().
 rt_entry_from(Node, Type, PredId, SuccId) ->
     #rt_entry{node=Node , type=Type , adjacent_fingers={PredId, SuccId},
-             custom=?RT:rt_entry_info(Node, Type, PredId, SuccId)}.
+             custom=rt_entry_info(Node, Type, PredId, SuccId)}.
 
 % @doc Create an rt_entry and return the entry together with the Pred und Succ node, where
 % the adjacent fingers are changed for each node.
@@ -873,7 +843,7 @@ get_source_node(#rt_t{source=NodeId, nodes=Nodes}) ->
     end.
 
 % @doc Get the id of the source node.
--spec get_source_id(RT :: rt()) -> ?RT:key().
+-spec get_source_id(RT :: rt()) -> key().
 get_source_id(#rt_t{source=NodeId}) -> NodeId.
 
 % @doc Set the source node of a routing table
@@ -898,14 +868,6 @@ set_num_active_learning_lookups(RT,Num) -> RT#rt_t{num_active_learning_lookups=N
 inc_num_active_learning_lookups(RT) ->
     Inc = get_num_active_learning_lookups(RT) + 1,
     set_num_active_learning_lookups(RT, Inc).
-
-% @doc Check if RT should be dumped for evaluating FRTChord
--spec should_dump(RT :: rt()) -> boolean().
-should_dump(RT) -> RT#rt_t.should_dump.
-
-% @doc Set that the RT should be dumped
--spec set_should_dump(RT :: rt()) -> rt().
-set_should_dump(RT) -> RT#rt_t{should_dump=true}.
 
 % @doc Get all sticky entries of a routing table
 -spec get_sticky_entries(rt()) -> [rt_entry()].
