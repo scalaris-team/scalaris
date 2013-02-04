@@ -1099,18 +1099,21 @@ check_rt_integrity(#rt_t{} = RT) ->
 %% @doc Wrap lookup messages.
 %% For node learning in lookups, a lookup message is wrapped with the global Pid of the
 %% sending routing table.
--spec wrap_message(Msg::comm:message(), Hops::non_neg_integer()) ->
+-spec wrap_message(Msg::comm:message(), State::dht_node_state:state(),
+                   Hops::non_neg_integer()) ->
     {'$wrapped', comm:mypid(), comm:message()} | comm:message().
-wrap_message(Msg, 0) -> {'$wrapped', comm:this(), Msg};
-wrap_message(Msg, _) -> Msg.
-%% userdevguide-end rt_frtchord:wrap_message
-
+wrap_message(Msg, State, 0) -> {'$wrapped', dht_node_state:get(State, node), Msg};
+wrap_message({'$wrapped', Issuer, _} = Msg, _State, _) ->
+    % learn a node when forwarding it's request
+    comm:send_local(self(), {?send_to_group_member, routing_table,
+                             {rt_learn_node, Issuer}}),
+    Msg.
 %% userdevguide-begin rt_frtchord:unwrap_message
 %% @doc Unwrap lookup messages.
 %% The Pid is retrieved and the Pid of the current node is sent to the retrieved Pid
 -spec unwrap_message(Msg::comm:message(), State::dht_node_state:state()) -> comm:message().
-unwrap_message({'$wrapped', Pid, UnwrappedMessage}, State) ->
-    comm:send(Pid,
+unwrap_message({'$wrapped', Issuer, UnwrappedMessage}, State) ->
+    comm:send(node:pidX(Issuer),
         {?send_to_group_member, routing_table,
             {rt_learn_node, dht_node_state:get(State, node)}
         }),
