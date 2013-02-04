@@ -7,7 +7,6 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Set;
 
-import de.zib.scalaris.examples.wikipedia.MultiHashMap;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace;
 import de.zib.scalaris.examples.wikipedia.bliki.MyNamespace.NamespaceEnum;
 import de.zib.scalaris.examples.wikipedia.bliki.MyWikiModel;
@@ -16,6 +15,7 @@ import de.zib.scalaris.examples.wikipedia.data.Page;
 import de.zib.scalaris.examples.wikipedia.data.Revision;
 import de.zib.scalaris.examples.wikipedia.data.ShortRevision;
 import de.zib.scalaris.examples.wikipedia.data.SiteInfo;
+import de.zib.tools.MultiHashMap;
 
 /**
  * Intermediate class between XML processing of a Wiki dump and custom

@@ -3,6 +3,8 @@ package de.zib.scalaris.examples.wikipedia;
 import java.util.ArrayList;
 import java.util.List;
 
+import de.zib.tools.LinkedMultiHashMap;
+
 
 /**
  * Common result class with a public member containing the result and a

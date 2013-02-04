@@ -18,6 +18,7 @@ import de.zib.scalaris.executor.ScalarisListAppendRemoveOp1;
 import de.zib.scalaris.executor.ScalarisListAppendRemoveOp2;
 import de.zib.scalaris.executor.ScalarisOpExecutor;
 import de.zib.scalaris.executor.ScalarisWriteOp;
+import de.zib.tools.LinkedMultiHashMap;
 
 /**
  * Wraps {@link ScalarisOpExecutor} and adds the different operations

@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.scalaris.examples.wikipedia;
+package de.zib.tools;
 
 import java.util.HashMap;
 import java.util.List;
@@ -22,13 +22,15 @@ import java.util.Map;
 /**
  * Provides a multi-map, i.e. a map associating multiple values with a single
  * key. Wraps the {@link HashMap} class.
- * 
+ *
  * @param <K>
  *            key type
  * @param <V>
  *            value type
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
+ * @version 3.18
+ * @since 3.18
  */
 public class MultiHashMap<K, V> extends MultiMap<HashMap<K, List<V>>, K, V> {
     /**
@@ -37,26 +39,26 @@ public class MultiHashMap<K, V> extends MultiMap<HashMap<K, List<V>>, K, V> {
     public MultiHashMap() {
         super(HashMap.class);
     }
-    
+
     /**
      * Constructs an empty map.
-     * 
+     *
      * @param initialCapacity
      *            the initial capacity of the hash table
      */
-    public MultiHashMap(int initialCapacity) {
+    public MultiHashMap(final int initialCapacity) {
         super(HashMap.class, initialCapacity);
     }
-    
+
     /**
      * Creates a map containing all values from another map.
-     * 
+     *
      * @param other
      *            the map to copy the values from
-     * 
+     *
      * @see #putAll(Map)
      */
-    public MultiHashMap(Map<? extends K, ? extends List<V>> other) {
+    public MultiHashMap(final Map<? extends K, ? extends List<V>> other) {
         super(HashMap.class, other);
     }
 }

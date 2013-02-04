@@ -30,5 +30,13 @@
  *
  * <p>See the {@link de.zib.tools.PropertyLoader} class documentation for more
  * details.</p>
+ *
+ * <h3>MultiMap classes</h3>
+ *
+ * Provides a multi-map, i.e. a map associating multiple values with a single
+ * key.
+ *
+ * <p>See the {@link de.zib.tools.MultiMap} class documentation for more
+ * details.</p>
  */
 package de.zib.tools;
