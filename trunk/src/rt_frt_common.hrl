@@ -35,27 +35,19 @@
 -author('mamuelle@informatik.hu-berlin.de').
 -behaviour(rt_beh).
 
--export([dump_to_csv/1,
-         get_random_key_from_generator/3,
-         get_size_without_special_nodes/1,
-         is_source/1,
-         is_sticky/1,
-         normalize/1,
-         get_custom_info/1, set_custom_info/2,
-         get_source_id/1, get_source_node/1,
-         rt_get_nodes/1, rt_entry_distance/2,
-         rt_entry_id/1, predecessor_node/2
-        ]).
+-export([dump_to_csv/1, get_source_id/1, get_source_node/1]).
 
 % exports for unit tests
--export([check_rt_integrity/1, check_well_connectedness/1]).
+-export([check_rt_integrity/1, check_well_connectedness/1, get_random_key_from_generator/3]).
 
-% Make dialyzer stop complaining about unused functions
+%% Make dialyzer stop complaining about unused functions
+
 % The following functions are only used when ?RT == rt_frtchord. Dialyzer should not
 % complain when they are not called.
 -export([get_num_active_learning_lookups/1,
          set_num_active_learning_lookups/2,
          inc_num_active_learning_lookups/1]).
+-export([rt_entry_distance/2, rt_entry_id/1, set_custom_info/2, get_custom_info/1]).
 
 % Make dialyzer stop complaining about wrong types in unused functions
 -export([rt_lookup_node/2, add_normal_entry/2]).
