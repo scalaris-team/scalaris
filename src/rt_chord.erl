@@ -375,7 +375,7 @@ to_list(State) ->
 
 %% userdevguide-begin rt_chord:wrap_message
 %% @doc Wrap lookup messages. This is a noop in Chord.
--spec wrap_message(State::dht_node_state:state(), Msg::comm:message(),
+-spec wrap_message(Msg::comm:message(), State::dht_node_state:state(),
                    Hops::non_neg_integer()) -> comm:message().
 wrap_message(Msg, _State, _Hops) -> Msg.
 %% userdevguide-end rt_chord:wrap_message

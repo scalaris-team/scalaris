@@ -73,7 +73,7 @@ rt_entry_info(Node, _Type, _PredId, _SuccId) ->
         end}.
 
 %% @doc Check if the given node belongs to another group of nodes
--spec is_from_other_group(node:node_type()) -> boolean().
+-spec is_from_other_group(rt_entry()) -> boolean().
 is_from_other_group(Node) ->
     (get_custom_info(Node))#rt_entry_info.group =:= same_dc.
 
@@ -81,4 +81,3 @@ is_from_other_group(Node) ->
 %%      valid.
 -spec frt_check_config() -> boolean().
 frt_check_config() -> true.
-
