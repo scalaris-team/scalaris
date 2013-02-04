@@ -1,4 +1,4 @@
-package de.zib.scalaris.examples.wikipedia;
+package de.zib.scalaris.executor;
 
 import java.util.List;
 
@@ -8,18 +8,27 @@ import de.zib.scalaris.operations.AddOnNrOp;
 
 /**
  * Implements a list append operation using the append operation of Scalaris.
- * 
+ * Supports an (optional) list counter key which is updated accordingly.
+ *
  * For a correct counter in the <tt>countKey</tt>, this class assumes that every
  * element from the <tt>toRemove</tt> list existed in the list (at least after
  * adding the elements from <tt>toAdd</tt>).
- * 
+ *
  * @param <T>
  *            the type of objects in the list
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
+ * @version 3.18
+ * @since 3.18
  */
 public class ScalarisListAppendRemoveOp2<T> extends ScalarisChangeListOp2 {
+    /**
+     * Elements to add to the stored list.
+     */
     final protected List<T> toAdd;
+    /**
+     * Elements to remove from the stored list (after adding {@link #toAdd}).
+     */
     final protected List<T> toRemove;
 
     /**
@@ -39,7 +48,8 @@ public class ScalarisListAppendRemoveOp2<T> extends ScalarisChangeListOp2 {
     }
 
     /**
-     * Adds {@link #toAdd} to the list at {@link ScalarisListOp2#key}.
+     * Adds {@link #toAdd} to the list at {@link ScalarisListOp2#key},
+     * removes {@link #toRemove} and updates the list counter (if present).
      *
      * @param requests
      *            the request list

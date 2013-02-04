@@ -1,21 +1,33 @@
-package de.zib.scalaris.examples.wikipedia;
+package de.zib.scalaris.executor;
 
 import com.ericsson.otp.erlang.OtpErlangException;
 
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.executor.ScalarisOp;
+import de.zib.scalaris.operations.AddOnNrOp;
 
 /**
- * Implements a list change operation using the append operation of
- * Scalaris.
+ * Implements a list change operation using the append operation of Scalaris.
+ * Supports an (optional) list counter key which is updated accordingly.
+ *
+ * Sub-classes need to override {@link #changeList(RequestList)} to perform the
+ * changes and issue a <em>single</em> {@link AddOnNrOp} operation and
+ * (optionally) a second {@link AddOnNrOp} for a list counter key!
  *
  * @author Nico Kruber, kruber@zib.de
+ * @version 3.18
+ * @since 3.18
  */
 public abstract class ScalarisChangeListOp2 implements ScalarisOp {
-    final String key;
-    final String countKey;
+    /**
+     * Key used to store the list.
+     */
+    protected final String key;
+    /**
+     * Key used to store the list counter.
+     */
+    protected final String countKey;
 
     /**
      * Creates a new list change operation.
@@ -47,6 +59,10 @@ public abstract class ScalarisChangeListOp2 implements ScalarisOp {
 
     /**
      * Changes the given page list and its counter (if present).
+     *
+     * Sub-classes overriding this method need to perform the changes and issue
+     * a <em>single</em> {@link AddOnNrOp} operation and (optionally) a second
+     * {@link AddOnNrOp} for a list counter key!
      *
      * @param requests
      *            the request list

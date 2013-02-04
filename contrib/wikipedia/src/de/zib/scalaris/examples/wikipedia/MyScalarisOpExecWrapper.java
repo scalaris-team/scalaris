@@ -14,6 +14,8 @@ import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisIncrementOp1;
 import de.zib.scalaris.executor.ScalarisIncrementOp2;
+import de.zib.scalaris.executor.ScalarisListAppendRemoveOp1;
+import de.zib.scalaris.executor.ScalarisListAppendRemoveOp2;
 import de.zib.scalaris.executor.ScalarisOpExecutor;
 import de.zib.scalaris.executor.ScalarisWriteOp;
 
