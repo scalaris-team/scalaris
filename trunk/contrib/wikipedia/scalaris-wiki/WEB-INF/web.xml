@@ -111,7 +111,7 @@ example:
   <!-- parameters in a POST request -->
     <filter>
         <filter-name>setCharacterEncodingFilter</filter-name>
-        <filter-class>de.zib.scalaris.examples.wikipedia.SetCharacterEncodingFilter</filter-class>
+        <filter-class>de.zib.scalaris.examples.wikipedia.tomcat.SetCharacterEncodingFilter</filter-class>
         <init-param>
             <param-name>encoding</param-name>
             <param-value>UTF-8</param-value>
@@ -125,7 +125,7 @@ example:
     <filter>
         <filter-name>failedRequestFilter</filter-name>
         <filter-class>
-          de.zib.scalaris.examples.wikipedia.FailedRequestFilter
+          de.zib.scalaris.examples.wikipedia.tomcat.FailedRequestFilter
         </filter-class>
         <async-supported>true</async-supported>
     </filter>
