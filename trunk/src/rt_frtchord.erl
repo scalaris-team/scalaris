@@ -87,7 +87,7 @@
 
 % @doc Maximum number of entries in a routing table
 -spec maximum_entries() -> non_neg_integer().
-maximum_entries() -> 128.
+maximum_entries() -> config:read(rt_frt_max_entries).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Key Handling
@@ -348,7 +348,9 @@ check_config() ->
         end and
     config:cfg_is_bool(rt_frtchord_al) and
     config:cfg_is_greater_than_equal(rt_frtchord_al_interval, 0) and
-    config:cfg_is_bool(rt_frtchord_should_dump)
+    config:cfg_is_bool(rt_frtchord_should_dump) and
+    config:cfg_is_integer(rt_frtchord_max_entries) and
+    config:cfg_is_greater_than(rt_frtchord_max_entries, 0)
     .
 
 %% @doc Generate a random key from the pdf as defined in (Nagao, Shudo, 2011)
