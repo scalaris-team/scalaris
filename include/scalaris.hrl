@@ -40,13 +40,14 @@
 
 %%Simple routingtable
 %-define(RT, rt_simple).
-%% userdevguide-end scalaris:rt
 
-%%Flexible routingtable
+%% Flexible Routing Tables
+%% Standard flexible routingtable
 %-define(RT, rt_frtchord).
-
-%%Grouped Flexible Routing Table
+%% Grouped Flexible Routing Table
 %-define(RT, rt_gfrtchord).
+
+%% userdevguide-end scalaris:rt
 
 %% userdevguide-begin scalaris:db
 %%Standard database backend
