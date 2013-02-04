@@ -1,4 +1,4 @@
-package de.zib.scalaris.examples.wikipedia;
+package de.zib.scalaris.executor;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -11,19 +11,26 @@ import de.zib.scalaris.NotFoundException;
 import de.zib.scalaris.RequestList;
 import de.zib.scalaris.ResultList;
 import de.zib.scalaris.UnknownException;
-import de.zib.scalaris.executor.ScalarisOp;
 import de.zib.scalaris.operations.ReadOp;
 import de.zib.scalaris.operations.WriteOp;
 
 /**
  * Implements a list change operation using the read and write operations of
- * Scalaris.
+ * Scalaris. Supports an (optional) list counter key which is updated
+ * accordingly.
  *
  * @author Nico Kruber, kruber@zib.de
+ * @version 3.18
+ * @since 3.18
  */
 public abstract class ScalarisChangeListOp1 implements ScalarisOp {
-
+    /**
+     * Key used to store the list.
+     */
     protected final String key;
+    /**
+     * Key used to store the list counter.
+     */
     protected final String countKey;
     /**
      * Sub-classes need to set this variable in {@link #changeList(List)},
@@ -78,8 +85,8 @@ public abstract class ScalarisChangeListOp1 implements ScalarisOp {
     }
 
     /**
-     * Verifies the read operation, changes the list and adds a write operation
-     * to the request list.
+     * Verifies the read operation, changes the list and adds write operations
+     * to the request list: one for the list, one for the counter (if present).
      *
      * @param firstOp   the first operation to process inside the result list
      * @param results   the result list
@@ -97,10 +104,10 @@ public abstract class ScalarisChangeListOp1 implements ScalarisOp {
             // this is ok
             pageList = new LinkedList<ErlangValue>();
         }
-        changeList(pageList);
+        pageList = changeList(pageList);
         if (listChanged) {
             requests.addOp(new WriteOp(key, pageList));
-            if (countKey != null && listCountChanged) {
+            if ((countKey != null) && listCountChanged) {
                 requests.addOp(new WriteOp(countKey, pageList.size()));
             }
         }
@@ -111,9 +118,11 @@ public abstract class ScalarisChangeListOp1 implements ScalarisOp {
      * Changes the given page list.
      *
      * @param pageList
-     *            the original page list
+     *            the page list to change
+     *
+     * @return the new list (may be the same object as <tt>pageList</tt>)
      */
-    protected abstract void changeList(List<ErlangValue> pageList);
+    protected abstract List<ErlangValue> changeList(List<ErlangValue> pageList);
 
     /**
      * Verifies the write operations.
@@ -130,29 +139,29 @@ public abstract class ScalarisChangeListOp1 implements ScalarisOp {
         if (listChanged) {
             results.processWriteAt(firstOp + checkedOps);
             ++checkedOps;
-            if (countKey != null && listCountChanged) {
+            if ((countKey != null) && listCountChanged) {
                 results.processWriteAt(firstOp + checkedOps);
                 ++checkedOps;
             }
         }
         return checkedOps;
     }
-    
+
     /**
      * Converts a list of <tt>T</tt> to a list of {@link ErlangValue} objects.
-     * 
+     *
      * @param list
      *            the list to convert
-     * 
+     *
      * @throws ClassCastException
      *             if the conversion fails
      */
     protected static <T> List<ErlangValue> toErlangValueList(final List<T> list)
             throws ClassCastException {
-                List<ErlangValue> result = new ArrayList<ErlangValue>(list.size());
-                for (T t : list) {
-                    result.add(new ErlangValue(t));
-                }
-                return result;
-            }
+        final List<ErlangValue> result = new ArrayList<ErlangValue>(list.size());
+        for (final T t : list) {
+            result.add(new ErlangValue(t));
+        }
+        return result;
+    }
 }
