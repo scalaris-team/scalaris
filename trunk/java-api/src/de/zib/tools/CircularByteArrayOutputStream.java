@@ -13,7 +13,7 @@
  *   See the License for the specific language governing permissions and
  *   limitations under the License.
  */
-package de.zib.scalaris.examples.wikipedia;
+package de.zib.tools;
 
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
@@ -21,26 +21,28 @@ import java.util.Arrays;
 
 /**
  * Circular {@link OutputStream} that limits the number of bytes.
- * 
+ *
  * @author Nico Kruber, kruber@zib.de
+ * @version 3.18
+ * @since 3.18
  */
 public class CircularByteArrayOutputStream extends OutputStream {
-    /** 
-     * The buffer where data is stored. 
+    /**
+     * The buffer where data is stored.
      */
     protected byte buf[];
-    
+
     protected int pos = 0;
     boolean filled = false;
 
     /**
-     * Creates a new byte array output stream, with a buffer capacity of 
-     * the specified size, in bytes. 
+     * Creates a new byte array output stream, with a buffer capacity of
+     * the specified size, in bytes.
      *
      * @param   size   the initial size.
      * @exception  IllegalArgumentException if size is negative.
      */
-    public CircularByteArrayOutputStream(int size) {
+    public CircularByteArrayOutputStream(final int size) {
         if (size < 0) {
             throw new IllegalArgumentException("Negative initial size: "
                     + size);
@@ -48,11 +50,8 @@ public class CircularByteArrayOutputStream extends OutputStream {
         buf = new byte[size];
     }
 
-    /* (non-Javadoc)
-     * @see java.io.ByteArrayOutputStream#write(int)
-     */
     @Override
-    public synchronized void write(int b) {
+    public synchronized void write(final int b) {
         if (pos == buf.length) {
             filled = true;
             pos = 0;
@@ -61,9 +60,9 @@ public class CircularByteArrayOutputStream extends OutputStream {
     }
 
     /**
-     * Creates a newly allocated byte array. Its size is the current 
-     * size of this output stream and the valid contents of the buffer 
-     * have been copied into it. 
+     * Creates a newly allocated byte array. Its size is the current
+     * size of this output stream and the valid contents of the buffer
+     * have been copied into it.
      *
      * @return  the current contents of this output stream, as a byte array.
      * @see     java.io.ByteArrayOutputStream#size()
@@ -72,7 +71,7 @@ public class CircularByteArrayOutputStream extends OutputStream {
         if (!filled) {
             return Arrays.copyOf(buf, pos);
         }
-        byte[] ret = new byte[buf.length];
+        final byte[] ret = new byte[buf.length];
         System.arraycopy(buf, pos, ret, 0, buf.length - pos);
         System.arraycopy(buf, 0, ret, buf.length - pos, pos);
         return ret;
@@ -82,7 +81,7 @@ public class CircularByteArrayOutputStream extends OutputStream {
     /**
      * Converts the buffer's contents into a string decoding bytes using the
      * platform's default character set. The length of the new <tt>String</tt>
-     * is a function of the character set, and hence may not be equal to the 
+     * is a function of the character set, and hence may not be equal to the
      * size of the buffer.
      *
      * <p> This method always replaces malformed-input and unmappable-character
@@ -93,6 +92,7 @@ public class CircularByteArrayOutputStream extends OutputStream {
      *
      * @return String decoded from the buffer's contents.
      */
+    @Override
     public synchronized String toString() {
         return new String(toByteArray());
     }
@@ -114,7 +114,7 @@ public class CircularByteArrayOutputStream extends OutputStream {
      * @exception  UnsupportedEncodingException
      *             If the named charset is not supported
      */
-    public synchronized String toString(String charsetName)
+    public synchronized String toString(final String charsetName)
             throws UnsupportedEncodingException {
         return new String(toByteArray(), charsetName);
     }

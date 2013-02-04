@@ -57,7 +57,6 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 
-import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.InvolvedKey;
 import de.zib.scalaris.examples.wikipedia.NamespaceUtils;
 import de.zib.scalaris.examples.wikipedia.Options;
@@ -77,6 +76,7 @@ import de.zib.scalaris.examples.wikipedia.data.xml.WikiDump;
 import de.zib.scalaris.examples.wikipedia.plugin.PluginClassLoader;
 import de.zib.scalaris.examples.wikipedia.plugin.WikiEventHandler;
 import de.zib.scalaris.examples.wikipedia.plugin.WikiPlugin;
+import de.zib.tools.CircularByteArrayOutputStream;
 
 /**
  * Servlet for handling wiki page display and editing.
