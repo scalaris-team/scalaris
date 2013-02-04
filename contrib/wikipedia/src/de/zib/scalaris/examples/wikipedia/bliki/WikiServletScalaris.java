@@ -44,7 +44,6 @@ import de.zib.scalaris.ConnectionFactory;
 import de.zib.scalaris.ConnectionPool;
 import de.zib.scalaris.NodeDiscovery;
 import de.zib.scalaris.TransactionSingleOp;
-import de.zib.scalaris.examples.wikipedia.CircularByteArrayOutputStream;
 import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.PageHistoryResult;
 import de.zib.scalaris.examples.wikipedia.RevisionResult;
@@ -60,6 +59,7 @@ import de.zib.scalaris.examples.wikipedia.data.xml.WikiDump;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpHandler;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpPreparedSQLiteToScalaris;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpToScalarisHandler;
+import de.zib.tools.CircularByteArrayOutputStream;
 
 /**
  * Wiki servlet connecting to Scalaris.
