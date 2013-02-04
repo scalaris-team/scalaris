@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.zib.scalaris.examples.wikipedia;
+package de.zib.scalaris.examples.wikipedia.tomcat;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
