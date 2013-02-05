@@ -19,18 +19,17 @@ Currently we offer the following APIs:
         (connections are established using distributed Erlang)
   \item a generic \emph{JSON API}\\
         (offered by an integrated HTTP server running on each \scalaris{} node)
-  \item a \emph{Python API} for Python >= 2.6 using JSON to talk to \scalaris{}. 
-  \item a \emph{Ruby API} for Ruby >= 1.8 using JSON to talk to \scalaris{}. 
+  \item a \emph{Python API} for Python >= 2.6 using JSON to talk to \scalaris{}.
+  \item a \emph{Ruby API} for Ruby >= 1.8 using JSON to talk to \scalaris{}.
 \end{itemize}
 
 Each API contains methods for accessing functions from the three layers
-\scalaris{} is composed of.
-Table~\ref{tab.api.layers} shows the modules and classes of Erlang, Java, Python and Ruby
-and their mapping to these layers. Details about the supported operations and
-how to access them in each of the APIs are provided in
-Section~\sieheref{sec:apis.ops}. A more detailed discussion about the generic
-JSON API including examples of JSON calls is shown in
-Section~\sieheref{sec.api.json}.
+\scalaris{} is composed of.  Table~\ref{tab.api.layers} shows the modules
+and classes of Erlang, Java, Python and Ruby and their mapping to these
+layers. Details about the supported operations and how to access them in
+each of the APIs are provided in Section~\sieheref{sec:apis.ops}. A more
+detailed discussion about the generic JSON API including examples of JSON
+calls is shown in Section~\sieheref{sec.api.json}.
 
 \begin{table}
   \centering
@@ -632,7 +631,7 @@ To finish the transaction, the request list can contain a 'commit' request
 as the last element, which triggers the validation phase of the transaction
 processing.
 Request lists are also supported for single read/write operations, i.e.
-every single operation is committed on its own. 
+every single operation is committed on its own.
 
 The JSON-API can be accessed via the \scalaris{}-Web-Server running on port
 8000 by default and pages under \code{<URL>/api/}.
@@ -850,7 +849,7 @@ Make a transaction, that sets two keys & $\to$ & \\
 \end{tabular}\vspace{-1.5em} \\
 
 \begin{tabular}{p{0.13\textwidth}p{0.78\textwidth}}
-& 
+&
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
 {"error": null,
@@ -889,7 +888,7 @@ In a second transaction: Read the two keys & $\to$ & \\
 \end{tabular}\vspace{-1.5em} \\
 
 \begin{tabular}{p{0.13\textwidth}p{0.78\textwidth}}
-& 
+&
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
 {"error": null,
@@ -934,7 +933,7 @@ translog we got from \scalaris{} (named \code{<TLOG>} here). & $\to$ & \\
 \end{tabular}\vspace{-1.5em} \\
 
 \begin{tabular}{p{0.13\textwidth}p{0.78\textwidth}}
-& 
+&
 \vspace{-1.5em}%
 \begin{lstlisting}[language=java]
 {"error": null,
@@ -1019,21 +1018,24 @@ further connection properties) by adapting the values defined in
 \end{lstlisting}
 \lstinputlisting[language={}]{scalaris-client-ruby.out}
 
-\section{Using Scalaris from Erlang}
+\section{Using \scalaris{} from Erlang}
 \label{chapter.systemuse.usingfromerl}
-In this section, we will describe how to use Scalaris with two small examples. After
-having build Scalaris as described in~\ref{chapter.downloadinstall}, Scalaris can be run
-from the source directory directly.
 
-\subsection{Running a Scalaris Cluster}
-In this example, we will set up a simple Scalaris cluster consisting of up to five nodes
-running on a single computer.
+In this section, we will describe how to use \scalaris{} with two small
+examples. After having build \scalaris{} as described
+in~\ref{chapter.downloadinstall}, \scalaris{} can be run from the source
+directory directly.
 
-\paragraph{Adapt the configuration}
-The first step is to adapt the configuration to your needs. We use the sample local
-configuration from~\ref{chapter.runscalaris.runtime_config}, copy it to \code{bin/scalaris.local.cfg} and add a number of different known
-hosts. Note that the management server will run on the same port as the first node started
-in the example, hence we adapt its port as well.
+\subsection{Running a \scalaris{} Cluster}
+In this example, we will set up a simple \scalaris{} cluster consisting of
+up to five nodes running on a single computer.
+
+\paragraph{Adapt the configuration.}
+The first step is to adapt the configuration to your needs. We use the
+sample local configuration from~\ref{chapter.runscalaris.runtime_config},
+copy it to \code{bin/scalaris.local.cfg} and add a number of different known
+hosts. Note that the management server will run on the same port as the
+first node started in the example, hence we adapt its port as well.
 
 \begin{lstlisting}
 {listen_ip, {127,0,0,1}}.
@@ -1042,12 +1044,11 @@ in the example, hence we adapt its port as well.
                 {{127,0,0,1},14196, service_per_vm},
                 {{127,0,0,1},14197, service_per_vm},
                 {{127,0,0,1},14198, service_per_vm}
-                % Although we will be using 5 nodes later, only 4 are added as known
-                % nodes.
+                % Although we will be using 5 nodes later, only 4 are added as known nodes.
             ]}.
 \end{lstlisting}
 
-\paragraph{Bootstrapping}
+\paragraph{Bootstrapping.}
 \label{par:Bootstrapping}
 
 In a shell (from now on called \code{S1}), start the first node ("premier"):
@@ -1055,28 +1056,31 @@ In a shell (from now on called \code{S1}), start the first node ("premier"):
 ./bin/scalarisctl -m -n premier@127.0.0.1 -p 14195 -y 8000 -s -f start
 \end{lstlisting}
 The \code{-m} and \code{-f} options instruct \code{scalarisctl} to start the
-management server and the first\_node. Note that the command above will produce some
-output about unknown nodes. This is expected, as some nodes defined in the configuration
-file above don't exist yet.
+management server and the first\_node. Note that the command above will
+produce some output about unknown nodes. This is expected, as some nodes
+defined in the configuration file above do not exist yet.
 
-After you run the above command and no further error occurred, you can query the locally
-available nodes using \code{scalarisctl}. Enter into a new shell (called \code{MS}):
+After you run the above command and no further error occurred, you can query
+the locally available nodes using \code{scalarisctl}. Enter into a new shell
+(called \code{MS}):
 \begin{lstlisting}[language=sh]
 ./bin/scalarisctl list
 epmd: up and running on port 4369 with data:
 name premier at port 47235
 \end{lstlisting}
 
-Scalaris also contains a webserver. You can access by pointing your browser to 
-\url{http://127.0.0.1:8000} (or the respective IP adress of the node). With the above example,
-you can see the first node ("premier") and its management role.
+\scalaris{} also contains a webserver. You can access it by pointing your
+browser to \url{http://127.0.0.1:8000} (or the respective IP address of the
+node). With the above example, you can see the first node ("premier") and
+its management role.
 
-\paragraph{Adding Nodes}
+\paragraph{Adding Nodes.}
 \label{par:AddingNodes}
 
 We will now add four additional nodes to the cluster. Use a new shell
-(\code{S2} to \code{S5}) for each of the following commands. Each newly added node is a
-"real" Scalaris node and could run on another physical computer than the other nodes.
+(\code{S2} to \code{S5}) for each of the following commands. Each newly
+added node is a "real" \scalaris{} node and could run on another physical
+computer than the other nodes.
 \begin{lstlisting}[language=sh]
 ./bin/scalarisctl -n second@127.0.0.1 -p 14196 -y 8001 -s start
 ./bin/scalarisctl -n n3@127.0.0.1 -p 14197 -y 8002 -s start
@@ -1085,8 +1089,8 @@ We will now add four additional nodes to the cluster. Use a new shell
 \end{lstlisting}
 Note that the last added nodes should not report a node as not reachable.
 
-The management server should now report that the nodes have indeed joined Scalaris
-successfully. Query \code{scalarisctl}:
+The management server should now report that the nodes have indeed joined
+\scalaris{} successfully. Query \code{scalarisctl}:
 \begin{lstlisting}[language=sh]
 ./bin/scalarisctl list
 epmd: up and running on port 4369 with data:
@@ -1096,63 +1100,72 @@ name n3 at port 41710
 name second at port 44329
 name premier at port 44862
 \end{lstlisting}
-The actual output might differ, as the port numbers are assigned by the operating system.
+The actual output might differ, as the port numbers are assigned by the
+operating system.
 
 Each node offers a web console. Point your browser to any url for
-\url{http://127.0.0.1:8001} to \url{http://127.0.0.1:8004}.
-Observe that all nodes claim the cluster ring to consist of 5 nodes.
+\url{http://127.0.0.1:8001} to \url{http://127.0.0.1:8004}. Observe that
+all nodes claim the cluster ring to consist of 5 nodes.
 
-The web interface of node \code{premier} differs from the other interfaces. This is due to
-the fact that the management server is running on this node, adding additional information
-to the web interface.
+The web interface of node \code{premier} differs from the other
+interfaces. This is due to the fact that the management server is running on
+this node, adding additional information to the web interface.
 
-\paragraph{Entering Data Using the Web Interface}
-A node's web interface can be used to query and enter data into Scalaris. To try this,
-point your browser to \url{http://127.0.0.1:8000} (or any of the other nodes) and use
-the provided HTML form.
+\paragraph{Entering Data Using the Web Interface.}
+A node's web interface can be used to query and enter data into \scalaris{}. To
+try this, point your browser to \url{http://127.0.0.1:8000} (or any of the
+other nodes) and use the provided HTML form.
 
 \begin{enumerate}
     \item Lookup key \code{hello}. This will return \lstinline|{fail,not_found}|
-    \item Add new keys \code{k1} and \code{k2} with values \code{v1} and \code{v2},
-    respectively. Then, lookup that key on
-    the current and one of the other nodes. This should return \lstinline|{ok,"v1"}| and
-    \lstinline|{ok, "v2"}| on both nodes.
-    \item Update the key \code{k1} by adding it on any node with value \code{v1updated}.
-    \item Update the key \code{k2} by adding it on any node with value \code{v2updated}.
-    Lookup the key again and you should receive \lstinline|{ok, v2updated}|
+    \item Add new keys \code{k1} and \code{k2} with values \code{v1} and
+      \code{v2}, respectively. Then, lookup that key on the current and one
+      of the other nodes. This should return \lstinline|{ok,"v1"}| and
+      \lstinline|{ok, "v2"}| on both nodes.
+    \item Update the key \code{k1} by adding it on any node with value
+      \code{v1updated}.
+    \item Update the key \code{k2} by adding it on any node with value
+      \code{v2updated}.  Lookup the key again and you should receive
+      \lstinline|{ok, v2updated}|
 \end{enumerate}
 
-\paragraph{Simulating Node Failure}
-To simulate a node failure, we will simply stop \code{n4} using \code{scalarisctl}:
+\paragraph{Simulating Node Failure.}
+To simulate a node failure, we will simply stop \code{n4} using
+\code{scalarisctl}:
 
 \begin{lstlisting}[language=sh]
 ./bin/scalarisctl -n n4@127.0.0.1 stop
 \end{lstlisting}
 
-Other nodes will notice the crash of \code{n4}. By querying the available nodes in the
-shell MS again, you will now see only 4 nodes.
+Other nodes will notice the crash of \code{n4}. By querying the available
+nodes in the shell MS again, you will now see only 4 nodes.
 
-Although the node \code{n4} left the system, the data in the system is still consistent.
-Try to query the keys you added above. You should receive the values for each.
+Although the node \code{n4} left the system, the data in the system is still
+consistent. Try to query the keys you added above. You should receive the
+values for each.
 
-We will restart \code{n4} again:
+We will start a new node with the name \code{n4} again:
 \begin{lstlisting}[language=sh]
 ./bin/scalarisctl -n n4@127.0.0.1 -p 14198 -y 8003 -s start
 \end{lstlisting}
 
-The node list (again, query \code{scalarisctl} in shell MS) will report \code{n4} as alive
-again. You can still lookup the keys from above and should also receive the same result
-for the queries.
+The node list (again, query \code{scalarisctl} in shell MS) will report
+\code{n4} as alive again. You can still lookup the keys from above and
+should also receive the same result for the queries.
 
-After running the above, we went from a five-node cluster to a 4-node cluster and back to
-a five-node cluster without any data loss due to a leaving node.
+After running the above, we went from a five-node cluster to a 4-node
+cluster and back to a five-node cluster without any data loss due to a
+leaving node. The system was not unavailable for users and would have served
+any user requests without violating the data consistency or availability.
 
-\paragraph{Controlling Scalaris Using the Erlang Shell}
-The calls to \code{scalarisctl} above which started a new scalaris node ended within an
-Erlang shell. Each of those shells can be used to control a local Scalaris node and issue
-queries to the distributed database. Enter shell \code{S1} and hit <return> to see the
-erlang shell prompt. Now, enter the following commands and check that the output is
-similar to the one provided here. You can stop the Erlang shell using \code{quit().}.
+\paragraph{Controlling \scalaris{}  Using the Erlang Shell.}
+The calls to \code{scalarisctl} above which started a new \scalaris{} node
+ended within an Erlang shell. Each of those shells can be used to control a
+local \scalaris{} node and issue queries to the distributed database. Enter
+shell \code{S1} and hit <return> to see the Erlang shell prompt. Now, enter
+the following commands and check that the output is similar to the one
+provided here. You can stop the Erlang shell using \code{quit().}, which
+then also stops the corresponding \scalaris{} node.
 
 \begin{lstlisting}
 (premier@127.0.0.1)1> api_tx:read("k0").
@@ -1165,32 +1178,33 @@ similar to the one provided here. You can stop the Erlang shell using \code{quit
 {ok,"v1updated"}
 (premier@127.0.0.1)5> api_tx:read(<<"k2">>).
 {ok,"v2updated"}
-(premier@127.0.0.1)6> api_tx:write(<<"k3">>,<<"v3">>). 
+(premier@127.0.0.1)6> api_tx:write(<<"k3">>,<<"v3">>).
 {ok}
-(premier@127.0.0.1)7> api_tx:read(<<"k3">>).           
+(premier@127.0.0.1)7> api_tx:read(<<"k3">>).
 {ok,<<"v3">>}
-(premier@127.0.0.1)8> api_tx:read("k3").    
+(premier@127.0.0.1)8> api_tx:read("k3").
 {ok,<<"v3">>}
 (premier@127.0.0.1)9> api_tx:write(<<"k4">>,{1,2,3,four}).
 {ok}
-(premier@127.0.0.1)10> api_tx:read("k4").                  
+(premier@127.0.0.1)10> api_tx:read("k4").
 {ok,{1,2,3,four}}
 \end{lstlisting}
 
-\paragraph{Attaching a Client to Scalaris}
-Now we will connect a true client to our 5 nodes Scalaris cluster. This
-client will not be a Scalaris node itself and thus represents a user application
-interacting with Scalaris.
+\paragraph{Attaching a Client to \scalaris{}.}
+Now we will connect a true client to our 5 nodes \scalaris{} cluster. This
+client will not be a \scalaris{} node itself and thus represents a user
+application interacting with \scalaris{}.
 
-We use a new shell to run an Erlang shell to do remote API calls to the server nodes.
+We use a new shell to run an Erlang shell to do remote API calls to the
+server nodes.
 
 \begin{lstlisting}[language=sh]
 erl -name client@127.0.0.1 -hidden -setcookie 'chocolate chip cookie'
 \end{lstlisting}
 
-The requests to Scalaris will be done using \code{rpc:call/4}. A production system would
-have some more sophisticated client side module, dispatching requests automatically to
-server nodes, for example.
+The requests to \scalaris{} will be done using \code{rpc:call/4}. A
+production system would have some more sophisticated client side module,
+dispatching requests automatically to server nodes, for example.
 
 \begin{lstlisting}
 (client@127.0.0.1)1> net_adm:ping('n3@127.0.0.1').
@@ -1201,37 +1215,30 @@ pong
 {ok,{1,2,3,four}}
 (client@127.0.0.1)4> rpc:call('n4@127.0.0.1', api_tx, read, [<<"k4">>]).
 {ok,{1,2,3,four}}
-(client@127.0.0.1)5> rpc:call('n5@127.0.0.1', api_tx, write, 
-[<<"num5">>,55]).
+(client@127.0.0.1)5> rpc:call('n5@127.0.0.1', api_tx, write, [<<"num5">>,55]).
 {ok}
-(client@127.0.0.1)6> rpc:call('n3@127.0.0.1', api_tx, read, 
-[<<"num5">>]).    
+(client@127.0.0.1)6> rpc:call('n3@127.0.0.1', api_tx, read, [<<"num5">>]).
 {ok,55}
-(client@127.0.0.1)7> rpc:call('n2@127.0.0.1', api_tx, add_on_nr, 
-[<<"num5">>,2]).
+(client@127.0.0.1)7> rpc:call('n2@127.0.0.1', api_tx, add_on_nr, [<<"num5">>,2]).
 {badrpc,nodedown}
-(client@127.0.0.1)8> rpc:call('second@127.0.0.1', api_tx, add_on_nr, 
-[<<"num5">>,2]).
+(client@127.0.0.1)8> rpc:call('second@127.0.0.1', api_tx, add_on_nr, [<<"num5">>,2]).
 {ok}
 (client@127.0.0.1)9> rpc:call('n3@127.0.0.1', api_tx, read, [<<"num5">>]).
 {ok,57}
-(client@127.0.0.1)10> rpc:call('n4@127.0.0.1', api_tx, test_and_set, 
-[<<"num5">>,57,59]).
+(client@127.0.0.1)10> rpc:call('n4@127.0.0.1', api_tx, test_and_set, [<<"num5">>,57,59]).
 {ok}
 (client@127.0.0.1)11> rpc:call('n5@127.0.0.1', api_tx, read, [<<"num5">>]).
-{ok,59}  
-(client@127.0.0.1)12> rpc:call('n4@127.0.0.1', api_tx, test_and_set, 
-[<<"num5">>,57,55]).
+{ok,59}
+(client@127.0.0.1)12> rpc:call('n4@127.0.0.1', api_tx, test_and_set, [<<"num5">>,57,55]).
 {fail,{key_changed,59}}
 (client@127.0.0.1)13> rpc:call('n3@127.0.0.1', api_tx, read, [<<"num5">>]).
 {ok,59}
-(client@127.0.0.1)14> rpc:call('n5@127.0.0.1', api_tx, test_and_set, 
-[<<"k2">>,"v2updated",<<"v2updatedTWICE">>]).
+(client@127.0.0.1)14> rpc:call('n5@127.0.0.1', api_tx, test_and_set,
+                               [<<"k2">>,"v2updated",<<"v2updatedTWICE">>]).
 {ok}
 (client@127.0.0.1)15> rpc:call('n4@127.0.0.1', api_tx, read, [<<"k2">>]).
 {ok,<<"v2updatedTWICE">>}
-(client@127.0.0.1)16> rpc:call('n3@127.0.0.1', api_tx, add_on_nr, 
-[<<"num5">>,-4]).                               
+(client@127.0.0.1)16> rpc:call('n3@127.0.0.1', api_tx, add_on_nr, [<<"num5">>,-4]).
 {ok}
 (client@127.0.0.1)17> rpc:call('n4@127.0.0.1', api_tx, read, [<<"num5">>]).
 {ok,55}
@@ -1239,8 +1246,8 @@ pong
 ok
 \end{lstlisting}
 
-To show that the above calls actually worked with Scalaris, connect another client to the
-cluster and read updates made by the first:
+To show that the above calls actually worked with \scalaris{}, connect
+another client to the cluster and read updates made by the first:
 
 \begin{lstlisting}[language=sh]
 erl -name clientagain@127.0.0.1 -hidden -setcookie 'chocolate chip cookie'
@@ -1249,22 +1256,19 @@ erl -name clientagain@127.0.0.1 -hidden -setcookie 'chocolate chip cookie'
 \begin{lstlisting}
 (clientagain@127.0.0.1)1> net_adm:ping('n5@127.0.0.1').
 pong
-(clientagain@127.0.0.1)2> rpc:call('n4@127.0.0.1', api_tx, read, 
-[<<"k0">>]).
+(clientagain@127.0.0.1)2> rpc:call('n4@127.0.0.1', api_tx, read, [<<"k0">>]).
 {fail,not_found}
-(clientagain@127.0.0.1)3> rpc:call('n4@127.0.0.1', api_tx, read, 
-[<<"k1">>]).
+(clientagain@127.0.0.1)3> rpc:call('n4@127.0.0.1', api_tx, read, [<<"k1">>]).
 {ok,"v1updated"}
-(clientagain@127.0.0.1)4> rpc:call('n3@127.0.0.1', api_tx, read, 
-[<<"k2">>]).
+(clientagain@127.0.0.1)4> rpc:call('n3@127.0.0.1', api_tx, read, [<<"k2">>]).
 {ok,<<"v2updatedTWICE">>}
-(clientagain@127.0.0.1)5> rpc:call('second@127.0.0.1', api_tx, read, 
-[<<"num5">>]).
+(clientagain@127.0.0.1)5> rpc:call('second@127.0.0.1', api_tx, read, [<<"num5">>]).
 {ok,55}
 \end{lstlisting}
 
-\paragraph{Shutting Down Scalaris}
-Firstly, we list the available nodes using \code{scalarisctl} using the shell \code{MS}.
+\paragraph{Shutting Down \scalaris{}.}
+Firstly, we list the available nodes using \code{scalarisctl} using the
+shell \code{MS}.
 
 \begin{lstlisting}[language=sh]
 ./bin/scalarisctl list
@@ -1286,7 +1290,6 @@ Secondly, we shut down each of the nodes:
 'n4@127.0.0.1'
 ./bin/scalarisctl -n n5@127.0.0.1 stop
 'n5@127.0.0.1'
-
 \end{lstlisting}
 
 Only the first node remains:
@@ -1303,26 +1306,29 @@ epmd: up and running on port 4369 with data:
 (nothing)
 \end{lstlisting}
 
-The Scalaris API offers more transactional operations than just single-key read and write.
-The next part of this section will describe how to build transaction logs for atomical
-operations and how Scalaris handles conflicts in concurrently running transactions. See
-the module \lstinline{api_tx} for more functions to access the data layer of Scalaris.
+The \scalaris{} API offers more transactional operations than just
+single-key read and write.  The next part of this section will describe how
+to build transaction logs for atomic operations and how \scalaris{}
+handles conflicts in concurrently running transactions. See the module
+\lstinline{api_tx} for more functions to access the data layer of
+\scalaris{}.
 
 \subsection{Transaction}
-In this section, we will describe how to build transactions on the client side using \lstinline{api_tx:req_list(Tlog, List)}.
+In this section, we will describe how to build transactions using
+\lstinline{api_tx:req_list(Tlog, List)} on the client side.
 
-The setup is similar to the five nodes cluster in the previous section.
-To simplify the example all API calls are typed inside the Erlang shells of nodes \code{n4}
-and \code{n5}.
+The setup is similar to the five nodes cluster in the previous section.  To
+simplify the example all API calls are typed inside the Erlang shells of
+nodes \code{n4} and \code{n5}.
 
-Consider two concurrent transactions \code{A} and \code{B}. \code{A} is a long-running
-operation, whereas \code{B} is only a short transaction.  In the example, \code{A} starts
-before \code{B} and \code{B} ends before \code{A}. \code{B} is "timely" nested in \code{A}
-and disturbs \code{A}.
+Consider two concurrent transactions \code{A} and \code{B}. \code{A} is a
+long-running operation, whereas \code{B} is only a short transaction.  In
+the example, \code{A} starts before \code{B} and \code{B} ends before
+\code{A}. \code{B} is "timely" nested in \code{A} and disturbs \code{A}.
 
-\paragraph{Single Read Operations}
-We first issue two read operations on nodes \code{n4, n5} to see that we are working on
-the same state for key \code{k1}:
+\paragraph{Single Read Operations.}
+We first issue two read operations on nodes \code{n4, n5} to see that we are
+working on the same state for key \code{k1}:
 
 \begin{lstlisting}
 (n4@127.0.0.1)10> api_tx:read(<<"k1">>).
@@ -1331,69 +1337,64 @@ the same state for key \code{k1}:
 {ok,<<"v1">>}
 \end{lstlisting}
 
-\paragraph{Create Transaction Logs and Add Operations}
-Now, we create two transaction logs for the transactions and add the operations which are
-to be run atomically. \code{A} will be created on node \code{n5}, \code{B} on \code{n4}:
+\paragraph{Create Transaction Logs and Add Operations.}
+Now, we create two transaction logs for the transactions and add the
+operations which are to be run atomically. \code{A} will be created on node
+\code{n5}, \code{B} on \code{n4}:
 \begin{lstlisting}
 (n5@127.0.0.1)18> T5longA0 = api_tx:new_tlog().
 []
-(n5@127.0.0.1)19> {T5longA1, R5longA1} = api_tx:req_list(T5longA0, [{read, 
-<<"k1">>}]).
+(n5@127.0.0.1)19> {T5longA1, R5longA1} = api_tx:req_list(T5longA0, [{read, <<"k1">>}]).
 {[{76,<<"k1">>,1,75,'$empty'}],[{ok,<<"v1">>}]}
 (n4@127.0.0.1)11> T4shortB0 = api_tx:new_tlog().
 []
-(n4@127.0.0.1)12> {T4shortB1, R4shortB1} = api_tx:req_list(T4shortB0, 
-[{read, <<"k1">>}]). 
+(n4@127.0.0.1)12> {T4shortB1, R4shortB1} = api_tx:req_list(T4shortB0, [{read, <<"k1">>}]).
 {[{76,<<"k1">>,1,75,'$empty'}],[{ok,<<"v1">>}]}
-(n4@127.0.0.1)13> {T4shortB2, R4shortB2} = api_tx:req_list(T4shortB1, 
-[{write, <<"k1">>, <<"v1Bshort">>}]).
+(n4@127.0.0.1)13> {T4shortB2, R4shortB2} = api_tx:req_list(T4shortB1,
+                                             [{write, <<"k1">>, <<"v1Bshort">>}]).
 {[{77,<<"k1">>,1,75, <<131,109,0,0,0,8,118,49,66,115,104,111,114,116>>}],
  [{ok}]}
-(n4@127.0.0.1)14> {T4shortB3, R4shortB3} = api_tx:req_list(T4shortB2, 
-[{read, <<"k1">>}]).                 
+(n4@127.0.0.1)14> {T4shortB3, R4shortB3} = api_tx:req_list(T4shortB2, [{read, <<"k1">>}]).
 {[{77,<<"k1">>,1,75, <<131,109,0,0,0,8,118,49,66,115,104,111,114,116>>}],
  [{ok,<<"v1Bshort">>}]}
 \end{lstlisting}
 
-To finish the transaction log for \code{B}, we add \lstinline|{commit}|. This operation
-should return a \code{ok}:
+To finish the transaction log for \code{B}, we add
+\lstinline|{commit}|. This operation should return an \code{ok}:
 
 \begin{lstlisting}
-(n4@127.0.0.1)15> {T4shortB4, R4shortB4} = api_tx:req_list(T4shortB3, 
-[{commit}]).        
+(n4@127.0.0.1)15> {T4shortB4, R4shortB4} = api_tx:req_list(T4shortB3, [{commit}]).
 {[],[{ok}]}
 (n4@127.0.0.1)16> [R4shortB1,R4shortB2,R4shortB3,R4shortB4].
 [[{ok,<<"v1">>}],[{ok}],[{ok,<<"v1Bshort">>}],[{ok}]]
 \end{lstlisting}
-This concludes the creation of \code{B}. Now we will try to commit the long running
-transaction \code{A} after reading the key \code{k1} again. This and further attempts to
-write the key will fail, as the transaction \code{B} wrote this key since \code{A}
-started.
+This concludes the creation of \code{B}. Now we will try to commit the long
+running transaction \code{A} after reading the key \code{k1} again. This and
+further attempts to write the key will fail, as the transaction \code{B}
+wrote this key since \code{A} started.
 \begin{lstlisting}
-(n5@127.0.0.1)20> {T5longA2, R5longA2} = api_tx:req_list(T5longA1, [{read, 
-<<"k1">>}]).
+(n5@127.0.0.1)20> {T5longA2, R5longA2} = api_tx:req_list(T5longA1, [{read, <<"k1">>}]).
 {[{76,<<"k1">>,2,{fail,abort},'$empty'}],
- [{ok,<<"v1Bshort">>}]} % SEE #### FAIL and ABORT ####
-(n5@127.0.0.1)21> {T5longA3, R5longA3} = api_tx:req_list(T5longA2, [{write, 
-<<"k1">>,<<"v1Along">>}]).
+ [{ok,<<"v1Bshort">>}]}                                % <-- SEE #### FAIL and ABORT ####
+(n5@127.0.0.1)21> {T5longA3, R5longA3} = api_tx:req_list(T5longA2,
+                                           [{write, <<"k1">>,<<"v1Along">>}]).
 {[{76,<<"k1">>,2,{fail,abort},'$empty'}],[{ok}]}
-(n5@127.0.0.1)22> {T5longA4, R5longA4} = api_tx:req_list(T5longA3, [{read, 
-<<"k1">>}]).               
+(n5@127.0.0.1)22> {T5longA4, R5longA4} = api_tx:req_list(T5longA3, [{read, <<"k1">>}]).
 {[{76,<<"k1">>,2,{fail,abort},'$empty'}],
  [{ok,<<"v1Bshort">>}]}
-(n5@127.0.0.1)23> {T5longA5, R5longA5} = api_tx:req_list(T5longA4, 
-[{commit}]).
-{[],[{fail,abort,[<<"k1">>]}]} % SEE #### FAIL and ABORT ####
+(n5@127.0.0.1)23> {T5longA5, R5longA5} = api_tx:req_list(T5longA4, [{commit}]).
+{[],[{fail,abort,[<<"k1">>]}]}                         % <-- SEE #### FAIL and ABORT ####
 (n4@127.0.0.1)17> api_tx:read(<<"k1">>).
 {ok,<<"v1Bshort">>}
 (n5@127.0.0.1)24> api_tx:read(<<"k1">>).
 {ok,<<"v1Bshort">>}
 \end{lstlisting}
 
-As expected, the first coherent commit \code{B} constructed on \code{n4} has won.
+As expected, the first coherent commit \code{B} constructed on \code{n4} has
+won.
 
-Note that in a real system, operations in \lstinline|api_tx:req_list(Tlog, List)| should
-be grouped together with a trailing \lstinline|{commit}|. The individual separation of all
-reads, writes and commits was done here on purpose to study the transactional behaviour.
+Note that in a real system, operations in \lstinline|api_tx:req_list(Tlog, List)| should be grouped together with a trailing \lstinline|{commit}| as
+far as possible. The individual separation of all reads, writes and commits
+was done here on purpose to study the transactional behaviour.
 
 % \section{PubSub}
