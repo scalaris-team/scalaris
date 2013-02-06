@@ -356,6 +356,8 @@ check_config() ->
         end and
     config:cfg_is_bool(rt_frtchord_al) and
     config:cfg_is_greater_than_equal(rt_frtchord_al_interval, 0) and
+    config:cfg_is_integer(rt_frt_max_entries) and
+    config:cfg_is_greater_than(rt_frt_max_entries, 0) and
     frt_check_config()
     .
 
