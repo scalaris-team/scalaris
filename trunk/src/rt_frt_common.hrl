@@ -730,8 +730,8 @@ entry_learning(Entry, Type, RT) ->
     % only add the entry if it doesn't exist yet or if it is a sticky node. If its a
     % stickynode, RM told us about a new neighbour -> if the neighbour was already added
     % as a normal node, convert it to a sticky node now.
-    case gb_trees:lookup(node:id(Entry), get_rt_tree(RT)) =:= none of
-        true ->
+    case gb_trees:lookup(node:id(Entry), get_rt_tree(RT)) of
+        none ->
             % change the type to 'sticky' if the node is between the neighbors of the source
             % node
             AdaptedType = case Type of
@@ -752,8 +752,8 @@ entry_learning(Entry, Type, RT) ->
                                         intervals:in(node:id(Entry), Interval2)
                             end;
                         false ->
-                            % two nodes are existing in the ring (otherwise, Pred == Succ
-                            % means there is a bug somewhere). when two nodes are in the
+                            % Only two nodes are existing in the ring (otherwise, Pred == Succ
+                            % means there is a bug somewhere!). When two nodes are in the
                             % system, another third node will be either the successor or
                             % predecessor of the source node when added.
                             true
@@ -785,7 +785,9 @@ entry_learning(Entry, Type, RT) ->
                     )
             end,
             rt_set_nodes(RT, Nodes);
-        false ->
+        {value, ExistingEntry} ->
+            % Always update a sticky entry, as that information was send from ring
+            % maintenance.
             case Type of
                 sticky -> % update entry
                     StickyEntry = rt_get_node(node:id(Entry), RT),
@@ -793,7 +795,15 @@ entry_learning(Entry, Type, RT) ->
                         StickyEntry#rt_entry{type=sticky},
                         get_rt_tree(RT)),
                     rt_set_nodes(RT, Nodes);
-                _ -> RT
+                _ ->
+                    case node:is_newer(Entry, rt_entry_node(ExistingEntry)) of
+                        true -> % replace an existing node with a newer version
+                            Nodes = gb_trees:enter(rt_entry_id(ExistingEntry),
+                                           rt_entry_set_node(ExistingEntry, Entry),
+                                           get_rt_tree(RT)),
+                            rt_set_nodes(RT, Nodes);
+                        false -> RT
+                    end
             end
     end.
 
@@ -904,6 +914,10 @@ add_normal_entry(Entry, RT) ->
 % @doc Get the inner node:node_type() of a rt_entry
 -spec rt_entry_node(N :: rt_entry()) -> node:node_type().
 rt_entry_node(#rt_entry{node=N}) -> N.
+
+% @doc Set the inner node:node_type() of a rt_entry
+-spec rt_entry_set_node(Entry :: rt_entry(), Node :: node:node_type()) -> rt_entry().
+rt_entry_set_node(#rt_entry{} = Entry, Node) -> Entry#rt_entry{node=Node}.
 
 % @doc Calculate the distance between two nodes in the routing table
 -spec rt_entry_distance(From :: rt_entry(), To :: rt_entry()) -> non_neg_integer().
