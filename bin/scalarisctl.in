@@ -50,6 +50,7 @@ ERL_SCHED_FLAGS_R14=${ERL_SCHED_FLAGS-"+sbt db +swt low"}
 
 # default values (commandline options change these parameters)
 NODE_NAME=node1
+ERLANG_HOSTNAME=""
 daemonize=0
 first=0
 first_quorum=0
@@ -130,7 +131,10 @@ fix_node_name() {
 }
 
 get_erlang_hostname() {
-    erl -name firstnode -noinput -eval 'io:format("~s", [string:sub_string(binary_to_list(term_to_binary(node())), string:chr(binary_to_list(term_to_binary(node())), $@)+1)]), halt(0).'
+    if test -z $ERLANG_HOSTNAME ; then
+        ERLANG_HOSTNAME=`erl -name foo$$ -noinput -eval 'io:format("~s", [string:sub_string(binary_to_list(term_to_binary(node())), string:chr(binary_to_list(term_to_binary(node())), $@)+1)]), halt(0).'`
+    fi
+    echo $ERLANG_HOSTNAME
 }
 
 # only get cookie from scalarisctl.conf if installed!
