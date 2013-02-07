@@ -125,8 +125,12 @@ fix_paths() {
 fix_node_name() {
     # if the given node name includes an '@', leave untouched
     if ! echo $NODE_NAME | grep "@" >/dev/null ; then
-        NODE_NAME=$NODE_NAME@`hostname -f`
+        NODE_NAME=$NODE_NAME@`get_erlang_hostname`
     fi
+}
+
+get_erlang_hostname() {
+    erl -name firstnode -noinput -eval 'io:format("~s", [string:sub_string(binary_to_list(term_to_binary(node())), string:chr(binary_to_list(term_to_binary(node())), $@)+1)]), halt(0).'
 }
 
 # only get cookie from scalarisctl.conf if installed!
@@ -161,13 +165,21 @@ checkinstallation() {
         exit 1
     fi
 
-    $ERL -noinput -name "checkinstallation@`hostname -f`" -eval 'halt(0).' > /dev/null
+    $ERL -noinput -name "checkinstallation" -eval 'halt(0).' > /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
+        echo "Please check the configuration of your hostnames"
         echo "ERROR: erl could not create a Erlang VM named 'checkinstallation'"
+        echo "We were trying to run: erl -noinput -name \"checkinstallation\" -eval 'halt(0).'"
+    fi
+
+    $ERL -noinput -name "checkinstallation@`get_erlang_hostname`" -eval 'halt(0).' > /dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: erl could not create a Erlang VM named 'checkinstallation@hostname'"
         echo "Are you already running a Scalaris boot server?"
         echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
-        echo "We were trying to run: erl -noinput -name \"checkinstallation@`hostname -f`\" -eval 'halt(0).'"
+        echo "We were trying to run: erl -noinput -name \"checkinstallation@`get_erlang_hostname`\" -eval 'halt(0).'"
     fi
 
     $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
@@ -218,10 +230,10 @@ checkinstallation() {
         echo "We were trying to run: $SCALARISCLIENT_JAVA -h"
     else
         HAS_JAVACLIENT=1
-        HOSTNAME=`hostname -f`
+        HOSTNAME=`get_erlang_hostname`
         JAVAHOST=`$SCALARISCLIENT_JAVA -lh`
         if [ "$HOSTNAME" != "$JAVAHOST" ]; then
-            echo "WARNING: the hostnames reported by 'hostname -f' and Java do not match. You won't be"
+            echo "WARNING: the hostnames reported by Erlang and Java do not match. You won't be"
             echo " able to connect to Scalaris using the Java-API through scalaris.jar. Also, the"
             echo " java unit tests will probably not work."
             echo " The java-api/scalaris script will work around this by using the value provided by"
@@ -233,8 +245,10 @@ checkinstallation() {
             echo " Please refer to your system's manual to set your hostname, e.g. change the"
             echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
             echo " the DNS."
-            echo "system: hostname -f"
+            echo "erlang: "
             echo "     -> $HOSTNAME"
+            echo "system: hostname -f"
+            echo "     -> `hostname -f`"
             echo "java:   $SCALARISCLIENT_JAVA -lh"
             echo "     -> $JAVAHOST"
         fi
@@ -566,7 +580,7 @@ scalarisstart(){
 scalarisstop(){
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
-        -name "ctl_$RANDOM@`hostname -f`" \
+        -name "ctl_$RANDOM@`get_erlang_hostname`" \
         -pa $BEAMDIR \
         -noinput \
         -s scalaris cli -extra $NODE_NAME stop
@@ -578,7 +592,7 @@ scalarisstop(){
 scalariscall(){
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
-        -name "ctl_$RANDOM@`hostname -f`" \
+        -name "ctl_$RANDOM@`get_erlang_hostname`" \
         -pa $BEAMDIR \
         -noinput \
         -eval "$1"
@@ -603,7 +617,7 @@ list_erlang_processes(){
 
 debug(){
     # look into epmd -list: boot or node
-    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name "rem@`hostname -f`" -remsh $NODE_NAME `echo $erl_flags`
+    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name "rem@`get_erlang_hostname`" -remsh $NODE_NAME `echo $erl_flags`
 }
 
 fix_paths

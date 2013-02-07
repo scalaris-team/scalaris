@@ -71,7 +71,7 @@ DIALYZER_PLT_LIBS=$(ERL_LIB_DIR)/common_test-*/ebin $(ERL_LIB_DIR)/compiler-*/eb
 #DIALYZER_PLT_LIBS=$(DIALYZER_PLT_LIBS) $(ERL_LIB_DIR)/gs-*/contribs/ebin $(ERL_LIB_DIR)/wx-*/examples/*
 DIALYZER_FLAGS ?= 
 
-SCALARIS_CT_NAME ?= ct
+SCALARIS_CT_NAME ?= ct@127.0.0.1
 # for java-test and java-bench:
 SCALARIS_UNITTEST_PORT ?= 14194
 SCALARIS_UNITTEST_YAWS_PORT ?= 8000
