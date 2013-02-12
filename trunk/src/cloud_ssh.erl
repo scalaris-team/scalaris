@@ -12,79 +12,125 @@
 -module(cloud_ssh).
 -author('michels@zib.de').
 
+-include("scalaris.hrl").
+
 -behavior(cloud_beh).
 
--include("../include/scalaris.hrl").
+-export([init/0, get_number_of_vms/0, add_vms/1, remove_vms/1, killall_vms/0]).
 
--export([init/0, get_number_of_vms/0, add_vms/1, remove_vms/1]).
-
-
+-define(cloud_ssh_key, "2a42cb863313526fca96098a95020db2a904b01157f191a9bb3200829f8596c7").
+ 
 %%%%%%%%%%%%%%%%%%%%%
 %%%% Behavior methods
 %%%%%%%%%%%%%%%%%%%%%
 
 -spec init() -> ok.
 init() ->
-	
-	ok.
-
+	Hosts =
+		case config:read(cloud_ssh_hosts) of
+			failed -> [];
+			List -> lists:map(fun(Host) -> {Host, inactive} end, List)
+		end,
+	case api_tx:read(?cloud_ssh_key) of
+		{fail, not_found} -> api_tx:write(?cloud_ssh_key, Hosts);
+		_ -> ok
+	end.
 
 -spec get_number_of_vms() -> integer().
 get_number_of_vms() ->
-	length(erlang:element(2, erl_epmd:names())).
+	{ok, List} = api_tx:read(?cloud_ssh_key),
+	length(List).
 
 -spec add_vms(integer()) -> ok.
 add_vms(N) ->
-	BaseScalarisPort = config:read(port),
-	BaseYawsPort = config:read(yaws_port),
-	{Mega, Secs, _} = now(),
-	Time = Mega * 1000000 + Secs,
-	SpawnFun = 
-		fun (X) -> 
-				Port = find_free_port(BaseScalarisPort),
-				YawsPort = find_free_port(BaseYawsPort),
-				NodeName = lists:flatten(io_lib:format("node~p_~p", [Time, X])),
-				Cmd = lists:flatten(io_lib:format("./../bin/scalarisctl -e -detached -s -p ~p -y ~p -n ~s start", 
-									[Port, YawsPort, NodeName])),
-				io:format("Executing: ~p~n", [Cmd]),
-				NumberVMs = get_number_of_vms(),
-				os:cmd(Cmd),
-				wait_for(fun get_number_of_vms/0, NumberVMs + 1),
-				timer:sleep(200)
-		end,
-	[SpawnFun(X) || X <- lists:seq(1, N), get_number_of_vms() < config:read(as_max_vms)],		   
+	UpdatedHosts = add_or_remove_vms(add, N),
+	api_tx:write(?cloud_ssh_key, UpdatedHosts),
 	ok.
 
 -spec remove_vms(integer()) -> ok.
 remove_vms(N) ->
-	AllVMs = lists:map(fun (El) -> erlang:element(1, El) end, erlang:element(2, erl_epmd:names())),
-	VMs = lists:filter(fun (El) -> El =/= "firstnode" end, AllVMs),
-	RemoveFun = 
-		fun(NodeName) ->						
-				Cmd = lists:flatten(io_lib:format("./../bin/scalarisctl -n ~s stop", 
-												  [NodeName])),
-				NumberVMs = get_number_of_vms(),
-				io:format("Executing: ~p~n", [Cmd]),
-				os:cmd(Cmd),
-				wait_for(fun get_number_of_vms/0, NumberVMs - 1)
-		end,
-	[RemoveFun(NodeName) || NodeName <- lists:sublist(VMs, N), get_number_of_vms() > config:read(as_min_vms)],
+	UpdatedHosts = add_or_remove_vms(remove, N),
+	api_tx:write(?cloud_ssh_key, UpdatedHosts),
 	ok.
+
+add_or_remove_vms(Flag, Pending) ->
+	Hosts = get_hosts(),
+	add_or_remove_vms(Flag, Pending, Hosts, []).
+
+add_or_remove_vms(_Flag, _Pending = 0, Hosts, UpdatedHosts) ->
+	UpdatedHosts ++ Hosts;
+%% case where more vms than possible have been requested
+add_or_remove_vms(_Flag, _Pending, _Hosts = [], UpdatedHosts) ->
+	UpdatedHosts;
+add_or_remove_vms(add, Pending, Hosts, UpdatedHosts) ->
+	[Host | RemainingHosts] = Hosts,
+	case Host of
+		{_, active} ->
+			add_or_remove_vms(add, Pending, RemainingHosts, UpdatedHosts ++ [Host]);
+		{Hostname, _} ->
+			Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node start",
+											  [get_ssh_args(), Hostname, get_path()])), 
+			io:format("Executing: ~p~n", [Cmd]),
+			os:cmd(Cmd),
+			add_or_remove_vms(add, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, active}])
+	end;
+add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
+	[Host | RemainingHosts] = Hosts,
+	case Host of
+		{Hostname, active} ->
+			Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -n node gstop",
+											 [get_ssh_args(), Hostname, get_path()])),
+			io:format("Executing: ~p~n", [Cmd]),
+			os:cmd(Cmd),
+			add_or_remove_vms(remove, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, inactive}]);
+		{_, _} ->
+			add_or_remove_vms(remove, Pending, RemainingHosts, UpdatedHosts ++ [Host])
+	end.
+
 
 %%%%%%%%%%%%%%%%%%%
 %%%% Helper methods
 %%%%%%%%%%%%%%%%%%%
-wait_for(Fun, ExpectedValue) ->
-	case Fun() of
-		ExpectedValue -> ok;
-		_ ->
-			wait_for(Fun, ExpectedValue)
+
+-spec killall_vms() -> ok.
+killall_vms() ->
+	Hosts = get_hosts(),
+	lists:foreach(fun({Hostname, _}) ->
+						  Cmd = lists:flatten(io_lib:format("ssh ~s ~s killall -9 beam.smp", 
+															[get_ssh_args(), Hostname])),
+						  os:cmd(Cmd)
+				  end, Hosts),
+	ok.
+
+get_hosts() ->
+	case api_tx:read(?cloud_ssh_key) of
+		{ok, Val} ->
+			Val;
+		_ -> []
 	end.
 
--spec find_free_port(integer()) -> integer().
-find_free_port(Port) ->
-	case gen_tcp:listen(Port, []) of
-		{ok, Socket} -> gen_tcp:close(Socket), 
-						Port;
-		_ -> find_free_port(Port+1)
+get_ssh_args() ->
+	case config:read(cloud_ssh_args) of
+		failed -> "";
+		Args -> Args
 	end.
+
+get_path() ->
+	case config:read(cloud_ssh_path) of
+		failed -> "scalaris";
+		Args -> Args
+	end.
+
+get_number_of_active_vms(Hosts) ->
+	lists:foldl(fun (VM, NumActive) ->
+						case VM of
+							{_IP, active} ->
+								NumActive + 1;
+							_ -> NumActive
+						end
+				end, 0, Hosts).
+
+-spec get_number_of_active_vms() -> integer().
+get_number_of_active_vms() ->
+	{ok, List} = api_tx:read(?cloud_ssh_key),
+	get_number_of_active_vms(List).
