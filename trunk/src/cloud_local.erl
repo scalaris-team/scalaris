@@ -1,7 +1,11 @@
 %%% @author Maximilian Michels <max@pvs-pc03.zib.de>
 %%% @copyright (C) 2013, Maximilian Michels
-%%% @doc
-%%%
+%%% @doc CLOUD LOCAL starts or stops local erlang vms based on alarms defined for the autoscale process.
+%%%      The module is used by autoscale if the following option has been set in scalaris.local.cfg:
+%%%        {as_cloud_module, cloud_local} 
+%%%      The following options can also be set:
+%%%        {cloud_local_min_vms, integer()}.
+%%%        {cloud_local_max_vms, integer()}.
 %%% @end
 
 -module(cloud_local).
