@@ -13,6 +13,8 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Unit tests for src/histogram.erl
+%% @end
 %% @version $Id$
 -module(histogram_SUITE).
 -author('schuett@zib.de').

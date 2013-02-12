@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Unit tests for src/db_ets.erl.
-%%% @end
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc    Unit tests for src/db_ets.erl.
+%% @end
 %% @version $Id$
 -module(db_ets_SUITE).
 

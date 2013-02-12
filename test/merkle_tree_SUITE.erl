@@ -1,6 +1,5 @@
 %  @copyright 2010-2011 Zuse Institute Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,16 +11,14 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    merkle_tree_SUITE.erl
-%%% @author Maik Lange <MLange@informatik.hu-berlin.de>
-%%% @doc    Tests for merkle tree module.
-%%% @end
-%%% Created : 06/04/2011 by Maik Lange <MLange@informatik.hu-berlin.de>
-%%%-------------------------------------------------------------------
-%% @version $Id$
 
+%% @author Maik Lange <MLange@informatik.hu-berlin.de>
+%% @doc    Tests for merkle tree module.
+%% @end
+%% @version $Id$
 -module(merkle_tree_SUITE).
+-author('mlange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -compile(export_all).
 

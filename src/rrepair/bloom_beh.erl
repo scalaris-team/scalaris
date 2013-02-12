@@ -16,8 +16,9 @@
 %% @doc    Bloom Filter Behaviour
 %% @end
 %% @version $Id$
-
 -module(bloom_beh).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -ifndef(have_callback_support).
 -export([behaviour_info/1]).

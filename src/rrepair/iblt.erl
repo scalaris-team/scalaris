@@ -24,8 +24,9 @@
 %%             <em>Whats the Difference? Efficient Set Reconciliation without Prior Context</em>
 %%             2011 SIGCOMM'11 Vol.41(4)
 %% @version $Id$
-
 -module(iblt).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -include("record_helpers.hrl").
 -include("scalaris.hrl").

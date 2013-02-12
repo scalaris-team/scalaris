@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Helper for rt_chord unit tests.
-%%% @end
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc    Helper for rt_chord unit tests.
+%% @end
 %% @version $Id$
 -module(rt_SUITE_rt_chord).
 -author('kruber@zib.de').

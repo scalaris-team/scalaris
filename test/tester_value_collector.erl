@@ -1,5 +1,5 @@
-%  Copyright 2010-2011 Zuse Institute Berlin
-%
+%  @copyright 2010-2011 Zuse Institute Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,18 +11,12 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : tester.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : value collector for test generator
-%%%
-%%% Created :  30 April 2010 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2010-2011 Zuse Institute Berlin
+%% @doc    value collector for test generator
+%% @end
 %% @version $Id$
 -module(tester_value_collector).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 

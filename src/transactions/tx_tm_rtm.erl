@@ -20,7 +20,7 @@
 %% @version $Id$
 -module(tx_tm_rtm).
 -author('schintke@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 %%-define(TRACE_RTM_MGMT(X,Y), io:format(X,Y)).
 %%-define(TRACE_RTM_MGMT(X,Y), ct:pal(X,Y)).

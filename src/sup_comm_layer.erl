@@ -14,10 +14,12 @@
 
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Florian Schintke <schintke@zib.de>
+%% @doc    Supervisor for the comm layer processes
+%% @end
 %% @version $Id$
 -module(sup_comm_layer).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(supervisor).
 

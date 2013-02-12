@@ -1,4 +1,4 @@
-%  Copyright 2008-2012 Zuse Institute Berlin
+%  @copyright 2008-2012 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -11,17 +11,15 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : api_tx_concurrent_SUITE.erl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : Unit tests for src/api_tx
-%%%
-%%% Created :  18 Aug 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Unit tests for src/api_tx
+%% @end
+%% @version $Id$
 -module(api_tx_concurrent_SUITE).
 
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -compile(export_all).
 

@@ -19,10 +19,10 @@
 %%         If one of the supervised processes fails, only the failed process
 %%         will be re-started!
 %% @end
-%% @version $Id: sup_dht_node.erl 3439 2012-08-08 16:00:46Z schintke $
+%% @version $Id$
 -module(sup_dht_node).
 -author('schuett@zib.de').
--vsn('$Id: sup_dht_node.erl 3439 2012-08-08 16:00:46Z schintke $ ').
+-vsn('$Id$').
 
 -behaviour(supervisor).
 -include("scalaris.hrl").

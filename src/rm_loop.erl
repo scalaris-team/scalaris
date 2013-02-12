@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(rm_loop).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

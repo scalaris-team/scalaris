@@ -18,6 +18,7 @@
 %%      purpose is to give new scalaris nodes a list of nodes already
 %%      in the system.
 %% @end
+%% @version $Id$
 -module(mgmt_server).
 -author('schuett@zib.de').
 -vsn('$Id$').

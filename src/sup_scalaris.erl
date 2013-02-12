@@ -22,7 +22,7 @@
 %% @version $Id$
 -module(sup_scalaris).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(supervisor).
 -export([init/1]).

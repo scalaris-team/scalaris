@@ -13,10 +13,10 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
-%% @doc Generic paxos round based register (prbr) implementation.
-%% The read/write store alias acceptor.
+%% @doc    Generic paxos round based register (prbr) implementation.
+%%         The read/write store alias acceptor.
 %% @end
-%% @version $Id:$
+%% @version $Id$
 -module(prbr).
 -author('schintke@zib.de').
 -vsn('$Id:$ ').

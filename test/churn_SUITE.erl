@@ -12,11 +12,12 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @author Florian Schintke <schintke@zib.de>
-%%% @doc : Unit tests for transactions under churn
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @author Nico Kruber <kruber@zib.de>
+%% @author Florian Schintke <schintke@zib.de>
+%% @doc : Unit tests for transactions under churn
+%% @end
+%% @version $Id$
 -module(churn_SUITE).
 -author('schuett@zib.de').
 -vsn('$Id$').

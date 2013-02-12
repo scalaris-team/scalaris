@@ -19,8 +19,9 @@
 %%         After calling gen_hashes the tree is ready to use and sealed.
 %% @end
 %% @version $Id$
-
 -module(merkle_tree).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -include("record_helpers.hrl").
 -include("scalaris.hrl").

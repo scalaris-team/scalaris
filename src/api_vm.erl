@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(api_vm).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([get_version/0, get_info/0,
          number_of_nodes/0, get_nodes/0, add_nodes/1,

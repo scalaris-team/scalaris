@@ -13,9 +13,9 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
-%% @doc Allow a sequence of consensus using a prbr.
+%% @doc    Allow a sequence of consensus using a prbr.
 %% @end
-%% @version $Id:$
+%% @version $Id$
 -module(rbrcseq).
 -author('schintke@zib.de').
 -vsn('$Id:$ ').

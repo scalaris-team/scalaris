@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(lb_common).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

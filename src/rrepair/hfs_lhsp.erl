@@ -26,8 +26,9 @@
 %%               "Summary Cache: A Scalable Wide-Area Web Cache Sharing Protocol" 
 %%               (Counting Bloom Filters Paper)
 %% @version $Id$
-
 -module(hfs_lhsp).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 % types
 -behaviour(hfs_beh).

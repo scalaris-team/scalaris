@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Unit tests for src/db_verify_use.erl.
-%%% @end
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc    Unit tests for src/db_verify_use.erl.
+%% @end
 %% @version $Id$
 -module(db_verify_use_SUITE).
 

@@ -20,6 +20,8 @@
 %% 9th Int. Conf. on Peer-to-Peer Computing Seattle, Sept. 2009.
 %% @version $Id$
 -module(dc_centroids).
+-author('mamuelle@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -export([
         new/2

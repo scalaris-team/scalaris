@@ -12,10 +12,10 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Unit tests for database implementations. Define the TEST_DB macro
-%%          to set the database module that is being tested.
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Unit tests for database implementations. Define the TEST_DB macro
+%%         to set the database module that is being tested.
+%% @end
 %% @version $Id$
 
 -include("scalaris.hrl").

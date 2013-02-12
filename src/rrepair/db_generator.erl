@@ -1,6 +1,5 @@
 %  @copyright 2010-2011 Zuse Institute Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,16 +11,14 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    merkle_tree_builder.erl
-%%% @author Maik Lange <MLange@informatik.hu-berlin.de>
-%%% @doc    Merkle Tree construction.
-%%% @end
-%%% Created : 15/11/2011 by Maik Lange <MLange@informatik.hu-berlin.de>
-%%%-------------------------------------------------------------------
-%% @version $Id: db_generator.erl 2843 2012-03-09 09:56:42Z schintke $
 
+%% @author Maik Lange <MLange@informatik.hu-berlin.de>
+%% @doc    Merkle Tree construction.
+%% @end
+%% @version $Id$
 -module(db_generator).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

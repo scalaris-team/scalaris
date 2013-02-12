@@ -20,7 +20,7 @@
 %% @version $Id$
 -module(rm_tman).
 -author('hennig@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

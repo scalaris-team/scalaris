@@ -12,13 +12,13 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc Vivaldi helper module for measuring latency between nodes.
-%%% @end
-%%% @version $Id$
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc Vivaldi helper module for measuring latency between nodes.
+%% @end
+%% @version $Id$
 -module(vivaldi_latency).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

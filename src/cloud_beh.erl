@@ -1,4 +1,4 @@
-% @copyright 2007-2013 Zuse Institute Berlin
+% @copyright 2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,7 +12,14 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
+%% @author Maximilian Michels <michels@zib.de>
+%% @doc Behaviour for various operations in a cloud environment, e.g. for
+%%      scaling.
+%% @end
+%% @version $Id$
 -module(cloud_beh).
+-author('michels@zib.de').
+-vsn('$Id$').
 
 -ifndef(have_callback_support).
 -export([behaviour_info/1]).

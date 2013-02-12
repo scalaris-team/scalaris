@@ -16,8 +16,9 @@
 %% @doc    HashFunctionSet Behaviour
 %% @end
 %% @version $Id$
-
 -module(hfs_beh).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -ifndef(have_callback_support).
 -export([behaviour_info/1]).

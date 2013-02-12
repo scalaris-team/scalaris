@@ -16,7 +16,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc lease store based on rbrcseq.
 %% @end
-%% @version $Id:$
+%% @version $Id$
 -module(l_on_cseq).
 -author('schintke@zib.de').
 -author('schuett@zib.de').

@@ -21,8 +21,9 @@
 %%          Journal of Functional Programming 19(1) pp: 95-106 
 %%          Implemented Method: Trial Division
 %% @version $Id$
-
 -module(prime).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -include("record_helpers.hrl").
 -include("scalaris.hrl").

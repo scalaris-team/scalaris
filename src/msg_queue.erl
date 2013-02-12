@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(msg_queue).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -ifdef(with_export_type_support).
 -export_type([msg_queue/0]).

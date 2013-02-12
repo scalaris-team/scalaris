@@ -13,10 +13,10 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc Unit tests for transactions under churn
+%% @doc    Unit tests for transactions under churn
 %% @end
+%% @version $Id$
 -module(tx_tm_rtm_SUITE).
-
 -author('schuett@zib.de').
 -vsn('$Id$').
 

@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(scalaris_cth).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("types.hrl").
 

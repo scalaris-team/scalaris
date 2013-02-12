@@ -23,7 +23,7 @@
 %% @version $Id$
 -module(lb_psv_gossip).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).

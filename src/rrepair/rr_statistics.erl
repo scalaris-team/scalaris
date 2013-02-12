@@ -16,8 +16,10 @@
 %% @doc    replica repair statistics module 
 %%         count outdated replicas
 %% @end
-%% @version $Id:  $
+%% @version $Id$
 -module(rr_statistics).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

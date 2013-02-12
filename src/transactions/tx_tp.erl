@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(tx_tp).
 -author('schintke@onscale.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

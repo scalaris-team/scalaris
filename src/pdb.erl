@@ -21,7 +21,7 @@
 %% @version $Id$
 -module(pdb).
 -author('schintke@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(pdb_beh).
 

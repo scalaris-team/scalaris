@@ -13,9 +13,9 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
-%% @doc Text mode top for an Erlang VM. Just call top:top() in the eshell.
+%% @doc    Text mode top for an Erlang VM. Just call top:top() in the eshell.
 %% @end
-%% @version $Id:$
+%% @version $Id$
 -module(top).
 -author('schintke@zib.de').
 -vsn('$Id:$ ').

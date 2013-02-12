@@ -1,6 +1,5 @@
 %  @copyright 2010-2011 Zuse Institute Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,18 +11,15 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    bloom_SUITE.erl
-%%% @author Maik Lange <MLange@informatik.hu-berlin.de>
-%%% @doc    Utility functions for execution time measurement.
-%%%         Src = http://www.trapexit.org/Measuring_Function_Execution_Time
-%%% @end
-%%% Created : 01/07/2011 by Maik Lange <MLange@informatik.hu-berlin.de>
-%%%-------------------------------------------------------------------
-%% @version $Id $
 
+%% @author Maik Lange <MLange@informatik.hu-berlin.de>
+%% @doc    Utility functions for execution time measurement.
+%%         Src = http://www.trapexit.org/Measuring_Function_Execution_Time
+%% @end
+%% @version $Id$
 -module(measure_util).
-
+-author('mlange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -export([time_avg/3, time_with_result/3]).
 -export([print/1, print/2, get/3]).

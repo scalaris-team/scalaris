@@ -19,8 +19,9 @@
 %%          <em>Network Applications of Bloom Filters: A Survey</em> 
 %%          2004 Internet Mathematics 1(4) 
 %% @version $Id$
-
 -module(bloom).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -include("record_helpers.hrl").
 

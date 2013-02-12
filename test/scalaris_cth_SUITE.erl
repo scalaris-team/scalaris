@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc    Unit tests for the scalaris_cth module.
-%%% @end
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc    Unit tests for the scalaris_cth module.
+%% @end
 %% @version $Id$
 -module(scalaris_cth_SUITE).
 -author('kruber@zib.de').

@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(uid).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -ifdef(with_export_type_support).
 -export_type([global_uid/0]).

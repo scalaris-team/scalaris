@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    routing table process
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    routing table process
+%% @end
 %% @version $Id$
 -module(rt_loop).
 -author('schuett@zib.de').

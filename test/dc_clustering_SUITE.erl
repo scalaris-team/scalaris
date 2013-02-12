@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
-%%% @doc    Unit tests for the dc_clustering module.
-%%% @end
+%% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
+%% @doc    Unit tests for the dc_clustering module.
+%% @end
 %% @version $Id$
 -module(dc_clustering_SUITE).
 -author('mamuelle@informatik.hu-berlin.de').

@@ -24,7 +24,7 @@
 %% @version $Id$
 -module(sup_dht_node_core).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(supervisor).
 

@@ -21,7 +21,7 @@
 %% @end
 %% @version $Id$
 -module(gen_component).
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -compile({inline, [gc_mod/1, gc_hand/1, gc_set_hand/2,
                    gc_bps/1, gc_set_bps/2,

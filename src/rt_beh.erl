@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(rt_beh).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 % for behaviour
 -ifndef(have_callback_support).

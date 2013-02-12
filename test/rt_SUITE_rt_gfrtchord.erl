@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
-%%% @doc    Helper for rt_frtchord unit tests.
-%%% @end
+%% @author Magnus Mueller <mamuelle@informatik.hu-berlin.de>
+%% @doc    Helper for rt_frtchord unit tests.
+%% @end
 %% @version $Id$
 -module(rt_SUITE_rt_gfrtchord).
 -author('mamuelle@informatik.hu-berlin.de').

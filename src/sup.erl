@@ -18,10 +18,10 @@
 %%      Start the supervisor separately and then add its childs one
 %%      after the other.
 %% @end
-%% @version $Id: $
+%% @version $Id$
 -module(sup).
 -author('schintke@zib.de').
--vsn('$Id: ').
+-vsn('$Id$').
 
 -export([sup_start/3]).
 
