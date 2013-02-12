@@ -50,7 +50,7 @@ ERL_SCHED_FLAGS_R14=${ERL_SCHED_FLAGS-"+sbt db +swt low"}
 
 # default values (commandline options change these parameters)
 NODE_NAME=node1
-ERLANG_HOSTNAME=""
+ERLANG_HOSTNAME=${ERLANG_HOSTNAME-""}
 daemonize=0
 first=0
 first_quorum=0
