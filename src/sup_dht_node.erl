@@ -19,10 +19,10 @@
 %%         If one of the supervised processes fails, only the failed process
 %%         will be re-started!
 %% @end
-%% @version $Id$
+%% @version $Id: sup_dht_node.erl 3439 2012-08-08 16:00:46Z schintke $
 -module(sup_dht_node).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id: sup_dht_node.erl 3439 2012-08-08 16:00:46Z schintke $ ').
 
 -behaviour(supervisor).
 -include("scalaris.hrl").
@@ -57,6 +57,11 @@ supspec(_) ->
 -spec childs([{pid_groups:groupname(), Options::[tuple()]}]) ->
                     [ProcessDescr::supervisor:child_spec()].
 childs([{DHTNodeGroup, Options}]) ->
+	Autoscale =
+		case config:read(autoscale) of
+			true -> util:sup_worker_desc(autoscale, autoscale, start_link, [DHTNodeGroup]);
+			_ -> []
+		end,
     Cyclon = util:sup_worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
     DC_Clustering =
         util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
@@ -89,6 +94,7 @@ childs([{DHTNodeGroup, Options}]) ->
             true -> util:sup_worker_desc(rrepair, rrepair, start_link, [DHTNodeGroup]);
             _ -> []
         end,
+	
     lists:flatten([ %% RepUpd may be [] and lists:flatten eliminates this
                     Monitor,
                     Delayer,
@@ -101,5 +107,6 @@ childs([{DHTNodeGroup, Options}]) ->
                     Gossip,
                     SupDHTNodeCore_AND,
                     MonitorPerf,
-                    RepUpdate
+                    RepUpdate,
+					Autoscale
            ]).
