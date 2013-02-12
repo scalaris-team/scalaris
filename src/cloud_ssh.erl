@@ -1,7 +1,12 @@
 %%% @author Maximilian Michels <max@pvs-pc03.zib.de>
 %%% @copyright (C) 2013, Maximilian Michels
-%%% @doc
-%%%
+%%% @doc Cloud SSH starts or stops erlang vms on ssh hosts based on alarms defined for the autoscale process.
+%%%      The module is used by autoscale if the following option has been set in scalaris.local.cfg:
+%%%        {as_cloud_module, cloud_ssh} 
+%%%      The following options can also be set:
+%%%        {cloud_ssh_hosts, ["host1", "host2", ..., "hostn"]}.
+%%%        {cloud_ssh_args, "arguments for ssh"}.
+%%%        {cloud_ssh_path, "path/to/scalaris/installation/on/host"}.
 %%% @end
 
 -module(cloud_ssh).
