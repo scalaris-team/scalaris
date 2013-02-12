@@ -24,8 +24,9 @@
 %%
 %% @end
 %% @version $Id$
-
 -module(rrepair).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

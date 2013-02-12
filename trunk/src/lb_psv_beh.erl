@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(lb_psv_beh).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 % for behaviour
 -ifndef(have_callback_support).

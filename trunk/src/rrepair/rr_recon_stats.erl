@@ -17,6 +17,8 @@
 %% @end
 %% @version $Id$
 -module(rr_recon_stats).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Exported functions and types

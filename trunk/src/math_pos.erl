@@ -21,7 +21,7 @@
 %% @version $Id$
 -module(math_pos).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -type position_var() :: [non_neg_integer()].
 

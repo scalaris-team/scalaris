@@ -18,10 +18,10 @@
 %% This abstraction allows for easy switching between
 %% erlang:put/get/erase and ets:insert/lookup/delete
 %% @end
-%% @version $Id: pdb.erl 3617 2012-08-27 13:25:33Z kruber@zib.de $
+%% @version $Id$
 -module(pdb_ets).
 -author('schintke@onscale.de').
--vsn('$Id: pdb.erl 3617 2012-08-27 13:25:33Z kruber@zib.de $ ').
+-vsn('$Id$').
 
 -behaviour(pdb_beh).
 

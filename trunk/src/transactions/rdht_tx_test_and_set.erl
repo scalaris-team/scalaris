@@ -22,7 +22,7 @@
 %% @version $Id$
 -module(rdht_tx_test_and_set).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).

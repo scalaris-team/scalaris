@@ -15,6 +15,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc Load generator
 %% @end
+%% @version $Id$
 -module(bench_load).
 -author('schuett@zib.de').
 -vsn('$Id$').

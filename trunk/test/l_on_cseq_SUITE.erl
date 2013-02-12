@@ -13,6 +13,8 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Unit tests for l_on_cseq
+%% @end
 %% @version $Id$
 -module(l_on_cseq_SUITE).
 -author('schuett@zib.de').

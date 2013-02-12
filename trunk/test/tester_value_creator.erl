@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(tester_value_creator).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("unittest.hrl").
 -include("tester.hrl").

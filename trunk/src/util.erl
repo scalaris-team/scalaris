@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Utility Functions.
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Utility Functions.
+%% @end
 %% @version $Id$
 -module(util).
 

@@ -14,6 +14,8 @@
 
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc Service functions for handling quorums.
+%% @end
+%% @version $Id$
 -module(quorum).
 -author('schintke@zib.de').
 -vsn('$Id$').

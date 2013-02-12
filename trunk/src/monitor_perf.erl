@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(monitor_perf).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

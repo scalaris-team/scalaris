@@ -12,9 +12,10 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Nico Kruber <kruber@zib.de>
-%%% @doc : Unit tests for unittest_helper
-%%% @end
+%% @author Nico Kruber <kruber@zib.de>
+%% @doc : Unit tests for unittest_helper
+%% @end
+%% @version $Id$
 -module(unittest_helper_SUITE).
 -author('kruber@zib.de').
 -vsn('$Id$').

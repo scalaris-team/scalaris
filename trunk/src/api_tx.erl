@@ -28,7 +28,7 @@
 -module(api_tx).
 -author('schintke@zib.de').
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -ifdef(with_export_type_support).
 -export_type([request/0, request_on_key/0,

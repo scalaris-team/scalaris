@@ -16,8 +16,9 @@
 %% @doc    replica reconcilication module
 %% @end
 %% @version $Id$
-
 -module(rr_recon).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

@@ -15,10 +15,10 @@
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    biased random number generator
 %% @end
-%% @version $Id: rr_recon.erl 3028 2012-04-20 13:57:59Z lakedaimon300@gmail.com $
-
+%% @version $Id$
 -module(random_bias).
-
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -include("record_helpers.hrl").
 -include("scalaris.hrl").

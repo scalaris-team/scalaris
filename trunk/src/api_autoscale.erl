@@ -1,4 +1,4 @@
-% @copyright 2007-2013 Zuse Institute Berlin
+% @copyright 2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -12,7 +12,13 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
+%% @author Ufuk Celebi <celebi@zib.de>
+%% @doc Simple auto-scaling service API.
+%% @end
+%% @version $Id$
+-author('celebi@zib.de').
 -module(api_autoscale).
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 -compile(export_all).

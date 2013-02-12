@@ -12,13 +12,13 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    dht_node join procedure
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    dht_node join procedure
+%% @end
 %% @version $Id$
 -module(dht_node_join).
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).

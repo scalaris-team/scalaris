@@ -1,6 +1,5 @@
 %  @copyright 2010-2012 Zuse Institute Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,14 +11,11 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    tester_type_checker.erl
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @author Florian Schintke <schintke@zib.de>
-%%% @doc    check whether a given value is of a given type
-%%% @end
-%%% Created :  10 Jan 2012 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @author Florian Schintke <schintke@zib.de>
+%% @doc    check whether a given value is of a given type
+%% @end
 %% @version $Id$
 -module(tester_type_checker).
 -author('schuett@zib.de').

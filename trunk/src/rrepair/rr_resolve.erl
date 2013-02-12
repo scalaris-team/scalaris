@@ -29,8 +29,9 @@
 %%           rrepair process provides API for resolve requests
 %% @end
 %% @version $Id$
-
 -module(rr_resolve).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -behaviour(gen_component).
 

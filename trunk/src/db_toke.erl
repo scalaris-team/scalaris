@@ -15,6 +15,7 @@
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc In-process Database using toke
 %% @end
+%% @version $Id$
 -module(db_toke).
 -author('kruber@zib.de').
 -vsn('$Id$').

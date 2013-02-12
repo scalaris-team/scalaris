@@ -14,11 +14,12 @@
 
 %% @author Florian Schintke <schintke@zib.de>
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @author Nico Kruber <kruber@zib.de>
-%% @version $Id: type_check_SUITE.erl 3571 2012-08-21 13:22:25Z kruber@zib.de $
+%% @doc    Unit tests for prbr
+%% @end
+%% @version $Id$
 -module(prbr_SUITE).
 -author('schintke@zib.de').
--vsn('$Id: type_check_SUITE.erl 3571 2012-08-21 13:22:25Z kruber@zib.de $ ').
+-vsn('$Id$').
 
 -compile(export_all).
 

@@ -1,6 +1,5 @@
 %  @copyright 2010-2012 Zuse Institute Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,18 +11,14 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    tester_collect_function_info.erl
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    collection type information about a function
-%%% @end
-%%% Created :  11 Jan 2012 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    collection type information about a function
+%% @end
 %% @version $Id$
 -module(tester_collect_function_info).
-
 -author('schuett@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([collect_fun_info/4]).
 

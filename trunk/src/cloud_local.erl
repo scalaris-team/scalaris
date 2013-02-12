@@ -1,4 +1,4 @@
-#% @copyright 2007-2013 Zuse Institute Berlin
+% @copyright 2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,17 +13,19 @@
 %   limitations under the License.
 
 %% @author Maximilian Michels <michels@zib.de>
-%% @copyright (C) 2013, Maximilian Michels
-%% @doc CLOUD LOCAL starts or stops local erlang vms based on alarms defined for the autoscale process.
-%%      The module is used by autoscale if the following option has been set in scalaris.local.cfg:
+%% @doc CLOUD LOCAL starts or stops local erlang vms based on alarms defined for
+%%      the autoscale process.
+%%      The module is used by autoscale if the following option has been set in
+%%      scalaris.local.cfg:
 %%        {as_cloud_module, cloud_local}
 %%      The following options can also be set:
 %%        {cloud_local_min_vms, integer()}.
 %%        {cloud_local_max_vms, integer()}.
 %% @end
-
+%% @version $Id$
 -module(cloud_local).
 -author('michels@zib.de').
+-vsn('$Id$').
 
 -behavior(cloud_beh).
 

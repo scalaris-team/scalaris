@@ -16,7 +16,7 @@
 %% @version $Id$
 -module(sup_yaws).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -behaviour(supervisor).
 

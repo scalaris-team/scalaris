@@ -12,9 +12,9 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Unit tests for src/util.erl.
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Unit tests for src/util.erl.
+%% @end
 %% @version $Id$
 -module(util_SUITE).
 -author('schuett@zib.de').

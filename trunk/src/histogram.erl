@@ -12,12 +12,12 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%%% @author Thorsten Schuett <schuett@zib.de>
-%%% @doc    Basic Histogram.
-%%%         Yael Ben-Haim and Elad Tom-Tov, "A streaming parallel
-%%%         decision tree algorithm", J. Machine Learning Research 11
-%%%         (2010), pp. 849--872.
-%%% @end
+%% @author Thorsten Schuett <schuett@zib.de>
+%% @doc    Basic Histogram.
+%%         Yael Ben-Haim and Elad Tom-Tov, "A streaming parallel
+%%         decision tree algorithm", J. Machine Learning Research 11
+%%         (2010), pp. 849--872.
+%% @end
 %% @version $Id$
 -module(histogram).
 -author('schuett@zib.de').

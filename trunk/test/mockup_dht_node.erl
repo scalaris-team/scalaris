@@ -19,7 +19,7 @@
 %% @version $Id$
 -module(mockup_dht_node).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -include("scalaris.hrl").
 

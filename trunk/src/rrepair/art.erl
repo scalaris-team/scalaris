@@ -22,8 +22,9 @@
 %%              - BU Computer Science TR
 %% @end
 %% @version $Id$
-
 -module(art).
+-author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -include("record_helpers.hrl").
 -include("scalaris.hrl").

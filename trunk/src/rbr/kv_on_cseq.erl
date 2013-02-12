@@ -13,9 +13,9 @@
 %   limitations under the License.
 
 %% @author Florian Schintke <schintke@zib.de>
-%% @doc key value store based on rbrcseq.
+%% @doc    key value store based on rbrcseq.
 %% @end
-%% @version $Id:$
+%% @version $Id$
 -module(kv_on_cseq).
 -author('schintke@zib.de').
 -vsn('$Id:$ ').

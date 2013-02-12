@@ -15,10 +15,10 @@
 %% @author Florian Schintke <schintke@zib.de>
 %% @doc Behaviour for pdb (see pdb.erl and pdb_ets.erl)
 %% @end
-%% @version $Id: pdb.erl 3735 2012-09-13 15:24:37Z kruber@zib.de $
+%% @version $Id$
 -module(pdb_beh).
 -author('schintke@zib.de').
--vsn('$Id: pdb.erl 3735 2012-09-13 15:24:37Z kruber@zib.de $ ').
+-vsn('$Id$').
 
 % for behaviour
 -ifndef(have_callback_support).

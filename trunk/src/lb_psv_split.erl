@@ -20,7 +20,7 @@
 %% @version $Id$
 -module(lb_psv_split).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 %-define(TRACE(X,Y), ct:pal(X,Y)).
 -define(TRACE(X,Y), ok).

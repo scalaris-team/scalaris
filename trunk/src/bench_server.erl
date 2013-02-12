@@ -15,6 +15,7 @@
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @doc This is a small server for running benchmarks
 %% @end
+%% @version $Id$
 -module(bench_server).
 -author('schuett@zib.de').
 -vsn('$Id$').

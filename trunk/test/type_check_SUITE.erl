@@ -15,10 +15,12 @@
 %% @author Florian Schintke <schintke@zib.de>
 %% @author Thorsten Schuett <schuett@zib.de>
 %% @author Nico Kruber <kruber@zib.de>
+%% @doc    Unit tests varifying type constraints via random testing.
+%% @end
 %% @version $Id$
 -module(type_check_SUITE).
 -author('schintke@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -compile(export_all).
 

@@ -1,5 +1,5 @@
-%  Copyright 2008-2012 Zuse Institute Berlin
-%
+%  @copyright 2008-2012 Zuse Institute Berlin
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -11,15 +11,10 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    : unittest.hrl
-%%% Author  : Thorsten Schuett <schuett@zib.de>
-%%% Description : contains unittest helpers
-%%%
-%%% Created :  14 Mar 2008 by Thorsten Schuett <schuett@zib.de>
-%%%-------------------------------------------------------------------
+
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @copyright 2007 Thorsten Schuett
+%% @doc    contains unittest helpers
+%% @end
 %% @version $Id$
 
 -ifdef(have_ctline_support).

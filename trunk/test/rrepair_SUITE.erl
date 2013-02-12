@@ -1,6 +1,5 @@
 %  @copyright 2010-2012 Zuse Institute Berlin
-%  @end
-%
+
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -12,18 +11,14 @@
 %   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
-%%%-------------------------------------------------------------------
-%%% File    rrepair_SUITE.erl
-%%% @author Maik Lange <malange@informatik.hu-berlin.de
-%%% @doc    Tests for rep update module.
-%%% @end
-%%% Created : 2011-05-27
-%%%-------------------------------------------------------------------
-%% @version $Id $
 
+%% @author Maik Lange <malange@informatik.hu-berlin.de
+%% @doc    Tests for rep update module.
+%% @end
+%% @version $Id$
 -module(rrepair_SUITE).
-
 -author('malange@informatik.hu-berlin.de').
+-vsn('$Id$').
 
 -compile(export_all).
 

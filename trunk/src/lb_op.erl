@@ -18,7 +18,7 @@
 %% @version $Id$
 -module(lb_op).
 -author('kruber@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -export([no_op/0, slide_op/4, jump_op/6,
         is_no_op/1, is_slide/1, is_jump/1, get/2]).

@@ -19,7 +19,7 @@
 
 -module(dc_centroids_SUITE).
 -author('mamuelle@informatik.hu-berlin.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 
 -compile(export_all).
 

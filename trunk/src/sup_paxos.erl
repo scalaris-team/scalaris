@@ -28,7 +28,7 @@
 %% @version $Id$
 -module(sup_paxos).
 -author('schintke@zib.de').
--vsn('$Id$ ').
+-vsn('$Id$').
 -behaviour(supervisor).
 -export([start_link/1, init/1]).
 -export([supspec/1, childs/1]).
