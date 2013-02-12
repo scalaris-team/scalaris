@@ -404,8 +404,8 @@ public abstract class AbstractTransaction<ReqL extends RequestList, ResL extends
      * @throws UnknownException
      *             if any other error occurs
      *
-     * @see #addOnNr(OtpErlangObject, OtpErlangLong)
-     * @see #addOnNr(OtpErlangObject, OtpErlangDouble)
+     * @see #addOnNr(OtpErlangString, OtpErlangLong)
+     * @see #addOnNr(OtpErlangString, OtpErlangDouble)
      * @since 3.9
      */
     protected void addOnNr_(final AddOnNrOp op) throws ConnectionException,

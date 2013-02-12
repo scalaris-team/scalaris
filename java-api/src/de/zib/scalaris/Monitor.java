@@ -393,8 +393,7 @@ public class Monitor {
      * @throws ClassCastException
      *             if the conversion fails
      *
-     * @see #tupleListToMap(OtpErlangObject, ListElementConverter,
-     *      ListElementConverter)
+     * @see #tupleListToMap(OtpErlangObject, ListElementConverter, ListElementConverter)
      */
     private static Map<Long, Double> tupleListToLDMap(
             final OtpErlangObject object) throws ClassCastException {
