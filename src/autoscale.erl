@@ -16,8 +16,8 @@
 %% @doc Auto-scaling service.
 %% @end
 %% @version $Id$
--author('celebi@zib.de').
 -module(autoscale).
+-author('celebi@zib.de').
 -vsn('$Id$').
 
 -behaviour(gen_component).

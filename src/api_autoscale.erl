@@ -16,8 +16,8 @@
 %% @doc Simple auto-scaling service API.
 %% @end
 %% @version $Id$
--author('celebi@zib.de').
 -module(api_autoscale).
+-author('celebi@zib.de').
 -vsn('$Id$').
 
 -include("scalaris.hrl").
