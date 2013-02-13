@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bp:blueprint xmlns:bp="http://www.4caast.eu/blueprint" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.4caast.eu/blueprint blueprint_template_v03.xsd ">
+  <bp:basic_properties_section>
+    <bp:blueprint_id>WikiOnScalaris-01-Blueprint</bp:blueprint_id>
+    <bp:blueprint_name>WikiOnScalaris-01-Blueprint</bp:blueprint_name>
+    <bp:description>Blueprint for the "Wiki on Scalaris" application.</bp:description>
+    <bp:ownership>
+      <bp:name>Zuse Institute Berlin</bp:name>
+      <bp:uri>http://www.zib.de</bp:uri>
+    </bp:ownership>
+    <bp:version>1.1</bp:version>
+    <bp:release_date>2012-07-25</bp:release_date>
+    <bp:isProduct>true</bp:isProduct>
+    <bp:status>unresolved</bp:status>
+  </bp:basic_properties_section>
+
+  <bp:offering_section>
+    <bp:offering>
+      <bp:offering_id>WikiOnScalaris-01</bp:offering_id>
+      <bp:resource_name>Wiki on Scalaris</bp:resource_name>
+      <bp:resource_type>PaaS</bp:resource_type>
+      <bp:endpoint_location>http://localhost:8080/scalaris-wiki/</bp:endpoint_location>
+      <bp:range_of_instance>
+        <bp:minimum>1</bp:minimum>
+        <bp:maximum>9999</bp:maximum>
+      </bp:range_of_instance>
+    </bp:offering>
+  </bp:offering_section>
+
+  <bp:deployment_artefact_section>
+    <bp:deployment_artefact>
+      <bp:artefact_id>WikiOnScalaris-01-war</bp:artefact_id>
+      <bp:artefact_name>scalaris-wiki.war</bp:artefact_name>
+      <bp:artefact_type>war-file</bp:artefact_type>
+      <bp:artefact_location>
+        https://svn.forge.morfeo-project.org/4caast/trunk/WP6/datastore/demo/scalaris-wiki.war
+      </bp:artefact_location>
+    </bp:deployment_artefact>
+  </bp:deployment_artefact_section>
+
+  <bp:resource_requirement_section>
+    <bp:resource_requirement>
+      <bp:requirement_id>WikiOnScalaris-01-ServletContainer</bp:requirement_id>
+      <bp:resource_name>servlet container v2.5</bp:resource_name>
+      <bp:resource_type>Servlet Container v2.5</bp:resource_type>
+      <bp:range_of_instances>
+        <bp:minimum>1</bp:minimum>
+        <bp:maximum>9999</bp:maximum>
+      </bp:range_of_instances>
+      <bp:policy_constraint>ServletContainer.constraints</bp:policy_constraint>
+    </bp:resource_requirement>
+    <bp:resource_requirement>
+      <bp:requirement_id>WikiOnScalaris-01-Scalaris</bp:requirement_id>
+      <bp:resource_name>Running Scalaris node</bp:resource_name>
+      <bp:resource_type>Scalaris node</bp:resource_type>
+      <bp:range_of_instances>
+        <bp:minimum>1</bp:minimum>
+        <bp:maximum>9999</bp:maximum>
+      </bp:range_of_instances>
+    </bp:resource_requirement>
+  </bp:resource_requirement_section>
+
+  <bp:topology_section>
+    <bp:vertical_dependency>
+      <bp:source>WikiOnScalaris-01-war</bp:source>
+      <bp:target>WikiOnScalaris-01-ServletContainer</bp:target>
+    </bp:vertical_dependency>
+    <bp:horizontal_dependency>
+      <bp:source>WikiOnScalaris-01-war</bp:source>
+      <bp:target>WikiOnScalaris-01-Scalaris</bp:target>
+    </bp:horizontal_dependency>
+  </bp:topology_section>
+</bp:blueprint>
