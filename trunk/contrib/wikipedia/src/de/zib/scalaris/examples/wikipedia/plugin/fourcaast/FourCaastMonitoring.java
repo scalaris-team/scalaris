@@ -116,7 +116,7 @@ public class FourCaastMonitoring implements WikiEventHandler, FourCaastMonitorin
 
     @Override
     public String getName() {
-        return "4CaaSt accounting";
+        return "4CaaSt monitoring";
     }
     
     @Override
@@ -131,7 +131,7 @@ public class FourCaastMonitoring implements WikiEventHandler, FourCaastMonitorin
 
     @Override
     public String getDescription() {
-        return "Registers page-view events with an accounting server.";
+        return "Exposes several timing values via JMX.";
     }
 
     @Override
