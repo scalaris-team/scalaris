@@ -101,7 +101,7 @@ change_id_and_check(OldId, NewId) ->
             case node:id(OldNode) =/= NewId andalso
                      ((NewNode =:= Pred) andalso (NewNode =:= Succ) % 1-element ring
                      orelse % two nodes:
-                          Pred =:= Succ
+                          ((Pred =:= Succ) andalso (node:id(Pred) =/= NewId))
                      orelse % at least three nodes:
                           intervals:in(NewId,
                                        intervals:new('(', node:id(Pred), node:id(Succ), ')'))) of
