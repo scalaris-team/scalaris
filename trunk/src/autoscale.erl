@@ -129,10 +129,10 @@ on({check_alarm, Name, AlarmEpoch}, {IsLeader, Alarms}) ->
 						unknown_alarm_handler ->
 							ok;
 						breach_lower ->
-							continue_alarm(Name, max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs), LeaderPid, Epoch),
+							continue_alarm(Name, erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs), LeaderPid, Epoch),
 							?CLOUD:remove_vms(Alarm#alarm.scale_down_by);
 						breach_upper ->
-							continue_alarm(Name, max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs), LeaderPid, Epoch),
+							continue_alarm(Name, erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs), LeaderPid, Epoch),
 							?CLOUD:add_vms(Alarm#alarm.scale_up_by);
 						ok ->
 							continue_alarm(Name, Alarm#alarm.period_secs, LeaderPid, Epoch)
