@@ -99,7 +99,10 @@ join_parameters_list() ->
 %% check whether we may loose some lookup when join is finished and
 %% slide operations are still going on.
 join_lookup(Config) ->
-    Keys = ?RT:get_replica_keys(0),
+    %% need config to get random node id
+    Config2 = unittest_helper:start_minimal_procs(Config, [], false),
+    Keys = ?RT:get_replica_keys(?RT:get_random_node_id()),
+    unittest_helper:stop_minimal_procs(Config2),
 
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
