@@ -126,6 +126,8 @@ ERLANG_UNAVAILABLE_LIBS=
 AC_ERLANG_CHECK_LIB(erts, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS erts")
 
 AC_ERLANG_CHECK_LIB(kernel, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS kernel")
+AC_CHECK_FILE($ERLANG_LIB_DIR_kernel/include/inet.hrl, ,
+              AC_MSG_FAILURE([kernel/include/inet.hrl not found - you won't be able to compile the erlang sources]))
 
 AC_ERLANG_CHECK_LIB(stdlib, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS stdlib")
 
@@ -141,7 +143,7 @@ AC_ERLANG_CHECK_LIB(ssl, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS ssl
 
 AC_ERLANG_CHECK_LIB(xmerl, , ERLANG_UNAVAILABLE_LIBS="$ERLANG_UNAVAILABLE_LIBS xmerl")
 
-AS_IF([test "x$ERLANG_UNAVAILABLE_LIBS" != x], AC_MSG_FAILURE([$ERLANG_UNAVAILABLE_LIBS not found - you won't be able compile the erlang sources]))
+AS_IF([test "x$ERLANG_UNAVAILABLE_LIBS" != x], AC_MSG_FAILURE([$ERLANG_UNAVAILABLE_LIBS not found - you won't be able ti compile the erlang sources]))
 
 # libs for optional build tasks:
 AC_ERLANG_CHECK_LIB(common_test, , AC_MSG_NOTICE([erlang-common_test not found - you won't be able to run the unit tests without common_test]))
