@@ -8,7 +8,7 @@ cd <scalaris-dir>
 2) start the JMX wrapper (reads monitoring values from Scalaris and exposes these via JMX):
 
 cd java-api
-./scalaris --jvmopts "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=14193 -Dcom.sun.management.jmxremote.auenticate=false -Dcom.sun.management.jmxremote.ssl=false" -jmx firstnode@localhost
+./scalaris --jvmopts "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=14193 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false" -jmx firstnode@localhost
 
 === How to use JASMINe monitoring probes with "Wiki on Scalaris" === 
 
@@ -19,7 +19,7 @@ ant
 
 2) start the Tomcat server with specific JMX port:
 
-ant run -Dscalaris.node="node1@localhost" -Dscalaris.cookie="chocolate chip cookie" -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=14192 -Dcom.sun.management.jmxremote.auenticate=false -Dcom.sun.management.jmxremote.ssl=false
+ant run -Dscalaris.node="node1@localhost" -Dscalaris.cookie="chocolate chip cookie" -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=14192 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false
 
 === Setup JASMINe monitoring probes === 
 
