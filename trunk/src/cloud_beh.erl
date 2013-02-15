@@ -38,10 +38,10 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-	 {init, 0},
+     {init, 0},
      {get_number_of_vms, 0},
      {add_vms, 1},
-	 {remove_vms, 1}
+     {remove_vms, 1}
     ];
 behaviour_info(_Other) ->
     undefined.

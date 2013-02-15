@@ -42,66 +42,66 @@
 
 -spec init() -> ok.
 init() ->
-	Hosts =
-		case config:read(cloud_ssh_hosts) of
-			failed -> [];
-			List -> lists:map(fun(Host) -> {Host, inactive} end, List)
-		end,
-	case api_tx:read(?cloud_ssh_key) of
-		{fail, not_found} -> api_tx:write(?cloud_ssh_key, Hosts);
-		_ -> ok
-	end.
+    Hosts =
+        case config:read(cloud_ssh_hosts) of
+            failed -> [];
+            List -> lists:map(fun(Host) -> {Host, inactive} end, List)
+        end,
+    case api_tx:read(?cloud_ssh_key) of
+        {fail, not_found} -> api_tx:write(?cloud_ssh_key, Hosts);
+        _ -> ok
+    end.
 
 -spec get_number_of_vms() -> non_neg_integer().
 get_number_of_vms() ->
-	{ok, List} = api_tx:read(?cloud_ssh_key),
-	length(List).
+    {ok, List} = api_tx:read(?cloud_ssh_key),
+    length(List).
 
 -spec add_vms(integer()) -> ok.
 add_vms(N) ->
-	UpdatedHosts = add_or_remove_vms(add, N),
-	{ok} = api_tx:write(?cloud_ssh_key, UpdatedHosts),
-	ok.
+    UpdatedHosts = add_or_remove_vms(add, N),
+    {ok} = api_tx:write(?cloud_ssh_key, UpdatedHosts),
+    ok.
 
 -spec remove_vms(integer()) -> ok.
 remove_vms(N) ->
-	UpdatedHosts = add_or_remove_vms(remove, N),
-	{ok} = api_tx:write(?cloud_ssh_key, UpdatedHosts),
-	ok.
+    UpdatedHosts = add_or_remove_vms(remove, N),
+    {ok} = api_tx:write(?cloud_ssh_key, UpdatedHosts),
+    ok.
 
 add_or_remove_vms(Flag, Pending) ->
-	Hosts = get_hosts(),
-	add_or_remove_vms(Flag, Pending, Hosts, []).
+    Hosts = get_hosts(),
+    add_or_remove_vms(Flag, Pending, Hosts, []).
 
 add_or_remove_vms(_Flag, _Pending = 0, Hosts, UpdatedHosts) ->
-	UpdatedHosts ++ Hosts;
+    UpdatedHosts ++ Hosts;
 %% case where more vms than possible have been requested
 add_or_remove_vms(_Flag, _Pending, _Hosts = [], UpdatedHosts) ->
-	UpdatedHosts;
+    UpdatedHosts;
 add_or_remove_vms(add, Pending, Hosts, UpdatedHosts) ->
-	[Host | RemainingHosts] = Hosts,
-	case Host of
-		{_, active} ->
-			add_or_remove_vms(add, Pending, RemainingHosts, UpdatedHosts ++ [Host]);
-		{Hostname, _} ->
-			Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node start",
-											  [get_ssh_args(), Hostname, get_path()])), 
-			io:format("Executing: ~p~n", [Cmd]),
-			_ = os:cmd(Cmd),
-			add_or_remove_vms(add, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, active}])
-	end;
+    [Host | RemainingHosts] = Hosts,
+    case Host of
+        {_, active} ->
+            add_or_remove_vms(add, Pending, RemainingHosts, UpdatedHosts ++ [Host]);
+        {Hostname, _} ->
+            Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node start",
+                                              [get_ssh_args(), Hostname, get_path()])), 
+            io:format("Executing: ~p~n", [Cmd]),
+            _ = os:cmd(Cmd),
+            add_or_remove_vms(add, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, active}])
+    end;
 add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
-	[Host | RemainingHosts] = Hosts,
-	case Host of
-		{Hostname, active} ->
-			Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -n node gstop",
-											 [get_ssh_args(), Hostname, get_path()])),
-			io:format("Executing: ~p~n", [Cmd]),
-			_ = os:cmd(Cmd),
-			add_or_remove_vms(remove, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, inactive}]);
-		{_, _} ->
-			add_or_remove_vms(remove, Pending, RemainingHosts, UpdatedHosts ++ [Host])
-	end.
+    [Host | RemainingHosts] = Hosts,
+    case Host of
+        {Hostname, active} ->
+            Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -n node gstop",
+                                              [get_ssh_args(), Hostname, get_path()])),
+            io:format("Executing: ~p~n", [Cmd]),
+            _ = os:cmd(Cmd),
+            add_or_remove_vms(remove, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, inactive}]);
+        {_, _} ->
+            add_or_remove_vms(remove, Pending, RemainingHosts, UpdatedHosts ++ [Host])
+    end.
 
 
 %%%%%%%%%%%%%%%%%%%
@@ -110,43 +110,43 @@ add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
 
 -spec killall_vms() -> ok.
 killall_vms() ->
-	Hosts = get_hosts(),
-	lists:foreach(fun({Hostname, _}) ->
-						  Cmd = lists:flatten(io_lib:format("ssh ~s ~s killall -9 beam.smp", 
-															[get_ssh_args(), Hostname])),
-						  os:cmd(Cmd)
-				  end, Hosts),
-	ok.
+    Hosts = get_hosts(),
+    lists:foreach(fun({Hostname, _}) ->
+                          Cmd = lists:flatten(io_lib:format("ssh ~s ~s killall -9 beam.smp", 
+                                                            [get_ssh_args(), Hostname])),
+                          os:cmd(Cmd)
+                  end, Hosts),
+    ok.
 
 get_hosts() ->
-	case api_tx:read(?cloud_ssh_key) of
-		{ok, Val} ->
-			Val;
-		_ -> []
-	end.
+    case api_tx:read(?cloud_ssh_key) of
+        {ok, Val} ->
+            Val;
+        _ -> []
+    end.
 
 get_ssh_args() ->
-	case config:read(cloud_ssh_args) of
-		failed -> "";
-		Args -> Args
-	end.
+    case config:read(cloud_ssh_args) of
+        failed -> "";
+        Args -> Args
+    end.
 
 get_path() ->
-	case config:read(cloud_ssh_path) of
-		failed -> "scalaris";
-		Args -> Args
-	end.
+    case config:read(cloud_ssh_path) of
+        failed -> "scalaris";
+        Args -> Args
+    end.
 
 get_number_of_active_vms(Hosts) ->
-	lists:foldl(fun (VM, NumActive) ->
-						case VM of
-							{_IP, active} ->
-								NumActive + 1;
-							_ -> NumActive
-						end
-				end, 0, Hosts).
+    lists:foldl(fun (VM, NumActive) ->
+                         case VM of
+                             {_IP, active} ->
+                                 NumActive + 1;
+                             _ -> NumActive
+                         end
+                end, 0, Hosts).
 
 -spec get_number_of_active_vms() -> integer().
 get_number_of_active_vms() ->
-	{ok, List} = api_tx:read(?cloud_ssh_key),
-	get_number_of_active_vms(List).
+    {ok, List} = api_tx:read(?cloud_ssh_key),
+    get_number_of_active_vms(List).
