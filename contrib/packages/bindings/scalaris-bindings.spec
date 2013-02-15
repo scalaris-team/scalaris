@@ -229,6 +229,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/scalaris
 %dir %{_docdir}/scalaris/
 %doc %{_docdir}/scalaris/java-api
+%{_sysconfdir}/init.d/scalaris-monitor
 
 %files -n ruby-scalaris
 %defattr(-,root,root,-)
