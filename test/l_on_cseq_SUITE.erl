@@ -1,4 +1,4 @@
-%% @copyright 2012 Zuse Institute Berlin
+%% @copyright 2012-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -115,6 +115,7 @@ tester_type_check_l_on_cseq(_Config) ->
              {lease_takeover, 1}, %% sends messages
              {lease_split, 4}, %% sends messages
              {lease_merge, 2}, %% sends messages
+             {unittest_lease_update, 2}, %% only for unittests
              {on, 2} %% cannot create dht_node_state
            ],
            [ {read, 2}, %% cannot create pids
@@ -302,7 +303,7 @@ test_split_but_lease_already_exists(_Config) ->
         fun(RightId, _Lease) ->
                 New = l_on_cseq:set_version(
                         l_on_cseq:set_epoch(
-                          l_on_cseq:create_lease(RightId),
+                          l_on_cseq:unittest_create_lease(RightId),
                           47),
                         11),
                 DB = l_on_cseq:get_db_for_id(RightId),
@@ -337,7 +338,7 @@ test_split_with_owner_change_in_step1(_Config) ->
                             l_on_cseq:set_epoch(Lease, l_on_cseq:get_epoch(Lease)+1),
                             0)),
                         comm:this()),
-                l_on_cseq:lease_update(Lease, New)
+                l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
     WaitLeftLeaseF = fun wait_for_delete/2,
@@ -360,7 +361,7 @@ test_split_with_owner_change_in_step2(Config) ->
                             l_on_cseq:set_epoch(Lease, l_on_cseq:get_epoch(Lease)+1),
                             0)),
                         comm:this()),
-                l_on_cseq:lease_update(Lease, New)
+                l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
     WaitLeftLeaseF = fun (Id, Lease) ->
@@ -384,7 +385,7 @@ test_split_with_owner_change_in_step3(Config) ->
                             l_on_cseq:set_epoch(Lease, l_on_cseq:get_epoch(Lease)+1),
                             0)),
                         comm:this()),
-                l_on_cseq:lease_update(Lease, New)
+                l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
     WaitRightLeaseF = fun (Id) ->
@@ -407,7 +408,7 @@ test_split_with_aux_change_in_step1(_Config) ->
                             l_on_cseq:set_epoch(Lease, l_on_cseq:get_epoch(Lease)+1),
                             0)),
                         {invalid, merge, stopped}),
-                l_on_cseq:lease_update(Lease, New)
+                l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
     WaitLeftLeaseF = fun (Id, Lease) ->
@@ -499,7 +500,7 @@ test_handover_helper(_Config, ModifyF, WaitF) ->
     Id = l_on_cseq:get_id(Old),
     % now we update the lease
     New = ModifyF(Old),
-    l_on_cseq:lease_update(Old, New),
+    l_on_cseq:unittest_lease_update(Old, New),
     wait_for_lease(New),
     % now the error handling of lease_handover is going to be tested
     l_on_cseq:lease_handover(Old, comm:this(), comm:this()),
@@ -676,7 +677,7 @@ test_renew_helper(_Config, ModifyF, WaitF) ->
     Id = l_on_cseq:get_id(Old),
     % now we update the lease
     New = ModifyF(Old),
-    l_on_cseq:lease_update(Old, New),
+    l_on_cseq:unittest_lease_update(Old, New),
     wait_for_lease(New),
     % now the error handling of lease_renew is going to be tested
     ct:pal("sending message ~p~n", [M]),

@@ -1,4 +1,4 @@
-% @copyright 2012 Zuse Institute Berlin,
+% @copyright 2012-2013 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -37,9 +37,11 @@
 -export([lease_takeover/1]).
 -export([lease_split/4]).
 -export([lease_merge/2]).
+
 % for unit tests
--export([lease_update/2]).
--export([create_lease/1]).
+-export([unittest_lease_update/2]).
+-export([unittest_create_lease/1]).
+
 -export([get_db_for_id/1]).
 
 % lease accessors
@@ -171,13 +173,13 @@ lease_merge(Lease1, Lease2) ->
     ok.
 
 % for unit tests
--spec lease_update(lease_t(), lease_t()) -> ok.
-lease_update(Old, New) ->
+-spec unittest_lease_update(lease_t(), lease_t()) -> ok.
+unittest_lease_update(Old, New) ->
     comm:send_local(pid_groups:get_my(dht_node),
-                    {l_on_cseq, update, Old, New, self()}),
+                    {l_on_cseq, unittest_update, Old, New, self()}),
     receive
         ?SCALARIS_RECV(
-            {l_on_cseq, update_success, Old, New}, %% ->
+            {l_on_cseq, unittest_update_success, Old, New}, %% ->
             ok
           )
     end.
@@ -244,39 +246,31 @@ on({l_on_cseq, renew_reply,
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% lease update (only for unit tests
+% lease update (only for unit tests)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, update, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
+on({l_on_cseq, unittest_update,
+    Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
     New, Caller}, State) ->
     %io:format("renew ~p~n", [Old]),
     ContentCheck = is_valid_update(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     %% @todo New passed for debugging only:
-    Self = comm:reply_as(self(), 3, {l_on_cseq, update_reply, '_', Old, New, Caller}),
+    Self = comm:reply_as(self(), 3, {l_on_cseq, unittest_update_reply, '_', Old, New, Caller}),
     rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
     State;
 
-on({l_on_cseq, update_reply, {qwrite_done, _ReqId, _Round, Value},
+on({l_on_cseq, unittest_update_reply, {qwrite_done, _ReqId, _Round, Value},
     Old, New, Caller}, State) ->
     io:format("successful update~n", []),
-    comm:send_local(Caller, {l_on_cseq, update_success, Old, New}),
+    comm:send_local(Caller, {l_on_cseq, unittest_update_success, Old, New}),
     update_lease_in_dht_node_state(Value, State);
 
-on({l_on_cseq, update_reply,
-    {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}}, New},
-   State) ->
-    % @todo retry
-    ct:pal("update denied: ~p ~p ~p~n", [Reason, Value, New]),
-    case Reason of
-        lease_does_not_exist ->
-            % @todo log message
-            State;
-        epoch_or_version_mismatch ->
-            lease_renew(Value),
-            io:format("trying again~n", []),
-            State
-    end;
+%% on({l_on_cseq, update_reply,
+%%    {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}},
+%%    Old, New, Caller},
+%%   State) ->
+%% must not happen, if it happens, it was wrongly used in a unittest
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -1011,8 +1005,8 @@ add_first_lease_to_db(Id, State) ->
           end || X <- ?RT:get_replica_keys(Id) ],
     dht_node_state:set_lease_list(State, [Lease]).
 
--spec create_lease(?RT:key()) -> lease_t().
-create_lease(Id) ->
+-spec unittest_create_lease(?RT:key()) -> lease_t().
+unittest_create_lease(Id) ->
     #lease{id      = Id,
            epoch   = 1,
            owner   = comm:this(),
@@ -1090,12 +1084,12 @@ remove_lease_from_dht_node_state(Lease, State) ->
     NewList = lists:keydelete(Id, 2, LeaseList),
     dht_node_state:set_lease_list(State, NewList).
 
-- spec id(intervals:interval()) -> non_neg_integer().
-id([]) -> 0;
-id([[]]) -> 0;
+-spec id(intervals:interval()) -> ?RT:key().
+id([]) -> ?MINUS_INFINITY;
+id([[]]) -> ?MINUS_INFINITY;
 id(X) ->
     case lists:member(all, X) of
-        true -> 0;
+        true -> ?MINUS_INFINITY;
         _ ->
             {_, Id, _, _} = intervals:get_bounds(X),
             Id
