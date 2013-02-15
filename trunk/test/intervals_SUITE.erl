@@ -1,4 +1,4 @@
-%  @copyright 2008-2011 Zuse Institute Berlin
+%  @copyright 2008-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ all() ->
 
 suite() ->
     [
-     {timetrap, {seconds, 45}}
+     {timetrap, {seconds, 90}}
     ].
 
 init_per_suite(Config) ->
