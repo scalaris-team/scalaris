@@ -124,26 +124,23 @@ on({check_alarm, Name, AlarmEpoch}, {IsLeader, Alarms}) ->
     case (Alarm =/= unknown_alarm) andalso (Alarm#alarm.state =:= active) andalso
              IsLeader andalso (Epoch =:= AlarmEpoch) of
         true ->
-        LeaderPid = self(),
-            % call alarm handler and reacht to breach_state 
-            case check_alarm(Alarm#alarm.handler, Alarm) of
-                unknown_alarm_handler ->
-                    ok;
-                breach_lower ->
-                    continue_alarm(
-                        Name,
-                        erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs),
-                        LeaderPid, Epoch),
-                    ?CLOUD:remove_vms(Alarm#alarm.scale_down_by);
-                breach_upper ->
-                    continue_alarm(
-                        Name,
-                        erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs),
-                        LeaderPid, Epoch),
-                    ?CLOUD:add_vms(Alarm#alarm.scale_up_by);
-                ok ->
-                    continue_alarm(Name, Alarm#alarm.period_secs, LeaderPid, Epoch)
-            end
+            % call alarm handler and react to breach_state 
+            _ = case check_alarm(Alarm#alarm.handler, Alarm) of
+                    unknown_alarm_handler ->
+                        ok;
+                    breach_lower ->
+                        continue_alarm(Name,
+                            erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs),
+                            self(), Epoch),
+                        ?CLOUD:remove_vms(Alarm#alarm.scale_down_by);
+                    breach_upper ->
+                        continue_alarm(Name,
+                            erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs),
+                            self(), Epoch),
+                        ?CLOUD:add_vms(Alarm#alarm.scale_up_by);
+                    ok ->
+                        continue_alarm(Name, Alarm#alarm.period_secs, self(), Epoch)
+                end,
             ok;
         false ->
             ok
@@ -160,7 +157,7 @@ on({toggle_alarm, Name}, {_IsLeader, Alarms}) ->
                     inactive ->
                         % update state and epoch in dict
                         continue_alarm(Name, Alarm#alarm.period_secs, self(), Epoch+1),
-                        update_alarm(Alarms, Name, [{state, active}, {epoch, Epoch+1}]),
+                        update_alarm(Alarms, Name, [{state, active}, {epoch, Epoch+1}])
                 end
         end,
     {_IsLeader, NewAlarms};
