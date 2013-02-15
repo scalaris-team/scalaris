@@ -367,6 +367,8 @@ public class ConnectionFactory {
     public static String fixLocalhostName(final String node) {
         if (node.endsWith("@localhost")) {
             return node.replaceAll("@localhost$", "@" + getLocalhostName());
+        } else if (node.indexOf('@') == -1) {
+            return node + "@" + getLocalhostName();
         }
         return node;
     }
