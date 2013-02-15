@@ -488,7 +488,7 @@ sed -i -e "s|python-api|python3-api|g" \
        -e "s|@PYTHONSITELIBDIR@|@PYTHON3SITELIBDIR@|g" \
        -e "s|PYTHON2|PYTHON3|g" python3-api/scalaris.in
 
-AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris python-api/scalaris python3-api/scalaris ruby-api/scalaris])
+AC_CONFIG_FILES([Emakefile Makefile bin/scalarisctl java-api/scalaris java-api/scalaris-java.conf contrib/init.d/scalaris contrib/init.d/scalaris-monitor python-api/scalaris python3-api/scalaris ruby-api/scalaris])
 AC_OUTPUT
 
 chmod u+x bin/scalarisctl
@@ -497,4 +497,5 @@ chmod u+x python-api/scalaris
 chmod u+x python3-api/scalaris
 chmod u+x ruby-api/scalaris
 chmod u+x contrib/init.d/scalaris
+chmod u+x contrib/init.d/scalaris-monitor
 

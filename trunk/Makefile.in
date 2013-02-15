@@ -554,6 +554,9 @@ install-java: java
 	install -d $(BINDIR)
 	install -m 755 -t $(BINDIR) \
 	           java-api/scalaris
+	install -d $(INITDIR)
+	install -m 744 -t $(INITDIR) \
+	           contrib/init.d/scalaris-monitor
 
 install-erlang: compile
 	install -d $(BEAMDIR)
