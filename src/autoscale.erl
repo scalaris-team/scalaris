@@ -124,7 +124,7 @@ on({check_alarm, Name, AlarmEpoch}, {IsLeader, Alarms}) ->
 		true ->
 			LeaderPid = self(),
 			% spawn alarm handler and 
-			spawn(fun() -> 
+			_ = spawn(fun() ->
 					case check_alarm(Alarm#alarm.handler, Alarm) of
 						unknown_alarm_handler ->
 							ok;
@@ -137,7 +137,8 @@ on({check_alarm, Name, AlarmEpoch}, {IsLeader, Alarms}) ->
 						ok ->
 							continue_alarm(Name, Alarm#alarm.period_secs, LeaderPid, Epoch)
 					end
-				  end);
+				  end),
+            ok;
 		false ->
 			ok
 	end,
