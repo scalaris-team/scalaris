@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Ufuk Celebi <celebi@zib.de>
-%% @doc Auto-scaling service.
+%% @doc Auto-scaling service. 
 %% @end
 %% @version $Id$
 -module(autoscale).
@@ -34,37 +34,38 @@
 % types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -type(alarm_handler() ::
-          load_avg |
-          latency_avg |
-          random_churn).
+      load_avg |
+      latency_avg |
+      random_churn).
 
--record(alarm, {
-                name             = ?required(alarm, name) :: atom(),
-                handler          = ?required(alarm, handler) :: alarm_handler(),
-                period_secs      = ?required(alarm, period_in_s) :: pos_integer(),
-                cooldown_secs    = 0 :: non_neg_integer(),
-                lower_limit      = ?MINUS_INFINITY :: number(),
-                upper_limit      = ?PLUS_INFINITY :: number(),
-                scale_down_by    = 1 :: non_neg_integer(),
-                scale_up_by      = 1 :: non_neg_integer(),
-                state             = active :: active | inactive,
-                opt_fields       = [] :: [{atom(), any()}]
-               }).
+-record(alarm,
+    {
+        name             = ?required(alarm, name) :: atom(),
+        handler          = ?required(alarm, handler) :: alarm_handler(),
+        period_secs      = ?required(alarm, period_in_s) :: pos_integer(),
+        cooldown_secs    = 0 :: non_neg_integer(),
+        lower_limit      = ?MINUS_INFINITY :: number(),
+        upper_limit      = ?PLUS_INFINITY :: number(),
+        scale_down_by    = 1 :: non_neg_integer(),
+        scale_up_by      = 1 :: non_neg_integer(),
+        state             = active :: active | inactive,
+        opt_fields       = [] :: [{atom(), any()}]
+    }).
 
 -type(state() ::
-          {IsLeader::boolean(), Alarms::dict()} |
-          unknown_event).
+    {IsLeader::boolean(), Alarms::dict()} |
+    unknown_event).
 
 -type(breach_state() ::
-          breach_lower |
-          breach_upper |
-          ok).
+    breach_lower |
+    breach_upper |
+    ok).
 
 -type(message() ::
-          {get_state_response, MyRange::intervals:interval()} |
-          {check_alarm, Name::atom()} |
-          {toggle_alarm, Name::atom()} |
-          {deactivate_alarms, Name::atom()}).
+    {get_state_response, MyRange::intervals:interval()} |
+    {check_alarm, Name::atom()} |
+    {toggle_alarm, Name::atom()} |
+    {deactivate_alarms, Name::atom()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % startup
@@ -100,13 +101,14 @@ on({get_state_response, MyRange}, {IsLeader, Alarms}) ->
         case {IsLeader, IsNewLeader} of
             {false, true} ->
                 dict:map(fun(Name, {Alarm, Epoch}) ->
-                                 case Alarm#alarm.state =:= active of
-                                     true ->
-                                         continue_alarm(Name, Alarm#alarm.period_secs, self(), Epoch+1);
-                                     false ->
-                                         ok
-                                 end,
-                                 {Alarm, Epoch+1}
+                             case Alarm#alarm.state =:= active of                                     
+                                 true ->
+                                     continue_alarm(Name, Alarm#alarm.period_secs,
+                                                    self(), Epoch+1);
+                                 false ->
+                                     ok
+                             end,
+                             {Alarm, Epoch+1}
                          end, Alarms);
             {_, _}        -> Alarms
         end,
@@ -122,22 +124,26 @@ on({check_alarm, Name, AlarmEpoch}, {IsLeader, Alarms}) ->
     case (Alarm =/= unknown_alarm) andalso (Alarm#alarm.state =:= active) andalso
              IsLeader andalso (Epoch =:= AlarmEpoch) of
         true ->
-            LeaderPid = self(),
-            % spawn alarm handler and 
-            _ = spawn(fun() ->
-                              case check_alarm(Alarm#alarm.handler, Alarm) of
-                                  unknown_alarm_handler ->
-                                      ok;
-                                  breach_lower ->
-                                      continue_alarm(Name, erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs), LeaderPid, Epoch),
-                                      ?CLOUD:remove_vms(Alarm#alarm.scale_down_by);
-                                  breach_upper ->
-                                      continue_alarm(Name, erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs), LeaderPid, Epoch),
-                                      ?CLOUD:add_vms(Alarm#alarm.scale_up_by);
-                                  ok ->
-                                      continue_alarm(Name, Alarm#alarm.period_secs, LeaderPid, Epoch)
-                              end
-                      end),
+        LeaderPid = self(),
+            % call alarm handler and reacht to breach_state 
+            case check_alarm(Alarm#alarm.handler, Alarm) of
+                unknown_alarm_handler ->
+                    ok;
+                breach_lower ->
+                    continue_alarm(
+                        Name,
+                        erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs),
+                        LeaderPid, Epoch),
+                    ?CLOUD:remove_vms(Alarm#alarm.scale_down_by);
+                breach_upper ->
+                    continue_alarm(
+                        Name,
+                        erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs),
+                        LeaderPid, Epoch),
+                    ?CLOUD:add_vms(Alarm#alarm.scale_up_by);
+                ok ->
+                    continue_alarm(Name, Alarm#alarm.period_secs, LeaderPid, Epoch)
+            end
             ok;
         false ->
             ok
@@ -150,19 +156,20 @@ on({toggle_alarm, Name}, {_IsLeader, Alarms}) ->
             {ok, {Alarm, Epoch}} ->
                 case Alarm#alarm.state of
                     active ->
-                        % update state in dict
                         update_alarm(Alarms, Name, [{state, inactive}]);
                     inactive ->
                         % update state and epoch in dict
-                        AlarmsUpdated = update_alarm(Alarms, Name, [{state, active}, {epoch, Epoch+1}]),
                         continue_alarm(Name, Alarm#alarm.period_secs, self(), Epoch+1),
-                        AlarmsUpdated
+                        update_alarm(Alarms, Name, [{state, active}, {epoch, Epoch+1}]),
                 end
         end,
     {_IsLeader, NewAlarms};
 on({deactivate_alarms}, {_IsLeader, Alarms}) ->
     AlarmNames = dict:fetch_keys(Alarms),
-    NewAlarms = lists:foldl(fun(Name, AlarmsAcc) -> update_alarm(AlarmsAcc, Name, {state, inactive}) end, Alarms, AlarmNames),
+    NewAlarms = lists:foldl(
+                    fun(Name, AlarmsAcc) ->
+                        update_alarm(AlarmsAcc, Name, {state, inactive})
+                    end, Alarms, AlarmNames),
     {_IsLeader, NewAlarms};
 on(_, _) ->
     unknown_event.
@@ -182,7 +189,8 @@ check_alarm(latency_avg, Alarm) ->
             [{api_tx, 'req_list', Data}] -> Data
         end,
     History = get_opt_field(Alarm, history, 1),
-    [Hd|Tail] = lists:map(fun({_, V}) -> get_breach_state(V, Alarm) end, lists:sublist(AvgMsD, History)),
+    [Hd|Tail] = lists:map(fun({_, V}) -> get_breach_state(V, Alarm) end,
+                          lists:sublist(AvgMsD, History)),
     ?IIF(lists:all(fun(X) -> X =:= Hd end, Tail), Hd, ok);
 check_alarm(random_churn, _Alarm) ->
     case randoms:rand_uniform(1,4) of
@@ -198,7 +206,7 @@ check_alarm(_, _) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec continue_alarm(atom(), pos_integer(), pid(), non_neg_integer()) -> ok.
 continue_alarm(Name, Secs, Pid, Epoch) ->
-    io:format("Alarm '~p' for ~p delayed by ~p seconds (Epoch ~p).~n", [Name, Pid, Secs, Epoch]),
+    %% io:format("Alarm '~p' for ~p delayed by ~p seconds (Epoch ~p).~n", [Name, Pid, Secs, Epoch]),
     msg_delay:send_local(Secs, Pid, {check_alarm, Name, Epoch}).
 
 update_alarm(Alarms, Name, {Field, NewValue}) ->
@@ -222,7 +230,11 @@ update_alarm(Alarms, Name, [{Field, NewValue}|Tail]) ->
                         state         -> 10;
                         _             -> -1
                     end,
-                dict:update(Name, fun({Alarm, Epoch}) -> {erlang:setelement(FieldIndex, Alarm, NewValue), Epoch} end, Alarms)
+                dict:update(Name,
+                            fun({Alarm, Epoch}) ->
+                                {erlang:setelement(FieldIndex, Alarm, NewValue), Epoch}
+                            end,
+                            Alarms)
         end,
     update_alarm(NewAlarms, Name, Tail);
 update_alarm(Alarms, _Name, []) ->
@@ -237,7 +249,8 @@ get_opt_field(Alarm, Field, Default) ->
 
 -spec get_breach_state(term(), #alarm{}) -> breach_state().
 get_breach_state(Value, Alarm) ->
-    ?IIF(Value < Alarm#alarm.lower_limit, breach_lower, ?IIF(Value > Alarm#alarm.upper_limit, breach_upper, ok)).
+    ?IIF(Value < Alarm#alarm.lower_limit, breach_lower,
+         ?IIF(Value > Alarm#alarm.upper_limit, breach_upper, ok)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % misc helpers
