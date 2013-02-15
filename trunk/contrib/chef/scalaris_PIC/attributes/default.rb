@@ -2,7 +2,7 @@
 # Cookbook Name:: scalaris_PIC
 # Attributes:: default
 #
-# Copyright 2012, Zuse Institute Berlin
+# Copyright 2012-2013, Zuse Institute Berlin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,5 +30,18 @@ default[:REC][:PICs][:scalaris_PIC] = [
                     :scalaris_users => [] # [{"user" => "User", "password" => "Password"}], if empty => no restrictions
                    }
   }]
+
+normal[:scalaris_PIC][:kpis] = {
+  :jmx_url => "service:jmx:rmi:///jndi/rmi://localhost:14193/jmxrmi",
+  :kpis => {"ScalarisNode_CurLatencyAvg" =>
+             {:on => "de.zib.scalaris:type=MonitorNode",
+              :att => "CurLatencyAvg",
+              :period => 1},
+            "ScalarisNode_CurLatencyStddev" =>
+             {:on => "de.zib.scalaris:type=MonitorNode",
+              :att => "CurLatencyStddev",
+              :period => 1}
+           }
+  }
 
 #puts "Printing scalaris attributes from attributes file: #{node[:REC][:PICs][:scalaris_PIC][0][:attributes]} "
