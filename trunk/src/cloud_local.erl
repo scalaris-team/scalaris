@@ -49,7 +49,7 @@ init() ->
 	ok.
 
 
--spec get_number_of_vms() -> integer().
+-spec get_number_of_vms() -> non_neg_integer().
 get_number_of_vms() ->
 	length(erlang:element(2, erl_epmd:names())).
 
@@ -68,11 +68,11 @@ add_vms(N) ->
 									[Port, YawsPort, NodeName])),
 				io:format("Executing: ~p~n", [Cmd]),
 				NumberVMs = get_number_of_vms(),
-				os:cmd(Cmd),
+				_ = os:cmd(Cmd),
 				wait_for(fun get_number_of_vms/0, NumberVMs + 1),
 				timer:sleep(200)
 		end,
-	[SpawnFun(X) || X <- lists:seq(1, N), get_number_of_vms() < config:read(cloud_local_max_vms)],		   
+	_ = [SpawnFun(X) || X <- lists:seq(1, N), get_number_of_vms() < config:read(cloud_local_max_vms)],
 	ok.
 
 -spec remove_vms(integer()) -> ok.
@@ -85,11 +85,11 @@ remove_vms(N) ->
 												  [NodeName])),
 				NumberVMs = get_number_of_vms(),
 				io:format("Executing: ~p~n", [Cmd]),
-				os:cmd(Cmd),
+				_ = os:cmd(Cmd),
 				wait_for(fun get_number_of_vms/0, NumberVMs - 1)
 		end,
-	[RemoveFun(NodeName) || NodeName <- lists:sublist(VMs, N), 
-							get_number_of_vms() > config:read(cloud_local_min_vms)],
+	_ = [RemoveFun(NodeName) || NodeName <- lists:sublist(VMs, N),
+							    get_number_of_vms() > config:read(cloud_local_min_vms)],
 	ok.
 
 %%%%%%%%%%%%%%%%%%%

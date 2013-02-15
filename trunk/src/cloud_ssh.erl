@@ -52,7 +52,7 @@ init() ->
 		_ -> ok
 	end.
 
--spec get_number_of_vms() -> integer().
+-spec get_number_of_vms() -> non_neg_integer().
 get_number_of_vms() ->
 	{ok, List} = api_tx:read(?cloud_ssh_key),
 	length(List).
@@ -60,13 +60,13 @@ get_number_of_vms() ->
 -spec add_vms(integer()) -> ok.
 add_vms(N) ->
 	UpdatedHosts = add_or_remove_vms(add, N),
-	api_tx:write(?cloud_ssh_key, UpdatedHosts),
+	{ok} = api_tx:write(?cloud_ssh_key, UpdatedHosts),
 	ok.
 
 -spec remove_vms(integer()) -> ok.
 remove_vms(N) ->
 	UpdatedHosts = add_or_remove_vms(remove, N),
-	api_tx:write(?cloud_ssh_key, UpdatedHosts),
+	{ok} = api_tx:write(?cloud_ssh_key, UpdatedHosts),
 	ok.
 
 add_or_remove_vms(Flag, Pending) ->
@@ -87,7 +87,7 @@ add_or_remove_vms(add, Pending, Hosts, UpdatedHosts) ->
 			Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node start",
 											  [get_ssh_args(), Hostname, get_path()])), 
 			io:format("Executing: ~p~n", [Cmd]),
-			os:cmd(Cmd),
+			_ = os:cmd(Cmd),
 			add_or_remove_vms(add, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, active}])
 	end;
 add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
@@ -97,7 +97,7 @@ add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
 			Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -n node gstop",
 											 [get_ssh_args(), Hostname, get_path()])),
 			io:format("Executing: ~p~n", [Cmd]),
-			os:cmd(Cmd),
+			_ = os:cmd(Cmd),
 			add_or_remove_vms(remove, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, inactive}]);
 		{_, _} ->
 			add_or_remove_vms(remove, Pending, RemainingHosts, UpdatedHosts ++ [Host])
