@@ -214,8 +214,8 @@ public class ConnectionFactory {
         final String[] nodesTemp = properties.getProperty("scalaris.node", "node1@localhost").split("[\\s,;]");
         nodes.clear();
 
-        for (int i = 0; i < nodesTemp.length; ++i) {
-            addNode(fixLocalhostName(nodesTemp[i]));
+        for (final String element : nodesTemp) {
+            addNode(fixLocalhostName(element));
         }
         cookie = properties.getProperty("scalaris.cookie", "chocolate chip cookie");
         clientName = properties.getProperty("scalaris.client.name", "java_client");
@@ -397,12 +397,7 @@ public class ConnectionFactory {
         final String erlangNodeName = System.getProperty("scalaris.erlang.nodename");
         if ((erlangNodeName == null) || (erlangNodeName.length() == 0)) {
             try {
-                // (more) reliable hostname look-up reported by
-                // http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4341822
-                hostname = InetAddress.getLocalHost().getHostName();
-                final String host = InetAddress.getByName(hostname).getHostAddress();
-                hostname = InetAddress.getByName(host).getHostName();
-
+                hostname = InetAddress.getLocalHost().getCanonicalHostName();
             } catch (final UnknownHostException e) {
             }
         } else {
