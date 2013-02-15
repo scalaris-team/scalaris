@@ -33,3 +33,15 @@ service "scalaris" do
     provider Chef::Provider::Service::Init
   end
 end
+
+service "scalaris-monitor" do
+  service_name "scalaris-monitor"
+  supports :status => true, :start => true, :stop => true, :restart => true
+  action [ :enable, :start ]
+  case node[:platform]
+  when "ubuntu", "debian"
+    provider Chef::Provider::Service::Init::Debian
+  else
+    provider Chef::Provider::Service::Init
+  end
+end

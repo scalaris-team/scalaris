@@ -19,7 +19,7 @@
 
 include_recipe "apt"
 
-scalaris_pkgs = ["scalaris"]
+scalaris_pkgs = ["scalaris", "scalaris-java"]
 
 scalaris_repo_base = "http://download.opensuse.org/repositories/home:/scalaris:/svn/"
 
