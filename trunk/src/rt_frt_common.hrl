@@ -249,7 +249,7 @@ get_size_without_special_nodes(#rt_t{} = RT) ->
     util:gb_trees_foldl(
         fun(_Key, Val, Acc) ->
                 Acc + case entry_type(Val) of
-                    normal -> 1; % TODO must include group nodes in GFRT
+                    normal -> 1;
                     _else -> 0
                 end
         end, 0, get_rt_tree(RT)).
