@@ -179,73 +179,90 @@ get_cookie() {
 }
 
 checkinstallation() {
-    echo "Running basic tests..."
+    echo -n "Running basic tests..."
+    MSG_FAILED="\x1b[1;31mFAILED\x1b[0m" #red
+    MSG_ATTENTION="\x1b[1;34mATTENTION\x1b[0m" #blue
+    MSG_SUCCESS="\x1b[1;32mSUCCESS\x1b[0m" #green
+    MSG_NOTINSTALLED="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+    MSG_DONE="DONE"
     $ERL -noinput -eval 'halt(0).'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_FAILED"
         echo "ERROR: erl could not be run"
         echo "We were trying to run: erl -noinput -eval 'halt(0).'"
         exit 1
     fi
 
     if [ ! -s `which erl` ]; then
+        echo -e "$MSG_FAILED"
         echo "ERROR: your erl executable is of size zero bytes: `which erl`"
         echo "ls -l `which erl`"
         exit 1
     fi
 
-    $ERL -noinput -name "checkinstallation" -eval 'halt(0).' > /dev/null
+    $ERL -noinput -name "checkinstallation" -eval 'halt(0).' &> /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_ATTENTION"
         echo "ERROR: erl could not create a Erlang VM named 'checkinstallation'"
         echo "Please check the configuration of your hostnames"
         echo "Are you already running another checkinstallation?"
         echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
         echo "We were trying to run: erl -noinput -name \"checkinstallation\" -eval 'halt(0).'"
+        echo -n "Continuing basic tests..."
     fi
 
-    $ERL -noinput -name "checkinstallation@`get_hostname`" -eval 'halt(0).' > /dev/null
+    $ERL -noinput -name "checkinstallation@`get_hostname`" -eval 'halt(0).' &> /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_ATTENTION"
         echo "ERROR: erl could not create a Erlang VM named 'checkinstallation@`get_hostname`'"
         echo "Are you already running another checkinstallation?"
         echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
         echo "We were trying to run: erl -noinput -name \"checkinstallation@`get_hostname`\" -eval 'halt(0).'"
+        echo -n "Continuing basic tests..."
     fi
 
-    $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
+    $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.' &> /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_FAILED"
         echo "ERROR: erlang could not start the crypto module"
         echo "We were trying to run: $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'"
         exit 1
     fi
 
     if [ -e $ETCDIR/scalaris.cfg ]; then
-        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end" &> /dev/null
         FAILED=$?
         if [ $FAILED -ne 0 ]; then
+            echo -e "$MSG_FAILED"
             echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.cfg"
             echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
             exit 1
         fi
     else
+        echo -e "$MSG_FAILED"
         echo "ERROR: there is no config file: $ETCDIR/scalaris.cfg"
+        exit 1
     fi
 
     if [ -e $ETCDIR/scalaris.local.cfg ]; then
-        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end"
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end" &> /dev/null
         FAILED=$?
         if [ $FAILED -ne 0 ]; then
+            echo -e "$MSG_FAILED"
             echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.local.cfg"
             echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.local.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
             exit 1
         fi
     fi
 
-    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(mgmt_server), code:ensure_loaded(dht_node)} of {{module,mgmt_server},{module,dht_node}} -> halt(0); X -> halt(1) end.'
+    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(mgmt_server), code:ensure_loaded(dht_node)} of {{module,mgmt_server},{module,dht_node}} -> halt(0); X -> halt(1) end.' &> /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_FAILED"
         echo "ERROR: could not find Scalaris' beam files"
         echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(mgmt_server), code:ensure_loaded(dht_node)} of {{module,mgmt_server},{module,dht_node}} -> halt(0); X -> halt(1) end.'"
         exit 1
@@ -254,6 +271,7 @@ checkinstallation() {
     HOSTNAME_ERL=`get_erlang_hostname`
     HOSTNAME_SYS=`get_sys_hostname`
     if [ "$HOSTNAME_ERL" != "$HOSTNAME_SYS" ]; then
+        echo -e "$MSG_ATTENTION"
         echo "WARNING: the hostnames reported by Erlang and the OS do not match."
         echo "erlang (get_erlang_hostname): "
         echo "     -> $HOSTNAME_ERL"
@@ -270,21 +288,25 @@ checkinstallation() {
         echo " Please refer to your system's manual to set your hostname, e.g. change the"
         echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
         echo " the DNS."
+        echo -n "Continuing basic tests..."
     fi
 
-    $SCALARISCLIENT_JAVA -h > /dev/null 2>/dev/null
+    $SCALARISCLIENT_JAVA -h &> /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         HAS_JAVACLIENT=0
-        echo -n "INFO: could not find Scalaris' Java-API files. "
+        echo -e "$MSG_ATTENTION"
+        echo "INFO: could not find Scalaris' Java-API files."
         echo "You won't be able to use the 'scalaris' command line script to access Scalaris."
         echo "  'make java' will build the Java-API"
         echo "We were trying to run: $SCALARISCLIENT_JAVA -h"
+        echo -n "Continuing basic tests..."
     else
         HAS_JAVACLIENT=1
         HOSTNAME_CTL=`get_hostname`
         HOSTNAME_JAVA=`$SCALARISCLIENT_JAVA -lh --noerl`
         if [ "$HOSTNAME_CTL" != "$HOSTNAME_JAVA" ]; then
+            echo -e "$MSG_ATTENTION"
             echo "WARNING: the hostnames reported by Erlang, OS and Java do not match."
             echo " You may run into trouble with the automatic '<node>@localhost' to"
             echo " '<node>@<hostname>' conversion done by the Java-API, e.g. if used through"
@@ -302,13 +324,15 @@ checkinstallation() {
             echo "     -> $HOSTNAME_CTL"
             echo "java:   $SCALARISCLIENT_JAVA -lh"
             echo "     -> $HOSTNAME_JAVA"
+            echo -n "Continuing basic tests..."
         fi
     fi
 
     CHECKCONFIGMSG=`$ERL -noinput -pa $BEAMDIR \
-        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"], []), halt(0)."`
+        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"], []), halt(0)." 2>&1`
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_FAILED"
         echo "$CHECKCONFIGMSG"
         echo "ERROR: some parameters in the config files are wrong or missing"
         echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"], []), halt(0).\""
@@ -319,6 +343,7 @@ checkinstallation() {
     CHECKCONFIGMSG=`$ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).'`
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_ATTENTION"
         echo "$CHECKCONFIGMSG"
         echo "WARNING: could not start erlang with the given $ERL_SCHED_FLAGS."
         echo " Defaults will be used when running Scalaris."
@@ -328,7 +353,10 @@ checkinstallation() {
         echo "  R15+: $ERL_SCHED_FLAGS_R15"
         echo "  R14 : $ERL_SCHED_FLAGS_R14"
         echo "We were trying to run: $ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).'"
+        echo -n "Continuing basic tests..."
     fi
+
+    echo -e "$MSG_DONE"
 
     echo "Running Scalaris run-time tests..."
     # test runtime
@@ -388,14 +416,14 @@ checkinstallation() {
 
         if [ $JAVAREAD1_FAILED -ne 0 -o $JAVAWRITE1_FAILED -ne 0 -o $JAVAREAD2_FAILED -ne 0 -o $JAVABENCH_FAILED -ne 0 ]; then
             JAVA_FAILED=1
-            JAVA_RESULT="\x1b[1;31mFAILED\x1b[0m" #red
+            JAVA_RESULT="$MSG_FAILED"
         else
             JAVA_FAILED=0
-            JAVA_RESULT="\x1b[1;32mSUCCESS\x1b[0m" #green
+            JAVA_RESULT="$MSG_SUCCESS"
         fi
     else
         JAVA_FAILED=0
-        JAVA_RESULT="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+        JAVA_RESULT="$MSG_NOTINSTALLED"
     fi
     echo -e "$JAVA_RESULT"
     if [ "$verbose" -eq 1 -o "$JAVA_FAILED" -ne 0 ]; then
@@ -431,14 +459,14 @@ checkinstallation() {
 
         if [ $PYTHONREAD1_FAILED -ne 0 -o $PYTHONWRITE1_FAILED -ne 0 -o $PYTHONREAD2_FAILED -ne 0 -o $PYTHONBENCH_FAILED -ne 0 ]; then
             PYTHON_FAILED=1
-            PYTHON_RESULT="\x1b[1;31mFAILED\x1b[0m" #red
+            PYTHON_RESULT="$MSG_FAILED"
         else
             PYTHON_FAILED=0
-            PYTHON_RESULT="\x1b[1;32mSUCCESS\x1b[0m" #green
+            PYTHON_RESULT="$MSG_SUCCESS"
         fi
     else
         PYTHON_FAILED=0
-        PYTHON_RESULT="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+        PYTHON_RESULT="$MSG_NOTINSTALLED"
     fi
     echo -e "$PYTHON_RESULT"
     if [ "$verbose" -eq 1 -o "$PYTHON_FAILED" -ne 0 ]; then
@@ -474,14 +502,14 @@ checkinstallation() {
 
         if [ $PYTHON3READ1_FAILED -ne 0 -o $PYTHON3WRITE1_FAILED -ne 0 -o $PYTHON3READ2_FAILED -ne 0 -o $PYTHON3BENCH_FAILED -ne 0 ]; then
             PYTHON3_FAILED=1
-            PYTHON3_RESULT="\x1b[1;31mFAILED\x1b[0m" #red
+            PYTHON3_RESULT="$MSG_FAILED"
         else
             PYTHON3_FAILED=0
-            PYTHON3_RESULT="\x1b[1;32mSUCCESS\x1b[0m" #green
+            PYTHON3_RESULT="$MSG_SUCCESS"
         fi
     else
         PYTHON3_FAILED=0
-        PYTHON3_RESULT="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+        PYTHON3_RESULT="$MSG_NOTINSTALLED"
     fi
     echo -e "$PYTHON3_RESULT"
     if [ "$verbose" -eq 1 -o "$PYTHON3_FAILED" -ne 0 ]; then
@@ -513,14 +541,14 @@ checkinstallation() {
 
         if [ $RUBYREAD1_FAILED -ne 0 -o $RUBYWRITE1_FAILED -ne 0 -o $RUBYREAD2_FAILED -ne 0 ]; then
             RUBY_FAILED=1
-            RUBY_RESULT="\x1b[1;31mFAILED\x1b[0m" #red
+            RUBY_RESULT="$MSG_FAILED"
         else
             RUBY_FAILED=0
-            RUBY_RESULT="\x1b[1;32mSUCCESS\x1b[0m" #green
+            RUBY_RESULT="$MSG_SUCCESS"
         fi
     else
         RUBY_FAILED=0
-        RUBY_RESULT="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+        RUBY_RESULT="$MSG_NOTINSTALLED"
     fi
     echo -e "$RUBY_RESULT"
     if [ "$verbose" -eq 1 -o "$RUBY_FAILED" -ne 0 ]; then
