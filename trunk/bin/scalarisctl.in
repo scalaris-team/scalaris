@@ -123,18 +123,43 @@ fix_paths() {
     fi
 }
 
-fix_node_name() {
-    # if the given node name includes an '@', leave untouched
-    if ! echo $NODE_NAME | grep "@" >/dev/null ; then
-        NODE_NAME=$NODE_NAME@`get_erlang_hostname`
+get_hostname() {
+    # Uses the OS hostname from "hostname -f" for the Erlang long node name.
+    if [ -z "$ERLANG_HOSTNAME" ] ; then
+        ERLANG_HOSTNAME="`get_sys_hostname`"
     fi
+    # Alternative using the hostname that erlang chooses if set up to start with a long node
+    # name and falls back to "hostname -f" if this is not possible:
+    # NOTE: In this case, the Java-API (if used as a library) is not always able
+    #       to guess the host name that Erlang expects and connections may fail.
+    #       Therefore, the convenience node spec "<node>@localhost" may not be used.
+#     if [ -z "$ERLANG_HOSTNAME" ] ; then
+#         ERLANG_HOSTNAME="`get_erlang_hostname`"
+#         if [ -z "$ERLANG_HOSTNAME" ] ; then
+#             # could not start erlang with long node name (no FQDN?)
+#             ERLANG_HOSTNAME="`get_sys_hostname`"
+#         fi
+#     fi
+    echo "$ERLANG_HOSTNAME"
 }
 
 get_erlang_hostname() {
-    if test -z $ERLANG_HOSTNAME ; then
-        ERLANG_HOSTNAME=`erl -name foo$$ -noinput -eval 'io:format("~s", [string:sub_string(binary_to_list(term_to_binary(node())), string:chr(binary_to_list(term_to_binary(node())), $@)+1)]), halt(0).'`
+    MY_HOSTNAME_ERL="`$ERL -name foo$$ -noinput -eval 'N=erlang:atom_to_list(node()),io:format("~s", [string:sub_string(N, string:chr(N, $@)+1)]), halt(0).' 2>/dev/null`"
+    if [ $? -ne 0 ] ; then
+        MY_HOSTNAME_ERL=
     fi
-    echo $ERLANG_HOSTNAME
+    echo "$MY_HOSTNAME_ERL"
+}
+
+get_sys_hostname() {
+    hostname -f
+}
+
+fix_node_name() {
+    # if the given node name includes an '@', leave untouched
+    if ! echo $NODE_NAME | grep "@" >/dev/null ; then
+        NODE_NAME="$NODE_NAME@`get_hostname`"
+    fi
 }
 
 # only get cookie from scalarisctl.conf if installed!
@@ -172,18 +197,20 @@ checkinstallation() {
     $ERL -noinput -name "checkinstallation" -eval 'halt(0).' > /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
-        echo "Please check the configuration of your hostnames"
         echo "ERROR: erl could not create a Erlang VM named 'checkinstallation'"
+        echo "Please check the configuration of your hostnames"
+        echo "Are you already running another checkinstallation?"
+        echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
         echo "We were trying to run: erl -noinput -name \"checkinstallation\" -eval 'halt(0).'"
     fi
 
-    $ERL -noinput -name "checkinstallation@`get_erlang_hostname`" -eval 'halt(0).' > /dev/null
+    $ERL -noinput -name "checkinstallation@`get_hostname`" -eval 'halt(0).' > /dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
-        echo "ERROR: erl could not create a Erlang VM named 'checkinstallation@hostname'"
-        echo "Are you already running a Scalaris boot server?"
+        echo "ERROR: erl could not create a Erlang VM named 'checkinstallation@`get_hostname`'"
+        echo "Are you already running another checkinstallation?"
         echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
-        echo "We were trying to run: erl -noinput -name \"checkinstallation@`get_erlang_hostname`\" -eval 'halt(0).'"
+        echo "We were trying to run: erl -noinput -name \"checkinstallation@`get_hostname`\" -eval 'halt(0).'"
     fi
 
     $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'
@@ -224,6 +251,27 @@ checkinstallation() {
         exit 1
     fi
 
+    HOSTNAME_ERL=`get_erlang_hostname`
+    HOSTNAME_SYS=`get_sys_hostname`
+    if [ "$HOSTNAME_ERL" != "$HOSTNAME_SYS" ]; then
+        echo "WARNING: the hostnames reported by Erlang and the OS do not match."
+        echo "erlang (get_erlang_hostname): "
+        echo "     -> $HOSTNAME_ERL"
+        echo "system (get_sys_hostname):"
+        echo "     -> $HOSTNAME_SYS"
+        echo " If debugging does not work, try one of the following solutions:"
+        echo " - during start, specify a full node name using IPs with '-n node@<IP>'"
+        echo " - set environment variable ERLANG_HOSTNAME to your IP"
+        if [ -n "$HOSTNAME_ERL" ] ; then
+            echo " - during start, specify a full node name using the erlang hostname with '-n node@$HOSTNAME_ERL'"
+            echo " - set environment variable ERLANG_HOSTNAME to the erlang hostname"
+        fi
+        echo " - fix your hostname setup system-wide"
+        echo " Please refer to your system's manual to set your hostname, e.g. change the"
+        echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
+        echo " the DNS."
+    fi
+
     $SCALARISCLIENT_JAVA -h > /dev/null 2>/dev/null
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -234,14 +282,15 @@ checkinstallation() {
         echo "We were trying to run: $SCALARISCLIENT_JAVA -h"
     else
         HAS_JAVACLIENT=1
-        HOSTNAME=`get_erlang_hostname`
-        JAVAHOST=`$SCALARISCLIENT_JAVA -lh`
-        if [ "$HOSTNAME" != "$JAVAHOST" ]; then
-            echo "WARNING: the hostnames reported by Erlang and Java do not match. You won't be"
-            echo " able to connect to Scalaris using the Java-API through scalaris.jar. Also, the"
-            echo " java unit tests will probably not work."
-            echo " The java-api/scalaris script will work around this by using the value provided by"
-            echo " 'hostname -f' and using this for both."
+        HOSTNAME_CTL=`get_hostname`
+        HOSTNAME_JAVA=`$SCALARISCLIENT_JAVA -lh --noerl`
+        if [ "$HOSTNAME_CTL" != "$HOSTNAME_JAVA" ]; then
+            echo "WARNING: the hostnames reported by Erlang, OS and Java do not match."
+            echo " You may run into trouble with the automatic '<node>@localhost' to"
+            echo " '<node>@<hostname>' conversion done by the Java-API, e.g. if used through"
+            echo " scalaris.jar. Also, the java unit tests will probably not work."
+            echo " The java-api/scalaris script will work around this by using the same mechanism"
+            echo " that scalarisctl uses to start nodes."
             echo " If you implement your own application either do not use \"@localhost\" in the"
             echo " scalaris.properties file or set the scalaris.erlang.nodename system property"
             echo " with the correct hostname (only the domain name part after the \"@\") or fix"
@@ -249,12 +298,10 @@ checkinstallation() {
             echo " Please refer to your system's manual to set your hostname, e.g. change the"
             echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
             echo " the DNS."
-            echo "erlang: "
-            echo "     -> $HOSTNAME"
-            echo "system: hostname -f"
-            echo "     -> `hostname -f`"
+            echo "scalarisctl: "
+            echo "     -> $HOSTNAME_CTL"
             echo "java:   $SCALARISCLIENT_JAVA -lh"
-            echo "     -> $JAVAHOST"
+            echo "     -> $HOSTNAME_JAVA"
         fi
     fi
 
@@ -584,7 +631,7 @@ scalarisstart(){
 scalarisstop(){
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
-        -name "ctl_$RANDOM@`get_erlang_hostname`" \
+        -name "ctl_$RANDOM@`get_hostname`" \
         -pa $BEAMDIR \
         -noinput \
         -s scalaris cli -extra $NODE_NAME stop
@@ -596,7 +643,7 @@ scalarisstop(){
 scalariscall(){
     pushd $BEAMDIR > /dev/null
     $ERL -setcookie "$SCALARIS_COOKIE" \
-        -name "ctl_$RANDOM@`get_erlang_hostname`" \
+        -name "ctl_$RANDOM@`get_hostname`" \
         -pa $BEAMDIR \
         -noinput \
         -eval "$1"
@@ -621,7 +668,7 @@ list_erlang_processes(){
 
 debug(){
     # look into epmd -list: boot or node
-    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name "rem@`get_erlang_hostname`" -remsh $NODE_NAME `echo $erl_flags`
+    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name "rem@`get_hostname`" -remsh $NODE_NAME `echo $erl_flags`
 }
 
 fix_paths

@@ -31,6 +31,7 @@ scalaris_exec_debug=false
 show_help=false
 no_erl=false
 jmvopts=""
+ERLANG_HOSTNAME=${ERLANG_HOSTNAME-""}
 
 until [ -z "$1" ]; do
   case $1 in
@@ -118,9 +119,40 @@ if $rpm_mode ; then
   fi
 fi
 
+get_hostname() {
+    # Uses the OS hostname from "hostname -f" for the Erlang long node name.
+    if [ -z "$ERLANG_HOSTNAME" ] ; then
+        ERLANG_HOSTNAME="`get_sys_hostname`"
+    fi
+    # Alternative using the hostname that erlang chooses if set up to start with a long node
+    # name and falls back to "hostname -f" if this is not possible:
+    # NOTE: In this case, the Java-API (if used as a library) is not always able
+    #       to guess the host name that Erlang expects and connections may fail.
+    #       Therefore, the convenience node spec "<node>@localhost" may not be used.
+#     if [ -z "$ERLANG_HOSTNAME" ] ; then
+#         ERLANG_HOSTNAME="`get_erlang_hostname`"
+#         if [ -z "$ERLANG_HOSTNAME" ] ; then
+#             # could not start erlang with long node name (no FQDN?)
+#             ERLANG_HOSTNAME="`get_sys_hostname`"
+#         fi
+#     fi
+}
+
+get_erlang_hostname() {
+    MY_HOSTNAME_ERL="`$ERL -name foo$$ -noinput -eval 'N=erlang:atom_to_list(node()),io:format("~s", [string:sub_string(N, string:chr(N, $@)+1)]), halt(0).' 2>/dev/null`"
+    if [ $? -ne 0 ] ; then
+        MY_HOSTNAME_ERL=
+    fi
+    echo "$MY_HOSTNAME_ERL"
+}
+
+get_sys_hostname() {
+    hostname -f
+}
+
 # Get local host name from erlang
 if ! $no_erl; then
-  ERLANG_NODE_NAME="`hostname -f`"
+  get_hostname
 fi
 
 # OS specific support.  $var _must_ be set to either true or false.
@@ -311,7 +343,7 @@ scalaris_exec_command="exec \"$JAVACMD\" $SCALARIS_OPTS\
   -classpath \"$LOCALCLASSPATH\"\
   $jmvopts\
   -Dscalaris.java.home=\"$SCALARIS_JAVA_HOME\"\
-  -Dscalaris.erlang.nodename=\"$ERLANG_NODE_NAME\"\
+  -Dscalaris.erlang.nodename=\"$ERLANG_HOSTNAME\"\
   -Dscalaris.cookie=\"`get_cookie`\"\
   -Dscalaris.node=\"$SCALARIS_JAPI_NODE\"\
   $scalaris_java_config de.zib.scalaris.Main $SCALARIS_ARGS $scalaris_exec_args"
