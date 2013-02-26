@@ -491,6 +491,7 @@ kill_new_processes(OldProcesses, Options) ->
                      not (InitCall =:= {test_server_sup, timetrap, 2} andalso
                               CurFun =:= {test_server_sup, timetrap, 2}),
                      not (InitCall =:= {test_server_gl, init, 1}),
+                     not (CurFun =:= {prim_file, drv_get_response, 1}), % spawned by R16 for io:put_chars/3
                      X =/= self(),
                      X =/= whereis(timer_server),
                      element(1, CurFun) =/= file_io_server],
