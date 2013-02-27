@@ -559,7 +559,7 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
       is_subtype(DB_Chunk,     {intervals:interval(), db_as_list_enc()}),
       is_subtype(Recon_Struct, bloom_recon_struct() | merkle_tree:merkle_tree() | art:art()).
 build_recon_struct(bloom, {I, DBItems}) ->    
-    Fpr = get_fpr(),
+    Fpr = get_bloom_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     BF = ?REP_BLOOM:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
@@ -778,7 +778,7 @@ fork_recon(Conf) ->
 %
 % rr_bloom_fpr              - bloom filter false positive rate (fpr)
 % rr_max_items              - max. number of items per bloom filter, if node data count 
-%                             exeeds rr_max_items two or more bloom filter will be used
+%                             exceeds rr_max_items two or more bloom filter will be used
 % rr_art_inner_fpr          - 
 % rr_art_leaf_fpr           -  
 % rr_art_correction_factor  - 
@@ -797,23 +797,31 @@ check_percent(Atom) ->
 -spec check_config() -> boolean().
 check_config() ->
     case config:read(rrepair_enabled) of
-        true ->                
-            check_percent(rr_bloom_fpr) andalso
-                check_percent(rr_art_inner_fpr) andalso
-                check_percent(rr_art_leaf_fpr) andalso
-                config:cfg_is_integer(rr_art_correction_factor) andalso
-                config:cfg_is_greater_than(rr_art_correction_factor, 0) andalso
-                config:cfg_is_integer(rr_merkle_branch_factor) andalso
-                config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
-                config:cfg_is_integer(rr_merkle_bucket_size) andalso
-                config:cfg_is_greater_than(merkle_bucket_size, 0) andalso
-                config:cfg_is_integer(rr_max_items) andalso
-                config:cfg_is_greater_than(rr_max_items, 0);
+        true ->
+            (config:read(rr_recon_method) =:= bloom andalso
+                 check_percent(rr_bloom_fpr) andalso
+                 config:cfg_is_integer(rr_max_items) andalso
+                 config:cfg_is_greater_than(rr_max_items, 0)) orelse
+            (config:read(rr_recon_method) =:= merkle_tree andalso
+                 config:cfg_is_integer(rr_merkle_branch_factor) andalso
+                 config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
+                 config:cfg_is_integer(rr_merkle_bucket_size) andalso
+                 config:cfg_is_greater_than(rr_merkle_bucket_size, 0)) orelse
+            (config:read(rr_recon_method) =:= art andalso
+                 config:cfg_is_integer(rr_merkle_branch_factor) andalso
+                 config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
+                 % NOTE: merkle_tree:get_opt_bucket_size/3 is used to calculate the optimal bucket size
+%%                  config:cfg_is_integer(rr_merkle_bucket_size) andalso
+%%                  config:cfg_is_greater_than(rr_merkle_bucket_size, 0) andalso
+                 check_percent(rr_art_inner_fpr) andalso
+                 check_percent(rr_art_leaf_fpr) andalso
+                 config:cfg_is_integer(rr_art_correction_factor) andalso
+                 config:cfg_is_greater_than(rr_art_correction_factor, 0));
         _ -> true
     end.
 
--spec get_fpr() -> float().
-get_fpr() ->
+-spec get_bloom_fpr() -> float().
+get_bloom_fpr() ->
     config:read(rr_bloom_fpr).
 
 -spec get_max_items(method()) -> pos_integer() | all.
@@ -821,7 +829,7 @@ get_max_items(Method) ->
     case Method of
         merkle_tree -> all;
         art -> all;
-        _ -> config:read(rr_max_items)
+        _ -> config:read(rr_max_items) % bloom, iblt
     end.
 
 -spec get_merkle_branch_factor() -> pos_integer().

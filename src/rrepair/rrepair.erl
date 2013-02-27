@@ -366,7 +366,7 @@ init(Trigger) ->
 % USED CONFIG FIELDS
 %	I) 	 rr_trigger: module name of any trigger
 %	II)  rr_trigger_interval: integer duration until next triggering (milliseconds)
-%	III) rr_recon_metod: set reconciliation algorithm name
+%	III) rr_recon_method: set reconciliation algorithm name
 %   IV)  rr_trigger_probability: this is the probability of starting a synchronisation 
 %								 with a random node if trigger has fired. ]0,100]
 %   V)   rr_session_ttl: time to live for sessions until they are garbage collected (milliseconds)
@@ -380,7 +380,7 @@ check_config() ->
     case config:read(rrepair_enabled) of
         true ->
             config:cfg_is_module(rr_trigger) andalso
-            config:cfg_is_atom(rr_recon_method) andalso
+            config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso % theoretically also 'iblt', but no full support for that yet
             config:cfg_is_integer(rr_session_ttl) andalso
             config:cfg_is_greater_than(rr_session_ttl, 0) andalso
 			config:cfg_is_integer(rr_trigger_probability) andalso
