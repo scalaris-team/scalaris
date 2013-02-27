@@ -451,10 +451,6 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
     rt_loop:set_rt(State, NewRT)
     ;
 
-handle_custom_message({send_rt, From}, State) ->
-    comm:send_local(From, {send_rt_response, rt_loop:get_rt(State)}),
-    State;
-
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_frtchord:handle_custom_message
 
