@@ -56,7 +56,7 @@
                item_count = 0                    :: non_neg_integer()  %number of inserted items
                }).
 
--opaque iblt() :: #iblt{}. 
+-type iblt() :: #iblt{}. 
 
 -type option()         :: prime.
 -type options()        :: [] | [option()].

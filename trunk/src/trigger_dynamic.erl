@@ -35,7 +35,7 @@
 
 -export([init/4, now/1, next/2, stop/1]).
 
--opaque state() :: {BaseIntervalFun::trigger:interval_fun(),
+-type state() :: {BaseIntervalFun::trigger:interval_fun(),
                     MinIntervalFun::trigger:interval_fun(),
                     MaxIntervalFun::trigger:interval_fun(),
                     MsgTag::comm:msg_tag(), TimerRef::ok | reference()}.

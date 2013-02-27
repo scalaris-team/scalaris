@@ -34,11 +34,11 @@
          , format_nodes/1, format_centroids/1
      ]).
 
--opaque attribute_type() :: {atom(), string()}.
+-type attribute_type() :: {atom(), string()}.
 -ifdef(forward_or_recursive_types_are_not_allowed).
--opaque html_type() :: {atom(), [attribute_type()], term() | [term()]}.
+-type html_type() :: {atom(), [attribute_type()], term() | [term()]}.
 -else.
--opaque html_type() :: {atom(), [attribute_type()], html_type() | [html_type()] | string()}.
+-type html_type() :: {atom(), [attribute_type()], html_type() | [html_type()] | string()}.
 -endif.
 
 % @doc Checks whether the current request is a post operation.
