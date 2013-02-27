@@ -33,7 +33,7 @@
 
 -export([init/4, now/1, next/2, stop/1]).
 
--opaque state() :: {trigger:interval_fun(), comm:msg_tag(), reference() | ok}.
+-type state() :: {trigger:interval_fun(), comm:msg_tag(), reference() | ok}.
 
 %% @doc Initializes the trigger with the given interval functions and the given
 %%      message tag used for the trigger message.
