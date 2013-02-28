@@ -122,7 +122,7 @@ start_scalaris_vm(Hostname) ->
     lists:foreach(fun (Service) ->
                           {StartCmd, _} = Service,
                           Cmd = format("ssh ~s ~s ~s", [get_ssh_args(), Hostname, StartCmd]),
-                          io:format("Executing: ~p~n", [Cmd])
+                          io:format("Executing: ~p~n", [Cmd]),
                           _ = os:cmd(Cmd)
                   end, Services),
     ok.
@@ -133,7 +133,7 @@ stop_scalaris_vm(Hostname) ->
     lists:foreach(fun (Service) ->
                           {_, StopCmd} = Service,
                           Cmd = format("ssh ~s ~s ~s", [get_ssh_args(), Hostname, StopCmd]),
-                          io:format("Executing: ~p~n", [Cmd])
+                          io:format("Executing: ~p~n", [Cmd]),
                           _ = os:cmd(Cmd)
                   end, Services),
     ok.
