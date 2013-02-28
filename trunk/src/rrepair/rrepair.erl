@@ -128,14 +128,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
 
-% @doc Requests db sync with DestKey using default recon method (given in config).
+% Requests db sync with DestKey using default recon method (given in config).
 on({request_sync, DestKey}, State) ->
     comm:send_local(self(), {request_sync, get_recon_method(), DestKey}),
     State;
 
-% @doc Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
+% Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
 %   Random leads to sync with a node which is associated with this (e.g. symmetric partner)
-% @end  
 on({request_sync, Method, DestKey}, State = #rrepair_state{ round = Round, 
                                                             open_recon = OpenRecon,
                                                             open_sessions = Sessions }) ->
