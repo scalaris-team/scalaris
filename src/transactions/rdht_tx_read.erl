@@ -459,7 +459,7 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
                    end;
                true -> pdb:set(Entry, Table)
             end;
-        true -> pdb:set(Entry, Table)
+        true -> set_or_delete_if_all_replied(Entry, Reps, Table)
     end.
 
 %% @doc Informs the client, updates the read state accordingly and sets it in
