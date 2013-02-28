@@ -128,13 +128,14 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
 
-% Requests db sync with DestKey using default recon method (given in config).
+% @doc Requests db sync with DestKey using default recon method (given in config).
 on({request_sync, DestKey}, State) ->
     comm:send_local(self(), {request_sync, get_recon_method(), DestKey}),
     State;
 
-% Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
-%   Random leads to sync with a node which is associated with this (e.g. symmetric partner)  
+% @doc Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
+%   Random leads to sync with a node which is associated with this (e.g. symmetric partner)
+% @end  
 on({request_sync, Method, DestKey}, State = #rrepair_state{ round = Round, 
                                                             open_recon = OpenRecon,
                                                             open_sessions = Sessions }) ->
@@ -223,27 +224,23 @@ on({rr_stats, Msg}, State) ->
 % report messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({recon_progress_report, _Sender, Initiator, Stats}, State = #rrepair_state{ open_recon = OpenRecon,
-                                                                             open_sessions = Sessions }) ->
-    %rr_recon_stats:get(status, Stats) =:= finish andalso
-        ?TRACE_RECON("~nRECON OK - Sender=~p - Initiator=~p~nStats=~p~nOpenRecon=~p~nSessions=~p", 
-                     [_Sender, Initiator, rr_recon_stats:print(Stats), OpenRecon - 1, Sessions]),    
-    NSessions = case Initiator of
-                    true -> 
-                        case extract_session(rr_recon_stats:get(session_id, Stats), Sessions) of
-                            {S, TSessions} ->
-                                SUpd = update_session_recon(S, Stats),
-                                check_session_complete(SUpd),
-                                [SUpd | TSessions];
-                            not_found ->
-                                %caused by error or forked rc instances by bloom filter rc
-                                %log:log(error, "[ ~p ] SESSION NOT FOUND BY INITIATOR ~p", [?MODULE, rr_recon_stats:get(session_id, Stats)]),
-                                Sessions
-                        end;
-                    false -> Sessions
+on({recon_progress_report, _Sender, false, _Stats}, State = #rrepair_state{ open_recon = OR }) ->
+    State#rrepair_state{ open_recon = OR - 1 };    
+on({recon_progress_report, _Sender, true, Stats}, State = #rrepair_state{ open_recon = OR,
+                                                                          open_sessions = OS }) ->
+    ?TRACE_RECON("~nRECON OK - Sender=~p - Initiator=~p~nStats=~p~nOpenRecon=~p~nSessions=~p", 
+                 [_Sender, Initiator, rr_recon_stats:print(Stats), OR - 1, OS]),    
+    NewOS = case extract_session(rr_recon_stats:get(session_id, Stats), OS) of
+                    {S, TSessions} ->
+                        SUpd = update_session_recon(S, Stats),
+                        check_session_complete(SUpd),
+                        [SUpd | TSessions];
+                    not_found ->
+                        %caused by error or forked rc instances by bloom filter rc
+                        %log:log(error, "[ ~p ] SESSION NOT FOUND BY INITIATOR ~p", [?MODULE, rr_recon_stats:get(session_id, Stats)]),
+                        OS
                 end,
-    State#rrepair_state{ open_recon = OpenRecon - 1,
-                         open_sessions = NSessions };
+    State#rrepair_state{ open_recon = OR - 1, open_sessions = NewOS };
 
 on({resolve_progress_report, _Sender, Stats}, State = #rrepair_state{open_resolve = OpenResolve,
                                                                      open_sessions = Sessions}) ->
