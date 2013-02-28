@@ -59,7 +59,9 @@ init([]) ->
 %% @doc message handler
 -spec on(message(), State::state()) -> state().
 on({report_stat, RcvCnt, RcvBytes, SendCnt, SendBytes},
-   {StartTime, PrevRcvCnt, PrevRcvBytes, PrevSendCnt, PrevSendBytes}) ->
+   {StartTime, PrevRcvCnt, PrevRcvBytes, PrevSendCnt, PrevSendBytes})
+  when RcvCnt >= 0 andalso RcvBytes >= 0 andalso
+       SendCnt >= 0 andalso SendBytes >= 0 ->
     {StartTime,
      PrevRcvCnt + RcvCnt, PrevRcvBytes + RcvBytes,
      PrevSendCnt + SendCnt, PrevSendBytes + SendBytes};
