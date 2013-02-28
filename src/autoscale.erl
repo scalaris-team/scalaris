@@ -14,6 +14,20 @@
 
 %% @author Ufuk Celebi <celebi@zib.de>
 %% @doc Auto-scaling service. 
+%%      {autoscale, true} in scalaris.local.cfg will enable this service
+%%
+%%      Alarms can be configured through
+%%      {autoscale_alarms, [{alarm, AlarmName, AlarmHandler, TimeCheckInterval,
+%%                                  MinValue, MaxValue, VMsToRemove, VMsToAdd,
+%%                                  active|inactive, [Options]}, ...]}.
+%%      Example:
+%%      {autoscale_alarms, [{alarm, load_alarm, load_avg, 10, 30, 10, 40, 1, 1, inactive, []},
+%%                          {alarm, churn, random_churn, 10, 0, 0, 50, 3, 5, inactive, []},
+%%                          {alarm, lat, latency_avg, 60, 0, 100, 250, 2, 2, inactive, []}]}.
+%%
+%%      The cloud module which is called to remove or add VMs can be configured using
+%%      {autoscale_cloud_module, CloudModule}.
+%%      Available modules are: cloud_local and cloud_ssh which implement cloud_beh
 %% @end
 %% @version $Id$
 -module(autoscale).
@@ -25,7 +39,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--define(CLOUD, (config:read(as_cloud_module))).
+-define(CLOUD, (config:read(autoscale_cloud_module))).
 
 -export([start_link/1, init/1, on/2]).
 -compile(export_all).
@@ -276,7 +290,7 @@ get_timestamp_secs({MegaSecs, Secs, _}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec read_alarms_from_config() -> [#alarm{}].
 read_alarms_from_config() ->
-    case Alarms = config:read(as_alarms) of
+    case Alarms = config:read(autoscale_alarms) of
         failed -> [];
         _      -> Alarms
     end.
