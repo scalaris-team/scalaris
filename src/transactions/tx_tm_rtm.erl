@@ -194,7 +194,10 @@ on({learner_decide, ItemId, _PaxosID, _Value} = Msg, State) ->
     case NewUnitializedOK of
         new ->
             %% we are the first or the tx is already done...?
-            msg_delay:send_local(60, self(),
+            %% (delete_if_still_uninitialized is only triggered when the
+            %% delayed trigger_delete_if_done does not catch the fourth
+            %% learner_decide - see below)
+            msg_delay:send_local(30, self(),
                                  {delete_if_still_uninitialized, ItemId});
         _ -> ok
     end,
@@ -878,9 +881,10 @@ trigger_delete_if_done(TxState, State) ->
                 true ->
                     TxId = tx_state_get_tid(TxState),
                     %% wait a bit for slow minority of answers to arrive
-                    %%msg_delay:send_local(1, self(),
-                    %%                     {?tx_tm_rtm_delete, TxId, Decision});
-                    comm:send_local(self(), {?tx_tm_rtm_delete, TxId, Decision});
+                    %% (delete_if_still_uninitialized is only triggered when
+                    %% this is not enough to catch the fourth learner_decide)
+                    msg_delay:send_local(2, self(),
+                                         {?tx_tm_rtm_delete, TxId, Decision});
                 false -> ok
             end
     end, ok.
