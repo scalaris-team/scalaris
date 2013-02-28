@@ -17,11 +17,13 @@
 %%      defined for the autoscale process.
 %%      The module is used by autoscale if the following option has been set in
 %%      scalaris.local.cfg:
-%%        {as_cloud_module, cloud_ssh}
+%%        {autoscale_cloud_module, cloud_ssh}
 %%      The following options can also be set:
 %%        {cloud_ssh_hosts, ["host1", "host2", ..., "hostn"]}.
 %%        {cloud_ssh_args, "arguments for ssh"}.
 %%        {cloud_ssh_path, "path/to/scalaris/installation/on/host"}.
+%%      Additional services besides Scalaris may be specified:
+%%        {cloud_ssh_services, [{ServiceStartCmd, ServiceStopCmd}, {Service2StartCmd, Service2StopCmd}, ...]}.
 %% @end
 %% @version $Id$
 -module(cloud_ssh).
@@ -35,6 +37,8 @@
 -export([init/0, get_number_of_vms/0, add_vms/1, remove_vms/1, killall_vms/0]).
 
 -define(cloud_ssh_key, "2a42cb863313526fca96098a95020db2a904b01157f191a9bb3200829f8596c7").
+-define(scalaris_start, "bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node start").
+-define(scalaris_stop, "bin/./scalarisctl -n node gstop").
  
 %%%%%%%%%%%%%%%%%%%%%
 %%%% Behavior methods
@@ -84,20 +88,14 @@ add_or_remove_vms(add, Pending, Hosts, UpdatedHosts) ->
         {_, active} ->
             add_or_remove_vms(add, Pending, RemainingHosts, UpdatedHosts ++ [Host]);
         {Hostname, _} ->
-            Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node start",
-                                              [get_ssh_args(), Hostname, get_path()])), 
-            io:format("Executing: ~p~n", [Cmd]),
-            _ = os:cmd(Cmd),
+            start_scalaris_vm(Hostname),
             add_or_remove_vms(add, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, active}])
     end;
 add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
     [Host | RemainingHosts] = Hosts,
     case Host of
         {Hostname, active} ->
-            Cmd = lists:flatten(io_lib:format("ssh ~s ~s ~s/bin/./scalarisctl -n node gstop",
-                                              [get_ssh_args(), Hostname, get_path()])),
-            io:format("Executing: ~p~n", [Cmd]),
-            _ = os:cmd(Cmd),
+            stop_scalaris_vm(Hostname),
             add_or_remove_vms(remove, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, inactive}]);
         {_, _} ->
             add_or_remove_vms(remove, Pending, RemainingHosts, UpdatedHosts ++ [Host])
@@ -118,6 +116,31 @@ killall_vms() ->
                   end, Hosts),
     ok.
 
+start_scalaris_vm(Hostname) ->
+    Scalaris = get_scalaris_service(),
+    Services = [Scalaris | get_additional_services()],
+    lists:foreach(fun (Service) ->
+                          {StartCmd, _} = Service,
+                          Cmd = format("ssh ~s ~s ~s", [get_ssh_args(), Hostname, StartCmd]),
+                          io:format("Executing: ~p~n", [Cmd])
+                          _ = os:cmd(Cmd)
+                  end, Services),
+    ok.
+
+stop_scalaris_vm(Hostname) ->
+    Scalaris = get_scalaris_service(),
+    Services = [Scalaris | get_additional_services()],
+    lists:foreach(fun (Service) ->
+                          {_, StopCmd} = Service,
+                          Cmd = format("ssh ~s ~s ~s", [get_ssh_args(), Hostname, StopCmd]),
+                          io:format("Executing: ~p~n", [Cmd])
+                          _ = os:cmd(Cmd)
+                  end, Services),
+    ok.
+
+format(FormatString, Items) ->
+    lists:flatten(io_lib:format(FormatString, Items)).
+
 get_hosts() ->
     case api_tx:read(?cloud_ssh_key) of
         {ok, Val} ->
@@ -131,10 +154,18 @@ get_ssh_args() ->
         Args -> Args
     end.
 
-get_path() ->
-    case config:read(cloud_ssh_path) of
-        failed -> "scalaris";
-        Args -> Args
+get_scalaris_service() ->
+    Path =
+        case config:read(cloud_ssh_path) of
+            failed -> "scalaris";
+            Arg -> Arg
+        end,
+    {format("~s/~s", [Path, ?scalaris_start]), format("~s/~s", [Path, ?scalaris_stop])}.
+
+get_additional_services() ->
+    case config:read(cloud_ssh_services) of
+        failed -> [];
+        [T|H] -> [T|H]
     end.
 
 get_number_of_active_vms(Hosts) ->
