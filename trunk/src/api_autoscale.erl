@@ -32,3 +32,26 @@ toggle_alarms(Names) ->
 deactivate_alarms () ->
     api_dht_raw:unreliable_lookup(?RT:hash_key("0"), {?send_to_group_member, autoscale,
                                                       {deactivate_alarms}}).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% autoscale_server 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+write_plot_data() ->
+    ?IIF(config:read(autoscale_server),
+        case MgmtServer = config:read(mgmt_server) of
+            failed -> {error, mgmt_server_false};
+            _      ->
+                comm:send(MgmtServer, {?send_to_group_member, autoscale_server,
+                                       {write_to_file}})
+        end,
+        {error, autoscale_server_false}).
+
+reset_plot_data() ->
+    ?IIF(config:read(autoscale_server),
+        case MgmtServer = config:read(mgmt_server) of
+            failed -> {error, mgmt_server_false};
+            _      ->
+                comm:send(MgmtServer, {?send_to_group_member, autoscale_server,
+                                       {reset}})
+        end,
+        {error, autoscale_server_false}).

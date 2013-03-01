@@ -144,6 +144,13 @@ childs(Options) ->
     ServicePaxosGroup = util:sup_supervisor_desc(
                           sup_service_paxos_group, sup_paxos, start_link,
                           [{ServiceGroup, []}]),
+    AutoscaleServer =
+        case config:read(autoscale_server) andalso
+                 StartMgmtServer of
+            true -> util:sup_worker_desc(autoscale_server, autoscale_server,
+                                         start_link, [ServiceGroup]);
+            _    -> []
+        end,
     %% order in the following list is the start order
     BasicServers = [TraceMPath,
                     Config,
@@ -158,7 +165,8 @@ childs(Options) ->
                     CommLayer,
                     FailureDetector,
                     AdminServer,
-                    ServicePaxosGroup],
+                    ServicePaxosGroup,
+                    AutoscaleServer],
     Servers = [YAWS, BenchServer, Ganglia],
     MgmtServers =
         case StartMgmtServer orelse util:is_unittest() of
