@@ -17,7 +17,8 @@
 %%      {autoscale, true} in scalaris.local.cfg will enable this service
 %%
 %%      Alarms can be configured through
-%%      {autoscale_alarms, [{alarm, AlarmName, AlarmHandler, TimeCheckInterval,
+%%      {autoscale_alarms, [{alarm, AlarmName, AlarmHandler,
+%%                                  TimeCheckInterval, TimeCooldown, 
 %%                                  MinValue, MaxValue, VMsToRemove, VMsToAdd,
 %%                                  active|inactive, [Options]}, ...]}.
 %%      Example:
@@ -40,9 +41,9 @@
 -include("scalaris.hrl").
 
 -define(CLOUD, (config:read(autoscale_cloud_module))).
+-define(PLOT_VMS_KEY, vms).
 
 -export([start_link/1, init/1, on/2]).
--compile(export_all).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % types
@@ -52,18 +53,17 @@
       latency_avg |
       random_churn).
 
--record(alarm,
-    {
-        name             = ?required(alarm, name) :: atom(),
-        handler          = ?required(alarm, handler) :: alarm_handler(),
-        period_secs      = ?required(alarm, period_in_s) :: pos_integer(),
-        cooldown_secs    = 0 :: non_neg_integer(),
-        lower_limit      = ?MINUS_INFINITY :: number(),
-        upper_limit      = ?PLUS_INFINITY :: number(),
-        scale_down_by    = 1 :: non_neg_integer(),
-        scale_up_by      = 1 :: non_neg_integer(),
-        state             = active :: active | inactive,
-        opt_fields       = [] :: [{atom(), any()}]
+-record(alarm, {
+        name                = ?required(alarm, name) :: atom(),
+        handler             = ?required(alarm, handler) :: alarm_handler(),
+        check_interval_secs = ?required(alarm, period_in_s) :: pos_integer(),
+        cooldown_secs       = 0 :: non_neg_integer(),
+        min_value           = ?MINUS_INFINITY :: number(),
+        max_value           = ?PLUS_INFINITY :: number(),
+        vms_to_remove       = 1 :: non_neg_integer(),
+        vms_to_add          = 1 :: non_neg_integer(),
+        state               = active :: active | inactive,
+        options             = [] :: [{atom(), any()}]
     }).
 
 -type(state() ::
@@ -93,7 +93,9 @@ start_link(DHTNodeGroup) ->
 init(null) ->
     ?CLOUD:init(),
     % dict with alarm name as key and {alarm record, epoch} as value 
-    Alarms = dict:from_list(lists:map(fun(A) -> {A#alarm.name, {A, 0}} end, read_alarms_from_config())),
+    Alarms = dict:from_list(lists:map(
+                              fun(A) -> {A#alarm.name, {A, 0}} end,
+                              read_alarms_from_config())),
     % check leadership and subscribe to direct neighborhood changes
     check_leadership(),
     rm_loop:subscribe(self(), autoscale,
@@ -101,6 +103,7 @@ init(null) ->
                       fun autoscale:check_leadership/4,
                       inf),
     % initial state: not leader and alarms from config
+    plot_add_now(?PLOT_VMS_KEY, ?CLOUD:get_number_of_vms()),
     {_IsLeader = false, Alarms}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,7 +120,7 @@ on({get_state_response, MyRange}, {IsLeader, Alarms}) ->
                 dict:map(fun(Name, {Alarm, Epoch}) ->
                              case Alarm#alarm.state =:= active of                                     
                                  true ->
-                                     continue_alarm(Name, Alarm#alarm.period_secs,
+                                     continue_alarm(Name, Alarm#alarm.check_interval_secs,
                                                     self(), Epoch+1);
                                  false ->
                                      ok
@@ -139,23 +142,24 @@ on({check_alarm, Name, AlarmEpoch}, {IsLeader, Alarms}) ->
              IsLeader andalso (Epoch =:= AlarmEpoch) of
         true ->
             % call alarm handler and react to breach_state 
-            _ = case check_alarm(Alarm#alarm.handler, Alarm) of
-                    unknown_alarm_handler ->
-                        ok;
+            NextCheckSecs =
+                case check_alarm(Alarm#alarm.handler, Alarm) of
+                    unknown_alarm_handler -> 0;
                     breach_lower ->
-                        continue_alarm(Name,
-                            erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs),
-                            self(), Epoch),
-                        ?CLOUD:remove_vms(Alarm#alarm.scale_down_by);
+                        ?CLOUD:remove_vms(Alarm#alarm.vms_to_remove),
+                        erlang:max(Alarm#alarm.check_interval_secs, Alarm#alarm.cooldown_secs);
                     breach_upper ->
-                        continue_alarm(Name,
-                            erlang:max(Alarm#alarm.period_secs, Alarm#alarm.cooldown_secs),
-                            self(), Epoch),
-                        ?CLOUD:add_vms(Alarm#alarm.scale_up_by);
+                        ?CLOUD:add_vms(Alarm#alarm.vms_to_add),
+                        erlang:max(Alarm#alarm.check_interval_secs, Alarm#alarm.cooldown_secs);
                     ok ->
-                        continue_alarm(Name, Alarm#alarm.period_secs, self(), Epoch)
+                        Alarm#alarm.check_interval_secs
                 end,
-            ok;
+            case NextCheckSecs > 0 of
+                true ->
+                    plot_add_now(?PLOT_VMS_KEY, ?CLOUD:get_number_of_vms()),
+                    continue_alarm(Name, NextCheckSecs, self(), Epoch);
+                false -> skip
+            end;
         false ->
             ok
     end,
@@ -170,7 +174,7 @@ on({toggle_alarm, Name}, {_IsLeader, Alarms}) ->
                         update_alarm(Alarms, Name, [{state, inactive}]);
                     inactive ->
                         % update state and epoch in dict
-                        continue_alarm(Name, Alarm#alarm.period_secs, self(), Epoch+1),
+                        continue_alarm(Name, Alarm#alarm.check_interval_secs, self(), Epoch+1),
                         update_alarm(Alarms, Name, [{state, active}, {epoch, Epoch+1}])
                 end
         end,
@@ -191,6 +195,7 @@ on(_, _) ->
 -spec check_alarm(alarm_handler(), #alarm{}) -> breach_state() | unknown_alarm_handler.
 check_alarm(load_avg, Alarm) ->
     AvgLoad = statistics:get_average_load(statistics:get_ring_details()),
+    plot_add_now(Alarm#alarm.name, AvgLoad),
     get_breach_state(AvgLoad, Alarm);
 check_alarm(latency_avg, Alarm) ->
     Monitor = pid_groups:find_a(monitor_perf),
@@ -199,6 +204,10 @@ check_alarm(latency_avg, Alarm) ->
             []                           -> {[], [], [], [], [], [], []};
             [{api_tx, 'req_list', Data}] -> Data
         end,
+    %
+    [{_, CurrentLatency}|_] = AvgMsD,
+    plot_add_now(Alarm#alarm.name, CurrentLatency),
+    %
     History = get_opt_field(Alarm, history, 1),
     [Hd|Tail] = lists:map(fun({_, V}) -> get_breach_state(V, Alarm) end,
                           lists:sublist(AvgMsD, History)),
@@ -217,7 +226,6 @@ check_alarm(_, _) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec continue_alarm(atom(), pos_integer(), pid(), non_neg_integer()) -> ok.
 continue_alarm(Name, Secs, Pid, Epoch) ->
-    %% io:format("Alarm '~p' for ~p delayed by ~p seconds (Epoch ~p).~n", [Name, Pid, Secs, Epoch]),
     msg_delay:send_local(Secs, Pid, {check_alarm, Name, Epoch}).
 
 update_alarm(Alarms, Name, {Field, NewValue}) ->
@@ -253,15 +261,15 @@ update_alarm(Alarms, _Name, []) ->
 
 -spec get_opt_field(#alarm{}, atom(), any()) -> false | any().
 get_opt_field(Alarm, Field, Default) ->
-    case lists:keyfind(Field, 1, Alarm#alarm.opt_fields) of
+    case lists:keyfind(Field, 1, Alarm#alarm.options) of
         false          -> Default;
         {Field, Value} -> Value
     end.
 
 -spec get_breach_state(term(), #alarm{}) -> breach_state().
 get_breach_state(Value, Alarm) ->
-    ?IIF(Value < Alarm#alarm.lower_limit, breach_lower,
-         ?IIF(Value > Alarm#alarm.upper_limit, breach_upper, ok)).
+    ?IIF(Value < Alarm#alarm.min_value, breach_lower,
+         ?IIF(Value > Alarm#alarm.max_value, breach_upper, ok)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % misc helpers
@@ -285,6 +293,18 @@ get_timestamp_secs() ->
 get_timestamp_secs({MegaSecs, Secs, _}) ->
     MegaSecs*1000000+Secs.
 
+-spec plot_add_now(PlotKey::atom(), Value::number()) ->
+          ok | {error, autoscale_server_false | mgmt_server_false}.
+plot_add_now(PlotKey, Value) ->
+    ?IIF(config:read(autoscale_server),
+        case MgmtServer = config:read(mgmt_server) of
+            failed -> {error, mgmt_server_false};
+            _      ->
+                comm:send(MgmtServer, {?send_to_group_member, autoscale_server,
+                                       {collect, PlotKey, _Now = get_timestamp_secs(), Value}}),
+                true
+        end,
+        {error, autoscale_server_false}).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % config
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
