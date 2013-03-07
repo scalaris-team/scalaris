@@ -10,7 +10,7 @@ import com.ericsson.otp.erlang.OtpErlangList;
  * Stores the result of a delete operation.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 2.6
+ * @version 3.19
  * @since 2.2
  *
  * @see ReplicatedDHT#delete(String)
@@ -54,5 +54,19 @@ public class DeleteResult {
                 }
             }
         }
+    }
+
+    /**
+     * Checks whether the delete operation has successfully deleted all replicas
+     * (replicas which did not exist are counted as successfully deleted as
+     * well). If not, the delete needs to be executed again (see
+     * {@link ReplicatedDHT#delete(com.ericsson.otp.erlang.OtpErlangString, int)}.
+     *
+     * @return whether all replicas were deleted or not
+     *
+     * @since 3.19
+     */
+    public boolean hasDeletedAll() {
+        return (ok + undef) == 4;
     }
 }

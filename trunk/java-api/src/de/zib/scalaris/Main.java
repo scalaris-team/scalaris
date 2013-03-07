@@ -277,8 +277,7 @@ public class Main {
             }
             try {
                 final ReplicatedDHT sc = new ReplicatedDHT();
-                sc.delete(key, timeout);
-                final DeleteResult deleteResult = sc.getLastDeleteResult();
+                final DeleteResult deleteResult = sc.delete(key, timeout);
                 System.out.println("delete(" + key + ", " + timeout + "): "
                         + deleteResult.ok + " ok, "
                         + deleteResult.locks_set + " locks_set, "

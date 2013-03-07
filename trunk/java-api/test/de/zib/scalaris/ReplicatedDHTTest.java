@@ -133,9 +133,10 @@ public class ReplicatedDHTTest {
 
         try {
             for (int i = 0; i < testData.length; ++i) {
-                final int deleted = rdht.delete(testTime + key + i);
+                final DeleteResult result0 = rdht.delete(testTime + key + i);
                 final DeleteResult result = rdht.getLastDeleteResult();
-                assertEquals(0, deleted);
+                assertEquals(result0, result);
+                assertEquals(true, result.hasDeletedAll());
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(4, result.undef);
@@ -174,9 +175,10 @@ public class ReplicatedDHTTest {
 
             // now try to delete the data:
             for (int i = 0; i < testData.length; ++i) {
-                int deleted = rdht.delete(testTime + key + i);
+                DeleteResult result0 = rdht.delete(testTime + key + i);
                 DeleteResult result = rdht.getLastDeleteResult();
-                assertEquals(4, deleted);
+                assertEquals(result0, result);
+                assertEquals(true, result.hasDeletedAll());
                 assertEquals(4, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
@@ -185,9 +187,10 @@ public class ReplicatedDHTTest {
                 checkKeyDoesNotExist(testTime + key + i);
 
                 // try again (should be successful with 0 deletes)
-                deleted = rdht.delete(testTime + key + i);
+                result0 = rdht.delete(testTime + key + i);
                 result = rdht.getLastDeleteResult();
-                assertEquals(0, deleted);
+                assertEquals(result0, result);
+                assertEquals(true, result.hasDeletedAll());
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(4, result.undef);
@@ -226,9 +229,10 @@ public class ReplicatedDHTTest {
 
             // now try to delete the data:
             for (int i = 0; i < testData.length; ++i) {
-                final int deleted = rdht.delete(testTime + key + i);
+                final DeleteResult result0 = rdht.delete(testTime + key + i);
                 final DeleteResult result = rdht.getLastDeleteResult();
-                assertEquals(4, deleted);
+                assertEquals(result0, result);
+                assertEquals(true, result.hasDeletedAll());
                 assertEquals(4, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
@@ -243,9 +247,10 @@ public class ReplicatedDHTTest {
 
             // now try to delete the data:
             for (int i = 0; i < testData.length; ++i) {
-                int deleted = rdht.delete(testTime + key + i);
+                DeleteResult result0 = rdht.delete(testTime + key + i);
                 DeleteResult result = rdht.getLastDeleteResult();
-                assertEquals(4, deleted);
+                assertEquals(result0, result);
+                assertEquals(true, result.hasDeletedAll());
                 assertEquals(4, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(0, result.undef);
@@ -254,9 +259,10 @@ public class ReplicatedDHTTest {
                 checkKeyDoesNotExist(testTime + key + i);
 
                 // try again (should be successful with 0 deletes)
-                deleted = rdht.delete(testTime + key + i);
+                result0 = rdht.delete(testTime + key + i);
                 result = rdht.getLastDeleteResult();
-                assertEquals(0, deleted);
+                assertEquals(result0, result);
+                assertEquals(true, result.hasDeletedAll());
                 assertEquals(0, result.ok);
                 assertEquals(0, result.locks_set);
                 assertEquals(4, result.undef);

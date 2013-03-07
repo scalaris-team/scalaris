@@ -59,7 +59,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * number of automatic retries is adjustable (default: 3).
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.4
+ * @version 3.19
  * @since 2.6
  */
 public class ReplicatedDHT {
@@ -68,7 +68,7 @@ public class ReplicatedDHT {
      *
      * @see #delete(String)
      */
-    private OtpErlangList lastDeleteResult = null;
+    private DeleteResult lastDeleteResult = null;
 
     /**
      * Connection to a TransactionSingleOp node.
@@ -110,7 +110,7 @@ public class ReplicatedDHT {
      * @param key
      *            the key to delete
      *
-     * @return the number of successfully deleted replicas
+     * @return a delete result object
      *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
@@ -122,10 +122,11 @@ public class ReplicatedDHT {
      *             if any other error occurs
      *
      * @since 2.8
+     * @version 3.19
      *
      * @see #delete(OtpErlangString, int)
      */
-    public int delete(final OtpErlangString key) throws ConnectionException,
+    public DeleteResult delete(final OtpErlangString key) throws ConnectionException,
     TimeoutException, UnknownException {
         return delete(key, 2000);
     }
@@ -142,7 +143,7 @@ public class ReplicatedDHT {
      * @param timeout
      *            the time (in milliseconds) to wait for results
      *
-     * @return the number of successfully deleted replicas
+     * @return a delete result object
      *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
@@ -154,8 +155,9 @@ public class ReplicatedDHT {
      *             if any other error occurs
      *
      * @since 2.8
+     * @version 3.19
      */
-    public int delete(final OtpErlangString key, final int timeout) throws ConnectionException,
+    public DeleteResult delete(final OtpErlangString key, final int timeout) throws ConnectionException,
     TimeoutException, UnknownException {
         lastDeleteResult = null;
         final OtpErlangObject received_raw = connection.doRPC("api_rdht", "delete",
@@ -170,13 +172,22 @@ public class ReplicatedDHT {
              *  - {fail, timeout, ResultsOk::pos_integer(), ResultList::[ok | undef]}
              */
             if (state.equals(CommonErlangObjects.okAtom) && (received.arity() == 3)) {
-                lastDeleteResult = (OtpErlangList) received.elementAt(2);
+                lastDeleteResult = new DeleteResult((OtpErlangList) received.elementAt(2));
                 final int succeeded = ((OtpErlangLong) received.elementAt(1)).intValue();
-                return succeeded;
+                // plausibility check:
+                if (succeeded != lastDeleteResult.ok) {
+                    throw new UnknownException(received_raw);
+                }
+                return lastDeleteResult;
             } else if (state.equals(CommonErlangObjects.failAtom) && (received.arity() == 4)) {
                 final OtpErlangObject reason = received.elementAt(1);
                 if (reason.equals(CommonErlangObjects.timeoutAtom)) {
-                    lastDeleteResult = (OtpErlangList) received.elementAt(3);
+                    lastDeleteResult = new DeleteResult((OtpErlangList) received.elementAt(3));
+                    final int succeeded = ((OtpErlangLong) received.elementAt(2)).intValue();
+                    // plausibility check:
+                    if (succeeded != lastDeleteResult.ok) {
+                        throw new UnknownException(received_raw);
+                    }
                     throw new TimeoutException(received_raw);
                 }
             }
@@ -197,7 +208,7 @@ public class ReplicatedDHT {
      * @param key
      *            the key to delete
      *
-     * @return the number of successfully deleted replicas
+     * @return a delete result object
      *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
@@ -209,10 +220,11 @@ public class ReplicatedDHT {
      *             if any other error occurs
      *
      * @since 2.2
+     * @version 3.19
      *
      * @see #delete(String, int)
      */
-    public int delete(final String key) throws ConnectionException,
+    public DeleteResult delete(final String key) throws ConnectionException,
     TimeoutException, UnknownException {
         return delete(key, 2000);
     }
@@ -229,7 +241,7 @@ public class ReplicatedDHT {
      * @param timeout
      *            the time (in milliseconds) to wait for results
      *
-     * @return the number of successfully deleted replicas
+     * @return a delete result object
      *
      * @throws ConnectionException
      *             if the connection is not active or a communication error
@@ -241,10 +253,11 @@ public class ReplicatedDHT {
      *             if any other error occurs
      *
      * @since 2.2
+     * @version 3.19
      *
      * @see #delete(OtpErlangString, int)
      */
-    public int delete(final String key, final int timeout) throws ConnectionException,
+    public DeleteResult delete(final String key, final int timeout) throws ConnectionException,
     TimeoutException, UnknownException {
         return delete(new OtpErlangString(key), timeout);
     }
@@ -252,23 +265,17 @@ public class ReplicatedDHT {
     /**
      * Returns the result of the last call to {@link #delete(String)}.
      *
-     * NOTE: This function traverses the result list returned by erlang and
-     * therefore takes some time to process. It is advised to store the returned
-     * result object once generated.
-     *
      * @return the delete result
      *
      * @throws UnknownException
      *             is thrown if an unknown reason was encountered
      *
      * @see #delete(String)
+     *
+     * @version 3.19
      */
-    public DeleteResult getLastDeleteResult() throws UnknownException {
-        try {
-            return new DeleteResult(lastDeleteResult);
-        } catch (final UnknownException e) {
-            throw new UnknownException(e, lastDeleteResult);
-        }
+    public DeleteResult getLastDeleteResult() {
+        return lastDeleteResult;
     }
 
     /**
