@@ -90,9 +90,9 @@
     {move, node_update, Tag::{move, slide_op:id()}} | % message from RM that it has changed the node's id to TargetId
     {move, rm_new_pred, Tag::{move, slide_op:id()}} | % message from RM that it knows the pred we expect
     {move, req_data, MoveFullId::slide_op:id()} |
-    {move, data, MovingData::?DB:db_as_list(), MoveFullId::slide_op:id()} |
+    {move, data, MovingData::dht_node_state:slide_data(), MoveFullId::slide_op:id()} |
     {move, data_ack, MoveFullId::slide_op:id()} |
-    {move, delta, ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()], MoveFullId::slide_op:id()} |
+    {move, delta, ChangedData::dht_node_state:slide_delta(), MoveFullId::slide_op:id()} |
     {move, delta_ack, MoveFullId::slide_op:id()} |
     {move, delta_ack, MoveFullId::slide_op:id(), continue, NewSlideId::slide_op:id()} |
     {move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
@@ -348,12 +348,12 @@ process_move_msg({move, data_ack, MoveFullId} = _Msg, MyState) ->
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data_ack], both, data_ack);
 
 % delta from neighbor
-process_move_msg({move, delta, ChangedData, DeletedKeys, MoveFullId} = _Msg, MyState) ->
+process_move_msg({move, delta, ChangedData, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                accept_delta(State, PredOrSucc, SlideOp1, ChangedData, DeletedKeys)
+                accept_delta(State, PredOrSucc, SlideOp1, ChangedData)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta], both, delta);
 
@@ -978,11 +978,8 @@ send_data(State, SlideOp) ->
             true  -> intervals:all();
             false -> slide_op:get_interval(SlideOp)
         end,
-    OldDB = dht_node_state:get(State, db),
-    MovingData = ?DB:get_entries(OldDB, MovingInterval),
-    NewDB = ?DB:record_changes(OldDB, MovingInterval),
+    {State_NewDB, MovingData} = dht_node_state:slide_get_data_start_record(State, MovingInterval),
     NewSlideOp = slide_op:set_phase(SlideOp, wait_for_data_ack),
-    State_NewDB = dht_node_state:set_db(State, NewDB),
     Msg = {move, data, MovingData, slide_op:get_id(NewSlideOp)},
     send2(State_NewDB, NewSlideOp, Msg).
 
@@ -990,10 +987,9 @@ send_data(State, SlideOp) ->
 %%      writes it to the DB. Then calls send_data_ack/3.
 %% @see send_data_ack/3
 -spec accept_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-                  Data::?DB:db_as_list()) -> dht_node_state:state().
+                  Data::dht_node_state:slide_data()) -> dht_node_state:state().
 accept_data(State, SlideOp, Data) ->
-    NewDB = ?DB:add_data(dht_node_state:get(State, db), Data),
-    State1 = dht_node_state:set_db(State, NewDB),
+    State1 = dht_node_state:slide_add_data(State, Data),
     NewSlideOp = slide_op:set_phase(SlideOp, wait_for_delta),
     Msg = {move, data_ack, slide_op:get_id(NewSlideOp)},
     send2(State1, NewSlideOp, Msg).
@@ -1040,14 +1036,10 @@ send_delta(State, SlideOp) ->
             false -> slide_op:get_interval(SlideOp)
         end,
     % send delta (values of keys that have changed during the move)
-    OldDB = dht_node_state:get(State, db),
-    {ChangedData, DeletedKeys} = ?DB:get_changes(OldDB, SlideOpInterval),
-    NewDB1 = ?DB:stop_record_changes(OldDB, SlideOpInterval),
-    NewDB = ?DB:delete_entries(NewDB1, SlideOpInterval),
-    State1 = dht_node_state:set_db(State, NewDB),
+    {State1, ChangedData} = dht_node_state:slide_take_delta_stop_record(State, SlideOpInterval),
     State2 = dht_node_state:rm_db_range(State1, slide_op:get_id(SlideOp)),
     SlOp1 = slide_op:set_phase(SlideOp, wait_for_delta_ack),
-    Msg = {move, delta, ChangedData, DeletedKeys, slide_op:get_id(SlOp1)},
+    Msg = {move, delta, ChangedData, slide_op:get_id(SlOp1)},
     send2(State2, SlOp1, Msg).
 
 %% @doc Accepts delta received during the given (existing!) slide operation and
@@ -1056,12 +1048,10 @@ send_delta(State, SlideOp) ->
 %%      the source pid (if it exists) and removes the slide operation from the
 %%      dht_node_state.
 -spec accept_delta(State::dht_node_state:state(), PredOrSucc::pred | succ,
-                   SlideOp::slide_op:slide_op(), ChangedData::?DB:db_as_list(),
-                   DeletedKeys::[?RT:key()]) -> dht_node_state:state().
-accept_delta(State, PredOrSucc, OldSlideOp, ChangedData, DeletedKeys) ->
-    NewDB1 = ?DB:add_data(dht_node_state:get(State, db), ChangedData),
-    NewDB2 = ?DB:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
-    State2 = dht_node_state:set_db(State, NewDB2),
+                   SlideOp::slide_op:slide_op(), ChangedData::dht_node_state:slide_delta())
+        -> dht_node_state:state().
+accept_delta(State, PredOrSucc, OldSlideOp, ChangedData) ->
+    State2 = dht_node_state:slide_add_delta(State, ChangedData),
     SlideOp = slide_op:set_msg_fwd(OldSlideOp, intervals:empty()),
     State3 = case PredOrSucc of
         succ -> State2;
