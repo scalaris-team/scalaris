@@ -35,7 +35,9 @@
 -export([set_tx_tp_db/2]).
 %% node moves:
 -export([get_slide/2, set_slide/3,
-        add_db_range/3, rm_db_range/2]).
+         slide_get_data_start_record/2, slide_add_data/2,
+         slide_take_delta_stop_record/2, slide_add_delta/2,
+         add_db_range/3, rm_db_range/2]).
 %% bulk owner:
 -export([add_bulkowner_reply_msg/5,
         take_bulkowner_reply_msgs/1,
@@ -46,7 +48,7 @@
 -export([set_prbr_state/3]).
 
 -ifdef(with_export_type_support).
--export_type([state/0, name/0, db_selector/0]).
+-export_type([state/0, name/0, db_selector/0, slide_data/0, slide_delta/0]).
 -endif.
 
 -type db_selector() :: kv. %%| tx_id | leases_1 | leases_2 | leases_3 | leases_4.
@@ -55,6 +57,10 @@
               | node_id | my_range | db_range | succ_range | join_time
               | db | tx_tp_db | proposer | load | slide_pred | slide_succ
               | msg_fwd | rm_state | monitor_proc | prbr_state.
+
+
+-type slide_data() :: MovingData::?DB:db_as_list().
+-type slide_delta() :: {ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()]}.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
@@ -371,3 +377,31 @@ details(State) ->
     Hostname = net_adm:localhost(),
     RTSize = get(State, rt_size),
     node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, erlang:memory(total)).
+
+-spec slide_get_data_start_record(state(), MovingInterval::intervals:interval())
+        -> {state(), slide_data()}.
+slide_get_data_start_record(State, MovingInterval) ->
+    OldDB = get(State, db),
+    MovingData = ?DB:get_entries(OldDB, MovingInterval),
+    NewDB = ?DB:record_changes(OldDB, MovingInterval),
+    {set_db(State, NewDB), MovingData}.
+
+-spec slide_add_data(state(),slide_data()) -> state().
+slide_add_data(State, Data) ->
+    NewDB = ?DB:add_data(dht_node_state:get(State, db), Data),
+    dht_node_state:set_db(State, NewDB).
+
+-spec slide_take_delta_stop_record(state(), MovingInterval::intervals:interval())
+        -> {state(), slide_delta()}.
+slide_take_delta_stop_record(State, MovingInterval) ->
+    OldDB = dht_node_state:get(State, db),
+    ChangedData = ?DB:get_changes(OldDB, MovingInterval),
+    NewDB1 = ?DB:stop_record_changes(OldDB, MovingInterval),
+    NewDB = ?DB:delete_entries(NewDB1, MovingInterval),
+    {dht_node_state:set_db(State, NewDB), ChangedData}.
+
+-spec slide_add_delta(state(), slide_delta()) -> state().
+slide_add_delta(State, {ChangedData, DeletedKeys}) ->
+    NewDB1 = ?DB:add_data(dht_node_state:get(State, db), ChangedData),
+    NewDB2 = ?DB:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
+    dht_node_state:set_db(State, NewDB2).
