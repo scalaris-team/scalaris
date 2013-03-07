@@ -151,7 +151,7 @@ java-test: compile java
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
 	sleep 5s ; \
-	ant -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" -buildfile java-api/build.xml test ; \
+	ant -Dscalaris.node="$(SCALARIS_JTEST_NAME)" -buildfile java-api/build.xml test ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$FAILED -ne 0 ]; then \
@@ -179,7 +179,7 @@ java-bench: compile java
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "jbench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
 	sleep 5s ; \
-	SCALARIS_JAPI_NODE="jbench_boot@localhost jbench_node1@localhost jbench_node2@localhost jbench_node3@localhost" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS); \
+	SCALARIS_JAPI_NODE="jbench_boot jbench_node1 jbench_node2 jbench_node3" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS); \
 	./bin/scalarisctl -n "jbench_boot" stop ; \
 	./bin/scalarisctl -n "jbench_node1" stop ; \
 	./bin/scalarisctl -n "jbench_node2" stop ; \
@@ -348,17 +348,17 @@ interop-test: compile java java-scalaris.test.compile python
 	-p $(SCALARIS_UNITTEST_PORT) \
 	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
 	sleep 5s ; \
-	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.log 2>&1; \
+	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)" de.zib.scalaris.InterOpTest -write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.log 2>&1; \
 	JAVA_WRITE_FAILED=$$? ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.log 2>&1 ; \
 	PYTHON_JSON_WRITE_FAILED=$$? ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_interop_test.rb write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.ruby_write.log 2>&1 ; \
 	RUBY_JSON_WRITE_FAILED=$$? ; \
-	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test java > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_read_java.log 2>&1 ; \
+	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)" de.zib.scalaris.InterOpTest -read interop_test java > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_read_java.log 2>&1 ; \
 	JAVA_READ_JAVA_FAILED=$$? ; \
-	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_read_python.log 2>&1 ; \
+	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)" de.zib.scalaris.InterOpTest -read interop_test json_python > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_read_python.log 2>&1 ; \
 	JAVA_READ_PYTHON_JSON_FAILED=$$? ; \
-	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)@localhost" de.zib.scalaris.InterOpTest -read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_read_ruby.log 2>&1 ; \
+	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)" de.zib.scalaris.InterOpTest -read interop_test json_ruby > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_read_ruby.log 2>&1 ; \
 	JAVA_READ_RUBY_JSON_FAILED=$$? ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py read interop_test java > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_read_java.log 2>&1 ; \
 	PYTHON_JSON_READ_JAVA_FAILED=$$? ; \
