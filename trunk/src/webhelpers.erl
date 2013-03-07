@@ -852,7 +852,7 @@ safe_html_string(Format, Data) ->
 
 %% @doc Escapes angle brackets within the string with their HTML counter parts
 %%      so that content is not mis-interpreted as HTML tags.
--spec safe_html_string(io_lib:chars() | [unicode:unicode_char()]) -> string().
+-spec safe_html_string(io_lib:chars()) -> string().
 safe_html_string(String) ->
     lists:flatten([case C of
                        $< -> "&lt;";
