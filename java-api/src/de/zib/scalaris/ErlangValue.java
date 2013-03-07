@@ -17,6 +17,7 @@ package de.zib.scalaris;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +38,7 @@ import com.ericsson.otp.erlang.OtpErlangTuple;
  * See {@link #ErlangValue(Object)} for a list of compatible types.
  *
  * @author Nico Kruber, kruber@zib.de
- * @version 3.5
+ * @version 3.19
  * @since 3.0
  */
 public class ErlangValue {
@@ -75,6 +76,8 @@ public class ErlangValue {
      * <ul>
      * <li>{@link List}&lt;Object&gt; with one of the native types except
      * <tt>byte[]</tt> or another (supported) list/map - {@link OtpErlangList}</li>
+     * <li>{@link Collection}&lt;Object&gt; same as {@link List}&lt;Object&gt;
+     * (internally represented as a list)</li>
      * <li>{@link Map}&lt;String, Object&gt; representing a JSON object -
      * {@link OtpErlangTuple}</li>
      * </ul>
@@ -128,12 +131,13 @@ public class ErlangValue {
             return new OtpErlangString((String) value);
         } else if (value instanceof byte[]) {
             return new OtpErlangBinary((byte[]) value);
-        } else if (value instanceof List<?>) {
-            final List<?> list = (List<?>) value;
+        } else if (value instanceof Collection<?>) {
+            // support collection types (represented internally as a list)
+            final Collection<?> list = (Collection<?>) value;
             final int listSize = list.size();
             final OtpErlangObject[] erlValue = new OtpErlangObject[listSize];
             int i = 0;
-            // TODO: optimise for specific lists?
+            // TODO: optimise for specific types, e.g. lists?
             for (final Object iter : list) {
                 erlValue[i] = convertToErlang(iter);
                 ++i;
@@ -437,6 +441,18 @@ public class ErlangValue {
     }
 
     /**
+     * Converts list elements to {@link String}s.
+     *
+     * @author Nico Kruber, kruber@zib.de
+     *
+     * @since 3.19
+     */
+    public static class StringListElementConverter implements
+            ListElementConverter<String> {
+        public String convert(final int i, final ErlangValue v) { return v.stringValue(); }
+    }
+
+    /**
      * Returns a list of mixed Java values of the wrapped erlang value.
      *
      * @param <T>
@@ -460,6 +476,41 @@ public class ErlangValue {
     }
 
     /**
+     * Returns a {@link Collection} of mixed Java values of the wrapped erlang
+     * value (internally represented as a list in Erlang).
+     *
+     * @param <T>
+     *            type of the elements in the list
+     * @param clazz
+     *            class of the result type
+     * @param converter
+     *            object that converts the list value to the desired type
+     *
+     * @return the converted value
+     *
+     * @throws ClassCastException
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
+     *
+     * @since 3.19
+     */
+    public <T> Collection<T> listCollectionValue(
+            final Class<? extends Collection<T>> clazz,
+            final ListElementConverter<T> converter) throws ClassCastException {
+        final OtpErlangList list = otpObjectToOtpList(value);
+        Collection<T> result;
+        try {
+            result = clazz.newInstance();
+            for (int i = 0; i < list.arity(); ++i) {
+                result.add(converter.convert(i, new ErlangValue(list.elementAt(i))));
+            }
+            return result;
+        } catch (final Exception e) {
+            throw new ClassCastException("Error creating collection: " + e.getMessage());
+        }
+    }
+
+    /**
      * Returns a list of mixed Java values (wrapped in {@link ErlangValue}
      * objects) of the wrapped erlang value.
      *
@@ -471,6 +522,30 @@ public class ErlangValue {
      */
     public List<ErlangValue> listValue() throws ClassCastException {
         return listValue(new ListElementConverter<ErlangValue>() {
+            public ErlangValue convert(final int i, final ErlangValue v) { return v; }
+        });
+    }
+
+    /**
+     * Returns a {@link Collection} of mixed Java values (wrapped in
+     * {@link ErlangValue} objects) of the wrapped erlang value (internally
+     * represented as a list in Erlang).
+     *
+     * @param clazz
+     *            class of the result type
+     *
+     * @return the converted value
+     *
+     * @throws ClassCastException
+     *             if thrown if a conversion is not possible, i.e. the type is
+     *             not supported
+     *
+     * @since 3.19
+     */
+    public Collection<ErlangValue> listCollectionValue(
+            final Class<? extends Collection<ErlangValue>> clazz)
+            throws ClassCastException {
+        return listCollectionValue(clazz, new ListElementConverter<ErlangValue>() {
             public ErlangValue convert(final int i, final ErlangValue v) { return v; }
         });
     }
@@ -524,9 +599,7 @@ public class ErlangValue {
      * @see #listValue(ListElementConverter)
      */
     public List<String> stringListValue() throws ClassCastException {
-        return listValue(new ListElementConverter<String>() {
-            public String convert(final int i, final ErlangValue v) { return v.stringValue(); }
-        });
+        return listValue(new StringListElementConverter());
     }
 
     /**
