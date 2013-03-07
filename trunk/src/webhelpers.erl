@@ -71,7 +71,7 @@ delete_key(Key, Timeout) ->
     util:tc(api_rdht, delete, [Key, Timeout]).
 
 %%%--------------------------Vivaldi-Map------------------------------
--spec getVivaldiMap() -> [{comm:mypid(), vivaldi:network_coordinate()}].
+-spec getVivaldiMap() -> [{{comm:mypid(), node_details:hostname()}, vivaldi:network_coordinate()}].
 getVivaldiMap() ->
     Nodes = [{
                 node:pidX(node_details:get(Node, node))

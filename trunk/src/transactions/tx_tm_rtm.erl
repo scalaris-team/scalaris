@@ -892,13 +892,12 @@ trigger_delete_if_done(TxState, State) ->
 %% @doc Merges the item states transferred in a ?tx_tm_rtm_init_RTM message
 %%      into the locally known state, initiates new paxos processes and
 %%      returns the holdback (message) queue. 
--spec merge_item_states(Tid::tx_id(),
-                        [{tx_tlog:tlog_entry(), tx_item_id()}],
+-spec merge_item_states(Tid::tx_id(), [tx_item_id()],
                         [{EntryId::tx_item_id(),
                           Maj_for_prepared::non_neg_integer(),
-                          Maj_for_abort::non_neg_integer()}],
+                          Maj_for_abort::non_neg_integer(), tx_tlog:tlog_entry()}],
                          State::state(), Learners::[comm:mypid()], LAcceptor::pid())
-        -> HoldBackQ::[comm:message()].
+        -> HoldBackQ::[[comm:message()]].
 merge_item_states(_Tid, [], [], _State, _Learners, _LAcceptor) -> [];
 merge_item_states(Tid, [EntryId | RestLocal],
                   [{EntryId, Maj_for_prepared, Maj_for_abort, TLogEntry} | RestNew],
