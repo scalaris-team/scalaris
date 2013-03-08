@@ -358,7 +358,7 @@ details(State, Which) ->
                     hostname    -> node_details:set(NodeDetails, hostname, net_adm:localhost());
                     message_log -> node_details:set(NodeDetails, message_log, ok);
                     memory      -> node_details:set(NodeDetails, memory, erlang:memory(total));
-                    is_leaving  -> node_details:set(NodeDetails, Elem, rm_loop:has_left(dht_node_state:get(State, rm_state)));
+                    is_leaving  -> node_details:set(NodeDetails, Elem, rm_loop:has_left(get(State, rm_state)));
                     Tag         -> node_details:set(NodeDetails, Tag, get(State, Tag))
                 end
         end,
@@ -388,20 +388,20 @@ slide_get_data_start_record(State, MovingInterval) ->
 
 -spec slide_add_data(state(),slide_data()) -> state().
 slide_add_data(State, Data) ->
-    NewDB = ?DB:add_data(dht_node_state:get(State, db), Data),
-    dht_node_state:set_db(State, NewDB).
+    NewDB = ?DB:add_data(get(State, db), Data),
+    set_db(State, NewDB).
 
 -spec slide_take_delta_stop_record(state(), MovingInterval::intervals:interval())
         -> {state(), slide_delta()}.
 slide_take_delta_stop_record(State, MovingInterval) ->
-    OldDB = dht_node_state:get(State, db),
+    OldDB = get(State, db),
     ChangedData = ?DB:get_changes(OldDB, MovingInterval),
     NewDB1 = ?DB:stop_record_changes(OldDB, MovingInterval),
     NewDB = ?DB:delete_entries(NewDB1, MovingInterval),
-    {dht_node_state:set_db(State, NewDB), ChangedData}.
+    {set_db(State, NewDB), ChangedData}.
 
 -spec slide_add_delta(state(), slide_delta()) -> state().
 slide_add_delta(State, {ChangedData, DeletedKeys}) ->
-    NewDB1 = ?DB:add_data(dht_node_state:get(State, db), ChangedData),
+    NewDB1 = ?DB:add_data(get(State, db), ChangedData),
     NewDB2 = ?DB:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
-    dht_node_state:set_db(State, NewDB2).
+    set_db(State, NewDB2).
