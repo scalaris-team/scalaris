@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -47,8 +47,9 @@
          make_slide/5,
          make_slide_leave/2, make_jump/4,
          crashed_node/3,
-         send/3, send_no_slide/3, send2/3, % for dht_node_join
          check_config/0]).
+% for dht_node_join, slide_chord:
+-export([send/3, send_no_slide/3, send2/3, continue_slide_delta/3, finish_slide/3]).
 
 -ifdef(with_export_type_support).
 -export_type([move_message/0]).
@@ -909,226 +910,114 @@ find_incremental_target_id(Neighbors, State, FinalTargetId, Type, OtherMTE) ->
         throw:empty_db -> FinalTargetId
     end.
 
-%% @doc Change the local node's ID to the given TargetId by calling the ring
-%%      maintenance and changing the slide operation's phase to
-%%      wait_for_node_update. 
+%% @doc Change the local node's ID to the given TargetId and progresses to the
+%%      next phase, e.g. wait_for_node_update. 
+%% @see slide_chord:change_my_id/2
 -spec change_my_id(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> dht_node_state:state().
 change_my_id(State, SlideOp) ->
     SlideOp1 = slide_op:set_setup_at_other(SlideOp),
-    case slide_op:get_sendORreceive(SlideOp1) of
-        'send' ->
-            State1 = dht_node_state:add_db_range(
-                       State, slide_op:get_interval(SlideOp1),
-                       slide_op:get_id(SlideOp1)),
-            SlideOp2 = SlideOp1;
-        'rcv'  ->
-            State1 = State,
-            SlideOp2 = slide_op:set_msg_fwd(SlideOp1, slide_op:get_interval(SlideOp1))
-    end,
-    case slide_op:is_leave(SlideOp2) of
-        true ->
-            rm_loop:leave(),
-            % de-activate processes not needed anymore:
-            dht_node_reregister:deactivate(),
-            % note: do not deactivate gossip, vivaldi or dc_clustering -
-            % their values are still valid and still count!
-%%             gossip:deactivate(),
-%%             dc_clustering:deactivate(),
-%%             vivaldi:deactivate(),
-            cyclon:deactivate(),
-            rt_loop:deactivate(),
-            dht_node_state:set_slide(
-              State1, succ, slide_op:set_phase(SlideOp2, wait_for_node_update));
-        _ ->
-            % note: subscribe with fully qualified function names, i.e. module:fun/arity
-            % (a so created fun seems to be the same no matter where created)
-            TargetId = slide_op:get_target_id(SlideOp2),
-            RMSubscrTag = {move, slide_op:get_id(SlideOp2)},
-            rm_loop:subscribe(self(), RMSubscrTag,
-                              fun(_OldN, NewN, _IsSlide) ->
-                                      nodelist:nodeid(NewN) =:= TargetId
-                                      % note: no need to check the id version
-                              end,
-                              fun dht_node_move:rm_send_node_change/4, 1),
-            rm_loop:update_id(TargetId),
-            dht_node_state:set_slide(
-              State1, succ, slide_op:set_phase(SlideOp2, wait_for_node_update))
-    end.
+    slide_chord:change_my_id(State, SlideOp1).
 
-%% @doc Requests data from the node of the given slide operation, sets the
-%%      slide operation's phase to
-%%      wait_for_data and sets the slide operation in the dht node's state.
+%% @doc Requests data from the node of the given slide operation and progresses
+%%      to the next phase, e.g. wait_for_data.
+%% @see slide_chord:request_data/2
 -spec request_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 request_data(State, SlideOp) ->
-    NewSlideOp = slide_op:set_phase(SlideOp, wait_for_data),
-    Msg = {move, req_data, slide_op:get_id(NewSlideOp)},
-    send2(State, NewSlideOp, Msg).
+    slide_chord:request_data(State, SlideOp).
 
-%% @doc Gets all data in the slide operation's interval from the DB and sends
-%%      it to the target node. Also sets the DB to record changes in this
-%%      interval and changes the slide operation's phase to wait_for_data_ack.
+%% @doc Sends data in the slide operation's interval and progresses to the next
+%%      phase, e.g. wait_for_data_ack.
+%% @see slide_chord:send_data/2
 -spec send_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 send_data(State, SlideOp) ->
-    % last part of a leave? -> transfer all DB entries!
-    % since in this case there is no other slide, we can safely use intervals:all()
-    MovingInterval =
-        case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp)
-                 andalso slide_op:get_next_op(SlideOp) =:= {none} of
-            true  -> intervals:all();
-            false -> slide_op:get_interval(SlideOp)
-        end,
-    {State_NewDB, MovingData} = dht_node_state:slide_get_data_start_record(State, MovingInterval),
-    NewSlideOp = slide_op:set_phase(SlideOp, wait_for_data_ack),
-    Msg = {move, data, MovingData, slide_op:get_id(NewSlideOp)},
-    send2(State_NewDB, NewSlideOp, Msg).
+    slide_chord:send_data(State, SlideOp).
 
 %% @doc Accepts data received during the given (existing!) slide operation and
-%%      writes it to the DB. Then calls send_data_ack/3.
-%% @see send_data_ack/3
+%%      writes it to the DB.
+%% @see slide_chord:accept_data/2
 -spec accept_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                   Data::dht_node_state:slide_data()) -> dht_node_state:state().
 accept_data(State, SlideOp, Data) ->
-    State1 = dht_node_state:slide_add_data(State, Data),
-    NewSlideOp = slide_op:set_phase(SlideOp, wait_for_delta),
-    Msg = {move, data_ack, slide_op:get_id(NewSlideOp)},
-    send2(State1, NewSlideOp, Msg).
+    slide_chord:accept_data(State, SlideOp, Data).
 
-%% @doc Tries to send the delta to the predecessor. If a slide is sending
-%%      data to its predecessor, we need to take care that the delta is not
-%%      send before the predecessor has changed its ID and our node knows
-%%      about it.
+%% @doc Tries to send the delta to the predecessor.
+%% @see slide_chord:try_send_delta_to_pred/2
 -spec try_send_delta_to_pred(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 try_send_delta_to_pred(State, SlideOp) ->
-    ExpPredId = slide_op:get_target_id(SlideOp),
-    Pred = dht_node_state:get(State, pred),
-    case node:id(Pred) of
-        ExpPredId ->
-            send_delta(State, SlideOp);
-        _ ->
-            SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update_data_ack),
-            RMSubscrTag = {move, slide_op:get_id(SlideOp)},
-            rm_loop:subscribe(
-              self(), RMSubscrTag,
-              fun(RMOldN, RMNewN, _IsSlide) ->
-                      RMNewPred = nodelist:pred(RMNewN),
-                      RMOldPred = nodelist:pred(RMOldN),
-                      RMOldPred =/= RMNewPred orelse
-                          node:id(RMNewPred) =:= ExpPredId
-              end,
-              fun dht_node_move:rm_notify_new_pred/4, 1),
-            dht_node_state:set_slide(State, pred, SlideOp1)
-    end.
+    slide_chord:try_send_delta_to_pred(State, SlideOp).
 
-%% @doc Gets changed data in the slide operation's interval from the DB and
-%%      sends as a delta to the target node. Also sets the DB to stop recording
-%%      changes in this interval and delete any such entries. Changes the slide
-%%      operation's phase to wait_for_delta_ack and calls send_delta2/5.
-%% @see send_delta2/5
+%% @doc Sends delta info and progresses to the next phase, e.g. wait_for_delta_ack.
+%% @see slide_chord:send_delta/2
 -spec send_delta(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 send_delta(State, SlideOp) ->
-    % last part of a leave? -> transfer all DB entries!
-    % since in this case there is no other slide, we can safely use intervals:all()
-    SlideOpInterval =
-        case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp)
-                 andalso slide_op:get_next_op(SlideOp) =:= {none} of
-            true  -> intervals:all();
-            false -> slide_op:get_interval(SlideOp)
-        end,
-    % send delta (values of keys that have changed during the move)
-    {State1, ChangedData} = dht_node_state:slide_take_delta_stop_record(State, SlideOpInterval),
-    State2 = dht_node_state:rm_db_range(State1, slide_op:get_id(SlideOp)),
-    SlOp1 = slide_op:set_phase(SlideOp, wait_for_delta_ack),
-    Msg = {move, delta, ChangedData, slide_op:get_id(SlOp1)},
-    send2(State2, SlOp1, Msg).
+    slide_chord:send_delta(State, SlideOp).
 
 %% @doc Accepts delta received during the given (existing!) slide operation and
-%%      writes it to the DB. Then removes the dht_node's message forward for 
-%%      the slide operation's interval, sends a delta_ack message, notifies
-%%      the source pid (if it exists) and removes the slide operation from the
-%%      dht_node_state.
+%%      continues.
+%% @see slide_chord:accept_delta/4
 -spec accept_delta(State::dht_node_state:state(), PredOrSucc::pred | succ,
                    SlideOp::slide_op:slide_op(), ChangedData::dht_node_state:slide_delta())
         -> dht_node_state:state().
 accept_delta(State, PredOrSucc, OldSlideOp, ChangedData) ->
-    State2 = dht_node_state:slide_add_delta(State, ChangedData),
-    SlideOp = slide_op:set_msg_fwd(OldSlideOp, intervals:empty()),
-    State3 = case PredOrSucc of
-        succ -> State2;
-        pred ->
-            % optimization: until we know about the new id of our pred (or a
-            % new pred), add the range to the db_range so our node already
-            % responds to such messages
-            ExpPredId = slide_op:get_target_id(SlideOp),
-            OldPred = slide_op:get_node(SlideOp),
-            MoveFullId = slide_op:get_id(SlideOp),
-            rm_loop:subscribe(
-              self(), {move, MoveFullId},
-              fun(RMOldN, RMNewN, _IsSlide) ->
-                      RMNewPred = nodelist:pred(RMNewN),
-                      RMOldPred = nodelist:pred(RMOldN),
-                      RMOldPred =/= RMNewPred orelse
-                          node:id(RMNewPred) =:= ExpPredId orelse
-                          RMNewPred =/= OldPred
-              end,
-              fun(Pid, {move, RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
-                      ?TRACE_SEND(Pid, {move, rm_db_range, RMSlideId}),
-                      comm:send_local(Pid, {move, rm_db_range, RMSlideId})
-              end, 1),
-            
-            dht_node_state:add_db_range(
-              State2, slide_op:get_interval(SlideOp),
-              MoveFullId)
-    end,
+    slide_chord:accept_delta(State, PredOrSucc, OldSlideOp, ChangedData).
 
-    % continue with the next planned operation:
-    case slide_op:is_incremental(SlideOp) of
-        true -> continue_slide_delta(State3, PredOrSucc, SlideOp);
-        _ ->
-            case slide_op:get_next_op(SlideOp) of
-                {none} -> accept_delta2(State3, PredOrSucc, SlideOp);
-                {join, _NewTargetId} ->
-                    log:log(warn, "[ dht_node_move ~.0p ] ignoring scheduled join after "
-                                  "receiving data (this doesn't make any sense!)",
-                            [comm:this()]),
-                    accept_delta2(State3, PredOrSucc, SlideOp);
-                {slide, PredOrSucc, NewTargetId, NewTag, NewSourcePid} ->
-                    % continue operation with the same node previously sliding with
-                    % TODO: piggy-back slide setup information with delta_ack
-                    % {move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
-                    State4 = accept_delta2(State3, PredOrSucc, SlideOp),
-                    make_slide(State4, PredOrSucc, NewTargetId, NewTag, NewSourcePid);
-                {slide, PredOrSucc2, NewTargetId, NewTag, NewSourcePid} ->
-                    % try setting up a slide with the other node
-                    State5 = accept_delta2(State3, PredOrSucc, SlideOp),
-                    make_slide(State5, PredOrSucc2, NewTargetId, NewTag, NewSourcePid);
-                {jump, NewTargetId, NewTag, NewSourcePid} ->
-                    % finish current slide, then set up jump
-                    % TODO: piggy-back slide setup information with delta_ack (if possible)
-                    State6 = accept_delta2(State3, PredOrSucc, SlideOp),
-                    make_jump(State6, NewTargetId, NewTag, NewSourcePid);
-                {leave, NewSourcePid} ->
-                    % finish current slide, then set up leave
-                    % (this is not a continued operation!)
-                    State7 = accept_delta2(State3, PredOrSucc, SlideOp),
-                    make_slide_leave(State7, NewSourcePid)
-            end
-    end.
-
+%% @doc Acknowledges a received delta by replying to the other node.
+%% @see slide_chord:accept_delta2/3
 -spec accept_delta2(State::dht_node_state:state(), PredOrSucc::pred | succ,
                     SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 accept_delta2(State, PredOrSucc, SlideOp) ->
+    slide_chord:accept_delta2(State, PredOrSucc, SlideOp).
+
+-spec finish_slide(State::dht_node_state:state(), PredOrSucc::pred | succ,
+                    SlideOp::slide_op:slide_op()) -> dht_node_state:state().
+finish_slide(State, PredOrSucc, SlideOp) ->
     Pid = node:pidX(slide_op:get_node(SlideOp)),
     MoveFullId = slide_op:get_id(SlideOp),
     fd:unsubscribe([Pid], {move, MoveFullId}),
-    Msg = {move, delta_ack, MoveFullId},
-    send_no_slide(Pid, Msg, 0),
     notify_source_pid(slide_op:get_source_pid(SlideOp),
                       {move, result, slide_op:get_tag(SlideOp), ok}),
     rm_loop:notify_slide_finished(PredOrSucc),
     dht_node_state:set_slide(State, PredOrSucc, null).
 
+-spec continue_slide_delta(State::dht_node_state:state(), PredOrSucc::pred | succ,
+                           SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 continue_slide_delta(State, PredOrSucc, SlideOp) ->
+    % continue with the next planned operation:
+    case slide_op:is_incremental(SlideOp) of
+        true -> continue_incremental_slide_delta(State, PredOrSucc, SlideOp);
+        _ ->
+            % note: send delta_ack and a potential new slide setup in two
+            %       messages so new op suggestions also have a chance to be
+            %       setup instead
+            State1 = accept_delta2(State, PredOrSucc, SlideOp),
+            case slide_op:get_next_op(SlideOp) of
+                {none} -> State1;
+                {join, _NewTargetId} ->
+                    log:log(warn, "[ dht_node_move ~.0p ] ignoring scheduled join after "
+                                  "receiving data (this doesn't make any sense!)",
+                            [comm:this()]),
+                    State1;
+                {slide, PredOrSucc, NewTargetId, NewTag, NewSourcePid} ->
+                    % continue operation with the same node previously sliding with
+                    make_slide(State1, PredOrSucc, NewTargetId, NewTag, NewSourcePid);
+                {slide, PredOrSucc2, NewTargetId, NewTag, NewSourcePid} ->
+                    % try setting up a slide with the other node
+                    make_slide(State1, PredOrSucc2, NewTargetId, NewTag, NewSourcePid);
+                {jump, NewTargetId, NewTag, NewSourcePid} ->
+                    % finish current slide, then set up jump
+                    make_jump(State1, NewTargetId, NewTag, NewSourcePid);
+                {leave, NewSourcePid} ->
+                    % finish current slide, then set up leave
+                    % (this is not a continued operation!)
+                    make_slide_leave(State1, NewSourcePid)
+            end
+    end.
+
+-spec continue_incremental_slide_delta(
+        State::dht_node_state:state(), PredOrSucc::pred | succ,
+        SlideOp::slide_op:slide_op()) -> dht_node_state:state().
+continue_incremental_slide_delta(State, PredOrSucc, SlideOp) ->
     Type = slide_op:get_type(SlideOp),
     % TODO: support other types
     case slide_op:get_next_op(SlideOp) of
@@ -1186,10 +1075,7 @@ notify_other_in_delta_ack(OldMoveFullId, NextSlideOp, State) ->
 -spec finish_delta_ack(State::dht_node_state:state(), PredOrSucc::pred | succ,
                        SlideOp::slide_op:slide_op()) -> dht_node_state:state().
 finish_delta_ack(State, PredOrSucc, SlideOp) ->
-    fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp))], {move, slide_op:get_id(SlideOp)}),
-    notify_source_pid(slide_op:get_source_pid(SlideOp),
-                      {move, result, slide_op:get_tag(SlideOp), ok}),
-    rm_loop:notify_slide_finished(PredOrSucc),
+    State1 = finish_slide(State, PredOrSucc, SlideOp),
     case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp) of
         true ->
             SupDhtNodeId = erlang:get(my_sup_dht_node_id),
@@ -1198,9 +1084,8 @@ finish_delta_ack(State, PredOrSucc, SlideOp) ->
                             {delete_node, SupDhtNode, SupDhtNodeId}),
             % note: we will be killed soon but need to be removed from the supervisor first
             % -> do not kill this process
-            State;
+            State1;
         _    ->
-            State1 = dht_node_state:set_slide(State, PredOrSucc, null),
             % continue with the next planned operation:
             case slide_op:get_next_op(SlideOp) of
                 {none} -> State1;
