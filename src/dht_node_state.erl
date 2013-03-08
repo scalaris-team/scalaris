@@ -37,6 +37,8 @@
 -export([get_slide/2, set_slide/3,
          slide_get_data_start_record/2, slide_add_data/2,
          slide_take_delta_stop_record/2, slide_add_delta/2,
+         slide_stop_record/3,
+         get_split_key/4,
          add_db_range/3, rm_db_range/2]).
 %% bulk owner:
 -export([add_bulkowner_reply_msg/5,
@@ -378,6 +380,8 @@ details(State) ->
     RTSize = get(State, rt_size),
     node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, erlang:memory(total)).
 
+%% @doc Gets all entries to transfer (slide) in the given range and starts delta
+%%      recording on the DB for changes in this interval.
 -spec slide_get_data_start_record(state(), MovingInterval::intervals:interval())
         -> {state(), slide_data()}.
 slide_get_data_start_record(State, MovingInterval) ->
@@ -386,22 +390,43 @@ slide_get_data_start_record(State, MovingInterval) ->
     NewDB = ?DB:record_changes(OldDB, MovingInterval),
     {set_db(State, NewDB), MovingData}.
 
+%% @doc Adds data from slide_get_data_start_record/2 to the local DB.
 -spec slide_add_data(state(),slide_data()) -> state().
 slide_add_data(State, Data) ->
     NewDB = ?DB:add_data(get(State, db), Data),
     set_db(State, NewDB).
 
+%% @doc Gets all DB changes in the given interval, stops recording delta infos
+%%      and removes the entries in this range from the DB.
 -spec slide_take_delta_stop_record(state(), MovingInterval::intervals:interval())
         -> {state(), slide_delta()}.
 slide_take_delta_stop_record(State, MovingInterval) ->
     OldDB = get(State, db),
     ChangedData = ?DB:get_changes(OldDB, MovingInterval),
-    NewDB1 = ?DB:stop_record_changes(OldDB, MovingInterval),
-    NewDB = ?DB:delete_entries(NewDB1, MovingInterval),
-    {set_db(State, NewDB), ChangedData}.
+    NewState = slide_stop_record(State, MovingInterval, true),
+    {NewState, ChangedData}.
 
+%% @doc Adds delta infos from slide_take_delta_stop_record/2 to the local DB.
 -spec slide_add_delta(state(), slide_delta()) -> state().
 slide_add_delta(State, {ChangedData, DeletedKeys}) ->
     NewDB1 = ?DB:add_data(get(State, db), ChangedData),
     NewDB2 = ?DB:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
     set_db(State, NewDB2).
+
+%% @doc Stops recording changes in the given interval.
+%%      Optionally, the data in this range can be deleted.
+-spec slide_stop_record(state(), MovingInterval::intervals:interval(),
+                        RemoveDataInInterval::boolean()) -> state().
+slide_stop_record(State, MovingInterval, Remove) ->
+    NewDB1 = ?DB:stop_record_changes(get(State, db), MovingInterval),
+    NewDB = if Remove -> ?DB:delete_entries(NewDB1, MovingInterval);
+               true   -> NewDB1
+            end,
+    set_db(State, NewDB).
+
+%% @doc Returns a key so that there are no more than TargetLoad entries
+%%      between Begin and this key in the DB.
+-spec get_split_key(state(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
+        -> {?RT:key(), TakenLoad::pos_integer()}.
+get_split_key(State, Begin, TargetLoad, Direction) ->
+    ?DB:get_split_key(get(State, db), Begin, TargetLoad, Direction).
