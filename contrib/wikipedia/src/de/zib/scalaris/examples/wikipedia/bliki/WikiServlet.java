@@ -807,11 +807,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.getInvolvedKeys().addAll(result.involvedKeys);
         final String serviceUser = page.getServiceUser().isEmpty() ? "" : "&service_user=" + page.getServiceUser();
         String redirectUrl;
+        ArrayList<Long> times = new ArrayList<Long>();
+        for (List<Long> time : result.stats.values()) {
+            times.addAll(time);
+        }
         if (result.success) {
-            ArrayList<Long> times = new ArrayList<Long>();
-            for (List<Long> time : result.stats.values()) {
-                times.addAll(time);
-            }
             StringBuilder redirectUrl0 = new StringBuilder(256);
             redirectUrl0.append("?title=");
             redirectUrl0.append(URLEncoder.encode(result.value.denormalise(namespace), "UTF-8"));
@@ -826,9 +826,16 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             showEmptyPage(request, response, connection, page);
             return;
         } else {
-            redirectUrl = response.encodeRedirectURL("?title=" + MAIN_PAGE
-                    + "&notice=error: can not view random page: <pre>"
-                    + result.message + "</pre>" + serviceUser);
+            StringBuilder redirectUrl0 = new StringBuilder(256);
+            redirectUrl0.append("?title=");
+            redirectUrl0.append(URLEncoder.encode(MAIN_PAGE, "UTF-8"));
+            redirectUrl0.append("&random_times=" + StringUtils.join(times, "%2C"));
+            redirectUrl0.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
+            redirectUrl0.append("&notice=" + URLEncoder.encode("error: can not view random page: <pre>" + result.message + "</pre>", "UTF-8"));
+            redirectUrl = "http://" + Options.getInstance().SERVERNAME
+                    + Options.getInstance().SERVERPATH
+                    + response.encodeRedirectURL(redirectUrl0.toString())
+                    + serviceUser;
         }
         for (WikiEventHandler handler: eventHandlers) {
             handler.onViewRandomPage(page, result, connection);
