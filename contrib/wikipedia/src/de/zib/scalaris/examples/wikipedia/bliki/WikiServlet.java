@@ -904,7 +904,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 page.setEditRestricted(true);
             }
 
-            forwardToPageJsp(request, response, connection, page);
+            forwardToPageJsp(request, response, connection, page, "page.jsp");
         } else {
             setParam_error(request, "ERROR: revision unavailable");
             addToParam_notice(request, "error: unknown error getting page " + title + ":" + req_oldid + ": <pre>" + result.message + "</pre>");
@@ -1213,7 +1213,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
-        forwardToPageJsp(request, response, connection, page);
+        forwardToPageJsp(request, response, connection, page, "page.jsp");
     }
 
     /**
@@ -1233,11 +1233,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      */
     protected void forwardToPageJsp(HttpServletRequest request,
             HttpServletResponse response, Connection connection,
-            WikiPageBean page) throws ServletException, IOException {
+            WikiPageBeanBase page, String jsp) throws ServletException, IOException {
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", page);
         request.setAttribute("servlet", this);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
+        RequestDispatcher dispatcher = request.getRequestDispatcher(jsp);
         dispatcher.forward(request, response);
     }
     
@@ -1290,7 +1290,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
-        forwardToPageJsp(request, response, connection, page);
+        forwardToPageJsp(request, response, connection, page, "page.jsp");
     }
 
     /**
@@ -1340,13 +1340,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             page.setWikiTitle(siteinfo.getSitename());
             page.setWikiNamespace(namespace);
-            
-            // forward the request and the bean to the jsp:
-            request.setAttribute("pageBean", page);
-            request.setAttribute("servlet", this);
-            RequestDispatcher dispatcher = request
-                    .getRequestDispatcher("pageHistory.jsp");
-            dispatcher.forward(request, response);
+
+            forwardToPageJsp(request, response, connection, page, "pageHistory.jsp");
         } else {
             setParam_error(request, "ERROR: revision list unavailable");
             addToParam_notice(request, "error: unknown error getting revision list for page " + title + ": <pre>" + result.message + "</pre>");
@@ -1411,16 +1406,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             }
             page.setPages(pageList);
             page.setFoundFullMatch(foundMatch);
-            
             page.setWikiTitle(siteinfo.getSitename());
             page.setWikiNamespace(namespace);
             
-            // forward the request and the bean to the jsp:
-            request.setAttribute("pageBean", page);
-            request.setAttribute("servlet", this);
-            RequestDispatcher dispatcher = request
-                    .getRequestDispatcher("pageSpecial_pagelist.jsp");
-            dispatcher.forward(request, response);
+            forwardToPageJsp(request, response, connection, page, "pageSpecial_pagelist.jsp");
         } else {
             if (result.connect_failed) {
                 setParam_error(request, "ERROR: DB connection failed");
@@ -1762,7 +1751,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             WikiPageBeanBase page) throws ServletException, IOException {
         page.setNotice(getParam_notice(request));
         page.setError(getParam_error(request));
-        forwardToPageJsp(request, response, connection, new WikiPageBean(page));
+        forwardToPageJsp(request, response, connection, new WikiPageBean(page), "page.jsp");
     }
     
     /**
@@ -1852,11 +1841,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
-        // forward the request and the bean to the jsp:
-        request.setAttribute("pageBean", page);
-        request.setAttribute("servlet", this);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("pageEdit.jsp");
-        dispatcher.forward(request, response);
+        forwardToPageJsp(request, response, connection, page, "pageEdit.jsp");
     }
     
     /**
@@ -1987,11 +1972,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
 
-        // forward the request and the bean to the jsp:
-        request.setAttribute("pageBean", page);
-        request.setAttribute("servlet", this);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("pageEdit.jsp");
-        dispatcher.forward(request, response);
+        forwardToPageJsp(request, response, connection, page, "pageEdit.jsp");
     }
     
     /**
