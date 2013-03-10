@@ -940,9 +940,11 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
      *            {@link #renderRevision()}, this will be <tt>false</tt>,
      *            otherwise always use <tt>true</tt>
      */
-    private void renderRevision(String title, RevisionResult result,
-            int renderer, HttpServletRequest request, Connection connection,
-            WikiPageBean page, boolean noRedirect, MyWikiModel wikiModel, boolean topLevel) {
+    private void renderRevision(final String title,
+            final RevisionResult result, final int renderer,
+            final HttpServletRequest request, final Connection connection,
+            final WikiPageBean page, final boolean noRedirect,
+            final MyWikiModel wikiModel, final boolean topLevel) {
         // set the page's contents according to the renderer used
         // (categories are included in the content string, so they only
         // need special handling the wiki renderer is used)
@@ -1066,41 +1068,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             page.setVersion(result.revision.getId());
             page.setDate(Revision.stringToCalendar(result.revision.getTimestamp()));
         }
-
         page.setNotice(getParam_notice(request));
-        final String[] pageSaveTimes = getParam(request, "save_times").split(",");
-        for (String pageSaveTime : pageSaveTimes) {
-            final int pageSaveTimeInt = parseInt(pageSaveTime, -1);
-            if (pageSaveTimeInt >= 0) {
-                final String statName = "SAVE:" + title;
-                page.addStat(statName, pageSaveTimeInt);
-            }
-        }
-        final int pageSaveServerTime = parseInt(getParam(request, "server_time"), -1);
-        if (pageSaveServerTime >= 0) {
-            page.addStat("server_time (last op)", pageSaveServerTime);
-        }
-        page.setSaveAttempts(parseInt(getParam(request, "save_attempts"), 0));
-        for (int i = 1; i <= Options.getInstance().WIKI_SAVEPAGE_RETRIES; ++i) {
-            final String failedKeysPar = getParam(request, "failed_keys" + i);
-            if (!failedKeysPar.isEmpty()) {
-                final List<String> pageSaveFailedKeys = Arrays.asList(failedKeysPar.split(" # "));
-                page.getFailedKeys().put(i, pageSaveFailedKeys);
-            }
-        }
-        final String involvedKeysPar = getParam(request, "involved_keys");
-        if (!involvedKeysPar.isEmpty()) {
-            page.getInvolvedKeys().add(new InvolvedKey());
-            InvolvedKey.addInvolvedKeys(page.getInvolvedKeys(), Arrays.asList(involvedKeysPar.split(" # ")), true);
-        }
-        final String[] pageRandomTimes = getParam(request, "random_times").split(",");
-        for (String pageRandomTime : pageRandomTimes) {
-            final int pageRandomTimeInt = parseInt(pageRandomTime, -1);
-            if (pageRandomTimeInt >= 0) {
-                final String statName = "RANDOM_PAGE (last op)";
-                page.addStat(statName, pageRandomTimeInt);
-            }
-        }
         page.setError(getParam_error(request));
         page.setWikiTitle(siteinfo.getSitename());
         page.setWikiNamespace(namespace);
@@ -1234,6 +1202,39 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     protected void forwardToPageJsp(HttpServletRequest request,
             HttpServletResponse response, Connection connection,
             WikiPageBeanBase page, String jsp) throws ServletException, IOException {
+        final String[] pageSaveTimes = getParam(request, "save_times").split(",");
+        for (String pageSaveTime : pageSaveTimes) {
+            final int pageSaveTimeInt = parseInt(pageSaveTime, -1);
+            if (pageSaveTimeInt >= 0) {
+                final String statName = "SAVE:" + page.getTitle();
+                page.addStat(statName, pageSaveTimeInt);
+            }
+        }
+        final int pageSaveServerTime = parseInt(getParam(request, "server_time"), -1);
+        if (pageSaveServerTime >= 0) {
+            page.addStat("server_time (last op)", pageSaveServerTime);
+        }
+        page.setSaveAttempts(parseInt(getParam(request, "save_attempts"), 0));
+        for (int i = 1; i <= Options.getInstance().WIKI_SAVEPAGE_RETRIES; ++i) {
+            final String failedKeysPar = getParam(request, "failed_keys" + i);
+            if (!failedKeysPar.isEmpty()) {
+                final List<String> pageSaveFailedKeys = Arrays.asList(failedKeysPar.split(" # "));
+                page.getFailedKeys().put(i, pageSaveFailedKeys);
+            }
+        }
+        final String involvedKeysPar = getParam(request, "involved_keys");
+        if (!involvedKeysPar.isEmpty()) {
+            page.getInvolvedKeys().add(new InvolvedKey());
+            InvolvedKey.addInvolvedKeys(page.getInvolvedKeys(), Arrays.asList(involvedKeysPar.split(" # ")), true);
+        }
+        final String[] pageRandomTimes = getParam(request, "random_times").split(",");
+        for (String pageRandomTime : pageRandomTimes) {
+            final int pageRandomTimeInt = parseInt(pageRandomTime, -1);
+            if (pageRandomTimeInt >= 0) {
+                final String statName = "RANDOM_PAGE (last op)";
+                page.addStat(statName, pageRandomTimeInt);
+            }
+        }
         // forward the request and the bean to the jsp:
         request.setAttribute("pageBean", page);
         request.setAttribute("servlet", this);
