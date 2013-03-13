@@ -4,13 +4,27 @@
 
 \usepackage[T1]{fontenc}
 \usepackage[latin1]{inputenc}
+\usepackage{listings}
+
+\usepackage{xcolor}
+\definecolor{lightyellow}{rgb}{1.0, 1.0, 0.5}
+\definecolor{codebackground}{HTML}{EEEEEE}
+\definecolor{commandinput}{rgb}{0.8,0.8,1}
+\definecolor{lightblue}{HTML}{1E90FF}
 
 \usepackage{tikz}
 \usetikzlibrary{positioning}
+\usetikzlibrary{shadows}
+\usetikzlibrary{fit}
+\usetikzlibrary{shapes.arrows}
+\usetikzlibrary{backgrounds}
 \usepackage[graphics,tightpage,active]{preview}
 \PreviewEnvironment{tikzpicture}
 \newlength{\imagewidth}
 \newlength{\imagescale}
 
+\usepackage{calc}
+
+\newcommand{\code}[1]{\lstinline[basicstyle=\ttfamily]!#1!}
 
 \begin{document}
