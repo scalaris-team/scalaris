@@ -28,7 +28,9 @@
 -include("client_types.hrl").
 
 all()   -> [
-            rbr_consistency,%,
+            %%rbr_concurrency_kv,
+            %%rbr_concurrency_leases%, %% not yet ready to run
+            %%rbr_consistency,
             tester_type_check_rbr
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
@@ -42,6 +44,25 @@ end_per_suite(Config) ->
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
+        rbr_concurrency_kv ->
+            %% stop ring from previous test case (it may have run into a timeout
+            unittest_helper:stop_ring(),
+            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+            Size = randoms:rand_uniform(2, 14),
+            unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir}]}]),
+            %% necessary for the consistency check:
+            unittest_helper:check_ring_size_fully_joined(Size),
+            Config;
+        rbr_concurrency_leases ->
+            %% stop ring from previous test case (it may have run into a timeout
+            unittest_helper:stop_ring(),
+            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+            Size = 1, %%randoms:rand_uniform(2, 14),
+            unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
+                                                       {leases, true}]}]),
+            %% necessary for the consistency check:
+            unittest_helper:check_ring_size_fully_joined(Size),
+            Config;
         rbr_consistency ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
@@ -65,6 +86,101 @@ init_per_testcase(TestCase, Config) ->
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
+
+%% TODO: unittest for: retrigger on read works
+%% TODO: unittest for: retrigger on write works
+
+rbr_concurrency_kv(_Config) ->
+    %% start random number of nodes
+    %% select a key to operate on
+    %% start random number of writers (increment operations
+    %%   / use increment as write filter)
+    %% start random number of readers
+    %%   only observe increasing values in reads
+    Count = 100,
+    Key = randoms:getRandomString(),
+
+    kv_on_cseq:write(Key, 1),
+    Parallel = randoms:rand_uniform(1, 11),
+    ct:pal("Starting ~p concurrent writers~n", [Parallel]),
+    UnitTestPid = self(),
+    _Pids = [ spawn(fun() ->
+                           [ begin
+                                 {ok, V} = kv_on_cseq:read(Key),
+                                 kv_on_cseq:write(Key, V+1)
+                                 % ct:pal("~p performed write of ~p.~n",
+                                 %       [_Nth, V+1])
+                             end
+                             || _I <- lists:seq(1, Count)],
+                           UnitTestPid ! {done}
+                   end)
+             || _Nth <- lists:seq(1, Parallel)],
+
+    [ receive {done} ->
+              ct:pal("Finished number ~p.~n", [Nth]),
+              ok
+      end || Nth <- lists:seq(1, Parallel)],
+
+    ct:pal("Planned ~p increments, done ~p~n",
+           [Count*Parallel, kv_on_cseq:read(Key)]),
+
+
+
+    ok.
+
+rbr_concurrency_leases(_Config) ->
+    %% start random number of nodes
+    %% select a key to operate on
+    %% start random number of writers (increment operations
+    %%   / use increment as write filter)
+    %% start random number of readers
+    %%   only observe increasing values in reads
+    Count = 100,
+    Key = ?RT:get_random_node_id(),
+
+    ContentCheck =
+        fun (Current, _WriteFilter, _Next) ->
+                case Current == prbr_bottom of
+                    true ->
+                        {true, null};
+                    false ->
+                        {false, lease_already_exists}
+                end
+        end,
+    New = l_on_cseq:unittest_create_lease(Key),
+    DB = l_on_cseq:get_db_for_id(Key),
+    rbrcseq:qwrite(DB, self(), Key,
+                   ContentCheck,
+                   New),
+    receive
+        {qwrite_done, _ReqId, _Round, _} -> ok
+    end,
+
+    Parallel = randoms:rand_uniform(1, 11),
+    ct:pal("Starting ~p concurrent writers~n", [Parallel]),
+    UnitTestPid = self(),
+    _Pids = [ spawn(fun() ->
+                            pid_groups:join(pid_groups:group_with(dht_node)),
+                           [ begin
+                                 {ok, V} = l_on_cseq:read(Key),
+                                 l_on_cseq:lease_renew(V)
+                                 % ct:pal("~p performed write of ~p.~n",
+                                 %       [_Nth, V+1])
+                             end
+                             || _I <- lists:seq(1, Count)],
+                           UnitTestPid ! {done}
+                   end)
+             || _Nth <- lists:seq(1, Parallel)],
+
+    [ receive {done} ->
+              ct:pal("Finished number ~p.~n", [Nth]),
+              ok
+      end || Nth <- lists:seq(1, Parallel)],
+
+    ct:pal("Planned ~p increments, done ~p~n",
+           [Count*Parallel, l_on_cseq:read(Key)]),
+
+    ok.
 
 rbr_consistency(_Config) ->
     %% create an rbr entry
