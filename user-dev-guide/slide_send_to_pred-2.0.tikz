@@ -1,0 +1,174 @@
+\input{tikz_header}
+
+\newlength{\tikzinnerheight}
+\setlength{\tikzinnerheight}{1.0cm}
+\newlength{\tikzsepheight}
+\setlength{\tikzsepheight}{0.75cm}
+\newlength{\tikzstartsucc}
+\setlength{\tikzstartsucc}{0.5\tikzsepheight}
+\newlength{\tikzstartpred}
+\setlength{\tikzstartpred}{\tikzstartsucc + \tikzinnerheight + 0.5\tikzsepheight}
+\newlength{\tikzsepinner}
+\setlength{\tikzsepinner}{\tikzinnerheight + \tikzsepheight}
+% \newlength{\tikzendsucc}
+% \setlength{\tikzendsucc}{\tikzsepinner + \tikzstartpred - \tikzstartsucc}
+
+\begin{tikzpicture}
+ [pre/.style={<-,shorten <=1pt,>=stealth,semithick},
+  post/.style={->,shorten >=1pt,>=stealth,semithick},
+  progress/.style={-,dashed,thin,black},
+  timeout/.style={draw=black!50, dashed},
+  process/.style={rectangle,black,rounded corners},
+  start/.style={rectangle,draw,thick,fill=yellow,draw=black,minimum height=0.7cm},
+  inner/.style={minimum height=\tikzinnerheight,thin},
+  end/.style={minimum height=0.4cm},
+  phase/.style={rectangle,draw,thick,black},
+  my_node/.style={rectangle,fill=codebackground,drop shadow,rounded corners},
+  action_l/.style={rectangle,black,font=\footnotesize,align=right},
+  action_r/.style={rectangle,black,font=\footnotesize,align=left},
+  note/.style={circle, thin, draw, outer sep=0.1cm},
+  async_r/.style={post,min distance=0.5,looseness=2.5,in=0,out=0},
+  async_l/.style={post,min distance=0.5,looseness=2.5,in=180,out=180},
+  async_desc/.style={rectangle,black,font=\footnotesize},
+  bend angle=60]
+
+ \node[font={\Large\bfseries}] (heading1) {Send data to predecessor};
+ \node[font=\footnotesize,below=-0.2 of heading1] (heading2) {(version 2.0)};
+
+ \node[start] (pred)      [below left=0.5 and 2 of heading1.south] {pred};
+ \node[inner] (pred-init)           [below=\tikzstartpred of pred]      {};
+ \node[inner] (pred-wait-for-rm)    [below=\tikzsepinner of pred-init] {};
+ \node[inner] (pred-got-data)       [below=\tikzsepinner of pred-wait-for-rm] {};
+ \node[inner] (pred-got-delta)      [below=\tikzsepinner of pred-got-data] {};
+ \node[inner] (pred-got-owner)      [below=\tikzsepinner of pred-got-delta] {};
+ \node[end]   (pred-end)  [below=\tikzstartsucc of pred-got-owner] {\footnotesize pred};
+
+ \node[start] (succ)      [below right=0.5 and 2 of heading1.south] {succ};
+ \node[inner] (succ-init)           [below=\tikzstartsucc of succ]      {};
+ \node[inner] (succ-init-from-pred) [below=\tikzsepinner of succ-init]      {};
+ \node[inner] (succ-send-data)      [below=\tikzsepinner of succ-init-from-pred]      {};
+ \node[inner] (succ-send-delta)     [below=\tikzsepinner of succ-send-data]      {};
+ \node[inner] (succ-send-owner)     [below=\tikzsepinner of succ-send-delta]      {};
+ \node[end]   (succ-end)  [below=\tikzstartpred of succ-send-owner] {\footnotesize succ};
+
+ \path[-] (pred)
+            edge [progress] (pred-end)
+          (succ)
+            edge [progress] (succ-end);
+
+ \path[->] (succ-init.south west)
+             edge [post,draw=lightgray] node[auto, anchor=south, lightgray,font=\footnotesize] {slide, pred, 'send'} node[auto, anchor=north, lightgray,font=\footnotesize] {(optional)} (pred-init.north east)
+           (pred-init.south east)
+             edge [post]  node[auto, anchor=south] {slide, succ, 'rcv'} (succ-init-from-pred.north west)
+
+           (succ-init-from-pred.east)
+             edge [async_r] node[async_desc, auto, anchor=west] {\textcolor{green}{prepare(slideOp)}}
+                  (succ-init-from-pred.south east)
+
+           (succ-init-from-pred.south west)
+             edge [post,lightblue] node[auto, anchor=south] {change\_id}
+                  (pred-wait-for-rm.north east)
+           (pred-wait-for-rm.south east)
+             edge [post,lightblue] node[auto, anchor=south] {req\_data} (succ-send-data.north west)
+
+           (succ-init-from-pred.south west)
+             edge [post,red,bend right=15] node[note, auto, anchor=east, red, pos=0.5] {$\ell$} (succ-send-data.north west)
+%            (succ-init-from-pred.south west)
+%              edge [post,red,bend right=15] node[auto, anchor=west, thin, red, draw=red, rounded corners, outer xsep=0.2cm, pos=0.8] {skip in slide\_lease} (succ-send-data.north west)
+
+           (pred-wait-for-rm.north west)
+             edge [async_l] node[async_desc, auto, anchor=east] {\textcolor{green}{update\_rm(slideOp.id)}}
+                  (pred-wait-for-rm.west)
+
+           (succ-send-data.south west)
+             edge [post] node[auto, anchor=south] {data} (pred-got-data.north east)
+           (pred-got-data.south east)
+             edge [post] node[auto, anchor=south] {data\_ack} (succ-send-delta.north west)
+
+           (succ-send-delta.north east)
+             edge [async_r] node[async_desc, auto, anchor=west] {\textcolor{green}{prepare\_send\_selta(slideOp)}}
+                  (succ-send-delta.east)
+
+           (succ-send-delta.south west)
+             edge [post] node[auto, anchor=south] {delta} (pred-got-delta.north east)
+           (pred-got-delta.south east)
+             edge [post] node[auto, anchor=south] {delta\_ack} (succ-send-owner.north west)
+
+           (succ-send-owner.north east)
+             edge [async_r] node[async_desc, auto, anchor=west] (update_owner) {\textcolor{green}{update\_owner(slideOp)}}
+                  (succ-send-owner.east)
+
+           (update_owner.south east)
+             edge [async_r,draw=lightgray,dashed,out=-50,in=160,looseness=1] node[pos=0.6, anchor=south, lightgray, sloped, font=\footnotesize] {rm\_update} node[pos=0.6, anchor=north, lightgray, sloped, font=\footnotesize] {(to dht\_node)} node[pos=0.2,note,draw,red,anchor=north] {$\ell$} (pred-got-owner.north west);
+
+
+ \node[note, lightblue, right=0.5 of pred-wait-for-rm] {c};
+%  \node[thin,lightblue,draw,rounded corners, right=0 of pred-wait-for-rm] {only slide\_chord};
+%  \node[thin,red,draw=red,rounded corners,anchor=north west,below left=.5\tikzsepheight and 0 of succ-send-owner] {only slide\_lease};
+
+ \node[action_l, left=0.1 of pred-init.east] {
+   slideOp.new()\\
+   fd.subscribe(slideOp.node)\\
+   \textcolor{green}{prepare(slideOp)}
+ };
+ \node[phase, below left=0.1 and 0.1 of pred-init.south,red,draw=red] (pred-init-p-leases) {wait\_for\_data};
+ \node[phase, below left=0.1 and 0.0 of pred-init-p-leases.south east,lightblue,draw] {wait\_for\_change\_id};
+
+ \node[phase, below left=0.1 and 0.1 of pred-wait-for-rm.south,lightblue,draw] {wait\_for\_data};
+
+ \node[action_l, left=0.1 of pred-got-data.east] {};
+ \node[phase, below left=0.1 and 0.1 of pred-got-data.south] {wait\_for\_delta};
+
+ \node[action_l, left=0.1 of pred-got-delta.east] {
+   fd.unsubscribe(slideOp.node)\\
+   \textcolor{green}{finish\_delta(slideOp)}\\
+   slideOp.delete()
+ };
+%  \node[phase, below left=0.1 and 0.1 of pred-got-delta.south] {wait\_for\_owner};
+
+ \node[action_l, left=0.1 of pred-got-owner.east] {}; % nothing to do
+
+ \node[action_r, right=0.1 of succ-init-from-pred.north west,anchor=west] {
+   slideOp.new()\\
+   fd.subscribe(slideOp.node)
+ };
+ \node[phase, below right=0.1 and 0.1 of succ-init-from-pred.south,lightblue,draw] {wait\_for\_req\_data};
+
+ \node[action_r, right=0.1 of succ-send-data.west] {
+   db.record\_changes(slideOp.interval)
+ };
+ \node[phase, below right=0.1 and 0.1 of succ-send-data.south] {wait\_for\_data\_ack};
+
+ \node[action_r, below right=0.1 and 0.1 of succ-send-delta.south west, anchor=south west] {
+   db.stop\_record\_changes(slideOp.interval)
+ };
+ \node[phase, below right=0.1 and 0.1 of succ-send-delta.south] {wait\_for\_delta\_ack};
+
+ \node[action_r, below right=0.1 and 0.1 of succ-send-owner.south west, anchor=west] {
+   fd.unsubscribe(slideOp.node)\\
+   slideOp.delete()
+ };
+
+%  \path[->] (phase2)
+%              edge [post] node[auto, anchor=east, text width=4.5cm] {} (phase2b)
+%              edge [post] node[auto, anchor=south, pos=0.6, text width=4cm]
+%                           {
+%                            \code{lookup_new_ids2()}\\
+%                            ~\footnotesize{$\hookrightarrow$\code{lookup_new_ids1()}}\\
+%                            ~~\scriptsize{$\hookrightarrow$\code{lookup()}}\\
+%                           }
+%                          node[auto, swap, anchor=north, pos=0.64, text width=4cm]
+%                           {
+%                            \footnotesize{\textcolor{red}{\code{skip_psv_lb} set,}}\\
+%                            \footnotesize{\textcolor{red}{non-empty ContactNodes}}\\
+%                           } (phase3)
+%            (phase2b)
+%              edge [post, bend left=-35]
+%                          node[auto, swap, pos=0.7, anchor=north west, text width=3cm]
+%                           {
+%                            \code{lookup_new_ids2()}\\
+%                            ~\footnotesize{$\hookrightarrow$\code{lookup_new_ids1()}}\\
+%                            ~~\scriptsize{$\hookrightarrow$\code{lookup()}}\\
+%                           } (phase3);
+\end{tikzpicture}
+\input{tikz_footer}
