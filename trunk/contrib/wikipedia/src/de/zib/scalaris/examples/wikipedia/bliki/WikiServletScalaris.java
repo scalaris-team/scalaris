@@ -29,7 +29,6 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.TreeSet;
 
-import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -352,11 +351,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
         page.setTitle("Import Wiki dump");
         page.setPage(content.toString());
 
-        // forward the request and the bean to the jsp:
-        request.setAttribute("pageBean", page);
-        request.setAttribute("servlet", this);
-        RequestDispatcher dispatcher = request.getRequestDispatcher("page.jsp");
-        dispatcher.forward(request, response);
+        forwardToPageJsp(request, response, connection, page, "page.jsp");
     }
     
     private class ImportThread extends Thread {
