@@ -28,9 +28,9 @@
 -include("client_types.hrl").
 
 all()   -> [
-            %%rbr_concurrency_kv,
-            %%rbr_concurrency_leases%, %% not yet ready to run
-            %%rbr_consistency,
+            rbr_concurrency_kv,
+            rbr_concurrency_leases,
+            rbr_consistency,
             tester_type_check_rbr
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
@@ -48,7 +48,7 @@ init_per_testcase(TestCase, Config) ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            Size = randoms:rand_uniform(2, 14),
+            Size = randoms:rand_uniform(3, 14),
             unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir}]}]),
             %% necessary for the consistency check:
             unittest_helper:check_ring_size_fully_joined(Size),
@@ -57,7 +57,7 @@ init_per_testcase(TestCase, Config) ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            Size = 1, %%randoms:rand_uniform(2, 14),
+            Size = randoms:rand_uniform(2, 14),
             unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
                                                        {leases, true}]}]),
             %% necessary for the consistency check:
@@ -97,19 +97,24 @@ rbr_concurrency_kv(_Config) ->
     %%   / use increment as write filter)
     %% start random number of readers
     %%   only observe increasing values in reads
-    Count = 100,
     Key = randoms:getRandomString(),
 
     kv_on_cseq:write(Key, 1),
     Parallel = randoms:rand_uniform(1, 11),
-    ct:pal("Starting ~p concurrent writers~n", [Parallel]),
+    Count = 1000 div Parallel,
+    ct:pal("Starting concurrent writers: ~p~n"
+           "Performing iterations: ~p~n",
+           [Parallel, Count]),
     UnitTestPid = self(),
     _Pids = [ spawn(fun() ->
                            [ begin
                                  {ok, V} = kv_on_cseq:read(Key),
                                  kv_on_cseq:write(Key, V+1)
-                                 % ct:pal("~p performed write of ~p.~n",
-                                 %       [_Nth, V+1])
+                                 %% if 0 == I rem 100 ->
+                                 %%   ct:pal("~p performed write ~p.~n",
+                                 %%   [_Nth, I]);
+                                 %%   true -> ok
+                                 %% end
                              end
                              || _I <- lists:seq(1, Count)],
                            UnitTestPid ! {done}
@@ -121,11 +126,8 @@ rbr_concurrency_kv(_Config) ->
               ok
       end || Nth <- lists:seq(1, Parallel)],
 
-    ct:pal("Planned ~p increments, done ~p~n",
+    ct:pal("Planned ~p increments, done ~p - discrepancy is ok~n",
            [Count*Parallel, kv_on_cseq:read(Key)]),
-
-
-
     ok.
 
 rbr_concurrency_leases(_Config) ->
@@ -135,7 +137,6 @@ rbr_concurrency_leases(_Config) ->
     %%   / use increment as write filter)
     %% start random number of readers
     %%   only observe increasing values in reads
-    Count = 100,
     Key = ?RT:get_random_node_id(),
 
     ContentCheck =
@@ -156,28 +157,46 @@ rbr_concurrency_leases(_Config) ->
         {qwrite_done, _ReqId, _Round, _} -> ok
     end,
 
-    Parallel = randoms:rand_uniform(1, 11),
-    ct:pal("Starting ~p concurrent writers~n", [Parallel]),
+    Parallel = randoms:rand_uniform(4, 11),
+    Count = 1000 div Parallel,
+    ct:pal("Starting concurrent writers: ~p~n"
+           "Performing iterations: ~p~n",
+           [Parallel, Count]),
     UnitTestPid = self(),
-    _Pids = [ spawn(fun() ->
-                            pid_groups:join(pid_groups:group_with(dht_node)),
-                           [ begin
-                                 {ok, V} = l_on_cseq:read(Key),
-                                 l_on_cseq:lease_renew(V)
-                                 % ct:pal("~p performed write of ~p.~n",
-                                 %       [_Nth, V+1])
-                             end
-                             || _I <- lists:seq(1, Count)],
-                           UnitTestPid ! {done}
-                   end)
-             || _Nth <- lists:seq(1, Parallel)],
+    _Pids =
+        [ spawn(
+            fun() ->
+                    pid_groups:join(pid_groups:group_with(dht_node)),
+                    [ begin
+                          F = fun(X) ->
+                                      {ok, V} = l_on_cseq:read(Key),
+                                      Update =
+                                          l_on_cseq:unittest_lease_update(
+                                            V,
+                                            l_on_cseq:set_version(
+                                              V, l_on_cseq:get_version(V)+1)),
+                                      case Update of
+                                          ok -> ok;
+                                          failed ->
+                                              %% ct:pal("~p retry ~p.~n",
+                                              %%        [_Nth, l_on_cseq:get_version(V)+1]),
+                                                  X(X)
+                                      end
+                              end,
+                          F(F)
+                          %% ct:pal("~p performed write.~n", [_Nth])
+                      end
+                      || _I <- lists:seq(1, Count)],
+                    UnitTestPid ! {done}
+            end)
+          || _Nth <- lists:seq(1, Parallel)],
 
     [ receive {done} ->
               ct:pal("Finished number ~p.~n", [Nth]),
               ok
       end || Nth <- lists:seq(1, Parallel)],
 
-    ct:pal("Planned ~p increments, done ~p~n",
+    ct:pal("Planned ~p increments, done ~p, discrepancy is ok~n",
            [Count*Parallel, l_on_cseq:read(Key)]),
 
     ok.

@@ -23,7 +23,7 @@
 %%-define(PDB, pdb_ets).
 -define(PDB, pdb).
 
-%%-define(TRACE(X,Y), io:format(X,Y)).
+%%-define(TRACE(X,Y), ct:pal("~p" X,[self()|Y])).
 %%-define(TRACE(X,Y),
 %%        Name = pid_groups:my_pidname(),
 %%        case Name of
@@ -51,6 +51,7 @@
 %% same-round-number replies
 
 -type entry() :: {any(), %% ReqId
+                  any(), %% debug field
                   non_neg_integer(), %% period of last retriggering / starting
                   non_neg_integer(), %% period of next retriggering
                   ?RT:key(), %% key
@@ -162,7 +163,7 @@ qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
     Pid = pid_groups:find_a(CSeqPidName),
     comm:send_local(Pid, {qwrite, Client,
                           Key, {ReadFilter, ContentCheck, WriteFilter},
-                          Value, _RetriggerAfter = 1}),
+                          Value, _RetriggerAfter = 2}),
     %% the process will reply to the client directly
     ok.
 
@@ -186,7 +187,7 @@ init(DBSelector) ->
 
 %% normal qread step 1: preparation and starting read-phase
 on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
-    ?TRACE("rbrcseq:on qread ~n", []),
+    ?TRACE("rbrcseq:on qread, Client ~p~n", [Client]),
     %% assign new reqest-id; (also assign new ReqId when retriggering)
 
     %% if the caller process may handle more than one request at a
@@ -194,6 +195,7 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
     %% request to use the prbr correctly.
     ReqId = uid:get_pids_uid(),
 
+    ?TRACE("rbrcseq:on qread ReqId ~p~n", [ReqId]),
     %% initiate lookups for replicas(Key) and perform
     %% rbr reads in a certain round (work as paxos proposer)
     %% there apply the content filter to only retrieve the required information
@@ -215,7 +217,7 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
     %% {next_period, ...}
 
     %% create local state for the request id
-    Entry = entry_new_read(ReqId, Key, Client, period(State),
+    Entry = entry_new_read(qread, ReqId, Key, Client, period(State),
                            ReadFilter, RetriggerAfter),
     %% store local state of the request
     set_entry(Entry, tablename(State)),
@@ -262,7 +264,7 @@ on({qread_collect,
         end;
 
 on({qread_initiate_write_through, ReadEntry}, State) ->
-    ?TRACE("rbrcseq:on qread_initiate_write_through~n", []),
+    ?TRACE("rbrcseq:on qread_initiate_write_through ~p~n", [ReadEntry]),
     %% if a read_filter was active, we cannot take over the value for
     %% a write_through.  We then have to retrigger the read without a
     %% read-filter, but in the end have to reply with a filtered
@@ -277,7 +279,8 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% we need a new id to collect the answers of this write
             %% the client in this new id will be ourselves, so we can
             %% proceed, when we got enough replies.
-            ct:pal("Write through without filtering~n"),
+            %% ct:pal("Write through without filtering ~p.~n",
+            %%        [entry_key(ReadEntry)]),
             This = comm:reply_as(
                      self(), 4,
                      {qread_write_through_done, ReadEntry, no_filtering, '_'}),
@@ -291,10 +294,12 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                        fun(_,_,_) -> {true, null} end,
                        fun prbr:noop_write_filter/3},
 
-            Entry = entry_new_write(ReqId, entry_key(ReadEntry), This,
+            Entry = entry_new_write(write_through, ReqId, entry_key(ReadEntry),
+                                    This,
                                     period(State),
                                     Filters, entry_val(ReadEntry),
-                                    _RetriggerAfter = 1),
+                                    entry_retrigger(ReadEntry)
+                                    - entry_period(ReadEntry)),
 
             Collector = comm:reply_as(
                           comm:this(), 3,
@@ -318,19 +323,19 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% consens is still open - can trigger a repair and will
             %% reply to us with a full entry, that we can filter
             %% ourselves before sending it to the original client
-            ct:pal("Write through with filtering~n"),
             This = comm:reply_as(
                      self(), 4,
                      {qread_write_through_done, ReadEntry, apply_filter, '_'}),
 
             gen_component:post_op(State,
               {qread, This, entry_key(ReadEntry),
-               fun prbr:noop_read_filter/1, entry_period(ReadEntry)})
+               fun prbr:noop_read_filter/1,
+               entry_retrigger(ReadEntry) - entry_period(ReadEntry)})
     end;
 
 on({qread_write_through_collect, ReqId,
     {write_reply, _Key, Round}}, State) ->
-    ?TRACE("rbrcseq:on qread_write_through_collect reply~n", []),
+    ?TRACE("rbrcseq:on qread_write_through_collect reply ~p~n", [ReqId]),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
         undefined ->
@@ -338,20 +343,22 @@ on({qread_write_through_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            ct:pal("Collect reply ~p ~p~n", [ReqId, Round]),
+            ?TRACE("rbrcseq:on qread_write_through_collect Client: ~p~n", [entry_client(Entry)]),
+            %% ct:pal("Collect reply ~p ~p~n", [ReqId, Round]),
             {Done, NewEntry} = add_write_reply(Entry, Round),
             case Done of
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
+                    ?TRACE("rbrcseq:on qread_write_through_collect infcl: ~p~n", [entry_client(Entry)]),
                     inform_client(qwrite_done, NewEntry),
-                    ?PDB:delete(entry_reqid(Entry), tablename(State))
+                    ?PDB:delete(ReqId, tablename(State))
             end
     end,
     State;
 
 on({qread_write_through_collect, ReqId,
     {write_deny, Key, NewerRound}}, State) ->
-    ?TRACE("rbrcseq:on qread_write_through_collect deny~n", []),
+    ?TRACE("rbrcseq:on qread_write_through_collect deny ~p~n", [ReqId]),
     TableName = tablename(State),
     Entry = get_entry(ReqId, TableName),
     _ = case Entry of
@@ -360,24 +367,64 @@ on({qread_write_through_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            ct:pal("Collect deny ~p ~p~n", [ReqId, NewerRound]),
+            %% ct:pal("Collect deny ~p ~p~n", [ReqId, NewerRound]),
+            ?TRACE("rbrcseq:on qread_write_through_collect deny Client: ~p~n", [entry_client(Entry)]),
             {Done, NewEntry} = add_write_deny(Entry, NewerRound),
-            ct:pal("#Denies = ~p, ~p~n", [entry_num_denies(NewEntry), Done]),
+            %% ct:pal("#Denies = ~p, ~p~n", [entry_num_denies(NewEntry), Done]),
             case Done of
-                false -> set_entry(NewEntry, tablename(State));
+                false ->
+                    set_entry(NewEntry, tablename(State)),
+                    State;
                 true ->
                     %% retry original read
                     ?PDB:delete(ReqId, TableName),
+
+                    %% we want to retry with the read, the original
+                    %% request is packed in the client field of the
+                    %% entry as we created a reply_as with
+                    %% qread_write_through_done The 2nd field of the
+                    %% reply_as was filled with the original state
+                    %% entry (including the original client and the
+                    %% original read filter.
+                    {_Pid, Msg1} = comm:unpack_cookie(entry_client(Entry), {whatever}),
+                    %% reply_as from qread write through without filtering
+                    qread_write_through_done = comm:get_msg_tag(Msg1),
+                    UnpackedEntry = element(2, Msg1),
+                    UnpackedClient = entry_client(UnpackedEntry),
+
+                    %% In case of filters enabled, we packed once more
+                    %% to write through without filters and applying
+                    %% the filters afterwards. Let's check this by
+                    %% unpacking and seeing whether the reply msg tag
+                    %% is still a qread_write_through_done. Then we
+                    %% have to use the 2nd unpacking to get the
+                    %% original client entry.
+                    {_Pid2, Msg2} = comm:unpack_cookie(
+                                      UnpackedClient, {whatever2}),
+
+                    {Client, Filter} =
+                        case comm:get_msg_tag(Msg2) of
+                            qread_write_through_done ->
+                                %% we also have to delete this request
+                                %% as no one will answer it.
+                                UnpackedEntry2 = element(2, Msg2),
+                                ?PDB:delete(entry_reqid(UnpackedEntry2),
+                                            TableName),
+                                {entry_client(UnpackedEntry2),
+                                 entry_filters(UnpackedEntry2)};
+                            _ ->
+                                {UnpackedClient,
+                                 entry_filters(UnpackedEntry)}
+                        end,
                     gen_component:post_op(State,
-                      {qread, entry_client(Entry), Key,
-                       fun prbr:noop_read_filter/1, entry_period(Entry)})
+                      {qread, Client, Key, Filter,
+                       entry_retrigger(Entry) - entry_period(Entry)})
             end
-    end,
-    State;
+    end;
 
 on({qread_write_through_done, ReadEntry, Filtering,
     {qwrite_done, _ReqId, Round, Val}}, State) ->
-    ?TRACE("rbrcseq:on qread_write_through_done qwrite_done~n", []),
+    ?TRACE("rbrcseq:on qread_write_through_done qwrite_done ~p ~p~n", [_ReqId, ReadEntry]),
     ClientVal =
         case Filtering of
             apply_filter -> F = entry_filters(ReadEntry), F(Val);
@@ -385,12 +432,13 @@ on({qread_write_through_done, ReadEntry, Filtering,
         end,
     TReplyEntry = entry_set_val(ReadEntry, ClientVal),
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
+    %% ct:pal("Write through of write request done informing ~p~n", [ReplyEntry]),
     inform_client(qread_done, ReplyEntry),
     State;
 
 on({qread_write_through_done, ReadEntry, Filtering,
     {qread_done, _ReqId, Round, Val}}, State) ->
-    ?TRACE("rbrcseq:on qread_write_through_done qread_done~n", []),
+    ?TRACE("rbrcseq:on qread_write_through_done qread_done ~p ~p~n", [_ReqId, ReadEntry]),
     ClientVal =
         case Filtering of
             apply_filter -> F = entry_filters(ReadEntry), F(Val);
@@ -398,6 +446,7 @@ on({qread_write_through_done, ReadEntry, Filtering,
         end,
     TReplyEntry = entry_set_val(ReadEntry, ClientVal),
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
+    %% ct:pal("Write through of read done informing ~p~n", [ReplyEntry]),
     inform_client(qread_done, ReplyEntry),
     State;
 
@@ -406,17 +455,12 @@ on({qwrite, Client, Key, Filters, Value, RetriggerAfter}, State) ->
     ?TRACE("rbrcseq:on qwrite~n", []),
     %% assign new reqest-id
     ReqId = uid:get_pids_uid(),
+    ?TRACE("rbrcseq:on qwrite c ~p uid ~p ~n", [Client, ReqId]),
 
     %% create local state for the request id, including used filters
-    Entry = entry_new_write(ReqId, Key, Client, period(State),
+    Entry = entry_new_write(qwrite, ReqId, Key, Client, period(State),
                             Filters, Value, RetriggerAfter),
 
-    %% we put the entry in the envelope instead of storing it this is
-    %% fine, as it remains in this process locally (in the end it is
-    %% send once to ourselves We need to do this to have a clean
-    %% interface to the 2nd phase of a write, which then can also be
-    %% used by the write_through that may be necessary in a normal
-    %% read (see above) providing a complete Entry on its own.
     This = comm:reply_as(self(), 3, {qwrite_read_done, ReqId, '_'}),
     set_entry(Entry, tablename(State)),
     gen_component:post_op(State, {qread, This, Key, element(1, Filters), 1});
@@ -426,7 +470,7 @@ on({qwrite_read_done, ReqId,
     {qread_done, _ReadId, Round, ReadValue}},
    State) ->
     ?TRACE("rbrcseq:on qwrite_read_done qread_done~n", []),
-    Entry = get_entry(ReqId, tablename(State)),
+    Entry = setelement(2, get_entry(ReqId, tablename(State)), qwrite_read_done),
     ContentCheck = element(2, entry_filters(Entry)),
     WriteFilter = element(3, entry_filters(Entry)),
     WriteValue = entry_val(Entry),
@@ -446,11 +490,10 @@ on({qwrite_read_done, ReqId,
               || X <- ?RT:get_replica_keys(entry_key(Entry)) ];
         {false, Reason} = _Err ->
             %% own proposal not possible as of content check
-            %% should rewrite old consensus??
             comm:send_local(entry_client(Entry),
                             {qwrite_deny, ReqId, Round, ReadValue,
                              {content_check_failed, Reason}}),
-            ?PDB:delete(entry_reqid(Entry), tablename(State))
+            ?PDB:delete(ReqId, tablename(State))
     end,
     State;
 
@@ -472,7 +515,7 @@ on({qwrite_collect, ReqId,
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
                     inform_client(qwrite_done, NewEntry),
-                    ?PDB:delete(entry_reqid(Entry), tablename(State))
+                    ?PDB:delete(ReqId, tablename(State))
             end
     end,
     State;
@@ -496,7 +539,8 @@ on({qwrite_collect, ReqId,
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
                     %% retry
-                    retrigger(NewEntry, TableName)%%,
+%%                    ct:pal("Concurrency detected, retrying~n"),
+                    retrigger(NewEntry, TableName, noincdelay)%%,
                     %% delete of entry is done in retrigger!
             end
     end,
@@ -536,24 +580,32 @@ on({next_period, NewPeriod}, State) ->
     %% scan for open requests older than NewPeriod and initiate
     %% retriggering for them
     Table = tablename(State),
-    _ = [ retrigger(X, Table) || X <- ?PDB:tab2list(Table),
-                                 NewPeriod > element(3, X) ],
+    _ = [ begin
+              ct:pal("Retrigger in period ~p caused by timeout for ~.0p~n",
+                     [NewPeriod, X]),
+              retrigger(X, Table, incdelay)
+          end
+          || X <- ?PDB:tab2list(Table), is_tuple(X),
+             13 =:= erlang:size(X), NewPeriod > element(4, X) ],
 
     %% re-trigger next next_period
     msg_delay:send_local(1, self(), {next_period, NewPeriod + 1}),
     set_period(State, NewPeriod).
 
--spec retrigger(entry(), ?PDB:tableid()) -> ok.
-retrigger(Entry, TableName) ->
-    RetriggerDelay = (entry_retrigger(Entry) - entry_period(Entry)) + 1,
+-spec retrigger(entry(), ?PDB:tableid(), incdelay|noincdelay) -> ok.
+retrigger(Entry, TableName, Incdelay) ->
+    RetriggerDelay = case Incdelay of
+                         incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
+                         noincdelay -> entry_retrigger(Entry)
+                     end,
     case erlang:size(Entry) of
-        12 when is_tuple(element(11, Entry)) -> %% write request
+        13 when is_tuple(element(12, Entry)) -> %% write request
             comm:send_local(self(),
                             {qwrite, entry_client(Entry),
                              entry_key(Entry), entry_filters(Entry),
                              entry_val(Entry),
                              RetriggerDelay});
-        12 -> %% read request
+        13 -> %% read request
             comm:send_local(self(),
                             {qread, entry_client(Entry),
                               entry_key(Entry), entry_filters(Entry),
@@ -570,62 +622,64 @@ set_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName).
 
 %% abstract data type to collect quorum read/write replies
--spec entry_new_read(any(), ?RT:key(),
+-spec entry_new_read(any(), any(), ?RT:key(),
                      comm:erl_local_pid(), non_neg_integer(), any(),
                      non_neg_integer())
                     -> entry().
-entry_new_read(ReqId, Key, Client, Period, Filter, RetriggerAfter) ->
-    {ReqId, Period, Period + RetriggerAfter, Key, Client,
+entry_new_read(Debug, ReqId, Key, Client, Period, Filter, RetriggerAfter) ->
+    {ReqId, Debug, Period, Period + RetriggerAfter, Key, Client,
      _MyRound = {0, 0}, _NumAcked = 0,
      _NumDenied = 0, _AckRound = {0, 0}, _AckVal = 0, Filter, 0}.
 
--spec entry_new_write(any(), ?RT:key(), comm:erl_local_pid(),
+-spec entry_new_write(any(), any(), ?RT:key(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
-entry_new_write(ReqId, Key, Client, Period, Filters, Value, RetriggerAfter) ->
-    {ReqId, Period, Period + RetriggerAfter, Key, Client, _MyRound = {0, 0},
-     _NumAcked = 0, _NumDenied = 0, _AckRound = {0, 0}, Value, Filters, 0}.
+entry_new_write(Debug, ReqId, Key, Client, Period, Filters, Value, RetriggerAfter) ->
+    {ReqId, Debug, Period, Period + RetriggerAfter, Key, Client,
+     _MyRound = {0, 0}, _NumAcked = 0, _NumDenied = 0, _AckRound = {0, 0}, Value, Filters, 0}.
 
 -spec entry_reqid(entry())        -> any().
 entry_reqid(Entry)                -> element(1, Entry).
 -spec entry_period(entry())       -> non_neg_integer().
-entry_period(Entry)               -> element(2, Entry).
+entry_period(Entry)               -> element(3, Entry).
 -spec entry_retrigger(entry())    -> non_neg_integer().
-entry_retrigger(Entry)            -> element(3, Entry).
+entry_retrigger(Entry)            -> element(4, Entry).
 -spec entry_key(entry())          -> any().
-entry_key(Entry)                  -> element(4, Entry).
+entry_key(Entry)                  -> element(5, Entry).
 -spec entry_client(entry())       -> comm:erl_local_pid().
-entry_client(Entry)               -> element(5, Entry).
+entry_client(Entry)               -> element(6, Entry).
 -spec entry_my_round(entry())     -> prbr:r_with_id().
-entry_my_round(Entry)             -> element(6, Entry).
+entry_my_round(Entry)             -> element(7, Entry).
 -spec entry_set_my_round(entry(), prbr:r_with_id()) -> entry().
-entry_set_my_round(Entry, Round)  -> setelement(6, Entry, Round).
+entry_set_my_round(Entry, Round)  -> setelement(7, Entry, Round).
 -spec entry_num_acks(entry())     -> non_neg_integer().
-entry_num_acks(Entry)             -> element(7, Entry).
+entry_num_acks(Entry)             -> element(8, Entry).
 -spec entry_inc_num_acks(entry()) -> entry().
-entry_inc_num_acks(Entry) -> setelement(7, Entry, element(7, Entry) + 1).
+entry_inc_num_acks(Entry) -> setelement(8, Entry, element(8, Entry) + 1).
 -spec entry_set_num_acks(entry(), non_neg_integer()) -> entry().
-entry_set_num_acks(Entry, Num)    -> setelement(7, Entry, Num).
+entry_set_num_acks(Entry, Num)    -> setelement(8, Entry, Num).
 -spec entry_num_denies(entry())   -> non_neg_integer().
-entry_num_denies(Entry)           -> element(8, Entry).
+entry_num_denies(Entry)           -> element(9, Entry).
 -spec entry_inc_num_denies(entry()) -> entry().
-entry_inc_num_denies(Entry) -> setelement(8, Entry, element(8, Entry) + 1).
+entry_inc_num_denies(Entry) -> setelement(9, Entry, element(9, Entry) + 1).
+-spec entry_set_num_denies(entry(), non_neg_integer()) -> entry().
+entry_set_num_denies(Entry, Val) -> setelement(9, Entry, Val).
 -spec entry_latest_seen(entry())  -> prbr:r_with_id().
-entry_latest_seen(Entry)          -> element(9, Entry).
+entry_latest_seen(Entry)          -> element(10, Entry).
 -spec entry_set_latest_seen(entry(), prbr:r_with_id()) -> entry().
-entry_set_latest_seen(Entry, Round) -> setelement(9, Entry, Round).
+entry_set_latest_seen(Entry, Round) -> setelement(10, Entry, Round).
 -spec entry_val(entry())           -> any().
-entry_val(Entry)                   -> element(10, Entry).
+entry_val(Entry)                   -> element(11, Entry).
 -spec entry_set_val(entry(), any()) -> entry().
-entry_set_val(Entry, Val)          -> setelement(10, Entry, Val).
+entry_set_val(Entry, Val)          -> setelement(11, Entry, Val).
 -spec entry_filters(entry())       -> any().
-entry_filters(Entry)               -> element(11, Entry).
+entry_filters(Entry)               -> element(12, Entry).
 -spec entry_set_num_newest(entry(), non_neg_integer())  -> entry().
-entry_set_num_newest(Entry, Val)        -> setelement(12, Entry, Val).
+entry_set_num_newest(Entry, Val)        -> setelement(13, Entry, Val).
 -spec entry_inc_num_newest(entry()) -> entry().
-entry_inc_num_newest(Entry)        -> setelement(12, Entry, 1 + element(12, Entry)).
+entry_inc_num_newest(Entry)        -> setelement(13, Entry, 1 + element(13, Entry)).
 -spec entry_num_newest(entry())    -> non_neg_integer().
-entry_num_newest(Entry)            -> element(12, Entry).
+entry_num_newest(Entry)            -> element(13, Entry).
 
 -spec add_read_reply(entry(), prbr:r_with_id(), client_value(), prbr:r_with_id()) -> {boolean() | write_through, entry()}.
 add_read_reply(Entry, AssignedRound, Val, AckRound) ->
@@ -657,11 +711,17 @@ add_write_reply(Entry, Round) ->
         case Round > entry_latest_seen(Entry) of
             false -> Entry;
             true ->
+                %% have to count the dropped acks as denies.
+                case entry_num_acks(Entry) > 0 of
+                    true ->
+                        ct:pal("This should not happen a~n");
+                    false -> ok
+                end,
                 %% reset rack and store newer round
                 T1Entry = entry_set_latest_seen(Entry, Round),
                 _T2Entry = entry_set_num_acks(T1Entry, 0)
     end,
-    {3 =< 1+entry_num_acks(E1), entry_inc_num_acks(E1)}.
+    {3 =< (1+entry_num_acks(E1)), entry_inc_num_acks(E1)}.
 
 -spec add_write_deny(entry(), prbr:r_with_id()) -> {boolean(), entry()}.
 add_write_deny(Entry, Round) ->
@@ -670,10 +730,13 @@ add_write_deny(Entry, Round) ->
             false -> Entry;
             true ->
                 %% reset rack and store newer round
+                OldAcks = entry_num_acks(Entry),
                 T1Entry = entry_set_latest_seen(Entry, Round),
-                _T2Entry = entry_set_num_acks(T1Entry, 0)
+                T2Entry = entry_set_num_acks(T1Entry, 0),
+                _T3Entry = entry_set_num_denies(
+                             T2Entry, OldAcks + entry_num_denies(T2Entry))
     end,
-    {2 =< 1+entry_num_denies(E1), entry_inc_num_denies(E1)}.
+    {2 =< (1+entry_num_denies(E1)), entry_inc_num_denies(E1)}.
 
 
 -spec inform_client(qread_done | qwrite_done, entry()) -> ok.
