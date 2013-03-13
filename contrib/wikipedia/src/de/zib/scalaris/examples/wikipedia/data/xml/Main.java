@@ -152,7 +152,7 @@ public class Main {
                 WikiDumpHandler.println(System.out, " importers   : " + numberOfImporters);
                 WikiDumpHandler.println(System.out, " my import nr: " + myNumber);
                 WikiDumpPreparedSQLiteToScalaris handler =
-                        new WikiDumpPreparedSQLiteToScalaris(filename, numberOfImporters, myNumber);
+                        new WikiDumpPreparedSQLiteToScalaris(filename, null, numberOfImporters, myNumber);
                 handler.setUp();
                 WikiDumpPreparedSQLiteToScalaris.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
                 Runtime.getRuntime().addShutdownHook(shutdownHook);
