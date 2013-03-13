@@ -318,7 +318,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 if (countKey != null) {
                     try {
                         stWrite.reset();
-                        int listSize = WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).listValue().size();
+                        int listSize = ErlangValue.otpObjectToOtpList(WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).value()).arity();
                         stWrite.bind(1, countKey).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(listSize)).stepThrough();
                     } catch (SQLiteException e) {
                         importer.error("write of " + countKey + " failed (sqlite error: " + e.toString() + ")");
