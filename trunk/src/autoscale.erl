@@ -45,6 +45,9 @@
 
 -export([start_link/1, init/1, on/2]).
 
+% rm neighborhood change function call
+-export([check_leadership/4]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -144,7 +147,6 @@ on({check_alarm, Name, AlarmEpoch}, {IsLeader, Alarms}) ->
             % call alarm handler and react to breach_state 
             NextCheckSecs =
                 case check_alarm(Alarm#alarm.handler, Alarm) of
-                    unknown_alarm_handler -> 0;
                     breach_lower ->
                         ?CLOUD:remove_vms(Alarm#alarm.vms_to_remove),
                         erlang:max(Alarm#alarm.check_interval_secs, Alarm#alarm.cooldown_secs);
@@ -217,9 +219,7 @@ check_alarm(random_churn, _Alarm) ->
         1 -> breach_upper;
         2 -> breach_lower;
         3 -> ok
-    end;
-check_alarm(_, _) ->
-    unknown_alarm_handler.
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % alarm helpers
@@ -228,33 +228,15 @@ check_alarm(_, _) ->
 continue_alarm(Name, Secs, Pid, Epoch) ->
     msg_delay:send_local(Secs, Pid, {check_alarm, Name, Epoch}).
 
+-spec update_alarm(dict(), atom(), {atom(), any()} | [{atom(), any()}]) -> dict().
 update_alarm(Alarms, Name, {Field, NewValue}) ->
     update_alarm(Alarms, Name, [{Field, NewValue}]);
 update_alarm(Alarms, Name, [{Field, NewValue}|Tail]) ->
-    NewAlarms =
-        case Field =:= epoch of
-            true ->
-                % update epoch
-                dict:update(Name, fun({_Alarm, _Epoch}) -> {_Alarm, NewValue} end, Alarms);
-            false ->
-                % update record
-                FieldIndex =
-                    case Field of
-                        period_secs   -> 4;
-                        cooldown_secs -> 5;
-                        lower_limit   -> 6;
-                        upper_limit   -> 7;
-                        scale_down_by -> 8;
-                        scale_up_by   -> 9;
-                        state         -> 10;
-                        _             -> -1
-                    end,
-                dict:update(Name,
-                            fun({Alarm, Epoch}) ->
-                                {erlang:setelement(FieldIndex, Alarm, NewValue), Epoch}
-                            end,
-                            Alarms)
-        end,
+    UpdateFun = ?IIF(Field =:= epoch,
+                     fun({_Alarm, _Epoch}) -> {_Alarm, NewValue} end,
+                     fun({Alarm, Epoch}) -> {erlang:setelement(10, Alarm, NewValue), Epoch} end
+                ),
+    NewAlarms = dict:update(Name, UpdateFun, Alarms),
     update_alarm(NewAlarms, Name, Tail);
 update_alarm(Alarms, _Name, []) ->
     Alarms.
@@ -293,18 +275,17 @@ get_timestamp_secs() ->
 get_timestamp_secs({MegaSecs, Secs, _}) ->
     MegaSecs*1000000+Secs.
 
--spec plot_add_now(PlotKey::atom(), Value::number()) ->
-          ok | {error, autoscale_server_false | mgmt_server_false}.
+-spec plot_add_now(PlotKey::atom(), Value::number()) -> boolean().
 plot_add_now(PlotKey, Value) ->
     ?IIF(config:read(autoscale_server),
         case MgmtServer = config:read(mgmt_server) of
-            failed -> {error, mgmt_server_false};
+            failed -> false;
             _      ->
                 comm:send(MgmtServer, {?send_to_group_member, autoscale_server,
                                        {collect, PlotKey, _Now = get_timestamp_secs(), Value}}),
                 true
         end,
-        {error, autoscale_server_false}).
+        false).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % config
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
