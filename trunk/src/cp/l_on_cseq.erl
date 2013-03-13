@@ -173,14 +173,17 @@ lease_merge(Lease1, Lease2) ->
     ok.
 
 % for unit tests
--spec unittest_lease_update(lease_t(), lease_t()) -> ok.
+-spec unittest_lease_update(lease_t(), lease_t()) -> ok | failed.
 unittest_lease_update(Old, New) ->
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, unittest_update, Old, New, self()}),
     receive
         ?SCALARIS_RECV(
             {l_on_cseq, unittest_update_success, Old, New}, %% ->
-            ok
+            ok);
+        ?SCALARIS_RECV(
+            {l_on_cseq, unittest_update_failed, Old, New}, %% ->
+            failed
           )
     end.
 
@@ -198,7 +201,7 @@ unittest_lease_update(Old, New) ->
 -spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
 on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}},
    State) ->
-    ct:pal("renew ~p~n", [Old]),
+    %% ct:pal("on renew ~p~n", [Old]),
     New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
     ContentCheck = generic_content_check(Old),
     DB = get_db_for_id(Id),
@@ -208,14 +211,14 @@ on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}},
     State;
 
 on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, Value}, _New}, State) ->
-    ct:pal("successful renew~n", []),
+    %% ct:pal("successful renew~n", []),
     update_lease_in_dht_node_state(Value, State);
 
 on({l_on_cseq, renew_reply,
     {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}}, New},
    State) ->
     % @todo retry
-    ct:pal("renew denied: ~p ~p ~p~n", [Reason, Value, New]),
+    ct:pal("renew denied: ~p~nVal: ~p~nNew: ~p~n", [Reason, Value, New]),
     case Reason of
         lease_does_not_exist ->
             case Value of %@todo is this necessary?
@@ -252,7 +255,7 @@ on({l_on_cseq, renew_reply,
 on({l_on_cseq, unittest_update,
     Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
     New, Caller}, State) ->
-    %io:format("renew ~p~n", [Old]),
+    %% io:format("renew ~p~n", [Old]),
     ContentCheck = is_valid_update(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
     %% @todo New passed for debugging only:
@@ -262,15 +265,16 @@ on({l_on_cseq, unittest_update,
 
 on({l_on_cseq, unittest_update_reply, {qwrite_done, _ReqId, _Round, Value},
     Old, New, Caller}, State) ->
-    io:format("successful update~n", []),
+    %% io:format("successful update~n", []),
     comm:send_local(Caller, {l_on_cseq, unittest_update_success, Old, New}),
     update_lease_in_dht_node_state(Value, State);
 
-%% on({l_on_cseq, update_reply,
-%%    {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}},
-%%    Old, New, Caller},
-%%   State) ->
-%% must not happen, if it happens, it was wrongly used in a unittest
+on({l_on_cseq, unittest_update_reply,
+    {qwrite_deny, _ReqId, _Round, _Value, {content_check_failed, _Reason}},
+    Old, New, Caller}, State) ->
+   comm:send_local(Caller, {l_on_cseq, unittest_update_failed, Old, New}),
+   State;
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -711,10 +715,10 @@ generic_content_check(#lease{owner=OldOwner,aux = OldAux,range=OldRange,
     fun ((any(), any(), any()) -> {boolean(), update_failed_reason() | null}). %% content check
 is_valid_update(CurrentEpoch, CurrentVersion) ->
     fun (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
-            ct:pal("is_valid_update: expected ~p, got ~p", [CurrentEpoch, E0]),
+            %% ct:pal("is_valid_update: expected ~p, got ~p", [CurrentEpoch, E0]),
             {false, epoch_or_version_mismatch};
         (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
-            ct:pal("is_valid_update: expected ~p, got ~p", [CurrentVersion, V0]),
+            %% ct:pal("is_valid_update: expected ~p, got ~p", [CurrentVersion, V0]),
             {false, epoch_or_version_mismatch};
         (_Current, _WriteFilter, _Next) ->
             {true, null}

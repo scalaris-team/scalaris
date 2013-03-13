@@ -90,7 +90,7 @@
 %% the value from.
 
 %% on read the acceptor can assign the next round number. They remain
-%% unique as we get the node_id in the read request and it is part of
+%% unique as we get the node_id in the read request and that is part of
 %% the round number.
 
 %% so there are no longer any read denies, all reads succeed.
