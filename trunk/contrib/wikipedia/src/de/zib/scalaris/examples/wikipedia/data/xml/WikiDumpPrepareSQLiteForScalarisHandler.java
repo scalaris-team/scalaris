@@ -155,7 +155,7 @@ public class WikiDumpPrepareSQLiteForScalarisHandler extends WikiDumpPageHandler
     }
 
     /**
-     * Reads an encoded Scalaris value from a (compressed) byte array.
+     * Reads a compressed and encoded Scalaris value from a (compressed) byte array.
      * 
      * @param value  the byte array to get the object from
      * 

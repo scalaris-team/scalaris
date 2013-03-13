@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -288,6 +289,16 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         }
     }
     
+    protected static class KVPair<T> {
+        public final String key;
+        public final T value;
+        
+        public KVPair(String key, T value) {
+            this.key = key;
+            this.value = value;
+        }
+    }
+    
     static class SQLiteCopyList implements Runnable {
         protected final String key;
         protected final String countKey;
@@ -304,36 +315,50 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             this.countKey = countKey;
         }
         
+        public static Collection<KVPair<Object>> splitOp(String key, String countKey, byte[] value) throws ClassNotFoundException, ClassCastException, IOException {
+            List<KVPair<Object>> result = new ArrayList<KVPair<Object>>(2);
+            // write list
+            result.add(new KVPair<Object>(key, value));
+            // write count (if available)
+            if (countKey != null) {
+                int listSize = ErlangValue.otpObjectToOtpList(
+                        WikiDumpPrepareSQLiteForScalarisHandler
+                                .objectFromBytes2(value).value()).arity();
+                result.add(new KVPair<Object>(countKey, listSize));
+            }
+            
+            return result;
+        }
+        
         @Override
         public void run() {
-            // split lists:
             try {
-                // write list
-                try {
-                    stWrite.bind(1, key).bind(2, value).stepThrough();
-                } catch (SQLiteException e) {
-                    importer.error("write of " + key + " failed (sqlite error: " + e.toString() + ")");
-                }
-                // write count (if available)
-                if (countKey != null) {
+                Collection<KVPair<Object>> operations = splitOp(key, countKey, value);
+                for (KVPair<Object> kvPair : operations) {
                     try {
-                        stWrite.reset();
-                        int listSize = ErlangValue.otpObjectToOtpList(WikiDumpPrepareSQLiteForScalarisHandler.objectFromBytes2(value).value()).arity();
-                        stWrite.bind(1, countKey).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(listSize)).stepThrough();
+                        byte[] valueB;
+                        if (kvPair.value instanceof byte[]) {
+                            valueB = (byte[]) kvPair.value;
+                        } else {
+                            valueB = WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(kvPair.value);
+                        }
+                        stWrite.bind(1, kvPair.key).bind(2, valueB).stepThrough();
                     } catch (SQLiteException e) {
-                        importer.error("write of " + countKey + " failed (sqlite error: " + e.toString() + ")");
-                    } catch (IOException e) {
-                        importer.error("write of " + countKey + " failed (error: " + e.toString() + ")");
-                    } catch (ClassNotFoundException e) {
-                        importer.error("write of " + countKey + " failed (error: " + e.toString() + ")");
+                        importer.error("write of " + kvPair.key + " failed (sqlite error: " + e.toString() + ")");
+                    } finally {
+                        try {
+                            stWrite.reset();
+                        } catch (SQLiteException e) {
+                            importer.error("failed to reset write statement (error: " + e.toString() + ")");
+                        }
                     }
                 }
-            } finally {
-                try {
-                    stWrite.reset();
-                } catch (SQLiteException e) {
-                    importer.error("failed to reset write statement (error: " + e.toString() + ")");
-                }
+            } catch (IOException e) {
+                importer.error("split of " + key + " failed (error: " + e.toString() + ")");
+            } catch (ClassNotFoundException e) {
+                importer.error("split of " + key + " failed (error: " + e.toString() + ")");
+            } catch (ClassCastException e) {
+                importer.error("split of " + key + " failed (error: " + e.toString() + ")");
             }
         }
     }
@@ -357,18 +382,13 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             this.optimisation = optimisation;
             this.countKey = countKey;
         }
-        
-        @Override
-        public void run() {
+
+        protected static HashMap<String, List<ErlangValue>> splitList(IBuckets optimisation, byte[] valueBytes)
+                throws RuntimeException, ClassNotFoundException, IOException {
             List<ErlangValue> value;
-            try {
                 value = WikiDumpPrepareSQLiteForScalarisHandler
                         .objectFromBytes2(valueBytes).listValue();
                 valueBytes = null;
-            } catch (Exception e) {
-                importer.error("write of " + key + " failed (error: " + e.toString() + ")");
-                return;
-            }
             // split lists:
             int bucketsToUse;
             if (optimisation instanceof IReadBuckets) {
@@ -398,37 +418,47 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                 }
                 valueAtKey2.add(obj);
             }
-
-            for (Entry<String, List<ErlangValue>> newList : newLists.entrySet()) {
-                try {
-                    // write list
-                    final String key2 = key + newList.getKey();
+            return newLists;
+        }
+        
+        @Override
+        public void run() {
+            try {
+                HashMap<String, List<ErlangValue>> newLists = splitList(optimisation, valueBytes);
+                for (Entry<String, List<ErlangValue>> newList : newLists.entrySet()) {
                     try {
-                        stWrite.bind(1, key2).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(newList.getValue())).stepThrough();
-                    } catch (SQLiteException e) {
-                        importer.error("write of " + key2 + " failed (sqlite error: " + e.toString() + ")");
-                    } catch (IOException e) {
-                        importer.error("write of " + key2 + " failed (error: " + e.toString() + ")");
-                    }
-                    // write count (if available)
-                    if (countKey != null) {
-                        final String countKey2 = countKey + newList.getKey();
+                        // write list
+                        final String key2 = key + newList.getKey();
+                        try {
+                            stWrite.bind(1, key2).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(newList.getValue())).stepThrough();
+                        } catch (SQLiteException e) {
+                            importer.error("write of " + key2 + " failed (sqlite error: " + e.toString() + ")");
+                        } catch (IOException e) {
+                            importer.error("write of " + key2 + " failed (error: " + e.toString() + ")");
+                        }
+                        // write count (if available)
+                        if (countKey != null) {
+                            final String countKey2 = countKey + newList.getKey();
+                            try {
+                                stWrite.reset();
+                                stWrite.bind(1, countKey2).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(newList.getValue().size())).stepThrough();
+                            } catch (SQLiteException e) {
+                                importer.error("write of " + countKey2 + " failed (sqlite error: " + e.toString() + ")");
+                            } catch (IOException e) {
+                                importer.error("write of " + countKey2 + " failed (error: " + e.toString() + ")");
+                            }
+                        }
+                    } finally {
                         try {
                             stWrite.reset();
-                            stWrite.bind(1, countKey2).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(newList.getValue().size())).stepThrough();
                         } catch (SQLiteException e) {
-                            importer.error("write of " + countKey2 + " failed (sqlite error: " + e.toString() + ")");
-                        } catch (IOException e) {
-                            importer.error("write of " + countKey2 + " failed (error: " + e.toString() + ")");
+                            importer.error("failed to reset write statement (error: " + e.toString() + ")");
                         }
                     }
-                } finally {
-                    try {
-                        stWrite.reset();
-                    } catch (SQLiteException e) {
-                        importer.error("failed to reset write statement (error: " + e.toString() + ")");
-                    }
                 }
+            } catch (Exception e) {
+                importer.error("write of " + key + " failed (error: " + e.toString() + ")");
+                return;
             }
         }
     }
@@ -451,11 +481,11 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             assert optimisation.getBuckets() > 1;
         }
         
-        @Override
-        public void run() {
+        public static Collection<KVPair<Integer>> splitCounter(IBuckets optimisation, String key, int value) {
             // cannot partition a counter without its original values,
             // however, it does not matter which counter is how large
             // -> make all bucket counters (almost) the same value
+            List<KVPair<Integer>> result = new ArrayList<KVPair<Integer>>(optimisation.getBuckets());
             
             int avg = value;
             if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
@@ -466,27 +496,33 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             int rest = value; 
             
             for (int i = 0; i < optimisation.getBuckets(); ++i) {
+                final String key2 = key + ":" + i;
+                int curValue;
+                if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+                    curValue = (i == optimisation.getBuckets() - 1) ? rest : avg;
+                } else if (optimisation instanceof IReadBuckets) {
+                    IReadBuckets optimisation2 = (IReadBuckets) optimisation;
+                    curValue = (i == optimisation2.getReadBuckets() - 1) ? rest : avg;
+                } else {
+                    throw new RuntimeException("unsupported optimisation: " + optimisation);
+                }
+                rest -= curValue;
+                result.add(new KVPair<Integer>(key2, curValue));
+            }
+            
+            return result;
+        }
+        
+        @Override
+        public void run() {
+            Collection<KVPair<Integer>> operations = splitCounter(optimisation, key, value);
+            for (KVPair<Integer> kvPair : operations) {
                 try {
-                    // write count (if available)
-                    final String key2 = key + ":" + i;
-                    int curValue;
-                    if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
-                        curValue = (i == optimisation.getBuckets() - 1) ? rest : avg;
-                    } else if (optimisation instanceof IReadBuckets) {
-                        IReadBuckets optimisation2 = (IReadBuckets) optimisation;
-                        curValue = (i == optimisation2.getReadBuckets() - 1) ? rest : avg;
-                    } else {
-                        throw new RuntimeException("unsupported optimisation: " + optimisation);
-                    }
-                    rest -= curValue;
-                    try {
-                        stWrite.reset();
-                        stWrite.bind(1, key2).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(curValue)).stepThrough();
-                    } catch (SQLiteException e) {
-                        importer.error("write of " + key2 + " failed (sqlite error: " + e.toString() + ")");
-                    } catch (IOException e) {
-                        importer.error("write of " + key2 + " failed (error: " + e.toString() + ")");
-                    }
+                    stWrite.bind(1, kvPair.key).bind(2, WikiDumpPrepareSQLiteForScalarisHandler.objectToBytes(kvPair.value)).stepThrough();
+                } catch (SQLiteException e) {
+                    importer.error("write of " + kvPair.key + " failed (sqlite error: " + e.toString() + ")");
+                } catch (IOException e) {
+                    importer.error("write of " + kvPair.key + " failed (error: " + e.toString() + ")");
                 } finally {
                     try {
                         stWrite.reset();
@@ -498,8 +534,42 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         }
     }
 
-    private static enum ListOrCountOp {
+    protected static enum ListOrCountOp {
         NONE, LIST, COUNTER;
+    }
+    
+    static {
+        // BEWARE: keep in sync with ScalarisDataHandler!
+        assert ScalarisDataHandler.getPageListKey(0).equals("pages:0");
+        assert ScalarisDataHandler.getPageListKey(-2).equals("pages:-2");
+        assert ScalarisDataHandler.getPageCountKey(0).equals("pages:0:count");
+        assert ScalarisDataHandlerUnnormalised.getRevKey("foobar", 0, new MyNamespace()).equals("foobar:rev:0");
+        assert ScalarisDataHandlerUnnormalised.getPageKey("foobar", new MyNamespace()).equals("foobar:page");
+        assert ScalarisDataHandlerUnnormalised.getRevListKey("foobar", new MyNamespace()).equals("foobar:revs");
+        assert ScalarisDataHandlerUnnormalised.getCatPageListKey("foobar", new MyNamespace()).equals("foobar:cpages");
+        assert ScalarisDataHandlerUnnormalised.getCatPageCountKey("foobar", new MyNamespace()).equals("foobar:cpages:count");
+        assert ScalarisDataHandlerUnnormalised.getTplPageListKey("foobar", new MyNamespace()).equals("foobar:tpages");
+        assert ScalarisDataHandlerUnnormalised.getBackLinksPageListKey("foobar", new MyNamespace()).equals("foobar:blpages");
+        assert ScalarisDataHandler.getContributionListKey("foobar").equals("foobar:user:contrib");
+    }
+    
+    protected static final Pattern pageListPattern = Pattern.compile("^pages:([+-]?[0-9]+)$", Pattern.DOTALL);
+    protected static final Pattern pageCountPattern = Pattern.compile("^pages:([+-]?[0-9]+):count$", Pattern.DOTALL);
+    protected static final Pattern revPattern = Pattern.compile("^(.*):rev:([0-9]+)$", Pattern.DOTALL);
+    protected static final Pattern pagePattern = Pattern.compile("^(.*):page$", Pattern.DOTALL);
+    protected static final Pattern revListPattern = Pattern.compile("^(.*):revs$", Pattern.DOTALL);
+    protected static final Pattern catPageListPattern = Pattern.compile("^(.*):cpages$", Pattern.DOTALL);
+    protected static final Pattern catPageCountPattern = Pattern.compile("^(.*):cpages:count$", Pattern.DOTALL);
+    protected static final Pattern tplPageListPattern = Pattern.compile("^(.*):tpages$", Pattern.DOTALL);
+    protected static final Pattern backLinksPageListPattern = Pattern.compile("^(.*):blpages$", Pattern.DOTALL);
+    protected static final Pattern contributionListPattern = Pattern.compile("^(.*):user:contrib$", Pattern.DOTALL);
+    
+    protected static class ConvertOp {
+        boolean copyValue = false;
+        ScalarisOpType opType = null;
+        ListOrCountOp listOrCount = ListOrCountOp.NONE;
+        String countKey = null;
+        IBuckets optimisation2 = null;
     }
     
     /**
@@ -511,141 +581,40 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     public void convertObjects() throws RuntimeException, FileNotFoundException {
         importStart();
         try {
-            try {
-                // BEWARE: keep in sync with ScalarisDataHandler!
-                assert ScalarisDataHandler.getPageListKey(0).equals("pages:0");
-                assert ScalarisDataHandler.getPageListKey(-2).equals("pages:-2");
-                assert ScalarisDataHandler.getPageCountKey(0).equals("pages:0:count");
-                assert ScalarisDataHandlerUnnormalised.getRevKey("foobar", 0, new MyNamespace()).equals("foobar:rev:0");
-                assert ScalarisDataHandlerUnnormalised.getPageKey("foobar", new MyNamespace()).equals("foobar:page");
-                assert ScalarisDataHandlerUnnormalised.getRevListKey("foobar", new MyNamespace()).equals("foobar:revs");
-                assert ScalarisDataHandlerUnnormalised.getCatPageListKey("foobar", new MyNamespace()).equals("foobar:cpages");
-                assert ScalarisDataHandlerUnnormalised.getCatPageCountKey("foobar", new MyNamespace()).equals("foobar:cpages:count");
-                assert ScalarisDataHandlerUnnormalised.getTplPageListKey("foobar", new MyNamespace()).equals("foobar:tpages");
-                assert ScalarisDataHandlerUnnormalised.getBackLinksPageListKey("foobar", new MyNamespace()).equals("foobar:blpages");
-                assert ScalarisDataHandler.getContributionListKey("foobar").equals("foobar:user:contrib");
-                
-                final Pattern pageListPattern = Pattern.compile("^pages:([+-]?[0-9]+)$", Pattern.DOTALL);
-                final Pattern pageCountPattern = Pattern.compile("^pages:([+-]?[0-9]+):count$", Pattern.DOTALL);
-                final Pattern revPattern = Pattern.compile("^(.*):rev:([0-9]+)$", Pattern.DOTALL);
-                final Pattern pagePattern = Pattern.compile("^(.*):page$", Pattern.DOTALL);
-                final Pattern revListPattern = Pattern.compile("^(.*):revs$", Pattern.DOTALL);
-                final Pattern catPageListPattern = Pattern.compile("^(.*):cpages$", Pattern.DOTALL);
-                final Pattern catPageCountPattern = Pattern.compile("^(.*):cpages:count$", Pattern.DOTALL);
-                final Pattern tplPageListPattern = Pattern.compile("^(.*):tpages$", Pattern.DOTALL);
-                final Pattern backLinksPageListPattern = Pattern.compile("^(.*):blpages$", Pattern.DOTALL);
-                final Pattern contributionListPattern = Pattern.compile("^(.*):user:contrib$", Pattern.DOTALL);
-                
+            try {                
                 while (stRead.step()) {
                     ++importedKeys;
                     String key = stRead.columnString(0);
                     byte[] value = stRead.columnBlob(1);
-
-                    final Matcher pageListMatcher = pageListPattern.matcher(key);
-                    final Matcher pageCountMatcher = pageCountPattern.matcher(key);
-                    final Matcher revMatcher = revPattern.matcher(key);
-                    final Matcher pageMatcher = pagePattern.matcher(key);
-                    final Matcher revListMatcher = revListPattern.matcher(key);
-                    final Matcher catPageListMatcher = catPageListPattern.matcher(key);
-                    final Matcher catPageCountMatcher = catPageCountPattern.matcher(key);
-                    final Matcher tplPageListMatcher = tplPageListPattern.matcher(key);
-                    final Matcher backLinksPageListMatcher = backLinksPageListPattern.matcher(key);
-                    final Matcher contributionListMatcher = contributionListPattern.matcher(key);
                     
-                    boolean copyValue = false;
-                    ScalarisOpType opType = null;
-                    ListOrCountOp listOrCount = ListOrCountOp.NONE;
-                    String countKey = null;
-                    
-                    if (key.equals(ScalarisDataHandler.getSiteInfoKey())) {
-                        copyValue = true;
-                    } else if (pageListMatcher.matches()) {
-                        int namespace = Integer.parseInt(pageListMatcher.group(1));
-                        countKey = ScalarisDataHandler.getPageCountKey(namespace);
-                        opType = ScalarisOpType.PAGE_LIST;
-                        listOrCount = ListOrCountOp.LIST;
-                    } else if (pageCountMatcher.matches()) {
-                        // ignore (written during page list partitioning (see below)
-                        listOrCount = ListOrCountOp.COUNTER;
-                    } else if (key.equals(ScalarisDataHandler.getArticleCountKey())) {
-                        countKey = null;
-                        opType = ScalarisOpType.ARTICLE_COUNT;
-                        listOrCount = ListOrCountOp.COUNTER;
-                    } else if (revMatcher.matches()) {
-                        opType = ScalarisOpType.REVISION;
-                        copyValue = true;
-                    } else if (pageMatcher.matches()) {
-                        opType = ScalarisOpType.PAGE;
-                        copyValue = true;
-                    } else if (revListMatcher.matches()) {
-                        countKey = null;
-                        opType = ScalarisOpType.SHORTREV_LIST;
-                        listOrCount = ListOrCountOp.LIST;
-                    } else if (catPageListMatcher.matches()) {
-                        String title = catPageListMatcher.group(1);
-                        countKey = title + ":cpages:count";
-                        opType = ScalarisOpType.CATEGORY_PAGE_LIST;
-                        listOrCount = ListOrCountOp.LIST;
-                    } else if (catPageCountMatcher.matches()) {
-                        // ignore (written during page list partitioning (see below)
-                        listOrCount = ListOrCountOp.COUNTER;
-                    } else if (tplPageListMatcher.matches()) {
-                        countKey = null;
-                        opType = ScalarisOpType.TEMPLATE_PAGE_LIST;
-                        listOrCount = ListOrCountOp.LIST;
-                    } else if (backLinksPageListMatcher.matches()) {
-                        // omit if disabled
-                        if (dbWriteOptions.WIKI_USE_BACKLINKS) {
-                            countKey = null;
-                            opType = ScalarisOpType.BACKLINK_PAGE_LIST;
-                            listOrCount = ListOrCountOp.LIST;
-                        }
-                    } else if (key.matches(ScalarisDataHandler.getStatsPageEditsKey())) {
-                        countKey = null;
-                        opType = ScalarisOpType.EDIT_STAT;
-                        listOrCount = ListOrCountOp.COUNTER;
-                    } else if (contributionListMatcher.matches()) {
-                        // omit if disabled
-                        if (dbWriteOptions.WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
-                            countKey = null;
-                            opType = ScalarisOpType.CONTRIBUTION;
-                            listOrCount = ListOrCountOp.LIST;
-                        }
-                    } else {
+                    ConvertOp convOp = getConvertOp(key, dbWriteOptions);
+                    if (convOp == null) {
                         println("unknown key: " + key);
-                    }
-
-                    IBuckets optimisation2 = null;
-                    if (opType != null) {
-                        final Optimisation optimisation = dbWriteOptions.OPTIMISATIONS.get(opType);
-                        if (optimisation instanceof IBuckets) {
-                            optimisation2 = (IBuckets) optimisation;
-                        } else {
-                            copyValue = true;
-                        }
+                        // use defaults and continue anyway...
+                        convOp = new ConvertOp();
                     }
                     
-                    if (copyValue) {
-                        if (listOrCount == ListOrCountOp.LIST) {
-                            addSQLiteJob(new SQLiteCopyList(this, key, value, countKey, stWrite));
+                    if (convOp.copyValue) {
+                        if (convOp.listOrCount == ListOrCountOp.LIST) {
+                            addSQLiteJob(new SQLiteCopyList(this, key, value, convOp.countKey, stWrite));
                         } else {
                             addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
                         }
-                    } else if (optimisation2 != null) {
-                        switch (listOrCount) {
+                    } else if (convOp.optimisation2 != null) {
+                        switch (convOp.listOrCount) {
                             case LIST:
                                 addSQLiteJob(new SQLiteWriteBucketListJob(this,
-                                        key, value, countKey, stWrite,
-                                        optimisation2));
+                                        key, value, convOp.countKey, stWrite,
+                                        convOp.optimisation2));
                                 break;
                             case COUNTER:
-                                if (optimisation2.getBuckets() > 1) {
-                                addSQLiteJob(new SQLiteWriteBucketCounterJob(
-                                        this, key,
-                                        WikiDumpPrepareSQLiteForScalarisHandler
-                                                .objectFromBytes2(value)
-                                                .intValue(), stWrite,
-                                        optimisation2));
+                                if (convOp.optimisation2.getBuckets() > 1) {
+                                    addSQLiteJob(new SQLiteWriteBucketCounterJob(
+                                            this, key,
+                                            WikiDumpPrepareSQLiteForScalarisHandler
+                                            .objectFromBytes2(value)
+                                            .intValue(), stWrite,
+                                            convOp.optimisation2));
                                 } else {
                                     addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
                                 }
@@ -673,6 +642,102 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             error("read failed (error: " + e.toString() + ")");
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Parses the key and gets the conversion op needed for a plain DB dump to a
+     * dump with the given optimisations.
+     * 
+     * @param key
+     *            the key to write to
+     * @param dbWriteOptions
+     *            optimisation options
+     * @return convert operation or <tt>null</tt> if the key signature is
+     *         unknown
+     * 
+     * @throws NumberFormatException
+     */
+    public static ConvertOp getConvertOp(String key, Options dbWriteOptions) throws NumberFormatException {
+        ConvertOp convOp = new ConvertOp();
+
+        final Matcher pageListMatcher = pageListPattern.matcher(key);
+        final Matcher pageCountMatcher = pageCountPattern.matcher(key);
+        final Matcher revMatcher = revPattern.matcher(key);
+        final Matcher pageMatcher = pagePattern.matcher(key);
+        final Matcher revListMatcher = revListPattern.matcher(key);
+        final Matcher catPageListMatcher = catPageListPattern.matcher(key);
+        final Matcher catPageCountMatcher = catPageCountPattern.matcher(key);
+        final Matcher tplPageListMatcher = tplPageListPattern.matcher(key);
+        final Matcher backLinksPageListMatcher = backLinksPageListPattern.matcher(key);
+        final Matcher contributionListMatcher = contributionListPattern.matcher(key);
+        
+        if (key.equals(ScalarisDataHandler.getSiteInfoKey())) {
+            convOp.copyValue = true;
+        } else if (pageListMatcher.matches()) {
+            int namespace = Integer.parseInt(pageListMatcher.group(1));
+            convOp.countKey = ScalarisDataHandler.getPageCountKey(namespace);
+            convOp.opType = ScalarisOpType.PAGE_LIST;
+            convOp.listOrCount = ListOrCountOp.LIST;
+        } else if (pageCountMatcher.matches()) {
+            // ignore (written during page list partitioning (see below)
+            convOp.listOrCount = ListOrCountOp.COUNTER;
+        } else if (key.equals(ScalarisDataHandler.getArticleCountKey())) {
+            convOp.countKey = null;
+            convOp.opType = ScalarisOpType.ARTICLE_COUNT;
+            convOp.listOrCount = ListOrCountOp.COUNTER;
+        } else if (revMatcher.matches()) {
+            convOp.opType = ScalarisOpType.REVISION;
+            convOp.copyValue = true;
+        } else if (pageMatcher.matches()) {
+            convOp.opType = ScalarisOpType.PAGE;
+            convOp.copyValue = true;
+        } else if (revListMatcher.matches()) {
+            convOp.countKey = null;
+            convOp.opType = ScalarisOpType.SHORTREV_LIST;
+            convOp.listOrCount = ListOrCountOp.LIST;
+        } else if (catPageListMatcher.matches()) {
+            String title = catPageListMatcher.group(1);
+            convOp.countKey = title + ":cpages:count";
+            convOp.opType = ScalarisOpType.CATEGORY_PAGE_LIST;
+            convOp.listOrCount = ListOrCountOp.LIST;
+        } else if (catPageCountMatcher.matches()) {
+            // ignore (written during page list partitioning (see below)
+            convOp.listOrCount = ListOrCountOp.COUNTER;
+        } else if (tplPageListMatcher.matches()) {
+            convOp.countKey = null;
+            convOp.opType = ScalarisOpType.TEMPLATE_PAGE_LIST;
+            convOp.listOrCount = ListOrCountOp.LIST;
+        } else if (backLinksPageListMatcher.matches()) {
+            // omit if disabled
+            if (dbWriteOptions.WIKI_USE_BACKLINKS) {
+                convOp.countKey = null;
+                convOp.opType = ScalarisOpType.BACKLINK_PAGE_LIST;
+                convOp.listOrCount = ListOrCountOp.LIST;
+            }
+        } else if (key.matches(ScalarisDataHandler.getStatsPageEditsKey())) {
+            convOp.countKey = null;
+            convOp.opType = ScalarisOpType.EDIT_STAT;
+            convOp.listOrCount = ListOrCountOp.COUNTER;
+        } else if (contributionListMatcher.matches()) {
+            // omit if disabled
+            if (dbWriteOptions.WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
+                convOp.countKey = null;
+                convOp.opType = ScalarisOpType.CONTRIBUTION;
+                convOp.listOrCount = ListOrCountOp.LIST;
+            }
+        } else {
+            return null;
+        }
+
+        if (convOp.opType != null) {
+            final Optimisation optimisation = dbWriteOptions.OPTIMISATIONS.get(convOp.opType);
+            if (optimisation instanceof IBuckets) {
+                convOp.optimisation2 = (IBuckets) optimisation;
+            } else {
+                convOp.copyValue = true;
+            }
+        }
+        return convOp;
     }
 
     /**

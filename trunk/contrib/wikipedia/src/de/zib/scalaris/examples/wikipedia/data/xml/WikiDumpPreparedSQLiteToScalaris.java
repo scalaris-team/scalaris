@@ -19,7 +19,11 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.math.BigInteger;
 import java.text.NumberFormat;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -36,9 +40,17 @@ import de.zib.scalaris.CommonErlangObjects;
 import de.zib.scalaris.Connection;
 import de.zib.scalaris.ConnectionException;
 import de.zib.scalaris.ConnectionFactory;
+import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.RoundRobinConnectionPolicy;
 import de.zib.scalaris.TransactionSingleOp;
+import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpConvertPreparedSQLite.ConvertOp;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpConvertPreparedSQLite.KVPair;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpConvertPreparedSQLite.ListOrCountOp;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpConvertPreparedSQLite.SQLiteCopyList;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpConvertPreparedSQLite.SQLiteWriteBucketCounterJob;
+import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpConvertPreparedSQLite.SQLiteWriteBucketListJob;
 import de.zib.scalaris.operations.WriteOp;
 
 /**
@@ -82,6 +94,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
     protected final int myNumber;
     protected final ConnectionFactory cFactory;
     protected boolean errorDuringImport = false;
+    protected final Options dbWriteOptions;
 
     /**
      * Sets up a SAX XmlHandler exporting all parsed pages except the ones in a
@@ -89,6 +102,9 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      * 
      * @param dbFileName
      *            the name of the database file to read from
+     * @param dbWriteOptions
+     *            options that specify which optimisations should be applied in
+     *            the Scalaris DB
      * @param numberOfImporters
      *            number of (independent) import jobs
      * @param myNumber
@@ -100,7 +116,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      *             if <tt>myNumber</tt> is not greater than 0 or is greater than
      *             <tt>numberOfImporters</tt>
      */
-    public WikiDumpPreparedSQLiteToScalaris(String dbFileName, int numberOfImporters, int myNumber) throws RuntimeException {
+    public WikiDumpPreparedSQLiteToScalaris(String dbFileName, Options dbWriteOptions, int numberOfImporters, int myNumber) throws RuntimeException {
         this.dbFileName = dbFileName;
         this.cFactory = new ConnectionFactory();
         Random random = new Random();
@@ -114,6 +130,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         if (myNumber > numberOfImporters || myNumber < 1) {
             throw new IllegalArgumentException("not 1 <= myNumber (" + myNumber + ") <= numberOfImporters (" + numberOfImporters + ")");
         }
+        this.dbWriteOptions = dbWriteOptions;
     }
 
     /**
@@ -122,6 +139,9 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      * 
      * @param dbFileName
      *            the name of the database file to read from
+     * @param dbWriteOptions
+     *            options that specify which optimisations should be applied in
+     *            the Scalaris DB
      * @param numberOfImporters
      *            number of (independent) import jobs
      * @param myNumber
@@ -135,7 +155,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
      *             if <tt>myNumber</tt> is not greater than 0 or is greater than
      *             <tt>numberOfImporters</tt>
      */
-    public WikiDumpPreparedSQLiteToScalaris(String dbFileName, int numberOfImporters, int myNumber, ConnectionFactory cFactory) throws RuntimeException {
+    public WikiDumpPreparedSQLiteToScalaris(String dbFileName, Options dbWriteOptions, int numberOfImporters, int myNumber, ConnectionFactory cFactory) throws RuntimeException {
         this.dbFileName = dbFileName;
         this.cFactory = cFactory;
         this.numberOfImporters = numberOfImporters;
@@ -143,6 +163,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         if (myNumber > numberOfImporters || myNumber < 1) {
             throw new IllegalArgumentException("not 1 <= myNumber (" + myNumber + ") <= numberOfImporters (" + numberOfImporters + ")");
         }
+        this.dbWriteOptions = dbWriteOptions;
     }
 
     /**
@@ -270,9 +291,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                 String key = st.columnString(0);
                 byte[] value = st.columnBlob(1);
                 try {
-                    OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
-                            .objectFromBytes(value);
-                    writeToScalaris(key, valueOtp);
+                    writeToScalaris(key, value);
                 } catch (ClassNotFoundException e) {
                     error("read of " + key + " failed (error: " + e.toString() + ")");
                     throw new RuntimeException(e);
@@ -304,9 +323,83 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
         }
     }
     
-    protected void writeToScalaris(String key, OtpErlangObject value) {
+    protected void writeToScalaris(String key, byte[] value) throws ClassNotFoundException, IOException {
         ++importedKeys;
-        requests.addOp(new WriteCompressedOp(key, value));
+        if (dbWriteOptions == null) {
+            OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
+                    .objectFromBytes(value);
+            requests.addOp(new WriteCompressedOp(key, valueOtp));
+        } else {
+            ConvertOp convOp = WikiDumpConvertPreparedSQLite.getConvertOp(key, dbWriteOptions);
+            if (convOp == null) {
+                println("unknown key: " + key);
+                // use defaults and continue anyway...
+                convOp = new ConvertOp();
+            }
+
+            if (convOp.copyValue) {
+                if (convOp.listOrCount == ListOrCountOp.LIST) {
+                    Collection<KVPair<Object>> operations = SQLiteCopyList.splitOp(key, convOp.countKey, value);
+                    for (KVPair<Object> kvPair : operations) {
+                        OtpErlangObject valueOtpCompressed;
+                        if (kvPair.value instanceof byte[]) {
+                            valueOtpCompressed = WikiDumpPrepareSQLiteForScalarisHandler
+                                    .objectFromBytes((byte[]) kvPair.value);
+                        } else {
+                            valueOtpCompressed = CommonErlangObjects
+                                    .encode(ErlangValue.convertToErlang(kvPair.value));
+                        }
+                        requests.addOp(new WriteCompressedOp(kvPair.key, valueOtpCompressed));
+                    }
+                } else {
+                    // write object as is
+                    OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
+                            .objectFromBytes(value);
+                    requests.addOp(new WriteCompressedOp(key, valueOtp));
+                }
+            } else if (convOp.optimisation2 != null) {
+                switch (convOp.listOrCount) {
+                    case LIST:
+                        try {
+                            HashMap<String, List<ErlangValue>> newLists = SQLiteWriteBucketListJob
+                                    .splitList(convOp.optimisation2, value);
+                            for (Entry<String, List<ErlangValue>> newList : newLists.entrySet()) {
+                                // write list
+                                final String key2 = key + newList.getKey();
+                                requests.addOp(new WriteOp(key2, newList.getValue()));
+                                // write count (if available)
+                                if (convOp.countKey != null) {
+                                    final String countKey2 = convOp.countKey + newList.getKey();
+                                    requests.addOp(new WriteOp(countKey2, newList.getValue().size()));
+                                }
+                            }
+                        } catch (Exception e) {
+                            println("write of " + key + " failed (error: " + e.toString() + ")");
+                            return;
+                        }
+                        break;
+                    case COUNTER:
+                        if (convOp.optimisation2.getBuckets() > 1) {
+                            int counter = WikiDumpPrepareSQLiteForScalarisHandler
+                                    .objectFromBytes2(value)
+                                    .intValue();
+                            Collection<KVPair<Integer>> newCounters = SQLiteWriteBucketCounterJob
+                                    .splitCounter(convOp.optimisation2, key, counter);
+                            for (KVPair<Integer> kvPair : newCounters) {
+                                requests.addOp(new WriteOp(kvPair.key, kvPair.value));
+                            }
+                        } else {
+                            // write object as is
+                            OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
+                                    .objectFromBytes(value);
+                            requests.addOp(new WriteCompressedOp(key, valueOtp));
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
         // bundle requests:
         if (requests.size() >= REQUEST_BUNDLE_SIZE) {
             Runnable worker = new WikiDumpToScalarisHandler.MyScalarisSingleRunnable(
