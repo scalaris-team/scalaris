@@ -485,30 +485,27 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             // cannot partition a counter without its original values,
             // however, it does not matter which counter is how large
             // -> make all bucket counters (almost) the same value
-            List<KVPair<Integer>> result = new ArrayList<KVPair<Integer>>(optimisation.getBuckets());
-            
             int avg = value;
-            if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
-                avg = value / optimisation.getBuckets();
-            } else if (optimisation instanceof IReadBuckets) {
-                avg = value / ((IReadBuckets) optimisation).getReadBuckets();
+            int bucketsToUse;
+            if (optimisation instanceof IReadBuckets) {
+                bucketsToUse = ((IReadBuckets) optimisation).getReadBuckets();
+            } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+                bucketsToUse = optimisation.getBuckets();
+            } else {
+                throw new RuntimeException("unsupported optimisation: " + optimisation);
             }
+            List<KVPair<Integer>> result = new ArrayList<KVPair<Integer>>(bucketsToUse);
+            avg = value / bucketsToUse;
             int rest = value; 
             
-            for (int i = 0; i < optimisation.getBuckets(); ++i) {
+            for (int i = 0; i < bucketsToUse; ++i) {
                 final String key2 = key + ":" + i;
                 int curValue;
-                if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
-                    curValue = (i == optimisation.getBuckets() - 1) ? rest : avg;
-                } else if (optimisation instanceof IReadBuckets) {
-                    IReadBuckets optimisation2 = (IReadBuckets) optimisation;
-                    curValue = (i == optimisation2.getReadBuckets() - 1) ? rest : avg;
-                } else {
-                    throw new RuntimeException("unsupported optimisation: " + optimisation);
-                }
+                curValue = (i == bucketsToUse - 1) ? rest : avg;
                 rest -= curValue;
                 result.add(new KVPair<Integer>(key2, curValue));
             }
+            assert(rest == 0);
             
             return result;
         }
