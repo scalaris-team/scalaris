@@ -147,12 +147,21 @@ public class Main {
             }
             ++i;
             
+            Options options = null;
+            if (args.length > i) {
+                if (args[i].length() > 0) {
+                    options = Options.getInstance();
+                    Options.parseOptions(options, args[i]);
+                }
+            }
+            ++i;
+            
             if (filename.endsWith(".db") && numberOfImporters > 0 && myNumber > 0) {
                 WikiDumpHandler.println(System.out, "wiki import from " + filename);
                 WikiDumpHandler.println(System.out, " importers   : " + numberOfImporters);
                 WikiDumpHandler.println(System.out, " my import nr: " + myNumber);
                 WikiDumpPreparedSQLiteToScalaris handler =
-                        new WikiDumpPreparedSQLiteToScalaris(filename, null, numberOfImporters, myNumber);
+                        new WikiDumpPreparedSQLiteToScalaris(filename, options, numberOfImporters, myNumber);
                 handler.setUp();
                 WikiDumpPreparedSQLiteToScalaris.ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
                 Runtime.getRuntime().addShutdownHook(shutdownHook);
