@@ -15,15 +15,27 @@
  */
 package de.zib.scalaris.examples.wikipedia;
 
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.DefaultHandler;
+import org.xml.sax.helpers.XMLReaderFactory;
 
 import de.zib.scalaris.ErlangValue;
 import de.zib.scalaris.examples.wikipedia.bliki.ExistingPagesCache;
@@ -934,5 +946,174 @@ public class Options {
         }
         System.err.println("unknown optimisation found: " + matcher.group());
         return null;
+    }
+
+    protected static class WebXmlInitParamHandler extends DefaultHandler {
+        public final Map<String, String> initParams = new HashMap<String, String>();
+        private final Map<String, String> curInitParams = new HashMap<String, String>();
+        protected StringBuilder curString = new StringBuilder();
+        protected String curInitParamName = null;
+        protected String curInitParamValue = null;
+        private boolean inWebApp = false;
+        private boolean inServlet = false;
+        private boolean inWikiServlet = false;
+        private boolean inInitParam = false;
+        private boolean parseContent = false;
+        
+
+        /* (non-Javadoc)
+         * @see org.xml.sax.helpers.DefaultHandler#startElement(java.lang.String, java.lang.String, java.lang.String, org.xml.sax.Attributes)
+         */
+        @Override
+        public void startElement(String uri, String localName, String qName,
+                Attributes attributes) throws SAXException {
+            /*
+             * <web-app ...>
+             *  <display-name>...</display-name>
+             *  <servlet>
+             *   <description>...</description>
+             *   <display-name>...</display-name>
+             *   <servlet-name>...</servlet-name>
+             *   <servlet-class>de.zib.scalaris.examples.wikipedia.bliki.WikiServletScalaris</servlet-class>
+             *   <init-param>
+             *    <param-name>
+             *     SERVERNAME|LOG_USER_REQS|SCALARIS_NODE_DISCOVERY|SERVERPATH|
+             *     WIKI_USE_BACKLINKS|WIKI_SAVEPAGE_RETRIES|WIKI_SAVEPAGE_RETRY_DELAY|
+             *     WIKI_PAGES_CACHE_IMPL|WIKI_REBUILD_PAGES_CACHE|WIKI_STORE_CONTRIBUTIONS|
+             *     WIKI_OPTIMISATIONS|...
+             *    </param-name>
+             *    <param-value>...</param-value>
+             *   </init-param>
+             *  </servlet>
+             *  ...
+             * </web-app>
+             */
+            if (inWebApp) {
+                if (inServlet) {
+                    if (inInitParam) {
+                        if (localName.equals("param-name")) {
+                            parseContent();
+                        } else if (localName.equals("param-value")) {
+                            parseContent();
+                        } else {
+                            throw new SAXException("unknown tag in <init-param>: " + localName);
+                        }
+                    } else if (localName.equals("servlet-class")) {
+                        parseContent();
+                    } else if (localName.equals("init-param")) {
+                        inInitParam = true;
+                    }
+                    // ignore other tags
+                } else if (localName.equals("servlet")) {
+                    inServlet = true;
+                }
+                // ignore other tags
+            } else if (localName.equals("web-app")) {
+                inWebApp = true;
+            } else {
+                throw new SAXException("unknown tag in root: " + localName);
+            }
+        }
+
+        private void parseContent() {
+            parseContent = true;
+            curString.setLength(0);
+        }
+
+        /* (non-Javadoc)
+         * @see org.xml.sax.helpers.DefaultHandler#characters(char[], int, int)
+         */
+        @Override
+        public void characters(char[] ch, int start, int length)
+                throws SAXException {
+            if (parseContent) {
+                curString.append(ch, start, length);
+            }
+        }
+
+        /* (non-Javadoc)
+         * @see org.xml.sax.helpers.DefaultHandler#endElement(java.lang.String, java.lang.String, java.lang.String)
+         */
+        @Override
+        public void endElement(String uri, String localName, String qName)
+                throws SAXException {
+            if (inWebApp) {
+                if (inServlet) {
+                    if (inInitParam) {
+                        if (localName.equals("param-name")) {
+                            parseContent = false;
+                            curInitParamName = curString.toString();
+                        } else if (localName.equals("param-value")) {
+                            parseContent = false;
+                            curInitParamValue = curString.toString();
+                        } else if (localName.equals("init-param")) {
+                            inInitParam = false;
+                            curInitParams.put(curInitParamName, curInitParamValue);
+                        } else {
+                            throw new SAXException("unknown tag in <init-param>: " + localName);
+                        }
+                    } else if (localName.equals("servlet-class")) {
+                        parseContent = false;
+                        String servletClass = curString.toString();
+                        if (servletClass.equals("de.zib.scalaris.examples.wikipedia.bliki.WikiServletScalaris")) {
+                            inWikiServlet = true;
+                        }
+                    } else if (localName.equals("init-param")) {
+                        throw new SAXException("closing </init-param> without matching start");
+                    } else if (localName.equals("servlet")) {
+                        if (inWikiServlet) {
+                            initParams.putAll(curInitParams);
+                        }
+                        inServlet = false;
+                        inWikiServlet = false;
+                    }
+                    // ignore other tags
+                } else if (localName.equals("servlet")) {
+                    throw new SAXException("closing </servlet> without matching start");
+                }
+                // ignore other tags
+            } else if (localName.equals("web-app")) {
+                inWebApp = false;
+            } else {
+                throw new SAXException("unknown tag in root: " + localName);
+            }
+        }
+        
+    }
+
+    /**
+     * Parses the given input file as a <tt>web.xml</tt> servlet descriptor for
+     * servlet configuration options.
+     * 
+     * @param options
+     *            the {@link Options} object to parse into
+     * @param filename
+     *            the name of the file to parse
+     */
+    public static void parseOptions(Options options, String filename) {
+        WebXmlInitParamHandler handler;
+        try {
+            FileInputStream is = new FileInputStream(filename);
+            BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+            handler = new WebXmlInitParamHandler();
+            XMLReader reader = XMLReaderFactory.createXMLReader();
+            reader.setContentHandler(handler);
+            reader.parse(new InputSource(br));
+            parseOptions(options,
+                    handler.initParams.get("SERVERNAME"),
+                    handler.initParams.get("SERVERPATH"),
+                    handler.initParams.get("WIKI_USE_BACKLINKS"),
+                    handler.initParams.get("WIKI_SAVEPAGE_RETRIES"),
+                    handler.initParams.get("WIKI_SAVEPAGE_RETRY_DELAY"),
+                    handler.initParams.get("WIKI_PAGES_CACHE_IMPL"),
+                    handler.initParams.get("WIKI_REBUILD_PAGES_CACHE"),
+                    handler.initParams.get("WIKI_STORE_CONTRIBUTIONS"),
+                    handler.initParams.get("WIKI_OPTIMISATIONS"),
+                    handler.initParams.get("LOG_USER_REQS"),
+                    handler.initParams.get("SCALARIS_NODE_DISCOVERY"));
+        } catch (Exception e) {
+            System.err.println("parsing failed: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
