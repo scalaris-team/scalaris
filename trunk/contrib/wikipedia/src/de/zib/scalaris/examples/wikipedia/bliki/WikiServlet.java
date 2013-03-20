@@ -977,9 +977,17 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                         page.addStats(tplResult.stats);
                         page.getInvolvedKeys().addAll(tplResult.involvedKeys);
                         if (tplResult.success) {
-                            final List<String> tplPageList = new ArrayList<String>(tplResult.value.size());
-                            wikiModel.denormalisePageTitles(tplResult.value, tplPageList);
-                            categoryPages.addAll(tplPageList);
+                            for (NormalisedTitle pageInTplOfCat: tplResult.value) {
+                                if (pageInTplOfCat.namespace.equals(MyNamespace.CATEGORY_NAMESPACE_KEY)) {
+                                    subCategories.add(pageInTplOfCat.title);
+                                // TODO: go into recursion?!
+                                // -> for now, just add the template as if it was an ordinary page
+//                                } else if (pageInTplOfCat.namespace.equals(MyNamespace.TEMPLATE_NAMESPACE_KEY)) {
+//                                  tplPages.add(pageInTplOfCat);
+                                } else {
+                                    categoryPages.add(pageInTplOfCat.denormalise(namespace));
+                                }
+                            }
                         } else {
                             if (tplResult.connect_failed) {
                                 setParam_error(request, "ERROR: DB connection failed");
