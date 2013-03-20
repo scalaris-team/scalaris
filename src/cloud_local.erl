@@ -102,10 +102,19 @@ wait_for(Fun, ExpectedValue) ->
             wait_for(Fun, ExpectedValue)
     end.
 
--spec find_free_port(integer()) -> integer().
-find_free_port(Port) ->
+-spec find_free_port(comm_server:tcp_port() | [comm_server:tcp_port()] |
+                         {From::comm_server:tcp_port(), To::comm_server:tcp_port()})
+        -> comm_server:tcp_port().
+find_free_port({From, To}) ->
+    find_free_port(lists:seq(From, To));
+find_free_port([Port | Rest]) when is_integer(Port) andalso Port >= 0 andalso Port =< 65535 ->
     case gen_tcp:listen(Port, []) of
         {ok, Socket} -> gen_tcp:close(Socket), 
                         Port;
-        _ -> find_free_port(Port+1)
-    end.
+        _ when Rest =:= [] -> find_free_port([Port+1]);
+        _ -> find_free_port(Rest)
+    end;
+find_free_port([]) ->
+    find_free_port([0]);
+find_free_port(Port) ->
+    find_free_port([Port]).
