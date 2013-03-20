@@ -49,9 +49,15 @@ init() ->
     ok.
 
 
+-spec get_vms() -> [string()].
+get_vms() ->
+    % only include VMs started by autoscale:
+    _VMs = [Name || {Name, _EpmdPort} <- erlang:element(2, erl_epmd:names()),
+                    re:run(Name, "autoscale_.*") =/= nomatch].
+
 -spec get_number_of_vms() -> non_neg_integer().
 get_number_of_vms() ->
-    length(erlang:element(2, erl_epmd:names())).
+    length(get_vms()).
 
 -spec add_vms(integer()) -> ok.
 add_vms(N) ->
@@ -63,7 +69,7 @@ add_vms(N) ->
         fun (X) -> 
                  Port = find_free_port(BaseScalarisPort),
                  YawsPort = find_free_port(BaseYawsPort),
-                 NodeName = lists:flatten(io_lib:format("node~p_~p", [Time, X])),
+                 NodeName = lists:flatten(io_lib:format("autoscale_~p_~p", [Time, X])),
                  Cmd = lists:flatten(io_lib:format("./../bin/scalarisctl -e -detached -s -p ~p -y ~p -n ~s start", 
                                                    [Port, YawsPort, NodeName])),
                  io:format("Executing: ~p~n", [Cmd]),
@@ -77,8 +83,7 @@ add_vms(N) ->
 
 -spec remove_vms(integer()) -> ok.
 remove_vms(N) ->
-    AllVMs = lists:map(fun (El) -> erlang:element(1, El) end, erlang:element(2, erl_epmd:names())),
-    VMs = lists:filter(fun (El) -> El =/= "firstnode" end, AllVMs),
+    VMs = get_vms(),
     RemoveFun = 
         fun(NodeName) ->						
                 Cmd = lists:flatten(io_lib:format("./../bin/scalarisctl -n ~s gstop", 
