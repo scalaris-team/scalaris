@@ -71,10 +71,10 @@ node_list() -> node_list(false).
 -spec node_list(UseShepherd::boolean()) -> ok.
 node_list(UseShepherd) ->
     Pid = mgmtPid(),
-    SendOptions = ?IIF(UseShepherd, [{shepherd, self()}], []),
     case comm:is_valid(Pid) of
-        true -> comm:send(Pid, {get_list, comm:this()}, SendOptions);
-        _    -> comm:send_local(self(), {get_list_response, []}, SendOptions)
+        true -> comm:send(Pid, {get_list, comm:this()},
+                          ?IIF(UseShepherd, [{shepherd, self()}], []));
+        _    -> comm:send_local(self(), {get_list_response, []})
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
