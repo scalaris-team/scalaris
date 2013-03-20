@@ -102,11 +102,11 @@ server(LS) ->
     end,
     server(LS).
 
--spec open_listen_port([comm_server:tcp_port()] | {From::comm_server:tcp_port(), To::comm_server:tcp_port()},
+-spec open_listen_port(comm_server:tcp_port() | [comm_server:tcp_port()] | {From::comm_server:tcp_port(), To::comm_server:tcp_port()},
                        IP::inet:ip_address()) -> inet:socket() | abort.
 open_listen_port({From, To}, IP) ->
     open_listen_port(lists:seq(From, To), IP);
-open_listen_port([Port | Rest], IP) ->
+open_listen_port([Port | Rest], IP) when is_integer(Port) andalso Port >= 0 andalso Port =< 65535 ->
     case gen_tcp:listen(Port, [binary, {packet, 4}, {ip, IP}, {backlog, 128}]
                         ++ comm_server:tcp_options(main)) of
         {ok, Socket} ->
