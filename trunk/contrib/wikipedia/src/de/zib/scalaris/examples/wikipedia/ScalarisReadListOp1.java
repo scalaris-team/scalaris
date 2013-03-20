@@ -2,6 +2,7 @@ package de.zib.scalaris.examples.wikipedia;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 
 import com.ericsson.otp.erlang.OtpErlangException;
@@ -116,8 +117,10 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
         int notFound = 0;
         NotFoundException lastNotFound = null;
         ErlangConverter<WriteCacheDiff<T>> writeCacheDiffConv = null;
+        HashSet<T> toDelete = null;
         if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
             writeCacheDiffConv = APPEND_INCREMENT_BUCKETS_WITH_WCACHE.getDiffConv(elemConv);
+            toDelete = new HashSet<T>();
         }
         for (int x = 0; x < keys.size(); ++x) {
             for (int i = 0; i < buckets; ++i) {
@@ -126,7 +129,7 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
                     if (writeCacheDiffConv != null && i >= ((IReadBuckets) optimisation).getReadBuckets()) {
                         WriteCacheDiff<T> diff = writeCacheDiffConv.convert(result);
                         value.addAll(diff.toAdd);
-                        value.removeAll(diff.toDelete);
+                        toDelete.addAll(diff.toDelete);
                     } else {
                         final List<T> list = listConv.convert(result);
                         value.addAll(list);
@@ -136,6 +139,9 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
                     lastNotFound = e;
                 }
             }
+        }
+        if (toDelete != null && !toDelete.isEmpty()) {
+            value.removeAll(toDelete);
         }
         if (failNotFound && notFound == (keys.size() * buckets)) {
             throw lastNotFound;
