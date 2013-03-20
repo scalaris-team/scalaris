@@ -967,6 +967,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                             subCategories.add(pageInCat.title);
                         } else if (pageInCat.namespace.equals(MyNamespace.TEMPLATE_NAMESPACE_KEY)) {
                             tplPages.add(pageInCat);
+                            categoryPages.add(pageInCat.denormalise(namespace));
                         } else {
                             categoryPages.add(pageInCat.denormalise(namespace));
                         }
@@ -980,10 +981,10 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                             for (NormalisedTitle pageInTplOfCat: tplResult.value) {
                                 if (pageInTplOfCat.namespace.equals(MyNamespace.CATEGORY_NAMESPACE_KEY)) {
                                     subCategories.add(pageInTplOfCat.title);
-                                // TODO: go into recursion?!
-                                // -> for now, just add the template as if it was an ordinary page
-//                                } else if (pageInTplOfCat.namespace.equals(MyNamespace.TEMPLATE_NAMESPACE_KEY)) {
+                                } else if (pageInTplOfCat.namespace.equals(MyNamespace.TEMPLATE_NAMESPACE_KEY)) {
+                                    // TODO: go into recursion?! -> for now, just add the template
 //                                  tplPages.add(pageInTplOfCat);
+                                    categoryPages.add(pageInTplOfCat.denormalise(namespace));
                                 } else {
                                     categoryPages.add(pageInTplOfCat.denormalise(namespace));
                                 }
