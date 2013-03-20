@@ -25,7 +25,7 @@
 
 -export([start_link/2,
          number_of_nodes/0,
-         node_list/0,
+         node_list/0, node_list/1,
          connect/0]).
 
 -behaviour(gen_component).
@@ -66,11 +66,15 @@ connect() ->
 
 %% @doc trigger a message with all nodes known to the mgmt server
 -spec node_list() -> ok.
-node_list() ->
+node_list() -> node_list(false).
+
+-spec node_list(UseShepherd::boolean()) -> ok.
+node_list(UseShepherd) ->
     Pid = mgmtPid(),
+    SendOptions = ?IIF(UseShepherd, [{shepherd, self()}], []),
     case comm:is_valid(Pid) of
-        true -> comm:send(Pid, {get_list, comm:this()});
-        _    -> comm:send_local(self(), {get_list_response, []})
+        true -> comm:send(Pid, {get_list, comm:this()}, SendOptions);
+        _    -> comm:send_local(self(), {get_list_response, []}, SendOptions)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

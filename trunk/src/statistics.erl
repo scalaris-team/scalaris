@@ -81,9 +81,14 @@ get_memory({failed, _}) ->
 %%      within 2s.
 -spec get_ring_details() -> ring().
 get_ring_details() ->
-    mgmt_server:node_list(),
+    mgmt_server:node_list(true),
     Nodes = receive
-                ?SCALARIS_RECV({get_list_response, N}, N)
+                ?SCALARIS_RECV({get_list_response, N}, N);
+                ?SCALARIS_RECV({send_error, _, {get_list, _}, Reason},
+                               begin
+                                 log:log(error,"[ ST ] Mgmt server unavailable: ~p", [Reason]),
+                                 throw('mgmt_server_timeout')
+                               end)
             after 2000 ->
                 log:log(error,"[ ST ] Timeout getting node list from mgmt server"),
                 throw('mgmt_server_timeout')
