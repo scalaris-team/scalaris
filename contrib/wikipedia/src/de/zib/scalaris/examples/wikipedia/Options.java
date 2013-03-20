@@ -18,11 +18,11 @@ package de.zib.scalaris.examples.wikipedia;
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -717,9 +717,10 @@ public class Options {
                 @Override
                 public WriteCacheDiff<T> convert(ErlangValue v)
                         throws ClassCastException {
-                    final List<T> toAdd = new LinkedList<T>();
-                    final Set<T> toDelete = new HashSet<T>();
-                    for(ErlangValue elem : v.listValue()) {
+                    final List<ErlangValue> listValue = v.listValue();
+                    final LinkedList<T> toAdd = new LinkedList<T>(listValue.size());
+                    final HashSet<T> toDelete = new HashSet<T>(listValue.size());
+                    for(ErlangValue elem : listValue) {
                         List<ErlangValue> diffObj = elem.listValue();
                         if (diffObj.size() != 2) {
                             throw new ClassCastException();

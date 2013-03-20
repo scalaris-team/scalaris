@@ -33,7 +33,7 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
     final ErlangConverter<List<T>> listConv;
     final ErlangConverter<T> elemConv;
     final boolean failNotFound;
-    final List<T> value = new ArrayList<T>();
+    final ArrayList<T> value = new ArrayList<T>();
     final private Optimisation optimisation;
 
     /**
@@ -128,10 +128,22 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
                     ErlangValue result = results.processReadAt(firstOp++);
                     if (writeCacheDiffConv != null && i >= ((IReadBuckets) optimisation).getReadBuckets()) {
                         WriteCacheDiff<T> diff = writeCacheDiffConv.convert(result);
+                        if (value.isEmpty() && !diff.toAdd.isEmpty()) {
+                            // assume each bucket has the same size
+                            // different keys may have different list sizes though
+                            // -> use automatic capacity increase for them
+                            value.ensureCapacity(diff.toAdd.size() * (buckets - i));
+                        }
                         value.addAll(diff.toAdd);
                         toDelete.addAll(diff.toDelete);
                     } else {
                         final List<T> list = listConv.convert(result);
+                        if (value.isEmpty() && !list.isEmpty()) {
+                            // assume each bucket has the same size
+                            // different keys may have different list sizes though
+                            // -> use automatic capacity increase for them
+                            value.ensureCapacity(list.size() * (buckets - i));
+                        }
                         value.addAll(list);
                     }
                 } catch (NotFoundException e) {
