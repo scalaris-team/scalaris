@@ -958,10 +958,8 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
                 page.addStats(catPagesResult.stats);
                 page.getInvolvedKeys().addAll(catPagesResult.involvedKeys);
                 if (catPagesResult.success) {
-                    TreeSet<String> subCategories = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
-                    TreeSet<String> categoryPages = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
-                    final List<String> catPageList = new ArrayList<String>(catPagesResult.value.size());
-                    wikiModel.denormalisePageTitles(catPagesResult.value, catPageList);
+                    final TreeSet<String> subCategories = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
+                    final TreeSet<String> categoryPages = new TreeSet<String>(String.CASE_INSENSITIVE_ORDER);
                     final List<NormalisedTitle> tplPages = new ArrayList<NormalisedTitle>(catPagesResult.value.size());
 
                     for (NormalisedTitle pageInCat: catPagesResult.value) {
