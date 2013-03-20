@@ -17,6 +17,7 @@ import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.IReadBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE.WriteCacheDiff;
+import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE.WriteCacheDiffConv;
 import de.zib.scalaris.executor.ScalarisOp;
 import de.zib.scalaris.operations.ReadOp;
 
@@ -119,7 +120,7 @@ public class ScalarisReadListOp1<T> implements ScalarisOp {
         ErlangConverter<WriteCacheDiff<T>> writeCacheDiffConv = null;
         HashSet<T> toDelete = null;
         if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
-            writeCacheDiffConv = APPEND_INCREMENT_BUCKETS_WITH_WCACHE.getDiffConv(elemConv);
+            writeCacheDiffConv = new WriteCacheDiffConv<T>(elemConv);
             toDelete = new HashSet<T>();
         }
         for (int x = 0; x < keys.size(); ++x) {

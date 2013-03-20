@@ -568,7 +568,7 @@ public class Options {
      * when writing to any of the write buckets.
      * 
      * Make sure to only use the tagged values when writing values to a write
-     * bucket! Use {@link #getDiffConv(ErlangConverter)} to get a converter that
+     * bucket! Use {@link WriteCacheDiffConv} to get a converter that
      * creates a {@link WriteCacheDiff} object which can then be used to create
      * a global view of the whole stored list including the write cache.
      * 
@@ -678,14 +678,14 @@ public class Options {
         public final <T> Object makeDelete(final T value) {
             return Arrays.asList(-1, value);
         }
-        
+
         /**
          * Result object that represents the write cache.
          * 
          * @param <T>
          *            the element type
          * 
-         * @see APPEND_INCREMENT_BUCKETS_WITH_WCACHE#getDiffConv(ErlangConverter)
+         * @see WriteCacheDiffConv
          */
         public static class WriteCacheDiff<T> {
             /**
@@ -704,43 +704,56 @@ public class Options {
         }
         
         /**
-         * Gets a converter to use for simplified access to the write cache.
+         * Converter that converts the write cache to a {@link WriteCacheDiff}
+         * object.
          * 
-         * @param elemConv
-         *            converter for a single entry of the list
+         * @author Nico Kruber, kruber@zib.de
          * 
-         * @return a converter that converts the write cache to a
-         *         {@link WriteCacheDiff} object
+         * @param <T>
+         *            element type to convert
          */
-        public static <T> ErlangConverter<WriteCacheDiff<T>> getDiffConv(final ErlangConverter<T> elemConv) {
-            return new ErlangConverter<Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE.WriteCacheDiff<T>>() {
-                @Override
-                public WriteCacheDiff<T> convert(ErlangValue v)
-                        throws ClassCastException {
-                    final List<ErlangValue> listValue = v.listValue();
-                    final LinkedList<T> toAdd = new LinkedList<T>(listValue.size());
-                    final HashSet<T> toDelete = new HashSet<T>(listValue.size());
-                    for(ErlangValue elem : listValue) {
-                        List<ErlangValue> diffObj = elem.listValue();
-                        if (diffObj.size() != 2) {
-                            throw new ClassCastException();
-                        }
-                        int tag = diffObj.get(0).intValue();
-                        T value = elemConv.convert(diffObj.get(1));
-                        switch (tag) {
-                            case 1:
-                                toAdd.add(value);
-                                break;
-                            case -1:
-                                toDelete.add(value);
-                                break;
-                            default:
-                                throw new ClassCastException();
-                        }
+        public static class WriteCacheDiffConv<T>
+                implements
+                ErlangConverter<Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE.WriteCacheDiff<T>> {
+            private final ErlangConverter<T> elemConv;
+
+            /**
+             * Creates a converter to use for simplified access to the write
+             * cache.
+             * 
+             * @param elemConv
+             *            converter for a single entry of the list
+             */
+            public WriteCacheDiffConv(ErlangConverter<T> elemConv) {
+                this.elemConv = elemConv;
+            }
+
+            @Override
+            public WriteCacheDiff<T> convert(ErlangValue v)
+                    throws ClassCastException {
+                final List<ErlangValue> listValue = v.listValue();
+                final ArrayList<T> toAdd = new ArrayList<T>(listValue.size());
+                final HashSet<T> toDelete = new HashSet<T>(listValue.size());
+                for(ErlangValue elem : listValue) {
+                    List<ErlangValue> diffObj = elem.listValue();
+                    if (diffObj.size() != 2) {
+                        throw new ClassCastException();
                     }
-                    return new WriteCacheDiff<T>(toAdd, toDelete);
+                    int tag = diffObj.get(0).intValue();
+                    T value = elemConv.convert(diffObj.get(1));
+                    switch (tag) {
+                        case 1:
+                            toAdd.add(value);
+                            break;
+                        case -1:
+                            toDelete.add(value);
+                            break;
+                        default:
+                            throw new ClassCastException();
+                    }
                 }
-            };
+                return new WriteCacheDiff<T>(toAdd, toDelete);
+            }
         }
     }
 
