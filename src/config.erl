@@ -317,12 +317,15 @@ cfg_is_port(Key) ->
     IsPort = fun(Value) ->
                      case Value of
                          X when erlang:is_integer(X) ->
-                             true;
+                             X >= 0 andalso X =< 65535;
                          Y when erlang:is_list(Y) ->
-                             lists:all(fun erlang:is_integer/1, Y);
+                             lists:all(fun(P) ->
+                                               erlang:is_integer(P) andalso
+                                                   P >= 0 andalso P =< 655351
+                                       end, Y);
                          {From, To} ->
-                             erlang:is_integer(From) andalso
-                                 erlang:is_integer(To);
+                             erlang:is_integer(From) andalso From >= 0 andalso From =< 655351 andalso
+                                 erlang:is_integer(To) andalso To >= 0 andalso To =< 655351;
                          _ -> false
                      end
              end,
