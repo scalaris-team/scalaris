@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2011 Zuse Institute Berlin
+# Copyright 2007-2013 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -72,12 +72,14 @@ usage(){
     echo "    -d          - daemonize"
     echo "    --screen    - if daemonized, put an interactive session into screen"
     echo "    -e <params> - pass additional parameters to erl"
-    echo "    -f          - first node (to start a new Scalaris instead of joining one) (not with -q)"
+    echo "    -f          - first node (to start a new Scalaris instead of joining one)"
+    echo "                  (not with -q)"
     echo "    -q          - elect first node from known hosts (not with -f)"
     echo "    -n <name>   - Erlang process name (default 'node')"
-    echo "    -c <cookie> - Erlang cookie to use (for distributed Erlang) (default '`get_cookie`')"
+    echo "    -c <cookie> - Erlang cookie to use (for distributed Erlang)"
+    echo "                  (default '`get_cookie`')"
     echo "    -p <port>   - TCP port for the Scalaris node"
-    echo "    -y <port>   - TCP port for the built-in webserver"
+    echo "    -y <port>   - TCP port for the built-in webserver (YAWS)"
     echo "    -k <key>    - join at the given key"
     echo "    -v          - verbose"
     echo "    --dist-erl-port <port>"
@@ -361,7 +363,7 @@ checkinstallation() {
     echo "Running Scalaris run-time tests..."
     # test runtime
     if [ -z "$yaws_port" ]; then
-        echo "  NOTE: yaws port not specified."
+        echo "  NOTE: yaws port not specified (you can specify it using -y <port> for $0)."
         echo "        Python, Python3, Ruby API tests may fail if the port is different in"
         echo "        one of the config files."
     else
