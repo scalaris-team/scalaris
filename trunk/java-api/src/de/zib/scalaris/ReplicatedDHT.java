@@ -121,8 +121,7 @@ public class ReplicatedDHT {
      * @throws UnknownException
      *             if any other error occurs
      *
-     * @since 2.8
-     * @version 3.19
+     * @since 3.19
      *
      * @see #delete(OtpErlangString, int)
      */
@@ -154,8 +153,7 @@ public class ReplicatedDHT {
      * @throws UnknownException
      *             if any other error occurs
      *
-     * @since 2.8
-     * @version 3.19
+     * @since 3.19
      */
     public DeleteResult delete(final OtpErlangString key, final int timeout) throws ConnectionException,
     TimeoutException, UnknownException {
@@ -219,8 +217,7 @@ public class ReplicatedDHT {
      * @throws UnknownException
      *             if any other error occurs
      *
-     * @since 2.2
-     * @version 3.19
+     * @since 3.19
      *
      * @see #delete(String, int)
      */
@@ -252,8 +249,7 @@ public class ReplicatedDHT {
      * @throws UnknownException
      *             if any other error occurs
      *
-     * @since 2.2
-     * @version 3.19
+     * @since 3.19
      *
      * @see #delete(OtpErlangString, int)
      */
@@ -271,8 +267,6 @@ public class ReplicatedDHT {
      *             is thrown if an unknown reason was encountered
      *
      * @see #delete(String)
-     *
-     * @version 3.19
      */
     public DeleteResult getLastDeleteResult() {
         return lastDeleteResult;
