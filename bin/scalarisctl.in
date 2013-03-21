@@ -203,7 +203,7 @@ checkinstallation() {
         exit 1
     fi
 
-    $ERL -noinput -name "checkinstallation" -eval 'halt(0).' &> /dev/null
+    $ERL -noinput -name "checkinstallation" -eval 'halt(0).' > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_ATTENTION"
@@ -215,7 +215,7 @@ checkinstallation() {
         echo -n "Continuing basic tests..."
     fi
 
-    $ERL -noinput -name "checkinstallation@`get_hostname`" -eval 'halt(0).' &> /dev/null
+    $ERL -noinput -name "checkinstallation@`get_hostname`" -eval 'halt(0).' > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_ATTENTION"
@@ -226,7 +226,7 @@ checkinstallation() {
         echo -n "Continuing basic tests..."
     fi
 
-    $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.' &> /dev/null
+    $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.' > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_FAILED"
@@ -236,7 +236,7 @@ checkinstallation() {
     fi
 
     if [ -e $ETCDIR/scalaris.cfg ]; then
-        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end" &> /dev/null
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end" > /dev/null 2>&1
         FAILED=$?
         if [ $FAILED -ne 0 ]; then
             echo -e "$MSG_FAILED"
@@ -251,7 +251,7 @@ checkinstallation() {
     fi
 
     if [ -e $ETCDIR/scalaris.local.cfg ]; then
-        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end" &> /dev/null
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end" > /dev/null 2>&1
         FAILED=$?
         if [ $FAILED -ne 0 ]; then
             echo -e "$MSG_FAILED"
@@ -261,7 +261,7 @@ checkinstallation() {
         fi
     fi
 
-    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(mgmt_server), code:ensure_loaded(dht_node)} of {{module,mgmt_server},{module,dht_node}} -> halt(0); X -> halt(1) end.' &> /dev/null
+    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(mgmt_server), code:ensure_loaded(dht_node)} of {{module,mgmt_server},{module,dht_node}} -> halt(0); X -> halt(1) end.' > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_FAILED"
@@ -293,7 +293,7 @@ checkinstallation() {
         echo -n "Continuing basic tests..."
     fi
 
-    $SCALARISCLIENT_JAVA -h &> /dev/null
+    $SCALARISCLIENT_JAVA -h > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         HAS_JAVACLIENT=0
@@ -374,13 +374,13 @@ checkinstallation() {
         export SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$port,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$port,service_per_vm}]"
     fi
     export SCALARIS_JAPI_NODE="$NODE_NAME"
-    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start &> /dev/null
+    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start > /dev/null 2>&1
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"
         echo "  we were trying to run: $0 -f -s -m -d start"
         # try to stop anyway (it could have been a false alarm):
-        $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop &> /dev/null &> /dev/null
+        $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
         exit 1
     fi
     sleep 3s # let Scalaris settle
@@ -396,7 +396,7 @@ checkinstallation() {
         KEY="checkinstallation-$RANDOM"
         JAVA_OUTPUT=`echo -e "> $SCALARISCLIENT_JAVA -r ${KEY}"`
         JAVAREAD1_OUTPUT=`$SCALARISCLIENT_JAVA -r ${KEY} 2>&1`
-        echo "$JAVAREAD1_OUTPUT" | grep "failed with not found" &> /dev/null
+        echo "$JAVAREAD1_OUTPUT" | grep "failed with not found" > /dev/null 2>&1
         JAVAREAD1_FAILED=$?
         JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVAREAD1_OUTPUT"`
 
@@ -413,7 +413,7 @@ checkinstallation() {
         JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n> $SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
         JAVABENCH_OUTPUT=`$SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
         JAVABENCH_FAILED=$?
-        echo "$JAVABENCH_OUTPUT" | grep "failed" &> /dev/null && JAVABENCH_FAILED=1
+        echo "$JAVABENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && JAVABENCH_FAILED=1
         JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVABENCH_OUTPUT"`
 
         if [ $JAVAREAD1_FAILED -ne 0 -o $JAVAWRITE1_FAILED -ne 0 -o $JAVAREAD2_FAILED -ne 0 -o $JAVABENCH_FAILED -ne 0 ]; then
@@ -439,7 +439,7 @@ checkinstallation() {
         KEY="checkinstallation-$RANDOM"
         PYTHON_OUTPUT=`echo -e "> $SCALARISCLIENT_PYTHON -r ${KEY}"`
         PYTHONREAD1_OUTPUT=`$SCALARISCLIENT_PYTHON -r ${KEY} 2>&1`
-        echo "$PYTHONREAD1_OUTPUT" | grep "failed with not_found" &> /dev/null
+        echo "$PYTHONREAD1_OUTPUT" | grep "failed with not_found" > /dev/null 2>&1
         PYTHONREAD1_FAILED=$?
         PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONREAD1_OUTPUT"`
 
@@ -456,7 +456,7 @@ checkinstallation() {
         PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n> $SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
         PYTHONBENCH_OUTPUT=`$SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
         PYTHONBENCH_FAILED=$?
-        echo "$PYTHONBENCH_OUTPUT" | grep "failed" &> /dev/null && PYTHONBENCH_FAILED=1
+        echo "$PYTHONBENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && PYTHONBENCH_FAILED=1
         PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONBENCH_OUTPUT"`
 
         if [ $PYTHONREAD1_FAILED -ne 0 -o $PYTHONWRITE1_FAILED -ne 0 -o $PYTHONREAD2_FAILED -ne 0 -o $PYTHONBENCH_FAILED -ne 0 ]; then
@@ -482,7 +482,7 @@ checkinstallation() {
         KEY="checkinstallation-$RANDOM"
         PYTHON3_OUTPUT=`echo -e "> $SCALARISCLIENT_PYTHON3 -r ${KEY}"`
         PYTHON3READ1_OUTPUT=`$SCALARISCLIENT_PYTHON3 -r ${KEY} 2>&1`
-        echo "$PYTHON3READ1_OUTPUT" | grep "failed with not_found" &> /dev/null
+        echo "$PYTHON3READ1_OUTPUT" | grep "failed with not_found" > /dev/null 2>&1
         PYTHON3READ1_FAILED=$?
         PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3READ1_OUTPUT"`
 
@@ -499,7 +499,7 @@ checkinstallation() {
         PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n> $SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
         PYTHON3BENCH_OUTPUT=`$SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
         PYTHON3BENCH_FAILED=$?
-        echo "$PYTHON3BENCH_OUTPUT" | grep "failed" &> /dev/null && PYTHON3BENCH_FAILED=1
+        echo "$PYTHON3BENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && PYTHON3BENCH_FAILED=1
         PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3BENCH_OUTPUT"`
 
         if [ $PYTHON3READ1_FAILED -ne 0 -o $PYTHON3WRITE1_FAILED -ne 0 -o $PYTHON3READ2_FAILED -ne 0 -o $PYTHON3BENCH_FAILED -ne 0 ]; then
@@ -525,7 +525,7 @@ checkinstallation() {
         KEY="checkinstallation-$RANDOM"
         RUBY_OUTPUT=`echo -e "> $SCALARISCLIENT_RUBY -r ${KEY}"`
         RUBYREAD1_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
-        echo "$RUBYREAD1_OUTPUT" | grep "Scalaris::NotFoundError" &> /dev/null
+        echo "$RUBYREAD1_OUTPUT" | grep "Scalaris::NotFoundError" > /dev/null 2>&1
         RUBYREAD1_FAILED=$?
         RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYREAD1_OUTPUT"`
 
@@ -557,7 +557,7 @@ checkinstallation() {
         echo "$RUBY_OUTPUT"
     fi
 
-    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop &> /dev/null
+    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
 
     if [ "$JAVA_FAILED" -ne 0 -o "$PYTHON_FAILED" -ne 0 \
          -o "$PYTHON3_FAILED" -ne 0 -o "$RUBY_FAILED" -ne 0 ]; then
