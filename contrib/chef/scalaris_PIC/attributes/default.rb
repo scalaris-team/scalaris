@@ -40,6 +40,18 @@ normal[:scalaris_PIC][:kpis] = {
             "ScalarisNode_CurLatencyStddev" =>
              {:on => "de.zib.scalaris:type=MonitorNode",
               :att => "CurLatencyStddev",
+              :period => 1},
+            "ScalarisService_CurLatencyAvg" =>
+             {:on => "de.zib.scalaris:type=MonitorService",
+              :att => "CurLatencyAvg",
+              :period => 1},
+            "ScalarisService_CurLatencyStddev" =>
+             {:on => "de.zib.scalaris:type=MonitorService",
+              :att => "CurLatencyStddev",
+              :period => 1},
+            "ScalarisService_LoadEstimate" =>
+             {:on => "de.zib.scalaris:type=MonitorService",
+              :att => "TotalLoad",
               :period => 1}
            }
   }
