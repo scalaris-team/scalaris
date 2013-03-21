@@ -75,7 +75,7 @@ add_vms(N) ->
                  io:format("Executing: ~p~n", [Cmd]),
                  NumberVMs = get_number_of_vms(),
                  _ = os:cmd(Cmd),
-                 wait_for(fun get_number_of_vms/0, NumberVMs + 1),
+                 util:wait_for(fun() -> get_number_of_vms() =:= NumberVMs + 1 end),
                  timer:sleep(200)
         end,
     _ = [SpawnFun(X) || X <- lists:seq(1, N), get_number_of_vms() < config:read(cloud_local_max_vms)],
@@ -91,7 +91,7 @@ remove_vms(N) ->
                 NumberVMs = get_number_of_vms(),
                 io:format("Executing: ~p~n", [Cmd]),
                 _ = os:cmd(Cmd),
-                wait_for(fun get_number_of_vms/0, NumberVMs - 1)
+                util:wait_for(fun() -> get_number_of_vms() =:= NumberVMs - 1 end)
         end,
     _ = [RemoveFun(NodeName) || NodeName <- lists:sublist(VMs, N),
                                 get_number_of_vms() > config:read(cloud_local_min_vms)],
@@ -100,13 +100,6 @@ remove_vms(N) ->
 %%%%%%%%%%%%%%%%%%%
 %%%% Helper methods
 %%%%%%%%%%%%%%%%%%%
-wait_for(Fun, ExpectedValue) ->
-    case Fun() of
-        ExpectedValue -> ok;
-        _ ->
-            wait_for(Fun, ExpectedValue)
-    end.
-
 -spec find_free_port(comm_server:tcp_port() | [comm_server:tcp_port()] |
                          {From::comm_server:tcp_port(), To::comm_server:tcp_port()})
         -> comm_server:tcp_port().
