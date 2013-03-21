@@ -46,22 +46,24 @@
 
 -export([start_link/6, init/1, on/2]).
 
+-type msg_queue() :: {MQueue::[{DestPid::pid(), Message::comm:message()}],
+                      OQueue::[comm:send_options()]}.
+-type stat_report() :: {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
+                        SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}.
 -type state() ::
     {DestIP               :: inet:ip_address(),
      DestPort             :: comm_server:tcp_port(),
      LocalListenPort      :: comm_server:tcp_port(),
-     Channel              :: main | prio,
+     Channel              :: comm:channel(),
      Socket               :: inet:socket() | notconnected,
      StartTime            :: erlang_timestamp(),
      SentMsgCount         :: non_neg_integer(),
      ReceivedMsgCount     :: non_neg_integer(),
-     MsgQueue             :: {MQueue::[{DestPid::pid(), Message::comm:message()}],
-                              OQueue::[comm:send_options()]},
+     MsgQueue             :: msg_queue(),
      MsgQueueLen          :: non_neg_integer(),
      DesiredBundleSize    :: non_neg_integer(),
      MsgsSinceBundleStart :: non_neg_integer(),
-     LastStatReport       :: {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
-                              SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}}.
+     LastStatReport       :: stat_report()}.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
     {tcp, Socket::inet:socket(), Data::binary()} |
@@ -73,7 +75,7 @@
 
 -spec start_link(pid_groups:groupname(), DestIP::inet:ip_address(),
                  comm_server:tcp_port(), inet:socket() | notconnected,
-                 Channel::main | prio, Dir::'rcv' | 'send' | 'both') -> {ok, pid()}.
+                 Channel::comm:channel(), Dir::'rcv' | 'send' | 'both') -> {ok, pid()}.
 start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Channel, Dir) ->
     {_, LocalListenPort} = comm_server:get_local_address_port(),
     DirStr = case Dir of
@@ -90,7 +92,7 @@ start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Chan
 
 %% @doc initialize: return initial state.
 -spec init({DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),
-            LocalListenPort::comm_server:tcp_port(), Channel::main | prio,
+            LocalListenPort::comm_server:tcp_port(), Channel::comm:channel(),
             Socket::inet:socket() | notconnected}) -> state().
 init({DestIP, DestPort, LocalListenPort, Channel, Socket}) ->
     msg_delay:send_local(10, self(), {report_stats}),
@@ -118,59 +120,24 @@ forward_msg(Process, Message, _State) ->
 %% @doc message handler
 -spec on(message(), state()) -> state().
 on({send, DestPid, Message, Options}, State) ->
-    Socket = case socket(State) of
-                 notconnected ->
-                     log:log(info, "Connecting to ~.0p:~.0p", [dest_ip(State), dest_port(State)]),
-                     new_connection(dest_ip(State),
-                                    dest_port(State),
+    case socket(State) of
+        notconnected ->
+            log:log(info, "Connecting to ~.0p:~.0p", [dest_ip(State), dest_port(State)]),
+            Socket = new_connection(dest_ip(State), dest_port(State),
                                     local_listen_port(State),
-                                    proplists:get_value(channel, Options, main));
-                 S -> S
-             end,
-    case Socket of
-        fail ->
-            comm_server:report_send_error(Options,
-                                         {dest_ip(State), dest_port(State), DestPid},
-                                         Message, tcp_connect_failed),
-            %%reconnect
-            set_socket(State, notconnected);
-        _ ->
-            case msg_queue_len(State) of
-                0 ->
-                    {_, MQL} = process_info(self(), message_queue_len),
-                    if MQL > 0 ->
-                            %% start message bundle for sending
-                            %% io:format("MQL ~p~n", [MQL]),
-                            MaxBundle = erlang:max(200, MQL div 100),
-                            T1 = set_msg_queue(State, {[{DestPid, Message}], [Options]}),
-                            T2 = set_msg_queue_len(T1, 1),
-                            % note: need to set the bundle size equal to MQL
-                            % -> to process this 1 msg + MQL messages (see below)
-                            set_desired_bundle_size(T2, erlang:min(MQL, MaxBundle));
-                       true ->
-                            NewSocket =
-                                send({dest_ip(State), dest_port(State), Socket},
-                                     DestPid, Message, Options, State),
-                            T1 = set_socket(State, NewSocket),
-                            inc_s_msg_count(T1)
-                    end;
-                QL ->
-                    {MsgQueue0, OptionQueue0} = msg_queue(State),
-                    MQueue = [{DestPid, Message} | MsgQueue0],
-                    OQueue = [Options | OptionQueue0],
-                    DBS = desired_bundle_size(State),
-                    MSBS = msgs_since_bundle_start(State),
-                    % can check for QL instead of QL+1 here due to DBS init above
-                    case (QL + MSBS) >= DBS of
-                        true ->
-%%                            io:format("Bundle Size: ~p~n", [length(MQueue)]),
-                            send_msg_bundle(State, Socket, MQueue, OQueue, QL + 1);
-                        false ->
-                            %% add to message bundle
-                            T1 = set_msg_queue(State, {MQueue, OQueue}),
-                            set_msg_queue_len(T1, QL + 1)
-                    end
-            end
+                                    proplists:get_value(channel, Options, main)),
+            case Socket of
+                fail ->
+                    comm_server:report_send_error(Options,
+                                                  {dest_ip(State), dest_port(State), DestPid},
+                                                  Message, tcp_connect_failed),
+                    State;
+                _ ->
+                    State1 = set_socket(State, Socket),
+                    State2 = set_last_stat_report(State1, {0, 0, 0, 0}),
+                    send_or_bundle(DestPid, Message, Options, State2)
+            end;
+        _ -> send_or_bundle(DestPid, Message, Options, State)
     end;
 
 on({tcp, Socket, Data}, State) ->
@@ -194,8 +161,7 @@ on({tcp, Socket, Data}, State) ->
                 inc_r_msg_count(State);
             {user_close} ->
                 log:log(warn,"[ CC ~p ] tcp user_close request", [self()]),
-                gen_tcp:close(Socket),
-                set_socket(State, notconnected);
+                close_connection(Socket, State);
             Unknown ->
                 log:log(warn,"[ CC ~p ] unknown message ~.0p", [self(), Unknown]),
                 %% may fail, when tcp just closed
@@ -206,36 +172,14 @@ on({tcp, Socket, Data}, State) ->
 
 on({tcp_closed, Socket}, State) ->
     log:log(warn,"[ CC ~p ] tcp closed info", [self()]),
-    gen_tcp:close(Socket),
-    set_socket(State, notconnected);
+    % report stats out of the original schedule (these would otherwise be lost)
+    NewState = report_stats(State),
+    close_connection(Socket, NewState);
 
 on({report_stats}, State) ->
     %% re-trigger
     msg_delay:send_local(10, self(), {report_stats}),
-    NewState =
-        case socket(State) of
-            notconnected -> State;
-            Socket ->
-                case inet:getstat(Socket, [recv_cnt, recv_oct,
-                                           send_cnt, send_oct]) of
-                    {ok, [{recv_cnt, RcvCnt}, {recv_oct, RcvBytes},
-                          {send_cnt, SendCnt}, {send_oct, SendBytes}]} ->
-                        PrevStat = last_stat_report(State),
-                        NewStat = {RcvCnt, RcvBytes, SendCnt, SendBytes},
-                        case PrevStat of
-                            NewStat -> State;
-                            _ ->
-                                {PrevRcvCnt, PrevRcvBytes, PrevSendCnt, PrevSendBytes} = PrevStat,
-                                comm:send_local(comm_stats,
-                                                {report_stat, RcvCnt - PrevRcvCnt,
-                                                 RcvBytes - PrevRcvBytes,
-                                                 SendCnt - PrevSendCnt,
-                                                 SendBytes - PrevSendBytes}),
-                                set_last_stat_report(State, NewStat)
-                        end;
-                    {error, _Reason} -> State
-                end
-        end,
+    NewState = report_stats(State),
     send_bundle_if_ready(NewState);
 
 on({web_debug_info, Requestor}, State) ->
@@ -316,52 +260,114 @@ on(UnknownMessage, State) ->
     log:log(error,"unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",[UnknownMessage,?MODULE,on,State]),
     send_bundle_if_ready(State).
 
--spec send({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm:send_options(), state())
-            -> notconnected | inet:socket();
-          ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, ?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], state())
-            -> notconnected | inet:socket().
-send(Receiver, Pid, Message, Options, State) ->
+-spec report_stats(State::state()) -> state().
+report_stats(State) ->
+    case socket(State) of
+        notconnected -> State;
+        Socket ->
+            case inet:getstat(Socket, [recv_cnt, recv_oct,
+                                       send_cnt, send_oct]) of
+                {ok, [{recv_cnt, RcvCnt}, {recv_oct, RcvBytes},
+                      {send_cnt, SendCnt}, {send_oct, SendBytes}]} ->
+                    PrevStat = last_stat_report(State),
+                    NewStat = {RcvCnt, RcvBytes, SendCnt, SendBytes},
+                    case PrevStat of
+                        NewStat -> State;
+                        _ ->
+                            {PrevRcvCnt, PrevRcvBytes, PrevSendCnt, PrevSendBytes} = PrevStat,
+                            comm:send_local(comm_stats,
+                                            {report_stat, RcvCnt - PrevRcvCnt,
+                                             RcvBytes - PrevRcvBytes,
+                                             SendCnt - PrevSendCnt,
+                                             SendBytes - PrevSendBytes}),
+                            set_last_stat_report(State, NewStat)
+                    end;
+                {error, _Reason} -> State
+            end
+    end.
+
+% PRE: connected socket
+-spec send_or_bundle(DestPid::pid(), Message::comm:message(), Options::comm:send_options(), State::state()) -> state().
+send_or_bundle(DestPid, Message, Options, State) ->
+    case msg_queue_len(State) of
+        0 ->
+            {_, MQL} = process_info(self(), message_queue_len),
+            if MQL > 0 ->
+                   %% start message bundle for sending
+                   %% io:format("MQL ~p~n", [MQL]),
+                   MaxBundle = erlang:max(200, MQL div 100),
+                   T1 = set_msg_queue(State, {[{DestPid, Message}], [Options]}),
+                   T2 = set_msg_queue_len(T1, 1),
+                   % note: need to set the bundle size equal to MQL
+                   % -> to process this 1 msg + MQL messages (see below)
+                   set_desired_bundle_size(T2, erlang:min(MQL, MaxBundle));
+               true ->
+                   NewState = send(DestPid, Message, Options, State),
+                   inc_s_msg_count(NewState)
+            end;
+        QL ->
+            {MsgQueue0, OptionQueue0} = msg_queue(State),
+            MQueue = [{DestPid, Message} | MsgQueue0],
+            OQueue = [Options | OptionQueue0],
+            DBS = desired_bundle_size(State),
+            MSBS = msgs_since_bundle_start(State),
+            % can check for QL instead of QL+1 here due to DBS init above
+            case (QL + MSBS) >= DBS of
+                true ->
+                    %%                            io:format("Bundle Size: ~p~n", [length(MQueue)]),
+                    send_msg_bundle(State, MQueue, OQueue, QL + 1);
+                false ->
+                    %% add to message bundle
+                    T1 = set_msg_queue(State, {MQueue, OQueue}),
+                    set_msg_queue_len(T1, QL + 1)
+            end
+    end.
+
+-spec send(pid(), comm:message(), comm:send_options(), state())
+            -> state();
+          (?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], state())
+            -> state().
+send(Pid, Message, Options, State) ->
     DeliverMsg = {?deliver, Pid, Message},
     BinaryMessage = ?COMM_COMPRESS_MSG(DeliverMsg, State),
-    send_internal(Receiver, Pid, Message, Options, BinaryMessage, State).
+    send_internal(Pid, Message, Options, BinaryMessage, State).
 
 -spec send_internal
-    ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, pid(), comm:message(), comm:send_options(), BinMsg::binary(), state())
-        -> notconnected | inet:socket();
-    ({inet:ip_address(), comm_server:tcp_port(), inet:socket()}, ?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], BinMsg::binary(), state())
-        -> notconnected | inet:socket().
-send_internal({Address, Port, Socket} = Receiver, Pid, Message, Options, BinaryMessage, State) ->
-    NewSocket =
-        case gen_tcp:send(Socket, BinaryMessage) of
-            ok ->
-                ?TRACE("~.0p Sent message ~.0p~n",
-                       [pid_groups:my_pidname(), Message]),
-                ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
-                Socket;
-            {error, closed} ->
-                report_bundle_error(Options,
-                                    {Address, Port, Pid},
-                                    Message, socket_closed),
-                log:log(warn,"[ CC ~p ] sending closed connection", [self()]),
-                gen_tcp:close(Socket),
-                notconnected;
-            {error, timeout} ->
-                log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
-                        [self(), Address, Port, timeout]),
-                send_internal(Receiver, Pid, Message, Options, BinaryMessage, State);
-            {error, Reason} ->
-                report_bundle_error(Options,
-                                    {Address, Port, Pid},
-                                    Message, Reason),
-                log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). closing connection",
-                        [self(), Address, Port, Reason]),
-                gen_tcp:close(Socket),
-                notconnected
-    end,
-    NewSocket.
+    (pid(), comm:message(), comm:send_options(), BinMsg::binary(), state())
+        -> state();
+    (?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], BinMsg::binary(), state())
+        -> state().
+send_internal(Pid, Message, Options, BinaryMessage, State) ->
+    Socket = socket(State),
+    case gen_tcp:send(Socket, BinaryMessage) of
+        ok ->
+            ?TRACE("~.0p Sent message ~.0p~n",
+                   [pid_groups:my_pidname(), Message]),
+            ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
+            State;
+        {error, closed} ->
+            Address = dest_ip(State),
+            Port = dest_port(State),
+            report_bundle_error(Options, {Address, Port, Pid}, Message,
+                                socket_closed),
+            log:log(warn,"[ CC ~p ] sending closed connection", [self()]),
+            close_connection(Socket, State);
+        {error, timeout} ->
+            log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
+                    [self(), dest_ip(State), dest_port(State), timeout]),
+            send_internal(Pid, Message, Options, BinaryMessage, State);
+        {error, Reason} ->
+            Address = dest_ip(State),
+            Port = dest_port(State),
+            report_bundle_error(Options, {Address, Port, Pid}, Message,
+                                Reason),
+            log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). closing connection",
+                    [self(), Address, Port, Reason]),
+            close_connection(Socket, State)
+    end.
 
 -spec new_connection(inet:ip_address(), comm_server:tcp_port(),
-                     comm_server:tcp_port(), Channel::main | prio | unknown)
+                     comm_server:tcp_port(), Channel::comm:channel() | unknown)
         -> inet:socket() | fail.
 new_connection(Address, Port, MyPort, Channel) ->
     case gen_tcp:connect(Address, Port, [binary, {packet, 4}]
@@ -394,6 +400,14 @@ new_connection(Address, Port, MyPort, Channel) ->
             fail
     end.
 
+-spec close_connection(Socket::inet:socket(), State::state()) -> state().
+close_connection(Socket, State) ->
+    gen_tcp:close(Socket),
+    case socket(State) of
+        Socket -> set_socket(State, notconnected);
+        _      -> State
+    end.
+
 -spec send_bundle_if_ready(state()) -> state().
 send_bundle_if_ready(InState) ->
     QL = msg_queue_len(InState),
@@ -405,32 +419,32 @@ send_bundle_if_ready(InState) ->
             MSBS = msgs_since_bundle_start(State),
             case (QL + MSBS) >= DBS of
                 true ->
-                    Socket = socket(State),
                     %% io:format("Sending packet with ~p msgs~n", [length(msg_queue(State))]),
                     {MQueue, OQueue} = msg_queue(State),
-                    send_msg_bundle(State, Socket, MQueue, OQueue, QL);
+                    send_msg_bundle(State, MQueue, OQueue, QL);
                 false -> State
             end
     end.
 
--spec send_msg_bundle(state(), inet:socket(),
+-spec send_msg_bundle(state(),
                       MQueue::[{DestPid::pid(), Message::comm:message()}],
                       OQueue::[comm:send_options()], QL::pos_integer()) -> state().
-send_msg_bundle(State, notconnected, MQueue, OQueue, QL) ->
-    % should not occur often - just in case a new MQueue, OQueue was given:
-    T1 = set_msg_queue(State, {MQueue, OQueue}),
-    set_msg_queue_len(T1, QL);
-send_msg_bundle(State, Socket, MQueue, OQueue, _QL) ->
-    NewSocket = send({dest_ip(State), dest_port(State), Socket},
-                     ?unpack_msg_bundle, MQueue, OQueue, State),
-    T1State = set_socket(State, NewSocket),
-    T2State = inc_s_msg_count(T1State),
-    T3State = set_msg_queue(T2State, {[], []}),
-    T4State = set_msg_queue_len(T3State, 0),
-    _T5State = set_msgs_since_bundle_start(T4State,0).
+send_msg_bundle(State, MQueue, OQueue, QL) ->
+    case socket(State) of
+        notconnected ->
+            % should not occur often - just in case a new MQueue, OQueue was given:
+            T1 = set_msg_queue(State, {MQueue, OQueue}),
+            set_msg_queue_len(T1, QL);
+        _ ->
+            T1State = send(?unpack_msg_bundle, MQueue, OQueue, State),
+            T2State = inc_s_msg_count(T1State),
+            T3State = set_msg_queue(T2State, {[], []}),
+            T4State = set_msg_queue_len(T3State, 0),
+            _T5State = set_msgs_since_bundle_start(T4State,0)
+    end.
 
 -spec state_new(DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),
-                LocalListenPort::comm_server:tcp_port(), Channel::main | prio,
+                LocalListenPort::comm_server:tcp_port(), Channel::comm:channel(),
                 Socket::inet:socket() | notconnected) -> state().
 state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
     {DestIP, DestPort, LocalListenPort, Channel, Socket,
@@ -439,31 +453,67 @@ state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0,
      _LastStatReport = {0, 0, 0, 0} }.
 
+-spec dest_ip(state()) -> inet:ip_address().
 dest_ip(State)                 -> element(1, State).
+
+-spec dest_port(state()) -> comm_server:tcp_port().
 dest_port(State)               -> element(2, State).
+
+-spec local_listen_port(state()) -> comm_server:tcp_port().
 local_listen_port(State)       -> element(3, State).
+
+-spec channel(state()) -> comm:channel().
 channel(State)                 -> element(4, State).
+
+-spec socket(state()) -> inet:socket() | notconnected.
 socket(State)                  -> element(5, State).
+
+-spec set_socket(state(), inet:socket() | notconnected) -> state().
 set_socket(State, Val)         -> setelement(5, State, Val).
+
+-spec started(state()) -> erlang_timestamp().
 started(State)                 -> element(6, State).
+
+-spec s_msg_count(state()) -> non_neg_integer().
 s_msg_count(State)             -> element(7, State).
+-spec inc_s_msg_count(state()) -> state().
 inc_s_msg_count(State)         -> setelement(7, State, s_msg_count(State) + 1).
+
+-spec r_msg_count(state()) -> non_neg_integer().
 r_msg_count(State)             -> element(8, State).
+-spec inc_r_msg_count(state()) -> state().
 inc_r_msg_count(State)         -> setelement(8, State, r_msg_count(State) + 1).
+
+-spec msg_queue(state()) -> msg_queue().
 msg_queue(State)               -> element(9, State).
+-spec set_msg_queue(state(), msg_queue()) -> state().
 set_msg_queue(State, Val)      -> setelement(9, State, Val).
+
+-spec msg_queue_len(state()) -> non_neg_integer().
 msg_queue_len(State)           -> element(10, State).
+-spec set_msg_queue_len(state(), non_neg_integer()) -> state().
 set_msg_queue_len(State, Val)  -> setelement(10, State, Val).
+
+-spec desired_bundle_size(state()) -> non_neg_integer().
 desired_bundle_size(State)     -> element(11, State).
+-spec set_desired_bundle_size(state(), non_neg_integer()) -> state().
 set_desired_bundle_size(State, Val) -> setelement(11, State, Val).
+
+-spec msgs_since_bundle_start(state()) -> non_neg_integer().
 msgs_since_bundle_start(State) -> element(12, State).
+-spec inc_msgs_since_bundle_start(state()) -> state().
 inc_msgs_since_bundle_start(State) ->
     setelement(12, State, msgs_since_bundle_start(State) + 1).
+-spec set_msgs_since_bundle_start(state(), non_neg_integer()) -> state().
 set_msgs_since_bundle_start(State, Val) ->
     setelement(12, State, Val).
+
+-spec last_stat_report(state()) -> stat_report().
 last_stat_report(State)          -> element(13, State).
+-spec set_last_stat_report(state(), stat_report()) -> state().
 set_last_stat_report(State, Val) -> setelement(13, State, Val).
 
+-spec status(State::state()) -> notconnected | connected.
 status(State) ->
      case socket(State) of
          notconnected -> notconnected;
@@ -484,6 +534,7 @@ report_bundle_error(Options, {Address, Port, ?unpack_msg_bundle}, Message, Reaso
 report_bundle_error(Options, {Address, Port, Pid}, Message, Reason) ->
     comm_server:report_send_error(Options, {Address, Port, Pid}, Message, Reason).
 
+-spec zip_and_foldr(fun((E1, E2) -> any()), [E1], [E2]) -> ok.
 zip_and_foldr(_F, [], []) ->
     ok;
 zip_and_foldr(F, [El1 | R1] , [El2 | R2]) ->
