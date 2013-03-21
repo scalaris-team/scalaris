@@ -25,7 +25,7 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
-%-define(TRACE(X,Y), ct:pal(X,Y)).
+%-define(TRACE(X,Y), log:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p)~n", [self(), Pid, Msg])).
 -define(TRACE1(Msg, State), ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p)~n", [self(), Msg, State])).
@@ -97,7 +97,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                     {SplitKey, OtherLoadNew} =
                         case MyLoad >= 2 of
                             true ->
-%%                                 ct:pal("[ ~.0p ] trying split by load", [self()]),
+%%                                 log:pal("[ ~.0p ] trying split by load", [self()]),
                                 TargetLoad =
                                     case gossip_state:get(BestValues, avgLoad) of
                                         unknown -> util:floor(MyLoad / 2);
@@ -105,7 +105,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                                             util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
                                         _       -> util:floor(MyLoad / 2)
                                     end,
-%%                                 ct:pal("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
+%%                                 log:pal("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
                                 try lb_common:split_by_load(DhtNodeState, TargetLoad)
                                 catch
                                     throw:'no key in range' ->
@@ -114,7 +114,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                                         lb_common:split_my_range(DhtNodeState, SelectedKey)
                                 end;
                             _ -> % split address range (fall-back):
-%%                                 ct:pal("[ ~.0p ] trying split by address range", [self()]),
+%%                                 log:pal("[ ~.0p ] trying split by address range", [self()]),
                                 lb_common:split_my_range(DhtNodeState, SelectedKey)
                         end,
                     MyPredId = node:id(dht_node_state:get(DhtNodeState, pred)),

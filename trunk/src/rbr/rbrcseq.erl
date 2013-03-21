@@ -23,11 +23,11 @@
 %%-define(PDB, pdb_ets).
 -define(PDB, pdb).
 
-%%-define(TRACE(X,Y), ct:pal("~p" X,[self()|Y])).
+%%-define(TRACE(X,Y), log:pal("~p" X,[self()|Y])).
 %%-define(TRACE(X,Y),
 %%        Name = pid_groups:my_pidname(),
 %%        case Name of
-%%            kv_rbrcseq -> ct:pal("~p ~p " X, [self(), Name | Y]);
+%%            kv_rbrcseq -> log:pal("~p ~p " X, [self(), Name | Y]);
 %%            _ -> ok
 %%        end).
 -define(TRACE(X,Y), ok).
@@ -279,7 +279,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
             %% we need a new id to collect the answers of this write
             %% the client in this new id will be ourselves, so we can
             %% proceed, when we got enough replies.
-            %% ct:pal("Write through without filtering ~p.~n",
+            %% log:pal("Write through without filtering ~p.~n",
             %%        [entry_key(ReadEntry)]),
             This = comm:reply_as(
                      self(), 4,
@@ -344,7 +344,7 @@ on({qread_write_through_collect, ReqId,
             State;
         _ ->
             ?TRACE("rbrcseq:on qread_write_through_collect Client: ~p~n", [entry_client(Entry)]),
-            %% ct:pal("Collect reply ~p ~p~n", [ReqId, Round]),
+            %% log:pal("Collect reply ~p ~p~n", [ReqId, Round]),
             {Done, NewEntry} = add_write_reply(Entry, Round),
             case Done of
                 false -> set_entry(NewEntry, tablename(State));
@@ -367,10 +367,10 @@ on({qread_write_through_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            %% ct:pal("Collect deny ~p ~p~n", [ReqId, NewerRound]),
+            %% log:pal("Collect deny ~p ~p~n", [ReqId, NewerRound]),
             ?TRACE("rbrcseq:on qread_write_through_collect deny Client: ~p~n", [entry_client(Entry)]),
             {Done, NewEntry} = add_write_deny(Entry, NewerRound),
-            %% ct:pal("#Denies = ~p, ~p~n", [entry_num_denies(NewEntry), Done]),
+            %% log:pal("#Denies = ~p, ~p~n", [entry_num_denies(NewEntry), Done]),
             case Done of
                 false ->
                     set_entry(NewEntry, tablename(State)),
@@ -432,7 +432,7 @@ on({qread_write_through_done, ReadEntry, Filtering,
         end,
     TReplyEntry = entry_set_val(ReadEntry, ClientVal),
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
-    %% ct:pal("Write through of write request done informing ~p~n", [ReplyEntry]),
+    %% log:pal("Write through of write request done informing ~p~n", [ReplyEntry]),
     inform_client(qread_done, ReplyEntry),
     State;
 
@@ -446,7 +446,7 @@ on({qread_write_through_done, ReadEntry, Filtering,
         end,
     TReplyEntry = entry_set_val(ReadEntry, ClientVal),
     ReplyEntry = entry_set_my_round(TReplyEntry, Round),
-    %% ct:pal("Write through of read done informing ~p~n", [ReplyEntry]),
+    %% log:pal("Write through of read done informing ~p~n", [ReplyEntry]),
     inform_client(qread_done, ReplyEntry),
     State;
 
@@ -539,7 +539,7 @@ on({qwrite_collect, ReqId,
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
                     %% retry
-%%                    ct:pal("Concurrency detected, retrying~n"),
+%%                    log:pal("Concurrency detected, retrying~n"),
                     retrigger(NewEntry, TableName, noincdelay)%%,
                     %% delete of entry is done in retrigger!
             end
@@ -581,7 +581,7 @@ on({next_period, NewPeriod}, State) ->
     %% retriggering for them
     Table = tablename(State),
     _ = [ begin
-              ct:pal("Retrigger in period ~p caused by timeout for ~.0p~n",
+              log:pal("Retrigger in period ~p caused by timeout for ~.0p~n",
                      [NewPeriod, X]),
               retrigger(X, Table, incdelay)
           end
@@ -714,7 +714,7 @@ add_write_reply(Entry, Round) ->
                 %% have to count the dropped acks as denies.
                 case entry_num_acks(Entry) > 0 of
                     true ->
-                        ct:pal("This should not happen a~n");
+                        log:pal("This should not happen a~n");
                     false -> ok
                 end,
                 %% reset rack and store newer round

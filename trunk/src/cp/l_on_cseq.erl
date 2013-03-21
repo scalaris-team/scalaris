@@ -201,7 +201,7 @@ unittest_lease_update(Old, New) ->
 -spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
 on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}},
    State) ->
-    %% ct:pal("on renew ~p~n", [Old]),
+    %% log:pal("on renew ~p~n", [Old]),
     New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
     ContentCheck = generic_content_check(Old),
     DB = get_db_for_id(Id),
@@ -211,14 +211,14 @@ on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}},
     State;
 
 on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, Value}, _New}, State) ->
-    %% ct:pal("successful renew~n", []),
+    %% log:pal("successful renew~n", []),
     update_lease_in_dht_node_state(Value, State);
 
 on({l_on_cseq, renew_reply,
     {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}}, New},
    State) ->
     % @todo retry
-    ct:pal("renew denied: ~p~nVal: ~p~nNew: ~p~n", [Reason, Value, New]),
+    log:pal("renew denied: ~p~nVal: ~p~nNew: ~p~n", [Reason, Value, New]),
     case Reason of
         lease_does_not_exist ->
             case Value of %@todo is this necessary?
@@ -299,14 +299,14 @@ on({l_on_cseq, handover, Old = #lease{id=Id, epoch=OldEpoch},
 on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value}, ReplyTo,
     _NewOwner, _New}, State) ->
     % @todo if success update lease in State
-    ct:pal("successful handover~n", []),
+    log:pal("successful handover~n", []),
     comm:send(ReplyTo, {handover, success, Value}),
     update_lease_in_dht_node_state(Value, State);
 
 on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
                                 {content_check_failed, Reason}},
     ReplyTo, NewOwner, New}, State) ->
-    ct:pal("handover denied: ~p ~p ~p~n", [Reason, Value, New]),
+    log:pal("handover denied: ~p ~p ~p~n", [Reason, Value, New]),
     case Reason of
         lease_does_not_exist ->
             comm:send(ReplyTo, {handover, failed, Value}),
@@ -320,7 +320,7 @@ on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
             comm:send(ReplyTo, {handover, failed, Value}),
             remove_lease_from_dht_node_state(Value, State);
         unexpected_aux     ->
-            %ct:pal("sending {handover, failed, Value}"),
+            %log:pal("sending {handover, failed, Value}"),
             comm:send(ReplyTo, {handover, failed, Value}), State;
         unexpected_range   ->
             comm:send(ReplyTo, {handover, failed, Value}), State;
@@ -468,7 +468,7 @@ on({l_on_cseq, merge_reply_step4, _L1, {qwrite_deny, _ReqId, _Round, _L2, _Reaso
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split, Lease, R1, R2, ReplyTo}, State) ->
     Id = id(R2),
-    ct:pal("split first step: creating second lease ~p~n", [Id]),
+    log:pal("split first step: creating second lease ~p~n", [Id]),
     New = #lease{id      = id(R2),
                  epoch   = 1,
                  owner   = comm:this(),
@@ -486,7 +486,7 @@ on({l_on_cseq, split, Lease, R1, R2, ReplyTo}, State) ->
 
 on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, Lease, {content_check_failed, Reason}}}, State) ->
-    ct:pal("split first step failed: ~p~n", [Reason]),
+    log:pal("split first step failed: ~p~n", [Reason]),
     case Reason of
         lease_already_exists ->
             comm:send(ReplyTo, {split, fail, Lease}),
@@ -500,7 +500,7 @@ on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, ReplyTo,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch}, R1, R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
-    ct:pal("split second step: updating L1~n", []),
+    log:pal("split second step: updating L1~n", []),
     New = Lease#lease{
             epoch   = OldEpoch + 1,
             range   = R1,
@@ -517,7 +517,7 @@ on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch}, R1, R2, Re
 
 on({l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, Lease, {content_check_failed, Reason}}}, State) ->
-    ct:pal("split second step failed: ~p~n", [Reason]),
+    log:pal("split second step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send(ReplyTo, {split, fail, Lease}), State; %@todo
         unexpected_owner     -> comm:send(ReplyTo, {split, fail, Lease}),
@@ -550,7 +550,7 @@ on({l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
 on({l_on_cseq, split_reply_step2,
     L2 = #lease{id=Id,epoch=OldEpoch}, R1, R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
-    ct:pal("split third step: renew L2 ~p~n", [Id]),
+    log:pal("split third step: renew L2 ~p~n", [Id]),
     New = L2#lease{
             epoch   = OldEpoch + 1,
             aux     = empty,
@@ -567,7 +567,7 @@ on({l_on_cseq, split_reply_step2,
 on({l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, Reason}}}, State) ->
     % @todo
-    ct:pal("split third step failed: ~p~n", [Reason]),
+    log:pal("split third step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send(ReplyTo, {split, fail, L2}), State; %@todo
         unexpected_owner     -> comm:send(ReplyTo, {split, fail, L2}),
@@ -600,7 +600,7 @@ on({l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
 on({l_on_cseq, split_reply_step3,
     L1 = #lease{id=Id,epoch=OldEpoch}, R1, R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
-    ct:pal("split fourth step: renew L1~n", []),
+    log:pal("split fourth step: renew L1~n", []),
     New = L1#lease{
             epoch   = OldEpoch + 1,
             aux     = empty,
@@ -616,15 +616,15 @@ on({l_on_cseq, split_reply_step3,
 
 on({l_on_cseq, split_reply_step4, _L2, _R1, _R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
-    ct:pal("successful split~n", []),
-    ct:pal("successful split ~p~n", [ReplyTo]),
+    log:pal("successful split~n", []),
+    log:pal("successful split ~p~n", [ReplyTo]),
     comm:send(ReplyTo, {split, success, L1}),
     update_lease_in_dht_node_state(L1, State);
 
 on({l_on_cseq, split_reply_step4, L2, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, L1, {content_check_failed, Reason}}}, State) ->
     % @todo
-    ct:pal("split fourth step: ~p~n", [Reason]),
+    log:pal("split fourth step: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send(ReplyTo, {split, fail, L1}), State;
         unexpected_owner     -> comm:send(ReplyTo, {split, fail, L1}),
@@ -715,10 +715,10 @@ generic_content_check(#lease{owner=OldOwner,aux = OldAux,range=OldRange,
     fun ((any(), any(), any()) -> {boolean(), update_failed_reason() | null}). %% content check
 is_valid_update(CurrentEpoch, CurrentVersion) ->
     fun (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
-            %% ct:pal("is_valid_update: expected ~p, got ~p", [CurrentEpoch, E0]),
+            %% log:pal("is_valid_update: expected ~p, got ~p", [CurrentEpoch, E0]),
             {false, epoch_or_version_mismatch};
         (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
-            %% ct:pal("is_valid_update: expected ~p, got ~p", [CurrentVersion, V0]),
+            %% log:pal("is_valid_update: expected ~p, got ~p", [CurrentVersion, V0]),
             {false, epoch_or_version_mismatch};
         (_Current, _WriteFilter, _Next) ->
             {true, null}

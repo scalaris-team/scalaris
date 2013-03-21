@@ -23,9 +23,9 @@
 -vsn('$Id$').
 
 %%-define(TRACE_RTM_MGMT(X,Y), io:format(X,Y)).
-%%-define(TRACE_RTM_MGMT(X,Y), ct:pal(X,Y)).
+%%-define(TRACE_RTM_MGMT(X,Y), log:pal(X,Y)).
 -define(TRACE_RTM_MGMT(X,Y), ok).
-%-define(TRACE(X,Y), ct:pal(X,Y)).
+%-define(TRACE(X,Y), log:pal(X,Y)).
 -define(TRACE(_X,_Y), ok).
 -behaviour(gen_component).
 -include("scalaris.hrl").
@@ -541,7 +541,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
     ?TRACE("tx_tm_rtm:propose_yourself(~p) as ~p~n", [Tid, state_get_role(State)]),
     %% after timeout take over and initiate new paxos round as proposer
     {ErrCodeTx, TxState} = get_tx_entry(Tid, State),
-%%    ct:pal("propose yourself (~.0p/~.0p) for: ~.0p ~.0p~n",
+%%    log:pal("propose yourself (~.0p/~.0p) for: ~.0p ~.0p~n",
 %%           [self(),
 %%            pid_groups:group_and_name_of(self()),
 %%            Tid, {ErrCodeTx, TxState}]),
@@ -570,7 +570,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                   {_, ItemState} = get_item_entry(ItemId, State),
                   case tx_item_get_decided(ItemState) of
                       false ->
-%%                          ct:pal("initiating proposer~n"),
+%%                          log:pal("initiating proposer~n"),
                           [ begin
                                 learner:start_paxosid(GLLearner, PaxId, Maj,
                                                       comm:this(), ItemId),
@@ -587,7 +587,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                             || {PaxId, _RTLog, _TP}
                                    <- tx_item_get_paxosids_rtlogs_tps(ItemState) ];
                       _Decision -> % already decided to prepared / abort
-                          ct:pal("Already decided~n"),
+                          log:pal("Already decided~n"),
                           ok
                   end
               end || ItemId <- tx_state_get_txitemids(TxState) ]
@@ -1073,7 +1073,7 @@ get_failed_keys(TxState, State) ->
     end,
     case length(Result) of
         NumAbort -> ok;
-        _ -> ct:pal("This should not happen: ~p =/= ~p~n",
+        _ -> log:pal("This should not happen: ~p =/= ~p~n",
                     [NumAbort, length(Result)])
     end,
     Result.
@@ -1104,7 +1104,7 @@ handle_crash(Pid, State, Handler) ->
 %%                  fun(X,StateIter) ->
 %%                          case is_tx_state(X) of
 %%                              true ->
-%%                                  ct:pal("propose yourself (~.0p/~.0p) for: ~.0p~n",
+%%                                  log:pal("propose yourself (~.0p/~.0p) for: ~.0p~n",
 %%                                         [self(),
 %%                                          pid_groups:group_and_name_of(self()),
 %%                                          tx_state_get_tid(X)]),

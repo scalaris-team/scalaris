@@ -96,7 +96,7 @@ start_link(Options) ->
 start_link(Files, Options) ->
     case whereis(config) of
         Pid when is_pid(Pid) ->
-            %% ct:pal("There is already a Config process:~n"),
+            %% error_logger:error_msg("There is already a Config process:~n"),
             {ok, Pid};
         _ ->
             TheFiles = case util:app_get_env(add_config, []) of
@@ -206,7 +206,7 @@ check_config() ->
         [ case X() of
               true -> true;
               false ->
-                  ct:pal(error, "check_config ~p failed.~n", [X]),
+                  error_logger:error_msg("check_config ~p failed.~n", [X]),
                   false
           end || X  <- [ fun log:check_config/0,
                          fun sup_scalaris:check_config/0,

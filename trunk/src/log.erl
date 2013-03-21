@@ -23,6 +23,7 @@
 
 -export([start_link/0]).
 -export([log/1, log/2, log/3, log/4, set_log_level/1]).
+-export([pal/1, pal/2]).
 -export([check_config/0]).
 
 -ifdef(with_export_type_support).
@@ -99,6 +100,13 @@ log(Logger, Level, Log, Data) ->
 -spec set_log_level(Level::log_level() | none) -> any().
 set_log_level(Level) ->
     log4erl:change_log_level(Level).
+
+% for (temporary) debugging, use log:pal/1 and log:pal/2
+-spec pal(LogMsg::string()) -> any().
+pal(Log) -> log(Log).
+
+-spec pal(LogMsg::string(), Data::list()) -> any().
+pal(Log, Data) -> log(Log, Data).
 
 %% @doc Checks whether config parameters of the log4erl process exist and are
 %%      valid.
