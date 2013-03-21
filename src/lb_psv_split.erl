@@ -22,7 +22,7 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
-%-define(TRACE(X,Y), ct:pal(X,Y)).
+%-define(TRACE(X,Y), log:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p)~n", [self(), Pid, Msg])).
 -define(TRACE1(Msg, State), ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p)~n", [self(), Msg, State])).
@@ -72,7 +72,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
                         case MyLoad >= 2 of
                             true ->
                                 TargetLoad = util:floor(MyLoad / 2),
-%%                                 ct:pal("T: ~.0p, My: ~.0p~n", [TargetLoad, MyLoad]),
+%%                                 log:pal("T: ~.0p, My: ~.0p~n", [TargetLoad, MyLoad]),
                                 try lb_common:split_by_load(DhtNodeState, TargetLoad)
                                 catch
                                     throw:'no key in range' ->
@@ -94,7 +94,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
                                         "sending no_op...", [self(), MyPredId]),
                             lb_op:no_op();
                         _ ->
-%%                             ct:pal("MK: ~.0p, SK: ~.0p~n", [MyNodeId, SplitKey]),
+%%                             log:pal("MK: ~.0p, SK: ~.0p~n", [MyNodeId, SplitKey]),
                             MyLoadNew = MyLoad - OtherLoadNew,
                             MyNodeDetails1 = node_details:set(node_details:new(), node, MyNode),
                             MyNodeDetails = node_details:set(MyNodeDetails1, load, MyLoad),

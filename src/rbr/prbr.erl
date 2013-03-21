@@ -150,7 +150,7 @@ on({prbr, write, _DB, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter
                                      PassedToUpdate, Value),
                 set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
             {dropped, NewerRound} ->
-                %% ct:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
+                %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
                 msg_write_deny(Proposer, Key, NewerRound)
         end,
     TableName.

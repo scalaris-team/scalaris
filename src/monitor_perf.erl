@@ -50,7 +50,7 @@
     {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
     {get_rrds, [{Process::atom(), Key::monitor:key()},...], SourcePid::comm:mypid()}.
 
-%-define(TRACE(X,Y), ct:pal(X,Y)).
+%-define(TRACE(X,Y), log:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 -define(TRACE1(Msg, State),
         ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n  State: ~.0p)~n", [self(), Msg, State])).

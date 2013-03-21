@@ -34,11 +34,11 @@
 -include("scalaris.hrl").
 
 %% breakpoint tracing
-%-define(TRACE_BP(X,Y), ct:pal(X,Y)).
+%-define(TRACE_BP(X,Y), log:pal(X,Y)).
 -define(TRACE_BP(X,Y), ok).
 %% userdevguide-begin gen_component:trace_bp_steps
 %-define(TRACE_BP_STEPS(X,Y), io:format(X,Y)).     %% output on console
-%-define(TRACE_BP_STEPS(X,Y), ct:pal(X,Y)).        %% output even if called by unittest
+%-define(TRACE_BP_STEPS(X,Y), log:pal(X,Y)).        %% output even if called by unittest
 %-define(TRACE_BP_STEPS(X,Y), io:format(user,X,Y)). %% clean output even if called by unittest
 -define(TRACE_BP_STEPS(X,Y), ok).
 %% userdevguide-end gen_component:trace_bp_steps

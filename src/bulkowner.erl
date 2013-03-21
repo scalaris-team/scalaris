@@ -82,7 +82,7 @@ send_reply_failed(Id, Target, Msg, Parents, Shepherd, _FailedPid) ->
 %% @doc main routine. It spans a broadcast tree over the nodes in I
 -spec bulk_owner(State::dht_node_state:state(), Id::uid:global_uid(), I::intervals:interval(), Msg::comm:message(), Parents::[comm:mypid()]) -> ok.
 bulk_owner(State, Id, I, Msg, Parents) ->
-%%     ct:pal("bulk_owner:~n self:~p,~n int :~p,~n rt  :~p~n", [dht_node_state:get(State, node), I, ?RT:to_list(State)]),
+%%     log:pal("bulk_owner:~n self:~p,~n int :~p,~n rt  :~p~n", [dht_node_state:get(State, node), I, ?RT:to_list(State)]),
     Neighbors = dht_node_state:get(State, neighbors),
     SuccIntI = intervals:intersection(I, nodelist:succ_range(Neighbors)),
     case intervals:is_empty(SuccIntI) of
@@ -120,7 +120,7 @@ bulk_owner_iter([], _Id, _I, _Msg, _Limit, _Parents) ->
 bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
     Interval_Head_Limit = node:mk_interval_between_ids(node:id(Head), Limit),
     Range = intervals:intersection(I, Interval_Head_Limit),
-%%     ct:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
+%%     log:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
     NewLimit =
         case intervals:is_empty(Range) of
             false -> comm:send(node:pidX(Head), {bulkowner, Id, Range, Msg, Parents}),

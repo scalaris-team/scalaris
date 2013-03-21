@@ -15,7 +15,7 @@
 
 %% @author Ahmed Nawras
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc Log4erl appender using ct:pal/1 instead if io:format/1 based on
+%% @doc Log4erl appender using log:pal/1 instead if io:format/1 based on
 %%      console_appender.
 %% @version $Id$
 -module(log4erl_ctpal_appender).
@@ -107,7 +107,7 @@ do_log(#log{level = L} = Log,#console_appender{level=Level, format=Format}) ->
 	true ->
 	    M = log_formatter:format(Log, Format),
 	    ?LOG2("console_appender result message is ~s~n",[M]),
-	    ct:pal(M);
+	    log:pal(M);
 	false ->
 	    ok
     end.

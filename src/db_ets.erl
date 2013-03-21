@@ -223,7 +223,7 @@ get_chunk_helper({ETSDB, _Subscr} = DB, Interval, AddDataFun, ChunkSize) ->
     case get_load_(DB) of
         0 -> {intervals:empty(), []};
         _ ->
-            %ct:pal("0: ~p ~p", [intervals:get_bounds(Interval), Interval]),
+            %log:pal("0: ~p ~p", [intervals:get_bounds(Interval), Interval]),
             {BeginBr, Begin, _End, _EndBr} = Bounds = intervals:get_bounds(Interval),
             % get first key which is in the interval and in the ets table:
             {FirstKey, Chunk0} = first_key_in_interval(DB, Begin, Interval, AddDataFun),
@@ -231,7 +231,7 @@ get_chunk_helper({ETSDB, _Subscr} = DB, Interval, AddDataFun, ChunkSize) ->
                              []  -> ChunkSize;
                              [_] -> ChunkSize - 1
                          end,
-            %ct:pal("first key: ~.0p~n", [FirstKey]),
+            %log:pal("first key: ~.0p~n", [FirstKey]),
             IsContinuous = intervals:is_continuous(Interval),
             % note: get_chunk_inner/8 will stop at the first value
             % which is not in Interval and not in BoundsInterval
@@ -293,12 +293,12 @@ first_key_in_interval({ETSDB, _Subscr} = DB, Current, Interval, AddDataFun) ->
         -> {?RT:key() | '$end_of_interval', [V]}.
 get_chunk_inner(_DB, RealStart, RealStart, _Interval, _AddDataFun,
                 _ChunkSize, Chunk, _BoundsInterval) ->
-    %ct:pal("inner: 0: ~p", [RealStart]),
+    %log:pal("inner: 0: ~p", [RealStart]),
     % we hit the start element, i.e. our whole data set has been traversed
     {'$end_of_interval', Chunk};
 get_chunk_inner({ETSDB, _Subscr} = _DB, Current, RealStart, _Interval, _AddDataFun,
                 0, Chunk, _BoundsInterval) ->
-    %ct:pal("inner: 1: ~p", [Current]),
+    %log:pal("inner: 1: ~p", [Current]),
     % we hit the chunk size limit
     case Current of
         '$end_of_table' ->
@@ -313,13 +313,13 @@ get_chunk_inner({ETSDB, _Subscr} = _DB, Current, RealStart, _Interval, _AddDataF
     end;
 get_chunk_inner({ETSDB, _Subscr} = DB, '$end_of_table', RealStart, Interval, AddDataFun,
                 ChunkSize, Chunk, BoundsInterval) ->
-    %ct:pal("inner: 2: ~p", ['$end_of_table']),
+    %log:pal("inner: 2: ~p", ['$end_of_table']),
     % reached end of table - start at beginning (may be a wrapping interval)
     get_chunk_inner(DB, ets:first(ETSDB), RealStart, Interval, AddDataFun,
                     ChunkSize, Chunk, BoundsInterval);
 get_chunk_inner({ETSDB, _Subscr} = DB, Current, RealStart, Interval, AddDataFun,
                 ChunkSize, Chunk, BoundsInterval) ->
-    %ct:pal("inner: 3: ~p", [Current]),
+    %log:pal("inner: 3: ~p", [Current]),
     case intervals:in(Current, Interval) of
         true ->
             Chunk1 = AddDataFun(DB, Current, Chunk),
@@ -363,7 +363,7 @@ get_split_key_({ETSDB, _Subscr} = DB, Begin, TargetLoad,
                 '$end_of_table' ->
                     throw('empty_db');
                 FirstKey ->
-                    %ct:pal("first key: ~.0p~n", [FirstKey]),
+                    %log:pal("first key: ~.0p~n", [FirstKey]),
                     {SplitKey, RestLoad} =
                         get_split_key_inner(DB, ETS_next(ETSDB, FirstKey),
                                             FirstKey, TargetLoad - 1, FirstKey,

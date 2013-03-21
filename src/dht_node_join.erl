@@ -20,7 +20,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
-%-define(TRACE(X,Y), ct:pal(X,Y)).
+%-define(TRACE(X,Y), log:pal(X,Y)).
 -define(TRACE(X,Y), ok).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p)~n", [self(), Pid, Msg])).
 -define(TRACE_JOIN1(Msg, JoinState),
