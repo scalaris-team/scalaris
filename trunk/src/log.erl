@@ -22,7 +22,7 @@
 -include("log4erl.hrl").
 
 -export([start_link/0]).
--export([log/2, log/3, log/4, set_log_level/1]).
+-export([log/1, log/2, log/3, log/4, set_log_level/1]).
 -export([check_config/0]).
 
 -ifdef(with_export_type_support).
@@ -77,9 +77,16 @@ start_link() ->
     end,
     Link.
 
--spec log(Level::log_level(), LogMsg::string()) -> any().
-log(Level, Log) ->
-    log4erl:log(Level,Log).
+-spec log(LogMsg::string()) -> any().
+log(Log) ->
+    log(Log, []).
+
+-spec log(Level::log_level(), LogMsg::string()) -> any();
+         (LogMsg::string(), Data::list()) -> any().
+log(Level, Log) when is_atom(Level) ->
+    log4erl:log(Level, Log);
+log(Log, Data) ->
+    log4erl:log(warn, Log, Data).
 
 -spec log(Level::log_level(), LogMsg::string(), Data::list()) -> any().
 log(Level, Log, Data) ->
