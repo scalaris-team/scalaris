@@ -109,8 +109,8 @@ forward_msg(Process, Message, _State) ->
             case whereis(Process) of
                 undefined ->
                     log:log(warn,
-                            "[ CC ] Cannot accept msg for unknown named"
-                                " process ~p: ~.0p~n", [Process, Message]);
+                            "[ CC ~p ] Cannot accept msg for unknown named"
+                                " process ~p: ~.0p~n", [self(), Process, Message]);
                 PID -> comm:send_local(PID, Message), ok
             end
     end.
@@ -193,11 +193,11 @@ on({tcp, Socket, Data}, State) ->
                 _ = inet:setopts(Socket, [{active, once}]),
                 inc_r_msg_count(State);
             {user_close} ->
-                log:log(warn,"[ CC ] tcp user_close request", []),
+                log:log(warn,"[ CC ~p ] tcp user_close request", [self()]),
                 gen_tcp:close(Socket),
                 set_socket(State, notconnected);
             Unknown ->
-                log:log(warn,"[ CC ] unknown message ~.0p", [Unknown]),
+                log:log(warn,"[ CC ~p ] unknown message ~.0p", [self(), Unknown]),
                 %% may fail, when tcp just closed
                 _ = inet:setopts(Socket, [{active, once}]),
                 State
@@ -205,7 +205,7 @@ on({tcp, Socket, Data}, State) ->
     send_bundle_if_ready(NewState);
 
 on({tcp_closed, Socket}, State) ->
-    log:log(warn,"[ CC ] tcp closed info", []),
+    log:log(warn,"[ CC ~p ] tcp closed info", [self()]),
     gen_tcp:close(Socket),
     set_socket(State, notconnected);
 
@@ -342,19 +342,19 @@ send_internal({Address, Port, Socket} = Receiver, Pid, Message, Options, BinaryM
                 report_bundle_error(Options,
                                     {Address, Port, Pid},
                                     Message, socket_closed),
-                log:log(warn,"[ CC ] sending closed connection", []),
+                log:log(warn,"[ CC ~p ] sending closed connection", [self()]),
                 gen_tcp:close(Socket),
                 notconnected;
             {error, timeout} ->
-                log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
-                        [Address, Port, timeout]),
+                log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
+                        [self(), Address, Port, timeout]),
                 send_internal(Receiver, Pid, Message, Options, BinaryMessage, State);
             {error, Reason} ->
                 report_bundle_error(Options,
                                     {Address, Port, Pid},
                                     Message, Reason),
-                log:log(error,"[ CC ] couldn't send to ~.0p:~.0p (~.0p). closing connection",
-                        [Address, Port, Reason]),
+                log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). closing connection",
+                        [self(), Address, Port, Reason]),
                 gen_tcp:close(Socket),
                 notconnected
     end,
@@ -383,14 +383,14 @@ new_connection(Address, Port, MyPort, Channel) ->
                     Socket;
                 {error, Reason} ->
                     % note: this should not occur since the socket was just created with 'ok'
-                    log:log(error,"[ CC ] reconnect to ~.0p because socket is ~.0p",
-                            [Address, Reason]),
+                    log:log(error,"[ CC ~p ] reconnect to ~.0p because socket is ~.0p",
+                            [self(), Address, Reason]),
                     gen_tcp:close(Socket),
                     new_connection(Address, Port, MyPort, Channel)
             end;
         {error, Reason} ->
-            log:log(info,"[ CC ] couldn't connect to ~.0p:~.0p (~.0p)",
-                    [Address, Port, Reason]),
+            log:log(info,"[ CC ~p ] couldn't connect to ~.0p:~.0p (~.0p)",
+                    [self(), Address, Port, Reason]),
             fail
     end.
 
