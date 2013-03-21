@@ -45,7 +45,7 @@ public class FourCaastMonitoringPlugin implements WikiPlugin {
         servlet.registerEventHandler(monitor);
         try {
             final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-            final ObjectName nodeMonitorName = new ObjectName("de.zib.scalaris:type=FourCaastMonitoringMBean");
+            final ObjectName nodeMonitorName = new ObjectName("de.zib.scalaris:type=FourCaastMonitoring");
             final FourCaastMonitoring nodeMonitorMbean = monitor;
             mbs.registerMBean(nodeMonitorMbean, nodeMonitorName);
         } catch (final MalformedObjectNameException e) {

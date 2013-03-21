@@ -368,9 +368,9 @@ public class Main {
     private static void startJmxService(final String node, final boolean verbose) {
         try {
             final MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
-            final ObjectName nodeMonitorName = new ObjectName("de.zib.scalaris:type=MonitorNodeMBean");
+            final ObjectName nodeMonitorName = new ObjectName("de.zib.scalaris:type=MonitorNode");
             final de.zib.scalaris.jmx.MonitorNode nodeMonitorMbean = new de.zib.scalaris.jmx.MonitorNode(node);
-            final ObjectName serviceMonitorName = new ObjectName("de.zib.scalaris:type=MonitorServiceMBean");
+            final ObjectName serviceMonitorName = new ObjectName("de.zib.scalaris:type=MonitorService");
             final de.zib.scalaris.jmx.MonitorService serviceMonitorMbean = new de.zib.scalaris.jmx.MonitorService(node);
             mbs.registerMBean(nodeMonitorMbean, nodeMonitorName);
             mbs.registerMBean(serviceMonitorMbean, serviceMonitorName);
