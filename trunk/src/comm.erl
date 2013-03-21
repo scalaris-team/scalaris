@@ -53,7 +53,7 @@
 -ifdef(with_export_type_support).
 -export_type([message/0, group_message/0, msg_tag/0, mypid/0,
               erl_local_pid/0, erl_local_pid_with_reply_as/0,
-              send_options/0]).
+              send_options/0, channel/0]).
 % for comm_layer and tester_scheduler
 -export_type([erl_local_pid_plain/0]).
 % for tester_scheduler
@@ -76,6 +76,8 @@
 -type mypid()         :: mypid_plain() | mypid_with_reply_as().
 
 -type plain_pid() :: mypid_plain() | erl_local_pid_plain().
+
+-type channel() :: main | prio.
 
 -type msg_tag() :: atom().
 %% there is no variable length-tuple definition for types -> declare
@@ -108,7 +110,7 @@
 
 -type send_options() :: [{shepherd, Pid::erl_local_pid()} |
                          {group_member, Process::atom()} |
-                         {channel, main | prio} | quiet].
+                         {channel, channel()} | quiet].
 
 %% @doc Sends a message to a process given by its pid.
 -spec send(mypid(), message() | group_message()) -> ok.
