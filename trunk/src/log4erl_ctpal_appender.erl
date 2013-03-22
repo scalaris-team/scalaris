@@ -107,7 +107,7 @@ do_log(#log{level = L} = Log,#console_appender{level=Level, format=Format}) ->
 	true ->
 	    M = log_formatter:format(Log, Format),
 	    ?LOG2("console_appender result message is ~s~n",[M]),
-	    log:pal(M);
+	    ct:pal(M);
 	false ->
 	    ok
     end.
