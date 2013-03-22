@@ -83,7 +83,7 @@ gstop() {
         echo -n "Shutting down Scalaris node \"${SCALARIS_NODE}\"... "
         PROCPID=`cat $PID_DS`
         if [ -e /proc/$PROCPID ];then
-            $SCALARISCTL gstop
+            $SU "$SCALARISCTL gstop"
             result=$?
         else
             # not running anymore
@@ -129,7 +129,7 @@ status() {
             return 1 # program is dead and /var/run pid file exists
         else
             echo -n "Checking Scalaris node \"${SCALARIS_NODE}\"... "
-            $SCALARISCTL status
+            $SU "$SCALARISCTL status"
             if [ $? -ne 0 ]; then
                 echo "probably crashed"
                 return 4 # program or service status is unknown
