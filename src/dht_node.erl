@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -32,7 +32,6 @@
 -endif.
 
 -type(database_message() ::
-      {?get_key, Source_PID::comm:mypid(), Key::?RT:key()} |
       {?get_key, Source_PID::comm:mypid(), SourceId::any(), HashedKey::?RT:key()} |
       {get_entries, Source_PID::comm:mypid(), Interval::intervals:interval()} |
       {get_entries, Source_PID::comm:mypid(), FilterFun::fun((db_entry:entry()) -> boolean()),
@@ -49,7 +48,7 @@
       {get_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key()} |
       {set_key_entry, Source_PID::comm:mypid(), Entry::db_entry:entry()} |
       {delete_key, Source_PID::comm:mypid(), ClientsId::{delete_client_id, uid:global_uid()}, HashedKey::?RT:key()} |
-      {add_data, Source_PID::comm:mypid(), ?DB:db_as_list()} |      
+      {add_data, Source_PID::comm:mypid(), ?DB:db_as_list()} |
       {drop_data, Data::?DB:db_as_list(), Sender::comm:mypid()}).
 
 -type(lookup_message() ::
@@ -63,7 +62,7 @@
       {get_yaws_info, Pid::comm:mypid()} |
       {get_state, Pid::comm:mypid(), Which::dht_node_state:name()} |
       {get_node_details, Pid::comm:mypid()} |
-      {get_node_details, Pid::comm:mypid(), Which::[node_details:node_details_name()]} |          
+      {get_node_details, Pid::comm:mypid(), Which::[node_details:node_details_name()]} |
       {get_pid_group, Pid::comm:mypid()} |
       {dump} |
       {web_debug_info, Requestor::comm:erl_local_pid()} |
@@ -206,12 +205,6 @@ on(X, State) when is_tuple(X) andalso element(1, X) =:= prbr ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Database
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({?get_key, Source_PID, HashedKey}, State) ->
-    comm:send(Source_PID,
-              {get_key_response, HashedKey,
-               ?DB:read(dht_node_state:get(State, db), HashedKey)}),
-    State;
-
 on({?get_key, Source_PID, SourceId, HashedKey}, State) ->
     Msg = {?get_key_with_id_reply, SourceId, HashedKey,
            ?DB:read(dht_node_state:get(State, db), HashedKey)},
