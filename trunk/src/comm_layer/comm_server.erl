@@ -55,7 +55,9 @@
 send({{_IP1, _IP2, _IP3, _IP4} = TargetIP, TargetPort, TargetPid} = Target,
      Message, Options) ->
     % integrated is_local/1 and make_local/1:
-    if is_pid(TargetPid) andalso node(TargetPid) =:= node() ->
+    {MyIP, MyPort} = get_local_address_port(),
+    if MyIP =:= TargetIP andalso MyPort =:= TargetPort andalso is_pid(TargetPid) ->
+           % local process identified by PID
            case is_process_alive(TargetPid) of
                true ->
                    %% minor gap of error reporting, if PID
@@ -69,26 +71,21 @@ send({{_IP1, _IP2, _IP3, _IP4} = TargetIP, TargetPort, TargetPid} = Target,
                    report_send_error(Options, Target, Message,
                                      local_target_not_alive)
            end;
-       is_pid(TargetPid) ->
+       MyIP =:= TargetIP andalso MyPort =:= TargetPort andalso is_atom(TargetPid) ->
+           % named local process
+           case whereis(TargetPid) of
+               undefined ->
+                   log:log(warn,
+                           "[ CC ] Cannot locally send msg to unknown named"
+                               " process ~p: ~.0p~n", [TargetPid, Message]),
+                   report_send_error(Options, Target, Message, unknown_named_process);
+               PID ->
+                   % assume that whereis/1 does not report dead PIDs
+                   PID ! Message, ok
+           end;
+       true ->
            ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
-           ?MODULE ! {send, TargetIP, TargetPort, TargetPid, Message, Options};
-       is_atom(TargetPid) -> % named process
-           {MyIP, MyPort} = get_local_address_port(),
-           if MyIP =:= TargetIP andalso MyPort =:= TargetPort ->
-                  case whereis(TargetPid) of
-                      undefined ->
-                          log:log(warn,
-                                  "[ CC ] Cannot locally send msg to unknown named"
-                                      " process ~p: ~.0p~n", [TargetPid, Message]),
-                          report_send_error(Options, Target, Message, unknown_named_process);
-                      PID ->
-                          % assume that whereis/1 does not report dead PIDs
-                          PID ! Message, ok
-                  end;
-              true ->
-                  ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
-                  ?MODULE ! {send, TargetIP, TargetPort, TargetPid, Message, Options}
-           end
+           ?MODULE ! {send, TargetIP, TargetPort, TargetPid, Message, Options}
     end.
 
 %% @doc returns process descriptor for the calling process
