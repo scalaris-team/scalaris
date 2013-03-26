@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,10 +13,15 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc    Type definitions for the client, e.g. cs_api*.
+%% @doc    Type definitions for the client, e.g. api_*.
 %% @end
 %% @version $Id$
 
--type client_key() :: string(). % see ?RT:hash_key/1
+%% client_key() is actually of type unicode:chardata().
+%% But we cannot generate that type in our tester as it contains
+%% maybe_improper_list() without further specifying its element type.
+%% See ?RT:hash_key/1
+%% -type client_key() :: unicode:chardata().
+-type client_key() :: string().
 -type client_value() :: any().
 -type client_version() :: ?DB:version().
