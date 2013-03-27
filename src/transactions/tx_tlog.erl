@@ -335,7 +335,7 @@ get_entry_status(Element)    -> element(4, Element).
 -spec set_entry_status(tlog_entry(), tx_status()) -> tlog_entry().
 set_entry_status(Element, Val) -> setelement(4, Element, Val).
 
--spec get_entry_snapshot(tlog_entry()) -> tx_status().
+-spec get_entry_snapshot(tlog_entry()) -> snap_number().
 get_entry_snapshot(Element)    -> element(5, Element).
 
 -spec set_entry_snapshot(tlog_entry(), tx_status()) -> tlog_entry().

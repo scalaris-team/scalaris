@@ -186,8 +186,8 @@ on({?init_TP, {_Tid, _RTMs, _Accs, _TM, _RTLogEntry, _ItemId, _PaxId, SnapNo} = 
     tx_tp:on_init_TP(Params, State);
 on({?tp_do_commit_abort, Id, Result, SnapNumber}, State) ->
     tx_tp:on_do_commit_abort(Id, Result, SnapNumber, State);
-on({?tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal}, State) ->
-    tx_tp:on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, State);
+on({?tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal, SnapNumber}, State) ->
+    tx_tp:on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, SnapNumber, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Lookup (see api_dht_raw.erl and dht_node_look up.erl)
