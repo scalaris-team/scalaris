@@ -278,7 +278,7 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
 
 -spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
              tx_tlog:snap_number(), tx_tlog:snap_number()) -> ?DB:db().
-commit(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
+commit(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_read:commit)~n", []),
     %% perform op: nothing to do for 'read'
     %% release locks
