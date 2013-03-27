@@ -32,7 +32,8 @@
 
 %% Perform single operation transactions.
 -export([req_list_commit_each/1,
-         read/1, write/2, add_del_on_list/3, add_on_nr/2, test_and_set/3]).
+         read/1, write/2, add_del_on_list/3, add_on_nr/2, test_and_set/3,
+         get_system_snapshot/0]).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
@@ -224,3 +225,14 @@ commit_req(Request) ->
 -spec req_list_commit_each([request_on_key()]) -> [result()].
 req_list_commit_each(ReqList) ->
     util:par_map(fun commit_req/1, ReqList, 50).
+
+%% @doc Get system snapshot
+-spec get_system_snapshot() -> list().
+get_system_snapshot() ->
+    snapshot_leader ! {init_snapshot,comm:this()},
+    receive
+        {global_snapshot_done,Data} ->
+            Data;
+        {global_snapshot_done_with_errors,ErrorInterval,Data} ->
+            {snapshot_failed,ErrorInterval,Data}
+    end.

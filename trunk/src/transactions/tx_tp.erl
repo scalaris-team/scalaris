@@ -50,7 +50,7 @@ init() ->
                   dht_node_state:state()) -> dht_node_state:state().
 %% messages handled in dht_node context:
 %% PreCond: check for DB responsibility must still be valid (ref. lookup_fin handling)
-on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId} = _Params, DHT_Node_State) ->
+on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo} = Params, DHT_Node_State) ->
     ?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
     %% validate locally via callback
     DB = dht_node_state:get(DHT_Node_State, db),

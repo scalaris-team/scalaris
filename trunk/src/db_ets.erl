@@ -219,16 +219,16 @@ copy_value_to_snapshot_table_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC
 
 %% @doc Returns snapshot data as is
 -spec get_snapshot_data_(DB::db_t()) -> db_as_list().
-get_snapshot_data_({_DB, _Subscr, SnapTable}) ->
+get_snapshot_data_({_DB, _Subscr, {SnapTable, _, _}}) ->
     ets:tab2list(SnapTable). 
 
 %% @doc Join snapshot and primary db such that all tuples in the primary db are replaced
 %%      if there is a matching tuple available in the snapshot set. The other tuples are
 %%      returned as is. 
--spec join_snapshot_data_(DB::db_t()) -> db_as_list(). 
-join_snapshot_data_(State = {_DB, _Subscr, {SnapTable, _, _}}) ->
+-spec join_snapshot_data_(State::db_t()) -> db_as_list(). 
+join_snapshot_data_(State) ->
     PrimaryDB = lists:keysort(1, get_data_(State)),
-    SnapshotDB = lists:keysort(1, get_snapshot_data_(SnapTable)),
+    SnapshotDB = lists:keysort(1, get_snapshot_data_(State)),
     Fun = 
         fun([], Result, _) -> 
                 Result; 

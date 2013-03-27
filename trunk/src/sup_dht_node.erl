@@ -94,6 +94,8 @@ childs([{DHTNodeGroup, Options}]) ->
             true -> util:sup_worker_desc(rrepair, rrepair, start_link, [DHTNodeGroup]);
             _ -> []
         end,
+    SnapshotLeader =
+        util:sup_worker_desc(snapshot_leader, snapshot_leader, start_link),
 	
     lists:flatten([ %% RepUpd may be [] and lists:flatten eliminates this
                     Monitor,
@@ -108,5 +110,6 @@ childs([{DHTNodeGroup, Options}]) ->
                     SupDHTNodeCore_AND,
                     MonitorPerf,
                     RepUpdate,
-					Autoscale
+					Autoscale,
+                    SnapshotLeader
            ]).

@@ -80,7 +80,7 @@ extract_from_tlog(Entry, _Key, Value1, EnDecode) ->
 %%   [TransLogEntries] (replicas)
 -spec validate_prefilter(tx_tlog:tlog_entry()) -> [tx_tlog:tlog_entry()].
 validate_prefilter(TLogEntry) ->
-    ?TRACE("rdht_tx_write:validate_prefilter(~p)~n", [TLog]),
+    ?TRACE("rdht_tx_write:validate_prefilter(~p)~n", [TLogEntry]),
     Key = tx_tlog:get_entry_key(TLogEntry),
     RKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     [ tx_tlog:set_entry_key(TLogEntry, X) || X <- RKeys ].
@@ -103,6 +103,7 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
     %%       atomically as a pair).
     ReadLocks = db_entry:get_readlock(DBEntry),
     WriteLock = db_entry:get_writelock(DBEntry),
+    ?TRACE("rdht_tx_write:validate: local snapnumber is ~p; snapnumber in tlog entry is ~p~n",[LocalSnapNumber,tx_tlog:get_entry_snapshot(RTLogEntry)]),
     SnapNumbersOK = (tx_tlog:get_entry_snapshot(RTLogEntry) >= LocalSnapNumber),
     if ((RTVers =:= DBVers andalso ReadLocks =:= 0) orelse RTVers > DBVers) andalso
            (WriteLock =:= false orelse WriteLock < RTVers) andalso SnapNumbersOK->
