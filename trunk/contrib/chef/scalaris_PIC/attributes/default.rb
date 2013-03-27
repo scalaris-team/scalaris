@@ -56,4 +56,15 @@ normal[:scalaris_PIC][:kpis] = {
            }
   }
 
+default[:REC][:PICs][:JASMINe_Probe][:ACs] = [
+  {:kpis_name => [
+                  "ScalarisNode_CurLatencyAvg",
+                  "ScalarisNode_CurLatencyStddev",
+                  "ScalarisService_CurLatencyAvg",
+                  "ScalarisService_CurLatencyStddev",
+                  "ScalarisService_LoadEstimate"
+                 ],
+   :pic_cookbook_name => "scalaris_PIC"
+  }]
+
 #puts "Printing scalaris attributes from attributes file: #{node[:REC][:PICs][:scalaris_PIC][0][:attributes]} "
