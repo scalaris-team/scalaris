@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 -behaviour(db_beh).
--type db_t() :: {Table::tid() | atom(), SubscrTable::tid() | atom(), SnapTable::tid() | atom()}.
+-type db_t() :: {Table::tid() | atom(), SubscrTable::tid() | atom(), {SnapTable::tid() | atom(), non_neg_integer(), non_neg_integer()}}.
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
@@ -45,7 +45,7 @@ new_() ->
     % better protected? All accesses would have to go to DB-process
     {ets:new(list_to_atom(DBName), [ordered_set | ?DB_ETS_ADDITIONAL_OPS]),
      ets:new(list_to_atom(SubscrName), [ordered_set, private]),
-     ets:new(list_to_atom(SnapDBName), [ordered_set, private])}.
+     {ets:new(list_to_atom(SnapDBName), [ordered_set, private]),0,0}}.
 
 %% @doc Re-opens a previously existing database (not supported by ets
 %%      -> create new DB).
@@ -64,14 +64,14 @@ close_(State = {DB, Subscr, SnapTable}, _Delete) ->
 
 %% @doc Returns the name of the table for open/1.
 -spec get_name_(DB::db_t()) -> db_name().
-get_name_({DB, _Subscr, _SnapTable}) ->
+get_name_({DB, _Subscr, _SnapState}) ->
     erlang:atom_to_list(ets:info(DB, name)).
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
 -spec get_entry2_(DB::db_t(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
-get_entry2_({DB, _Subscr, _SnapTable}, Key) ->
+get_entry2_({DB, _Subscr, _SnapState}, Key) ->
     case ets:lookup(DB, Key) of
         [Entry] -> {true, Entry};
         []      -> {false, db_entry:new(Key)}
@@ -80,11 +80,13 @@ get_entry2_({DB, _Subscr, _SnapTable}, Key) ->
 %% @doc Inserts a complete entry into the DB.
 %%      Note: is the Entry is a null entry, it will be deleted!
 -spec set_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
-set_entry_(State = {DB, _Subscr, _SnapTable}, Entry) ->
+set_entry_(State = {DB, _Subscr, {_SnapTable, LiveLC, _SnapLC}}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_entry_(State, Entry);
-        _    -> ets:insert(DB, Entry),
-                call_subscribers(State, {write, Entry})
+        _    -> {_, OldEntry} = get_entry2_(State,db_entry:get_key(Entry)),
+                NewLiveLC = db_entry:update_lockcount(OldEntry,Entry,LiveLC),
+                ets:insert(DB, Entry),
+                call_subscribers({DB,_Subscr,{_SnapTable,_SnapLC,NewLiveLC}}, {write, Entry})
     end.
 
 %% @doc Updates an existing (!) entry in the DB.
@@ -95,18 +97,20 @@ update_entry_(State, Entry) ->
 
 %% @doc Removes all values with the given key from the DB.
 -spec delete_entry_at_key_(DB::db_t(), ?RT:key()) -> NewDB::db_t().
-delete_entry_at_key_(State = {DB, _Subscr, _SnapTable}, Key) ->
+delete_entry_at_key_(State = {DB, _Subscr, {_SnapTable, LiveLC, _SnapLC}}, Key) ->
+    {_, OldEntry} = get_entry2_(State,Key),
+    NewLiveLC = db_entry:update_lockcount(OldEntry,db_entry:new(Key),LiveLC),
     ets:delete(DB, Key),
-    call_subscribers(State, {delete, Key}).
+    call_subscribers({DB,_Subscr,{_SnapTable,_SnapLC,NewLiveLC}}, {delete, Key}).
 
 %% @doc Returns the number of stored keys.
 -spec get_load_(DB::db_t()) -> Load::integer().
-get_load_({DB, _Subscr, _SnapTable}) ->
+get_load_({DB, _Subscr, _SnapState}) ->
     ets:info(DB, size).
 
 %% @doc Returns the number of stored keys in the given interval.
 -spec get_load_(DB::db_t(), Interval::intervals:interval()) -> Load::integer().
-get_load_(State = {DB, _Subscr, _SnapTable}, Interval) ->
+get_load_(State = {DB, _Subscr, _SnapState}, Interval) ->
     IsEmpty = intervals:is_empty(Interval),
     IsAll = intervals:is_all(Interval),
     if
@@ -124,7 +128,7 @@ get_load_(State = {DB, _Subscr, _SnapTable}, Interval) ->
 
 %% @doc Adds all db_entry objects in the Data list.
 -spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
-add_data_(State = {DB, _Subscr, _SnapTable}, Data) ->
+add_data_(State = {DB, _Subscr, _SnapState}, Data) ->
     ets:insert(DB, Data),
     _ = lists:foldl(fun(Entry, _) ->
                         call_subscribers(State, {write, Entry})
@@ -137,7 +141,7 @@ add_data_(State = {DB, _Subscr, _SnapTable}, Data) ->
 %%      keys!
 -spec split_data_(DB::db_t(), MyNewInterval::intervals:interval()) ->
          {NewDB::db_t(), db_as_list()}.
-split_data_(State = {DB, _Subscr, _SnapTable}, MyNewInterval) ->
+split_data_(State = {DB, _Subscr, _SnapState}, MyNewInterval) ->
     F = fun (DBEntry, HisList) ->
                 Key = db_entry:get_key(DBEntry),
                 case intervals:in(Key, MyNewInterval) of
@@ -159,7 +163,7 @@ split_data_(State = {DB, _Subscr, _SnapTable}, MyNewInterval) ->
                    FilterFun::fun((DBEntry::db_entry:entry()) -> boolean()),
                    ValueFun::fun((DBEntry::db_entry:entry()) -> Value))
         -> [Value].
-get_entries_({DB, _Subscr, _SnapTable}, FilterFun, ValueFun) ->
+get_entries_({DB, _Subscr, _SnapState}, FilterFun, ValueFun) ->
     F = fun (DBEntry, Data) ->
                  case FilterFun(DBEntry) of
                      true -> [ValueFun(DBEntry) | Data];
@@ -174,14 +178,11 @@ get_entries_({DB, _Subscr, _SnapTable}, FilterFun, ValueFun) ->
                       RangeOrFun::intervals:interval() |
                                   fun((DBEntry::db_entry:entry()) -> boolean()))
         -> NewDB::db_t().
-delete_entries_(State = {DB, _Subscr, _SnapTable}, FilterFun) when is_function(FilterFun) ->
+delete_entries_(State = {DB, _Subscr, _SnapState}, FilterFun) when is_function(FilterFun) ->
     F = fun(DBEntry, _) ->
                 case FilterFun(DBEntry) of
                     false -> ok;
-                    _     -> Key = db_entry:get_key(DBEntry),
-                             ets:delete(DB, Key),
-                             _ = call_subscribers(State, {delete, Key}),
-                             ok
+                    _     -> delete_entry_at_key_(State, db_entry:get_key(DBEntry))
                 end
         end,
     ets:foldl(F, ok, DB),
@@ -198,18 +199,21 @@ delete_entries_(State, Interval) ->
 
 %% @doc Returns all DB entries.
 -spec get_data_(DB::db_t()) -> db_as_list().
-get_data_({DB, _Subscr, _SnapTable}) ->
+get_data_({DB, _Subscr, _SnapState}) ->
     ets:tab2list(DB).
 
 %% Snapshot-related functions
 
 %% @doc Copy existing entry to snapshot table
 -spec copy_value_to_snapshot_table_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
-copy_value_to_snapshot_table_(State = {_DB, _Subscr, SnapTable}, Key) ->
+copy_value_to_snapshot_table_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Key) ->
     case get_entry2_(State, Key) of
-        {true, Entry} -> ets:insert(SnapTable,Entry)
+        {true, Entry}   ->  {_, OldSnapEntry} = get_snapshot_entry_(State,db_entry:get_key(Entry)),
+                            NewSnapLC = db_entry:update_lockcount(OldSnapEntry,Entry,SnapLC),
+                            ets:insert(SnapTable,Entry);
+        _               ->  NewSnapLC = SnapLC
     end,
-    State.
+    {_DB,_Subscr,{SnapTable,NewSnapLC,_LiveLC}}.
 
 %% @doc Returns snapshot data as is
 -spec get_snapshot_data_(DB::db_t()) -> db_as_list().
@@ -220,9 +224,9 @@ get_snapshot_data_({_DB, _Subscr, SnapTable}) ->
 %%      if there is a matching tuple available in the snapshot set. The other tuples are
 %%      returned as is. 
 -spec join_snapshot_data_(DB::db_t()) -> db_as_list(). 
-join_snapshot_data_(State = {_DB, _Subscr, SnapshotTable}) ->
+join_snapshot_data_(State = {_DB, _Subscr, {SnapTable, _, _}}) ->
     PrimaryDB = lists:keysort(1, get_data_(State)),
-    SnapshotDB = lists:keysort(1, get_snapshot_data_(SnapshotTable)),
+    SnapshotDB = lists:keysort(1, get_snapshot_data_(SnapTable)),
     Fun = 
         fun([], Result, _) -> 
                 Result; 
@@ -233,25 +237,29 @@ join_snapshot_data_(State = {_DB, _Subscr, SnapshotTable}) ->
     Fun(SnapshotDB,PrimaryDB,Fun).
 
 -spec set_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
-set_snapshot_entry_(State = {_DB, _Subscr, SnapTable}, Entry) ->
+set_snapshot_entry_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_snapshot_entry_(State, Entry);
-        _    -> ets:insert(SnapTable, Entry)
-    end,
-    State.
+        _    -> {_, OldEntry} = get_snapshot_entry_(State,db_entry:get_key(Entry)),
+                NewSnapLC = db_entry:update_lockcount(OldEntry,Entry,SnapLC),
+                ets:insert(SnapTable, Entry),
+                {_DB,_Subscr,{SnapTable,NewSnapLC,_LiveLC}}
+    end.
 
 
 -spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
-get_snapshot_entry_({_DB, _Subscr, SnapTable}, Key) ->
+get_snapshot_entry_({_DB, _Subscr, {SnapTable, _, _}}, Key) ->
     case ets:lookup(SnapTable, Key) of
         [Entry] -> {true, Entry};
         []      -> {false, db_entry:new(Key)}
     end.
 
 -spec delete_snapshot_entry_at_key_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
-delete_snapshot_entry_at_key_(State = {_DB, _Subscr, SnapTable}, Key) ->
+delete_snapshot_entry_at_key_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Key) ->
+    {_, OldEntry} = get_snapshot_entry_(State,Key),
+    NewSnapLC = db_entry:update_lockcount(OldEntry,db_entry:new(Key),SnapLC),
     ets:delete(SnapTable, Key),
-    State.
+    {_DB,_Subscr,{SnapTable,NewSnapLC,_LiveLC}}.
 
 %% @doc Removes all values with the given entry's key from the Snapshot DB.
 -spec delete_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
@@ -259,9 +267,16 @@ delete_snapshot_entry_(State, Entry) ->
     Key = db_entry:get_key(Entry),
     delete_snapshot_entry_at_key_(State, Key).
 
--spec clear_snapshot_(DB::db_t()) -> NewDB::db_t().
-clear_snapshot_({_DB, _Subscr, SnapTable}) ->
-    ets:delete(SnapTable).
+-spec init_snapshot_(DB::db_t()) -> NewDB::db_t().
+init_snapshot_({_DB, _Subscr, {SnapTable, LiveLC, _SnapLC}}) ->
+    ets:delete(SnapTable),
+    SnapDBName = "db_" ++ randoms:getRandomString() ++ ":snapshot",
+    % copy live db lock count to new snapshot db
+    {_DB,_Subscr,{ets:new(list_to_atom(SnapDBName), [ordered_set, private]), LiveLC, LiveLC}}.
+
+-spec snapshot_is_lockfree_(DB::db_t()) -> boolean().
+snapshot_is_lockfree_({_DB, _Subscr, {_SnapTable, _LiveLC, SnapLC}}) ->
+    SnapLC =:= 0.
 
 %% End snapshot-related functions
 
@@ -285,7 +300,7 @@ get_chunk_(DB, Interval, FilterFun, ValueFun, ChunkSize) ->
 
 -spec get_chunk_helper(DB::db_t(), Interval::intervals:interval(), AddDataFun::add_data_fun(V),
                        ChunkSize::pos_integer()) -> {intervals:interval(), [V]}.
-get_chunk_helper({ETSDB, _Subscr, _SnapTables} = DB, Interval, AddDataFun, ChunkSize) ->
+get_chunk_helper({ETSDB, _Subscr, _SnapStates} = DB, Interval, AddDataFun, ChunkSize) ->
     % assert ChunkSize > 0, see ChunkSize type
     case get_load_(DB) of
         0 -> {intervals:empty(), []};
@@ -336,7 +351,7 @@ get_chunk_helper({ETSDB, _Subscr, _SnapTables} = DB, Interval, AddDataFun, Chunk
 -spec first_key_in_interval(
         DB::db_t(), Next::?RT:key(), Interval::intervals:interval(),
         AddDataFun::add_data_fun(V)) -> {?RT:key(), [V]}.
-first_key_in_interval({ETSDB, _Subscr, _SnapTable} = DB, Current, Interval, AddDataFun) ->
+first_key_in_interval({ETSDB, _Subscr, _SnapState} = DB, Current, Interval, AddDataFun) ->
     case intervals:in(Current, Interval) andalso ets:member(ETSDB, Current) of
         true -> {Current, AddDataFun(DB, Current, [])};
         _    ->
@@ -363,7 +378,7 @@ get_chunk_inner(_DB, RealStart, RealStart, _Interval, _AddDataFun,
     %log:pal("inner: 0: ~p", [RealStart]),
     % we hit the start element, i.e. our whole data set has been traversed
     {'$end_of_interval', Chunk};
-get_chunk_inner({ETSDB, _Subscr, _SnapTable} = _DB, Current, RealStart, _Interval, _AddDataFun,
+get_chunk_inner({ETSDB, _Subscr, _SnapState} = _DB, Current, RealStart, _Interval, _AddDataFun,
                 0, Chunk, _BoundsInterval) ->
     %log:pal("inner: 1: ~p", [Current]),
     % we hit the chunk size limit
@@ -378,13 +393,13 @@ get_chunk_inner({ETSDB, _Subscr, _SnapTable} = _DB, Current, RealStart, _Interva
         _ ->
             {Current, Chunk}
     end;
-get_chunk_inner({ETSDB, _Subscr, _SnapTable} = DB, '$end_of_table', RealStart, Interval, AddDataFun,
+get_chunk_inner({ETSDB, _Subscr, _SnapState} = DB, '$end_of_table', RealStart, Interval, AddDataFun,
                 ChunkSize, Chunk, BoundsInterval) ->
     %log:pal("inner: 2: ~p", ['$end_of_table']),
     % reached end of table - start at beginning (may be a wrapping interval)
     get_chunk_inner(DB, ets:first(ETSDB), RealStart, Interval, AddDataFun,
                     ChunkSize, Chunk, BoundsInterval);
-get_chunk_inner({ETSDB, _Subscr, _SnapTable} = DB, Current, RealStart, Interval, AddDataFun,
+get_chunk_inner({ETSDB, _Subscr, _SnapState} = DB, Current, RealStart, Interval, AddDataFun,
                 ChunkSize, Chunk, BoundsInterval) ->
     %log:pal("inner: 3: ~p", [Current]),
     case intervals:in(Current, Interval) of
@@ -419,7 +434,7 @@ get_split_key_(DB, Begin, TargetLoad, backward) ->
         ETS_first::fun((DB::tid() | atom()) -> ?RT:key() | '$end_of_table'),
         ETS_next::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'))
         -> {?RT:key(), TakenLoad::pos_integer()}.
-get_split_key_({ETSDB, _Subscr, _SnapTable} = DB, Begin, TargetLoad,
+get_split_key_({ETSDB, _Subscr, _SnapState} = DB, Begin, TargetLoad,
                ETS_first, ETS_next) ->
     % assert ChunkSize > 0, see ChunkSize type
     case get_load_(DB) of
@@ -465,10 +480,10 @@ get_split_key_inner(_DB, RealStart, RealStart, TargetLoad, SplitKey, _ETS_first,
 get_split_key_inner(_DB, _Current, _RealStart, 0, SplitKey, _ETS_first, _ETS_next) ->
     % we hit the chunk size limit
     {SplitKey, 0};
-get_split_key_inner({ETSDB, _Subscr, _SnapTable} = DB, '$end_of_table', RealStart, TargetLoad, SplitKey, ETS_first, ETS_next) ->
+get_split_key_inner({ETSDB, _Subscr, _SnapState} = DB, '$end_of_table', RealStart, TargetLoad, SplitKey, ETS_first, ETS_next) ->
     % reached end of table - start at beginning (may be a wrapping interval)
     get_split_key_inner(DB, ETS_first(ETSDB), RealStart, TargetLoad, SplitKey, ETS_first, ETS_next);
-get_split_key_inner({ETSDB, _Subscr, _SnapTable} = DB, Current, RealStart, TargetLoad, _SplitKey, ETS_first, ETS_next) ->
+get_split_key_inner({ETSDB, _Subscr, _SnapState} = DB, Current, RealStart, TargetLoad, _SplitKey, ETS_first, ETS_next) ->
     Next = ETS_next(ETSDB, Current),
     get_split_key_inner(DB, Next, RealStart, TargetLoad - 1, Current, ETS_first, ETS_next).
 
