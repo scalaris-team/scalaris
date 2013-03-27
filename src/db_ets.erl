@@ -55,11 +55,14 @@ open_(_FileName) ->
 
 %% @doc Closes and deletes the DB.
 -spec close_(DB::db_t(), Delete::boolean()) -> any().
-close_(State = {DB, Subscr, SnapTable}, _Delete) ->
+close_(State = {DB, Subscr, {SnapTable, _LiveLC, _SnapLC}}, _Delete) ->
     _ = call_subscribers(State, close_db),
     ets:delete(DB),
     ets:delete(Subscr),
-    ets:delete(SnapTable).
+    case SnapTable of
+        false -> ok;
+        _ -> ets:delete(SnapTable)
+    end.
 
 %% @doc Returns the name of the table for open/1.
 -spec get_name_(DB::db_t()) -> db_name().
