@@ -25,24 +25,27 @@
 -vsn('$Id: snapshot_SUITE.erl 3244 2012-06-05 16:19:11Z stefankeidel85@gmail.com $').
 
 all() ->
-    [test_copy_value_to_snapshot_table,test_set_get_for_snapshot_table,
-     test_delete_from_snapshot_table,test_init_snapshot,test_delete_snapshot,
+    [%test_copy_value_to_snapshot_table,test_set_get_for_snapshot_table,
+     %test_delete_from_snapshot_table,test_init_snapshot,test_delete_snapshot,
      %rdht_tx_read
-     test_rdht_tx_read_validate_should_abort,test_rdht_tx_read_validate_should_prepare,
-     test_rdht_tx_read_validate_db_copy,test_rdht_tx_read_commit_with_snap_1,
-     test_rdht_tx_read_commit_with_snap_2, test_rdht_tx_read_commit_without_snap,
+     %test_rdht_tx_read_validate_should_abort,test_rdht_tx_read_validate_should_prepare,
+     %test_rdht_tx_read_validate_db_copy,test_rdht_tx_read_commit_with_snap_1,
+     %test_rdht_tx_read_commit_with_snap_2, test_rdht_tx_read_commit_without_snap,
      %rdht_tx_write
-     test_rdht_tx_write_validate_should_abort,test_rdht_tx_write_validate_should_prepare,
-     test_rdht_tx_write_validate_db_copy,test_rdht_tx_write_commit_with_snap,
-     test_rdht_tx_write_commit_without_snap, test_rdht_tx_write_abort_without_snap,
-     test_rdht_tx_write_abort_with_snap,
+     %test_rdht_tx_write_validate_should_abort,test_rdht_tx_write_validate_should_prepare,
+     %test_rdht_tx_write_validate_db_copy,test_rdht_tx_write_commit_with_snap,
+     %test_rdht_tx_write_commit_without_snap, test_rdht_tx_write_abort_without_snap,
+     %test_rdht_tx_write_abort_with_snap,
      % lock counting
-     test_lock_counting_on_live_db,
-     %integration
-     test_basic_race_multiple_snapshots, test_single_snapshot_call,test_spam_transactions_and_snapshots
+     %test_lock_counting_on_live_db,
+     % integration
+     %test_basic_race_multiple_snapshots, test_single_snapshot_call,
+     test_spam_transactions_and_snapshots
+     % misc
+     %bench_increment
     ].
 
-suite() -> [ {timetrap, {seconds, 60}} ].
+suite() -> [ {timetrap, {seconds, 120}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -377,5 +380,16 @@ do_transaction_a() ->
 -spec do_transaction_b() -> any().
 do_transaction_b() ->
     api_tx:req_list([{read,"A"},{write,"B",randoms:getRandomInt()},{write,"A",randoms:getRandomInt()},{commit}]).
+
+-spec bench_increment(any()) -> ok.
+bench_increment(_) ->
+    unittest_helper:make_ring(4),
+     SpamPid1 = erlang:spawn(fun() ->
+               bench:increment(1, 1000)
+          end),
+    Return = tester:test(api_tx, get_system_snapshot, 0, 200),
+    ct:pal("tester return: ~p ~n",[Return]),
+    util:wait_for_process_to_die(SpamPid1),
+    ok.
 
 
