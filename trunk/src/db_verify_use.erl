@@ -415,4 +415,10 @@ delete_snapshot_({DB, Counter} = _DB_) ->
     verify_counter(Counter),
     {?BASE_DB:delete_snapshot(DB), update_counter(Counter)}.
 
+-spec decrease_snapshot_lockcount_(DB::db_t()) -> NewDB::db_t().
+decrease_snapshot_lockcount_({DB, Counter} = _DB_) ->
+    ?TRACE1(decrease_snapshot_lockcount, _DB_),
+    verify_counter(Counter),
+    {?BASE_DB:decrease_snapshot_lockcount(DB), update_counter(Counter)}.
+
 % end snapshot-related functions

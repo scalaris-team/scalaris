@@ -290,7 +290,8 @@ commit(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
             if RTLogVers =:= DBVers ->
                    NewEntry = db_entry:dec_readlock(DBEntry),
                    NewDB = ?DB:set_entry(DB, NewEntry),
-                   case (TMSnapNo < OwnSnapNo) of
+                   TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
+                   case (TLogSnapNo < OwnSnapNo) of
                        true -> % we have to apply changes to the snapshot db as well
                            case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
                                {true, SnapEntry} -> 

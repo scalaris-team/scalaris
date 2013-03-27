@@ -23,8 +23,8 @@
 %% @end
 %% @version $Id$
 
--define(TRACE(X,Y), io:format(X,Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), ok).
 
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).

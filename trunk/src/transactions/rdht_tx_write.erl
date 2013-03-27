@@ -126,7 +126,7 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
 
 -spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
              tx_tlog:snap_number(), tx_tlog:snap_number()) -> ?DB:db().
-commit(DB, RTLogEntry, _OwnProposalWas, TMSnapNo, OwnSnapNo) ->
+commit(DB, RTLogEntry, _OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_write:commit)~n", []),
     DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
     %% perform op
@@ -143,20 +143,21 @@ commit(DB, RTLogEntry, _OwnProposalWas, TMSnapNo, OwnSnapNo) ->
                         db_entry:reset_locks(T2DBEntry);
                    true -> T2DBEntry
                 end,
-            NewDB = ?DB:set_entry(DB, NewEntry),
-            case (TMSnapNo < OwnSnapNo) of
+            TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
+            NewDB = case (TLogSnapNo < OwnSnapNo) of
                 true ->
                     ?DB:set_snapshot_entry(DB, NewEntry);
                 _ -> 
-                    NewDB
-            end;
+                    DB
+            end,
+            ?DB:set_entry(NewDB, NewEntry);
        true ->
             DB %% outdated commit
     end.
 
 -spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
             tx_tlog:snap_number(), tx_tlog:snap_number()) -> ?DB:db().
-abort(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
+abort(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_write:abort)~n", []),
     %% abort operation
     %% release locks?
@@ -164,6 +165,7 @@ abort(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
         ?prepared ->
             DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
             RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
+            TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
             % Note: WriteLock is always >= DBVers! - old check:
 %%             DBVers = db_entry:get_version(DBEntry),
 %%             if RTLogVers =:= DBVers ->
@@ -172,7 +174,7 @@ abort(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
                     %% op that created the write lock or outdated WL?
                     NewEntry = db_entry:unset_writelock(DBEntry),
                     NewDB = ?DB:set_entry(DB, NewEntry),
-                    case (TMSnapNo < OwnSnapNo) of
+                    case (TLogSnapNo < OwnSnapNo) of
                         true -> % we have to apply changes to the snapshot db as well
                             case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
                                 {true, SnapEntry} -> 
@@ -182,8 +184,9 @@ abort(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
                                     NewSnapEntry = db_entry:unset_writelock(SnapEntry),
                                     ?DB:set_snapshot_entry(NewDB, NewSnapEntry);
                                 {false, _} ->
-                                    % key was not found in snapshot table -> dbs are in sync for this key
-                                    NewDB
+                                    % key was not found in snapshot table -> dbs are in sync for this key,
+                                    % which means we only have to decrease the lockcount by 1
+                                    ?DB:decrease_snapshot_lockcount(NewDB)
                             end;
                         _ -> % no changes in the snapshot db
                             NewDB
