@@ -56,7 +56,7 @@
       {?lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
 
 -type(snapshot_message() ::
-      {do_snapshot, SnapNumber::non_neg_integer(), Leader::any()} |
+      {do_snapshot, SnapNumber::non_neg_integer(), Leader::comm:mypid()} |
       {local_snapshot_is_done}).
 
 -type(rt_message() ::
@@ -173,7 +173,16 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
     end;
 
 %% messages handled as a transaction participant (TP)
-on({?init_TP, Params}, State) ->
+on({?init_TP, {_Tid, _RTMs, _Accs, _TM, _RTLogEntry, _ItemId, _PaxId, SnapNo} = Params}, State) ->
+    % check if new snapshot
+    SnapState = dht_node_state:get(State,snapshot_state),
+    LocalSnapNumber = snapshot_state:get_number(SnapState),
+    case SnapNo > LocalSnapNumber of
+        true ->
+            comm:send(comm:this(), {do_snapshot, SnapNo, none});
+        false ->
+            ok
+    end,
     tx_tp:on_init_TP(Params, State);
 on({?tp_do_commit_abort, Id, Result}, State) ->
     tx_tp:on_do_commit_abort(Id, Result, State);

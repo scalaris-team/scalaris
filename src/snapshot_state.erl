@@ -14,10 +14,10 @@
 
 %% @author Stefan Keidel <keidel@informatik.hu-berlin.de>
 %% @doc Local state information needed for the S3 snapshot algorithm
-%% @version $Id: snapshot_state.erl 2850 2012-03-12 09:10:51Z stefankeidel85@gmail.com $
+%% @version $Id$
 -module(snapshot_state).
 -author('keidel@informatik.hu-berlin.de').
--vsn('$Id: snapshot_state.erl 2850 2012-03-12 09:10:51Z stefankeidel85@gmail.com $').
+-vsn('$Id$').
 
 -export([new/0,new/3,get_number/1,is_in_progress/1,get_leaders/1,
          set_number/2,add_leader/2,start_progress/1,stop_progress/1]).
@@ -60,7 +60,12 @@ set_number(SnapInfo,NewVal) ->
 
 -spec add_leader(snapshot_state(),any()) -> snapshot_state().
 add_leader({Number,InProgress,Leaders},NewLeader) ->
-    {Number,InProgress,[NewLeader | Leaders]}.
+    case NewLeader of
+        none ->
+            {Number,InProgress,Leaders};
+        _ ->
+            {Number,InProgress,[NewLeader | Leaders]}
+    end.
   
 -spec start_progress(snapshot_state()) -> snapshot_state().
 start_progress(SnapInfo) -> setelement(2,SnapInfo,true).
