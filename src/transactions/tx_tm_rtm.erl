@@ -81,7 +81,7 @@ msg_tp_do_commit_abort(TP, Id, Result) ->
     % hack to find out the dht_node's snapshot number
     {_,Dict} = erlang:process_info(pid_groups:get_my(dht_node), dictionary),
     {_,LocalSnapNumber} = lists:keyfind("local_snap_number", 1, Dict),
-    comm:send(TP, {tp_do_commit_abort, Id, Result, LocalSnapNumber}).
+    comm:send(TP, {?tp_do_commit_abort, Id, Result, LocalSnapNumber}).
 
 %% public interface for transaction validation using Paxos-Commit.
 %% ClientsID may be nil, its not used by tx_tm. It will be repeated in
@@ -779,8 +779,6 @@ init_TPs(TxState, ItemStates) ->
           ItemId = tx_item_get_itemid(ItemState),
           [ begin
                 Key = tx_tlog:get_entry_key(RTLog),
-                Msg1 = {?init_TP, {Tid, CleanRTMs, Accs, TM,
-                                  tx_tlog:drop_value(RTLog), ItemId, PaxId}},
                 % hack to find out the dht_node's snapshot number
                 {_,Dict} = erlang:process_info(pid_groups:get_my(dht_node), dictionary),
                 {_,LocalSnapNumber} = lists:keyfind("local_snap_number", 1, Dict),

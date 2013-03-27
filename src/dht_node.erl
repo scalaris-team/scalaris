@@ -184,8 +184,8 @@ on({?init_TP, {_Tid, _RTMs, _Accs, _TM, _RTLogEntry, _ItemId, _PaxId, SnapNo} = 
             ok
     end,
     tx_tp:on_init_TP(Params, State);
-on({?tp_do_commit_abort, Id, Result}, State) ->
-    tx_tp:on_do_commit_abort(Id, Result, State);
+on({?tp_do_commit_abort, Id, Result, SnapNumber}, State) ->
+    tx_tp:on_do_commit_abort(Id, Result, SnapNumber, State);
 on({?tp_do_commit_abort_fwd, TM, TMItemId, RTLogEntry, Result, OwnProposal}, State) ->
     tx_tp:on_do_commit_abort_fwd(TM, TMItemId, RTLogEntry, Result, OwnProposal, State);
 
@@ -229,7 +229,7 @@ on({?read_op, Source_PID, SourceId, HashedKey, Op}, State) ->
     DB = dht_node_state:get(State, db),
     {ok, Value, Version} = ?DB:read(DB, HashedKey),
     {Ok_Fail, Val_Reason, Vers} = rdht_tx_read:extract_from_value(Value, Version, Op),
-    SnapInfo = dht_node_state:get(snapshot_state,State),
+    SnapInfo = dht_node_state:get(State, snapshot_state),
     SnapNumber = snapshot_state:get_number(SnapInfo),
     Msg = {?read_op_with_id_reply, SourceId, SnapNumber, Ok_Fail, Val_Reason, Vers},
     comm:send(Source_PID, Msg),

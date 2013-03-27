@@ -31,64 +31,67 @@
 
 -include("scalaris.hrl").
 
--type(state() :: {SnapNo::non_neg_integer(),InProgress::boolean(),Snapshots::atom(),intervals:interval(),intervals:interval(),comm:mypid() | false}).
+-type(snapshot_leader_state() :: {SnapNo::non_neg_integer(),InProgress::boolean(),Snapshots::atom(),intervals:interval(),intervals:interval(),comm:mypid() | false}).
 
 % constructors
 
--spec new() -> state().
+-spec new() -> snapshot_leader_state().
 new() ->
     {0,false,[],intervals:empty(),intervals:empty(),false}.
 
--spec new(non_neg_integer(),boolean(),comm:mypid()) -> state().
+-spec new(non_neg_integer(),boolean(),comm:mypid()) -> snapshot_leader_state().
 new(Number,InProgress,Client) ->
     SnapDBName = "db_" ++ randoms:getRandomString() ++ ":snapshot_leader",
     {Number,InProgress,ets:new(list_to_atom(SnapDBName), [ordered_set, private]),intervals:empty(),intervals:empty(),Client}.
 
 % getters
 
--spec get_number(state()) -> non_neg_integer().
+-spec get_number(snapshot_leader_state()) -> non_neg_integer().
 get_number(State) -> element(1,State).
 
--spec is_in_progress(state()) -> boolean().
+-spec is_in_progress(snapshot_leader_state()) -> boolean().
 is_in_progress(State) -> element(2,State).
 
--spec get_global_snapshot(state()) -> list().
+-spec get_global_snapshot(snapshot_leader_state()) -> list().
 get_global_snapshot(State) -> ets:tab2list(element(3,State)).
 
--spec get_client(state()) -> comm:mypid().
+-spec get_client(snapshot_leader_state()) -> comm:mypid().
 get_client(State) -> element(6,State).
 
--spec interval_union_is_all(state()) -> boolean().
+-spec interval_union_is_all(snapshot_leader_state()) -> boolean().
 interval_union_is_all({_,_,_,Interval,ErrorInterval,_} = _State) ->
     intervals:is_all(intervals:union(Interval, ErrorInterval)).
 
--spec get_error_interval(state()) -> intervals:interval().
+-spec get_error_interval(snapshot_leader_state()) -> intervals:interval().
 get_error_interval(State) -> element(5,State).
 
 % setters
 
--spec set_number(state(), non_neg_integer()) -> state().
+-spec set_number(snapshot_leader_state(), non_neg_integer()) ->
+    snapshot_leader_state().
 set_number(SnapInfo,NewVal) -> 
     erlang:put("local_snap_number",NewVal),
     setelement(1,SnapInfo,NewVal).
 
--spec add_snapshot(state(),any()) -> state().
+-spec add_snapshot(snapshot_leader_state(),any()) -> snapshot_leader_state().
 add_snapshot({Number,InProgress,SnapshotDB,Interval,ErrorInterval,Client},NewSnapshot) ->
     add_snapshot_entries_to_db(SnapshotDB,NewSnapshot),
     {Number,InProgress,SnapshotDB,Interval,ErrorInterval,Client}.
 
--spec add_interval(state(),intervals:interval()) -> state().
+-spec add_interval(snapshot_leader_state(),intervals:interval()) ->
+    snapshot_leader_state().
 add_interval({_Number,_InProgress,_SnapshotDB,Interval,_ErrorInterval,_Client},NewInterval) ->
     {_Number,_InProgress,_SnapshotDB,intervals:union(Interval, NewInterval),_ErrorInterval,_Client}.
 
--spec add_error_interval(state(),intervals:interval()) -> state().
+-spec add_error_interval(snapshot_leader_state(),intervals:interval()) ->
+    snapshot_leader_state().
 add_error_interval({_Number,_InProgress,_SnapshotDB,_Interval,ErrorInterval,_Client},NewInterval) ->
     {_Number,_InProgress,_SnapshotDB,_Interval,intervals:union(ErrorInterval, NewInterval),_Client}.
 
--spec start_progress(state()) -> state().
+-spec start_progress(snapshot_leader_state()) -> snapshot_leader_state().
 start_progress(SnapInfo) -> setelement(2,SnapInfo,true).
 
--spec stop_progress(state()) -> state().
+-spec stop_progress(snapshot_leader_state()) -> snapshot_leader_state().
 stop_progress(SnapInfo) -> setelement(2,SnapInfo,false).
 
 % helpers
