@@ -29,8 +29,8 @@
 
 -behaviour(tx_op_beh).
 -export([work_phase/3,
-         validate_prefilter/1, validate/2,
-         commit/3, abort/3,
+         validate_prefilter/1, validate/3,
+         commit/5, abort/5,
          extract_from_tlog/4]).
 
 -behaviour(gen_component).
@@ -86,8 +86,9 @@ validate_prefilter(TLogEntry) ->
     [ tx_tlog:set_entry_key(TLogEntry, X) || X <- RKeys ].
 
 %% validate the translog entry and return the proposal
--spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), ?prepared | ?abort}.
-validate(DB, RTLogEntry) ->
+-spec validate(?DB:db(), tx_tlog:snap_number(), tx_tlog:tlog_entry()) ->
+    {?DB:db(), ?prepared | ?abort}.
+validate(DB, LocalSnapNumber, RTLogEntry) ->
     %% contact DB to check entry
     %% set locks on DB
     DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
@@ -102,8 +103,16 @@ validate(DB, RTLogEntry) ->
     %%       atomically as a pair).
     ReadLocks = db_entry:get_readlock(DBEntry),
     WriteLock = db_entry:get_writelock(DBEntry),
+    SnapNumbersOK = (tx_tlog:get_entry_snapshot(RTLogEntry) >= LocalSnapNumber),
     if ((RTVers =:= DBVers andalso ReadLocks =:= 0) orelse RTVers > DBVers) andalso
-           (WriteLock =:= false orelse WriteLock < RTVers) ->
+           (WriteLock =:= false orelse WriteLock < RTVers) andalso SnapNumbersOK->
+           %% if a snapshot instance is running, copy old value to snapshot db before setting lock
+           case ?DB:snapshot_is_running(DB) of
+               true ->
+                   ?DB:copy_value_to_snapshot_table(DB,db_entry:get_key(DBEntry));
+               false -> 
+                   DB
+           end,
            %% set locks on entry (use RTVers for write locks to allow proper
            %% handling of outdated commit and abort messages - only clean up
            %% if the write lock version matches!)
@@ -114,8 +123,9 @@ validate(DB, RTLogEntry) ->
            {DB, ?abort}
     end.
 
--spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
-commit(DB, RTLogEntry, _OwnProposalWas) ->
+-spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
+             tx_tlog:snap_number(), tx_tlog:snap_number()) -> ?DB:db().
+commit(DB, RTLogEntry, _OwnProposalWas, TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_write:commit)~n", []),
     DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
     %% perform op
@@ -132,13 +142,20 @@ commit(DB, RTLogEntry, _OwnProposalWas) ->
                         db_entry:reset_locks(T2DBEntry);
                    true -> T2DBEntry
                 end,
-            ?DB:set_entry(DB, NewEntry);
+            NewDB = ?DB:set_entry(DB, NewEntry),
+            case (TMSnapNo < OwnSnapNo) of
+                true ->
+                    ?DB:set_snapshot_entry(DB, NewEntry);
+                _ -> 
+                    NewDB
+            end;
        true ->
             DB %% outdated commit
     end.
 
--spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
-abort(DB, RTLogEntry, OwnProposalWas) ->
+-spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
+            tx_tlog:snap_number(), tx_tlog:snap_number()) -> ?DB:db().
+abort(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_write:abort)~n", []),
     %% abort operation
     %% release locks?
@@ -153,7 +170,23 @@ abort(DB, RTLogEntry, OwnProposalWas) ->
             if WriteLock =/= false andalso WriteLock =< RTLogVers ->
                     %% op that created the write lock or outdated WL?
                     NewEntry = db_entry:unset_writelock(DBEntry),
-                    ?DB:set_entry(DB, NewEntry);
+                    NewDB = ?DB:set_entry(DB, NewEntry),
+                    case (TMSnapNo < OwnSnapNo) of
+                        true -> % we have to apply changes to the snapshot db as well
+                            case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
+                                {true, SnapEntry} -> 
+                                    % in this case there was an entry with this key in the snapshot table
+                                    % so it might have different locks than the one in the live db.
+                                    % we're applying the lock decrease on the snapshot table entry
+                                    NewSnapEntry = db_entry:unset_writelock(SnapEntry),
+                                    ?DB:set_snapshot_entry(NewDB, NewSnapEntry);
+                                {false, _} ->
+                                    % key was not found in snapshot table -> dbs are in sync for this key
+                                    NewDB
+                            end;
+                        _ -> % no changes in the snapshot db
+                            NewDB
+                    end;
                true -> DB
             end;
         ?abort ->

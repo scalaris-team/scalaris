@@ -114,6 +114,8 @@
 -callback delete_snapshot_entry_at_key(DB::db(), Key::?RT:key()) -> NewDB::db().
 -callback init_snapshot(DB::db()) -> NewDB::db().
 -callback snapshot_is_lockfree(DB::db()) -> boolean().
+-callback snapshot_is_running(DB::db()) -> boolean().
+-callback delete_snapshot(DB::db()) -> NewDB::db().
 
 -callback check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.
 
@@ -149,7 +151,8 @@ behaviour_info(callbacks) ->
      {copy_value_to_snapshot_table, 2}, {get_snapshot_data, 1},
      {join_snapshot_data, 1}, {set_snapshot_entry, 2},
      {get_snapshot_entry, 2}, {delete_snapshot_entry, 2},
-     {delete_snapshot_entry_at_key, 2}, {init_snapshot, 1}, {snapshot_is_lockfree, 1}
+     {delete_snapshot_entry_at_key, 2}, {init_snapshot, 1}, {snapshot_is_lockfree, 1},
+     {snapshot_is_running,1}, {delete_snapshot,1}
     ];
 behaviour_info(_Other) ->
     undefined.

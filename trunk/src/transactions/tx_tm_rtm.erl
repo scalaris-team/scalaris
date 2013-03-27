@@ -78,7 +78,10 @@ msg_commit_reply(Client, ClientsID, Result) ->
 
 -spec msg_tp_do_commit_abort(comm:mypid(), any(), ?commit | ?abort) -> ok.
 msg_tp_do_commit_abort(TP, Id, Result) ->
-    comm:send(TP, {?tp_do_commit_abort, Id, Result}).
+    % hack to find out the dht_node's snapshot number
+    Dict = erlang:process_info(pid_groups:get_my(dht_node), dictionary),
+    LocalSnapNumber = dict:fetch(Dict, "local_snap_number"),
+    comm:send(TP, {tp_do_commit_abort, Id, Result, LocalSnapNumber}).
 
 %% public interface for transaction validation using Paxos-Commit.
 %% ClientsID may be nil, its not used by tx_tm. It will be repeated in

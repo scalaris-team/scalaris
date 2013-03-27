@@ -19,7 +19,7 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--compile({inline, [new_entry/5, new_entry/6,
+-compile({inline, [new_entry/5, new_entry/6, new_entry/7,
                    get_entry_operation/1, set_entry_operation/2,
                    get_entry_key/1,       set_entry_key/2,
                    get_entry_status/1,    set_entry_status/2,
@@ -45,7 +45,7 @@
 -export([merge/2, first_req_per_key_not_in_tlog/2, cleanup/1]).
 
 %% Operations on entries of TLogs
--export([new_entry/5, new_entry/6]).
+-export([new_entry/5, new_entry/6, new_entry/7]).
 -export([get_entry_operation/1, set_entry_operation/2]).
 -export([get_entry_key/1,       set_entry_key/2]).
 -export([get_entry_status/1,    set_entry_status/2]).
@@ -307,6 +307,12 @@ new_entry(Op, Key, Vers, ValType, Val) ->
             -> tlog_entry().
 new_entry(Op, Key, Vers, Status, ValType, Val) ->
     {Op, Key, Vers, Status, 1, ValType, Val}.
+
+-spec new_entry(tx_op(), ?RT:key(), non_neg_integer() | -1,
+                tx_status(), snap_number(), value_type_r() | value_type_w(), rdht_tx:encoded_value())
+            -> tlog_entry().
+new_entry(Op, Key, Vers, Status, SnapNumber, ValType, Val) ->
+    {Op, Key, Vers, Status, SnapNumber, ValType, Val}.
 
 -spec get_entry_operation(tlog_entry()) -> tx_op().
 get_entry_operation(Element) -> element(1, Element).

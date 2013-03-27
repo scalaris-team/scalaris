@@ -215,7 +215,9 @@ on({?read_op, Source_PID, SourceId, HashedKey, Op}, State) ->
     DB = dht_node_state:get(State, db),
     {ok, Value, Version} = ?DB:read(DB, HashedKey),
     {Ok_Fail, Val_Reason, Vers} = rdht_tx_read:extract_from_value(Value, Version, Op),
-    Msg = {?read_op_with_id_reply, SourceId, Ok_Fail, Val_Reason, Vers},
+    SnapInfo = dht_node_state:get(snapshot_state,State),
+    SnapNumber = snapshot_state:get_number(SnapInfo),
+    Msg = {?read_op_with_id_reply, SourceId, SnapNumber, Ok_Fail, Val_Reason, Vers},
     comm:send(Source_PID, Msg),
     State;
 
@@ -408,7 +410,13 @@ on({zombie, Node}, State) ->
     RMState = dht_node_state:get(State, rm_state),
     RMState1 = rm_loop:zombie_node(RMState, Node),
     % TODO: call other modules, e.g. join, move
-    dht_node_state:set_rm(State, RMState1).
+    dht_node_state:set_rm(State, RMState1);
+
+on({do_snapshot, SnapNumber, Leader}, State) ->
+    snapshot:on_do_snapshot(SnapNumber, Leader, State);
+
+on({local_snapshot_is_done}, State) ->
+    snapshot:on_local_snapshot_is_done(State).
 
 
 %% userdevguide-begin dht_node:start

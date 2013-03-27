@@ -29,8 +29,8 @@
 
 -behaviour(tx_op_beh).
 -export([work_phase/3, work_phase_key/5,
-         validate_prefilter/1, validate/2,
-         commit/3, abort/3,
+         validate_prefilter/1, validate/3,
+         commit/5, abort/5,
          extract_from_value/3, extract_from_tlog/4]).
 
 -behaviour(gen_component).
@@ -249,8 +249,9 @@ validate_prefilter(TLogEntry) ->
     [ tx_tlog:set_entry_key(TLogEntry, X) || X <- RKeys ].
 
 %% validate the translog entry and return the proposal
--spec validate(?DB:db(), tx_tlog:tlog_entry()) -> {?DB:db(), ?prepared | ?abort}.
-validate(DB, RTLogEntry) ->
+-spec validate(?DB:db(), tx_tlog:snap_number(), tx_tlog:tlog_entry()) ->
+    {?DB:db(), ?prepared | ?abort}.
+validate(DB, LocalSnapNumber, RTLogEntry) ->
     ?TRACE("rdht_tx_read:validate)~n", []),
     %% contact DB to check entry
     DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
@@ -258,7 +259,15 @@ validate(DB, RTLogEntry) ->
         (tx_tlog:get_entry_version(RTLogEntry)
          >= db_entry:get_version(DBEntry)),
     Lockable = (false =:= db_entry:get_writelock(DBEntry)),
-    if VersionOK andalso Lockable ->
+    SnapNumbersOK = (tx_tlog:get_entry_snapshot(RTLogEntry) >= LocalSnapNumber),
+    if VersionOK andalso Lockable andalso SnapNumbersOK ->
+           %% if a snapshot instance is running, copy old value to snapshot db before setting lock
+           case ?DB:snapshot_is_running(DB) of
+               true ->
+                   ?DB:copy_value_to_snapshot_table(DB,db_entry:get_key(DBEntry));
+               false -> 
+                   DB
+           end,
            %% set locks on entry
            NewEntry = db_entry:inc_readlock(DBEntry),
            NewDB = ?DB:set_entry(DB, NewEntry),
@@ -267,8 +276,9 @@ validate(DB, RTLogEntry) ->
            {DB, ?abort}
     end.
 
--spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
-commit(DB, RTLogEntry, OwnProposalWas) ->
+-spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
+             tx_tlog:snap_number(), tx_tlog:snap_number()) -> ?DB:db().
+commit(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_read:commit)~n", []),
     %% perform op: nothing to do for 'read'
     %% release locks
@@ -279,7 +289,23 @@ commit(DB, RTLogEntry, OwnProposalWas) ->
             DBVers = db_entry:get_version(DBEntry),
             if RTLogVers =:= DBVers ->
                    NewEntry = db_entry:dec_readlock(DBEntry),
-                   ?DB:set_entry(DB, NewEntry);
+                   NewDB = ?DB:set_entry(DB, NewEntry),
+                   case (TMSnapNo < OwnSnapNo) of
+                       true -> % we have to apply changes to the snapshot db as well
+                           case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
+                               {true, SnapEntry} -> 
+                                   % in this case there was an entry with this key in the snapshot table
+                                   % so it might have different locks than the one in the live db.
+                                   % we're applying the lock decrease on the snapshot table entry
+                                   NewSnapEntry = db_entry:dec_readlock(SnapEntry),
+                                   ?DB:set_snapshot_entry(NewDB, NewSnapEntry);
+                               {false, _} ->
+                                   % key was not found in snapshot table -> both dbs are in sync for this key
+                                   NewDB
+                           end;
+                       _ -> % no changes in the snapshot db
+                           NewDB
+                   end;
                true -> DB %% a write has already deleted this lock
             end;
         ?abort ->
@@ -289,11 +315,12 @@ commit(DB, RTLogEntry, OwnProposalWas) ->
             DB
     end.
 
--spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort) -> ?DB:db().
-abort(DB, RTLogEntry, OwnProposalWas) ->
+-spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
+            tx_tlog:snap_number(), tx_tlog:snap_number()) -> ?DB:db().
+abort(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_read:abort)~n", []),
     %% same as when committing
-    commit(DB, RTLogEntry, OwnProposalWas).
+    commit(DB, RTLogEntry, OwnProposalWas, TMSnapNo, OwnSnapNo).
 
 
 %% be startable via supervisor, use gen_component
@@ -322,14 +349,14 @@ init([]) ->
 
 -spec on(comm:message(), state()) -> state().
 %% reply triggered by api_dht_raw:unreliable_get_key/3
-on({?read_op_with_id_reply, Id, Ok_Fail, Val_Reason, Vers},
+on({?read_op_with_id_reply, Id, SnapNumber, Ok_Fail, Val_Reason, Vers},
    {Reps, MajOk, MajDeny, Table} = State) ->
     ?TRACE("~p rdht_tx_read:on(get_key_with_id_reply) ID ~p~n", [self(), Id]),
     Entry = get_entry(Id, Table),
     %% @todo inform sender when its entry is outdated?
     %% @todo inform former sender on outdated entry when we
     %% get a newer entry?
-    TmpEntry = state_add_reply(Entry, {Ok_Fail, Val_Reason, Vers}),
+    TmpEntry = state_add_reply(Entry, {Ok_Fail, Val_Reason, Vers}, SnapNumber),
     _ = case state_get_client(TmpEntry) of
             unknown ->
                 %% when we get a client, we will inform it
@@ -496,7 +523,8 @@ make_tlog_entry(Entry, ValType) ->
               {?fail, _}     -> ?value_dropped;
               _              -> Val0
           end,
-    tx_tlog:new_entry(?read, Key, Vers, Status, ValType, Val).
+    SnapNumber = state_get_snapshot_number(Entry),
+    tx_tlog:new_entry(?read, Key, Vers, Status, SnapNumber, ValType, Val).
 
 -spec set_or_delete_if_all_replied(read_state_decided(),
                                    pos_integer(), atom()) -> ok.
