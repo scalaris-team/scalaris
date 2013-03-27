@@ -23,6 +23,7 @@
                    get_entry_operation/1, set_entry_operation/2,
                    get_entry_key/1,       set_entry_key/2,
                    get_entry_status/1,    set_entry_status/2,
+                   get_entry_snapshot/1,  set_entry_snapshot/2,
                    get_entry_value/1,     set_entry_value/3,
                    get_entry_value_type/1,
                    drop_value/1,
@@ -48,6 +49,7 @@
 -export([get_entry_operation/1, set_entry_operation/2]).
 -export([get_entry_key/1,       set_entry_key/2]).
 -export([get_entry_status/1,    set_entry_status/2]).
+-export([get_entry_snapshot/1,  set_entry_snapshot/2]).
 -export([get_entry_value/1,     set_entry_value/3,
          get_entry_value_type/1]).
 -export([drop_value/1]).
@@ -62,12 +64,14 @@
 
 -type tx_status() :: ?ok | ?fail. % TODO: add 'undefined'?!
 -type tx_op()     :: ?read | ?write.
+-type snap_number() :: non_neg_integer().
 % note: from all the value types, only ?value and ?value_dropped remain in the
 %       user tlog - the rest are intermediate states!
 -type value_type_r() :: ?value | ?partial_value | ?not_found | {?fail, atom() | integer()} | ?value_dropped.
 -type value_type_w() :: ?value | {?fail, atom() | integer()} | ?value_dropped.
 
 -type tlog_key() :: client_key() | ?RT:key().
+%% TODO this does not make sense anymore
 %% TLogEntry: {Operation, Key, Version, Status, Value}
 %% Sample: {?read,"key3",?value,"value3",0}
 -type tlog_entry_read() ::
@@ -75,6 +79,7 @@
             Key       :: tlog_key(),
             Version   :: non_neg_integer() | -1,
             Status    :: tx_status(),
+            SnapshotNumber :: snap_number(),
             % note: only partial reads allow ?partial_value:
             ValueType :: value_type_r(),
             Value     :: rdht_tx:encoded_value() | ?value_dropped % ?value_dropped if ValueType =:= ?not_found or {?fail, _} or ?value_dropped
@@ -84,6 +89,7 @@
             Key       :: tlog_key(),
             Version   :: non_neg_integer() | -1,
             Status    :: tx_status(),
+            SnapshotNumber :: snap_number(),
             ValueType :: value_type_w(),
             Value     :: rdht_tx:encoded_value() | ?value_dropped % ?value_dropped if ValueType =:= ?not_found or {?fail, _} or ?value_dropped
           }.
@@ -93,6 +99,7 @@
             Key       :: client_key(),
             Version   :: non_neg_integer() | -1,
             Status    :: tx_status(),
+            SnapshotNumber :: snap_number(),
             ValueType :: ?value_dropped,
             Value     :: ?value_dropped
           }
@@ -100,6 +107,7 @@
             Key       :: client_key(),
             Version   :: non_neg_integer() | -1,
             Status    :: tx_status(),
+            SnapshotNumber :: snap_number(),
             ValueType :: ?value,
             Value     :: rdht_tx:encoded_value()
           }.
@@ -292,13 +300,13 @@ cleanup(TLog) ->
                 value_type_r() | value_type_w(), rdht_tx:encoded_value())
             -> tlog_entry().
 new_entry(Op, Key, Vers, ValType, Val) ->
-    {Op, Key, Vers, ?ok, ValType, Val}.
+    {Op, Key, Vers, ?ok, 1, ValType, Val}.
 
 -spec new_entry(tx_op(), ?RT:key(), non_neg_integer() | -1,
                 tx_status(), value_type_r() | value_type_w(), rdht_tx:encoded_value())
             -> tlog_entry().
 new_entry(Op, Key, Vers, Status, ValType, Val) ->
-    {Op, Key, Vers, Status, ValType, Val}.
+    {Op, Key, Vers, Status, 1, ValType, Val}.
 
 -spec get_entry_operation(tlog_entry()) -> tx_op().
 get_entry_operation(Element) -> element(1, Element).
@@ -321,15 +329,21 @@ get_entry_status(Element)    -> element(4, Element).
 -spec set_entry_status(tlog_entry(), tx_status()) -> tlog_entry().
 set_entry_status(Element, Val) -> setelement(4, Element, Val).
 
+-spec get_entry_snapshot(tlog_entry()) -> tx_status().
+get_entry_snapshot(Element)    -> element(5, Element).
+
+-spec set_entry_snapshot(tlog_entry(), tx_status()) -> tlog_entry().
+set_entry_snapshot(Element, Val)    -> setelement(5, Element, Val).
+
 -spec get_entry_value_type(tlog_entry()) -> value_type_r() | value_type_w().
-get_entry_value_type(Element)  -> element(5, Element).
+get_entry_value_type(Element)  -> element(6, Element).
 
 -spec get_entry_value(tlog_entry()) -> {value_type_r() | value_type_w(), rdht_tx:encoded_value()}.
-get_entry_value(Element)       -> {element(5, Element), element(6, Element)}.
+get_entry_value(Element)       -> {element(6, Element), element(7, Element)}.
 
 -spec set_entry_value(tlog_entry(), value_type_r() | value_type_w(), rdht_tx:encoded_value()) -> tlog_entry().
 set_entry_value(Element, ValType, Val) ->
-    setelement(6, setelement(5, Element, ValType), Val).
+    setelement(7, setelement(6, Element, ValType), Val).
 
 -spec drop_value(tlog_entry()) -> tlog_entry().
 drop_value(Element) ->

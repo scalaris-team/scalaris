@@ -149,6 +149,12 @@ delete_entry_at_key_(State = {{DB, _FileName}, _Subscr}, Key, Key_) ->
     toke_drv:delete(DB, Key_),
     call_subscribers(State, {delete, Key}).
 
+%% @doc Copy existing entry to snapshot tabe
+%% @TODO Implement!
+-spec copy_value_to_snapshot_table_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
+copy_value_to_snapshot_table_(State = {_DB, _Subscr, _SnapTable}, _Key) ->
+    State.
+
 %% @doc Returns the number of stored keys.
 -spec get_load_(DB::db_t()) -> Load::integer().
 get_load_({{DB, _FileName}, _Subscr}) ->
@@ -361,6 +367,20 @@ get_data_({{DB, _FileName}, _Subscr}) ->
     toke_drv:fold(fun (_K, DBEntry, Acc) ->
                            [erlang:binary_to_term(DBEntry) | Acc]
                   end, [], DB).
+
+%% @doc Returns snapshot data as is
+%% @TODO implement! 
+-spec get_snapshot_data_(DB::db_t()) -> db_as_list(). 
+get_snapshot_data_(_State = {_DB, _Subscr, _SnapshotTable}) ->
+    [].
+
+%% @doc Join snapshot and primary db such that all tuples in the primary db are replaced
+%%      if there is a matching tuple available in the snapshot set. The other tuples are
+%%      returned as is.
+%% @TODO implement! 
+-spec join_snapshot_data_(DB::db_t()) -> db_as_list(). 
+join_snapshot_data_(_State = {_DB, _Subscr, _SnapshotTable}) ->
+    [].
 
 %% @doc Returns the key that would remove not more than TargetLoad entries
 %%      from the DB when starting at the key directly after Begin.
