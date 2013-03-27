@@ -52,7 +52,6 @@
 -callback set_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
 -callback update_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
 -callback delete_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
--callback copy_value_to_snapshot_table(DB::db(), Key::?RT:key()) -> NewDB::db().
 
 % convenience methods:
 -callback read(DB::db(), Key::?RT:key())
@@ -93,10 +92,6 @@
 -callback get_data(DB::db()) -> db_as_list().
 -callback add_data(DB::db(), db_as_list()) -> NewDB::db().
 
-% snapshots:
--callback get_snapshot_data(DB::db()) -> db_as_list().
--callback join_snapshot_data(DB::db()) -> db_as_list().
-
 % subscriptions:
 -callback set_subscription(DB::db(), subscr_t()) -> db().
 -callback get_subscription(DB::db(), Tag::any()) -> [subscr_t()].
@@ -108,6 +103,16 @@
 -callback stop_record_changes(OldDB::db(), intervals:interval()) -> NewDB::db().
 -callback get_changes(DB::db()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 -callback get_changes(DB::db(), intervals:interval()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
+
+% snapshots:
+-callback copy_value_to_snapshot_table(DB::db(), Key::?RT:key()) -> NewDB::db().
+-callback get_snapshot_data(DB::db()) -> db_as_list().
+-callback join_snapshot_data(DB::db()) -> db_as_list().
+-callback set_snapshot_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
+-callback get_snapshot_entry(DB::db(), Key::?RT:key()) -> NewDB::db().
+-callback delete_snapshot_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
+-callback delete_snapshot_entry_at_key(DB::db(), Key::?RT:key()) -> NewDB::db().
+-callback clear_snapshot(DB::db()) -> NewDB::db().
 
 -callback check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.
 
@@ -138,7 +143,12 @@ behaviour_info(callbacks) ->
      {record_changes, 2}, {stop_record_changes, 1}, {stop_record_changes, 2},
      {get_changes, 1}, {get_changes, 2},
      % debugging
-     {check_db, 1}
+     {check_db, 1},
+     % snapshots
+     {copy_value_to_snapshot_table, 2}, {get_snapshot_data, 1},
+     {join_snapshot_data, 1}, {set_snapshot_entry, 2},
+     {get_snapshot_entry, 2}, {delete_snapshot_entry, 2},
+     {delete_snapshot_entry_at_key, 2}, {clear_snapshot, 1}
     ];
 behaviour_info(_Other) ->
     undefined.

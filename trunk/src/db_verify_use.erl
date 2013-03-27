@@ -144,12 +144,6 @@ delete_entry_({DB, Counter} = _DB_, Entry) ->
     verify_counter(Counter),
     {?BASE_DB:delete_entry(DB, Entry), update_counter(Counter)}.
 
-%% @doc Copy existing entry to snapshot tabe
-%% @TODO Implement!
--spec copy_value_to_snapshot_table_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
-copy_value_to_snapshot_table_(State = {_DB, _Subscr, _SnapTable}, _Key) ->
-    State.
-
 %% @doc Returns the number of stored keys.
 -spec get_load_(DB::db_t()) -> Load::integer().
 get_load_({DB, Counter} = _DB_) ->
@@ -234,20 +228,6 @@ get_data_({DB, Counter} = _DB_) ->
     ?TRACE1(get_data, _DB_),
     verify_counter(Counter),
     ?BASE_DB:get_data(DB).
-
-%% @doc Returns snapshot data as is
-%% @TODO implement! 
--spec get_snapshot_data_(DB::db_t()) -> db_as_list(). 
-get_snapshot_data_(_State = {_DB, _Subscr, _SnapshotTable}) ->
-    [].
-
-%% @doc Join snapshot and primary db such that all tuples in the primary db are replaced
-%%      if there is a matching tuple available in the snapshot set. The other tuples are
-%%      returned as is.
-%% @TODO implement! 
--spec join_snapshot_data_(DB::db_t()) -> db_as_list(). 
-join_snapshot_data_(_State = {_DB, _Subscr, _SnapshotTable}) ->
-    [].
 
 %% doc Adds a subscription for the given interval under Tag (overwrites an
 %%     existing subscription with that tag).
@@ -365,3 +345,60 @@ check_db({DB, Counter} = _DB_) ->
     ?TRACE1(check_db, _DB_),
     verify_counter(Counter),
     ?BASE_DB:check_db(DB).
+
+% snapshot-related functions
+
+%% @doc Copy existing entry to snapshot tabe
+-spec copy_value_to_snapshot_table_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
+copy_value_to_snapshot_table_({DB, Counter} = _DB_, Key) ->
+    ?TRACE2(copy_value_to_snapshot_table, _DB_, Key),
+    verify_counter(Counter),
+    {?BASE_DB:copy_value_to_snapshot_table(DB, Key), update_counter(Counter)}.
+
+%% @doc Returns snapshot data as is
+-spec get_snapshot_data_(DB::db_t()) -> db_as_list(). 
+get_snapshot_data_({DB, Counter} = _DB_) ->
+    ?TRACE1(get_snapshot_data, _DB_),
+    verify_counter(Counter),
+    ?BASE_DB:get_snapshot_data(DB).
+
+%% @doc Join snapshot and primary db such that all tuples in the primary db are replaced
+%%      if there is a matching tuple available in the snapshot set. The other tuples are
+%%      returned as is.
+-spec join_snapshot_data_(DB::db_t()) -> db_as_list(). 
+join_snapshot_data_({DB, Counter} = _DB_) ->
+    ?TRACE1(join_snapshot_data, _DB_),
+    verify_counter(Counter),
+    ?BASE_DB:join_snapshot_data(DB).
+
+-spec set_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
+set_snapshot_entry_({DB, Counter} = _DB_, Entry) ->
+    ?TRACE2(set_snapshot_entry, _DB_, Entry),
+    verify_counter(Counter),
+    {?BASE_DB:set_snapshot_entry(DB, Entry), update_counter(Counter)}.
+
+-spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
+get_snapshot_entry_({DB, Counter} = _DB_, Key) -> 
+    ?TRACE2(get_snapshot_entry, _DB_, Entry),
+    verify_counter(Counter),
+    {?BASE_DB:get_snapshot_entry(DB, Key), update_counter(Counter)}.
+
+-spec delete_snapshot_entry_at_key_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
+delete_snapshot_entry_at_key_({DB, Counter} = _DB_, Key) ->
+    ?TRACE2(delete_snapshot_entry_at_key, _DB_, Entry),
+    verify_counter(Counter),
+    {?BASE_DB:delete_snapshot_entry_at_key(DB, Key), update_counter(Counter)}.
+
+%% @doc Removes all values with the given entry's key from the Snapshot DB.
+-spec delete_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
+delete_snapshot_entry_(State, Entry) ->
+    Key = db_entry:get_key(Entry),
+    delete_snapshot_entry_at_key_(State, Key).
+
+-spec clear_snapshot_(DB::db_t()) -> NewDB::db_t().
+clear_snapshot_({DB, Counter} = _DB_) ->
+    ?TRACE1(clear_snapshot, _DB_),
+    verify_counter(Counter),
+    {?BASE_DB:clear_snapshot(DB), update_counter(Counter)}.
+
+% end snapshot-related functions

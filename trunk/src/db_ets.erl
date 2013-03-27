@@ -45,7 +45,7 @@ new_() ->
     % better protected? All accesses would have to go to DB-process
     {ets:new(list_to_atom(DBName), [ordered_set | ?DB_ETS_ADDITIONAL_OPS]),
      ets:new(list_to_atom(SubscrName), [ordered_set, private]),
-     ets:new(list_to_atom(SnapDBName), [ordered_set])}.
+     ets:new(list_to_atom(SnapDBName), [ordered_set, private])}.
 
 %% @doc Re-opens a previously existing database (not supported by ets
 %%      -> create new DB).
@@ -98,14 +98,6 @@ update_entry_(State, Entry) ->
 delete_entry_at_key_(State = {DB, _Subscr, _SnapTable}, Key) ->
     ets:delete(DB, Key),
     call_subscribers(State, {delete, Key}).
-
-%% @doc Copy existing entry to snapshot table
--spec copy_value_to_snapshot_table_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
-copy_value_to_snapshot_table_(State = {_DB, _Subscr, SnapTable}, Key) ->
-    case get_entry2_(State, Key) of
-        {true, Entry} -> ets:insert(SnapTable,Entry)
-    end,
-    State.
 
 %% @doc Returns the number of stored keys.
 -spec get_load_(DB::db_t()) -> Load::integer().
@@ -209,6 +201,16 @@ delete_entries_(State, Interval) ->
 get_data_({DB, _Subscr, _SnapTable}) ->
     ets:tab2list(DB).
 
+%% Snapshot-related functions
+
+%% @doc Copy existing entry to snapshot table
+-spec copy_value_to_snapshot_table_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
+copy_value_to_snapshot_table_(State = {_DB, _Subscr, SnapTable}, Key) ->
+    case get_entry2_(State, Key) of
+        {true, Entry} -> ets:insert(SnapTable,Entry)
+    end,
+    State.
+
 %% @doc Returns snapshot data as is
 -spec get_snapshot_data_(DB::db_t()) -> db_as_list().
 get_snapshot_data_({_DB, _Subscr, SnapTable}) ->
@@ -228,7 +230,40 @@ join_snapshot_data_(State = {_DB, _Subscr, SnapshotTable}) ->
                 Newlist = lists:keyreplace(Key, 1, List2, Tuple), 
                 F(More, Newlist,F)
         end,
-    Fun(SnapshotDB,PrimaryDB,Fun).    
+    Fun(SnapshotDB,PrimaryDB,Fun).
+
+-spec set_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
+set_snapshot_entry_(State = {_DB, _Subscr, SnapTable}, Entry) ->
+    case db_entry:is_null(Entry) of
+        true -> delete_snapshot_entry_(State, Entry);
+        _    -> ets:insert(SnapTable, Entry)
+    end,
+    State.
+
+
+-spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
+get_snapshot_entry_({_DB, _Subscr, SnapTable}, Key) ->
+    case ets:lookup(SnapTable, Key) of
+        [Entry] -> {true, Entry};
+        []      -> {false, db_entry:new(Key)}
+    end.
+
+-spec delete_snapshot_entry_at_key_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
+delete_snapshot_entry_at_key_(State = {_DB, _Subscr, SnapTable}, Key) ->
+    ets:delete(SnapTable, Key),
+    State.
+
+%% @doc Removes all values with the given entry's key from the Snapshot DB.
+-spec delete_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
+delete_snapshot_entry_(State, Entry) ->
+    Key = db_entry:get_key(Entry),
+    delete_snapshot_entry_at_key_(State, Key).
+
+-spec clear_snapshot_(DB::db_t()) -> NewDB::db_t().
+clear_snapshot_({_DB, _Subscr, SnapTable}) ->
+    ets:delete(SnapTable).
+
+%% End snapshot-related functions
 
 -spec get_chunk_(DB::db_t(), Interval::intervals:interval(),
                  FilterFun::fun((db_entry:entry()) -> boolean()),
