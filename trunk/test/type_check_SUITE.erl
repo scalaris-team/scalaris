@@ -80,7 +80,9 @@ tester_type_check_api(_Config) ->
           {api_monitor, [], []},
           {api_pubsub, [], []},
           {api_rdht, [], [ {delete_collect_results, 3} ]}, %% receives
-          {api_tx, [], []}
+          {api_tx, 
+           [ {get_system_snapshot, 0} %% receives msgs
+           ], []}
         ],
     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
       || {Mod, Excl, ExclPriv} <- Modules ],
@@ -284,15 +286,15 @@ tester_type_check_tx(_Config) ->
              {commit, 1} %% should work, but hangs
            ]},
           {rdht_tx_read,
-           [ {abort, 3},
-             {commit, 3},
+           [ {abort, 5},
+             {commit, 5},
              {extract_from_value, 3}, %% tested via feeder
              {extract_from_tlog, 4}, %% tested via feeder
              {init, 1},
              {on,2},
              {start_link, 1},
              {validate_prefilter, 1}, %% TODO: not a list error
-             {validate, 2},
+             {validate, 3},
              {work_phase, 3}
            ],
            [ {quorum_read, 4}, %% needs collector pid
@@ -300,11 +302,11 @@ tester_type_check_tx(_Config) ->
              {make_tlog_entry, 2} %% tested via feeder
            ]},
           {rdht_tx_write,
-           [ {abort, 3},
-             {commit, 3},
+           [ {abort, 5},
+             {commit, 5},
              {start_link, 1}, {init, 1}, {on,2},
              {validate_prefilter, 1}, %% TODO: not a list error
-             {validate, 2},
+             {validate, 3},
              {work_phase, 3}
            ], []},
           {rdht_tx_add_del_on_list,
@@ -323,6 +325,7 @@ tester_type_check_tx(_Config) ->
           {tx_tlog,
            [ {new_entry, 5}, %% TODO: some combinations of value types are not allowed
              {new_entry, 6}, %% TODO: some combinations of value types are not allowed
+             {new_entry, 7}, %% TODO: some combinations of value types are not allowed
              {set_entry_key, 2}, %% split tlog types for client and rt:keys
              {set_entry_operation, 2}, %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
              {set_entry_value, 3} %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)

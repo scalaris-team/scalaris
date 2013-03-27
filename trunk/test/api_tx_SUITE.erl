@@ -721,13 +721,19 @@ prop_random_from_list(Key, Value) ->
     _ = api_tx:write(Key,  [Value]),
     ?equals_pattern(
         api_tx:req_list([{read, Key, random_from_list}]),
-        {[{?read, Key, Version, ?ok, ?value_dropped, ?value_dropped}],
-         [{ok, { Value, 1 } }]} when is_integer(Version) andalso Version >= 0),
+        {[{?read, Key, Version, ?ok, SnapNumber, ?value_dropped, ?value_dropped}],
+         [{ok, { Value, 1 } }]} when is_integer(Version) 
+                                    andalso Version >= 0
+                                    andalso is_integer(SnapNumber)
+                                    andalso SnapNumber >= 0),
     ValueEnc = rdht_tx:encode_value({Value, 1}),
     ?equals_pattern(
         api_txc:req_list([{read, Key, random_from_list}]),
-        {[{?read, Key, Version, ?ok, ?value_dropped, ?value_dropped}],
-         [{ok, ValueEnc}]} when is_integer(Version) andalso Version >= 0),
+        {[{?read, Key, Version, ?ok, SnapNumber, ?value_dropped, ?value_dropped}],
+         [{ok, ValueEnc}]} when is_integer(Version)
+                                    andalso Version >= 0
+                                    andalso is_integer(SnapNumber)
+                                    andalso SnapNumber >= 0),
     true.
 
 tester_random_from_list(_Config) ->
