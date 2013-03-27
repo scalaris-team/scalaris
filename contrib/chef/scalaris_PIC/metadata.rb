@@ -5,7 +5,7 @@ description      "Installs/Configures Scalaris for the 4CaaSt platform"
 #long_description IO.read(File.join(File.dirname(__FILE__), 'README.md'))
 version          "0.0.1"
 
-depends "apt"
+depends "apt", "= 1.1.2"
 
 %w{ debian ubuntu centos redhat fedora suse }.each do |os|
   supports os
