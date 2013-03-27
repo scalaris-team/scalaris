@@ -41,33 +41,34 @@ SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen"
 
 # For SELinux we need to use 'runuser' not 'su'
 if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
-    SU="$RUNUSER $SCALARIS_USER -s /bin/bash -c"
+    SU="$RUNUSER"
 else
-    SU="$SU $SCALARIS_USER -s /bin/bash -c"
+    SU="$SU"
 fi
+SU_CMD="$SU $SCALARIS_USER -s /bin/bash -c"
 
 start() {
-    if [ -f $PID_DS ]; then
-        PROCPID=`cat $PID_DS`
-        if [ -e /proc/$PROCPID ];then
+    if [ -f "$PID_DS" ]; then
+        PROCPID=`cat "$PID_DS"`
+        if [ -e "/proc/$PROCPID" ];then
             echo "Scalaris node \"${SCALARIS_NODE}\" already started"
             return 0
         fi
     fi
 
-    echo >> $LOG_DS
-    date >> $LOG_DS
-    echo -e "Starting Scalaris node \"${SCALARIS_NODE}\"...\n\n" >> $LOG_DS
+    echo >> "$LOG_DS"
+    date >> "$LOG_DS"
+    echo -e "Starting Scalaris node \"${SCALARIS_NODE}\"...\n\n" >> "$LOG_DS"
     echo -n "Starting Scalaris node \"${SCALARIS_NODE}\"... "
-    $SU "$SCALARISCTL start" >> $LOG_DS 2>&1
+    $SU_CMD "$SCALARISCTL start" >> "$LOG_DS" 2>&1
     if [ $? -ne 0 ]; then
         echo "failed"
         return 1 # generic or unspecified error
     fi
     sleep 1s
-    $SU "$SCREEN -ls | grep \"scalaris_${SCALARIS_NODE}\" | cut -d'.' -f1 | head -n1 | xargs echo" > $PID_DS
+    $SU_CMD "$SCREEN -ls | grep \"scalaris_${SCALARIS_NODE}\" | cut -d'.' -f1 | head -n1 | xargs echo" > "$PID_DS"
 
-    if [ -e /proc/$PROCPID ]; then
+    if [ -e "/proc/$PROCPID" ]; then
         echo "success"
     else
         echo "failed"
@@ -79,18 +80,18 @@ start() {
 
 gstop() {
     result=0
-    if [ -f $PID_DS ]; then
+    if [ -f "$PID_DS" ]; then
         echo -n "Shutting down Scalaris node \"${SCALARIS_NODE}\"... "
-        PROCPID=`cat $PID_DS`
-        if [ -e /proc/$PROCPID ];then
-            $SU "$SCALARISCTL gstop"
+        PROCPID=`cat "$PID_DS"`
+        if [ -e "/proc/$PROCPID" ];then
+            $SU_CMD "$SCALARISCTL gstop"
             result=$?
         else
             # not running anymore
             result=0
         fi
         if [ $result -eq 0 ]; then
-            rm -f $PID_DS
+            rm -f "$PID_DS"
             echo "success"
         else
             echo "failed"
@@ -104,12 +105,12 @@ gstop() {
 
 stop() {
     result=0
-    if [ -f $PID_DS ]; then
+    if [ -f "$PID_DS" ]; then
         echo -n "Killing Scalaris node \"${SCALARIS_NODE}\"... "
-        killproc -p $PID_DS screen
+        killproc -p "$PID_DS" "$SCREEN"
         result=$?
         if [ $result -eq 0 ]; then
-            rm -f $PID_DS
+            rm -f "$PID_DS"
             echo "success"
         else
             echo "failed"
@@ -122,14 +123,14 @@ stop() {
 }
 
 status() {
-    if [ -f $PID_DS ]; then
-        PROCPID=`cat $PID_DS`
-        if [ ! -e /proc/$PROCPID ];then
+    if [ -f "$PID_DS" ]; then
+        PROCPID=`cat "$PID_DS"`
+        if [ ! -e "/proc/$PROCPID" ];then
             echo "Scalaris node \"${SCALARIS_NODE}\" has crashed"
             return 1 # program is dead and /var/run pid file exists
         else
             echo -n "Checking Scalaris node \"${SCALARIS_NODE}\"... "
-            $SU "$SCALARISCTL status"
+            $SU_CMD "$SCALARISCTL status"
             if [ $? -ne 0 ]; then
                 echo "probably crashed"
                 return 4 # program or service status is unknown
