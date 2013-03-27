@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 -behaviour(db_beh).
--type db_t() :: {Table::tid() | atom(), SubscrTable::tid() | atom(), {SnapTable::tid() | atom(), non_neg_integer(), non_neg_integer()}}.
+-type db_t() :: {Table::tid() | atom(), SubscrTable::tid() | atom(), {SnapTable::tid() | atom() | boolean(), non_neg_integer(), non_neg_integer()}}.
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
@@ -41,11 +41,10 @@ new_() ->
     RandomName = randoms:getRandomString(),
     DBName = "db_" ++ RandomName,
     SubscrName = DBName ++ ":subscribers",
-    SnapDBName = DBName ++ ":snapshot",
     % better protected? All accesses would have to go to DB-process
     {ets:new(list_to_atom(DBName), [ordered_set | ?DB_ETS_ADDITIONAL_OPS]),
      ets:new(list_to_atom(SubscrName), [ordered_set, private]),
-     {ets:new(list_to_atom(SnapDBName), [ordered_set, private]),0,0}}.
+     {false,0,0}}.
 
 %% @doc Re-opens a previously existing database (not supported by ets
 %%      -> create new DB).
@@ -269,7 +268,10 @@ delete_snapshot_entry_(State, Entry) ->
 
 -spec init_snapshot_(DB::db_t()) -> NewDB::db_t().
 init_snapshot_({_DB, _Subscr, {SnapTable, LiveLC, _SnapLC}}) ->
-    ets:delete(SnapTable),
+    case SnapTable of
+        false -> ok;
+        _ -> ets:delete(SnapTable)
+    end,
     SnapDBName = "db_" ++ randoms:getRandomString() ++ ":snapshot",
     % copy live db lock count to new snapshot db
     {_DB,_Subscr,{ets:new(list_to_atom(SnapDBName), [ordered_set, private]), LiveLC, LiveLC}}.
@@ -277,6 +279,17 @@ init_snapshot_({_DB, _Subscr, {SnapTable, LiveLC, _SnapLC}}) ->
 -spec snapshot_is_lockfree_(DB::db_t()) -> boolean().
 snapshot_is_lockfree_({_DB, _Subscr, {_SnapTable, _LiveLC, SnapLC}}) ->
     SnapLC =:= 0.
+
+-spec snapshot_is_running_(DB::db_t()) -> boolean().
+snapshot_is_running_({_DB, _Subscr, {SnapTable, _LiveLC, _SnapLC}}) ->
+    case SnapTable of
+        false -> false;
+        _ -> true
+    end.
+
+-spec delete_snapshot_(DB::db_t()) -> NewDB::db_t().
+delete_snapshot_({_DB, _Subscr, {_SnapTable, _LiveLC, _SnapLC}}) ->
+    {_DB, _Subscr, {false, _LiveLC, 0}}.
 
 %% End snapshot-related functions
 

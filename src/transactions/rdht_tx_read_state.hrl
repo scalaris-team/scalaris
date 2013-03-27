@@ -26,7 +26,8 @@
                    state_get_result/1, state_set_result/2,
                    state_get_decided/1, state_set_decided/2,
                    state_is_client_informed/1, state_set_client_informed/1,
-                   state_get_numreplied/1
+                   state_get_numreplied/1,
+                   state_get_snapshot_number/1, state_set_snapshot_number/2
                   ]}).
 
 % {?ok|fail, Val|FailReason, Vers}
@@ -42,6 +43,7 @@
                     Result           :: result() | {?fail, 0, -2},
                     IsDecided        :: tx_tlog:tx_status() | false,
                     IsClientInformed :: boolean(),
+                    SnapNumber       :: tx_tlog:snap_number(),
                     Op               :: ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
                   }.
 -type read_state_decided() ::
@@ -53,6 +55,7 @@
                     Result           :: result(),
                     IsDecided        :: tx_tlog:tx_status(),
                     IsClientInformed :: boolean(),
+                    SnapNumber       :: tx_tlog:snap_number(),
                     Op               :: ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}
                   }.
 
@@ -91,10 +94,14 @@ state_set_decided(State, Val) ->    setelement(7, State, Val).
 state_is_client_informed(State) ->  element(8, State).
 -spec state_set_client_informed(read_state()) -> read_state().
 state_set_client_informed(State) -> setelement(8, State, true).
+-spec state_get_snapshot_number(read_state()) -> tx_tlog:snap_number().
+state_get_snapshot_number(State) -> element(9, State).
+-spec state_set_snapshot_number(read_state(), tx_tlog:snap_number()) -> read_state().
+state_set_snapshot_number(State, Val) -> setelement(9, State, Val).
 -spec state_get_op(read_state()) -> ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}.
-state_get_op(State) ->          element(9, State).
+state_get_op(State) ->          element(10, State).
 -spec state_set_op(read_state(), ?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()}) -> read_state().
-state_set_op(State, Op) ->     setelement(9, State, Op).
+state_set_op(State, Op) ->     setelement(10, State, Op).
 
 -spec state_get_numreplied(read_state()) -> non_neg_integer().
 state_get_numreplied(State) ->
@@ -102,15 +109,17 @@ state_get_numreplied(State) ->
 
 -spec state_add_reply(read_state(),
                       Result::{?ok, rdht_tx:encoded_value(), ?DB:version()} | {?ok, empty_val, -1} |
-                          {?fail, ?not_found | ?empty_list | ?not_a_list, ?DB:version()})
+                          {?fail, ?not_found | ?empty_list | ?not_a_list,
+                           ?DB:version()}, tx_tlog:snap_number())
         -> read_state().
-state_add_reply(State, Result) ->
+state_add_reply(State, Result, SnapNumber) ->
     ?TRACE("state_add_reply state res majok majdeny ~p ~p ~n", [State, Result]),
     Vers = element(3, Result),
     OldVers = element(3, state_get_result(State)),
     TmpState = if Vers > OldVers -> state_set_result(State, Result);
                   true           -> State
                end,
-    if Vers >= 0 -> state_inc_numok(TmpState);
+    NewState = if Vers >= 0 -> state_inc_numok(TmpState);
        true      -> state_inc_numfailed(TmpState)
-    end.
+    end,
+    state_set_snapshot_number(NewState, SnapNumber).

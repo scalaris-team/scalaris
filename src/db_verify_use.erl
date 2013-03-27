@@ -397,12 +397,22 @@ delete_snapshot_entry_(State, Entry) ->
 
 -spec init_snapshot_(DB::db_t()) -> NewDB::db_t().
 init_snapshot_({DB, Counter} = _DB_) ->
-    ?TRACE1(clear_snapshot, _DB_),
+    ?TRACE1(init_snapshot, _DB_),
     verify_counter(Counter),
     {?BASE_DB:init_snapshot(DB), update_counter(Counter)}.
 
 -spec snapshot_is_lockfree_(DB::db_t()) -> boolean().
-snapshot_is_lockfree_({DB, Counter} = _DB_) ->
+snapshot_is_lockfree_({DB, _Counter} = _DB_) ->
     ?BASE_DB:snapshot_is_lockfree(DB).
+
+-spec snapshot_is_running_(DB::db_t()) -> boolean().
+snapshot_is_running_({DB, _Counter} = _DB_) ->
+    ?BASE_DB:snapshot_is_running(DB).
+
+-spec delete_snapshot_(DB::db_t()) -> NewDB::db_t().
+delete_snapshot_({DB, Counter} = _DB_) ->
+    ?TRACE1(delete_snapshot, _DB_),
+    verify_counter(Counter),
+    {?BASE_DB:delete_snapshot(DB), update_counter(Counter)}.
 
 % end snapshot-related functions

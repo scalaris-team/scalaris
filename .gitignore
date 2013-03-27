@@ -29,3 +29,6 @@
 /TAGS*
 /*.log
 ebin/
+*.swp
+Session.vim
+.vimrc

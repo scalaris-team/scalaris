@@ -79,11 +79,10 @@ new_db(FileName, TokeOptions) ->
         ok ->
             RandomName = randoms:getRandomString(),
             SubscrName = "db_" ++ RandomName ++ ":subscribers",
-            SnapDBName = "db_" ++ RandomName ++ ":snapshot",
             case toke_drv:open(DB, FileName, TokeOptions) of
                 ok     -> {{DB, FileName},
                            ets:new(list_to_atom(SubscrName), [ordered_set, private]),
-                           {ets:new(list_to_atom(SnapDBName), [ordered_set, private]),0,0}};
+                           {false,0,0}};
                 Error2 -> log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error2]),
                           erlang:error({toke_failed, Error2})
             end;
@@ -469,5 +468,16 @@ init_snapshot_({{_DB, _FileName}, _Subscr, {SnapTable,LiveLC,_SnapLC}}) ->
 -spec snapshot_is_lockfree_(DB::db_t()) -> boolean().
 snapshot_is_lockfree_({{_DB, _FileName}, _Subscr, {_SnapTable, _LiveLC, SnapLC}}) ->
     SnapLC =:= 0.
+
+-spec snapshot_is_running_(DB::db_t()) -> boolean().
+snapshot_is_running_({{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, _SnapLC}}) ->
+    case SnapTable of
+        false -> false;
+        _ -> true
+    end.
+
+-spec delete_snapshot_(DB::db_t()) -> NewDB::db_t().
+delete_snapshot_({{DB, FileName}, Subscr, {_SnapTable, LiveLC, _SnapLC}}) ->
+    {{DB, FileName}, Subscr, {false, LiveLC, 0}}.
 
 % end snapshot-related functions
