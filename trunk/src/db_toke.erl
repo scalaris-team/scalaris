@@ -24,7 +24,7 @@
 
 -behaviour(db_beh).
 
--type db_t() :: {{DB::pid(), FileName::string()}, SubscrTable::tid() | atom()}.
+-type db_t() :: {{DB::pid(), FileName::string()}, SubscrTable::tid() | atom(),{SnapTable::tid() | atom(), non_neg_integer(), non_neg_integer()}}.
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
@@ -83,7 +83,7 @@ new_db(FileName, TokeOptions) ->
             case toke_drv:open(DB, FileName, TokeOptions) of
                 ok     -> {{DB, FileName},
                            ets:new(list_to_atom(SubscrName), [ordered_set, private]),
-                           ets:new(list_to_atom(SnapDBName), [ordered_set, private])};
+                           {ets:new(list_to_atom(SnapDBName), [ordered_set, private]),0,0}};
                 Error2 -> log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error2]),
                           erlang:error({toke_failed, Error2})
             end;
@@ -94,7 +94,7 @@ new_db(FileName, TokeOptions) ->
 
 %% @doc Deletes all contents of the given DB.
 -spec close_(DB::db_t(), Delete::boolean()) -> any().
-close_(State = {{DB, FileName}, _Subscr, _SnapTable}, Delete) ->
+close_(State = {{DB, FileName}, _Subscr, _SnapState}, Delete) ->
     _ = call_subscribers(State, close_db),
     toke_drv:close(DB),
     toke_drv:delete(DB),
@@ -112,14 +112,14 @@ close_(State = {{DB, FileName}, _Subscr, _SnapTable}, Delete) ->
 %% @doc Returns the name of the DB, i.e. the path to its file, which can be
 %%      used with open/1.
 -spec get_name_(DB::db_t()) -> db_name().
-get_name_({{_DB, FileName}, _Subscr, _SnapTable}) ->
+get_name_({{_DB, FileName}, _Subscr, _SnapState}) ->
     FileName.
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned. The first component of the result
 %%      tuple states whether the value really exists in the DB.
 -spec get_entry2_(DB::db_t(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
-get_entry2_({{DB, _FileName}, _Subscr, _SnapTable}, Key) ->
+get_entry2_({{DB, _FileName}, _Subscr, _SnapState}, Key) ->
     case toke_drv:get(DB, erlang:term_to_binary(Key, [{minor_version, 1}])) of
         not_found -> {false, db_entry:new(Key)};
         Entry     -> {true, erlang:binary_to_term(Entry)}
@@ -127,7 +127,7 @@ get_entry2_({{DB, _FileName}, _Subscr, _SnapTable}, Key) ->
 
 %% @doc Inserts a complete entry into the DB.
 -spec set_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
-set_entry_(State = {{DB, _FileName}, _Subscr, _SnapTable}, Entry) ->
+set_entry_(State = {{DB, _FileName}, _Subscr, _SnapState}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_entry_(State, Entry);
         _    -> 
@@ -147,19 +147,19 @@ update_entry_(State, Entry) ->
 delete_entry_at_key_(State, Key) ->
     delete_entry_at_key_(State, Key, erlang:term_to_binary(Key, [{minor_version, 1}])).
 
-delete_entry_at_key_(State = {{DB, _FileName}, _Subscr, _SnapTable}, Key, Key_) ->
+delete_entry_at_key_(State = {{DB, _FileName}, _Subscr, _SnapState}, Key, Key_) ->
     toke_drv:delete(DB, Key_),
     call_subscribers(State, {delete, Key}).
 
 %% @doc Returns the number of stored keys.
 -spec get_load_(DB::db_t()) -> Load::integer().
-get_load_({{DB, _FileName}, _Subscr, _SnapTable}) ->
+get_load_({{DB, _FileName}, _Subscr, _SnapState}) ->
     % TODO: not really efficient (maybe store the load in the DB?)
     toke_drv:fold(fun (_K, _V, Load) -> Load + 1 end, 0, DB).
 
 %% @doc Returns the number of stored keys in the given interval.
 -spec get_load_(DB::db_t(), Interval::intervals:interval()) -> Load::integer().
-get_load_(State = {{DB, _FileName}, _Subscr, _SnapTable}, Interval) ->
+get_load_(State = {{DB, _FileName}, _Subscr, _SnapState}, Interval) ->
     IsEmpty = intervals:is_empty(Interval),
     IsAll = intervals:is_all(Interval),
     if
@@ -177,7 +177,7 @@ get_load_(State = {{DB, _FileName}, _Subscr, _SnapTable}, Interval) ->
 
 %% @doc Adds all db_entry objects in the Data list.
 -spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
-add_data_(State = {{DB, _FileName}, _Subscr, _SnapTable}, Data) ->
+add_data_(State = {{DB, _FileName}, _Subscr, _SnapState}, Data) ->
     % -> do not use set_entry (no further checks for changed keys necessary)
     _ = lists:foldl(
           fun(DBEntry, _) ->
@@ -194,7 +194,7 @@ add_data_(State = {{DB, _FileName}, _Subscr, _SnapTable}, Data) ->
 %%      keys!
 -spec split_data_(DB::db_t(), MyNewInterval::intervals:interval()) ->
          {NewDB::db_t(), db_as_list()}.
-split_data_(State = {{DB, _FileName}, _Subscr, _SnapTable}, MyNewInterval) ->
+split_data_(State = {{DB, _FileName}, _Subscr, _SnapState}, MyNewInterval) ->
     % first collect all toke keys to remove from my db (can not delete while doing fold!)
     F = fun(_K, DBEntry_, HisList) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
@@ -224,7 +224,7 @@ split_data_(State = {{DB, _FileName}, _Subscr, _SnapTable}, MyNewInterval) ->
                    FilterFun::fun((DBEntry::db_entry:entry()) -> boolean()),
                    ValueFun::fun((DBEntry::db_entry:entry()) -> Value))
         -> [Value].
-get_entries_({{DB, _FileName}, _Subscr, _SnapTable}, FilterFun, ValueFun) ->
+get_entries_({{DB, _FileName}, _Subscr, _SnapState}, FilterFun, ValueFun) ->
     F = fun (_Key, DBEntry_, Data) ->
                  DBEntry = erlang:binary_to_term(DBEntry_),
                  case FilterFun(DBEntry) of
@@ -255,7 +255,7 @@ get_chunk_(State, Interval, FilterFun, ValueFun, ChunkSize) ->
                        AddDataFun::fun((Key_::binary(), Key::?RT:key(), db_entry:entry(), [T]) -> [T]),
                        GetKeyFromDataFun::fun((T) -> ?RT:key()), ChunkSize::pos_integer() | all)
         -> {intervals:interval(), [T]}.
-get_chunk_helper({{DB, _FileName}, _Subscr, _SnapTable}, Interval, AddDataFun, GetKeyFromDataFun, ChunkSize) ->
+get_chunk_helper({{DB, _FileName}, _Subscr, _SnapState}, Interval, AddDataFun, GetKeyFromDataFun, ChunkSize) ->
     {BeginBr, Begin, _End, _EndBr} = intervals:get_bounds(Interval),
     % try to find the first existing key in the interval, starting at Begin:
     MInfToBegin = intervals:minus(intervals:all(),
@@ -321,7 +321,7 @@ get_chunk_helper_filter(Data, MInfToBegin, GetKeyFromDataFun, ChunkSize) ->
                       RangeOrFun::intervals:interval() |
                                   fun((DBEntry::db_entry:entry()) -> boolean()))
         -> NewDB::db_t().
-delete_entries_(State = {{DB, _FileName}, _Subscr, _SnapTable}, FilterFun) when is_function(FilterFun) ->
+delete_entries_(State = {{DB, _FileName}, _Subscr, _SnapState}, FilterFun) when is_function(FilterFun) ->
     % first collect all toke keys to delete (can not delete while doing fold!)
     F = fun(KeyToke, DBEntry_, ToDelete) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
@@ -359,7 +359,7 @@ delete_chunk_(DB, Interval, ChunkSize) ->
 
 %% @doc Returns all DB entries.
 -spec get_data_(DB::db_t()) -> db_as_list().
-get_data_({{DB, _FileName}, _Subscr, _SnapTable}) ->
+get_data_({{DB, _FileName}, _Subscr, _SnapState}) ->
     toke_drv:fold(fun (_K, DBEntry, Acc) ->
                            [erlang:binary_to_term(DBEntry) | Acc]
                   end, [], DB).
@@ -397,27 +397,27 @@ get_split_key_(DB, Begin, TargetLoad, Direction) ->
 
 % snapshot-related functions
 
-%% @doc Copy existing entry to snapshot tabe
-%% @TODO Implement!
+%% @doc Copy existing entry to snapshot table
 -spec copy_value_to_snapshot_table_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
-copy_value_to_snapshot_table_(State = {{_DB, _FileName}, _Subscr, SnapTable}, Key) ->
+copy_value_to_snapshot_table_(State = {{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Key) ->
     case get_entry2_(State, Key) of
-        {true, Entry} -> ets:insert(SnapTable,Entry)
+        {true, Entry}   ->  {_, OldSnapEntry} = get_snapshot_entry_(State,db_entry:get_key(Entry)),
+                            NewSnapLC = db_entry:update_lockcount(OldSnapEntry,Entry,SnapLC),
+                            ets:insert(SnapTable,Entry);
+        _               ->  NewSnapLC = SnapLC
     end,
-    State.
+    {{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, NewSnapLC}}.
 
 %% @doc Returns snapshot data as is
-%% @TODO implement! 
 -spec get_snapshot_data_(DB::db_t()) -> db_as_list(). 
-get_snapshot_data_({{_DB, _FileName}, _Subscr, SnapTable}) ->
+get_snapshot_data_({{_DB, _FileName}, _Subscr, {SnapTable, _, _}}) ->
     ets:tab2list(SnapTable).
 
 %% @doc Join snapshot and primary db such that all tuples in the primary db are replaced
 %%      if there is a matching tuple available in the snapshot set. The other tuples are
 %%      returned as is.
-%% @TODO implement! 
 -spec join_snapshot_data_(DB::db_t()) -> db_as_list(). 
-join_snapshot_data_(State = {{_DB, _FileName}, _Subscr, SnapTable}) ->
+join_snapshot_data_(State = {{_DB, _FileName}, _Subscr, {SnapTable, _, _}}) ->
     PrimaryDB = lists:keysort(1, get_data_(State)),
     SnapshotDB = lists:keysort(1, get_snapshot_data_(SnapTable)),
     Fun = 
@@ -430,12 +430,14 @@ join_snapshot_data_(State = {{_DB, _FileName}, _Subscr, SnapTable}) ->
     Fun(SnapshotDB,PrimaryDB,Fun).
 
 -spec set_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
-set_snapshot_entry_(State = {{_DB, _FileName}, _Subscr, SnapTable}, Entry) ->
+set_snapshot_entry_(State = {{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Entry) ->
     case db_entry:is_null(Entry) of
         true -> delete_snapshot_entry_(State, Entry);
-        _    -> ets:insert(SnapTable, Entry)
-    end,
-    State.
+        _    -> {_, OldEntry} = get_snapshot_entry_(State,db_entry:get_key(Entry)),
+                NewSnapLC = db_entry:update_lockcount(OldEntry,Entry,SnapLC),
+                ets:insert(SnapTable, Entry),
+                {{_DB, _FileName},_Subscr,{SnapTable,NewSnapLC,_LiveLC}}
+    end.
 
 
 -spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
@@ -446,9 +448,11 @@ get_snapshot_entry_({{_DB, _FileName}, _Subscr, SnapTable}, Key) ->
     end.
 
 -spec delete_snapshot_entry_at_key_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
-delete_snapshot_entry_at_key_(State = {{_DB, _FileName}, _Subscr, SnapTable}, Key) ->
+delete_snapshot_entry_at_key_(State = {{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Key) ->
+    {_, OldEntry} = get_snapshot_entry_(State,Key),
+    NewSnapLC = db_entry:update_lockcount(OldEntry,db_entry:new(Key),SnapLC),
     ets:delete(SnapTable, Key),
-    State.
+    {{_DB, _FileName},_Subscr,{SnapTable,NewSnapLC,_LiveLC}}.
 
 %% @doc Removes all values with the given entry's key from the Snapshot DB.
 -spec delete_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
@@ -456,8 +460,14 @@ delete_snapshot_entry_(State, Entry) ->
     Key = db_entry:get_key(Entry),
     delete_snapshot_entry_at_key_(State, Key).
 
--spec clear_snapshot_(DB::db_t()) -> NewDB::db_t().
-clear_snapshot_({{_DB, _FileName}, _Subscr, SnapTable}) ->
-    ets:delete(SnapTable).
+-spec init_snapshot_(DB::db_t()) -> NewDB::db_t().
+init_snapshot_({{_DB, _FileName}, _Subscr, {SnapTable,LiveLC,_SnapLC}}) ->
+    ets:delete(SnapTable),
+    SnapDBName = "db_" ++ randoms:getRandomString() ++ ":snapshot",
+    {{_DB, _FileName}, _Subscr, {ets:new(list_to_atom(SnapDBName), [ordered_set, private]),LiveLC,LiveLC}}.
+
+-spec snapshot_is_lockfree_(DB::db_t()) -> boolean().
+snapshot_is_lockfree_({{_DB, _FileName}, _Subscr, {_SnapTable, _LiveLC, SnapLC}}) ->
+    SnapLC =:= 0.
 
 % end snapshot-related functions

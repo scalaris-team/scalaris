@@ -29,7 +29,7 @@
          get_writelock/1, set_writelock/2, unset_writelock/1,
          get_version/1,
          reset_locks/1, is_locked/1,
-         is_empty/1, is_null/1]).
+         is_empty/1, is_null/1, update_lockcount/3]).
 
 % only for unit tests:
 -export([inc_version/1, dec_version/1]).
@@ -127,3 +127,19 @@ is_empty(_) -> false.
 -spec is_null(entry()) -> boolean().
 is_null({_Key, empty_val, false, 0, -1}) -> true;
 is_null(_) -> false.
+
+%% @doc Helper for lock bookkeeping. Compares two db_entries and updates counter accordingly
+-spec update_lockcount(OldEntry::entry(),NewEntry::entry(),LC::non_neg_integer()) ->
+          {non_neg_integer(), non_neg_integer()}.
+update_lockcount(OldEntry,NewEntry,LC) ->
+    TmpLC = LC + (get_readlock(NewEntry) - get_readlock(OldEntry)),
+    case get_writelock(NewEntry) of
+        true    ->  case get_writelock(OldEntry) of
+                       true -> TmpLC; 
+                       false -> TmpLC + 1
+                    end; 
+        false   ->  case get_writelock(OldEntry) of
+                       true -> TmpLC - 1; 
+                       false -> TmpLC
+                    end
+    end.
