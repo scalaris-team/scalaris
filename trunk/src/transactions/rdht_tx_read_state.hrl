@@ -61,7 +61,7 @@
 
 -spec state_new(rdht_tx:req_id()) -> read_state().
 state_new(Id) ->
-    {Id, unknown, unknown, 0, 0, {?fail, 0, -2}, false, false, ?read}.
+    {Id, unknown, unknown, 0, 0, {?fail, 0, -2}, false, false, 0, ?read}.
 
 -spec state_get_id(read_state()) -> rdht_tx:req_id().
 state_get_id(State) ->              element(1, State).

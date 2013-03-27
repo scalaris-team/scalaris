@@ -138,12 +138,12 @@ is_null(_) -> false.
 update_lockcount(OldEntry,NewEntry,LC) ->
     TmpLC = LC + (get_readlock(NewEntry) - get_readlock(OldEntry)),
     case get_writelock(NewEntry) of
-        true    ->  case get_writelock(OldEntry) of
-                       true -> TmpLC; 
-                       false -> TmpLC + 1
-                    end; 
         false   ->  case get_writelock(OldEntry) of
-                       true -> TmpLC - 1; 
-                       false -> TmpLC
+                       false -> TmpLC;
+                       _ -> TmpLC - 1 
+                    end;
+        _    ->  case get_writelock(OldEntry) of
+                       false -> TmpLC + 1;
+                       _ -> TmpLC
                     end
     end.

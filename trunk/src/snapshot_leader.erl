@@ -53,12 +53,12 @@ on({init_snapshot,Client},State) ->
     ?TRACE("snapshot_leader got init_snapshot~n",[]),
     NewSnapNum = snapshot_leader_state:get_number(State) + 1,
     % send init_snapshot to all dht_nodes
-    bulkowner:issue_bulk_owner(util:get_global_uid(), intervals:all(), {do_snapshot, NewSnapNum, comm:this()}),
+    bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), {do_snapshot, NewSnapNum, comm:this()}),
     snapshot_leader_state:new(NewSnapNum, true,Client);
 
 % TODO: too much redundant code below -> break this up into several functions
 
-on({local_snapshot_done, From, SnapNumber, Range, Snapshot}, State) ->
+on({local_snapshot_done, _From, SnapNumber, Range, Snapshot}, State) ->
     ?TRACE("snapshot_leader got local_snapshot_done from ~p for range ~p~n",[From,Range]),
     case (snapshot_leader_state:is_in_progress(State) 
          andalso SnapNumber =:= snapshot_leader_state:get_number(State)) of
