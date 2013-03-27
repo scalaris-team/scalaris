@@ -52,6 +52,7 @@
 -callback set_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
 -callback update_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
 -callback delete_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
+-callback copy_value_to_snapshot_table(DB::db(), Key::?RT:key()) -> NewDB::db().
 
 % convenience methods:
 -callback read(DB::db(), Key::?RT:key())
@@ -91,6 +92,10 @@
 
 -callback get_data(DB::db()) -> db_as_list().
 -callback add_data(DB::db(), db_as_list()) -> NewDB::db().
+
+% snapshots:
+-callback get_snapshot_data(DB::db()) -> db_as_list().
+-callback join_snapshot_data(DB::db()) -> db_as_list().
 
 % subscriptions:
 -callback set_subscription(DB::db(), subscr_t()) -> db().

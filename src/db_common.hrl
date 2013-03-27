@@ -23,6 +23,9 @@
 %% @end
 %% @version $Id$
 
+-define(TRACE(X,Y), io:format(X,Y)).
+%-define(TRACE(X,Y), ok).
+
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).
 -spec close_(DB::db_t()) -> any().
@@ -46,7 +49,7 @@ read(DB, Key) ->
 %% @doc Updates the value of the given key.
 -spec write(DB::db(), Key::?RT:key(), Value::value(), Version::version()) ->
          NewDB::db().
-write(DB, Key, Value, Version) ->
+write(DB, Key, Value, Version) ->   
     {Exists, DBEntry} = get_entry2_(DB, Key),
     case Exists of
         false ->
@@ -183,7 +186,7 @@ remove_subscription_(State = {_DB, Subscr}, Tag) ->
 %% @doc Go through all subscriptions and perform the given operation if
 %%      matching.
 -spec call_subscribers(State::db_t(), Operation::close_db | subscr_op_t()) -> db_t().
-call_subscribers(State = {_DB, Subscr}, Operation) ->
+call_subscribers(State = {_DB, Subscr, _SnapTable}, Operation) ->
     call_subscribers_iter(State, Operation, ets:first(Subscr)).
 
 %% @doc Iterates over all susbcribers and calls their subscribed functions.
