@@ -39,30 +39,31 @@ SCALARISMON="@bindir@/scalaris --jvmopts \"-Dcom.sun.management.jmxremote=true -
 
 # For SELinux we need to use 'runuser' not 'su'
 if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
-    SU="$RUNUSER $SCALARIS_USER -s /bin/bash -c"
+    SU="$RUNUSER"
 else
-    SU="$SU $SCALARIS_USER -s /bin/bash -c"
+    SU="$SU"
 fi
+SU_CMD="$SU $SCALARIS_USER -s /bin/bash -c"
 
 start() {
-    if [ -f $PID_DS ]; then
+    if [ -f "$PID_DS" ]; then
         PROCPID=`cat $PID_DS`
-        if [ -e /proc/$PROCPID ];then
+        if [ -e "/proc/$PROCPID" ];then
             echo "Scalaris monitor for \"${SCALARIS_NODE}\" already started"
             return 0
         fi
     fi
 
-    echo >> $LOG_DS
-    date >> $LOG_DS
-    echo -e "Starting Scalaris monitor for \"${SCALARIS_NODE}\"...\n\n" >> $LOG_DS
+    echo >> "$LOG_DS"
+    date >> "$LOG_DS"
+    echo -e "Starting Scalaris monitor for \"${SCALARIS_NODE}\"...\n\n" >> "$LOG_DS"
     echo -n "Starting Scalaris monitor for \"${SCALARIS_NODE}\"... "
-    $SU "$SCALARISMON" >> $LOG_DS 2>&1 &
+    $SU_CMD "$SCALARISMON" >> "$LOG_DS" 2>&1 &
     PROCPID=$!
-    echo $PROCPID > $PID_DS
+    echo $PROCPID > "$PID_DS"
     sleep 1s
 
-    if [ -e /proc/$PROCPID ]; then
+    if [ -e "/proc/$PROCPID" ]; then
         echo "success"
     else
         echo "failed"
@@ -74,12 +75,12 @@ start() {
 
 stop() {
     result=0
-    if [ -f $PID_DS ]; then
+    if [ -f "$PID_DS" ]; then
         echo -n "Stopping Scalaris monitor for \"${SCALARIS_NODE}\"... "
-        killproc -p $PID_DS $SU
+        killproc -p "$PID_DS" "$SU"
         result=$?
         if [ $result -eq 0 ]; then
-            rm -f $PID_DS
+            rm -f "$PID_DS"
             echo "success"
         else
             echo "failed"
@@ -92,9 +93,9 @@ stop() {
 }
 
 status() {
-    if [ -f $PID_DS ]; then
+    if [ -f "$PID_DS" ]; then
         PROCPID=`cat $PID_DS`
-        if [ ! -e /proc/$PROCPID ];then
+        if [ ! -e "/proc/$PROCPID" ];then
             echo "Scalaris monitor for \"${SCALARIS_NODE}\" has crashed"
             return 1 # program is dead and /var/run pid file exists
         else
