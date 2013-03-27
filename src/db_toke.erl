@@ -24,7 +24,7 @@
 
 -behaviour(db_beh).
 
--type db_t() :: {{DB::pid(), FileName::string()}, SubscrTable::tid() | atom(),{SnapTable::tid() | atom(), non_neg_integer(), non_neg_integer()}}.
+-type db_t() :: {{DB::pid(), FileName::string()}, SubscrTable::tid() | atom(),{SnapTable::tid() | atom() | boolean(), non_neg_integer(), non_neg_integer()}}.
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
@@ -461,7 +461,12 @@ delete_snapshot_entry_(State, Entry) ->
 
 -spec init_snapshot_(DB::db_t()) -> NewDB::db_t().
 init_snapshot_({{_DB, _FileName}, _Subscr, {SnapTable,LiveLC,_SnapLC}}) ->
-    ets:delete(SnapTable),
+    case SnapTable of
+        false ->
+            ets:delete(SnapTable);
+        _ -> 
+            ok
+    end,
     SnapDBName = "db_" ++ randoms:getRandomString() ++ ":snapshot",
     {{_DB, _FileName}, _Subscr, {ets:new(list_to_atom(SnapDBName), [ordered_set, private]),LiveLC,LiveLC}}.
 

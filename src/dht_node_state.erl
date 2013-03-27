@@ -198,9 +198,9 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         proposer     -> Proposer;
         slide_pred   -> SlidePred;
         slide_succ   -> SlideSucc;
-		snapshot_state -> SnapState;
         rm_state     -> RMState;
         monitor_proc -> MonitorProc;
+        snapshot_state -> SnapState;
         succlist     -> nodelist:succs(rm_loop:get_neighbors(RMState));
         succ         -> nodelist:succ(rm_loop:get_neighbors(RMState));
         succ_id      -> node:id(nodelist:succ(rm_loop:get_neighbors(RMState)));
