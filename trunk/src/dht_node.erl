@@ -55,6 +55,10 @@
       {?lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
       {?lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
 
+-type(snapshot_message() ::
+      {do_snapshot, SnapNumber::non_neg_integer(), Leader::any()} |
+      {local_snapshot_is_done}).
+
 -type(rt_message() ::
       {rt_update, RoutingTable::?RT:external_rt()}).
 
@@ -78,6 +82,7 @@
     rt_message() |
     dht_node_move:move_message() |
     misc_message() |
+    snapshot_message() |
     {zombie, Node::node:node_type()} |
     {crash, DeadPid::comm:mypid()} |
     {crash, DeadPid::comm:mypid(), Cookie::tuple()} |
