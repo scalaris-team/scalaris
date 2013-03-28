@@ -130,7 +130,7 @@ is_null(_) -> false.
 
 %% @doc Helper for lock bookkeeping. Compares two db_entries and updates counter accordingly
 %% It assumes that only related entries are compared, i.e. it is assumed that no locks are
-%& released that are not held in the first place. With random parameters it is possible
+%% released that are not held in the first place. With random parameters it is possible
 %% that we return a negative number (hence the spec integer() to make the unit tests happy)
 %% but that shouldn't be a problem if we compare only entries and their immediate replacements.
 -spec update_lockcount(OldEntry::entry(),NewEntry::entry(),LC::non_neg_integer()) ->
