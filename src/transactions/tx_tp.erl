@@ -1,5 +1,4 @@
-%% @copyright 2009-2012 Zuse Institute Berlin
-%%            2010 onScale solutions GmbH
+%% @copyright 2009-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,12 +12,12 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%% @author Florian Schintke <schintke@onscale.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc Part of generic transactions implementation using Paxos Commit
 %%           The role of a transaction participant.
 %% @version $Id$
 -module(tx_tp).
--author('schintke@onscale.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 -include("scalaris.hrl").
@@ -50,7 +49,7 @@ init() ->
                   dht_node_state:state()) -> dht_node_state:state().
 %% messages handled in dht_node context:
 %% PreCond: check for DB responsibility must still be valid (ref. lookup_fin handling)
-on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo} = Params, DHT_Node_State) ->
+on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo}, DHT_Node_State) ->
     %?TRACE("tx_tp:on_init_TP({..., ...})~n", []),
     %% validate locally via callback
     DB = dht_node_state:get(DHT_Node_State, db),
@@ -82,7 +81,7 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo} = Params, D
             %% remember own proposal for lock release
             TP_DB = dht_node_state:get(DHT_Node_State, tx_tp_db),
             pdb:set({PaxId, Proposal}, TP_DB),
-            
+
             dht_node_state:set_db(DHT_Node_State, TmpDB)%;
 %%         false ->
 %%             %% forward commit to now responsible node
@@ -165,7 +164,7 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DH
                 end,
             comm:send(TM, {?tp_committed, TMItemId}),
             % check if snapshot is running and if so, if it's already done
-            SnapState = dht_node_state:get(DHT_Node_State, snapshot_state),            
+            SnapState = dht_node_state:get(DHT_Node_State, snapshot_state),
             case {snapshot_state:is_in_progress(SnapState),?DB:snapshot_is_running(Res),?DB:snapshot_is_lockfree(Res)} of
                 {true,true,true} ->
                     ?TRACE("~p tx_tp:update_db_or_forward snapshot is finally done~n",[comm:this()]),
@@ -175,7 +174,7 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DH
                     ?TRACE("~p tx_tp:update_db_or_forward db: ~p~n",[comm:this(),Res]),
                     ?TRACE("~p tx_tp:update_db_or_forward db data: ~p~n",[comm:this(),?DB:get_data(Res)]),
                     ?TRACE("~p tx_tp:update_db_or_forward snapshot data: ~p~n",[comm:this(),?DB:get_snapshot_data(Res)]);
-                _ ->                    
+                _ ->
                     ok
             end,
             Res;
