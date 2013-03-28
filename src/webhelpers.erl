@@ -457,7 +457,7 @@ renderRing({ok, Details}) ->
         fun(NodeX) ->
                 case get_indexed_id_by_node(NodeX) of
                     undefined -> lists:flatten(
-                                   io:format("<b>~p</b>", [node:id(NodeX)]));
+                                   io_lib:format("<b>~p</b>", [node:id(NodeX)]));
                     X         -> X
                 end
         end,
