@@ -260,7 +260,7 @@ set_snapshot_entry_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Entry)
     end.
 
 
--spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
+-spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
 get_snapshot_entry_({_DB, _Subscr, {SnapTable, _, _}}, Key) ->
     case ets:lookup(SnapTable, Key) of
         [Entry] -> {true, Entry};

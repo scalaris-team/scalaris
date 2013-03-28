@@ -24,7 +24,8 @@
 
 -behaviour(db_beh).
 
--type db_t() :: {{DB::pid(), FileName::string()}, SubscrTable::tid() | atom(),{SnapTable::tid() | atom() | boolean(), non_neg_integer(), non_neg_integer()}}.
+-type db_t() :: {{DB::pid(), FileName::string()}, SubscrTable::tid() | atom(),
+                 {SnapTable::tid() | atom() | boolean(), non_neg_integer(), non_neg_integer()}}.
 
 % Note: must include db_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
@@ -454,8 +455,8 @@ set_snapshot_entry_(State = {{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, Sna
     end.
 
 
--spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
-get_snapshot_entry_({{_DB, _FileName}, _Subscr, SnapTable}, Key) ->
+-spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
+get_snapshot_entry_({{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, _SnapLC}}, Key) ->
     case ets:lookup(SnapTable, Key) of
         [Entry] -> {true, Entry};
         []      -> {false, db_entry:new(Key)}

@@ -377,11 +377,11 @@ set_snapshot_entry_({DB, Counter} = _DB_, Entry) ->
     verify_counter(Counter),
     {?BASE_DB:set_snapshot_entry(DB, Entry), update_counter(Counter)}.
 
--spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
-get_snapshot_entry_({DB, Counter} = _DB_, Key) -> 
-    ?TRACE2(get_snapshot_entry, _DB_, Entry),
+-spec get_snapshot_entry_(DB::db_t(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
+get_snapshot_entry_({DB, Counter} = _DB_, Key) ->
+    ?TRACE2(get_snapshot_entry, _DB_, Key),
     verify_counter(Counter),
-    {?BASE_DB:get_snapshot_entry(DB, Key), update_counter(Counter)}.
+    ?BASE_DB:get_snapshot_entry(DB, Key).
 
 -spec delete_snapshot_entry_at_key_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
 delete_snapshot_entry_at_key_({DB, Counter} = _DB_, Key) ->

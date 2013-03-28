@@ -187,7 +187,7 @@ join_snapshot_data(DB) -> join_snapshot_data_(DB).
 -spec set_snapshot_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
 set_snapshot_entry(DB, Entry) -> set_snapshot_entry_(DB, Entry).
 
--spec get_snapshot_entry(DB::db(), Key::?RT:key()) -> NewDB::db().
+-spec get_snapshot_entry(DB::db(), Key::?RT:key()) -> {Exists::boolean(), db_entry:entry()}.
 get_snapshot_entry(DB, Key) -> get_snapshot_entry_(DB, Key).
 
 -spec delete_snapshot_entry_at_key(DB::db(), Key::?RT:key()) -> NewDB::db().
