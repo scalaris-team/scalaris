@@ -1,5 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin,
-%            2009 onScale solutions
+% @copyright 2009-2013 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,12 +12,12 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%% @author Florian Schintke <schintke@onscale.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc    In-process database using ets
 %% @end
 %% @version $Id$
 -module(db_ets).
--author('schintke@onscale.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 -include("scalaris.hrl").
@@ -228,16 +227,16 @@ get_snapshot_data_({_DB, _Subscr, {SnapTable, _, _}}) ->
 
 %% @doc Join snapshot and primary db such that all tuples in the primary db are replaced
 %%      if there is a matching tuple available in the snapshot set. The other tuples are
-%%      returned as is. 
--spec join_snapshot_data_(State::db_t()) -> db_as_list(). 
+%%      returned as is.
+-spec join_snapshot_data_(State::db_t()) -> db_as_list().
 join_snapshot_data_(State) ->
     PrimaryDB = lists:keysort(1, get_data_(State)),
     SnapshotDB = lists:keysort(1, get_snapshot_data_(State)),
-    Fun = 
-        fun([], Result, _) -> 
-                Result; 
-           ([{Key, _, _, _, _} = Tuple | More] , List2, F) -> 
-                Newlist = lists:keyreplace(Key, 1, List2, Tuple), 
+    Fun =
+        fun([], Result, _) ->
+                Result;
+           ([{Key, _, _, _, _} = Tuple | More] , List2, F) ->
+                Newlist = lists:keyreplace(Key, 1, List2, Tuple),
                 F(More, Newlist,F)
         end,
     Fun(SnapshotDB,PrimaryDB,Fun).
@@ -245,7 +244,7 @@ join_snapshot_data_(State) ->
 -spec set_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 set_snapshot_entry_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Entry) ->
     case db_entry:is_null(Entry) of
-        true -> delete_snapshot_entry_(State, Entry);        
+        true -> delete_snapshot_entry_(State, Entry);
         % if there is a snapshot entry for this key, we base our lock calculation off that,
         % if not, we have to consider the live db because of the copy-on-write logic
         _    -> case get_snapshot_entry_(State,db_entry:get_key(Entry)) of
@@ -267,7 +266,7 @@ get_snapshot_entry_({_DB, _Subscr, {SnapTable, _, _}}, Key) ->
         []      -> {false, db_entry:new(Key)}
     end.
 
--spec delete_snapshot_entry_at_key_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
+-spec delete_snapshot_entry_at_key_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
 delete_snapshot_entry_at_key_(State = {_DB, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Key) ->
     case get_snapshot_entry_(State,Key) of
         {true, OldEntry} ->

@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -462,7 +462,7 @@ get_snapshot_entry_({{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, _SnapLC}}, 
         []      -> {false, db_entry:new(Key)}
     end.
 
--spec delete_snapshot_entry_at_key_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
+-spec delete_snapshot_entry_at_key_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
 delete_snapshot_entry_at_key_(State = {{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Key) ->
     case get_snapshot_entry_(State,Key) of
         {true, OldEntry} ->
