@@ -108,17 +108,17 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
     if ((RTVers =:= DBVers andalso ReadLocks =:= 0) orelse RTVers > DBVers) andalso
            (WriteLock =:= false orelse WriteLock < RTVers) andalso SnapNumbersOK->
            %% if a snapshot instance is running, copy old value to snapshot db before setting lock
-           case ?DB:snapshot_is_running(DB) of
-               true ->
-                   ?DB:copy_value_to_snapshot_table(DB,db_entry:get_key(DBEntry));
-               false -> 
-                   DB
-           end,
+           DB1 = case ?DB:snapshot_is_running(DB) of
+                     true ->
+                         ?DB:copy_value_to_snapshot_table(DB,db_entry:get_key(DBEntry));
+                     false -> 
+                         DB
+                 end,
            %% set locks on entry (use RTVers for write locks to allow proper
            %% handling of outdated commit and abort messages - only clean up
            %% if the write lock version matches!)
            NewEntry = db_entry:set_writelock(DBEntry, RTVers),
-           NewDB = ?DB:set_entry(DB, NewEntry),
+           NewDB = ?DB:set_entry(DB1, NewEntry),
            {NewDB, ?prepared};
        true ->
            {DB, ?abort}

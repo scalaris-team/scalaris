@@ -45,7 +45,7 @@ init() ->
                   [comm:mypid()], [comm:mypid()], comm:mypid(),
                   tx_tlog:tlog_entry(),
                   tx_tm_rtm:tx_item_id(),
-                  tx_tm_rtm:paxos_id()},
+                  tx_tm_rtm:paxos_id(), tx_tlog:snap_number()},
                   dht_node_state:state()) -> dht_node_state:state().
 %% messages handled in dht_node context:
 %% PreCond: check for DB responsibility must still be valid (ref. lookup_fin handling)
