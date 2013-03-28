@@ -274,14 +274,23 @@ flush_ring_cache() ->
 extract_ring_info([]) ->
     [];
 extract_ring_info([RingE]) ->
-    MyId = node:id(node_details:get(RingE, node)),
+    Node = node_details:get(RingE, node),
+    MyId = node:id(Node),
     PredId = node:id(node_details:get(RingE, pred)),
     MyIndexStr = case get_indexed_id_by_id(MyId) of
                      undefined -> "";
                      MyIndex -> integer_to_list(MyIndex) ++ ": "
                  end,
-    Label = MyIndexStr ++ node_details:get(RingE, hostname) ++ " (" ++
-                integer_to_list(node_details:get(RingE, load)) ++ ")",
+    NodePid = node:pidX(Node),
+    case comm:get_ip(NodePid) of
+        {NodeIP1, NodeIP2, NodeIP3, NodeIP4} -> ok;
+        _ -> NodeIP1 = NodeIP2 = NodeIP3 = NodeIP4 = 0
+    end,
+    NodePort = comm:get_port(NodePid),
+    Label = lists:flatten(io_lib:format("~s~s / ~B.~B.~B.~B:~B (~B)",
+                  [MyIndexStr, node_details:get(RingE, hostname),
+                   NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort,
+                   node_details:get(RingE, load)])),
     case MyId =:= PredId of
         true -> [{Label, "100.00", true}];
         _ ->
@@ -306,7 +315,8 @@ extract_ring_info([RingE1, RingE2 | Rest], First, Acc) ->
 -spec extract_ring_info2(RingE1::node_details:node_details(), RingE2::node_details:node_details())
         -> [{Label::string(), Value::string(), Known::boolean()}].
 extract_ring_info2(RingE1, RingE2) ->
-    E1_MyId = node:id(node_details:get(RingE1, node)),
+    E1_Node = node_details:get(RingE1, node),
+    E1_MyId = node:id(E1_Node),
     E1_PredId = node:id(node_details:get(RingE1, pred)),
     E2_PredId = node:id(node_details:get(RingE2, pred)),
     E1_Diff = ?RT:get_range(E1_PredId, E1_MyId) * 100 / ?RT:n(),
@@ -314,8 +324,16 @@ extract_ring_info2(RingE1, RingE2) ->
                         undefined -> "";
                         E1_MyIndex -> integer_to_list(E1_MyIndex) ++ ": "
                     end,
-    E1_Label = E1_MyIndexStr ++ node_details:get(RingE1, hostname) ++ " (" ++
-                   integer_to_list(node_details:get(RingE1, load)) ++ ")",
+    E1_NodePid = node:pidX(E1_Node),
+    case comm:get_ip(E1_NodePid) of
+        {E1_NodeIP1, E1_NodeIP2, E1_NodeIP3, E1_NodeIP4} -> ok;
+        _ -> E1_NodeIP1 = E1_NodeIP2 = E1_NodeIP3 = E1_NodeIP4 = 0
+    end,
+    E1_NodePort = comm:get_port(E1_NodePid),
+    E1_Label = lists:flatten(io_lib:format("~s~s / ~B.~B.~B.~B:~B (~B)",
+                  [E1_MyIndexStr, node_details:get(RingE1, hostname),
+                   E1_NodeIP1, E1_NodeIP2, E1_NodeIP3, E1_NodeIP4, E1_NodePort,
+                   node_details:get(RingE1, load)])),
     E1_Me_val = io_lib:format("~f", [E1_Diff]),
     case E1_MyId =:= E2_PredId of
         true -> [{E1_Label, E1_Me_val, true}];
@@ -408,7 +426,7 @@ getRingRendered() ->
               {table, [{bgcolor, "#CCDCEE"}, {width, "100%"}],
                [{tr, [{bgcolor, "#000099"}],
                  [
-                  {td, [{align, "center"}, {width,"200px"}], {strong, [], {font, [{color, "white"}], "Host"}}},
+                  {td, [{align, "center"}, {width,"350px"}], {strong, [], {font, [{color, "white"}], "Host"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Preds"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succs"}}},
@@ -435,15 +453,25 @@ renderRing({ok, Details}) ->
                      undefined -> dead_node();
                      MyIndex -> MyIndex
                  end,
-    NodeListFun = fun(NodeX) ->
-                          case get_indexed_id_by_node(NodeX) of
-                              undefined -> node:id(NodeX);
-                              X         -> "<b>" ++ integer_to_list(X) ++ "</b>"
-                          end
-                  end,
+    NodeListFun =
+        fun(NodeX) ->
+                case get_indexed_id_by_node(NodeX) of
+                    undefined -> lists:flatten(
+                                   io:format("<b>~p</b>", [node:id(NodeX)]));
+                    X         -> X
+                end
+        end,
+    NodePid = node:pidX(Node),
+    case comm:get_ip(NodePid) of
+        {NodeIP1, NodeIP2, NodeIP3, NodeIP4} -> ok;
+        _ -> NodeIP1 = NodeIP2 = NodeIP3 = NodeIP4 = 0
+    end,
+    NodePort = comm:get_port(NodePid),
     {tr, [], 
       [
-       {td, [], [get_flag(Hostname), io_lib:format("~p", [Hostname])]},
+       {td, [], [get_flag(Hostname),
+                 io_lib:format("~p (~B.~B.~B.~B:~B)",
+                               [Hostname, NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort])]},
        {td, [], io_lib:format("~.100p", [[NodeListFun(N) || N <- PredList]])},
        {td, [], io_lib:format("~p:&nbsp;~p", [MyIndexStr, node:id(Node)])},
        {td, [], io_lib:format("~.100p", [[NodeListFun(N) || N <- SuccList]])},
@@ -496,7 +524,7 @@ getIndexedRingRendered() ->
               {table, [{bgcolor, "#CCDCEE"}, {width, "100%"}],
                [{tr, [{bgcolor, "#000099"}],
                  [
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Host"}}},
+                  {td, [{align, "center"}, {width,"350px"}], {strong, [], {font, [{color, "white"}], "Host"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Preds Offset"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succs Offsets"}}},
@@ -531,9 +559,17 @@ renderIndexedRing({ok, Details}) ->
                      undefined -> dead_node();
                      X -> X
                  end,
+    NodePid = node:pidX(Node),
+    case comm:get_ip(NodePid) of
+        {NodeIP1, NodeIP2, NodeIP3, NodeIP4} -> ok;
+        _ -> NodeIP1 = NodeIP2 = NodeIP3 = NodeIP4 = 0
+    end,
+    NodePort = comm:get_port(NodePid),
     {tr, [],
       [
-       {td, [], [get_flag(Hostname), io_lib:format("~p", [Hostname])]},
+       {td, [], [get_flag(Hostname),
+                 io_lib:format("~p (~B.~B.~B.~B:~B)",
+                               [Hostname, NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort])]},
        case hd(PredIndex) =:= -1 of
            true->
                {td, [], io_lib:format("~p", [PredIndex])};
