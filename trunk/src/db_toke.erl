@@ -424,17 +424,17 @@ get_snapshot_data_({{_DB, _FileName}, _Subscr, {SnapTable, _, _}}) ->
 %%      if there is a matching tuple available in the snapshot set. The other tuples are
 %%      returned as is.
 -spec join_snapshot_data_(DB::db_t()) -> db_as_list(). 
-join_snapshot_data_(State = {{_DB, _FileName}, _Subscr, {SnapTable, _, _}}) ->
+join_snapshot_data_(State) ->
     PrimaryDB = lists:keysort(1, get_data_(State)),
-    SnapshotDB = lists:keysort(1, get_snapshot_data_(SnapTable)),
-    Fun = 
-        fun([], Result, _) -> 
-                Result; 
-           ([{Key, _, _, _, _} = Tuple | More] , List2, F) -> 
-                Newlist = lists:keyreplace(Key, 1, List2, Tuple), 
-                F(More, Newlist,F)
-        end,
-    Fun(SnapshotDB,PrimaryDB,Fun).
+    SnapshotDB = lists:keysort(1, get_snapshot_data_(State)),
+    join_snapshot_data_helper(SnapshotDB, PrimaryDB).
+
+-spec join_snapshot_data_helper(SnapshotDB::db_as_list(), PrimaryDB::db_as_list())
+        -> db_as_list().
+join_snapshot_data_helper([], Result) -> Result;
+join_snapshot_data_helper([{Key, _, _, _, _} = Tuple | More], List2) ->
+    Newlist = lists:keyreplace(Key, 1, List2, Tuple), 
+    join_snapshot_data_helper(More, Newlist).
 
 -spec set_snapshot_entry_(DB::db_t(), Entry::db_entry:entry()) -> NewDB::db_t().
 set_snapshot_entry_(State = {{_DB, _FileName}, _Subscr, {SnapTable, _LiveLC, SnapLC}}, Entry) ->    

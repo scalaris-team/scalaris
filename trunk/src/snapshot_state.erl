@@ -19,56 +19,56 @@
 -author('keidel@informatik.hu-berlin.de').
 -vsn('$Id$').
 
--export([new/0,new/3,get_number/1,is_in_progress/1,get_leaders/1,
-         set_number/2,add_leader/2,start_progress/1,stop_progress/1]).
+-export([new/0, new/3, get_number/1, is_in_progress/1, get_leaders/1,
+         set_number/2, add_leader/2, start_progress/1, stop_progress/1]).
 
 -ifdef(with_export_type_support).
 -export_type([snapshot_state/0]).
 -endif.
 
--type(snapshot_state() :: {SnapNo::non_neg_integer(),InProgress::boolean(),Leaders::list()}).
+-type(snapshot_state() :: {SnapNo::non_neg_integer(), InProgress::boolean(), Leaders::list()}).
 
 % constructors
 
 -spec new() -> snapshot_state().
 new() ->
-    erlang:put("local_snap_number",0),
-    {0,false,[]}.
+    erlang:put("local_snap_number", 0),
+    {0, false, []}.
 
--spec new(non_neg_integer(),boolean(),list()) -> snapshot_state().
-new(Number,InProgress,Leaders) ->
-    erlang:put("local_snap_number",Number),
-    {Number,InProgress,Leaders}.
+-spec new(non_neg_integer(), boolean(), list()) -> snapshot_state().
+new(Number, InProgress, Leaders) ->
+    erlang:put("local_snap_number", Number),
+    {Number, InProgress, Leaders}.
 
 % getters
 
 -spec get_number(snapshot_state()) -> non_neg_integer().
-get_number({Number,_,_}) -> Number.
+get_number({Number, _, _}) -> Number.
 
 -spec is_in_progress(snapshot_state()) -> boolean().
-is_in_progress({_,InProgress,_}) -> InProgress.
+is_in_progress({_, InProgress, _}) -> InProgress.
 
 -spec get_leaders(snapshot_state()) -> list().
-get_leaders({_,_,Leaders}) -> Leaders.
+get_leaders({_, _, Leaders}) -> Leaders.
 
 % setters
 
 -spec set_number(snapshot_state(), non_neg_integer()) -> snapshot_state().
-set_number(SnapInfo,NewVal) -> 
-    erlang:put("local_snap_number",NewVal),
-    setelement(1,SnapInfo,NewVal).
+set_number(SnapInfo, NewVal) -> 
+    erlang:put("local_snap_number", NewVal),
+    setelement(1, SnapInfo, NewVal).
 
--spec add_leader(snapshot_state(),any()) -> snapshot_state().
-add_leader({Number,InProgress,Leaders},NewLeader) ->
+-spec add_leader(snapshot_state(), any()) -> snapshot_state().
+add_leader({Number, InProgress, Leaders}, NewLeader) ->
     case NewLeader of
         none ->
-            {Number,InProgress,Leaders};
+            {Number, InProgress, Leaders};
         _ ->
-            {Number,InProgress,[NewLeader | Leaders]}
+            {Number, InProgress, [NewLeader | Leaders]}
     end.
   
 -spec start_progress(snapshot_state()) -> snapshot_state().
-start_progress(SnapInfo) -> setelement(2,SnapInfo,true).
+start_progress(SnapInfo) -> setelement(2, SnapInfo, true).
 
 -spec stop_progress(snapshot_state()) -> snapshot_state().
-stop_progress(SnapInfo) -> setelement(2,SnapInfo,false).
+stop_progress(SnapInfo) -> setelement(2, SnapInfo, false).

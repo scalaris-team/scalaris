@@ -262,15 +262,15 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
     SnapNumbersOK = (tx_tlog:get_entry_snapshot(RTLogEntry) >= LocalSnapNumber),
     if VersionOK andalso Lockable andalso SnapNumbersOK ->
            %% if a snapshot instance is running, copy old value to snapshot db before setting lock
-           case ?DB:snapshot_is_running(DB) of
-               true ->
-                   ?DB:copy_value_to_snapshot_table(DB,db_entry:get_key(DBEntry));
-               false -> 
-                   DB
-           end,
+           DB1 = case ?DB:snapshot_is_running(DB) of
+                     true ->
+                         ?DB:copy_value_to_snapshot_table(DB, db_entry:get_key(DBEntry));
+                     false -> 
+                         DB
+                 end,
            %% set locks on entry
            NewEntry = db_entry:inc_readlock(DBEntry),
-           NewDB = ?DB:set_entry(DB, NewEntry),
+           NewDB = ?DB:set_entry(DB1, NewEntry),
            {NewDB, ?prepared};
        true ->
            {DB, ?abort}
