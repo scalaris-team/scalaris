@@ -26,7 +26,7 @@
 -export_type([snapshot_state/0]).
 -endif.
 
--type(snapshot_state() :: {SnapNo::non_neg_integer(), InProgress::boolean(), Leaders::list()}).
+-type(snapshot_state() :: {SnapNo::non_neg_integer(), InProgress::boolean(), Leaders::[comm:mypid()]}).
 
 % constructors
 
@@ -35,10 +35,10 @@ new() ->
     erlang:put("local_snap_number", 0),
     {0, false, []}.
 
--spec new(non_neg_integer(), boolean(), list()) -> snapshot_state().
+-spec new(non_neg_integer(), boolean(), [comm:mypid() | none]) -> snapshot_state().
 new(Number, InProgress, Leaders) ->
     erlang:put("local_snap_number", Number),
-    {Number, InProgress, Leaders}.
+    {Number, InProgress, [X || X <- Leaders, X =/= none]}.
 
 % getters
 
@@ -48,7 +48,7 @@ get_number({Number, _, _}) -> Number.
 -spec is_in_progress(snapshot_state()) -> boolean().
 is_in_progress({_, InProgress, _}) -> InProgress.
 
--spec get_leaders(snapshot_state()) -> list().
+-spec get_leaders(snapshot_state()) -> [comm:mypid()].
 get_leaders({_, _, Leaders}) -> Leaders.
 
 % setters
@@ -58,14 +58,10 @@ set_number(SnapInfo, NewVal) ->
     erlang:put("local_snap_number", NewVal),
     setelement(1, SnapInfo, NewVal).
 
--spec add_leader(snapshot_state(), any()) -> snapshot_state().
+-spec add_leader(snapshot_state(), comm:mypid() | none) -> snapshot_state().
+add_leader(State, none) -> State;
 add_leader({Number, InProgress, Leaders}, NewLeader) ->
-    case NewLeader of
-        none ->
-            {Number, InProgress, Leaders};
-        _ ->
-            {Number, InProgress, [NewLeader | Leaders]}
-    end.
+    {Number, InProgress, [NewLeader | Leaders]}.
   
 -spec start_progress(snapshot_state()) -> snapshot_state().
 start_progress(SnapInfo) -> setelement(2, SnapInfo, true).
