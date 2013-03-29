@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -255,7 +255,7 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
                        %% copy the dictionary of the original tester process
                        %% to worker threads (allows to join a pid_group if
                        %% necessary for a test
-                       [ erlang:put(K, V) || {K, V} <- Dict ],
+                       _ = [ erlang:put(K, V) || {K, V} <- Dict ],
                        Result = run(Module, Func, Arity,
                                     Iterations div Threads, ParseState, Options,
                                     Thread),
@@ -353,20 +353,23 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
                      false -> skipped
                  end,
 
-          %% %% if Fun is a feeder, crosscheck existance of tested fun,
-          %% %% but do not trigger tests for that.
+          %% if Fun is a feeder, crosscheck existence of tested fun,
+          %% but do not trigger tests for that.
           FunString = atom_to_list(Fun),
-          %% case lists:suffix("_feeder", FunString) of
-          %%     true ->
-          %%         TestedFun = lists:sublist(FunString, length(FunString) - 7),
-          %%         case lists:member({TestedFun, Arity}, FunList) of
-          %%             true -> ok;
-          %%             false ->
-          %%                 ct:pal("Found feeder, but no destination fun ~p:~p/~p~n",
-          %%                        [Module, Fun, Arity])
-          %%         end;
-          %%     false -> ok
-          %% end,
+          case lists:suffix("_feeder", FunString) of
+              true ->
+                  TestedFunString = lists:sublist(FunString,
+                                                  length(FunString) - 7),
+                  TestedFun = list_to_existing_atom(TestedFunString),
+                  case lists:member({TestedFun, Arity}, FunList) of
+                      true -> ok;
+                      false ->
+                          ct:pal("Found feeder, but no target fun ~p:~p/~p~n",
+                                 [Module, TestedFun, Arity]),
+                          throw(error)
+                  end;
+              false -> ok
+          end,
 
           %% if a feeder is found, test with feeder and ignore the
           %% exclude list, as a feeder is expected to feed the
