@@ -57,8 +57,10 @@
 -type time()         :: erlang_timestamp() | non_neg_integer().
 -type logger()       :: io_format                       %% | ctpal
                       | {log_collector, comm:mypid()}.
--type pidinfo()      :: {comm:mypid(), {pid_groups:groupname(),
-                                        pid_groups:pidname()}}.
+-type pidinfo()      :: {comm:mypid(), 
+                         {pid_groups:groupname(), pid_groups:pidname()} |
+                             no_pid_name | 
+                             non_local_pid_name_unknown}.
 -type anypid()       :: pid() | comm:mypid() | pidinfo().
 -type trace_id()     :: atom().
 -type send_event()   :: {log_send, time(), trace_id(),
