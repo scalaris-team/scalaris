@@ -71,14 +71,19 @@
 -type trace_event()  :: send_event() | info_event() | recv_event().
 -type trace()        :: [trace_event()].
 -type msg_map_fun()  :: fun((comm:message()) -> comm:message()).
--type passed_state() :: {trace_id(), logger(), msg_map_fun()}.
+-type filter_fun()   :: fun((trace_event()) -> boolean()).
+-type passed_state() :: {trace_id(), logger(), msg_map_fun(), filter_fun()}.
 -type gc_mpath_msg() :: {'$gen_component', trace_mpath, passed_state(),
                          Source::pidinfo(), Dest::pidinfo(), comm:message()}.
+-type options()      :: [{logger, logger() | comm:mypid()} |
+                         {map_fun, msg_map_fun()} |
+                         {filter_fun, filter_fun()}].
 
 -ifdef(with_export_type_support).
 -export_type([logger/0]).
 -export_type([pidinfo/0]).
 -export_type([passed_state/0]).
+-export_type([trace_event/0]).
 -endif.
 
 -spec start() -> ok.
@@ -86,27 +91,34 @@ start() -> start(default).
 
 -spec start(trace_id() | passed_state()) -> ok.
 start(TraceId) when is_atom(TraceId) ->
-    LoggerPid = pid_groups:find_a(trace_mpath),
-    start(TraceId, comm:make_global(LoggerPid), fun(Msg) -> Msg end);
+    start(TraceId, []);
 start(PState) when is_tuple(PState) ->
     start(passed_state_trace_id(PState),
           passed_state_logger(PState),
-          passed_state_msg_map_fun(PState)).
+          passed_state_msg_map_fun(PState),
+          passed_state_filter_fun(PState)).
 
--spec start(trace_id(), logger() | comm:mypid() | msg_map_fun()) -> ok.
-start(TraceId, MsgMapFun) when is_function(MsgMapFun) ->
-    LoggerPid = pid_groups:find_a(trace_mpath),
-    start(TraceId, comm:make_global(LoggerPid), MsgMapFun);
+-spec start(trace_id(), logger() | comm:mypid() | options()) -> ok.
+start(TraceId, Options) when is_list(Options) ->
+    _Logger = proplists:get_value(logger, Options, nil),
+    Logger = if _Logger =:= nil ->
+                    LoggerPid = pid_groups:find_a(trace_mpath),
+                    comm:make_global(LoggerPid);
+                true -> _Logger
+             end,
+    MsgFun = proplists:get_value(map_fun, Options, fun(Msg) -> Msg end),
+    FilterFun = proplists:get_value(filter_fun, Options, fun(_) -> true end),
+    start(TraceId, Logger, MsgFun, FilterFun);
 start(TraceId, Logger) ->
-    start(TraceId, Logger, fun(Msg) -> Msg end).
+    start(TraceId, [{logger, Logger}]).
 
--spec start(trace_id(), logger() | comm:mypid(), msg_map_fun()) -> ok.
-start(TraceId, _Logger, MsgMapFun) ->
+-spec start(trace_id(), logger() | comm:mypid(), msg_map_fun(), filter_fun()) -> ok.
+start(TraceId, _Logger, MsgMapFun, FilterFun) ->
     Logger = case comm:is_valid(_Logger) of
                  true -> {log_collector, _Logger}; %% just a pid was given
                  false -> _Logger
              end,
-    PState = passed_state_new(TraceId, Logger, MsgMapFun),
+    PState = passed_state_new(TraceId, Logger, MsgMapFun, FilterFun),
     own_passed_state_put(PState).
 
 -spec stop() -> ok.
@@ -528,9 +540,21 @@ log_recv(PState, FromPid, ToPid, Msg) ->
 send_log_msg(LoggerPid, Msg) ->
     %% don't log the sending of log messages ...
     RestoreThis = own_passed_state_get(),
-    stop(),
-    comm:send(LoggerPid, Msg),
-    own_passed_state_put(RestoreThis).
+    case RestoreThis of
+        undefined ->
+            stop(),
+            comm:send(LoggerPid, Msg),
+            own_passed_state_put(RestoreThis);
+        _ ->
+            FilterFun = passed_state_filter_fun(RestoreThis),
+            case FilterFun(Msg) of
+                true ->
+                    stop(),
+                    comm:send(LoggerPid, Msg),
+                    own_passed_state_put(RestoreThis);
+                false -> ok
+            end
+     end.
 
 -spec normalize_pidinfo(anypid()) -> pidinfo().
 normalize_pidinfo(Pid) ->
@@ -593,12 +617,13 @@ on({cleanup, TraceId}, State) ->
         false                       -> State
     end.
 
-passed_state_new(TraceId, Logger, MsgMapFun) ->
-    {TraceId, Logger, MsgMapFun}.
+passed_state_new(TraceId, Logger, MsgMapFun, FilterFun) ->
+    {TraceId, Logger, MsgMapFun, FilterFun}.
 
 passed_state_trace_id(State)      -> element(1, State).
 passed_state_logger(State)        -> element(2, State).
 passed_state_msg_map_fun(State)   -> element(3, State).
+passed_state_filter_fun(State)    -> element(4, State).
 
 own_passed_state_put(State)       -> erlang:put(trace_mpath, State), ok.
 own_passed_state_get()            -> erlang:get(trace_mpath).
