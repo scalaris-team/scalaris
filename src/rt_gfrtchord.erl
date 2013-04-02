@@ -57,7 +57,7 @@ allowed_nodes(RT) ->
             % Is there any non-group entry $n$ such that $d(s, e_\alpha) \leq d(s, n)$ and
             % $n \neq s.pred$? The following line basically computes $E_leap$ and checks
             % if that set is empty.
-            lists:any(fun(Predecessor) -> false;
+            lists:any(fun(P) when P == Predecessor -> false;
                          (N) -> get_range(SourceId, rt_entry_id(N)) >= E_alphaDist
                       end, E_NG)
     end,
