@@ -395,8 +395,8 @@ handle_custom_message({get_rt, Pid}, State) ->
 handle_custom_message({get_rt_reply, RT}, State) ->
     %% merge the routing tables. Note: We don't care if this message is not from our
     %current successor. We just have to make sure that the merged entries are valid.
-    LocalRT = rt_loop:get_rt(State),
-    NewRT = case LocalRT =/= RT of
+    OldRT = rt_loop:get_rt(State),
+    NewRT = case OldRT =/= RT of
         true ->
             % - add each entry from the other RT if it doesn't already exist
             % - entries to be added have to be normal entries as RM invokes adding sticky
@@ -408,10 +408,11 @@ handle_custom_message({get_rt_reply, RT}, State) ->
                             false -> add_normal_entry(rt_entry_node(Entry), Acc)
                         end
                 end,
-                LocalRT, get_rt_tree(RT));
+                OldRT, get_rt_tree(RT));
 
-        false -> LocalRT
+        false -> OldRT
     end,
+    ?RT:check(OldRT, RT, rt_loop:get_neighb(State), true),
     rt_loop:set_rt(State, NewRT);
 
 % lookup a random key chosen with a pdf:
@@ -444,10 +445,10 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
     NewRT = case ?RT:rt_lookup_node(node:id(NewNode), OldRT) of
         none -> RT = ?RT:add_normal_entry(NewNode, OldRT),
                 ?RT:check(OldRT, RT, rt_loop:get_neighb(State), true),
-                RT;
-        _Else ->  OldRT
+                RT
+            ;
+        {value, _RTEntry} -> OldRT
     end,
-
     rt_loop:set_rt(State, NewRT)
     ;
 
@@ -819,7 +820,7 @@ entry_learning_and_filtering(Entry, Type, RT) ->
             %otherwise, there isn't a subscription yet
             case rt_lookup_node(node:id(Entry), NewRT) of
                 none -> ok;
-                _Else -> update_fd(RT, NewRT)
+                {value, _RTEntry} -> update_fd(RT, NewRT)
             end,
             NewRT;
         false ->
@@ -836,10 +837,8 @@ entry_learning_and_filtering(Entry, Type, RT) ->
 get_source_node(#rt_t{source=undefined}) -> erlang:error("routing table source unknown");
 get_source_node(#rt_t{source=NodeId, nodes=Nodes}) ->
     case Nodes =:= gb_trees:empty() of
-            false ->
-                gb_trees:get(NodeId, Nodes);
-            true  ->
-                exit(rt_broken_tree_empty)
+            false -> gb_trees:get(NodeId, Nodes);
+            true  -> exit(rt_broken_tree_empty)
     end.
 
 % @doc Get the id of the source node.
@@ -936,7 +935,7 @@ rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 rt_get_node(NodeId, RT)  -> gb_trees:get(NodeId, get_rt_tree(RT)).
 
 % @doc Similar to rt_get_node/2, but doesn't crash when the id doesn't exist
--spec rt_lookup_node(NodeId :: key(), RT :: rt()) -> {value, rt_entry()} | nil.
+-spec rt_lookup_node(NodeId :: key(), RT :: rt()) -> {value, rt_entry()} | none.
 rt_lookup_node(NodeId, RT) -> gb_trees:lookup(NodeId, get_rt_tree(RT)).
 
 % @doc Get the id of a given node
