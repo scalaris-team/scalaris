@@ -620,7 +620,7 @@ entry_filtering(#rt_t{} = RT) ->
 
 -spec entry_filtering(rt(),[#rt_entry{type :: 'normal'}]) -> rt().
 entry_filtering(RT, []) -> RT; % only sticky entries and the source node given; nothing to do
-entry_filtering(RT, [_|_] = AllowedNodes) ->
+entry_filtering(RT, AllowedNodes) when is_list(AllowedNodes) ->
     Spacings = [
         begin PredNode = predecessor_node(RT,Node),
               {Node, spacing(Node, RT) + spacing(PredNode, RT)}
