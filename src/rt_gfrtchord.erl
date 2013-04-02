@@ -41,15 +41,13 @@ allowed_nodes(RT) ->
             FirstDist = get_range(SourceId, rt_entry_id(First)),
 
             % E_alpha: nearest entry to this node in E_G
-            % E_beta: farthest entry to this node in E_G
-            % TODO we need only the distances, get rid of the nodes
             % TODO do this calculation when computing E_G
-            {E_alphaDist, _E_betaDist} = lists:foldl(fun (Node, {Min, Max}) ->
+            E_alphaDist = lists:foldl(fun (Node, Min) ->
                         NodeDist = get_range(SourceId, rt_entry_id(Node)),
-                        NewMin = erlang:min(Min, NodeDist),
-                        NewMax = erlang:max(Max, NodeDist),
-                        {NewMin, NewMax}
-                end, {FirstDist, FirstDist}, E_G),
+                        erlang:min(Min, NodeDist)
+                end, FirstDist, E_G),
+            Predecessor = predecessor_node(RT, Source),
+
             % E_near = [N || N <- Nodes, get_range(SourceId, N) < E_alphaDist],
             % E_NG intersected with E_far to build E_leap:
             Predecessor = predecessor_node(RT, Source),
