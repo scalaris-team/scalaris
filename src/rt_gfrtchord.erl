@@ -34,31 +34,36 @@ allowed_nodes(RT) ->
     Source = get_source_node(RT),
     SourceId = rt_entry_id(Source),
     Nodes = rt_get_nodes(RT),
+
+    % $E_{\bar{G}}$ and $E_{G}$
     {E_NG, E_G} = lists:partition(fun is_from_other_group/1, Nodes),
 
-    E_leap = case E_G of
+    % If $E_G = \emptyset$, we know that we can allow all nodes to be filtered.
+    % Otherwise, check if $E_\text{leap} \neq \emptyset$.
+    OnlyNonGroupMembers = case E_G of
+        [] -> true;
         [First|_] ->
             FirstDist = get_range(SourceId, rt_entry_id(First)),
 
-            % E_alpha: nearest entry to this node in E_G
-            % TODO do this calculation when computing E_G
-            E_alphaDist = lists:foldl(fun (Node, Min) ->
+            % Compute the distance to the group $d(s, e_\alpha)$
+            E_alphaDist = lists:foldl(
+                fun (Node, Min) ->
                         NodeDist = get_range(SourceId, rt_entry_id(Node)),
                         erlang:min(Min, NodeDist)
                 end, FirstDist, E_G),
+
             Predecessor = predecessor_node(RT, Source),
 
-            % E_near = [N || N <- Nodes, get_range(SourceId, N) < E_alphaDist],
-            % E_NG intersected with E_far to build E_leap:
-            Predecessor = predecessor_node(RT, Source),
-            [N || N <- E_NG, get_range(SourceId, rt_entry_id(N)) >= E_alphaDist,
-                  N =/= Predecessor];
-        [] -> []
+            % Is there any non-group entry $n$ such that $d(s, e_\alpha) \leq d(s, n)$ and
+            % $n \neq s.pred$? The following line basically computes $E_leap$ and checks
+            % if that set is empty.
+            lists:any(fun(Predecessor) -> false;
+                         (N) -> get_range(SourceId, rt_entry_id(N)) >= E_alphaDist
+                      end, E_NG)
     end,
 
-    case E_leap of
-        [] -> [N || N <- Nodes, not is_sticky(N) and not is_source(N)];
-        _ -> [N || N <- E_NG, not is_sticky(N) and not is_source(N)]
+    if OnlyNonGroupMembers -> [N || N <- E_NG, not is_sticky(N) and not is_source(N)];
+       true -> [N || N <- Nodes, not is_sticky(N) and not is_source(N)]
     end.
 
 -spec rt_entry_info(Node :: node:node_type(), Type :: entry_type(),
