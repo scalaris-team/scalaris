@@ -209,8 +209,6 @@ reply_with_send_error(Msg, State) ->
                              {node:pidX(element(5, Msg)), element(4, Msg)};
                          slide_get_mte ->
                              {node:pidX(element(5, Msg)), element(4, Msg)};
-                         slide_w_mte ->
-                             {node:pidX(element(5, Msg)), element(4, Msg)};
                          _ ->
                              {null, ok}
                      end;
@@ -222,7 +220,6 @@ reply_with_send_error(Msg, State) ->
                              delta_ack     -> {timeouts, 0};
                              slide         -> element(4, Msg);
                              slide_get_mte -> element(4, Msg);
-                             slide_w_mte   -> element(4, Msg);
                              _             -> slide_op:get_id(Slide)
                          end,
                      {Target, FailMsgCookie}
