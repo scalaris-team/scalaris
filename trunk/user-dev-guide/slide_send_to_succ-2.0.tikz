@@ -85,6 +85,11 @@
                   (pred-send-owner.west);
 
 
+ \node[action_l, left=0.1 of pred-init.south east,lightgray] {
+   SlideOp.new()\\
+   fd.subscribe(SlideOp.node)%
+ };
+
  \node[action_l, left=0.1 of pred-send-data.north east] {
    SlideOp.new()\\
    fd.subscribe(SlideOp.node)%

@@ -116,7 +116,9 @@
 
  \node[phase, below left=0.1 and 0.1 of pred-wait-for-rm.south,lightblue,draw] {wait\_for\_data};
 
- \node[action_l, left=0.1 of pred-got-data.east] {};
+ \node[action_l, left=0.1 of pred-got-data.east] {
+   \textcolor{green}{update\_rcv\_data(SlideOp, TargetId, NextOp)}%
+ };
  \node[phase, below left=0.1 and 0.1 of pred-got-data.south] {wait\_for\_delta};
 
  \node[action_l, left=0.1 of pred-got-delta.east] {
@@ -128,6 +130,11 @@
  \node[action_l, left=0.1 of pred-got-owner.east] {}; % nothing to do
 
 
+
+ \node[action_r, right=0.1 of succ-init.south west, lightgray] {
+   SlideOp.new()\\
+   fd.subscribe(SlideOp.node)%
+ };
 
  \node[action_r, right=0.1 of succ-init-from-pred.north west,anchor=west] {
    SlideOp.new()\\
