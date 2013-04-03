@@ -49,9 +49,6 @@
          inc_num_active_learning_lookups/1]).
 -export([rt_entry_distance/2, rt_entry_id/1, set_custom_info/2, get_custom_info/1]).
 
-% Make dialyzer stop complaining about wrong types in unused functions
--export([rt_lookup_node/2, add_normal_entry/2]).
-
 % Functions which are to be implemented in modules including this header
 -export([allowed_nodes/1, frt_check_config/0, rt_entry_info/4]).
 
