@@ -30,6 +30,12 @@
 %%    when you think everything is recorded
 %% 5. call trace_mpath:cleanup(your_trace_id) to free the memory
 %%
+%% Optional Startup for reduced memory consumption:
+%%   1.1 Use message map fun to normalize or shrink messages
+%%       call: trace_mpath:start(your_trace_id, [{map_fun, your_map_fun()}])
+%%   1.2 Use filter fun to log only messages your are interested in
+%%       call: trace_mpath:start(your_trace_id, [{filter_fun, your_filter_fun()}])
+%%       attention: filter_fun operates on mapped messages if map_fun() is used
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -include("scalaris.hrl").
@@ -493,6 +499,7 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
             send_log_msg(
+              PState,
               LoggerPid,
               {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg), LocalOrGlobal})
     end,
@@ -515,7 +522,7 @@ log_info(PState, FromPid, Info) ->
                        Info]);
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
-            send_log_msg(LoggerPid, {log_info, Now, TraceId, FromPid, Info})
+            send_log_msg(PState, LoggerPid, {log_info, Now, TraceId, FromPid, Info})
     end,
     ok.
 
@@ -533,30 +540,23 @@ log_recv(PState, FromPid, ToPid, Msg) ->
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
             send_log_msg(
+              PState,
               LoggerPid,
               {log_recv, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg)})
     end,
     ok.
 
--spec send_log_msg(comm:mypid(), trace_event()) -> ok.
-send_log_msg(LoggerPid, Msg) ->
+-spec send_log_msg(passed_state(), comm:mypid(), trace_event()) -> ok.
+send_log_msg(RestoreThis, LoggerPid, Msg) ->
     %% don't log the sending of log messages ...
-    RestoreThis = own_passed_state_get(),
-    case RestoreThis of
-        undefined ->
+    FilterFun = passed_state_filter_fun(RestoreThis),
+    case FilterFun(Msg) of
+        true ->
             stop(),
             comm:send(LoggerPid, Msg),
             own_passed_state_put(RestoreThis);
-        _ ->
-            FilterFun = passed_state_filter_fun(RestoreThis),
-            case FilterFun(Msg) of
-                true ->
-                    stop(),
-                    comm:send(LoggerPid, Msg),
-                    own_passed_state_put(RestoreThis);
-                false -> ok
-            end
-     end.
+        false -> ok
+    end.
 
 -spec normalize_pidinfo(anypid()) -> pidinfo().
 normalize_pidinfo(Pid) ->
