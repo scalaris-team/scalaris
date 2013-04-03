@@ -141,7 +141,7 @@ process_move_msg({move, done, MoveFullId} = _Msg, MyState) ->
                                   {move, result, slide_op:get_tag(SlideOp1), ok}),
                 dht_node_state:set_slide(State, PredOrSucc, null)
         end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_other_mte], both, done);
+    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_other], both, done);
 
 process_move_msg({move, change_op, MoveFullId, TargetId, NextOp} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
@@ -289,7 +289,7 @@ process_move_msg({move, data, MovingData, MoveFullId} = _Msg, MyState) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 accept_data(State, SlideOp1, MovingData)
         end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data, wait_for_other_mte, wait_for_change_op], both, data);
+    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data, wait_for_other, wait_for_change_op], both, data);
 
 % acknowledgement from neighbor that its node received data for the slide op with the given id
 process_move_msg({move, data_ack, MoveFullId} = _Msg, MyState) ->
@@ -517,7 +517,7 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
             % b) we are waiting for the second node's MaxTransportEntries
             % -> re-create the slide (TargetId or NextOp may have changed)
             case slide_op:get_phase(SlideOp) of
-                wait_for_other_mte ->
+                wait_for_other ->
                     WorkerFun =
                         fun(SlideOp0, PredOrSucc0, State0) ->
                                 SlideOp1 = slide_op:cancel_timer(SlideOp0), % previous timer
@@ -532,7 +532,7 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
                                   MaxTransportEntries, slide_op:get_source_pid(SlideOp1),
                                   MsgTag, NextOp)
                         end,
-                    safe_operation(WorkerFun, State, MoveFullId, [wait_for_other_mte], both, slide);
+                    safe_operation(WorkerFun, State, MoveFullId, [wait_for_other], both, slide);
                 _ ->
                     State
             end;
@@ -693,7 +693,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     SlideOp = slide_op:new_slide(
                                 MoveFullId, NewType, TargetId, Tag, SourcePid,
                                 OtherMTE, NextOp, Neighbors),
-                    SlideOp1 = slide_op:set_phase(SlideOp, wait_for_other_mte),
+                    SlideOp1 = slide_op:set_phase(SlideOp, wait_for_other),
                     notify_other(SlideOp1, State);
                 X when (X =:= slide orelse X =:= delta_ack) andalso
                            not UseIncrSlides ->
@@ -747,7 +747,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     SlideOp = slide_op:new_slide(
                                 MoveFullId, NewType, TargetId, Tag, SourcePid,
                                 OtherMTE, NextOp, Neighbors),
-                    SlideOp1 = slide_op:set_phase(SlideOp, wait_for_other_mte),
+                    SlideOp1 = slide_op:set_phase(SlideOp, wait_for_other),
                     notify_other(SlideOp1, State);
                 change_id ->
                     SlideOp = slide_op:new_slide(

@@ -55,7 +55,7 @@
 
 -type phase() ::
         null | % should only occur as an intermediate state, otherwise equal to "no slide op"
-        wait_for_other_mte | % a node initiated a slide but needs more info from its partner
+        wait_for_other | % a node initiated a slide but needs more info from its partner
         wait_for_node_update | % pred changing its id
         wait_for_pred_update_join | % wait for the local rm process to know about a joining node (pred)
         wait_for_pred_update_data_ack | % wait for the local rm process to know about the changed pred's ID
