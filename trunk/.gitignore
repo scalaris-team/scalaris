@@ -33,7 +33,7 @@ ebin/
 *.swp
 Session.vim
 .vimrc
-user_default.erl
-ct_default.css
-jquery-latest.js
-jquery.tablesorter.min.js
+/src/user_default.erl
+/ct_default.css
+/jquery-latest.js
+/jquery.tablesorter.min.js

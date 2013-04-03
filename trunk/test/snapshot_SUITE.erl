@@ -40,9 +40,9 @@ all() ->
      test_lock_counting_on_live_db,
      %% integration
      test_basic_race_multiple_snapshots, test_single_snapshot_call,
-     test_spam_transactions_and_snapshots
+     test_spam_transactions_and_snapshots,
      %% misc
-     %bench_increment
+     bench_increment
     ].
 
 suite() -> [ {timetrap, {seconds, 120}} ].
