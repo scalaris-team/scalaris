@@ -207,8 +207,6 @@ reply_with_send_error(Msg, State) ->
                      case element(2, Msg) of
                          slide ->
                              {node:pidX(element(5, Msg)), element(4, Msg)};
-                         slide_get_mte ->
-                             {node:pidX(element(5, Msg)), element(4, Msg)};
                          _ ->
                              {null, ok}
                      end;
@@ -219,7 +217,6 @@ reply_with_send_error(Msg, State) ->
                              slide_abort   -> {timeouts, 0};
                              delta_ack     -> {timeouts, 0};
                              slide         -> element(4, Msg);
-                             slide_get_mte -> element(4, Msg);
                              _             -> slide_op:get_id(Slide)
                          end,
                      {Target, FailMsgCookie}
@@ -237,8 +234,6 @@ reply_with_send_error(Msg, State) ->
 -type move_message() ::
 %{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op(), MaxTransportEntries::pos_integer()} |
     {{move, slide, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
-%{move, slide_get_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()} |
-    {{move, slide_get_mte, '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, change_op, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from pred to succ that it has created a new (incremental) slide if succ has already set up the slide
     {{move, change_op, '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, change_id, MoveFullId::slide_op:id()} | % message from succ to pred if pred has already set up the slide
