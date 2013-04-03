@@ -692,7 +692,6 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
         {ok, {slide, pred, 'send'} = NewType} ->
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             UseIncrSlides = use_incremental_slides(),
-            UseSymmIncrSlides = use_symmetric_incremental_slides(),
             case MsgTag of
                 nomsg when not UseIncrSlides ->
                     SlideOp = slide_op:new_slide(
@@ -702,18 +701,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     State1 = dht_node_state:add_db_range(
                                State, slide_op:get_interval(SlideOp1), MoveFullId),
                     notify_other(SlideOp1, State1);
-                nomsg when UseSymmIncrSlides ->
-                    IncTargetKey = find_incremental_target_id(
-                                     Neighbors, State,
-                                     TargetId, NewType, OtherMTE),
-                    SlideOp = slide_op:new_slide_i(
-                                MoveFullId, NewType, IncTargetKey, TargetId,
-                                Tag, SourcePid, OtherMTE, Neighbors),
-                    SlideOp1 = slide_op:set_phase(SlideOp, wait_for_req_data),
-                    State1 = dht_node_state:add_db_range(
-                               State, slide_op:get_interval(SlideOp1), MoveFullId),
-                    notify_other(SlideOp1, State1);
-                nomsg -> % asymmetric slide -> get mte:
+                nomsg -> % incremental slide -> get mte:
                     % note: can not add db range yet (current range unknown)
                     SlideOp = slide_op:new_slide(
                                 MoveFullId, NewType, TargetId, Tag, SourcePid,
@@ -761,7 +749,6 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
         {ok, {slide, succ, 'send'} = NewType} ->
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             UseIncrSlides = use_incremental_slides(),
-            UseSymmIncrSlides = use_symmetric_incremental_slides(),
             case MsgTag of
                 nomsg when not UseIncrSlides ->
                     SlideOp = slide_op:new_slide(
@@ -769,16 +756,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                                 OtherMTE, NextOp, Neighbors),
                     SlideOp1 = slide_op:set_phase(SlideOp, wait_for_change_id),
                     notify_other(SlideOp1, State);
-                nomsg when UseSymmIncrSlides ->
-                    IncTargetKey = find_incremental_target_id(
-                                     Neighbors, State,
-                                     TargetId, NewType, get_max_transport_entries()),
-                    SlideOp = slide_op:new_slide_i(
-                                MoveFullId, NewType, IncTargetKey, TargetId,
-                                Tag, SourcePid, OtherMTE, Neighbors),
-                    SlideOp1 = slide_op:set_phase(SlideOp, wait_for_change_id),
-                    notify_other(SlideOp1, State);
-                nomsg -> % asymmetric slide -> get mte:
+                nomsg -> % incremental slide -> get mte:
                     SlideOp = slide_op:new_slide(
                                 MoveFullId, NewType, TargetId, Tag, SourcePid,
                                 OtherMTE, NextOp, Neighbors),
@@ -1485,8 +1463,7 @@ check_config() ->
     config:cfg_is_integer(move_send_msg_retry_delay) and
     config:cfg_is_greater_than_equal(move_send_msg_retry_delay, 0) and
 
-    config:cfg_is_bool(move_use_incremental_slides) and
-    config:cfg_is_bool(move_symmetric_incremental_slides).
+    config:cfg_is_bool(move_use_incremental_slides).
     
 %% @doc Gets the max number of DB entries per data move operation (set in the
 %%      config files).
@@ -1511,10 +1488,3 @@ get_send_msg_retries() ->
 -spec use_incremental_slides() -> boolean().
 use_incremental_slides() ->
     config:read(move_use_incremental_slides).
-
-%% @doc Checks whether symmetric incremental slides are to be used (only if
-%%      move_use_incremental_slides is activated) (set in the config files).
--spec use_symmetric_incremental_slides() -> boolean().
-use_symmetric_incremental_slides() ->
-    config:read(move_use_incremental_slides) andalso
-        config:read(move_symmetric_incremental_slides).
