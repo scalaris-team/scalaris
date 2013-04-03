@@ -26,9 +26,14 @@
 /result_read_1_100000.txt
 /Thumbs.db
 /python3-api
+/python-api
 /TAGS*
 /*.log
 ebin/
 *.swp
 Session.vim
 .vimrc
+user_default.erl
+ct_default.css
+jquery-latest.js
+jquery.tablesorter.min.js
