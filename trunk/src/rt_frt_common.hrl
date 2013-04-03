@@ -509,8 +509,8 @@ check_helper(OldRT, NewRT, ReportToFD) ->
     end.
 
 %% @doc Filter the source node's pid from a list.
--spec filter_source_pid(rt(),[any()]) -> [any()].
-filter_source_pid(RT,ListOfPids) ->
+-spec filter_source_pid(rt(), [comm:mypid()]) -> [comm:mypid()].
+filter_source_pid(RT, ListOfPids) ->
     SourcePid = node:pidX(rt_entry_node(get_source_node(RT))),
     [P || P <- ListOfPids, P =/= SourcePid].
 
