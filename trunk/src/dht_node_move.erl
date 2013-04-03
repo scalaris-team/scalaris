@@ -185,7 +185,9 @@ process_move_msg({move, change_id, MoveFullId, TargetId, NextOp} = _Msg, MyState
         fun(SlideOp, succ, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 % simply re-create the slide (TargetId or NextOp might have changed)
-                State1 = dht_node_state:set_slide(State, succ, null),
+                % note: fd:subscribe/2 will be called by exec_setup_slide_not_found
+                fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp1))], {move, MoveFullId}),
+                State1 = dht_node_state:set_slide(State, succ, null), % just in case
                 Command = {ok, slide_op:get_type(SlideOp1)},
                 exec_setup_slide_not_found(
                   Command, State1, slide_op:get_id(SlideOp1), slide_op:get_node(SlideOp1),
@@ -536,7 +538,9 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
                     WorkerFun =
                         fun(SlideOp0, PredOrSucc0, State0) ->
                                 SlideOp1 = slide_op:cancel_timer(SlideOp0), % previous timer
-                                State1 = dht_node_state:set_slide(State0, PredOrSucc0, null),
+                                % note: fd:subscribe/2 will be called by exec_setup_slide_not_found
+                                fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp1))], {move, MoveFullId}),
+                                State1 = dht_node_state:set_slide(State0, PredOrSucc0, null), % just in case
                                 Command = {ok, slide_op:get_type(SlideOp1)},
                                 % re-create with new parameters:
                                 % note: we need to take the SourcePid from the existing op!
