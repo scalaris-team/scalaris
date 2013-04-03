@@ -202,7 +202,9 @@ update_entries(NewNeighbors, RT) ->
 
     % convert former neighboring nodes to normal nodes and add sticky nodes
     FilteredRT = lists:foldl(fun sticky_entry_to_normal_node/2, RT, ConvertNodesIds),
-    sets:fold(fun add_sticky_entry/2, FilteredRT, ToBeAddedNodes)
+    NewRT = sets:fold(fun add_sticky_entry/2, FilteredRT, ToBeAddedNodes),
+    check_helper(RT, NewRT, true),
+    NewRT
     .
 
 %% userdevguide-begin rt_frtchord:update
@@ -412,7 +414,7 @@ handle_custom_message({get_rt_reply, RT}, State) ->
 
         false -> OldRT
     end,
-    ?RT:check(OldRT, RT, rt_loop:get_neighb(State), true),
+    ?RT:check(OldRT, NewRT, rt_loop:get_neighb(State), true),
     rt_loop:set_rt(State, NewRT);
 
 % lookup a random key chosen with a pdf:
@@ -476,21 +478,35 @@ check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
          nodelist:succ(OldNeighbors) =:= nodelist:succ(NewNeighbors) andalso
          nodelist:pred(OldNeighbors) =:= nodelist:pred(NewNeighbors) of
         true -> ok;
-        _Else -> % update the exported routing table
-            Pid = pid_groups:get_my(dht_node),
-            case Pid of
-                failed -> ok;
-                _E     ->
-                    RTExt = export_rt_to_dht_node(NewRT, NewNeighbors),
-                    comm:send_local(Pid, {rt_update, RTExt})
-            end,
-            % update failure detector:
-            case ReportToFD of
-                true -> add_fd(NewRT);
-                _Else -> ok
-            end
-    end
+        _Else -> export_to_dht(NewRT, ReportToFD)
+    end.
+
+% @doc Helper to send the new routing table to the dht node
+-spec export_to_dht(rt(), ReportToFD :: boolean()) -> ok.
+export_to_dht(NewRT, ReportToFD) ->
+    Pid = pid_groups:get_my(dht_node),
+    case Pid of
+        failed -> ok;
+        _E     ->
+            RTExt = export_rt_to_dht_node_helper(NewRT),
+            comm:send_local(Pid, {rt_update, RTExt})
+    end,
+    % update failure detector:
+    case ReportToFD of
+        true -> add_fd(NewRT);
+        _Else -> ok
+    end,
+    ok
     .
+
+% @doc Helper to check for routing table changes, excluding changes to the neighborhood.
+-spec check_helper(OldRT :: rt(), NewRT :: rt(), ReportToFD :: boolean()) -> ok.
+check_helper(OldRT, NewRT, ReportToFD) ->
+    case OldRT =:= NewRT
+    of
+        true -> ok;
+        false -> export_to_dht(NewRT, ReportToFD)
+    end.
 
 %% @doc Filter the source node's pid from a list of pids.
 -spec filter_source_pid(RT :: rt(), ListOfPids :: [pid()]) -> [pid()].
@@ -558,8 +574,8 @@ next_hop(State, Id) ->
 %% @doc Converts the internal RT to the external RT used by the dht_node.
 %% The external routing table is optimized to speed up ?RT:next_hop/2. For this, it is
 %%  only a gb_tree with keys being node ids and values being of type node:node_type().
--spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
-export_rt_to_dht_node(RT, _Neighbors) ->
+-spec export_rt_to_dht_node_helper(rt()) -> external_rt().
+export_rt_to_dht_node_helper(RT) ->
     % From each rt_entry, we extract only the field "node" and add it to the tree
     % under the node id. The source node is filtered.
     util:gb_trees_foldl(
@@ -569,8 +585,11 @@ export_rt_to_dht_node(RT, _Neighbors) ->
                     _Else -> Node = rt_entry_node(V),
                         gb_trees:enter(node:id(Node), Node, Acc)
                 end
-        end, gb_trees:empty(),get_rt_tree(RT))
-    .
+        end, gb_trees:empty(),get_rt_tree(RT)).
+
+-spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
+export_rt_to_dht_node(RT, _Neighbors) ->
+    export_rt_to_dht_node_helper(RT).
 %% userdevguide-end rt_frtchord:export_rt_to_dht_node
 
 %% userdevguide-begin rt_frtchord:to_list
@@ -891,8 +910,7 @@ add_entry(Node, Type, RT) ->
 
 % @doc Add a sticky entry to the routing table
 -spec add_sticky_entry(Entry :: node:node_type(), rt()) -> rt().
-add_sticky_entry(Entry, RT) ->
-   add_entry(Entry, sticky, RT).
+add_sticky_entry(Entry, RT) -> add_entry(Entry, sticky, RT).
 
 % @doc Add the source entry to the routing table
 -spec add_source_entry(Entry :: node:node_type(), rt()) -> rt().
