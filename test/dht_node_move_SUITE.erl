@@ -285,14 +285,10 @@ reply_with_send_error(Msg, State) ->
 
 % keep in sync with dht_node_move and the timeout config parameters set in set_move_config_parameters/0
 -type move_message() ::
-%{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()}})
-    {{move, slide, '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
+%{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op(), MaxTransportEntries::pos_integer()} |
+    {{move, slide, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, slide_get_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()} |
     {{move, slide_get_mte, '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
-%{move, slide_w_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
-    {{move, slide_w_mte, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
-%{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op()} |
-    {{move, slide, '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, my_mte, MoveFullId::slide_op:id(), MaxTransportEntries::pos_integer()} | % max transport entries from a partner
     {{move, my_mte, '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, change_op, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from pred to succ that it has created a new (incremental) slide if succ has already set up the slide
