@@ -197,7 +197,7 @@ create_value_(Unknown , _Size, _ParseState) ->
     throw(function_clause).
 
 %% @doc creates a record value
--spec create_record_value(RecordName :: type_name(),
+-spec create_record_value(RecordName :: atom(),
                           {record, Types :: [type_spec()]} | [type_spec()],
                           Size :: non_neg_integer(),
                           ParseState :: tester_parse_state:state()) -> tuple().
