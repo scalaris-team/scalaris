@@ -289,8 +289,6 @@ reply_with_send_error(Msg, State) ->
     {{move, slide, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, slide_get_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()} |
     {{move, slide_get_mte, '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
-%{move, my_mte, MoveFullId::slide_op:id(), MaxTransportEntries::pos_integer()} | % max transport entries from a partner
-    {{move, my_mte, '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, change_op, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from pred to succ that it has created a new (incremental) slide if succ has already set up the slide
     {{move, change_op, '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, change_id, MoveFullId::slide_op:id()} | % message from succ to pred if pred has already set up the slide

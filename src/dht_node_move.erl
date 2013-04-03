@@ -79,9 +79,8 @@
 -type move_message1() ::
     {move, start_slide, pred | succ, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
     {move, start_jump, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
-    {move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op(), MaxTransportEntries::pos_integer()} |
+    {move, slide,         OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op(), MaxTransportEntries::pos_integer()} |
     {move, slide_get_mte, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any()} |
-    {move, my_mte, MoveFullId::slide_op:id(), MaxTransportEntries::pos_integer()} | % max transport entries from a partner
     {move, change_op, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from pred to succ that it has created a new (incremental) slide if succ has already set up the slide
     {move, change_id, MoveFullId::slide_op:id()} | % message from succ to pred if pred has already set up the slide
     {move, change_id, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from succ to pred if pred has already set up the slide but succ made it an incremental slide
@@ -152,21 +151,6 @@ process_move_msg({move, done, MoveFullId} = _Msg, MyState) ->
                 dht_node_state:set_slide(State, PredOrSucc, null)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_other_mte], both, done);
-
-process_move_msg({move, my_mte, MoveFullId, OtherMTE} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
-                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                % simply re-create the slide (TargetId or NextOp have changed)
-                State1 = dht_node_state:set_slide(State, PredOrSucc, null),
-                Command = {ok, slide_op:get_type(SlideOp1)},
-                exec_setup_slide_not_found(
-                  Command, State1, MoveFullId, slide_op:get_node(SlideOp1),
-                  slide_op:get_target_id(SlideOp1), slide_op:get_tag(SlideOp1),
-                  OtherMTE, slide_op:get_source_pid(SlideOp1), my_mte, {none})
-        end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_other_mte], both, my_mte);
 
 process_move_msg({move, change_op, MoveFullId, TargetId, NextOp} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
@@ -489,47 +473,40 @@ notify_other(SlideOp, State) ->
     SendOrReceive = slide_op:get_sendORreceive(SlideOp),
     UseIncrSlides = use_incremental_slides(),
     Msg =
-        if SetupAtOther ->
-               if SendOrReceive =:= 'rcv' andalso PredOrSucc =:= succ andalso
-                      Phase =:= wait_for_change_id ->
-                      {move, my_mte, slide_op:get_id(SlideOp), get_max_transport_entries()};
-                  SendOrReceive =:= 'rcv' andalso PredOrSucc =:= pred andalso
-                      Phase =:= wait_for_change_op ->
-                      {move, my_mte, slide_op:get_id(SlideOp), get_max_transport_entries()};
-                  SendOrReceive =:= 'send' andalso PredOrSucc =:= succ ->
-                      {move, change_op, slide_op:get_id(SlideOp),
-                       slide_op:get_target_id(SlideOp),
-                       slide_op:get_next_op(SlideOp)};
-                  PredOrSucc =:= pred ->
-                      case slide_op:is_incremental(SlideOp) of
-                          true ->
-                              {move, change_id, slide_op:get_id(SlideOp),
-                               slide_op:get_target_id(SlideOp),
-                               slide_op:get_next_op(SlideOp)};
-                          _ ->
-                              {move, change_id, slide_op:get_id(SlideOp)}
-                      end
-               end;
-           true ->
-               if Phase =:= wait_for_other_mte ->
-                      {move, slide_get_mte, Type, slide_op:get_id(SlideOp),
-                       dht_node_state:get(State, node), SlOpNode,
-                       slide_op:get_target_id(SlideOp),
-                       slide_op:get_tag(SlideOp)};
-                  true ->
-                      {MTE, NextOp} = 
-                          case slide_op:is_incremental(SlideOp) of
-                              true ->
-                                  {unknown, slide_op:get_next_op(SlideOp)};
-                              _ when UseIncrSlides andalso SendOrReceive =:= 'rcv' ->
-                                  {get_max_transport_entries(), {none}};
-                              _ ->
-                                  {unknown, {none}}
-                          end,
-                      {move, slide, Type, slide_op:get_id(SlideOp),
-                       dht_node_state:get(State, node), SlOpNode,
-                       slide_op:get_target_id(SlideOp),
-                       slide_op:get_tag(SlideOp), NextOp, MTE}
+        if (not SetupAtOther) andalso Phase =:= wait_for_other_mte -> % beware: overlap with 2nd
+               {move, slide_get_mte, Type, slide_op:get_id(SlideOp),
+                dht_node_state:get(State, node), SlOpNode,
+                slide_op:get_target_id(SlideOp),
+                slide_op:get_tag(SlideOp)};
+           (SetupAtOther andalso SendOrReceive =:= 'rcv' andalso
+                ((PredOrSucc =:= succ andalso Phase =:= wait_for_change_id) orelse
+                  PredOrSucc =:= pred andalso Phase =:= wait_for_change_op)) orelse
+           (not SetupAtOther) ->
+               {MTE, NextOp} = 
+                   case slide_op:is_incremental(SlideOp) of
+                       true ->
+                           {unknown, slide_op:get_next_op(SlideOp)};
+                       _ when UseIncrSlides andalso SendOrReceive =:= 'rcv' ->
+                           {get_max_transport_entries(), {none}};
+                       _ ->
+                           {unknown, {none}}
+                   end,
+               {move, slide, Type, slide_op:get_id(SlideOp),
+                dht_node_state:get(State, node), SlOpNode,
+                slide_op:get_target_id(SlideOp),
+                slide_op:get_tag(SlideOp), NextOp, MTE};
+           SetupAtOther andalso SendOrReceive =:= 'send' andalso PredOrSucc =:= succ ->
+               {move, change_op, slide_op:get_id(SlideOp),
+                slide_op:get_target_id(SlideOp),
+                slide_op:get_next_op(SlideOp)};
+           SetupAtOther andalso PredOrSucc =:= pred -> % beware: overlap with 2nd
+               case slide_op:is_incremental(SlideOp) of
+                   true ->
+                       {move, change_id, slide_op:get_id(SlideOp),
+                        slide_op:get_target_id(SlideOp),
+                        slide_op:get_next_op(SlideOp)};
+                   _ ->
+                       {move, change_id, slide_op:get_id(SlideOp)}
                end
         end,
     send2(State, SlideOp, Msg).
@@ -547,11 +524,31 @@ notify_other(SlideOp, State) ->
 setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
             MaxTransportEntries, SourcePid, MsgTag, NextOp) ->
     case get_slide(State, MoveFullId) of
-        {ok, _PredOrSucc, _SlideOp} ->
-            % there could already be slide operation and a second message was
-            % send after an unsuccessful send-message on the other node
+        {ok, _PredOrSucc, SlideOp} ->
+            % there could already be a slide operation because
+            % a) a second message was send after an unsuccessful send-message
+            %    on the other node
             % -> ignore this message
-            State;
+            % b) we are waiting for the second node's MaxTransportEntries
+            % -> re-create the slide (TargetId or NextOp may have changed)
+            case slide_op:get_phase(SlideOp) of
+                wait_for_other_mte ->
+                    WorkerFun =
+                        fun(SlideOp0, PredOrSucc0, State0) ->
+                                SlideOp1 = slide_op:cancel_timer(SlideOp0), % previous timer
+                                State1 = dht_node_state:set_slide(State0, PredOrSucc0, null),
+                                Command = {ok, slide_op:get_type(SlideOp1)},
+                                % re-create with new parameters:
+                                % note: we need to take the SourcePid from the existing op!
+                                exec_setup_slide_not_found(
+                                  Command, State1, MoveFullId, TargetNode, TargetId, Tag,
+                                  MaxTransportEntries, slide_op:get_source_pid(SlideOp1),
+                                  MsgTag, NextOp)
+                        end,
+                    safe_operation(WorkerFun, State, MoveFullId, [wait_for_other_mte], both, slide);
+                _ ->
+                    State
+            end;
         not_found ->
             Command = check_setup_slide_not_found(
                         State, Type, MyNode, TargetNode, TargetId),
@@ -648,7 +645,7 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
         TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(),
         OtherMaxTransportEntries::unknown | pos_integer(),
         SourcePid::comm:erl_local_pid() | null,
-        MsgTag::nomsg | slide | slide_get_mte | delta_ack | change_id | my_mte | change_op,
+        MsgTag::nomsg | slide | slide_get_mte | delta_ack | change_id | change_op,
         NextOp::slide_op:next_op()) -> dht_node_state:state().
 exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                            TargetId, Tag, OtherMTE, SourcePid, MsgTag, NextOp) ->
@@ -733,7 +730,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     State1 = dht_node_state:add_db_range(
                                State, slide_op:get_interval(SlideOp2), MoveFullId),
                     notify_other(SlideOp2, State1);
-                Y when (Y =:= slide orelse Y =:= delta_ack orelse Y =:= my_mte) ->
+                Y when (Y =:= slide orelse Y =:= delta_ack) ->
                     IncTargetKey = find_incremental_target_id(
                                      Neighbors, State,
                                      TargetId, NewType, OtherMTE),
@@ -793,7 +790,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                                 OtherMTE, NextOp, Neighbors),
                     change_my_id(State, SlideOp);
                 X when ((X =:= slide andalso OtherMTE =/= unknown) orelse
-                            X =:= my_mte orelse X =:= delta_ack) ->
+                            X =:= delta_ack) ->
                     IncTargetKey = find_incremental_target_id(
                                      Neighbors, State,
                                      TargetId, NewType, OtherMTE),
