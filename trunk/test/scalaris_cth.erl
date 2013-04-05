@@ -118,7 +118,7 @@ pre_init_per_testcase(TC, Config, State) when is_record(State, state) ->
     when is_subtype(Return, unittest_helper:kv_opts() | {fail, Reason::term()} | {skip, Reason::term()} | {timetrap_timeout, integer()} | term()).
 post_end_per_testcase(TC, Config, Return, {ok, State}) ->
     post_end_per_testcase(TC, Config, Return, State);
-post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) ->
+post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
     {Start, NewTcStart} =  case lists:keytake(self(), 1, State#state.tc_start) of
                                {value, {_, Val}, List} -> {Val, List};
                                false -> { failed, State#state.tc_start }
@@ -141,6 +141,15 @@ post_end_per_testcase(TC, _Config, Return, State) when is_record(State, state) -
                             failed -> TimeTrapTime_ms;
                             _      -> Start
                         end,
+            Suite = State#state.suite,
+            try Suite:end_per_testcase(TC, Config)
+            catch
+                exit:undef ->
+                    unittest_helper:stop_ring();
+                Error ->
+                    ct:pal("Caught ~p while trying to clean up Ring after
+                           timeout~n", [Error])
+            end,
             ok;
         _ ->
             TCTime_ms = timer:now_diff(os:timestamp(), Start) / 1000,
