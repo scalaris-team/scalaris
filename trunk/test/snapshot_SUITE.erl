@@ -354,10 +354,10 @@ test_spam_transactions_and_snapshots(_) ->
     
     % spam transactions in two sepreate processes
     SpamPid1 = erlang:spawn(fun() ->
-               tester:test(?MODULE, do_transaction_a, 0, 2500)
+               tester:test(?MODULE, do_transaction_a, 0, 1500)
           end),
     SpamPid2 = erlang:spawn(fun() ->
-               tester:test(?MODULE, do_transaction_b, 0, 2500)
+               tester:test(?MODULE, do_transaction_b, 0, 1500)
           end),
     
     % spam snapshots here
