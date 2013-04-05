@@ -145,7 +145,7 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
             try Suite:end_per_testcase(TC, Config)
             catch
                 exit:undef ->
-                    unittest_helper:stop_ring();
+                    ok;
                 Error ->
                     ct:pal("Caught ~p while trying to clean up Ring after
                            timeout~n", [Error])
