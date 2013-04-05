@@ -15,14 +15,14 @@
 %%% @author Stefan Keidel <keidel@informatik.hu-berlin.de>
 %%% @doc    Snapshot algorithm unit tests
 %%% @end
-%%& @version $Id: snapshot_SUITE.erl 3244 2012-06-05 16:19:11Z stefankeidel85@gmail.com $
+%%% @version $Id$
 -module(snapshot_SUITE).
 -author('keidel@informatik.hu-berlin.de').
 -compile(export_all).
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
--vsn('$Id: snapshot_SUITE.erl 3244 2012-06-05 16:19:11Z stefankeidel85@gmail.com $').
+-vsn('$Id$').
 
 all() ->
     [test_copy_value_to_snapshot_table,test_set_get_for_snapshot_table,
