@@ -338,7 +338,8 @@ public class MyWikiModel extends WikiModel {
 
     /**
      * Determines if a template name corresponds to a magic word using
-     * {@link MyMagicWord#isMagicWord(String)}.
+     * {@link MyMagicWord#isMagicWord(String)} (does not recognise magic
+     * words with parameters, e.g. <tt>TALKPAGENAME:Title</tt>).
      * 
      * @param name
      *            the template name (without the template namespace)
