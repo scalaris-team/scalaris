@@ -44,9 +44,42 @@ public class MyMagicWord extends MagicWord {
         MY_MAGIC_WORDS.add(MAGIC_DISPLAY_TITLE);
         MY_MAGIC_WORDS.add(MAGIC_DEFAULT_SORT);
     }
-    
+
+    /**
+     * Determines if a template name corresponds to a magic word (does not
+     * recognise magic words with parameters, e.g. <tt>TALKPAGENAME:Title</tt> -
+     * use {@link #extractMagicWordPart(String)} for a full title and check for
+     * magic word with its result).
+     * 
+     * @param name
+     *            the potential magic word
+     * @return <tt>true</tt> if <tt>name</tt> was a magic word, <tt>false</tt>
+     *         otherwise
+     */
     public static boolean isMagicWord(String name) {
         return MagicWord.isMagicWord(name) || isMyMagicWord(name);
+    }
+
+    /**
+     * Extract the potential magic word part from a given title name.
+     * 
+     * @param title
+     *            the template's name without the namespace, e.g. a magic word
+     *            including its parameters
+     * 
+     * @return the magic word or another string
+     *
+     * @see MyWikiModel#processMagicWord(String)
+     * @see #isMagicWord(String)
+     */
+    public static String extractMagicWordPart(String title) {
+        int index = title.indexOf(':');
+        String magicWord = title;
+        if (index > 0) {
+            // if it is a magic word, the first part is the word itself, the second its parameters
+            magicWord = title.substring(0, index);
+        }
+        return magicWord;
     }
 
     /**
