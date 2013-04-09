@@ -33,9 +33,8 @@ calculateStddev(Avg, Avg2) ->
 
 -spec default_sort_fun(Op1::{lb_op:lb_op(), integer()},
                        Op2::{lb_op:lb_op(), integer()}) -> boolean().
-default_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
-    Op1Change =< Op2Change orelse
-        ((Op1Change =:= Op2Change) andalso Op1 =< Op2).
+default_sort_fun({_Op1, Op1Change}, {_Op2, Op2Change}) ->
+    Op1Change =< Op2Change.
 
 % MinSum2Change = minimal required change of sum(load ^2)
 -spec bestStddev(Ops::[lb_op:lb_op()], MinSum2Change::integer() | plus_infinity)

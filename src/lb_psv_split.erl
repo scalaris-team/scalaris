@@ -149,8 +149,7 @@ my_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
             Op2NewRange = try ?RT:get_range(Op2NewPredId, Op2NewMyId)
                           catch throw:not_supported -> 0
                           end,
-            Op2NewRange =< Op1NewRange orelse
-                ((Op1NewRange =:= Op2NewRange) andalso Op1 =< Op2);
+            Op2NewRange =< Op1NewRange;
         _ -> false
     end.
 
