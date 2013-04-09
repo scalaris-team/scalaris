@@ -114,7 +114,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
 %%      of the standard deviation is at the front.
 %%      Note: this is executed at the joining node.
 -spec sort_candidates(Ops::[lb_op:lb_op()]) -> [lb_op:lb_op()].
-sort_candidates(Ops) -> lb_common:bestStddev(Ops, plus_infinity).
+sort_candidates(Ops) -> lb_common:bestStddev(util:shuffle(Ops), plus_infinity).
 
 -spec process_join_msg(comm:message(), State::any(),
         DhtNodeState::dht_node_state:state()) -> unknown_event.

@@ -678,7 +678,8 @@ lookup_new_ids2(TotalCount, JoinState) ->
     end.
 
 %% @doc Creates Count new (unique) additional IDs.
--spec create_join_ids(Count::pos_integer(), OldIds::[?RT:key()]) -> {AllKeys::[?RT:key(),...], OnlyNewKeys::[?RT:key(),...]}.
+-spec create_join_ids(Count::pos_integer(), OldIds::[?RT:key()])
+        -> {AllKeys::[?RT:key(),...], OnlyNewKeys::[?RT:key(),...]}.
 create_join_ids(Count, OldIds) ->
     OldIdsSet = gb_sets:from_list(OldIds),
     NewIdsSet = create_join_ids_helper(Count + gb_sets:size(OldIdsSet), OldIdsSet),
