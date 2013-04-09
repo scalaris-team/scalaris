@@ -125,10 +125,10 @@ process_join_msg(_Msg, _State, _DhtNodeState) ->
 %%      algorithm exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(lb_psv_simple_samples) and
-    config:cfg_is_greater_than_equal(lb_psv_simple_samples, 1).
+    config:cfg_is_integer(lb_psv_samples) and
+    config:cfg_is_greater_than_equal(lb_psv_samples, 1).
 
 %% @doc Gets the number of nodes to sample (set in the config files).
 -spec conf_get_number_of_samples() -> pos_integer().
 conf_get_number_of_samples() ->
-    config:read(lb_psv_simple_samples).
+    config:read(lb_psv_samples).

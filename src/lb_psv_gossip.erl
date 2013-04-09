@@ -14,7 +14,7 @@
 
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Passive load balancing using gossip to sample O(log(N)) nodes (at
-%%         least lb_psv_gossip_min_samples samples) and choose the
+%%         least lb_psv_samples samples) and choose the
 %%         one that reduces the standard deviation the most.
 %%         If there is no load address ranges are split in halves, otherwise
 %%         no more load is moved than is needed to have the average load on one
@@ -195,10 +195,10 @@ process_join_msg({gossip_get_values_best_response, BestValues},
 %%      algorithm exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(lb_psv_gossip_min_samples) and
-    config:cfg_is_greater_than_equal(lb_psv_gossip_min_samples, 1).
+    config:cfg_is_integer(lb_psv_samples) and
+    config:cfg_is_greater_than_equal(lb_psv_samples, 1).
 
 %% @doc Gets the minnimum number of nodes to sample (set in the config files).
 -spec conf_get_min_number_of_samples() -> pos_integer().
 conf_get_min_number_of_samples() ->
-    config:read(lb_psv_gossip_min_samples).
+    config:read(lb_psv_samples).
