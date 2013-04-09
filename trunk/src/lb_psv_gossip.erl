@@ -171,7 +171,8 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
 %%      Note: this is executed at the joining node.
 -spec sort_candidates(Ops::[lb_op:lb_op()]) -> [lb_op:lb_op()].
 sort_candidates(Ops) ->
-    lb_common:bestStddev(Ops, plus_infinity, fun lb_psv_split:my_sort_fun/2).
+    lb_common:bestStddev(util:shuffle(Ops), plus_infinity,
+                         fun lb_psv_split:my_sort_fun/2).
 
 -spec process_join_msg(custom_message(),
         {get_samples, SourcePid::comm:mypid(), Conn::dht_node_join:connection()} |

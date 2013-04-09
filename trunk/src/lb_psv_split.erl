@@ -160,7 +160,7 @@ my_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
 %%      Note: this is executed at the joining node.
 -spec sort_candidates(Ops::[lb_op:lb_op()]) -> [lb_op:lb_op()].
 sort_candidates(Ops) ->
-    lb_common:bestStddev(Ops, plus_infinity, fun my_sort_fun/2).
+    lb_common:bestStddev(util:shuffle(Ops), plus_infinity, fun my_sort_fun/2).
 
 -spec process_join_msg(comm:message(), State::any(),
         DhtNodeState::dht_node_state:state()) -> unknown_event.
