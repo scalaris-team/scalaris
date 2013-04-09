@@ -115,7 +115,7 @@ childs(Options) ->
         util:sup_worker_desc(clients_monitor, monitor, start_link, ["clients_group"]),
     DHTNodeJoinAt = case util:app_get_env(join_at, random) of
                          random -> [];
-                         Id     -> [{{dht_node, id}, Id}]
+                         Id     -> [{{dht_node, id}, Id}, {skip_psv_lb}]
                      end,
     DhtNodeId = randoms:getRandomString(),
     DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
