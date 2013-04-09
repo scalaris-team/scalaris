@@ -16,9 +16,10 @@
 %% @doc    Passive load balancing using gossip to sample O(log(N)) nodes (at
 %%         least lb_psv_samples samples) and choose the
 %%         one that reduces the standard deviation the most.
-%%         If there is no load address ranges are split in halves, otherwise
-%%         no more load is moved than is needed to have the average load on one
-%%         of the two nodes.
+%%         If there is no load address ranges are split according to
+%%         lb_psv_split_fallback, i.e. in halves or using the selected keys,
+%%         otherwise no more load is moved than is needed to have the average
+%%         load on one of the two nodes.
 %% @end
 %% @version $Id$
 -module(lb_psv_gossip).
@@ -95,27 +96,37 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                     MyNodeId = node:id(MyNode),
                     MyLoad = dht_node_state:get(DhtNodeState, load),
                     {SplitKey, OtherLoadNew} =
-                        case MyLoad >= 2 of
-                            true ->
-%%                                 log:pal("[ ~.0p ] trying split by load", [self()]),
-                                TargetLoad =
-                                    case gossip_state:get(BestValues, avgLoad) of
-                                        unknown -> util:floor(MyLoad / 2);
-                                        AvgLoad when AvgLoad > 0 andalso MyLoad > AvgLoad ->
-                                            util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
-                                        _       -> util:floor(MyLoad / 2)
-                                    end,
-%%                                 log:pal("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
-                                try lb_common:split_by_load(DhtNodeState, TargetLoad)
-                                catch
-                                    throw:'no key in range' ->
-                                        %%                                 log:log(info, "[ Node ~w ] could not split load - no key in my range, "
-                                        %%                                             "splitting address range instead", [self()]),
-                                        lb_common:split_my_range(DhtNodeState, SelectedKey)
-                                end;
-                            _ -> % split address range (fall-back):
-%%                                 log:pal("[ ~.0p ] trying split by address range", [self()]),
-                                lb_common:split_my_range(DhtNodeState, SelectedKey)
+                        if MyLoad >= 2 ->
+%%                                log:pal("[ ~.0p ] trying split by load", [self()]),
+                               TargetLoad =
+                                   case gossip_state:get(BestValues, avgLoad) of
+                                       unknown -> util:floor(MyLoad / 2);
+                                       AvgLoad when AvgLoad > 0 andalso MyLoad > AvgLoad ->
+                                           util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
+                                       _       -> util:floor(MyLoad / 2)
+                                   end,
+%%                                log:pal("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
+                               try lb_common:split_by_load(DhtNodeState, TargetLoad)
+                               catch
+                                   throw:'no key in range' ->
+%%                                        log:log(info, "[ Node ~w ] could not split load - no key in my range, "
+%%                                                    "using fall-back instead", [self()]),
+                                       case config:read(lb_psv_split_fallback) of
+                                           split_address -> % split address range:
+%%                                                log:pal("[ ~.0p ] trying split by address range", [self()]),
+                                               lb_common:split_my_range(DhtNodeState, SelectedKey);
+                                           keep_key -> % keep (randomly selected) key:
+                                               lb_common:split_by_key(DhtNodeState, SelectedKey)
+                                       end
+                               end;
+                            true -> % fall-back
+                                case config:read(lb_psv_split_fallback) of
+                                    split_address -> % split address range:
+%%                                         log:pal("[ ~.0p ] trying split by address range", [self()]),
+                                        lb_common:split_my_range(DhtNodeState, SelectedKey);
+                                    keep_key -> % keep (randomly selected) key:
+                                        lb_common:split_by_key(DhtNodeState, SelectedKey)
+                                end
                         end,
                     MyPredId = node:id(dht_node_state:get(DhtNodeState, pred)),
                     case SplitKey of
@@ -197,7 +208,8 @@ process_join_msg({gossip_get_values_best_response, BestValues},
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_integer(lb_psv_samples) and
-    config:cfg_is_greater_than_equal(lb_psv_samples, 1).
+    config:cfg_is_greater_than_equal(lb_psv_samples, 1) and
+    config:cfg_is_in(lb_psv_split_fallback, [split_address, keep_key]).
 
 %% @doc Gets the minnimum number of nodes to sample (set in the config files).
 -spec conf_get_min_number_of_samples() -> pos_integer().

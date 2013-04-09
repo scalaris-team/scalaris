@@ -75,11 +75,9 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
                                         "sending no_op...", [self(), MyNodeId]),
                             lb_op:no_op();
                         _ ->
-                            MyPredId = dht_node_state:get(DhtNodeState, pred_id),
                             MyLoad = dht_node_state:get(DhtNodeState, load),
-                            DB = dht_node_state:get(DhtNodeState, db),
-                            Interval = node:mk_interval_between_ids(MyPredId, SelectedKey),
-                            OtherLoadNew = ?DB:get_load(DB, Interval),
+                            {SelectedKey, OtherLoadNew} =
+                                lb_common:split_by_key(DhtNodeState, SelectedKey),
                             MyLoadNew = MyLoad - OtherLoadNew,
                             MyNodeDetails = node_details:set(
                                               node_details:set(node_details:new(), node, MyNode), load, MyLoad),

@@ -23,7 +23,7 @@
 -include("scalaris.hrl").
 
 -export([calculateStddev/2, bestStddev/2, bestStddev/3,
-         split_by_load/2, split_my_range/2]).
+         split_by_load/2, split_by_key/2, split_my_range/2]).
 
 
 % Avg2 = average of load ^2
@@ -95,6 +95,18 @@ split_by_load(DhtNodeState, TargetLoad) ->
         end,
 %%     log:pal("[ ~.0p ]  TN: ~.0p, SK: ~.0p~n", [self(), TargetLoadNew, SplitKey]),
     {SplitKey, TargetLoadNew}.
+
+%% @doc Returns the given SplitKey and the load that would be split off by
+%%      using this key.
+-spec split_by_key(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key())
+        -> {SplitKey::?RT:key(), TargetLoadNew::non_neg_integer()}.
+split_by_key(DhtNodeState, SelectedKey) ->
+    MyPredId = dht_node_state:get(DhtNodeState, pred_id),
+    DB = dht_node_state:get(DhtNodeState, db),
+    Interval = node:mk_interval_between_ids(MyPredId, SelectedKey),
+    TargetLoadNew = ?DB:get_load(DB, Interval),
+%%     log:pal("[ ~.0p ]  TN: ~.0p, SK: ~.0p~n", [self(), TargetLoadNew, SelectedKey]),
+    {SelectedKey, TargetLoadNew}.
 
 %% @doc Returns the SplitKey that splits the current node's address range in
 %%      two (almost) equal halves.

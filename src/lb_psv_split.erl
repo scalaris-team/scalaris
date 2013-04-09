@@ -15,7 +15,9 @@
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Simple passive load balancing sampling k nodes and choosing the
 %%         one that reduces the standard deviation the most.
-%%         Splits loads in half, if there is no load address ranges are split.
+%%         Splits loads in half, if there is no load address ranges are split
+%%         according to lb_psv_split_fallback, i.e. in halves or using the
+%%         selected keys.
 %% @end
 %% @version $Id$
 -module(lb_psv_split).
@@ -134,23 +136,25 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
 -spec my_sort_fun(Op1::{lb_op:lb_op(), integer()},
                   Op2::{lb_op:lb_op(), integer()}) -> boolean().
 my_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
-    case Op1Change < Op2Change of
-        true -> true;
-        _ when Op1Change =:= Op2Change ->
-            Op1NewInterval = node_details:get(lb_op:get(Op1, n1_new), my_range),
-            {_, Op1NewPredId, Op1NewMyId, _} =
-                intervals:get_bounds(Op1NewInterval),
-            Op1NewRange = try ?RT:get_range(Op1NewPredId, Op1NewMyId)
-                          catch throw:not_supported -> 0
-                          end,
-            Op2NewInterval = node_details:get(lb_op:get(Op2, n1_new), my_range),
-            {_, Op2NewPredId, Op2NewMyId, _} =
-                intervals:get_bounds(Op2NewInterval),
-            Op2NewRange = try ?RT:get_range(Op2NewPredId, Op2NewMyId)
-                          catch throw:not_supported -> 0
-                          end,
-            Op2NewRange =< Op1NewRange;
-        _ -> false
+    if Op1Change < Op2Change -> true;
+       true ->
+           case config:read(lb_psv_split_fallback) of
+               split_address when Op1Change =:= Op2Change ->
+                   Op1NewInterval = node_details:get(lb_op:get(Op1, n1_new), my_range),
+                   {_, Op1NewPredId, Op1NewMyId, _} =
+                       intervals:get_bounds(Op1NewInterval),
+                   Op1NewRange = try ?RT:get_range(Op1NewPredId, Op1NewMyId)
+                                 catch throw:not_supported -> 0
+                                 end,
+                   Op2NewInterval = node_details:get(lb_op:get(Op2, n1_new), my_range),
+                   {_, Op2NewPredId, Op2NewMyId, _} =
+                       intervals:get_bounds(Op2NewInterval),
+                   Op2NewRange = try ?RT:get_range(Op2NewPredId, Op2NewMyId)
+                                 catch throw:not_supported -> 0
+                                 end,
+                   Op2NewRange =< Op1NewRange;
+               keep_key -> Op1Change =:= Op2Change
+           end
     end.
 
 %% @doc Sorts all provided operations so that the one with the biggest change
@@ -172,7 +176,8 @@ process_join_msg(_Msg, _State, _DhtNodeState) ->
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_integer(lb_psv_samples) and
-    config:cfg_is_greater_than_equal(lb_psv_samples, 1).
+    config:cfg_is_greater_than_equal(lb_psv_samples, 1) and
+    config:cfg_is_in(lb_psv_split_fallback, [split_address, keep_key]).
 
 %% @doc Gets the number of nodes to sample (set in the config files).
 -spec conf_get_number_of_samples() -> pos_integer().
