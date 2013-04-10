@@ -45,7 +45,7 @@ all() ->
      bench_increment
     ].
 
-suite() -> [ {timetrap, {seconds, 120}} ].
+suite() -> [ {timetrap, {seconds, 30}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
