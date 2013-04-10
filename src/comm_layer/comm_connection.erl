@@ -172,9 +172,7 @@ on({tcp, Socket, Data}, State) ->
 
 on({tcp_closed, Socket}, State) ->
     log:log(warn,"[ CC ~p ] tcp closed info", [self()]),
-    % report stats out of the original schedule (these would otherwise be lost)
-    NewState = report_stats(State),
-    close_connection(Socket, NewState);
+    close_connection(Socket, State);
 
 on({report_stats}, State) ->
     %% re-trigger
@@ -404,7 +402,10 @@ new_connection(Address, Port, MyPort, Channel) ->
 close_connection(Socket, State) ->
     gen_tcp:close(Socket),
     case socket(State) of
-        Socket -> set_socket(State, notconnected);
+        Socket ->
+            % report stats out of the original schedule
+            % (these would otherwise be lost)
+            set_socket(report_stats(State), notconnected);
         _      -> State
     end.
 
