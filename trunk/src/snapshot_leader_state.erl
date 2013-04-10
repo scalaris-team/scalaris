@@ -19,7 +19,7 @@
 -author('keidel@informatik.hu-berlin.de').
 -vsn('$Id$').
 
--export([new/0, new/3,
+-export([new/0, new/4,
          get_number/1, is_in_progress/1, get_global_snapshot/1, get_client/1,
          interval_union_is_all/1, get_error_interval/1,
          set_number/2, add_snapshot/2, add_interval/2, add_error_interval/2,
@@ -43,6 +43,12 @@
 -spec new() -> state().
 new() ->
     new(0, false, false).
+
+%% need to clean up ets table from old state
+-spec new(non_neg_integer(), boolean(), comm:mypid() | false, state()) -> state().
+new(Number, InProgress, Client, {_, _, OldTable, _, _, _}) -> 
+    ets:delete(OldTable),
+    new(Number, InProgress, Client).
 
 -spec new(non_neg_integer(), boolean(), comm:mypid() | false) -> state().
 new(Number, InProgress, Client) ->

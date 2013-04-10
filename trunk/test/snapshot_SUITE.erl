@@ -350,20 +350,21 @@ test_spam_transactions_and_snapshots(_) ->
     unittest_helper:make_ring(4),
     
     % apply a couple of transactions beforehand
-    tester:test(?MODULE, do_transaction_a, 0, 100),
+    tester:test(?MODULE, do_transaction_a, 1, 100),
     
-    % spam transactions in two sepreate processes
+    ct:pal("spaming transactions..."),
     SpamPid1 = erlang:spawn(fun() ->
-               tester:test(?MODULE, do_transaction_a, 0, 1500)
+                    [do_transaction_a(X) || X <- lists:seq(1,1500)]
           end),
     SpamPid2 = erlang:spawn(fun() ->
-               tester:test(?MODULE, do_transaction_b, 0, 1500)
+                    [do_transaction_b(X) || X <- lists:seq(1,1500)]
           end),
     
+    ct:pal("spaming snapshots..."),
     % spam snapshots here
     tester:test(api_tx, get_system_snapshot, 0, 100),
     
-    % wait for transaction spam
+    ct:pal("waiting for transaction spam..."),
     util:wait_for_process_to_die(SpamPid1),
     util:wait_for_process_to_die(SpamPid2),
     
@@ -373,12 +374,14 @@ test_spam_transactions_and_snapshots(_) ->
     ct:pal("snapshot: ~p~n",[Snap]),
     ok.
 
--spec do_transaction_a() -> any().
-do_transaction_a() ->
+-spec do_transaction_a(number()) -> any().
+do_transaction_a(_I) ->
+    %% ct:pal("spaming transaction_a...~p",[I]),
     api_tx:req_list([{read,"B"},{write,"A",randoms:getRandomInt()},{write,"B",randoms:getRandomInt()},{commit}]).
 
--spec do_transaction_b() -> any().
-do_transaction_b() ->
+-spec do_transaction_b(number()) -> any().
+do_transaction_b(_I) ->
+    %% ct:pal("spaming transaction_b...~p",[I]),
     api_tx:req_list([{read,"A"},{write,"B",randoms:getRandomInt()},{write,"A",randoms:getRandomInt()},{commit}]).
 
 -spec bench_increment(any()) -> ok.

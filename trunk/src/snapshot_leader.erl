@@ -37,7 +37,6 @@
 %% be startable via supervisor, use gen_component
 -spec start_link() -> {ok, pid()}.
 start_link() ->
-    ?TRACE("snapshot_leader:start_link~n", []),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [], % parameters passed to init
                              [{erlang_register, snapshot_leader}]).
@@ -50,25 +49,27 @@ init([]) ->
 -spec on(message(), snapshot_leader_state:state()) -> snapshot_leader_state:state().
 
 on({init_snapshot, Client}, State) ->
-    ?TRACE("snapshot_leader got init_snapshot~n", []),
     NewSnapNum = snapshot_leader_state:get_number(State) + 1,
+    ?TRACE("snapshot_leader: init_snapshot with number ~p~n", [NewSnapNum]),
     % send init_snapshot to all dht_nodes
     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), {do_snapshot, NewSnapNum, comm:this()}),
-    snapshot_leader_state:new(NewSnapNum, true, Client);
+    snapshot_leader_state:new(NewSnapNum, true, Client, State);
 
 % TODO: too much redundant code below -> break this up into several functions
 
 on({local_snapshot_done, _From, SnapNumber, Range, Snapshot}, State) ->
-    ?TRACE("snapshot_leader got local_snapshot_done from ~p for range ~p~n", [From, Range]),
     case (snapshot_leader_state:is_in_progress(State) 
          andalso SnapNumber =:= snapshot_leader_state:get_number(State)) of
         true -> 
+            ?TRACE("snapshot_leader: local_snapshot_done ~p from ~p for range ~p~n",
+                   [SnapNumber, From, Range]),
             TmpState = snapshot_leader_state:add_interval(State, Range),
             NewState = snapshot_leader_state:add_snapshot(TmpState, Snapshot),
             case snapshot_leader_state:interval_union_is_all(NewState) of
                 true -> % snapshot done, message client and "reset" local state
                     Data = snapshot_leader_state:get_global_snapshot(NewState),
-                    ?TRACE("snapshot_leader is done. sending data: ~p~n", [Data]),
+                    ?TRACE("snapshot_leader: snapshot ~p is done. sending
+                           data...~n", [SnapNumber]),
                     ErrorInterval = snapshot_leader_state:get_error_interval(NewState),
                     case intervals:is_empty(ErrorInterval) of
                         true ->
@@ -78,11 +79,13 @@ on({local_snapshot_done, _From, SnapNumber, Range, Snapshot}, State) ->
                             comm:send(snapshot_leader_state:get_client(NewState),
                                       {global_snapshot_done_with_errors, ErrorInterval, Data})
                     end,
-                    snapshot_leader_state:new(SnapNumber, false, false);
+                    snapshot_leader_state:new(SnapNumber, false, false, NewState);
                 false ->
                     NewState
             end;
         false -> % late/random snapshot_done message -> ignore
+            %% ?TRACE("snapshot_leader: local_snapshot_done ~p but stale ~n",
+            %%        [SnapNumber]),
             State
     end;
 
@@ -94,7 +97,7 @@ on({local_snapshot_failed, _From, SnapNumber, Range, _Msg}, State) ->
             case snapshot_leader_state:interval_union_is_all(NewState) of
                 true -> % snapshot done, message client and "reset" local state
                     Data = snapshot_leader_state:get_global_snapshot(NewState),
-                    ?TRACE("snapshot_leader finished with error. sending data: ~p~n", [Data]),
+                    ?TRACE("snapshot_leader: Snapshot ~p failed sending data...~n", [SnapNumber]),
                     ErrorInterval = snapshot_leader_state:get_error_interval(NewState),
                     case intervals:is_empty(ErrorInterval) of
                         true ->
@@ -104,7 +107,7 @@ on({local_snapshot_failed, _From, SnapNumber, Range, _Msg}, State) ->
                             comm:send(snapshot_leader_state:get_client(NewState),
                                       {global_snapshot_done_with_errors, ErrorInterval, Data})
                     end,
-                    snapshot_leader_state:new(SnapNumber, false, false);
+                    snapshot_leader_state:new(SnapNumber, false, false, NewState);
                 false ->
                     NewState
             end;

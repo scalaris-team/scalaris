@@ -310,7 +310,10 @@ snapshot_is_running_({_DB, _Subscr, {SnapTable, _LiveLC, _SnapLC}}) ->
     end.
 
 -spec delete_snapshot_(DB::db_t()) -> NewDB::db_t().
-delete_snapshot_({_DB, _Subscr, {_SnapTable, _LiveLC, _SnapLC}}) ->
+delete_snapshot_({_DB, _Subscr, {false, _LiveLC, _SnapLC}} = Db) ->
+    Db;
+delete_snapshot_({_DB, _Subscr, {SnapTable, _LiveLC, _SnapLC}}) ->
+    ets:delete(SnapTable),
     {_DB, _Subscr, {false, _LiveLC, 0}}.
 
 %% End snapshot-related functions
