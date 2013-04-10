@@ -273,16 +273,28 @@ report_stats(State) ->
                         NewStat -> State;
                         _ ->
                             {PrevRcvCnt, PrevRcvBytes, PrevSendCnt, PrevSendBytes} = PrevStat,
-                            comm:send_local(comm_stats,
-                                            {report_stat, RcvCnt - PrevRcvCnt,
-                                             RcvBytes - PrevRcvBytes,
-                                             SendCnt - PrevSendCnt,
-                                             SendBytes - PrevSendBytes}),
+                            comm:send_local(
+                              comm_stats,
+                              {report_stat,
+                               overflow_aware_diff(RcvCnt, PrevRcvCnt),
+                               overflow_aware_diff(RcvBytes, PrevRcvBytes),
+                               overflow_aware_diff(SendCnt, PrevSendCnt),
+                               overflow_aware_diff(SendBytes, PrevSendBytes)}),
                             set_last_stat_report(State, NewStat)
                     end;
                 {error, _Reason} -> State
             end
     end.
+
+%% @doc Diff between A and B taking an overflow at 2^32 or 2^64 into account,
+%%      otherwise <tt>A - B</tt>. Fails if A &lt; B and B &lt;= 2^32 or 2^64.
+-spec overflow_aware_diff(number(), number()) -> number().
+overflow_aware_diff(A, B) when A >= B ->
+    A - B;
+overflow_aware_diff(A, B) when A < B andalso B < 4294967296 -> % 2^32
+    4294967296 - B + A;
+overflow_aware_diff(A, B) when A < B andalso B < 18446744073709551616 -> % 2^64
+    18446744073709551616 - B + A.
 
 % PRE: connected socket
 -spec send_or_bundle(DestPid::pid(), Message::comm:message(), Options::comm:send_options(), State::state()) -> state().
