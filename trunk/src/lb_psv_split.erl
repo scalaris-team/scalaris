@@ -153,6 +153,7 @@ my_sort_fun({Op1, Op1Change}, {Op2, Op2Change}) ->
                                  catch throw:not_supported -> 0
                                  end,
                    Op2NewRange =< Op1NewRange;
+               split_address -> false;
                keep_key -> Op1Change =:= Op2Change
            end
     end.
