@@ -29,9 +29,9 @@
 snapshot_is_done(DHTNodeState) ->
     SnapState = dht_node_state:get(DHTNodeState, snapshot_state),
     DB = dht_node_state:get(DHTNodeState,db),
-    ?TRACE("~p snapshot:snapshot_is_done: ~p ~p ~p ~n",[comm:this(),snapshot_state:is_in_progress(SnapState),?DB:snapshot_is_running(DB),?DB:snapshot_is_lockfree(DB)]),
     case {snapshot_state:is_in_progress(SnapState),?DB:snapshot_is_running(DB),?DB:snapshot_is_lockfree(DB)} of
-        {true,true,true} -> true;
+        {true,true,true} ->
+            true;
         _ ->
             ?TRACE("~p snapshot:snapshot_is_done db: ~p~n",[comm:this(),DB]),
             ?TRACE("~p snapshot:snapshot_is_done db data: ~p~n",[comm:this(),?DB:get_data(DB)]),
@@ -41,14 +41,13 @@ snapshot_is_done(DHTNodeState) ->
     
 -spec on_do_snapshot(non_neg_integer(),any(),dht_node_state:state()) -> dht_node_state:state().
 on_do_snapshot(SnapNumber, Leader, DHTNodeState) ->
-    ?TRACE("~p snapshot:on_do_snapshot: ~p ~p~n",[comm:this(),SnapNumber,Leader]),
     SnapState = dht_node_state:get(DHTNodeState, snapshot_state),
-    ?TRACE("~p snapshot:on_do_snapshot: snapshot state is ~p~n",[comm:this(),SnapState]),
     case snapshot_state:is_in_progress(SnapState) of
         true -> % old snapshot is still running or current snapshot is already running
             case snapshot_state:get_number(SnapState) < SnapNumber of
                 true -> % currently running snapshot is old
-                    ?TRACE("~p snapshot:on_do_snapshot: new snapshot arrived~n",[comm:this()]),
+                    ?TRACE("snapshot: on_do_snapshot: starting new ~p dumping
+                           old ~p~n",[SnapNumber, snapshot_state:get_number(SnapState)]),
                     msg_snapshot_leaders_err("New snapshot arrived",
                                              snapshot_state:get_number(SnapState),
                                              dht_node_state:get(DHTNodeState,my_range),
@@ -61,19 +60,19 @@ on_do_snapshot(SnapNumber, Leader, DHTNodeState) ->
                             NewSnapState = snapshot_state:add_leader(SnapState, Leader),
                             NewState = dht_node_state:set_snapshot_state(DHTNodeState, NewSnapState);
                         false ->
+                            ?TRACE("snapshot: on_do_snapshot: ignoring old snapshot message ~p~n", [SnapNumber]),
                             % old snapshot -> ignore (or error msg?)
                             NewState = DHTNodeState
                     end
             end;
         false ->
             % no snapshot is progress -> init new
-            ?TRACE("~p snapshot:on_do_snapshot: init new snapshot~n",[comm:this()]),
+            ?TRACE("snapshot: on_do_snapshot: init new snapshot~n",[]),
             NewState = delete_and_init_snapshot(SnapNumber,Leader,DHTNodeState)
     end,
     % check if snapshot is already done (i.e. there were no active transactions when the snapshot arrived)
     case snapshot:snapshot_is_done(NewState) of
         true ->
-            ?TRACE("~p snapshot:on_do_snapshot: snapshot is done~n",[comm:this()]),
             comm:send(comm:this(), {local_snapshot_is_done});
         false ->
             ?TRACE("~p snapshot:on_do_snapshot: snapshot is not done~n",[comm:this()]),
@@ -84,12 +83,12 @@ on_do_snapshot(SnapNumber, Leader, DHTNodeState) ->
 
 -spec on_local_snapshot_is_done(dht_node_state:state()) -> dht_node_state:state().
 on_local_snapshot_is_done(DHTNodeState) ->
-    ?TRACE("~p snapshot:on_local_snapshot_is_done~n",[comm:this()]),
     Db = dht_node_state:get(DHTNodeState,db),
     SnapState = dht_node_state:get(DHTNodeState,snapshot_state),
     
     % collect local state and send it
     SnapNumber = snapshot_state:get_number(SnapState),
+    ?TRACE("snapshot: local snapshot ~p done~n",[SnapNumber]),
     Data = ?DB:join_snapshot_data(Db),
     Leaders = snapshot_state:get_leaders(SnapState),
     DBRange = dht_node_state:get(DHTNodeState,my_range),
@@ -116,8 +115,7 @@ msg_snapshot_leaders_err(_Msg,_SnapNumber,_DBRange,[]) ->
 
 -spec delete_and_init_snapshot(non_neg_integer(),any(),dht_node_state:state()) -> dht_node_state:state().
 delete_and_init_snapshot(SnapNumber,Leader,DHTNodeState) ->
-    NewDB = ?DB:init_snapshot(?DB:delete_snapshot(dht_node_state:get(DHTNodeState,db))),
-    ?TRACE("new DB: ~p~n",[NewDB]),
+    NewDB = ?DB:init_snapshot(dht_node_state:get(DHTNodeState,db)),
     TmpSnapState = snapshot_state:new(SnapNumber, true, [Leader]),
     TmpState = dht_node_state:set_db(DHTNodeState, NewDB),
     dht_node_state:set_snapshot_state(TmpState, TmpSnapState).

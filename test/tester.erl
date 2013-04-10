@@ -136,6 +136,8 @@ run(Module, Func, Arity, Iterations, ParseState, Options, Thread) ->
 run_helper(_Module, _Func, _Arity, 0, _FunType, _FeederFunType, _TypeInfos, _Options, _Thread) ->
     ok;
 run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, TypeInfos, Options, Thread) ->
+    %% ct:pal("Calling: ~.0p:~.0p(~.0p)...~p to call", [Module, Func, Options,
+    %%                                                  Iterations -1]),
     case run_test_ttt(Module, Func, FunType, FeederFunType, TypeInfos, Options, Thread) of
         ok ->
             run_helper(Module, Func, Arity, Iterations - 1, FunType, FeederFunType,
@@ -221,11 +223,11 @@ apply_feeder(Module, Func, Args, ResultType, TypeInfos) ->
     end.
 
 apply_args(Module, Func, Args, ResultType, TypeInfos, Thread) ->
-%%     ct:pal("Calling: ~.0p:~.0p(~.0p)", [Module, Func, Args]),
+    %% ct:pal("Calling: ~.0p:~.0p(~.0p)", [Module, Func, Args]),
     try
         tester_global_state:set_last_call(Thread, Module, Func, Args),
         Result = erlang:apply(Module, Func, Args),
-%%         ct:pal("Result: ~.0p ~n~.0p", [Result, ResultType]),
+        %% ct:pal("Result: ~.0p ~n~.0p", [Result, ResultType]),
         case tester_type_checker:check(Result, ResultType, TypeInfos) of
             true ->
                 ok;
