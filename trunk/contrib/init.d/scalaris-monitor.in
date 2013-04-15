@@ -2,8 +2,8 @@
 
 ### BEGIN INIT INFO
 # Provides:          scalaris-monitor
-# Required-Start:    $network $remote_fs
-# Required-Stop:     $network $remote_fs
+# Required-Start:    $network $remote_fs scalaris
+# Required-Stop:     $network $remote_fs scalaris
 # Default-Start:     3 5
 # Default-Stop:
 # Short-Description: JMX monitor for a Scalaris node
