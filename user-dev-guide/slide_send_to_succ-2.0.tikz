@@ -85,20 +85,21 @@
                   (pred-send-owner.west);
 
 
- \node[action_l, left=0.1 of pred-init.south east,lightgray] {
+ \node[action_l, left=0.1 of pred-init.south east ,lightgray] {
    SlideOp.new()\\
    fd.subscribe(SlideOp.node)%
  };
+ \node[phase, below left=0.4 and 0.1 of pred-init.south, lightgray] {wait\_for\_other};
 
  \node[action_l, left=0.1 of pred-send-data.north east] {
    SlideOp.new()\\
    fd.subscribe(SlideOp.node)%
  };
  
- \node[action_l, left=0.1 of pred-send-data.south east, anchor=north east] (pred-send-data-action) {
+ \node[action_l, left=0.1 of pred-send-data.south east, anchor=north east] {
    db.record\_changes(SlideOp.interval)%
  };
- \node[phase, below left=0.0 and 0.1 of pred-send-data-action.south east] {wait\_for\_data\_ack};
+ \node[phase, below left=0.5 and 0.1 of pred-send-data.south] {wait\_for\_data\_ack};
  
  \node[action_l, below left=0.1 and 0.1 of pred-send-delta.south east, anchor=south east] {
    db.stop\_record\_changes(SlideOp.interval)%
