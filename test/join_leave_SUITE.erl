@@ -232,6 +232,29 @@ tester_join_at(Config) ->
     prop_join_at(rt_SUITE:number_to_key(0), rt_SUITE:number_to_key(0)),
     tester:test(?MODULE, prop_join_at, 2, 5).
 
+-spec reply_with_send_error(Msg::comm:message(), State) -> State
+        when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).
+reply_with_send_error(Msg, State) when is_tuple(State) andalso element(1, State) =:= state ->
+    dht_node_move_SUITE:reply_with_send_error(Msg, State),
+    case element(2, Msg) of
+        join_response ->
+            Target = node:pidX(element(3, Msg)),
+            MoveId = element(5, Msg),
+            comm:send(Target, {move, {send_error, comm:this(), Msg, unittest}, MoveId});
+        _ ->
+            ok
+    end,
+    State;
+reply_with_send_error(Msg, State) when is_tuple(State) andalso element(1, State) =:= join ->
+    case element(2, Msg) of
+        join_response ->
+            Target = node:pidX(element(3, Msg)),
+            FailMsgCookie = element(5, Msg),
+            comm:send(Target, {move, {send_error, comm:this(), Msg, unittest}, FailMsgCookie});
+        _ -> ok
+    end,
+    State.
+
 % TODO: simulate more message drops,
 % TODO: simulate certain protocol runs, e.g. the other node replying with noop, etc.
 % keep in sync with dht_node_join and the timeout config parameters of join_parameters_list/0
@@ -241,7 +264,7 @@ tester_join_at(Config) ->
 %{join, get_number_of_samples, Samples::non_neg_integer(), Conn::connection()} |
 %{join, get_candidate_response, OrigJoinId::?RT:key(), Candidate::lb_op:lb_op(), Conn::connection()} |
 %{join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
-    {{join, join_response, '_', '_', '_', '_'}, [], 1..2, drop_msg} |
+    {{join, join_response, '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{join, join_response, not_responsible, CandId::lb_op:id()} |
 %{join, lookup_timeout, Conn::connection()} |
 %{join, known_hosts_timeout} |
@@ -260,10 +283,18 @@ tester_join_at(Config) ->
 %% @doc Makes IgnoredMessages unique, i.e. only one msg per msg type.
 -spec fix_tester_ignored_msg_list(IgnoredMessages::[join_message(),...]) -> [join_message(),...].
 fix_tester_ignored_msg_list(IgnoredMessages) ->
-    lists:usort(fun(E1, E2) ->
-                        erlang:element(2, erlang:element(1, E1)) =<
-                            erlang:element(2, erlang:element(1, E2))
-                end, IgnoredMessages).
+    IMsg2 = lists:usort(fun(E1, E2) ->
+                                erlang:element(2, erlang:element(1, E1)) =<
+                                    erlang:element(2, erlang:element(1, E2))
+                        end, IgnoredMessages),
+    [begin
+         NewAction =
+             case Action of
+                 reply_with_send_error -> fun reply_with_send_error/2;
+                 X -> X
+             end,
+         {Msg, Conds, Count, NewAction}
+     end || {Msg, Conds, Count, Action} <- IMsg2].
 
 -spec send_ignore_msg_list_to(NthNode::1..4, PredOrSuccOrNode::pred | succ | node, IgnoredMessages::[join_message(),...]) -> ok.
 send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
@@ -282,8 +313,9 @@ send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
     comm:send(node:pidX(Other), {mockup_dht_node, add_match_specs, IgnoredMessages}).
 
 -spec prop_join_at_timeouts(FirstId::?RT:key(), SecondId::?RT:key(),
-        IgnoredMessages::[join_message(),...]) -> true.
-prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_) ->
+        IgnoredMessages::[join_message(),...], IgnMsgAt1st::boolean(),
+        IgnMsgAt2nd::boolean()) -> true.
+prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_, IgnMsgAt1st, IgnMsgAt2nd) ->
     OldProcesses = unittest_helper:get_processes(),
     BenchSlaves = 2, BenchRuns = 50,
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
@@ -291,10 +323,15 @@ prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_) ->
     unittest_helper:make_ring_with_ids(
       [FirstId],
       [{config, [{dht_node, mockup_dht_node}, pdb:get(log_path, ?MODULE), {monitor_perf_interval, 0} | join_parameters_list()]}]),
-    send_ignore_msg_list_to(1, node, IgnoredMessages),
+    if IgnMsgAt1st -> send_ignore_msg_list_to(1, node, IgnoredMessages);
+       true        -> ok
+    end,
     BenchPid = erlang:spawn(fun() -> bench:increment(BenchSlaves, BenchRuns) end),
     util:wait_for_process_to_die(BenchPid),
-    _ = admin:add_node_at_id(SecondId),
+    MoreOpts = if IgnMsgAt2nd -> [{match_specs, IgnoredMessages}];
+                  true        -> []
+               end,
+    _ = admin:add_node([{{dht_node, id}, SecondId}, {skip_psv_lb}] ++ MoreOpts),
     check_size(2),
     unittest_helper:check_ring_load(BenchSlaves * 4),
     unittest_helper:check_ring_data(),
@@ -307,7 +344,7 @@ prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_) ->
 tester_join_at_timeouts(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     pdb:set({log_path, PrivDir}, ?MODULE),
-    tester:test(?MODULE, prop_join_at_timeouts, 3, 5).
+    tester:test(?MODULE, prop_join_at_timeouts, 5, 5).
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->

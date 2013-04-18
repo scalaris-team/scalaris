@@ -195,7 +195,9 @@ symm4_slide_pred_rcv_load_incremental(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%
 
-reply_with_send_error(Msg, State) ->
+-spec reply_with_send_error(Msg::comm:message(), State::dht_node_state:state())
+        -> State::dht_node_state:state().
+reply_with_send_error(Msg, State) when element(1, Msg) =:= move ->
     % just in case, if there are two slides, then send two send errors
     SlidePred = dht_node_state:get(State, slide_pred),
     SlideSucc = dht_node_state:get(State, slide_succ),
@@ -222,12 +224,11 @@ reply_with_send_error(Msg, State) ->
                      {Target, FailMsgCookie}
              end
          end || Slide <- lists:usort([SlidePred, SlideSucc])],
-    _ = [begin
-             case {Target, FailMsgCookie} of
-                 {null, ok} -> ok;
-                 _ -> comm:send(Target, {move, {send_error, comm:this(), Msg, unittest}, FailMsgCookie})
-             end
-         end|| {Target, FailMsgCookie} <- lists:usort(FailMsgs)],
+    _ = [comm:send(Target, {move, {send_error, comm:this(), Msg, unittest}, FailMsgCookie})
+        || X = {Target, FailMsgCookie} <- lists:usort(FailMsgs),
+           X =/= {null, ok}],
+    State;
+reply_with_send_error(_Msg, State) ->
     State.
 
 % keep in sync with dht_node_move and the timeout config parameters set in set_move_config_parameters/0
