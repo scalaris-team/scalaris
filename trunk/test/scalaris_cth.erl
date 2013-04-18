@@ -137,10 +137,6 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
                                     [Thread, Module, Function, Args])
                      end
                  end || Thread <- lists:seq(1, 8)],
-            TCTime_ms = case Start of
-                            failed -> TimeTrapTime_ms;
-                            _      -> Start
-                        end,
             Suite = State#state.suite,
             try Suite:end_per_testcase(TC, Config)
             catch
@@ -151,10 +147,16 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
                            timeout~n", [Error])
             end,
             ok;
+        {skip, {failed, {_FailedMod, _FailedFun, {timetrap_timeout, TimeTrapTime_ms}}}} ->
+            ok;
         _ ->
-            TCTime_ms = timer:now_diff(os:timestamp(), Start) / 1000,
+            TimeTrapTime_ms = 0,
             ok
     end,
+    TCTime_ms = case Start of
+                    failed -> TimeTrapTime_ms;
+                    _      -> timer:now_diff(os:timestamp(), Start) / 1000
+                end,
     ct:pal("####################################################~n"
            "End ~p:~p -> ~.0p (after ~fs)",
            [State#state.suite, TC, Return, TCTime_ms / 1000]),
