@@ -46,6 +46,9 @@
 -export([join_as_first/3, join_as_other/3,
          process_join_state/2, process_join_msg/2, check_config/0]).
 
+% for join_leave_SUITE:
+-export([reject_join_response/4]).
+
 -ifdef(with_export_type_support).
 -export_type([join_state/0, join_message/0, connection/0]).
 -endif.
@@ -365,26 +368,34 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId} = _Msg,
     % only act on related messages, i.e. messages from the current candidate
     Phase = get_phase(JoinState),
     State1 = case get_candidates(JoinState) of
-        [] when Phase =:= phase4 -> % no candidates -> should not happen in phase4!
+        [] when Phase =:= phase4 ->
+            % no candidates -> should not happen in phase4!
             log:log(error, "[ Node ~w ] empty candidate list in join phase 4, "
                            "starting over", [self()]),
+            reject_join_response(Succ, Pred, MoveId, CandId),
             NewJoinState = start_over(JoinState),
             ?TRACE_JOIN_STATE(NewJoinState),
             {join, NewJoinState, QueuedMessages};
-        [] -> State; % in all other phases, ignore the delayed join_response
-                     % if no candidates exist
+        [] ->
+            % in all other phases, ignore the delayed join_response if no
+            % candidates exist
+            reject_join_response(Succ, Pred, MoveId, CandId),
+            State;
         [Candidate | _Rest] ->
             CandidateNode = node_details:get(lb_op:get(Candidate, n1succ_new), node),
             CandidateNodeSame = node:same_process(CandidateNode, Succ),
             case lb_op:get(Candidate, id) =:= CandId of
                 false ->
+                    % ignore old/unrelated message
                     log:log(warn, "[ Node ~w ] ignoring old or unrelated "
                                   "join_response message", [self()]),
-                    State; % ignore old/unrelated message
+                    reject_join_response(Succ, Pred, MoveId, CandId),
+                    State;
                 _ when not CandidateNodeSame ->
                     % id is correct but the node is not (should never happen!)
                     log:log(error, "[ Node ~w ] got join_response but the node "
                                   "changed, trying next candidate", [self()]),
+                    reject_join_response(Succ, Pred, MoveId, CandId),
                     NewJoinState = try_next_candidate(JoinState),
                     ?TRACE_JOIN_STATE(NewJoinState),
                     {join, NewJoinState, QueuedMessages};
@@ -395,6 +406,7 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId} = _Msg,
                         true ->
                             log:log(warn, "[ Node ~w ] chosen ID already exists, "
                                           "trying next candidate", [self()]),
+                            reject_join_response(Succ, Pred, MoveId, CandId),
                             % note: can not keep Id, even if skip_psv_lb is set
                             JoinState1 = remove_candidate_front(JoinState),
                             NewJoinState = contact_best_candidate(JoinState1),
@@ -892,6 +904,14 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     msg_queue:send(QueuedMessages),
     NewRT_ext = ?RT:empty_ext(Neighbors),
     dht_node_state:new(NewRT_ext, RMState, DB).
+
+-spec reject_join_response(Succ::node:node_type(), Pred::node:node_type(),
+                           MoveFullId::slide_op:id(), CandId::lb_op:id()) -> ok.
+reject_join_response(Succ, _Pred, MoveId, _CandId) ->
+    % similar to dht_node_move:abort_slide/9 - keep message in sync!
+    Msg = {move, slide_abort, pred, MoveId, ongoing_slide},
+    ?TRACE_SEND(node:pidX(Succ), Msg),
+    dht_node_move:send_no_slide(node:pidX(Succ), Msg, 0).
 
 %% @doc Finishes the join by setting up a slide operation to get the data from
 %%      the other node and sends all queued messages.

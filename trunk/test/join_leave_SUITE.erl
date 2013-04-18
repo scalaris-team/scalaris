@@ -255,6 +255,18 @@ reply_with_send_error(Msg, State) when is_tuple(State) andalso element(1, State)
     end,
     State.
 
+-spec reply_with_abort(Msg::comm:message(), State) -> State
+        when is_subtype(State, dht_node_state:state() | dht_node_join:join_state())
+reply_with_abort(_Msg, State) when is_tuple(State) andalso element(1, State) =:= state ->
+    State;
+reply_with_abort(Msg, State) when is_tuple(State) andalso element(1, State) =:= join ->
+    case Msg of
+        {join, join_response, Succ, Pred, MoveId, CandId} ->
+            dht_node_join:reject_join_response(Succ, Pred, MoveId, CandId);
+        _ -> ok
+    end,
+    State.
+
 % TODO: simulate more message drops,
 % TODO: simulate certain protocol runs, e.g. the other node replying with noop, etc.
 % keep in sync with dht_node_join and the timeout config parameters of join_parameters_list/0
@@ -264,7 +276,7 @@ reply_with_send_error(Msg, State) when is_tuple(State) andalso element(1, State)
 %{join, get_number_of_samples, Samples::non_neg_integer(), Conn::connection()} |
 %{join, get_candidate_response, OrigJoinId::?RT:key(), Candidate::lb_op:lb_op(), Conn::connection()} |
 %{join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
-    {{join, join_response, '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
+    {{join, join_response, '_', '_', '_', '_'}, [], 1..2, reply_with_send_error | reply_with_abort} |
 %{join, join_response, not_responsible, CandId::lb_op:id()} |
 %{join, lookup_timeout, Conn::connection()} |
 %{join, known_hosts_timeout} |
@@ -291,6 +303,7 @@ fix_tester_ignored_msg_list(IgnoredMessages) ->
          NewAction =
              case Action of
                  reply_with_send_error -> fun reply_with_send_error/2;
+                 reply_with_abort -> fun reply_with_abort/2;
                  X -> X
              end,
          {Msg, Conds, Count, NewAction}
