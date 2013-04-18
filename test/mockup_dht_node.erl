@@ -75,8 +75,15 @@ start_link(DHTNodeGroup, Options) ->
 
 -spec init(Options::[tuple()]) -> state().
 init(Options) ->
-    ModuleState = dht_node:init(Options),
-    module_state_to_my_state(ModuleState, {dht_node, fun dht_node:on/2, ModuleState, []}).
+    case lists:keytake(match_specs, 1, Options) of
+        {value, {match_specs, MatchSpecs}, RestOptions} ->
+            ok;
+        false -> RestOptions = Options,
+                 MatchSpecs = [],
+                 ok
+    end,
+    ModuleState = dht_node:init(RestOptions),
+    module_state_to_my_state(ModuleState, {dht_node, fun dht_node:on/2, ModuleState, MatchSpecs}).
 
 -spec module_state_to_my_state(module_state(), state()) -> state().
 module_state_to_my_state(ModuleState, {Module, OldHandler, _, NewMatchSpecs}) ->
