@@ -536,13 +536,7 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
                 fd:subscribe([node:pidX(NewPred)], {move, MoveFullId}),
                 SlideOp = slide_op:new_sending_slide_join(
                             MoveFullId, NewPred, join, Neighbors),
-                SlideOp1 = slide_op:set_phase(SlideOp, wait_for_pred_update_join),
-                RMSubscrTag = {move, slide_op:get_id(SlideOp1)},
-                rm_loop:subscribe(self(), RMSubscrTag,
-                                  fun(_OldN, NewN, _IsSlide) ->
-                                          NewPred =:= nodelist:pred(NewN)
-                                  end,
-                                  fun dht_node_move:rm_notify_new_pred/4, 1),
+                SlideOp1 = slide_op:set_phase(SlideOp, wait_for_req_data),
                 State1 = dht_node_state:add_db_range(
                            State, slide_op:get_interval(SlideOp1),
                            slide_op:get_id(SlideOp1)),
