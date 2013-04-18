@@ -258,21 +258,14 @@ process_move_msg({move, rm_new_pred, {move, MoveFullId} = RMSubscrTag} = _Msg, M
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_pred_update_data_ack], pred, rm_new_pred);
 
 % request for data from a neighbor
-process_move_msg({move, req_data, MoveFullId} = Msg, MyState) ->
-    ?TRACE1(Msg, MyState),
+process_move_msg({move, req_data, MoveFullId} = _Msg, MyState) ->
+    ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, _PredOrSucc, State) ->
-                case slide_op:get_phase(SlideOp) of
-                    wait_for_pred_update_data_ack ->
-                        % send message again - we are waiting for an updated pred in the rm state
-                        comm:send_local_after(10, self(), Msg),
-                        State;
-                    _ ->
-                        SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                        send_data(State, SlideOp1)
-                end
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
+                send_data(State, SlideOp1)
         end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_req_data, wait_for_pred_update_data_ack], pred, req_data);
+    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_req_data], pred, req_data);
 
 % data from a neighbor
 process_move_msg({move, data, MovingData, MoveFullId} = _Msg, MyState) ->
