@@ -247,31 +247,24 @@ process_move_msg({move, node_leave} = _Msg, State) ->
 % wait for the joining node to appear in the rm-process -> got ack from rm:
 % (see dht_node_join.erl) or
 % wait for the rm to update its pred to the expected pred in the data_ack phase
-% precond(wait_for_pred_update_join - during join):
-%   all conditions to change into the next phase must be met
 % precond(wait_for_pred_update_data_ack): none (conditions will be checked here) 
 process_move_msg({move, rm_new_pred, {move, MoveFullId} = RMSubscrTag} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, pred, State) ->
                 rm_loop:unsubscribe(self(), RMSubscrTag),
-                case slide_op:get_phase(SlideOp) of
-                    wait_for_pred_update_join ->
-                        NewSlideOp = slide_op:set_phase(SlideOp, wait_for_req_data),
-                        dht_node_state:set_slide(State, pred, NewSlideOp);
-                    wait_for_pred_update_data_ack ->
-                        try_send_delta_to_pred(State, SlideOp)
-                end
+                try_send_delta_to_pred(State, SlideOp)
         end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_pred_update_join, wait_for_pred_update_data_ack], pred, rm_new_pred);
+    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_pred_update_data_ack], pred, rm_new_pred);
 
 % request for data from a neighbor
 process_move_msg({move, req_data, MoveFullId} = Msg, MyState) ->
     ?TRACE1(Msg, MyState),
     WorkerFun =
         fun(SlideOp, _PredOrSucc, State) ->
-                case lists:member(slide_op:get_phase(SlideOp), [wait_for_pred_update_join, wait_for_pred_update_data_ack]) of
-                    true -> % send message again - we are waiting for an updated pred in the rm state
+                case slide_op:get_phase(SlideOp) of
+                    wait_for_pred_update_data_ack ->
+                        % send message again - we are waiting for an updated pred in the rm state
                         comm:send_local_after(10, self(), Msg),
                         State;
                     _ ->
@@ -279,7 +272,7 @@ process_move_msg({move, req_data, MoveFullId} = Msg, MyState) ->
                         send_data(State, SlideOp1)
                 end
         end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_req_data, wait_for_pred_update_join, wait_for_pred_update_data_ack], pred, req_data);
+    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_req_data, wait_for_pred_update_data_ack], pred, req_data);
 
 % data from a neighbor
 process_move_msg({move, data, MovingData, MoveFullId} = _Msg, MyState) ->
@@ -1215,13 +1208,12 @@ get_slide(State, MoveFullId) ->
             NodeSlOp = slide_op:get_node(SlideOp),
             % - allow changed pred during a leave if the new pred is not between
             %   the leaving node and the current node!
-            % - allow outdated pred during wait_for_pred_update_join if the new
+            % - allow outdated pred during join (as an existing node) if the new
             %   pred is in the current range
             case node:same_process(Node, NodeSlOp) orelse
                      (PredOrSucc =:= pred andalso
                           (slide_op:is_leave(SlideOp) orelse
-                               (slide_op:is_join(SlideOp) andalso
-                                    slide_op:get_phase(SlideOp) =:= wait_for_pred_update_join)) andalso
+                               slide_op:is_join(SlideOp)) andalso
                           intervals:in(node:id(NodeSlOp), dht_node_state:get(State, my_range))) of
                 true -> {ok,             PredOrSucc, SlideOp};
                 _    -> {wrong_neighbor, PredOrSucc, SlideOp}

@@ -57,7 +57,6 @@
         null | % should only occur as an intermediate state, otherwise equal to "no slide op"
         wait_for_other | % a node initiated a slide but needs more info from its partner
         wait_for_node_update | % pred changing its id
-        wait_for_pred_update_join | % wait for the local rm process to know about a joining node (pred)
         wait_for_pred_update_data_ack | % wait for the local rm process to know about the changed pred's ID
         wait_for_change_id | wait_for_req_data | wait_for_data_ack | wait_for_delta_ack | % sending node
         wait_for_change_op | wait_for_data | wait_for_delta. % receiving node
