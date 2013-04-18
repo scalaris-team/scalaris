@@ -40,16 +40,14 @@
 
  \node[start] (pred)      [below left=0.5 and 2.5 of heading1.south] {pred};
  \node[inner] (pred-init)           [below=\tikzstartfirst of pred]      {};
- \node[inner] (pred-wait-for-rm)    [below=\tikzsepinner of pred-init] {};
- \node[inner] (pred-got-data)       [below=\tikzsepinner of pred-wait-for-rm] {};
+ \node[inner] (pred-got-data)       [below=\tikzsepinner of pred-init] {};
  \node[inner] (pred-got-delta)      [below=\tikzsepinner of pred-got-data] {};
  \node[inner] (pred-got-owner)      [below=\tikzsepinner of pred-got-delta] {};
  \node[end]   (pred-end)  [below=\tikzstartsecond of pred-got-owner] {\footnotesize pred};
 
  \node[start] (succ)      [below right=0.5 and 2.5 of heading1.south] {succ};
  \node[inner] (succ-init)           [below=\tikzstartsecond of succ]      {};
- \node[inner] (succ-init-from-pred) [below=\tikzsepinner of succ-init]      {};
- \node[inner] (succ-send-data)      [below=\tikzsepinner of succ-init-from-pred]      {};
+ \node[inner] (succ-send-data)      [below=\tikzsepinner of succ-init]      {};
  \node[inner] (succ-send-delta)     [below=\tikzsepinner of succ-send-data]      {};
  \node[inner] (succ-send-owner)     [below=\tikzsepinner of succ-send-delta]      {};
  \node[end]   (succ-end)  [below=\tikzstartfirst of succ-send-owner] {\footnotesize succ};
@@ -62,31 +60,20 @@
  \path[->] (succ-init.south west)
              edge [post,draw=lightgray] node[msg_t, lightgray,font=\footnotesize] {slide, pred, 'send'} node[msg_b, lightgray,font=\footnotesize] {(optional)} (pred-init.north east)
            (pred-init.south east)
-             edge [post]  node[msg_t] {slide, succ, 'rcv'\textcolor{lightgray}{, MaxE}} (succ-init-from-pred.north west)
+             edge [post]  node[msg_t] {slide, succ, 'rcv'\textcolor{lightgray}{, MaxE}} (succ-send-data.north west)
 
-           (succ-init-from-pred.east)
+           (succ-send-data.east)
              edge [async_r] node[async_desc, auto, anchor=west] {\textcolor{green}{prepare\_send\_data(SlideOp)}}
-                  (succ-init-from-pred.south east)
-
-           (succ-init-from-pred.south west)
-             edge [post,lightblue] node[msg_t] {change\_id}
-                  (pred-wait-for-rm.north east)
-           (pred-wait-for-rm.south east)
-             edge [post,lightblue] node[msg_t] {req\_data} (succ-send-data.north west)
-
-           (succ-init-from-pred.south west)
-             edge [post,red,bend right=15] node[note, auto, anchor=east, red, pos=0.5] {$\ell$} (succ-send-data.north west)
-%            (succ-init-from-pred.south west)
-%              edge [post,red,bend right=15] node[auto, anchor=west, thin, red, draw=red, rounded corners, outer xsep=0.2cm, pos=0.8] {skip in slide\_lease} (succ-send-data.north west)
-
-           (pred-wait-for-rm.north west)
-             edge [async_l] node[async_desc, auto, anchor=east] {\textcolor{green}{update\_rm(SlideOp.id)}}
-                  (pred-wait-for-rm.west)
+                  (succ-send-data.south east)
 
            (succ-send-data.south west)
              edge [post] node[msg_t] {data\textcolor{lightgray}{, TargetId, NextOp}} (pred-got-data.north east)
            (pred-got-data.south east)
              edge [post] node[msg_t] {data\_ack} (succ-send-delta.north west)
+
+           (pred-got-data.north west)
+             edge [async_l] node[async_desc, auto, anchor=east] {\textcolor{green}{update\_rcv\_data(SlideOp, TargetId, NextOp)}}
+                  (pred-got-data.west)
 
            (succ-send-delta.north east)
              edge [async_r] node[async_desc, auto, anchor=west] {\textcolor{green}{prepare\_send\_selta(SlideOp)}}
@@ -102,23 +89,13 @@
                   (succ-send-owner.east);
 
 
- \node[note, lightblue, right=0.5 of pred-wait-for-rm] {c};
-%  \node[thin,lightblue,draw,rounded corners, right=0 of pred-wait-for-rm] {only slide\_chord};
-%  \node[thin,red,draw=red,rounded corners,anchor=north west,below left=.5\tikzsepheight and 0 of succ-send-owner] {only slide\_lease};
-
  \node[action_l, left=0.1 of pred-init.east] {
    SlideOp.new()\\
    fd.subscribe(SlideOp.node)\\
    \textcolor{green}{prepare\_rcv\_data(SlideOp)}%
  };
- \node[phase, below left=0.35 and 0.1 of pred-init.south,red,draw=red] (pred-init-p-leases) {wait\_for\_data};
- \node[phase, left=0.1 of pred-init-p-leases,lightblue,draw] {wait\_for\_change\_id};
+ \node[phase, below left=0.35 and 0.1 of pred-init.south] (pred-init-p-leases) {wait\_for\_data};
 
- \node[phase, below left=0.1 and 0.1 of pred-wait-for-rm.south,lightblue,draw] {wait\_for\_data};
-
- \node[action_l, left=0.1 of pred-got-data.east] {
-   \textcolor{green}{update\_rcv\_data(SlideOp, TargetId, NextOp)}%
- };
  \node[phase, below left=0.1 and 0.1 of pred-got-data.south] {wait\_for\_delta};
 
  \node[action_l, left=0.1 of pred-got-delta.east] {
@@ -135,17 +112,17 @@
    SlideOp.new()\\
    fd.subscribe(SlideOp.node)%
  };
+ \node[phase, below right=0.4 and 0.1 of succ-init.south, lightgray] {wait\_for\_other};
 
- \node[action_r, right=0.1 of succ-init-from-pred.north west,anchor=west] {
+ \node[action_r, right=0.1 of succ-send-data.north west,anchor=west] {
    SlideOp.new()\\
    fd.subscribe(SlideOp.node)%
  };
- \node[phase, below right=0.1 and 0.1 of succ-init-from-pred.south,lightblue,draw] {wait\_for\_req\_data};
 
- \node[action_r, right=0.1 of succ-send-data.west] {
+ \node[action_r, below=0.3 of succ-send-data.south,anchor=west] {
    db.record\_changes(SlideOp.interval)%
  };
- \node[phase, below right=0.1 and 0.1 of succ-send-data.south] {wait\_for\_data\_ack};
+ \node[phase, below right=0.5 and 0.1 of succ-send-data.south] {wait\_for\_data\_ack};
 
  \node[action_r, below right=0.1 and 0.1 of succ-send-delta.south west, anchor=south west] {
    db.stop\_record\_changes(SlideOp.interval)%
@@ -153,7 +130,7 @@
  \node[phase, below right=0.1 and 0.1 of succ-send-delta.south] {wait\_for\_delta\_ack};
 
  \coordinate (succ-cont-start1) at ($(succ-send-owner)-(0,.5\tikzsepinner)$);
- \coordinate (succ-cont-end) at ($(succ-init-from-pred)+(0,0.1)$);
+ \coordinate (succ-cont-end) at ($(succ-send-data)+(0,0.1)$);
  \coordinate (pred-cont-start1) at ($(pred-got-delta.south)+(0,-0.25)$);
  \coordinate (pred-cont-start2) at ($(pred-cont-start1)-(0,1.25)$);
  \coordinate (pred-cont-end) at ($(pred-init.south)+(0,-0.25)$);
@@ -169,10 +146,10 @@
    SlideOp.delete()%
  };
 
- \coordinate (pred-cont-mid) at ($(pred-cont-start1)+(-7,0.2)$);
- \draw[post, rounded corners, dashed, lightgray] (pred-cont-start1) -- +(-7,0) -- ($(pred-cont-end)+(-7,0)$) -- (pred-cont-end);
- \draw[post, rounded corners, dashed, lightgray] (pred-cont-start2) -- +(-7,0) -- (pred-cont-mid);
- \node[action_r, lightgray, anchor=west] at ($(pred-cont-start1)!0.5!(pred-cont-start2)+(-7,0)$) {if (NextOp == continue) -> continue\\SlideOp.update()\\prepare\_rcv\_data(SlideOp)};
+ \coordinate (pred-cont-mid) at ($(pred-cont-start1)+(-7.5,0.2)$);
+ \draw[post, rounded corners, dashed, lightgray] (pred-cont-start1) -- +(-7.5,0) -- ($(pred-cont-end)+(-7.5,0)$) -- (pred-cont-end);
+ \draw[post, rounded corners, dashed, lightgray] (pred-cont-start2) -- +(-7.5,0) -- (pred-cont-mid);
+ \node[action_r, lightgray, anchor=west] at ($(pred-cont-start1)!0.5!(pred-cont-start2)+(-7.5,0)$) {if (NextOp == continue) -> continue\\SlideOp.update()\\prepare\_rcv\_data(SlideOp)};
 
 \end{tikzpicture}
 \input{tikz_footer}
