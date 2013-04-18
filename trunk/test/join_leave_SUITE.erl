@@ -256,7 +256,7 @@ reply_with_send_error(Msg, State) when is_tuple(State) andalso element(1, State)
     State.
 
 -spec reply_with_abort(Msg::comm:message(), State) -> State
-        when is_subtype(State, dht_node_state:state() | dht_node_join:join_state())
+        when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).
 reply_with_abort(_Msg, State) when is_tuple(State) andalso element(1, State) =:= state ->
     State;
 reply_with_abort(Msg, State) when is_tuple(State) andalso element(1, State) =:= join ->
@@ -268,7 +268,7 @@ reply_with_abort(Msg, State) when is_tuple(State) andalso element(1, State) =:= 
     State.
 
 -spec reply_with_crash(Msg::comm:message(), State) -> State
-        when is_subtype(State, dht_node_state:state() | dht_node_join:join_state())
+        when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).
 reply_with_crash(_Msg, State) when is_tuple(State) andalso element(1, State) =:= state ->
     State;
 reply_with_crash(Msg, State) when is_tuple(State) andalso element(1, State) =:= join ->
