@@ -291,7 +291,7 @@ reply_to_join_request(_Msg, State, _Reason) when is_tuple(State) andalso element
 %{join, get_candidate_response, OrigJoinId::?RT:key(), Candidate::lb_op:lb_op(), Conn::connection()} |
 %{join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
     {{join, join_response, '_', '_', '_', '_'}, [], 1..2,
-     reply_to_join_response_abort | reply_to_join_response_crash | reply_to_join_response_send_error} |
+     {reply_to_join_response, abort | crash | send_error}} |
 %{join, join_response, not_responsible, CandId::lb_op:id()} |
 %{join, lookup_timeout, Conn::connection()} |
 %{join, known_hosts_timeout} |
@@ -303,7 +303,7 @@ reply_to_join_request(_Msg, State, _Reason) when is_tuple(State) andalso element
 %{join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key(), LbPsv::module(), Conn::connection()} |
 %{join, join_request, NewPred::node:node_type(), CandId::lb_op:id()} |
     {{join, join_request, '_', '_'}, [], 1..2,
-     drop_msg | reply_to_join_request_not_responsible | reply_to_join_request_busy}.
+     drop_msg | {reply_to_join_request, not_responsible | busy}}.
 %{Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() |
 %      lb_psv_gossip:custom_message(),
 % {join, LbPsv::module(), LbPsvState::term()}}
@@ -318,16 +318,10 @@ fix_tester_ignored_msg_list(IgnoredMessages) ->
     [begin
          NewAction =
              case Action of
-                 reply_to_join_response_send_error ->
-                     fun(MsgX, StateX) -> reply_to_join_response(MsgX, StateX, send_error) end;
-                 reply_to_join_response_abort ->
-                     fun(MsgX, StateX) -> reply_to_join_response(MsgX, StateX, abort) end;
-                 reply_to_join_response_crash ->
-                     fun(MsgX, StateX) -> reply_to_join_response(MsgX, StateX, crash) end;
-                 reply_to_join_request_not_responsible ->
-                     fun(MsgX, StateX) -> reply_to_join_request(MsgX, StateX, not_responsible) end;
-                 reply_to_join_request_busy ->
-                     fun(MsgX, StateX) -> reply_to_join_request(MsgX, StateX, busy) end;
+                 {reply_to_join_response, Reason} ->
+                     fun(MsgX, StateX) -> reply_to_join_response(MsgX, StateX, Reason) end;
+                 {reply_to_join_request, Reason} ->
+                     fun(MsgX, StateX) -> reply_to_join_request(MsgX, StateX, Reason) end;
                  X -> X
              end,
          {Msg, Conds, Count, NewAction}
