@@ -350,7 +350,11 @@ on({send_error, _FailedTarget, FailedMsg, _Reason} = Msg, State)
 on({get_yaws_info, Pid}, State) ->
     comm:send(Pid, {get_yaws_info_response, comm:get_ip(comm:this()), config:read(yaws_port), pid_groups:my_groupname()}),
     State;
-on({get_state, Pid, Which}, State) ->
+on({get_state, Pid, Which}, State) when is_list(Which) ->
+    comm:send(Pid, {get_state_response,
+                    [{X, dht_node_state:get(State, Which)} || X <- Which]}),
+    State;
+on({get_state, Pid, Which}, State) when is_atom(Which) ->
     comm:send(Pid, {get_state_response, dht_node_state:get(State, Which)}),
     State;
 on({get_node_details, Pid}, State) ->
