@@ -232,49 +232,39 @@ tester_join_at(Config) ->
     prop_join_at(rt_SUITE:number_to_key(0), rt_SUITE:number_to_key(0)),
     tester:test(?MODULE, prop_join_at, 2, 5).
 
--spec reply_with_send_error(Msg::comm:message(), State) -> State
+-spec reply_to_join_response(Msg::comm:message(), State, Reason::abort | crash | send_error) -> State
         when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).
-reply_with_send_error(Msg, State) when is_tuple(State) andalso element(1, State) =:= state ->
-    dht_node_move_SUITE:reply_with_send_error(Msg, State),
-    case element(2, Msg) of
-        join_response ->
-            Target = node:pidX(element(3, Msg)),
-            MoveId = element(5, Msg),
-            comm:send(Target, {move, {send_error, comm:this(), Msg, unittest}, MoveId});
-        _ ->
-            ok
-    end,
-    State;
-reply_with_send_error(Msg, State) when is_tuple(State) andalso element(1, State) =:= join ->
-    case element(2, Msg) of
-        join_response ->
-            Target = node:pidX(element(3, Msg)),
-            FailMsgCookie = element(5, Msg),
-            comm:send(Target, {move, {send_error, comm:this(), Msg, unittest}, FailMsgCookie});
-        _ -> ok
-    end,
-    State.
-
--spec reply_with_abort(Msg::comm:message(), State) -> State
-        when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).
-reply_with_abort(_Msg, State) when is_tuple(State) andalso element(1, State) =:= state ->
-    State;
-reply_with_abort(Msg, State) when is_tuple(State) andalso element(1, State) =:= join ->
+reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(1, State) =:= state ->
     case Msg of
         {join, join_response, Succ, Pred, MoveId, CandId} ->
-            dht_node_join:reject_join_response(Succ, Pred, MoveId, CandId);
-        _ -> ok
+            % joined nodes only reply with a reject! (crash and send_error are always possible)
+            case Reason of
+                send_error ->
+                    comm:send(node:pidX(Succ), {move, {send_error, comm:this(), Msg, unittest}, MoveId});
+                crash ->
+                    comm:send(node:pidX(Succ), {crash, comm:this(), {move, MoveId}});
+                abort ->
+                    dht_node_join:reject_join_response(Succ, Pred, MoveId, CandId)
+            end;
+        {join, join_response, _MsgReason, _CandId} ->
+            % joined nodes only ignore this message! (not sent with shepherd, no fd used)
+            case Reason of
+                _ ->
+                    ok
+            end
     end,
-    State.
-
--spec reply_with_crash(Msg::comm:message(), State) -> State
-        when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).
-reply_with_crash(_Msg, State) when is_tuple(State) andalso element(1, State) =:= state ->
     State;
-reply_with_crash(Msg, State) when is_tuple(State) andalso element(1, State) =:= join ->
+reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(1, State) =:= join ->
     case Msg of
-        {join, join_response, Succ, _Pred, MoveId, _CandId} ->
-            comm:send(node:pidX(Succ), {crash, comm:this(), {move, MoveId}});
+        {join, join_response, Succ, Pred, MoveId, CandId} ->
+            case Reason of
+                send_error ->
+                    comm:send(node:pidX(Succ), {move, {send_error, comm:this(), Msg, unittest}, MoveId});
+                abort ->
+                    dht_node_join:reject_join_response(Succ, Pred, MoveId, CandId);
+                crash ->
+                    comm:send(node:pidX(Succ), {crash, comm:this(), {move, MoveId}})
+            end;
         _ -> ok
     end,
     State.
@@ -300,7 +290,8 @@ reply_to_join_request(_Msg, State, _Reason) when is_tuple(State) andalso element
 %{join, get_number_of_samples, Samples::non_neg_integer(), Conn::connection()} |
 %{join, get_candidate_response, OrigJoinId::?RT:key(), Candidate::lb_op:lb_op(), Conn::connection()} |
 %{join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
-    {{join, join_response, '_', '_', '_', '_'}, [], 1..2, reply_with_send_error | reply_with_abort | reply_with_crash} |
+    {{join, join_response, '_', '_', '_', '_'}, [], 1..2,
+     reply_to_join_response_abort | reply_to_join_response_crash | reply_to_join_response_send_error} |
 %{join, join_response, not_responsible, CandId::lb_op:id()} |
 %{join, lookup_timeout, Conn::connection()} |
 %{join, known_hosts_timeout} |
@@ -327,9 +318,12 @@ fix_tester_ignored_msg_list(IgnoredMessages) ->
     [begin
          NewAction =
              case Action of
-                 reply_with_send_error -> fun reply_with_send_error/2;
-                 reply_with_abort -> fun reply_with_abort/2;
-                 reply_with_crash -> fun reply_with_crash/2;
+                 reply_to_join_response_send_error ->
+                     fun(MsgX, StateX) -> reply_to_join_response(MsgX, StateX, send_error) end;
+                 reply_to_join_response_abort ->
+                     fun(MsgX, StateX) -> reply_to_join_response(MsgX, StateX, abort) end;
+                 reply_to_join_response_crash ->
+                     fun(MsgX, StateX) -> reply_to_join_response(MsgX, StateX, crash) end;
                  reply_to_join_request_not_responsible ->
                      fun(MsgX, StateX) -> reply_to_join_request(MsgX, StateX, not_responsible) end;
                  reply_to_join_request_busy ->
