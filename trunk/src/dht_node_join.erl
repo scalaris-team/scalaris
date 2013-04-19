@@ -63,7 +63,7 @@
     {join, get_number_of_samples, Samples::non_neg_integer(), Conn::connection()} |
     {join, get_candidate_response, OrigJoinId::?RT:key(), Candidate::lb_op:lb_op(), Conn::connection()} |
     {join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
-    {join, join_response, not_responsible, CandId::lb_op:id()} |
+    {join, join_response, not_responsible | busy, CandId::lb_op:id()} |
     {join, known_hosts_timeout, JoinUUId::pos_integer()} |
     {join, lookup_timeout, Conn::connection(), JoinId::?RT:key(), JoinUUId::pos_integer()} |
     {join, get_number_of_samples_timeout, Conn::connection(), JoinUUId::pos_integer()} |
@@ -328,9 +328,10 @@ process_join_state({join, join_request_timeout, _Timeouts, _CandId, _JoinId} = _
     State;
 
 %% userdevguide-begin dht_node_join:join_other_p4
-process_join_state({join, join_response, not_responsible, CandId} = _Msg,
+process_join_state({join, join_response, Reason, CandId} = _Msg,
                    {join, JoinState, QueuedMessages} = State)
-  when element(1, JoinState) =:= phase4 ->
+  when element(1, JoinState) =:= phase4 andalso
+           (Reason =:= not_responsible orelse Reason =:= busy) ->
     ?TRACE_JOIN1(_Msg, JoinState),
     % the node we contacted is not responsible for the selected key anymore
     % -> try the next candidate, if the message is related to the current candidate
@@ -345,10 +346,18 @@ process_join_state({join, join_response, not_responsible, CandId} = _Msg,
             case lb_op:get(Candidate, id) =:= CandId of
                 false -> State; % unrelated/old message
                 _ ->
-                    log:log(info,
-                            "[ Node ~w ] node contacted for join is not responsible "
-                            "for the selected ID (anymore), trying next candidate",
-                            [self()]),
+                    if Reason =:= not_responsible ->
+                           log:log(info,
+                                   "[ Node ~w ] node contacted for join is not "
+                                       "responsible for the selected ID (anymore), "
+                                       "trying next candidate",
+                                   [self()]);
+                       Reason =:= busy ->
+                           log:log(info,
+                                   "[ Node ~w ] node contacted for join is busy, "
+                                       "trying next candidate",
+                                   [self()])
+                    end,
                     NewJoinState = try_next_candidate(JoinState),
                     ?TRACE_JOIN_STATE(NewJoinState),
                     {join, NewJoinState, QueuedMessages}
@@ -356,8 +365,9 @@ process_join_state({join, join_response, not_responsible, CandId} = _Msg,
     end;
 
 % in other phases remove the candidate from the list (if it still exists):
-process_join_state({join, join_response, not_responsible, CandId} = _Msg,
-                   {join, JoinState, QueuedMessages}) ->
+process_join_state({join, join_response, Reason, CandId} = _Msg,
+                   {join, JoinState, QueuedMessages})
+  when (Reason =:= not_responsible orelse Reason =:= busy) ->
     ?TRACE_JOIN1(_Msg, JoinState),
     {join, remove_candidate(CandId, JoinState), QueuedMessages};
 
@@ -558,6 +568,8 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
         _ ->
             ?TRACE("[ ~.0p ]~n  ignoring join_request from ~.0p due to a running slide~n",
                    [self(), NewPred]),
+            ?TRACE_SEND(node:pidX(NewPred), {join, join_response, busy, CandId}),
+            comm:send(node:pidX(NewPred), {join, join_response, busy, CandId}),
             State
     end;
 %% userdevguide-end dht_node_join:join_request1
@@ -572,7 +584,8 @@ process_join_msg({join, get_candidate_response, _OrigJoinId, _Candidate, _Conn} 
     State;
 process_join_msg({join, join_response, _Succ, _Pred, _MoveFullId, _CandId} = _Msg, State) ->
     State;
-process_join_msg({join, join_response, not_responsible, _CandId} = _Msg, State) ->
+process_join_msg({join, join_response, Reason, _CandId} = _Msg, State)
+  when (Reason =:= not_responsible orelse Reason =:= busy) ->
     State;
 process_join_msg({join, lookup_timeout, _Conn, _Id, _JoinId} = _Msg, State) ->
     State;
