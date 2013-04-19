@@ -49,7 +49,7 @@ groups() ->
     unittest_helper:create_ct_groups([join_lookup], [{join_lookup, [sequence, {repeat_until_any_fail, 30}]}]) ++
     unittest_helper:create_ct_groups([add_3_rm_3_data], [{add_3_rm_3_data, [sequence, {repeat_until_any_fail, 30}]}]).
 
-suite() -> [ {timetrap, {seconds, 60}} ].
+suite() -> [ {timetrap, {seconds, 90}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -279,6 +279,18 @@ reply_with_crash(Msg, State) when is_tuple(State) andalso element(1, State) =:= 
     end,
     State.
 
+-spec reply_to_join_request(Msg::comm:message(), State, Reason::not_responsible | busy) -> State
+        when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).
+reply_to_join_request(Msg, State, Reason) when is_tuple(State) andalso element(1, State) =:= state ->
+    case Msg of
+        {join, join_request, NewPred, CandId} ->
+            comm:send(node:pidX(NewPred), {join, join_response, Reason, CandId});
+        _ -> ok
+    end,
+    State;
+reply_to_join_request(_Msg, State, _Reason) when is_tuple(State) andalso element(1, State) =:= join ->
+    State.
+
 % TODO: simulate more message drops,
 % TODO: simulate certain protocol runs, e.g. the other node replying with noop, etc.
 % keep in sync with dht_node_join and the timeout config parameters of join_parameters_list/0
@@ -299,7 +311,8 @@ reply_with_crash(Msg, State) when is_tuple(State) andalso element(1, State) =:= 
 %{join, number_of_samples_request, SourcePid::comm:mypid(), LbPsv::module(), Conn::connection()} |
 %{join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key(), LbPsv::module(), Conn::connection()} |
 %{join, join_request, NewPred::node:node_type(), CandId::lb_op:id()} |
-    {{join, join_request, '_', '_'}, [], 1..2, drop_msg}.
+    {{join, join_request, '_', '_'}, [], 1..2,
+     drop_msg | reply_to_join_request_not_responsible | reply_to_join_request_busy}.
 %{Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() |
 %      lb_psv_gossip:custom_message(),
 % {join, LbPsv::module(), LbPsvState::term()}}
@@ -317,6 +330,10 @@ fix_tester_ignored_msg_list(IgnoredMessages) ->
                  reply_with_send_error -> fun reply_with_send_error/2;
                  reply_with_abort -> fun reply_with_abort/2;
                  reply_with_crash -> fun reply_with_crash/2;
+                 reply_to_join_request_not_responsible ->
+                     fun(MsgX, StateX) -> reply_to_join_request(MsgX, StateX, not_responsible) end;
+                 reply_to_join_request_busy ->
+                     fun(MsgX, StateX) -> reply_to_join_request(MsgX, StateX, busy) end;
                  X -> X
              end,
          {Msg, Conds, Count, NewAction}
@@ -370,7 +387,7 @@ prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_, IgnMsgAt1st, IgnMsgAt
 tester_join_at_timeouts(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     pdb:set({log_path, PrivDir}, ?MODULE),
-    tester:test(?MODULE, prop_join_at_timeouts, 5, 5).
+    tester:test(?MODULE, prop_join_at_timeouts, 5, 10).
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->
