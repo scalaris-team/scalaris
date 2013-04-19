@@ -582,7 +582,8 @@ process_join_msg({join, get_number_of_samples, _Samples, _Conn} = _Msg, State) -
     State;
 process_join_msg({join, get_candidate_response, _OrigJoinId, _Candidate, _Conn} = _Msg, State) ->
     State;
-process_join_msg({join, join_response, _Succ, _Pred, _MoveFullId, _CandId} = _Msg, State) ->
+process_join_msg({join, join_response, Succ, Pred, MoveFullId, CandId} = _Msg, State) ->
+    reject_join_response(Succ, Pred, MoveFullId, CandId),
     State;
 process_join_msg({join, join_response, Reason, _CandId} = _Msg, State)
   when (Reason =:= not_responsible orelse Reason =:= busy) ->
