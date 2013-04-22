@@ -636,7 +636,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                                          SourcePid, OtherMTE, NextOp, Neighbors),
             SlideOp1 = slide_op:set_phase(SlideOp, wait_for_data),
             SlideOp2 = slide_op:set_setup_at_other(SlideOp1),
-            SlideOp3 = slide_op:set_msg_fwd(SlideOp2, slide_op:get_interval(SlideOp2)),
+            SlideOp3 = slide_op:set_msg_fwd(SlideOp2),
             notify_other(SlideOp3, State);
         {ok, {slide, pred, 'send'} = NewType} ->
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
@@ -743,7 +743,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
             case MsgTag of
                 nomsg when not UseIncrSlides ->
                     SlideOp1 = slide_op:set_phase(SlideOp, wait_for_data),
-                    SlideOp2 = slide_op:set_msg_fwd(SlideOp1, slide_op:get_interval(SlideOp1)),
+                    SlideOp2 = slide_op:set_msg_fwd(SlideOp1),
                     notify_other(SlideOp2, State);
                 nomsg ->
                     % we can not add msg forward yet as we do not know our target id
@@ -757,7 +757,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                 X when (X =:= slide orelse X =:= change_op) ->
                     SlideOp1 = slide_op:set_phase(SlideOp, wait_for_data),
                     SlideOp2 = slide_op:set_setup_at_other(SlideOp1),
-                    SlideOp3 = slide_op:set_msg_fwd(SlideOp2, slide_op:get_interval(SlideOp2)),
+                    SlideOp3 = slide_op:set_msg_fwd(SlideOp2),
                     notify_other(SlideOp3, State)
             end;
         {ok, move_done} ->

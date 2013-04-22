@@ -933,7 +933,7 @@ finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId) ->
     fd:subscribe([node:pidX(Succ)], {move, MoveId}),
     SlideOp = slide_op:new_receiving_slide_join(MoveId, Pred, Succ, node:id(Me), join),
     SlideOp1 = slide_op:set_phase(SlideOp, wait_for_node_update),
-    SlideOp2 = slide_op:set_msg_fwd(SlideOp1, slide_op:get_interval(SlideOp1)),
+    SlideOp2 = slide_op:set_msg_fwd(SlideOp1),
     State1 = dht_node_state:set_slide(State, succ, SlideOp2),
     RMSubscrTag = {move, slide_op:get_id(SlideOp2)},
     comm:send_local(self(), {move, node_update, RMSubscrTag}),

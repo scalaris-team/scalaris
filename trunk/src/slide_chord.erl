@@ -46,7 +46,7 @@ change_my_id(State, SlideOp) ->
             SlideOp2 = SlideOp;
         'rcv'  ->
             State1 = State,
-            SlideOp2 = slide_op:set_msg_fwd(SlideOp, slide_op:get_interval(SlideOp))
+            SlideOp2 = slide_op:set_msg_fwd(SlideOp)
     end,
     case slide_op:is_leave(SlideOp2) of
         true ->
@@ -176,7 +176,7 @@ send_delta(State, SlideOp) ->
         -> dht_node_state:state().
 accept_delta(State, PredOrSucc, OldSlideOp, ChangedData) ->
     State2 = dht_node_state:slide_add_delta(State, ChangedData),
-    SlideOp = slide_op:set_msg_fwd(OldSlideOp, intervals:empty()),
+    SlideOp = slide_op:remove_msg_fwd(OldSlideOp),
     State3 = case PredOrSucc of
         succ -> State2;
         pred ->

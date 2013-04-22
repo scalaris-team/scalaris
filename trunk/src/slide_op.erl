@@ -36,7 +36,7 @@
          is_setup_at_other/1, set_setup_at_other/1,
          get_next_op/1, set_next_op/2,
          get_other_max_entries/1, set_other_max_entries/2,
-         get_msg_fwd/1, set_msg_fwd/2]).
+         get_msg_fwd/1, set_msg_fwd/1, remove_msg_fwd/1]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -447,10 +447,10 @@ set_other_max_entries(SlideOp, OtherMTE) -> SlideOp#slide_op{other_max_entries =
 get_msg_fwd(null) -> [];
 get_msg_fwd(#slide_op{msg_fwd=MsgFwd}) -> MsgFwd.
 
--spec set_msg_fwd(SlideOp::slide_op(), Interval::intervals:interval()) -> slide_op().
-set_msg_fwd(SlideOp, Interval) ->
-    NewFwd = case intervals:is_empty(Interval) of
-                 true -> [];
-                 _    -> [{Interval, node:pidX(get_node(SlideOp))}]
-             end,
-    SlideOp#slide_op{msg_fwd = NewFwd}.
+-spec set_msg_fwd(SlideOp::slide_op()) -> slide_op().
+set_msg_fwd(SlideOp = #slide_op{interval=Interval}) ->
+    SlideOp#slide_op{msg_fwd = [{Interval, node:pidX(get_node(SlideOp))}]}.
+
+-spec remove_msg_fwd(SlideOp::slide_op()) -> slide_op().
+remove_msg_fwd(SlideOp) ->
+    SlideOp#slide_op{msg_fwd = []}.
