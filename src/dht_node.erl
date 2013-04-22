@@ -352,7 +352,7 @@ on({get_yaws_info, Pid}, State) ->
     State;
 on({get_state, Pid, Which}, State) when is_list(Which) ->
     comm:send(Pid, {get_state_response,
-                    [{X, dht_node_state:get(State, Which)} || X <- Which]}),
+                    [{X, dht_node_state:get(State, X)} || X <- Which]}),
     State;
 on({get_state, Pid, Which}, State) when is_atom(Which) ->
     comm:send(Pid, {get_state_response, dht_node_state:get(State, Which)}),
