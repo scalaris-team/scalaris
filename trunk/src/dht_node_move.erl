@@ -143,21 +143,13 @@ process_move_msg({move, done, MoveFullId} = _Msg, MyState) ->
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_other], both, done);
 
-process_move_msg({move, change_op, MoveFullId, TargetId, NextOp} = _Msg, MyState) ->
+process_move_msg({move, change_op = MsgTag, MoveFullId, TargetId, NextOp} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, pred, State) ->
-                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                % simply re-create the slide (TargetId or NextOp have changed)
-                % note: fd:subscribe/2 will be called by exec_setup_slide_not_found
-                fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp1))], {move, MoveFullId}),
-                State1 = dht_node_state:set_slide(State, pred, null), % just in case
-                Command = {ok, slide_op:get_type(SlideOp1)},
-                exec_setup_slide_not_found(
-                  Command, State1, MoveFullId, slide_op:get_node(SlideOp1),
-                  TargetId, slide_op:get_tag(SlideOp1),
-                  slide_op:get_other_max_entries(SlideOp1),
-                  slide_op:get_source_pid(SlideOp1), change_op, NextOp)
+                update_existing_slide(
+                  SlideOp, State, TargetId,
+                  slide_op:get_other_max_entries(SlideOp), MsgTag, NextOp)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_change_op], pred, change_op);
 
@@ -170,21 +162,13 @@ process_move_msg({move, change_id, MoveFullId} = _Msg, MyState) ->
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_change_id], succ, change_id);
 
-process_move_msg({move, change_id, MoveFullId, TargetId, NextOp} = _Msg, MyState) ->
+process_move_msg({move, change_id = MsgTag, MoveFullId, TargetId, NextOp} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, succ, State) ->
-                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                % simply re-create the slide (TargetId or NextOp might have changed)
-                % note: fd:subscribe/2 will be called by exec_setup_slide_not_found
-                fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp1))], {move, MoveFullId}),
-                State1 = dht_node_state:set_slide(State, succ, null), % just in case
-                Command = {ok, slide_op:get_type(SlideOp1)},
-                exec_setup_slide_not_found(
-                  Command, State1, slide_op:get_id(SlideOp1), slide_op:get_node(SlideOp1),
-                  TargetId, slide_op:get_tag(SlideOp1),
-                  slide_op:get_other_max_entries(SlideOp1),
-                  slide_op:get_source_pid(SlideOp1), change_id, NextOp)
+                update_existing_slide(
+                  SlideOp, State, TargetId,
+                  slide_op:get_other_max_entries(SlideOp), MsgTag, NextOp)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_change_id], succ, change_id);
 
@@ -505,18 +489,10 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
             case slide_op:get_phase(SlideOp) of
                 wait_for_other ->
                     WorkerFun =
-                        fun(SlideOp0, PredOrSucc0, State0) ->
-                                SlideOp1 = slide_op:cancel_timer(SlideOp0), % previous timer
-                                % note: fd:subscribe/2 will be called by exec_setup_slide_not_found
-                                fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp1))], {move, MoveFullId}),
-                                State1 = dht_node_state:set_slide(State0, PredOrSucc0, null), % just in case
-                                Command = {ok, slide_op:get_type(SlideOp1)},
-                                % re-create with new parameters:
-                                % note: we need to take the SourcePid from the existing op!
-                                exec_setup_slide_not_found(
-                                  Command, State1, MoveFullId, TargetNode, TargetId, Tag,
-                                  MaxTransportEntries, slide_op:get_source_pid(SlideOp1),
-                                  MsgTag, NextOp)
+                        fun(SlideOp0, _PredOrSucc0, State0) ->
+                                update_existing_slide(
+                                  SlideOp0, State0, TargetId,
+                                  MaxTransportEntries, MsgTag, NextOp)
                         end,
                     safe_operation(WorkerFun, State, MoveFullId, [wait_for_other], both, slide);
                 _ ->
@@ -1266,6 +1242,29 @@ notify_source_pid(SourcePid, Message) ->
         _ -> ?TRACE_SEND(SourcePid, Message),
              comm:send_local(SourcePid, Message)
     end.
+
+%% @doc Re-creates a slide operation with the given (updated) parameters.
+%%      Note: assumes that such a slide does not already exist.
+-spec update_existing_slide(
+        OldSlideOp::slide_op:slide_op(), State::dht_node_state:state(),
+        TargetId::?RT:key(), OtherMaxTransportEntries::unknown | pos_integer(),
+        MsgTag::nomsg | slide | delta_ack | change_id | change_op,
+        NextOp::slide_op:next_op()) -> dht_node_state:state().
+update_existing_slide(OldSlideOp, State, TargetId, OtherMTE, MsgTag, NextOp) ->
+    PredOrSucc = slide_op:get_predORsucc(OldSlideOp),
+    MoveFullId = slide_op:get_id(OldSlideOp),
+    SlideOp1 = slide_op:cancel_timer(OldSlideOp), % cancel previous timer
+    % simply re-create the slide (TargetId or NextOp have changed)
+    % note: fd:subscribe/2 will be called by exec_setup_slide_not_found
+    fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp1))], {move, MoveFullId}),
+    State1 = dht_node_state:set_slide(State, PredOrSucc, null), % just in case
+    % note: msg_fwd are stored in the slide and do not require additional removal
+    State2 = dht_node_state:rm_db_range(State1, MoveFullId),
+    Command = {ok, slide_op:get_type(SlideOp1)},
+    exec_setup_slide_not_found(
+      Command, State2, MoveFullId, slide_op:get_node(SlideOp1), TargetId,
+      slide_op:get_tag(SlideOp1), OtherMTE, slide_op:get_source_pid(SlideOp1),
+      MsgTag, NextOp).
 
 %% @doc Aborts the given slide operation. Assume the SlideOp has already been
 %%      set in the dht_node and resets the according slide in its state to
