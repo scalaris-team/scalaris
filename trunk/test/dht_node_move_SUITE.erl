@@ -25,39 +25,46 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
-test_cases() ->
-    [
-     symm4_slide_succ_rcv_load, symm4_slide_succ_send_load,
-     symm4_slide_pred_send_load, symm4_slide_pred_rcv_load,
-     symm4_slide_succ_rcv_load_incremental,
-     symm4_slide_succ_send_load_incremental,
-     symm4_slide_pred_send_load_incremental,
-     symm4_slide_pred_rcv_load_incremental,
-     tester_symm4_slide_succ_rcv_load_timeouts_succ,
-     tester_symm4_slide_succ_rcv_load_timeouts_node,
-     tester_symm4_slide_succ_rcv_load_timeouts_succ_incremental,
-     tester_symm4_slide_succ_rcv_load_timeouts_node_incremental,
-     tester_symm4_slide_succ_send_load_timeouts_succ,
-     tester_symm4_slide_succ_send_load_timeouts_node,
-     tester_symm4_slide_succ_send_load_timeouts_succ_incremental,
-     tester_symm4_slide_succ_send_load_timeouts_node_incremental,
-     tester_symm4_slide_pred_send_load_timeouts_pred,
-     tester_symm4_slide_pred_send_load_timeouts_node,
-     tester_symm4_slide_pred_send_load_timeouts_pred_incremental,
-     tester_symm4_slide_pred_send_load_timeouts_node_incremental,
-     tester_symm4_slide_pred_rcv_load_timeouts_pred,
-     tester_symm4_slide_pred_rcv_load_timeouts_node,
-     tester_symm4_slide_pred_rcv_load_timeouts_pred_incremental,
-     tester_symm4_slide_pred_rcv_load_timeouts_node_incremental
-    ].
+test_cases() -> [].
 
 all() ->
+    [
+     {group, send_to_pred},
+     {group, send_to_pred_incremental},
+     {group, send_to_succ},
+     {group, send_to_succ_incremental}
+    ] ++
 %%     unittest_helper:create_ct_all(test_cases()).
-    test_cases().
+        test_cases().
 
 groups() ->
-%%     unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
-    [].
+    GroupOptions = [sequence, {repeat, 1}],
+    SendToPredTestCases =
+        [
+         symm4_slide_succ_rcv_load,
+         symm4_slide_pred_send_load,
+         tester_symm4_slide_succ_rcv_load_timeouts_succ,
+         tester_symm4_slide_succ_rcv_load_timeouts_node,
+         tester_symm4_slide_pred_send_load_timeouts_pred,
+         tester_symm4_slide_pred_send_load_timeouts_node
+        ],
+    SendToSuccTestCases =
+        [
+         symm4_slide_succ_send_load,
+         symm4_slide_pred_rcv_load,
+         tester_symm4_slide_succ_send_load_timeouts_succ,
+         tester_symm4_slide_succ_send_load_timeouts_node,
+         tester_symm4_slide_pred_rcv_load_timeouts_pred,
+         tester_symm4_slide_pred_rcv_load_timeouts_node
+        ],
+    [
+     {send_to_pred, GroupOptions, SendToPredTestCases},
+     {send_to_pred_incremental, GroupOptions, SendToPredTestCases},
+     {send_to_succ, GroupOptions, SendToSuccTestCases},
+     {send_to_succ_incremental, GroupOptions, SendToSuccTestCases}
+    ] ++
+%%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
+        [].
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
@@ -68,7 +75,19 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
-init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
+init_per_group(Group, Config) ->
+    Config1 = unittest_helper:init_per_group(Group, Config),
+    MoveConf = case Group of
+                   send_to_pred ->
+                       move_config_parameters();
+                   send_to_pred_incremental ->
+                       move_config_parameters_incremental();
+                   send_to_succ ->
+                       move_config_parameters();
+                   send_to_succ_incremental ->
+                       move_config_parameters_incremental()
+               end,
+    [{move_config, MoveConf} | Config1].
 
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
@@ -76,15 +95,13 @@ init_per_testcase(_TestCase, Config) ->
     % stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    {move_config, MoveConf} = lists:keyfind(move_config, 1, Config),
     unittest_helper:make_ring_with_ids(
       fun() -> ?RT:get_replica_keys(?RT:hash_key("0")) end,
-      [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}, {monitor_perf_interval, 0}]}]),
+      [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}, {monitor_perf_interval, 0}]
+            ++ MoveConf}]),
     % wait for all nodes to finish their join before writing data
     unittest_helper:check_ring_size_fully_joined(4),
-    % note: do not change move_config parameters during a move, e.g. a join!
-    % -> this may leed to the move being aborted if one node uses the new
-    %    parameters and another node still uses the old parameters
-    set_move_config_parameters(),
     %% write some data (use a function because left-over tx_timeout messages can disturb the tests):
     Pid = erlang:spawn(fun() ->
                                _ = [api_tx:write(erlang:integer_to_list(X), X) || X <- lists:seq(1, 100)]
@@ -98,20 +115,21 @@ end_per_testcase(_TestCase, _Config) ->
     ok.
 
 %% @doc Sets tighter timeouts for slides
--spec set_move_config_parameters() -> ok.
-set_move_config_parameters() ->
-    config:write(move_use_incremental_slides, false),
-    config:write(move_wait_for_reply_timeout, 1000),
-    config:write(move_send_msg_retries, 2),
-    config:write(move_send_msg_retry_delay, 0).
+-spec move_config_parameters() -> [{atom(), term()}].
+move_config_parameters() ->
+    [{move_use_incremental_slides, false},
+     {move_wait_for_reply_timeout, 1000},
+     {move_send_msg_retries, 2},
+     {move_send_msg_retry_delay, 0}].
 
 %% @doc Sets tighter timeouts for slides
--spec set_move_config_parameters_incremental() -> ok.
-set_move_config_parameters_incremental() ->
-    set_move_config_parameters(),
-    config:write(move_use_incremental_slides, true),
-    config:write(move_max_transport_entries, 2),
-    config:write(move_send_msg_retry_delay, 0).
+-spec move_config_parameters_incremental() -> ok.
+move_config_parameters_incremental() ->
+    % note: later parameters in the list override the first ones in config
+    move_config_parameters() ++
+        [{move_use_incremental_slides, true},
+         {move_max_transport_entries, 2},
+         {move_send_msg_retry_delay, 0}].
 
 %% @doc Test slide with successor, receiving data from it (using api_tx in the bench server).
 symm4_slide_succ_rcv_load(_Config) ->
@@ -141,18 +159,6 @@ symm4_slide_succ_send_load(_Config) ->
     unittest_helper:check_ring_load(440),
     unittest_helper:check_ring_data().
 
-%% @doc Test slide with successor, receiving data from it (using api_tx in the bench server).
-%%      Uses incremental slides.
-symm4_slide_succ_rcv_load_incremental(Config) ->
-    set_move_config_parameters_incremental(),
-    symm4_slide_succ_rcv_load(Config).
-
-%% @doc Test slide with successor, sending data to it (using api_tx in the bench server).
-%%      Uses incremental slides.
-symm4_slide_succ_send_load_incremental(Config) ->
-    set_move_config_parameters_incremental(),
-    symm4_slide_succ_send_load(Config).
-
 %% @doc Test slide with predecessor, sending data to it (using api_tx in the bench server).
 symm4_slide_pred_send_load(_Config) ->
     stop_time(fun() ->
@@ -180,18 +186,6 @@ symm4_slide_pred_rcv_load(_Config) ->
               end, "symm4_slide_pred_rcv_load"),
     unittest_helper:check_ring_load(440),
     unittest_helper:check_ring_data().
-
-%% @doc Test slide with predecessor, sending data to it (using api_tx in the bench server).
-%%      Uses incremental slides.
-symm4_slide_pred_send_load_incremental(Config) ->
-    set_move_config_parameters_incremental(),
-    symm4_slide_pred_send_load(Config).
-
-%% @doc Test slide with predecessor, receiving data from it (using api_tx in the bench server).
-%%      Uses incremental slides.
-symm4_slide_pred_rcv_load_incremental(Config) ->
-    set_move_config_parameters_incremental(),
-    symm4_slide_pred_rcv_load(Config).
 
 %%%%%%%%%%%%%%%%%%%%
 
@@ -354,24 +348,6 @@ tester_symm4_slide_succ_rcv_load_timeouts_node(_Config) ->
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
-tester_symm4_slide_succ_rcv_load_timeouts_succ_incremental(_Config) ->
-    set_move_config_parameters_incremental(),
-    BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_succ, 1, 25),
-    unittest_helper:check_ring_load(440),
-    unittest_helper:check_ring_data(),
-    erlang:exit(BenchPid, 'kill'),
-    util:wait_for_process_to_die(BenchPid).
-
-tester_symm4_slide_succ_rcv_load_timeouts_node_incremental(_Config) ->
-    set_move_config_parameters_incremental(),
-    BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_node, 1, 25),
-    unittest_helper:check_ring_load(440),
-    unittest_helper:check_ring_data(),
-    erlang:exit(BenchPid, 'kill'),
-    util:wait_for_process_to_die(BenchPid).
-
 %% @doc Test slide with successor, sending data to it (using api_tx in the bench server), ignore (some) messages on succ.
 -spec prop_symm4_slide_succ_send_load_timeouts_succ(IgnoredMessages::[move_message(),...]) -> true.
 prop_symm4_slide_succ_send_load_timeouts_succ(IgnoredMessages_) ->
@@ -418,24 +394,6 @@ tester_symm4_slide_succ_send_load_timeouts_succ(_Config) ->
     util:wait_for_process_to_die(BenchPid).
 
 tester_symm4_slide_succ_send_load_timeouts_node(_Config) ->
-    BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_node, 1, 25),
-    unittest_helper:check_ring_load(440),
-    unittest_helper:check_ring_data(),
-    erlang:exit(BenchPid, 'kill'),
-    util:wait_for_process_to_die(BenchPid).
-
-tester_symm4_slide_succ_send_load_timeouts_succ_incremental(_Config) ->
-    set_move_config_parameters_incremental(),
-    BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_succ, 1, 25),
-    unittest_helper:check_ring_load(440),
-    unittest_helper:check_ring_data(),
-    erlang:exit(BenchPid, 'kill'),
-    util:wait_for_process_to_die(BenchPid).
-
-tester_symm4_slide_succ_send_load_timeouts_node_incremental(_Config) ->
-    set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_node, 1, 25),
     unittest_helper:check_ring_load(440),
@@ -497,24 +455,6 @@ tester_symm4_slide_pred_send_load_timeouts_node(_Config) ->
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
 
-tester_symm4_slide_pred_send_load_timeouts_pred_incremental(_Config) ->
-    set_move_config_parameters_incremental(),
-    BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_pred, 1, 25),
-    unittest_helper:check_ring_load(440),
-    unittest_helper:check_ring_data(),
-    erlang:exit(BenchPid, 'kill'),
-    util:wait_for_process_to_die(BenchPid).
-
-tester_symm4_slide_pred_send_load_timeouts_node_incremental(_Config) ->
-    set_move_config_parameters_incremental(),
-    BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_node, 1, 25),
-    unittest_helper:check_ring_load(440),
-    unittest_helper:check_ring_data(),
-    erlang:exit(BenchPid, 'kill'),
-    util:wait_for_process_to_die(BenchPid).
-
 %% @doc Test slide with successor, receiving data from it (using api_tx in the bench server), ignore (some) messages on pred.
 -spec prop_symm4_slide_pred_rcv_load_timeouts_pred(IgnoredMessages::[move_message(),...]) -> true.
 prop_symm4_slide_pred_rcv_load_timeouts_pred(IgnoredMessages_) ->
@@ -562,24 +502,6 @@ tester_symm4_slide_pred_rcv_load_timeouts_pred(_Config) ->
     util:wait_for_process_to_die(BenchPid).
 
 tester_symm4_slide_pred_rcv_load_timeouts_node(_Config) ->
-    BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_node, 1, 25),
-    unittest_helper:check_ring_load(440),
-    unittest_helper:check_ring_data(),
-    erlang:exit(BenchPid, 'kill'),
-    util:wait_for_process_to_die(BenchPid).
-
-tester_symm4_slide_pred_rcv_load_timeouts_pred_incremental(_Config) ->
-    set_move_config_parameters_incremental(),
-    BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_pred, 1, 25),
-    unittest_helper:check_ring_load(440),
-    unittest_helper:check_ring_data(),
-    erlang:exit(BenchPid, 'kill'),
-    util:wait_for_process_to_die(BenchPid).
-
-tester_symm4_slide_pred_rcv_load_timeouts_node_incremental(_Config) ->
-    set_move_config_parameters_incremental(),
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
     tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_node, 1, 25),
     unittest_helper:check_ring_load(440),
