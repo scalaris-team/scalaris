@@ -28,10 +28,10 @@
 -include("client_types.hrl").
 
 all()   -> [
+            tester_type_check_rbr,
             rbr_concurrency_kv,
             rbr_concurrency_leases,
-            rbr_consistency,
-            tester_type_check_rbr
+            rbr_consistency
            ].
 suite() -> [ {timetrap, {seconds, 400}} ].
 
@@ -248,7 +248,7 @@ tester_type_check_rbr(_Config) ->
           ],
            [ {msg_read_reply, 4},  %% sends messages
              {msg_read_deny, 3},   %% sends messages
-             {msg_write_reply, 3}, %% sends messages
+             {msg_write_reply, 4}, %% sends messages
              {msg_write_deny, 3},  %% sends messages
              {get_entry, 2}        %% needs valid tid()
             ]},
@@ -289,7 +289,7 @@ modify_rbr_at_key(R, N) ->
                       R, AssignedRound, {[], false, N+1, N}, null,
                       fun prbr:noop_write_filter/3}}),
     receive
-        {write_reply, R, _} ->
+        {write_reply, R, _, _NextRound} ->
             ok
     end.
 
