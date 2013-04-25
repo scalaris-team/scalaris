@@ -334,7 +334,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
     end;
 
 on({qread_write_through_collect, ReqId,
-    {write_reply, _Key, Round}}, State) ->
+    {write_reply, _Key, Round, _NextRound}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_collect reply ~p~n", [ReqId]),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -501,7 +501,7 @@ on({qwrite_read_done, ReqId,
 %%                when      majority reached, -> finish.
 %%                otherwise just register the reply.
 on({qwrite_collect, ReqId,
-    {write_reply, _Key, Round}}, State) ->
+    {write_reply, _Key, Round, _NextRound}}, State) ->
     ?TRACE("rbrcseq:on qwrite_collect write_reply~n", []),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -539,7 +539,7 @@ on({qwrite_collect, ReqId,
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
                     %% retry
-%%                    log:pal("Concurrency detected, retrying~n"),
+                    %% log:pal("Concurrency detected, retrying~n"),
                     retrigger(NewEntry, TableName, noincdelay)%%,
                     %% delete of entry is done in retrigger!
             end

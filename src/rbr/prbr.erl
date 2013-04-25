@@ -106,9 +106,9 @@
 msg_read_reply(Client, YourRound, Val, LastWriteRound) ->
     comm:send(Client, {read_reply, YourRound, Val, LastWriteRound}).
 
--spec msg_write_reply(comm:mypid(), any(), r_with_id()) -> ok.
-msg_write_reply(Client, Key, Round_for_write) ->
-    comm:send(Client, {write_reply, Key, Round_for_write}).
+-spec msg_write_reply(comm:mypid(), any(), r_with_id(), r_with_id()) -> ok.
+msg_write_reply(Client, Key, UsedWriteRound, YourNextRoundForWrite) ->
+    comm:send(Client, {write_reply, Key, UsedWriteRound, YourNextRoundForWrite}).
 
 -spec msg_write_deny(comm:mypid(), any(), r_with_id()) -> ok.
 msg_write_deny(Client, Key, NewerRound) ->
@@ -144,10 +144,10 @@ on({prbr, write, _DB, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     KeyEntry = get_entry(Key, TableName),
     _ = case writable(KeyEntry, InRound) of
-            {ok, NewKeyEntry} ->
-                msg_write_reply(Proposer, Key, InRound),
+            {ok, NewKeyEntry, NextWriteRound} ->
                 NewVal = WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value),
+                msg_write_reply(Proposer, Key, InRound, NextWriteRound),
                 set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
             {dropped, NewerRound} ->
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
@@ -204,15 +204,34 @@ next_read_round(Entry, ProposerUID) ->
     LatestSeenWrite = r_with_id_get_r(entry_r_write(Entry)),
     r_with_id_new(util:max(LatestSeenRead, LatestSeenWrite) + 1, ProposerUID).
 
--spec writable(entry(), r_with_id()) -> {ok, entry()} |
-                                        {dropped, r_with_id()}.
+
+
+-spec writable(entry(), r_with_id()) -> {ok, entry(),
+                                         NextWriteRound :: r_with_id()} |
+                                        {dropped,
+                                         NewerSeenRound :: r_with_id()}.
 writable(Entry, InRound) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
     case (InRound >= LatestSeenRead)
         andalso (InRound > LatestSeenWrite) of
-        true ->  {ok, entry_set_r_write(Entry, InRound)};
-        false -> {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
+        true ->
+            T1Entry = entry_set_r_write(Entry, InRound),
+            %% prepare fast_paxos for this client:
+            NextWriteRound = next_read_round(T1Entry,
+                                             r_with_id_get_id(InRound)),
+            %% assume this token was seen in a read already, so no one else
+            %% can interfere without paxos noticing it
+            T2Entry = entry_set_r_read(T1Entry, NextWriteRound),
+            {ok, T2Entry, NextWriteRound};
+        false ->
+            %% proposer may not have latest value for a clean content
+            %% check, and another proposer is concurrently active, so
+            %% we do not prepare a fast_paxos for this client, but let
+            %% the other proposer the chance to pass read and write
+            %% phase.  The denied proposer has to perform a read and write
+            %% phase on its own (including a new content check).
+            {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
     end.
 
 %% @doc Checks whether config parameters exist and are valid.
