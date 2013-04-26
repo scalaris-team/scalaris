@@ -39,47 +39,64 @@
 -define(cloud_ssh_key, "2a42cb863313526fca96098a95020db2a904b01157f191a9bb3200829f8596c7").
 -define(scalaris_start, "bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node start").
 -define(scalaris_stop, "bin/./scalarisctl -n node gstop").
- 
+
+-type status() :: active | inactive.
+-type host() :: tuple(string(), status()).
+-type hostlist() :: list(host()).
+
 %%%%%%%%%%%%%%%%%%%%%
 %%%% Behavior methods
 %%%%%%%%%%%%%%%%%%%%%
 
--spec init() -> ok.
+-spec init() -> fail | ok.
 init() ->
-    Hosts =
-        case config:read(cloud_ssh_hosts) of
-            failed -> [];
-            List -> lists:map(fun(Host) -> {Host, inactive} end, List)
-        end,
-    case api_tx:read(?cloud_ssh_key) of
-        {fail, not_found} -> api_tx:write(?cloud_ssh_key, Hosts);
+    case get_hosts() of
+        fail -> Hosts =
+                  case config:read(cloud_ssh_hosts) of
+                      failed -> [];
+                      List -> lists:map(fun(Host) -> {Host, inactive} end, List)
+                  end,
+              save_hosts(Hosts);
         _ -> ok
     end.
 
--spec get_number_of_vms() -> non_neg_integer().
+-spec get_number_of_vms() -> fail | non_neg_integer().
 get_number_of_vms() ->
-    {ok, List} = api_tx:read(?cloud_ssh_key),
-    length(List).
+    case get_hosts() of
+		fail -> fail;
+		{_, List} -> get_number_of_vms(List)
+	end.
 
--spec add_vms(integer()) -> ok.
+-spec get_number_of_vms(hostlist()) -> fail | non_neg_integer().
+get_number_of_vms(Hosts) ->
+    lists:foldl(fun (VM, NumActive) ->
+                        case VM of
+                            {_IP, active} ->
+                                NumActive + 1;
+                            _ -> NumActive
+                        end
+                end, 0, Hosts).
+
+-spec add_vms(pos_integer()) -> fail | ok.
 add_vms(N) ->
-    UpdatedHosts = add_or_remove_vms(add, N),
-    {ok} = api_tx:write(?cloud_ssh_key, UpdatedHosts),
-    ok.
+    add_or_remove_vms(add, N).
 
--spec remove_vms(integer()) -> ok.
+-spec remove_vms(pos_integer()) -> fail | ok.
 remove_vms(N) ->
-    UpdatedHosts = add_or_remove_vms(remove, N),
-    {ok} = api_tx:write(?cloud_ssh_key, UpdatedHosts),
-    ok.
+    add_or_remove_vms(remove, N).
 
+-spec add_or_remove_vms(add | remove, integer()) ->  fail | ok.
 add_or_remove_vms(Flag, Pending) ->
-    Hosts = get_hosts(),
-    add_or_remove_vms(Flag, Pending, Hosts, []).
+	case get_hosts() of
+    	{TLog, Hosts} ->
+			UpdatedHosts = add_or_remove_vms(Flag, Pending, Hosts, []),
+			save_hosts(TLog, UpdatedHosts);
+		fail -> fail
+	end.
 
+-spec add_or_remove_vms(add | remove, integer(), hostlist(), hostlist()) -> hostlist().
 add_or_remove_vms(_Flag, _Pending = 0, Hosts, UpdatedHosts) ->
     UpdatedHosts ++ Hosts;
-%% case where more vms than possible have been requested
 add_or_remove_vms(_Flag, _Pending, _Hosts = [], UpdatedHosts) ->
     UpdatedHosts;
 add_or_remove_vms(add, Pending, Hosts, UpdatedHosts) ->
@@ -108,22 +125,24 @@ add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
 
 -spec killall_vms() -> ok.
 killall_vms() ->
-    Hosts = get_hosts(),
-    lists:foreach(fun({Hostname, _}) ->
-                          Cmd = lists:flatten(io_lib:format("ssh ~s ~s killall -9 beam.smp", 
+	case get_hosts() of
+		{_, Hosts} ->
+    		lists:foreach(fun({Hostname, _}) ->
+                          Cmd = lists:flatten(io_lib:format("ssh ~s ~s killall -9 beam.smp",
                                                             [get_ssh_args(), Hostname])),
-                          os:cmd(Cmd)
-                  end, Hosts),
-    ok.
+                          exec(Cmd)
+            end, Hosts);
+		fail -> fail
+    end.
 
 start_scalaris_vm(Hostname) ->
     Scalaris = get_scalaris_service(),
     Services = [Scalaris | get_additional_services()],
     lists:foreach(fun (Service) ->
                           {StartCmd, _} = Service,
-                          Cmd = format("ssh ~s ~s ~s", [get_ssh_args(), Hostname, StartCmd]),
+                          Cmd = format("ssh ~s ~s \"~s\"", [get_ssh_args(), Hostname, StartCmd]),
                           io:format("Executing: ~p~n", [Cmd]),
-                          _ = os:cmd(Cmd)
+                          _ = exec(Cmd)
                   end, Services),
     ok.
 
@@ -132,28 +151,41 @@ stop_scalaris_vm(Hostname) ->
     Services = [Scalaris | get_additional_services()],
     lists:foreach(fun (Service) ->
                           {_, StopCmd} = Service,
-                          Cmd = format("ssh ~s ~s ~s", [get_ssh_args(), Hostname, StopCmd]),
+                          Cmd = format("ssh ~s ~s \"~s\"", [get_ssh_args(), Hostname, StopCmd]),
                           io:format("Executing: ~p~n", [Cmd]),
-                          _ = os:cmd(Cmd)
+                          _ = exec(Cmd)
                   end, Services),
     ok.
 
 format(FormatString, Items) ->
     lists:flatten(io_lib:format(FormatString, Items)).
 
+-spec get_hosts() -> fail | {tx_tlog:tlog_ext(), hostlist()}.
 get_hosts() ->
-    case api_tx:read(?cloud_ssh_key) of
-        {ok, Val} ->
-            Val;
-        _ -> []
-    end.
+	case api_tx:read(api_tx:new_tlog(), ?cloud_ssh_key) of
+		{TLog, {ok, Hosts}} -> {TLog, Hosts};
+		_ -> fail
+	end.
 
+-spec save_hosts(hostlist()) -> fail | ok.
+save_hosts(Hosts) ->
+	save_hosts(api_tx:new_tlog(), Hosts).
+
+-spec save_hosts(tx_tlog:tlog_ext(), hostlist()) -> fail | ok.
+save_hosts(TLog, Hosts) ->
+	case api_tx:req_list(TLog, [{write, ?cloud_ssh_key, Hosts}, {commit}]) of
+		{[], [{ok}, {ok}]} -> ok;
+		_ -> fail
+	end.
+
+-spec get_ssh_args() -> string().
 get_ssh_args() ->
     case config:read(cloud_ssh_args) of
         failed -> "";
         Args -> Args
     end.
 
+-spec get_scalaris_service() ->  tuple(string(), string()).
 get_scalaris_service() ->
     Path =
         case config:read(cloud_ssh_path) of
@@ -162,22 +194,13 @@ get_scalaris_service() ->
         end,
     {format("~s/~s", [Path, ?scalaris_start]), format("~s/~s", [Path, ?scalaris_stop])}.
 
+-spec get_additional_services() -> list(tuple(string(),string())).
 get_additional_services() ->
     case config:read(cloud_ssh_services) of
         failed -> [];
         [T|H] -> [T|H]
     end.
 
-get_number_of_active_vms(Hosts) ->
-    lists:foldl(fun (VM, NumActive) ->
-                         case VM of
-                             {_IP, active} ->
-                                 NumActive + 1;
-                             _ -> NumActive
-                         end
-                end, 0, Hosts).
-
--spec get_number_of_active_vms() -> integer().
-get_number_of_active_vms() ->
-    {ok, List} = api_tx:read(?cloud_ssh_key),
-    get_number_of_active_vms(List).
+-spec exec(string()) -> pid().
+exec(Cmd) ->
+    _ = spawn(os, cmd, [Cmd]).
