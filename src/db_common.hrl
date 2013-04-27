@@ -25,6 +25,8 @@
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
+%% -define(TRACE_SNAP(X, Y), ct:pal(ct_error_notify, X, Y)).
+-define(TRACE_SNAP(X, Y), ?TRACE(X, Y)).
 
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be
 %%      re-opened using open/1).
@@ -343,13 +345,16 @@ get_changes_helper(State, [{CurKey} | RestKeys], Interval, ChangedEntries, Delet
 %% @doc Copy existing entry to snapshot table
 -spec copy_value_to_snapshot_table_(DB::db_t(), Key::?RT:key()) -> NewDB::db_t().
 copy_value_to_snapshot_table_(State = {DB, Subscr, {SnapTable, LiveLC, SnapLC}}, Key) ->
-    case get_entry2_(State, Key) of
+    NewSnapLC = case get_entry2_(State, Key) of
         {true, Entry}   ->
             {_, OldSnapEntry} = get_snapshot_entry_(State, db_entry:get_key(Entry)),
-            NewSnapLC = db_entry:update_lockcount(OldSnapEntry, Entry, SnapLC),
-            ets:insert(SnapTable, Entry);
+            ets:insert(SnapTable, Entry),
+            TmpLC = db_entry:update_lockcount(OldSnapEntry, Entry, SnapLC),
+            ?TRACE_SNAP("copy_value_to_snapshot_table: ~p~nfrom ~p to ~p~n~p",
+                        [comm:this(), SnapLC, TmpLC, Entry]),
+            TmpLC;
         _ ->
-            NewSnapLC = SnapLC
+            SnapLC
     end,
     {DB, Subscr, {SnapTable, LiveLC, NewSnapLC}}.
 
@@ -384,13 +389,15 @@ set_snapshot_entry_(State = {DB, Subscr, {SnapTable, LiveLC, SnapLC}}, Entry) ->
         _    ->
             % if there is a snapshot entry for this key, we base our lock calculation on that,
             % if not, we have to consider the live db because of the copy-on-write logic
-            case get_snapshot_entry_(State, db_entry:get_key(Entry)) of
+            NewSnapLC = case get_snapshot_entry_(State, db_entry:get_key(Entry)) of
                 {true, OldEntry} ->
-                    NewSnapLC = db_entry:update_lockcount(OldEntry, Entry, SnapLC);
+                    db_entry:update_lockcount(OldEntry, Entry, SnapLC);
                 {false, _} ->
                     {_, LiveEntry} = get_entry2_(State, db_entry:get_key(Entry)),
-                    NewSnapLC = db_entry:update_lockcount(LiveEntry, Entry, SnapLC)
+                    db_entry:update_lockcount(LiveEntry, Entry, SnapLC)
             end,
+            ?TRACE_SNAP("set_snapshot_entry: ~p~n~p~n~p", 
+                        [comm:this(), NewSnapLC, Entry]),
             ets:insert(SnapTable, Entry),
             {DB, Subscr, {SnapTable, LiveLC, NewSnapLC}}
     end.

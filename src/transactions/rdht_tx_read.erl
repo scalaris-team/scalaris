@@ -23,6 +23,8 @@
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
+%% -define(TRACE_SNAP(X, Y), ct:pal(X, Y)).
+-define(TRACE_SNAP(X, Y), ?TRACE(X, Y)).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
@@ -264,6 +266,8 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
            %% if a snapshot instance is running, copy old value to snapshot db before setting lock
            DB1 = case ?DB:snapshot_is_running(DB) of
                      true ->
+                        ?TRACE_SNAP("rdht_tx_read:validate: ~p~n~p",
+                                    [comm:this(), DB]),
                          ?DB:copy_value_to_snapshot_table(DB, db_entry:get_key(DBEntry));
                      false -> 
                          DB
@@ -295,16 +299,22 @@ commit(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
                        true -> % we have to apply changes to the snapshot db as well
                            case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
                                {true, SnapEntry} -> 
+                                    ?TRACE_SNAP("rdht_tx_read ~p~nkey in snapdb...reducing lockcount",
+                                        [comm:this()]),
                                    % in this case there was an entry with this key in the snapshot table
                                    % so it might have different locks than the one in the live db.
                                    % we're applying the lock decrease on the snapshot table entry
                                    NewSnapEntry = db_entry:dec_readlock(SnapEntry),
                                    ?DB:set_snapshot_entry(NewDB, NewSnapEntry);
                                {false, _} ->
+                                    ?TRACE_SNAP("rdht_tx_read ~p~nkey not in snapdb~n~p",
+                                        [comm:this(), tx_tlog:get_entry_key(RTLogEntry)]),
                                    % key was not found in snapshot table -> both dbs are in sync for this key
                                    NewDB
                            end;
                        _ -> % no changes in the snapshot db
+                            ?TRACE_SNAP("rdht_tx_read ~p~n snapnumbers not ok~n~p   ~p",
+                                [comm:this(), TLogSnapNo, OwnSnapNo]),
                            NewDB
                    end;
                true -> DB %% a write has already deleted this lock
