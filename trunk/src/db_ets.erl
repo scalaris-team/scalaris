@@ -181,14 +181,13 @@ get_entries_({DB, _Subscr, _SnapState}, FilterFun, ValueFun) ->
                                   fun((DBEntry::db_entry:entry()) -> boolean()))
         -> NewDB::db_t().
 delete_entries_(State = {DB, _Subscr, _SnapState}, FilterFun) when is_function(FilterFun) ->
-    F = fun(DBEntry, _) ->
+    F = fun(DBEntry, StateAcc) ->
                 case FilterFun(DBEntry) of
-                    false -> ok;
-                    _     -> delete_entry_at_key_(State, db_entry:get_key(DBEntry))
+                    false -> StateAcc;
+                    _     -> delete_entry_at_key_(StateAcc, db_entry:get_key(DBEntry))
                 end
         end,
-    ets:foldl(F, ok, DB),
-    State;
+    ets:foldl(F, State, DB);
 delete_entries_(State, Interval) ->
     {Elements, RestInterval} = intervals:get_elements(Interval),
     case intervals:is_empty(RestInterval) of

@@ -23,6 +23,8 @@
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
+%% -define(TRACE_SNAP(X, Y), ct:pal(X, Y)).
+-define(TRACE_SNAP(X, Y), ?TRACE(X, Y)).
 
 -include("scalaris.hrl").
 -include("client_types.hrl").
@@ -119,8 +121,14 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
            %% if the write lock version matches!)
            NewEntry = db_entry:set_writelock(DBEntry, RTVers),
            NewDB = ?DB:set_entry(DB1, NewEntry),
+            ?TRACE_SNAP("rdht_tx_write:validate prepare: ~p~n~p  ~p~n~p~n~p~n~p",
+                        [comm:this(), tx_tlog:get_entry_snapshot(RTLogEntry),
+                         LocalSnapNumber, DB, DB1, NewDB]),
            {NewDB, ?prepared};
        true ->
+            ?TRACE_SNAP("rdht_tx_write:validate abort: ~p~n~p  ~p",
+                        [comm:this(), tx_tlog:get_entry_snapshot(RTLogEntry),
+                         LocalSnapNumber]),
            {DB, ?abort}
     end.
 
@@ -147,14 +155,23 @@ commit(DB, RTLogEntry, _OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
             NewDB = case (TLogSnapNo < OwnSnapNo) of
                 true ->
                     case ?DB:snapshot_is_running(DB) of
-                        true -> ?DB:set_snapshot_entry(DB, NewEntry);
-                        _ -> DB
+                        true -> 
+                            TmpDb = ?DB:set_snapshot_entry(DB, NewEntry),
+                            ?TRACE_SNAP("rdht_tx_write:commit ~p~nset entry in snapdb~n~p~n~p",
+                                [comm:this(), NewEntry, TmpDb]),
+                            TmpDb;
+                        _ -> 
+                            ?TRACE_SNAP("rdht_tx_write:commit ~p~nno snapshot running~n~p",
+                                [comm:this(), DB]),
+                            DB
                     end;
                 _ -> 
                     DB
             end,
             ?DB:set_entry(NewDB, NewEntry);
        true ->
+            ?TRACE_SNAP("rdht_tx_write:commit ~p~noutdated commit~n~p",
+                [comm:this(), DB]),
             DB %% outdated commit
     end.
 
@@ -185,18 +202,53 @@ abort(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
                                     % so it might have different locks than the one in the live db.
                                     % we're applying the lock decrease on the snapshot table entry
                                     NewSnapEntry = db_entry:unset_writelock(SnapEntry),
-                                    ?DB:set_snapshot_entry(NewDB, NewSnapEntry);
+                                    TmpDb = ?DB:set_snapshot_entry(NewDB,
+                                                                   NewSnapEntry),
+                                    ?TRACE_SNAP("rdht_tx_write:abort ~p~nkey in snapdb...reducing lockcount~n~p~n~p",
+                                        [comm:this(), NewDB, TmpDb]),
+                                    TmpDb;
                                 {false, _} ->
                                     % key was not found in snapshot table -> dbs are in sync for this key,
                                     % which means we only have to decrease the lockcount by 1
-                                    ?DB:decrease_snapshot_lockcount(NewDB)
+                                    TmpDb = ?DB:decrease_snapshot_lockcount(NewDB),
+                                    ?TRACE_SNAP("rdht_tx_write:abort ~p~nkey not in snapdb...reducing lockcount~n~p~n~p",
+                                        [comm:this(), NewDB, TmpDb]),
+                                    TmpDb
                             end;
-                        _ -> % no changes in the snapshot db
-                            NewDB
+                        _ ->
+                            %% check if LiveLC and SnapLC are > 1 in old db
+                            %% in this case a transaction got through validation
+                            %% just before a new snapshot begun on this node. 
+                            %% On other nodes the snapshots was triggered before
+                            %% the transaction...hence the abort. 
+                            %% lockcount needs to be decreased so snapshots can
+                            %% advance
+                            {_Db, _Subscr, {_SnapDb, LiveLC, SnapLC}} = DB,
+                            if LiveLC > 0 andalso SnapLC >= LiveLC ->
+                                    %% in case the tx was validated before new
+                                    %% snapshot we need to decrease the copied
+                                    %% lockcount
+                                    TmpDB = ?DB:decrease_snapshot_lockcount(NewDB),
+                                    ?TRACE_SNAP("rdht_tx_write:abort** ~p
+                                                snapnumbers not ok but snaplocks exist
+                                                ~p   ~p~n~p~n~p~n~p",
+                                        [comm:this(), TLogSnapNo, OwnSnapNo, DB,
+                                         NewDB, TmpDB]),
+                                        TmpDB;
+                                true -> 
+                                    ?TRACE_SNAP("rdht_tx_write:abort** ~p
+                                    snapnumbers not ok but locks are ok
+                                                ~p   ~p~n~p~n~p",
+                                                [comm:this(), TLogSnapNo,
+                                                 OwnSnapNo, DB, NewDB]),
+                                    NewDB
+                            end
                     end;
                true -> DB
             end;
         ?abort ->
+            ?TRACE_SNAP("rdht_tx_write:abort ~p~nown proposal was abort~n~p",
+                [comm:this(), DB]),
             DB
     end.
 

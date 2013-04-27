@@ -40,7 +40,7 @@ all() ->
      test_lock_counting_on_live_db,
      %% integration
      test_basic_race_multiple_snapshots, test_single_snapshot_call,
-     test_spam_transactions_and_snapshots,
+     test_spam_transactions_and_snapshots_on_fully_joined,
      %% misc
      bench_increment
     ].
@@ -346,18 +346,20 @@ test_basic_race_multiple_snapshots(_) ->
     ok.
 
 -spec test_spam_transactions_and_snapshots(any()) -> ok.
-test_spam_transactions_and_snapshots(_) ->
+test_spam_transactions_and_snapshots_on_fully_joined(_) ->
     unittest_helper:make_ring(4),
+    ct:pal("wating for fully joind ring...~n~p", 
+           [unittest_helper:check_ring_size_fully_joined(4),
     
     % apply a couple of transactions beforehand
-    tester:test(?MODULE, do_transaction_a, 1, 100),
+    tester:test(?MODULE, do_transaction_a, 1, 10),
     
     ct:pal("spaming transactions..."),
     SpamPid1 = erlang:spawn(fun() ->
-                    [do_transaction_a(X) || X <- lists:seq(1,1500)]
+                    [do_transaction_a(X) || X <- lists:seq(1,500)]
           end),
     SpamPid2 = erlang:spawn(fun() ->
-                    [do_transaction_b(X) || X <- lists:seq(1,1500)]
+                    [do_transaction_b(X) || X <- lists:seq(1,500)]
           end),
     
     ct:pal("spaming snapshots..."),

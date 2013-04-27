@@ -42,7 +42,7 @@ snapshot_is_done(DHTNodeState) ->
 -spec on_do_snapshot(non_neg_integer(),any(),dht_node_state:state()) -> dht_node_state:state().
 on_do_snapshot(SnapNumber, Leader, DHTNodeState) ->
     SnapState = dht_node_state:get(DHTNodeState, snapshot_state),
-    case snapshot_state:is_in_progress(SnapState) of
+    NewState = case snapshot_state:is_in_progress(SnapState) of
         true -> % old snapshot is still running or current snapshot is already running
             case snapshot_state:get_number(SnapState) < SnapNumber of
                 true -> % currently running snapshot is old
@@ -52,23 +52,23 @@ on_do_snapshot(SnapNumber, Leader, DHTNodeState) ->
                                              snapshot_state:get_number(SnapState),
                                              dht_node_state:get(DHTNodeState,my_range),
                                              snapshot_state:get_leaders(SnapState)),
-                    NewState = delete_and_init_snapshot(SnapNumber,Leader,DHTNodeState);
+                    delete_and_init_snapshot(SnapNumber,Leader,DHTNodeState);
                 false -> % the current snapshot is the same as the incoming one or newer
                     case snapshot_state:get_number(SnapState) =:= SnapNumber of
                         true ->
                             % additional msg for current snapshot -> add leader to dht node state for later messaging
                             NewSnapState = snapshot_state:add_leader(SnapState, Leader),
-                            NewState = dht_node_state:set_snapshot_state(DHTNodeState, NewSnapState);
+                            dht_node_state:set_snapshot_state(DHTNodeState, NewSnapState);
                         false ->
                             ?TRACE("snapshot: on_do_snapshot: ignoring old snapshot message ~p~n", [SnapNumber]),
                             % old snapshot -> ignore (or error msg?)
-                            NewState = DHTNodeState
+                             DHTNodeState
                     end
             end;
         false ->
             % no snapshot is progress -> init new
             ?TRACE("snapshot: on_do_snapshot: init new snapshot~n",[]),
-            NewState = delete_and_init_snapshot(SnapNumber,Leader,DHTNodeState)
+            delete_and_init_snapshot(SnapNumber,Leader,DHTNodeState)
     end,
     % check if snapshot is already done (i.e. there were no active transactions when the snapshot arrived)
     case snapshot:snapshot_is_done(NewState) of
