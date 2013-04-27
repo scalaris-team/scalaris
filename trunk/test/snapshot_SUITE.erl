@@ -345,11 +345,11 @@ test_basic_race_multiple_snapshots(_) ->
     tester:test(api_tx, get_system_snapshot, 0, 100),
     ok.
 
--spec test_spam_transactions_and_snapshots(any()) -> ok.
+-spec test_spam_transactions_and_snapshots_on_fully_joined(any()) -> ok.
 test_spam_transactions_and_snapshots_on_fully_joined(_) ->
     unittest_helper:make_ring(4),
     ct:pal("wating for fully joind ring...~n~p", 
-           [unittest_helper:check_ring_size_fully_joined(4),
+           [unittest_helper:check_ring_size_fully_joined(4)]),
     
     % apply a couple of transactions beforehand
     tester:test(?MODULE, do_transaction_a, 1, 10),

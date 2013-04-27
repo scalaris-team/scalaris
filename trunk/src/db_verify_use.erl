@@ -405,6 +405,14 @@ init_snapshot_({DB, Counter} = _DB_) ->
 snapshot_is_lockfree_({DB, _Counter} = _DB_) ->
     ?BASE_DB:snapshot_is_lockfree(DB).
 
+-spec get_live_lc_(DB::db_t()) -> non_neg_integer().
+get_live_lc_({DB, _Counter}) -> 
+    ?BASE_DB:get_live_lc(DB).
+
+-spec get_snap_lc_(DB::db_t()) -> non_neg_integer().
+get_snap_lc_({DB, _Counter}) ->
+    ?BASE_DB:get_snap_lc(DB).
+
 -spec snapshot_is_running_(DB::db_t()) -> boolean().
 snapshot_is_running_({DB, _Counter} = _DB_) ->
     ?BASE_DB:snapshot_is_running(DB).

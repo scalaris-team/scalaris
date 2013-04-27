@@ -438,6 +438,14 @@ init_snapshot_({DB, Subscr, {SnapTable, LiveLC, _SnapLC}}) ->
     % copy live db lock count to new snapshot db
     {DB, Subscr, {ets:new(list_to_atom(SnapDBName), [ordered_set, private]), LiveLC, LiveLC}}.
 
+-spec get_snap_lc_(DB::db_t()) -> non_neg_integer().
+get_snap_lc_({_DB, _Subscr, {_SnapTable, _LiveLC, SnapLC}}) ->
+    SnapLC.
+
+-spec get_live_lc_(DB::db_t()) -> non_neg_integer().
+get_live_lc_({_DB, _Subscr, {_SnapTable, LiveLC, _SnapLC}}) ->
+    LiveLC.
+
 -spec snapshot_is_lockfree_(DB::db_t()) -> boolean().
 snapshot_is_lockfree_({_DB, _Subscr, {_SnapTable, _LiveLC, SnapLC}}) ->
     SnapLC =:= 0.
