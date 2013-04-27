@@ -52,6 +52,7 @@
 -export([copy_value_to_snapshot_table/2, get_snapshot_data/1, join_snapshot_data/1]).
 -export([set_snapshot_entry/2, get_snapshot_entry/2, delete_snapshot_entry/2, delete_snapshot_entry_at_key/2]).
 -export([init_snapshot/1,snapshot_is_lockfree/1]).
+-export([get_live_lc/1,get_snap_lc/1]).
 -export([snapshot_is_running/1,delete_snapshot/1,decrease_snapshot_lockcount/1]).
 
 %% public methods:
@@ -201,6 +202,12 @@ delete_snapshot_entry(DB, Entry) -> delete_snapshot_entry_(DB, Entry).
 
 -spec snapshot_is_lockfree(DB::db()) -> boolean().
 snapshot_is_lockfree(DB) -> snapshot_is_lockfree_(DB).
+
+-spec get_live_lc(DB::db()) -> non_neg_integer().
+get_live_lc(DB) -> get_live_lc_(DB).
+
+-spec get_snap_lc(DB::db()) -> non_neg_integer().
+get_snap_lc(DB) -> get_snap_lc_(DB).
 
 -spec snapshot_is_running(DB::db()) -> boolean().
 snapshot_is_running(DB) -> snapshot_is_running_(DB).

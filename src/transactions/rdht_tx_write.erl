@@ -223,7 +223,8 @@ abort(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
                             %% the transaction...hence the abort. 
                             %% lockcount needs to be decreased so snapshots can
                             %% advance
-                            {_Db, _Subscr, {_SnapDb, LiveLC, SnapLC}} = DB,
+                            LiveLC = ?DB:get_live_lc(DB),
+                            SnapLC = ?DB:get_snap_lc(DB),
                             if LiveLC > 0 andalso SnapLC >= LiveLC ->
                                     %% in case the tx was validated before new
                                     %% snapshot we need to decrease the copied
