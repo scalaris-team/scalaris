@@ -196,7 +196,7 @@ manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
               {statistics, Statistics},
               {wall_clock_time, WallClockTime},
               {wall_clock_throughput, WallClockTP},
-              {wall_clocl_latency, WallClockLat},
+              {wall_clock_latency, WallClockLat},
               {min_troughput_overall, MinTP},
               {min_troughput_each, MinTPAll},
               {mean_troughput_overall, MeanTP},
