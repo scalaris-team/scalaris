@@ -335,7 +335,7 @@ send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
 
     FailMsg = lists:flatten(io_lib:format("~.0p (~B.*) ignoring messages: ~.0p",
                                           [PredOrSuccOrNode, NthNode, IgnoredMessages])),
-    {Pred, Node, Succ} = dht_node_move_SUITE:get_pred_node_succ(NthNode, FailMsg),
+    {_PredsPred, Pred, Node, Succ} = dht_node_move_SUITE:get_pred_node_succ(NthNode, FailMsg),
     Other = case PredOrSuccOrNode of
                 succ -> Succ;
                 pred -> Pred;
