@@ -45,7 +45,7 @@
                     true  -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, true, ??Boolean, true)
+                          UnittestAny, true, ??Boolean, "true")
                 end
         end()).
 
@@ -56,7 +56,7 @@
                     true  -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, true, ??Boolean, true, Note)
+                          UnittestAny, true, ??Boolean, "true", Note)
                 end
         end()).
 
@@ -142,7 +142,7 @@
         fun() ->
                 Fun = fun(F) ->
                               case ?consume_message(Message, 0) of
-                                  ok -> F(F);
+                                  true -> F(F);
                                   timeout -> true
                               end
                       end,

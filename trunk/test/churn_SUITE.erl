@@ -92,7 +92,7 @@ transactions_3_failures_4_nodes_read(_) ->
 
 -spec transactions_X_failures_4_nodes_read(
         FailedNodes::1..3, RAfterFail::ok | abort | ok_or_abort,
-        WAfterFail::ok | abort | ok_or_abort) -> ok.
+        WAfterFail::ok | abort | ok_or_abort) -> true.
 transactions_X_failures_4_nodes_read(FailedNodes, RAfterFail, WAfterFail) ->
     ?equals_w_note(api_tx:write("0", 1), {ok}, "write_0_a"),
     ?equals_w_note(api_tx:read("0"), {ok, 1}, "read_0_a"),
@@ -188,8 +188,8 @@ pause_node(DhtNodeSupPid) ->
              false -> ok
          end || Pid <- DhtNodeSupChilds],
 
-    [ comm:send_local(fd, {unittest_report_down, comm:make_global(X)})
-      || X <- unittest_helper:get_all_children(DhtNodeSupPid)],
+    _ = [ comm:send_local(fd, {unittest_report_down, comm:make_global(X)})
+          || X <- unittest_helper:get_all_children(DhtNodeSupPid)],
 
     pid_groups:hide(GroupName),
     {GroupName, DhtNodeSupChilds}.

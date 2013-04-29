@@ -44,7 +44,7 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
--spec plus(Config::[tuple()]) -> ok.
+-spec plus(Config::[tuple()]) -> true.
 plus(_Config) ->
     ?equals(math_pos:plus(  [1],   [1], 10),   [2]),
     ?equals(math_pos:plus(  [1],   [2], 10),   [3]),
@@ -54,7 +54,7 @@ plus(_Config) ->
     ?equals(math_pos:plus(  [9],   [1], 10),   [0]),
     ?equals(math_pos:plus([0,9], [0,1], 10), [1,0]).
 
--spec minus(Config::[tuple()]) -> ok.
+-spec minus(Config::[tuple()]) -> true.
 minus(_Config) ->
     ?equals(math_pos:minus(  [1],   [1], 10),   [0]),
     ?equals(math_pos:minus(  [1],   [2], 10),   [9]),
@@ -64,7 +64,7 @@ minus(_Config) ->
     ?equals(math_pos:minus(  [9],   [1], 10),   [8]),
     ?equals(math_pos:minus([0,9], [0,1], 10), [0,8]).
 
--spec multiply(Config::[tuple()]) -> ok.
+-spec multiply(Config::[tuple()]) -> true.
 multiply(_Config) ->
     ?equals(math_pos:multiply(  [1], 2, 10),   [2]),
     ?equals(math_pos:multiply(  [2], 2, 10),   [4]),
@@ -96,7 +96,7 @@ multiply(_Config) ->
     ?equals(math_pos:multiply([0,6], 3, 10), [1,8]),
     ?equals(math_pos:multiply([0,7], 3, 10), [2,1]).
 
--spec divide(Config::[tuple()]) -> ok.
+-spec divide(Config::[tuple()]) -> true.
 divide(_Config) ->
     ?equals(math_pos:divide(  [1], 2, 10),   [0]),
     ?equals(math_pos:divide(  [2], 2, 10),   [1]),

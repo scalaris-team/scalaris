@@ -48,7 +48,7 @@ init_per_testcase(_TestCase, Config) ->
     config:write(no_print_ring_data, true),
     % load necessary code for the atom check to work (we do not create additional atoms):
     InitKey = "memtest_SUITE",
-    api_tx:write(InitKey, 1),
+    {ok} = api_tx:write(InitKey, 1),
     api_tx_SUITE:wait_for_dht_entries(?RT:get_replica_keys(?RT:hash_key(InitKey))),
     garbage_collect_all(),
     Config.
@@ -145,7 +145,7 @@ write(Number, Size) when Number >= 1 ->
         util:for_to_fold(1, Number,
                          fun(I) ->
                                  Bin = make_binary(I, Size),
-                                 api_tx:write(Key, Bin),
+                                 {ok} = api_tx:write(Key, Bin),
                                  % wait for late write messages:
                                  api_tx_SUITE:wait_for_dht_entries(?RT:get_replica_keys(?RT:hash_key(Key))),
                                  %print_table_info(Table),
@@ -179,7 +179,7 @@ fill(Start, End, Size) when End >= Start ->
                          fun(I) ->
                                  Key = lists:flatten(io_lib:format("fill_~B", [I])),
                                  Bin = make_binary(I, Size),
-                                 api_tx:write(Key, Bin),
+                                 {ok} = api_tx:write(Key, Bin),
                                  % wait for late write messages:
                                  api_tx_SUITE:wait_for_dht_entries(?RT:get_replica_keys(?RT:hash_key(Key))),
                                  %print_table_info(Table, lists:flatten(io_lib:format("~B", [I]))),
@@ -215,7 +215,7 @@ modify(Start, End, Repeat, Size) when End >= Start andalso Repeat >= 1 ->
                     fun(J) ->
                             Key = lists:flatten(io_lib:format("modify_~B", [I])),
                             Bin = make_binary(I+J, Size),
-                            api_tx:write(Key, Bin),
+                            {ok} = api_tx:write(Key, Bin),
                             % wait for late write messages:
                             api_tx_SUITE:wait_for_dht_entries(?RT:get_replica_keys(?RT:hash_key(Key))),
                             %print_table_info(Table, lists:flatten(io_lib:format("~B", [I]))),

@@ -362,7 +362,7 @@ write_test_race_mult_rings(Config) ->
     write_test(Config),
     write_test(Config).
 
--spec write_test(Config::[tuple()]) -> ok.
+-spec write_test(Config::[tuple()]) -> true.
 write_test(Config) ->
     OldRegistered = erlang:registered(),
     OldProcesses = unittest_helper:get_processes(),
@@ -458,9 +458,9 @@ read_write_2old_locked(_Config) ->
 -spec read_write_notfound(Config::[tuple()]) -> ok.
 read_write_notfound(_Config) ->
     Key = "read_write_notfound_test",
-    [read_write_notfound_test(Key ++ lists:flatten(io_lib:format("_~p_~p", [X, M])), X, M)
-       || X <- [none | lists:seq(1,4)],
-          M <- [single, req_list]],
+    _ = [read_write_notfound_test(Key ++ lists:flatten(io_lib:format("_~p_~p", [X, M])), X, M)
+           || X <- [none | lists:seq(1,4)],
+              M <- [single, req_list]],
     ok.
 
 -spec read_write_notfound_test(Key::client_key(), HashedKeyToExclude::1..4 | none, Mode::single | req_list) -> ok.
@@ -927,7 +927,7 @@ tester_req_list(_Config) ->
 %%      be the same as ExpRes (1|2-element list).
 -spec same_result_if_not_random(Req::api_tx:request_on_key(), ORes::[api_tx:result(),...],
                                 Res::[api_tx:result(),...], ExpRes::[api_tx:result(),...],
-                                Note::iolist()) -> ok.
+                                Note::iolist()) -> true.
 same_result_if_not_random(Req, [ORes], Res, ExpRes, Note) ->
     case Req of
         {read, _Key0, ReadOp}
@@ -1177,7 +1177,7 @@ prop_tester_req_list_on_same_key(Key, InReqList) ->
     check_commit(TLogSeqE, CommitE, RingVal),
 
     %% perform on key as int
-    api_tx:write(Key, 42),
+    {ok} = api_tx:write(Key, 42),
     {TLogSeqI, _ResultSeqI} =
         lists:foldl(fun(Req, {TLog, Res}) ->
                             {NTLog, NRes} = api_tx:req_list(TLog, [Req]),
@@ -1189,7 +1189,7 @@ prop_tester_req_list_on_same_key(Key, InReqList) ->
     check_commit(TLogSeqI, CommitI, 42),
 
     %% perform on key as list
-    api_tx:write(Key, [42]),
+    {ok} = api_tx:write(Key, [42]),
     {TLogSeqL, _ResultSeqL} =
         lists:foldl(fun(Req, {TLog, Res}) ->
                             {NTLog, NRes} = api_tx:req_list(TLog, [Req]),
@@ -1214,7 +1214,7 @@ req_list_parallelism(_Config) ->
                      || X <- lists:seq(1, Partitions)],
 
     api_tx:req_list_commit_each(WriteReqsPart),
-    api_tx:write("articles:count", 200 * Partitions),
+    {ok} = api_tx:write("articles:count", 200 * Partitions),
 
     Iters = 500,
 

@@ -128,22 +128,20 @@ is_empty(_) -> false.
 is_null({_Key, empty_val, false, 0, -1}) -> true;
 is_null(_) -> false.
 
-%% @doc Helper for lock bookkeeping. Compares two db_entries and updates counter accordingly
-%% It assumes that only related entries are compared, i.e. it is assumed that no locks are
-%% released that are not held in the first place. With random parameters it is possible
-%% that we return a negative number (hence the spec integer() to make the unit tests happy)
-%% but that shouldn't be a problem if we compare only entries and their immediate replacements.
--spec update_lockcount(OldEntry::entry(),NewEntry::entry(),LC::non_neg_integer()) ->
-          integer().
-update_lockcount(OldEntry,NewEntry,LC) ->
+%% @doc Helper for lock bookkeeping. Compares two db_entries and updates counter
+%%      accordingly. It assumes that only related entries are compared, i.e. it
+%%      is assumed that no locks are released that are not held in the first
+%%      place. With random parameters it is possible that we return a negative
+%%      number (hence the spec integer() to make the unit tests happy) but that
+%%      shouldn't be a problem if we compare only entries and their immediate
+%%      replacements.
+-spec update_lockcount(OldEntry::entry(), NewEntry::entry(), LC::non_neg_integer())
+        -> integer().
+update_lockcount(OldEntry, NewEntry, LC) ->
     TmpLC = LC + (get_readlock(NewEntry) - get_readlock(OldEntry)),
-    case get_writelock(NewEntry) of
-        false   ->  case get_writelock(OldEntry) of
-                       false -> TmpLC;
-                       _ -> TmpLC - 1 
-                    end;
-        _    ->  case get_writelock(OldEntry) of
-                       false -> TmpLC + 1;
-                       _ -> TmpLC
-                    end
+    WL_old = get_writelock(OldEntry),
+    WL_new = get_writelock(NewEntry),
+    if WL_new =:= false andalso WL_old =/= false -> TmpLC - 1;
+       WL_new =/= false andalso WL_old =:= false -> TmpLC + 1;
+       true                                      -> TmpLC
     end.

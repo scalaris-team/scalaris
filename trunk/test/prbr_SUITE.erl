@@ -99,7 +99,7 @@ rbr_concurrency_kv(_Config) ->
     %%   only observe increasing values in reads
     Key = randoms:getRandomString(),
 
-    kv_on_cseq:write(Key, 1),
+    {ok} = kv_on_cseq:write(Key, 1),
     Parallel = randoms:rand_uniform(1, 11),
     Count = 1000 div Parallel,
     ct:pal("Starting concurrent writers: ~p~n"
@@ -107,24 +107,24 @@ rbr_concurrency_kv(_Config) ->
            [Parallel, Count]),
     UnitTestPid = self(),
     _Pids = [ spawn(fun() ->
-                           [ begin
-                                 {ok, V} = kv_on_cseq:read(Key),
-                                 kv_on_cseq:write(Key, V+1)
-                                 %% if 0 == I rem 100 ->
-                                 %%   ct:pal("~p performed write ~p.~n",
-                                 %%   [_Nth, I]);
-                                 %%   true -> ok
-                                 %% end
-                             end
-                             || _I <- lists:seq(1, Count)],
+                            _ = [ begin
+                                      {ok, V} = kv_on_cseq:read(Key),
+                                      {ok} = kv_on_cseq:write(Key, V+1)
+                                      %% if 0 == I rem 100 ->
+                                      %%   ct:pal("~p performed write ~p.~n",
+                                      %%   [_Nth, I]);
+                                      %%   true -> ok
+                                      %% end
+                                  end
+                                  || _I <- lists:seq(1, Count)],
                            UnitTestPid ! {done}
                    end)
              || _Nth <- lists:seq(1, Parallel)],
 
-    [ receive {done} ->
-              ct:pal("Finished number ~p.~n", [Nth]),
-              ok
-      end || Nth <- lists:seq(1, Parallel)],
+    _ = [ receive {done} ->
+                      ct:pal("Finished number ~p.~n", [Nth]),
+                      ok
+          end || Nth <- lists:seq(1, Parallel)],
 
     ct:pal("Planned ~p increments, done ~p - discrepancy is ok~n",
            [Count*Parallel, kv_on_cseq:read(Key)]),
@@ -167,34 +167,34 @@ rbr_concurrency_leases(_Config) ->
         [ spawn(
             fun() ->
                     pid_groups:join(pid_groups:group_with(dht_node)),
-                    [ begin
-                          F = fun(X) ->
-                                      {ok, V} = l_on_cseq:read(Key),
-                                      Update =
-                                          l_on_cseq:unittest_lease_update(
-                                            V,
-                                            l_on_cseq:set_version(
-                                              V, l_on_cseq:get_version(V)+1)),
-                                      case Update of
-                                          ok -> ok;
-                                          failed ->
-                                              %% ct:pal("~p retry ~p.~n",
-                                              %%        [_Nth, l_on_cseq:get_version(V)+1]),
+                    _ = [ begin
+                              F = fun(X) ->
+                                          {ok, V} = l_on_cseq:read(Key),
+                                          Update =
+                                              l_on_cseq:unittest_lease_update(
+                                                V,
+                                                l_on_cseq:set_version(
+                                                  V, l_on_cseq:get_version(V)+1)),
+                                          case Update of
+                                              ok -> ok;
+                                              failed ->
+                                                  %% ct:pal("~p retry ~p.~n",
+                                                  %%        [_Nth, l_on_cseq:get_version(V)+1]),
                                                   X(X)
-                                      end
-                              end,
-                          F(F)
+                                          end
+                                  end,
+                              F(F)
                           %% ct:pal("~p performed write.~n", [_Nth])
-                      end
-                      || _I <- lists:seq(1, Count)],
+                          end
+                          || _I <- lists:seq(1, Count)],
                     UnitTestPid ! {done}
             end)
           || _Nth <- lists:seq(1, Parallel)],
 
-    [ receive {done} ->
-              ct:pal("Finished number ~p.~n", [Nth]),
-              ok
-      end || Nth <- lists:seq(1, Parallel)],
+    _ = [ receive {done} ->
+                      ct:pal("Finished number ~p.~n", [Nth]),
+                      ok
+          end || Nth <- lists:seq(1, Parallel)],
 
     ct:pal("Planned ~p increments, done ~p, discrepancy is ok~n",
            [Count*Parallel, l_on_cseq:read(Key)]),
@@ -213,23 +213,24 @@ rbr_consistency(_Config) ->
     Key = "a",
 
     %% initialize key
-    kv_on_cseq:write(Key, 1),
+    {ok} = kv_on_cseq:write(Key, 1),
 
     %% select a replica
     Replicas = ?RT:get_replica_keys(?RT:hash_key(Key)),
 
-    [ begin
-          New = N+100,
-          Old = case N of
-                    1 -> 1;
-                    _ -> N+99
-                end,
-
-          modify_rbr_at_key(R, N+100),
-
-          %% intercept and drop a message at r1
-          lists:foldl(read_quorum_without(Key), {Old, New}, Nodes)
-      end || {R,N} <- lists:zip(Replicas, lists:seq(1,4))],
+    _ = [ begin
+              New = N+100,
+              Old = case N of
+                        1 -> 1;
+                        _ -> N+99
+                    end,
+              
+              modify_rbr_at_key(R, N+100),
+              
+              %% intercept and drop a message at r1
+              _ = lists:foldl(read_quorum_without(Key), {Old, New}, Nodes),
+              ok
+          end || {R,N} <- lists:zip(Replicas, lists:seq(1,4))],
 
     ok.
 
@@ -267,8 +268,8 @@ tester_type_check_rbr(_Config) ->
           }
 
         ],
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     true.
 
 modify_rbr_at_key(R, N) ->

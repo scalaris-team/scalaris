@@ -108,8 +108,8 @@ join_lookup(Config) ->
     unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
     %% do as less as possible between make_ring and sending the lookups
     This = comm:this(),
-    [ comm:send_local(pid_groups:find_a(dht_node), {?lookup_aux, X, 0,
-                     {ping, This}}) || X <- Keys ],
+    _ = [ comm:send_local(pid_groups:find_a(dht_node),
+                          {?lookup_aux, X, 0, {ping, This}}) || X <- Keys ],
 
     %% got all 4 replies? ok
     [ receive {pong} -> ok end || _ <- Keys ].
@@ -194,7 +194,7 @@ add_3_rm_2_load(Config) ->
 add_3_rm_3_load(Config) ->
     add_x_rm_y_load(Config, 3, 3).
 
--spec add_x_rm_y_load(Config::[tuple()], X::non_neg_integer(), Y::pos_integer()) -> ok.
+-spec add_x_rm_y_load(Config::[tuple()], X::non_neg_integer(), Y::pos_integer()) -> boolean().
 add_x_rm_y_load(Config, X, Y) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0} | join_parameters_list()]}]),

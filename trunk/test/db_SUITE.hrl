@@ -61,6 +61,9 @@ tests_avail() ->
 
 suite() -> [ {timetrap, {seconds, 10}} ].
 
+-define(KEY(Key), ?RT:hash_key(Key)).
+-define(VALUE(Val), rdht_tx:encode_value(Val)).
+
 %% @doc Returns the min of Desired and max_rw_tests_per_suite().
 %%      Should be used to limit the number of executions of r/w suites.
 -spec rw_suite_runs(Desired::pos_integer()) -> pos_integer().
@@ -97,30 +100,30 @@ end_per_suite(Config) ->
         end()).
 
 read(_Config) ->
-    prop_new(?RT:hash_key("Unknown")).
+    prop_new(?KEY("Unknown")).
 
 write(_Config) ->
-    prop_write(?RT:hash_key("Key1"), "Value1", 1, ?RT:hash_key("Key2")).
+    prop_write(?KEY("Key1"), ?VALUE("Value1"), 1, ?KEY("Key2")).
 
 delete(_Config) ->
-    prop_delete(?RT:hash_key("DeleteKey1"), "Value1", false, 0, 1, ?RT:hash_key("DeleteKey2")),
-    prop_delete(?RT:hash_key("DeleteKey1"), "Value1", false, 1, 1, ?RT:hash_key("DeleteKey2")).
+    prop_delete(?KEY("DeleteKey1"), ?VALUE("Value1"), false, 0, 1, ?KEY("DeleteKey2")),
+    prop_delete(?KEY("DeleteKey1"), ?VALUE("Value1"), false, 1, 1, ?KEY("DeleteKey2")).
 
 get_load_and_middle(_Config) ->
     DB = ?TEST_DB:new(),
     ?equals(?TEST_DB:get_load(DB), 0),
-    DB2 = ?TEST_DB:write(DB, "Key1", "Value1", 1),
+    DB2 = ?TEST_DB:write(DB, 1, ?VALUE("Value1"), 1),
     ?equals(?TEST_DB:get_load(DB2), 1),
-    DB3 = ?TEST_DB:write(DB2, "Key1", "Value1", 2),
+    DB3 = ?TEST_DB:write(DB2, 1, ?VALUE("Value1"), 2),
     ?equals(?TEST_DB:get_load(DB3), 1),
-    DB4 = ?TEST_DB:write(DB3, "Key2", "Value2", 1),
+    DB4 = ?TEST_DB:write(DB3, 2, ?VALUE("Value2"), 1),
     ?equals(?TEST_DB:get_load(DB4), 2),
-    DB5 = ?TEST_DB:write(DB4, "Key3", "Value3", 1),
-    DB6 = ?TEST_DB:write(DB5, "Key4", "Value4", 1),
+    DB5 = ?TEST_DB:write(DB4, 3, ?VALUE("Value3"), 1),
+    DB6 = ?TEST_DB:write(DB5, 4, ?VALUE("Value4"), 1),
     OrigFullList = ?TEST_DB:get_data(DB6),
-    {DB7, HisList} = ?TEST_DB:split_data(DB6, node:mk_interval_between_ids("Key2", "Key4")),
-    ?equals(?TEST_DB:read(DB7, "Key3"), {ok, "Value3", 1}),
-    ?equals(?TEST_DB:read(DB7, "Key4"), {ok, "Value4", 1}),
+    {DB7, HisList} = ?TEST_DB:split_data(DB6, node:mk_interval_between_ids(2, 4)),
+    ?equals(?TEST_DB:read(DB7, 3), {ok, ?VALUE("Value3"), 1}),
+    ?equals(?TEST_DB:read(DB7, 4), {ok, ?VALUE("Value4"), 1}),
     ?equals(?TEST_DB:get_load(DB7), 2),
     ?equals(length(HisList), 2),
     ?equals(length(?TEST_DB:get_data(DB7)), 2),
@@ -132,94 +135,94 @@ get_load_and_middle(_Config) ->
 %% @doc Some split_data tests using fixed values.
 %% @see prop_split_data/2
 split_data(_Config) ->
-    prop_split_data([db_entry:new(1, "Value1", 1),
-                     db_entry:new(2, "Value2", 2)], intervals:empty()),
-    prop_split_data([db_entry:new(1, "Value1", 1),
-                     db_entry:new(2, "Value2", 2)], intervals:all()),
-    prop_split_data([db_entry:new(1, "Value1", 1),
-                     db_entry:new(2, "Value2", 2)], intervals:new(2)),
-    prop_split_data([db_entry:new(1, "Value1", 1),
-                     db_entry:new(2, "Value2", 2)], intervals:new(5)),
-    prop_split_data([db_entry:new(1, "Value1", 1),
-                     db_entry:new(2, "Value2", 2),
-                     db_entry:new(3, "Value3", 3),
-                     db_entry:new(4, "Value4", 4),
-                     db_entry:new(5, "Value5", 5)],
+    prop_split_data([db_entry:new(1, ?VALUE("Value1"), 1),
+                     db_entry:new(2, ?VALUE("Value2"), 2)], intervals:empty()),
+    prop_split_data([db_entry:new(1, ?VALUE("Value1"), 1),
+                     db_entry:new(2, ?VALUE("Value2"), 2)], intervals:all()),
+    prop_split_data([db_entry:new(1, ?VALUE("Value1"), 1),
+                     db_entry:new(2, ?VALUE("Value2"), 2)], intervals:new(2)),
+    prop_split_data([db_entry:new(1, ?VALUE("Value1"), 1),
+                     db_entry:new(2, ?VALUE("Value2"), 2)], intervals:new(5)),
+    prop_split_data([db_entry:new(1, ?VALUE("Value1"), 1),
+                     db_entry:new(2, ?VALUE("Value2"), 2),
+                     db_entry:new(3, ?VALUE("Value3"), 3),
+                     db_entry:new(4, ?VALUE("Value4"), 4),
+                     db_entry:new(5, ?VALUE("Value5"), 5)],
                     intervals:new('[', 2, 4, ')')),
-    prop_split_data([db_entry:new(1, "Value1", 1),
-                     db_entry:new(2, "Value2", 2),
-                     db_entry:new(3, "Value3", 3),
-                     db_entry:new(4, "Value4", 4),
-                     db_entry:new(5, "Value5", 5)],
+    prop_split_data([db_entry:new(1, ?VALUE("Value1"), 1),
+                     db_entry:new(2, ?VALUE("Value2"), 2),
+                     db_entry:new(3, ?VALUE("Value3"), 3),
+                     db_entry:new(4, ?VALUE("Value4"), 4),
+                     db_entry:new(5, ?VALUE("Value5"), 5)],
                     intervals:union(intervals:new('[', 1, 3, ')'),
                                     intervals:new(4))),
-    prop_split_data([db_entry:set_writelock(db_entry:new(1, "Value1", 1), 1),
-                     db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
-                     db_entry:new(3, "Value3", 3),
-                     db_entry:new(4, "Value4", 4),
-                     db_entry:new(5, "Value5", 5)],
+    prop_split_data([db_entry:set_writelock(db_entry:new(1, ?VALUE("Value1"), 1), 1),
+                     db_entry:inc_readlock(db_entry:new(2, ?VALUE("Value2"), 2)),
+                     db_entry:new(3, ?VALUE("Value3"), 3),
+                     db_entry:new(4, ?VALUE("Value4"), 4),
+                     db_entry:new(5, ?VALUE("Value5"), 5)],
                     intervals:union(intervals:new('[', 1, 3, ')'),
                                     intervals:new(4))).
 
 %% @doc Some update_entries tests using fixed values.
 %% @see prop_update_entries_helper/3
 update_entries(_Config) ->
-    prop_update_entries_helper([db_entry:new(1, "Value1", 1),
-                                db_entry:new(2, "Value2", 1),
-                                db_entry:new(3, "Value3", 1),
-                                db_entry:new(4, "Value4", 1),
-                                db_entry:new(5, "Value5", 1)],
-                               [db_entry:new(1, "Value1", 2),
-                                db_entry:new(2, "Value2", 2),
-                                db_entry:new(3, "Value3", 2),
-                                db_entry:new(4, "Value4", 2),
-                                db_entry:new(5, "Value5", 2)],
-                               [db_entry:new(1, "Value1", 2),
-                                db_entry:new(2, "Value2", 2),
-                                db_entry:new(3, "Value3", 2),
-                                db_entry:new(4, "Value4", 2),
-                                db_entry:new(5, "Value5", 2)]),
-    prop_update_entries_helper([db_entry:new(1, "Value1", 1),
-                                db_entry:new(2, "Value2", 1),
-                                db_entry:new(3, "Value3", 1),
-                                db_entry:new(4, "Value4", 1),
-                                db_entry:new(5, "Value5", 1)],
-                               [db_entry:new(1, "Value1", 2),
-                                db_entry:new(4, "Value4", 2),
-                                db_entry:new(5, "Value5", 3)],
-                               [db_entry:new(1, "Value1", 2),
-                                db_entry:new(2, "Value2", 1),
-                                db_entry:new(3, "Value3", 1),
-                                db_entry:new(4, "Value4", 2),
-                                db_entry:new(5, "Value5", 3)]),
-    prop_update_entries_helper([db_entry:new(1, "Value1", 2),
-                                db_entry:new(2, "Value2", 2),
-                                db_entry:new(3, "Value3", 2),
-                                db_entry:new(4, "Value4", 2),
-                                db_entry:new(5, "Value5", 2)],
-                               [db_entry:new(1, "Value1", 1),
-                                db_entry:new(4, "Value4", 1),
-                                db_entry:new(5, "Value5", 1)],
-                               [db_entry:new(1, "Value1", 2),
-                                db_entry:new(2, "Value2", 2),
-                                db_entry:new(3, "Value3", 2),
-                                db_entry:new(4, "Value4", 2),
-                                db_entry:new(5, "Value5", 2)]),
-    prop_update_entries_helper([db_entry:set_writelock(db_entry:new(1, "Value1", 1), 1),
-                                db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
-                                db_entry:new(3, "Value3", 1),
-                                db_entry:new(4, "Value4", 1),
-                                db_entry:new(5, "Value5", 1)],
-                               [db_entry:new(1, "Value1", 2),
-                                db_entry:new(2, "Value2", 2),
-                                db_entry:new(3, "Value3", 2),
-                                db_entry:new(4, "Value4", 2),
-                                db_entry:new(5, "Value5", 2)],
-                               [db_entry:set_writelock(db_entry:new(1, "Value1", 1), 1),
-                                db_entry:inc_readlock(db_entry:new(2, "Value2", 2)),
-                                db_entry:new(3, "Value3", 2),
-                                db_entry:new(4, "Value4", 2),
-                                db_entry:new(5, "Value5", 2)]),
+    prop_update_entries_helper([db_entry:new(1, ?VALUE("Value1"), 1),
+                                db_entry:new(2, ?VALUE("Value2"), 1),
+                                db_entry:new(3, ?VALUE("Value3"), 1),
+                                db_entry:new(4, ?VALUE("Value4"), 1),
+                                db_entry:new(5, ?VALUE("Value5"), 1)],
+                               [db_entry:new(1, ?VALUE("Value1"), 2),
+                                db_entry:new(2, ?VALUE("Value2"), 2),
+                                db_entry:new(3, ?VALUE("Value3"), 2),
+                                db_entry:new(4, ?VALUE("Value4"), 2),
+                                db_entry:new(5, ?VALUE("Value5"), 2)],
+                               [db_entry:new(1, ?VALUE("Value1"), 2),
+                                db_entry:new(2, ?VALUE("Value2"), 2),
+                                db_entry:new(3, ?VALUE("Value3"), 2),
+                                db_entry:new(4, ?VALUE("Value4"), 2),
+                                db_entry:new(5, ?VALUE("Value5"), 2)]),
+    prop_update_entries_helper([db_entry:new(1, ?VALUE("Value1"), 1),
+                                db_entry:new(2, ?VALUE("Value2"), 1),
+                                db_entry:new(3, ?VALUE("Value3"), 1),
+                                db_entry:new(4, ?VALUE("Value4"), 1),
+                                db_entry:new(5, ?VALUE("Value5"), 1)],
+                               [db_entry:new(1, ?VALUE("Value1"), 2),
+                                db_entry:new(4, ?VALUE("Value4"), 2),
+                                db_entry:new(5, ?VALUE("Value5"), 3)],
+                               [db_entry:new(1, ?VALUE("Value1"), 2),
+                                db_entry:new(2, ?VALUE("Value2"), 1),
+                                db_entry:new(3, ?VALUE("Value3"), 1),
+                                db_entry:new(4, ?VALUE("Value4"), 2),
+                                db_entry:new(5, ?VALUE("Value5"), 3)]),
+    prop_update_entries_helper([db_entry:new(1, ?VALUE("Value1"), 2),
+                                db_entry:new(2, ?VALUE("Value2"), 2),
+                                db_entry:new(3, ?VALUE("Value3"), 2),
+                                db_entry:new(4, ?VALUE("Value4"), 2),
+                                db_entry:new(5, ?VALUE("Value5"), 2)],
+                               [db_entry:new(1, ?VALUE("Value1"), 1),
+                                db_entry:new(4, ?VALUE("Value4"), 1),
+                                db_entry:new(5, ?VALUE("Value5"), 1)],
+                               [db_entry:new(1, ?VALUE("Value1"), 2),
+                                db_entry:new(2, ?VALUE("Value2"), 2),
+                                db_entry:new(3, ?VALUE("Value3"), 2),
+                                db_entry:new(4, ?VALUE("Value4"), 2),
+                                db_entry:new(5, ?VALUE("Value5"), 2)]),
+    prop_update_entries_helper([db_entry:set_writelock(db_entry:new(1, ?VALUE("Value1"), 1), 1),
+                                db_entry:inc_readlock(db_entry:new(2, ?VALUE("Value2"), 2)),
+                                db_entry:new(3, ?VALUE("Value3"), 1),
+                                db_entry:new(4, ?VALUE("Value4"), 1),
+                                db_entry:new(5, ?VALUE("Value5"), 1)],
+                               [db_entry:new(1, ?VALUE("Value1"), 2),
+                                db_entry:new(2, ?VALUE("Value2"), 2),
+                                db_entry:new(3, ?VALUE("Value3"), 2),
+                                db_entry:new(4, ?VALUE("Value4"), 2),
+                                db_entry:new(5, ?VALUE("Value5"), 2)],
+                               [db_entry:set_writelock(db_entry:new(1, ?VALUE("Value1"), 1), 1),
+                                db_entry:inc_readlock(db_entry:new(2, ?VALUE("Value2"), 2)),
+                                db_entry:new(3, ?VALUE("Value3"), 2),
+                                db_entry:new(4, ?VALUE("Value4"), 2),
+                                db_entry:new(5, ?VALUE("Value5"), 2)]),
     prop_update_entry({239309376718523519117394992299371645018, empty_val, false, 0, -1},
                       <<6>>, false, 7, 4).
 
@@ -239,9 +242,9 @@ changed_keys(_Config) ->
 %% @doc Tests that previously failed with tester-generated values or otherwise
 %%      manually generated test cases.
 various_tests(_Config) ->
-    prop_changed_keys_split_data2([create_db_entry(3, empty_val, false, 0, -1),
-                                   create_db_entry(0, empty_val, false, 0, -1)],
-                                 intervals:new('[', 3, minus_infinity,']'),
+    prop_changed_keys_split_data2([create_db_entry(?KEY("3"), empty_val, false, 0, -1),
+                                   create_db_entry(?KEY("0"), empty_val, false, 0, -1)],
+                                 intervals:new('[', ?KEY("3"), minus_infinity,']'),
                                  intervals:new(plus_infinity)).
 
 % tester-based functions below:
@@ -757,7 +760,7 @@ prop_changed_keys_get_entry(Data, ChangesInterval, Key) ->
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
 
-    ?TEST_DB:get_entry(DB3, Key),
+    _ = ?TEST_DB:get_entry(DB3, Key),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_entry_1"),
     
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_entry_2"),
@@ -840,7 +843,7 @@ prop_changed_keys_read(Data, ChangesInterval, Key) ->
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
-    ?TEST_DB:read(DB3, Key),
+    _ = ?TEST_DB:read(DB3, Key),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_read_1"),
     
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_read_2"),
@@ -893,7 +896,7 @@ prop_changed_keys_get_entries2(Data, ChangesInterval, Interval) ->
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
-    ?TEST_DB:get_entries(DB3, Interval),
+    _ = ?TEST_DB:get_entries(DB3, Interval),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_entries2_1"),
     
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_entries2_2"),
@@ -914,7 +917,7 @@ prop_changed_keys_get_entries4(Data, ChangesInterval, Interval) ->
                 end,
     ValueFun = fun(E) -> db_entry:get_key(E) end,
     
-    ?TEST_DB:get_entries(DB3, FilterFun, ValueFun),
+    _ = ?TEST_DB:get_entries(DB3, FilterFun, ValueFun),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_entries4_1"),
     
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_entries4_2"),
@@ -928,7 +931,7 @@ prop_get_chunk3(Keys2, Interval, ChunkSize) ->
         true ->
             Keys = lists:usort(Keys2),
             DB = ?TEST_DB:new(),
-            DB2 = lists:foldl(fun(Key, DBA) -> ?TEST_DB:write(DBA, Key, "Value", 1) end, DB, Keys),
+            DB2 = lists:foldl(fun(Key, DBA) -> ?TEST_DB:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
             {Next, Chunk} = ?TEST_DB:get_chunk(DB2, Interval, ChunkSize),
             ?TEST_DB:close(DB2),
             ?equals(lists:usort(Chunk), lists:sort(Chunk)), % check for duplicates
@@ -963,7 +966,7 @@ prop_delete_chunk3(Keys2, Interval, ChunkSize) ->
         true ->
             Keys = lists:usort(Keys2),
             DB = ?TEST_DB:new(),
-            DB2 = lists:foldl(fun(Key, DBA) -> ?TEST_DB:write(DBA, Key, "Value", 1) end, DB, Keys),
+            DB2 = lists:foldl(fun(Key, DBA) -> ?TEST_DB:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
             {Next_GC, Chunk} = ?TEST_DB:get_chunk(DB2, Interval, ChunkSize),
             {Next_DC, DB3} = ?TEST_DB:delete_chunk(DB2, Interval, ChunkSize),
             ?equals(Next_GC, Next_DC),
@@ -1129,7 +1132,13 @@ prop_changed_keys_get_data(Data, ChangesInterval) ->
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
-    ?TEST_DB:get_data(DB3),
+    % lists:usort removes all but first occurrence of equal elements
+    % -> reverse list since ?TEST_DB:add_data will keep the last element
+    UniqueData = lists:usort(fun(A, B) ->
+                                     db_entry:get_key(A) =< db_entry:get_key(B)
+                             end, lists:reverse(Data)),
+    
+    ?equals(lists:sort(?TEST_DB:get_data(DB3)), UniqueData),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_data_1"),
     
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_data_2"),
@@ -1167,7 +1176,7 @@ prop_changed_keys_check_db(Data, ChangesInterval) ->
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
-    ?TEST_DB:check_db(DB3),
+    _ = ?TEST_DB:check_db(DB3),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_check_db_1"),
     
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_check_db_2"),
@@ -1299,8 +1308,8 @@ tester_delete_chunk3(_Config) ->
 
 tester_changed_keys_update_entries(_Config) ->
     prop_changed_keys_update_entries(
-      [{?RT:hash_key("200"),empty_val,false,0,-1}], intervals:all(),
-      {?RT:hash_key("100"),empty_val,false,1,-1}, {?RT:hash_key("200"),empty_val,false,296,-1}),
+      [{?KEY("200"),empty_val,false,0,-1}], intervals:all(),
+      {?KEY("100"),empty_val,false,1,-1}, {?KEY("200"),empty_val,false,296,-1}),
     tester:test(?MODULE, prop_changed_keys_update_entries, 4, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_delete_entries1(_Config) ->
@@ -1349,9 +1358,13 @@ check_entry(DB, Key, ExpDBEntry, ExpRead, ExpExists, Note) ->
 
 % note: use manageable values for ReadLock!
 -spec create_db_entry(Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
-                      ReadLock::0..1000, Version::?DB:version() | -1) -> db_entry:entry().
+                      ReadLock::0..1000, Version::?DB:version()) -> db_entry:entry();
+                     (Key::?RT:key(), Value::empty_val, WriteLock::boolean(),
+                      ReadLock::0..1000, Version::-1) -> db_entry:entry().
 create_db_entry(Key, Value, WriteLock, ReadLock, Version) ->
-    E1 = db_entry:new(Key, Value, Version),
+    E1 = if Value =:= empty_val andalso Version =:= -1 -> db_entry:new(Key);
+            true -> db_entry:new(Key, Value, Version)
+         end,
     E2 = case WriteLock of
              true -> db_entry:set_writelock(E1, db_entry:get_version(E1));
              _    -> E1

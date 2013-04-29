@@ -44,11 +44,10 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    _ = crypto:start(),
-    Config.
+    unittest_helper:init_per_suite(Config).
 
-end_per_suite(_Config) ->
-    crypto:stop(),
+end_per_suite(Config) ->
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -128,14 +127,14 @@ prop_get(CellCount, Items, Options) ->
                                     _ -> Sum + 1
                                 end
                         end, 0, Items),
-    if 
-        Found =:= 0 andalso length(Items) > 0 -> pvp_iblt_test ! count_zero;
-        Found > 0 andalso Found =:= length(Items) -> pvp_iblt_test ! count_all;
-        length(Items) > 0 -> pvp_iblt_test ! {some, Found, length(Items)};
-        true -> ok
-    end,
-    pvp_iblt_test ! {found_sum, Found},
-    pvp_iblt_test ! {items_sum, length(Items)},
+    _ = if 
+            Found =:= 0 andalso length(Items) > 0 -> pvp_iblt_test ! count_zero;
+            Found > 0 andalso Found =:= length(Items) -> pvp_iblt_test ! count_all;
+            length(Items) > 0 -> pvp_iblt_test ! {some, Found, length(Items)};
+            true -> ok
+        end,
+    _ = pvp_iblt_test ! {found_sum, Found},
+    _ = pvp_iblt_test ! {items_sum, length(Items)},
     true.
 
 collector({ZeroFound, SomeFound, SomeAll, AllFound} = D, {FoundSum, ItemsSum} = A) ->

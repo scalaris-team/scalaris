@@ -116,7 +116,7 @@ end_per_testcase(_TestCase, _Config) ->
     ok.
 
 %% @doc Sets tighter timeouts for slides
--spec move_config_parameters() -> [{atom(), term()}].
+-spec move_config_parameters() -> unittest_helper:kv_opts().
 move_config_parameters() ->
     [{move_use_incremental_slides, false},
      {move_wait_for_reply_timeout, 1000},
@@ -124,7 +124,7 @@ move_config_parameters() ->
      {move_send_msg_retry_delay, 0}].
 
 %% @doc Sets tighter timeouts for slides
--spec move_config_parameters_incremental() -> ok.
+-spec move_config_parameters_incremental() -> unittest_helper:kv_opts().
 move_config_parameters_incremental() ->
     % note: later parameters in the list override the first ones in config
     move_config_parameters() ++
