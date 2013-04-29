@@ -311,7 +311,7 @@ bp_cond_tm_crash(Message, _State) ->
 
 tm_crash(_) ->
     ct:pal("Starting tm_crash~n"),
-    _ = api_tx:write("a", "Hello world!"),
+    {ok} = api_tx:write("a", "Hello world!"),
     %% ct:pal("written initial value and setting breakpoints now~n"),
     TMs = pid_groups:find_all(tx_tm),
     %% all TMs break at next commit request:
@@ -345,12 +345,12 @@ tm_crash(_) ->
     %% anyway, so we skip the cleanup here.
     _ = [ gen_component:bp_del_async(X, tm_crash) || X <- TMs ],
 
-    [ gen_component:bp_cont(X) || X <- TMs ],
+    _ = [ gen_component:bp_cont(X) || X <- TMs ],
     ok.
 
 tp_crash(_) ->
     ct:pal("Starting tp_crash, simulated by holding the dht_node_proposer~n"),
-    api_tx:write("a", "Hello world!"),
+    {ok} = api_tx:write("a", "Hello world!"),
     %% ct:pal("written initial value and setting breakpoints now~n"),
     AllProposers = pid_groups:find_all(paxos_proposer),
     Proposers = [X || X <- AllProposers,
@@ -382,16 +382,16 @@ tp_crash(_) ->
 
 all_tp_crash(_) ->
     ct:pal("Starting all_tp_crash, simulated by holding the dht_node_proposers~n"),
-    api_tx:write("a", "Hello world!"),
+    {ok} = api_tx:write("a", "Hello world!"),
     %% ct:pal("written initial value and setting breakpoints now~n"),
     AllProposers = pid_groups:find_all(paxos_proposer),
     Proposers = [X || X <- AllProposers,
                       "basic_services" =/= pid_groups:group_of(X)],
     %% break all TPs (majority) after proposer initialize:
-    [ gen_component:bp_set(Proposer, proposer_initialize, all_tp_crash)
-      || Proposer <- Proposers],
+    _ = [ gen_component:bp_set(Proposer, proposer_initialize, all_tp_crash)
+          || Proposer <- Proposers],
     %% ct:pal("Breakpoints set~n"),
-    [ gen_component:bp_barrier(Proposer) || Proposer <- Proposers ],
+    _ = [ gen_component:bp_barrier(Proposer) || Proposer <- Proposers ],
     %% ct:pal("Barriers set~n"),
 
     %% TM only performs the tx_tm_rtm_commit that lead to the BP
@@ -399,8 +399,8 @@ all_tp_crash(_) ->
     %% got the request.
     %% Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- Proposers ],
     %% report the one tp as failed
-    [ comm:send_local(fd, {unittest_report_down, comm:make_global(Proposer)})
-      || Proposer <- Proposers],
+    _ = [ comm:send_local(fd, {unittest_report_down, comm:make_global(Proposer)})
+          || Proposer <- Proposers],
 
     %% ct:pal("Starting read commit~n"),
     Res = api_tx:req_list([{read, "a"}, {commit}]),
@@ -409,5 +409,6 @@ all_tp_crash(_) ->
 
     %%[ erlang:exit(Pid, kill) || Pid <- Pids ],
 
-    [ gen_component:bp_del(Proposer, all_tp_crash) ||  Proposer <- Proposers],
-    [ gen_component:bp_cont(Proposer) || Proposer <- Proposers].
+    _ = [ gen_component:bp_del(Proposer, all_tp_crash) ||  Proposer <- Proposers],
+    _ = [ gen_component:bp_cont(Proposer) || Proposer <- Proposers],
+    ok.

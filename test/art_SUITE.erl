@@ -39,11 +39,10 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    _ = crypto:start(),
-    Config.
+    unittest_helper:init_per_suite(Config).
 
-end_per_suite(_Config) ->
-    crypto:stop(),
+end_per_suite(Config) ->
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -103,7 +102,7 @@ eprof(_) ->
     Keys = db_generator:get_db(I, ToAdd, uniform),
     Merkle = merkle_tree:new(I, Keys, []),
         
-    eprof:start(),
+    _ = eprof:start(),
     Fun = fun() -> art:new(Merkle) end,
     eprof:profile([], Fun),
     eprof:stop_profiling(),

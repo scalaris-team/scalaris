@@ -88,12 +88,10 @@ suite() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init_per_suite(Config) ->
-    _ = crypto:start(),    
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
     erlang:erase(?DBSizeKey),
-    crypto:stop(),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
@@ -181,9 +179,9 @@ mpath(Config) ->
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
     config:write(rr_bloom_fpr, Fpr),
-    db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
-                                               {fprob, 50}, 
-                                               {distribution, uniform}]),
+    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
+                                                   {fprob, 50}, 
+                                                   {distribution, uniform}]),
     %chose node pair    
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
@@ -198,13 +196,13 @@ mpath(Config) ->
 	%TRACE
 	A = trace_mpath:get_trace(TraceName),
     trace_mpath:cleanup(TraceName),
-	B = [X || X = {log_send, _Time, _, 
+	B = [X || X = {log_send, _Time, _TraceID, 
 				   {{_FIP,_FPort,_FPid}, _FName}, 
 				   {{_TIP,_TPort,_TPid}, _TName}, 
-				   _Msg} <- A],
-	file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])), 
-	file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(B)])),
-    %file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [eval_admin:get_bandwidth(A)])),  
+				   _Msg, _LocalOrGlobal} <- A],
+	ok = file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])), 
+	ok = file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(B)])),
+    %ok = file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [eval_admin:get_bandwidth(A)])),  
 	ok.
 
 simple(Config) ->
@@ -240,9 +238,9 @@ dest(Config) ->
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
     config:write(rr_bloom_fpr, Fpr),
-    db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
-                                               {fprob, 50}, 
-                                               {distribution, uniform}]),
+    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
+                                                   {fprob, 50}, 
+                                                   {distribution, uniform}]),
     %chose node pair    
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
@@ -281,10 +279,10 @@ dest_empty_node(Config) ->
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
     config:write(rr_bloom_fpr, Fpr),
-    db_generator:fill_ring(random, DataCount, [{ftype, regen}, 
-                                               {fprob, 100}, 
-                                               {distribution, uniform},
-                                               {fdest, [1]}]),
+    _ = db_generator:fill_ring(random, DataCount, [{ftype, regen}, 
+                                                   {fprob, 100}, 
+                                                   {distribution, uniform},
+                                                   {fdest, [1]}]),
     %chose any node not in quadrant 1    
     KeyGrp = ?RT:get_replica_keys(?RT:get_random_node_id()),
     IKey = util:randomelem([X || X <- KeyGrp, rr_recon:get_key_quadrant(X) =/= 1]),
@@ -373,9 +371,9 @@ session_ttl(Config) ->
     
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, RRConf),    
-    db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
-                                               {fprob, 90}, 
-                                               {distribution, uniform}]),
+    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
+                                                   {fprob, 90}, 
+                                                   {distribution, uniform}]),
     %chose node pair
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
@@ -470,7 +468,7 @@ prop_map_key_to_interval(L, R, Key) ->
                 [W] -> ?equals(Mapped, W);
                 [_|_] ->
                     NotIn = [Y || Y <- RGrp, Y =/= Key, not intervals:in(Y, I)],
-                    [?assert(rr_recon:map_key_to_interval(Z, I) =/= Mapped) || Z <- NotIn], 
+                    _ = [?assert(rr_recon:map_key_to_interval(Z, I) =/= Mapped) || Z <- NotIn], 
                     ?assert(intervals:in(Mapped, I))
             end;
         _ -> true
@@ -528,15 +526,15 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig) ->
     build_symmetric_ring(NodeCount, Config, RRConfig),
     config:write(rr_bloom_fpr, Fpr),
     erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
-    db_generator:fill_ring(random, DBSize, DBParams),    
+    _ = db_generator:fill_ring(random, DBSize, DBParams),    
     InitDBStat = get_db_status(),
     print_status(0, InitDBStat),
-    util:for_to_ex(1, Rounds, 
-                   fun(I) ->
-                           startSyncRound(NodeKeys),
-                           waitForSyncRoundEnd(NodeKeys),
-                           print_status(I, get_db_status())
-                   end),
+    _ = util:for_to_ex(1, Rounds, 
+                       fun(I) ->
+                               startSyncRound(NodeKeys),
+                               waitForSyncRoundEnd(NodeKeys),
+                               print_status(I, get_db_status())
+                       end),
     EndStat = get_db_status(),
     unittest_helper:stop_ring(),
     {InitDBStat, EndStat}.

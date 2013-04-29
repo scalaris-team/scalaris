@@ -84,8 +84,8 @@ tester_type_check_api(_Config) ->
            [ {get_system_snapshot, 0} %% receives msgs
            ], []}
         ],
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     tester:unregister_type_checker({typedef, rdht_tx, encoded_value}),
     tester:unregister_value_creator({typedef, rdht_tx, encoded_value}),
     true.
@@ -113,8 +113,8 @@ tester_type_check_config(_Config) ->
         ],
     %% These tests generate errors which would be too verbose.
     log:set_log_level(none),
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     log:set_log_level(config:read(log_level)),
     true.
 
@@ -124,8 +124,8 @@ tester_type_check_gossip(_Config) ->
     Modules =
         [ {gossip_state, [], []}
         ],
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     true.
 
 tester_type_check_math(_Config) ->
@@ -180,8 +180,8 @@ tester_type_check_math(_Config) ->
            ]},
           {randoms, [{start, 0}, {stop, 0}], []}
         ],
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     tester:unregister_type_checker({typedef, intervals, interval}),
     tester:unregister_type_checker({typedef, intervals, simple_interval}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval}),
@@ -221,8 +221,8 @@ tester_type_check_node(_Config) ->
             {lfilter, 4} %% cannot create funs
           ]}
         ],
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     true.
 
 tester_type_check_paxos(_Config) ->
@@ -267,8 +267,8 @@ tester_type_check_paxos(_Config) ->
            [ {msg_prepare,4}, %% tries to send messages
              {start_new_higher_round,3}]} %% tries to send messages
         ],
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     true.
 
 tester_type_check_tx(_Config) ->
@@ -358,8 +358,8 @@ tester_type_check_tx(_Config) ->
           %% {tx_tp,[{init, 0}, {on_do_commit_abort_fwd, 6},
           %% {on_do_commit_abort, 3}, {on_init_TP, 2}]},
         ],
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     tester:unregister_type_checker({typedef, rdht_tx, encoded_value}),
     tester:unregister_value_creator({typedef, rdht_tx, encoded_value}),
     true.
@@ -492,8 +492,8 @@ tester_type_check_util(_Config) ->
              {default_dumpX_val_fun,2} %% spec too wide (must be tuple sometimes)
            ]}
         ],
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
 %% feeders are found automatically - sample explicit call would be:
 %%    tester:test(util, readable_utc_time, 1, 25, [with_feeder]),
 

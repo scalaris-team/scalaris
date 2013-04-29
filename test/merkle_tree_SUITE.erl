@@ -63,7 +63,7 @@ eprof(_) ->
     Keys = db_generator:get_db(I, ToAdd, uniform),
     ct:pal("DB GEN OK"),
 
-    eprof:start(),
+    _ = eprof:start(),
     Fun = fun() -> merkle_tree:new(I, Keys, []) end,
     eprof:profile([], Fun),
     eprof:stop_profiling(),

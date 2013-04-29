@@ -144,7 +144,7 @@ erlang_put(_Config) ->
     ok.
 
 pdb_get(_Config) ->
-    pdb:new(pdb_get, [ordered_set, private, named_table]),
+    _ = pdb:new(pdb_get, [ordered_set, private, named_table]),
     pdb:set({"performance", "abc"}, pdb_get),
     iter(count(), fun() ->
                           pdb:get("performance", pdb_get)
@@ -152,7 +152,7 @@ pdb_get(_Config) ->
     ok.
 
 pdb_set(_Config) ->
-    pdb:new(pdb_set, [ordered_set, private, named_table]),
+    _ = pdb:new(pdb_set, [ordered_set, private, named_table]),
     iter(count(), fun() ->
                           pdb:set({"performance", "abc"}, pdb_set)
                   end, "pdb:set"),

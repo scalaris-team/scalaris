@@ -46,12 +46,11 @@ suite() ->
     ].
 
 init_per_suite(Config) ->
-    _ = crypto:start(),
-    Config.
+    unittest_helper:init_per_suite(Config).
 
-end_per_suite(_Config) ->
-    crypto:stop(),
-    ok.    
+end_per_suite(Config) ->
+    _ = unittest_helper:end_per_suite(Config),
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -162,7 +161,7 @@ eprof(_) ->
     BF = newBloom(Count, 0.1),
     Items = [randoms:getRandomInt() || _ <- lists:seq(1, Count)], 
         
-    eprof:start(),
+    _ = eprof:start(),
     Fun = fun() -> ?BLOOM:add(BF, Items) end,
     eprof:profile([], Fun),
     eprof:stop_profiling(),

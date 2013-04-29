@@ -359,7 +359,7 @@ tester_from_elements1(_Config) ->
 % intervals:tester_create_interval/2
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_normalize_well_formed(intervals:interval()) -> boolean().
+-spec prop_normalize_well_formed(intervals:invalid_interval()) -> boolean().
 prop_normalize_well_formed(Is) ->
     intervals:is_well_formed(Is).
 

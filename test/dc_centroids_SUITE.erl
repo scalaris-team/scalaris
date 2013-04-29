@@ -46,7 +46,7 @@ end_per_suite(Config) ->
 %
 % This is the euclidian distance between two centroids
 distance(_Config) ->
-    U = dc_centroids:new([0,0], 1.0),
-    V = dc_centroids:new([1,1], 1.0),
+    U = dc_centroids:new([0.0,0.0], 1.0),
+    V = dc_centroids:new([1.0,1.0], 1.0),
     ?equals(dc_centroids:distance(U,V), math:sqrt(2)),
     ok.

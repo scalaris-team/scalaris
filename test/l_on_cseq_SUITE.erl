@@ -125,8 +125,8 @@ tester_type_check_l_on_cseq(_Config) ->
         ],
     %% join a dht_node group to be able to call lease trigger functions
     pid_groups:join(pid_groups:group_with(dht_node)),
-    [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-      || {Mod, Excl, ExclPriv} <- Modules ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -772,7 +772,7 @@ watch_message(Pid, Message) ->
     comm:send_local(Pid, Message),
     receive
         {saw_message} ->
-            gen_component:bp_step(Pid),
+            _ = gen_component:bp_step(Pid),
             gen_component:bp_del(Pid, watch_message),
             gen_component:bp_cont(Pid)
     end.

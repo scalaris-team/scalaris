@@ -59,6 +59,8 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 -define(TEST_DB, db_ets).
+-define(KEY(Key), ?RT:hash_key(Key)).
+-define(VALUE(Val), rdht_tx:encode_value(Val)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % snapshot-related DB API tests 
@@ -68,59 +70,63 @@ end_per_testcase(_TestCase, Config) ->
 test_copy_value_to_snapshot_table(_Config) ->
     InitDb = ?TEST_DB:new(),
     Db = ?TEST_DB:init_snapshot(InitDb),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("foo", "bar", 0)),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("key", "val", 1)),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("123", "456", 0)),
-    Db = ?TEST_DB:copy_value_to_snapshot_table(Db, "foo"),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "key"), {false, {"key", empty_val, false, 0, -1}}),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "123"), {false, {"123", empty_val, false, 0, -1}}),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "bar"), {false, {"bar", empty_val, false, 0, -1}}),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "foo"), {true, {"foo", "bar", false, 0, 0}}),
+    EntryFoo = db_entry:new(?KEY("foo"), ?VALUE("bar"), 0),
+    Db = ?TEST_DB:set_entry(Db, EntryFoo),
+    Db = ?TEST_DB:set_entry(Db, db_entry:new(?KEY("key"), ?VALUE("val"), 1)),
+    Db = ?TEST_DB:set_entry(Db, db_entry:new(?KEY("123"), ?VALUE("456"), 0)),
+    Db = ?TEST_DB:copy_value_to_snapshot_table(Db, ?KEY("foo")),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("key")), {false, db_entry:new(?KEY("key"))}),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("123")), {false, db_entry:new(?KEY("123"))}),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("bar")), {false, db_entry:new(?KEY("bar"))}),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("foo")), {true, EntryFoo}),
     ok.
 
 -spec test_set_get_for_snapshot_table(any()) -> ok.
 test_set_get_for_snapshot_table(_Config) ->
     InitDb = ?TEST_DB:new(),
     Db = ?TEST_DB:init_snapshot(InitDb),
-    Db = ?TEST_DB:set_snapshot_entry(Db, db_entry:new("foo", "bar", 5)),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "key"), {false, {"key", empty_val, false, 0, -1}}),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "foo"), {true, {"foo", "bar", false, 0, 5}}),
+    EntryFoo = db_entry:new(?KEY("foo"), ?VALUE("bar"), 5),
+    Db = ?TEST_DB:set_snapshot_entry(Db, EntryFoo),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("key")), {false, db_entry:new(?KEY("key"))}),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("foo")), {true, EntryFoo}),
     ok.
 
 -spec test_delete_from_snapshot_table(any()) -> ok.
 test_delete_from_snapshot_table(_Config) ->
     InitDb = ?TEST_DB:new(),
     Db = ?TEST_DB:init_snapshot(InitDb),
-    Db = ?TEST_DB:set_snapshot_entry(Db, db_entry:new("foo", "bar", 5)),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "foo"), {true, {"foo", "bar", false, 0, 5}}),
-    Db = ?TEST_DB:delete_snapshot_entry(Db, db_entry:new("foo", "some_val", 4711)),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "foo"), {false, {"foo", empty_val, false, 0, -1}}),
-    Db = ?TEST_DB:set_snapshot_entry(Db, db_entry:new("foo", "bar", 5)),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "foo"), {true, {"foo", "bar", false, 0, 5}}),
-    Db = ?TEST_DB:delete_snapshot_entry_at_key(Db, "foo"),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "foo"), {false, {"foo", empty_val, false, 0, -1}}),
+    EntryFoo = db_entry:new(?KEY("foo"), ?VALUE("bar"), 5),
+    Db = ?TEST_DB:set_snapshot_entry(Db, EntryFoo),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("foo")), {true, EntryFoo}),
+    Db = ?TEST_DB:delete_snapshot_entry(Db, db_entry:new(?KEY("foo"), ?VALUE("some_val"), 4711)),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("foo")), {false, db_entry:new(?KEY("foo"))}),
+    Db = ?TEST_DB:set_snapshot_entry(Db, EntryFoo),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("foo")), {true, EntryFoo}),
+    Db = ?TEST_DB:delete_snapshot_entry_at_key(Db, ?KEY("foo")),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("foo")), {false, db_entry:new(?KEY("foo"))}),
     ok.
 
 -spec test_init_snapshot(any()) -> ok.
 test_init_snapshot(_Config) ->
     InitDb = ?TEST_DB:new(),
     Db = ?TEST_DB:init_snapshot(InitDb),
-    Db = ?TEST_DB:set_snapshot_entry(Db, db_entry:new("foo", "bar", 5)),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("key", "val", 4711)),
-    Db = ?TEST_DB:copy_value_to_snapshot_table(Db, "key"),
+    Db = ?TEST_DB:set_snapshot_entry(Db, db_entry:new(?KEY("foo"), ?VALUE("bar"), 5)),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 4711),
+    Db = ?TEST_DB:set_entry(Db, EntryKey),
+    Db = ?TEST_DB:copy_value_to_snapshot_table(Db, ?KEY("key")),
     ClearDb = ?TEST_DB:init_snapshot(Db),
-    ?equals(?TEST_DB:get_snapshot_entry(ClearDb, "foo"), {false, {"foo", empty_val, false, 0, -1}}),
-    ?equals(?TEST_DB:get_snapshot_entry(ClearDb, "key"), {false, {"key", empty_val, false, 0, -1}}),
-    ?equals(?TEST_DB:get_entry2(ClearDb, "key"), {true, {"key", "val", false, 0, 4711}}),
-    ClearDb = ?TEST_DB:copy_value_to_snapshot_table(ClearDb, "key"),
-    ?equals(?TEST_DB:get_snapshot_entry(ClearDb, "key"), {true, {"key", "val", false, 0, 4711}}),
+    ?equals(?TEST_DB:get_snapshot_entry(ClearDb, ?KEY("foo")), {false, db_entry:new(?KEY("foo"))}),
+    ?equals(?TEST_DB:get_snapshot_entry(ClearDb, ?KEY("key")), {false, db_entry:new(?KEY("key"))}),
+    ?equals(?TEST_DB:get_entry2(ClearDb, ?KEY("key")), {true, EntryKey}),
+    ClearDb = ?TEST_DB:copy_value_to_snapshot_table(ClearDb, ?KEY("key")),
+    ?equals(?TEST_DB:get_snapshot_entry(ClearDb, ?KEY("key")), {true, EntryKey}),
     ok.
 
 -spec test_delete_snapshot(any()) -> ok.
 test_delete_snapshot(_) ->
     InitDb = ?TEST_DB:new(),
     Db = ?TEST_DB:init_snapshot(InitDb),
-    Db = ?TEST_DB:set_snapshot_entry(Db, db_entry:new("foo", "bar", 5)),
+    Db = ?TEST_DB:set_snapshot_entry(Db, db_entry:new(?KEY("foo"), ?VALUE("bar"), 5)),
     DelDb = ?TEST_DB:delete_snapshot(Db),
     ?equals(?TEST_DB:snapshot_is_running(DelDb), false),
     ok.
@@ -135,8 +141,8 @@ test_delete_snapshot(_) ->
 -spec test_rdht_tx_read_validate_should_abort(any()) -> ok.
 test_rdht_tx_read_validate_should_abort(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("key", "val", 1)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_read, "key", 1, value, 1, ?value, "new_val"),
+    Db = ?TEST_DB:set_entry(Db, db_entry:new(?KEY("key"), ?VALUE("val"), 1)),
+    TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("new_val")),
     {_NewDb, Vote} = rdht_tx_read:validate(Db, 5, TLogEntry),
     ?equals(Vote, ?abort),
     ok.
@@ -145,8 +151,8 @@ test_rdht_tx_read_validate_should_abort(_) ->
 -spec test_rdht_tx_read_validate_should_prepare(any()) -> ok.
 test_rdht_tx_read_validate_should_prepare(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("key", "val", 1)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_read, "key", 1, value, 4711, ?value, "new_val"),
+    Db = ?TEST_DB:set_entry(Db, db_entry:new(?KEY("key"), ?VALUE("val"), 1)),
+    TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 1, ?ok, 4711, ?value, ?VALUE("new_val")),
     {_NewDb, Vote} = rdht_tx_read:validate(Db, 4711, TLogEntry),
     ?equals(Vote, ?prepared),
     ok.
@@ -156,13 +162,14 @@ test_rdht_tx_read_validate_should_prepare(_) ->
 -spec test_rdht_tx_read_validate_db_copy(any()) -> ok.
 test_rdht_tx_read_validate_db_copy(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("key", "val", 1)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_read, "key", 2, value, 1, ?value, "new_val"),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
+    Db = ?TEST_DB:set_entry(Db, EntryKey),
+    TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 2, ?ok, 1, ?value, ?VALUE("new_val")),
     {NewDb, _Vote} = rdht_tx_read:validate(Db, 1, TLogEntry),
-    ?equals(?TEST_DB:get_snapshot_entry(NewDb, "key"),
-            {true, {"key", "val", false, 0, 1}}), % no readlocks in snap db
-    ?equals(?TEST_DB:get_entry2(NewDb, "key"),
-            {true, {"key", "val", false, 1, 1}}), % 1 readlock in live db
+    ?equals(?TEST_DB:get_snapshot_entry(NewDb, ?KEY("key")),
+            {true, EntryKey}), % no readlocks in snap db
+    ?equals(?TEST_DB:get_entry2(NewDb, ?KEY("key")),
+            {true, db_entry:inc_readlock(EntryKey)}), % 1 readlock in live db
     ok.
 
 % for "old" transactions (as in TM snapnr 1 is lesser than local snapnr 2) , changes
@@ -170,15 +177,15 @@ test_rdht_tx_read_validate_db_copy(_) ->
 -spec test_rdht_tx_read_commit_with_snap_1(any()) -> ok.
 test_rdht_tx_read_commit_with_snap_1(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Entry = db_entry:new("key", "val", 1),
-    TmpDb = ?TEST_DB:set_entry(Db, db_entry:inc_readlock(Entry)),
-    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, db_entry:inc_readlock(Entry)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_read, "key", 1, value, 1, ?value, "val"),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
+    TmpDb = ?TEST_DB:set_entry(Db, db_entry:inc_readlock(EntryKey)),
+    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, db_entry:inc_readlock(EntryKey)),
+    TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("val")),
     CommitDb = rdht_tx_read:commit(NewDb, TLogEntry, ?prepared, 1, 2),
-    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, "key"),
-            {true, {"key", "val", false, 0, 1}}), % no readlocks in snap db
-    ?equals(?TEST_DB:get_entry2(CommitDb, "key"),
-            {true, {"key", "val", false, 0, 1}}), % no readlocks in live db
+    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, ?KEY("key")),
+            {true, EntryKey}), % no readlocks in snap db
+    ?equals(?TEST_DB:get_entry2(CommitDb, ?KEY("key")),
+            {true, EntryKey}), % no readlocks in live db
     ok.
 
 % for "old" transactions (as in TM snapnr 1 is lesser than local snapnr 2) , changes
@@ -188,29 +195,30 @@ test_rdht_tx_read_commit_with_snap_1(_) ->
 -spec test_rdht_tx_read_commit_with_snap_2(any()) -> ok.
 test_rdht_tx_read_commit_with_snap_2(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Entry = db_entry:new("key", "val", 1),
-    NewDb = ?TEST_DB:set_entry(Db, db_entry:inc_readlock(Entry)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_read, "key", 1, value, 1, ?value, "val"),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
+    NewDb = ?TEST_DB:set_entry(Db, db_entry:inc_readlock(EntryKey)),
+    TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("val")),
     CommitDb = rdht_tx_read:commit(NewDb, TLogEntry, ?prepared, 1, 2),
-    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, "key"),
-            {false, {"key", empty_val, false, 0, -1}}), % no entry in snap db
-    ?equals(?TEST_DB:get_entry2(CommitDb, "key"),
-            {true, {"key", "val", false, 0, 1}}), % no readlocks in live db
+    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, ?KEY("key")),
+            {false, db_entry:new(?KEY("key"))}), % no entry in snap db
+    ?equals(?TEST_DB:get_entry2(CommitDb, ?KEY("key")),
+            {true, EntryKey}), % no readlocks in live db
     ok.
 
 % "new" transaction -> changes only on live db, snapshot db remains untouched
 -spec test_rdht_tx_read_commit_without_snap(any()) -> ok.
 test_rdht_tx_read_commit_without_snap(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Entry = db_entry:new("key", "val", 1),
-    TmpDb = ?TEST_DB:set_entry(Db, db_entry:inc_readlock(Entry)),
-    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, db_entry:inc_readlock(Entry)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_read, "key", 1, value, 2, ?value, "val"),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
+    EntryKey_RL = db_entry:inc_readlock(EntryKey),
+    TmpDb = ?TEST_DB:set_entry(Db, EntryKey_RL),
+    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, EntryKey_RL),
+    TLogEntry = tx_tlog:new_entry(?read, ?KEY("key"), 1, ?ok, 2, ?value, ?VALUE("val")),
     CommitDb = rdht_tx_read:commit(NewDb, TLogEntry, ?prepared, 2, 2),
-    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, "key"),
-            {true, {"key", "val", false, 1, 1}}), % readlock in snap db
-    ?equals(?TEST_DB:get_entry2(CommitDb, "key"),
-            {true, {"key", "val", false, 0, 1}}), % no readlocks in live db
+    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, ?KEY("key")),
+            {true, EntryKey_RL}), % readlock in snap db
+    ?equals(?TEST_DB:get_entry2(CommitDb, ?KEY("key")),
+            {true, EntryKey}), % no readlocks in live db
     ok.
 
 % in rdht_tx_read, abort equals commit, so abort doesn't have to be tested!
@@ -221,8 +229,8 @@ test_rdht_tx_read_commit_without_snap(_) ->
 -spec test_rdht_tx_write_validate_should_abort(any()) -> ok.
 test_rdht_tx_write_validate_should_abort(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("key", "val", 1)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_write, "key", 1, value, 1, ?value, "new_val"),
+    Db = ?TEST_DB:set_entry(Db, db_entry:new(?KEY("key"), ?VALUE("val"), 1)),
+    TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("val")),
     {_NewDb, Vote} = rdht_tx_write:validate(Db, 5, TLogEntry),
     ?equals(Vote, ?abort),
     ok.
@@ -231,8 +239,8 @@ test_rdht_tx_write_validate_should_abort(_) ->
 -spec test_rdht_tx_write_validate_should_prepare(any()) -> ok.
 test_rdht_tx_write_validate_should_prepare(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("key", "val", 1)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_write, "key", 1, value, 4711, ?value, "new_val"),
+    Db = ?TEST_DB:set_entry(Db, db_entry:new(?KEY("key"), ?VALUE("val"), 1)),
+    TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 4711, ?value, ?VALUE("val")),
     {_NewDb, Vote} = rdht_tx_write:validate(Db, 4711, TLogEntry),
     ?equals(Vote, ?prepared),
     ok.
@@ -242,75 +250,82 @@ test_rdht_tx_write_validate_should_prepare(_) ->
 -spec test_rdht_tx_write_validate_db_copy(any()) -> ok.
 test_rdht_tx_write_validate_db_copy(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Db = ?TEST_DB:set_entry(Db, db_entry:new("key", "val", 1)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_write, "key", 1, value, 1, ?value, "new_val"),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
+    Db = ?TEST_DB:set_entry(Db, EntryKey),
+    TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("val")),
     {NewDb, _Vote} = rdht_tx_write:validate(Db, 1, TLogEntry),
-    ?equals(?TEST_DB:get_snapshot_entry(NewDb, "key"),
-            {true, {"key", "val", false, 0, 1}}), % no lock in snap db
-    ?equals(?TEST_DB:get_entry2(NewDb, "key"),
-            {true, {"key", "val", 1, 0, 1}}), % lock in live db
+    ?equals(?TEST_DB:get_snapshot_entry(NewDb, ?KEY("key")),
+            {true, EntryKey}), % no lock in snap db
+    ?equals(?TEST_DB:get_entry2(NewDb, ?KEY("key")),
+            {true, db_entry:set_writelock(EntryKey, 1)}), % lock in live db
     ok.
 
 % for "old" transactions (as in TM snapnr 1 is lesser than local snapnr 2), changes should be applied to both dbs.
 -spec test_rdht_tx_write_commit_with_snap(any()) -> ok.
 test_rdht_tx_write_commit_with_snap(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Entry = db_entry:new("key", "val", 1),
-    TmpDb = ?TEST_DB:set_entry(Db, db_entry:set_writelock(Entry, 1)),
-    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, db_entry:set_writelock(Entry, 1)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_write, "key", 1, value, 1, ?value, "new_val"),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
+    EntryKey_WL = db_entry:set_writelock(EntryKey, 1),
+    TmpDb = ?TEST_DB:set_entry(Db, EntryKey_WL),
+    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, EntryKey_WL),
+    TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("val")),
+    NewEntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 2),
     CommitDb = rdht_tx_write:commit(NewDb, TLogEntry, ?prepared, 1, 2),
-    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, "key"),
-            {true, {"key", "new_val", false, 0, 2}}), % no lock in snap db
-    ?equals(?TEST_DB:get_entry2(CommitDb, "key"),
-            {true, {"key", "new_val", false, 0, 2}}), % no lock in live db
+    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, ?KEY("key")),
+            {true, NewEntryKey}), % no lock in snap db
+    ?equals(?TEST_DB:get_entry2(CommitDb, ?KEY("key")),
+            {true, NewEntryKey}), % no lock in live db
     ok.
 
 % "new" transaction -> changes only on live db, snapshot db remains untouched
 -spec test_rdht_tx_write_commit_without_snap(any()) -> ok.
 test_rdht_tx_write_commit_without_snap(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Entry = db_entry:new("key", "val", 1),
-    TmpDb = ?TEST_DB:set_entry(Db, db_entry:set_writelock(Entry, 1)),
-    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, db_entry:set_writelock(Entry, 1)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_write, "key", 1, value, 2, ?value, "new_val"),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
+    EntryKey_WL = db_entry:set_writelock(EntryKey, 1),
+    TmpDb = ?TEST_DB:set_entry(Db, EntryKey_WL),
+    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, EntryKey_WL),
+    TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 2, ?value, ?VALUE("val")),
+    NewEntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 2),
     CommitDb = rdht_tx_write:commit(NewDb, TLogEntry, ?prepared, 2, 2),
-    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, "key"),
-            {true, {"key", "val", 1, 0, 1}}), % lock in snap db
-    ?equals(?TEST_DB:get_entry2(CommitDb, "key"),
-            {true, {"key", "new_val", false, 0, 2}}), % no lock in live db
+    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, ?KEY("key")),
+            {true, EntryKey_WL}), % lock in snap db
+    ?equals(?TEST_DB:get_entry2(CommitDb, ?KEY("key")),
+            {true, NewEntryKey}), % no lock in live db
     ok.
 
 % for "old" transactions (as in TM snapnr 1 is lesser than local snapnr 2), changes should be applied to both dbs.
 -spec test_rdht_tx_write_abort_with_snap(any()) -> ok.
 test_rdht_tx_write_abort_with_snap(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Entry = db_entry:new("key", "val", 1),
-    TmpDb = ?TEST_DB:set_entry(Db, db_entry:set_writelock(Entry, 1)),
-    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, db_entry:set_writelock(Entry, 1)),
-    ?equals(?TEST_DB:get_entry2(Db, "key"), {true, {"key", "val", 1, 0, 1}}),
-    ?equals(?TEST_DB:get_snapshot_entry(Db, "key"), {true, {"key", "val", 1, 0, 1}}),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_write, "key", 1, value, 1, ?value, "new_val"),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
+    EntryKey_WL = db_entry:set_writelock(EntryKey, 1),
+    TmpDb = ?TEST_DB:set_entry(Db, EntryKey_WL),
+    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, EntryKey_WL),
+    ?equals(?TEST_DB:get_entry2(Db, ?KEY("key")), {true, EntryKey_WL}),
+    ?equals(?TEST_DB:get_snapshot_entry(Db, ?KEY("key")), {true, EntryKey_WL}),
+    TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 1, ?value, ?VALUE("val")),
     CommitDb = rdht_tx_write:abort(NewDb, TLogEntry, ?prepared, 1, 2),
-    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, "key"),
-            {true, {"key", "val", false, 0, 1}}), % no lock in snap db
-    ?equals(?TEST_DB:get_entry2(CommitDb, "key"),
-            {true, {"key", "val", false, 0, 1}}), % no lock in live db
+    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, ?KEY("key")),
+            {true, EntryKey}), % no lock in snap db
+    ?equals(?TEST_DB:get_entry2(CommitDb, ?KEY("key")),
+            {true, EntryKey}), % no lock in live db
     ok.
 
 % "new" transaction -> changes only on live db, snapshot db remains untouched
 -spec test_rdht_tx_write_abort_without_snap(any()) -> ok.
 test_rdht_tx_write_abort_without_snap(_) ->
     Db = ?TEST_DB:init_snapshot(?TEST_DB:new()),
-    Entry = db_entry:new("key", "val", 1),
-    TmpDb = ?TEST_DB:set_entry(Db, db_entry:set_writelock(Entry, 1)),
-    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, db_entry:set_writelock(Entry, 1)),
-    TLogEntry = tx_tlog:new_entry(rdht_tx_write, "key", 1, value, 2, ?value, "new_val"),
+    EntryKey = db_entry:new(?KEY("key"), ?VALUE("val"), 1),
+    EntryKey_WL = db_entry:set_writelock(EntryKey, 1),
+    TmpDb = ?TEST_DB:set_entry(Db, EntryKey_WL),
+    NewDb = ?TEST_DB:set_snapshot_entry(TmpDb, EntryKey_WL),
+    TLogEntry = tx_tlog:new_entry(?write, ?KEY("key"), 1, ?ok, 2, ?value, ?VALUE("val")),
     CommitDb = rdht_tx_write:abort(NewDb, TLogEntry, ?prepared, 1, 2),
-    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, "key"),
-            {true, {"key", "val", 1, 0, 1}}), % lock in snap db
-    ?equals(?TEST_DB:get_entry2(CommitDb, "key"),
-            {true, {"key", "val", false, 0, 1}}), % no lock in live db
+    ?equals(?TEST_DB:get_snapshot_entry(CommitDb, ?KEY("key")),
+            {true, EntryKey_WL}), % lock in snap db
+    ?equals(?TEST_DB:get_entry2(CommitDb, ?KEY("key")),
+            {true, EntryKey}), % no lock in live db
     ok.
 
 %%%%% lock counting tests
@@ -318,11 +333,11 @@ test_rdht_tx_write_abort_without_snap(_) ->
 -spec test_lock_counting_on_live_db(any()) -> ok.
 test_lock_counting_on_live_db(_) ->
     Db = ?TEST_DB:new(),
-    Entry = db_entry:new("foo", "bar", 0),
-    WriteLockEntry = db_entry:set_writelock(Entry, 1),
-    NewDB = {_, _, {_, LiveLC, _SnapLC}} = ?TEST_DB:set_entry(Db, WriteLockEntry),
+    EntryFoo = db_entry:new(?KEY("foo"), ?VALUE("bar"), 0),
+    EntryFoo_WL = db_entry:set_writelock(EntryFoo, 1),
+    NewDB = {_, _, {_, LiveLC, _SnapLC}} = ?TEST_DB:set_entry(Db, EntryFoo_WL),
     ?equals(LiveLC, 1),
-    {_, _, {_, NewLiveLC, _}} = ?TEST_DB:set_entry(NewDB, Entry),
+    {_, _, {_, NewLiveLC, _}} = ?TEST_DB:set_entry(NewDB, EntryFoo),
     ?equals(NewLiveLC, 0),
     ok.
     
@@ -332,7 +347,9 @@ test_lock_counting_on_live_db(_) ->
 -spec test_single_snapshot_call(any()) -> ok.
 test_single_snapshot_call(_) ->
     unittest_helper:make_ring(10),
-    api_tx:req_list([{write, "A", 1}, {write, "B", 2}, {write, "C", 3}, {write, "D", 4}, {commit}]),
+    {_, [{ok}, {ok}, {ok}, {ok}, {ok}]} =
+        api_tx:req_list([{write, "A", 1}, {write, "B", 2}, {write, "C", 3},
+                         {write, "D", 4}, {commit}]),
     ?equals_pattern(api_tx:get_system_snapshot(),
                     [{_, _, 0}, {_, _, 0}, {_, _, 0}, {_, _, 0}]),
     ok.
@@ -340,8 +357,10 @@ test_single_snapshot_call(_) ->
 -spec test_basic_race_multiple_snapshots(any()) -> ok.
 test_basic_race_multiple_snapshots(_) ->
     unittest_helper:make_ring(4),
-    api_tx:req_list([{read, "A"}, {read, "B"}, {write, "A", 8},
-                     {read, "A"}, {read, "A"}, {read, "A"}, {write, "B", 9}, {commit}]),
+    {_, [{fail,not_found}, {fail,not_found}, {ok},
+         {ok, _A2}, {ok, _A2}, {ok, _A2}, {ok}, {ok}]} =
+        api_tx:req_list([{read, "A"}, {read, "B"}, {write, "A", 8},
+                         {read, "A"}, {read, "A"}, {read, "A"}, {write, "B", 9}, {commit}]),
     tester:test(api_tx, get_system_snapshot, 0, 100),
     ok.
 

@@ -59,8 +59,7 @@ process_iter(Parent, Key, Count, AbortCount) ->
     Result = inc(Key),
     case Result of
         {ok}             -> process_iter(Parent, Key, Count - 1, AbortCount);
-        {fail, abort, _} -> process_iter(Parent, Key, Count, AbortCount + 1);
-        {fail, timeout}  -> process_iter(Parent, Key, Count, AbortCount + 1)
+        {fail, abort, _} -> process_iter(Parent, Key, Count, AbortCount + 1)
     end.
 
 increment_test_8(_Config) -> increment_test_n(_Config, 8).

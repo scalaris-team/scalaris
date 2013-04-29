@@ -57,11 +57,11 @@ in(X, List) ->
 % Test mathlib:euclideanDistance/2
 euclidian_distance(_Config) ->
     {U1, V1, V2, V3, V4} = {
-        [0.0,0.0]
-        , [0, 1.0]
-        , [1.0, 0]
-        , [1.0, 1.0]
-        , [-1.0,-1.0]
+        [0.0,0.0],
+        [0, 1.0],
+        [1.0, 0],
+        [1.0, 1.0],
+        [-1.0,-1.0]
     },
     ?equals(mathlib:euclideanDistance(U1, U1), 0.0),
     ?equals(mathlib:euclideanDistance(U1, V1), 1.0),
@@ -82,13 +82,14 @@ euclidian_distance(_Config) ->
 nearest_centroid(_Config) ->
     % Note: The relative size will be ignored in this unittest, so we set it to zero
 
-    U = dc_centroids:new([0.0,0.0], 0),
+    U = dc_centroids:new([0.0, 0.0], 0.0),
 
     %% ----- Good cases which should work ------
 
     %% List of Centroids is not empty. U is not an element and only one
     %   element in the list is nearest to U
-    C1 = [C1Nearest1, C1Nearest2|_]=[dc_centroids:new([X,X], 0) || X <- lists:seq(1,5)],
+    C1 = [C1Nearest1, C1Nearest2 | _] = [dc_centroids:new([float(X), float(X)], 0.0)
+                                           || X <- lists:seq(1,5)],
     ?equals(mathlib:nearestCentroid(U, C1), {math:sqrt(2), C1Nearest1}),
     ?equals(mathlib:nearestCentroid(U, tl(C1)), {math:sqrt(8), C1Nearest2}),
 
@@ -113,19 +114,20 @@ nearest_centroid(_Config) ->
     ?equals(mathlib:nearestCentroid(U, []), none),
 
     % ambiguous centroids: return a node from a set of nodes
-    Ambiguous1 = [dc_centroids:new([X,Y],0) || X <- lists:seq(1,5), Y <- lists:seq(1,5)],
+    Ambiguous1 = [dc_centroids:new([float(X), float(Y)], 0.0)
+                    || X <- lists:seq(1,5), Y <- lists:seq(1,5)],
     {AmbiguousDistance1, Element} = mathlib:nearestCentroid(U, Ambiguous1),
     ?equals(AmbiguousDistance1, math:sqrt(2)),
-    AllowedElements1 = [dc_centroids:new([X,Y],0) || {X, Y} <- [
+    AllowedElements1 = [dc_centroids:new([X, Y], 0.0) || {X, Y} <- [
             {1.0,1.0},{1.0,-1.0},{-1.0,1.0},{-1.0,-1.0}
         ]],
     ?assert_w_note(in(Element, AllowedElements1),
         "Nearest element not in list of allowed coordinates"),
 
     % regression test
-    U2 = dc_centroids:new([0,0], 1.0),
-    V2 = dc_centroids:new([1,1], 1.0),
-    FarAway = dc_centroids:new([100,100], 1.0),
+    U2 = dc_centroids:new([0.0, 0.0], 1.0),
+    V2 = dc_centroids:new([1.0, 1.0], 1.0),
+    FarAway = dc_centroids:new([100.0, 100.0], 1.0),
     ?equals(mathlib:nearestCentroid(U2, [V2, FarAway]), {dc_centroids:distance(U2, V2),
             V2}),
     ?equals(mathlib:nearestCentroid(U2, [FarAway, V2]), {dc_centroids:distance(U2, V2),
@@ -141,7 +143,8 @@ nearest_centroid(_Config) ->
 % - When ambiguous, pick any two elements with a smallest distance
 closest_points(_Config) ->
     %% ----- Good cases which should work ------
-    C1 = [C1_1,C1_2|_]=[dc_centroids:new([X,X], 0) || X <- lists:seq(1,5)],
+    C1 = [C1_1, C1_2 | _] = [dc_centroids:new([float(X), float(X)], 0.0)
+                               || X <- lists:seq(1,5)],
     Dist1 = dc_centroids:distance(C1_1, C1_2),
     ?equals(mathlib:closestPoints(C1), {Dist1, C1_1, C1_2}),
 
@@ -150,12 +153,13 @@ closest_points(_Config) ->
     ?equals(mathlib:closestPoints([]), none),
 
     % list with only one element
-    U = dc_centroids:new([0,0], 0),
+    U = dc_centroids:new([0.0, 0.0], 0.0),
     ?equals(mathlib:closestPoints([U]), none),
 
     % ambiguous list
-    C2 = [C2_1,C2_2|_]=[dc_centroids:new([X,Y], 0) || X <- lists:seq(1,5),
-        Y <- lists:seq(1,5)],
+    C2 = [C2_1, C2_2 | _] = [dc_centroids:new([float(X), float(Y)], 0.0)
+                               || X <- lists:seq(1,5),
+                                  Y <- lists:seq(1,5)],
     Dist2 = dc_centroids:distance(C2_1, C2_2),
     ?equals(mathlib:closestPoints(C2), {Dist2, C2_1, C2_2}),
 
@@ -165,9 +169,9 @@ closest_points(_Config) ->
     ?equals(Dist3, 1.0),
 
     % regression test
-    U2 = dc_centroids:new([0,0], 1.0),
-    V2 = dc_centroids:new([1,1], 1.0),
-    FarAway = dc_centroids:new([100,100], 1.0),
+    U2 = dc_centroids:new([0.0, 0.0], 1.0),
+    V2 = dc_centroids:new([1.0, 1.0], 1.0),
+    FarAway = dc_centroids:new([100.0, 100.0], 1.0),
     ?equals(mathlib:closestPoints([U2, V2, FarAway]),
         {dc_centroids:distance(U2,V2), U2, V2}),
     ?equals(mathlib:closestPoints([U2, FarAway, V2]),
@@ -194,22 +198,22 @@ agglomerative_clustering(_Config) ->
     ?equals(mathlib:aggloClustering([], 0), []),
 
     % single node
-    U = dc_centroids:new([0,0], 1.0),
+    U = dc_centroids:new([0.0, 0.0], 1.0),
     ?equals(mathlib:aggloClustering([U], 0), [U]),
 
     % merge two nodes
-    V = dc_centroids:new([1,1], 1.0),
-    MergedUV = dc_centroids:new([0.5,0.5], 2.0),
+    V = dc_centroids:new([1.0, 1.0], 1.0),
+    MergedUV = dc_centroids:new([0.5, 0.5], 2.0),
     ?equals(mathlib:aggloClustering([U,V], 2), [MergedUV]),
     ?equals(mathlib:aggloClustering([V,U], 2), [MergedUV]),
 
     % don't merge far-away nodes
-    FarAway = dc_centroids:new([100,100], 1.0),
+    FarAway = dc_centroids:new([100.0, 100.0], 1.0),
     ?equals(mathlib:aggloClustering([V, FarAway], 50), [V, FarAway]),
     ?equals(mathlib:aggloClustering([V, U, FarAway], 99), [MergedUV, FarAway]),
     ?equals(mathlib:aggloClustering([V, FarAway, U], 99), [MergedUV, FarAway]),
 
     % merge many nodes, relative size sum should remain the same
-    C = [dc_centroids:new([X,X], 1/6) || X <- lists:seq(1,6)],
+    C = [dc_centroids:new([float(X), float(X)], 1/6) || X <- lists:seq(1,6)],
     ?equals(mathlib:aggloClustering(C, 7), [dc_centroids:new([3.5, 3.5], 1.0)]),
     ok.
