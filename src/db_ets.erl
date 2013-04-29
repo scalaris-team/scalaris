@@ -343,28 +343,30 @@ get_chunk_inner({ETSDB, _Subscr, _SnapState} = DB, Current, RealStart, Interval,
     end.
 
 %% @doc Returns the key that would remove not more than TargetLoad entries
-%%      from the DB when starting at the key directly after Begin.
+%%      from the DB when starting at the key directly after Begin in case of
+%%      forward searches and directly at Begin in case of backward searches,
+%%      respectively.
 %%      Precond: a load larger than 0
 %%      Note: similar to get_chunk/2.
 -spec get_split_key_(DB::db_t(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key_(DB, Begin, TargetLoad, forward) ->
-    get_split_key_(DB, Begin, TargetLoad, fun ets:first/1, fun ets:next/2);
+    get_split_key_(DB, Begin, TargetLoad, fun ets:first/1, fun ets:next/2, false);
 get_split_key_(DB, Begin, TargetLoad, backward) ->
-    get_split_key_(DB, Begin, TargetLoad, fun ets:last/1, fun ets:prev/2).
+    get_split_key_(DB, Begin, TargetLoad, fun ets:last/1, fun ets:prev/2, true).
 
 -spec get_split_key_(DB::db_t(), Begin::?RT:key(), TargetLoad::pos_integer(),
         ETS_first::fun((DB::tid() | atom()) -> ?RT:key() | '$end_of_table'),
-        ETS_next::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'))
-        -> {?RT:key(), TakenLoad::pos_integer()}.
+        ETS_next::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'),
+        IncludeBegin::boolean()) -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key_({ETSDB, _Subscr, _SnapState} = DB, Begin, TargetLoad,
-               ETS_first, ETS_next) ->
+               ETS_first, ETS_next, IncludeBegin) ->
     % assert ChunkSize > 0, see ChunkSize type
     case get_load_(DB) of
         0 -> throw('empty_db');
         _ ->
             % get first key in the ets table which is larger than Begin:
-            case first_key(ETSDB, Begin, ETS_first, ETS_next) of
+            case first_key(ETSDB, Begin, ETS_first, ETS_next, IncludeBegin) of
                 '$end_of_table' ->
                     throw('empty_db');
                 FirstKey ->
@@ -381,9 +383,14 @@ get_split_key_({ETSDB, _Subscr, _SnapState} = DB, Begin, TargetLoad,
 %%      Note: Key does not have to exist in the table.
 -spec first_key(DB::tid() | atom(), Key::?RT:key(),
         ETS_first::fun((DB::tid() | atom()) -> ?RT:key() | '$end_of_table'),
-        ETS_next::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'))
-            -> ?RT:key() | '$end_of_table'.
-first_key(ETSDB, Key, ETS_first, ETS_next) ->
+        ETS_next::fun((DB::tid() | atom(), Key::?RT:key()) -> ?RT:key() | '$end_of_table'),
+        IncludeBegin::boolean()) -> ?RT:key() | '$end_of_table'.
+first_key(ETSDB, Key, ETS_first, ETS_next, true) ->
+    case ets:lookup(ETSDB, Key) of
+        [Entry] -> db_entry:get_key(Entry);
+        []      -> first_key(ETSDB, Key, ETS_first, ETS_next, false)
+    end;
+first_key(ETSDB, Key, ETS_first, ETS_next, false) ->
     case ETS_next(ETSDB, Key) of
         '$end_of_table' -> ETS_first(ETSDB);
         X               -> X
