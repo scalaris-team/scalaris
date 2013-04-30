@@ -332,14 +332,6 @@ delete_entries_({DB, Counter} = _DB_, RangeOrFilterFun) ->
     verify_counter(Counter),
     {?BASE_DB:delete_entries(DB, RangeOrFilterFun), update_counter(Counter)}.
 
--spec delete_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
-        -> {intervals:interval(), db_t()}.
-delete_chunk_({DB, Counter} = _DB_, Interval, ChunkSize) ->
-    ?TRACE3(delete_chunk, _DB_, Interval, ChunkSize),
-    verify_counter(Counter),
-    {RestInterval, NewDB} = ?BASE_DB:delete_chunk(DB, Interval, ChunkSize),
-    {RestInterval, {NewDB, update_counter(Counter)}}.
-
 -spec check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.
 check_db({DB, Counter} = _DB_) ->
     ?TRACE1(check_db, _DB_),

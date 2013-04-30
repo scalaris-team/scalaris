@@ -353,14 +353,6 @@ delete_entries_(State, Interval) ->
                             end)
     end.
 
--spec delete_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
-        -> {intervals:interval(), db_t()}.
-delete_chunk_(DB, Interval, ChunkSize) ->
-    AddDataFun = fun(Key_, Key, _DBEntry_, Data) -> [{Key, Key_} | Data] end,
-    {Next, Chunk} = get_chunk_helper(DB, Interval, AddDataFun, fun({K, _K_}) -> K end, ChunkSize),
-    DB2 = lists:foldl(fun({Key, Key_}, DB1) -> delete_entry_at_key_(DB1, Key, Key_) end, DB, Chunk),
-    {Next, DB2}.
-
 %% @doc Returns all DB entries.
 -spec get_data_(DB::db_t()) -> db_as_list().
 get_data_({{DB, _FileName}, _Subscr, _SnapState}) ->
