@@ -653,14 +653,14 @@ macro_equals_failed(ActualVal, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, 
             _    -> lists:flatten(
                       io_lib:format("(Note: ~.0p)~n", [lists:flatten(Note0)]))
         end,
-    ct:pal("Failed~n"
+    ct:pal("Failed (in ~.0p)~n"
            " Message    ~s evaluated to~n"
            "             \"~.0p\"~n"
            "            which is not ~s the expected ~s that evaluates to~n"
            "             \"~.0p\"~n~.0s"
            " Stacktrace ~p~n"
            " Linetrace  ~p~n",
-           [ActualStr, ActualVal, CompFunStr, ExpectedStr, ExpectedVal, Note,
+           [self(), ActualStr, ActualVal, CompFunStr, ExpectedStr, ExpectedVal, Note,
             util:get_stacktrace(), util:get_linetrace()]),
     ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n~.0p",
              [ActualStr, ActualVal, ExpectedStr, ExpectedVal, Note]).
