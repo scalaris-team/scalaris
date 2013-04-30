@@ -45,7 +45,7 @@
                     true  -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, true, ??Boolean, "true", null)
+                          UnittestAny, true, "=:=", ??Boolean, "true", null)
                 end
         end()).
 
@@ -56,7 +56,7 @@
                     true  -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, true, ??Boolean, "true", Note)
+                          UnittestAny, true, "=:=", ??Boolean, "true", Note)
                 end
         end()).
 
@@ -73,7 +73,7 @@
                     ExpectedPattern -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, ??ExpectedPattern, ??Actual, ??ExpectedPattern, null)
+                          UnittestAny, ??ExpectedPattern, "=:=", ??Actual, ??ExpectedPattern, null)
                 end
         end()).
 
@@ -84,9 +84,15 @@
                     ExpectedPattern -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, ??ExpectedPattern, ??Actual, ??ExpectedPattern, Note)
+                          UnittestAny, ??ExpectedPattern, "=:=", ??Actual, ??ExpectedPattern, Note)
                 end
         end()).
+
+-define(compare(CompFun, Actual, Expected),
+        unittest_helper:macro_compare(CompFun, Actual, Expected, ??CompFun, ??Actual, ??Expected, null)).
+
+-define(compare_w_note(CompFun, Actual, Expected, Note),
+        unittest_helper:macro_compare(CompFun, Actual, Expected, ??CompFun, ??Actual, ??Expected, Note)).
 
 -define(expect_exception(Cmd, ExceptionType, ExceptionPattern),
         % wrap in function so that the internal variables are out of the calling function's scope
@@ -95,14 +101,14 @@
                     UnittestAny ->
                         UnittestExpExceptionStr = "exception " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, UnittestExpExceptionStr, ??Cmd, UnittestExpExceptionStr, null)
+                          UnittestAny, UnittestExpExceptionStr, "=:=", ??Cmd, UnittestExpExceptionStr, null)
                 catch
                     ExceptionType:ExceptionPattern -> true;
                     UnittestOtherType:UnittestOtherException ->
                         UnittestExpExceptionStr = "exception " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
                         UnittestActExceptionStr = lists:flatten(io_lib:format("exception ~.0p:~.0p", [UnittestOtherType, UnittestOtherException])),
                         unittest_helper:macro_equals_failed(
-                          UnittestActExceptionStr, UnittestExpExceptionStr, ??Cmd, UnittestExpExceptionStr, null)
+                          UnittestActExceptionStr, UnittestExpExceptionStr, "=:=", ??Cmd, UnittestExpExceptionStr, null)
                 end
         end()).
 

@@ -38,8 +38,8 @@
          create_ct_all/1, create_ct_groups/2,
          init_per_group/2, end_per_group/2,
          get_ring_data/0, print_ring_data/0,
-         macro_equals/5,
-         macro_equals_failed/5,
+         macro_equals/5, macro_compare/7,
+         macro_equals_failed/6,
          expect_no_message_timeout/1,
          prepare_config/1,
          start_minimal_procs/3, stop_minimal_procs/1,
@@ -632,14 +632,21 @@ print_ring_data() ->
 -spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(),
                    ExpectedStr::string(), Note::iolist() | null) -> true | no_return().
 macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr, Note) ->
-    case Actual of
-        ExpectedVal -> true;
-        Any -> macro_equals_failed(Any, ExpectedVal, ActualStr, ExpectedStr, Note)
+    macro_compare(fun erlang:'=:='/2, Actual, ExpectedVal, "=:=", ActualStr, ExpectedStr, Note).
+
+-spec macro_compare(CompFun::fun((T, T) -> boolean()), Actual::any(), ExpectedVal::any(),
+                    CompFunStr::string(), ActualStr::string(), ExpectedStr::string(),
+                    Note::iolist() | null) -> true | no_return().
+macro_compare(CompFun, Actual, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, Note) ->
+    case CompFun(Actual, ExpectedVal) of
+        true  -> true;
+        false -> macro_equals_failed(Actual, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, Note)
     end.
 
--spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), ActualStr::string(),
-                          ExpectedStr::string(), Note::iolist() | null) -> no_return().
-macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr, Note0) ->
+-spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), CompFunStr::string(),
+                          ActualStr::string(), ExpectedStr::string(), Note::iolist() | null)
+        -> no_return().
+macro_equals_failed(ActualVal, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, Note0) ->
     Note =
         case Note0 of
             null -> "";
@@ -649,11 +656,11 @@ macro_equals_failed(ActualVal, ExpectedVal, ActualStr, ExpectedStr, Note0) ->
     ct:pal("Failed~n"
            " Message    ~s evaluated to~n"
            "             \"~.0p\"~n"
-           "            which is not the expected ~s that evaluates to~n"
+           "            which is not ~s the expected ~s that evaluates to~n"
            "             \"~.0p\"~n~.0s"
            " Stacktrace ~p~n"
            " Linetrace  ~p~n",
-           [ActualStr, ActualVal, ExpectedStr, ExpectedVal, Note,
+           [ActualStr, ActualVal, CompFunStr, ExpectedStr, ExpectedVal, Note,
             util:get_stacktrace(), util:get_linetrace()]),
     ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n~.0p",
              [ActualStr, ActualVal, ExpectedStr, ExpectedVal, Note]).
