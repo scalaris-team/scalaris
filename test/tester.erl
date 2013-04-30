@@ -261,12 +261,12 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
                        Result = run(Module, Func, Arity,
                                     Iterations div Threads, ParseState, Options,
                                     Thread),
-                       Master ! {result, Result},
+                       Master ! {result, Result, self()},
                        tester_global_state:reset_last_call(Thread)
                end) || Thread <- lists:seq(1, Threads)],
-    Results = [receive {result, Result} -> Result end || _ <- lists:seq(1, Threads)],
+    Results = [receive {result, Result, ThreadPid} -> {Result, ThreadPid} end || _ <- lists:seq(1, Threads)],
     %ct:pal("~w~n", [Results]),
-    _ = [fun (Result) ->
+    _ = [fun ({Result, ThreadPid}) ->
                  case Result of
                      {fail, ResultValue, ResultType, Error, Module, Func, Args, Term,
                       StackTrace, LineTrace} ->
@@ -274,14 +274,14 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
                                        [$,, $ | X] -> X;
                                        X -> X
                                    end,
-                         ct:pal("Failed~n"
+                         ct:pal("Failed (in ~.0p)~n"
                                 " Message    ~p in ~1000p:~1000p(~s):~n"
                                 "            ~p~n"
                                 " Result     ~p~n"
                                 " ResultType ~p~n"
                                 " Stacktrace ~p~n"
                                 " Linetrace  ~p~n",
-                                [Error, Module, Func, ArgsStr, Term, ResultValue,
+                                [ThreadPid, Error, Module, Func, ArgsStr, Term, ResultValue,
                                  ResultType, StackTrace, LineTrace]),
                          ?ct_fail("~.0p in ~.0p:~.0p(~.0p): ~.0p",
                                   [Error, Module, Func, Args, Term]);
