@@ -175,28 +175,37 @@ commit(DB, RTLogEntry, _OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
             DB %% outdated commit
     end.
 
--spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
+-spec abort(?DB:db(), tx_tlog:tlog_entry(), OwnProposalWas::?prepared | ?abort,
             tx_tlog:snap_number(), tx_tlog:snap_number()) -> ?DB:db().
-abort(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
+abort(DB, _RTLogEntry, ?abort, _TMSnapNo, _OwnSnapNo) ->
+    %% our own proposal was abort so no locks to clean up
+    DB;
+abort(DB, RTLogEntry, ?prepared, _TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_write:abort)~n", []),
-    %% abort operation
-    %% release locks?
-    case OwnProposalWas of
-        ?prepared ->
-            DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
-            RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
+    %% abort operation when we voted prepared
+    %% need to release locks
+    DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
+    RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
+    % Note: WriteLock is always >= DBVers! - old check:
+    %%             DBVers = db_entry:get_version(DBEntry),
+    %%             if RTLogVers =:= DBVers ->
+    WriteLock = db_entry:get_writelock(DBEntry),
+    if WriteLock =/= false andalso WriteLock =< RTLogVers ->
+            %% op that created the write lock or outdated WL?
+            NewEntry = db_entry:unset_writelock(DBEntry),
+            NewDB = ?DB:set_entry(DB, NewEntry),
             TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
-            % Note: WriteLock is always >= DBVers! - old check:
-%%             DBVers = db_entry:get_version(DBEntry),
-%%             if RTLogVers =:= DBVers ->
-            WriteLock = db_entry:get_writelock(DBEntry),
-            if WriteLock =/= false andalso WriteLock =< RTLogVers ->
-                    %% op that created the write lock or outdated WL?
-                    NewEntry = db_entry:unset_writelock(DBEntry),
-                    NewDB = ?DB:set_entry(DB, NewEntry),
+            case ?DB:snapshot_is_running(NewDB) of
+                false ->
+                    %% if no snapshot is running don't operate on the snapshot
+                    %% state
+                    log:log(warn, "rdht_tx_write:abort(): lockcount wrong; possible inconsisten snapshot~p~n",
+                            [OwnSnapNo]),
+                    NewDB;
+                true ->
                     case (TLogSnapNo < OwnSnapNo) of
                         true -> % we have to apply changes to the snapshot db as well
-                            case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
+                            case ?DB:get_snapshot_entry(NewDB, tx_tlog:get_entry_key(RTLogEntry)) of
                                 {true, SnapEntry} -> 
                                     % in this case there was an entry with this key in the snapshot table
                                     % so it might have different locks than the one in the live db.
@@ -205,14 +214,14 @@ abort(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
                                     TmpDb = ?DB:set_snapshot_entry(NewDB,
                                                                    NewSnapEntry),
                                     ?TRACE_SNAP("rdht_tx_write:abort ~p~nkey in snapdb...reducing lockcount~n~p~n~p",
-                                        [comm:this(), NewDB, TmpDb]),
+                                                [comm:this(), NewDB, TmpDb]),
                                     TmpDb;
                                 {false, _} ->
                                     % key was not found in snapshot table -> dbs are in sync for this key,
                                     % which means we only have to decrease the lockcount by 1
                                     TmpDb = ?DB:decrease_snapshot_lockcount(NewDB),
                                     ?TRACE_SNAP("rdht_tx_write:abort ~p~nkey not in snapdb...reducing lockcount~n~p~n~p",
-                                        [comm:this(), NewDB, TmpDb]),
+                                                [comm:this(), NewDB, TmpDb]),
                                     TmpDb
                             end;
                         _ ->
@@ -233,9 +242,9 @@ abort(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
                                     ?TRACE_SNAP("rdht_tx_write:abort** ~p
                                                 snapnumbers not ok but snaplocks exist
                                                 ~p   ~p~n~p~n~p~n~p",
-                                        [comm:this(), TLogSnapNo, OwnSnapNo, DB,
-                                         NewDB, TmpDB]),
-                                        TmpDB;
+                                                [comm:this(), TLogSnapNo, OwnSnapNo, DB,
+                                                 NewDB, TmpDB]),
+                                    TmpDB;
                                 true -> 
                                     ?TRACE_SNAP("rdht_tx_write:abort** ~p
                                     snapnumbers not ok but locks are ok
@@ -244,13 +253,9 @@ abort(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
                                                  OwnSnapNo, DB, NewDB]),
                                     NewDB
                             end
-                    end;
-               true -> DB
+                    end
             end;
-        ?abort ->
-            ?TRACE_SNAP("rdht_tx_write:abort ~p~nown proposal was abort~n~p",
-                [comm:this(), DB]),
-            DB
+        true -> DB
     end.
 
 %% be startable via supervisor, use gen_component
