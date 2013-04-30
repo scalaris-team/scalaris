@@ -416,13 +416,3 @@ get_split_key_inner({ETSDB, _Subscr, _SnapState} = DB, '$end_of_table', RealStar
 get_split_key_inner({ETSDB, _Subscr, _SnapState} = DB, Current, RealStart, TargetLoad, _SplitKey, ETS_first, ETS_next) ->
     Next = ETS_next(ETSDB, Current),
     get_split_key_inner(DB, Next, RealStart, TargetLoad - 1, Current, ETS_first, ETS_next).
-
--spec delete_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
-        -> {intervals:interval(), db_t()}.
-delete_chunk_(DB, Interval, all) ->
-    delete_chunk_(DB, Interval, get_load_(DB));
-delete_chunk_(DB, Interval, ChunkSize) ->
-    AddDataFun = fun(_DB1, Key, Data) -> [Key | Data] end,
-    {Next, Chunk} = get_chunk_helper(DB, Interval, AddDataFun, ChunkSize),
-    DB2 = lists:foldl(fun(Key, DB1) -> delete_entry_at_key_(DB1, Key) end, DB, Chunk),
-    {Next, DB2}.

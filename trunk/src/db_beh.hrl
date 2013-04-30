@@ -40,7 +40,7 @@
 -export([get_entry/2, get_entry2/2, set_entry/2, update_entry/2, delete_entry/2]).
 -export([read/2, write/4, delete/2]).
 -export([get_entries/2, get_entries/3]).
--export([get_chunk/3, get_chunk/5, delete_chunk/3, get_split_key/4]).
+-export([get_chunk/3, get_chunk/5, get_split_key/4]).
 -export([update_entries/4]).
 -export([delete_entries/2]).
 -export([get_load/1, get_load/2, split_data/2, get_data/1, add_data/2]).
@@ -128,10 +128,6 @@ update_entries(DB, Values, Pred, UpdateFun) -> update_entries_(DB, Values, Pred,
                                  fun((DBEntry::db_entry:entry()) -> boolean()))
         -> NewDB::db().
 delete_entries(DB, RangeOrFun) -> delete_entries_(DB, RangeOrFun).
-
--spec delete_chunk(DB::db(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
-        -> {intervals:interval(), db()}.
-delete_chunk(DB, Interval, ChunkSize) -> delete_chunk_(DB, Interval, ChunkSize).
 
 -spec split_data(DB::db(), MyNewInterval::intervals:interval()) ->
          {NewDB::db(), db_as_list()}.

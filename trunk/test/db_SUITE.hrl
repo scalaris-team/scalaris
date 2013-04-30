@@ -44,7 +44,6 @@ tests_avail() ->
      tester_changed_keys_get_entries2,
      tester_changed_keys_get_entries4,
      tester_get_chunk3,
-     tester_delete_chunk3,
      tester_changed_keys_update_entries,
      tester_changed_keys_delete_entries1,
      tester_changed_keys_delete_entries2,
@@ -960,25 +959,6 @@ prop_get_chunk3(Keys2, Interval, ChunkSize) ->
         _ -> true
     end.
 
--spec prop_delete_chunk3(Keys::[?RT:key()], Interval::intervals:interval(), ChunkSize::pos_integer() | all) -> true.
-prop_delete_chunk3(Keys2, Interval, ChunkSize) ->
-    case not intervals:is_empty(Interval) of
-        true ->
-            Keys = lists:usort(Keys2),
-            DB = ?TEST_DB:new(),
-            DB2 = lists:foldl(fun(Key, DBA) -> ?TEST_DB:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
-            {Next_GC, Chunk} = ?TEST_DB:get_chunk(DB2, Interval, ChunkSize),
-            {Next_DC, DB3} = ?TEST_DB:delete_chunk(DB2, Interval, ChunkSize),
-            ?equals(Next_GC, Next_DC),
-            PostDeleteChunkSize = ?TEST_DB:get_load(DB3),
-            DB5 = lists:foldl(fun (Entry, DB4) -> ?TEST_DB:delete_entry(DB4, Entry) end, DB3, Chunk),
-            PostDeleteSize = ?TEST_DB:get_load(DB5),
-            ?TEST_DB:close(DB5),
-            ?equals(PostDeleteChunkSize, PostDeleteSize), % delete should have deleted all items in Chunk
-            ?equals(length(Keys) - length(Chunk), PostDeleteSize); % delete should have deleted all items in Chunk
-        _ -> true
-    end.
-
 -spec prop_changed_keys_update_entries(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
         Entry1::db_entry:entry(), Entry2::db_entry:entry()) -> true.
@@ -1302,9 +1282,6 @@ tester_get_chunk3(_Config) ->
     prop_get_chunk3([0, 4, 31], intervals:new('[', 0, 4, ']'), 2),
     prop_get_chunk3([1, 5, 127, 13], intervals:new('[', 3, 2, ']'), 4),
     tester:test(?MODULE, prop_get_chunk3, 3, rw_suite_runs(1000), [{threads, 2}]).
-
-tester_delete_chunk3(_Config) ->
-    tester:test(?MODULE, prop_delete_chunk3, 3, rw_suite_runs(1000), [{threads, 2}]).
 
 tester_changed_keys_update_entries(_Config) ->
     prop_changed_keys_update_entries(

@@ -81,8 +81,6 @@
                          RangeOrFun::intervals:interval() |
                                      fun((DBEntry::db_entry:entry()) -> boolean()))
         -> NewDB::db().
--callback delete_chunk(DB::db(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
-        -> {intervals:interval(), db()}.
 
 -callback split_data(DB::db(), MyNewInterval::intervals:interval())
         -> {NewDB::db(), db_as_list()}.
@@ -137,7 +135,6 @@ behaviour_info(callbacks) ->
      {get_chunk, 3}, {get_chunk, 5},
      % dangerous calls
      {delete, 2}, {delete_entry, 2},
-     {delete_chunk, 3},
      % load balancing
      {get_load, 1}, {get_load, 2}, {split_data, 2}, {get_split_key, 4},
      % operations on multiple entries
