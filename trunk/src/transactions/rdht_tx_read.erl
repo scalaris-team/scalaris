@@ -280,50 +280,56 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
            {DB, ?abort}
     end.
 
--spec commit(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
+-spec commit(?DB:db(), tx_tlog:tlog_entry(), OwnProposalWas::?prepared | ?abort,
              tx_tlog:snap_number(), tx_tlog:snap_number()) -> ?DB:db().
-commit(DB, RTLogEntry, OwnProposalWas, _TMSnapNo, OwnSnapNo) ->
+commit(DB, _RTLogEntry, ?abort, _TMSnapNo, _OwnSnapNo) ->
+    %% own proposal was abort, so no lock to clean up
+    %% we could compare DB with RTLogEntry and update if outdated
+    %% as this commit confirms the status of a majority of the
+    %% replicas. Could also be possible already in the validate req?
+    DB;
+commit(DB, RTLogEntry, ?prepared, _TMSnapNo, OwnSnapNo) ->
     ?TRACE("rdht_tx_read:commit)~n", []),
     %% perform op: nothing to do for 'read'
     %% release locks
-    case OwnProposalWas of
-        ?prepared ->
-            DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
-            RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
-            DBVers = db_entry:get_version(DBEntry),
-            if RTLogVers =:= DBVers ->
-                   NewEntry = db_entry:dec_readlock(DBEntry),
-                   NewDB = ?DB:set_entry(DB, NewEntry),
-                   TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
-                   case (TLogSnapNo < OwnSnapNo) of
-                       true -> % we have to apply changes to the snapshot db as well
-                           case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
-                               {true, SnapEntry} -> 
+    DBEntry = ?DB:get_entry(DB, tx_tlog:get_entry_key(RTLogEntry)),
+    RTLogVers = tx_tlog:get_entry_version(RTLogEntry),
+    DBVers = db_entry:get_version(DBEntry),
+    if RTLogVers =:= DBVers ->
+            NewEntry = db_entry:dec_readlock(DBEntry),
+            NewDB = ?DB:set_entry(DB, NewEntry),
+            TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
+            case ?DB:snapshot_is_running(NewDB) of
+                true ->
+                    case (TLogSnapNo < OwnSnapNo) of
+                        true -> % we have to apply changes to the snapshot db as well
+                            case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
+                                {true, SnapEntry} -> 
                                     ?TRACE_SNAP("rdht_tx_read ~p~nkey in snapdb...reducing lockcount",
-                                        [comm:this()]),
-                                   % in this case there was an entry with this key in the snapshot table
-                                   % so it might have different locks than the one in the live db.
-                                   % we're applying the lock decrease on the snapshot table entry
-                                   NewSnapEntry = db_entry:dec_readlock(SnapEntry),
-                                   ?DB:set_snapshot_entry(NewDB, NewSnapEntry);
-                               {false, _} ->
+                                                [comm:this()]),
+                                    % in this case there was an entry with this key in the snapshot table
+                                    % so it might have different locks than the one in the live db.
+                                    % we're applying the lock decrease on the snapshot table entry
+                                    NewSnapEntry = db_entry:dec_readlock(SnapEntry),
+                                    ?DB:set_snapshot_entry(NewDB, NewSnapEntry);
+                                {false, _} ->
                                     ?TRACE_SNAP("rdht_tx_read ~p~nkey not in snapdb~n~p",
-                                        [comm:this(), tx_tlog:get_entry_key(RTLogEntry)]),
-                                   % key was not found in snapshot table -> both dbs are in sync for this key
-                                   NewDB
-                           end;
-                       _ -> % no changes in the snapshot db
+                                                [comm:this(), tx_tlog:get_entry_key(RTLogEntry)]),
+                                    % key was not found in snapshot table -> both dbs are in sync for this key
+                                    NewDB
+                            end;
+                        _ -> % no changes in the snapshot db
                             ?TRACE_SNAP("rdht_tx_read ~p~n snapnumbers not ok~n~p   ~p",
-                                [comm:this(), TLogSnapNo, OwnSnapNo]),
-                           NewDB
-                   end;
-               true -> DB %% a write has already deleted this lock
+                                        [comm:this(), TLogSnapNo, OwnSnapNo]),
+                            NewDB
+                    end;
+                false ->
+                    %% should not happen
+                    log:log(warn, "rdht_tx_read:commit(): lockcount wrong; possible inconsisten snapshot~p~n",
+                            [OwnSnapNo]),
+                    NewDB
             end;
-        ?abort ->
-            %% we could compare DB with RTLogEntry and update if outdated
-            %% as this commit confirms the status of a majority of the
-            %% replicas. Could also be possible already in the validate req?
-            DB
+        true -> DB %% a write has already deleted this lock
     end.
 
 -spec abort(?DB:db(), tx_tlog:tlog_entry(), ?prepared | ?abort,
