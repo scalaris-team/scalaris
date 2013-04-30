@@ -45,7 +45,7 @@
                     true  -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, true, ??Boolean, "true")
+                          UnittestAny, true, ??Boolean, "true", null)
                 end
         end()).
 
@@ -61,7 +61,7 @@
         end()).
 
 -define(equals(Actual, Expected),
-        unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected)).
+        unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected, null)).
 
 -define(equals_w_note(Actual, Expected, Note),
         unittest_helper:macro_equals(Actual, Expected, ??Actual, ??Expected, Note)).
@@ -73,7 +73,7 @@
                     ExpectedPattern -> true;
                     UnittestAny ->
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, ??ExpectedPattern, ??Actual, ??ExpectedPattern)
+                          UnittestAny, ??ExpectedPattern, ??Actual, ??ExpectedPattern, null)
                 end
         end()).
 
@@ -95,14 +95,14 @@
                     UnittestAny ->
                         UnittestExpExceptionStr = "exception " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
                         unittest_helper:macro_equals_failed(
-                          UnittestAny, UnittestExpExceptionStr, ??Cmd, UnittestExpExceptionStr)
+                          UnittestAny, UnittestExpExceptionStr, ??Cmd, UnittestExpExceptionStr, null)
                 catch
                     ExceptionType:ExceptionPattern -> true;
                     UnittestOtherType:UnittestOtherException ->
                         UnittestExpExceptionStr = "exception " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
                         UnittestActExceptionStr = lists:flatten(io_lib:format("exception ~.0p:~.0p", [UnittestOtherType, UnittestOtherException])),
                         unittest_helper:macro_equals_failed(
-                          UnittestActExceptionStr, UnittestExpExceptionStr, ??Cmd, UnittestExpExceptionStr)
+                          UnittestActExceptionStr, UnittestExpExceptionStr, ??Cmd, UnittestExpExceptionStr, null)
                 end
         end()).
 
