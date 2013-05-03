@@ -217,7 +217,9 @@ get_chunk_(DB, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
                              _    -> Data
                          end
                  end,
-    get_chunk_helper(DB, StartId, Interval, AddDataFun, ChunkSize, forward).
+    {Next, Data} =
+        get_chunk_helper(DB, StartId, Interval, AddDataFun, ChunkSize, forward),
+    {Next, lists:reverse(Data)}.
 
 -type add_data_fun(V) :: fun((DB::db_t(), Key::?RT:key(), Data::[] | V) -> [] | V).
 -type ets_start_fun() :: fun((Table::tid() | atom()) -> ?RT:key() | '$end_of_table').
