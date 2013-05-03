@@ -933,11 +933,12 @@ prop_get_chunk4(Keys2, StartId, Interval, ChunkSize) ->
     {Next, Chunk} = ?TEST_DB:get_chunk(DB2, StartId, Interval, ChunkSize),
     ?TEST_DB:close(DB2),
     ?equals(lists:usort(Chunk), lists:sort(Chunk)), % check for duplicates
-    KeysInRange = count_keys_in_range(Keys, Interval),
+    KeysInRange = [Key || Key <- Keys, intervals:in(Key, Interval)],
+    KeysInRangeCount = length(KeysInRange),
     ExpectedChunkSize =
         case ChunkSize of
-            all -> KeysInRange;
-            _   -> erlang:min(KeysInRange, ChunkSize)
+            all -> KeysInRangeCount;
+            _   -> erlang:min(KeysInRangeCount, ChunkSize)
         end,
     case ExpectedChunkSize =/= length(Chunk) of
         true ->
@@ -954,7 +955,18 @@ prop_get_chunk4(Keys2, StartId, Interval, ChunkSize) ->
                                  [Next, Interval])),
     ?equals_w_note([Entry || Entry <- Chunk,
                              intervals:in(db_entry:get_key(Entry), Next)],
-                   [], io_lib:format("Next: ~.0p", [Next])).
+                   [], io_lib:format("Next: ~.0p", [Next])),
+    if KeysInRangeCount > 0 ->
+           FirstAfterStartId =
+               case lists:partition(fun(Key) -> Key >= StartId end, KeysInRange) of
+                   {[], [H|_]} -> H;
+                   {[H|_], _}  -> H
+               end,
+           ?compare(fun(Chunk, FirstAfterStartId) ->
+                            db_entry:get_key(hd(Chunk)) =:= FirstAfterStartId
+                    end, Chunk, FirstAfterStartId);
+       true -> true
+    end.
 
 -spec prop_get_split_key5(Keys::[?RT:key(),...], Begin::?RT:key(), End::?RT:key(), TargetLoad::pos_integer(), forward | backward) -> true.
 prop_get_split_key5(Keys2, Begin, End, TargetLoad, ForwardBackward) ->
@@ -978,8 +990,6 @@ prop_get_split_key5(Keys2, Begin, End, TargetLoad, ForwardBackward) ->
     ?compare(fun erlang:'=<'/2, TakenLoad, TargetLoad),
     ?compare(fun erlang:'=<'/2, length(Chunk), TargetLoad),
     ?equals(length(Chunk), TakenLoad),
-    
-%%     KeysInRange = count_keys_in_range(Keys, Interval),
     true.
 
 -spec prop_changed_keys_update_entries(

@@ -265,10 +265,8 @@ get_chunk_helper({{DB, _FileName}, _Subscr, _SnapState}, StartId, Interval,
         true ->
             {intervals:empty(), []};
         _ ->
-            {BeginBr, Begin, _End, _EndBr} = intervals:get_bounds(Interval),
             % try to find the first existing key in the interval, starting at Begin:
-            MInfToBegin = intervals:minus(intervals:all(),
-                                          intervals:new(BeginBr, Begin, ?PLUS_INFINITY, ')')),
+            StartInt = intervals:new('[', StartId, ?PLUS_INFINITY, ')'),
             % note: N is a helper for filtering out unnecessary items every once in a while
             F = fun (Key_, DBEntry_, {N, Data} = Acc) ->
                          Key = erlang:binary_to_term(Key_),
@@ -282,7 +280,7 @@ get_chunk_helper({{DB, _FileName}, _Subscr, _SnapState}, StartId, Interval,
                                  case N rem 2 * ChunkSize of
                                      0 ->
                                          {0, get_chunk_helper_filter(
-                                            Data1, MInfToBegin, GetKeyFromDataFun, ChunkSize)};
+                                            Data1, StartInt, GetKeyFromDataFun, ChunkSize)};
                                      _ ->
                                          {N + 1, Data1}
                                  end;
@@ -290,7 +288,7 @@ get_chunk_helper({{DB, _FileName}, _Subscr, _SnapState}, StartId, Interval,
                          end
                 end,
             {_, Data} = toke_drv:fold(F, {0, []}, DB),
-            SortedData = get_chunk_helper_sort(Data, MInfToBegin, GetKeyFromDataFun),
+            SortedData = get_chunk_helper_sort(Data, StartInt, GetKeyFromDataFun),
             case ChunkSize of
                 all -> {intervals:empty(), SortedData};
                 _   -> {Chunk, Rest} = util:safe_split(ChunkSize, SortedData),
@@ -298,30 +296,28 @@ get_chunk_helper({{DB, _FileName}, _Subscr, _SnapState}, StartId, Interval,
                            []      -> {intervals:empty(), Chunk};
                            [H | _] ->
                                Next = GetKeyFromDataFun(H),
-                               NextToIntBegin =
-                                   case BeginBr of
-                                       '(' -> intervals:new('[', Next, Begin, ']');
-                                       '[' -> intervals:new('[', Next, Begin, ')')
-                                   end,
+                               % assert ChunkSize > 0, see ChunkSize type
+                               FirstKey = GetKeyFromDataFun(hd(Chunk)),
+                               NextToIntBegin = intervals:new('[', Next, FirstKey, ')'),
                                {intervals:intersection(Interval, NextToIntBegin), Chunk}
                        end
             end
     end.
 
--spec get_chunk_helper_sort(Data::[T], MInfToBegin::intervals:interval(),
+-spec get_chunk_helper_sort(Data::[T], StartInt::intervals:interval(),
                             GetKeyFromDataFun::fun((T) -> ?RT:key())) -> SortedData::[T].
-get_chunk_helper_sort(Data, MInfToBegin, GetKeyFromDataFun) ->
-    {SecondPart, FirstPart} =
+get_chunk_helper_sort(Data, StartInt, GetKeyFromDataFun) ->
+    {FirstPart, SecondPart} =
         lists:partition(fun(E) ->
-                                intervals:in(GetKeyFromDataFun(E), MInfToBegin)
+                                intervals:in(GetKeyFromDataFun(E), StartInt)
                         end, Data),
     lists:append(lists:usort(FirstPart), lists:usort(SecondPart)).
 
--spec get_chunk_helper_filter(Data::[T], MInfToBegin::intervals:interval(),
+-spec get_chunk_helper_filter(Data::[T], StartInt::intervals:interval(),
                               GetKeyFromDataFun::fun((T) -> ?RT:key()),
                               ChunkSize::pos_integer()) -> SortedData::[T].
-get_chunk_helper_filter(Data, MInfToBegin, GetKeyFromDataFun, ChunkSize) ->
-    SortedData = get_chunk_helper_sort(Data, MInfToBegin, GetKeyFromDataFun),
+get_chunk_helper_filter(Data, StartInt, GetKeyFromDataFun, ChunkSize) ->
+    SortedData = get_chunk_helper_sort(Data, StartInt, GetKeyFromDataFun),
     % note: leave one extra to be able to find the next available key
     {Chunk, _Rest} = util:safe_split(ChunkSize + 1, SortedData),
     Chunk.
