@@ -43,7 +43,8 @@ tests_avail() ->
      tester_changed_keys_delete,
      tester_changed_keys_get_entries2,
      tester_changed_keys_get_entries4,
-     tester_get_chunk3,
+     tester_get_chunk4,
+     tester_get_split_key5,
      tester_changed_keys_update_entries,
      tester_changed_keys_delete_entries1,
      tester_changed_keys_delete_entries2,
@@ -924,40 +925,62 @@ prop_changed_keys_get_entries4(Data, ChangesInterval, Interval) ->
     ?TEST_DB:close(DB4),
     true.
 
--spec prop_get_chunk3(Keys::[?RT:key()], Interval::intervals:interval(), ChunkSize::pos_integer() | all) -> true.
-prop_get_chunk3(Keys2, Interval, ChunkSize) ->
-    case not intervals:is_empty(Interval) of
+-spec prop_get_chunk4(Keys::[?RT:key()], StartId::?RT:key(), Interval::intervals:interval(), ChunkSize::pos_integer() | all) -> true.
+prop_get_chunk4(Keys2, StartId, Interval, ChunkSize) ->
+    Keys = lists:usort(Keys2),
+    DB = ?TEST_DB:new(),
+    DB2 = lists:foldl(fun(Key, DBA) -> ?TEST_DB:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
+    {Next, Chunk} = ?TEST_DB:get_chunk(DB2, StartId, Interval, ChunkSize),
+    ?TEST_DB:close(DB2),
+    ?equals(lists:usort(Chunk), lists:sort(Chunk)), % check for duplicates
+    KeysInRange = count_keys_in_range(Keys, Interval),
+    ExpectedChunkSize =
+        case ChunkSize of
+            all -> KeysInRange;
+            _   -> erlang:min(KeysInRange, ChunkSize)
+        end,
+    case ExpectedChunkSize =/= length(Chunk) of
         true ->
-            Keys = lists:usort(Keys2),
-            DB = ?TEST_DB:new(),
-            DB2 = lists:foldl(fun(Key, DBA) -> ?TEST_DB:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
-            {Next, Chunk} = ?TEST_DB:get_chunk(DB2, Interval, ChunkSize),
-            ?TEST_DB:close(DB2),
-            ?equals(lists:usort(Chunk), lists:sort(Chunk)), % check for duplicates
-            KeysInRange = count_keys_in_range(Keys, Interval),
-            ExpectedChunkSize =
-                case ChunkSize of
-                    all -> KeysInRange;
-                    _   -> erlang:min(KeysInRange, ChunkSize)
-                end,
-            case ExpectedChunkSize =/= length(Chunk) of
-                true ->
-                    ?ct_fail("chunk has wrong size ~.0p ~.0p ~.0p, expected size: ~.0p",
-                             [Chunk, Keys, Interval, ExpectedChunkSize]);
-                false ->
-                    ?equals([Entry || Entry <- Chunk,
-                                      not intervals:in(db_entry:get_key(Entry), Interval)],
-                            [])
-            end,
-            % Next if subset of Interval, no chunk entry is in Next:
-            ?equals_w_note(intervals:is_subset(Next, Interval), true,
-                           io_lib:format("Next ~.0p is not subset of ~.0p",
-                                         [Next, Interval])),
-            ?equals_w_note([Entry || Entry <- Chunk,
-                                     intervals:in(db_entry:get_key(Entry), Next)],
-                           [], io_lib:format("Next: ~.0p", [Next]));
-        _ -> true
-    end.
+            ?ct_fail("chunk has wrong size ~.0p ~.0p ~.0p, expected size: ~.0p",
+                     [Chunk, Keys, Interval, ExpectedChunkSize]);
+        false ->
+            ?equals([Entry || Entry <- Chunk,
+                              not intervals:in(db_entry:get_key(Entry), Interval)],
+                    [])
+    end,
+    % Next if subset of Interval, no chunk entry is in Next:
+    ?equals_w_note(intervals:is_subset(Next, Interval), true,
+                   io_lib:format("Next ~.0p is not subset of ~.0p",
+                                 [Next, Interval])),
+    ?equals_w_note([Entry || Entry <- Chunk,
+                             intervals:in(db_entry:get_key(Entry), Next)],
+                   [], io_lib:format("Next: ~.0p", [Next])).
+
+-spec prop_get_split_key5(Keys::[?RT:key(),...], Begin::?RT:key(), End::?RT:key(), TargetLoad::pos_integer(), forward | backward) -> true.
+prop_get_split_key5(Keys2, Begin, End, TargetLoad, ForwardBackward) ->
+    Keys = lists:usort(Keys2),
+    DB = ?TEST_DB:new(),
+    DB2 = lists:foldl(fun(Key, DBA) -> ?TEST_DB:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
+    {SplitKey, TakenLoad} = ?TEST_DB:get_split_key(DB2, Begin, End, TargetLoad, ForwardBackward),
+    SplitInterval = case ForwardBackward of
+                        forward  ->
+                            intervals:new('(', Begin, SplitKey, ']');
+                        backward when TakenLoad < TargetLoad ->
+                            % not enough items to take - SplitKey =:= End
+                            ?equals(SplitKey, End),
+                            intervals:new('[', SplitKey, Begin, ']');
+                        backward ->
+                            intervals:new('(', SplitKey, Begin, ']')
+                    end,
+    {_Next, Chunk} = ?TEST_DB:get_chunk(DB2, Begin, SplitInterval, all),
+    ?TEST_DB:close(DB2),
+    
+    ?compare(fun erlang:'=<'/2, TakenLoad, TargetLoad),
+    ?compare(fun erlang:'=<'/2, length(Chunk), TargetLoad),
+    ?equals(length(Chunk), TakenLoad),
+    
+%%     KeysInRange = count_keys_in_range(Keys, Interval),
+    true.
 
 -spec prop_changed_keys_update_entries(
         Data::?TEST_DB:db_as_list(), ChangesInterval::intervals:interval(),
@@ -1278,10 +1301,20 @@ tester_changed_keys_get_entries2(_Config) ->
 tester_changed_keys_get_entries4(_Config) ->
     tester:test(?MODULE, prop_changed_keys_get_entries4, 3, rw_suite_runs(1000), [{threads, 2}]).
 
-tester_get_chunk3(_Config) ->
-    prop_get_chunk3([0, 4, 31], intervals:new('[', 0, 4, ']'), 2),
-    prop_get_chunk3([1, 5, 127, 13], intervals:new('[', 3, 2, ']'), 4),
-    tester:test(?MODULE, prop_get_chunk3, 3, rw_suite_runs(1000), [{threads, 2}]).
+tester_get_chunk4(_Config) ->
+    prop_get_chunk4([0, 4, 31], 0, intervals:new('[', 0, 4, ']'), 2),
+    prop_get_chunk4([1, 5, 127, 13], 3, intervals:new('[', 3, 2, ']'), 4),
+    prop_get_chunk4([30,20,8,4],9,[{interval,'[',0,10,']'},{interval,'[',28,32,')'}],all),
+    prop_get_chunk4([321412035892863292970556376746395450950,178033137068077382596514331220271255735,36274679037320551674149151592760931654,24467032062604602002936599440583551943],
+                    39662566533623950601697671725795532001,
+                    [{interval,'[',0,117488216920678280505356111701746995698,']'},{element,161901968021578670353994653229245016552},{interval,'[',225156471921460939006161924022031177737,340282366920938463463374607431768211456,')'}],
+                    all),
+    tester:test(?MODULE, prop_get_chunk4, 4, rw_suite_runs(10000), [{threads, 2}]).
+
+tester_get_split_key5(_Config) ->
+    prop_get_split_key5([2], 6, 4, 12, backward),
+    prop_get_split_key5([12, 10, 4], 6, 8, 1, backward),
+    tester:test(?MODULE, prop_get_split_key5, 5, rw_suite_runs(10000), [{threads, 2}]).
 
 tester_changed_keys_update_entries(_Config) ->
     prop_changed_keys_update_entries(

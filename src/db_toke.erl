@@ -240,12 +240,12 @@ get_entries_({{DB, _FileName}, _Subscr, _SnapState}, FilterFun, ValueFun) ->
 
 %% @doc Returns all ValueFun(DBEntry) objects of the given DB which are in the
 %%      given interval and satisfy FilterFun but at most ChunkSize elements.
-%%      See get_chunk/3 for more details.
--spec get_chunk_(DB::db_t(), Interval::intervals:interval(),
+%%      See get_chunk/4 for more details.
+-spec get_chunk_(DB::db_t(), StartId::?RT:key(), Interval::intervals:interval(),
                  FilterFun::fun((db_entry:entry()) -> boolean()),
                  ValueFun::fun((db_entry:entry()) -> V), ChunkSize::pos_integer() | all)
         -> {intervals:interval(), [V]}.
-get_chunk_(State, Interval, FilterFun, ValueFun, ChunkSize) ->
+get_chunk_(State, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
     AddDataFun = fun(_Key_, _Key, DBEntry_, Data) ->
                          DBEntry = erlang:binary_to_term(DBEntry_),
                          case FilterFun(DBEntry) of
@@ -253,52 +253,59 @@ get_chunk_(State, Interval, FilterFun, ValueFun, ChunkSize) ->
                              _    -> Data
                          end
                  end,
-    get_chunk_helper(State, Interval, AddDataFun, fun db_entry:get_key/1, ChunkSize).
+    get_chunk_helper(State, StartId, Interval, AddDataFun, fun db_entry:get_key/1, ChunkSize).
 
--spec get_chunk_helper(DB::db_t(), Interval::intervals:interval(),
+-spec get_chunk_helper(DB::db_t(), StartId::?RT:key(), Interval::intervals:interval(),
                        AddDataFun::fun((Key_::binary(), Key::?RT:key(), db_entry:entry(), [T]) -> [T]),
                        GetKeyFromDataFun::fun((T) -> ?RT:key()), ChunkSize::pos_integer() | all)
         -> {intervals:interval(), [T]}.
-get_chunk_helper({{DB, _FileName}, _Subscr, _SnapState}, Interval, AddDataFun, GetKeyFromDataFun, ChunkSize) ->
-    {BeginBr, Begin, _End, _EndBr} = intervals:get_bounds(Interval),
-    % try to find the first existing key in the interval, starting at Begin:
-    MInfToBegin = intervals:minus(intervals:all(),
-                                  intervals:new(BeginBr, Begin, ?PLUS_INFINITY, ')')),
-    % note: N is a helper for filtering out unnecessary items every once in a while
-    F = fun (Key_, DBEntry_, {N, Data} = Acc) ->
-                 Key = erlang:binary_to_term(Key_),
-                 case intervals:in(Key, Interval) of
-                     true when ChunkSize =:= all ->
-                         % note: no need to count items here
-                         {0, AddDataFun(Key_, Key, DBEntry_, Data)};
-                     true ->
-                         Data1 = AddDataFun(Key_, Key, DBEntry_, Data),
-                         % filter out unnecessary items every (2 * ChunkSize) elements
-                         case N rem 2 * ChunkSize of
-                             0 ->
-                                 {0, get_chunk_helper_filter(Data1, MInfToBegin, GetKeyFromDataFun, ChunkSize)};
-                             _ ->
-                                 {N + 1, Data1}
-                         end;
-                     _    -> Acc
-                 end
-        end,
-    {_, Data} = toke_drv:fold(F, {0, []}, DB),
-    SortedData = get_chunk_helper_sort(Data, MInfToBegin, GetKeyFromDataFun),
-    case ChunkSize of
-        all -> {intervals:empty(), SortedData};
-        _   -> {Chunk, Rest} = util:safe_split(ChunkSize, SortedData),
-               case Rest of
-                   []      -> {intervals:empty(), Chunk};
-                   [H | _] ->
-                       Next = GetKeyFromDataFun(H),
-                       NextToIntBegin =
-                           case BeginBr of
-                               '(' -> intervals:new('[', Next, Begin, ']');
-                               '[' -> intervals:new('[', Next, Begin, ')')
-                           end,
-                       {intervals:intersection(Interval, NextToIntBegin), Chunk}
-               end
+get_chunk_helper({{DB, _FileName}, _Subscr, _SnapState}, StartId, Interval,
+                 AddDataFun, GetKeyFromDataFun, ChunkSize) ->
+    case intervals:is_empty(Interval) of
+        true ->
+            {intervals:empty(), []};
+        _ ->
+            {BeginBr, Begin, _End, _EndBr} = intervals:get_bounds(Interval),
+            % try to find the first existing key in the interval, starting at Begin:
+            MInfToBegin = intervals:minus(intervals:all(),
+                                          intervals:new(BeginBr, Begin, ?PLUS_INFINITY, ')')),
+            % note: N is a helper for filtering out unnecessary items every once in a while
+            F = fun (Key_, DBEntry_, {N, Data} = Acc) ->
+                         Key = erlang:binary_to_term(Key_),
+                         case intervals:in(Key, Interval) of
+                             true when ChunkSize =:= all ->
+                                 % note: no need to count items here
+                                 {0, AddDataFun(Key_, Key, DBEntry_, Data)};
+                             true ->
+                                 Data1 = AddDataFun(Key_, Key, DBEntry_, Data),
+                                 % filter out unnecessary items every (2 * ChunkSize) elements
+                                 case N rem 2 * ChunkSize of
+                                     0 ->
+                                         {0, get_chunk_helper_filter(
+                                            Data1, MInfToBegin, GetKeyFromDataFun, ChunkSize)};
+                                     _ ->
+                                         {N + 1, Data1}
+                                 end;
+                             _    -> Acc
+                         end
+                end,
+            {_, Data} = toke_drv:fold(F, {0, []}, DB),
+            SortedData = get_chunk_helper_sort(Data, MInfToBegin, GetKeyFromDataFun),
+            case ChunkSize of
+                all -> {intervals:empty(), SortedData};
+                _   -> {Chunk, Rest} = util:safe_split(ChunkSize, SortedData),
+                       case Rest of
+                           []      -> {intervals:empty(), Chunk};
+                           [H | _] ->
+                               Next = GetKeyFromDataFun(H),
+                               NextToIntBegin =
+                                   case BeginBr of
+                                       '(' -> intervals:new('[', Next, Begin, ']');
+                                       '[' -> intervals:new('[', Next, Begin, ')')
+                                   end,
+                               {intervals:intersection(Interval, NextToIntBegin), Chunk}
+                       end
+            end
     end.
 
 -spec get_chunk_helper_sort(Data::[T], MInfToBegin::intervals:interval(),
@@ -364,29 +371,56 @@ get_data_({{DB, _FileName}, _Subscr, _SnapState}) ->
 %%      from the DB when starting at the key directly after Begin.
 %%      Precond: a load larger than 0
 %%      Note: similar to get_chunk/2.
--spec get_split_key_(DB::db_t(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
+-spec get_split_key_(DB::db_t(), Begin::?RT:key(), End::?RT:key(),
+                     TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
-get_split_key_(DB, Begin, TargetLoad, Direction) ->
+get_split_key_(State = {{DB, _FileName}, _Subscr, _SnapState}, Begin, End, TargetLoad, Direction) ->
     % assert ChunkSize > 0, see ChunkSize type
-    case get_load_(DB) of
+    case get_load_(State) of
         0 -> throw('empty_db');
         _ ->
+            Interval = case Direction of
+                           forward  -> intervals:new('(', Begin, End, ']');
+                           backward -> intervals:new('(', End, Begin, ']')
+                       end,
             % first need to get all keys, then sort them and filter out the split key
-            F = fun (Key_, _DBEntry_, Data) -> [erlang:binary_to_term(Key_) | Data] end,
+            F = fun (Key_, _DBEntry_, Keys) ->
+                         Key = erlang:binary_to_term(Key_),
+                         case intervals:in(Key, Interval) of
+                             true -> [Key | Keys];
+                             _    -> Keys
+                         end
+                end,
             Keys = toke_drv:fold(F, [], DB),
             % try to find the first existing key in the interval, starting at Begin (exclusive):
-            MInfToBegin = intervals:minus(intervals:all(),
-                                          intervals:new('(', Begin, ?PLUS_INFINITY, ')')),
-            {SecondPart, FirstPart} =
-                lists:partition(fun(E) -> intervals:in(E, MInfToBegin) end, Keys),
-            SortedKeys = lists:append(lists:usort(FirstPart), lists:usort(SecondPart)),
             
             case Direction of
                 forward  ->
-                    {Chunk, _Rest} = util:safe_split(TargetLoad, SortedKeys),
-                    {lists:last(Chunk), erlang:length(Chunk)};
+                    % always start chunking at Begin:
+                    StartInt = intervals:new('[', Begin, ?PLUS_INFINITY, ')'),
+                    {FirstPart, SecondPart} =
+                        lists:partition(fun(E) -> intervals:in(E, StartInt) end, Keys),
+                    SortedKeys = lists:append(lists:usort(FirstPart), lists:usort(SecondPart)),
+                    TargetLoad2 = TargetLoad;
                 backward ->
-                    {Chunk, _Rest} = util:safe_split(TargetLoad, lists:reverse(SortedKeys)),
-                    {hd(Chunk), erlang:length(Chunk)}
+                    StartInt = intervals:new('[', ?MINUS_INFINITY, Begin, ']'),
+                    {FirstPart, SecondPart} =
+                        lists:partition(fun(E) -> intervals:in(E, StartInt) end, Keys),
+                    SortedKeys = lists:append(lists:usort(fun erlang:'>='/2, FirstPart),
+                                              lists:usort(fun erlang:'>='/2, SecondPart)),
+                    TargetLoad2 = TargetLoad + 1 % split key will remain on the node
+            end,
+            case lists:foldl(fun(Key, {[], 0}) -> {[Key], 1}; % assume TargetLoad >= 1
+                                (_Key, {_Keys, Count} = Acc) when Count >= TargetLoad2 -> Acc;
+                                (Key, {_Keys, Count}) -> {[Key], Count + 1}
+                             end, {[], 0}, SortedKeys) of
+                {[], 0} ->
+                    {End, 0};
+                {[H], Taken} when Direction =:= forward ->
+                    {H, Taken};
+                {[H], Taken} when Direction =:= backward andalso Taken =:= TargetLoad2 ->
+                    {H, TargetLoad};
+                {[_H], Taken} when Direction =:= backward andalso Taken =< TargetLoad ->
+                    {End, Taken}
             end
     end.

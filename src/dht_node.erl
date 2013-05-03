@@ -246,12 +246,14 @@ on({get_entries, Source_PID, FilterFun, ValFun}, State) ->
     State;
 
 on({get_chunk, Source_PID, Interval, MaxChunkSize}, State) ->
-    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), Interval, MaxChunkSize),
+    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), dht_node_state:get(State, node_id),
+                          Interval, MaxChunkSize),
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
 on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) ->
-    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), Interval, FilterFun, ValueFun, MaxChunkSize),
+    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), dht_node_state:get(State, node_id),
+                          Interval, FilterFun, ValueFun, MaxChunkSize),
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
@@ -377,7 +379,9 @@ on({web_debug_info, Requestor}, State) ->
     % get a list of up to 50 KV pairs to display:
     DataListTmp = [{"",
                     webhelpers:safe_html_string("~p", [DBEntry])}
-                  || DBEntry <- element(2, ?DB:get_chunk(dht_node_state:get(State, db), intervals:all(), 50))],
+                  || DBEntry <- element(2, ?DB:get_chunk(dht_node_state:get(State, db),
+                                                         dht_node_state:get(State, node_id),
+                                                         intervals:all(), 50))],
     DataList = case Load > 50 of
                    true  -> lists:append(DataListTmp, [{"...", ""}]);
                    false -> DataListTmp

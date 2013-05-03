@@ -96,7 +96,8 @@ get_entries_(State, Interval) ->
             [E || Key <- Elements, E <- [get_entry_(State, Key)], not db_entry:is_empty(E)];
         _ ->
             {_, Data} =
-                get_chunk_(State, Interval,
+                get_chunk_(State, ?RT:hash_key("0"), % any key will work, here!
+                           Interval,
                            fun(DBEntry) ->
                                    (not db_entry:is_empty(DBEntry)) andalso
                                        intervals:in(db_entry:get_key(DBEntry), Interval)
@@ -113,10 +114,10 @@ get_entries_(State, Interval) ->
 %%      Returns the chunk and the remaining interval for which the DB may still
 %%      have data (a subset of I).
 %%      Precond: Interval is a subset of the range of the dht_node and continuous!
--spec get_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
+-spec get_chunk_(DB::db_t(), StartId::?RT:key(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
         -> {intervals:interval(), db_as_list()}.
-get_chunk_(DB, Interval, ChunkSize) ->
-    get_chunk_(DB, Interval, fun(_) -> true end, fun(E) -> E end, ChunkSize).
+get_chunk_(DB, StartId, Interval, ChunkSize) ->
+    get_chunk_(DB, StartId, Interval, fun(_) -> true end, fun(E) -> E end, ChunkSize).
 
 %% @doc Updates all (existing or non-existing) non-locked entries from
 %%      NewEntries for which Pred(OldEntry, NewEntry) returns true with

@@ -778,34 +778,20 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
         OtherMaxTransportEntries::unknown | pos_integer()) -> ?RT:key().
 find_incremental_target_id(Neighbors, State, FinalTargetId, Type, OtherMTE) ->
     PredOrSucc = slide_op:get_predORsucc(Type),
-    SendOrReceive = slide_op:get_sendORreceive(Type),
+    'send' = slide_op:get_sendORreceive(Type), % just in case
     MTE = case OtherMTE of
               unknown -> get_max_transport_entries();
               _       -> erlang:min(OtherMTE, get_max_transport_entries())
           end,
-    % if data is send to the successor, we need to increase the MTE since the
-    % last found item will be left on this node
-    MTE1 = if PredOrSucc =:= succ andalso SendOrReceive =:= 'send' -> MTE + 1;
-              true -> MTE
-           end,
     PredId = node:id(nodelist:pred(Neighbors)),
     % TODO: optimise here - if the remaining interval has no data, return FinalTargetId
-    try case PredOrSucc of
-            pred ->
-                {SplitKey, _} = dht_node_state:get_split_key(State, PredId, MTE1, forward),
-                % beware not to select a key larger than TargetId:
-                case nodelist:succ_ord_id(SplitKey, FinalTargetId, PredId) of
-                    true -> SplitKey;
-                    _    -> FinalTargetId
-                end;
-            succ ->
-                MyId = nodelist:nodeid(Neighbors),
-                {SplitKey, _} = dht_node_state:get_split_key(State, MyId, MTE1, backward),
-                % beware not to select a key smaller than TargetId:
-                case nodelist:succ_ord_id(SplitKey, FinalTargetId, PredId) of
-                    true -> FinalTargetId;
-                    _    -> SplitKey
-                end
+    case PredOrSucc of
+        pred -> BeginId = PredId, Dir = forward;
+        succ -> BeginId = nodelist:nodeid(Neighbors), Dir = backward
+    end,
+    try case dht_node_state:get_split_key(State, BeginId, FinalTargetId, MTE, Dir) of
+            {SplitKey, MTE} -> SplitKey;
+            {_SplitKey, MTEX} when MTEX < MTE -> FinalTargetId
         end
     catch
         throw:empty_db -> FinalTargetId

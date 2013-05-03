@@ -67,9 +67,10 @@
                       FilterFun::fun((DBEntry::db_entry:entry()) -> boolean()),
                       ValueFun::fun((DBEntry::db_entry:entry()) -> Value))
         -> [Value].
--callback get_chunk(DB::db(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
+-callback get_chunk(DB::db(), StartId::?RT:key(), Interval::intervals:interval(),
+                    ChunkSize::pos_integer() | all)
         -> {intervals:interval(), db_as_list()}.
--callback get_chunk(DB::db(), Interval::intervals:interval(),
+-callback get_chunk(DB::db(), StartId::?RT:key(), Interval::intervals:interval(),
                     FilterFun::fun((db_entry:entry()) -> boolean()),
                     ValueFun::fun((db_entry:entry()) -> V), ChunkSize::pos_integer() | all)
         -> {intervals:interval(), [V]}.
@@ -84,7 +85,7 @@
 
 -callback split_data(DB::db(), MyNewInterval::intervals:interval())
         -> {NewDB::db(), db_as_list()}.
--callback get_split_key(DB::db(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
+-callback get_split_key(DB::db(), Begin::?RT:key(), End::?RT:key(), TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
 
 -callback get_data(DB::db()) -> db_as_list().
@@ -132,11 +133,11 @@ behaviour_info(callbacks) ->
      % standard calls
      {read, 2}, {write, 4},
      {get_entry, 2}, {get_entry2, 2}, {set_entry, 2}, {update_entry, 2},
-     {get_chunk, 3}, {get_chunk, 5},
+     {get_chunk, 4}, {get_chunk, 6},
      % dangerous calls
      {delete, 2}, {delete_entry, 2},
      % load balancing
-     {get_load, 1}, {get_load, 2}, {split_data, 2}, {get_split_key, 4},
+     {get_load, 1}, {get_load, 2}, {split_data, 2}, {get_split_key, 5},
      % operations on multiple entries
      {get_data, 1}, {add_data, 2},
      {get_entries, 2}, {get_entries, 3},

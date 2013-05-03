@@ -39,12 +39,14 @@
 %% -define(TRACE3(Fun, Par1, Par2, Par3), io:format("~w: ~w(~w, ~w, ~w)~n", [self(), Fun, Par1, Par2, Par3])).
 %% -define(TRACE4(Fun, Par1, Par2, Par3, Par4), io:format("~w: ~w(~w, ~w, ~w, ~w)~n", [self(), Fun, Par1, Par2, Par3, Par4])).
 %% -define(TRACE5(Fun, Par1, Par2, Par3, Par4, Par5), io:format("~w: ~w(~w, ~w, ~w, ~w, ~w)~n", [self(), Fun, Par1, Par2, Par3, Par4, Par5])).
+%% -define(TRACE6(Fun, Par1, Par2, Par3, Par4, Par5, Par6), io:format("~w: ~w(~w, ~w, ~w, ~w, ~w, ~w)~n", [self(), Fun, Par1, Par2, Par3, Par4, Par5, Par6])).
 -define(TRACE0(Fun), ok).
 -define(TRACE1(Fun, Par1), ok).
 -define(TRACE2(Fun, Par1, Par2), ok).
 -define(TRACE3(Fun, Par1, Par2, Par3), ok).
 -define(TRACE4(Fun, Par1, Par2, Par3, Par4), ok).
 -define(TRACE5(Fun, Par1, Par2, Par3, Par4, Par5), ok).
+-define(TRACE6(Fun, Par1, Par2, Par3, Par4, Par5, Par6), ok).
 -spec verify_counter(Counter::non_neg_integer()) -> ok.
 verify_counter(Counter) ->
     case erlang:get(?MODULE) of
@@ -177,12 +179,12 @@ split_data_({DB, Counter} = _DB_, MyNewInterval) ->
 
 %% @doc Returns the key that would remove not more than TargetLoad entries
 %%      from the DB when starting at the key directly after Begin.
--spec get_split_key_(DB::db_t(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
+-spec get_split_key_(DB::db_t(), Begin::?RT:key(), End::?RT:key(), TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
-get_split_key_({DB, Counter} = _DB_, Begin, TargetLoad, Direction) ->
+get_split_key_({DB, Counter} = _DB_, Begin, End, TargetLoad, Direction) ->
     ?TRACE4(get_load, _DB_, Begin, TargetLoad, Direction),
     verify_counter(Counter),
-    ?BASE_DB:get_split_key(DB, Begin, TargetLoad, Direction).
+    ?BASE_DB:get_split_key(DB, Begin, End, TargetLoad, Direction).
 
 %% @doc Gets (non-empty) db_entry objects in the given range.
 -spec get_entries_(DB::db_t(), Range::intervals:interval()) -> db_as_list().
@@ -204,23 +206,24 @@ get_entries_({DB, Counter} = _DB_, FilterFun, ValueFun) ->
 
 %% @doc Returns all key-value pairs of the given DB which are in the given
 %%      interval but at most ChunkSize elements.
--spec get_chunk_(DB::db_t(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
+-spec get_chunk_(DB::db_t(), StartId::?RT:key(), Interval::intervals:interval(),
+                 ChunkSize::pos_integer() | all)
         -> {intervals:interval(), db_as_list()}.
-get_chunk_({DB, Counter} = _DB_, Interval, ChunkSize) ->
-    ?TRACE3(get_chunk, _DB_, Interval, ChunkSize),
+get_chunk_({DB, Counter} = _DB_, StartId, Interval, ChunkSize) ->
+    ?TRACE4(get_chunk, _DB_, StartId, Interval, ChunkSize),
     verify_counter(Counter),
-    ?BASE_DB:get_chunk(DB, Interval, ChunkSize).
+    ?BASE_DB:get_chunk(DB, StartId, Interval, ChunkSize).
 
 %% @doc Returns all key-value pairs of the given DB which are in the given
 %%      interval but at most ChunkSize elements.
--spec get_chunk_(DB::db_t(), Interval::intervals:interval(),
+-spec get_chunk_(DB::db_t(), StartId::?RT:key(), Interval::intervals:interval(),
                  FilterFun::fun((db_entry:entry()) -> boolean()),
                  ValueFun::fun((db_entry:entry()) -> V), ChunkSize::pos_integer() | all)
         -> {intervals:interval(), [V]}.
-get_chunk_({DB, Counter} = _DB_, Interval, FilterFun, ValueFun, ChunkSize) ->
-    ?TRACE5(get_chunk, _DB_, Interval, FilterFun, ValueFun, ChunkSize),
+get_chunk_({DB, Counter} = _DB_, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
+    ?TRACE6(get_chunk, _DB_, StartId, Interval, FilterFun, ValueFun, ChunkSize),
     verify_counter(Counter),
-    ?BASE_DB:get_chunk(DB, Interval, FilterFun, ValueFun, ChunkSize).
+    ?BASE_DB:get_chunk(DB, StartId, Interval, FilterFun, ValueFun, ChunkSize).
 
 %% @doc Returns all DB entries.
 -spec get_data_(DB::db_t()) -> db_as_list().
