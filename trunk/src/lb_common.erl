@@ -84,17 +84,14 @@ calc_sum2Change(Op) ->
 -spec split_by_load(DhtNodeState::dht_node_state:state(), TargetLoad::pos_integer())
         -> {SplitKey::?RT:key(), TargetLoadNew::non_neg_integer()}.
 split_by_load(DhtNodeState, TargetLoad) ->
-    DB = dht_node_state:get(DhtNodeState, db),
     Neighbors = dht_node_state:get(DhtNodeState, neighbors),
 %%     log:pal("[ ~.0p ] data: ~.0p", [self(), ?DB:get_data(DB)]),
-    {SplitKey, TargetLoadNew} =
-        ?DB:get_split_key(DB, node:id(nodelist:pred(Neighbors)), TargetLoad, forward),
-    _ = case intervals:in(SplitKey, nodelist:node_range(Neighbors)) of
-            false -> erlang:throw('no key in range');
-            _     -> ok
-        end,
-%%     log:pal("[ ~.0p ]  TN: ~.0p, SK: ~.0p~n", [self(), TargetLoadNew, SplitKey]),
-    {SplitKey, TargetLoadNew}.
+    PredId = node:id(nodelist:pred(Neighbors)),
+    NodeId = nodelist:nodeid(Neighbors),
+    case dht_node_state:get_split_key(DhtNodeState, PredId, NodeId, TargetLoad, forward) of
+        {NodeId, _TargetLoadNew} -> erlang:throw('no key in range');
+        X -> X
+    end.
 
 %% @doc Returns the given SplitKey and the load that would be split off by
 %%      using this key.

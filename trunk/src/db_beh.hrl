@@ -40,7 +40,7 @@
 -export([get_entry/2, get_entry2/2, set_entry/2, update_entry/2, delete_entry/2]).
 -export([read/2, write/4, delete/2]).
 -export([get_entries/2, get_entries/3]).
--export([get_chunk/3, get_chunk/5, get_split_key/4]).
+-export([get_chunk/4, get_chunk/6, get_split_key/5]).
 -export([update_entries/4]).
 -export([delete_entries/2]).
 -export([get_load/1, get_load/2, split_data/2, get_data/1, add_data/2]).
@@ -106,16 +106,16 @@ get_entries(DB, Range) -> get_entries_(DB, Range).
         -> [Value].
 get_entries(DB, FilterFun, ValueFun) -> get_entries_(DB, FilterFun, ValueFun).
 
--spec get_chunk(DB::db(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
+-spec get_chunk(DB::db(), StartId::?RT:key(), Interval::intervals:interval(), ChunkSize::pos_integer() | all)
         -> {intervals:interval(), db_as_list()}.
-get_chunk(DB, Interval, ChunkSize) -> get_chunk_(DB, Interval, ChunkSize).
+get_chunk(DB, StartId, Interval, ChunkSize) -> get_chunk_(DB, StartId, Interval, ChunkSize).
 
--spec get_chunk(DB::db(), Interval::intervals:interval(),
+-spec get_chunk(DB::db(), StartId::?RT:key(), Interval::intervals:interval(),
                  FilterFun::fun((db_entry:entry()) -> boolean()),
                  ValueFun::fun((db_entry:entry()) -> V), ChunkSize::pos_integer() | all)
         -> {intervals:interval(), [V]}.
-get_chunk(DB, Interval, FilterFun, ValueFun, ChunkSize) ->
-    get_chunk_(DB, Interval, FilterFun, ValueFun, ChunkSize).
+get_chunk(DB, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
+    get_chunk_(DB, StartId, Interval, FilterFun, ValueFun, ChunkSize).
 
 -spec update_entries(DB::db(), Values::[db_entry:entry()],
                      Pred::fun((OldEntry::db_entry:entry(), NewEntry::db_entry:entry()) -> boolean()),
@@ -133,10 +133,10 @@ delete_entries(DB, RangeOrFun) -> delete_entries_(DB, RangeOrFun).
          {NewDB::db(), db_as_list()}.
 split_data(DB, MyNewInterval) -> split_data_(DB, MyNewInterval).
 
--spec get_split_key(DB::db(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
+-spec get_split_key(DB::db(), Begin::?RT:key(), End::?RT:key(), TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
-get_split_key(DB, Begin, TargetLoad, Direction) ->
-    get_split_key_(DB, Begin, TargetLoad, Direction).
+get_split_key(DB, Begin, End, TargetLoad, Direction) ->
+    get_split_key_(DB, Begin, End, TargetLoad, Direction).
 
 -spec get_data(DB::db()) -> db_as_list().
 get_data(DB) -> get_data_(DB).

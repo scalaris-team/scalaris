@@ -38,7 +38,7 @@
          slide_get_data_start_record/2, slide_add_data/2,
          slide_take_delta_stop_record/2, slide_add_delta/2,
          slide_stop_record/3,
-         get_split_key/4,
+         get_split_key/5,
          add_db_range/3, rm_db_range/2]).
 %% bulk owner:
 -export([add_bulkowner_reply_msg/5,
@@ -437,7 +437,7 @@ slide_stop_record(State, MovingInterval, Remove) ->
 
 %% @doc Returns a key so that there are no more than TargetLoad entries
 %%      between Begin and this key in the DB.
--spec get_split_key(state(), Begin::?RT:key(), TargetLoad::pos_integer(), forward | backward)
+-spec get_split_key(state(), Begin::?RT:key(), End::?RT:key(), TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
-get_split_key(State, Begin, TargetLoad, Direction) ->
-    ?DB:get_split_key(get(State, db), Begin, TargetLoad, Direction).
+get_split_key(State, Begin, End, TargetLoad, Direction) ->
+    ?DB:get_split_key(get(State, db), Begin, End, TargetLoad, Direction).
