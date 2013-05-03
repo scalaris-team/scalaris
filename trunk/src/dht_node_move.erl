@@ -789,12 +789,9 @@ find_incremental_target_id(Neighbors, State, FinalTargetId, Type, OtherMTE) ->
         pred -> BeginId = PredId, Dir = forward;
         succ -> BeginId = nodelist:nodeid(Neighbors), Dir = backward
     end,
-    try case dht_node_state:get_split_key(State, BeginId, FinalTargetId, MTE, Dir) of
-            {SplitKey, MTE} -> SplitKey;
-            {_SplitKey, MTEX} when MTEX < MTE -> FinalTargetId
-        end
-    catch
-        throw:empty_db -> FinalTargetId
+    case dht_node_state:get_split_key(State, BeginId, FinalTargetId, MTE, Dir) of
+        {SplitKey, MTE} -> SplitKey;
+        {_SplitKey, MTEX} when MTEX < MTE -> FinalTargetId
     end.
 
 %% @doc Change the local node's ID to the given TargetId and progresses to the

@@ -374,53 +374,49 @@ get_data_({{DB, _FileName}, _Subscr, _SnapState}) ->
 -spec get_split_key_(DB::db_t(), Begin::?RT:key(), End::?RT:key(),
                      TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
-get_split_key_(State = {{DB, _FileName}, _Subscr, _SnapState}, Begin, End, TargetLoad, Direction) ->
+get_split_key_({{DB, _FileName}, _Subscr, _SnapState}, Begin, End, TargetLoad, Direction) ->
     % assert ChunkSize > 0, see ChunkSize type
-    case get_load_(State) of
-        0 -> throw('empty_db');
-        _ ->
-            Interval = case Direction of
-                           forward  -> intervals:new('(', Begin, End, ']');
-                           backward -> intervals:new('(', End, Begin, ']')
-                       end,
-            % first need to get all keys, then sort them and filter out the split key
-            F = fun (Key_, _DBEntry_, Keys) ->
-                         Key = erlang:binary_to_term(Key_),
-                         case intervals:in(Key, Interval) of
-                             true -> [Key | Keys];
-                             _    -> Keys
-                         end
-                end,
-            Keys = toke_drv:fold(F, [], DB),
-            % try to find the first existing key in the interval, starting at Begin (exclusive):
-            
-            case Direction of
-                forward  ->
-                    % always start chunking at Begin:
-                    StartInt = intervals:new('[', Begin, ?PLUS_INFINITY, ')'),
-                    {FirstPart, SecondPart} =
-                        lists:partition(fun(E) -> intervals:in(E, StartInt) end, Keys),
-                    SortedKeys = lists:append(lists:usort(FirstPart), lists:usort(SecondPart)),
-                    TargetLoad2 = TargetLoad;
-                backward ->
-                    StartInt = intervals:new('[', ?MINUS_INFINITY, Begin, ']'),
-                    {FirstPart, SecondPart} =
-                        lists:partition(fun(E) -> intervals:in(E, StartInt) end, Keys),
-                    SortedKeys = lists:append(lists:usort(fun erlang:'>='/2, FirstPart),
-                                              lists:usort(fun erlang:'>='/2, SecondPart)),
-                    TargetLoad2 = TargetLoad + 1 % split key will remain on the node
-            end,
-            case lists:foldl(fun(Key, {[], 0}) -> {[Key], 1}; % assume TargetLoad >= 1
-                                (_Key, {_Keys, Count} = Acc) when Count >= TargetLoad2 -> Acc;
-                                (Key, {_Keys, Count}) -> {[Key], Count + 1}
-                             end, {[], 0}, SortedKeys) of
-                {[], 0} ->
-                    {End, 0};
-                {[H], Taken} when Direction =:= forward ->
-                    {H, Taken};
-                {[H], Taken} when Direction =:= backward andalso Taken =:= TargetLoad2 ->
-                    {H, TargetLoad};
-                {[_H], Taken} when Direction =:= backward andalso Taken =< TargetLoad ->
-                    {End, Taken}
-            end
+    Interval = case Direction of
+                   forward  -> intervals:new('(', Begin, End, ']');
+                   backward -> intervals:new('(', End, Begin, ']')
+               end,
+    % first need to get all keys, then sort them and filter out the split key
+    F = fun (Key_, _DBEntry_, Keys) ->
+                 Key = erlang:binary_to_term(Key_),
+                 case intervals:in(Key, Interval) of
+                     true -> [Key | Keys];
+                     _    -> Keys
+                 end
+        end,
+    Keys = toke_drv:fold(F, [], DB),
+    % try to find the first existing key in the interval, starting at Begin (exclusive):
+    
+    case Direction of
+        forward  ->
+            % always start chunking at Begin:
+            StartInt = intervals:new('[', Begin, ?PLUS_INFINITY, ')'),
+            {FirstPart, SecondPart} =
+                lists:partition(fun(E) -> intervals:in(E, StartInt) end, Keys),
+            SortedKeys = lists:append(lists:usort(FirstPart), lists:usort(SecondPart)),
+            TargetLoad2 = TargetLoad;
+        backward ->
+            StartInt = intervals:new('[', ?MINUS_INFINITY, Begin, ']'),
+            {FirstPart, SecondPart} =
+                lists:partition(fun(E) -> intervals:in(E, StartInt) end, Keys),
+            SortedKeys = lists:append(lists:usort(fun erlang:'>='/2, FirstPart),
+                                      lists:usort(fun erlang:'>='/2, SecondPart)),
+            TargetLoad2 = TargetLoad + 1 % split key will remain on the node
+    end,
+    case lists:foldl(fun(Key, {[], 0}) -> {[Key], 1}; % assume TargetLoad >= 1
+                        (_Key, {_Keys, Count} = Acc) when Count >= TargetLoad2 -> Acc;
+                        (Key, {_Keys, Count}) -> {[Key], Count + 1}
+                     end, {[], 0}, SortedKeys) of
+        {[], 0} ->
+            {End, 0};
+        {[H], Taken} when Direction =:= forward ->
+            {H, Taken};
+        {[H], Taken} when Direction =:= backward andalso Taken =:= TargetLoad2 ->
+            {H, TargetLoad};
+        {[_H], Taken} when Direction =:= backward andalso Taken =< TargetLoad ->
+            {End, Taken}
     end.
