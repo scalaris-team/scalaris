@@ -258,32 +258,38 @@ get_chunk_helper({ETSDB, _Subscr, _SnapStates} = DB, StartId, Interval,
             {LastKey, _ChunkL, ChunkLProcessed} =
                 first_key_in_interval(DB, ETS_last, ETS_prev, StartId, Interval,
                                       StartFromI, AddDataFun, IsContinuous),
-            %log:pal("first key: ~.0p~n", [FirstKey]),
-            % note: the value from Chunk1 is not added by get_chunk_inner!
-            {Next, Chunk, RestChunkSize} =
-                get_chunk_inner(DB, ETS_first, ETS_next, ETS_next(ETSDB, FirstKey), LastKey,
-                                Interval, AddDataFun, ChunkSize - ChunkFProcessed,
-                                ChunkF),
+            %log:pal("first key: ~.0p~nlast key : ~.0p~n", [FirstKey, LastKey]),
             
-            % if data from LastKey was not added (if FirstKey =:= LastKey) and
-            % we have space left, add it here:
-            Chunk1 = if ChunkLProcessed =/= 0 andalso FirstKey =/= LastKey
-                            andalso RestChunkSize =/= 0 ->
-                            % use AddDataFun to process the item as the user intended:
-                            AddDataFun(DB, LastKey, Chunk);
-                        true -> Chunk
-                     end,
-            
-            case Next of
-                '$end_of_interval' ->
-                    {intervals:empty(), Chunk1};
+            case FirstKey of
+                LastKey when FirstKey =/= StartId ->
+                    {intervals:empty(), ChunkF};
                 _ ->
-                    NextToIntBegin =
-                        case ForwardBackward of
-                            forward -> intervals:new('[', Next, FirstKey, ')');
-                            backward -> intervals:new('(', FirstKey, Next, ']')
-                        end,
-                    {intervals:intersection(Interval, NextToIntBegin), Chunk1}
+                    % note: the value from Chunk1 is not added by get_chunk_inner!
+                    {Next, Chunk, RestChunkSize} =
+                        get_chunk_inner(DB, ETS_first, ETS_next, ETS_next(ETSDB, FirstKey), LastKey,
+                                        Interval, AddDataFun, ChunkSize - ChunkFProcessed,
+                                        ChunkF),
+                    
+                    % if data from LastKey was not added (if FirstKey =:= LastKey) and
+                    % we have space left, add it here:
+                    Chunk1 = if ChunkLProcessed =/= 0 andalso FirstKey =/= LastKey
+                                    andalso RestChunkSize =/= 0 ->
+                                    % use AddDataFun to process the item as the user intended:
+                                    AddDataFun(DB, LastKey, Chunk);
+                                true -> Chunk
+                             end,
+                    
+                    case Next of
+                        '$end_of_interval' ->
+                            {intervals:empty(), Chunk1};
+                        _ ->
+                            TakenInterval =
+                                case ForwardBackward of
+                                    forward -> intervals:new('(', LastKey, Next, ']');
+                                    backward -> intervals:new('[', Next, LastKey, ')')
+                                end,
+                            {intervals:minus(Interval, TakenInterval), Chunk1}
+                    end
             end
     end.
 
