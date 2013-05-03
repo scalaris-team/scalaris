@@ -662,8 +662,8 @@ macro_equals_failed(ActualVal, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, 
            " Linetrace  ~p~n",
            [self(), ActualStr, ActualVal, CompFunStr, ExpectedStr, ExpectedVal, Note,
             util:get_stacktrace(), util:get_linetrace()]),
-    ?ct_fail("~s evaluated to \"~.0p\" which is not the expected ~s that evaluates to \"~.0p\"~n~.0p",
-             [ActualStr, ActualVal, ExpectedStr, ExpectedVal, Note]).
+    ?ct_fail("~s evaluated to \"~.0p\" which is not ~s the expected ~s that evaluates to \"~.0p\"~n~.0p",
+             [ActualStr, ActualVal, CompFunStr, ExpectedStr, ExpectedVal, Note]).
 
 -spec expect_no_message_timeout(Timeout::pos_integer()) -> true | no_return().
 expect_no_message_timeout(Timeout) ->
