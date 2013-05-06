@@ -199,9 +199,14 @@ abort(DB, RTLogEntry, ?prepared, _TMSnapNo, OwnSnapNo) ->
                 false ->
                     %% if no snapshot is running don't operate on the snapshot
                     %% state
-                    log:log(warn, "rdht_tx_write:abort(): lockcount wrong; possible inconsisten snapshot~p~n",
+                    case (TLogSnapNo < OwnSnapNo) of
+                        true ->
+                            log:log(warn, "rdht_tx_write:abort(): lockcount wrong; possible inconsistent snapshot ~p~n",
                             [OwnSnapNo]),
-                    NewDB;
+                            NewDB;
+                        _ ->
+                            NewDB
+                    end;
                 true ->
                     case (TLogSnapNo < OwnSnapNo) of
                         true -> % we have to apply changes to the snapshot db as well
