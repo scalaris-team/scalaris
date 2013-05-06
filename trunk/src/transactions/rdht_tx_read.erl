@@ -300,6 +300,16 @@ commit(DB, RTLogEntry, ?prepared, _TMSnapNo, OwnSnapNo) ->
             NewDB = ?DB:set_entry(DB, NewEntry),
             TLogSnapNo = tx_tlog:get_entry_snapshot(RTLogEntry),
             case ?DB:snapshot_is_running(NewDB) of
+                false ->
+                    case (TLogSnapNo < OwnSnapNo) of
+                        true ->
+                        %% should not happen
+                            log:log(warn, "rdht_tx_write:abort(): lockcount wrong; possible inconsistent snapshot ~p~n",
+                            [OwnSnapNo]),
+                            NewDB;
+                        _ ->
+                            NewDB
+                    end;
                 true ->
                     case (TLogSnapNo < OwnSnapNo) of
                         true -> % we have to apply changes to the snapshot db as well
@@ -322,12 +332,7 @@ commit(DB, RTLogEntry, ?prepared, _TMSnapNo, OwnSnapNo) ->
                             ?TRACE_SNAP("rdht_tx_read ~p~n snapnumbers not ok~n~p   ~p",
                                         [comm:this(), TLogSnapNo, OwnSnapNo]),
                             NewDB
-                    end;
-                false ->
-                    %% should not happen
-                    log:log(warn, "rdht_tx_read:commit(): lockcount wrong; possible inconsisten snapshot~p~n",
-                            [OwnSnapNo]),
-                    NewDB
+                    end
             end;
         true -> DB %% a write has already deleted this lock
     end.
