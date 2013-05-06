@@ -20,7 +20,6 @@
 %%        {autoscale_cloud_module, cloud_ssh}
 %%      The following options can also be set:
 %%        {cloud_ssh_hosts, ["host1", "host2", ..., "hostn"]}.
-%%        {cloud_ssh_args, "arguments for ssh"}.
 %%        {cloud_ssh_path, "path/to/scalaris/installation/on/host"}.
 %%      Additional services besides Scalaris may be specified:
 %%        {cloud_ssh_services, [{ServiceStartCmd, ServiceStopCmd}, {Service2StartCmd, Service2StopCmd}, ...]}.
@@ -37,8 +36,8 @@
 -export([init/0, get_number_of_vms/0, add_vms/1, remove_vms/1, killall_vms/0]).
 
 -define(cloud_ssh_key, "2a42cb863313526fca96098a95020db2a904b01157f191a9bb3200829f8596c7").
--define(scalaris_start, "bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node start").
--define(scalaris_stop, "bin/./scalarisctl -n node gstop").
+-define(scalaris_start, "bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node1 start").
+-define(scalaris_stop, "bin/./scalarisctl -n node1 gstop").
 
 -type status() :: active | inactive.
 -type host() :: tuple(string(), status()).
@@ -105,14 +104,14 @@ add_or_remove_vms(add, Pending, Hosts, UpdatedHosts) ->
         {_, active} ->
             add_or_remove_vms(add, Pending, RemainingHosts, UpdatedHosts ++ [Host]);
         {Hostname, _} ->
-            start_scalaris_vm(Hostname),
+            scalaris_vm(start, Hostname),
             add_or_remove_vms(add, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, active}])
     end;
 add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
     [Host | RemainingHosts] = Hosts,
     case Host of
         {Hostname, active} ->
-            stop_scalaris_vm(Hostname),
+            scalaris_vm(stop, Hostname),
             add_or_remove_vms(remove, Pending - 1, RemainingHosts, UpdatedHosts ++ [{Hostname, inactive}]);
         {_, _} ->
             add_or_remove_vms(remove, Pending, RemainingHosts, UpdatedHosts ++ [Host])
@@ -123,35 +122,34 @@ add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
 %%%% Helper methods
 %%%%%%%%%%%%%%%%%%%
 
--spec killall_vms() -> ok.
+-spec killall_vms() -> fail | ok.
 killall_vms() ->
 	case get_hosts() of
 		{_, Hosts} ->
-    		lists:foreach(fun({Hostname, _}) ->
-                          Cmd = lists:flatten(io_lib:format("ssh ~s ~s killall -9 beam.smp",
-                                                            [get_ssh_args(), Hostname])),
-                          exec(Cmd)
-            end, Hosts);
+    		lists:foreach(fun({Hostname, Status}) ->
+                                  case Status of
+                                      active ->
+                                          scalaris_vm(stop, Hostname);
+                                      inactive ->
+                                          ok
+                                  end
+                          end, Hosts),
+            ok;
 		fail -> fail
     end.
 
-start_scalaris_vm(Hostname) ->
+-spec scalaris_vm(start | stop, string()) -> ok.
+scalaris_vm(Action, Hostname) ->
     Scalaris = get_scalaris_service(),
     Services = [Scalaris | get_additional_services()],
     lists:foreach(fun (Service) ->
-                          {StartCmd, _} = Service,
-                          Cmd = format("ssh ~s ~s \"~s\"", [get_ssh_args(), Hostname, StartCmd]),
-                          io:format("Executing: ~p~n", [Cmd]),
-                          _ = exec(Cmd)
-                  end, Services),
-    ok.
-
-stop_scalaris_vm(Hostname) ->
-    Scalaris = get_scalaris_service(),
-    Services = [Scalaris | get_additional_services()],
-    lists:foreach(fun (Service) ->
-                          {_, StopCmd} = Service,
-                          Cmd = format("ssh ~s ~s \"~s\"", [get_ssh_args(), Hostname, StopCmd]),
+				{StartCmd, StopCmd} = Service,
+				ServiceCmd =
+				case Action of
+								  start -> StartCmd;
+								  stop  -> StopCmd
+							  end,
+                          Cmd = format("ssh -n -f ~s \"(~s)\"", [Hostname, ServiceCmd]),
                           io:format("Executing: ~p~n", [Cmd]),
                           _ = exec(Cmd)
                   end, Services),
@@ -177,13 +175,6 @@ save_hosts(TLog, Hosts) ->
 		{[], [{ok}, {ok}]} -> ok;
 		_ -> fail
 	end.
-
--spec get_ssh_args() -> string().
-get_ssh_args() ->
-    case config:read(cloud_ssh_args) of
-        failed -> "";
-        Args -> Args
-    end.
 
 -spec get_scalaris_service() ->  tuple(string(), string()).
 get_scalaris_service() ->
