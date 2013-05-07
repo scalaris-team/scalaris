@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@
 
 -callback empty_ext(nodelist:neighborhood()) -> external_rt().
 -callback init(nodelist:neighborhood()) -> rt().
--callback hash_key(client_key()) -> key().
+-callback hash_key(client_key() | binary()) -> key().
 -callback get_random_node_id() -> key().
 -callback next_hop(dht_node_state:state(), key()) -> comm:mypid().
 
