@@ -1,4 +1,4 @@
-% @copyright 2008-2012 Zuse Institute Berlin
+% @copyright 2008-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -48,15 +48,17 @@ empty(Neighbors) -> nodelist:succ(Neighbors).
 init(Neighbors) -> empty(Neighbors).
 
 %% @doc Hashes the key to the identifier space.
--spec hash_key(client_key()) -> key().
+-spec hash_key(client_key() | binary()) -> key().
 hash_key(Key) -> hash_key_(Key).
 
 %% @doc Hashes the key to the identifier space (internal function to allow
 %%      use in e.g. get_random_node_id without dialyzer complaining about the
 %%      opaque key type).
--spec hash_key_(client_key()) -> key_t().
+-spec hash_key_(client_key() | binary()) -> key_t().
+hash_key_(Key) when not is_binary(Key) ->
+    hash_key_(client_key_to_binary(Key));
 hash_key_(Key) ->
-    <<N:128>> = erlang:md5(client_key_to_binary(Key)),
+    <<N:128>> = crypto:md5(Key),
     N.
 %% userdevguide-end rt_simple:hash_key
 

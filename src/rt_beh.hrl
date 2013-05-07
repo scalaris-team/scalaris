@@ -1,4 +1,4 @@
-% @copyright 2010-2012 Zuse Institute Berlin
+% @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -44,6 +44,8 @@
      ]).
 
 -spec client_key_to_binary(Key::client_key()) -> binary().
+client_key_to_binary(Key) when is_binary(Key) ->
+    Key;
 client_key_to_binary(Key) ->
     case unicode:characters_to_binary(Key) of
         {incomplete, Encoded, Rest} ->

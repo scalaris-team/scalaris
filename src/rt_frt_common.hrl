@@ -120,15 +120,15 @@ init(Neighbors) ->
     update_entries(Neighbors, add_source_entry(nodelist:node(Neighbors), #rt_t{})).
 
 %% @doc Hashes the key to the identifier space.
--spec hash_key(client_key()) -> key().
+-spec hash_key(client_key() | binary()) -> key().
 hash_key(Key) -> hash_key_(Key).
 
 %% @doc Hashes the key to the identifier space (internal function to allow
 %%      use in e.g. get_random_node_id without dialyzer complaining about the
 %%      opaque key type).
--spec hash_key_(client_key()) -> key_t().
+-spec hash_key_(client_key() | binary()) -> key_t().
 hash_key_(Key) ->
-    <<N:128>> = erlang:md5(client_key_to_binary(Key)),
+    <<N:128>> = crypto:md5(client_key_to_binary(Key)),
     N.
 %% userdevguide-end rt_frtchord:hash_key
 
