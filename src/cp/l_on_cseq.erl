@@ -966,7 +966,7 @@ read(Key) ->
                       )
         end.
 
--spec read(lease_id(), comm:erl_local_pid_plain()) -> ok.
+-spec read(lease_id(), comm:erl_local_pid()) -> ok.
 read(Key, Pid) ->
     %% decide which lease db is responsible, ie. if the key is from
     %% the first quarter of the ring, use lease_db1, if from 2nd
