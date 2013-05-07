@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -96,6 +96,34 @@ childs([DHTNodeGroup, Options]) ->
                    [DHTNodeGroup,
                     _PidGroupsNameL4 = lease_db4,
                     _DBSelectorL4 = leases_4]),
+    %% rbrcseq process working on the txid_db1 DB
+    Tx1_RBRcseq = util:sup_worker_desc(
+                   txid1_rbrcseq, rbrcseq,
+                   start_link,
+                   [DHTNodeGroup,
+                    _PidGroupsNameT1 = txid_db1,
+                    _DBSelectorT1 = txid_1]),
+    %% rbrcseq process working on the txid_db2 DB
+    Tx2_RBRcseq = util:sup_worker_desc(
+                   txid2_rbrcseq, rbrcseq,
+                   start_link,
+                   [DHTNodeGroup,
+                    _PidGroupsNameT2 = txid_db2,
+                    _DBSelectorT2 = txid_2]),
+    %% rbrcseq process working on the txid_db3 DB
+    Tx3_RBRcseq = util:sup_worker_desc(
+                   txid3_rbrcseq, rbrcseq,
+                   start_link,
+                   [DHTNodeGroup,
+                    _PidGroupsNameT3 = txid_db3,
+                    _DBSelectorT3 = txid_3]),
+    %% rbrcseq process working on the txid_db4 DB
+    Tx4_RBRcseq = util:sup_worker_desc(
+                   txid4_rbrcseq, rbrcseq,
+                   start_link,
+                   [DHTNodeGroup,
+                    _PidGroupsNameT4 = txid_db4,
+                    _DBSelectorT4 = txid_4]),
 
     DHTNodeMonitor = util:sup_worker_desc(
                        dht_node_monitor, dht_node_monitor, start_link,
@@ -110,6 +138,10 @@ childs([DHTNodeGroup, Options]) ->
      L2_RBRcseq,
      L3_RBRcseq,
      L4_RBRcseq,
+     Tx1_RBRcseq,
+     Tx2_RBRcseq,
+     Tx3_RBRcseq,
+     Tx4_RBRcseq,
      DHTNodeMonitor,
      DHTNode,
      TX
