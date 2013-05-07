@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -55,7 +55,9 @@
 -export_type([state/0, name/0, db_selector/0, slide_data/0, slide_delta/0]).
 -endif.
 
--type db_selector() :: kv. %%| tx_id | leases_1 | leases_2 | leases_3 | leases_4.
+-type db_selector() :: kv |
+                       txid_1 | txid_2 | txid_3 | txid_4 |
+                       leases_1 | leases_2 | leases_3 | leases_4.
 -type name() :: rt | rt_size | neighbors | succlist | succ | succ_id
               | succ_pid | predlist | pred | pred_id | pred_pid | node
               | node_id | my_range | db_range | succ_range | join_time
@@ -83,6 +85,10 @@
                 bulkowner_reply_ids     = []   :: [uid:global_uid()],
                 monitor_proc            = ?required(state, monitor_proc) :: pid(),
                 prbr_kv_db = ?required(state, prbr_state) :: prbr:state(),
+                txid_db1 = ?required(state, prbr_state) :: prbr:state(),
+                txid_db2 = ?required(state, prbr_state) :: prbr:state(),
+                txid_db3 = ?required(state, prbr_state) :: prbr:state(),
+                txid_db4 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db1 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db2 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db3 = ?required(state, prbr_state) :: prbr:state(),
@@ -103,6 +109,10 @@ new(RT, RMState, DB) ->
            proposer = pid_groups:get_my(paxos_proposer),
            monitor_proc = pid_groups:get_my(dht_node_monitor),
            prbr_kv_db = prbr:init(prbr_kv_db),
+           txid_db1 = prbr:init(txid_db1),
+           txid_db2 = prbr:init(txid_db2),
+           txid_db3 = prbr:init(txid_db3),
+           txid_db4 = prbr:init(txid_db4),
            lease_db1 = prbr:init(lease_db1),
            lease_db2 = prbr:init(lease_db2),
            lease_db3 = prbr:init(lease_db3),
@@ -167,6 +177,10 @@ new(RT, RMState, DB) ->
          (state(), rm_state) -> rm_loop:state();
          (state(), monitor_proc) -> pid();
          (state(), prbr_kv_db) -> prbr:state();
+         (state(), txid_db1) -> prbr:state();
+         (state(), txid_db2) -> prbr:state();
+         (state(), txid_db3) -> prbr:state();
+         (state(), txid_db4) -> prbr:state();
          (state(), lease_db1) -> prbr:state();
          (state(), lease_db2) -> prbr:state();
          (state(), lease_db3) -> prbr:state();
@@ -176,8 +190,9 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
            db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState,
+           txid_db1=TxIdDB1, txid_db2=TxIdDB2, txid_db3=TxIdDB3, txid_db4=TxIdDB4,
            lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4, lease_list=LeaseList,
-		   snapshot_state=SnapState}, Key) ->
+           snapshot_state=SnapState}, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -214,7 +229,10 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         join_time    -> JoinTime;
         load         -> ?DB:get_load(DB);
         prbr_kv_db   -> PRBRState;
-        %% txid_db -> TxIdDB;
+        txid_db1     -> TxIdDB1;
+        txid_db2     -> TxIdDB2;
+        txid_db3     -> TxIdDB3;
+        txid_db4     -> TxIdDB4;
         lease_db1    -> LeaseDB1;
         lease_db2    -> LeaseDB2;
         lease_db3    -> LeaseDB3;
@@ -226,7 +244,10 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
 get_prbr_state(State, WhichDB) ->
     case WhichDB of
         kv -> get(State, prbr_kv_db);
-        %% tx_id -> get(State, txid_db);
+        txid_1 -> get(State, txid_db1);
+        txid_2 -> get(State, txid_db2);
+        txid_3 -> get(State, txid_db3);
+        txid_4 -> get(State, txid_db4);
         leases_1 -> get(State, lease_db1);
         leases_2 -> get(State, lease_db2);
         leases_3 -> get(State, lease_db3);
@@ -238,6 +259,10 @@ set_prbr_state(State, WhichDB, Value) ->
     case WhichDB of
         kv -> State#state{prbr_kv_db = Value};
         %% tx_id ->    State#state{tx_id = Value};
+        txid_1 -> State#state{txid_db1 = Value};
+        txid_2 -> State#state{txid_db2 = Value};
+        txid_3 -> State#state{txid_db3 = Value};
+        txid_4 -> State#state{txid_db4 = Value};
         leases_1 -> State#state{lease_db1 = Value};
         leases_2 -> State#state{lease_db2 = Value};
         leases_3 -> State#state{lease_db3 = Value};
