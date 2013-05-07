@@ -24,6 +24,7 @@
 
 -export([parse_expression/2]).
 
+-spec parse_expression(any(), any()) -> any().
 parse_expression(Clauses, ParseState) when is_list(Clauses) ->
     lists:foldl(fun parse_expression/2, ParseState, Clauses);
 parse_expression({call, _, Fun, Parameters}, ParseState) ->

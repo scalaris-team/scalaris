@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -82,6 +82,8 @@ create_value_({builtin_type, gb_tree}, Size, ParseState) ->
                        end
                end, T, L)
     end;
+create_value_({builtin_type, maybe_improper_list}, Size, ParseState) ->
+    create_value_({list, {typedef, tester, test_any}}, Size, ParseState);
 create_value_({builtin_type, module}, _Size, _ParseState) ->
     Values = [element(1, X) || X <- code:all_loaded()],
     lists:nth(crypto:rand_uniform(1, length(Values) + 1), Values);
