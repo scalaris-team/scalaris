@@ -240,9 +240,15 @@ tester_type_check_rbr(_Config) ->
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {kv_on_cseq,
-           [ {is_valid_next_req, 3} %% cannot create funs
+           [ {commit_read, 3}, %% tested via feeder
+             {commit_write, 3}, %% tested via feeder
+             {set_lock, 3} %% tested via feeder
            ],
-           []},
+           [ {cc_single_write, 3}, %% cannot create funs
+             {cc_set_rl, 3}, %% cannot create funs
+             {cc_set_wl, 3},  %% cannot create funs
+             {cc_commit_read, 3}  %% cannot create funs
+           ]},
           {prbr,
            [ {on, 2},       %% sends messages
              {set_entry, 2} %% needs valid tid()
@@ -259,14 +265,14 @@ tester_type_check_rbr(_Config) ->
              {qread, 4},      %% needs fun as input
              {start_link, 3}, %% needs fun as input
              {qwrite, 5},     %% needs funs as input
-             {qwrite, 7}      %% needs funs as input
+             {qwrite, 7},      %% needs funs as input
+             {qwrite_fast, 9}      %% needs funs as input
            ],
            [ {inform_client, 2}, %% cannot create valid envelopes
              {get_entry, 2},     %% needs valid tid()
              {set_entry, 2}      %% needs valid tid()
            ]
           }
-
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],

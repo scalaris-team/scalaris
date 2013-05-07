@@ -38,6 +38,7 @@
 %% api:
 -export([qread/3, qread/4]).
 -export([qwrite/5, qwrite/7]).
+-export([qwrite_fast/9]).
 
 -export([start_link/3]).
 -export([init/1, on/2]).
@@ -102,7 +103,9 @@ qread(CSeqPidName, Client, Key, ReadFilter) ->
 %%
 %% user definable functions and types for qwrite and abbreviations:
 %% RF = ReadFilter(dbdata() | no_value_yet) -> read_info().
-%% CC = ContentCheck(read_info(), WF, value()) -> {boolean(), UI}.
+%% CC = ContentCheck(read_info(), WF, value()) ->
+%%         {true, UI}
+%%       | {false, Reason}.
 %% WF = WriteFilter(old_dbdata(), UI, value()) -> dbdata().
 %% RI = ReadInfo produced by RF
 %% UI = UpdateInfo (data that could be used to update/detect outdated replicas)
@@ -164,6 +167,23 @@ qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
     comm:send_local(Pid, {qwrite, Client,
                           Key, {ReadFilter, ContentCheck, WriteFilter},
                           Value, _RetriggerAfter = 2}),
+    %% the process will reply to the client directly
+    ok.
+
+-spec qwrite_fast(pid_groups:pidname(),
+             comm:erl_local_pid(),
+             ?RT:key(),
+             fun ((any()) -> any()), %% read filter
+             fun ((any(), any(), any()) -> any()), %% content check
+             fun ((any(), any(), any()) -> any()), %% write filter
+             client_value(), prbr:r_with_id(), client_value() | prbr_bottom)
+            -> ok.
+qwrite_fast(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
+            WriteFilter, Value, Round, OldValue) ->
+    Pid = pid_groups:find_a(CSeqPidName),
+    comm:send_local(Pid, {qwrite_fast, Client,
+                          Key, {ReadFilter, ContentCheck, WriteFilter},
+                          Value, _RetriggerAfter = 2, Round, OldValue}),
     %% the process will reply to the client directly
     ok.
 
@@ -470,12 +490,31 @@ on({qwrite_read_done, ReqId,
     {qread_done, _ReadId, Round, ReadValue}},
    State) ->
     ?TRACE("rbrcseq:on qwrite_read_done qread_done~n", []),
-    Entry = setelement(2, get_entry(ReqId, tablename(State)), qwrite_read_done),
+    gen_component:post_op(State, {do_qwrite_fast, ReqId, Round, ReadValue});
+
+on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
+    WriteValue, RetriggerAfter, Round, OldValue}, State) ->
+
+    %% create state and ReqId, store it and trigger 'do_qwrite_fast'
+    %% which is also the write phase of a slow write.
+        %% assign new reqest-id
+    ReqId = uid:get_pids_uid(),
+    ?TRACE("rbrcseq:on qwrite c ~p uid ~p ~n", [Client, ReqId]),
+
+    %% create local state for the request id, including used filters
+    Entry = entry_new_write(qwrite, ReqId, Key, Client, period(State),
+                            Filters, WriteValue, RetriggerAfter),
+
+    set_entry(Entry, tablename(State)),
+    gen_component:post_op(State, {do_qwrite_fast, ReqId, Round, OldValue});
+
+on({do_qwrite_fast, ReqId, Round, OldValue}, State) ->
+    Entry = setelement(2, get_entry(ReqId, tablename(State)), do_qwrite_fast),
     ContentCheck = element(2, entry_filters(Entry)),
     WriteFilter = element(3, entry_filters(Entry)),
     WriteValue = entry_val(Entry),
 
-    _ = case ContentCheck(ReadValue, WriteFilter, WriteValue) of
+    _ = case ContentCheck(OldValue, WriteFilter, WriteValue) of
         {true, PassedToUpdate} ->
             %% own proposal possible as next instance in the consens sequence
             This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
@@ -491,7 +530,7 @@ on({qwrite_read_done, ReqId,
         {false, Reason} = _Err ->
             %% own proposal not possible as of content check
             comm:send_local(entry_client(Entry),
-                            {qwrite_deny, ReqId, Round, ReadValue,
+                            {qwrite_deny, ReqId, Round, OldValue,
                              {content_check_failed, Reason}}),
             ?PDB:delete(ReqId, tablename(State))
     end,
@@ -528,7 +567,7 @@ on({qwrite_collect, ReqId,
     ?TRACE("rbrcseq:on qwrite_collect write_deny~n", []),
     TableName = tablename(State),
     Entry = get_entry(ReqId, TableName),
-    _ = case Entry of
+    case Entry of
         undefined ->
             %% drop replies for unknown requests, as they must be
             %% outdated as all replies run through the same process.
@@ -536,14 +575,45 @@ on({qwrite_collect, ReqId,
         _ ->
             {Done, NewEntry} = add_write_deny(Entry, NewerRound),
             case Done of
-                false -> set_entry(NewEntry, tablename(State));
+                false -> set_entry(NewEntry, TableName),
+                         State;
                 true ->
                     %% retry
                     %% log:pal("Concurrency detected, retrying~n"),
-                    retrigger(NewEntry, TableName, noincdelay)%%,
-                    %% delete of entry is done in retrigger!
+
+                    %% we have to reshuffle retries a bit, so no two
+                    %% proposers using the same rbrcseq process steal
+                    %% each other the token forever.
+                    %% On a random basis, we either reenqueue the
+                    %% request to ourselves or we retry the request
+                    %% directly via a post_op.
+
+%% As this happens only when concurrency is detected (not the critical
+%% failure- and concurrency-free path), we have the time to choose a
+%% random number. This is still faster than using msg_delay or
+%% comm:local_send_after() with a random delay.
+                    case randoms:rand_uniform(1,4) of
+                        1 ->
+                            retrigger(NewEntry, TableName, noincdelay),
+                            %% delete of entry is done in retrigger!
+                            State;
+                        2 ->
+                            NewReq = req_for_retrigger(NewEntry, noincdelay),
+                            %% TODO: maybe record number of retries
+                            %% and make timespan chosen from
+                            %% dynamically wider
+                            comm:send_local_after(
+                              10 + randoms:rand_uniform(1,90), self(),
+                              NewReq),
+                            ?PDB:delete(element(1, NewEntry), TableName),
+                            State;
+                        3 ->
+                            NewReq = req_for_retrigger(NewEntry, noincdelay),
+                            ?PDB:delete(element(1, NewEntry), TableName),
+                            gen_component:post_op(State, NewReq)
+                    end
             end
-    end,
+    end
     %% decide somehow whether a fast paxos or a normal paxos is necessary
     %% if full paxos: perform qread(self(), Key, ContentReadFilter)
 
@@ -560,7 +630,7 @@ on({qwrite_collect, ReqId,
 
     %% drop replies for unknown requests, as they must be outdated
     %% as all initiations run through the same process.
-    State;
+    ;
 
 %% periodically scan the local states for long lasting entries and
 %% retrigger them
@@ -592,25 +662,39 @@ on({next_period, NewPeriod}, State) ->
     msg_delay:send_local(1, self(), {next_period, NewPeriod + 1}),
     set_period(State, NewPeriod).
 
--spec retrigger(entry(), ?PDB:tableid(), incdelay|noincdelay) -> ok.
-retrigger(Entry, TableName, Incdelay) ->
-    RetriggerDelay = case Incdelay of
+-spec req_for_retrigger(entry(), incdelay|noincdelay) ->
+                               {qread,
+                                Client :: comm:erl_local_pid(),
+                                Key :: ?RT:key(),
+                                Filters :: any(),
+                                Delay :: non_neg_integer()}
+                               | {qwrite,
+                                Client :: comm:erl_local_pid(),
+                                Key :: ?RT:key(),
+                                Filters :: any(),
+                                Val :: any(),
+                                Delay :: non_neg_integer()}.
+req_for_retrigger(Entry, IncDelay) ->
+    RetriggerDelay = case IncDelay of
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
     case erlang:size(Entry) of
         13 when is_tuple(element(12, Entry)) -> %% write request
-            comm:send_local(self(),
-                            {qwrite, entry_client(Entry),
-                             entry_key(Entry), entry_filters(Entry),
-                             entry_val(Entry),
-                             RetriggerDelay});
+            {qwrite, entry_client(Entry),
+             entry_key(Entry), entry_filters(Entry),
+             entry_val(Entry),
+             RetriggerDelay};
         13 -> %% read request
-            comm:send_local(self(),
-                            {qread, entry_client(Entry),
-                              entry_key(Entry), entry_filters(Entry),
-                             RetriggerDelay})
-        end,
+            {qread, entry_client(Entry),
+             entry_key(Entry), entry_filters(Entry),
+             RetriggerDelay}
+    end.
+
+-spec retrigger(entry(), ?PDB:tableid(), incdelay|noincdelay) -> ok.
+retrigger(Entry, TableName, IncDelay) ->
+    Request = req_for_retrigger(Entry, IncDelay),
+    comm:send_local(self(), Request),
     ?PDB:delete(element(1, Entry), TableName).
 
 -spec get_entry(any(), ?PDB:tableid()) -> entry() | undefined.
