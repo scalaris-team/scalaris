@@ -30,9 +30,9 @@ test_cases() -> [].
 all() ->
     [
      {group, send_to_pred},
-     {group, send_to_pred_incremental}%,
-     %{group, send_to_succ},
-     %{group, send_to_succ_incremental}
+     {group, send_to_pred_incremental},
+     {group, send_to_succ},
+     {group, send_to_succ_incremental}
     ] ++
 %%     unittest_helper:create_ct_all(test_cases()).
         test_cases().
@@ -230,19 +230,11 @@ reply_with_send_error(_Msg, State) ->
 -type move_message() ::
 %{move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op(), MaxTransportEntries::pos_integer()} |
     {{move, slide, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error} |
-%{move, change_op, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from pred to succ that it has created a new (incremental) slide if succ has already set up the slide
-    {{move, change_op, '_', '_', '_'}, [], 1..2, reply_with_send_error} |
-%{move, change_id, MoveFullId::slide_op:id()} | % message from succ to pred if pred has already set up the slide
-    {{move, change_id, '_'}, [], 1..2, reply_with_send_error} |
-%{move, change_id, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from succ to pred if pred has already set up the slide but succ made it an incremental slide
-    {{move, change_id, '_', '_', '_'}, [], 1..2, reply_with_send_error} |
 %{move, slide_abort, pred | succ, MoveFullId::slide_op:id(), Reason::abort_reason()} |
     {{move, slide_abort, '_', '_', '_'}, [], 1, reply_with_send_error} |
 % note: do not loose local messages:
 %{move, node_update, Tag::{move, slide_op:id()}} | % message from RM that it has changed the node's id to TargetId
 %{move, rm_new_pred, Tag::{move, slide_op:id()}} | % message from RM that it knows the pred we expect
-%{move, req_data, MoveFullId::slide_op:id()} |
-    {{move, req_data, '_'}, [], 1..2, reply_with_send_error} |
 %{move, data, MovingData::?DB:db_as_list(), MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} |
     {{move, data, '_', '_', '_', '_'}, [], 1..5, reply_with_send_error} |
 %{move, data_ack, MoveFullId::slide_op:id()} |
