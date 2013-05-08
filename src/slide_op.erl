@@ -270,7 +270,7 @@ update_target_id(SlideOp = #slide_op{type=Type, node=TargetNode, msg_fwd=OldMsgF
     {Interval, TargetNode2} =
         get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, Neighbors),
     % TargetNode2 may be more up to date - check that this is the same node though
-    true = node:same_process(TargetNode, TargetNode2),
+    true = (node:same_process(TargetNode, TargetNode2) orelse is_leave(SlideOp, 'rcv')),
     SlideOp1 = SlideOp#slide_op{interval = Interval,
                                 target_id = TargetId,
                                 next_op = NextOp},
