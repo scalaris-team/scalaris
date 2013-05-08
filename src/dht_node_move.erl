@@ -49,7 +49,7 @@
          crashed_node/3,
          check_config/0]).
 % for dht_node_join, slide_chord:
--export([send/3, send_no_slide/3, send2/3, continue_slide_delta/3, finish_slide/3,
+-export([send/3, send_no_slide/3, send2/3, continue_slide_delta/2, finish_slide/2,
          notify_other/2, check_setup_slide_not_found/5, exec_setup_slide_not_found/10,
          change_my_id/2, send_data_ack/2,
          use_incremental_slides/0, get_max_transport_entries/0]).
@@ -137,11 +137,11 @@ process_move_msg({move, slide, MyType, MoveFullId, OtherNode,
 process_move_msg({move, done, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 notify_source_pid(slide_op:get_source_pid(SlideOp1),
                                   {move, result, slide_op:get_tag(SlideOp1), ok}),
-                dht_node_state:set_slide(State, PredOrSucc, null)
+                dht_node_state:set_slide(State, slide_op:get_predORsucc(SlideOp1), null)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_other], both, done);
 
@@ -166,7 +166,7 @@ process_move_msg({move, slide_abort, PredOrSucc, MoveFullId, Reason} = _Msg, Sta
 process_move_msg({move, node_update, {move, MoveFullId} = RMSubscrTag} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, succ, State) ->
+        fun(SlideOp, State) ->
                 rm_loop:unsubscribe(self(), RMSubscrTag),
                 case slide_op:get_sendORreceive(SlideOp) of
                     'send' -> send_data(State, SlideOp);
@@ -201,7 +201,7 @@ process_move_msg({move, node_leave} = _Msg, State) ->
 process_move_msg({move, rm_new_pred, {move, MoveFullId} = RMSubscrTag} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, pred, State) ->
+        fun(SlideOp, State) ->
                 rm_loop:unsubscribe(self(), RMSubscrTag),
                 try_send_delta_to_pred(State, SlideOp)
         end,
@@ -211,8 +211,9 @@ process_move_msg({move, rm_new_pred, {move, MoveFullId} = RMSubscrTag} = _Msg, M
 process_move_msg({move, data, MovingData, MoveFullId, TargetId, NextOp} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
+                PredOrSucc = slide_op:get_predORsucc(SlideOp1),
                 State2 = update_target_on_existing_slide(
                            SlideOp1, State, TargetId, NextOp),
                 case dht_node_state:get_slide(State2, MoveFullId) of
@@ -226,11 +227,11 @@ process_move_msg({move, data, MovingData, MoveFullId, TargetId, NextOp} = _Msg, 
 process_move_msg({move, data_ack, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 % if sending data to the predecessor, check if we have already
                 % received the new predecessor info, otherwise wait for it
-                case PredOrSucc =:= pred andalso
+                case slide_op:get_predORsucc(SlideOp1) =:= pred andalso
                          slide_op:get_sendORreceive(SlideOp1) =:= send of
                     true -> try_send_delta_to_pred(State, SlideOp1);
                     _    -> send_delta(State, SlideOp1)
@@ -242,9 +243,9 @@ process_move_msg({move, data_ack, MoveFullId} = _Msg, MyState) ->
 process_move_msg({move, delta, ChangedData, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                accept_delta(State, PredOrSucc, SlideOp1, ChangedData)
+                accept_delta(State, SlideOp1, ChangedData)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta], both, delta);
 
@@ -253,10 +254,10 @@ process_move_msg({move, delta, ChangedData, MoveFullId} = _Msg, MyState) ->
 process_move_msg({move, delta_ack, MoveFullId, continue, NewSlideId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 finish_delta_ack_continue(
-                  State, PredOrSucc, SlideOp1, NewSlideId)
+                  State, SlideOp1, NewSlideId)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta_ack], both, delta_ack);
 
@@ -266,10 +267,10 @@ process_move_msg({move, delta_ack, MoveFullId, MyNextOpType, NewSlideId, OtherNo
                   OtherTargetNode, TargetId, Tag, MaxTransportEntries} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 finish_delta_ack_next(
-                  State, PredOrSucc, SlideOp1, MyNextOpType, NewSlideId,
+                  State, SlideOp1, MyNextOpType, NewSlideId,
                   OtherTargetNode, OtherNode, TargetId, Tag,
                   MaxTransportEntries, null)
         end,
@@ -280,14 +281,14 @@ process_move_msg({move, delta_ack, MoveFullId, MyNextOpType, NewSlideId, OtherNo
 process_move_msg({move, delta_ack, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                finish_delta_ack(State, PredOrSucc, SlideOp1)
+                finish_delta_ack(State, SlideOp1)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta_ack], both, delta_ack);
 
 % we have temporarily added a db_range which can now be removed
-% see accept_delta/5
+% see accept_delta/3
 process_move_msg({move, rm_db_range, MoveFullId} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     dht_node_state:rm_db_range(State, MoveFullId);
@@ -315,9 +316,10 @@ process_move_msg({move, {send_error, Target, Message, _Reason}, MoveFullId} = _M
 process_move_msg({move, {send_error_retry, Target, Message, _Reason}, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, State) ->
                 NewSlideOp = slide_op:inc_timeouts(SlideOp),
                 MaxRetries = get_send_msg_retries(),
+                PredOrSucc = slide_op:get_predORsucc(SlideOp),
                 case slide_op:get_timeouts(SlideOp) of
                     T when T =< MaxRetries -> ok;
                     T    ->
@@ -334,7 +336,8 @@ process_move_msg({move, {send_error_retry, Target, Message, _Reason}, MoveFullId
 process_move_msg({move, timeout, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
-        fun(SlideOp, PredOrSucc, State) ->
+        fun(SlideOp, State) ->
+                PredOrSucc = slide_op:get_predORsucc(SlideOp),
                 log:log(warn,
                         "[ dht_node_move ~.0p ] slide with ~p: no reply received within ~pms",
                         [comm:this(), PredOrSucc, get_wait_for_reply_timeout()]),
@@ -458,7 +461,7 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
             case slide_op:get_phase(SlideOp) of
                 wait_for_other ->
                     WorkerFun =
-                        fun(SlideOp0, _PredOrSucc0, State0) ->
+                        fun(SlideOp0, State0) ->
                                 % during a join, everything was already set up
                                 % by join_request
                                 % -> don't re-create the slide!!
@@ -788,42 +791,44 @@ send_delta(State, SlideOp) ->
 
 %% @doc Accepts delta received during the given (existing!) slide operation and
 %%      continues.
-%% @see slide_chord:accept_delta/4
--spec accept_delta(State::dht_node_state:state(), PredOrSucc::pred | succ,
-                   SlideOp::slide_op:slide_op(), ChangedData::dht_node_state:slide_delta())
+%% @see slide_chord:accept_delta/3
+-spec accept_delta(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                   ChangedData::dht_node_state:slide_delta())
         -> dht_node_state:state().
-accept_delta(State, PredOrSucc, OldSlideOp, ChangedData) ->
-    slide_chord:accept_delta(State, PredOrSucc, OldSlideOp, ChangedData).
+accept_delta(State, OldSlideOp, ChangedData) ->
+    slide_chord:accept_delta(State, OldSlideOp, ChangedData).
 
 %% @doc Acknowledges a received delta by replying to the other node.
-%% @see slide_chord:accept_delta2/3
--spec accept_delta2(State::dht_node_state:state(), PredOrSucc::pred | succ,
-                    SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-accept_delta2(State, PredOrSucc, SlideOp) ->
-    slide_chord:accept_delta2(State, PredOrSucc, SlideOp).
+%% @see slide_chord:accept_delta2/2
+-spec accept_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> dht_node_state:state().
+accept_delta2(State, SlideOp) ->
+    slide_chord:accept_delta2(State, SlideOp).
 
--spec finish_slide(State::dht_node_state:state(), PredOrSucc::pred | succ,
-                    SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-finish_slide(State, PredOrSucc, SlideOp) ->
+-spec finish_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> dht_node_state:state().
+finish_slide(State, SlideOp) ->
     Pid = node:pidX(slide_op:get_node(SlideOp)),
     MoveFullId = slide_op:get_id(SlideOp),
     fd:unsubscribe([Pid], {move, MoveFullId}),
     notify_source_pid(slide_op:get_source_pid(SlideOp),
                       {move, result, slide_op:get_tag(SlideOp), ok}),
+    PredOrSucc = slide_op:get_predORsucc(SlideOp),
     rm_loop:notify_slide_finished(PredOrSucc),
     dht_node_state:set_slide(State, PredOrSucc, null).
 
--spec continue_slide_delta(State::dht_node_state:state(), PredOrSucc::pred | succ,
-                           SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-continue_slide_delta(State, PredOrSucc, SlideOp) ->
+-spec continue_slide_delta(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> dht_node_state:state().
+continue_slide_delta(State, SlideOp) ->
     % continue with the next planned operation:
     case slide_op:is_incremental(SlideOp) of
-        true -> continue_incremental_slide_delta(State, PredOrSucc, SlideOp);
+        true -> continue_incremental_slide_delta(State, SlideOp);
         _ ->
             % note: send delta_ack and a potential new slide setup in two
             %       messages so new op suggestions also have a chance to be
             %       setup instead
-            State1 = accept_delta2(State, PredOrSucc, SlideOp),
+            State1 = accept_delta2(State, SlideOp),
+            PredOrSucc = slide_op:get_predORsucc(SlideOp),
             case slide_op:get_next_op(SlideOp) of
                 {none} -> State1;
                 {join, _NewTargetId} ->
@@ -848,10 +853,11 @@ continue_slide_delta(State, PredOrSucc, SlideOp) ->
     end.
 
 -spec continue_incremental_slide_delta(
-        State::dht_node_state:state(), PredOrSucc::pred | succ,
-        SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-continue_incremental_slide_delta(State, PredOrSucc, SlideOp) ->
+        State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> dht_node_state:state().
+continue_incremental_slide_delta(State, SlideOp) ->
     Type = slide_op:get_type(SlideOp),
+    PredOrSucc = slide_op:get_predORsucc(SlideOp),
     % TODO: support other types
     case slide_op:get_next_op(SlideOp) of
         {slide, continue, NewTargetId} when Type =:= {slide, PredOrSucc, 'rcv'} ->
@@ -883,10 +889,10 @@ continue_incremental_slide_delta(State, PredOrSucc, SlideOp) ->
             end;
         {jump, continue, _NewTargetId} ->
             % TODO
-            accept_delta2(State, PredOrSucc, SlideOp);
+            accept_delta2(State, SlideOp);
         {leave, continue} ->
             % TODO
-            accept_delta2(State, PredOrSucc, SlideOp)
+            accept_delta2(State, SlideOp)
     end.
 
 % similar to notify_other/2:
@@ -899,10 +905,10 @@ notify_other_in_delta_ack(OldMoveFullId, NextSlideOp, State) ->
            slide_op:get_id(NextSlideOp)},
     send2(State, NextSlideOp, Msg).
 
--spec finish_delta_ack(State::dht_node_state:state(), PredOrSucc::pred | succ,
-                       SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-finish_delta_ack(State, PredOrSucc, SlideOp) ->
-    State1 = finish_slide(State, PredOrSucc, SlideOp),
+-spec finish_delta_ack(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> dht_node_state:state().
+finish_delta_ack(State, SlideOp) ->
+    State1 = finish_slide(State, SlideOp),
     case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp) of
         true ->
             SupDhtNodeId = erlang:get(my_sup_dht_node_id),
@@ -914,6 +920,7 @@ finish_delta_ack(State, PredOrSucc, SlideOp) ->
             State1;
         _    ->
             % continue with the next planned operation:
+            PredOrSucc = slide_op:get_predORsucc(SlideOp),
             case slide_op:get_next_op(SlideOp) of
                 {none} -> State1;
                 {join, NewTargetId} ->
@@ -929,41 +936,42 @@ finish_delta_ack(State, PredOrSucc, SlideOp) ->
     end.
 
 -spec finish_delta_ack_continue(
-        State::dht_node_state:state(), PredOrSucc::pred | succ,
+        State::dht_node_state:state(),
         SlideOp::slide_op:slide_op(), NewSlideId::slide_op:id())
     -> dht_node_state:state().
-finish_delta_ack_continue(State, PredOrSucc, SlideOp, NewSlideId) ->
+finish_delta_ack_continue(State, SlideOp, NewSlideId) ->
     MyNode = dht_node_state:get(State, node),
+    Type = slide_op:get_type(SlideOp),
+    PredOrSucc = slide_op:get_predORsucc(Type),
     TargetNode = dht_node_state:get(State, PredOrSucc),
     Tag = slide_op:get_tag(SlideOp),
     SourcePid = slide_op:get_source_pid(SlideOp),
-    Type = slide_op:get_type(SlideOp),
     OtherMTE = slide_op:get_other_max_entries(SlideOp),
     % TODO: support other types
     case slide_op:get_next_op(SlideOp) of
         {slide, continue, NewTargetId} when Type =:= {slide, PredOrSucc, 'send'} ->
             finish_delta_ack_next(
-              State, PredOrSucc, SlideOp, Type, NewSlideId, MyNode,
+              State, SlideOp, Type, NewSlideId, MyNode,
               TargetNode, NewTargetId, Tag, OtherMTE, SourcePid);
         {jump, continue, _NewTargetId} ->
             % TODO
-            finish_delta_ack(State, PredOrSucc, SlideOp);
+            finish_delta_ack(State, SlideOp);
         {leave, continue} ->
             % TODO
-            finish_delta_ack(State, PredOrSucc, SlideOp);
+            finish_delta_ack(State, SlideOp);
         _ -> % our next op is different from the other node's next op
             % TODO
             abort_slide(State, SlideOp, next_op_mismatch, true)
     end.
 
 -spec finish_delta_ack_next(
-        State::dht_node_state:state(), PredOrSucc::pred | succ,
+        State::dht_node_state:state(),
         SlideOp::slide_op:slide_op(), MyNextOpType::slide_op:type(),
         NewSlideId::slide_op:id(), MyNode::node:node_type(),
         TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(),
         MaxTransportEntries::unknown | pos_integer(),
         SourcePid::comm:erl_local_pid() | null) -> dht_node_state:state().
-finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
+finish_delta_ack_next(State, SlideOp, MyNextOpType, NewSlideId,
                       MyNode, TargetNode, TargetId, Tag, MaxTransportEntries,
                       SourcePid) ->
     fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp))], {move, slide_op:get_id(SlideOp)}),
@@ -1000,7 +1008,8 @@ finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
                                           "got next op: ~.0p",
                                     [comm:this(), MyNextOp, MyNextOpType])
                     end,
-                    State1 = dht_node_state:set_slide(State, PredOrSucc, null),
+                    State1 = dht_node_state:set_slide(
+                               State, slide_op:get_predORsucc(SlideOp), null),
                     Command = check_setup_slide_not_found(
                                 State1, MyNextOpType, MyNode, TargetNode, TargetId),
                     exec_setup_slide_not_found(
@@ -1015,20 +1024,20 @@ finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
 %%      (a message to the pred/succ is send, too). An exception is made for a
 %%      crashed_node message which would naturally result in a wrong_neighbor!
 -spec safe_operation(
-    WorkerFun::fun((SlideOp::slide_op:slide_op(), PredOrSucc::pred | succ,
-                    State::dht_node_state:state()) -> dht_node_state:state()),
+    WorkerFun::fun((SlideOp::slide_op:slide_op(), State::dht_node_state:state())
+                    -> dht_node_state:state()),
     State::dht_node_state:state(), MoveFullId::slide_op:id(),
     WorkPhases::[slide_op:phase(),...] | all, PredOrSuccExp::pred | succ | both,
     MoveMsgTag::atom()) -> dht_node_state:state().
 safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgTag) ->
     case get_slide(State, MoveFullId) of
-        {_, PredOrSucc, SlideOp} when MoveMsgTag =:= crashed_node ->
-            WorkerFun(SlideOp, PredOrSucc, State);
+        {_, _PredOrSucc, SlideOp} when MoveMsgTag =:= crashed_node ->
+            WorkerFun(SlideOp, State);
         {ok, PredOrSucc, SlideOp} ->
             case PredOrSuccExp =:= both orelse PredOrSucc =:= PredOrSuccExp of
                 true ->
                     case WorkPhases =:= all orelse lists:member(slide_op:get_phase(SlideOp), WorkPhases) of
-                        true -> WorkerFun(SlideOp, PredOrSucc, State);
+                        true -> WorkerFun(SlideOp, State);
                         _    ->
                             log:log(info, "[ dht_node_move ~.0p ] unexpected message ~.0p received in phase ~.0p",
                                     [comm:this(), MoveMsgTag, slide_op:get_phase(SlideOp)]),
@@ -1320,7 +1329,7 @@ abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, Notify
 crashed_node(MyState, _DeadPid, {move, MoveFullId} = _Cookie) ->
     ?TRACE1({crash, _DeadPid, _Cookie}, MyState),
     WorkerFun =
-        fun(SlideOp, _PredOrSucc, State) ->
+        fun(SlideOp, State) ->
                 abort_slide(State, SlideOp, target_down, false)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, all, both, crashed_node).
