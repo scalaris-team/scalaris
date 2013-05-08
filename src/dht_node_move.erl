@@ -535,16 +535,14 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
             % TODO: implement step-wise join
             SlideOp = slide_op:new_sending_slide_join(
                         MoveFullId, TargetNode, join, Neighbors),
-            % in ordinary slides, the DB range is extended right before the
-            % other node is instructed to change the ID - during a join this is
-            % the case after receiving the initial join_request -> set it now!
-            State1 = dht_node_state:add_db_range(
-                       State, slide_op:get_interval(SlideOp),
-                       slide_op:get_id(SlideOp)),
             % note: phase will be set by notify_other/2 and needs to remain null here
-            case MsgTag of
-                nomsg -> notify_other(SlideOp, State1);
-                slide -> prepare_send_data1(State1, SlideOp)
+            case slide_chord:prepare_join_send(State, SlideOp) of
+                {ok, State1, SlideOp1} when MsgTag =:= nomsg ->
+                    notify_other(SlideOp1, State1);
+                {ok, State1, SlideOp1} when MsgTag =:= slide ->
+                    prepare_send_data1(State1, SlideOp1);
+                {abort, Reason, State1, SlideOp1} ->
+                    abort_slide(State1, SlideOp1, Reason, MsgTag =/= nomsg)
             end;
         {ok, {slide, pred, 'send'} = NewType} ->
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
@@ -570,9 +568,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                                  OtherMTE, NextOp, Neighbors)
                         end,
                     % note: phase will be set by prepare_send_data1/2 and needs to remain null here
-                    State1 = dht_node_state:add_db_range(
-                               State, slide_op:get_interval(SlideOp), MoveFullId),
-                    prepare_send_data1(State1, SlideOp)
+                    prepare_send_data1(State, SlideOp)
             end;
         {ok, {join, 'rcv'}} -> % similar to {slide, succ, 'rcv'}
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
