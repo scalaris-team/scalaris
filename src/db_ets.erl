@@ -258,17 +258,22 @@ get_chunk_helper({ETSDB, _Subscr, _SnapStates} = DB, StartId, Interval,
             {LastKey, _ChunkL, ChunkLProcessed} =
                 first_key_in_interval(DB, ETS_last, ETS_prev, StartId, Interval,
                                       StartFromI, AddDataFun, IsContinuous),
-            %log:pal("first key: ~.0p~nlast key : ~.0p~n", [FirstKey, LastKey]),
+%%             log:pal("first key: ~.0p~nlast key : ~.0p~n", [FirstKey, LastKey]),
             
             case FirstKey of
                 LastKey when FirstKey =/= StartId ->
+                    % only one element in DB or interval
                     {intervals:empty(), ChunkF};
                 _ ->
                     % note: the value from Chunk1 is not added by get_chunk_inner!
+%%                     log:pal("get_chunk:~nCSize: ~.2p~nFSize: ~.2p~nRSize: ~.2p",
+%%                             [ChunkSize, ChunkFProcessed, ChunkSize - ChunkFProcessed]),
                     {Next, Chunk, RestChunkSize} =
                         get_chunk_inner(DB, ETS_first, ETS_next, ETS_next(ETSDB, FirstKey), LastKey,
                                         Interval, AddDataFun, ChunkSize - ChunkFProcessed,
                                         ChunkF),
+%%                     log:pal("get_chunk_inner:~nNext:  ~.2p~nChunk: ~.2p~nRSize: ~.2p",
+%%                             [Next, Chunk, RestChunkSize]),
                     
                     % if data from LastKey was not added (if FirstKey =:= LastKey) and
                     % we have space left, add it here:
@@ -281,13 +286,23 @@ get_chunk_helper({ETSDB, _Subscr, _SnapStates} = DB, StartId, Interval,
                     
                     case Next of
                         '$end_of_interval' ->
+%%                             log:pal("get_chunk:~nNextI: ~.2p~nChunk: ~.2p",
+%%                                     [intervals:empty(), Chunk1]),
                             {intervals:empty(), Chunk1};
                         _ ->
                             TakenInterval =
                                 case ForwardBackward of
-                                    forward -> intervals:new('(', LastKey, Next, ']');
-                                    backward -> intervals:new('[', Next, LastKey, ')')
+                                    forward when FirstKey =:= LastKey ->
+                                        intervals:new('[', LastKey, Next, ']');
+                                    forward ->
+                                        intervals:new('(', LastKey, Next, ']');
+                                    backward when FirstKey =:= LastKey ->
+                                        intervals:new('[', Next, LastKey, ']');
+                                    backward ->
+                                        intervals:new('[', Next, LastKey, ')')
                                 end,
+%%                             log:pal("get_chunk:~nNextI: ~.2p~nChunk: ~.2p",
+%%                                     [intervals:minus(Interval, TakenInterval), Chunk1]),
                             {intervals:minus(Interval, TakenInterval), Chunk1}
                     end
             end
@@ -304,7 +319,7 @@ first_key_in_interval({ETSDB, _Subscr, _SnapState} = DB, ETS_first, ETS_next,
                       Start, Interval, StartFromI, AddDataFun, TryFromI) ->
     case intervals:in(Start, Interval) andalso ets:member(ETSDB, Start) of
         true ->
-            {Start, AddDataFun(DB, Start, []), 0};
+            {Start, AddDataFun(DB, Start, []), 1};
         _    ->
             Next = case ETS_next(ETSDB, Start) of
                        '$end_of_table' -> ETS_first(ETSDB);
