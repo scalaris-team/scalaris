@@ -92,7 +92,7 @@ Available packages are listed in the following table:
 || RHEL || 5.5 || stable: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_5/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/RHEL_5/] ||
 || RHEL || 6 || stable: [http://download.opensuse.org/repositories/home:/scalaris/RHEL_6/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/RHEL_6/] ||
 || Debian || 6.0 (Squeeze) || stable: [http://download.opensuse.org/repositories/home:/scalaris/Debian_6.0/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Debian_6.0/] ||
-|| Debian || 7.0 (Wheezy) || stable: [http://download.opensuse.org/repositories/home:/scalaris/Debian_6.0/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Debian_6.0/] ||
+|| Debian || 7.0 (Wheezy) || stable: [http://download.opensuse.org/repositories/home:/scalaris/Debian_7.0/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Debian_7.0/] ||
 || Ubuntu || 10.04 (Lucid Lynx) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_10.04/] ||
 || Ubuntu || 11.10 (Oneiric Ocelot) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_11.10/] ||
 || Ubuntu || 12.04 (Precise Pangolin) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_12.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_12.04/] ||
