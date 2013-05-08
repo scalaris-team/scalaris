@@ -241,15 +241,10 @@ reply_with_send_error(_Msg, State) ->
     {{move, data_ack, '_'}, [], 1..5, reply_with_send_error} |
 %{move, delta, ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()], MoveFullId::slide_op:id()} |
     {{move, delta, '_', '_', '_'}, [], 1..5, reply_with_send_error} |
-%{move, delta_ack, MoveFullId::slide_op:id()} |
-% note: this would result in the slide op being aborted with send_delta_timeout
-%       since only send_delta_timeout will handle this but at this point, the
-%       other node will not have this slide op anymore
-%    {{move, delta_ack, '_'}, [], 1..2, reply_with_send_error} |
-%{move, delta_ack, MoveFullId::slide_op:id(), continue, NewSlideId::slide_op:id()} |
-    {{move, delta_ack, '_', continue, '_'}, [], 1..2, reply_with_send_error} |
-%{move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
-    {{move, delta_ack, '_', '_', '_', '_', '_', '_', '_', '_'}, [], 1..2, reply_with_send_error}.
+%%{move, delta_ack, MoveFullId::slide_op:id(), {none}} |
+    {{move, delta_ack, '_', {none}}, [], 1..2, reply_with_send_error} |
+%{move, delta_ack, MoveFullId::slide_op:id(), {continue, NewSlideId::slide_op:id()}} |
+    {{move, delta_ack, '_', {continue, '_'}}, [], 1..2, reply_with_send_error}.
 % note: do not lose local messages:
 %{move, rm_db_range, MoveFullId::slide_op:id()} |
 % note: there's no timeout for this message

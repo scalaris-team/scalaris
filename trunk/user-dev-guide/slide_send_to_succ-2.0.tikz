@@ -81,7 +81,7 @@
              edge [post] node[msg_t] {delta\_ack} (pred-send-owner.north east)
 
            (pred-send-owner.north west)
-             edge [async_l] node[async_desc, auto, anchor=east] (update_owner) {\textcolor{green}{update\_owner(SlideOp)}}
+             edge [async_l] node[async_desc, auto, anchor=east] (finish_delta_ack) {\textcolor{green}{finish\_delta\_ack(SlideOp)}}
                   (pred-send-owner.west);
 
 
@@ -132,7 +132,7 @@
  \coordinate (pred-cont-start1) at ($(pred-send-owner)-(0,.5\tikzsepinner)$);
  \coordinate (pred-cont-end) at ($(pred-send-data.west)+(0,0.1)$);
 
- \path[->] (update_owner.south east)
+ \path[->] (finish_delta_ack.south east)
              edge [async_l,draw=lightgray,dashed,out=230,in=30,looseness=0.8] node[msg_t, pos=0.5, lightgray, font=\footnotesize] {rm\_update} node[msg_b, pos=0.5, lightgray, font=\footnotesize] {(to dht\_node)} node[pos=0.37,note,draw,red,anchor=north] {$\ell$} ($(succ-cont-start1)!0.7!(succ-cont-start2)$);
 
  \draw[post, rounded corners, dashed, lightgray] (pred-cont-start1) -- +(-7,0) -- ($(pred-cont-end)+(-7,0)$) -- (pred-cont-end);
