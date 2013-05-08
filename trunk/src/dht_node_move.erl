@@ -125,10 +125,10 @@ process_move_msg({move, start_jump, TargetId, Tag, SourcePid} = _Msg, State) ->
 
 % notification from predecessor/successor that it wants to slide with our node
 % (maybe incremental)
-process_move_msg({move, slide, OtherType, MoveFullId, OtherNode,
+process_move_msg({move, slide, MyType, MoveFullId, OtherNode,
                   OtherTargetNode, TargetId, Tag, NextOp, MaxTransportEntries} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    setup_slide(State, slide_op:other_type_to_my_type(OtherType), MoveFullId,
+    setup_slide(State, MyType, MoveFullId,
                 OtherTargetNode, OtherNode, TargetId, Tag, MaxTransportEntries,
                 null, slide, NextOp);
 
@@ -261,13 +261,12 @@ process_move_msg({move, delta_ack, MoveFullId, continue, NewSlideId} = _Msg, MyS
 
 % acknowledgement from neighbor that its node received delta for the slide op
 % with the given id and wants to set up a new slide with the given parameters
-process_move_msg({move, delta_ack, MoveFullId, OtherNextOpType, NewSlideId, OtherNode,
+process_move_msg({move, delta_ack, MoveFullId, MyNextOpType, NewSlideId, OtherNode,
                   OtherTargetNode, TargetId, Tag, MaxTransportEntries} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                MyNextOpType = slide_op:other_type_to_my_type(OtherNextOpType),
                 finish_delta_ack_next(
                   State, PredOrSucc, SlideOp1, MyNextOpType, NewSlideId,
                   OtherTargetNode, OtherNode, TargetId, Tag,
@@ -404,9 +403,9 @@ notify_other(SlideOp, State) ->
                end,
            SlideOp1 = slide_op:set_phase(SlideOp, wait_for_data),
            send2(State, SlideOp1,
-                 {move, slide, Type, slide_op:get_id(SlideOp1),
-                  dht_node_state:get(State, node), SlOpNode,
-                  slide_op:get_target_id(SlideOp1),
+                 {move, slide, slide_op:other_type_to_my_type(Type),
+                  slide_op:get_id(SlideOp1), dht_node_state:get(State, node),
+                  SlOpNode, slide_op:get_target_id(SlideOp1),
                   slide_op:get_tag(SlideOp1), NextOp, MTE});
        not SetupAtOther -> % beware: overlap with 1st
            SlideOp1 = slide_op:set_phase(SlideOp, wait_for_other),
@@ -426,9 +425,9 @@ notify_other(SlideOp, State) ->
                           true          -> {unknown, {none}}
                        end,
                    send2(State, SlideOp1,
-                         {move, slide, Type, slide_op:get_id(SlideOp1),
-                          dht_node_state:get(State, node), SlOpNode,
-                          slide_op:get_target_id(SlideOp1),
+                         {move, slide, slide_op:other_type_to_my_type(Type),
+                          slide_op:get_id(SlideOp1), dht_node_state:get(State, node),
+                          SlOpNode, slide_op:get_target_id(SlideOp1),
                           slide_op:get_tag(SlideOp1), NextOp, MTE})
            end;
        SetupAtOther andalso SendOrReceive =:= 'send' ->
