@@ -296,8 +296,8 @@ update_target_id(SlideOp = #slide_op{type=Type, node=TargetNode, msg_fwd=OldMsgF
                                 target_id = TargetId,
                                 next_op = NextOp},
     case OldMsgFwd of
-        []    -> set_msg_fwd(SlideOp1);
-        [_|_] -> SlideOp1
+        []  -> SlideOp1;
+        [_] -> set_msg_fwd(SlideOp1)
     end.
 
 %% @doc Returns the id of a receiving or sending slide operation.
