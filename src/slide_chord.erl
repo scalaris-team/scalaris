@@ -33,7 +33,7 @@
          prepare_send_data1/3, prepare_send_data2/3,
          update_rcv_data1/3, update_rcv_data2/3,
          prepare_send_delta1/3, prepare_send_delta2/3,
-         finish_delta1/4, finish_delta2/3,
+         finish_delta1/3, finish_delta2/3,
          finish_delta_ack1/4, finish_delta_ack2/3]).
 
 -spec prepare_join_send(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
@@ -214,27 +214,24 @@ prepare_send_delta2(State, SlideOp, {continue}) ->
     MoveFullId = slide_op:get_id(SlideOp),
     {ok, dht_node_state:rm_db_range(State, MoveFullId), SlideOp}.
 
-%% @doc Accepts delta received during the given (existing!) slide operation and
-%%      writes it to the DB. Then removes the dht_node's message forward for 
-%%      the slide operation's interval and continues be sending a message to
-%%      ReplyPid (if receiving from pred, right after the RM is up-to-date).
+%% @doc Removes the dht_node's message forward for the slide operation's
+%%      interval and continues by sending a message to ReplyPid
+%%      (if receiving from pred, right after the RM is up-to-date).
 %% @see finish_delta2/3
 %% @see dht_node_move:finish_delta1/3
 -spec finish_delta1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-                    ChangedData::dht_node_state:slide_delta(),
                     ReplyPid::comm:erl_local_pid())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
-finish_delta1(State, OldSlideOp, ChangedData, ReplyPid) ->
-    State1 = dht_node_state:slide_add_delta(State, ChangedData),
+finish_delta1(State, OldSlideOp, ReplyPid) ->
     SlideOp = slide_op:remove_msg_fwd(OldSlideOp),
     case slide_op:get_predORsucc(SlideOp) of
         succ -> send_continue_msg(ReplyPid);
-        pred -> send_continue_msg_when_pred_ok(State1, SlideOp, ReplyPid)
+        pred -> send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid)
     end,
     % optimization: until we know about the new id of our pred (or a
     % new pred or the continue message), add the range to the db_range so our
     % node already responds to such messages
-    {ok, dht_node_state:add_db_range(State1, slide_op:get_interval(SlideOp),
+    {ok, dht_node_state:add_db_range(State, slide_op:get_interval(SlideOp),
                                      slide_op:get_id(SlideOp)), SlideOp}.
 
 %% @doc Cleans up after finish_delta1/4 once the RM is up-to-date, e.g. removes
