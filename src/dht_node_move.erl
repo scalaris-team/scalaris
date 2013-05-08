@@ -212,8 +212,9 @@ process_move_msg({move, data, MovingData, MoveFullId, TargetId, NextOp} = _Msg, 
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, PredOrSucc, State) ->
+                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
                 State2 = update_target_on_existing_slide(
-                           SlideOp, State, TargetId, NextOp),
+                           SlideOp1, State, TargetId, NextOp),
                 case dht_node_state:get_slide(State2, MoveFullId) of
                     {PredOrSucc, SlideOp2} -> accept_data(State2, SlideOp2, MovingData);
                     not_found -> State2 % if aborted
