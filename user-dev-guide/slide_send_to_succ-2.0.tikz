@@ -38,17 +38,17 @@
  \node[font={\Large\bfseries}] (heading1) {Send data to successor};
  \node[font=\footnotesize,below=-0.2 of heading1] (heading2) {(version 2.0)};
 
- \node[start] (pred)      [below left=0.5 and 2.5 of heading1.south] {pred};
+ \node[start] (pred)      [below left=0.5 and 2.25 of heading1.south] {pred};
  \node[inner] (pred-init)           [below=\tikzstartsecond of pred]      {};
  \node[inner] (pred-send-data)      [below=\tikzsepinner of pred-init] {};
  \node[inner] (pred-send-delta)     [below=\tikzsepinner of pred-send-data] {};
  \node[inner] (pred-send-owner)     [below=\tikzsepinner of pred-send-delta] {};
  \node[end]   (pred-end)  [below=\tikzstartfirst of pred-send-owner] {\footnotesize pred};
 
- \node[start] (succ)      [below right=0.5 and 2.5 of heading1.south] {succ};
+ \node[start] (succ)      [below right=0.5 and 2.25 of heading1.south] {succ};
  \node[inner] (succ-init)           [below=\tikzstartfirst of succ]      {};
- \node[inner] (succ-got-data)      [below=\tikzsepinner of succ-init]      {};
- \node[inner] (succ-got-delta)     [below=\tikzsepinner of succ-got-data]      {};
+ \node[inner] (succ-got-data)       [below=\tikzsepinner of succ-init]      {};
+ \node[inner] (succ-got-delta)      [below=\tikzsepinner of succ-got-data]      {};
  \node[inner] (succ-got-owner)      [below=\tikzsepinner of succ-got-delta] {};
  \node[end]   (succ-end)  [below=\tikzstartsecond of succ-got-owner] {\footnotesize succ};
 
@@ -76,7 +76,7 @@
                   (succ-got-data.east)
 
            (pred-send-delta.north west)
-             edge [async_l] node[async_desc, auto, anchor=east] {\textcolor{green}{prepare\_send\_selta(SlideOp)}}
+             edge [async_l] node[async_desc, auto, anchor=east] {\textcolor{green}{prepare\_send\_delta(SlideOp)}}
                   (pred-send-delta.west)
 
            (pred-send-delta.south east)
