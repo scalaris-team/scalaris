@@ -29,12 +29,23 @@
 -define(TRACE(X,Y), ok).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
 
--export([prepare_rcv_data/2,
+-export([prepare_join_send/2, prepare_rcv_data/2,
          prepare_send_data1/3, prepare_send_data2/3,
          update_rcv_data1/3, update_rcv_data2/3,
          prepare_send_delta1/3, prepare_send_delta2/3,
          finish_delta1/4, finish_delta2/3,
          finish_delta_ack1/4, finish_delta_ack2/3]).
+
+-spec prepare_join_send(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+prepare_join_send(State, SlideOp) ->
+    % in ordinary slides, the DB range is extended right before the
+    % other node is instructed to change the ID - during a join this is
+    % the case after receiving the initial join_request -> set it now!
+    State1 = dht_node_state:add_db_range(
+               State, slide_op:get_interval(SlideOp),
+               slide_op:get_id(SlideOp)),
+    {ok, State1, SlideOp}.
 
 -spec prepare_rcv_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
@@ -104,13 +115,16 @@ change_my_id(State, SlideOp, ReplyPid) ->
 %% @see prepare_send_data2/3
 %% @see dht_node_move:prepare_send_data1/2
 -spec prepare_send_data1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-                       ReplyPid::comm:erl_local_pid())
+                         ReplyPid::comm:erl_local_pid())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_data1(State, SlideOp, ReplyPid) ->
     case slide_op:get_predORsucc(SlideOp) of
         'succ' -> change_my_id(State, SlideOp, ReplyPid);
-        'pred' -> send_continue_msg(ReplyPid),
-                  {ok, State, SlideOp}
+        'pred' -> State1 = dht_node_state:add_db_range(
+                             State, slide_op:get_interval(SlideOp),
+                             slide_op:get_id(SlideOp)),
+                  send_continue_msg(ReplyPid),
+                  {ok, State1, SlideOp}
     end.
 
 %% @doc Cleans up after prepare_send_data1/3 once the RM is up-to-date, (no-op here).
