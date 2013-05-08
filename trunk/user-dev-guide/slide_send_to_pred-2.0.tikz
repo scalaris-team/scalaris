@@ -84,6 +84,10 @@
            (pred-got-delta.south east)
              edge [post] node[msg_t] {delta\_ack} (succ-send-owner.north west)
 
+           (pred-got-delta.north west)
+             edge [async_l] node[async_desc, auto, anchor=east] {\textcolor{green}{finish\_delta(SlideOp, TargetId, NextOp)}}
+                  (pred-got-delta.west)
+
            (succ-send-owner.north east)
              edge [async_r] node[async_desc, auto, anchor=west] (finish_delta_ack) {\textcolor{green}{finish\_delta\_ack(SlideOp)}}
                   (succ-send-owner.east);
@@ -98,8 +102,7 @@
 
  \node[phase, below left=0.1 and 0.1 of pred-got-data.south] {wait\_for\_delta};
 
- \node[action_l, left=0.1 of pred-got-delta.east] {
-   \textcolor{green}{finish\_delta(SlideOp)}\\
+ \node[action_l, left=0.1 of pred-got-delta.south east] {
    fd.unsubscribe(SlideOp.node)\\
    SlideOp.delete()%
  };
@@ -131,7 +134,7 @@
 
  \coordinate (succ-cont-start1) at ($(succ-send-owner)-(0,.5\tikzsepinner)$);
  \coordinate (succ-cont-end) at ($(succ-send-data)+(0,0.1)$);
- \coordinate (pred-cont-start1) at ($(pred-got-delta.south)+(0,-0.25)$);
+ \coordinate (pred-cont-start1) at ($(pred-got-delta.south)+(0,-0.5)$);
  \coordinate (pred-cont-start2) at ($(pred-cont-start1)-(0,1.25)$);
  \coordinate (pred-cont-end) at ($(pred-init.south)+(0,-0.25)$);
 
