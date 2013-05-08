@@ -24,8 +24,8 @@
 
 -include("scalaris.hrl").
 
--define(TRACE(X,Y), log:pal(X,Y)).
-%-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), log:pal(X,Y)).
+-define(TRACE(X,Y), ok).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
 -define(TRACE1(Msg, State),
         ?TRACE("[ ~.0p ]~n  Msg: ~.0p~n"
