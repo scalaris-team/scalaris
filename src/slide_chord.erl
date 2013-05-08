@@ -29,7 +29,7 @@
 -define(TRACE(X,Y), ok).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
 
--export([change_my_id/2, request_data/2, send_data/2, accept_data/3,
+-export([change_my_id/2, send_data/2, accept_data/3,
          try_send_delta_to_pred/2, send_delta/2, accept_delta/4, accept_delta2/3]).
 
 %% @doc Change the local node's ID to the given TargetId by calling the ring
@@ -78,15 +78,6 @@ change_my_id(State, SlideOp) ->
               State1, succ, slide_op:set_phase(SlideOp2, wait_for_node_update))
     end.
 
-%% @doc Requests data from the node of the given slide operation, sets the
-%%      slide operation's phase to
-%%      wait_for_data and sets the slide operation in the dht node's state.
--spec request_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-request_data(State, SlideOp) ->
-    NewSlideOp = slide_op:set_phase(SlideOp, wait_for_data),
-    Msg = {move, req_data, slide_op:get_id(NewSlideOp)},
-    dht_node_move:send2(State, NewSlideOp, Msg).
-
 %% @doc Gets all data in the slide operation's interval from the DB and sends
 %%      it to the target node. Also sets the DB to record changes in this
 %%      interval and changes the slide operation's phase to wait_for_data_ack.
@@ -113,7 +104,10 @@ send_data(State, SlideOp) ->
                   Data::dht_node_state:slide_data()) -> dht_node_state:state().
 accept_data(State, SlideOp, Data) ->
     State1 = dht_node_state:slide_add_data(State, Data),
-    dht_node_move:change_my_id(State1, SlideOp).
+    case slide_op:get_predORsucc(SlideOp) of
+        'succ' -> dht_node_move:change_my_id(State1, SlideOp);
+        'pred' -> dht_node_move:send_data_ack(State1, SlideOp)
+    end.
 
 %% @doc Tries to send the delta to the predecessor. If a slide is sending
 %%      data to its predecessor, we need to take care that the delta is not

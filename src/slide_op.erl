@@ -60,7 +60,7 @@
         wait_for_node_update | % pred changing its id
         wait_for_pred_update_data_ack | % wait for the local rm process to know about the changed pred's ID
         wait_for_data_ack | wait_for_delta_ack | % sending node
-        wait_for_change_op | wait_for_data | wait_for_delta. % receiving node
+        wait_for_data | wait_for_delta. % receiving node
 
 -type next_op() ::
         {slide, continue, Id::?RT:key()} |
@@ -267,8 +267,10 @@ update_target_id(SlideOp = #slide_op{type=Type, node=TargetNode, msg_fwd=OldMsgF
                  TargetId, NextOp, Neighbors) ->
     PredOrSucc = get_predORsucc(Type),
     SendOrReceive = get_sendORreceive(Type),
-    {Interval, TargetNode} =
+    {Interval, TargetNode2} =
         get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, Neighbors),
+    % TargetNode2 may be more up to date - check that this is the same node though
+    true = node:same_process(TargetNode, TargetNode2),
     SlideOp1 = SlideOp#slide_op{interval = Interval,
                                 target_id = TargetId,
                                 next_op = NextOp},
