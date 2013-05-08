@@ -62,7 +62,8 @@
     {get_dht_nodes_response, Nodes::[node:node_type()]} |
     {join, get_number_of_samples, Samples::non_neg_integer(), Conn::connection()} |
     {join, get_candidate_response, OrigJoinId::?RT:key(), Candidate::lb_op:lb_op(), Conn::connection()} |
-    {join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
+    {join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(),
+     CandId::lb_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} |
     {join, join_response, not_responsible | busy, CandId::lb_op:id()} |
     {join, known_hosts_timeout, JoinUUId::pos_integer()} |
     {join, lookup_timeout, Conn::connection(), JoinId::?RT:key(), JoinUUId::pos_integer()} |
@@ -72,7 +73,7 @@
     % messages at the existing node:
     {join, number_of_samples_request, SourcePid::comm:mypid(), LbPsv::module(), Conn::connection()} |
     {join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key(), LbPsv::module(), Conn::connection()} |
-    {join, join_request, NewPred::node:node_type(), CandId::lb_op:id()} |
+    {join, join_request, NewPred::node:node_type(), CandId::lb_op:id(), MaxTransportEntries::unknown | pos_integer()} |
     {join, LbPsv::module(),
      Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() |
           lb_psv_gossip:custom_message(),
@@ -372,7 +373,7 @@ process_join_state({join, join_response, Reason, CandId} = _Msg,
     {join, remove_candidate(CandId, JoinState), QueuedMessages};
 
 % note: accept (delayed) join_response messages in any phase
-process_join_state({join, join_response, Succ, Pred, MoveId, CandId} = _Msg,
+process_join_state({join, join_response, Succ, Pred, MoveId, CandId, TargetId, NextOp} = _Msg,
                    {join, JoinState, QueuedMessages} = State) ->
     ?TRACE_JOIN1(_Msg, JoinState),
     % only act on related messages, i.e. messages from the current candidate
@@ -410,7 +411,7 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId} = _Msg,
                     ?TRACE_JOIN_STATE(NewJoinState),
                     {join, NewJoinState, QueuedMessages};
                 _ ->
-                    MyId = node_details:get(lb_op:get(Candidate, n1_new), new_key),
+                    MyId = TargetId,
                     MyIdVersion = get_id_version(JoinState),
                     case MyId =:= node:id(Succ) orelse MyId =:= node:id(Pred) of
                         true ->
@@ -433,7 +434,7 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId} = _Msg,
                             rm_loop:notify_new_pred(node:pidX(Succ), Me),
                             
                             finish_join_and_slide(Me, Pred, Succ, ?DB:new(),
-                                                  QueuedMessages, MoveId)
+                                                  QueuedMessages, MoveId, NextOp)
                     end
             end
     end,
@@ -533,7 +534,7 @@ process_join_msg({join, get_candidate, Source_PID, Key, LbPsv, Conn} = _Msg, Sta
 %% userdevguide-end dht_node_join:get_candidate
 
 %% userdevguide-begin dht_node_join:join_request1
-process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
+process_join_msg({join, join_request, NewPred, CandId, MaxTransportEntries} = _Msg, State)
   when (not is_atom(NewPred)) -> % avoid confusion with not_responsible message
     ?TRACE1(_Msg, State),
     TargetId = node:id(NewPred),
@@ -546,13 +547,15 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
             MoveFullId = uid:get_global_uid(),
             State1 = dht_node_move:exec_setup_slide_not_found(
                        Command, State, MoveFullId, NewPred, TargetId, join,
-                       unknown, null, nomsg, {none}),
+                       MaxTransportEntries, null, nomsg, {none}),
             % set up slide, now send join_response:
             MyOldPred = dht_node_state:get(State1, pred),
             % no need to tell the ring maintenance -> the other node will trigger an update
             % also this is better in case the other node dies during the join
             %%     rm_loop:notify_new_pred(comm:this(), NewPred),
-            Msg = {join, join_response, MyNode, MyOldPred, MoveFullId, CandId},
+            SlideOp = dht_node_state:get(State1, slide_pred),
+            Msg = {join, join_response, MyNode, MyOldPred, MoveFullId, CandId,
+                   slide_op:get_target_id(SlideOp), slide_op:get_next_op(SlideOp)},
             dht_node_move:send(node:pidX(NewPred), Msg, MoveFullId),
             State1;
         {abort, ongoing_slide, JoinType} ->
@@ -579,7 +582,7 @@ process_join_msg({join, get_number_of_samples, _Samples, _Conn} = _Msg, State) -
     State;
 process_join_msg({join, get_candidate_response, _OrigJoinId, _Candidate, _Conn} = _Msg, State) ->
     State;
-process_join_msg({join, join_response, Succ, Pred, MoveFullId, CandId} = _Msg, State) ->
+process_join_msg({join, join_response, Succ, Pred, MoveFullId, CandId, _TargetId, _NextOp} = _Msg, State) ->
     reject_join_response(Succ, Pred, MoveFullId, CandId),
     State;
 process_join_msg({join, join_response, Reason, _CandId} = _Msg, State)
@@ -850,8 +853,13 @@ send_join_request(JoinState, Timeouts) ->
             NewSucc = node_details:get(lb_op:get(BestCand, n1succ_new), node),
             Me = node:new(comm:this(), Id, IdVersion),
             CandId = lb_op:get(BestCand, id),
-            ?TRACE_SEND(node:pidX(NewSucc), {join, join_request, Me, CandId}),
-            comm:send(node:pidX(NewSucc), {join, join_request, Me, CandId}),
+            MyMTE = case dht_node_move:use_incremental_slides() of
+                        true -> dht_node_move:get_max_transport_entries();
+                        false -> unknown
+                    end,
+            Msg = {join, join_request, Me, CandId, MyMTE},
+            ?TRACE_SEND(node:pidX(NewSucc), Msg),
+            comm:send(node:pidX(NewSucc), Msg),
             msg_delay:send_local(
               get_join_request_timeout() div 1000, self(),
               {join, join_request_timeout, Timeouts, CandId, get_join_uuid(JoinState)}),
@@ -921,15 +929,16 @@ reject_join_response(Succ, _Pred, MoveId, _CandId) ->
 %% @doc Finishes the join by setting up a slide operation to get the data from
 %%      the other node and sends all queued messages.
 -spec finish_join_and_slide(Me::node:node_type(), Pred::node:node_type(),
-                  Succ::node:node_type(), DB::?DB:db(),
-                  QueuedMessages::msg_queue:msg_queue(), MoveId::slide_op:id())
+                            Succ::node:node_type(), DB::?DB:db(),
+                            QueuedMessages::msg_queue:msg_queue(),
+                            MoveId::slide_op:id(), NextOp::slide_op:next_op())
         -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}],
             State::dht_node_state:state()}.
-finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId) ->
+finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId, NextOp) ->
     State = finish_join(Me, Pred, Succ, DB, QueuedMessages),
     State1 = dht_node_move:exec_setup_slide_not_found(
                {ok, {join, 'rcv'}}, State, MoveId, Succ, node:id(Me), join,
-               unknown, null, nomsg, {none}),
+               unknown, null, nomsg, NextOp),
     gen_component:change_handler(State1, fun dht_node:on/2).
 %% userdevguide-end dht_node_join:finish_join
 

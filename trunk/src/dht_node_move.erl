@@ -51,7 +51,8 @@
 % for dht_node_join, slide_chord:
 -export([send/3, send_no_slide/3, send2/3, continue_slide_delta/3, finish_slide/3,
          notify_other/2, check_setup_slide_not_found/5, exec_setup_slide_not_found/10,
-         change_my_id/2]).
+         change_my_id/2,
+         use_incremental_slides/0, get_max_transport_entries/0]).
 
 -ifdef(with_export_type_support).
 -export_type([move_message/0]).
@@ -81,7 +82,9 @@
 -type move_message1() ::
     {move, start_slide, pred | succ, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
     {move, start_jump, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
-    {move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), NextOp::slide_op:next_op(), MaxTransportEntries::pos_integer()} |
+    {move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(),
+     InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(),
+     Tag::any(), NextOp::slide_op:next_op(), MaxTransportEntries::unknown | pos_integer()} |
     {move, change_id, MoveFullId::slide_op:id()} | % message from succ to pred if pred has already set up the slide
     {move, change_id, MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} | % message from succ to pred if pred has already set up the slide but succ made it an incremental slide
     {move, slide_abort, pred | succ, MoveFullId::slide_op:id(), Reason::abort_reason()} |
@@ -93,7 +96,8 @@
     {move, delta, ChangedData::dht_node_state:slide_delta(), MoveFullId::slide_op:id()} |
     {move, delta_ack, MoveFullId::slide_op:id()} |
     {move, delta_ack, MoveFullId::slide_op:id(), continue, NewSlideId::slide_op:id()} |
-    {move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(), InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::pos_integer()} |
+    {move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(),
+     InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::unknown | pos_integer()} |
     {move, rm_db_range, MoveFullId::slide_op:id()} |
     {move, done, MoveFullId::slide_op:id()} |
     {move, timeout, MoveFullId::slide_op:id()} % sent a message to the succ/pred but no reply yet
@@ -699,7 +703,6 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     notify_other(SlideOp2, State1)
             end;
         {ok, {join, 'rcv'}} -> % similar to {slide, succ, 'rcv'}
-            % TODO: implement step-wise join
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             SlideOp = slide_op:new_receiving_slide_join(MoveFullId, TargetId, join, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
@@ -708,7 +711,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
             % the ID is going to be changed - we already set the new ID during
             % a join -> set it now!
             SlideOp2 = slide_op:set_msg_fwd(SlideOp1),
-            notify_other(SlideOp2, State);
+            SlideOp3 = slide_op:set_next_op(SlideOp2, NextOp),
+            notify_other(SlideOp3, State);
         {ok, {slide, succ, 'rcv'} = NewType} ->
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
@@ -1049,7 +1053,7 @@ finish_delta_ack_continue(State, PredOrSucc, SlideOp, NewSlideId) ->
         SlideOp::slide_op:slide_op(), MyNextOpType::slide_op:type(),
         NewSlideId::slide_op:id(), MyNode::node:node_type(),
         TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(),
-        MaxTransportEntries::pos_integer(),
+        MaxTransportEntries::unknown | pos_integer(),
         SourcePid::comm:erl_local_pid() | null) -> dht_node_state:state().
 finish_delta_ack_next(State, PredOrSucc, SlideOp, MyNextOpType, NewSlideId,
                       MyNode, TargetNode, TargetId, Tag, MaxTransportEntries,

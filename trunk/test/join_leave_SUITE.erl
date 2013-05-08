@@ -236,7 +236,7 @@ tester_join_at(Config) ->
         when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).
 reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(1, State) =:= state ->
     case Msg of
-        {join, join_response, Succ, Pred, MoveId, CandId} ->
+        {join, join_response, Succ, Pred, MoveId, CandId, _TargetId, _NextOp} ->
             % joined nodes only reply with a reject! (crash and send_error are always possible)
             case Reason of
                 send_error ->
@@ -256,7 +256,7 @@ reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(
     State;
 reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(1, State) =:= join ->
     case Msg of
-        {join, join_response, Succ, Pred, MoveId, CandId} ->
+        {join, join_response, Succ, Pred, MoveId, CandId, _TargetId, _NextOp} ->
             case Reason of
                 send_error ->
                     comm:send(node:pidX(Succ), {move, {send_error, comm:this(), Msg, unittest}, MoveId});
@@ -273,7 +273,7 @@ reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(
         when is_subtype(State, dht_node_state:state() | dht_node_join:join_state()).
 reply_to_join_request(Msg, State, Reason) when is_tuple(State) andalso element(1, State) =:= state ->
     case Msg of
-        {join, join_request, NewPred, CandId} ->
+        {join, join_request, NewPred, CandId, _MaxTransportEntries} ->
             comm:send(node:pidX(NewPred), {join, join_response, Reason, CandId});
         _ -> ok
     end,
@@ -289,8 +289,9 @@ reply_to_join_request(_Msg, State, _Reason) when is_tuple(State) andalso element
 %{get_dht_nodes_response, Nodes::[node:node_type()]} |
 %{join, get_number_of_samples, Samples::non_neg_integer(), Conn::connection()} |
 %{join, get_candidate_response, OrigJoinId::?RT:key(), Candidate::lb_op:lb_op(), Conn::connection()} |
-%{join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(), CandId::lb_op:id()} |
-    {{join, join_response, '_', '_', '_', '_'}, [], 1..2,
+%{join, join_response, Succ::node:node_type(), Pred::node:node_type(), MoveFullId::slide_op:id(),
+% CandId::lb_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} |
+    {{join, join_response, '_', '_', '_', '_', '_', '_'}, [], 1..2,
      {reply_to_join_response, abort | crash | send_error}} |
 %{join, join_response, not_responsible, CandId::lb_op:id()} |
 %{join, lookup_timeout, Conn::connection()} |
@@ -301,8 +302,8 @@ reply_to_join_request(_Msg, State, _Reason) when is_tuple(State) andalso element
 %% messages at the existing node:
 %{join, number_of_samples_request, SourcePid::comm:mypid(), LbPsv::module(), Conn::connection()} |
 %{join, get_candidate, Source_PID::comm:mypid(), Key::?RT:key(), LbPsv::module(), Conn::connection()} |
-%{join, join_request, NewPred::node:node_type(), CandId::lb_op:id()} |
-    {{join, join_request, '_', '_'}, [], 1..2,
+%{join, join_request, NewPred::node:node_type(), CandId::lb_op:id(), MaxTransportEntries::unknown | pos_integer()} |
+    {{join, join_request, '_', '_', '_'}, [], 1..2,
      drop_msg | {reply_to_join_request, not_responsible | busy}}.
 %{Msg::lb_psv_simple:custom_message() | lb_psv_split:custom_message() |
 %      lb_psv_gossip:custom_message(),
