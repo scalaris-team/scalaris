@@ -25,6 +25,10 @@
 -endif.
 
 -ifdef(have_callback_support).
+-callback prepare_rcv_data(
+            State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()} |
+           {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
 -callback prepare_send_data1(
             State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
             ReplyPid::comm:erl_local_pid())
@@ -79,6 +83,7 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
+     {prepare_rcv_data, 2},
      {prepare_send_data1, 3},
      {prepare_send_data2, 3},
      {update_rcv_data1, 3},
