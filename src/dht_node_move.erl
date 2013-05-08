@@ -1236,14 +1236,16 @@ update_target_on_existing_slide(OldSlideOp, State, TargetId, NextOp) ->
                                  dht_node_state:get(State, neighbors)),
                     
                     MoveFullId = slide_op:get_id(SlideOp1),
-                    MySlideDBRange = [1 || {_, Id} <- dht_node_state:get(State, db_range),
-                                           Id =:= MoveFullId],
-                    State1 = case MySlideDBRange of
-                                 []    -> State;
-                                 [_|_] -> dht_node_state:add_db_range(
-                                            dht_node_state:rm_db_range(State, MoveFullId),
-                                            slide_op:get_interval(SlideOp1), MoveFullId)
-                             end,
+                    HasDBRange = lists:any(fun({_, Id}) -> Id =:= MoveFullId end,
+                                           dht_node_state:get(State, db_range)),
+                    State1 =
+                        if HasDBRange ->
+                               % assume we can add a DB range if it exists already
+                               dht_node_state:add_db_range(
+                                 dht_node_state:rm_db_range(State, MoveFullId),
+                                 slide_op:get_interval(SlideOp1), MoveFullId);
+                           true -> State
+                        end,
                     dht_node_state:set_slide(State1, PredOrSucc, SlideOp1);
                 false ->
                     log:log(warn,"[ dht_node_move ~.0p ] new TargetId and NextOp received "
