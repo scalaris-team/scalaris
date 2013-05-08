@@ -537,39 +537,36 @@ process_join_msg({join, join_request, NewPred, CandId} = _Msg, State)
   when (not is_atom(NewPred)) -> % avoid confusion with not_responsible message
     ?TRACE1(_Msg, State),
     TargetId = node:id(NewPred),
-    case dht_node_move:can_slide_pred(State, TargetId, {join, 'rcv'}) of
-        true ->
-            try
-                % TODO: implement step-wise join
-                MoveFullId = uid:get_global_uid(),
-                Neighbors = dht_node_state:get(State, neighbors),
-                fd:subscribe([node:pidX(NewPred)], {move, MoveFullId}),
-                SlideOp = slide_op:new_sending_slide_join(
-                            MoveFullId, NewPred, join, Neighbors),
-                SlideOp1 = slide_op:set_phase(SlideOp, wait_for_req_data),
-                State1 = dht_node_state:add_db_range(
-                           State, slide_op:get_interval(SlideOp1),
-                           slide_op:get_id(SlideOp1)),
-                MoveFullId = slide_op:get_id(SlideOp1),
-                MyOldPred = dht_node_state:get(State1, pred),
-                MyNode = dht_node_state:get(State1, node),
-                % no need to tell the ring maintenance -> the other node will trigger an update
-                % also this is better in case the other node dies during the join
-                %%     rm_loop:notify_new_pred(comm:this(), NewPred),
-                Msg = {join, join_response, MyNode, MyOldPred, MoveFullId, CandId},
-                dht_node_move:send2(State1, SlideOp1, Msg)
-            catch throw:not_responsible ->
-                      ?TRACE_SEND(node:pidX(NewPred),
-                                  {join, join_response, not_responsible, CandId}),
-                      comm:send(node:pidX(NewPred),
-                                {join, join_response, not_responsible, CandId}),
-                      State
-            end;
-        _ ->
+    JoinType = {join, 'send'},
+    MyNode = dht_node_state:get(State, node),
+    Command = dht_node_move:check_setup_slide_not_found(
+                State, JoinType, MyNode, NewPred, TargetId),
+    case Command of
+        {ok, JoinType} ->
+            MoveFullId = uid:get_global_uid(),
+            State1 = dht_node_move:exec_setup_slide_not_found(
+                       Command, State, MoveFullId, NewPred, TargetId, join,
+                       unknown, null, nomsg, {none}),
+            % set up slide, now send join_response:
+            MyOldPred = dht_node_state:get(State1, pred),
+            % no need to tell the ring maintenance -> the other node will trigger an update
+            % also this is better in case the other node dies during the join
+            %%     rm_loop:notify_new_pred(comm:this(), NewPred),
+            Msg = {join, join_response, MyNode, MyOldPred, MoveFullId, CandId},
+            dht_node_move:send(node:pidX(NewPred), Msg, MoveFullId),
+            State1;
+        {abort, ongoing_slide, JoinType} ->
             ?TRACE("[ ~.0p ]~n  ignoring join_request from ~.0p due to a running slide~n",
                    [self(), NewPred]),
             ?TRACE_SEND(node:pidX(NewPred), {join, join_response, busy, CandId}),
             comm:send(node:pidX(NewPred), {join, join_response, busy, CandId}),
+            State;
+        {abort, _Reason, JoinType} -> % all other errors:
+            ?TRACE("~p", [Command]),
+            ?TRACE_SEND(node:pidX(NewPred),
+                        {join, join_response, not_responsible, CandId}),
+            comm:send(node:pidX(NewPred),
+                      {join, join_response, not_responsible, CandId}),
             State
     end;
 %% userdevguide-end dht_node_join:join_request1
@@ -930,13 +927,9 @@ reject_join_response(Succ, _Pred, MoveId, _CandId) ->
             State::dht_node_state:state()}.
 finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId) ->
     State = finish_join(Me, Pred, Succ, DB, QueuedMessages),
-    fd:subscribe([node:pidX(Succ)], {move, MoveId}),
-    SlideOp = slide_op:new_receiving_slide_join(MoveId, Pred, Succ, node:id(Me), join),
-    SlideOp1 = slide_op:set_phase(SlideOp, wait_for_node_update),
-    SlideOp2 = slide_op:set_msg_fwd(SlideOp1),
-    State1 = dht_node_state:set_slide(State, succ, SlideOp2),
-    RMSubscrTag = {move, slide_op:get_id(SlideOp2)},
-    comm:send_local(self(), {move, node_update, RMSubscrTag}),
+    State1 = dht_node_move:exec_setup_slide_not_found(
+               {ok, {join, 'rcv'}}, State, MoveId, Succ, node:id(Me), join,
+               unknown, null, nomsg, {none}),
     gen_component:change_handler(State1, fun dht_node:on/2).
 %% userdevguide-end dht_node_join:finish_join
 

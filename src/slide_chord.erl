@@ -102,7 +102,9 @@ send_data(State, SlideOp) ->
         end,
     {State_NewDB, MovingData} = dht_node_state:slide_get_data_start_record(State, MovingInterval),
     NewSlideOp = slide_op:set_phase(SlideOp, wait_for_data_ack),
-    Msg = {move, data, MovingData, slide_op:get_id(NewSlideOp)},
+    Msg = {move, data, MovingData, slide_op:get_id(NewSlideOp),
+           slide_op:get_target_id(NewSlideOp),
+           slide_op:get_next_op(NewSlideOp)},
     dht_node_move:send2(State_NewDB, NewSlideOp, Msg).
 
 %% @doc Accepts data received during the given (existing!) slide operation and
@@ -111,9 +113,7 @@ send_data(State, SlideOp) ->
                   Data::dht_node_state:slide_data()) -> dht_node_state:state().
 accept_data(State, SlideOp, Data) ->
     State1 = dht_node_state:slide_add_data(State, Data),
-    NewSlideOp = slide_op:set_phase(SlideOp, wait_for_delta),
-    Msg = {move, data_ack, slide_op:get_id(NewSlideOp)},
-    dht_node_move:send2(State1, NewSlideOp, Msg).
+    dht_node_move:change_my_id(State1, SlideOp).
 
 %% @doc Tries to send the delta to the predecessor. If a slide is sending
 %%      data to its predecessor, we need to take care that the delta is not

@@ -21,9 +21,10 @@
 -vsn('$Id$').
 
 -export([new_slide/8, new_slide_i/8,
-         new_receiving_slide_join/5, new_sending_slide_join/4,
+         new_receiving_slide_join/4, new_sending_slide_join/4,
          new_sending_slide_leave/4, new_sending_slide_leave/5,
          new_sending_slide_jump/4, new_sending_slide_jump/5,
+         update_target_id/4,
          other_type_to_my_type/1,
          is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1,
          is_incremental/1,
@@ -58,7 +59,7 @@
         wait_for_other | % a node initiated a slide but needs more info from its partner
         wait_for_node_update | % pred changing its id
         wait_for_pred_update_data_ack | % wait for the local rm process to know about the changed pred's ID
-        wait_for_change_id | wait_for_req_data | wait_for_data_ack | wait_for_delta_ack | % sending node
+        wait_for_data_ack | wait_for_delta_ack | % sending node
         wait_for_change_op | wait_for_data | wait_for_delta. % receiving node
 
 -type next_op() ::
@@ -157,15 +158,17 @@ get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, Neighbors) ->
 %% @doc Sets up a new slide operation for a joining node (see
 %%      dht_node_join.erl). MyKey is the joining node's new Id and will be used
 %%      as the target id of the slide operation.
--spec new_receiving_slide_join(MoveId::uid:global_uid(), NewPred::node:node_type(),
-        NewSucc::node:node_type(), MyNewKey::?RT:key(), Tag::any()) -> slide_op().
-new_receiving_slide_join(MoveId, NewPred, NewSucc, MyNewKey, Tag) ->
-    IntervalToReceive = node:mk_interval_between_ids(node:id(NewPred), MyNewKey),
+-spec new_receiving_slide_join(MoveId::uid:global_uid(), TargetId::?RT:key(),
+        Tag::any(), Neighbors::nodelist:neighborhood()) -> slide_op().
+new_receiving_slide_join(MoveId, TargetId, Tag, Neighbors) ->
+    Pred = nodelist:pred(Neighbors),
+    TargetNode = nodelist:succ(Neighbors),
+    IntervalToReceive = node:mk_interval_between_ids(node:id(Pred), TargetId),
     #slide_op{type = {join, 'rcv'},
               id = MoveId,
-              node = NewSucc,
+              node = TargetNode,
               interval = IntervalToReceive,
-              target_id = MyNewKey,
+              target_id = TargetId,
               tag = Tag,
               source_pid = null}.
 
@@ -177,7 +180,9 @@ new_receiving_slide_join(MoveId, NewPred, NewSucc, MyNewKey, Tag) ->
         Tag::any(), Neighbors::nodelist:neighborhood()) -> slide_op().
 new_sending_slide_join(MoveId, JoiningNode, Tag, Neighbors) ->
     JoiningNodeId = node:id(JoiningNode),
-    case intervals:in(JoiningNodeId, nodelist:node_range(Neighbors)) of
+    Pred = nodelist:pred(Neighbors),
+    case (JoiningNodeId =:= node:id(Pred) andalso node:same_process(JoiningNode, Pred)) orelse
+             intervals:in(JoiningNodeId, nodelist:node_range(Neighbors)) of
         false -> erlang:throw(not_responsible);
         _ ->
             IntervalToSend = node:mk_interval_between_ids(
@@ -253,6 +258,24 @@ new_sending_slide_jump(MoveId, CurTargetId, FinalTargetId, Tag, Neighbors) ->
               tag = Tag,
               source_pid = null,
               next_op = NextOp}.
+
+%% @doc Updates the slide op with a new TargetId and NextOp adapting message
+%%      forwards and intervals accordingly.
+-spec update_target_id(slide_op(), TargetId::?RT:key(), NextOp::next_op(),
+                       Neighbors::nodelist:neighborhood()) -> slide_op().
+update_target_id(SlideOp = #slide_op{type=Type, node=TargetNode, msg_fwd=OldMsgFwd},
+                 TargetId, NextOp, Neighbors) ->
+    PredOrSucc = get_predORsucc(Type),
+    SendOrReceive = get_sendORreceive(Type),
+    {Interval, TargetNode} =
+        get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, Neighbors),
+    SlideOp1 = SlideOp#slide_op{interval = Interval,
+                                target_id = TargetId,
+                                next_op = NextOp},
+    case OldMsgFwd of
+        []    -> set_msg_fwd(SlideOp1);
+        [_|_] -> SlideOp1
+    end.
 
 %% @doc Returns the id of a receiving or sending slide operation.
 -spec get_id(SlideOp::slide_op()) -> id().
