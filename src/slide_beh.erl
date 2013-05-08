@@ -79,15 +79,15 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     {prepare_send_data1, 3}
-     {prepare_send_data2, 3}
-     {update_rcv_data1, 3}
-     {update_rcv_data2, 3}
-     {prepare_send_delta1, 3}
-     {prepare_send_delta2, 3}
-     {finish_delta1, 4}
-     {finish_delta2, 3}
-     {finish_delta_ack1, 4}
+     {prepare_send_data1, 3},
+     {prepare_send_data2, 3},
+     {update_rcv_data1, 3},
+     {update_rcv_data2, 3},
+     {prepare_send_delta1, 3},
+     {prepare_send_delta2, 3},
+     {finish_delta1, 4},
+     {finish_delta2, 3},
+     {finish_delta_ack1, 4},
      {finish_delta_ack2, 3}
     ];
 behaviour_info(_Other) ->
