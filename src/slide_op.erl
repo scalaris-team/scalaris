@@ -26,7 +26,7 @@
          new_sending_slide_jump/4, new_sending_slide_jump/5,
          update_target_id/4,
          other_type_to_my_type/1,
-         is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1,
+         is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1, is_jump/2,
          is_incremental/1,
          get_id/1, get_node/1, get_interval/1, get_target_id/1,
          get_source_pid/1, get_tag/1, get_sendORreceive/1, get_type/1,
@@ -395,7 +395,15 @@ is_leave(_Type, _SendOrReceive) -> false.
 %% @doc Returns whether the given slide op or type is a jump operation.
 -spec is_jump(SlideOp::slide_op() | type()) -> boolean().
 is_jump(#slide_op{type=Type}) -> is_jump(Type);
-is_jump(Type) -> element(1, Type) =:= jump.
+is_jump({jump, _SendOrReceive}) -> true;
+is_jump(_Type) -> false.
+
+%% @doc Returns whether the given slide op or type is a jump operation sending
+%%      or receiving data as provided.
+-spec is_jump(SlideOp::slide_op() | type(), 'send' | 'rcv') -> boolean().
+is_jump(#slide_op{type=Type}, SendOrReceive) -> is_jump(Type, SendOrReceive);
+is_jump({jump, SendOrReceive}, SendOrReceive) -> true;
+is_jump(_Type, _SendOrReceive) -> false.
 
 %% @doc Returns whether the given slide op is part of an incremental slide.
 -spec is_incremental(SlideOp::slide_op()) -> boolean().
