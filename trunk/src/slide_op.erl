@@ -60,7 +60,8 @@
         wait_for_node_update | % pred changing its id
         wait_for_pred_update_data_ack | % wait for the local rm process to know about the changed pred's ID
         wait_for_data_ack | wait_for_delta_ack | % sending node
-        wait_for_data | wait_for_delta. % receiving node
+        wait_for_data | wait_for_delta | % receiving node
+        wait_for_continue. % async (local) slide message to rm-specific implementation
 
 -type next_op() ::
         {slide, continue, Id::?RT:key()} |

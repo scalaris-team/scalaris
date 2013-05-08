@@ -30,7 +30,7 @@
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
 
 -export([change_my_id/2, send_data/2, accept_data/3,
-         try_send_delta_to_pred/2, send_delta/2, accept_delta/3, accept_delta2/2]).
+         try_send_delta_to_pred/2, send_delta/2, finish_delta1/4, finish_delta2/3]).
 
 %% @doc Change the local node's ID to the given TargetId by calling the ring
 %%      maintenance and changing the slide operation's phase to
@@ -158,63 +158,66 @@ send_delta(State, SlideOp) ->
     Msg = {move, delta, ChangedData, slide_op:get_id(SlOp1)},
     dht_node_move:send2(State2, SlOp1, Msg).
 
+-spec send_continue_msg(Pid::comm:erl_local_pid()) -> ok.
+send_continue_msg(Pid) ->
+    ?TRACE_SEND(Pid, {continue}),
+    comm:send_local(Pid, {continue}).
+
+-spec send_continue_msg_when_pred_ok(
+        State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+        ReplyPid::comm:erl_local_pid()) -> ok.
+send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid) ->
+    ExpPredId = slide_op:get_target_id(SlideOp),
+    case dht_node_state:get(State, pred_id) of
+        ExpPredId ->
+            send_continue_msg(ReplyPid);
+        _ ->
+            OldPred = slide_op:get_node(SlideOp),
+            rm_loop:subscribe(
+              ReplyPid, {move, slide_op:get_id(SlideOp)},
+              fun(RMOldN, RMNewN, _IsSlide) ->
+                      RMNewPred = nodelist:pred(RMNewN),
+                      RMOldPred = nodelist:pred(RMOldN),
+                      RMOldPred =/= RMNewPred orelse
+                          node:id(RMNewPred) =:= ExpPredId orelse
+                          RMNewPred =/= OldPred
+              end,
+              fun(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
+                      send_continue_msg(Pid)
+              end, 1)
+    end.
+
 %% @doc Accepts delta received during the given (existing!) slide operation and
 %%      writes it to the DB. Then removes the dht_node's message forward for 
-%%      the slide operation's interval and continues with
-%%      dht_node_move:continue_slide_delta/2 which will ultimately call
-%%      accept_delta2/2.
-%% @see dht_node_move:continue_slide_delta/2
-%% @see accept_delta2/2
--spec accept_delta(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-                   ChangedData::dht_node_state:slide_delta())
-        -> dht_node_state:state().
-accept_delta(State, OldSlideOp, ChangedData) ->
-    State2 = dht_node_state:slide_add_delta(State, ChangedData),
+%%      the slide operation's interval and continues be sending a message to
+%%      ReplyPid (if receiving from pred, right after the RM is up-to-date).
+%% @see finish_delta2/3
+%% @see dht_node_move:finish_delta1/3
+-spec finish_delta1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                    ChangedData::dht_node_state:slide_delta(),
+                    ReplyPid::comm:erl_local_pid())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+finish_delta1(State, OldSlideOp, ChangedData, ReplyPid) ->
+    State1 = dht_node_state:slide_add_delta(State, ChangedData),
     SlideOp = slide_op:remove_msg_fwd(OldSlideOp),
-    State3 = case slide_op:get_predORsucc(SlideOp) of
-        succ -> State2;
-        pred ->
-            % optimization: until we know about the new id of our pred (or a
-            % new pred), add the range to the db_range so our node already
-            % responds to such messages
-            ExpPredId = slide_op:get_target_id(SlideOp),
-            case dht_node_state:get(State2, pred_id) of
-                ExpPredId -> State2;
-                _ ->
-                    OldPred = slide_op:get_node(SlideOp),
-                    MoveFullId = slide_op:get_id(SlideOp),
-                    rm_loop:subscribe(
-                      self(), {move, MoveFullId},
-                      fun(RMOldN, RMNewN, _IsSlide) ->
-                              RMNewPred = nodelist:pred(RMNewN),
-                              RMOldPred = nodelist:pred(RMOldN),
-                              RMOldPred =/= RMNewPred orelse
-                                  node:id(RMNewPred) =:= ExpPredId orelse
-                                  RMNewPred =/= OldPred
-                      end,
-                      fun(Pid, {move, RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
-                              ?TRACE_SEND(Pid, {move, rm_db_range, RMSlideId}),
-                              comm:send_local(Pid, {move, rm_db_range, RMSlideId})
-                      end, 1),
-                    
-                    dht_node_state:add_db_range(
-                      State2, slide_op:get_interval(SlideOp),
-                      MoveFullId)
-            end
+    case slide_op:get_predORsucc(SlideOp) of
+        succ -> send_continue_msg(ReplyPid);
+        pred -> send_continue_msg_when_pred_ok(State1, SlideOp, ReplyPid)
     end,
-    dht_node_move:continue_slide_delta(State3, SlideOp).
+    % optimization: until we know about the new id of our pred (or a
+    % new pred or the continue message), add the range to the db_range so our
+    % node already responds to such messages
+    {ok, dht_node_state:add_db_range(State1, slide_op:get_interval(SlideOp),
+                                     slide_op:get_id(SlideOp)), SlideOp}.
 
-%% @doc Acknowledges a received delta by sending a delta_ack message to the
-%%      other node, notifies the source pid (if it exists) and removes the slide
-%%      operation from the dht_node_state.
-%% @see dht_node_move:continue_slide_delta/2
--spec accept_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
-        -> dht_node_state:state().
-accept_delta2(State, SlideOp) ->
-    Pid = node:pidX(slide_op:get_node(SlideOp)),
+%% @doc Cleans up after finish_delta1/4 once the RM is up-to-date, e.g. removes
+%%      temporary additional db_range entries.
+%% @see finish_delta1/4
+%% @see dht_node_move:finish_delta2/3
+-spec finish_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                    EmbeddedMsg::{continue}) -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+finish_delta2(State, SlideOp, {continue}) ->
     MoveFullId = slide_op:get_id(SlideOp),
-    Msg = {move, delta_ack, MoveFullId},
-    dht_node_move:send_no_slide(Pid, Msg, 0),
-    dht_node_move:finish_slide(State, SlideOp).
+    {ok, dht_node_state:rm_db_range(State, MoveFullId), SlideOp}.
 
 %% TODO: add handling of received delta_ack messages
