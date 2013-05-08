@@ -71,10 +71,10 @@
         -> {ok, dht_node_state:state(), slide_op:slide_op()} |
            {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
 -callback finish_delta_ack2(
-            State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-            NextOpMsg::dht_node_move:next_op_msg())
-        -> {ok, dht_node_state:state(), slide_op:slide_op(), NextOpMsg::dht_node_move:next_op_msg()} |
-           {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
+            State::dht_node_state:state(), SlideOp::slide_op:slide_op(), NextOpMsg)
+        -> {ok, dht_node_state:state(), slide_op:slide_op(), NextOpMsg} |
+           {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}
+        when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
