@@ -865,7 +865,7 @@ continue_incremental_slide_delta(State, PredOrSucc, SlideOp) ->
                         State1, Type, MyNode, TargetNode, NewTargetId),
             case Command of
                 {ok, {slide, _, 'rcv'} = NewType} ->
-                    Neighbors = dht_node_state:get(State, neighbors),
+                    Neighbors = dht_node_state:get(State1, neighbors),
                     % continued slide with pred/succ, receive data
                     % -> reserve slide_op with pred/succ
                     NewMoveFullId = uid:get_global_uid(),
