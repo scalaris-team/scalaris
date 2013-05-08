@@ -1151,11 +1151,11 @@ can_slide_pred(State, TargetId, _Type) ->
              (not intervals:in(TargetId, slide_op:get_interval(SlideSucc)) andalso
                   not slide_op:is_leave(SlideSucc))
         ) andalso
-        % 2) no left-over DBRange (from sending data to successor) waiting for RM-update
+        % 2) no left-over DBRange (from receiving data from predecessor) waiting for RM-update
         % -> we need to integrate this range into my_range first in order to proceed
         %    (most code does not look at db_range and only uses my_range to create intervals!)
         (DBRange =:= [] orelse
-             (SlideSucc =/= null andalso
+             (SlideSucc =/= null andalso tl(DBRange) =:= [] andalso % only one DBRange element
                   element(2, hd(DBRange)) =:= slide_op:get_id(SlideSucc))
         ).
 
