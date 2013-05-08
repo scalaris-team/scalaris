@@ -30,7 +30,7 @@
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
 
 -export([change_my_id/2, send_data/2, accept_data/3,
-         try_send_delta_to_pred/2, send_delta/2, accept_delta/4, accept_delta2/3]).
+         try_send_delta_to_pred/2, send_delta/2, accept_delta/3, accept_delta2/2]).
 
 %% @doc Change the local node's ID to the given TargetId by calling the ring
 %%      maintenance and changing the slide operation's phase to
@@ -161,17 +161,17 @@ send_delta(State, SlideOp) ->
 %% @doc Accepts delta received during the given (existing!) slide operation and
 %%      writes it to the DB. Then removes the dht_node's message forward for 
 %%      the slide operation's interval and continues with
-%%      dht_node_move:continue_slide_delta/3 which will ultimately call
-%%      accept_delta2/3.
-%% @see dht_node_move:continue_slide_delta/3
-%% @see accept_delta2/3
--spec accept_delta(State::dht_node_state:state(), PredOrSucc::pred | succ,
-                   SlideOp::slide_op:slide_op(), ChangedData::dht_node_state:slide_delta())
+%%      dht_node_move:continue_slide_delta/2 which will ultimately call
+%%      accept_delta2/2.
+%% @see dht_node_move:continue_slide_delta/2
+%% @see accept_delta2/2
+-spec accept_delta(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                   ChangedData::dht_node_state:slide_delta())
         -> dht_node_state:state().
-accept_delta(State, PredOrSucc, OldSlideOp, ChangedData) ->
+accept_delta(State, OldSlideOp, ChangedData) ->
     State2 = dht_node_state:slide_add_delta(State, ChangedData),
     SlideOp = slide_op:remove_msg_fwd(OldSlideOp),
-    State3 = case PredOrSucc of
+    State3 = case slide_op:get_predORsucc(SlideOp) of
         succ -> State2;
         pred ->
             % optimization: until we know about the new id of our pred (or a
@@ -202,19 +202,19 @@ accept_delta(State, PredOrSucc, OldSlideOp, ChangedData) ->
                       MoveFullId)
             end
     end,
-    dht_node_move:continue_slide_delta(State3, PredOrSucc, SlideOp).
+    dht_node_move:continue_slide_delta(State3, SlideOp).
 
 %% @doc Acknowledges a received delta by sending a delta_ack message to the
 %%      other node, notifies the source pid (if it exists) and removes the slide
 %%      operation from the dht_node_state.
-%% @see dht_node_move:continue_slide_delta/3
--spec accept_delta2(State::dht_node_state:state(), PredOrSucc::pred | succ,
-                    SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-accept_delta2(State, PredOrSucc, SlideOp) ->
+%% @see dht_node_move:continue_slide_delta/2
+-spec accept_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> dht_node_state:state().
+accept_delta2(State, SlideOp) ->
     Pid = node:pidX(slide_op:get_node(SlideOp)),
     MoveFullId = slide_op:get_id(SlideOp),
     Msg = {move, delta_ack, MoveFullId},
     dht_node_move:send_no_slide(Pid, Msg, 0),
-    dht_node_move:finish_slide(State, PredOrSucc, SlideOp).
+    dht_node_move:finish_slide(State, SlideOp).
 
 %% TODO: add handling of received delta_ack messages
