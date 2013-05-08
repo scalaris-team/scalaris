@@ -665,12 +665,12 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
             State1 = dht_node_state:add_db_range(
                        State, slide_op:get_interval(SlideOp),
                        slide_op:get_id(SlideOp)),
-            SlideOp1 = slide_op:set_phase(SlideOp, wait_for_other),
-            SlideOp2 = if MsgTag =/= nomsg ->
-                              slide_op:set_setup_at_other(SlideOp);
-                          true -> SlideOp1
+            SlideOp1 = if MsgTag =:= nomsg ->
+                              slide_op:set_phase(SlideOp, wait_for_other);
+                          true ->
+                              slide_op:set_setup_at_other(SlideOp)
                        end,
-            notify_other(SlideOp2, State1);
+            notify_other(SlideOp1, State1);
         {ok, {slide, pred, 'send'} = NewType} ->
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             UseIncrSlides = use_incremental_slides(),
