@@ -47,9 +47,9 @@
          make_slide_leave/2, make_jump/4,
          crashed_node/3,
          check_config/0]).
-% for dht_node_join, slide_chord:
--export([send/3, send_no_slide/3, send2/3, finish_slide/2,
-         notify_other/2, check_setup_slide_not_found/5, exec_setup_slide_not_found/10,
+% for dht_node_join:
+-export([send/3, send_no_slide/3,
+         check_setup_slide_not_found/5, exec_setup_slide_not_found/10,
          use_incremental_slides/0, get_max_transport_entries/0]).
 
 -ifdef(with_export_type_support).
@@ -721,7 +721,7 @@ prepare_send_data2(State, SlideOp, EmbeddedMsg) ->
             Msg = {move, data, MovingData, slide_op:get_id(SlideOp2),
                    slide_op:get_target_id(SlideOp2),
                    slide_op:get_next_op(SlideOp2)},
-            dht_node_move:send2(State2, SlideOp2, Msg);
+            send2(State2, SlideOp2, Msg);
         {abort, Reason, State1, SlideOp1} ->
             abort_slide(State1, SlideOp1, Reason, true)
     end.
@@ -763,7 +763,7 @@ update_rcv_data2(State, SlideOp, EmbeddedMsg) ->
         {ok, State1, SlideOp1} ->
             SlideOp2 = slide_op:set_phase(SlideOp1, wait_for_delta),
             Msg = {move, data_ack, slide_op:get_id(SlideOp2)},
-            dht_node_move:send2(State1, SlideOp2, Msg);
+            send2(State1, SlideOp2, Msg);
         {abort, Reason, State1, SlideOp1} ->
             abort_slide(State1, SlideOp1, Reason, true)
     end.
@@ -808,7 +808,7 @@ prepare_send_delta2(State, SlideOp, EmbeddedMsg) ->
             % send delta (values of keys that have changed during the move)
             SlideOp2 = slide_op:set_phase(SlideOp1, wait_for_delta_ack),
             Msg = {move, delta, ChangedData, slide_op:get_id(SlideOp2)},
-            dht_node_move:send2(State2, SlideOp2, Msg);
+            send2(State2, SlideOp2, Msg);
         {abort, Reason, State1, SlideOp1} ->
             abort_slide(State1, SlideOp1, Reason, true)
     end.
