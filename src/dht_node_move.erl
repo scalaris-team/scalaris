@@ -579,20 +579,12 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
             SlideOp = slide_op:new_receiving_slide_join(MoveFullId, TargetId, join, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
             SlideOp1 = slide_op:set_setup_at_other(SlideOp), % we received a join_response before
-            % in ordinary slides, the message forward will be set right before
-            % the ID is going to be changed - we already set the new ID during
-            % a join -> set it now!
-            SlideOp2 = slide_op:set_msg_fwd(SlideOp1),
-            SlideOp3 = slide_op:set_next_op(SlideOp2, NextOp),
-            notify_other(SlideOp3, State);
-        {ok, {slide, succ, 'rcv'} = NewType} ->
-            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
-            SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
-                                         SourcePid, OtherMTE, NextOp, Neighbors),
-            % note: phase will be set by notify_other/2 and needs to remain null here
-            case MsgTag of
-                nomsg -> notify_other(SlideOp, State);
-                slide -> notify_other(slide_op:set_setup_at_other(SlideOp), State)
+            SlideOp2 = slide_op:set_next_op(SlideOp1, NextOp),
+            case slide_chord:prepare_rcv_data(State, SlideOp2) of
+                {ok, State1, SlideOp3} ->
+                    notify_other(SlideOp3, State1);
+                {abort, Reason, State1, SlideOp3} ->
+                    abort_slide(State1, SlideOp3, Reason, true)
             end;
         {ok, {jump, 'send'}} -> % similar to {ok, {slide, succ, 'send'}}
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
@@ -643,15 +635,20 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                         end,
                     prepare_send_data1(State, SlideOp)
             end;
-        {ok, NewType} when NewType =:= {slide, pred, 'rcv'} orelse NewType =:= {leave, 'rcv'} ->
+        {ok, NewType} when NewType =:= {slide, pred, 'rcv'} orelse
+                               NewType =:= {leave, 'rcv'} orelse
+                               NewType =:= {slide, succ, 'rcv'} ->
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
             SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
                                          SourcePid, OtherMTE, NextOp, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
-            SlideOp1 = slide_op:set_msg_fwd(SlideOp),
-            case MsgTag of
-                nomsg -> notify_other(SlideOp1, State);
-                slide -> notify_other(slide_op:set_setup_at_other(SlideOp1), State)
+            case slide_chord:prepare_rcv_data(State, SlideOp) of
+                {ok, State1, SlideOp1} when MsgTag =:= nomsg ->
+                    notify_other(SlideOp1, State1);
+                {ok, State1, SlideOp1} when MsgTag =:= slide ->
+                    notify_other(slide_op:set_setup_at_other(SlideOp1), State1);
+                {abort, Reason, State1, SlideOp1} ->
+                    abort_slide(State1, SlideOp1, Reason, MsgTag =/= nomsg)
             end;
         {ok, move_done} ->
             notify_source_pid(SourcePid, {move, result, Tag, ok}),
