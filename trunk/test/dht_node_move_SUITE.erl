@@ -29,8 +29,8 @@ test_cases() -> [].
 
 all() ->
     [
-     {group, send_to_pred}%,
-     %{group, send_to_pred_incremental},
+     {group, send_to_pred},
+     {group, send_to_pred_incremental}%,
      %{group, send_to_succ},
      %{group, send_to_succ_incremental}
     ] ++
