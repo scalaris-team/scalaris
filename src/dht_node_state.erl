@@ -22,8 +22,8 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
-%-define(TRACE(X,Y), log:pal(X,Y)).
--define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), log:pal(X,Y)).
+%-define(TRACE(X,Y), ok).
 
 -export([new/3,
          get/2,
