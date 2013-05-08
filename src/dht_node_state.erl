@@ -22,6 +22,9 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
+%-define(TRACE(X,Y), log:pal(X,Y)).
+-define(TRACE(X,Y), ok).
+
 -export([new/3,
          get/2,
          dump/1,
@@ -342,10 +345,12 @@ set_snapshot_state(State,NewInfo) -> State#state{snapshot_state=NewInfo}.
                    SlideId::slide_op:id()) -> state().
 add_db_range(State = #state{db_range=DBRange}, Interval, SlideId) ->
     false = intervals:is_all(Interval),
+    ?TRACE("[ ~.0p ] add_db_range: ~.0p~n", [self(), Interval]),
     State#state{db_range = [{Interval, SlideId} | DBRange]}.
 
 -spec rm_db_range(State::state(), SlideId::slide_op:id()) -> state().
 rm_db_range(State = #state{db_range=DBRange}, SlideId) ->
+    ?TRACE("[ ~.0p ] rm_db_range: ~.0p~n", [self(), [I || {I, Id} <- DBRange, Id =:= SlideId]]),
     State#state{db_range = [X || X = {_, Id} <- DBRange, Id =/= SlideId]}.
 
 -spec add_bulkowner_reply_msg(State::state(), Id::uid:global_uid(), Target::comm:mypid(),

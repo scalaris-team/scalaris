@@ -42,6 +42,9 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
+%-define(TRACE(X,Y), log:pal(X,Y)).
+-define(TRACE(X,Y), ok).
+
 -ifdef(with_export_type_support).
 -export_type([slide_op/0, id/0, phase/0, type/0, next_op/0]).
 -endif.
@@ -501,8 +504,10 @@ get_msg_fwd(#slide_op{msg_fwd=MsgFwd}) -> MsgFwd.
 
 -spec set_msg_fwd(SlideOp::slide_op()) -> slide_op().
 set_msg_fwd(SlideOp = #slide_op{interval=Interval}) ->
+    ?TRACE("[ ~.0p ] set_msg_fwd: ~.0p~n", [self(), Interval]),
     SlideOp#slide_op{msg_fwd = [{Interval, node:pidX(get_node(SlideOp))}]}.
 
 -spec remove_msg_fwd(SlideOp::slide_op()) -> slide_op().
 remove_msg_fwd(SlideOp) ->
+    ?TRACE("[ ~.0p ] remove_msg_fwd: ~.0p~n", [self(), SlideOp#slide_op.msg_fwd]),
     SlideOp#slide_op{msg_fwd = []}.
