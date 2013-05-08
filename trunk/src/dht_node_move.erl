@@ -43,7 +43,7 @@
 
 -export([process_move_msg/2,
          can_slide_succ/3, can_slide_pred/3,
-         rm_notify_new_pred/4, rm_send_node_change/4,
+         rm_send_node_change/4,
          make_slide/5,
          make_slide_leave/2, make_jump/4,
          crashed_node/3,
@@ -87,7 +87,6 @@
      Tag::any(), NextOp::slide_op:next_op(), MaxTransportEntries::unknown | pos_integer()} |
     {move, slide_abort, pred | succ, MoveFullId::slide_op:id(), Reason::abort_reason()} |
     {move, node_update, Tag::{move, slide_op:id()}} | % message from RM that it has changed the node's id to TargetId
-    {move, rm_new_pred, Tag::{move, slide_op:id()}} | % message from RM that it knows the pred we expect
     {move, data, MovingData::dht_node_state:slide_data(), MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} |
     {move, data_ack, MoveFullId::slide_op:id()} |
     {move, delta, ChangedData::dht_node_state:slide_delta(), MoveFullId::slide_op:id()} |
@@ -194,19 +193,6 @@ process_move_msg({move, node_leave} = _Msg, State) ->
             State % ignore unrelated node leave messages
     end;
 
-% wait for the joining node to appear in the rm-process -> got ack from rm:
-% (see dht_node_join.erl) or
-% wait for the rm to update its pred to the expected pred in the data_ack phase
-% precond(wait_for_pred_update_data_ack): none (conditions will be checked here) 
-process_move_msg({move, rm_new_pred, {move, MoveFullId} = RMSubscrTag} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, State) ->
-                rm_loop:unsubscribe(self(), RMSubscrTag),
-                try_send_delta_to_pred(State, SlideOp)
-        end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_pred_update_data_ack], pred, rm_new_pred);
-
 % data from a neighbor
 process_move_msg({move, data, MovingData, MoveFullId, TargetId, NextOp} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
@@ -229,13 +215,7 @@ process_move_msg({move, data_ack, MoveFullId} = _Msg, MyState) ->
     WorkerFun =
         fun(SlideOp, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                % if sending data to the predecessor, check if we have already
-                % received the new predecessor info, otherwise wait for it
-                case slide_op:get_predORsucc(SlideOp1) =:= pred andalso
-                         slide_op:get_sendORreceive(SlideOp1) =:= send of
-                    true -> try_send_delta_to_pred(State, SlideOp1);
-                    _    -> send_delta(State, SlideOp1)
-                end
+                prepare_send_delta1(State, SlideOp1)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_data_ack], both, data_ack);
 
@@ -350,6 +330,8 @@ process_move_msg({move, continue, MoveFullId, Operation, EmbeddedMsg} = _Msg, My
                         % validity here and call functions manually to avoid
                         % having to export them
                         case Operation of
+                            prepare_send_delta2 ->
+                                prepare_send_delta2(State, SlideOp, EmbeddedMsg);
                             finish_delta2 ->
                                 finish_delta2(State, SlideOp, EmbeddedMsg)
                         end
@@ -785,17 +767,50 @@ send_data_ack(State, SlideOp) ->
 accept_data(State, SlideOp, Data) ->
     slide_chord:accept_data(State, SlideOp, Data).
 
-%% @doc Tries to send the delta to the predecessor.
-%% @see slide_chord:try_send_delta_to_pred/2
--spec try_send_delta_to_pred(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-try_send_delta_to_pred(State, SlideOp) ->
-    slide_chord:try_send_delta_to_pred(State, SlideOp).
+%% @doc Prepares to send a delta message for the given (existing!) slide operation and
+%%      continues.
+%% @see slide_chord:prepare_send_delta1/3
+-spec prepare_send_delta1(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> dht_node_state:state().
+prepare_send_delta1(State, OldSlideOp) ->
+    MoveFullId = slide_op:get_id(OldSlideOp),
+    ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, prepare_send_delta2, '_'}),
+    SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
+    case slide_chord:prepare_send_delta1(State, SlideOp1, ReplyPid) of
+        {ok, State1, SlideOp2} ->
+            PredOrSucc = slide_op:get_predORsucc(SlideOp2),
+            dht_node_state:set_slide(State1, PredOrSucc, SlideOp2);
+        {abort, Reason, State1, SlideOp2} ->
+            abort_slide(State1, SlideOp2, Reason, true)
+    end.
 
-%% @doc Sends delta info and progresses to the next phase, e.g. wait_for_delta_ack.
-%% @see slide_chord:send_delta/2
--spec send_delta(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-send_delta(State, SlideOp) ->
-    slide_chord:send_delta(State, SlideOp).
+%% @doc Gets changed data in the slide operation's interval from the DB and
+%%      sends it as a delta to the target node. Also sets the DB to stop
+%%      recording changes in this interval and delete any such entries. Changes
+%%      the slide operation's phase to wait_for_delta_ack.
+%% @see slide_chord:prepare_send_delta2/3
+-spec prepare_send_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                          EmbeddedMsg::comm:message()) -> dht_node_state:state().
+prepare_send_delta2(State, SlideOp, EmbeddedMsg) ->
+    case slide_chord:prepare_send_delta2(State, SlideOp, EmbeddedMsg) of
+        {ok, State1, SlideOp1} ->
+            % last part of a leave? -> transfer all DB entries!
+            % since in this case there is no other slide, we can safely use intervals:all()
+            SlideOpInterval =
+                case slide_op:is_leave(SlideOp1) andalso not slide_op:is_jump(SlideOp1)
+                         andalso slide_op:get_next_op(SlideOp1) =:= {none} of
+                    true  -> intervals:all();
+                    false -> slide_op:get_interval(SlideOp1)
+                end,
+            {State2, ChangedData} = dht_node_state:slide_take_delta_stop_record(
+                                      State1, SlideOpInterval),
+            % send delta (values of keys that have changed during the move)
+            SlideOp2 = slide_op:set_phase(SlideOp1, wait_for_delta_ack),
+            Msg = {move, delta, ChangedData, slide_op:get_id(SlideOp2)},
+            dht_node_move:send2(State2, SlideOp2, Msg);
+        {abort, Reason, State1, SlideOp1} ->
+            abort_slide(State1, SlideOp1, Reason, true)
+    end.
 
 %% @doc Accepts delta received during the given (existing!) slide operation and
 %%      continues.
@@ -1073,24 +1088,6 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, PredOrSuccExp, MoveMsgT
                                       "(operation: ~.0p)~n", [comm:this(), MoveMsgTag, PredOrSucc, PredOrSuccExp, SlideOp]),
                     abort_slide(State, SlideOp, {protocol_error, ErrorMsg}, false)
             end;
-        not_found when MoveMsgTag =:= rm_new_pred ->
-            % ignore (local) rm_new_pred messages arriving too late
-            case uid:is_my_old_uid(MoveFullId) of
-                true -> ok;
-                remote ->
-                    log:log(info, "[ dht_node_move ~.0p ] ~.0p received with no "
-                           "matching slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
-                            [comm:this(), MoveMsgTag, MoveFullId,
-                             dht_node_state:get(State, slide_pred),
-                             dht_node_state:get(State, slide_succ)]);
-                _ ->
-                    log:log(warn, "[ dht_node_move ~.0p ] ~.0p received with no "
-                           "matching slide operation (ID: ~.0p, slide_pred: ~.0p, slide_succ: ~.0p)~n",
-                            [comm:this(), MoveMsgTag, MoveFullId,
-                             dht_node_state:get(State, slide_pred),
-                             dht_node_state:get(State, slide_succ)])
-            end,
-            State;
         not_found when MoveMsgTag =:= send_error_retry ->
             State;
         not_found ->
@@ -1423,15 +1420,6 @@ make_slide_leave(State, SourcePid) ->
 rm_send_node_change(Pid, Tag, _OldNeighbors, _NewNeighbors) ->
     ?TRACE_SEND(Pid, {move, node_update, Tag}),
     comm:send_local(Pid, {move, node_update, Tag}).
-
-%% @doc Sends a rm_new_pred message to the dht_node_move module when a new
-%%      predecessor appears at the rm-process. Used in the rm-subscription
-%%      during a node join - see dht_node_join.erl.
--spec rm_notify_new_pred(Pid::pid(), Tag::{move, slide_op:id()},
-        OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_notify_new_pred(Pid, Tag, _OldNeighbors, _NewNeighbors) ->
-    ?TRACE_SEND(Pid, {move, rm_new_pred, Tag}),
-    comm:send_local(Pid, {move, rm_new_pred, Tag}).
 
 %% @doc Checks whether config parameters regarding dht_node moves exist and are
 %%      valid.
