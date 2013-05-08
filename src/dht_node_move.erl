@@ -1396,7 +1396,7 @@ make_slide_leave(State, SourcePid) ->
 %% @doc Send a  node change update message to this module inside the dht_node.
 %%      Will be registered with the dht_node as a node change subscriber.
 %% @see dht_node_state:add_nc_subscr/3
--spec rm_send_node_change(Pid::pid(), Tag::{move, slide_op:type(), slide_op:id()},
+-spec rm_send_node_change(Pid::pid(), Tag::{move, slide_op:id()},
                        OldNeighbors::nodelist:neighborhood(),
                        NewNeighbors::nodelist:neighborhood()) -> ok.
 rm_send_node_change(Pid, Tag, _OldNeighbors, _NewNeighbors) ->
@@ -1406,7 +1406,7 @@ rm_send_node_change(Pid, Tag, _OldNeighbors, _NewNeighbors) ->
 %% @doc Sends a rm_new_pred message to the dht_node_move module when a new
 %%      predecessor appears at the rm-process. Used in the rm-subscription
 %%      during a node join - see dht_node_join.erl.
--spec rm_notify_new_pred(Pid::pid(), Tag::{move, slide_op:type(), slide_op:id()},
+-spec rm_notify_new_pred(Pid::pid(), Tag::{move, slide_op:id()},
         OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()) -> ok.
 rm_notify_new_pred(Pid, Tag, _OldNeighbors, _NewNeighbors) ->
     ?TRACE_SEND(Pid, {move, rm_new_pred, Tag}),
