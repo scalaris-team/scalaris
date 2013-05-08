@@ -263,12 +263,33 @@ new_sending_slide_jump(MoveId, CurTargetId, FinalTargetId, Tag, Neighbors) ->
 %%      forwards and intervals accordingly.
 -spec update_target_id(slide_op(), TargetId::?RT:key(), NextOp::next_op(),
                        Neighbors::nodelist:neighborhood()) -> slide_op().
+update_target_id(SlideOp = #slide_op{target_id=TargetId}, TargetId, NextOp, _Neighbors) ->
+    SlideOp#slide_op{next_op = NextOp};
 update_target_id(SlideOp = #slide_op{type=Type, node=TargetNode, msg_fwd=OldMsgFwd},
                  TargetId, NextOp, Neighbors) ->
     PredOrSucc = get_predORsucc(Type),
     SendOrReceive = get_sendORreceive(Type),
     {Interval, TargetNode2} =
-        get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, Neighbors),
+        case is_join(Type, 'rcv') of
+            false ->
+                Pred = nodelist:pred(Neighbors),
+                case SendOrReceive =:= 'rcv' andalso
+                         node:id(Pred) =:= TargetId of
+                    false ->
+                        get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, Neighbors);
+                    true ->
+                        % the leaving node may not be in Neighbors any more!
+                        % in this case, the TargetId is the same ID as the pred ID!
+                        % -> use the ID of the TargetNode instead (should be up-to-date!)
+                        {node:mk_interval_between_ids(TargetId, node:id(TargetNode)),
+                         TargetNode}
+                end;
+            true ->
+                % note: we always need to transfer everything from Pred to TargetId
+                {node:mk_interval_between_ids(node:id(nodelist:pred(Neighbors)), TargetId),
+                 nodelist:succ(Neighbors)}
+        end,
+    false = intervals:is_all(Interval),
     % TargetNode2 may be more up to date - check that this is the same node though
     true = (node:same_process(TargetNode, TargetNode2) orelse is_leave(SlideOp, 'rcv')),
     SlideOp1 = SlideOp#slide_op{interval = Interval,
