@@ -49,7 +49,7 @@ groups() ->
     unittest_helper:create_ct_groups([join_lookup], [{join_lookup, [sequence, {repeat_until_any_fail, 30}]}]) ++
     unittest_helper:create_ct_groups([add_3_rm_3_data], [{add_3_rm_3_data, [sequence, {repeat_until_any_fail, 30}]}]).
 
-suite() -> [ {timetrap, {seconds, 90}} ].
+suite() -> [ {timetrap, {seconds, 30}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).

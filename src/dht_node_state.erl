@@ -341,6 +341,7 @@ set_snapshot_state(State,NewInfo) -> State#state{snapshot_state=NewInfo}.
 -spec add_db_range(State::state(), Interval::intervals:interval(),
                    SlideId::slide_op:id()) -> state().
 add_db_range(State = #state{db_range=DBRange}, Interval, SlideId) ->
+    false = intervals:is_all(Interval),
     State#state{db_range = [{Interval, SlideId} | DBRange]}.
 
 -spec rm_db_range(State::state(), SlideId::slide_op:id()) -> state().

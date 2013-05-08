@@ -169,11 +169,7 @@ process_move_msg({move, node_update, {move, MoveFullId} = RMSubscrTag} = _Msg, M
         fun(SlideOp, succ, State) ->
                 rm_loop:unsubscribe(self(), RMSubscrTag),
                 case slide_op:get_sendORreceive(SlideOp) of
-                    'send' ->
-                        State1 = dht_node_state:add_db_range(
-                                   State, slide_op:get_interval(SlideOp),
-                                   MoveFullId),
-                        send_data(State1, SlideOp);
+                    'send' -> send_data(State, SlideOp);
                     'rcv'  -> send_data_ack(State, SlideOp)
                 end
         end,
@@ -188,10 +184,7 @@ process_move_msg({move, node_leave} = _Msg, State) ->
              slide_op:get_phase(SlideOp) =:= wait_for_node_update andalso
              slide_op:get_sendORreceive(SlideOp) =:= 'send' of
         true ->
-            State1 = dht_node_state:add_db_range(
-                       State, slide_op:get_interval(SlideOp),
-                       slide_op:get_id(SlideOp)),
-            send_data(State1, SlideOp);
+            send_data(State, SlideOp);
         _ ->
             % we should not receive node update messages unless we are waiting for them
             % (node id updates should only be triggered by this module anyway)
@@ -466,9 +459,21 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
                 wait_for_other ->
                     WorkerFun =
                         fun(SlideOp0, _PredOrSucc0, State0) ->
-                                recreate_existing_slide(
-                                  SlideOp0, State0, TargetId,
-                                  MaxTransportEntries, MsgTag, NextOp)
+                                % during a join, everything was already set up
+                                % by join_request
+                                % -> don't re-create the slide!!
+                                % (the interval may be wrong since the joining
+                                % node may already be known to the rm)
+                                case slide_op:is_join(SlideOp0, 'send') of
+                                    true ->
+                                        SlideOp1 = slide_op:set_phase(SlideOp0, null),
+                                        SlideOp2 = slide_op:set_setup_at_other(SlideOp1),
+                                        notify_other(SlideOp2, State0);
+                                    false ->
+                                        recreate_existing_slide(
+                                          SlideOp0, State0, TargetId,
+                                          MaxTransportEntries, MsgTag, NextOp)
+                                end
                         end,
                     safe_operation(WorkerFun, State, MoveFullId, [wait_for_other], both, slide);
                 _ ->
@@ -1169,50 +1174,56 @@ notify_source_pid(SourcePid, Message) ->
         OldSlideOp::slide_op:slide_op(), State::dht_node_state:state(),
         TargetId::?RT:key(), NextOp::slide_op:next_op()) -> dht_node_state:state().
 update_target_on_existing_slide(OldSlideOp, State, TargetId, NextOp) ->
-    PredOrSucc = slide_op:get_predORsucc(OldSlideOp),
-    SendOrReceive = slide_op:get_sendORreceive(OldSlideOp),
-    AllowedI =
-        if PredOrSucc =:= succ andalso SendOrReceive =:= 'rcv' ->
-               % new target ID can only be between my current ID and the old target ID!
-               OldTargetId = slide_op:get_target_id(OldSlideOp),
-               MyId = dht_node_state:get(State, node_id),
-               node:mk_interval_between_ids(MyId, OldTargetId);
-           PredOrSucc =:= succ andalso SendOrReceive =:= 'send' ->
-               % new target ID can only be between the old target ID and my current ID!
-               OldTargetId = slide_op:get_target_id(OldSlideOp),
-               MyId = dht_node_state:get(State, node_id),
-               node:mk_interval_between_ids(OldTargetId, MyId);
-           PredOrSucc =:= pred ->
-               % we cannot really check anything here with chord as the pred may have already changed
-               intervals:all()
-        end,
-    case intervals:in(TargetId, AllowedI) of
-        true ->
-            % TODO: if there is any other NextOp planned, abort that!
-            % (currently there is no mechanism to add NextOp's other than
-            % incremental slides, so it is ok to just remove the old one for now)
-            SlideOp1 = slide_op:update_target_id(
-                         OldSlideOp, TargetId, NextOp,
-                         dht_node_state:get(State, neighbors)),
-            
-            MoveFullId = slide_op:get_id(SlideOp1),
-            MySlideDBRange = [1 || {_, Id} <- dht_node_state:get(State, db_range),
-                                   Id =:= MoveFullId],
-            State1 = case MySlideDBRange of
-                         []    -> State;
-                         [_|_] -> dht_node_state:add_db_range(
-                                    dht_node_state:rm_db_range(State, MoveFullId),
-                                    slide_op:get_interval(SlideOp1), MoveFullId)
-                     end,
-            dht_node_state:set_slide(State1, PredOrSucc, SlideOp1);
-        false ->
-            log:log(warn,"[ dht_node_move ~.0p ] new TargetId and NextOp received "
-                        "but not in allowed range (ID: ~.0p, node(slide): ~.0p, "
-                        "my_id: ~.0p, target_id: ~.0p, new_target_id: ~.0p)~n",
-                    [comm:this(), slide_op:get_id(OldSlideOp),
-                     dht_node_state:get(State, node_id),
-                     slide_op:get_target_id(OldSlideOp), TargetId]),
-            abort_slide(State, OldSlideOp, changed_parameters, true)
+            PredOrSucc = slide_op:get_predORsucc(OldSlideOp),
+    case slide_op:get_target_id(OldSlideOp) of
+        TargetId ->
+            SlideOp1 = slide_op:set_next_op(OldSlideOp, NextOp),
+            dht_node_state:set_slide(State, PredOrSucc, SlideOp1);
+        _ ->
+            SendOrReceive = slide_op:get_sendORreceive(OldSlideOp),
+            AllowedI =
+                if PredOrSucc =:= succ andalso SendOrReceive =:= 'rcv' ->
+                       % new target ID can only be between my current ID and the old target ID!
+                       OldTargetId = slide_op:get_target_id(OldSlideOp),
+                       MyId = dht_node_state:get(State, node_id),
+                       node:mk_interval_between_ids(MyId, OldTargetId);
+                   PredOrSucc =:= succ andalso SendOrReceive =:= 'send' ->
+                       % new target ID can only be between the old target ID and my current ID!
+                       OldTargetId = slide_op:get_target_id(OldSlideOp),
+                       MyId = dht_node_state:get(State, node_id),
+                       node:mk_interval_between_ids(OldTargetId, MyId);
+                   PredOrSucc =:= pred ->
+                       % we cannot really check anything here with chord as the pred may have already changed
+                       intervals:all()
+                end,
+            case intervals:in(TargetId, AllowedI) of
+                true ->
+                    % TODO: if there is any other NextOp planned, abort that!
+                    % (currently there is no mechanism to add NextOp's other than
+                    % incremental slides, so it is ok to just remove the old one for now)
+                    SlideOp1 = slide_op:update_target_id(
+                                 OldSlideOp, TargetId, NextOp,
+                                 dht_node_state:get(State, neighbors)),
+                    
+                    MoveFullId = slide_op:get_id(SlideOp1),
+                    MySlideDBRange = [1 || {_, Id} <- dht_node_state:get(State, db_range),
+                                           Id =:= MoveFullId],
+                    State1 = case MySlideDBRange of
+                                 []    -> State;
+                                 [_|_] -> dht_node_state:add_db_range(
+                                            dht_node_state:rm_db_range(State, MoveFullId),
+                                            slide_op:get_interval(SlideOp1), MoveFullId)
+                             end,
+                    dht_node_state:set_slide(State1, PredOrSucc, SlideOp1);
+                false ->
+                    log:log(warn,"[ dht_node_move ~.0p ] new TargetId and NextOp received "
+                                "but not in allowed range (ID: ~.0p, node(slide): ~.0p, "
+                                "my_id: ~.0p, target_id: ~.0p, new_target_id: ~.0p)~n",
+                            [comm:this(), slide_op:get_id(OldSlideOp),
+                             dht_node_state:get(State, node_id),
+                             slide_op:get_target_id(OldSlideOp), TargetId]),
+                    abort_slide(State, OldSlideOp, changed_parameters, true)
+            end
     end.
 
 %% @doc Re-creates a slide operation with the given (updated) parameters.
