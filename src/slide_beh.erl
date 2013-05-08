@@ -25,6 +25,26 @@
 -endif.
 
 -ifdef(have_callback_support).
+-callback prepare_send_data1(
+            State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+            ReplyPid::comm:erl_local_pid())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()} |
+           {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
+-callback prepare_send_data2(
+            State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+            EmbeddedMsg::{continue})
+        -> {ok, dht_node_state:state(), slide_op:slide_op()} |
+           {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
+-callback update_rcv_data1(
+            State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+            ReplyPid::comm:erl_local_pid())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()} |
+           {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
+-callback update_rcv_data2(
+            State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+            EmbeddedMsg::comm:message())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()} |
+           {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
 -callback prepare_send_delta1(
             State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
             ReplyPid::comm:erl_local_pid())
@@ -49,6 +69,10 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
+     {prepare_send_data1, 3}
+     {prepare_send_data2, 3}
+     {update_rcv_data1, 3}
+     {update_rcv_data2, 3}
      {prepare_send_delta1, 3}
      {prepare_send_delta2, 3}
      {finish_delta1, 4}

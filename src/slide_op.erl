@@ -57,7 +57,6 @@
 -type phase() ::
         null | % should only occur as an intermediate state, otherwise equal to "no slide op"
         wait_for_other | % a node initiated a slide but needs more info from its partner
-        wait_for_node_update | % pred changing its id
         wait_for_data_ack | wait_for_delta_ack | % sending node
         wait_for_data | wait_for_delta | % receiving node
         wait_for_continue. % async (local) slide message to rm-specific implementation
