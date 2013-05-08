@@ -29,10 +29,10 @@ test_cases() -> [].
 
 all() ->
     [
-     {group, send_to_pred},
-     {group, send_to_pred_incremental},
-     {group, send_to_succ},
-     {group, send_to_succ_incremental}
+     {group, send_to_pred}%,
+     %{group, send_to_pred_incremental},
+     %{group, send_to_succ},
+     %{group, send_to_succ_incremental}
     ] ++
 %%     unittest_helper:create_ct_all(test_cases()).
         test_cases().
@@ -243,8 +243,8 @@ reply_with_send_error(_Msg, State) ->
 %{move, rm_new_pred, Tag::{move, slide_op:id()}} | % message from RM that it knows the pred we expect
 %{move, req_data, MoveFullId::slide_op:id()} |
     {{move, req_data, '_'}, [], 1..2, reply_with_send_error} |
-%{move, data, MovingData::?DB:db_as_list(), MoveFullId::slide_op:id()} |
-    {{move, data, '_', '_'}, [], 1..5, reply_with_send_error} |
+%{move, data, MovingData::?DB:db_as_list(), MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} |
+    {{move, data, '_', '_', '_', '_'}, [], 1..5, reply_with_send_error} |
 %{move, data_ack, MoveFullId::slide_op:id()} |
     {{move, data_ack, '_'}, [], 1..5, reply_with_send_error} |
 %{move, delta, ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()], MoveFullId::slide_op:id()} |
