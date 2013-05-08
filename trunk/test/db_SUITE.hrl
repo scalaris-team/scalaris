@@ -59,7 +59,7 @@ tests_avail() ->
      tester_stop_record_changes
     ].
 
-suite() -> [ {timetrap, {seconds, 10}} ].
+suite() -> [ {timetrap, {seconds, 15}} ].
 
 -define(KEY(Key), ?RT:hash_key(Key)).
 -define(VALUE(Val), rdht_tx:encode_value(Val)).
@@ -1330,6 +1330,11 @@ tester_get_chunk4(_Config) ->
 tester_get_split_key5(_Config) ->
     prop_get_split_key5([2], 6, 4, 12, backward),
     prop_get_split_key5([12, 10, 4], 6, 8, 1, backward),
+    prop_get_split_key5([10, 9], 10, 6, 2, backward),
+    prop_get_split_key5([10, 9, 8], 10, 6, 2, backward),
+    prop_get_split_key5([10, 9, 8, 7], 10, 6, 2, backward),
+    prop_get_split_key5([10, 9, 8, 7, 4], 10, 6, 2, backward),
+    prop_get_split_key5([11, 10, 9, 8, 7, 4], 10, 6, 2, backward),
     tester:test(?MODULE, prop_get_split_key5, 5, rw_suite_runs(10000), [{threads, 2}]).
 
 tester_changed_keys_update_entries(_Config) ->
