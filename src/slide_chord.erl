@@ -178,25 +178,29 @@ accept_delta(State, PredOrSucc, OldSlideOp, ChangedData) ->
             % new pred), add the range to the db_range so our node already
             % responds to such messages
             ExpPredId = slide_op:get_target_id(SlideOp),
-            OldPred = slide_op:get_node(SlideOp),
-            MoveFullId = slide_op:get_id(SlideOp),
-            rm_loop:subscribe(
-              self(), {move, MoveFullId},
-              fun(RMOldN, RMNewN, _IsSlide) ->
-                      RMNewPred = nodelist:pred(RMNewN),
-                      RMOldPred = nodelist:pred(RMOldN),
-                      RMOldPred =/= RMNewPred orelse
-                          node:id(RMNewPred) =:= ExpPredId orelse
-                          RMNewPred =/= OldPred
-              end,
-              fun(Pid, {move, RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
-                      ?TRACE_SEND(Pid, {move, rm_db_range, RMSlideId}),
-                      comm:send_local(Pid, {move, rm_db_range, RMSlideId})
-              end, 1),
-            
-            dht_node_state:add_db_range(
-              State2, slide_op:get_interval(SlideOp),
-              MoveFullId)
+            case dht_node_state:get(State2, pred_id) of
+                ExpPredId -> State2;
+                _ ->
+                    OldPred = slide_op:get_node(SlideOp),
+                    MoveFullId = slide_op:get_id(SlideOp),
+                    rm_loop:subscribe(
+                      self(), {move, MoveFullId},
+                      fun(RMOldN, RMNewN, _IsSlide) ->
+                              RMNewPred = nodelist:pred(RMNewN),
+                              RMOldPred = nodelist:pred(RMOldN),
+                              RMOldPred =/= RMNewPred orelse
+                                  node:id(RMNewPred) =:= ExpPredId orelse
+                                  RMNewPred =/= OldPred
+                      end,
+                      fun(Pid, {move, RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
+                              ?TRACE_SEND(Pid, {move, rm_db_range, RMSlideId}),
+                              comm:send_local(Pid, {move, rm_db_range, RMSlideId})
+                      end, 1),
+                    
+                    dht_node_state:add_db_range(
+                      State2, slide_op:get_interval(SlideOp),
+                      MoveFullId)
+            end
     end,
     dht_node_move:continue_slide_delta(State3, PredOrSucc, SlideOp).
 
