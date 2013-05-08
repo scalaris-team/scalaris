@@ -248,8 +248,8 @@ finish_delta_ack1(State, OldSlideOp, NextOpMsg, ReplyPid) ->
 %% @doc No-op with chord RT.
 %% @see finish_delta_ack1/3
 %% @see dht_node_move:finish_delta_ack2/3
--spec finish_delta_ack2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-                        NextOpMsg::dht_node_move:next_op_msg())
-        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+-spec finish_delta_ack2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(), NextOpMsg)
+        -> {ok, dht_node_state:state(), slide_op:slide_op(), NextOpMsg}
+        when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
 finish_delta_ack2(State, SlideOp, NextOpMsg) ->
     {ok, State, SlideOp, NextOpMsg}.
