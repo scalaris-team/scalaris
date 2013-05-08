@@ -53,7 +53,7 @@
          use_incremental_slides/0, get_max_transport_entries/0]).
 
 -ifdef(with_export_type_support).
--export_type([move_message/0, abort_reason/0]).
+-export_type([move_message/0, next_op_msg/0, abort_reason/0]).
 -endif.
 
 -type abort_reason() ::
@@ -77,6 +77,10 @@
 
 -type result_message() :: {move, result, Tag::any(), Reason::abort_reason() | ok}.
 
+-type next_op_msg() ::
+    {none} |
+    {continue, NewSlideId::slide_op:id()}.
+
 -type move_message1() ::
     {move, start_slide, pred | succ, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
     {move, start_jump, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
@@ -87,10 +91,7 @@
     {move, data, MovingData::dht_node_state:slide_data(), MoveFullId::slide_op:id(), TargetId::?RT:key(), NextOp::slide_op:next_op()} |
     {move, data_ack, MoveFullId::slide_op:id()} |
     {move, delta, ChangedData::dht_node_state:slide_delta(), MoveFullId::slide_op:id()} |
-    {move, delta_ack, MoveFullId::slide_op:id()} |
-    {move, delta_ack, MoveFullId::slide_op:id(), continue, NewSlideId::slide_op:id()} |
-    {move, delta_ack, MoveFullId::slide_op:id(), OtherType::slide_op:type(), NewSlideId::slide_op:id(),
-     InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(), MaxTransportEntries::unknown | pos_integer()} |
+    {move, delta_ack, MoveFullId::slide_op:id(), next_op_msg()} |
     {move, rm_db_range, MoveFullId::slide_op:id()} |
     {move, done, MoveFullId::slide_op:id()} |
     {move, timeout, MoveFullId::slide_op:id()} % sent a message to the succ/pred but no reply yet
@@ -208,40 +209,13 @@ process_move_msg({move, delta, ChangedData, MoveFullId} = _Msg, MyState) ->
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta], both, delta);
 
 % acknowledgement from neighbor that its node received delta for the slide op
-% with the given id and wants to continue the (incremental) slide
-process_move_msg({move, delta_ack, MoveFullId, continue, NewSlideId} = _Msg, MyState) ->
+% with the given id and information about how to continue
+process_move_msg({move, delta_ack, MoveFullId, NextOpMsg} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun =
         fun(SlideOp, State) ->
                 SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                finish_delta_ack_continue(
-                  State, SlideOp1, NewSlideId)
-        end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta_ack], both, delta_ack);
-
-% acknowledgement from neighbor that its node received delta for the slide op
-% with the given id and wants to set up a new slide with the given parameters
-process_move_msg({move, delta_ack, MoveFullId, MyNextOpType, NewSlideId, OtherNode,
-                  OtherTargetNode, TargetId, Tag, MaxTransportEntries} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, State) ->
-                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                finish_delta_ack_next(
-                  State, SlideOp1, MyNextOpType, NewSlideId,
-                  OtherTargetNode, OtherNode, TargetId, Tag,
-                  MaxTransportEntries, null)
-        end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta_ack], both, delta_ack);
-
-% acknowledgement from neighbor that its node received delta for the slide op
-% with the given id
-process_move_msg({move, delta_ack, MoveFullId} = _Msg, MyState) ->
-    ?TRACE1(_Msg, MyState),
-    WorkerFun =
-        fun(SlideOp, State) ->
-                SlideOp1 = slide_op:cancel_timer(SlideOp), % cancel previous timer
-                finish_delta_ack(State, SlideOp1)
+                finish_delta_ack1(State, SlideOp1, NextOpMsg)
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_delta_ack], both, delta_ack);
 
@@ -315,7 +289,9 @@ process_move_msg({move, continue, MoveFullId, Operation, EmbeddedMsg} = _Msg, My
                             prepare_send_delta2 ->
                                 prepare_send_delta2(State, SlideOp, EmbeddedMsg);
                             finish_delta2 ->
-                                finish_delta2(State, SlideOp, EmbeddedMsg)
+                                finish_delta2(State, SlideOp, EmbeddedMsg);
+                            finish_delta_ack2 ->
+                                finish_delta_ack2(State, SlideOp, EmbeddedMsg)
                         end
                 end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_continue], both, continue).
@@ -864,8 +840,17 @@ finish_delta1(State, OldSlideOp, ChangedData) ->
 -spec send_delta_ack(SlideOp::slide_op:slide_op()) -> ok.
 send_delta_ack(SlideOp) ->
     Pid = node:pidX(slide_op:get_node(SlideOp)),
-    Msg = {move, delta_ack, slide_op:get_id(SlideOp)},
+    Msg = {move, delta_ack, slide_op:get_id(SlideOp), {none}},
     send_no_slide(Pid, Msg, 0).
+
+% similar to notify_other/2:
+% pre: incremental slide in slide op on this node
+-spec notify_other_in_delta_ack(OldMoveFullId::slide_op:id(),
+        NextSlideOp::slide_op:slide_op(), State::dht_node_state:state())
+            -> dht_node_state:state().
+notify_other_in_delta_ack(OldMoveFullId, NextSlideOp, State) ->
+    Msg = {move, delta_ack, OldMoveFullId, {continue, slide_op:get_id(NextSlideOp)}},
+    send2(State, NextSlideOp, Msg).
 
 -spec finish_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> dht_node_state:state().
@@ -962,127 +947,124 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
             abort_slide(State1, SlideOp1, Reason, true)
     end.
 
-% similar to notify_other/2:
-% pre: incremental slide in slide op on this node
--spec notify_other_in_delta_ack(OldMoveFullId::slide_op:id(),
-        NextSlideOp::slide_op:slide_op(), State::dht_node_state:state())
-            -> dht_node_state:state().
-notify_other_in_delta_ack(OldMoveFullId, NextSlideOp, State) ->
-    Msg = {move, delta_ack, OldMoveFullId, continue,
-           slide_op:get_id(NextSlideOp)},
-    send2(State, NextSlideOp, Msg).
-
--spec finish_delta_ack(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+%% @doc Accepts delta_ack received during the given (existing!) slide operation and
+%%      continues.
+%% @see slide_chord:finish_delta_ack1/4
+-spec finish_delta_ack1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                        NextOpMsg::next_op_msg())
         -> dht_node_state:state().
-finish_delta_ack(State, SlideOp) ->
-    State1 = finish_slide(State, SlideOp),
-    case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp) of
-        true ->
-            SupDhtNodeId = erlang:get(my_sup_dht_node_id),
-            SupDhtNode = pid_groups:get_my(sup_dht_node),
-            comm:send_local(pid_groups:find_a(service_per_vm),
-                            {delete_node, SupDhtNode, SupDhtNodeId}),
-            % note: we will be killed soon but need to be removed from the supervisor first
-            % -> do not kill this process
-            State1;
-        _    ->
-            % continue with the next planned operation:
-            PredOrSucc = slide_op:get_predORsucc(SlideOp),
-            case slide_op:get_next_op(SlideOp) of
-                {none} -> State1;
-                {join, NewTargetId} ->
-                    OldIdVersion = node:id_version(dht_node_state:get(State1, node)),
-                    dht_node_join:join_as_other(NewTargetId, OldIdVersion + 1, [{skip_psv_lb}]);
-                {slide, PredOrSucc, NewTargetId, NewTag, NewSourcePid} ->
-                    make_slide(State1, PredOrSucc, NewTargetId, NewTag, NewSourcePid);
-                {jump, NewTargetId, NewTag, NewSourcePid} ->
-                    make_jump(State1, NewTargetId, NewTag, NewSourcePid);
-                {leave, NewSourcePid} ->
-                    make_slide_leave(State1, NewSourcePid)
-            end
+finish_delta_ack1(State, OldSlideOp, NextOpMsg) ->
+    MoveFullId = slide_op:get_id(OldSlideOp),
+    ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, finish_delta_ack2, '_'}),
+    SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
+    case slide_chord:finish_delta_ack1(State, SlideOp1, NextOpMsg, ReplyPid) of
+        {ok, State1, SlideOp2} ->
+            PredOrSucc = slide_op:get_predORsucc(SlideOp2),
+            dht_node_state:set_slide(State1, PredOrSucc, SlideOp2);
+        {abort, Reason, State1, SlideOp2} ->
+            abort_slide(State1, SlideOp2, Reason, true)
     end.
 
--spec finish_delta_ack_continue(
-        State::dht_node_state:state(),
-        SlideOp::slide_op:slide_op(), NewSlideId::slide_op:id())
-    -> dht_node_state:state().
-finish_delta_ack_continue(State, SlideOp, NewSlideId) ->
+-spec finish_delta_ack2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                        NextOp::next_op_msg()) -> dht_node_state:state().
+finish_delta_ack2(State, SlideOp, NextOpMsg) ->
+    case slide_chord:finish_delta_ack2(State, SlideOp, NextOpMsg) of
+        {ok, State1, SlideOp1, NextOpMsg1} ->
+            case slide_op:is_leave(SlideOp1) andalso not slide_op:is_jump(SlideOp1) of
+                true ->
+                    SupDhtNodeId = erlang:get(my_sup_dht_node_id),
+                    SupDhtNode = pid_groups:get_my(sup_dht_node),
+                    comm:send_local(pid_groups:find_a(service_per_vm),
+                                    {delete_node, SupDhtNode, SupDhtNodeId}),
+                    % note: we will be killed soon but need to be removed from the supervisor first
+                    % -> do not kill this process
+                    finish_slide(State1, SlideOp1);
+                _ ->
+                    finish_delta_ack2B(State1, SlideOp1, NextOpMsg1)
+            end;
+        {abort, Reason, State1, SlideOp1} ->
+            abort_slide(State1, SlideOp1, Reason, true)
+    end.
+
+%% Pre: SlideOp is no finished leaving slide (see finish_delta_ack2/3)
+-spec finish_delta_ack2B(
+        State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+        NextOpMsg::next_op_msg() |
+          {NextOpType::slide_op:type(), NewSlideId::slide_op:id(),
+          InitNode::node:node_type(), TargetNode::node:node_type(),
+          TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null})
+        -> dht_node_state:state().
+finish_delta_ack2B(State, SlideOp, {none}) ->
+    State1 = finish_slide(State, SlideOp),
+    % continue with the next planned operation:
+    PredOrSucc = slide_op:get_predORsucc(SlideOp),
+    case slide_op:get_next_op(SlideOp) of
+        {none} -> State1;
+        {join, NewTargetId} ->
+            OldIdVersion = node:id_version(dht_node_state:get(State1, node)),
+            dht_node_join:join_as_other(NewTargetId, OldIdVersion + 1, [{skip_psv_lb}]);
+        {slide, PredOrSucc, NewTargetId, NewTag, NewSourcePid} ->
+            make_slide(State1, PredOrSucc, NewTargetId, NewTag, NewSourcePid);
+        {jump, NewTargetId, NewTag, NewSourcePid} ->
+            make_jump(State1, NewTargetId, NewTag, NewSourcePid);
+        {leave, NewSourcePid} ->
+            make_slide_leave(State1, NewSourcePid)
+    end;
+finish_delta_ack2B(State, SlideOp, {continue, NewSlideId}) ->
     MyNode = dht_node_state:get(State, node),
     Type = slide_op:get_type(SlideOp),
     PredOrSucc = slide_op:get_predORsucc(Type),
     TargetNode = dht_node_state:get(State, PredOrSucc),
     Tag = slide_op:get_tag(SlideOp),
     SourcePid = slide_op:get_source_pid(SlideOp),
-    OtherMTE = slide_op:get_other_max_entries(SlideOp),
     % TODO: support other types
     case slide_op:get_next_op(SlideOp) of
         {slide, continue, NewTargetId} when Type =:= {slide, PredOrSucc, 'send'} ->
-            finish_delta_ack_next(
-              State, SlideOp, Type, NewSlideId, MyNode,
-              TargetNode, NewTargetId, Tag, OtherMTE, SourcePid);
+            finish_delta_ack2B(
+              State, SlideOp, {Type, NewSlideId, MyNode,
+                               TargetNode, NewTargetId, Tag, SourcePid});
         {jump, continue, _NewTargetId} ->
             % TODO
-            finish_delta_ack(State, SlideOp);
+            finish_delta_ack2B(State, SlideOp, {none});
         {leave, continue} ->
             % TODO
-            finish_delta_ack(State, SlideOp);
+            finish_delta_ack2B(State, SlideOp, {none});
         _ -> % our next op is different from the other node's next op
             % TODO
             abort_slide(State, SlideOp, next_op_mismatch, true)
-    end.
-
--spec finish_delta_ack_next(
-        State::dht_node_state:state(),
-        SlideOp::slide_op:slide_op(), MyNextOpType::slide_op:type(),
-        NewSlideId::slide_op:id(), MyNode::node:node_type(),
-        TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(),
-        MaxTransportEntries::unknown | pos_integer(),
-        SourcePid::comm:erl_local_pid() | null) -> dht_node_state:state().
-finish_delta_ack_next(State, SlideOp, MyNextOpType, NewSlideId,
-                      MyNode, TargetNode, TargetId, Tag, MaxTransportEntries,
-                      SourcePid) ->
+    end;
+finish_delta_ack2B(State, SlideOp, {MyNextOpType, NewSlideId, MyNode,
+                                   TargetNode, TargetId, Tag, SourcePid}) ->
     fd:unsubscribe([node:pidX(slide_op:get_node(SlideOp))], {move, slide_op:get_id(SlideOp)}),
-    case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp) of
-        true ->
-            % TODO: allow if continue op is leave, too!
-            log:log(warn, "[ dht_node_move ~.0p ] ignoring request to continue "
-                          "a leave operation (this doesn't make any sense!)",
-                    [comm:this()]),
-            SupDhtNodeId = erlang:get(my_sup_dht_node_id),
-            SupDhtNode = pid_groups:get_my(sup_dht_node),
-            util:supervisor_terminate_childs(SupDhtNode),
-            ok = supervisor:terminate_child(main_sup, SupDhtNodeId),
-            ok = supervisor:delete_child(main_sup, SupDhtNodeId),
-            kill;
-        _    ->
-            % Always prefer the other node's next_op over ours as it is almost
-            % set up. Unless our scheduled op is a leave operation which needs
-            % to be favoured.
-            case slide_op:get_next_op(SlideOp) of
-                {leave, NewSourcePid} when NewSourcePid =/= continue ->
-                    State1 = abort_slide(State, SlideOp, scheduled_leave, true),
-                    make_slide_leave(State1, NewSourcePid);
-                MyNextOp ->
-                    % TODO: check if warnings are generated in all cases
-                    case MyNextOp of
-                        {none} -> ok;
-                        {slide, continue, TargetId} -> ok;
-                        {jump, continue, TargetId} -> ok;
-                        {leave, continue} -> ok;
-                        _ ->
-                            log:log(info, "[ dht_node_move ~.0p ] removing "
-                                          "scheduled next op ~.0p, "
-                                          "got next op: ~.0p",
-                                    [comm:this(), MyNextOp, MyNextOpType])
-                    end,
-                    State1 = dht_node_state:set_slide(
-                               State, slide_op:get_predORsucc(SlideOp), null),
-                    Command = check_setup_slide_not_found(
-                                State1, MyNextOpType, MyNode, TargetNode, TargetId),
-                    exec_setup_slide_not_found(
-                      Command, State1, NewSlideId, TargetNode, TargetId,
-                      Tag, MaxTransportEntries, SourcePid, delta_ack, {none})
-            end
+    % Always prefer the other node's next_op over ours as it is almost
+    % set up. Unless our scheduled op is a leave operation which needs
+    % to be favoured.
+    case slide_op:get_next_op(SlideOp) of
+        {leave, NewSourcePid} when NewSourcePid =/= continue ->
+            State1 = abort_slide(State, TargetNode, NewSlideId, null, SourcePid,
+                                 Tag, MyNextOpType, scheduled_leave, true),
+            make_slide_leave(State1, NewSourcePid);
+        MyNextOp ->
+            % TODO: check if warnings are generated in all cases
+            case MyNextOp of
+                {none} -> ok;
+                {slide, continue, TargetId} -> ok;
+                {jump, continue, TargetId} -> ok;
+                {leave, continue} -> ok;
+                _ ->
+                    log:log(info, "[ dht_node_move ~.0p ] removing "
+                                "scheduled next op ~.0p, "
+                                "got next op: ~.0p",
+                            [comm:this(), MyNextOp, MyNextOpType])
+            end,
+            State1 = dht_node_state:set_slide(
+                       State, slide_op:get_predORsucc(SlideOp), null),
+            Command = check_setup_slide_not_found(
+                        State1, MyNextOpType, MyNode, TargetNode, TargetId),
+            exec_setup_slide_not_found(
+              Command, State1, NewSlideId, TargetNode, TargetId,
+              Tag, slide_op:get_other_max_entries(SlideOp), SourcePid,
+              delta_ack, {none})
     end.
 
 %% @doc Checks if a slide operation with the given MoveFullId exists and
