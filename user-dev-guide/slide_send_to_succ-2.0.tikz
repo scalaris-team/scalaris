@@ -125,16 +125,18 @@
 
  \node[phase, below right=0.1 and 0.1 of succ-got-data.south] {wait\_for\_delta};
 
- \node[action_r, right=0.1 of succ-got-owner.west] {}; % nothing to do
+ \node[action_r, right=0.1 of succ-got-owner.north west] {
+   fd.unsubscribe(SlideOp.node)\\
+   SlideOp.delete()%
+ };
 
- \coordinate (succ-cont-start1) at ($(succ-got-delta.south)-(0,0.25)$);
- \coordinate (succ-cont-start2) at ($(succ-cont-start1)-(0,1.25)$);
+ \coordinate (succ-cont-start1) at ($(succ-got-owner.north)+(0,0.5)$);
  \coordinate (succ-cont-end) at ($(succ-init.south)+(0,-0.25)$);
  \coordinate (pred-cont-start1) at ($(pred-send-owner)-(0,.5\tikzsepinner)$);
  \coordinate (pred-cont-end) at ($(pred-send-data.west)+(0,0.1)$);
 
  \path[->] (finish_delta_ack.south east)
-             edge [async_l,draw=lightgray,dashed,out=230,in=30,looseness=0.8] node[msg_t, pos=0.5, lightgray, font=\footnotesize] {rm\_update} node[msg_b, pos=0.5, lightgray, font=\footnotesize] {(to dht\_node)} node[pos=0.37,note,draw,red,anchor=north] {$\ell$} ($(succ-cont-start1)!0.7!(succ-cont-start2)$);
+             edge [async_l,draw=lightgray,dashed,out=230,in=30,looseness=0.8] node[msg_t, pos=0.5, lightgray, font=\footnotesize] {rm\_update} node[msg_b, pos=0.5, lightgray, font=\footnotesize] {(to dht\_node)} node[pos=0.37,note,draw,red,anchor=north] {$\ell$} (succ-got-owner.south);
 
  \draw[post, rounded corners, dashed, lightgray] (pred-cont-start1) -- +(-7,0) -- ($(pred-cont-end)+(-7,0)$) -- (pred-cont-end);
  \node[action_r, lightgray, anchor=south west] at ($(pred-cont-start1)+(-7,0)$) {if (NextOp == continue)\\SlideOp.update()};
@@ -146,13 +148,7 @@
  
  \coordinate (succ-cont-mid) at ($(succ-cont-start1)+(7.5,0.2)$);
  \draw[post, rounded corners, dashed, lightgray] (succ-cont-start1) -- +(7.5,0) -- ($(succ-cont-end)+(7.5,0)$) -- (succ-cont-end);
- \draw[post, rounded corners, dashed, lightgray] (succ-cont-start2) -- +(7.5,0) -- (succ-cont-mid);
- \node[action_l, lightgray, anchor=east] at ($(succ-cont-start1)!0.5!(succ-cont-start2)+(7,0)$) {if (NextOp == continue) -> continue\\SlideOp.update()\\prepare\_rcv\_data(SlideOp)};
-
- \node[action_r, below right=\tikzstartsecond and 0.1 of succ-got-owner.north west, anchor=north west] {
-   fd.unsubscribe(SlideOp.node)\\
-   SlideOp.delete()%
- };
+ \node[action_l, lightgray, anchor=south east] at ($(succ-cont-start1)+(7,0)$) {if (NextOp == continue) -> continue\\SlideOp.update()\\prepare\_rcv\_data(SlideOp)};
 
 \end{tikzpicture}
 \input{tikz_footer}
