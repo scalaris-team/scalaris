@@ -29,14 +29,32 @@
 -define(TRACE(X,Y), ok).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
 
--export([prepare_send_data1/3, prepare_send_data2/3,
+-export([prepare_rcv_data/2,
+         prepare_send_data1/3, prepare_send_data2/3,
          update_rcv_data1/3, update_rcv_data2/3,
          prepare_send_delta1/3, prepare_send_delta2/3,
          finish_delta1/4, finish_delta2/3,
          finish_delta_ack1/4, finish_delta_ack2/3]).
 
+-spec prepare_rcv_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+prepare_rcv_data(State, SlideOp) ->
+    Type = slide_op:get_type(SlideOp),
+    % message forward on succ is set before the pred can change its ID;
+    % on pred in ordinary slides, the message forward will be set right before
+    % the ID is going to be changed;
+    % during a join we already set the new ID -> set message forward now, too!
+    SlideOp1 = case (slide_op:get_sendORreceive(Type) =:= 'rcv' andalso
+                         slide_op:get_predORsucc(Type) =:= pred)
+                        orelse slide_op:is_join(Type, 'rcv') of
+                   true ->
+                       slide_op:set_msg_fwd(SlideOp);
+                   _ -> SlideOp
+               end,
+    {ok, State, SlideOp1}.
+    
 %% @doc Change the local node's ID to the given TargetId by calling the ring
-%%      maintenance and sending a continue message when the node is up-to-date. 
+%%      maintenance and sending a continue message when the node is up-to-date.
 -spec change_my_id(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                    ReplyPid::comm:erl_local_pid())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
