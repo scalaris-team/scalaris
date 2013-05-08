@@ -823,12 +823,13 @@ finish_delta1(State, OldSlideOp, ChangedData) ->
     MoveFullId = slide_op:get_id(OldSlideOp),
     ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, finish_delta2, '_'}),
     SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
-    case slide_chord:finish_delta1(State, SlideOp1, ChangedData, ReplyPid) of
-        {ok, State1, SlideOp2} ->
+    State1 = dht_node_state:slide_add_delta(State, ChangedData),
+    case slide_chord:finish_delta1(State1, SlideOp1, ReplyPid) of
+        {ok, State2, SlideOp2} ->
             PredOrSucc = slide_op:get_predORsucc(SlideOp2),
-            dht_node_state:set_slide(State1, PredOrSucc, SlideOp2);
-        {abort, Reason, State1, SlideOp2} ->
-            abort_slide(State1, SlideOp2, Reason, true)
+            dht_node_state:set_slide(State2, PredOrSucc, SlideOp2);
+        {abort, Reason, State2, SlideOp2} ->
+            abort_slide(State2, SlideOp2, Reason, true)
     end.
 
 -spec send_delta_ack(SlideOp::slide_op:slide_op(), NextOp::next_op_msg()) -> ok.

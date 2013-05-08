@@ -65,7 +65,7 @@
            {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
 -callback finish_delta1(
             State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-            ChangedData::dht_node_state:slide_delta(), ReplyPid::comm:erl_local_pid())
+            ReplyPid::comm:erl_local_pid())
         -> {ok, dht_node_state:state(), slide_op:slide_op()} |
            {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
 -callback finish_delta2(
@@ -95,7 +95,7 @@ behaviour_info(callbacks) ->
      {update_rcv_data2, 3},
      {prepare_send_delta1, 3},
      {prepare_send_delta2, 3},
-     {finish_delta1, 4},
+     {finish_delta1, 3},
      {finish_delta2, 3},
      {finish_delta_ack1, 4},
      {finish_delta_ack2, 3}
