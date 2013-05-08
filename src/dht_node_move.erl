@@ -887,9 +887,16 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
                                           NewMoveFullId, NewType, NewTargetId, Tag,
                                           SourcePid, OtherMTE, {none}, Neighbors),
                                     % note: phase will be set by notify_other/2 and needs to remain null here
-                                    NextSlideOp1 = slide_op:set_phase(NextSlideOp, wait_for_data),
-                                    Msg = {move, delta_ack, MoveFullId, {continue, NewMoveFullId}},
-                                    send2(State2, NextSlideOp1, Msg);
+                                    case slide_chord:prepare_rcv_data(State2, NextSlideOp) of
+                                        {ok, State3, NextSlideOp1} ->
+                                            NextSlideOp2 = slide_op:set_phase(NextSlideOp1, wait_for_data),
+                                            Msg = {move, delta_ack, MoveFullId, {continue, NewMoveFullId}},
+                                            send2(State3, NextSlideOp2, Msg);
+                                        {abort, Reason, State3, NextSlideOp1} ->
+                                            % let this op finish and abort the continued one:
+                                            send_delta_ack(SlideOp1, {abort, NewMoveFullId, Reason}),
+                                            abort_slide(State3, NextSlideOp1, Reason, false)
+                                    end;
                                 {abort, Reason, _Type} -> % note: the type returned here is the same as Type
                                     % let this op finish and abort the continued one:
                                     send_delta_ack(SlideOp1, {abort, NewMoveFullId, Reason}),
