@@ -71,6 +71,10 @@
            (succ-got-data.south west)
              edge [post] node[msg_t] {data\_ack} (pred-send-delta.north east)
 
+           (succ-got-data.north east)
+             edge [async_r] node[async_desc, auto, anchor=west] {\textcolor{green}{update\_rcv\_data(SlideOp, TargetId, NextOp)}}
+                  (succ-got-data.east)
+
            (pred-send-delta.north west)
              edge [async_l] node[async_desc, auto, anchor=east] {\textcolor{green}{prepare\_send\_selta(SlideOp)}}
                   (pred-send-delta.west)
@@ -79,6 +83,10 @@
              edge [post] node[msg_t] {delta} (succ-got-delta.north west)
            (succ-got-delta.south west)
              edge [post] node[msg_t] {delta\_ack} (pred-send-owner.north east)
+
+           (succ-got-delta.north east)
+             edge [async_r] node[async_desc, auto, anchor=west] {\textcolor{green}{finish\_delta(SlideOp)}}
+                  (succ-got-delta.east)
 
            (pred-send-owner.north west)
              edge [async_l] node[async_desc, auto, anchor=east] (finish_delta_ack) {\textcolor{green}{finish\_delta\_ack(SlideOp)}}
@@ -115,14 +123,7 @@
  };
  \node[phase, below right=0.35 and 0.1 of succ-init.south] {wait\_for\_data};
 
- \node[action_r, right=0.1 of succ-got-data.west] {
-   \textcolor{green}{update\_rcv\_data(SlideOp, TargetId, NextOp)}%
- };
  \node[phase, below right=0.1 and 0.1 of succ-got-data.south] {wait\_for\_delta};
-
- \node[action_r, right=0.1 of succ-got-delta.west] {
-   \textcolor{green}{finish\_delta(SlideOp)}%
- };
 
  \node[action_r, right=0.1 of succ-got-owner.west] {}; % nothing to do
 
@@ -143,9 +144,9 @@
    SlideOp.delete()%
  };
  
- \coordinate (succ-cont-mid) at ($(succ-cont-start1)+(7,0.2)$);
- \draw[post, rounded corners, dashed, lightgray] (succ-cont-start1) -- +(7,0) -- ($(succ-cont-end)+(7,0)$) -- (succ-cont-end);
- \draw[post, rounded corners, dashed, lightgray] (succ-cont-start2) -- +(7,0) -- (succ-cont-mid);
+ \coordinate (succ-cont-mid) at ($(succ-cont-start1)+(7.5,0.2)$);
+ \draw[post, rounded corners, dashed, lightgray] (succ-cont-start1) -- +(7.5,0) -- ($(succ-cont-end)+(7.5,0)$) -- (succ-cont-end);
+ \draw[post, rounded corners, dashed, lightgray] (succ-cont-start2) -- +(7.5,0) -- (succ-cont-mid);
  \node[action_l, lightgray, anchor=east] at ($(succ-cont-start1)!0.5!(succ-cont-start2)+(7,0)$) {if (NextOp == continue) -> continue\\SlideOp.update()\\prepare\_rcv\_data(SlideOp)};
 
  \node[action_r, below right=\tikzstartsecond and 0.1 of succ-got-owner.north west, anchor=north west] {
