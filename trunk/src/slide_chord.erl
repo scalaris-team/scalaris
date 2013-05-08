@@ -29,16 +29,17 @@
 -define(TRACE(X,Y), ok).
 -define(TRACE_SEND(Pid, Msg), ?TRACE("[ ~.0p ] to ~.0p: ~.0p~n", [self(), Pid, Msg])).
 
--export([change_my_id/2, send_data/2, accept_data/3,
+-export([prepare_send_data1/3, prepare_send_data2/3,
+         update_rcv_data1/3, update_rcv_data2/3,
          prepare_send_delta1/3, prepare_send_delta2/3,
          finish_delta1/4, finish_delta2/3]).
 
 %% @doc Change the local node's ID to the given TargetId by calling the ring
-%%      maintenance and changing the slide operation's phase to
-%%      wait_for_node_update. 
--spec change_my_id(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
-        -> dht_node_state:state().
-change_my_id(State, SlideOp) ->
+%%      maintenance and sending a continue message when the node is up-to-date. 
+-spec change_my_id(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                   ReplyPid::comm:erl_local_pid())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+change_my_id(State, SlideOp, ReplyPid) ->
     case slide_op:get_sendORreceive(SlideOp) of
         'send' ->
             State1 = dht_node_state:add_db_range(
@@ -61,54 +62,69 @@ change_my_id(State, SlideOp) ->
 %%             vivaldi:deactivate(),
             cyclon:deactivate(),
             rt_loop:deactivate(),
-            dht_node_state:set_slide(
-              State1, succ, slide_op:set_phase(SlideOp2, wait_for_node_update));
+            {ok, State1, SlideOp2};
         _ ->
             % note: subscribe with fully qualified function names, i.e. module:fun/arity
             % (a so created fun seems to be the same no matter where created)
             TargetId = slide_op:get_target_id(SlideOp2),
-            RMSubscrTag = {move, slide_op:get_id(SlideOp2)},
-            rm_loop:subscribe(self(), RMSubscrTag,
-                              fun(_OldN, NewN, _IsSlide) ->
-                                      nodelist:nodeid(NewN) =:= TargetId
-                                      % note: no need to check the id version
-                              end,
-                              fun dht_node_move:rm_send_node_change/4, 1),
+            rm_loop:subscribe(
+              ReplyPid, {move, slide_op:get_id(SlideOp2)},
+              fun(_OldN, NewN, _IsSlide) ->
+                      nodelist:nodeid(NewN) =:= TargetId
+              % note: no need to check the id version
+              end,
+              fun(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
+                      send_continue_msg(Pid)
+              end, 1),
             rm_loop:update_id(TargetId),
-            dht_node_state:set_slide(
-              State1, succ, slide_op:set_phase(SlideOp2, wait_for_node_update))
+            {ok, State1, SlideOp2}
     end.
 
-%% @doc Gets all data in the slide operation's interval from the DB and sends
-%%      it to the target node. Also sets the DB to record changes in this
-%%      interval and changes the slide operation's phase to wait_for_data_ack.
--spec send_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-send_data(State, SlideOp) ->
-    % last part of a leave? -> transfer all DB entries!
-    % since in this case there is no other slide, we can safely use intervals:all()
-    MovingInterval =
-        case slide_op:is_leave(SlideOp) andalso not slide_op:is_jump(SlideOp)
-                 andalso slide_op:get_next_op(SlideOp) =:= {none} of
-            true  -> intervals:all();
-            false -> slide_op:get_interval(SlideOp)
-        end,
-    {State_NewDB, MovingData} = dht_node_state:slide_get_data_start_record(State, MovingInterval),
-    NewSlideOp = slide_op:set_phase(SlideOp, wait_for_data_ack),
-    Msg = {move, data, MovingData, slide_op:get_id(NewSlideOp),
-           slide_op:get_target_id(NewSlideOp),
-           slide_op:get_next_op(NewSlideOp)},
-    dht_node_move:send2(State_NewDB, NewSlideOp, Msg).
-
-%% @doc Accepts data received during the given (existing!) slide operation and
-%%      writes it to the DB.
--spec accept_data(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-                  Data::dht_node_state:slide_data()) -> dht_node_state:state().
-accept_data(State, SlideOp, Data) ->
-    State1 = dht_node_state:slide_add_data(State, Data),
+%% @doc Prepares sending data for the given (existing!) slide operation and
+%%      changes the own ID if necessary.
+%% @see prepare_send_data2/3
+%% @see dht_node_move:prepare_send_data1/2
+-spec prepare_send_data1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                       ReplyPid::comm:erl_local_pid())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+prepare_send_data1(State, SlideOp, ReplyPid) ->
     case slide_op:get_predORsucc(SlideOp) of
-        'succ' -> dht_node_move:change_my_id(State1, SlideOp);
-        'pred' -> dht_node_move:send_data_ack(State1, SlideOp)
+        'succ' -> change_my_id(State, SlideOp, ReplyPid);
+        'pred' -> send_continue_msg(ReplyPid),
+                  {ok, State, SlideOp}
     end.
+
+%% @doc Cleans up after prepare_send_data1/3 once the RM is up-to-date, (no-op here).
+%% @see prepare_send_data1/3
+%% @see dht_node_move:prepare_send_data2/3
+-spec prepare_send_data2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                         EmbeddedMsg::{continue})
+        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+prepare_send_data2(State, SlideOp, {continue}) ->
+    {ok, State, SlideOp}.
+
+%% @doc Accepts data received during the given (existing!) slide operation,
+%%      writes it to the DB and changes the own ID if necessary.
+%% @see update_rcv_data2/3
+%% @see dht_node_move:update_rcv_data1/5
+-spec update_rcv_data1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                       ReplyPid::comm:erl_local_pid())
+        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+update_rcv_data1(State, SlideOp, ReplyPid) ->
+    case slide_op:get_predORsucc(SlideOp) of
+        'succ' -> change_my_id(State, SlideOp, ReplyPid);
+        'pred' -> send_continue_msg(ReplyPid),
+                  {ok, State, SlideOp}
+    end.
+
+%% @doc Cleans up after update_rcv_data1/3 once the RM is up-to-date, (no-op here).
+%% @see update_rcv_data1/3
+%% @see dht_node_move:update_rcv_data2/3
+-spec update_rcv_data2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                       EmbeddedMsg::{continue})
+        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+update_rcv_data2(State, SlideOp, {continue}) ->
+    {ok, State, SlideOp}.
 
 -spec send_continue_msg(Pid::comm:erl_local_pid()) -> ok.
 send_continue_msg(Pid) ->
