@@ -65,7 +65,6 @@
         {slide, continue, Id::?RT:key()} |
         {jump, continue, Id::?RT:key()} |
         {leave, continue} |
-        {join, Id::?RT:key()} |
         {slide, pred | succ, Id::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
         {jump, Id::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
         {leave, SourcePid::comm:erl_local_pid() | null} |
