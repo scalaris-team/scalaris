@@ -330,7 +330,7 @@ process_move_msg({move, {send_error_retry, Target, Message, _Reason}, MoveFullId
                 send(Target, Message, MoveFullId),
                 dht_node_state:set_slide(State, PredOrSucc, NewSlideOp)
         end,
-    safe_operation(WorkerFun, MyState, MoveFullId, all, both, send_error);
+    safe_operation(WorkerFun, MyState, MoveFullId, all, both, send_error_retry);
 
 % no reply from the target node within get_wait_for_reply_timeout() ms
 process_move_msg({move, timeout, MoveFullId} = _Msg, MyState) ->
