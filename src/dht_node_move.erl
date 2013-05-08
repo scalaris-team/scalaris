@@ -911,33 +911,28 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
                     %       setup instead
                     send_delta_ack(SlideOp1),
                     State2 = finish_slide(State1, SlideOp1),
-                    PredOrSucc = slide_op:get_predORsucc(SlideOp1),
-                    case slide_op:get_next_op(SlideOp1) of
-                        {none} -> State2;
-                        {join, _NewTargetId} ->
-                            log:log(warn, "[ dht_node_move ~.0p ] ignoring scheduled join after "
-                                        "receiving data (this doesn't make any sense!)",
-                                    [comm:this()]),
-                            State2;
-                        {slide, PredOrSucc, NewTargetId, NewTag, NewSourcePid} ->
-                            % continue operation with the same node previously sliding with
-                            make_slide(State2, PredOrSucc, NewTargetId, NewTag, NewSourcePid);
-                        {slide, PredOrSucc2, NewTargetId, NewTag, NewSourcePid} ->
-                            % try setting up a slide with the other node
-                            make_slide(State2, PredOrSucc2, NewTargetId, NewTag, NewSourcePid);
-                        {jump, NewTargetId, NewTag, NewSourcePid} ->
-                            % finish current slide, then set up jump
-                            make_jump(State2, NewTargetId, NewTag, NewSourcePid);
-                        {leave, NewSourcePid} ->
-                            % finish current slide, then set up leave
-                            % (this is not a continued operation!)
-                            make_slide_leave(State2, NewSourcePid)
-                    end
+                    continue_with_next_op(State2, SlideOp1)
             end;
         {abort, Reason, State1, SlideOp1} ->
             % an abort at this stage is really useless (data has been fully integrated!)
             % nevertheless at least the source can be notified... 
             abort_slide(State1, SlideOp1, Reason, true)
+    end.
+
+%% @doc Extracts the next planned operation from OldSlideOp and sets it up.
+-spec continue_with_next_op(State::dht_node_state:state(), OldSlideOp::slide_op:slide_op())
+        -> dht_node_state:state().
+continue_with_next_op(State, OldSlideOp) ->
+    case slide_op:get_next_op(OldSlideOp) of
+        {none} -> State;
+        {slide, PredOrSucc, NewTargetId, NewTag, NewSourcePid} ->
+            % continue operation with the same node previously sliding with or
+            % try setting up a slide with the other node
+            make_slide(State, PredOrSucc, NewTargetId, NewTag, NewSourcePid);
+        {jump, NewTargetId, NewTag, NewSourcePid} ->
+            make_jump(State, NewTargetId, NewTag, NewSourcePid);
+        {leave, NewSourcePid} ->
+            make_slide_leave(State, NewSourcePid)
     end.
 
 %% @doc Accepts delta_ack received during the given (existing!) slide operation and
@@ -993,20 +988,7 @@ finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     State1;
 finish_delta_ack2B(State, SlideOp, {none}) ->
     State1 = finish_slide(State, SlideOp),
-    % continue with the next planned operation:
-    PredOrSucc = slide_op:get_predORsucc(SlideOp),
-    case slide_op:get_next_op(SlideOp) of
-        {none} -> State1;
-        {join, NewTargetId} ->
-            OldIdVersion = node:id_version(dht_node_state:get(State1, node)),
-            dht_node_join:join_as_other(NewTargetId, OldIdVersion + 1, [{skip_psv_lb}]);
-        {slide, PredOrSucc, NewTargetId, NewTag, NewSourcePid} ->
-            make_slide(State1, PredOrSucc, NewTargetId, NewTag, NewSourcePid);
-        {jump, NewTargetId, NewTag, NewSourcePid} ->
-            make_jump(State1, NewTargetId, NewTag, NewSourcePid);
-        {leave, NewSourcePid} ->
-            make_slide_leave(State1, NewSourcePid)
-    end;
+    continue_with_next_op(State1, SlideOp);
 finish_delta_ack2B(State, SlideOp, {continue, NewSlideId}) ->
     MyNode = dht_node_state:get(State, node),
     Type = slide_op:get_type(SlideOp),
