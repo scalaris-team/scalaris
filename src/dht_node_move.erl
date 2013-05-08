@@ -967,18 +967,12 @@ finish_delta_ack1(State, OldSlideOp, NextOpMsg) ->
 finish_delta_ack2(State, SlideOp, NextOpMsg) ->
     case slide_chord:finish_delta_ack2(State, SlideOp, NextOpMsg) of
         {ok, State1, SlideOp1, NextOpMsg1} ->
-            case slide_op:is_leave(SlideOp1) andalso not slide_op:is_jump(SlideOp1) of
-                true ->
-                    SupDhtNodeId = erlang:get(my_sup_dht_node_id),
-                    SupDhtNode = pid_groups:get_my(sup_dht_node),
-                    comm:send_local(pid_groups:find_a(service_per_vm),
-                                    {delete_node, SupDhtNode, SupDhtNodeId}),
-                    % note: we will be killed soon but need to be removed from the supervisor first
-                    % -> do not kill this process
-                    finish_slide(State1, SlideOp1);
-                _ ->
-                    finish_delta_ack2B(State1, SlideOp1, NextOpMsg1)
-            end;
+            NextOpMsg2 =
+                case slide_op:is_leave(SlideOp1) andalso not slide_op:is_jump(SlideOp1) of
+                    true  -> {finish_leave};
+                    false -> NextOpMsg1
+                end,
+            finish_delta_ack2B(State1, SlideOp1, NextOpMsg2);
         {abort, Reason, State1, SlideOp1} ->
             abort_slide(State1, SlideOp1, Reason, true)
     end.
@@ -987,10 +981,20 @@ finish_delta_ack2(State, SlideOp, NextOpMsg) ->
 -spec finish_delta_ack2B(
         State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
         NextOpMsg::next_op_msg() |
+          {finish_leave} |
           {NextOpType::slide_op:type(), NewSlideId::slide_op:id(),
           InitNode::node:node_type(), TargetNode::node:node_type(),
           TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null})
         -> dht_node_state:state().
+finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
+    State1 = finish_slide(State, SlideOp),
+    SupDhtNodeId = erlang:get(my_sup_dht_node_id),
+    SupDhtNode = pid_groups:get_my(sup_dht_node),
+    comm:send_local(pid_groups:find_a(service_per_vm),
+                    {delete_node, SupDhtNode, SupDhtNodeId}),
+    % note: we will be killed soon but need to be removed from the supervisor first
+    % -> do not kill this process
+    State1;
 finish_delta_ack2B(State, SlideOp, {none}) ->
     State1 = finish_slide(State, SlideOp),
     % continue with the next planned operation:
