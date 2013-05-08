@@ -684,17 +684,17 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     notify_other(SlideOp1, State);
                 Y when (Y =:= slide orelse Y =:= delta_ack) ->
                     SlideOp =
-                        if not UseIncrSlides ->
-                               slide_op:new_slide(
-                                 MoveFullId, NewType, TargetId, Tag, SourcePid,
-                                 OtherMTE, NextOp, Neighbors);
-                           true ->
+                        if UseIncrSlides orelse OtherMTE =/= unknown->
                                IncTargetKey = find_incremental_target_id(
                                                 Neighbors, State,
                                                 TargetId, NewType, OtherMTE),
                                slide_op:new_slide_i(
                                  MoveFullId, NewType, IncTargetKey, TargetId,
-                                 Tag, SourcePid, OtherMTE, Neighbors)
+                                 Tag, SourcePid, OtherMTE, Neighbors);
+                           true ->
+                               slide_op:new_slide(
+                                 MoveFullId, NewType, TargetId, Tag, SourcePid,
+                                 OtherMTE, NextOp, Neighbors)
                         end,
                     % note: phase will be set by notify_other/2 and needs to remain null here
                     SlideOp2 = slide_op:set_setup_at_other(SlideOp),
