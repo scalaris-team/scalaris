@@ -537,7 +537,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
             SlideOp = slide_op:new_sending_slide_join(
                         MoveFullId, TargetNode, join, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
-            case slide_chord:prepare_join_send(State, SlideOp) of
+            SlideMod = get_slide_mod(),
+            case SlideMod:prepare_join_send(State, SlideOp) of
                 {ok, State1, SlideOp1} when MsgTag =:= nomsg ->
                     notify_other(SlideOp1, State1);
                 {ok, State1, SlideOp1} when MsgTag =:= slide ->
@@ -577,7 +578,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
             % note: phase will be set by notify_other/2 and needs to remain null here
             SlideOp1 = slide_op:set_setup_at_other(SlideOp), % we received a join_response before
             SlideOp2 = slide_op:set_next_op(SlideOp1, NextOp),
-            case slide_chord:prepare_rcv_data(State, SlideOp2) of
+            SlideMod = get_slide_mod(),
+            case SlideMod:prepare_rcv_data(State, SlideOp2) of
                 {ok, State1, SlideOp3} ->
                     notify_other(SlideOp3, State1);
                 {abort, Reason, State1, SlideOp3} ->
@@ -639,7 +641,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
             SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
                                          SourcePid, OtherMTE, NextOp, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
-            case slide_chord:prepare_rcv_data(State, SlideOp) of
+            SlideMod = get_slide_mod(),
+            case SlideMod:prepare_rcv_data(State, SlideOp) of
                 {ok, State1, SlideOp1} when MsgTag =:= nomsg ->
                     notify_other(SlideOp1, State1);
                 {ok, State1, SlideOp1} when MsgTag =:= slide ->
@@ -690,7 +693,8 @@ prepare_send_data1(State, SlideOp) ->
     SlideOp1 = slide_op:set_setup_at_other(SlideOp),
     ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, prepare_send_data2, '_'}),
     SlideOp2 = slide_op:set_phase(SlideOp1, wait_for_continue),
-    case slide_chord:prepare_send_data1(State, SlideOp2, ReplyPid) of
+    SlideMod = get_slide_mod(),
+    case SlideMod:prepare_send_data1(State, SlideOp2, ReplyPid) of
         {ok, State1, SlideOp3} ->
             PredOrSucc = slide_op:get_predORsucc(SlideOp3),
             dht_node_state:set_slide(State1, PredOrSucc, SlideOp3);
@@ -705,7 +709,8 @@ prepare_send_data1(State, SlideOp) ->
 -spec prepare_send_data2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                          EmbeddedMsg::comm:message()) -> dht_node_state:state().
 prepare_send_data2(State, SlideOp, EmbeddedMsg) ->
-    case slide_chord:prepare_send_data2(State, SlideOp, EmbeddedMsg) of
+    SlideMod = get_slide_mod(),
+    case SlideMod:prepare_send_data2(State, SlideOp, EmbeddedMsg) of
         {ok, State1, SlideOp1} ->
             % last part of a leave? -> transfer all DB entries!
             % since in this case there is no other slide, we can safely use intervals:all()
@@ -743,7 +748,8 @@ update_rcv_data1(State, SlideOp, Data, TargetId, NextOp) ->
             ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, update_rcv_data2, '_'}),
             SlideOp2 = slide_op:set_phase(SlideOp1, wait_for_continue),
             State2 = dht_node_state:slide_add_data(State1, Data),
-            case slide_chord:update_rcv_data1(State2, SlideOp2, ReplyPid) of
+            SlideMod = get_slide_mod(),
+            case SlideMod:update_rcv_data1(State2, SlideOp2, ReplyPid) of
                 {ok, State3, SlideOp3} ->
                     PredOrSucc = slide_op:get_predORsucc(SlideOp3),
                     dht_node_state:set_slide(State3, PredOrSucc, SlideOp3);
@@ -759,7 +765,8 @@ update_rcv_data1(State, SlideOp, Data, TargetId, NextOp) ->
 -spec update_rcv_data2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                        EmbeddedMsg::comm:message()) -> dht_node_state:state().
 update_rcv_data2(State, SlideOp, EmbeddedMsg) ->
-    case slide_chord:update_rcv_data2(State, SlideOp, EmbeddedMsg) of
+    SlideMod = get_slide_mod(),
+    case SlideMod:update_rcv_data2(State, SlideOp, EmbeddedMsg) of
         {ok, State1, SlideOp1} ->
             SlideOp2 = slide_op:set_phase(SlideOp1, wait_for_delta),
             Msg = {move, data_ack, slide_op:get_id(SlideOp2)},
@@ -777,7 +784,8 @@ prepare_send_delta1(State, OldSlideOp) ->
     MoveFullId = slide_op:get_id(OldSlideOp),
     ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, prepare_send_delta2, '_'}),
     SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
-    case slide_chord:prepare_send_delta1(State, SlideOp1, ReplyPid) of
+    SlideMod = get_slide_mod(),
+    case SlideMod:prepare_send_delta1(State, SlideOp1, ReplyPid) of
         {ok, State1, SlideOp2} ->
             PredOrSucc = slide_op:get_predORsucc(SlideOp2),
             dht_node_state:set_slide(State1, PredOrSucc, SlideOp2);
@@ -793,7 +801,8 @@ prepare_send_delta1(State, OldSlideOp) ->
 -spec prepare_send_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                           EmbeddedMsg::comm:message()) -> dht_node_state:state().
 prepare_send_delta2(State, SlideOp, EmbeddedMsg) ->
-    case slide_chord:prepare_send_delta2(State, SlideOp, EmbeddedMsg) of
+    SlideMod = get_slide_mod(),
+    case SlideMod:prepare_send_delta2(State, SlideOp, EmbeddedMsg) of
         {ok, State1, SlideOp1} ->
             % last part of a leave? -> transfer all DB entries!
             % since in this case there is no other slide, we can safely use intervals:all()
@@ -824,7 +833,8 @@ finish_delta1(State, OldSlideOp, ChangedData) ->
     ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, finish_delta2, '_'}),
     SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
     State1 = dht_node_state:slide_add_delta(State, ChangedData),
-    case slide_chord:finish_delta1(State1, SlideOp1, ReplyPid) of
+    SlideMod = get_slide_mod(),
+    case SlideMod:finish_delta1(State1, SlideOp1, ReplyPid) of
         {ok, State2, SlideOp2} ->
             PredOrSucc = slide_op:get_predORsucc(SlideOp2),
             dht_node_state:set_slide(State2, PredOrSucc, SlideOp2);
@@ -853,7 +863,8 @@ finish_slide(State, SlideOp) ->
 -spec finish_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                     EmbeddedMsg::comm:message()) -> dht_node_state:state().
 finish_delta2(State, SlideOp, EmbeddedMsg) ->
-    case slide_chord:finish_delta2(State, SlideOp, EmbeddedMsg) of
+    SlideMod = get_slide_mod(),
+    case SlideMod:finish_delta2(State, SlideOp, EmbeddedMsg) of
         {ok, State1, SlideOp1} ->
             % continue with the next planned operation:
             case slide_op:is_incremental(SlideOp1) of
@@ -888,7 +899,7 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
                                           NewMoveFullId, NewType, NewTargetId, Tag,
                                           SourcePid, OtherMTE, {none}, Neighbors),
                                     % note: phase will be set by notify_other/2 and needs to remain null here
-                                    case slide_chord:prepare_rcv_data(State2, NextSlideOp) of
+                                    case SlideMod:prepare_rcv_data(State2, NextSlideOp) of
                                         {ok, State3, NextSlideOp1} ->
                                             NextSlideOp2 = slide_op:set_phase(NextSlideOp1, wait_for_data),
                                             Msg = {move, delta_ack, MoveFullId, {continue, NewMoveFullId}},
@@ -953,7 +964,8 @@ finish_delta_ack1(State, OldSlideOp, NextOpMsg) ->
     MoveFullId = slide_op:get_id(OldSlideOp),
     ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, finish_delta_ack2, '_'}),
     SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
-    case slide_chord:finish_delta_ack1(State, SlideOp1, NextOpMsg, ReplyPid) of
+    SlideMod = get_slide_mod(),
+    case SlideMod:finish_delta_ack1(State, SlideOp1, NextOpMsg, ReplyPid) of
         {ok, State1, SlideOp2} ->
             PredOrSucc = slide_op:get_predORsucc(SlideOp2),
             dht_node_state:set_slide(State1, PredOrSucc, SlideOp2);
@@ -964,7 +976,8 @@ finish_delta_ack1(State, OldSlideOp, NextOpMsg) ->
 -spec finish_delta_ack2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                         NextOp::next_op_msg()) -> dht_node_state:state().
 finish_delta_ack2(State, SlideOp, NextOpMsg) ->
-    case slide_chord:finish_delta_ack2(State, SlideOp, NextOpMsg) of
+    SlideMod = get_slide_mod(),
+    case SlideMod:finish_delta_ack2(State, SlideOp, NextOpMsg) of
         {ok, State1, SlideOp1, NextOpMsg1} ->
             NextOpMsg2 =
                 case slide_op:is_leave(SlideOp1) andalso not slide_op:is_jump(SlideOp1) of
@@ -1410,6 +1423,14 @@ make_slide_leave(State, SourcePid) ->
     setup_slide(State, {leave, 'send'}, MoveFullId, InitNode,
                 OtherNode, node:id(PredNode), leave,
                 unknown, SourcePid, nomsg, {none}).
+
+-spec get_slide_mod() -> slide_chord. % | slide_leases.
+get_slide_mod() ->
+    case config:read(leases) of
+        %true -> slide_leases;
+        failed -> slide_chord;
+        false -> slide_chord
+    end.
 
 %% @doc Checks whether config parameters regarding dht_node moves exist and are
 %%      valid.
