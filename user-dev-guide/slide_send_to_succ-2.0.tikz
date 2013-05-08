@@ -58,9 +58,9 @@
             edge [progress] (succ-end);
 
  \path[->] (pred-init.south east)
-             edge [post,lightgray]  node[msg_t,lightgray,font=\footnotesize] {slide, succ, 'send'} node[msg_b,lightgray,font=\footnotesize] {(optional)} (succ-init.north west)
+             edge [post,lightgray]  node[msg_t,lightgray,font=\footnotesize] {slide, pred, 'rcv'} node[msg_b,lightgray,font=\footnotesize] {(optional)} (succ-init.north west)
            (succ-init.south west)
-             edge [post] node[msg_t] {slide, pred, 'rcv'\textcolor{lightgray}{, MaxE}} (pred-send-data.north east)
+             edge [post] node[msg_t] {slide, succ, 'send'\textcolor{lightgray}{, MaxE}} (pred-send-data.north east)
 
            (pred-send-data.west)
              edge [async_l] node[async_desc, auto, anchor=east, align=right] {\textcolor{green}{prepare\_send\_data(SlideOp)}}
