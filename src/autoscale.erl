@@ -13,285 +13,491 @@
 %   limitations under the License.
 
 %% @author Ufuk Celebi <celebi@zib.de>
-%% @doc Auto-scaling service. 
-%%      {autoscale, true} in scalaris.local.cfg will enable this service
+%% @doc Auto-scaling service.
 %%
-%%      Alarms can be configured through
-%%      {autoscale_alarms, [{alarm, AlarmName, AlarmHandler,
-%%                                  TimeCheckInterval, TimeCooldown, 
-%%                                  MinValue, MaxValue, VMsToRemove, VMsToAdd,
-%%                                  active|inactive, [Options]}, ...]}.
+%%      {autoscale, true} in scalaris.local.cfg will enable this service.
+%%
+%%      The main task of the autoscale is to manage a set of installed alarms
+%%      by calling their alarm handlers periodically. Every alarm handler can
+%%      request to add or remove VMs (see alarm_handler/2).
+%%
+%%      Alarms are read from the config as a list of alarm records:
+%%      {autoscale_alarms, [{alarm, Name (req.), Options (opt.),
+%%                                  Interval (opt.), Cooldown (opt.),
+%%                                  State (opt.)}]}.
+%%
+%%      Every provided tuple corresponds to the alarm record type:
+%%        - Name:     the name of the alarm (should be unique)
+%%        - Options:  options are alarm handler specific (see alarm_handler/2)
+%%        - Interval: interval between alarm checks in seconds
+%%        - Cooldown: interval after a scale request
+%%        - State:    active or inactive
+%%
 %%      Example:
-%%      {autoscale_alarms, [{alarm, load_alarm, load_avg, 10, 30, 10, 40, 1, 1, inactive, []},
-%%                          {alarm, churn, random_churn, 10, 0, 0, 50, 3, 5, inactive, []},
-%%                          {alarm, lat, latency_avg, 60, 0, 100, 250, 2, 2, inactive, []}]}.
+%%      {autoscale_alarms, [{alarm, rand_churn, [{lower_limit, -3}, {upper_limit, 10}], 60, 0, inactive},
+%%                          {alarm, lat_avg, [], 60, 120, inactive}]}.
 %%
-%%      The cloud module which is called to remove or add VMs can be configured using
-%%      {autoscale_cloud_module, CloudModule}.
-%%      Available modules are: cloud_local and cloud_ssh which implement cloud_beh
+%%      In this example, the rand_churn alarm handler is called every 60
+%%      seconds and configured with the options lower_limit and upper_limit.
+%%      The lat_avg alarm handler is called every 60 seconds and falls
+%%      back to the default options (set in the alarm handler), because no
+%%      options are provided. If the lat_avg handler requested to add or remove
+%%      VMs, the handler will be called after 120 seconds in order to allow the
+%%      changes to take effect (cooldown). 
+%%
+%%      VMs requests are handled by the cloud module. It can be configured with
+%%        {autoscale_cloud_module, CloudModule}.
+%%
+%%      Possible modules are: cloud_local, cloud_ssh, and cloud_cps. For both
+%%      cloud_local and cloud_ssh, scale requests are pushed by autoscale.
+%%      cloud_cps is a dummy and not actually implemented as a module. Instead,
+%%      the manager of the ConPaaS scalaris service needs to pull the current
+%%      request via the JSON API.
 %% @end
 %% @version $Id$
 -module(autoscale).
 -author('celebi@zib.de').
--vsn('$Id$').
+-vsn('$Id$'). 
 
 -behaviour(gen_component).
 
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--define(CLOUD, (config:read(autoscale_cloud_module))).
--define(PLOT_VMS_KEY, vms).
-
+%% gen_component functions
 -export([start_link/1, init/1, on/2]).
+%% rm_loop interaction
+-export([send_my_range_req/4]).
 
-% rm neighborhood change function call
--export([check_leadership/4]).
+-define(TRACE(X), ?TRACE(X, [])).
+%% -define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
+-define(TRACE(_X,_Y), ok).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% types
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--type(alarm_handler() ::
-      load_avg |
-      latency_avg |
-      random_churn).
+-define(CLOUD, (config:read(autoscale_cloud_module))).
+-define(AUTOSCALE_TX_KEY,
+        "d9c966df633f8b1577eacff013166db95917a7002999b6fbbb67a3dd572d5035").
 
--record(alarm, {
-        name                = ?required(alarm, name) :: atom(),
-        handler             = ?required(alarm, handler) :: alarm_handler(),
-        check_interval_secs = ?required(alarm, period_in_s) :: pos_integer(),
-        cooldown_secs       = 0 :: non_neg_integer(),
-        min_value           = ?MINUS_INFINITY :: number(),
-        max_value           = ?PLUS_INFINITY :: number(),
-        vms_to_remove       = 1 :: non_neg_integer(),
-        vms_to_add          = 1 :: non_neg_integer(),
-        state               = active :: active | inactive,
-        options             = [] :: [{atom(), any()}]
-    }).
+%%==============================================================================
+%% Types
+%%==============================================================================
 
--type(state() ::
-    {IsLeader::boolean(), Alarms::dict()} |
-    unknown_event).
+-type key_value_list() :: [{Key :: atom(), Value :: term()}].
 
--type(breach_state() ::
-    breach_lower |
-    breach_upper |
-    ok).
+-record(alarm, {name     = ?required(alarm, name) :: atom(),
+                options  = []                     :: key_value_list(),
+                interval = 60                     :: pos_integer(),
+                cooldown = 90                     :: non_neg_integer(),
+                state    = inactive               :: active | inactive }).
+
+-record(scale_req, {req   = 0        :: integer(),
+                    lock  = unlocked :: locked | unlocked,
+                    mode  = push     :: push | pull,
+                    epoch = 0        :: non_neg_integer()}).
+
+-type alarm()     :: #alarm{}.
+-type alarms()    :: [alarm()].
+-type scale_req() :: #scale_req{}.
+-type triggers()  :: [{Name :: atom(), Trigger :: reference() | ok}].
+
+-type(api_message() ::
+          {pull_scale_req, Pid :: pid()} |
+          {unlock_scale_req, Pid :: pid()} |
+          {toggle_alarm, Name :: atom(), Pid :: pid()} |
+          {activate_alarms, Pid :: pid()} |
+          {deactivate_alarms, Pid :: pid()}).
 
 -type(message() ::
-    {get_state_response, MyRange::intervals:interval()} |
-    {check_alarm, Name::atom()} |
-    {toggle_alarm, Name::atom()} |
-    {deactivate_alarms, Name::atom()}).
+          {get_state_response, MyRange :: intervals:interval()} |
+          {check_alarm, Name :: atom()} |
+          {push_scale_req} |
+          api_message()).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec start_link(DHTNodeGroup::pid_groups:groupname()) -> {ok, pid()}.
-start_link(DHTNodeGroup) ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, null,
-                             [{pid_groups_join_as, DHTNodeGroup, autoscale}]).
+-type state() :: {IsLeader :: boolean(),
+                  Alarms   :: alarms(),
+                  ScaleReq :: scale_req(),
+                  Triggers :: triggers()}.
 
--spec init(null) -> state().
-init(null) ->
-    ?CLOUD:init(),
-    % dict with alarm name as key and {alarm record, epoch} as value 
-    Alarms = dict:from_list(lists:map(
-                              fun(A) -> {A#alarm.name, {A, 0}} end,
-                              read_alarms_from_config())),
-    % check leadership and subscribe to direct neighborhood changes
-    check_leadership(),
-    rm_loop:subscribe(self(), autoscale,
-                      fun rm_loop:subscribe_dneighbor_change_filter/3,
-                      fun autoscale:check_leadership/4,
-                      inf),
-    % initial state: not leader and alarms from config
-    plot_add_now(?PLOT_VMS_KEY, ?CLOUD:get_number_of_vms()),
-    {_IsLeader = false, Alarms}.
+%%==============================================================================
+%% Alarm handlers
+%%==============================================================================
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% message handlers
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% leadership maintenance %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec on(message(), state()) -> state().
-on({get_state_response, MyRange}, {IsLeader, Alarms}) ->
-    %% @fix: dbrange vs myrange?
-    IsNewLeader = intervals:in(?RT:hash_key("0"), MyRange),
-    NewAlarms = 
-        case {IsLeader, IsNewLeader} of
-            {false, true} ->
-                dict:map(fun(Name, {Alarm, Epoch}) ->
-                             case Alarm#alarm.state =:= active of                                     
-                                 true ->
-                                     continue_alarm(Name, Alarm#alarm.check_interval_secs,
-                                                    self(), Epoch+1);
-                                 false ->
-                                     ok
-                             end,
-                             {Alarm, Epoch+1}
-                         end, Alarms);
-            {_, _}        -> Alarms
-        end,
-    {IsNewLeader, NewAlarms};
-
-%% alarm maintenance %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({check_alarm, Name, AlarmEpoch}, {IsLeader, Alarms}) -> 
-    {Alarm, Epoch} =
-        case dict:find(Name, Alarms) of
-            {ok, Value} -> Value;
-            error       -> {unknown_alarm, 0}
-        end,
-    case (Alarm =/= unknown_alarm) andalso (Alarm#alarm.state =:= active) andalso
-             IsLeader andalso (Epoch =:= AlarmEpoch) of
-        true ->
-            % call alarm handler and react to breach_state 
-            NextCheckSecs =
-                case check_alarm(Alarm#alarm.handler, Alarm) of
-                    breach_lower ->
-                        ?CLOUD:remove_vms(Alarm#alarm.vms_to_remove),
-                        erlang:max(Alarm#alarm.check_interval_secs, Alarm#alarm.cooldown_secs);
-                    breach_upper ->
-                        ?CLOUD:add_vms(Alarm#alarm.vms_to_add),
-                        erlang:max(Alarm#alarm.check_interval_secs, Alarm#alarm.cooldown_secs);
-                    ok ->
-                        Alarm#alarm.check_interval_secs
-                end,
-            case NextCheckSecs > 0 of
-                true ->
-                    plot_add_now(?PLOT_VMS_KEY, ?CLOUD:get_number_of_vms()),
-                    continue_alarm(Name, NextCheckSecs, self(), Epoch);
-                false -> skip
-            end;
-        false ->
-            ok
-    end,
-    {IsLeader, Alarms};
-on({toggle_alarm, Name}, {_IsLeader, Alarms}) ->
-    NewAlarms = 
-        case dict:find(Name, Alarms) of
-            error                -> Alarms;
-            {ok, {Alarm, Epoch}} ->
-                case Alarm#alarm.state of
-                    active ->
-                        update_alarm(Alarms, Name, [{state, inactive}]);
-                    inactive ->
-                        % update state and epoch in dict
-                        continue_alarm(Name, Alarm#alarm.check_interval_secs, self(), Epoch+1),
-                        update_alarm(Alarms, Name, [{state, active}, {epoch, Epoch+1}])
-                end
-        end,
-    {_IsLeader, NewAlarms};
-on({deactivate_alarms}, {_IsLeader, Alarms}) ->
-    AlarmNames = dict:fetch_keys(Alarms),
-    NewAlarms = lists:foldl(
-                    fun(Name, AlarmsAcc) ->
-                        update_alarm(AlarmsAcc, Name, {state, inactive})
-                    end, Alarms, AlarmNames),
-    {_IsLeader, NewAlarms};
-on(_, _) ->
-    unknown_event.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% alarm handlers
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec check_alarm(alarm_handler(), #alarm{}) -> breach_state() | unknown_alarm_handler.
-check_alarm(load_avg, Alarm) ->
-    AvgLoad = statistics:get_average_load(statistics:get_ring_details()),
-    plot_add_now(Alarm#alarm.name, AvgLoad),
-    get_breach_state(AvgLoad, Alarm);
-check_alarm(latency_avg, Alarm) ->
+%% @doc Check average latency measured by monitor_perf and request scaling if
+%%      average latency is out of provided bounds.
+%%      Options:
+%%        lower_limit_ms: lowest avg. lat. to tolerate before scaling down
+%%        upper_limit_ms: highest avg. lat. to tolerate before scaling up
+%%        vms_to_remove: number of vms to add, when avg. lat. < lower_limit_ms
+%%        vms_to_add: number of vms to add, when avg. lat. > upper_limit_ms
+%% @todo add history option (-> don't check only latest avg lat)
+alarm_handler(lat_avg, Options) ->
+    LoMs        = get_alarm_option(Options, lower_limit_ms, 1000),
+    HiMs        = get_alarm_option(Options, upper_limit_ms, 2000),
+    VmsToRemove = get_alarm_option(Options, vms_to_remove, 1),
+    VmsToAdd    = get_alarm_option(Options, vms_to_add, 1),
+    
     Monitor = pid_groups:find_a(monitor_perf),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, _StddevMsD, _HistMsD} =
         case statistics:getTimingMonitorStats(Monitor, [{api_tx, 'req_list'}], tuple) of
             []                           -> {[], [], [], [], [], [], []};
             [{api_tx, 'req_list', Data}] -> Data
         end,
-    %
-    [{_, CurrentLatency}|_] = AvgMsD,
-    plot_add_now(Alarm#alarm.name, CurrentLatency),
-    %
-    History = get_opt_field(Alarm, history, 1),
-    [Hd|Tail] = lists:map(fun({_, V}) -> get_breach_state(V, Alarm) end,
-                          lists:sublist(AvgMsD, History)),
-    ?IIF(lists:all(fun(X) -> X =:= Hd end, Tail), Hd, ok);
-check_alarm(random_churn, _Alarm) ->
-    case randoms:rand_uniform(1,4) of
-        1 -> breach_upper;
-        2 -> breach_lower;
-        3 -> ok
-    end.
+    [{_, LatestAvgMsD}|_] = AvgMsD,
+    
+    log(lat_avg, LatestAvgMsD),
+    
+    if
+        LatestAvgMsD < LoMs ->
+            VmsToRemove;
+        LatestAvgMsD > HiMs ->
+            VmsToAdd;
+        true ->
+            0
+    end;
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% alarm helpers
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec continue_alarm(atom(), pos_integer(), pid(), non_neg_integer()) -> ok.
-continue_alarm(Name, Secs, Pid, Epoch) ->
-    msg_delay:send_local(Secs, Pid, {check_alarm, Name, Epoch}).
+%% @doc Pick a number UAR and add or remove VMs by that amount.
+%%      Options:
+%%        lower_limit: max. number of vms to remove
+%%        upper_limit: max. number of vms to add
+alarm_handler(rand_churn, Options) ->
+    Lo = get_alarm_option(Options, lower_limit, -5),
+    Hi = get_alarm_option(Options, upper_limit, 5),
+    Churn = randoms:rand_uniform(Lo, Hi),
+    
+    log(rand_churn, Churn),
 
--spec update_alarm(dict(), atom(), {atom(), any()} | [{atom(), any()}]) -> dict().
-update_alarm(Alarms, Name, {Field, NewValue}) ->
-    update_alarm(Alarms, Name, [{Field, NewValue}]);
-update_alarm(Alarms, Name, [{Field, NewValue}|Tail]) ->
-    UpdateFun = ?IIF(Field =:= epoch,
-                     fun({_Alarm, _Epoch}) -> {_Alarm, NewValue} end,
-                     fun({Alarm, Epoch}) -> {erlang:setelement(10, Alarm, NewValue), Epoch} end
-                ),
-    NewAlarms = dict:update(Name, UpdateFun, Alarms),
-    update_alarm(NewAlarms, Name, Tail);
-update_alarm(Alarms, _Name, []) ->
-    Alarms.
+    Churn.
 
--spec get_opt_field(#alarm{}, atom(), any()) -> false | any().
-get_opt_field(Alarm, Field, Default) ->
-    case lists:keyfind(Field, 1, Alarm#alarm.options) of
-        false          -> Default;
-        {Field, Value} -> Value
-    end.
+%%==============================================================================
+%% Msg loop: main functions
+%%==============================================================================
+-spec on(message(), state()) -> state().
 
--spec get_breach_state(term(), #alarm{}) -> breach_state().
-get_breach_state(Value, Alarm) ->
-    ?IIF(Value < Alarm#alarm.min_value, breach_lower,
-         ?IIF(Value > Alarm#alarm.max_value, breach_upper, ok)).
+%% @doc Set new leader state at startup and ring changes.
+on({get_state_response, MyRange}, {IsLeader, Alarms, ScaleReq, Triggers}) ->
+    IsNewLeader = intervals:in(?RT:hash_key("0"), MyRange),
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% misc helpers
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec check_leadership() -> ok.
-check_leadership() ->
-    DhtNode = pid_groups:get_my(dht_node),
-    comm:send_local(DhtNode, {get_state, comm:this(), my_range}).
-
--spec check_leadership(pid(), autoscale, nodelist:neighborhood(), nodelist:neighborhood()) -> ok.
-check_leadership(Pid, autoscale, _, _) ->
-    GrpName = pid_groups:group_of(Pid),
-    DhtNode = pid_groups:pid_of(GrpName, dht_node),
-    comm:send_local(DhtNode, {get_state, comm:make_global(Pid), my_range}).
-
--spec get_timestamp_secs() -> pos_integer().
-get_timestamp_secs() ->
-    get_timestamp_secs(erlang:now()).
-
--spec get_timestamp_secs(erlang:timestamp()) -> pos_integer().
-get_timestamp_secs({MegaSecs, Secs, _}) ->
-    MegaSecs*1000000+Secs.
-
--spec plot_add_now(PlotKey::atom(), Value::number()) -> boolean().
-plot_add_now(PlotKey, Value) ->
-    ?IIF(config:read(autoscale_server),
-        case MgmtServer = config:read(mgmt_server) of
-            failed -> false;
-            _      ->
-                comm:send(MgmtServer, {?send_to_group_member, autoscale_server,
-                                       {collect, PlotKey, _Now = get_timestamp_secs(), Value}}),
-                true
+    {NewAlarms, NewScaleReq, NewTriggers} =
+        case {IsLeader, IsNewLeader} of
+            {false, true} ->
+                {tx_merge_alarms(Alarms),
+                 ScaleReq#scale_req{lock = unlocked, req = 0},
+                 % init triggers for alarms
+                 lists:map(
+                   fun(Alarm) ->
+                           {Alarm#alarm.name,
+                            next(Alarm#alarm.name, Alarm#alarm.interval)}
+                   end, Alarms)};
+            {true, false} ->
+                {Alarms,
+                 ScaleReq#scale_req{lock = unlocked, req = 0},
+                 % cancel all triggers
+                 lists:map(fun({Name, Trigger}) -> {Name, cancel(Trigger)} end,
+                           Triggers)};
+            {_, _}        ->
+                {Alarms, ScaleReq, Triggers}
         end,
-        false).
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% config
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    ?TRACE("leadership: ~p", [{IsLeader, IsNewLeader}]),
+    {IsNewLeader, NewAlarms, NewScaleReq, NewTriggers};
+
+%% @doc Check alarm Name for new scale request. 
+on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
+  when IsLeader andalso ScaleReq#scale_req.lock =:= unlocked  ->
+    Alarm = get_alarm(Name, Alarms),
+
+    % call alarm handler
+    NewReq =
+        case Alarm#alarm.state of
+            active   -> alarm_handler(Name, Alarm#alarm.options);
+            inactive -> ScaleReq#scale_req.req
+        end,
+
+    % delay for next check (cooldown if scale req /= 0)
+    NewDelay =
+        case NewReq == 0 of
+            true  -> Alarm#alarm.interval;
+            false -> erlang:max(Alarm#alarm.interval, Alarm#alarm.cooldown)
+        end,
+
+    % push request to cloud module (except cloud_cps)
+    case ScaleReq#scale_req.mode of
+        push -> comm:send_local(self(), {push_scale_req});
+        pull -> ok
+    end,
+
+    ?TRACE("check_alarm: ~p, ~p new vms requested, ~p s delayed",
+           [Name, NewReq, NewDelay]),
+    {IsLeader, Alarms, ScaleReq#scale_req{req = NewReq},
+     next(Name, NewDelay, Triggers)};
+
+on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
+  when IsLeader andalso ScaleReq#scale_req.lock =:= locked  ->
+    Alarm = get_alarm(Name, Alarms),
+    
+    ?TRACE("check_alarm: ~p, scale_req is locked", [Name]),
+    {IsLeader, Alarms, ScaleReq, next(Name, Alarm#alarm.interval, Triggers)};
+
+on({push_scale_req}, {IsLeader, _Alarms, ScaleReq, _Triggers})
+  when IsLeader andalso ScaleReq#scale_req.lock =:= unlocked ->
+
+    Req = ScaleReq#scale_req.req,
+    if
+        Req > 0  -> ?CLOUD:add_vms(Req);
+        Req < 0  -> ?CLOUD:remove_vms(Req*-1);
+        Req == 0 -> ok
+    end,
+    
+    ?TRACE("push_scale_req: ~p", [ScaleReq]),
+    {IsLeader, _Alarms, ScaleReq#scale_req{req = 0}, _Triggers};
+
+%%==============================================================================
+%% Msg loop: API msgs
+%%==============================================================================
+%% Msg loop: API msgs -> scale req polling API
+%%============================================================================== 
+on({pull_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers}) 
+  when ScaleReq#scale_req.lock =:= locked ->
+    comm:send(Pid, {scale_req_resp, {error, locked}}),
+    ?TRACE("pull_scale_req, lock_state: ~p", [ScaleReq#scale_req.lock]),
+    State;
+on({pull_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers}) 
+  when ScaleReq#scale_req.lock =:= unlocked ->
+    % reply
+    comm:send(Pid, {scale_req_resp, {ok, ScaleReq#scale_req.req}}),
+    % start timeout @todo add timeout to cofig
+    Trigger = comm:send_local_after(60*1000, self(),
+                                    {unlock_scale_req_timeout}),
+    NewTriggers = Triggers ++ [{timeout, Trigger}],
+    % lock 
+    NewScaleReq = ScaleReq#scale_req{lock = locked},
+    ?TRACE("unlock_scale_req, lock_state: ~p", [ScaleReq#scale_req.lock]),
+    {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
+
+on({unlock_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
+  when ScaleReq#scale_req.lock =:= locked ->
+    % reply
+    comm:send(Pid, {scale_req_resp, ok}),
+    % cancel timeout
+    {value, {timeout, Trigger}, NewTriggers} =
+        lists:keytake(timeout, 1, Triggers),
+    cancel(Trigger),
+    % unlock
+    NewScaleReq = ScaleReq#scale_req{lock = unlocked, req  = 0},
+    ?TRACE("unlock_scale_req, lock_state: ~p", [ScaleReq#scale_req.lock]),
+    {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
+on({unlock_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers})
+  when ScaleReq#scale_req.lock =:= unlocked ->
+    % reply
+    comm:send(Pid, {scale_req_resp, {error, not_locked}}),
+    ?TRACE("unlock_scale_req, lock_state: ~p", [ScaleReq#scale_req.lock]),
+    State;
+
+on({unlock_scale_req_timeout}, {_IsLeader, _Alarms, ScaleReq, Triggers}) ->
+    NewTriggers = lists:keydelete(timeout, 1, Triggers),
+    NewScaleReq = ScaleReq#scale_req{lock = unlocked},
+    ?TRACE("unlock_scale_req_timeout"),
+    {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
+
+%%==============================================================================
+%% Msg loop: API msgs -> alarm state API
+%%==============================================================================
+on({toggle_alarm, Name, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
+    NewAlarms =
+       case get_alarm(Name, Alarms) of
+            false ->
+                comm:send(Pid, {toggle_alarm_resp, {error, unknown_alarm}}),
+                Alarms;
+            Alarm ->
+                Toggled = case Alarm#alarm.state of
+                              active   -> Alarm#alarm{state = inactive};
+                              inactive -> Alarm#alarm{state = active}
+                          end,
+                case tx_update_alarms([Toggled], [Alarm]) of
+                    ok   ->
+                        comm:send(Pid, {toggle_alarm_resp,
+                                   {ok, {new_state, Toggled#alarm.state}}}),
+                        % update alarm
+                        lists:keystore(Name, 2, Alarms, Toggled);
+                    fail ->
+                        comm:send(Pid, {toggle_alarm_resp, {error, tx_fail}}),
+                        Alarms
+                end
+        end,
+    ?TRACE("alarms: ~p, ~nnewalarms: ~p", [Alarms, NewAlarms]),
+    {_IsLeader, NewAlarms, _ScaleReq, _Triggers};
+on({activate_alarms, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
+    AllActive = lists:map(fun(Alarm) -> Alarm#alarm{state = active} end,
+                          Alarms),
+    NewAlarms =
+        case tx_update_alarms(AllActive, Alarms) of
+            ok ->
+                comm:send(Pid, {activate_alarms_resp, ok}),
+                AllActive;
+            fail ->
+                comm:send(Pid, {activate_alarms_resp, {error, tx_fail}}),
+                Alarms
+        end,
+    {_IsLeader, NewAlarms, _ScaleReq, _Triggers};
+on({deactivate_alarms, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
+    AllInactive = lists:map(fun(Alarm) -> Alarm#alarm{state = inactive} end,
+                            Alarms),
+    NewAlarms =
+        case tx_update_alarms(AllInactive, Alarms) of
+            ok ->
+                comm:send(Pid, {deactivate_alarms_resp, ok}),
+                AllInactive;
+            fail ->
+                comm:send(Pid, {deactivate_alarms_resp, {error, tx_fail}}),
+                Alarms
+        end,
+    {_IsLeader, NewAlarms, _ScaleReq, _Triggers};
+
+on(_Msg, State) ->
+    State.
+
+%%==============================================================================
+%% Triggers
+%%==============================================================================
+
+%% @doc Check alarm Name in Delay seconds.  
+-spec next(Name :: atom(), Delay :: pos_integer()) -> reference().
+next(Name, Delay) ->
+    comm:send_local_after(Delay*1000, self(), {check_alarm, Name}).
+
+%% @doc Check alarm Name in trigger list in Delay seconds.
+-spec next(Name :: atom(), Delay :: pos_integer(), Triggers :: triggers()) ->
+          triggers().
+next(Name, Delay, Triggers) ->
+    lists:keyreplace(Name, 1, Triggers, {Name, next(Name, Delay)}).
+
+%% @doc Cancel timer of trigger.
+-spec cancel(Trigger :: reference() | ok) -> ok.
+cancel(Trigger) ->
+    _ = erlang:cancel_timer(Trigger),
+    ok.
+
+%%==============================================================================
+%% Alarm helpers
+%%==============================================================================
+
+%% @doc Get alarm by name.
+-spec get_alarm(Name :: atom(), Alarms :: alarms()) -> alarm() | false.
+get_alarm(Name, Alarms) ->
+    lists:keyfind(Name, 2, Alarms).
+
+%% @doc Get value for specified option key from key-value list. Return provided
+%%      default value, if key does not exist.   
+-spec get_alarm_option(Options :: key_value_list(), Key :: atom(),
+                       Default :: any()) -> any().
+get_alarm_option(Options, FieldKey, Default) ->
+    case lists:keyfind(FieldKey, 1, Options) of
+        {FieldKey, Value} -> Value;
+        false             -> Default
+    end.
+
+%% @doc Log alarm values and number of VMs at autoscale_server.
+-spec log(Key :: atom(), Value :: term()) -> ok.
+log(Key, Value) ->
+    case autoscale_server:check_config() andalso ?CLOUD =/= cloud_cps of
+        true  ->
+            autoscale_server:log(
+              [{vms, ?CLOUD:get_number_of_vms()}, {Key, Value}]);
+        false ->
+            ok
+    end.
+
+%%==============================================================================
+%% Misc
+%%==============================================================================
+
+%% @doc Request my_range from dht_node (called by rm_loop at direct neighborhood
+%%      changes).
+-spec send_my_range_req(Pid :: pid(), Tag :: ?MODULE,
+                        _OldN :: nodelist:neighborhood(),
+                        _NewN :: nodelist:neighborhood()) -> ok.
+send_my_range_req(Pid, ?MODULE, _OldN, _NewN) ->
+    DhtNodeOfPid = pid_groups:pid_of(pid_groups:group_of(Pid), dht_node),
+    comm:send_local(DhtNodeOfPid, {get_state, comm:make_global(Pid), my_range}).
+
+%% @doc Write alarm updates to dht.
+%%      When a node becomes leader, she merges her local alarms with alarms from
+%%      the ring (alarms on ring overwrite local alarms). See tx_merge_alarms/2.
+tx_update_alarms(ToAdd, ToRem) ->
+    {TLog, _Res} = api_tx:add_del_on_list(
+                     api_tx:new_tlog(), ?AUTOSCALE_TX_KEY, ToAdd, ToRem),
+    case api_tx:commit(TLog) of
+        {ok} ->
+            ok;
+        {fail, abort, _ClientKeys} ->
+            fail
+    end.
+
+%% @doc Merge local alarms with updated alarms from dht.
+-spec tx_merge_alarms(Alarms :: alarms()) -> alarms().
+tx_merge_alarms(Alarms) ->
+    case api_tx:read(?AUTOSCALE_TX_KEY) of
+        {ok, Updates} ->
+            lists:foldl(
+              fun(Alarm, Acc) ->
+                      lists:keyreplace(Alarm#alarm.name, 2, Acc, Alarm) 
+              end, Alarms, Updates);
+        {fail, not_found} ->
+            Alarms
+    end.     
+
+%%==============================================================================
+%% Startup
+%%==============================================================================
+
+-spec start_link(DHTNodeGroup :: pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
+                             [{pid_groups_join_as, DHTNodeGroup, autoscale}]).
+
+-spec init([]) -> state().
+init([]) ->
+    % initial my_range request to dht_node
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {get_state, comm:this(), my_range}),
+
+    % check my_range at direct neighborhood changes
+    rm_loop:subscribe(
+      self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_filter/3,
+      fun (Pid, ?MODULE, _OldN, _NewN) ->
+               DhtNodeOfPid = pid_groups:pid_of(pid_groups:group_of(Pid),
+                                                dht_node),
+               comm:send_local(DhtNodeOfPid,
+                               {get_state, comm:make_global(Pid), my_range})
+      end, inf),
+
+    % intial state
+    {_IsLeader = false,
+     _Alarms   = read_alarms_from_config(),
+     _ScaleReq =
+         case ?CLOUD =:= cloud_cps of
+             true  -> #scale_req{mode = pull};
+             false -> #scale_req{mode = push}
+         end,
+     _Triggers = []}.
+
+%%==============================================================================
+%% Config
+%%==============================================================================
 -spec read_alarms_from_config() -> [#alarm{}].
 read_alarms_from_config() ->
-    case Alarms = config:read(autoscale_alarms) of
-        failed -> [];
-        _      -> Alarms
+    case check_config() of
+        true  ->
+            % @todo add convenience for cfg 
+            config:read(autoscale_alarms);
+        false ->
+            []
     end.
+
+%% @doc Checks whether config parameters exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_exists(autoscale_alarms) andalso
+    config:cfg_exists(autoscale_cloud_module) andalso
+    config:cfg_is_list(autoscale_alarms, 
+                       fun(X) -> erlang:is_record(X, alarm) end,
+                       "alarm record tuple").
