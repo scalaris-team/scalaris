@@ -135,9 +135,6 @@
  \coordinate (pred-cont-start1) at ($(pred-send-owner)-(0,.5\tikzsepinner)$);
  \coordinate (pred-cont-end) at ($(pred-send-data.west)+(0,0.1)$);
 
- \path[->] (finish_delta_ack.south east)
-             edge [async_l,draw=lightgray,dashed,out=230,in=30,looseness=0.8] node[msg_t, pos=0.5, lightgray, font=\footnotesize] {rm\_update} node[msg_b, pos=0.5, lightgray, font=\footnotesize] {(to dht\_node)} node[pos=0.37,note,draw,red,anchor=north] {$\ell$} (succ-got-owner.south);
-
  \draw[post, rounded corners, dashed, lightgray] (pred-cont-start1) -- +(-7,0) -- ($(pred-cont-end)+(-7,0)$) -- (pred-cont-end);
  \node[action_r, lightgray, anchor=south west] at ($(pred-cont-start1)+(-7,0)$) {if (NextOp == continue)\\SlideOp.update()};
 
