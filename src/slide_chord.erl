@@ -225,14 +225,18 @@ prepare_send_delta2(State, SlideOp, {continue}) ->
 finish_delta1(State, OldSlideOp, ReplyPid) ->
     SlideOp = slide_op:remove_msg_fwd(OldSlideOp),
     case slide_op:get_predORsucc(SlideOp) of
-        succ -> send_continue_msg(ReplyPid);
-        pred -> send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid)
-    end,
-    % optimization: until we know about the new id of our pred (or a
-    % new pred or the continue message), add the range to the db_range so our
-    % node already responds to such messages
-    {ok, dht_node_state:add_db_range(State, slide_op:get_interval(SlideOp),
-                                     slide_op:get_id(SlideOp)), SlideOp}.
+        succ ->
+            send_continue_msg(ReplyPid),
+            {ok, State, SlideOp};
+        pred ->
+            send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid),
+            % optimization: until we know about the new id of our pred (or a
+            % new pred or the continue message), add the range to the db_range
+            % so our node already responds to such messages
+            {ok, dht_node_state:add_db_range(
+               State, slide_op:get_interval(SlideOp), slide_op:get_id(SlideOp)),
+             SlideOp}
+    end.
 
 %% @doc Cleans up after finish_delta1/4 once the RM is up-to-date, e.g. removes
 %%      temporary additional db_range entries.
