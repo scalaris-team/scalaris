@@ -15,7 +15,7 @@
          etcdir/0,
          is_local_install/0]).
 
-version() -> "1.95".
+version() -> "1.96".
 
 vardir() ->  "/usr/local/var".
 
