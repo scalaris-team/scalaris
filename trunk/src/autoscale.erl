@@ -126,8 +126,8 @@
 %%      Options:
 %%        lower_limit_ms: lowest avg. lat. to tolerate before scaling down
 %%        upper_limit_ms: highest avg. lat. to tolerate before scaling up
-%%        vms_to_remove: number of vms to add, when avg. lat. < lower_limit_ms
-%%        vms_to_add: number of vms to add, when avg. lat. > upper_limit_ms
+%%        vms_to_remove: number of vms to add, when avg. lat. &lt; lower_limit_ms
+%%        vms_to_add: number of vms to add, when avg. lat. &gt; upper_limit_ms
 %% @todo add history option (-> don't check only latest avg lat)
 alarm_handler(lat_avg, Options) ->
     LoMs        = get_alarm_option(Options, lower_limit_ms, 1000),
