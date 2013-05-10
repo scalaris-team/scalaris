@@ -4,7 +4,7 @@
 -export([t/1, revt/1]).
 -export([t/2, revt/2]).
 
--include_lib("yaws/include/yaws.hrl").
+-include("/home/data/nico/downloads/yaws-1.96/yaws-1.96/src/../include/yaws.hrl").
 
 default_type() -> default_type(global).
 t(Ext) -> t(global, Ext).

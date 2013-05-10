@@ -1283,7 +1283,8 @@ handle_method_result(Res, CliSock, {IP,Port}, GS, Req, H, Num) ->
             erase_transients(),
             {ok, Num+1};
         {page, P} ->
-            %% keep post_parse
+            %% Because the request is rewritten but the body is the same, we
+            %% keep post_parse and erase query_parse.
             erase(query_parse),
             put(outh, #outh{}),
             case P of
@@ -1301,15 +1302,31 @@ handle_method_result(Res, CliSock, {IP,Port}, GS, Req, H, Num) ->
             %% `is_reentrant_request' flag is used to correctly identify the url
             %% type
             put(is_reentrant_request, true),
-            SC = pick_sconf(GS#gs.gconf, H, GS#gs.group),
-            put(sc, SC#sconf{appmods = []}),
-            check_keepalive_maxuses(GS, Num),
-            Call = call_method(Req#http_request.method,
-                               CliSock, {IP,Port},
-                               Req#http_request{path = {abs_path, Page}},
-                               H#headers{content_length = undefined}),
+
+            %% Renew #sconf{} to restore docroot/xtra_docroots fields
+            OldSC = get(sc),
+            NewSC = pick_sconf(GS#gs.gconf, H, GS#gs.group),
+            put(sc, NewSC#sconf{appmods = OldSC#sconf.appmods}),
+
+            %% Rewrite the request
+            NextReq = Req#http_request{path = {abs_path, Page}},
+
+            %% Renew #arg{}: keep clidata, state and cont
+            Arg0 = case get(yaws_arg) of
+                       undefined -> #arg{};
+                       A         -> A
+                   end,
+            Arg1 = make_arg(CliSock, {IP,Port}, H, NextReq, Arg0#arg.clidata),
+            Arg2 = Arg1#arg{cont=Arg0#arg.cont, state=Arg0#arg.state},
+
+            %% Get the number of bytes already read and do the reentrant call
+            CliDataPos = case get(client_data_pos) of
+                             undefined -> 0;
+                             Pos       -> Pos
+                         end,
+            Call  = handle_request(CliSock, Arg2, CliDataPos),
             Call2 = fix_keepalive_maxuses(Call),
-            handle_method_result(Call2, CliSock, {IP,Port}, GS, Req, H, Num)
+            handle_method_result(Call2, CliSock, {IP,Port}, GS, NextReq, H, Num)
     end.
 
 
@@ -1769,7 +1786,9 @@ handle_request(CliSock, ARG, N) ->
 
                     case {IsRev, IsRedirect} of
                         {_, {true, Redir}} ->
-                            deliver_302_map(CliSock, Req, ARG, Redir);
+                            ARG1 = ARG#arg{server_path = DecPath,
+                                           querydata   = QueryString},
+                            deliver_redirect_map(CliSock, Req, ARG1, Redir, N);
                         {false, _} ->
                             %%'main' branch so to speak. Most requests
                             %% pass through here.
@@ -2060,7 +2079,7 @@ is_redirect_map(_, []) ->
     false;
 is_redirect_map(Path, RedirMap) ->
     case lists:keyfind(Path, 1, RedirMap) of
-        {Path, _Url, _AppendMod}=E ->
+        {Path, _Code, _Url, _AppendMod}=E ->
             {true, E};
         false when Path == "/" ->
             false;
@@ -2286,16 +2305,22 @@ handle_ut(CliSock, ARG, UT = #urltype{type = directory}, N) ->
     end;
 
 
-handle_ut(CliSock, ARG, UT = #urltype{type = redir}, _N) ->
+handle_ut(CliSock, ARG, UT = #urltype{type = redir}, N) ->
     Req = ARG#arg.req,
     H = ARG#arg.headers,
     yaws:outh_set_dyn_headers(Req, H, UT),
+    case yaws:outh_get_doclose() of
+        true  -> ok;
+        _     -> flush(CliSock, N, H#headers.content_length,
+                       yaws:to_lower(H#headers.transfer_encoding))
+    end,
     deliver_302(CliSock, Req, ARG, UT#urltype.path);
 
 handle_ut(CliSock, ARG, UT = #urltype{type = appmod}, N) ->
     Req = ARG#arg.req,
     H = ARG#arg.headers,
     yaws:outh_set_dyn_headers(Req, H, UT),
+    maybe_set_page_options(),
     {Mod,_} = UT#urltype.data,
     deliver_dyn_part(CliSock,
                      0, "appmod",
@@ -2454,66 +2479,91 @@ new_redir_h(OH, Loc, Status) ->
 %% we must deliver a 302 if the browser asks for a dir
 %% without a trailing / in the HTTP req
 %% otherwise the relative urls in /dir/index.html will be broken.
-
-%%!todo - review.
-%% Why is DecPath being tokenized around "?" - only to reassemble??
-%% What happens when Path is not flat?
-
+%% Note: Here Path is always decoded, so we must encode it
 deliver_302(CliSock, _Req, Arg, Path) ->
     ?Debug("in redir 302 ",[]),
     H = get(outh),
     SC=get(sc),
-    Scheme = yaws:redirect_scheme(SC),
+    Scheme  = yaws:redirect_scheme(SC),
     Headers = Arg#arg.headers,
-    DecPath = yaws_api:url_decode(Path),
+    EncPath = yaws_api:url_encode(Path),
     RedirHost = yaws:redirect_host(SC, Headers#headers.host),
-    Loc = case string:tokens(DecPath, "?") of
-              [P] ->
-                  ["Location: ", Scheme, RedirHost, P, "\r\n"];
-              [P, Q] ->
-                  ["Location: ", Scheme, RedirHost, P, "?", Q, "\r\n"]
-          end,
 
+    %% QueryString must be added
+    Loc = case Arg#arg.querydata of
+              undefined -> ["Location: ", Scheme, RedirHost, EncPath, "\r\n"];
+              [] -> ["Location: ", Scheme, RedirHost, EncPath, "\r\n"];
+              Q -> ["Location: ", Scheme, RedirHost, EncPath, "?", Q, "\r\n"]
+          end,
     new_redir_h(H, Loc),
     deliver_accumulated(CliSock),
     done_or_continue().
 
 
-deliver_302_map(CliSock, Req, Arg,
-                {_Prefix,URL,Mode})  when is_record(URL,url) ->
-    ?Debug("in redir 302 ",[]),
-    H = get(outh),
-    DecPath = safe_decode_path(Req#http_request.path),
-    {P, Q} = yaws:split_at(DecPath, $?),
-    LocPath = yaws_api:format_partial_url(URL, get(sc)),
-    Loc = if
-              Mode == append ->
-                  Newpath = filename:join([URL#url.path ++ P]),
-                  NLocPath = yaws_api:format_partial_url(
-                               URL#url{path = Newpath}, get(sc)),
-                  case Q of
-                      [] ->
-                          ["Location: ", NLocPath, "\r\n"];
-                      _Q ->
-                          ["Location: ", NLocPath, "?", Q, "\r\n"]
-                  end;
-              Mode == noappend,Q == [] ->
-                  ["Location: ", LocPath, "\r\n"];
-              Mode == noappend,Q /= [] ->
-                  ["Location: ", LocPath, "?", Q, "\r\n"]
-          end,
-    Headers = Arg#arg.headers,
-    {DoClose, _Chunked} = yaws:dcc(Req, Headers),
-    new_redir_h(H#outh{
-                  connection  = yaws:make_connection_close_header(DoClose),
-                  doclose = DoClose,
-                  server = yaws:make_server_header(),
-                  chunked = false,
-                  date = yaws:make_date_header()
-                 }, Loc),
+deliver_redirect_map(CliSock, Req, _Arg,
+                     {_Prefix, Code, undefined, _Mode}, _N) ->
+    %% Here Code is 1xx, 2xx, 4xx or 5xx
+    ?Debug("in redir ~p", [Code]),
+    deliver_xxx(CliSock, Req, Code);
+deliver_redirect_map(_CliSock, _Req, Arg,
+                     {_Prefix, Code, Path, Mode}, N) when is_list(Path) ->
+    %% Here Code is 1xx, 2xx, 4xx or 5xx
+    ?Debug("in redir ~p", [Code]),
+    Path1 = if
+                Mode == append ->
+                    EncPath = yaws_api:url_encode(Arg#arg.server_path),
+                    filename:join([Path ++ EncPath]);
+                true -> %% noappend
+                    Path
+            end,
+    Page = case Arg#arg.querydata of
+               undefined -> Path1;
+               []        -> Path1;
+               Q         -> Path1 ++ "?" ++ Q
+           end,
 
+    %% Set variables used in handle_method_result/7
+    put(yaws_arg, Arg),
+    put(client_data_pos, N),
+    {page, {[{status, Code}], Page}};
+deliver_redirect_map(CliSock, Req, Arg,
+                     {_Prefix, Code, URL, Mode}, N) when is_record(URL, url) ->
+    %% Here Code is 3xx
+    ?Debug("in redir ~p", [Code]),
+    H = get(outh),
+    QueryData = case Arg#arg.querydata of
+                    undefined -> [];
+                    Q         -> Q
+                end,
+    LocPath = if
+                  Mode == append ->
+                      EncPath = yaws_api:url_encode(Arg#arg.server_path),
+                      Path1   = filename:join([URL#url.path ++ EncPath]),
+                      yaws_api:format_partial_url(
+                        URL#url{path=Path1,querypart=QueryData}, get(sc)
+                       );
+                  true -> %% noappend
+                      yaws_api:format_partial_url(URL#url{querypart=QueryData},
+                                                  get(sc))
+              end,
+    Loc = ["Location: ", LocPath, "\r\n"],
+
+    {DoClose, _Chunked} = yaws:dcc(Req, Arg#arg.headers),
+    case DoClose of
+        true  -> ok;
+        _     -> flush(CliSock, N, (Arg#arg.headers)#headers.content_length,
+                       (Arg#arg.headers)#headers.transfer_encoding)
+    end,
+    new_redir_h(H#outh{
+                  connection = yaws:make_connection_close_header(DoClose),
+                  doclose    = DoClose,
+                  server     = yaws:make_server_header(),
+                  chunked    = false,
+                  date       = yaws:make_date_header()
+                 }, Loc, Code),
     deliver_accumulated(CliSock),
     done_or_continue().
+
 
 deliver_options(CliSock, _Req, Options) ->
     H = #outh{status = 200,
@@ -2691,6 +2741,8 @@ deliver_dyn_part(CliSock,                       % essential params
                  DeliverCont                    % call DeliverCont(Arg)
                                                 % to continue normally
                 ) ->
+    %% Note: yaws_arg and client_data_pos are also used in
+    %% handle_method_result/7 when `{page, Page}' is returned
     put(yaws_ut, UT),
     put(yaws_arg, Arg),
     put(client_data_pos, CliDataPos0),
@@ -3593,13 +3645,14 @@ decide_deflate(true, SC, Arg, Data, decide, Mode) ->
             false;
 
         true ->
-            Mime = yaws:outh_get_content_type(),
-            ?Debug("Check compression support: Mime-Type=~p~n", [Mime]),
-            case compressible_mime_type(Mime, DOpts) of
+            Mime0     = yaws:outh_get_content_type(),
+            [Mime1|_] = yaws:split_sep(Mime0, $;), %% Remove charset
+            ?Debug("Check compression support: Mime-Type=~p~n", [Mime1]),
+            case compressible_mime_type(Mime1, DOpts) of
                 true ->
                     case (Arg =:= undefined
                           orelse
-                          yaws:accepts_gzip(Arg#arg.headers, Mime)) of
+                          yaws:accepts_gzip(Arg#arg.headers, Mime1)) of
                         true when Mode =:= final ->
                             ?Debug("Compress data~n", []),
                             yaws:outh_set_content_encoding(deflate),
@@ -3616,7 +3669,7 @@ decide_deflate(true, SC, Arg, Data, decide, Mode) ->
                             false
                     end;
                 false ->
-                    ?Debug("~p is not compressible~n", [Mime]),
+                    ?Debug("~p is not compressible~n", [Mime1]),
                     yaws:outh_set_content_encoding(identity),
                     false
             end
@@ -3893,7 +3946,7 @@ deliver_large_file(CliSock,  _Req, UT, Range) ->
 
 send_file(CliSock, Path, all, undefined) when is_port(CliSock) ->
     ?Debug("send_file(~p,~p,no ...)~n", [CliSock, Path]),
-    {ok, Size} = yaws_sendfile:send(CliSock, Path),
+    Size = yaws_sendfile:send(CliSock, Path),
     yaws_stats:sent(Size);
 send_file(CliSock, Path, all, undefined) ->
     ?Debug("send_file(~p,~p,no ...)~n", [CliSock, Path]),
@@ -3901,7 +3954,7 @@ send_file(CliSock, Path, all, undefined) ->
     send_file(CliSock, Fd, undefined);
 send_file(CliSock, _, all, {gzfile, GzFile}) when is_port(CliSock) ->
     ?Debug("send_file(~p,~p, ...)~n", [CliSock, GzFile]),
-    {ok, Size} = yaws_sendfile:send(CliSock, GzFile),
+    Size = yaws_sendfile:send(CliSock, GzFile),
     yaws_stats:sent(Size);
 send_file(CliSock, _, all, {gzfile, GzFile}) ->
     ?Debug("send_file(~p,~p, ...)~n", [CliSock, GzFile]),
@@ -3912,7 +3965,7 @@ send_file(CliSock, Path, all, Priv) ->
     {ok, Fd} = file:open(Path, [raw, binary, read]),
     send_file(CliSock, Fd, Priv);
 send_file(CliSock, Path,  {fromto, From, To, _Tot}, _) when is_port(CliSock) ->
-    {ok, Size} = yaws_sendfile:send(CliSock, Path, From, (To-From+1)),
+    Size = yaws_sendfile:send(CliSock, Path, From, (To-From+1)),
     yaws_stats:sent(Size);
 send_file(CliSock, Path,  {fromto, From, To, _Tot}, _) ->
     {ok, Fd} = file:open(Path, [raw, binary, read]),
@@ -3956,14 +4009,33 @@ url_type(GetPath, ArgDocroot, VirtualDir) ->
     SC=get(sc),
     GC=get(gc),
     E = SC#sconf.ets,
+
+    %% In reentrant call, the cache can be disabled. It could be useful in case
+    %% of "proxy" appmod.
+    NoCache = case get(is_reentrant_request) of
+                  true ->
+                      case get(page_options) of
+                          undefined -> false;
+                          Opts      ->  proplists:get_bool(disable_cache, Opts)
+                      end;
+                  _ ->
+                      false
+              end,
+
     case ets:lookup(E, {url, GetPath}) of
         [] ->
             UT = do_url_type(SC, GetPath, ArgDocroot, VirtualDir),
             ?TC([{record, UT, urltype}]),
             ?Debug("UT=~s\n", [?format_record(UT, urltype)]),
-            CF = cache_file(SC, GC, GetPath, UT),
-            ?Debug("CF=~s\n", [?format_record(CF, urltype)]),
-            CF;
+            if
+                NoCache ->
+                    ?Debug("Cache disabled\n", []),
+                    UT;
+                true ->
+                    CF = cache_file(SC, GC, GetPath, UT),
+                    ?Debug("CF=~s\n", [?format_record(CF, urltype)]),
+                    CF
+            end;
         [{_, When, UT}] ->
             N = now_secs(),
             Refresh = GC#gconf.cache_refresh_secs,
@@ -4117,7 +4189,6 @@ do_url_type(SC, GetPath, ArgDocroot, VirtualDir) ->
     ?Debug("do_url_type SC=~s~nGetPath=~p~nVirtualDir=~p~n",
            [?format_record(SC,sconf), GetPath,VirtualDir]),
 
-
     case GetPath of
         _ when ?sc_has_dav(SC) ->
             {Comps, RevFile} = comp_split(GetPath),
@@ -4139,6 +4210,12 @@ do_url_type(SC, GetPath, ArgDocroot, VirtualDir) ->
         "/" -> %% special case
             case lists:keysearch("/", 1, SC#sconf.appmods) of
                 {value, AppmodDef} ->
+                    %% Remove appmod for this request to avoid an infinte loop
+                    %% in case of a reentrant call
+                    put(sc, SC#sconf{appmods=lists:delete(
+                                               AppmodDef, SC#sconf.appmods
+                                              )}),
+
                     %% AppmodDef can be either a 2-tuple or 3-tuple depending
                     %% on whether there are exclude paths present. We want
                     %% only the second element of the tuple in either case.
@@ -4194,6 +4271,12 @@ do_url_type(SC, GetPath, ArgDocroot, VirtualDir) ->
                                                    ArgDocroot, VirtualDir)
                     end;
                 {ok, {Mount, Mod}} ->
+                    %% Remove appmod for this request to avoid an infinte loop
+                    %% in case of a reentrant call
+                    put(sc, SC#sconf{appmods=lists:keydelete(
+                                               Mount, 1, SC#sconf.appmods
+                                              )}),
+
                     %%active_appmod found the most specific appmod for this
                     %% request path
                     %% - now we need to determine the prepath & path_info
@@ -4690,8 +4773,9 @@ parse_user_path(DR, [H|T], User) ->
     parse_user_path(DR, T, [H|User]).
 
 
-deflate_q(true, SC, regular, Mime) ->
-    case compressible_mime_type(Mime, SC#sconf.deflate_options) of
+deflate_q(true, SC, regular, Mime0) ->
+    [Mime1|_] = yaws:split_sep(Mime0, $;), %% Remove charset
+    case compressible_mime_type(Mime1, SC#sconf.deflate_options) of
         true -> dynamic;
         false -> undefined
     end;

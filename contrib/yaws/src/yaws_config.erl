@@ -50,7 +50,7 @@ paths() ->
 load(E = #env{conf = false}) ->
     case yaws:first(fun(F) -> yaws:exists(F) end, paths()) of
         false ->
-            {error, "Can't find config file "};
+            {error, "Can't find any config file "};
         {ok, _, File} ->
             load(E#env{conf = {file, File}})
     end;
@@ -79,8 +79,8 @@ load(E) ->
                 Err ->
                     Err
             end;
-        _ ->
-            {error, "Can't open config file " ++ File}
+        Err ->
+            {error, ?F("Can't open config file ~s: ~p", [File, Err])}
     end.
 
 
@@ -520,45 +520,25 @@ make_default_gconf(Debug, Id) ->
 %% Keep this function for backward compatibility. But no one is supposed to use
 %% it (yaws_config is an internal module, its api is private).
 make_default_sconf() ->
-    make_default_gconf([], undefined).
+    make_default_sconf([], undefined).
 
 make_default_sconf([], Port) ->
     make_default_sconf(filename:join([yaws_dir(), "www"]), Port);
 make_default_sconf(DocRoot, undefined) ->
     make_default_sconf(DocRoot, 8000);
 make_default_sconf(DocRoot, Port) ->
-    set_server(#sconf{port=Port, listen={127,0,0,1}, docroot=DocRoot}).
-
-yaws_dir() ->
-    %% below, ignore dialyzer warning:
-    %% "The pattern 'false' can never match the type 'true'"
-    case  yaws_generated:is_local_install() of
+    AbsDocRoot = filename:absname(DocRoot),
+    case is_dir(AbsDocRoot) of
         true ->
-            P = filename:split(code:which(?MODULE)),
-            P1 = del_tail(P),
-            filename:join(P1);
+            set_server(#sconf{port=Port,listen={127,0,0,1},docroot=AbsDocRoot});
         false ->
-            code:lib_dir(yaws)
+            throw({error, ?F("Invalid docroot: directory ~s does not exist",
+                             [AbsDocRoot])})
     end.
 
-del_tail(Parts) ->
-    del_tail(Parts,[]).
-%% Initial ".." should be preserved
-del_tail([".." |Tail], Acc) ->
-    del_tail(Tail, [".."|Acc]);
-del_tail(Parts, Acc) ->
-    del_tail2(Parts, Acc).
 
-%% Embedded ".." should be removed together with preceding dir
-del_tail2([_H, ".." |Tail], Acc) ->
-    del_tail2(Tail, Acc);
-del_tail2([".." |Tail], [_P|Acc]) ->
-    del_tail2(Tail, Acc);
-del_tail2([_X, _Y], Acc) ->
-    lists:reverse(Acc);
-del_tail2([H|T], Acc) ->
-    del_tail2(T, [H|Acc]).
-
+yaws_dir() ->
+    yaws:get_app_dir().
 
 string_to_host_and_port(String) ->
     case string:tokens(String, ":") of
@@ -619,8 +599,9 @@ fload(FD, globals, GC, C, Cs, Lno, Chars) ->
                                 Err ->
                                     Err
                             end;
-                        _ ->
-                            {error, "Can't open config file " ++ File}
+                        Err ->
+                            {error, ?F("Can't open config file ~s:~p",
+                                       [File,Err])}
                     end;
                 false ->
                     {error, ?F("Expect filename at line ~w", [Lno])}
@@ -1800,21 +1781,25 @@ fload(FD, server_redirect, GC, C, Cs, Lno, Chars, RedirMap) ->
     case Toks of
         [] ->
             fload(FD, server_redirect, GC, C, Cs, Lno+1, Next, RedirMap);
-        [Path, '=', URL] ->
-            try yaws_api:parse_url(URL, sloppy) of
-                U when is_record(U, url) ->
+        [Path, '=', '=' | Rest] ->
+            %% "Normalize" Path
+            Path1 = filename:join([yaws_api:path_norm(Path)]),
+            case parse_redirect(Path1, Rest, noappend, Lno) of
+                {error, Str} ->
+                    {error, Str};
+                Redir ->
                     fload(FD, server_redirect, GC, C, Cs, Lno+1, Next,
-                          [{Path, U, append}|RedirMap])
-            catch _:_ ->
-                    {error, ?F("bad redir ~p at line ~w", [URL, Lno])}
+                          [Redir|RedirMap])
             end;
-        [Path, '=', '=', URL] ->
-            try yaws_api:parse_url(URL, sloppy) of
-                U when is_record(U, url) ->
+        [Path, '=' | Rest] ->
+            %% "Normalize" Path
+            Path1 = filename:join([yaws_api:path_norm(Path)]),
+            case parse_redirect(Path1, Rest, append, Lno) of
+                {error, Str} ->
+                    {error, Str};
+                Redir ->
                     fload(FD, server_redirect, GC, C, Cs, Lno+1, Next,
-                          [{Path, U, noappend}|RedirMap])
-            catch _:_ ->
-                    {error, ?F("Bad redir ~p at line ~w", [URL, Lno])}
+                          [Redir|RedirMap])
             end;
         ['<', "/redirect", '>'] ->
             C2 = C#sconf{redirect_map = lists:reverse(RedirMap)},
@@ -2345,6 +2330,52 @@ parse_mime_types_info(add_charsets, NewCharsets, Info) ->
         {ok, Charsets} -> {ok, Info#mime_types_info{charsets=Charsets}};
         Error          -> Error
     end.
+
+
+parse_redirect(Path, [Code, URL], Mode, Lno) ->
+    case catch list_to_integer(Code) of
+        I when is_integer(I), I >= 300, I =< 399 ->
+            try yaws_api:parse_url(URL, sloppy) of
+                U when is_record(U, url) ->
+                    {Path, I, U, Mode}
+            catch _:_ ->
+                    {error, ?F("Bad redirect URL ~p at line ~w", [URL, Lno])}
+            end;
+        I when is_integer(I), I >= 100, I =< 599 ->
+            %% Only relative path are authorized here
+            try yaws_api:parse_url(URL, sloppy) of
+                #url{scheme=undefined, host=[], port=undefined, path=P} ->
+                    {Path, I, P, Mode};
+                #url{} ->
+                    {error, ?F("Bad redirect rule at line ~w: "
+                               " Absolute URL is forbidden here", [Lno])}
+            catch _:_ ->
+                    {error, ?F("Bad redirect URL ~p at line ~w", [URL, Lno])}
+            end;
+        _ ->
+            {error, ?F("Bad status code ~p at line ~w", [Code, Lno])}
+    end;
+parse_redirect(Path, [CodeOrUrl], Mode, Lno) ->
+    case catch list_to_integer(CodeOrUrl) of
+        I when is_integer(I), I >= 300, I =< 399 ->
+            {error, ?F("Bad redirect rule at line ~w: "
+                       "URL to redirect to is missing ", [Lno])};
+        I when is_integer(I), I >= 100, I =< 599 ->
+            {Path, I, undefined, Mode};
+        I when is_integer(I) ->
+            {error, ?F("Bad status code ~p at line ~w", [CodeOrUrl, Lno])};
+        _ ->
+            try yaws_api:parse_url(CodeOrUrl, sloppy) of
+                #url{}=U ->
+                    {Path, 302, U, Mode}
+            catch _:_ ->
+                    {error, ?F("Bad redirect URL ~p at line ~w",
+                               [CodeOrUrl, Lno])}
+            end
+    end;
+parse_redirect(_Path, _, _Mode, Lno) ->
+    {error, ?F("Bad redirect rule at line ~w", [Lno])}.
+
 
 
 ssl_start() ->

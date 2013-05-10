@@ -520,7 +520,7 @@ prop_get({'DAV:',lockdiscovery},_A,R) ->
                             {'D:lockscope',[],[prop_get_format(scope,Lock#davlock.scope)]},
                             {'D:locktype',[],[prop_get_format(type,Lock#davlock.type)]},
                             {'D:depth',[],[prop_get_format(depth,Lock#davlock.depth)]},
-                            %{'D:owner',[],[prop_get_format(owner,Lock#davlock.owner)]}, % kept secret
+                          %%{'D:owner',[],[prop_get_format(owner,Lock#davlock.owner)]}, % kept secret
                             {'D:timeout',[],[prop_get_format(timeout,Lock#davlock.timeout)]},
                             {'D:locktoken',[],[prop_get_format(locktoken,Lock#davlock.id)]},
                             {'D:lockroot',[],[prop_get_format(lockroot,Lock#davlock.path)]}
@@ -605,8 +605,8 @@ prop_get_format(locktoken,Id) ->
     {'D:href',[],["opaquelocktoken:"++Id]};
 prop_get_format(lockroot,Ref) ->
     {'D:href',[],[Ref]};
-prop_get_format(owner,Owner) ->
-    Owner;
+%%prop_get_format(owner,Owner) ->
+%%    Owner;
 prop_get_format(_,_) ->
     throw(500).
 
@@ -808,7 +808,7 @@ if_eval_condition([{true,state,Ref}|T],_Result,_Valid,A,Target,Locks) ->
     Valid1 = true,
     Result1 andalso if_eval_condition(T,Result1,Valid1,A,Target,Locks);
 if_eval_condition([{true,etag,Ref}|T],_Result,Valid,A,Target,Locks) ->
-    F = file:read_info(A#arg.docroot++Target),
+    {ok, F} = file:read_file_info(filename:join(A#arg.docroot,Target)),
     E = yaws:make_etag(F),
     Result1 = (E==Ref),
     Valid1 = Valid,
