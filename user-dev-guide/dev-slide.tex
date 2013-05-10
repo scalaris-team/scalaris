@@ -1,0 +1,128 @@
+\chapter{How data is transferred (atomically)}
+\label{chapter.slide}
+\svnrev{r4750}
+
+A data transfer from a node to one of its (two) neighbours is also called a
+\emph{slide}. A slide operation is defined in the \erlmodule{slide\_op} module,
+the protocol is mainly implemented in \erlmodule{dht\_node\_move}.
+Parts of the slide are dependent on the ring maintenance implementation and are
+split off into modules implementing the \erlmodule{slide\_beh} behaviour.
+
+Though the protocols are mainly symmetric, we distinguish between sending data
+to the predecessor and sending data to the successor, respectively. In the
+following protocol visualisations, arrows denote message exchanges, pseudo-code
+for operations that are being executed is put at the side of each time bar.
+Functions in green are those implemented in the \erlmodule{slide\_beh}
+behaviour, if annotated with an arrow pointing to itself, this callback is
+asynchronous.
+During the protocol, the slide operation goes through several phases which are
+show in black boxes.
+
+In general, a slide consists of three steps:
+\begin{enumerate}
+ \item set up slide
+ \item send data \& start recording changes, i.e. delta
+ \item send delta \& transfer responsibility
+\end{enumerate}
+
+The latter two may be repeated to execute incremental slides which further
+reduce periods of unavailability. During this period, no node is responsible
+for the range to transfer and messages are thus delayed until the receiving
+node gains responsibility.
+
+%\pagebreak
+\section{Sending data to the predecessor}
+
+\subsection{Protocol}
+\input{slide_send_to_pred-2.0.tikz}
+
+\subsection{Callbacks}
+% \medskip
+{%\small
+\begin{tabular}{P{4.2cm}P{5.4cm}P{5.4cm}}
+  \toprule
+  & \code{slide_chord}
+  & \code{slide_leases} \tn
+  \midrule
+  %
+  \bfseries $\leftarrow$ prepare\_rcv\_data
+  & \emph{\color{gray}nothing to do}
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\rightarrow$ prepare\_send\_data
+  & add DB range
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\leftarrow$ update\_rcv\_data
+  & set MSG forward,\\change my ID
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\rightarrow$ prepare\_send\_delta
+  & wait until pred up-to-date,\\then: remove DB range
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\leftarrow$ finish\_delta
+  & remove MSG forward
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\rightarrow$ finish\_delta\_ack
+  & \emph{\color{gray}nothing to do}
+  &  \tn % TODO
+  \bottomrule
+\end{tabular}
+}
+% \medskip
+
+\pagebreak
+\section{Sending data to the successor}
+
+\subsection{Protocol}
+\input{slide_send_to_succ-2.0.tikz}
+
+\subsection{Callbacks}
+
+% \medskip
+{%\small
+\begin{tabular}{P{4.2cm}P{5.4cm}P{5.4cm}}
+  \toprule
+  & \code{slide_chord}
+  & \code{slide_leases} \tn
+  \midrule
+  %
+  \bfseries $\rightarrow$ prepare\_rcv\_data
+  & set MSG forward
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\leftarrow$ prepare\_send\_data
+  & add DB range,\\change my ID
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\rightarrow$ update\_rcv\_data
+  & \emph{\color{gray}nothing to do}
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\leftarrow$ prepare\_send\_delta
+  & remove DB range
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\rightarrow$ finish\_delta
+  & remove MSG forward,\\until pred up-to-date:\\$\hookrightarrow$ add DB range\\then: remove DB range
+  &  \tn % TODO
+  \midrule
+  %
+  \bfseries $\leftarrow$ finish\_delta\_ack
+  & \emph{\color{gray}nothing to do}
+  &  \tn % TODO
+  \bottomrule
+\end{tabular}
+}
+% \medskip
