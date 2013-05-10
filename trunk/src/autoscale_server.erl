@@ -29,7 +29,10 @@
 
 -behaviour(gen_component).
 
+-include("scalaris.hrl").
+
 -export([start_link/1, init/1, on/2]).
+-export([check_config/0, log/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % types
@@ -78,3 +81,23 @@ on({write_to_file}, {PlotData}) ->
     {PlotData};
 on(_, _) ->
     unknown_event.
+
+-spec log(KeyValueList :: [{Key :: atom(), Value :: term()}]) -> ok.
+log(KeyValueList)  ->
+    {Ms, S, _Us} = erlang:now(),
+    NowMs = Ms*1000000+S,
+    MgmtServer = config:read(mgmt_server),
+    
+    lists:foreach(
+      fun({Key, Value}) ->
+              comm:send(MgmtServer, {?send_to_group_member, autoscale_server,
+                                     {collect, Key, NowMs, Value}})
+      end, KeyValueList),
+    ok.
+
+%% @doc Checks whether config parameters for autoscale_server exist and are valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:read(autoscale_server) =:= true andalso
+        config:cfg_exists(autoscale_server_plot_path) andalso
+        config:read(mgmt_server) =/= failed.
