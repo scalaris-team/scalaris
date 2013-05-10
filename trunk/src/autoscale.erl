@@ -69,7 +69,7 @@
 %% rm_loop interaction
 -export([send_my_range_req/4]).
 
--define(TRACE(X), ?TRACE(X, [])).
+-define(TRACE1(X), ?TRACE(X, [])).
 %% -define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
 -define(TRACE(_X,_Y), ok).
 
@@ -295,7 +295,7 @@ on({unlock_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers})
 on({unlock_scale_req_timeout}, {_IsLeader, _Alarms, ScaleReq, Triggers}) ->
     NewTriggers = lists:keydelete(timeout, 1, Triggers),
     NewScaleReq = ScaleReq#scale_req{lock = unlocked},
-    ?TRACE("unlock_scale_req_timeout"),
+    ?TRACE1("unlock_scale_req_timeout"),
     {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
 
 %%==============================================================================
