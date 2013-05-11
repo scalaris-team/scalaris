@@ -4,6 +4,10 @@
 4) ./configure && make in the extracted yaws dir (not <scalaris>/contrib/yaws)
 5) copy src/mime_types.erl and src/yaws_generated.erl to <scalaris>/contrib/yaws/src
 5a) fix absolute include path in mime_types.erl to yaws.hrl
+5b) if still needed, fix non-UTF8 files for Erlang/master (in yaws dir):
+for file in yaws_xmlrpc.erl yaws_rpc.erl yaws_ls.erl yaws_jsonrpc.erl yaws_exhtml.erl ; do \
+  sed -i -e "1i %% -*- coding: Latin-1 -*-" src/$file ; \
+done
 6) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
 %-define(HAVE_SENDFILE, true).
 7) that's it, go back to <scalaris>/ and run make clean && ./configure && make
