@@ -80,7 +80,6 @@
 %%==============================================================================
 %% Types
 %%==============================================================================
-
 -type key_value_list() :: [{Key :: atom(), Value :: term()}].
 
 -record(alarm, {name     = ?required(alarm, name) :: atom(),
@@ -91,8 +90,7 @@
 
 -record(scale_req, {req   = 0        :: integer(),
                     lock  = unlocked :: locked | unlocked,
-                    mode  = push     :: push | pull,
-                    epoch = 0        :: non_neg_integer()}).
+                    mode  = push     :: push | pull}).
 
 -type alarm()     :: #alarm{}.
 -type alarms()    :: [alarm()].
@@ -120,7 +118,6 @@
 %%==============================================================================
 %% Alarm handlers
 %%==============================================================================
-
 %% @doc Check average latency measured by monitor_perf and request scaling if
 %%      average latency is out of provided bounds.
 %%      Options:
@@ -258,7 +255,7 @@ on({push_scale_req}, {IsLeader, _Alarms, ScaleReq, _Triggers})
 on({pull_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers}) 
   when ScaleReq#scale_req.lock =:= locked ->
     comm:send(Pid, {scale_req_resp, {error, locked}}),
-    ?TRACE("pull_scale_req, lock_state: ~p", [ScaleReq#scale_req.lock]),
+    ?TRACE("pull_scale_req,~nscale_req: ~p", [ScaleReq]),
     State;
 on({pull_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers}) 
   when ScaleReq#scale_req.lock =:= unlocked ->
@@ -270,7 +267,7 @@ on({pull_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
     NewTriggers = Triggers ++ [{timeout, Trigger}],
     % lock 
     NewScaleReq = ScaleReq#scale_req{lock = locked},
-    ?TRACE("unlock_scale_req, lock_state: ~p", [ScaleReq#scale_req.lock]),
+    ?TRACE("pull_scale_req,~nscale_req: ~p", [ScaleReq]),
     {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
 
 on({unlock_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
@@ -283,13 +280,13 @@ on({unlock_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
     cancel(Trigger),
     % unlock
     NewScaleReq = ScaleReq#scale_req{lock = unlocked, req  = 0},
-    ?TRACE("unlock_scale_req, lock_state: ~p", [ScaleReq#scale_req.lock]),
+    ?TRACE("unlock_scale_req,~nscale_req: ~p", [ScaleReq]),
     {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
 on({unlock_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers})
   when ScaleReq#scale_req.lock =:= unlocked ->
     % reply
     comm:send(Pid, {scale_req_resp, {error, not_locked}}),
-    ?TRACE("unlock_scale_req, lock_state: ~p", [ScaleReq#scale_req.lock]),
+    ?TRACE("unlock_scale_req,~nscale_req: ~p", [ScaleReq]),
     State;
 
 on({unlock_scale_req_timeout}, {_IsLeader, _Alarms, ScaleReq, Triggers}) ->
@@ -358,7 +355,6 @@ on(_Msg, State) ->
 %%==============================================================================
 %% Triggers
 %%==============================================================================
-
 %% @doc Check alarm Name in Delay seconds.  
 -spec next(Name :: atom(), Delay :: pos_integer()) -> reference().
 next(Name, Delay) ->
@@ -379,7 +375,6 @@ cancel(Trigger) ->
 %%==============================================================================
 %% Alarm helpers
 %%==============================================================================
-
 %% @doc Get alarm by name.
 -spec get_alarm(Name :: atom(), Alarms :: alarms()) -> alarm() | false.
 get_alarm(Name, Alarms) ->
@@ -409,7 +404,6 @@ log(Key, Value) ->
 %%==============================================================================
 %% Misc
 %%==============================================================================
-
 %% @doc Request my_range from dht_node (called by rm_loop at direct neighborhood
 %%      changes).
 -spec send_my_range_req(Pid :: pid(), Tag :: ?MODULE,
@@ -448,7 +442,6 @@ tx_merge_alarms(Alarms) ->
 %%==============================================================================
 %% Startup
 %%==============================================================================
-
 -spec start_link(DHTNodeGroup :: pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],

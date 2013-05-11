@@ -21,6 +21,13 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+%% Polling API
+-export([pull_scale_req/0, unlock_scale_req/0]).
+%% Alarm state API
+-export([toggle_alarm/1, activate_alarms/0, deactivate_alarms/0]).
+%% Autoscale server API
+-export([write_plot_data/0, reset_plot_data/0]).
+
 -compile(export_all).
 
 %%==============================================================================
@@ -49,7 +56,6 @@ unlock_scale_req() ->
 %%==============================================================================
 %% Alarm state API
 %%==============================================================================
-
 %% @doc Toggle state of alarm Name from active to inactive and vice versa.
 -spec toggle_alarm(Name :: atom()) -> {ok, {new_state, NewState :: active | inactive}} |
                                       {error, unknown_alarm} |
@@ -78,7 +84,6 @@ deactivate_alarms () ->
 %%==============================================================================
 %% Autoscale server API
 %%==============================================================================
-
 write_plot_data() ->
     ?IIF(config:read(autoscale_server),
         case MgmtServer = config:read(mgmt_server) of
@@ -102,7 +107,6 @@ reset_plot_data() ->
 %%==============================================================================
 %% Misc
 %%==============================================================================
-
 %% @doc Send to autoscale leader.
 -spec send_to_leader(Msg :: comm:msg()) -> ok. 
 send_to_leader(Msg) ->
