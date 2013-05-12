@@ -43,7 +43,7 @@
 %%      back to the default options (set in the alarm handler), because no
 %%      options are provided. If the lat_avg handler requested to add or remove
 %%      VMs, the handler will be called after 120 seconds in order to allow the
-%%      changes to take effect (cooldown). 
+%%      changes to take effect (cooldown).
 %%
 %%      VMs requests are handled by the cloud module. It can be configured with
 %%        {autoscale_cloud_module, CloudModule}.
@@ -57,7 +57,7 @@
 %% @version $Id$
 -module(autoscale).
 -author('celebi@zib.de').
--vsn('$Id$'). 
+-vsn('$Id$').
 
 -behaviour(gen_component).
 
@@ -77,9 +77,9 @@
 -define(AUTOSCALE_TX_KEY,
         "d9c966df633f8b1577eacff013166db95917a7002999b6fbbb67a3dd572d5035").
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Types
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -type key_value_list() :: [{Key :: atom(), Value :: term()}].
 
 -record(alarm, {name     = ?required(alarm, name) :: atom(),
@@ -115,9 +115,9 @@
                   ScaleReq :: scale_req(),
                   Triggers :: triggers()}.
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Alarm handlers
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Check average latency measured by monitor_perf and request scaling if
 %%      average latency is out of provided bounds.
 %%      Options:
@@ -131,7 +131,7 @@ alarm_handler(lat_avg, Options) ->
     HiMs        = get_alarm_option(Options, upper_limit_ms, 2000),
     VmsToRemove = get_alarm_option(Options, vms_to_remove, 1),
     VmsToAdd    = get_alarm_option(Options, vms_to_add, 1),
-    
+
     Monitor = pid_groups:find_a(monitor_perf),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, _StddevMsD, _HistMsD} =
         case statistics:getTimingMonitorStats(Monitor, [{api_tx, 'req_list'}], tuple) of
@@ -139,9 +139,9 @@ alarm_handler(lat_avg, Options) ->
             [{api_tx, 'req_list', Data}] -> Data
         end,
     [{_, LatestAvgMsD}|_] = AvgMsD,
-    
+
     log(lat_avg, LatestAvgMsD),
-    
+
     if
         LatestAvgMsD < LoMs ->
             VmsToRemove;
@@ -159,14 +159,14 @@ alarm_handler(rand_churn, Options) ->
     Lo = get_alarm_option(Options, lower_limit, -5),
     Hi = get_alarm_option(Options, upper_limit, 5),
     Churn = randoms:rand_uniform(Lo, Hi),
-    
+
     log(rand_churn, Churn),
 
     Churn.
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Msg loop: main functions
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
 
 %% @doc Set new leader state at startup and ring changes.
@@ -193,11 +193,11 @@ on({get_state_response, MyRange}, {IsLeader, Alarms, ScaleReq, Triggers}) ->
             {_, _}        ->
                 {Alarms, ScaleReq, Triggers}
         end,
-    
+
     ?TRACE("leadership: ~p", [{IsLeader, IsNewLeader}]),
     {IsNewLeader, NewAlarms, NewScaleReq, NewTriggers};
 
-%% @doc Check alarm Name for new scale request. 
+%% @doc Check alarm Name for new scale request.
 on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
   when IsLeader andalso ScaleReq#scale_req.lock =:= unlocked  ->
     Alarm = get_alarm(Name, Alarms),
@@ -230,7 +230,7 @@ on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
 on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
   when IsLeader andalso ScaleReq#scale_req.lock =:= locked  ->
     Alarm = get_alarm(Name, Alarms),
-    
+
     ?TRACE("check_alarm: ~p, scale_req is locked", [Name]),
     {IsLeader, Alarms, ScaleReq, next(Name, Alarm#alarm.interval, Triggers)};
 
@@ -243,21 +243,21 @@ on({push_scale_req}, {IsLeader, _Alarms, ScaleReq, _Triggers})
         Req < 0  -> ?CLOUD:remove_vms(Req*-1);
         Req == 0 -> ok
     end,
-    
+
     ?TRACE("push_scale_req: ~p", [ScaleReq]),
     {IsLeader, _Alarms, ScaleReq#scale_req{req = 0}, _Triggers};
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Msg loop: API msgs
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Msg loop: API msgs -> scale req polling API
-%%============================================================================== 
-on({pull_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers}) 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({pull_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers})
   when ScaleReq#scale_req.lock =:= locked ->
     comm:send(Pid, {scale_req_resp, {error, locked}}),
     ?TRACE("pull_scale_req,~nscale_req: ~p", [ScaleReq]),
     State;
-on({pull_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers}) 
+on({pull_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
   when ScaleReq#scale_req.lock =:= unlocked ->
     % reply
     comm:send(Pid, {scale_req_resp, {ok, ScaleReq#scale_req.req}}),
@@ -265,7 +265,7 @@ on({pull_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
     Trigger = comm:send_local_after(60*1000, self(),
                                     {unlock_scale_req_timeout}),
     NewTriggers = Triggers ++ [{timeout, Trigger}],
-    % lock 
+    % lock
     NewScaleReq = ScaleReq#scale_req{lock = locked},
     ?TRACE("pull_scale_req,~nscale_req: ~p", [ScaleReq]),
     {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
@@ -295,9 +295,9 @@ on({unlock_scale_req_timeout}, {_IsLeader, _Alarms, ScaleReq, Triggers}) ->
     ?TRACE1("unlock_scale_req_timeout"),
     {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Msg loop: API msgs -> alarm state API
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({toggle_alarm, Name, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
     NewAlarms =
        case get_alarm(Name, Alarms) of
@@ -352,10 +352,10 @@ on({deactivate_alarms, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
 on(_Msg, State) ->
     State.
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Triggers
-%%==============================================================================
-%% @doc Check alarm Name in Delay seconds.  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Check alarm Name in Delay seconds.
 -spec next(Name :: atom(), Delay :: pos_integer()) -> reference().
 next(Name, Delay) ->
     comm:send_local_after(Delay*1000, self(), {check_alarm, Name}).
@@ -372,16 +372,16 @@ cancel(Trigger) ->
     _ = erlang:cancel_timer(Trigger),
     ok.
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Alarm helpers
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Get alarm by name.
 -spec get_alarm(Name :: atom(), Alarms :: alarms()) -> alarm() | false.
 get_alarm(Name, Alarms) ->
     lists:keyfind(Name, 2, Alarms).
 
 %% @doc Get value for specified option key from key-value list. Return provided
-%%      default value, if key does not exist.   
+%%      default value, if key does not exist.
 -spec get_alarm_option(Options :: key_value_list(), Key :: atom(),
                        Default :: any()) -> any().
 get_alarm_option(Options, FieldKey, Default) ->
@@ -401,9 +401,9 @@ log(Key, Value) ->
             ok
     end.
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Misc
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Request my_range from dht_node (called by rm_loop at direct neighborhood
 %%      changes).
 -spec send_my_range_req(Pid :: pid(), Tag :: ?MODULE,
@@ -433,15 +433,15 @@ tx_merge_alarms(Alarms) ->
         {ok, Updates} ->
             lists:foldl(
               fun(Alarm, Acc) ->
-                      lists:keyreplace(Alarm#alarm.name, 2, Acc, Alarm) 
+                      lists:keyreplace(Alarm#alarm.name, 2, Acc, Alarm)
               end, Alarms, Updates);
         {fail, not_found} ->
             Alarms
-    end.     
+    end.
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Startup
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec start_link(DHTNodeGroup :: pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
@@ -473,9 +473,9 @@ init([]) ->
          end,
      _Triggers = []}.
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Config
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec read_alarms_from_config() -> [#alarm{}].
 read_alarms_from_config() ->
     case check_config() of

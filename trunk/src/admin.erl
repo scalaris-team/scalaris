@@ -1,4 +1,4 @@
-% @copyright 2008-2012 Zuse Institute Berlin
+% @copyright 2008-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -38,9 +38,9 @@
          'UnknownPreds:', UnknownPreds::nodelist:snodelist(),
          'UnknownSuccs:', UnknownSuccs::nodelist:snodelist()}.
 
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API functions
-%%====================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% userdevguide-begin admin:add_nodes
 % @doc add new Scalaris nodes on the local node
@@ -238,9 +238,9 @@ number_of_nodes() ->
         5000 -> timeout
     end.
 
-%%===============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%=
 % % comm_logger functions
-% %===============================================================================
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%=
 % @doc returns communications information. the comm-layer logs for
 % each message-tag how many message were sent and how large were these
 % messages in total. get_dump/0 returns a map from message-tag to
@@ -318,9 +318,9 @@ diff([Tag | Rest], Before, After) ->
             [{Tag, NewSize - Size, NewCount - Count} | diff(Rest, Before, After)]
     end.
 
-%%=============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% admin server functions
-%%=============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec start_link() -> {ok, pid()}.
 start_link() ->
     {ok, spawn_link(?MODULE, start, [])}.
@@ -361,9 +361,9 @@ nodes() ->
             end,
     Nodes.
 
-%%=============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Debug functions
-%%=============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec print_ages() -> ok.
 print_ages() ->
