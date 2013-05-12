@@ -30,18 +30,18 @@
 
 -compile(export_all).
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Polling API
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Pull current scale request from autoscale leader. If the request is
 %%      successful, further requests are blocked until a unlock_scale_req/0 call
 %%      has been made. Autoscale defines a timeout, after which the lock will be
 %%      automatically freed, i.e. the caller has $timeout seconds to satisfy
-%%      the request and notify autoscale by unlock_scale_req/0. 
--spec pull_scale_req() -> {ok, Req :: integer()} | 
-                          {error, locked} |                          
-                          {error, resp_timeout}. 
+%%      the request and notify autoscale by unlock_scale_req/0.
+-spec pull_scale_req() -> {ok, Req :: integer()} |
+                          {error, locked} |
+                          {error, resp_timeout}.
 pull_scale_req() ->
     send_to_leader_wait_resp(
       {pull_scale_req, comm:this()}, scale_req_resp, 5).
@@ -53,9 +53,9 @@ unlock_scale_req() ->
     send_to_leader_wait_resp(
       {unlock_scale_req, comm:this()}, scale_req_resp, 5).
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Alarm state API
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Toggle state of alarm Name from active to inactive and vice versa.
 -spec toggle_alarm(Name :: atom()) -> {ok, {new_state, NewState :: active | inactive}} |
                                       {error, unknown_alarm} |
@@ -81,9 +81,9 @@ deactivate_alarms () ->
     send_to_leader_wait_resp(
       {deactivate_alarms, comm:this()}, deactivate_alarms_resp, 5).
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Autoscale server API
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 write_plot_data() ->
     ?IIF(config:read(autoscale_server),
         case MgmtServer = config:read(mgmt_server) of
@@ -104,20 +104,20 @@ reset_plot_data() ->
         end,
         {error, autoscale_server_false}).
 
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Misc
-%%==============================================================================
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Send to autoscale leader.
--spec send_to_leader(Msg :: comm:msg()) -> ok. 
+-spec send_to_leader(Msg :: comm:msg()) -> ok.
 send_to_leader(Msg) ->
     api_dht_raw:unreliable_lookup(?RT:hash_key("0"),
                                   {?send_to_group_member, autoscale, Msg}).
 
-%% @doc Send to autoscale leader and wait for response. 
+%% @doc Send to autoscale leader and wait for response.
 -spec send_to_leader_wait_resp(Msg :: comm:message(),
                                RespTag :: comm:msg_tag(),
                                Timeout :: pos_integer()) ->
-          {RespTag :: comm:msg_tag(), Resp :: term()} | {error, resp_timeout}. 
+          {RespTag :: comm:msg_tag(), Resp :: term()} | {error, resp_timeout}.
 send_to_leader_wait_resp(Msg, RespTag, Timeout) ->
     send_to_leader(Msg),
     receive
