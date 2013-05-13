@@ -47,32 +47,32 @@ node gains responsibility.
   %
   \bfseries $\leftarrow$ prepare\_rcv\_data
   & \emph{\color{gray}nothing to do}
-  &  \tn % TODO
+  & \emph{\color{gray}nothing to do} \tn
   \midrule
   %
   \bfseries $\rightarrow$ prepare\_send\_data
   & add DB range
-  &  \tn % TODO
+  & \emph{\color{gray}nothing to do} \tn
   \midrule
   %
   \bfseries $\leftarrow$ update\_rcv\_data
   & set MSG forward,\\change my ID
-  &  \tn % TODO
+  & \emph{\color{gray}nothing to do} \tn
   \midrule
   %
   \bfseries $\rightarrow$ prepare\_send\_delta
   & wait until pred up-to-date,\\then: remove DB range
-  &  \tn % TODO
+  & split own lease into two ranges and locally disable the lease, which is to be sent to pred \tn
   \midrule
   %
   \bfseries $\leftarrow$ finish\_delta
   & remove MSG forward
-  &  \tn % TODO
+  & \emph{\color{gray}nothing to do} \tn
   \midrule
   %
   \bfseries $\rightarrow$ finish\_delta\_ack
   & \emph{\color{gray}nothing to do}
-  &  \tn % TODO
+  & handover the lease to pred and notify pred of owner change \tn
   \bottomrule
 \end{tabular}
 }
@@ -96,32 +96,32 @@ node gains responsibility.
   %
   \bfseries $\rightarrow$ prepare\_rcv\_data
   & set MSG forward
-  &  \tn % TODO
+  & \emph{\color{gray}nothing to do} \tn
   \midrule
   %
   \bfseries $\leftarrow$ prepare\_send\_data
   & add DB range,\\change my ID
-  &  \tn % TODO
+  & \emph{\color{gray}nothing to do} \tn
   \midrule
   %
   \bfseries $\rightarrow$ update\_rcv\_data
   & \emph{\color{gray}nothing to do}
-  &  \tn % TODO
+  & \emph{\color{gray}nothing to do} \tn
   \midrule
   %
   \bfseries $\leftarrow$ prepare\_send\_delta
   & remove DB range
-  &  \tn % TODO
+  & split own lease into two ranges and locally disable the lease, which is to be sent to succ \tn
   \midrule
   %
   \bfseries $\rightarrow$ finish\_delta
   & remove MSG forward,\\until pred up-to-date:\\$\hookrightarrow$ add DB range\\then: remove DB range
-  &  \tn % TODO
+  & \emph{\color{gray}nothing to do} \tn
   \midrule
   %
   \bfseries $\leftarrow$ finish\_delta\_ack
   & \emph{\color{gray}nothing to do}
-  &  \tn % TODO
+  & handover the lease to succ and notify succ of owner change \tn
   \bottomrule
 \end{tabular}
 }
