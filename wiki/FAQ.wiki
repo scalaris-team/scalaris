@@ -94,7 +94,6 @@ Available packages are listed in the following table:
 || Debian || 6.0 (Squeeze) || stable: [http://download.opensuse.org/repositories/home:/scalaris/Debian_6.0/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Debian_6.0/] ||
 || Debian || 7.0 (Wheezy) || stable: [http://download.opensuse.org/repositories/home:/scalaris/Debian_7.0/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Debian_7.0/] ||
 || Ubuntu || 10.04 (Lucid Lynx) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_10.04/] ||
-|| Ubuntu || 11.10 (Oneiric Ocelot) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_11.10/] ||
 || Ubuntu || 12.04 (Precise Pangolin) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_12.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_12.04/] ||
 || Ubuntu || 12.10 (Quantal Quetzal) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_12.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_12.10/] ||
 || Ubuntu || 13.04 (Raring Ringtail) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_13.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_13.04/] ||
@@ -131,7 +130,7 @@ This is currently not possible because the Open Build Service does not export a 
 Please note that the Open Build Service does not create a source repository for .deb-based distributions. To add one of our repositories to your System, add a line like the following to your sources.list (mostly in `/etc/apt/`). _Adapt the URL to the distribution you use (see above)._
 
 {{{
-deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_11.10/ ./
+deb http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_13.04/ ./
 }}}
 
 Then download our package signing key and add it to your system (as root):
