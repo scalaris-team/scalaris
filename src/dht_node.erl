@@ -453,7 +453,7 @@ init(Options) ->
     Id = case config:read(leases) of
         true ->
                  msg_delay:send_local(1, self(), {l_on_cseq, renew_leases}),
-                 ?MINUS_INFINITY;
+                 l_on_cseq:id(intervals:all());
         _ ->
                  % get my ID (if set, otherwise chose a random ID):
                  case lists:keyfind({dht_node, id}, 1, Options) of

@@ -115,6 +115,8 @@ tester_type_check_l_on_cseq(_Config) ->
              {lease_takeover, 1}, %% sends messages
              {lease_split, 4}, %% sends messages
              {lease_merge, 2}, %% sends messages
+             {id, 1}, %% todo
+             {split_range, 2}, %% todo
              {unittest_lease_update, 2}, %% only for unittests
              {on, 2} %% cannot create dht_node_state
            ],
@@ -255,11 +257,11 @@ test_renew_with_concurrent_aux_change_valid_merge(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 test_split(_Config) ->
     NullF = fun (_Id, _Lease) -> ok end,
-    WaitLeftLeaseF = fun (Id, Lease) ->
-                              OldEpoch   = l_on_cseq:get_epoch(Lease),
-                              wait_for_lease_version(Id, OldEpoch+2, 0)
+    WaitRightLeaseF = fun (Id, Lease) ->
+                             OldEpoch   = l_on_cseq:get_epoch(Lease),
+                             wait_for_lease_version(Id, OldEpoch+2, 0)
                      end,
-    WaitRightLeaseF = fun (Id) ->
+    WaitLeftLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 2, 0)
                       end,
     FinalWaitF = fun wait_for_split_success_msg/0,
@@ -276,11 +278,11 @@ test_split_with_concurrent_renew(_Config) ->
                                                  l_on_cseq:get_epoch(Lease),
                                                  l_on_cseq:get_version(Lease)+1)
                   end,
-    WaitLeftLeaseF = fun (Id, Lease) ->
+    WaitRightLeaseF = fun (Id, Lease) ->
                               OldEpoch   = l_on_cseq:get_epoch(Lease),
                               wait_for_lease_version(Id, OldEpoch+2, 0)
                      end,
-    WaitRightLeaseF = fun (Id) ->
+    WaitLeftLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 2, 0)
                       end,
     FinalWaitF = fun wait_for_split_success_msg/0,
@@ -300,26 +302,28 @@ test_split_but_lease_already_exists(_Config) ->
                 end
         end,
     CreateLeaseF =
-        fun(RightId, _Lease) ->
+        fun(LeftId) ->
                 New = l_on_cseq:set_version(
                         l_on_cseq:set_epoch(
-                          l_on_cseq:unittest_create_lease(RightId),
+                          l_on_cseq:unittest_create_lease(LeftId),
                           47),
                         11),
-                DB = l_on_cseq:get_db_for_id(RightId),
-                rbrcseq:qwrite(DB, self(), RightId,
+                DB = l_on_cseq:get_db_for_id(LeftId),
+                rbrcseq:qwrite(DB, self(), LeftId,
                                ContentCheck,
                                New),
                 receive
-                    {qwrite_done, _ReqId, _Round, _} -> ok
+                    {qwrite_done, _ReqId, _Round, _} -> ok;
+                    X -> ct:pal("wrong message ~p", [X]),
+                          timer:sleep(4000)
                 end
         end,
-    WaitLeftLeaseF = fun (Id, Lease) ->
+    WaitRightLeaseF = fun (Id, Lease) ->
                              OldEpoch = l_on_cseq:get_epoch(Lease),
                              OldVersion = l_on_cseq:get_version(Lease),
                              wait_for_lease_version(Id, OldEpoch, OldVersion)
                      end,
-    WaitRightLeaseF = fun (Id) ->
+    WaitLeftLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 47, 11)
                       end,
     FinalWaitF = fun wait_for_split_fail_msg/0,
@@ -341,8 +345,8 @@ test_split_with_owner_change_in_step1(_Config) ->
                 l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
-    WaitLeftLeaseF = fun wait_for_delete/2,
-    WaitRightLeaseF = fun (Id) ->
+    WaitRightLeaseF = fun wait_for_delete/2,
+    WaitLeftLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 1, 0)
                       end,
     FinalWaitF = fun wait_for_split_fail_msg/0,
@@ -364,11 +368,11 @@ test_split_with_owner_change_in_step2(Config) ->
                 l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
-    WaitLeftLeaseF = fun (Id, Lease) ->
+    WaitRightLeaseF = fun (Id, Lease) ->
                              OldEpoch = l_on_cseq:get_epoch(Lease),
                              wait_for_lease_version(Id, OldEpoch + 1, 0)
                      end,
-    WaitRightLeaseF = fun wait_for_delete/1,
+    WaitLeftLeaseF = fun wait_for_delete/1,
     FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_3_steps(Config,
                                   NullF, NullF, ChangeOwnerF,
@@ -388,10 +392,10 @@ test_split_with_owner_change_in_step3(Config) ->
                 l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
-    WaitRightLeaseF = fun (Id) ->
+    WaitLeftLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 2, 0)
                      end,
-    WaitLeftLeaseF = fun wait_for_delete/2,
+    WaitRightLeaseF = fun wait_for_delete/2,
     FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_4_steps(Config,
                                   NullF, NullF, NullF, ChangeOwnerF,
@@ -411,10 +415,10 @@ test_split_with_aux_change_in_step1(_Config) ->
                 l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
-    WaitLeftLeaseF = fun (Id, Lease) ->
+    WaitRightLeaseF = fun (Id, Lease) ->
                              wait_for_lease_version(Id, l_on_cseq:get_epoch(Lease) + 1, 0)
                       end,
-    WaitRightLeaseF = fun (Id) ->
+    WaitLeftLeaseF = fun (Id) ->
                              wait_for_lease_version(Id, 1, 0)
                       end,
     FinalWaitF = fun wait_for_split_fail_msg/0,
@@ -503,7 +507,7 @@ test_handover_helper(_Config, ModifyF, WaitF) ->
     l_on_cseq:unittest_lease_update(Old, New),
     wait_for_lease(New),
     % now the error handling of lease_handover is going to be tested
-    l_on_cseq:lease_handover(Old, comm:this(), comm:this()),
+    l_on_cseq:lease_handover(Old, comm:this(), self()),
     WaitF(Id, Old),
     true.
 
@@ -523,10 +527,11 @@ test_split_prepare() ->
                  {get_state_response, List} ->
                      hd(List)
              end,
-    Range = l_on_cseq:get_range(L),
-    [R1, R2] = intervals:split(Range, 2),
-    LeftId = id(R1),
-    RightId = id(R2),
+    {ok, R1, R2} = l_on_cseq:split_range(l_on_cseq:get_range(L),
+                                         ?RT:get_random_node_id()),
+    %[R1, R2] = intervals:split(l_on_cseq:get_range(L), 2),
+    LeftId = l_on_cseq:id(R1),
+    RightId = l_on_cseq:id(R2),
     intercept_split_request(),                                   % install intercepts
     intercept_split_reply(split_reply_step1),                    %
     intercept_split_reply(split_reply_step2),                    %
@@ -534,7 +539,7 @@ test_split_prepare() ->
     intercept_split_reply(split_reply_step4),                    %
 
     % step1
-    l_on_cseq:lease_split(L, R1, R2, comm:this()),               % trigger step
+    l_on_cseq:lease_split(L, R1, R2, self()),               % trigger step
     ct:pal("intercepting msg"),
     StartMsg = receive                                           % intercept msg
                    M = {l_on_cseq, split, _, _, _, _} ->
@@ -550,15 +555,15 @@ test_split_helper_for_1_step(_Config,
                              WaitLeftLease, WaitRightLease, FinalWaitF) ->
     DHTNode = pid_groups:find_a(dht_node),
     {Lease, LeftId, RightId, StartMsg} = test_split_prepare(),
-    ModifyBeforeStep1(RightId, Lease),                           % modify world
+    ModifyBeforeStep1(LeftId),                           % modify world
     gen_component:bp_del(DHTNode, block_split_request),
     gen_component:bp_del(DHTNode, split_reply_step1),
     comm:send_local(DHTNode, StartMsg),                          % release msg
     % wait for result
     ct:pal("wait left"),
-    WaitLeftLease(LeftId, Lease),
+    WaitLeftLease(LeftId),
     ct:pal("wait right"),
-    WaitRightLease(RightId),
+    WaitRightLease(RightId, Lease),
     FinalWaitF().
 
 test_split_helper_for_2_steps(_Config,
@@ -568,17 +573,17 @@ test_split_helper_for_2_steps(_Config,
     DHTNode = pid_groups:find_a(dht_node),
     {Lease, LeftId, RightId, StartMsg} = test_split_prepare(),
     ct:pal("0"),
-    ModifyBeforeStep1(RightId, Lease),                           % modify world
+    ModifyBeforeStep1(LeftId, Lease),                           % modify world
     gen_component:bp_del(DHTNode, block_split_request),
     comm:send_local(DHTNode, StartMsg),                          % release msg
     % step 2
-    split_helper_do_step(split_reply_step1, ModifyBeforeStep2, LeftId),
+    split_helper_do_step(split_reply_step1, ModifyBeforeStep2, RightId),
     wait_for_split_message(split_reply_step2),
     % wait for result
     ct:pal("wait left"),
-    WaitLeftLease(LeftId, Lease),
+    WaitLeftLease(LeftId),
     ct:pal("wait right"),
-    WaitRightLease(RightId),
+    WaitRightLease(RightId, Lease),
     FinalWaitF().
 
 test_split_helper_for_3_steps(_Config,
@@ -598,9 +603,9 @@ test_split_helper_for_3_steps(_Config,
     wait_for_split_message(split_reply_step3),
     % wait for result
     ct:pal("wait left"),
-    WaitLeftLease(LeftId, Lease),
+    WaitLeftLease(LeftId),
     ct:pal("wait right"),
-    WaitRightLease(RightId),
+    WaitRightLease(RightId, Lease),
     FinalWaitF().
 
 test_split_helper_for_4_steps(_Config,
@@ -623,9 +628,9 @@ test_split_helper_for_4_steps(_Config,
     wait_for_split_message(split_reply_step4),
     % wait for result
     ct:pal("wait left"),
-    WaitLeftLease(LeftId, Lease),
+    WaitLeftLease(LeftId),
     ct:pal("wait right"),
-    WaitRightLease(RightId),
+    WaitRightLease(RightId, Lease),
     FinalWaitF().
 
 split_helper_do_step(StepTag, ModifyBeforeStep, Id) ->
@@ -853,15 +858,4 @@ block_trigger(Pid) ->
                 _ ->
                     false
             end
-    end.
-
-- spec id(intervals:interval()) -> non_neg_integer().
-id([]) -> 0;
-id([[]]) -> 0;
-id(X) ->
-    case lists:member(all, X) of
-        true -> 0;
-        _ ->
-            {_, Id, _, _} = intervals:get_bounds(X),
-            Id
     end.

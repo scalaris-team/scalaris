@@ -51,9 +51,11 @@
          get_id/1,
          get_owner/1, set_owner/2,
          get_aux/1, set_aux/2,
-         get_range/1, set_range/2]).
+         get_range/1, set_range/2,
+         split_range/2]).
 
 -export([add_first_lease_to_db/2]).
+-export([id/1]).
 
 -ifdef(with_export_type_support).
 -export_type([lease_list/0]).
@@ -143,7 +145,7 @@ lease_renew(Lease) ->
                     {l_on_cseq, renew, Lease}),
     ok.
 
--spec lease_handover(lease_t(), comm:mypid(), comm:mypid()) -> ok.
+-spec lease_handover(lease_t(), comm:mypid(), comm:erl_local_pid()) -> ok.
 lease_handover(Lease, NewOwner, ReplyTo) ->
     % @todo precondition: i am owner of Lease
     comm:send_local(pid_groups:get_my(dht_node),
@@ -158,7 +160,7 @@ lease_takeover(Lease) ->
     ok.
 
 -spec lease_split(lease_t(), intervals:interval(),
-                  intervals:interval(), comm:mypid()) -> ok.
+                  intervals:interval(), comm:erl_local_pid()) -> ok.
 lease_split(Lease, R1, R2, ReplyTo) ->
     % @todo precondition: i am owner of Lease and id(R2) == id(Lease)
     comm:send_local(pid_groups:get_my(dht_node),
@@ -300,7 +302,7 @@ on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value}, ReplyTo,
     _NewOwner, _New}, State) ->
     % @todo if success update lease in State
     log:pal("successful handover~n", []),
-    comm:send(ReplyTo, {handover, success, Value}),
+    comm:send_local(ReplyTo, {handover, success, Value}),
     update_lease_in_dht_node_state(Value, State);
 
 on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
@@ -309,7 +311,7 @@ on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
     log:pal("handover denied: ~p ~p ~p~n", [Reason, Value, New]),
     case Reason of
         lease_does_not_exist ->
-            comm:send(ReplyTo, {handover, failed, Value}),
+            comm:send_local(ReplyTo, {handover, failed, Value}),
             case Value of %@todo is this necessary?
                 prbr_bottom ->
                     State;
@@ -317,13 +319,13 @@ on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
                     remove_lease_from_dht_node_state(Value, State)
             end;
         unexpected_owner   ->
-            comm:send(ReplyTo, {handover, failed, Value}),
+            comm:send_local(ReplyTo, {handover, failed, Value}),
             remove_lease_from_dht_node_state(Value, State);
         unexpected_aux     ->
             %log:pal("sending {handover, failed, Value}"),
-            comm:send(ReplyTo, {handover, failed, Value}), State;
+            comm:send_local(ReplyTo, {handover, failed, Value}), State;
         unexpected_range   ->
-            comm:send(ReplyTo, {handover, failed, Value}), State;
+            comm:send_local(ReplyTo, {handover, failed, Value}), State;
         unexpected_timeout -> lease_handover(Value, NewOwner, ReplyTo), State;
         unexpected_epoch   -> lease_handover(Value, NewOwner, ReplyTo), State;
         unexpected_version -> lease_handover(Value, NewOwner, ReplyTo), State;
@@ -467,12 +469,12 @@ on({l_on_cseq, merge_reply_step4, _L1, {qwrite_deny, _ReqId, _Round, _L2, _Reaso
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split, Lease, R1, R2, ReplyTo}, State) ->
-    Id = id(R2),
+    Id = id(R1),
     log:pal("split first step: creating second lease ~p~n", [Id]),
-    New = #lease{id      = id(R2),
+    New = #lease{id      = id(R1),
                  epoch   = 1,
                  owner   = comm:this(),
-                 range   = R2,
+                 range   = R1,
                  aux     = {invalid, split, R1, R2},
                  version = 0,
                  timeout = new_timeout()},
@@ -489,7 +491,7 @@ on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, ReplyTo,
     log:pal("split first step failed: ~p~n", [Reason]),
     case Reason of
         lease_already_exists ->
-            comm:send(ReplyTo, {split, fail, Lease}),
+            comm:send_local(ReplyTo, {split, fail, Lease}),
             remove_lease_from_dht_node_state(Lease, State)
     end;
 
@@ -503,7 +505,7 @@ on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch}, R1, R2, Re
     log:pal("split second step: updating L1~n", []),
     New = Lease#lease{
             epoch   = OldEpoch + 1,
-            range   = R1,
+            range   = R2,
             aux     = {valid, split, R1, R2},
             version = 0,
             timeout = new_timeout()},
@@ -519,11 +521,11 @@ on({l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, Lease, {content_check_failed, Reason}}}, State) ->
     log:pal("split second step failed: ~p~n", [Reason]),
     case Reason of
-        lease_does_not_exist -> comm:send(ReplyTo, {split, fail, Lease}), State; %@todo
-        unexpected_owner     -> comm:send(ReplyTo, {split, fail, Lease}),
+        lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, Lease}), State; %@todo
+        unexpected_owner     -> comm:send_local(ReplyTo, {split, fail, Lease}),
                                 remove_lease_from_dht_node_state(Lease, State); %@todo
-        unexpected_range     -> comm:send(ReplyTo, {split, fail, Lease}), State; %@todo
-        unexpected_aux       -> comm:send(ReplyTo, {split, fail, Lease}), State; %@todo
+        unexpected_range     -> comm:send_local(ReplyTo, {split, fail, Lease}), State; %@todo
+        unexpected_aux       -> comm:send_local(ReplyTo, {split, fail, Lease}), State; %@todo
         unexpected_timeout ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step1, Lease, R1, R2, ReplyTo,
@@ -569,11 +571,11 @@ on({l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
     % @todo
     log:pal("split third step failed: ~p~n", [Reason]),
     case Reason of
-        lease_does_not_exist -> comm:send(ReplyTo, {split, fail, L2}), State; %@todo
-        unexpected_owner     -> comm:send(ReplyTo, {split, fail, L2}),
+        lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, L2}), State; %@todo
+        unexpected_owner     -> comm:send_local(ReplyTo, {split, fail, L2}),
                                 remove_lease_from_dht_node_state(L2, State); %@todo
-        unexpected_range     -> comm:send(ReplyTo, {split, fail, L2}), State; %@todo
-        unexpected_aux       -> comm:send(ReplyTo, {split, fail, L2}), State; %@todo
+        unexpected_range     -> comm:send_local(ReplyTo, {split, fail, L2}), State; %@todo
+        unexpected_aux       -> comm:send_local(ReplyTo, {split, fail, L2}), State; %@todo
         unexpected_timeout ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
@@ -618,7 +620,7 @@ on({l_on_cseq, split_reply_step4, _L2, _R1, _R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
     log:pal("successful split~n", []),
     log:pal("successful split ~p~n", [ReplyTo]),
-    comm:send(ReplyTo, {split, success, L1}),
+    comm:send_local(ReplyTo, {split, success, L1}),
     update_lease_in_dht_node_state(L1, State);
 
 on({l_on_cseq, split_reply_step4, L2, R1, R2, ReplyTo,
@@ -626,11 +628,11 @@ on({l_on_cseq, split_reply_step4, L2, R1, R2, ReplyTo,
     % @todo
     log:pal("split fourth step: ~p~n", [Reason]),
     case Reason of
-        lease_does_not_exist -> comm:send(ReplyTo, {split, fail, L1}), State;
-        unexpected_owner     -> comm:send(ReplyTo, {split, fail, L1}),
+        lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, L1}), State;
+        unexpected_owner     -> comm:send_local(ReplyTo, {split, fail, L1}),
                                 remove_lease_from_dht_node_state(L1, State);
-        unexpected_range     -> comm:send(ReplyTo, {split, fail, L1}), State;
-        unexpected_aux       -> comm:send(ReplyTo, {split, fail, L1}), State;
+        unexpected_range     -> comm:send_local(ReplyTo, {split, fail, L1}), State;
+        unexpected_aux       -> comm:send_local(ReplyTo, {split, fail, L1}), State;
         unexpected_timeout ->
             % retry
             gen_component:post_op(State, {l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
@@ -656,7 +658,7 @@ on({l_on_cseq, split_reply_step4, L2, R1, R2, ReplyTo,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, renew_leases}, State) ->
     LeaseList = dht_node_state:get(State, lease_list),
-    io:format("renewing all local leases: ~p~n", [length(LeaseList)]),
+    %io:format("renewing all local leases: ~p~n", [length(LeaseList)]),
     _ = [lease_renew(L) || L <- LeaseList],
     msg_delay:send_local(delta() div 2, self(), {l_on_cseq, renew_leases}),
     State.
@@ -1089,14 +1091,21 @@ remove_lease_from_dht_node_state(Lease, State) ->
     dht_node_state:set_lease_list(State, NewList).
 
 -spec id(intervals:interval()) -> ?RT:key().
-id([]) -> ?MINUS_INFINITY;
-id([[]]) -> ?MINUS_INFINITY;
+id([all]) -> ?MINUS_INFINITY;
 id(X) ->
-    case lists:member(all, X) of
-        true -> ?MINUS_INFINITY;
-        _ ->
-            {_, Id, _, _} = intervals:get_bounds(X),
-            Id
+    {_, _, Id, _} = intervals:get_bounds(X),
+    Id.
+
+-spec split_range(intervals:interval(), ?RT:key()) -> {ok, intervals:interval(), intervals:interval()} | failed.
+split_range(Range, Key) ->
+    case intervals:is_continuous(Range) of
+       false ->
+            failed;
+        true ->
+            {_, Low, _, _} = intervals:get_bounds(Range),
+            R1 = node:mk_interval_between_ids(Low, Key),
+            R2 = node:mk_interval_between_ids(Key, id(Range)),
+            {ok, R1, R2}
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
