@@ -62,7 +62,7 @@ node gains responsibility.
   %
   \bfseries $\rightarrow$ prepare\_send\_delta
   & wait until pred up-to-date,\\then: remove DB range
-  & split own lease into two ranges and locally disable the lease, which is to be sent to pred \tn
+  & split own lease into two ranges, locally disable lease sent to pred \tn
   \midrule
   %
   \bfseries $\leftarrow$ finish\_delta
@@ -72,7 +72,7 @@ node gains responsibility.
   %
   \bfseries $\rightarrow$ finish\_delta\_ack
   & \emph{\color{gray}nothing to do}
-  & handover the lease to pred and notify pred of owner change \tn
+  & hand over the lease to pred, notify pred of owner change \tn
   \bottomrule
 \end{tabular}
 }
@@ -111,7 +111,7 @@ node gains responsibility.
   %
   \bfseries $\leftarrow$ prepare\_send\_delta
   & remove DB range
-  & split own lease into two ranges and locally disable the lease, which is to be sent to succ \tn
+  & split own lease into two ranges, locally disable lease sent to succ \tn
   \midrule
   %
   \bfseries $\rightarrow$ finish\_delta
@@ -121,7 +121,7 @@ node gains responsibility.
   %
   \bfseries $\leftarrow$ finish\_delta\_ack
   & \emph{\color{gray}nothing to do}
-  & handover the lease to succ and notify succ of owner change \tn
+  & hand over the lease to succ, notify succ of owner change \tn
   \bottomrule
 \end{tabular}
 }
