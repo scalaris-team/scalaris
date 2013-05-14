@@ -1424,10 +1424,10 @@ make_slide_leave(State, SourcePid) ->
                 OtherNode, node:id(PredNode), leave,
                 unknown, SourcePid, nomsg, {none}).
 
--spec get_slide_mod() -> slide_chord. % | slide_leases.
+-spec get_slide_mod() -> slide_chord | slide_leases.
 get_slide_mod() ->
     case config:read(leases) of
-        %true -> slide_leases;
+        true -> slide_leases;
         failed -> slide_chord;
         false -> slide_chord
     end.
