@@ -170,7 +170,8 @@ finish_delta_ack1(State, OldSlideOp, NextOpMsg, ReplyPid) ->
     % handover lease to succ
     % notify succ
     % @todo
-    send_continue_msg(ReplyPid),
+    ?TRACE_SEND(ReplyPid, NextOpMsg),
+    comm:send_local(ReplyPid, NextOpMsg),
     io:format("finish_delta_ack1~n", []),
     {ok, State, OldSlideOp}.
 
