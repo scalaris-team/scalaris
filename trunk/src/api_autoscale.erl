@@ -84,6 +84,7 @@ deactivate_alarms () ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Autoscale server API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec write_plot_data() -> ok | {error, mgmt_server_false | autoscale_server_false}.
 write_plot_data() ->
     ?IIF(config:read(autoscale_server),
         case MgmtServer = config:read(mgmt_server) of
@@ -94,6 +95,7 @@ write_plot_data() ->
         end,
         {error, autoscale_server_false}).
 
+-spec reset_plot_data() -> ok | {error, mgmt_server_false | autoscale_server_false}.
 reset_plot_data() ->
     ?IIF(config:read(autoscale_server),
         case MgmtServer = config:read(mgmt_server) of
@@ -108,7 +110,7 @@ reset_plot_data() ->
 %% Misc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Send to autoscale leader.
--spec send_to_leader(Msg :: comm:msg()) -> ok.
+-spec send_to_leader(Msg :: comm:message()) -> ok.
 send_to_leader(Msg) ->
     api_dht_raw:unreliable_lookup(?RT:hash_key("0"),
                                   {?send_to_group_member, autoscale, Msg}).
