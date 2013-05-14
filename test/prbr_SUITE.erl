@@ -57,7 +57,8 @@ init_per_testcase(TestCase, Config) ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            Size = randoms:rand_uniform(2, 14),
+            Size = 1, %% larger rings not supported by leases yet,
+            %% Size = randoms:rand_uniform(2, 14),
             unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir},
                                                        {leases, true}]}]),
             %% necessary for the consistency check:
