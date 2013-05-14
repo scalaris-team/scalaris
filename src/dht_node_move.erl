@@ -291,8 +291,8 @@ process_move_msg({move, continue, MoveFullId, Operation, EmbeddedMsg} = _Msg, My
                                 prepare_send_delta2(State, SlideOp, EmbeddedMsg);
                             finish_delta2 ->
                                 finish_delta2(State, SlideOp, EmbeddedMsg);
-                            finish_delta_ack2 ->
-                                finish_delta_ack2(State, SlideOp, EmbeddedMsg)
+                            {finish_delta_ack2, NextOpMsg} ->
+                                finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg)
                         end
                 end,
     safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_continue], continue).
@@ -962,10 +962,10 @@ continue_with_next_op(State, OldSlideOp) ->
         -> dht_node_state:state().
 finish_delta_ack1(State, OldSlideOp, NextOpMsg) ->
     MoveFullId = slide_op:get_id(OldSlideOp),
-    ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, finish_delta_ack2, '_'}),
+    ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, {finish_delta_ack2, NextOpMsg}, '_'}),
     SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
     SlideMod = get_slide_mod(),
-    case SlideMod:finish_delta_ack1(State, SlideOp1, NextOpMsg, ReplyPid) of
+    case SlideMod:finish_delta_ack1(State, SlideOp1, ReplyPid) of
         {ok, State1, SlideOp2} ->
             PredOrSucc = slide_op:get_predORsucc(SlideOp2),
             dht_node_state:set_slide(State1, PredOrSucc, SlideOp2);
@@ -974,10 +974,11 @@ finish_delta_ack1(State, OldSlideOp, NextOpMsg) ->
     end.
 
 -spec finish_delta_ack2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-                        NextOp::next_op_msg()) -> dht_node_state:state().
-finish_delta_ack2(State, SlideOp, NextOpMsg) ->
+                        NextOp::next_op_msg(), EmbeddedMsg::comm:message())
+        -> dht_node_state:state().
+finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg) ->
     SlideMod = get_slide_mod(),
-    case SlideMod:finish_delta_ack2(State, SlideOp, NextOpMsg) of
+    case SlideMod:finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg) of
         {ok, State1, SlideOp1, NextOpMsg1} ->
             NextOpMsg2 =
                 case slide_op:is_leave(SlideOp1) andalso not slide_op:is_jump(SlideOp1) of
