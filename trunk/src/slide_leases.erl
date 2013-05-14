@@ -32,7 +32,7 @@
          update_rcv_data1/3, update_rcv_data2/3,
          prepare_send_delta1/3, prepare_send_delta2/3,
          finish_delta1/3, finish_delta2/3,
-         finish_delta_ack1/4, finish_delta_ack2/3]).
+         finish_delta_ack1/3, finish_delta_ack2/4]).
 
 -spec prepare_join_send(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
@@ -163,24 +163,23 @@ finish_delta2(State, SlideOp, {continue}) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec finish_delta_ack1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-                        NextOpMsg::dht_node_move:next_op_msg(),
                         ReplyPid::comm:erl_local_pid())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
-finish_delta_ack1(State, OldSlideOp, NextOpMsg, ReplyPid) ->
+finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
     % handover lease to succ
     % notify succ
     % @todo
-    ?TRACE_SEND(ReplyPid, NextOpMsg),
-    comm:send_local(ReplyPid, NextOpMsg),
+    send_continue_msg(ReplyPid),
     io:format("finish_delta_ack1~n", []),
     {ok, State, OldSlideOp}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec finish_delta_ack2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(), NextOpMsg)
+-spec finish_delta_ack2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                        NextOpMsg, EmbeddedMsg::{continue})
         -> {ok, dht_node_state:state(), slide_op:slide_op(), NextOpMsg}
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
-finish_delta_ack2(State, SlideOp, NextOpMsg) ->
+finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
     % do nothing
     io:format("finish_delta_ack2~n", []),
     {ok, State, SlideOp, NextOpMsg}.

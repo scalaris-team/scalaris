@@ -75,11 +75,12 @@
            {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
 -callback finish_delta_ack1(
             State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-            NextOpMsg::dht_node_move:next_op_msg(), ReplyPid::comm:erl_local_pid())
+            ReplyPid::comm:erl_local_pid())
         -> {ok, dht_node_state:state(), slide_op:slide_op()} |
            {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
 -callback finish_delta_ack2(
-            State::dht_node_state:state(), SlideOp::slide_op:slide_op(), NextOpMsg)
+            State::dht_node_state:state(), SlideOp::slide_op:slide_op(), NextOpMsg,
+            EmbeddedMsg::comm:message())
         -> {ok, dht_node_state:state(), slide_op:slide_op(), NextOpMsg} |
            {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
@@ -97,8 +98,8 @@ behaviour_info(callbacks) ->
      {prepare_send_delta2, 3},
      {finish_delta1, 3},
      {finish_delta2, 3},
-     {finish_delta_ack1, 4},
-     {finish_delta_ack2, 3}
+     {finish_delta_ack1, 3},
+     {finish_delta_ack2, 4}
     ];
 behaviour_info(_Other) ->
     undefined.
