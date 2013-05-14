@@ -117,7 +117,7 @@ send_to_leader(Msg) ->
 -spec send_to_leader_wait_resp(Msg :: comm:message(),
                                RespTag :: comm:msg_tag(),
                                Timeout :: pos_integer()) ->
-          {RespTag :: comm:msg_tag(), Resp :: term()} | {error, resp_timeout}.
+          Resp :: term() | {error, resp_timeout}.
 send_to_leader_wait_resp(Msg, RespTag, Timeout) ->
     send_to_leader(Msg),
     receive
