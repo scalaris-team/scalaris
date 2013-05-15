@@ -147,13 +147,17 @@ update_entry_(State, Entry) ->
 %% @doc Removes all values with the given key from the DB.
 -spec delete_entry_at_key_(DB::db_t(), ?RT:key()) -> NewDB::db_t().
 delete_entry_at_key_(State, Key) ->
-    delete_entry_at_key_(State, Key, erlang:term_to_binary(Key, [{minor_version, 1}])).
+    delete_entry_at_key_(State, Key, delete).
 
-delete_entry_at_key_(State = {{DB, _FileName}, _Subscr, {SnapTable,LiveLC,SnapLC}}, Key, Key_) ->
+%% @doc Removes all values with the given key from the DB with specified reason.
+-spec delete_entry_at_key_(DB::db_t(), ?RT:key(), delete | split) -> NewDB::db_t().
+delete_entry_at_key_(State = {{DB, _FileName}, _Subscr,
+                              {SnapTable,LiveLC,SnapLC}}, Key, Reason) ->
     {_, OldEntry} = get_entry2_(State,Key),
     NewLiveLC = db_entry:update_lockcount(OldEntry,db_entry:new(Key),LiveLC),
-    toke_drv:delete(DB, Key_),
-    call_subscribers({{DB, _FileName}, _Subscr, {SnapTable,NewLiveLC,SnapLC}}, {delete, Key}).
+    toke_drv:delete(DB, erlang:term_to_binary(Key, [{minor_version, 1}])),
+    call_subscribers({{DB, _FileName}, _Subscr, {SnapTable,NewLiveLC,SnapLC}},
+                     {Reason, Key}).
 
 %% @doc Returns the number of stored keys.
 -spec get_load_(DB::db_t()) -> Load::integer().
@@ -181,16 +185,12 @@ get_load_(State = {{DB, _FileName}, _Subscr, _SnapState}, Interval) ->
 
 %% @doc Adds all db_entry objects in the Data list.
 -spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
-add_data_(State = {{DB, _FileName}, _Subscr, _SnapState}, Data) ->
+add_data_(State, Data) ->
     % -> do not use set_entry (no further checks for changed keys necessary)
-    _ = lists:foldl(
-          fun(DBEntry, _) ->
-              ok = toke_drv:insert(DB,
-                                   erlang:term_to_binary(db_entry:get_key(DBEntry), [{minor_version, 1}]),
-                                   erlang:term_to_binary(DBEntry, [{minor_version, 1}])),
-              call_subscribers(State, {write, DBEntry})
-          end, ok, Data),
-    State.
+    lists:foldl(
+          fun(DBEntry, StateAcc) ->
+                    set_entry_(StateAcc, DBEntry)
+          end, State, Data).
 
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
@@ -209,18 +209,16 @@ split_data_(State = {{DB, _FileName}, _Subscr, _SnapState}, MyNewInterval) ->
         end,
     HisList = toke_drv:fold(F, [], DB),
     % delete empty entries from HisList and remove all entries in HisList from the DB
-    HisListFilt =
-        lists:foldl(
-          fun(DBEntry, L) ->
-                  Key = db_entry:get_key(DBEntry),
-                  toke_drv:delete(DB, erlang:term_to_binary(Key, [{minor_version, 1}])),
-                  _ = call_subscribers(State, {split, Key}),
-                  case db_entry:is_empty(DBEntry) of
-                      false -> [DBEntry | L];
-                      _     -> L
-                  end
-          end, [], HisList),
-    {State, HisListFilt}.
+    lists:foldl(fun(DBEntry, {StateAcc, HL}) -> 
+                        case db_entry:is_empty(DBEntry) of 
+                            false -> 
+                                Key = db_entry:get_key(DBEntry),
+                                {delete_entry_at_key_(StateAcc, Key, split),
+                                 [DBEntry | HL]};
+                            _ -> {StateAcc, HL} 
+                        end 
+                end, 
+                {State, []}, HisList).
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
@@ -330,20 +328,18 @@ get_chunk_helper_filter(Data, StartInt, GetKeyFromDataFun, ChunkSize) ->
         -> NewDB::db_t().
 delete_entries_(State = {{DB, _FileName}, _Subscr, _SnapState}, FilterFun) when is_function(FilterFun) ->
     % first collect all toke keys to delete (can not delete while doing fold!)
-    F = fun(KeyToke, DBEntry_, ToDelete) ->
+    F = fun(_KeyToke, DBEntry_, ToDelete) ->
                 DBEntry = erlang:binary_to_term(DBEntry_),
                 case FilterFun(DBEntry) of
                     false -> ToDelete;
-                    _     -> [{KeyToke, db_entry:get_key(DBEntry)} | ToDelete]
+                    _     -> [db_entry:get_key(DBEntry) | ToDelete]
                 end
         end,
     KeysToDelete = toke_drv:fold(F, [], DB),
     % delete all entries with these keys
-    _ = lists:foldl(fun({KeyToke, Key}, _) ->
-                        toke_drv:delete(DB, KeyToke),
-                        call_subscribers(State, {delete, Key})
-                    end, ok, KeysToDelete),
-    State;
+    lists:foldl(fun(Key, StateAcc) ->
+                    delete_entry_at_key_(StateAcc, Key)
+                    end, State, KeysToDelete);
 delete_entries_(State, Interval) ->
     {Elements, RestInterval} = intervals:get_elements(Interval),
     case intervals:is_empty(RestInterval) of

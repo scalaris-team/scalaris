@@ -97,13 +97,18 @@ set_entry_(State = {DB, _Subscr, {_SnapTable, LiveLC, _SnapLC}}, Entry) ->
 update_entry_(State, Entry) ->
     set_entry_(State, Entry).
 
-%% @doc Removes all values with the given key from the DB.
+%% @doc Removes all values with the given key from the DB with reason delete.
 -spec delete_entry_at_key_(DB::db_t(), ?RT:key()) -> NewDB::db_t().
-delete_entry_at_key_(State = {DB, _Subscr, {_SnapTable, LiveLC, _SnapLC}}, Key) ->
+delete_entry_at_key_(State, Key) ->
+    delete_entry_at_key_(State, Key, delete).
+
+%% @doc Removes all values with the given key from the DB with specified reason.
+-spec delete_entry_at_key_(DB::db_t(), ?RT:key(), delete | split) -> NewDB::db_t().
+delete_entry_at_key_(State = {DB, _Subscr, {_SnapTable, LiveLC, _SnapLC}}, Key, Reason) ->
     {_, OldEntry} = get_entry2_(State,Key),
     NewLiveLC = db_entry:update_lockcount(OldEntry,db_entry:new(Key),LiveLC),
     ets:delete(DB, Key),
-    call_subscribers({DB,_Subscr,{_SnapTable,NewLiveLC,_SnapLC}}, {delete, Key}).
+    call_subscribers({DB,_Subscr,{_SnapTable,NewLiveLC,_SnapLC}}, {Reason, Key}).
 
 %% @doc Returns the number of stored keys.
 -spec get_load_(DB::db_t()) -> Load::integer().
@@ -130,12 +135,10 @@ get_load_(State = {DB, _Subscr, _SnapState}, Interval) ->
 
 %% @doc Adds all db_entry objects in the Data list.
 -spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
-add_data_(State = {DB, _Subscr, _SnapState}, Data) ->
-    ets:insert(DB, Data),
-    _ = lists:foldl(fun(Entry, _) ->
-                        call_subscribers(State, {write, Entry})
-                    end, ok, Data),
-    State.
+add_data_(State, Data) ->
+    lists:foldl(fun(Entry, StateAcc) ->
+                        set_entry_(StateAcc, Entry)
+                    end, State, Data).
 
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
@@ -144,20 +147,18 @@ add_data_(State = {DB, _Subscr, _SnapState}, Data) ->
 -spec split_data_(DB::db_t(), MyNewInterval::intervals:interval()) ->
          {NewDB::db_t(), db_as_list()}.
 split_data_(State = {DB, _Subscr, _SnapState}, MyNewInterval) ->
-    F = fun (DBEntry, HisList) ->
+    F = fun (DBEntry, {StateAcc, HisList}) ->
                 Key = db_entry:get_key(DBEntry),
                 case intervals:in(Key, MyNewInterval) of
-                    true -> HisList;
-                    _    -> ets:delete(DB, Key),
-                            _ = call_subscribers(State, {split, Key}),
-                            case db_entry:is_empty(DBEntry) of
+                    true -> {StateAcc, HisList};
+                    _    -> NewHisList = case db_entry:is_empty(DBEntry) of
                                 false -> [DBEntry | HisList];
                                 _     -> HisList
-                            end
+                            end,
+                            {delete_entry_at_key_(StateAcc, Key, split), NewHisList}
                 end
         end,
-    HisList = ets:foldl(F, [], DB),
-    {State, HisList}.
+    ets:foldl(F, {State, []}, DB).
 
 %% @doc Gets all custom objects (created by ValueFun(DBEntry)) from the DB for
 %%      which FilterFun returns true.
