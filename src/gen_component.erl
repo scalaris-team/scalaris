@@ -610,6 +610,11 @@ on_unknown_event(UnknownMessage, UState, GCState) ->
              gc_hand(GCState),
              self(), catch pid_groups:group_and_name_of(self()),
              {UState, GCState}]),
+    case util:is_unittest() of
+        true ->
+            ct:abort_current_testcase(unknown_message);
+        _ -> ok
+    end,
     ok.
 
 on_exception(Msg, Level, Reason, Stacktrace, UState, GCState) ->
@@ -630,6 +635,11 @@ on_exception(Msg, Level, Reason, Stacktrace, UState, GCState) ->
              erlang:get(test_server_loc),
              {UState, GCState},
              Stacktrace]),
+    case util:is_unittest() of
+        true ->
+            ct:abort_current_testcase(exception_throw);
+        _ -> ok
+    end,
     ok.
 
 -spec on_post_op(comm:message(), user_state(), gc_state())
