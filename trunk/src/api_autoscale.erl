@@ -22,7 +22,7 @@
 
 -include("scalaris.hrl").
 %% Polling API
--export([pull_scale_req/0, unlock_scale_req/0]).
+-export([pull_scale_req/0, lock_scale_req/0, unlock_scale_req/0]).
 %% Alarm state API
 -export([toggle_alarm/1, activate_alarms/0, deactivate_alarms/0]).
 %% Autoscale server API
@@ -35,20 +35,21 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Pull current scale request from autoscale leader. If the request is
-%%      successful, further requests are blocked until a unlock_scale_req/0 call
-%%      has been made. Autoscale defines a timeout, after which the lock will be
-%%      automatically freed, i.e. the caller has $timeout seconds to satisfy
-%%      the request and notify autoscale by unlock_scale_req/0.
--spec pull_scale_req() -> {ok, Req :: integer()} |
-                          {error, locked} |
-                          {error, resp_timeout}.
+%%      not 0, further requests should be locked with lock_scale_req/0 until a
+%%      unlock_scale_req/0 call has been made. Autoscale defines a timeout,
+%%      after which the lock will be automatically freed, i.e. the caller has
+%%      $timeout seconds to satisfy the request and notify autoscale by
+%%      unlock_scale_req/0.
+-spec pull_scale_req() -> {ok, Req :: integer()} | {error, resp_timeout}.
 pull_scale_req() ->
     send_to_leader_wait_resp(
       {pull_scale_req, comm:this()}, scale_req_resp, 5).
 
--spec unlock_scale_req() -> ok |
-                            {error, not_locked} |
-                            {error, resp_timeout}.
+-spec lock_scale_req() -> ok | {error, locked} | {error, resp_timeout}.
+lock_scale_req() ->
+    send_to_leader_wait_resp({lock_scale_req, comm:this()}, scale_req_resp, 5).
+
+-spec unlock_scale_req() -> ok | {error, not_locked} | {error, resp_timeout}.
 unlock_scale_req() ->
     send_to_leader_wait_resp(
       {unlock_scale_req, comm:this()}, scale_req_resp, 5).

@@ -29,6 +29,7 @@
 handler(nop, [_Value]) -> "ok";
 
 handler(pull_scale_req  , []) -> pull_scale_req();
+handler(lock_scale_req, [])   -> lock_scale_req();
 handler(unlock_scale_req, []) -> unlock_scale_req();
 
 handler(AnyOp, AnyParams) ->
@@ -43,6 +44,15 @@ pull_scale_req() ->
                   true  -> {value, Value};
                   false -> {reason, atom_to_list(Value)}
               end]}.
+
+-spec lock_scale_req() -> {struct, [{Key::atom(), Value::term()}]}.
+lock_scale_req() ->
+    case api_autoscale:lock_scale_req() of
+        ok ->
+            {struct, [{status, "ok"}]};
+        {error, Reason} ->           
+            {struct, [{status, "error"}, {reason, atom_to_list(Reason)}]}
+    end.
 
 -spec unlock_scale_req() -> {struct, [{Key::atom(), Value::term()}]}.
 unlock_scale_req() ->
