@@ -91,22 +91,12 @@ update_rcv_data2(State, SlideOp, {continue}) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
     % start to split own range
-    % @todo
     io:format("prepare_send_delta1~n", []),
-    LeaseList = dht_node_state:get(State, lease_list),
-    Interval = slide_op:get_interval(OldSlideOp),
-    Pred = fun (L) ->
-                   intervals:is_subset(Interval, l_on_cseq:get_range(L))
-                       andalso intervals:is_continuous(intervals:intersection(Interval, l_on_cseq:get_range(L)))
-           end,
-    io:format("lease list: ~p~n", [LeaseList]),
-    io:format("interval  : ~p~n", [Interval]),
-    case lists:filter(Pred, LeaseList) of
-        [Lease] ->
+    case find_lease(State, OldSlideOp) of
+        {ok, Lease} ->
             Id = l_on_cseq:id(l_on_cseq:get_range(Lease)),
-            io:format("found lease ~p~n", [Lease]),
-            io:format("slide interval ~p~n", [Interval]),
             % check slide direction
+            Interval = slide_op:get_interval(OldSlideOp),
             {R1, R2} = case intervals:in(Id, Interval) of
                            true ->
                                % ->
@@ -119,23 +109,26 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
             io:format("R2 ~p ~n", [R2]),
             l_on_cseq:lease_split(Lease, R1, R2, ReplyPid),
             {ok, State, OldSlideOp};
-        _ ->
+        error ->
+            % @todo
             error
     end.
 
 -spec prepare_send_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                           EmbeddedMsg::any())
-        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+        -> {ok, dht_node_state:state(), slide_op:slide_op()} | error.
 prepare_send_delta2(State, SlideOp, Msg) ->
     % check that split has been done
     case Msg of
-        {split, success, Lease} ->
+        {split, success, _Lease} ->
             % disable new lease
-            State1 = locally_disable_lease(State, SlideOp),
-            % @todo
             io:format("prepare_send_delta2 ~p~n", [Msg]),
+            io:format("prepare_send_delta2 ~p~n", [SlideOp]),
+            {ok, NewLease} = find_lease(State, SlideOp),
+            State1 = locally_disable_lease(State, NewLease),
             {ok, State1, SlideOp};
         _ ->
+            % @todo
             error
     end.
 
@@ -167,11 +160,18 @@ finish_delta2(State, SlideOp, {continue}) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
     % handover lease to succ
-    % notify succ
-    % @todo
-    send_continue_msg(ReplyPid),
     io:format("finish_delta_ack1~n", []),
-    {ok, State, OldSlideOp}.
+    case find_lease(State, OldSlideOp) of
+        {ok, Lease} ->
+            Node = slide_op:get_node(OldSlideOp),
+            NewOwner = node:pidX(Node),
+            l_on_cseq:lease_handover(Lease, NewOwner, ReplyPid),
+            {ok, State, OldSlideOp};
+        _ ->
+            io:format("finish_delta_ack1: error~n", []),
+            % @todo
+            error
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -179,10 +179,20 @@ finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
                         NextOpMsg, EmbeddedMsg::{continue})
         -> {ok, dht_node_state:state(), slide_op:slide_op(), NextOpMsg}
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
-finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
-    % do nothing
-    io:format("finish_delta_ack2~n", []),
-    {ok, State, SlideOp, NextOpMsg}.
+finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
+    % notify neighbor on successful handover
+    io:format("finish_delta_ack2 ~p~n", [Msg]),
+    case Msg of
+        {handover, success, Lease} ->
+            % notify succ
+            Owner = l_on_cseq:get_owner(Lease),
+            l_on_cseq:lease_send_lease_to_node(Owner, Lease),
+            State1 = l_on_cseq:remove_lease_from_dht_node_state(Lease, State),
+            {ok, State1, SlideOp, NextOpMsg};
+        _ ->
+            % @todo
+            error
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -196,6 +206,25 @@ send_continue_msg(Pid) ->
     comm:send_local(Pid, {continue}).
 
 -spec locally_disable_lease(State::dht_node_state:state(),
-                            SlideOp::slide_op:slide_op()) -> dht_node_state:state().
-locally_disable_lease(State, SlideOp) ->
-    State.
+                            Lease::l_on_cseq:lease_t()) -> dht_node_state:state().
+locally_disable_lease(State, Lease) ->
+    l_on_cseq:disable_lease(State, Lease).
+
+find_lease(State, SlideOp) ->
+    {ActiveLeaseList, PassiveLeaseList} = dht_node_state:get(State, lease_list),
+    Interval = slide_op:get_interval(SlideOp),
+    Pred = fun (L) ->
+                   intervals:is_subset(Interval, l_on_cseq:get_range(L))
+                       andalso intervals:is_continuous(intervals:intersection(Interval, l_on_cseq:get_range(L)))
+           end,
+    case lists:filter(Pred, ActiveLeaseList) of
+        [Lease] ->
+            {ok, Lease};
+        _ ->
+            case lists:filter(Pred, PassiveLeaseList) of
+                [Lease] ->
+                    {ok, Lease};
+                _ ->
+                    error
+            end
+    end.

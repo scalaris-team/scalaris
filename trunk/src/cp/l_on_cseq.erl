@@ -32,11 +32,14 @@
 
 -export([on/2]).
 
--export([lease_renew/1]).
+-export([lease_renew/2]).
 -export([lease_handover/3]).
 -export([lease_takeover/1]).
 -export([lease_split/4]).
 -export([lease_merge/2]).
+-export([lease_send_lease_to_node/2]).
+-export([disable_lease/2]).
+-export([remove_lease_from_dht_node_state/2]).
 
 % for unit tests
 -export([unittest_lease_update/2]).
@@ -55,10 +58,12 @@
          split_range/2]).
 
 -export([add_first_lease_to_db/2]).
+-export([empty_lease_list/0]).
 -export([id/1]).
 
 -ifdef(with_export_type_support).
--export_type([lease_list/0]).
+-export_type([lease_list_state/0]).
+-export_type([lease_t/0]).
 -endif.
 
 %% filters and checks for rbr_cseq operations
@@ -83,6 +88,7 @@
           timeout = ?required(lease, timeout) :: erlang_timestamp()}).
 -type lease_t() :: #lease{}.
 -type lease_list() :: [lease_t()].
+-type lease_list_state() :: {lease_list(), lease_list()}.
 
 -type generic_failed_reason() :: lease_does_not_exist
                                | unexpected_owner
@@ -139,10 +145,10 @@ delta() -> 10.
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec lease_renew(lease_t()) -> ok.
-lease_renew(Lease) ->
+-spec lease_renew(lease_t(), active | passive) -> ok.
+lease_renew(Lease, Mode) ->
     comm:send_local(pid_groups:get_my(dht_node),
-                    {l_on_cseq, renew, Lease}),
+                    {l_on_cseq, renew, Lease, Mode}),
     ok.
 
 -spec lease_handover(lease_t(), comm:mypid(), comm:erl_local_pid()) -> ok.
@@ -174,6 +180,16 @@ lease_merge(Lease1, Lease2) ->
                     {l_on_cseq, merge, Lease1, Lease2}),
     ok.
 
+-spec lease_send_lease_to_node(Pid::comm:mypid(), Lease::lease_t()) -> ok.
+lease_send_lease_to_node(Pid, Lease) ->
+    % @todo precondition: Pid is a dht_node
+    comm:send(Pid, {l_on_cseq, send_lease_to_node, Lease}),
+    ok.
+
+-spec disable_lease(State::dht_node_state:state(), Lease::lease_t()) -> dht_node_state:state().
+disable_lease(State, Lease) ->
+    disable_lease_in_dht_node_state(Lease, State).
+
 % for unit tests
 -spec unittest_lease_update(lease_t(), lease_t()) -> ok | failed.
 unittest_lease_update(Old, New) ->
@@ -189,6 +205,10 @@ unittest_lease_update(Old, New) ->
           )
     end.
 
+-spec empty_lease_list() -> lease_list_state().
+empty_lease_list() ->
+    {[], []}.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % gen_component
@@ -201,53 +221,62 @@ unittest_lease_update(Old, New) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
-on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}},
+on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}, Mode},
    State) ->
     %% log:pal("on renew ~p~n", [Old]),
     New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
     ContentCheck = generic_content_check(Old),
     DB = get_db_for_id(Id),
 %% @todo New passed for debugging only:
-    Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New}),
+    Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New, Mode}),
     rbrcseq:qwrite(DB, Self, Id, ContentCheck, New),
     State;
 
-on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, Value}, _New}, State) ->
+on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, _Round, Value}, _New, Mode}, State) ->
     %% log:pal("successful renew~n", []),
-    update_lease_in_dht_node_state(Value, State);
+    update_lease_in_dht_node_state(Value, State, Mode);
 
 on({l_on_cseq, renew_reply,
-    {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}}, New},
+    {qwrite_deny, _ReqId, _Round, Value, {content_check_failed, Reason}}, New, Mode},
    State) ->
     % @todo retry
-    log:pal("renew denied: ~p~nVal: ~p~nNew: ~p~n", [Reason, Value, New]),
+    log:pal("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, New, Mode]),
+    log:pal("id: ~p~n", [dht_node_state:get(State, node_id)]),
+    log:pal("lease list: ~p~n", [dht_node_state:get(State, lease_list)]),
+    log:pal("timeout: ~p~n", [calendar:now_to_local_time(get_timeout(Value))]),
     case Reason of
         lease_does_not_exist ->
             case Value of %@todo is this necessary?
                 prbr_bottom ->
                     State;
                 _ ->
-                    remove_lease_from_dht_node_state(Value, State)
+                    remove_lease_from_dht_node_state(Value, State, Mode)
             end;
-        unexpected_owner   -> remove_lease_from_dht_node_state(Value, State);
+        unexpected_owner   -> remove_lease_from_dht_node_state(Value, State, Mode);
         unexpected_aux     ->
             case get_aux(Value) of
-                empty                  -> lease_renew(Value), State;
-                {invalid, split, _, _} -> lease_renew(Value), State;
-                {invalid, merge, _, _} -> lease_renew(Value), State;
+                empty                  -> lease_renew(Value, Mode), State;
+                {invalid, split, _, _} -> lease_renew(Value, Mode), State;
+                {invalid, merge, _, _} -> lease_renew(Value, Mode), State;
                 {invalid, merge, stopped} ->
-                    remove_lease_from_dht_node_state(Value, State);
-                {valid, split, _, _}   -> lease_renew(Value), State;
-                {valid, merge, _, _}   -> lease_renew(Value), State
+                    remove_lease_from_dht_node_state(Value, State, Mode);
+                {valid, split, _, _}   -> lease_renew(Value, Mode), State;
+                {valid, merge, _, _}   -> lease_renew(Value, Mode), State
             end;
-        unexpected_range   -> lease_renew(Value), State;
-        unexpected_timeout -> lease_renew(Value), State;
-        unexpected_epoch   -> lease_renew(Value), State;
-        unexpected_version -> lease_renew(Value), State;
+        unexpected_range   -> lease_renew(Value, Mode), State;
+        unexpected_timeout -> lease_renew(Value, Mode), State;
+        unexpected_epoch   -> lease_renew(Value, Mode), State;
+        unexpected_version -> lease_renew(Value, Mode), State;
         timeout_is_not_newer_than_current_lease ->
-            lease_renew(Value),
+            lease_renew(Value, Mode),
             State
     end;
+
+on({l_on_cseq, send_lease_to_node, Lease}, State) ->
+    % @todo do we need any checks?
+    % @todo do i need to notify rm about the new range?
+    update_lease_in_dht_node_state(Lease, State, active);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -269,7 +298,7 @@ on({l_on_cseq, unittest_update_reply, {qwrite_done, _ReqId, _Round, Value},
     Old, New, Caller}, State) ->
     %% io:format("successful update~n", []),
     comm:send_local(Caller, {l_on_cseq, unittest_update_success, Old, New}),
-    update_lease_in_dht_node_state(Value, State);
+    update_lease_in_dht_node_state(Value, State, active);
 
 on({l_on_cseq, unittest_update_reply,
     {qwrite_deny, _ReqId, _Round, _Value, {content_check_failed, _Reason}},
@@ -302,8 +331,9 @@ on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value}, ReplyTo,
     _NewOwner, _New}, State) ->
     % @todo if success update lease in State
     log:pal("successful handover~n", []),
+    Mode = get_mode(State, Value),
     comm:send_local(ReplyTo, {handover, success, Value}),
-    update_lease_in_dht_node_state(Value, State);
+    update_lease_in_dht_node_state(Value, State, Mode);
 
 on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
                                 {content_check_failed, Reason}},
@@ -515,7 +545,7 @@ on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch}, R1, R2, Re
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
-    update_lease_in_dht_node_state(L2, State);
+    update_lease_in_dht_node_state(L2, State, active);
 
 on({l_on_cseq, split_reply_step2, L2, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, Lease, {content_check_failed, Reason}}}, State) ->
@@ -564,7 +594,7 @@ on({l_on_cseq, split_reply_step2,
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
-    update_lease_in_dht_node_state(L1, State);
+    update_lease_in_dht_node_state(L1, State, active);
 
 on({l_on_cseq, split_reply_step3, L1, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, Reason}}}, State) ->
@@ -614,14 +644,14 @@ on({l_on_cseq, split_reply_step3,
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
-    update_lease_in_dht_node_state(L2, State);
+    update_lease_in_dht_node_state(L2, State, active);
 
 on({l_on_cseq, split_reply_step4, _L2, _R1, _R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
     log:pal("successful split~n", []),
     log:pal("successful split ~p~n", [ReplyTo]),
     comm:send_local(ReplyTo, {split, success, L1}),
-    update_lease_in_dht_node_state(L1, State);
+    update_lease_in_dht_node_state(L1, State, active);
 
 on({l_on_cseq, split_reply_step4, L2, R1, R2, ReplyTo,
     {qwrite_deny, _ReqId, _Round, L1, {content_check_failed, Reason}}}, State) ->
@@ -657,9 +687,10 @@ on({l_on_cseq, split_reply_step4, L2, R1, R2, ReplyTo,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, renew_leases}, State) ->
-    LeaseList = dht_node_state:get(State, lease_list),
+    {ActiveLeaseList, PassiveLeaseList} = dht_node_state:get(State, lease_list),
     %io:format("renewing all local leases: ~p~n", [length(LeaseList)]),
-    _ = [lease_renew(L) || L <- LeaseList],
+    _ = [lease_renew(L, active) || L <- ActiveLeaseList],
+    _ = [lease_renew(L, passive) || L <- PassiveLeaseList],
     msg_delay:send_local(delta() div 2, self(), {l_on_cseq, renew_leases}),
     State.
 
@@ -1009,7 +1040,7 @@ add_first_lease_to_db(Id, State) ->
               Entry = prbr:new(X, Lease),
               prbr:set_entry(Entry, DBHandle)
           end || X <- ?RT:get_replica_keys(Id) ],
-    dht_node_state:set_lease_list(State, [Lease]).
+    dht_node_state:set_lease_list(State, {[Lease], []}).
 
 -spec unittest_create_lease(?RT:key()) -> lease_t().
 unittest_create_lease(Id) ->
@@ -1047,6 +1078,9 @@ set_epoch(Lease, Epoch) -> Lease#lease{epoch=Epoch}.
 -spec set_timeout(lease_t()) -> lease_t().
 set_timeout(Lease) -> Lease#lease{timeout=new_timeout()}.
 
+-spec get_timeout(lease_t()) -> erlang_timestamp().
+get_timeout(#lease{timeout=Timeout}) -> Timeout.
+
 -spec get_id(lease_t()) -> ?RT:key().
 get_id(#lease{id=Id}) -> Id.
 
@@ -1068,27 +1102,69 @@ get_range(#lease{range=Range}) -> Range.
 -spec set_range(lease_t(), intervals:interval()) -> lease_t().
 set_range(L, Range) -> L#lease{range=Range}.
 
--spec update_lease_in_dht_node_state(lease_t(), dht_node_state:state()) ->
+-spec update_lease_in_dht_node_state(lease_t(), dht_node_state:state(), active | passive) ->
     dht_node_state:state().
-update_lease_in_dht_node_state(Lease, State) ->
-    Id = Lease#lease.id,
-    LeaseList = dht_node_state:get(State, lease_list),
-    NewList = case lists:keyfind(Id, 2, LeaseList) of
-                  false ->
-                      [Lease|LeaseList];
-                  _OldLease ->
-                      %io:format("replacing ~p with ~p ~n", [OldLease, Lease]),
-                      lists:keyreplace(Id, 2, LeaseList, Lease)
-              end,
-    dht_node_state:set_lease_list(State, NewList).
+update_lease_in_dht_node_state(Lease, State, Mode) ->
+    {ActiveLeaseList, PassiveLeaseList} = dht_node_state:get(State, lease_list),
+    case Mode of
+        active ->
+            NewActiveLeaseList = update_lease_in_list(Lease, ActiveLeaseList),
+            dht_node_state:set_lease_list(State, {NewActiveLeaseList, PassiveLeaseList});
+        passive ->
+            NewPassiveLeaseList = update_lease_in_list(Lease, PassiveLeaseList),
+            dht_node_state:set_lease_list(State, {ActiveLeaseList, NewPassiveLeaseList})
+    end.
 
 -spec remove_lease_from_dht_node_state(lease_t(), dht_node_state:state()) ->
     dht_node_state:state().
 remove_lease_from_dht_node_state(Lease, State) ->
+    NewState = remove_lease_from_dht_node_state(Lease, State, active),
+    remove_lease_from_dht_node_state(Lease, NewState, passive).
+
+-spec remove_lease_from_dht_node_state(lease_t(), dht_node_state:state(), active | passive) ->
+    dht_node_state:state().
+remove_lease_from_dht_node_state(Lease, State, Mode) ->
     Id = Lease#lease.id,
-    LeaseList = dht_node_state:get(State, lease_list),
-    NewList = lists:keydelete(Id, 2, LeaseList),
-    dht_node_state:set_lease_list(State, NewList).
+    {ActiveLeaseList, PassiveLeaseList} = dht_node_state:get(State, lease_list),
+    case Mode of
+        active ->
+            NewActiveLeaseList = lists:keydelete(Id, 2, ActiveLeaseList),
+            dht_node_state:set_lease_list(State, {NewActiveLeaseList, PassiveLeaseList});
+        passive ->
+            NewPassiveLeaseList = lists:keydelete(Id, 2, PassiveLeaseList),
+            dht_node_state:set_lease_list(State, {ActiveLeaseList, NewPassiveLeaseList})
+    end.
+
+-spec disable_lease_in_dht_node_state(lease_t(), dht_node_state:state()) ->
+    dht_node_state:state().
+disable_lease_in_dht_node_state(Lease, State) ->
+    Id = Lease#lease.id,
+    {ActiveLeaseList, PassiveLeaseList} = dht_node_state:get(State, lease_list),
+    NewActiveLeaseList = lists:keydelete(Id, 2, ActiveLeaseList),
+    NewPassiveLeaseList = update_lease_in_list(Lease, PassiveLeaseList),
+    dht_node_state:set_lease_list(State, {NewActiveLeaseList, NewPassiveLeaseList}).
+
+-spec update_lease_in_list(Lease::lease_t(), LeaseList::lease_list()) -> lease_list().
+update_lease_in_list(Lease, LeaseList) ->
+    Id = Lease#lease.id,
+    case lists:keyfind(Id, 2, LeaseList) of
+        false ->
+            [Lease|LeaseList];
+        _OldLease ->
+            %io:format("replacing ~p with ~p ~n", [OldLease, Lease]),
+            lists:keyreplace(Id, 2, LeaseList, Lease)
+    end.
+
+-spec get_mode(State::dht_node_state:state(), Lease::lease_t()) -> active | passive.
+get_mode(State, Lease) ->
+    {_ActiveLeaseList, PassiveLeaseList} = dht_node_state:get(State, lease_list),
+    Id = Lease#lease.id,
+    case lists:keyfind(Id, 2, PassiveLeaseList) of
+        false ->
+            active;
+        _ ->
+            passive
+    end.
 
 -spec id(intervals:interval()) -> ?RT:key().
 id([all]) -> ?MINUS_INFINITY;

@@ -110,19 +110,24 @@ tester_type_check_l_on_cseq(_Config) ->
     Modules =
         [ {l_on_cseq,
            [ {add_first_lease_to_db, 2}, %% cannot create DB refs for State
-             {lease_renew, 1}, %% sends messages
+             {lease_renew, 2}, %% sends messages
              {lease_handover, 3}, %% sends messages
              {lease_takeover, 1}, %% sends messages
              {lease_split, 4}, %% sends messages
              {lease_merge, 2}, %% sends messages
+             {lease_send_lease_to_node, 2}, %% sends messages
              {id, 1}, %% todo
              {split_range, 2}, %% todo
              {unittest_lease_update, 2}, %% only for unittests
+             {disable_lease, 2}, %% requires dht_node_state
              {on, 2} %% cannot create dht_node_state
            ],
            [ {read, 2}, %% cannot create pids
-             {update_lease_in_dht_node_state, 2}, %% gb_trees not supported by type_checker
-             {remove_lease_from_dht_node_state, 2} %% gb_trees not supported by type_checker
+             {update_lease_in_dht_node_state, 3}, %% gb_trees not supported by type_checker
+             {remove_lease_from_dht_node_state, 2}, %% gb_trees not supported by type_checker
+             {remove_lease_from_dht_node_state, 3}, %% gb_trees not supported by type_checker
+             {disable_lease_in_dht_node_state, 2}, %% gb_trees not supported by type_checker
+             {get_mode, 2} %% gb_trees not supported by type_checker
            ]}
         ],
     %% join a dht_node group to be able to call lease trigger functions
@@ -273,7 +278,7 @@ test_split(_Config) ->
 test_split_with_concurrent_renew(_Config) ->
     NullF = fun (_Id, _Lease) -> ok end,
     RenewLeaseF = fun (_Id, Lease) ->
-                          l_on_cseq:lease_renew(Lease),
+                          l_on_cseq:lease_renew(Lease, active),
                           wait_for_lease_version(l_on_cseq:get_id(Lease),
                                                  l_on_cseq:get_epoch(Lease),
                                                  l_on_cseq:get_version(Lease)+1)
@@ -500,7 +505,7 @@ test_handover_helper(_Config, ModifyF, WaitF) ->
     pid_groups:join(pid_groups:group_with(dht_node)),
 
     % intercept lease renew
-    {l_on_cseq, renew, Old} = intercept_lease_renew(),
+    {l_on_cseq, renew, Old, _Mode} = intercept_lease_renew(),
     Id = l_on_cseq:get_id(Old),
     % now we update the lease
     New = ModifyF(Old),
@@ -518,14 +523,14 @@ test_handover_helper(_Config, ModifyF, WaitF) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 test_split_prepare() ->
     % intercept lease renew
-    {l_on_cseq, renew, _Old} = intercept_lease_renew(),
+    {l_on_cseq, renew, _Old, _Mode} = intercept_lease_renew(),
     % prepeare split
     DHTNode = pid_groups:find_a(dht_node),
     pid_groups:join(pid_groups:group_with(dht_node)),
     comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
     L = receive
-                 {get_state_response, List} ->
-                     hd(List)
+                 {get_state_response, {ActiveList, _PassiveList}} ->
+                     hd(ActiveList)
              end,
     {ok, R1, R2} = l_on_cseq:split_range(l_on_cseq:get_range(L),
                                          ?RT:get_random_node_id()),
@@ -678,14 +683,13 @@ test_renew_helper(_Config, ModifyF, WaitF) ->
     pid_groups:join(pid_groups:group_with(dht_node)),
 
     % intercept lease renew
-    M = {l_on_cseq, renew, Old} = intercept_lease_renew(),
+    M = {l_on_cseq, renew, Old, Mode} = intercept_lease_renew(),
     Id = l_on_cseq:get_id(Old),
     % now we update the lease
     New = ModifyF(Old),
     l_on_cseq:unittest_lease_update(Old, New),
     wait_for_lease(New),
     % now the error handling of lease_renew is going to be tested
-    ct:pal("sending message ~p~n", [M]),
     comm:send_local(DHTNode, M),
     WaitF(Id, Old),
     true.
@@ -751,7 +755,7 @@ wait_for_epoch_update(Id, Old) ->
 wait_for_delete(Id, _Old) ->
     DHTNode = pid_groups:find_a(dht_node),
     wait_for(fun () ->
-                     L = get_dht_node_state(DHTNode, lease_list),
+                     {L, _} = get_dht_node_state(DHTNode, lease_list),
                      lists:all(fun(Lease) ->
                                        l_on_cseq:get_id(Lease) =/= Id
                                end, L)
@@ -760,7 +764,7 @@ wait_for_delete(Id, _Old) ->
 wait_for_delete(Id) ->
     DHTNode = pid_groups:find_a(dht_node),
     wait_for(fun () ->
-                     L = get_dht_node_state(DHTNode, lease_list),
+                     {L, _} = get_dht_node_state(DHTNode, lease_list),
                      lists:all(fun(Lease) ->
                                        l_on_cseq:get_id(Lease) =/= Id
                                end, L)
@@ -797,10 +801,9 @@ intercept_lease_renew() ->
     % we wait for the next periodic trigger
     gen_component:bp_set_cond(DHTNode, block_renew(self()), block_renew),
     Msg = receive
-              M = {l_on_cseq, renew, _Lease} ->
+              M = {l_on_cseq, renew, _Lease, _Mode} ->
                   M
           end,
-    ct:pal("intercepted renew request ~p~n", [Msg]),
     gen_component:bp_set_cond(DHTNode, block_trigger(self()), block_trigger),
     gen_component:bp_del(DHTNode, block_renew),
     Msg.
@@ -841,7 +844,7 @@ block_split_reply(Pid, StepTag) ->
 block_renew(Pid) ->
     fun (Message, _State) ->
             case Message of
-                {l_on_cseq, renew, _Lease} ->
+                {l_on_cseq, renew, _Lease, _Mode} ->
                     comm:send_local(Pid, Message),
                     drop_single;
                 _ ->
