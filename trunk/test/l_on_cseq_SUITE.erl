@@ -120,13 +120,13 @@ tester_type_check_l_on_cseq(_Config) ->
              {split_range, 2}, %% todo
              {unittest_lease_update, 2}, %% only for unittests
              {disable_lease, 2}, %% requires dht_node_state
-             {on, 2} %% cannot create dht_node_state
+             {on, 2}, %% cannot create dht_node_state (reference for bulkowner)
+             {remove_lease_from_dht_node_state, 2} %% cannot create dht_node_state (reference for bulkowner)
            ],
            [ {read, 2}, %% cannot create pids
-             {update_lease_in_dht_node_state, 3}, %% gb_trees not supported by type_checker
-             {remove_lease_from_dht_node_state, 2}, %% gb_trees not supported by type_checker
-             {remove_lease_from_dht_node_state, 3}, %% gb_trees not supported by type_checker
-             {disable_lease_in_dht_node_state, 2}, %% gb_trees not supported by type_checker
+             {update_lease_in_dht_node_state, 3}, %% cannot create reference (bulkowner uses one in dht_node_state
+             {remove_lease_from_dht_node_state, 3}, %% cannot create dht_node_state (reference for bulkowner)
+             {disable_lease_in_dht_node_state, 2}, %% cannot create dht_node_state (reference for bulkowner)
              {get_mode, 2} %% gb_trees not supported by type_checker
            ]}
         ],
