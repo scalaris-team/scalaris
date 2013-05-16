@@ -252,48 +252,47 @@ on({push_scale_req}, {IsLeader, _Alarms, ScaleReq, _Triggers})
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Msg loop: API msgs -> scale req polling API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({pull_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers})
-  when ScaleReq#scale_req.lock =:= locked ->
-    comm:send(Pid, {scale_req_resp, {error, locked}}),
+on({pull_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers}) ->
+    comm:send(Pid, {scale_req_resp, {ok, ScaleReq#scale_req.req}}),
     ?TRACE("pull_scale_req,~nscale_req: ~p", [ScaleReq]),
     State;
-on({pull_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
+
+on({lock_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers})
+  when ScaleReq#scale_req.lock =:= locked ->
+    comm:send(Pid, {scale_req_resp, {error, locked}}),
+    ?TRACE("lock_scale_req,~nscale_req: ~p", [ScaleReq]),
+    State;
+
+on({lock_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
   when ScaleReq#scale_req.lock =:= unlocked ->
-    % reply
-    comm:send(Pid, {scale_req_resp, {ok, ScaleReq#scale_req.req}}),
+    comm:send(Pid, {scale_req_resp, ok}),
     % start timeout @todo add timeout to cofig
     Trigger = comm:send_local_after(60*1000, self(),
                                     {unlock_scale_req_timeout}),
-    NewTriggers = Triggers ++ [{timeout, Trigger}],
-    % lock
-    NewScaleReq = ScaleReq#scale_req{lock = locked},
-    ?TRACE("pull_scale_req,~nscale_req: ~p", [ScaleReq]),
-    {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
+    ?TRACE("lock_scale_req,~nscale_req: ~p", [ScaleReq]),
+    {_IsLeader, _Alarms, ScaleReq#scale_req{lock = locked},
+                         Triggers ++ [{timeout, Trigger}]};
 
 on({unlock_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
   when ScaleReq#scale_req.lock =:= locked ->
-    % reply
     comm:send(Pid, {scale_req_resp, ok}),
     % cancel timeout
-    {value, {timeout, Trigger}, NewTriggers} =
-        lists:keytake(timeout, 1, Triggers),
+    {value, {timeout, Trigger}, NewTriggers} = lists:keytake(
+                                                 timeout, 1, Triggers),
     cancel(Trigger),
-    % unlock
-    NewScaleReq = ScaleReq#scale_req{lock = unlocked, req  = 0},
     ?TRACE("unlock_scale_req,~nscale_req: ~p", [ScaleReq]),
-    {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
+    {_IsLeader, _Alarms, ScaleReq#scale_req{lock = unlocked, req  = 0},
+                         NewTriggers};
 on({unlock_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers})
   when ScaleReq#scale_req.lock =:= unlocked ->
-    % reply
     comm:send(Pid, {scale_req_resp, {error, not_locked}}),
     ?TRACE("unlock_scale_req,~nscale_req: ~p", [ScaleReq]),
     State;
 
 on({unlock_scale_req_timeout}, {_IsLeader, _Alarms, ScaleReq, Triggers}) ->
-    NewTriggers = lists:keydelete(timeout, 1, Triggers),
-    NewScaleReq = ScaleReq#scale_req{lock = unlocked},
     ?TRACE1("unlock_scale_req_timeout"),
-    {_IsLeader, _Alarms, NewScaleReq, NewTriggers};
+    {_IsLeader, _Alarms, ScaleReq#scale_req{lock = unlocked},
+                         lists:keydelete(timeout, 1, Triggers)};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Msg loop: API msgs -> alarm state API
