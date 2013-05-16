@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -97,6 +97,18 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
                                            {typedef, tester, test_any}]}},
                            CheckStack, ParseState)
             catch _:_ -> {false, [{Value, dict_functions_thrown} | CheckStack]}
+            end;
+        {builtin_type, gb_trees} ->
+            % there is no is_gb_tree/1, so try some functions on the dict to check
+            try
+                _ = gb_trees:size(Value),
+                _ = gb_trees:is_defined('$non_existing_key', Value),
+                _ = gb_trees:enter('$non_existing_key', '$value', Value),
+                check_list(gb_trees:to_list(Value), % [{Key, Value}]
+                           {list, {tuple, [{typedef, tester, test_any},
+                                           {typedef, tester, test_any}]}},
+                           CheckStack, ParseState)
+            catch _:_ -> {false, [{Value, gb_trees_functions_thrown} | CheckStack]}
             end;
         float ->
             check_basic_type(Value, Type, CheckStack, ParseState,
