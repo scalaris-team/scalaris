@@ -63,7 +63,8 @@
      MsgQueueLen          :: non_neg_integer(),
      DesiredBundleSize    :: non_neg_integer(),
      MsgsSinceBundleStart :: non_neg_integer(),
-     LastStatReport       :: stat_report()}.
+     LastStatReport       :: stat_report(),
+     NumberOfTimeouts	  :: non_neg_integer()}.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
     {tcp, Socket::inet:socket(), Data::binary()} |
@@ -354,18 +355,30 @@ send_internal(Pid, Message, Options, BinaryMessage, State) ->
             ?TRACE("~.0p Sent message ~.0p~n",
                    [pid_groups:my_pidname(), Message]),
             ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
-            State;
+            set_number_of_timeouts(State, 0);
         {error, closed} ->
             Address = dest_ip(State),
             Port = dest_port(State),
             report_bundle_error(Options, {Address, Port, Pid}, Message,
                                 socket_closed),
             log:log(warn,"[ CC ~p ] sending closed connection", [self()]),
-            close_connection(Socket, State);
+            close_connection(Socket, set_number_of_timeouts(State, 0));
         {error, timeout} ->
-            log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
-                    [self(), dest_ip(State), dest_port(State), timeout]),
-            send_internal(Pid, Message, Options, BinaryMessage, State);
+            NumberOfTimeouts = number_of_timeouts(State),
+            if  % retry 5 times
+                NumberOfTimeouts < 5 ->
+                    log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). retrying.",
+                            [self(), dest_ip(State), dest_port(State), timeout]),
+                    send_internal(Pid, Message, Options, BinaryMessage, set_number_of_timeouts(State, NumberOfTimeouts + 1));
+                true ->
+                    log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). retried 5 times, now closing the connection.",
+                            [self(), dest_ip(State), dest_port(State), timeout]),
+                    Address = dest_ip(State),
+                    Port = dest_port(State),
+                    report_bundle_error(Options, {Address, Port, Pid}, Message,
+                                        socket_timeout),
+                    close_connection(Socket, set_number_of_timeouts(State, 0))
+            end;
         {error, Reason} ->
             Address = dest_ip(State),
             Port = dest_port(State),
@@ -373,7 +386,7 @@ send_internal(Pid, Message, Options, BinaryMessage, State) ->
                                 Reason),
             log:log(error,"[ CC ~p ] couldn't send to ~.0p:~.0p (~.0p). closing connection",
                     [self(), Address, Port, Reason]),
-            close_connection(Socket, State)
+            close_connection(Socket, set_number_of_timeouts(State, 0))
     end.
 
 -spec new_connection(inet:ip_address(), comm_server:tcp_port(),
@@ -464,7 +477,8 @@ state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
      _StartTime = os:timestamp(), _SentMsgCount = 0, _ReceivedMsgCount = 0,
      _MsgQueue = {[], []}, _Len = 0,
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0,
-     _LastStatReport = {0, 0, 0, 0} }.
+     _LastStatReport = {0, 0, 0, 0},
+     _NumberOfTimeouts = 0}.
 
 -spec dest_ip(state()) -> inet:ip_address().
 dest_ip(State)                 -> element(1, State).
@@ -525,6 +539,11 @@ set_msgs_since_bundle_start(State, Val) ->
 last_stat_report(State)          -> element(13, State).
 -spec set_last_stat_report(state(), stat_report()) -> state().
 set_last_stat_report(State, Val) -> setelement(13, State, Val).
+
+-spec number_of_timeouts(state()) -> non_neg_integer().
+number_of_timeouts(State) -> element(14, State).
+-spec set_number_of_timeouts(state(), non_neg_integer()) -> state().
+set_number_of_timeouts(State, N) -> setelement(14, State, N).
 
 -spec status(State::state()) -> notconnected | connected.
 status(State) ->
