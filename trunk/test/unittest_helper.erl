@@ -44,7 +44,8 @@
          prepare_config/1,
          start_minimal_procs/3, stop_minimal_procs/1,
          check_ring_load/1, check_ring_data/0, check_ring_data/2,
-         build_interval/2]).
+         build_interval/2,
+         db_entry_not_null/1, scrub_data/1]).
 
 -ifdef(with_export_type_support).
 -export_type([process_info/0, kv_opts/0]).
@@ -779,3 +780,17 @@ build_interval(?PLUS_INFINITY, ?MINUS_INFINITY) -> intervals:all();
 build_interval(A, A) -> intervals:all();
 build_interval(A, B) when A < B -> intervals:new('(', A, B, ']');
 build_interval(A, B) when A > B -> intervals:new('(', B, A, ']').
+
+%% @doc can be used to filter empty entries out of a list of db_entries
+-spec db_entry_not_null(db_entry:entry()) -> boolean().
+db_entry_not_null(Entry) ->
+    not db_entry:is_null(Entry).
+
+%% @doc removes duplicates and db_entries that are null
+-spec scrub_data(?DB:db_as_list()) -> ?DB:db_as_list().
+scrub_data(Data) ->
+    lists:filter(
+        fun db_entry_not_null/1, 
+        lists:usort(fun(A, B) ->
+                 db_entry:get_key(A) =< db_entry:get_key(B)
+            end, lists:reverse(Data))).
