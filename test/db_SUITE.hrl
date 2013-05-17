@@ -463,13 +463,7 @@ tester_delete(_Config) ->
 prop_add_data(Data) ->
     DB = ?TEST_DB:new(),
     
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    %% db_entries that are null won't be inserted into db anymore
-    UniqueCleanData = lists:filter(fun db_entriy_not_null/1, UniqueData),
+    UniqueCleanData = unittest_helper:scrub_data(Data),
     
     DB2 = ?TEST_DB:add_data(DB, Data),
     check_db2(DB2, length(UniqueCleanData), UniqueCleanData, "check_db_add_data_1"),
@@ -583,13 +577,7 @@ tester_get_entries2(_Config) ->
 -spec prop_get_load2(Data::?TEST_DB:db_as_list(), LoadInterval::intervals:interval()) -> true.
 prop_get_load2(Data, LoadInterval) ->
     DB = ?TEST_DB:new(),
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    %% db_entries that are null won't be inserted into db anymore
-    UniqueCleanData = lists:filter(fun db_entriy_not_null/1, UniqueData),
+    UniqueCleanData = unittest_helper:scrub_data(Data),
 
     DB2 = ?TEST_DB:add_data(DB, Data),
     
@@ -617,14 +605,8 @@ tester_get_load2(_Config) ->
 -spec prop_split_data(Data::?TEST_DB:db_as_list(), Range::intervals:interval()) -> true.
 prop_split_data(Data, Range) ->
     DB = ?TEST_DB:new(),
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    %% db_entries that are null won't be inserted into db anymore
-    UniqueCleanData = lists:filter(fun db_entriy_not_null/1, UniqueData),
-    DB2 = ?TEST_DB:add_data(DB, UniqueData),
+    DB2 = ?TEST_DB:add_data(DB, Data),
+    UniqueCleanData = unittest_helper:scrub_data(Data),
 
     InHisRangeFun = fun(A) -> (not db_entry:is_empty(A)) andalso
                                   (not intervals:in(db_entry:get_key(A), Range))
@@ -652,13 +634,7 @@ tester_split_data(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_update_entries(Data::?TEST_DB:db_as_list(), ItemsToUpdate::pos_integer()) -> true.
 prop_update_entries(Data, ItemsToUpdate) ->
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    %% db_entries that are null won't be inserted into db anymore
-    UniqueCleanData = lists:filter(fun db_entriy_not_null/1, UniqueData),
+    UniqueCleanData = unittest_helper:scrub_data(Data),
     {UniqueUpdateData, UniqueOldData} =
     case length(UniqueCleanData) < ItemsToUpdate of
         true ->
@@ -669,7 +645,7 @@ prop_update_entries(Data, ItemsToUpdate) ->
 
     ExpUpdatedData = UniqueUpdateData ++ UniqueOldData,
     
-    prop_update_entries_helper(UniqueData, UniqueUpdateData, ExpUpdatedData).
+    prop_update_entries_helper(UniqueCleanData, UniqueUpdateData, ExpUpdatedData).
 
 -spec prop_update_entries_helper(UniqueData::?TEST_DB:db_as_list(), UniqueUpdateData::?TEST_DB:db_as_list(), ExpUpdatedData::?TEST_DB:db_as_list()) -> true.
 prop_update_entries_helper(UniqueData, UniqueUpdateData, ExpUpdatedData) ->
@@ -706,13 +682,7 @@ prop_delete_entries1(Data, Range) ->
     
     DB3 = ?TEST_DB:delete_entries(DB2, Range),
     
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    %% db_entries that are null won't be inserted into db anymore
-    UniqueCleanData = lists:filter(fun db_entriy_not_null/1, UniqueData),
+    UniqueCleanData = unittest_helper:scrub_data(Data),
     UniqueRemainingData = [DBEntry || DBEntry <- UniqueCleanData,
                                       not intervals:in(db_entry:get_key(DBEntry), Range)],
     check_db2(DB3, length(UniqueRemainingData), UniqueRemainingData, "check_db_delete_entries1_1"),
@@ -729,13 +699,7 @@ prop_delete_entries2(Data, Range) ->
     
     DB3 = ?TEST_DB:delete_entries(DB2, FilterFun),
     
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    %% db_entries that are null won't be inserted into db anymore
-    UniqueCleanData = lists:filter(fun db_entriy_not_null/1, UniqueData),
+    UniqueCleanData = unittest_helper:scrub_data(Data),
     UniqueRemainingData = [DBEntry || DBEntry <- UniqueCleanData,
                                       intervals:in(db_entry:get_key(DBEntry), Range)],
     check_db2(DB3, length(UniqueRemainingData), UniqueRemainingData, "check_db_delete_entries2_1"),
@@ -1038,13 +1002,7 @@ prop_changed_keys_delete_entries1(Data, ChangesInterval, Range) ->
     
     DB4 = ?TEST_DB:delete_entries(DB3, Range),
     
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    %% db_entries that are null won't be inserted into db anymore
-    UniqueCleanData = lists:filter(fun db_entriy_not_null/1, UniqueData),
+    UniqueCleanData = unittest_helper:scrub_data(Data),
     DeletedKeys = [{db_entry:get_key(DBEntry), true}
                   || DBEntry <- UniqueCleanData,
                      intervals:in(db_entry:get_key(DBEntry), Range)],
@@ -1066,13 +1024,7 @@ prop_changed_keys_delete_entries2(Data, ChangesInterval, Range) ->
     
     DB4 = ?TEST_DB:delete_entries(DB3, FilterFun),
     
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    %% db_entries that are null won't be inserted into db anymore
-    UniqueCleanData = lists:filter(fun db_entriy_not_null/1, UniqueData),
+    UniqueCleanData = unittest_helper:scrub_data(Data),
     DeletedKeys = [{db_entry:get_key(DBEntry), true}
                   || DBEntry <- UniqueCleanData,
                      not intervals:in(db_entry:get_key(DBEntry), Range)],
@@ -1136,7 +1088,7 @@ prop_changed_keys_split_data1(Data, ChangesInterval, MyNewInterval) ->
         MyNewInterval1::intervals:interval()) -> true.
 prop_changed_keys_split_data2(Data, ChangesInterval, MyNewInterval) ->
     %% db_entries that are null won't be inserted into db anymore
-    CleanData = lists:filter(fun db_entriy_not_null/1, Data),
+    CleanData = unittest_helper:scrub_data(Data),
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:record_changes(DB, ChangesInterval),
     DB3 = ?TEST_DB:add_data(DB2, CleanData),
@@ -1157,13 +1109,7 @@ prop_changed_keys_get_data(Data, ChangesInterval) ->
     DB2 = ?TEST_DB:add_data(DB, Data),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
-    % lists:usort removes all but first occurrence of equal elements
-    % -> reverse list since ?TEST_DB:add_data will keep the last element
-    UniqueData = lists:usort(fun(A, B) ->
-                                     db_entry:get_key(A) =< db_entry:get_key(B)
-                             end, lists:reverse(Data)),
-    %% db_entries that are null won't be inserted into db anymore
-    UniqueCleanData = lists:filter(fun db_entriy_not_null/1, UniqueData),
+    UniqueCleanData = unittest_helper:scrub_data(Data),
 
     ?equals(lists:sort(?TEST_DB:get_data(DB3)), lists:sort(UniqueCleanData)),
     ?equals_w_note(?TEST_DB:get_changes(DB3), {[], []}, "changed_keys_get_data_1"),
@@ -1618,8 +1564,3 @@ count_keys_in_range(Keys, Interval) ->
                             _    -> Count
                         end
                 end, 0, Keys).
-
-%% can be used to filter empty entries out of a list of db_entries
--spec db_entriy_not_null(db_entry:entry()) -> boolean().
-db_entriy_not_null(Entry) ->
-    not db_entry:is_null(Entry).
