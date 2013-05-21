@@ -98,8 +98,8 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
                            CheckStack, ParseState)
             catch _:_ -> {false, [{Value, dict_functions_thrown} | CheckStack]}
             end;
-        {builtin_type, gb_trees} ->
-            % there is no is_gb_tree/1, so try some functions on the dict to check
+        {builtin_type, gb_tree} ->
+            % there is no is_gb_tree/1, so try some functions on the tree to check
             try
                 _ = gb_trees:size(Value),
                 _ = gb_trees:is_defined('$non_existing_key', Value),
@@ -166,6 +166,11 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             check_record(Value, Type, CheckStack, ParseState);
         {record, FieldList} when is_list(FieldList) ->
             check_record_fields(Value, Type, CheckStack, ParseState);
+        reference ->
+            case is_reference(Value) of
+                true -> {true, CheckStack};
+                false -> {false, [not_a_reference | CheckStack]}
+            end;
         tid ->
             % built-in < R14; otherwise ets:tid()
             inner_check(Value, integer, CheckStack, ParseState);
