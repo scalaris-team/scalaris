@@ -206,8 +206,8 @@ on_active({start_clustering_shuffle}, #state_active{cluster_trigger_state = C} =
 % ask vivaldi for network coordinate
 on_active({reset_clustering}
           , #state_active{reset_trigger_state = ResetTriggerState} = State) ->
-    NewResetTriggerState = trigger:next(ResetTriggerState),
     vivaldi:get_coordinate(),
+    NewResetTriggerState = trigger:next(ResetTriggerState),
     State#state_active{reset_trigger_state=NewResetTriggerState}
     ;
 

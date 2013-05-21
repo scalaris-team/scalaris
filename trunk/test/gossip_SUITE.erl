@@ -142,7 +142,7 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
     config:write(gossip_converge_avg_count_start_new_round, ConvAvgCntSNR),
     
     {NewPreviousState, NewState, NewMsgQueue, NewTriggerState, NewMyRange} =
-        gossip:on_active({gossip_trigger}, {PreviousState, State, MsgQueue, get_ptrigger_nodelay(), MyRange}),
+        gossip:on_active({gossip_periodic}, {PreviousState, State, MsgQueue, get_ptrigger_nodelay(), MyRange}),
     
     ?equals(NewMyRange, MyRange),
 
@@ -172,7 +172,6 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
             ?equals(NewPreviousState, gossip_state:inc_triggered(State)),
             ?equals(NewMsgQueue, MsgQueue),
             ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-            ?expect_message({gossip_trigger}),
             
             ?expect_message({get_node_details, This, [load]});
         false ->
@@ -183,8 +182,7 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
             ?equals(gossip_state:get(NewState, converge_avg_count), gossip_state:get(State, converge_avg_count)),
             ?equals(NewPreviousState, PreviousState),
             ?equals(NewMsgQueue, MsgQueue),
-            ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
-            ?expect_message({gossip_trigger})
+            ?equals_pattern(NewTriggerState, {'trigger_periodic', _})
     end,
     % request for random node?
     case gossip_state:get(NewState, round) > 0 andalso

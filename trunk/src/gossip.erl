@@ -231,11 +231,15 @@ on_active({activate_gossip, NewRange},
           {PreviousState, State, QueuedMessages, TriggerState, _OldMyRange}) ->
     {PreviousState, State, QueuedMessages, TriggerState, NewRange};
 
-on_active({gossip_trigger},
+on_active({gossip_trigger}, {PreviousState, State, QueuedMessages, TriggerState, MyRange}) ->
+    NewTriggerState = trigger:next(TriggerState),
+    NewState = {PreviousState, State, QueuedMessages, NewTriggerState, MyRange},
+    gen_component:post_op(NewState, {gossip_periodic});
+
+on_active({gossip_periodic},
           {PreviousState, State, QueuedMessages, TriggerState, MyRange}) ->
     % this message is received continuously when the Trigger calls
     % see gossip_trigger and gossip_interval in the scalaris.cfg file
-    NewTriggerState = trigger:next(TriggerState),
     NewState1 = gossip_state:inc_triggered(State),
     % request a check whether we are the leader and can thus decide whether to
     % start a new round
@@ -249,7 +253,7 @@ on_active({gossip_trigger},
         true -> request_random_node();
         false -> ok
     end,
-    {NewPreviousState, NewState2, QueuedMessages, NewTriggerState, MyRange};
+    {NewPreviousState, NewState2, QueuedMessages, TriggerState, MyRange};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Responses to requests for information about the local node

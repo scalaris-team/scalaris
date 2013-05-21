@@ -170,8 +170,8 @@ on_active({activate_vivaldi}, State) ->
 on_active({vivaldi_trigger}, {Coordinate, Confidence, TriggerState} ) ->
     % start new vivaldi shuffle
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),
-    NewTriggerState = trigger:next(TriggerState),
     cyclon:get_subset_rand(1),
+    NewTriggerState = trigger:next(TriggerState),
     {Coordinate, Confidence, NewTriggerState};
 
 % ignore empty node list from cyclon
