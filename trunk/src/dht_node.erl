@@ -359,6 +359,9 @@ on({get_state, Pid, Which}, State) when is_list(Which) ->
 on({get_state, Pid, Which}, State) when is_atom(Which) ->
     comm:send(Pid, {get_state_response, dht_node_state:get(State, Which)}),
     State;
+on({get_state, Pid}, State) ->
+    comm:send(Pid, {get_state_response, State}),
+    State;
 on({get_node_details, Pid}, State) ->
     comm:send(Pid, {get_node_details_response, dht_node_state:details(State)}),
     State;
