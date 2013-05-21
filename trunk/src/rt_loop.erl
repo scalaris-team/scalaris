@@ -152,14 +152,19 @@ on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT, TriggerSt
 %% userdevguide-end rt_loop:update_rt
 
 %% userdevguide-begin rt_loop:trigger
+% Message handler to manage the trigger
 on_active({trigger_rt}, {Neighbors, OldRT, TriggerState}) ->
+    % trigger next stabilization    
+    NewTriggerState = trigger:next(TriggerState),
+    gen_component:post_op(new_state(Neighbors, OldRT, NewTriggerState), {periodic_rt_rebuild});
+
+% Actual periodic rebuilding of the RT
+on_active({periodic_rt_rebuild}, {Neighbors, OldRT, TriggerState}) ->
     % start periodic stabilization
     % log:log(debug, "[ RT ] stabilize"),
     NewRT = ?RT:init_stabilize(Neighbors, OldRT),
     ?RT:check(OldRT, NewRT, Neighbors, true),
-    % trigger next stabilization
-    NewTriggerState = trigger:next(TriggerState),
-    new_state(Neighbors, NewRT, NewTriggerState);
+    new_state(Neighbors, NewRT, TriggerState);
 %% userdevguide-end rt_loop:trigger
 
 % failure detector reported dead node
