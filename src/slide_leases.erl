@@ -237,7 +237,7 @@ find_lease(State, SlideOp) ->
 tester_create_dht_node_state() ->
     DHTNode = pid_groups:find_a(dht_node),
     ct:pal("DHTNode ~p", [DHTNode]),
-    comm:send_local(DHTNode, {get_state, comm:mypid()}),
+    comm:send_local(DHTNode, {get_state, comm:this()}),
     receive
         {get_state_response, State} ->
             State
