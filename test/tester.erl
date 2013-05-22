@@ -208,10 +208,12 @@ apply_feeder(Module, Func, Args, ResultType, TypeInfos) ->
             true ->
                 {ok, Result};
             {false, ErrMsg} ->
+                tester_type_checker:log_error(ErrMsg),
                 {fail, no_result, ResultType, type_check_failed_of_feeder_result, Module,
                  FeederFun,
                  Args,
-                 ErrMsg, erlang:get_stacktrace(), util:get_linetrace()}
+                 consult_output_for_detailed_type_check_report,
+                 erlang:get_stacktrace(), util:get_linetrace()}
         end
     catch
         Error:Reason ->
@@ -232,9 +234,10 @@ apply_args(Module, Func, Args, ResultType, TypeInfos, Thread) ->
             true ->
                 ok;
             {false, ErrorMsg} ->
-                % @todo give good error message
+                tester_type_checker:log_error(ErrorMsg),
                 {fail, Result, ResultType, type_check_failed_on_fun_result, Module, Func,
-                 Args, ErrorMsg, no_stacktrace, util:get_linetrace()}
+                 Args, consult_output_for_detailed_type_check_report,
+                 no_stacktrace, util:get_linetrace()}
         end
     catch
         exit:{test_case_failed, Reason} ->
