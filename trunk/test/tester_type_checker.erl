@@ -23,6 +23,7 @@
 -vsn('$Id$').
 
 -export([check/3]).
+-export([log_error/1]).
 
 -include("tester.hrl").
 %-include("unittest.hrl").
@@ -121,7 +122,7 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
         {integer, Int} ->
             check_basic_type_with_prop(
               Value, Type, CheckStack, ParseState,
-              fun erlang:is_integer/1, {not_the_integer, Int},
+              fun erlang:is_integer/1, not_the_integer,
               fun(X) -> Int =:= X end);
         {list, _InnerType} ->
             check_list(Value, Type, CheckStack, ParseState);
@@ -185,11 +186,11 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             {false, [{type_checker_unsupported_type, Type} | CheckStack]}
     end.
 
-check_basic_type(Value, _Type, CheckStack, _ParseState,
+check_basic_type(Value, Type, CheckStack, _ParseState,
                  TypeCheck, Report) ->
     case TypeCheck(Value) of
         true -> true;
-        false -> {false, [{Value, Report} | CheckStack]}
+        false -> {false, [{Value, Report, Type} | CheckStack]}
     end.
 
 check_basic_type_with_prop(Value, Type, CheckStack, ParseState,
@@ -200,7 +201,7 @@ check_basic_type_with_prop(Value, Type, CheckStack, ParseState,
         true ->
             case ValCheck(Value) of
                 true -> true;
-                false -> {false, [{Value, Report} | CheckStack]}
+                false -> {false, [{Value, Report, Type} | CheckStack]}
             end;
         {false, _} = R -> R
     end.
@@ -214,8 +215,12 @@ check_typedef(Value, {typedef, Module, TypeName} = T,
             {false, [{tester_lookup_type_failed,
                       {Module, TypeName}} | CheckStack]};
         {value, InnerType} ->
-            inner_check(Value, InnerType,
-                        [{Value, T} | CheckStack], ParseState)
+            case inner_check(Value, InnerType,
+                             CheckStack, ParseState) of
+                {false, ErrStack} ->
+                    {false, [{T, defined_as, InnerType, ErrStack}]};
+                true -> true
+            end
     end.
 
 check_range(Value, {range, {integer, Min}, {integer, Max}} = T,
@@ -226,8 +231,7 @@ check_range(Value, {range, {integer, Min}, {integer, Max}} = T,
                 true -> true;
                 false ->
                     {false,
-                     [{Value, not_in,
-                       '[', Min, '..', Max, ']'} | CheckStack ]}
+                     [{Value, not_in, T} | CheckStack ]}
             end;
         false ->
             {false, [{Value, no_integer_in_range, T} | CheckStack]}
@@ -240,10 +244,14 @@ check_record(Value, {record, Module, TypeName} = T, CheckStack, ParseState) ->
                       {Module, TypeName}} | CheckStack]};
         {value, {record, FieldList} = _InnerType} ->
             %% check record name here (add it as record field in front)
-            inner_check(Value, {record,
+            case inner_check(Value, {record,
                         [ {typed_record_field, tag, {atom, TypeName}}
                           | FieldList ]},
-                        [{Value, T} | CheckStack], ParseState)
+                             CheckStack, ParseState) of
+                {false, ErrStack} ->
+                    {false, [{Value, record_field_mismatch, T, ErrStack}]};
+                true -> true
+            end
     end.
 
 
@@ -257,16 +265,22 @@ check_record_fields(Value, {record, FieldList}, CheckStack, ParseState)
 check_list(Value, {list, InnerType} = T, CheckStack, ParseState) ->
     case is_list(Value) of
         true ->
-            check_list_iter(Value, InnerType,
-                            [{Value, T} | CheckStack], ParseState, 1);
+            case check_list_iter(Value, InnerType, CheckStack, ParseState, 1) of
+                {false, ErrStack} ->
+                    {false, [{Value, list_element_mismatch, T, ErrStack}]};
+                true -> true
+            end;
         false ->
             {false, [{Value, no_list, T} | CheckStack]}
     end;
 check_list(Value, {nonempty_list, InnerType} = T, CheckStack, ParseState) ->
     case is_list(Value) andalso [] =/= Value of
         true ->
-            check_list_iter(Value, InnerType,
-                            [{Value, T} | CheckStack], ParseState, 1);
+            case check_list_iter(Value, InnerType, CheckStack, ParseState, 1) of
+                {false, ErrStack} ->
+                    {false, [{Value, list_element_mismatch, T, ErrStack}]};
+                        true -> true
+                    end;
         false ->
             {false, [{Value, no_nonempty_list, T} | CheckStack]}
     end.
@@ -275,13 +289,11 @@ check_list(Value, {nonempty_list, InnerType} = T, CheckStack, ParseState) ->
 check_list_iter([], _Type, _CheckStack, _ParseState, _Count) ->
     true;
 check_list_iter([Value | Tail], Type, CheckStack, ParseState, Count) ->
-    case inner_check(Value, Type,
-                     [{Value, list_element, Count, Type} | CheckStack],
-                     ParseState) of
+    case inner_check(Value, Type, CheckStack, ParseState) of
         true ->
             check_list_iter(Tail, Type, CheckStack, ParseState, Count + 1);
         {false, Stack} ->
-            {false, Stack}
+            {false, [{Value, list_element, Count, Type, Stack}]}
     end.
 
 check_atom(Value, {atom, Atom} = T, CheckStack, _ParseState) ->
@@ -290,7 +302,7 @@ check_atom(Value, {atom, Atom} = T, CheckStack, _ParseState) ->
             case Value =:= Atom of
                 true -> true;
                 false ->
-                    {false, [{Value, not_the_atom, Atom} | CheckStack]}
+                    {false, [{Value, not_the_atom, T} | CheckStack]}
             end;
         false ->
             {false, [{Value, no_atom, T} | CheckStack]}
@@ -301,10 +313,13 @@ check_tuple(Value, {tuple, Tuple} = T, CheckStack, ParseState) ->
         true ->
             case erlang:tuple_size(Value) =:= erlang:length(Tuple) of
                 true ->
-                    check_tuple_iter(tuple_to_list(Value), Tuple,
-                                     [{Value, T} | CheckStack], ParseState, 1);
-                false ->
-                    {false, [{Value, not_same_arity, T} | CheckStack]}
+                    case check_tuple_iter(tuple_to_list(Value), Tuple,
+                                          CheckStack, ParseState, 1) of
+                        {false, ErrStack} ->
+                            {false, [{Value, tuple_element_mismatch, T, ErrStack}]};
+                        true -> true
+                    end;
+                _ -> {false, [{Value, not_same_arity, T} | CheckStack]}
             end;
         false ->
             {false, [{Value, no_tuple, T} | CheckStack]}
@@ -314,13 +329,11 @@ check_tuple_iter([], [], _CheckStack, _ParseState, _Count) ->
     true;
 check_tuple_iter([Value | Tail], [Type | TypeTail], CheckStack,
                  ParseState, Count) ->
-    case inner_check(Value, Type,
-                     [{Value, tuple_element, Count, Type} | CheckStack],
-                     ParseState) of
+    case inner_check(Value, Type, CheckStack, ParseState) of
         true ->
             check_tuple_iter(Tail, TypeTail, CheckStack, ParseState, Count + 1);
         {false, Stack} ->
-            {false, Stack}
+            {false, [{Value, tuple_element, Count, Type, Stack}]}
     end.
 
 check_union(Value, {union, Union}, CheckStack, ParseState) ->
@@ -338,8 +351,8 @@ check_union(Value, {union, Union}, CheckStack, ParseState) ->
            end, {false, []}, Union) of
         true -> true;
         {false, UnionStack} ->
-            {false, [{Value, no_union_variant_matched, UnionStack},
-                     {Value, {union, Union}}| CheckStack]}
+            {false, [{Value, no_union_variant_matched,
+                      {union, Union}, UnionStack} | CheckStack]}
     end.
 
 check_fun(Value, {'fun', {product, ParamTypes} = Type, _ResultType},
@@ -358,3 +371,100 @@ check_fun(Value, {'fun', {product, ParamTypes} = Type, _ResultType},
             end
     end.
 
+-spec log_error(any()) -> ok.
+log_error([ErrorReport]) ->
+    ErrorIOList = log_error(ErrorReport, ""),
+    ct:pal(lists:flatten("TypeCheck:~n" ++ ErrorIOList)),
+    ok;
+log_error(ErrorReport) ->
+    ErrorIOList = log_error(ErrorReport, ""),
+    ct:pal(lists:flatten("TypeCheck:~n" ++ ErrorIOList)),
+    ok.
+
+log_error([], _Prefix) -> "";
+log_error([ErrorReport], Prefix) ->
+    log_error(ErrorReport, Prefix ++ "  ");
+log_error([H|T], Prefix) ->
+    log_error(H, Prefix ++ " |")
+        ++ log_error(T, Prefix);
+log_error({Val, tuple_element, I, Type, Tree}, Prefix) ->
+    io_lib:format(
+      Prefix ++ "`-Error:         tuple element ~.0p mismatched~n" ++
+      Prefix ++ "  Expected type: ~s~n" ++
+      Prefix ++ "  Value:         ~.0p~n" ++
+      Prefix ++ "  Because:~n",
+      [I, render_type(Type), Val])
+      ++ log_error(Tree, Prefix ++ " ");
+log_error({Val, list_element, I, Type, Tree}, Prefix) ->
+    io_lib:format(
+      Prefix ++ "`-Error:         list element ~.0p mismatched~n" ++
+      Prefix ++ "  Expected type: ~s~n" ++
+      Prefix ++ "  Value:         ~.0p~n" ++
+      Prefix ++ "  Because:~n",
+      [I, render_type(Type), Val])
+      ++ log_error(Tree, Prefix ++ " ");
+log_error({Type, defined_as, InnerType, Tree}, Prefix) ->
+    io_lib:format(
+      Prefix ++ "`-Expected type: ~s~n" ++
+      Prefix ++ "  DefinedAs:     ~s~n",
+      [render_type(Type), render_type(InnerType)])
+      ++ log_error(Tree, Prefix ++ " ");
+log_error({Val, Error, Type, Tree}, Prefix) when is_list(Tree) ->
+    io_lib:format(
+      Prefix ++ "`-Error:         ~.0p~n" ++
+      Prefix ++ "  Expected type: ~s~n" ++
+      Prefix ++ "  Value:         ~.0p~n" ++
+      Prefix ++ "  Because:~n",
+      [Error, render_type(Type), Val])
+      ++ log_error(Tree, Prefix ++ " ");
+log_error({Val, Error, Type}, Prefix) ->
+    io_lib:format(
+      Prefix ++ "`-Error:         ~.0p~n" ++
+      Prefix ++ "  Expected type: ~s~n" ++
+      Prefix ++ "  Value:         ~.0p~n",
+      [Error, render_type(Type), Val]);
+log_error(ErrorReport, Prefix) ->
+    io_lib:format(Prefix ++ "`-***~.0p~n", [ErrorReport]).
+
+render_type(Type) ->
+    lists:flatten(render_type_(Type)).
+
+render_type_(Basic) when is_atom(Basic) ->
+    io_lib:format("~p()", [Basic]);
+render_type_({atom, Atom}) ->
+    io_lib:format("'~p'", [Atom]);
+render_type_({builtin_type, Type}) ->
+    io_lib:format("erlang:~p()", [Type]);
+render_type_({'fun', {product, _ParamTypes} = P, ResultType}) ->
+    "fun(" ++ render_type(P) ++ ") -> " ++
+        render_type_(ResultType);
+render_type_({integer, Int}) ->
+    io_lib:format("~p", [Int]);
+render_type_({list, InnerType}) ->
+    "[" ++ render_type_(InnerType) ++ "]";
+render_type_({nonempty_list, InnerType}) ->
+    "nonempty_list: [" ++ render_type_(InnerType) ++ "]";
+render_type_({product, TypeList}) when is_list(TypeList) ->
+    list_separated_by(TypeList, ", ");
+render_type_({range, {integer, Min}, {integer, Max}}) ->
+    io_lib:format("~p..~p", [Min, Max]);
+render_type_({record, Module, RecordName}) ->
+    io_lib:format("~p:#~p{}", [Module, RecordName]);
+render_type_({record, FieldList}) when is_list(FieldList) ->
+    list_separated_by(FieldList, ", ");
+render_type_({tuple, Tuple}) when is_list(Tuple) ->
+    "{" ++ list_separated_by(Tuple, ", ") ++ "}";
+render_type_({tuple, Tuple}) when is_tuple(Tuple) ->
+    render_type_(Tuple);
+render_type_({typedef, Module, TypeName}) ->
+    io_lib:format("~p:~p()", [Module, TypeName]);
+render_type_({union, Union}) ->
+    list_separated_by(Union, " | ");
+render_type_(Other) ->
+    io_lib:format("***~.0p***", [Other]).
+
+list_separated_by([], _Separator) -> "";
+list_separated_by([Type], _Separator) ->
+    render_type_(Type);
+list_separated_by([H|T], Separator) ->
+    render_type_(H) ++ Separator ++ list_separated_by(T, Separator).
