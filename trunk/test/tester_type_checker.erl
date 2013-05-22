@@ -37,7 +37,7 @@ check(Value, Type, ParseState) ->
         true ->
             true;
         {false, _CheckStack} = R ->
-            %ct:pal("Type check failed: ~.0p", [_CheckStack]),
+            %%ct:pal("Type check failed: ~.0p", [_CheckStack]),
             R
     end.
 
@@ -167,10 +167,8 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
         {record, FieldList} when is_list(FieldList) ->
             check_record_fields(Value, Type, CheckStack, ParseState);
         reference ->
-            case is_reference(Value) of
-                true -> {true, CheckStack};
-                false -> {false, [not_a_reference | CheckStack]}
-            end;
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_reference/1, no_reference);
         tid ->
             % built-in < R14; otherwise ets:tid()
             inner_check(Value, integer, CheckStack, ParseState);
@@ -262,7 +260,7 @@ check_list(Value, {list, InnerType} = T, CheckStack, ParseState) ->
             check_list_iter(Value, InnerType,
                             [{Value, T} | CheckStack], ParseState, 1);
         false ->
-            {false, [{Value, not_a_list, T} | CheckStack]}
+            {false, [{Value, no_list, T} | CheckStack]}
     end;
 check_list(Value, {nonempty_list, InnerType} = T, CheckStack, ParseState) ->
     case is_list(Value) andalso [] =/= Value of
@@ -309,7 +307,7 @@ check_tuple(Value, {tuple, Tuple} = T, CheckStack, ParseState) ->
                     {false, [{Value, not_same_arity, T} | CheckStack]}
             end;
         false ->
-            {false, [{Value, not_a_tuple, T} | CheckStack]}
+            {false, [{Value, no_tuple, T} | CheckStack]}
     end.
 
 check_tuple_iter([], [], _CheckStack, _ParseState, _Count) ->
@@ -348,7 +346,7 @@ check_fun(Value, {'fun', {product, ParamTypes} = Type, _ResultType},
           CheckStack, _ParseState) ->
     case is_function(Value) of
         false ->
-            {false, [{Value, is_not_a_function, Type} | CheckStack]};
+            {false, [{Value, no_function, Type} | CheckStack]};
         true ->
             {arity, Arity} = erlang:fun_info(Value, arity),
             case Arity =:= length(ParamTypes) of
