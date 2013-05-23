@@ -40,11 +40,11 @@ create_value(Type, Size, ParseState) ->
             try create_value_(Type, Size, ParseState)
             catch
                 throw:{error, Msg} ->
-                    NewMsg = lists:flatten(io_lib:format("couldn't create a value of type ~p",
+                    NewMsg = lists:flatten(io_lib:format("couldn't create a value of type ~s",
                                            [tester_type_checker:render_type(Type)])),
                     throw({error, [NewMsg|Msg]});
                 throw:Term ->
-                    NewMsg = lists:flatten(io_lib:format("couldn't create a value of type ~p",
+                    NewMsg = lists:flatten(io_lib:format("couldn't create a value of type ~s",
                                            [tester_type_checker:render_type(Type)])),
                     throw({error, [NewMsg]})
             end;

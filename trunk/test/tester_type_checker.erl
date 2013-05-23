@@ -456,9 +456,11 @@ render_type_({record, FieldList}) when is_list(FieldList) ->
 render_type_({tuple, Tuple}) when is_list(Tuple) ->
     "{" ++ list_separated_by(Tuple, ", ") ++ "}";
 render_type_({tuple, Tuple}) when is_tuple(Tuple) ->
-    render_type_(Tuple);
+    "{" ++ render_type_(Tuple) ++ "}";
 render_type_({typedef, Module, TypeName}) ->
     io_lib:format("~p:~p()", [Module, TypeName]);
+render_type_({typed_record_field, Name, Type}) ->
+    io_lib:format("...#{~p :: ~s, ...}", [Name, render_type_(Type)]);
 render_type_({union, Union}) ->
     list_separated_by(Union, " | ");
 render_type_(Other) ->
