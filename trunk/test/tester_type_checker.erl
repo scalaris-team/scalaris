@@ -24,6 +24,7 @@
 
 -export([check/3]).
 -export([log_error/1]).
+-export([render_type/1]).
 
 -include("tester.hrl").
 %-include("unittest.hrl").

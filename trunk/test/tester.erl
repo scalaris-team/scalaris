@@ -164,8 +164,9 @@ run_test_ttt(Module, Func,
     Size = 30,
     Args = try tester_value_creator:create_value(ArgType, Size, TypeInfos)
            catch
-               Error:Reason ->
-                   ct:pal("Reason: ~p~n", [Reason]),
+               Error:{error, Reason} ->
+                   print_error(Reason),
+                   %ct:pal("Reason: ~p~n", [Reason]),
                    {fail, no_result, no_result_type, Error, tester_value_creator,
                     create_value,
                     [ArgType, Size, TypeInfos],
@@ -354,7 +355,7 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
           Res1 = case lists:member(FA, FunsToTestNormally) of
                      true ->
                          ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
-                         test(Module, Fun, Arity, Count, [{threads, 2}]);
+                         test(Module, Fun, Arity, Count, [{threads, 1}]);
                      false -> skipped
                  end,
 
@@ -385,7 +386,7 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
               true ->
                   ct:pal("Testing with feeder ~p:~p/~p~n",
                          [Module, Fun, Arity]),
-                  [Res1 , test(Module, Fun, Arity, Count, [{threads, 2}, with_feeder])];
+                  [Res1 , test(Module, Fun, Arity, Count, [{threads, 1}, with_feeder])];
               false -> Res1
           end
       end
@@ -428,3 +429,13 @@ register_value_creator(Type, Module, Function, Arity) ->
 -spec unregister_value_creator({typedef, module(), atom()}) -> true | ok.
 unregister_value_creator(Type) ->
     tester_global_state:unregister_value_creator(Type).
+
+print_error(Msgs) ->
+    ct:pal("error in value creator:\n" ++ lists:flatten(print_error_(Msgs, ""))).
+
+print_error_([], _Prefix) ->
+    "";
+print_error_([Msg|Msgs], "") ->
+    io_lib:format("~p~n", [Msg]) ++ print_error_(Msgs, " ");
+print_error_([Msg|Msgs], Prefix) ->
+    io_lib:format("~p~p~n", [Prefix, Msg]) ++ print_error_(Msgs, Prefix ++ " ").
