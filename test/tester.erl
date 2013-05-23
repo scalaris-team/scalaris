@@ -436,6 +436,6 @@ print_error(Msgs) ->
 print_error_([], _Prefix) ->
     "";
 print_error_([Msg|Msgs], "") ->
-    io_lib:format("~p~n", [Msg]) ++ print_error_(Msgs, " ");
+    io_lib:format("~s~n", [Msg]) ++ print_error_(Msgs, " ");
 print_error_([Msg|Msgs], Prefix) ->
-    io_lib:format("~p~p~n", [Prefix, Msg]) ++ print_error_(Msgs, Prefix ++ " ").
+    io_lib:format("~s~s~n", [Prefix, Msg]) ++ print_error_(Msgs, Prefix ++ " ").
