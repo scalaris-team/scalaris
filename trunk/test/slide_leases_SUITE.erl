@@ -37,8 +37,8 @@ groups() ->
 
 all() ->
     [
-     %{group, tester_tests},
-     %{group, join_tests}
+     {group, tester_tests},
+     {group, join_tests}
      ].
 
 suite() -> [ {timetrap, {seconds, 120}} ].
@@ -77,11 +77,13 @@ end_per_testcase(_TestCase, Config) ->
 tester_type_check_slide_leases(_Config) ->
     Count = 1000,
     config:write(no_print_ring_data, true),
-    tester:register_value_creator({typedef, dht_node_state, state}, slide_leases, tester_create_dht_node_state, 0),
+    %tester:register_value_creator({typedef, dht_node_state, state}, slide_leases, tester_create_dht_node_state, 0),
+    %tester:register_value_creator({typedef, dht_node_state, state}, slide_leases, tester_create_slide_ops, 0),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {slide_leases,
            [
+            {prepare_join_send, 2},
             {prepare_rcv_data, 2},
             {prepare_send_data1, 3},
             {prepare_send_data2, 3},
@@ -104,7 +106,7 @@ tester_type_check_slide_leases(_Config) ->
     pid_groups:join(pid_groups:group_with(dht_node)),
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_value_creator({typedef, intervals, interval}),
+    %tester:unregister_value_creator( TODO ),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -114,6 +116,9 @@ tester_type_check_slide_leases(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 test_single_join(_Config) ->
+    wait_for_ring_size(1),
+    wait_for_correct_ring(),
+    ct:pal("leases ~p", [get_leases()]),
     api_vm:add_nodes(1),
     wait_for_ring_size(2),
     wait_for_correct_ring(),
@@ -131,6 +136,9 @@ wait_for(F) ->
         true ->
             ok;
         false ->
+            wait_for(F);
+        X ->
+            ct:pal("error in wait_for ~p", [X]),
             wait_for(F)
     end.
 
@@ -138,7 +146,7 @@ wait_for_ring_size(Size) ->
     wait_for(fun () -> api_vm:number_of_nodes() == Size end).
 
 wait_for_correct_ring() ->
-    wait_for(fun () -> admin:check_ring() end).
+    wait_for(fun () -> admin:check_ring() == ok end).
 
 
 get_dht_node_state(Pid, What) ->
@@ -146,4 +154,12 @@ get_dht_node_state(Pid, What) ->
     receive
         {get_state_response, Data} ->
             Data
+    end.
+
+get_leases() ->
+    DHTNode = pid_groups:find_a(dht_node),
+    comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
+    receive
+        {get_state_response, Leases} ->
+            Leases
     end.
