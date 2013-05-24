@@ -162,41 +162,47 @@ run_test_ttt(Module, Func,
              TypeInfos, Options, Thread) ->
     {ArgType, ResultType} = get_arg_and_result_type(FunType, FeederFunType, Options),
     Size = 30,
-    Args = try tester_value_creator:create_value(ArgType, Size, TypeInfos)
+    GenArgs = try
+               {ok, tester_value_creator:create_value(ArgType, Size, TypeInfos)}
            catch
                Error:{error, Reason} ->
                    print_error(Reason),
                    %ct:pal("Reason: ~p~n", [Reason]),
-                   {fail, no_result, no_result_type, Error, tester_value_creator,
-                    create_value,
-                    [ArgType, Size, TypeInfos],
-                    Reason, erlang:get_stacktrace(), util:get_linetrace()}
+                   {fail, {fail, no_result, no_result_type, Error, tester_value_creator,
+                           create_value,
+                           [ArgType, Size, typeInfos], %TypeInfos
+                           Reason, erlang:get_stacktrace(), util:get_linetrace()}}
            end,
-    case proplists:get_bool(with_feeder, Options) of
-        true ->
-            % result is a tuple
-            Result = apply_feeder(Module, Func, Args, ResultType, TypeInfos),
-            case Result of
-                {ok, FeededArgs} ->
-                    FunResultTypes =
-                        [InnerResultType
-                         || {'fun', InnerArgType, InnerResultType} <- FunTypes,
-                            tester_type_checker:check(FeededArgs, InnerArgType, TypeInfos) =:= true],
-                    case FunResultTypes of
-                        [] ->
-                            {fail, no_result, no_result_type,
-                             type_check_failed_feeder_result_is_not_valid_input_for_fun,
-                             Module, Func, Args, none, erlang:get_stacktrace(),
-                             util:get_linetrace()};
-                        _ ->
-                            apply_args(Module, Func, tuple_to_list(FeededArgs),
-                                       {union, FunResultTypes}, TypeInfos, Thread)
+    case GenArgs of
+        {ok, Args} ->
+            case proplists:get_bool(with_feeder, Options) of
+                true ->
+                                                % result is a tuple
+                    Result = apply_feeder(Module, Func, Args, ResultType, TypeInfos),
+                    case Result of
+                        {ok, FeededArgs} ->
+                            FunResultTypes =
+                                [InnerResultType
+                                 || {'fun', InnerArgType, InnerResultType} <- FunTypes,
+                                    tester_type_checker:check(FeededArgs, InnerArgType, TypeInfos) =:= true],
+                            case FunResultTypes of
+                                [] ->
+                                    {fail, no_result, no_result_type,
+                                     type_check_failed_feeder_result_is_not_valid_input_for_fun,
+                                     Module, Func, Args, none, erlang:get_stacktrace(),
+                                     util:get_linetrace()};
+                                _ ->
+                                    apply_args(Module, Func, tuple_to_list(FeededArgs),
+                                               {union, FunResultTypes}, TypeInfos, Thread)
+                            end;
+                        FeederError ->
+                            FeederError
                     end;
-                FeederError ->
-                    FeederError
+                false ->
+                    apply_args(Module, Func, Args, ResultType, TypeInfos, Thread)
             end;
-        false ->
-            apply_args(Module, Func, Args, ResultType, TypeInfos, Thread)
+        {fail, ErrorDesc} ->
+            ErrorDesc
     end.
 
 % @doc called before the actual test to convert the input values. Can
@@ -272,7 +278,7 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
     %ct:pal("~w~n", [Results]),
     _ = [fun ({Result, ThreadPid}) ->
                  case Result of
-                     {fail, ResultValue, ResultType, Error, Module, Func, Args, Term,
+                     {fail, ResultValue, ResultType, Error, _Module, _Func, Args, Term,
                       StackTrace, LineTrace} ->
                          ArgsStr = case lists:flatten([io_lib:format(", ~1000p", [Arg]) || Arg <- Args]) of
                                        [$,, $ | X] -> X;
