@@ -28,6 +28,7 @@
 
         farity_list/1, record_defs/1, function/3]).
 
+-spec parse_transform(any(), any()) -> any().
 parse_transform(Forms, _Options) ->
     forms(Forms).
 
@@ -76,6 +77,7 @@ form({eof,Line}) -> {eof,Line}.
 
 %% -type farity_list([Farity]) -> [Farity] when Farity <= {atom(),integer()}.
 
+-spec farity_list(list()) -> list().
 farity_list([{Name,Arity}|Fas]) ->
     [{Name,Arity}|farity_list(Fas)];
 farity_list([]) -> [].
@@ -84,6 +86,7 @@ farity_list([]) -> [].
 %%  N.B. Field names are full expressions here but only atoms are allowed
 %%  by the *parser*!
 
+-spec record_defs(list()) -> list().
 record_defs([{record_field,Line,{atom,La,A},Val0}|Is]) ->
     Val1 = expr(Val0),
     [{record_field,Line,{atom,La,A},Val1}|record_defs(Is)];
@@ -93,6 +96,7 @@ record_defs([]) -> [].
 
 %% -type function(atom(), integer(), [Clause]) -> {atom(),integer(),[Clause]}.
 
+-spec function(atom(), integer(), any()) -> {atom(), integer(), any()}.
 function(Name, Arity, Clauses0) ->
     Clauses1 = clauses(Clauses0),
     {Name,Arity,Clauses1}.
