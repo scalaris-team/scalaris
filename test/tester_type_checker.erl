@@ -427,6 +427,7 @@ log_error({Val, Error, Type}, Prefix) ->
 log_error(ErrorReport, Prefix) ->
     io_lib:format(Prefix ++ "`-***~.0p~n", [ErrorReport]).
 
+-spec render_type(any()) -> string().
 render_type(Type) ->
     lists:flatten(render_type_(Type)).
 
