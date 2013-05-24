@@ -431,11 +431,10 @@ unregister_value_creator(Type) ->
     tester_global_state:unregister_value_creator(Type).
 
 print_error(Msgs) ->
-    ct:pal("error in value creator:\n" ++ lists:flatten(print_error_(Msgs, ""))).
+    ct:pal("error in value creator. could not create a value of type:\n"
+           ++ lists:flatten(print_error_(lists:reverse(Msgs), "  "))).
 
 print_error_([], _Prefix) ->
     "";
-print_error_([Msg|Msgs], "") ->
-    io_lib:format("~s~n", [Msg]) ++ print_error_(Msgs, " ");
 print_error_([Msg|Msgs], Prefix) ->
-    io_lib:format("~s~s~n", [Prefix, Msg]) ++ print_error_(Msgs, Prefix ++ " ").
+    io_lib:format("~s~s~n", [Prefix, Msg]) ++ print_error_(Msgs, " in ").
