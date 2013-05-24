@@ -79,6 +79,8 @@ childs([DHTNodeGroup]) ->
     TX_RTM3_Paxos = util:sup_supervisor_desc(
                     sup_paxos_rtm3, sup_paxos, start_link,
                     [{DHTNodeGroup, [{sup_paxos_prefix, tx_rtm3}]}]),
+    TX_TM_New = util:sup_worker_desc(tx_tm_new, tx_tm, start_link,
+                                 [DHTNodeGroup, tx_tm_new]),
     [
      RDHT_tx_read, RDHT_tx_write,
      %% start paxos supervisors before tx processes to create used atoms
@@ -86,5 +88,6 @@ childs([DHTNodeGroup]) ->
      TX_RTM0_Paxos, TX_RTM0,
      TX_RTM1_Paxos, TX_RTM1,
      TX_RTM2_Paxos, TX_RTM2,
-     TX_RTM3_Paxos, TX_RTM3
+     TX_RTM3_Paxos, TX_RTM3,
+     TX_TM_New
     ].

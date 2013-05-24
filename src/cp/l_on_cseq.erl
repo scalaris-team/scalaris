@@ -231,7 +231,7 @@ empty_lease_list() ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
+-spec on(comm:message(), dht_node_state:state()) -> dht_node_state:state() | kill.
 on({l_on_cseq, split_and_change_owner, _Lease, NewOwner, ReplyPid, SplitResult}, State) ->
     case SplitResult of
         {split, success, L2, _L1} ->
