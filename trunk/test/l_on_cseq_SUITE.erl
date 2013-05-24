@@ -683,7 +683,7 @@ test_renew_helper(_Config, ModifyF, WaitF) ->
     pid_groups:join(pid_groups:group_with(dht_node)),
 
     % intercept lease renew
-    M = {l_on_cseq, renew, Old, Mode} = intercept_lease_renew(),
+    M = {l_on_cseq, renew, Old, _Mode} = intercept_lease_renew(),
     Id = l_on_cseq:get_id(Old),
     % now we update the lease
     New = ModifyF(Old),

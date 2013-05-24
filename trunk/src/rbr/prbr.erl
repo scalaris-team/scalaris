@@ -43,6 +43,10 @@
 %% let users retrieve their uid from an assigned round number.
 -export([r_with_id_get_id/1]).
 
+%% let users retrieve their smallest possible round for fast_write on
+%% entry creation.
+-export([smallest_round/1]).
+
 -ifdef(with_export_type_support).
 -export_type([message/0]).
 -export_type([state/0]).
@@ -167,6 +171,17 @@ set_entry(NewEntry, TableName) ->
     ?PDB:set(NewEntry, TableName),
     TableName.
 
+%% As the round number contains the client's pid, they are still
+%% unique.  Two clients using their smallest_round for a fast write
+%% concurrently are separated, because we do not use plain Paxos, but
+%% assign a succesful writer immediately the next round_number for a
+%% follow up fast_write by increasing our read_round already on the
+%% write.  So, the smallest_round of the second client becomes invalid
+%% when the first one writes.  In consequence, at most one proposer
+%% can perform a successful fast_write with its smallest_round. Voila!
+-spec smallest_round(comm:mypid()) -> r_with_id().
+smallest_round(Pid) -> {0, Pid}.
+
 %% operations for abstract data type entry()
 
 -spec new(any()) -> entry().
@@ -176,8 +191,8 @@ new(Key) ->
 -spec new(any(), any()) -> entry().
 new(Key, Val) ->
     {Key,
-     _R_Read = {0, '_'},
-     _R_Write = {0, '_'},
+     _R_Read = {0, '_'},  %% Note: atoms < pids, so this is a good default.
+     _R_Write = {0, '_'}, %% Note: atoms < pids, so this is a good default.
      _Value = Val}.
 
 

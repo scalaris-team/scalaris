@@ -97,7 +97,7 @@
                 lease_db3 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db4 = ?required(state, prbr_state) :: prbr:state(),
                 lease_list = ?required(state, lease_list) :: l_on_cseq:lease_list_state(),
-				snapshot_state   = null :: snapshot_state:snapshot_state() | null 
+                snapshot_state   = null :: snapshot_state:snapshot_state() | null
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state

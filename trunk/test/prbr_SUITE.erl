@@ -78,9 +78,8 @@ init_per_testcase(TestCase, Config) ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring(1,
-                                      [{config, [{log_path, PrivDir},
-                                                 {leases, true}]}]),
+            Size = randoms:rand_uniform(1, 9),
+            unittest_helper:make_ring(Size, [{config, [{log_path, PrivDir}]}]),
             Config
     end.
 
@@ -123,7 +122,7 @@ rbr_concurrency_kv(_Config) ->
              || _Nth <- lists:seq(1, Parallel)],
 
     _ = [ receive {done} ->
-                      ct:pal("Finished number ~p.~n", [Nth]),
+                      ct:pal("Finished ~p/~p.~n", [Nth, Parallel]),
                       ok
           end || Nth <- lists:seq(1, Parallel)],
 
@@ -164,10 +163,14 @@ rbr_concurrency_leases(_Config) ->
            "Performing iterations: ~p~n",
            [Parallel, Count]),
     UnitTestPid = self(),
+    DHTNodeGroups = pid_groups:groups_with(dht_node),
+    DHTNodeGroupsLen = length(DHTNodeGroups),
     _Pids =
         [ spawn(
             fun() ->
-                    pid_groups:join(pid_groups:group_with(dht_node)),
+                    Group = lists:nth(1 + Nth rem DHTNodeGroupsLen,
+                                      DHTNodeGroups),
+                    pid_groups:join(Group),
                     _ = [ begin
                               F = fun(X) ->
                                           {ok, V} = l_on_cseq:read(Key),
@@ -190,10 +193,10 @@ rbr_concurrency_leases(_Config) ->
                           || _I <- lists:seq(1, Count)],
                     UnitTestPid ! {done}
             end)
-          || _Nth <- lists:seq(1, Parallel)],
+          || Nth <- lists:seq(1, Parallel)],
 
     _ = [ receive {done} ->
-                      ct:pal("Finished number ~p.~n", [Nth]),
+                      ct:pal("Finished ~p/~p.~n", [Nth, Parallel]),
                       ok
           end || Nth <- lists:seq(1, Parallel)],
 
@@ -225,9 +228,9 @@ rbr_consistency(_Config) ->
                         1 -> 1;
                         _ -> N+99
                     end,
-              
+
               modify_rbr_at_key(R, N+100),
-              
+
               %% intercept and drop a message at r1
               _ = lists:foldl(read_quorum_without(Key), {Old, New}, Nodes),
               ok
@@ -240,8 +243,35 @@ tester_type_check_rbr(_Config) ->
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
-        [ {kv_on_cseq,
-           [ {commit_read, 3}, %% tested via feeder
+        [ {txid_on_cseq,
+           [ {is_valid_new, 3}, %% cannot create funs
+             {is_valid_decide, 3}, %% cannot create funs
+             {is_valid_delete, 3}, %% cannot create funs
+             {new, 3}, %% tested via feeder
+             {decide, 5}, %% cannot create pids
+             {delete, 2}, %% cannot create pids
+             {read, 2} %% cannot create pids
+           ],
+           [ {cc_single_write, 3}, %% cannot create funs
+             {cc_set_rl, 3}, %% cannot create funs
+             {cc_set_wl, 3},  %% cannot create funs
+             {cc_commit_read, 3}  %% cannot create funs
+           ]},
+          {tx_tm,
+           [{start_link, 2},       %% starts processes
+            {init, 1},             %% needs to be pid_group member
+            {on, 2},               %% needs valid messages
+            {on_init, 2},          %% needs valid messages
+            {commit, 4},           %% needs valid clients pid
+            {msg_commit_reply, 3} %% needs valid clients pid
+           ],
+           [ {get_entry, 2},         %% could read arb, entries
+             %% guessing keys of tx entries...
+             {tx_state_add_nextround_writtenval_for_commit, 4} 
+           ]
+          },
+          {kv_on_cseq,
+           [ {commit_read, 5}, %% tested via feeder
              {commit_write, 3}, %% tested via feeder
              {set_lock, 3} %% tested via feeder
            ],
@@ -261,13 +291,14 @@ tester_type_check_rbr(_Config) ->
              {get_entry, 2}        %% needs valid tid()
             ]},
           {rbrcseq,
-           [ {on, 2},         %% sends messages
-             {qread, 3},      %% tries to create envelopes
-             {qread, 4},      %% needs fun as input
-             {start_link, 3}, %% needs fun as input
-             {qwrite, 5},     %% needs funs as input
+           [ {on, 2},          %% sends messages
+             {qread, 3},       %% tries to create envelopes
+             {qread, 4},       %% needs fun as input
+             {start_link, 3},  %% needs fun as input
+             {qwrite, 5},      %% needs funs as input
              {qwrite, 7},      %% needs funs as input
-             {qwrite_fast, 9}      %% needs funs as input
+             {qwrite_fast, 7}, %% needs funs as input
+             {qwrite_fast, 9}  %% needs funs as input
            ],
            [ {inform_client, 2}, %% cannot create valid envelopes
              {get_entry, 2},     %% needs valid tid()

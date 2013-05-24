@@ -38,7 +38,7 @@
 %% api:
 -export([qread/3, qread/4]).
 -export([qwrite/5, qwrite/7]).
--export([qwrite_fast/9]).
+-export([qwrite_fast/7, qwrite_fast/9]).
 
 -export([start_link/3]).
 -export([init/1, on/2]).
@@ -143,6 +143,17 @@ qwrite(CSeqPidName, Client, Key, CC, Value) ->
     WF = fun prbr:noop_write_filter/3,
     qwrite(CSeqPidName, Client, Key, RF, CC, WF, Value).
 
+-spec qwrite_fast(pid_groups:pidname(),
+                  comm:erl_local_pid(),
+                  ?RT:key(),
+                  fun ((any(), any(), any()) -> any()), %% CC (Content Check)
+                  client_value(), prbr:r_with_id(),
+                  client_value() | prbr_bottom) -> ok.
+qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
+    RF = fun prbr:noop_read_filter/1,
+    WF = fun prbr:noop_write_filter/3,
+    qwrite_fast(CSeqPidName, Client, Key, RF, CC, WF, Value, Round, OldVal).
+
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
              ?RT:key(),
@@ -222,7 +233,7 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
     This = comm:reply_as(comm:this(), 2, {qread_collect, '_'}),
 
     %% add the ReqId in case we concurrently perform several requests
-    %% for the same key from the same process, which may happen
+    %% for the same key from the same process, which may happen.
     %% later: retrieve the request id from the assigned round number
     %% to get the entry from the pdb
     MyId = {my_id(), ReqId},
@@ -354,7 +365,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
     end;
 
 on({qread_write_through_collect, ReqId,
-    {write_reply, _Key, Round, _NextRound}}, State) ->
+    {write_reply, _Key, Round, NextRound}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_collect reply ~p~n", [ReqId]),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -370,7 +381,8 @@ on({qread_write_through_collect, ReqId,
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
                     ?TRACE("rbrcseq:on qread_write_through_collect infcl: ~p~n", [entry_client(Entry)]),
-                    inform_client(qwrite_done, NewEntry),
+                    ReplyEntry = entry_set_my_round(NewEntry, NextRound),
+                    inform_client(qwrite_done, ReplyEntry),
                     ?PDB:delete(ReqId, tablename(State))
             end
     end,
@@ -493,7 +505,7 @@ on({qwrite_read_done, ReqId,
     gen_component:post_op(State, {do_qwrite_fast, ReqId, Round, ReadValue});
 
 on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
-    WriteValue, RetriggerAfter, Round, OldValue}, State) ->
+    WriteValue, RetriggerAfter, Round, ReadFilterResultValue}, State) ->
 
     %% create state and ReqId, store it and trigger 'do_qwrite_fast'
     %% which is also the write phase of a slow write.
@@ -506,15 +518,16 @@ on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
                             Filters, WriteValue, RetriggerAfter),
 
     set_entry(Entry, tablename(State)),
-    gen_component:post_op(State, {do_qwrite_fast, ReqId, Round, OldValue});
+    gen_component:post_op(State, {do_qwrite_fast, ReqId, Round,
+                                  ReadFilterResultValue});
 
-on({do_qwrite_fast, ReqId, Round, OldValue}, State) ->
+on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
     Entry = setelement(2, get_entry(ReqId, tablename(State)), do_qwrite_fast),
     ContentCheck = element(2, entry_filters(Entry)),
     WriteFilter = element(3, entry_filters(Entry)),
     WriteValue = entry_val(Entry),
 
-    _ = case ContentCheck(OldValue, WriteFilter, WriteValue) of
+    _ = case ContentCheck(OldRFResultValue, WriteFilter, WriteValue) of
         {true, PassedToUpdate} ->
             %% own proposal possible as next instance in the consens sequence
             This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
@@ -530,7 +543,7 @@ on({do_qwrite_fast, ReqId, Round, OldValue}, State) ->
         {false, Reason} = _Err ->
             %% own proposal not possible as of content check
             comm:send_local(entry_client(Entry),
-                            {qwrite_deny, ReqId, Round, OldValue,
+                            {qwrite_deny, ReqId, Round, OldRFResultValue,
                              {content_check_failed, Reason}}),
             ?PDB:delete(ReqId, tablename(State))
     end,
@@ -540,7 +553,7 @@ on({do_qwrite_fast, ReqId, Round, OldValue}, State) ->
 %%                when      majority reached, -> finish.
 %%                otherwise just register the reply.
 on({qwrite_collect, ReqId,
-    {write_reply, _Key, Round, _NextRound}}, State) ->
+    {write_reply, _Key, Round, NextRound}}, State) ->
     ?TRACE("rbrcseq:on qwrite_collect write_reply~n", []),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -553,7 +566,8 @@ on({qwrite_collect, ReqId,
             case Done of
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
-                    inform_client(qwrite_done, NewEntry),
+                    ReplyEntry = entry_set_my_round(NewEntry, NextRound),
+                    inform_client(qwrite_done, ReplyEntry),
                     ?PDB:delete(ReqId, tablename(State))
             end
     end,
@@ -825,12 +839,13 @@ add_write_deny(Entry, Round) ->
 
 -spec inform_client(qread_done | qwrite_done, entry()) -> ok.
 inform_client(Tag, Entry) ->
-    comm:send_local(entry_client(Entry),
-                    {Tag,
-                     entry_reqid(Entry),
-                     entry_my_round(Entry),
-                     entry_val(Entry)
-                    }).
+    comm:send_local(
+      entry_client(Entry),
+      {Tag,
+       entry_reqid(Entry),
+       entry_my_round(Entry), %% here: round for client's next fast qwrite
+       entry_val(Entry)
+      }).
 
 %% @doc needs to be unique for this process in the whole system
 -spec my_id() -> any().
