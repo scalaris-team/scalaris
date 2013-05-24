@@ -38,6 +38,7 @@
 -export([lease_split/4]).
 -export([lease_merge/2]).
 -export([lease_send_lease_to_node/2]).
+-export([lease_split_and_change_owner/5]).
 -export([disable_lease/2]).
 -export([remove_lease_from_dht_node_state/2]).
 
@@ -55,7 +56,8 @@
          get_owner/1, set_owner/2,
          get_aux/1, set_aux/2,
          get_range/1, set_range/2,
-         split_range/2]).
+         split_range/2,
+         is_valid/1]).
 
 -export([add_first_lease_to_db/2]).
 -export([empty_lease_list/0]).
@@ -186,6 +188,20 @@ lease_send_lease_to_node(Pid, Lease) ->
     comm:send(Pid, {l_on_cseq, send_lease_to_node, Lease}),
     ok.
 
+-spec lease_split_and_change_owner(lease_t(), intervals:interval(),
+                                   intervals:interval(), comm:mypid(),
+                                   comm:erl_local_pid()) -> ok.
+lease_split_and_change_owner(Lease, R1, R2, NewOwner, ReplyPid) ->
+    % @todo precondition: i am owner of Lease and id(R2) == id(Lease)
+    % @todo precondition: i am owner of Lease
+    DHTNode = pid_groups:get_my(dht_node),
+    SplitReply = comm:reply_as(DHTNode, 6,
+                               {l_on_cseq, split_and_change_owner, Lease,
+                                NewOwner, ReplyPid, '_'}),
+    comm:send_local(DHTNode,
+                    {l_on_cseq, split, Lease, R1, R2, SplitReply}),
+    ok.
+
 -spec disable_lease(State::dht_node_state:state(), Lease::lease_t()) -> dht_node_state:state().
 disable_lease(State, Lease) ->
     disable_lease_in_dht_node_state(Lease, State).
@@ -215,12 +231,22 @@ empty_lease_list() ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
+on({l_on_cseq, split_and_change_owner, _Lease, NewOwner, ReplyPid, SplitResult}, State) ->
+    case SplitResult of
+        {split, success, L2, _L1} ->
+            gen_component:post_op(State,
+                                  {l_on_cseq, handover, L2, NewOwner, ReplyPid});
+        {split, fail, L1} ->
+            comm:send(ReplyPid, {split, fail, L1}),
+            State
+    end;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % lease renewal
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec on(any(), dht_node_state:state()) -> dht_node_state:state() | kill.
 on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}, Mode},
    State) ->
     %% log:pal("on renew ~p~n", [Old]),
@@ -275,6 +301,7 @@ on({l_on_cseq, renew_reply,
 on({l_on_cseq, send_lease_to_node, Lease}, State) ->
     % @todo do we need any checks?
     % @todo do i need to notify rm about the new range?
+    log:log("send_lease_to_node ~p ~p~n", [self(), Lease]),
     update_lease_in_dht_node_state(Lease, State, active);
 
 
@@ -500,7 +527,7 @@ on({l_on_cseq, merge_reply_step4, _L1, {qwrite_deny, _ReqId, _Round, _L2, _Reaso
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split, Lease, R1, R2, ReplyTo}, State) ->
     Id = id(R1),
-    log:pal("split first step: creating second lease ~p~n", [Id]),
+    log:pal("split first step: creating second lease (~p)~n", [Id]),
     New = #lease{id      = id(R1),
                  epoch   = 1,
                  owner   = comm:this(),
@@ -532,7 +559,7 @@ on({l_on_cseq, split_reply_step1, _Lease, _R1, _R2, ReplyTo,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, split_reply_step1, Lease=#lease{id=Id,epoch=OldEpoch}, R1, R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
-    log:pal("split second step: updating L1~n", []),
+    log:pal("split second step: updating L1 (~p)~n", [Id]),
     New = Lease#lease{
             epoch   = OldEpoch + 1,
             range   = R2,
@@ -646,11 +673,11 @@ on({l_on_cseq, split_reply_step3,
                    New),
     update_lease_in_dht_node_state(L2, State, active);
 
-on({l_on_cseq, split_reply_step4, _L2, _R1, _R2, ReplyTo,
+on({l_on_cseq, split_reply_step4, L2, _R1, _R2, ReplyTo,
     {qwrite_done, _ReqId, _Round, L1}}, State) ->
     log:pal("successful split~n", []),
     log:pal("successful split ~p~n", [ReplyTo]),
-    comm:send_local(ReplyTo, {split, success, L1}),
+    comm:send_local(ReplyTo, {split, success, L2, L1}),
     update_lease_in_dht_node_state(L1, State, active);
 
 on({l_on_cseq, split_reply_step4, L2, R1, R2, ReplyTo,
@@ -1101,6 +1128,10 @@ get_range(#lease{range=Range}) -> Range.
 
 -spec set_range(lease_t(), intervals:interval()) -> lease_t().
 set_range(L, Range) -> L#lease{range=Range}.
+
+-spec is_valid(lease_t()) -> boolean().
+is_valid(L) ->
+    os:timestamp() <  L#lease.timeout.
 
 -spec update_lease_in_dht_node_state(lease_t(), dht_node_state:state(), active | passive) ->
     dht_node_state:state().
