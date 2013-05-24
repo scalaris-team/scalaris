@@ -33,7 +33,7 @@ lookup_aux(State, Key, Hops, Msg) ->
     case config:read(leases) of
         true ->
             lookup_aux_leases(State, Key, Hops, Msg);
-        false ->
+        _ ->
             lookup_aux_chord(State, Key, Hops, Msg)
 end.
 
