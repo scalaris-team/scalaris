@@ -1,4 +1,4 @@
-% @copyright 2012 Zuse Institute Berlin
+% @copyright 2012-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -63,9 +63,9 @@
 -type time()         :: erlang_timestamp() | non_neg_integer().
 -type logger()       :: io_format                       %% | ctpal
                       | {log_collector, comm:mypid()}.
--type pidinfo()      :: {comm:mypid(), 
+-type pidinfo()      :: {comm:mypid(),
                          {pid_groups:groupname(), pid_groups:pidname()} |
-                             no_pid_name | 
+                             no_pid_name |
                              non_local_pid_name_unknown}.
 -type anypid()       :: pid() | comm:mypid() | pidinfo().
 -type trace_id()     :: atom().
@@ -277,6 +277,11 @@ to_texfile(Trace, Filename) ->
 
     EndTime =  element(2, lists:last(DrawTrace)),
 
+    case 565 < (EndTime div ScaleX) of
+        true -> io:format("Warning: trace (~pcm) will be to wide for LaTeX (max. 565cm).~n",
+                          [EndTime div ScaleX]);
+        false -> ok
+    end,
     %% draw nodes and timelines
     _ = lists:foldl(
           fun(X, Acc) ->
@@ -287,6 +292,16 @@ to_texfile(Trace, Filename) ->
                   io:format(File,
                             "\\draw[color=gray,very thin] (0, -~p) -- (~pcm, -~p);~n",
                             [length(Acc)/2, (EndTime+10)/ScaleX, length(Acc)/2]),
+                  case EndTime > 600 of
+                      true ->
+                          io:format(File,
+                                    "\\foreach \\x in {~p,~p,...,~p}~n"
+                                    "  \\node[anchor=south east,gray,inner sep=0pt] at (\\x, -~p) {\\tiny ~s};~n",
+                                    [300 div ScaleX, 600 div ScaleX,
+                                     ((trunc((EndTime+10)) div 300) * 300) div ScaleX,
+                                     length(Acc)/2, LatexNode]);
+                      false -> ok
+                  end,
                   [X | Acc]
           end,
           [], Nodes),
