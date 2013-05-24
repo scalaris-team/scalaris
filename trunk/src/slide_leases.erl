@@ -40,6 +40,7 @@
 -spec prepare_join_send(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_join_send(State, SlideOp) ->
+    ct:pal("prepare_join_send", []),
     % can be ignored for leases
     {ok, State, SlideOp}.
 
@@ -110,7 +111,9 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
                        end,
             io:format("R1 ~p ~n", [R1]),
             io:format("R2 ~p ~n", [R2]),
-            l_on_cseq:lease_split(Lease, R1, R2, ReplyPid),
+            Node = slide_op:get_node(OldSlideOp),
+            NewOwner = node:pidX(Node),
+            l_on_cseq:lease_split_and_change_owner(Lease, R1, R2, NewOwner, ReplyPid),
             {ok, State, OldSlideOp};
         error ->
             % @todo
@@ -123,14 +126,12 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
 prepare_send_delta2(State, SlideOp, Msg) ->
     % check that split has been done
     case Msg of
-        {split, success, _Lease} ->
+        {handover, success, NewLease} ->
             % disable new lease
             io:format("prepare_send_delta2 ~p~n", [Msg]),
-            io:format("prepare_send_delta2 ~p~n", [SlideOp]),
-            {ok, NewLease} = find_lease(State, SlideOp),
             State1 = locally_disable_lease(State, NewLease),
             {ok, State1, SlideOp};
-        _ ->
+        {split, fail, _Lease} ->
             % @todo
             error
     end.
@@ -163,18 +164,9 @@ finish_delta2(State, SlideOp, {continue}) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
     % handover lease to succ
-    io:format("finish_delta_ack1~n", []),
-    case find_lease(State, OldSlideOp) of
-        {ok, Lease} ->
-            Node = slide_op:get_node(OldSlideOp),
-            NewOwner = node:pidX(Node),
-            l_on_cseq:lease_handover(Lease, NewOwner, ReplyPid),
-            {ok, State, OldSlideOp};
-        _ ->
-            io:format("finish_delta_ack1: error~n", []),
-            % @todo
-            error
-    end.
+    comm:send_local(ReplyPid, {continue}),
+    log:log("finish_delta_ack1~n", []),
+    {ok, State, OldSlideOp}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -184,15 +176,15 @@ finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
 finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
     % notify neighbor on successful handover
-    io:format("finish_delta_ack2 ~p~n", [Msg]),
-    case Msg of
-        {handover, success, Lease} ->
-            % notify succ
+    log:log("finish_delta_ack2 ~p~n", [Msg]),
+    % notify succ
+    case find_lease(State, SlideOp) of
+        {ok, Lease} ->
             Owner = l_on_cseq:get_owner(Lease),
             l_on_cseq:lease_send_lease_to_node(Owner, Lease),
             State1 = l_on_cseq:remove_lease_from_dht_node_state(Lease, State),
             {ok, State1, SlideOp, NextOpMsg};
-        _ ->
+        error ->
             % @todo
             error
     end.
@@ -236,7 +228,6 @@ find_lease(State, SlideOp) ->
 -spec tester_create_dht_node_state() -> dht_node_state:state().
 tester_create_dht_node_state() ->
     DHTNode = pid_groups:find_a(dht_node),
-    ct:pal("DHTNode ~p", [DHTNode]),
     comm:send_local(DHTNode, {get_state, comm:this()}),
     receive
         {get_state_response, State} ->

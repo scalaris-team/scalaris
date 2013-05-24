@@ -30,6 +30,16 @@
 -spec lookup_aux(State::dht_node_state:state(), Key::intervals:key(),
                  Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux(State, Key, Hops, Msg) ->
+    case config:read(leases) of
+        true ->
+            lookup_aux_leases(State, Key, Hops, Msg);
+        false ->
+            lookup_aux_chord(State, Key, Hops, Msg)
+end.
+
+-spec lookup_aux_chord(State::dht_node_state:state(), Key::intervals:key(),
+                       Hops::non_neg_integer(), Msg::comm:message()) -> ok.
+lookup_aux_chord(State, Key, Hops, Msg) ->
     Neighbors = dht_node_state:get(State, neighbors),
     WrappedMsg = ?RT:wrap_message(Msg, State, Hops),
     case intervals:in(Key, nodelist:succ_range(Neighbors)) of
@@ -41,10 +51,39 @@ lookup_aux(State, Key, Hops, Msg) ->
             comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
     end.
 
+-spec lookup_aux_leases(State::dht_node_state:state(), Key::intervals:key(),
+                       Hops::non_neg_integer(), Msg::comm:message()) -> ok.
+lookup_aux_leases(State, Key, Hops, Msg) ->
+    case leases:is_responsible(State, Key) of
+        true ->
+            comm:send_local(dht_node_state:get(State, monitor_proc),
+                            {lookup_hops, Hops}),
+            DHTNode = pid_groups:find_a(dht_node),
+            %log:log("aux -> fin: ~p ~p~n", [self(), DHTNode]),
+            comm:send_local(DHTNode,
+                            {?lookup_fin, Key, Hops + 1, Msg});
+        false ->
+            WrappedMsg = ?RT:wrap_message(Msg, State, Hops),
+            %log:log("lookup_aux_leases route ~p~n", [self()]),
+            P = ?RT:next_hop(State, Key),
+            %log:log("lookup_aux_leases route ~p -> ~p~n", [self(), P]),
+            comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
+    end.
+
 %% @doc Find the node responsible for Key and send him the message Msg.
 -spec lookup_fin(State::dht_node_state:state(), Key::intervals:key(),
                  Hops::non_neg_integer(), Msg::comm:message()) -> dht_node_state:state().
 lookup_fin(State, Key, Hops, Msg) ->
+    case config:read(leases) of
+        true ->
+            lookup_fin_leases(State, Key, Hops, Msg);
+        _ ->
+            lookup_fin_chord(State, Key, Hops, Msg)
+    end.
+
+-spec lookup_fin_chord(State::dht_node_state:state(), Key::intervals:key(),
+                 Hops::non_neg_integer(), Msg::comm:message()) -> dht_node_state:state().
+lookup_fin_chord(State, Key, Hops, Msg) ->
     MsgFwd = dht_node_state:get(State, msg_fwd),
     FwdList = [P || {I, P} <- MsgFwd, intervals:in(Key, I)],
     case FwdList of
@@ -91,6 +130,23 @@ lookup_fin(State, Key, Hops, Msg) ->
         [Pid] -> comm:send(Pid, {?lookup_fin, Key, Hops + 1, Msg}),
                  State
     end.
+
+-spec lookup_fin_leases(State::dht_node_state:state(), Key::intervals:key(),
+                 Hops::non_neg_integer(), Msg::comm:message()) -> dht_node_state:state().
+lookup_fin_leases(State, Key, Hops, Msg) ->
+    case leases:is_responsible(State, Key) of
+        true ->
+            %log:log("lookup_fin success: ~p", [self()]),
+            comm:send_local(dht_node_state:get(State, monitor_proc),
+                            {lookup_hops, Hops}),
+            Unwrap = ?RT:unwrap_message(Msg, State),
+            gen_component:post_op(State, Unwrap);
+        false ->
+            log:log("lookup_fin fail: ~p", [self()]),
+            lookup_aux(State, Key, Hops, Msg),
+            State
+    end.
+
 %% userdevguide-end dht_node_lookup:routing
 
 -spec lookup_aux_failed(dht_node_state:state(), Target::comm:mypid(),
