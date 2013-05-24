@@ -40,12 +40,10 @@ create_value(Type, Size, ParseState) ->
             try create_value_(Type, Size, ParseState)
             catch
                 throw:{error, Msg} ->
-                    NewMsg = lists:flatten(io_lib:format("couldn't create a value of type ~s",
-                                           [tester_type_checker:render_type(Type)])),
+                    NewMsg = tester_type_checker:render_type(Type),
                     throw({error, [NewMsg|Msg]});
-                throw:Term ->
-                    NewMsg = lists:flatten(io_lib:format("couldn't create a value of type ~s",
-                                           [tester_type_checker:render_type(Type)])),
+                throw:_Term ->
+                    NewMsg = tester_type_checker:render_type(Type),
                     throw({error, [NewMsg]})
             end;
         Creator -> case custom_value_creator(Creator, Type, Size, ParseState) of
@@ -207,7 +205,7 @@ create_value_({union, Types}, Size, ParseState) ->
     create_value(lists:nth(crypto:rand_uniform(1, Length + 1), Types),
                  Size, ParseState);
 create_value_(Unknown , _Size, _ParseState) ->
-    ct:pal("Cannot create type ~.0p ~p~n", [Unknown, util:get_stacktrace()]),
+    ct:pal("Cannot create type ~.0p~n", [Unknown]),
     throw(function_clause).
 
 %% @doc creates a record value
