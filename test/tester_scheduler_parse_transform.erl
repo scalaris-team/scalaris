@@ -22,6 +22,7 @@
 
 -export([parse_transform/2]).
 
+-spec parse_transform(any(), any()) -> any().
 parse_transform(Forms, _Options) ->
     forms(Forms).
 
