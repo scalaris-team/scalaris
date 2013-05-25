@@ -28,6 +28,7 @@
 -spec handler(atom(), list()) -> any().
 handler(nop, [_Value]) -> "ok";
 
+handler(check_config , [])    -> check_config();
 handler(pull_scale_req  , []) -> pull_scale_req();
 handler(lock_scale_req, [])   -> lock_scale_req();
 handler(unlock_scale_req, []) -> unlock_scale_req();
@@ -36,6 +37,19 @@ handler(AnyOp, AnyParams) ->
     io:format("Unknown request = ~s:~p(~p)~n", [?MODULE, AnyOp, AnyParams]),
     {struct, [{failure, "unknownreq"}]}.
 
+%% @doc Call api_autoscale and return:
+%%        {'status': 'ok'} -or-
+%%        {'status': 'error'}
+-spec check_config() -> {struct, [{Key::atom(), Value::term()}]}.
+check_config() ->
+    {struct, [{status, case api_autoscale:check_config() of
+                           true  -> "ok";
+                           false -> "error"
+                       end}]}.
+
+%% @doc Call api_autoscale and return:
+%%        {'status': 'ok', 'value': <number>} -or-
+%%        {'status': 'error', 'reason': <reason>}
 -spec pull_scale_req() -> {struct, [{Key::atom(), Value::term()}]}.
 pull_scale_req() ->
     {Status, Value} = api_autoscale:pull_scale_req(),
@@ -44,7 +58,9 @@ pull_scale_req() ->
                   true  -> {value, Value};
                   false -> {reason, atom_to_list(Value)}
               end]}.
-
+%% @doc Call api_autoscale and return:
+%%        {'status': 'ok'} -or-
+%%        {'status': 'error', 'reason': <reason>}
 -spec lock_scale_req() -> {struct, [{Key::atom(), Value::term()}]}.
 lock_scale_req() ->
     case api_autoscale:lock_scale_req() of
@@ -54,6 +70,9 @@ lock_scale_req() ->
             {struct, [{status, "error"}, {reason, atom_to_list(Reason)}]}
     end.
 
+%% @doc Call api_autoscale and return:
+%%        {'status': 'ok'} -or-
+%%        {'status': 'error', 'reason': <reason>}
 -spec unlock_scale_req() -> {struct, [{Key::atom(), Value::term()}]}.
 unlock_scale_req() ->
     case api_autoscale:unlock_scale_req() of
