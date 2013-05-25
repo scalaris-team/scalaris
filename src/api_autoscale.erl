@@ -21,6 +21,8 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+%% Misc API
+-export([check_config/0]).
 %% Polling API
 -export([pull_scale_req/0, lock_scale_req/0, unlock_scale_req/0]).
 %% Alarm state API
@@ -29,6 +31,15 @@
 -export([write_plot_data/0, reset_plot_data/0]).
 
 -compile(export_all).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Misc API
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Checks whether config parameters exist and are valid (requires a pull
+%%      configuration, i.e. cloud_cps as cloud_module). 
+-spec check_config() -> boolean().
+check_config() ->
+    autoscale:check_config() andalso is_in_pull_mode().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Polling API
@@ -40,19 +51,34 @@
 %%      after which the lock will be automatically freed, i.e. the caller has
 %%      $timeout seconds to satisfy the request and notify autoscale by
 %%      unlock_scale_req/0.
--spec pull_scale_req() -> {ok, Req :: integer()} | {error, resp_timeout}.
+-spec pull_scale_req() -> {ok, Req :: integer()} | {error, resp_timeout} |
+                                                   {error, autoscale_false}.
 pull_scale_req() ->
-    send_to_leader_wait_resp(
-      {pull_scale_req, comm:this()}, scale_req_resp, 5).
+    case autoscale:check_config() andalso is_in_pull_mode() of
+        true  -> send_to_leader_wait_resp({pull_scale_req, comm:this()},
+                                          scale_req_resp, 5);
+        false -> {error, autoscale_false}
+    end.
 
--spec lock_scale_req() -> ok | {error, locked} | {error, resp_timeout}.
+-spec lock_scale_req() -> ok | {error, locked} |
+                               {error, resp_timeout} |
+                               {error, autoscale_false}.
 lock_scale_req() ->
-    send_to_leader_wait_resp({lock_scale_req, comm:this()}, scale_req_resp, 5).
+    case autoscale:check_config() andalso is_in_pull_mode() of
+        true  -> send_to_leader_wait_resp({lock_scale_req, comm:this()},
+                                          scale_req_resp, 5);
+        false -> {error, autoscale_false}
+    end.
 
--spec unlock_scale_req() -> ok | {error, not_locked} | {error, resp_timeout}.
+-spec unlock_scale_req() -> ok | {error, not_locked} |
+                                 {error, resp_timeout} |
+                                 {error, autoscale_false}.
 unlock_scale_req() ->
-    send_to_leader_wait_resp(
-      {unlock_scale_req, comm:this()}, scale_req_resp, 5).
+    case autoscale:check_config() andalso is_in_pull_mode() of
+        true  -> send_to_leader_wait_resp({unlock_scale_req, comm:this()},
+                                          scale_req_resp, 5);
+        false -> {error, autoscale_false}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Alarm state API
@@ -61,26 +87,36 @@ unlock_scale_req() ->
 -spec toggle_alarm(Name :: atom()) -> {ok, {new_state, NewState :: active | inactive}} |
                                       {error, unknown_alarm} |
                                       {error, tx_fail} |
-                                      {error, resp_timeout}.
+                                      {error, resp_timeout} |
+                                      {error, autoscale_false}.
 toggle_alarm(Name) ->
-    send_to_leader_wait_resp(
-      {toggle_alarm, Name, comm:this()}, toggle_alarm_resp, 5).
+    case autoscale:check_config() of
+        true  -> send_to_leader_wait_resp({toggle_alarm, Name, comm:this()},
+                                          toggle_alarm_resp, 5);
+        false -> {error, autoscale_false}
+    end.
 
 %% @doc Set all alarms to active.
--spec activate_alarms() -> ok |
-                           {error, tx_fail} |
-                           {error, resp_timeout}.
+-spec activate_alarms() -> ok | {error, tx_fail} |
+                                {error, resp_timeout} |
+                                {error, autoscale_false}.
 activate_alarms () ->
-    send_to_leader_wait_resp(
-      {activate_alarms, comm:this()}, activate_alarms_resp, 5).
+    case autoscale:check_config() of
+        true  -> send_to_leader_wait_resp({activate_alarms, comm:this()},
+                                          activate_alarms_resp, 5);
+        false -> {error, autoscale_false}
+    end.
 
 %% @doc Set all alarms to inactive.
--spec deactivate_alarms() -> ok |
-                           {error, tx_fail} |
-                           {error, resp_timeout}.
+-spec deactivate_alarms() -> ok | {error, tx_fail} |
+                                  {error, resp_timeout} |
+                                  {error, autoscale_false}.
 deactivate_alarms () ->
-    send_to_leader_wait_resp(
-      {deactivate_alarms, comm:this()}, deactivate_alarms_resp, 5).
+    case autoscale:check_config() of
+        true  -> send_to_leader_wait_resp({deactivate_alarms, comm:this()},
+                                          deactivate_alarms_resp, 5);
+        false -> {error, autoscale_false}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Autoscale server API
@@ -128,3 +164,8 @@ send_to_leader_wait_resp(Msg, RespTag, Timeout) ->
     after
         Timeout*1000    -> {error, resp_timeout}
     end.
+
+%% @doc Check whether scale requests are pulled or pushed to cloud_module. 
+-spec is_in_pull_mode() -> boolean().
+is_in_pull_mode() ->
+    config:read(autoscale_cloud_module) =:= cloud_cps.

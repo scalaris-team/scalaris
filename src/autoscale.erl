@@ -68,12 +68,15 @@
 -export([start_link/1, init/1, on/2]).
 %% rm_loop interaction
 -export([send_my_range_req/4]).
+%% misc (check_config for api_autoscale) 
+-export([check_config/0]).
 
 -define(TRACE1(X), ?TRACE(X, [])).
 %% -define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
 -define(TRACE(_X,_Y), ok).
 
 -define(CLOUD, (config:read(autoscale_cloud_module))).
+%% Tx key for writing updates of alarms to dht 
 -define(AUTOSCALE_TX_KEY,
         "d9c966df633f8b1577eacff013166db95917a7002999b6fbbb67a3dd572d5035").
 
@@ -248,8 +251,6 @@ on({push_scale_req}, {IsLeader, _Alarms, ScaleReq, _Triggers})
     {IsLeader, _Alarms, ScaleReq#scale_req{req = 0}, _Triggers};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Msg loop: API msgs
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Msg loop: API msgs -> scale req polling API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({pull_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers}) ->
@@ -262,7 +263,6 @@ on({lock_scale_req, Pid}, State = {_IsLeader, _Alarms, ScaleReq, _Triggers})
     comm:send(Pid, {scale_req_resp, {error, locked}}),
     ?TRACE("lock_scale_req,~nscale_req: ~p", [ScaleReq]),
     State;
-
 on({lock_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
   when ScaleReq#scale_req.lock =:= unlocked ->
     comm:send(Pid, {scale_req_resp, ok}),
@@ -359,7 +359,7 @@ on(_Msg, State) ->
 next(Name, Delay) ->
     comm:send_local_after(Delay*1000, self(), {check_alarm, Name}).
 
-%% @doc Check alarm Name in trigger list in Delay seconds.
+%% @doc Check alarm Name from trigger list in Delay seconds.
 -spec next(Name :: atom(), Delay :: pos_integer(), Triggers :: triggers()) ->
           triggers().
 next(Name, Delay, Triggers) ->
@@ -488,6 +488,7 @@ read_alarms_from_config() ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
+    config:read(autoscale) =:= true andalso
     config:cfg_exists(autoscale_alarms) andalso
     config:cfg_exists(autoscale_cloud_module) andalso
     config:cfg_is_list(autoscale_alarms, 
