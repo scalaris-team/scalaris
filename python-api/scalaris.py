@@ -515,6 +515,70 @@ class JSONConnection(object):
                 except:
                     pass
         raise UnknownError(result)
+
+    # results: {'status': 'ok' | 'error'}
+    @staticmethod
+    def process_result_autoscale_check_config(result):
+        if isinstance(result, dict) and 'status' in result:
+            if result['status'] == 'ok':
+                return True
+            else:
+                return False
+        raise UnknownError(result)
+    
+    # <reason>: 'resp_timeout' | 'autoscale_false'
+    # results: {'status': 'ok', 'value' : <number>} or
+    #          {'status': 'error', 'reason': <reason>}
+    @staticmethod
+    def process_result_autoscale_pull_scale_req(result):
+        if isinstance(result, dict) and 'status' in result:
+            if result['status'] == 'ok' and 'value' in result and isinstance(result['value'], int):
+                return result['value']
+            
+            if result['status'] == 'error' and 'reason' in result:
+                if result['reason'] == 'resp_timeout':
+                    raise TimeoutError(result)
+                elif result['reason'] == 'autoscale_false':
+                    raise ConfigError(result)
+        raise UnknownError(result)
+    
+    # <reason>: 'locked' | 'resp_timeout' | 'autoscale_false'
+    # results: {'status' : 'ok'} or
+    #          {'status': 'error', 'reason': <reason>}
+    @staticmethod
+    def process_result_autoscale_lock_scale_req(result):
+        if isinstance(result, dict) and 'status' in result:
+            if result['status'] == 'ok':
+                return result['status']
+            
+            if result['status'] == 'error':
+                if result['reason'] == 'locked':
+                    raise LockError(result)
+                elif result['reason'] == 'resp_timeout':
+                    raise TimeoutError(result)
+                elif result['reason'] == 'autoscale_false':
+                    raise ConfigError(result)
+        
+        return UnknownError(result)
+        
+    # <reason>: 'not_locked' | 'resp_timeout' | 'autoscale_false'
+    # results: {'status' : 'ok'} or
+    #          {'status': 'error', 'reason': <reason>}
+    @staticmethod
+    def process_result_autoscale_unlock_scale_req(result):
+        if isinstance(result, dict) and 'status' in result:
+            if result['status'] == 'ok':
+                return result['status']
+            
+            if result['status'] == 'error':
+                if result['reason'] == 'not_locked':
+                    raise LockError(result)
+                elif result['reason'] == 'resp_timeout':
+                    raise TimeoutError(result)
+                elif result['reason'] == 'autoscale_false':
+                    raise ConfigError(result)
+        
+        return UnknownError(result)
     
     # result: 'ok'
     @staticmethod
@@ -642,6 +706,27 @@ class TimeoutError(ScalarisError):
     fails due to a timeout.
     """
     
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
+class ConfigError(ScalarisError):
+    """
+    Exception that is thrown if a autoscale operation fails, because it was not
+    configured correctly.
+    """
+    def __init__(self, raw_result):
+        self.raw_result = raw_result
+    def __str__(self):
+        return repr(self.raw_result)
+
+class LockError(ScalarisError):
+    """
+    Exception that is thrown if a autoscale lock/unlock operation fails,
+    because of a wrong lock state, i.e. lock when is already locked or unlock
+    when not locked.
+    """
     def __init__(self, raw_result):
         self.raw_result = raw_result
     def __str__(self):
@@ -1458,6 +1543,57 @@ class ScalarisVM(object):
         result = self._conn.callp('/api/pubsub.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
     
+    def close_connection(self):
+        """
+        Close the connection to scalaris
+        (it will automatically be re-opened on the next request).
+        """
+        self._conn.close()
+        
+class Autoscale(object):
+    """
+    Provides methods to interact with autoscale API.
+    """
+    
+    api = '/api/autoscale.yaws'
+
+    """
+    Create a new object using the given connection.
+    """
+    def __init__(self, conn = None):
+        if conn is None:
+            conn = JSONConnection()
+        self._conn = conn
+        
+    def process_result_check_config(self, result):
+        return self._conn.process_result_autoscale_check_config(result)
+    
+    def process_result_pull_scale_req(self, result):
+        return self._conn.process_result_autoscale_pull_scale_req(result)
+        
+    def process_result_lock_scale_req(self, result):
+        return self._conn.process_result_autoscale_lock_scale_req(result)
+
+    def process_result_unlock_scale_req(self, result):
+        return self._conn.process_result_autoscale_unlock_scale_req(result)
+
+    """ API calls """
+    def checkConfig(self):
+        result = self._conn.callp(Autoscale.api, 'check_config', [])
+        return self.process_result_check_config(result)
+
+    def pullScaleReq(self):
+        result = self._conn.callp(Autoscale.api, 'pull_scale_req', [])
+        return self.process_result_pull_scale_req(result)
+
+    def lockScaleReq(self):
+        result = self._conn.callp(Autoscale.api, 'lock_scale_req', [])
+        return self.process_result_lock_scale_req(result)
+
+    def unlockScaleReq(self):
+        result = self._conn.callp(Autoscale.api, 'unlock_scale_req', [])
+        return self.process_result_unlock_scale_req(result)
+
     def close_connection(self):
         """
         Close the connection to scalaris
