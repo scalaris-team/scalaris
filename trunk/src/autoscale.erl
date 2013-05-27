@@ -205,6 +205,9 @@ on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
   when IsLeader andalso ScaleReq#scale_req.lock =:= unlocked  ->
     Alarm = get_alarm(Name, Alarms),
 
+    % log current number of vms
+    log_vms(),
+    
     % call alarm handler
     NewReq =
         case Alarm#alarm.state of
@@ -389,13 +392,22 @@ get_alarm_option(Options, FieldKey, Default) ->
         false             -> Default
     end.
 
-%% @doc Log alarm values and number of VMs at autoscale_server.
+%% @doc Log key-value-pair at autoscale_server.
 -spec log(Key :: atom(), Value :: term()) -> ok.
 log(Key, Value) ->
     case autoscale_server:check_config() andalso ?CLOUD =/= cloud_cps of
         true  ->
-            autoscale_server:log(
-              [{vms, ?CLOUD:get_number_of_vms()}, {Key, Value}]);
+            autoscale_server:log(Key, Value);
+        false ->
+            ok
+    end.
+
+%% @doc Log number of VMs at autoscale_server.
+-spec log_vms() -> ok.
+log_vms() ->
+    case autoscale_server:check_config() andalso ?CLOUD =/= cloud_cps of
+        true  ->
+            autoscale_server:log(vms, ?CLOUD:get_number_of_vms());
         false ->
             ok
     end.
