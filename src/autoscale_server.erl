@@ -32,7 +32,7 @@
 -include("scalaris.hrl").
 
 -export([start_link/1, init/1, on/2]).
--export([check_config/0, log/1]).
+-export([check_config/0, log/1, log/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % types
@@ -82,8 +82,12 @@ on({write_to_file}, {PlotData}) ->
 on(_, _) ->
     unknown_event.
 
+-spec log(Key :: atom(), Value :: term()) -> ok.
+log(Key, Value) ->
+    log([{Key, Value}]).
+
 -spec log(KeyValueList :: [{Key :: atom(), Value :: term()}]) -> ok.
-log(KeyValueList)  ->
+log(KeyValueList) when erlang:is_list(KeyValueList)  ->
     {Ms, S, _Us} = erlang:now(),
     NowMs = Ms*1000000+S,
     MgmtServer = config:read(mgmt_server),
