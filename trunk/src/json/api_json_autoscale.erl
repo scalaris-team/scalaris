@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
-%% main handler for json calls
+%% @doc main handler for json calls
 -spec handler(atom(), list()) -> any().
 handler(nop, [_Value]) -> "ok";
 
@@ -48,8 +48,8 @@ check_config() ->
                        end}]}.
 
 %% @doc Call api_autoscale and return:
-%%        {'status': 'ok', 'value': <number>} -or-
-%%        {'status': 'error', 'reason': <reason>}
+%%        {'status': 'ok', 'value': number} -or-
+%%        {'status': 'error', 'reason': reason}
 -spec pull_scale_req() -> {struct, [{Key::atom(), Value::term()}]}.
 pull_scale_req() ->
     {Status, Value} = api_autoscale:pull_scale_req(),
@@ -60,24 +60,24 @@ pull_scale_req() ->
               end]}.
 %% @doc Call api_autoscale and return:
 %%        {'status': 'ok'} -or-
-%%        {'status': 'error', 'reason': <reason>}
+%%        {'status': 'error', 'reason': reason}
 -spec lock_scale_req() -> {struct, [{Key::atom(), Value::term()}]}.
 lock_scale_req() ->
     case api_autoscale:lock_scale_req() of
         ok ->
             {struct, [{status, "ok"}]};
-        {error, Reason} ->           
+        {error, Reason} ->
             {struct, [{status, "error"}, {reason, atom_to_list(Reason)}]}
     end.
 
 %% @doc Call api_autoscale and return:
 %%        {'status': 'ok'} -or-
-%%        {'status': 'error', 'reason': <reason>}
+%%        {'status': 'error', 'reason': reason}
 -spec unlock_scale_req() -> {struct, [{Key::atom(), Value::term()}]}.
 unlock_scale_req() ->
     case api_autoscale:unlock_scale_req() of
         ok ->
             {struct, [{status, "ok"}]};
-        {error, Reason} ->           
+        {error, Reason} ->
             {struct, [{status, "error"}, {reason, atom_to_list(Reason)}]}
     end.
