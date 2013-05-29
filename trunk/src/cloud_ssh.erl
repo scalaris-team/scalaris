@@ -29,6 +29,9 @@
 -author('michels@zib.de').
 -vsn('$Id$').
 
+%-define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(_X,_Y), ok).
+
 -include("scalaris.hrl").
 
 -behavior(cloud_beh).
@@ -51,20 +54,20 @@
 init() ->
     case get_hosts() of
         fail -> Hosts =
-                  case config:read(cloud_ssh_hosts) of
-                      failed -> [];
-                      List -> lists:map(fun(Host) -> {Host, inactive} end, List)
-                  end,
-              save_hosts(Hosts);
+                    case config:read(cloud_ssh_hosts) of
+                        failed -> [];
+                        List -> lists:map(fun(Host) -> {Host, inactive} end, List)
+                    end,
+                save_hosts(Hosts);
         _ -> ok
     end.
 
 -spec get_number_of_vms() -> fail | non_neg_integer().
 get_number_of_vms() ->
     case get_hosts() of
-		fail -> fail;
-		{_, List} -> get_number_of_vms(List)
-	end.
+        fail -> fail;
+        {_, List} -> get_number_of_vms(List)
+    end.
 
 -spec get_number_of_vms(hostlist()) -> fail | non_neg_integer().
 get_number_of_vms(Hosts) ->
@@ -86,12 +89,12 @@ remove_vms(N) ->
 
 -spec add_or_remove_vms(add | remove, integer()) ->  fail | ok.
 add_or_remove_vms(Flag, Pending) ->
-	case get_hosts() of
+    case get_hosts() of
     	{TLog, Hosts} ->
-			UpdatedHosts = add_or_remove_vms(Flag, Pending, Hosts, []),
-			save_hosts(TLog, UpdatedHosts);
-		fail -> fail
-	end.
+            UpdatedHosts = add_or_remove_vms(Flag, Pending, Hosts, []),
+            save_hosts(TLog, UpdatedHosts);
+        fail -> fail
+    end.
 
 -spec add_or_remove_vms(add | remove, integer(), hostlist(), hostlist()) -> hostlist().
 add_or_remove_vms(_Flag, _Pending = 0, Hosts, UpdatedHosts) ->
@@ -124,9 +127,9 @@ add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
 
 -spec killall_vms() -> fail | ok.
 killall_vms() ->
-	case get_hosts() of
-		{_, Hosts} ->
-    		lists:foreach(fun({Hostname, Status}) ->
+    case get_hosts() of
+        {_, Hosts} ->
+            lists:foreach(fun({Hostname, Status}) ->
                                   case Status of
                                       active ->
                                           scalaris_vm(stop, Hostname);
@@ -135,7 +138,7 @@ killall_vms() ->
                                   end
                           end, Hosts),
             ok;
-		fail -> fail
+        fail -> fail
     end.
 
 -spec scalaris_vm(start | stop, string()) -> ok.
@@ -143,38 +146,39 @@ scalaris_vm(Action, Hostname) ->
     Scalaris = get_scalaris_service(),
     Services = [Scalaris | get_additional_services()],
     lists:foreach(fun (Service) ->
-				{StartCmd, StopCmd} = Service,
-				ServiceCmd =
-				case Action of
-								  start -> StartCmd;
-								  stop  -> StopCmd
-							  end,
+                          {StartCmd, StopCmd} = Service,
+                          ServiceCmd =
+                              case Action of
+                                  start -> StartCmd;
+                                  stop  -> StopCmd
+                              end,
                           Cmd = format("ssh -n -f ~s \"(~s)\"", [Hostname, ServiceCmd]),
-                          io:format("Executing: ~p~n", [Cmd]),
+                          ?TRACE("Executing: ~p~n", [Cmd]),
                           _ = exec(Cmd)
                   end, Services),
     ok.
 
+-spec format(string(), list()) -> string().
 format(FormatString, Items) ->
     lists:flatten(io_lib:format(FormatString, Items)).
 
 -spec get_hosts() -> fail | {tx_tlog:tlog_ext(), hostlist()}.
 get_hosts() ->
-	case api_tx:read(api_tx:new_tlog(), ?cloud_ssh_key) of
-		{TLog, {ok, Hosts}} -> {TLog, Hosts};
-		_ -> fail
-	end.
+    case api_tx:read(api_tx:new_tlog(), ?cloud_ssh_key) of
+        {TLog, {ok, Hosts}} -> {TLog, Hosts};
+        _ -> fail
+    end.
 
 -spec save_hosts(hostlist()) -> fail | ok.
 save_hosts(Hosts) ->
-	save_hosts(api_tx:new_tlog(), Hosts).
+    save_hosts(api_tx:new_tlog(), Hosts).
 
 -spec save_hosts(tx_tlog:tlog_ext(), hostlist()) -> fail | ok.
 save_hosts(TLog, Hosts) ->
-	case api_tx:req_list(TLog, [{write, ?cloud_ssh_key, Hosts}, {commit}]) of
-		{[], [{ok}, {ok}]} -> ok;
-		_ -> fail
-	end.
+    case api_tx:req_list(TLog, [{write, ?cloud_ssh_key, Hosts}, {commit}]) of
+        {[], [{ok}, {ok}]} -> ok;
+        _ -> fail
+    end.
 
 -spec get_scalaris_service() ->  tuple(string(), string()).
 get_scalaris_service() ->
