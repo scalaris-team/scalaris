@@ -612,6 +612,7 @@ on_unknown_event(UnknownMessage, UState, GCState) ->
              {UState, GCState}]),
     case util:is_unittest() of
         true ->
+            catch tester_global_state:log_last_calls(),
             ct:abort_current_testcase(unknown_message);
         _ -> ok
     end,
@@ -637,6 +638,7 @@ on_exception(Msg, Level, Reason, Stacktrace, UState, GCState) ->
              Stacktrace]),
     case util:is_unittest() of
         true ->
+            catch tester_global_state:log_last_calls(),
             ct:abort_current_testcase(exception_throw);
         _ -> ok
     end,

@@ -1,4 +1,4 @@
-%  @copyright 2011, 2012 Zuse Institute Berlin
+%  @copyright 2011-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@
 
 -record(state, { processes = [] :: [unittest_helper:process_info()] | undefined,
                  suite          :: atom() | undefined,
-                 tc_start = []  :: [{comm:erl_local_pid(), erlang_timestamp()}] | [] 
+                 tc_start = []  :: [{comm:erl_local_pid(), erlang_timestamp()}] | []
                }).
 -type state() :: #state{} | {ok, #state{}}. % the latter for erlang =< R14B03
 -type id() :: atom().
@@ -129,14 +129,7 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
                 true -> ok;
                 _ -> unittest_helper:print_ring_data()
             end,
-            _ = [begin
-                     case tester_global_state:get_last_call(Thread) of
-                         failed -> ok;
-                         {Module, Function, Args} ->
-                             ct:pal("Last call by tester (thread ~B):~n~.0p:~.0p(~.0p)",
-                                    [Thread, Module, Function, Args])
-                     end
-                 end || Thread <- lists:seq(1, 8)],
+            catch tester_global_state:log_last_calls(),
             Suite = State#state.suite,
             try Suite:end_per_testcase(TC, Config)
             catch

@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@
          unregister_value_creator/1,
          get_value_creator/1]).
 -export([set_last_call/4, get_last_call/1, reset_last_call/1]).
+-export([log_last_calls/0]).
 
 -include("tester.hrl").
 -include("unittest.hrl").
@@ -131,3 +132,15 @@ create_table() ->
               util:sleep_for_ever()
       end),
     receive go -> true end.
+
+-spec log_last_calls() -> ok.
+log_last_calls() ->
+    [begin
+         case tester_global_state:get_last_call(Thread) of
+             failed -> ok;
+             {Module, Function, Args} ->
+                 ct:pal("Last call by tester (thread ~B):~n~.0p:~.0p(~.0p).",
+                        [Thread, Module, Function, Args])
+         end
+     end || Thread <- lists:seq(1, 8)],
+    ok.
