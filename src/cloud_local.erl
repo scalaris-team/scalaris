@@ -27,9 +27,12 @@
 -author('michels@zib.de').
 -vsn('$Id$').
 
--behavior(cloud_beh).
+%-define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(_X,_Y), ok).
 
 -include("scalaris.hrl").
+
+-behavior(cloud_beh).
 
 -export([init/0, get_number_of_vms/0, add_vms/1, remove_vms/1]).
 
@@ -42,7 +45,7 @@
 init() ->
     case config:read(cloud_local_min_vms) of
         failed ->
-            config:write(cloud_local_min_vms, 1),
+            config:write(cloud_local_min_vms, 0),
             config:write(cloud_local_max_vms, ?PLUS_INFINITY);
         X -> X
     end,
@@ -59,7 +62,7 @@ get_vms() ->
 get_number_of_vms() ->
     length(get_vms()).
 
--spec add_vms(integer()) -> ok.
+-spec add_vms(non_neg_integer()) -> ok.
 add_vms(N) ->
     BaseScalarisPort = config:read(port),
     BaseYawsPort = config:read(yaws_port),
@@ -67,30 +70,28 @@ add_vms(N) ->
     Time = Mega * 1000000 + Secs,
     SpawnFun = 
         fun (X) -> 
-                 Port = find_free_port(BaseScalarisPort),
-                 YawsPort = find_free_port(BaseYawsPort),
-                 NodeName = lists:flatten(io_lib:format("autoscale_~p_~p", [Time, X])),
-                 Cmd = lists:flatten(io_lib:format("./../bin/scalarisctl -e -detached -s -p ~p -y ~p -n ~s start", 
-                                                   [Port, YawsPort, NodeName])),
-                 io:format("Executing: ~p~n", [Cmd]),
+                Port = find_free_port(BaseScalarisPort),
+                YawsPort = find_free_port(BaseYawsPort),
+                NodeName = format("autoscale_~p_~p", [Time, X]),
+                Cmd = format("./../bin/scalarisctl -e -detached -s -p ~p -y ~p -n ~s start", 
+                             [Port, YawsPort, NodeName]),
+                ?TRACE("Executing: ~p~n", [Cmd]),
                  NumberVMs = get_number_of_vms(),
-                 _ = os:cmd(Cmd),
-                 util:wait_for(fun() -> get_number_of_vms() =:= NumberVMs + 1 end),
-                 timer:sleep(200)
+                _ = exec(Cmd),
+                util:wait_for(fun() -> get_number_of_vms() =:= NumberVMs + 1 end)
         end,
     _ = [SpawnFun(X) || X <- lists:seq(1, N), get_number_of_vms() < config:read(cloud_local_max_vms)],
     ok.
 
--spec remove_vms(integer()) -> ok.
+-spec remove_vms(non_neg_integer()) -> ok.
 remove_vms(N) ->
     VMs = get_vms(),
     RemoveFun = 
         fun(NodeName) ->						
-                Cmd = lists:flatten(io_lib:format("./../bin/scalarisctl -n ~s gstop", 
-                                                  [NodeName])),
+                Cmd = format("./../bin/scalarisctl -n ~s gstop", [NodeName]),
                 NumberVMs = get_number_of_vms(),
-                io:format("Executing: ~p~n", [Cmd]),
-                _ = os:cmd(Cmd),
+                ?TRACE("Executing: ~p~n", [Cmd]),
+                _ = exec(Cmd),
                 util:wait_for(fun() -> get_number_of_vms() =:= NumberVMs - 1 end)
         end,
     _ = [RemoveFun(NodeName) || NodeName <- lists:sublist(VMs, N),
@@ -101,8 +102,8 @@ remove_vms(N) ->
 %%%% Helper methods
 %%%%%%%%%%%%%%%%%%%
 -spec find_free_port(comm_server:tcp_port() | [comm_server:tcp_port()] |
-                         {From::comm_server:tcp_port(), To::comm_server:tcp_port()})
-        -> comm_server:tcp_port().
+                     {From::comm_server:tcp_port(), To::comm_server:tcp_port()})
+                    -> comm_server:tcp_port().
 find_free_port({From, To}) ->
     find_free_port(lists:seq(From, To));
 find_free_port([Port | Rest]) when is_integer(Port) andalso Port >= 0 andalso Port =< 65535 ->
@@ -116,3 +117,12 @@ find_free_port([]) ->
     find_free_port([0]);
 find_free_port(Port) ->
     find_free_port([Port]).
+
+
+-spec format(string(), list()) -> string().
+format(FormatString, Items) ->
+    lists:flatten(io_lib:format(FormatString, Items)).
+
+-spec exec(string()) -> pid().
+exec(Cmd) ->
+    _ = spawn(os, cmd, [Cmd]).
