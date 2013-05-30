@@ -49,7 +49,9 @@
 %%        {autoscale_cloud_module, CloudModule}.
 %%
 %%      Possible modules are: cloud_local, cloud_ssh, and cloud_cps. For both
-%%      cloud_local and cloud_ssh, scale requests are pushed by autoscale.
+%%      cloud_local and cloud_ssh, scale requests are pushed by autoscale, for
+%%      cloud_cps, autoscale expects pulling of requests.
+%%
 %%      cloud_cps is a dummy and not actually implemented as a module. Instead,
 %%      the manager of the ConPaaS scalaris service needs to pull the current
 %%      request via the JSON API.
@@ -480,7 +482,9 @@ init([]) ->
      _ScaleReq =
          case ?CLOUD =:= cloud_cps of
              true  -> #scale_req{mode = pull};
-             false -> #scale_req{mode = push}
+             false ->
+                 ?CLOUD:init(),
+                 #scale_req{mode = push}
          end,
      _Triggers = []}.
 
