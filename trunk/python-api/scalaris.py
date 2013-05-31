@@ -1578,19 +1578,19 @@ class Autoscale(object):
         return self._conn.process_result_autoscale_unlock_scale_req(result)
 
     """ API calls """
-    def checkConfig(self):
+    def check_config(self):
         result = self._conn.callp(Autoscale.api, 'check_config', [])
         return self.process_result_check_config(result)
 
-    def pullScaleReq(self):
+    def pull_scale_req(self):
         result = self._conn.callp(Autoscale.api, 'pull_scale_req', [])
         return self.process_result_pull_scale_req(result)
 
-    def lockScaleReq(self):
+    def lock_scale_req(self):
         result = self._conn.callp(Autoscale.api, 'lock_scale_req', [])
         return self.process_result_lock_scale_req(result)
 
-    def unlockScaleReq(self):
+    def unlock_scale_req(self):
         result = self._conn.callp(Autoscale.api, 'unlock_scale_req', [])
         return self.process_result_unlock_scale_req(result)
 
