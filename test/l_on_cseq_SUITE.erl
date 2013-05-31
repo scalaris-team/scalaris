@@ -116,6 +116,7 @@ tester_type_check_l_on_cseq(_Config) ->
              {lease_split, 4}, %% sends messages
              {lease_merge, 2}, %% sends messages
              {lease_send_lease_to_node, 2}, %% sends messages
+             {lease_split_and_change_owner, 5}, %% sends messages
              {id, 1}, %% todo
              {split_range, 2}, %% todo
              {unittest_lease_update, 2}, %% only for unittests
@@ -173,8 +174,8 @@ test_renew_with_concurrent_range_change(_Config) ->
                   l_on_cseq:set_timeout(
                     l_on_cseq:set_version(
                       l_on_cseq:set_epoch(Old, l_on_cseq:get_epoch(Old)+1),
-                    0)),
-                  other_range)
+                      0)),
+                  obfuscated_intervals_all())
         end,
     WaitF = fun wait_for_epoch_update/2,
     test_renew_helper(_Config, ModifyF, WaitF),
@@ -351,9 +352,14 @@ test_split_with_owner_change_in_step1(_Config) ->
         end,
     NullF = fun (_Id, _Lease) -> ok end,
     WaitRightLeaseF = fun wait_for_delete/2,
-    WaitLeftLeaseF = fun (Id) ->
-                             wait_for_lease_version(Id, 1, 0)
-                      end,
+    WaitLeftLeaseF = fun (_Id) -> ok end,
+                            % we cannot read the left lease anymore, because
+                            % consistent routing will prevent the delivery of
+                            % messages
+
+    %fun (Id) ->
+    %        wait_for_lease_version(Id, 1, 0)
+    %end,
     FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_2_steps(_Config,
                                   NullF, ChangeOwnerF,
@@ -373,10 +379,14 @@ test_split_with_owner_change_in_step2(Config) ->
                 l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
-    WaitRightLeaseF = fun (Id, Lease) ->
-                             OldEpoch = l_on_cseq:get_epoch(Lease),
-                             wait_for_lease_version(Id, OldEpoch + 1, 0)
-                     end,
+    WaitRightLeaseF = fun (Id, Lease) -> ok end,
+                            % we cannot read the left lease anymore, because
+                            % consistent routing will prevent the delivery of
+                            % messages
+    %fun (Id, Lease) ->
+    %        OldEpoch = l_on_cseq:get_epoch(Lease),
+    %        wait_for_lease_version(Id, OldEpoch + 1, 0)
+    %end,
     WaitLeftLeaseF = fun wait_for_delete/1,
     FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_3_steps(Config,
@@ -397,9 +407,13 @@ test_split_with_owner_change_in_step3(Config) ->
                 l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
-    WaitLeftLeaseF = fun (Id) ->
-                             wait_for_lease_version(Id, 2, 0)
-                     end,
+    WaitLeftLeaseF = fun (Id) -> ok end,
+                            % we cannot read the left lease anymore, because
+                            % consistent routing will prevent the delivery of
+                            % messages
+    %fun (Id) ->
+    %        wait_for_lease_version(Id, 2, 0)
+    %end,
     WaitRightLeaseF = fun wait_for_delete/2,
     FinalWaitF = fun wait_for_split_fail_msg/0,
     test_split_helper_for_4_steps(Config,
@@ -660,9 +674,9 @@ wait_for_split_message(StepTag) ->
     end.
 
 wait_for_split_success_msg() ->
-    ct:pal("wait_for_split_success_msg()"),
+    ct:pal("wait_for_split_success_msg() ~p", [self()]),
     receive
-        {split, success, _} ->
+        {split, success, _, _} ->
             ok
     end.
 
@@ -713,9 +727,10 @@ wait_for_lease(Lease) ->
     wait_for_lease_helper(Id, fun (L) -> L == Lease end).
 
 wait_for_lease_version(Id, Epoch, Version) ->
+    ct:pal("wait_for_lease_version ~p", [Id]),
     wait_for_lease_helper(Id,
                           fun (Lease) ->
-                                  %ct:pal("want ~p:~p; have ~p:~p", [Epoch, Version, l_on_cseq:get_epoch(Lease), l_on_cseq:get_version(Lease)]),
+                                  ct:pal("want ~p:~p; have ~p:~p", [Epoch, Version, l_on_cseq:get_epoch(Lease), l_on_cseq:get_version(Lease)]),
                                   Epoch   == l_on_cseq:get_epoch(Lease)
                           andalso Version == l_on_cseq:get_version(Lease)
                           end).
@@ -728,6 +743,13 @@ wait_for_lease_owner(Id, NewOwner) ->
 
 wait_for_lease_helper(Id, F) ->
     wait_for(fun () ->
+                     DHTNode = pid_groups:find_a(dht_node),
+                     comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
+                     {A, P} = receive
+                             {get_state_response, {ActiveList, PassiveList}} ->
+                                 {ActiveList, PassiveList}
+                         end,
+                     ct:pal("~p ~p", [A, P]),
                      case l_on_cseq:read(Id) of
                          {ok, Lease} ->
                              F(Lease);
@@ -754,6 +776,7 @@ wait_for_epoch_update(Id, Old) ->
 
 wait_for_delete(Id, _Old) ->
     DHTNode = pid_groups:find_a(dht_node),
+    ct:pal("wait_for_delete ~p", [Id]),
     wait_for(fun () ->
                      {L, _} = get_dht_node_state(DHTNode, lease_list),
                      lists:all(fun(Lease) ->
@@ -762,6 +785,7 @@ wait_for_delete(Id, _Old) ->
              end).
 
 wait_for_delete(Id) ->
+    ct:pal("wait_for_delete ~p", [Id]),
     DHTNode = pid_groups:find_a(dht_node),
     wait_for(fun () ->
                      {L, _} = get_dht_node_state(DHTNode, lease_list),
@@ -862,3 +886,15 @@ block_trigger(Pid) ->
                     false
             end
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% utility functions
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+obfuscated_intervals_all() ->
+    [{interval,'(',0,5,']'},
+     {element,0},
+     {interval,'(',5,340282366920938463463374607431768211456,')'}
+    ].
