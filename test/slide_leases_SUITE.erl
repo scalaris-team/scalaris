@@ -28,10 +28,12 @@
 
 groups() ->
     [{tester_tests, [sequence], [
-                              tester_type_check_slide_leases
+                                 tester_type_check_slide_leases
                               ]},
      {join_tests, [sequence], [
-                             test_single_join
+                               test_single_join,
+                               test_double_join,
+                               test_triple_join
                                ]}
     ].
 
@@ -115,13 +117,33 @@ tester_type_check_slide_leases(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+synchronous_join(TargetSize) ->
+    api_vm:add_nodes(1),
+    wait_for_ring_size(TargetSize),
+    wait_for_correct_ring().
+
 test_single_join(_Config) ->
     wait_for_ring_size(1),
     wait_for_correct_ring(),
     ct:pal("leases ~p", [get_leases()]),
-    api_vm:add_nodes(1),
-    wait_for_ring_size(2),
+    synchronous_join(2),
+    true.
+
+test_double_join(_Config) ->
+    wait_for_ring_size(1),
     wait_for_correct_ring(),
+    ct:pal("leases ~p", [get_leases()]),
+    synchronous_join(2),
+    synchronous_join(3),
+    true.
+
+test_triple_join(_Config) ->
+    wait_for_ring_size(1),
+    wait_for_correct_ring(),
+    ct:pal("leases ~p", [get_leases()]),
+    synchronous_join(2),
+    synchronous_join(3),
+    synchronous_join(4),
     true.
 
 
