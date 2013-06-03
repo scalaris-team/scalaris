@@ -456,6 +456,7 @@ init(Options) ->
     Id = case {is_first(Options), config:read(leases)} of
              {true, true} ->
                  msg_delay:send_local(1, self(), {l_on_cseq, renew_leases}),
+                 erlang:put('$with_lease', true),
                  l_on_cseq:id(intervals:all());
              {true, _} ->
                  % get my ID (if set, otherwise chose a random ID):
@@ -465,6 +466,7 @@ init(Options) ->
                  end;
              {false, true} ->
                  msg_delay:send_local(1, self(), {l_on_cseq, renew_leases}),
+                 erlang:put('$with_lease', true),
                  % get my ID (if set, otherwise chose a random ID):
                  case lists:keyfind({dht_node, id}, 1, Options) of
                      {{dht_node, id}, IdX} -> IdX;
