@@ -30,7 +30,7 @@
 -spec lookup_aux(State::dht_node_state:state(), Key::intervals:key(),
                  Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux(State, Key, Hops, Msg) ->
-    case config:read(leases) of
+    case erlang:get('$with_lease') of
         true ->
             lookup_aux_leases(State, Key, Hops, Msg);
         _ ->
@@ -74,7 +74,7 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
 -spec lookup_fin(State::dht_node_state:state(), Key::intervals:key(),
                  Hops::non_neg_integer(), Msg::comm:message()) -> dht_node_state:state().
 lookup_fin(State, Key, Hops, Msg) ->
-    case config:read(leases) of
+    case erlang:get('$with_lease') of
         true ->
             lookup_fin_leases(State, Key, Hops, Msg);
         _ ->
