@@ -457,7 +457,7 @@ init(Options) ->
              {true, true} ->
                  msg_delay:send_local(1, self(), {l_on_cseq, renew_leases}),
                  l_on_cseq:id(intervals:all());
-             {true, false} ->
+             {true, _} ->
                  % get my ID (if set, otherwise chose a random ID):
                  case lists:keyfind({dht_node, id}, 1, Options) of
                      {{dht_node, id}, IdX} -> IdX;
@@ -470,7 +470,7 @@ init(Options) ->
                      {{dht_node, id}, IdX} -> IdX;
                      _ -> ?RT:get_random_node_id()
                  end;
-             {false, false} ->
+             {false, _} ->
                  case lists:keyfind({dht_node, id}, 1, Options) of
                      {{dht_node, id}, IdX} -> IdX;
                      _ -> ?RT:get_random_node_id()
