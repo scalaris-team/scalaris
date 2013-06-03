@@ -32,8 +32,8 @@ groups() ->
                               ]},
      {join_tests, [sequence], [
                                test_single_join,
-                               test_double_join,
-                               test_triple_join
+                               test_double_join
+%                               test_triple_join
                                ]}
     ].
 
