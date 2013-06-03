@@ -453,12 +453,24 @@ init(Options) ->
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
     erlang:put(my_sup_dht_node_id, MySupDhtNode),
 
-    Id = case config:read(leases) of
-        true ->
+    Id = case {is_first(Options), config:read(leases)} of
+             {true, true} ->
                  msg_delay:send_local(1, self(), {l_on_cseq, renew_leases}),
                  l_on_cseq:id(intervals:all());
-        _ ->
+             {true, false} ->
                  % get my ID (if set, otherwise chose a random ID):
+                 case lists:keyfind({dht_node, id}, 1, Options) of
+                     {{dht_node, id}, IdX} -> IdX;
+                     _ -> ?RT:get_random_node_id()
+                 end;
+             {false, true} ->
+                 msg_delay:send_local(1, self(), {l_on_cseq, renew_leases}),
+                 % get my ID (if set, otherwise chose a random ID):
+                 case lists:keyfind({dht_node, id}, 1, Options) of
+                     {{dht_node, id}, IdX} -> IdX;
+                     _ -> ?RT:get_random_node_id()
+                 end;
+             {false, false} ->
                  case lists:keyfind({dht_node, id}, 1, Options) of
                      {{dht_node, id}, IdX} -> IdX;
                      _ -> ?RT:get_random_node_id()
