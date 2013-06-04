@@ -74,13 +74,15 @@
 -export([check_config/0]).
 
 -define(TRACE1(X), ?TRACE(X, [])).
-%% -define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
+%%-define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
 -define(TRACE(_X,_Y), ok).
 
 -define(CLOUD, (config:read(autoscale_cloud_module))).
 %% Tx key for writing updates of alarms to dht 
 -define(AUTOSCALE_TX_KEY,
         "d9c966df633f8b1577eacff013166db95917a7002999b6fbbb67a3dd572d5035").
+%% Default timeout when pulling scale requests
+-define(DEFAULT_LOCK_TIMEOUT, 60).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Types
@@ -272,7 +274,7 @@ on({lock_scale_req, Pid}, {_IsLeader, _Alarms, ScaleReq, Triggers})
   when ScaleReq#scale_req.lock =:= unlocked ->
     comm:send(Pid, {scale_req_resp, ok}),
     % start timeout @todo add timeout to cofig
-    Trigger = comm:send_local_after(60*1000, self(),
+    Trigger = comm:send_local_after(get_lock_timeout()*1000, self(),
                                     {unlock_scale_req_timeout}),
     ?TRACE("lock_scale_req,~nscale_req: ~p", [ScaleReq]),
     {_IsLeader, _Alarms, ScaleReq#scale_req{lock = locked},
@@ -478,7 +480,7 @@ init([]) ->
 
     % intial state
     {_IsLeader = false,
-     _Alarms   = read_alarms_from_config(),
+     _Alarms   = get_alarms(),
      _ScaleReq =
          case ?CLOUD =:= cloud_cps of
              true  -> #scale_req{mode = pull};
@@ -491,14 +493,23 @@ init([]) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Config
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec read_alarms_from_config() -> [#alarm{}].
-read_alarms_from_config() ->
+-spec get_alarms() -> [#alarm{}].
+get_alarms() ->
     case check_config() of
         true  ->
             % @todo add convenience for cfg 
             config:read(autoscale_alarms);
         false ->
             []
+    end.
+
+%% @doc Get timeout for pull lock (in seconds) from config.
+-spec get_lock_timeout() -> pos_integer().
+get_lock_timeout() ->
+    case config:read(autoscale_lock_timeout) of
+        Timeout when erlang:is_integer(Timeout) andalso Timeout > 0 ->
+            Timeout;
+        _ -> ?DEFAULT_LOCK_TIMEOUT
     end.
 
 %% @doc Checks whether config parameters exist and are valid.
