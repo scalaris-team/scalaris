@@ -21,6 +21,12 @@
 -vsn('$Id$').
 
 -include("scalaris.hrl").
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Types
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-type autoscale_error_resp() :: {error, resp_timeout | autoscale_false}. 
+
 %% Misc API
 -export([check_config/0]).
 %% Polling API
@@ -51,8 +57,7 @@ check_config() ->
 %%      after which the lock will be automatically freed, i.e. the caller has
 %%      $timeout seconds to satisfy the request and notify autoscale by
 %%      unlock_scale_req/0.
--spec pull_scale_req() -> {ok, Req :: integer()} | {error, resp_timeout} |
-                                                   {error, autoscale_false}.
+-spec pull_scale_req() -> {ok, Req :: integer()} | autoscale_error_resp().
 pull_scale_req() ->
     case autoscale:check_config() andalso is_in_pull_mode() of
         true  -> send_to_leader_wait_resp({pull_scale_req, comm:this()},
@@ -60,9 +65,7 @@ pull_scale_req() ->
         false -> {error, autoscale_false}
     end.
 
--spec lock_scale_req() -> ok | {error, locked} |
-                               {error, resp_timeout} |
-                               {error, autoscale_false}.
+-spec lock_scale_req() -> ok | {error, locked} | autoscale_error_resp().
 lock_scale_req() ->
     case autoscale:check_config() andalso is_in_pull_mode() of
         true  -> send_to_leader_wait_resp({lock_scale_req, comm:this()},
@@ -70,9 +73,7 @@ lock_scale_req() ->
         false -> {error, autoscale_false}
     end.
 
--spec unlock_scale_req() -> ok | {error, not_locked} |
-                                 {error, resp_timeout} |
-                                 {error, autoscale_false}.
+-spec unlock_scale_req() -> ok | {error, not_locked} | autoscale_error_resp().
 unlock_scale_req() ->
     case autoscale:check_config() andalso is_in_pull_mode() of
         true  -> send_to_leader_wait_resp({unlock_scale_req, comm:this()},
@@ -85,10 +86,8 @@ unlock_scale_req() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Toggle state of alarm Name from active to inactive and vice versa.
 -spec toggle_alarm(Name :: atom()) -> {ok, {new_state, NewState :: active | inactive}} |
-                                      {error, unknown_alarm} |
-                                      {error, tx_fail} |
-                                      {error, resp_timeout} |
-                                      {error, autoscale_false}.
+                                      {error, unknown_alarm | tx_fail} |
+                                      autoscale_error_resp().
 toggle_alarm(Name) ->
     case autoscale:check_config() of
         true  -> send_to_leader_wait_resp({toggle_alarm, Name, comm:this()},
@@ -96,10 +95,21 @@ toggle_alarm(Name) ->
         false -> {error, autoscale_false}
     end.
 
+%% @doc Update options of alarm Name by merging current with NewOptions.
+-spec update_alarm(Name :: atom(), NewOptions :: {Key :: atom(), Value :: term()} | autoscale:key_value_list()) ->
+          {ok, {new_options, UpdatedOptions :: autoscale:key_value_list()}} |
+          autoscale_error_resp().
+update_alarm(Name, NewOption) when erlang:is_tuple(NewOption) ->
+    update_alarm(Name, [NewOption]);
+update_alarm(Name, NewOptions) ->
+    case autoscale:check_config() of
+        true  -> send_to_leader_wait_resp({update_alarm, Name, NewOptions, comm:this()},
+                                          update_alarm_resp, 5);
+        false -> {error, autoscale_false}
+    end.
+
 %% @doc Set all alarms to active.
--spec activate_alarms() -> ok | {error, tx_fail} |
-                                {error, resp_timeout} |
-                                {error, autoscale_false}.
+-spec activate_alarms() -> ok | {error, tx_fail} | autoscale_error_resp().
 activate_alarms () ->
     case autoscale:check_config() of
         true  -> send_to_leader_wait_resp({activate_alarms, comm:this()},
@@ -108,9 +118,7 @@ activate_alarms () ->
     end.
 
 %% @doc Set all alarms to inactive.
--spec deactivate_alarms() -> ok | {error, tx_fail} |
-                                  {error, resp_timeout} |
-                                  {error, autoscale_false}.
+-spec deactivate_alarms() -> ok | {error, tx_fail} | autoscale_error_resp().
 deactivate_alarms () ->
     case autoscale:check_config() of
         true  -> send_to_leader_wait_resp({deactivate_alarms, comm:this()},

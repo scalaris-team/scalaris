@@ -74,8 +74,8 @@
 -export([check_config/0]).
 
 -define(TRACE1(X), ?TRACE(X, [])).
-%% -define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
--define(TRACE(_X,_Y), ok).
+-define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
+%% -define(TRACE(_X,_Y), ok).
 
 -define(CLOUD, (config:read(autoscale_cloud_module))).
 -define(AUTOSCALE_TX_KEY, "d9c966df633f8b1577eacff013166db95917a7002999b6fbb").
@@ -118,6 +118,8 @@
                   Alarms   :: alarms(),
                   ScaleReq :: scale_req(),
                   Triggers :: triggers()}.
+
+-export_type([key_value_list/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Alarm handlers
@@ -162,7 +164,7 @@ alarm_handler(lat_avg, Options) ->
 alarm_handler(rand_churn, Options) ->
     Lo = get_alarm_option(Options, lower_limit, -5),
     Hi = get_alarm_option(Options, upper_limit, 5),
-    Churn = randoms:rand_uniform(Lo, Hi),
+    Churn = randoms:rand_uniform(Lo, Hi+1),
 
     log(rand_churn, Churn),
 
@@ -307,7 +309,7 @@ on({toggle_alarm, Name, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
             {error, unknown_alarm} ->
                 comm:send(Pid, {toggle_alarm_resp, {error, unknown_alarm}}),
                 Alarms;
-            {ok, Alarm}        ->
+            {ok, Alarm} ->
                 Toggled = case Alarm#alarm.state of
                               active   -> Alarm#alarm{state = inactive};
                               inactive -> Alarm#alarm{state = active}
@@ -324,6 +326,7 @@ on({toggle_alarm, Name, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
         end,
     ?TRACE("alarms: ~p, ~nnewalarms: ~p", [Alarms, NewAlarms]),
     {_IsLeader, NewAlarms, _ScaleReq, _Triggers};
+
 on({activate_alarms, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
     AllActive = lists:map(fun(Alarm) -> Alarm#alarm{state = active} end,
                           Alarms),
@@ -337,6 +340,7 @@ on({activate_alarms, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
                 Alarms
         end,
     {_IsLeader, NewAlarms, _ScaleReq, _Triggers};
+
 on({deactivate_alarms, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
     AllInactive = lists:map(fun(Alarm) -> Alarm#alarm{state = inactive} end,
                             Alarms),
@@ -348,6 +352,31 @@ on({deactivate_alarms, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
             fail ->
                 comm:send(Pid, {deactivate_alarms_resp, {error, tx_fail}}),
                 Alarms
+        end,
+    {_IsLeader, NewAlarms, _ScaleReq, _Triggers};
+
+on({update_alarm, Name, NewOptions, Pid},
+   {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
+    NewAlarms =
+        case get_alarm(Name, Alarms) of
+            {error, unknown_alarm} ->
+                comm:send(Pid, {update_alarm_resp, {error, unknown_alarm}}),
+                Alarms;
+            {ok, Alarm} -> 
+                UpdatedOptions = lists:foldl(
+                                   fun(Option = {Key, _Value}, Acc) ->
+                                           lists:keystore(Key, 1, Acc, Option)
+                                   end, Alarm#alarm.options, NewOptions),
+                UpdatedAlarm = Alarm#alarm{options=UpdatedOptions},
+                case tx_update_alarms(UpdatedAlarm, Alarm) of
+                    ok   ->
+                        comm:send(Pid, {update_alarm_resp,
+                                   {ok, {new_options, UpdatedOptions}}}),
+                        update_alarm(UpdatedAlarm, Alarms);
+                    fail ->
+                        comm:send(Pid, {update_alarm_resp, {error, tx_fail}}),
+                        Alarms
+                end
         end,
     {_IsLeader, NewAlarms, _ScaleReq, _Triggers};
 
@@ -398,8 +427,7 @@ get_alarm_option(Options, FieldKey, Default) ->
 
 -spec update_alarm(UpdatedAlarm :: #alarm{}, Alarms :: alarms()) -> alarms().
 update_alarm(UpdatedAlarm, Alarms) ->
-    Key = UpdatedAlarm#alarm.name,
-    lists:keystore(Key, 2, Alarms, UpdatedAlarm).
+    lists:keystore(UpdatedAlarm#alarm.name, 2, Alarms, UpdatedAlarm).
 
 %% @doc Log key-value-pair at autoscale_server.
 -spec log(Key :: atom(), Value :: term()) -> ok.
@@ -433,9 +461,17 @@ send_my_range_req(Pid, ?MODULE, _OldN, _NewN) ->
     DhtNodeOfPid = pid_groups:pid_of(pid_groups:group_of(Pid), dht_node),
     comm:send_local(DhtNodeOfPid, {get_state, comm:make_global(Pid), my_range}).
 
-%% @doc Write alarm updates to dht.
+%% @doc Write alarm updates to dht. Alarms in ToAdd are added to the ring and
+%%      alarms in ToRem are removed. Usually, ToAdd should contain the new
+%%      version of the alarm and ToRem the old version (which could possibly
+%%      have been written to the dht before).
+%%       
 %%      When a node becomes leader, she merges her local alarms with alarms from
 %%      the ring (alarms on ring overwrite local alarms). See tx_merge_alarms/2.
+-spec tx_update_alarms(ToAdd :: alarms(), ToRem :: alarms()) -> ok | fail.
+tx_update_alarms(ToAdd, ToRem)
+  when erlang:is_tuple(ToAdd) andalso erlang:is_tuple(ToRem) ->
+    tx_update_alarms([ToAdd], [ToRem]);
 tx_update_alarms(ToAdd, ToRem) ->
     {TLog, _Res} = api_tx:add_del_on_list(
                      api_tx:new_tlog(), ?AUTOSCALE_TX_KEY, ToAdd, ToRem),
