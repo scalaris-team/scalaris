@@ -74,14 +74,11 @@
 -export([check_config/0]).
 
 -define(TRACE1(X), ?TRACE(X, [])).
-%%-define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
+%% -define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
 -define(TRACE(_X,_Y), ok).
 
 -define(CLOUD, (config:read(autoscale_cloud_module))).
-%% Tx key for writing updates of alarms to dht 
--define(AUTOSCALE_TX_KEY,
-        "d9c966df633f8b1577eacff013166db95917a7002999b6fbbb67a3dd572d5035").
-%% Default timeout when pulling scale requests
+-define(AUTOSCALE_TX_KEY, "d9c966df633f8b1577eacff013166db95917a7002999b6fbb").
 -define(DEFAULT_LOCK_TIMEOUT, 60).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -207,7 +204,7 @@ on({get_state_response, MyRange}, {IsLeader, Alarms, ScaleReq, Triggers}) ->
 %% @doc Check alarm Name for new scale request.
 on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
   when IsLeader andalso ScaleReq#scale_req.lock =:= unlocked  ->
-    Alarm = get_alarm(Name, Alarms),
+    {ok, Alarm} = get_alarm(Name, Alarms),
 
     % log current number of vms
     log_vms(),
@@ -239,7 +236,7 @@ on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
 
 on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
   when IsLeader andalso ScaleReq#scale_req.lock =:= locked  ->
-    Alarm = get_alarm(Name, Alarms),
+    {ok, Alarm} = get_alarm(Name, Alarms),
 
     ?TRACE("check_alarm: ~p, scale_req is locked", [Name]),
     {IsLeader, Alarms, ScaleReq, next(Name, Alarm#alarm.interval, Triggers)};
@@ -307,10 +304,10 @@ on({unlock_scale_req_timeout}, {_IsLeader, _Alarms, ScaleReq, Triggers}) ->
 on({toggle_alarm, Name, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
     NewAlarms =
        case get_alarm(Name, Alarms) of
-            false ->
+            {error, unknown_alarm} ->
                 comm:send(Pid, {toggle_alarm_resp, {error, unknown_alarm}}),
                 Alarms;
-            Alarm ->
+            {ok, Alarm}        ->
                 Toggled = case Alarm#alarm.state of
                               active   -> Alarm#alarm{state = inactive};
                               inactive -> Alarm#alarm{state = active}
@@ -319,8 +316,7 @@ on({toggle_alarm, Name, Pid}, {_IsLeader, Alarms, _ScaleReq, _Triggers}) ->
                     ok   ->
                         comm:send(Pid, {toggle_alarm_resp,
                                    {ok, {new_state, Toggled#alarm.state}}}),
-                        % update alarm
-                        lists:keystore(Name, 2, Alarms, Toggled);
+                        update_alarm(Toggled, Alarms);
                     fail ->
                         comm:send(Pid, {toggle_alarm_resp, {error, tx_fail}}),
                         Alarms
@@ -382,9 +378,13 @@ cancel(Trigger) ->
 %% Alarm helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Get alarm by name.
--spec get_alarm(Name :: atom(), Alarms :: alarms()) -> alarm() | false.
+-spec get_alarm(Name :: atom(), Alarms :: alarms()) -> {ok, alarm()} |
+                                                       {false, unknown_alarm}.
 get_alarm(Name, Alarms) ->
-    lists:keyfind(Name, 2, Alarms).
+    case Alarm = lists:keyfind(Name, 2, Alarms) of
+        false  -> {error, unknown_alarm};
+        _Found -> {ok, Alarm}
+    end.
 
 %% @doc Get value for specified option key from key-value list. Return provided
 %%      default value, if key does not exist.
@@ -395,6 +395,11 @@ get_alarm_option(Options, FieldKey, Default) ->
         {FieldKey, Value} -> Value;
         false             -> Default
     end.
+
+-spec update_alarm(UpdatedAlarm :: #alarm{}, Alarms :: alarms()) -> alarms().
+update_alarm(UpdatedAlarm, Alarms) ->
+    Key = UpdatedAlarm#alarm.name,
+    lists:keystore(Key, 2, Alarms, UpdatedAlarm).
 
 %% @doc Log key-value-pair at autoscale_server.
 -spec log(Key :: atom(), Value :: term()) -> ok.
