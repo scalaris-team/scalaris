@@ -31,9 +31,9 @@ groups() ->
                                  tester_type_check_slide_leases
                               ]},
      {join_tests, [sequence], [
-                               test_single_join,
-                               test_double_join
-%                               test_triple_join
+                               test_single_join
+                               %test_double_join
+                               %test_triple_join
                                ]}
     ].
 
@@ -120,19 +120,20 @@ tester_type_check_slide_leases(_Config) ->
 synchronous_join(TargetSize) ->
     api_vm:add_nodes(1),
     wait_for_ring_size(TargetSize),
-    wait_for_correct_ring().
+    wait_for_correct_ring(),
+    wait_for_correct_leases(TargetSize).
 
 test_single_join(_Config) ->
     wait_for_ring_size(1),
     wait_for_correct_ring(),
-    ct:pal("leases ~p", [get_leases()]),
+    %ct:pal("leases ~p", [get_all_leases()]),
     synchronous_join(2),
     true.
 
 test_double_join(_Config) ->
     wait_for_ring_size(1),
     wait_for_correct_ring(),
-    ct:pal("leases ~p", [get_leases()]),
+    %ct:pal("leases ~p", [get_all_leases()]),
     synchronous_join(2),
     synchronous_join(3),
     true.
@@ -140,7 +141,7 @@ test_double_join(_Config) ->
 test_triple_join(_Config) ->
     wait_for_ring_size(1),
     wait_for_correct_ring(),
-    ct:pal("leases ~p", [get_leases()]),
+    %ct:pal("leases ~p", [get_all_leases()]),
     synchronous_join(2),
     synchronous_join(3),
     synchronous_join(4),
@@ -178,10 +179,40 @@ get_dht_node_state(Pid, What) ->
             Data
     end.
 
-get_leases() ->
-    DHTNode = pid_groups:find_a(dht_node),
-    comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
-    receive
-        {get_state_response, Leases} ->
-            Leases
+get_all_leases() ->
+    [ get_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ].
+
+get_leases(Pid) ->
+    get_dht_node_state(Pid, lease_list).
+
+wait_for_correct_leases(TargetSize) ->
+    wait_for(lease_checker(TargetSize)).
+
+is_disjoint([]) ->
+    true;
+is_disjoint([H | T]) ->
+    is_disjoint(H, T) andalso
+        is_disjoint(T).
+
+is_disjoint(_I, []) ->
+    true;
+is_disjoint(I, [H|T]) ->
+    intervals:is_empty(intervals:intersection([I],[H]))
+        andalso is_disjoint(I, T).
+
+lease_checker(TargetSize) ->
+    fun () ->
+            LeaseLists = get_all_leases(),
+            ActiveLeases  = lists:flatten([Active  || {Active, _}  <- LeaseLists]),
+            PassiveLeases = lists:flatten([Passive || {_, Passive} <- LeaseLists]),
+            ActiveIntervals =   lists:flatten(
+                                  [ l_on_cseq:get_range(Lease) || Lease <- ActiveLeases]),
+            NormalizedActiveIntervals = intervals:tester_create_interval(ActiveIntervals),
+            ct:pal("ActiveLeases: ~p", [ActiveLeases]),
+            ct:pal("ActiveIntervals: ~p", [ActiveIntervals]),
+            ct:pal("PassiveLeases: ~p", [PassiveLeases]),
+            intervals:is_all(NormalizedActiveIntervals) andalso
+                is_disjoint(ActiveIntervals) andalso
+                length(ActiveLeases) == TargetSize andalso
+                length(PassiveLeases) == 0
     end.
