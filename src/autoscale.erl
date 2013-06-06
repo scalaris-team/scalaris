@@ -27,7 +27,7 @@
 %%                                  State (opt.)}]}.
 %%
 %%      Every provided tuple corresponds to the alarm record type:
-%%        - Name:     the name of the alarm (should be unique)
+%%        - Name:     the name of the alarm handler (should be unique)
 %%        - Options:  options are alarm handler specific (see alarm_handler/2)
 %%        - Interval: interval between alarm checks in seconds
 %%        - Cooldown: interval after a scale request
@@ -150,9 +150,9 @@ alarm_handler(lat_avg, Options) ->
 
     if
         LatestAvgMsD < LoMs ->
-            VmsToRemove;
+            -VmsToRemove;
         LatestAvgMsD > HiMs ->
-            VmsToAdd;
+            +VmsToAdd;
         true ->
             0
     end;
