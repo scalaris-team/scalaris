@@ -132,6 +132,7 @@ prepare_send_delta2(State, SlideOp, Msg) ->
             State1 = locally_disable_lease(State, NewLease),
             {ok, State1, SlideOp};
         {split, fail, _Lease} ->
+            log:log("prepare_send_delta2: split failed~n", []),
             % @todo
             error
     end.
