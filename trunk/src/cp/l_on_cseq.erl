@@ -238,7 +238,7 @@ on({l_on_cseq, split_and_change_owner, _Lease, NewOwner, ReplyPid, SplitResult},
             gen_component:post_op(State,
                                   {l_on_cseq, handover, L2, NewOwner, ReplyPid});
         {split, fail, L1} ->
-            comm:send(ReplyPid, {split, fail, L1}),
+            comm:send_local(ReplyPid, {split, fail, L1}),
             State
     end;
 
