@@ -531,14 +531,12 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
         {true, PassedToUpdate} ->
             %% own proposal possible as next instance in the consens sequence
             This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
-            Dest = pid_groups:find_a(dht_node),
             DB = db_selector(State),
-            [ comm:send_local(Dest,
-                              {?lookup_aux, X, 0,
+                [ api_dht_raw:unreliable_lookup(X,
                                {prbr, write, DB, This, X, Round,
                                 WriteValue,
                                 PassedToUpdate,
-                                WriteFilter}})
+                                WriteFilter})
               || X <- ?RT:get_replica_keys(entry_key(Entry)) ];
         {false, Reason} = _Err ->
             %% own proposal not possible as of content check
