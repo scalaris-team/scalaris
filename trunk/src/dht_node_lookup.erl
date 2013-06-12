@@ -25,6 +25,14 @@
 -export([lookup_aux/4, lookup_fin/4,
          lookup_aux_failed/3, lookup_fin_failed/3]).
 
+-export([envelope/2]).
+
+-type enveloped_message() :: {pos_integer(), f, comm:message()}.
+
+-spec envelope(pos_integer(), comm:message()) -> enveloped_message().
+envelope(Nth, Msg) ->
+    {Nth, f, Msg}.
+
 %% userdevguide-begin dht_node_lookup:routing
 %% @doc Find the node responsible for Key and send him the message Msg.
 -spec lookup_aux(State::dht_node_state:state(), Key::intervals:key(),
@@ -62,6 +70,8 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
             %log:log("aux -> fin: ~p ~p~n", [self(), DHTNode]),
             comm:send_local(DHTNode,
                             {?lookup_fin, Key, Hops + 1, Msg});
+        maybe ->
+            ok;
         false ->
             WrappedMsg = ?RT:wrap_message(Msg, State, Hops),
             %log:log("lookup_aux_leases route ~p~n", [self()]),
@@ -90,10 +100,11 @@ lookup_fin_chord(State, Key, Hops, Msg) ->
         []    ->
             case dht_node_state:is_db_responsible(Key, State) of
                 true ->
-                    comm:send_local(dht_node_state:get(State, monitor_proc),
-                                    {lookup_hops, Hops}),
-                    Unwrap = ?RT:unwrap_message(Msg, State),
-                    gen_component:post_op(State, Unwrap);
+                    %comm:send_local(dht_node_state:get(State, monitor_proc),
+                    %                {lookup_hops, Hops}),
+                    %Unwrap = ?RT:unwrap_message(Msg, State),
+                    %gen_component:post_op(State, Unwrap);
+                    deliver(State, Msg, false, Hops);
                 false ->
                     % it is possible that we received the message due to a
                     % forward while sliding and before the other node removed
@@ -136,11 +147,9 @@ lookup_fin_chord(State, Key, Hops, Msg) ->
 lookup_fin_leases(State, Key, Hops, Msg) ->
     case leases:is_responsible(State, Key) of
         true ->
-            %log:log("lookup_fin success: ~p", [self()]),
-            comm:send_local(dht_node_state:get(State, monitor_proc),
-                            {lookup_hops, Hops}),
-            Unwrap = ?RT:unwrap_message(Msg, State),
-            gen_component:post_op(State, Unwrap);
+            deliver(State, Msg, true, Hops);
+        maybe ->
+            deliver(State, Msg, false, Hops);
         false ->
             log:log("lookup_fin fail: ~p", [self()]),
             lookup_aux(State, Key, Hops, Msg),
@@ -162,3 +171,16 @@ lookup_fin_failed(State, _Target, {?lookup_fin, Key, Hops, Msg} = _Message) ->
     %io:format("lookup_fin_failed(State, ~p, ~p)~n", [_Target, _Message]),
     comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State.
+
+deliver(State, Msg, Consistency, Hops) ->
+    %log:log("lookup_fin success: ~p ~p", [self(), Msg]),
+    comm:send_local(dht_node_state:get(State, monitor_proc),
+                    {lookup_hops, Hops}),
+    Unwrap = ?RT:unwrap_message(Msg, State),
+    case Unwrap of
+        {Nth, f, InnerMsg} ->
+            gen_component:post_op(State,
+                                  erlang:setelement(Nth, InnerMsg, Consistency));
+        _ ->
+            gen_component:post_op(State, Unwrap)
+    end.

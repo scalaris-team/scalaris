@@ -35,16 +35,37 @@
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec is_responsible(dht_node_state:state(), ?RT:key()) -> boolean().
+-spec is_responsible(dht_node_state:state(), ?RT:key()) -> boolean() | maybe.
 is_responsible(State, Key) ->
     {ActiveLeaseList, _} = dht_node_state:get(State, lease_list),
-    case lists:any(fun (Lease) ->
-                           intervals:in(Key, l_on_cseq:get_range(Lease))
-                               andalso l_on_cseq:is_valid(Lease)
-                   end, ActiveLeaseList) of
-        true -> true;
-        false ->
-            %log:log("is_responsible failed ~p ~p", [Key, ActiveLeaseList]),
-            false
-    end.
+    is_responsible_(ActiveLeaseList, Key).
+%    case lists:any(fun (Lease) ->
+%                           intervals:in(Key, l_on_cseq:get_range(Lease))
+%                               andalso l_on_cseq:is_valid(Lease)
+%                   end, ActiveLeaseList) of
+%        true -> true;
+%        false ->
+%            %log:log("is_responsible failed ~p ~p", [Key, ActiveLeaseList]),
+%            false
+%    end.
 
+is_responsible_([], _Key) ->
+    false;
+is_responsible_([Lease|List], Key) ->
+    RangeMatches = intervals:in(Key, l_on_cseq:get_range(Lease)),
+    IsAlive = l_on_cseq:is_valid(Lease),
+    if
+        IsAlive andalso RangeMatches ->
+            true;
+        RangeMatches ->
+            case is_responsible(List, Key) of
+                true ->
+                    true;
+                maybe ->
+                    maybe;
+                false ->
+                    maybe
+            end;
+        true ->
+            is_responsible_(List, Key)
+    end.
