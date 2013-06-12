@@ -74,7 +74,7 @@ test_consistent_send(_Config) ->
                                   Ev),
     receive
         {unittest_consistent_send, Self, true} = Msg ->
-            ct:pal("message ~p", [Msg])
+            ct:pal("message ~p", [Msg]);
         {unittest_consistent_send, Self, false} = Msg ->
             ct:pal("message ~p", [Msg])
     end.
