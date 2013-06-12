@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -240,7 +240,7 @@ get_msg_tag(Msg)
 -spec unpack_cookie(mypid(), message()) -> {mypid_plain(), message()};
                    (erl_local_pid(), message()) -> {erl_local_pid_plain(), message()}.
 unpack_cookie({Pid, e, Nth, Envelope}, Msg) ->
-    {Pid, setelement(Nth, Envelope, Msg)};
+    unpack_cookie(Pid, setelement(Nth, Envelope, Msg));
 unpack_cookie(Pid, Msg)              -> {Pid, Msg}.
 
 %% @doc Creates a group member message and filter out the send options for the
