@@ -417,6 +417,11 @@ on({unittest_get_bounds_and_data, SourcePid}, State) ->
     comm:send(SourcePid, {unittest_get_bounds_and_data_response, MyBounds, Data, Pred, Succ}),
     State;
 
+on({unittest_consistent_send, Pid, _X} = Msg, State) ->
+    true = util:is_unittest(),
+    comm:send_local(Pid, Msg),
+    State;
+
 on({get_dht_nodes_response, _KnownHosts}, State) ->
     % will ignore these messages after join
     State;
