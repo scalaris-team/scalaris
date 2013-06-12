@@ -1,4 +1,4 @@
-% @copyright 2011, 2012 Zuse Institute Berlin
+% @copyright 2011, 2012, 2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -138,7 +138,6 @@ on({get_state_response, MyI}, State =
                         stats = Stats,
                         method = Method,
                         dest_key = DestKey,
-                        dhtNodePid = DhtPid,                        
                         ownerRemotePid = OwnerPid }) ->    
     Msg = {?send_to_group_member, rrepair, 
            {continue_recon, OwnerPid, rr_recon_stats:get(session_id, Stats), 
@@ -148,7 +147,7 @@ on({get_state_response, MyI}, State =
                _ -> DestKey
            end,
     ?TRACE("START_TO_DEST ~p", [DKey]),
-    comm:send_local(DhtPid, {?lookup_aux, DKey, 0, Msg}),    
+    api_dht_raw:unreliable_lookup(DKey, Msg),    
     comm:send_local(self(), {shutdown, negotiate_interval}),
     State;
 

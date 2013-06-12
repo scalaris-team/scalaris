@@ -486,11 +486,10 @@ on_init({new_node_id, Id}, State) ->
 
 %% do not accept new commit requests when not enough rtms are valid
 on_init({tx_tm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
-    %% forward request to a node which is ready to serve requests
-    DHTNode = pid_groups:get_my(dht_node),
-    %% there, redirect message to tx_tm_new
+    %% forward request to a node which is ready to serve requests.
+    %% There, redirect message to tx_tm_new
     RedirectMsg = {?send_to_group_member, tx_tm_new, Msg},
-    comm:send_local(DHTNode, {?lookup_aux, ?RT:get_random_node_id(), 0, RedirectMsg}),
+    api_dht_raw:unreliable_lookup(?RT:get_random_node_id(), RedirectMsg),
     State.
 
 
