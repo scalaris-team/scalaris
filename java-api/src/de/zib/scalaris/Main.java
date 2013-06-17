@@ -383,7 +383,7 @@ public class Main {
         } catch (final NullPointerException e) {
             throw new RuntimeException(e);
         } catch (final ConnectionException e) {
-            printException("publish failed with connection error", e, verbose);
+            printException("JMX service failed with connection error", e, verbose);
         } catch (final InstanceAlreadyExistsException e) {
             throw new RuntimeException(e);
         } catch (final MBeanRegistrationException e) {
