@@ -35,7 +35,7 @@ PID_DS="@localstatedir@/run/scalaris-monitor_${SCALARIS_NODE}.pid"
 
 LOG_DS="@localstatedir@/log/scalaris/initd-monitor_${SCALARIS_NODE}.log"
 
-SCALARISMON="@bindir@/scalaris --jvmopts \"-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=14193 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false\" -jmx ${SCALARIS_NODE}"
+SCALARISMON="@bindir@/scalaris --jvmopts \"-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=14193 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dscalaris.client.name=scalaris_monitor\" -jmx ${SCALARIS_NODE}"
 
 # For SELinux we need to use 'runuser' not 'su'
 if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
