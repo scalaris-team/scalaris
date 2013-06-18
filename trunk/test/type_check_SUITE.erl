@@ -1,4 +1,4 @@
-%% @copyright 2012 Zuse Institute Berlin
+%% @copyright 2012-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -454,7 +454,7 @@ tester_type_check_util(_Config) ->
              {ssplit_unique, 3}, %% cannot create funs
              {ssplit_unique, 4}, %% cannot create funs
              {supervisor_terminate, 1}, %% could destroy the system
-             {supervisor_terminate_childs, 1}, %% tester not ready for gb_trees
+             {supervisor_terminate_childs, 1}, %% cannot generate proper gb_trees
              {tc, 1}, {tc, 2}, {tc, 3}, %% don't call arbitrary functions
              {topDumpX, 1},
              {topDumpX, 3},

@@ -1,4 +1,4 @@
-% @copyright 2009-2012 Zuse Institute Berlin
+% @copyright 2009-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@
 -export([get_entry_version/1]).
 
 -ifdef(with_export_type_support).
--export_type([tlog/0, tlog_entry/0]).
+-export_type([tlog/0, tlog_entry/0, tlog_entry_write/0]).
 -export_type([tlog_ext/0, tlog_entry_ext/0]).
 -export_type([tx_status/0, tx_op/0]).
 -export_type([snap_number/0]).

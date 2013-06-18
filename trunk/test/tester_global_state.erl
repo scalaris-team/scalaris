@@ -135,12 +135,13 @@ create_table() ->
 
 -spec log_last_calls() -> ok.
 log_last_calls() ->
-    [begin
-         case tester_global_state:get_last_call(Thread) of
-             failed -> ok;
-             {Module, Function, Args} ->
-                 ct:pal("Last call by tester (thread ~B):~n~.0p:~.0p(~.0p).",
-                        [Thread, Module, Function, Args])
-         end
-     end || Thread <- lists:seq(1, 8)],
+    _ = [begin
+             case tester_global_state:get_last_call(Thread) of
+                 failed -> ok;
+                 {Module, Function, Args} ->
+                     ct:pal("Last call by tester (thread ~B):~n"
+                            "~.0p:~.0p(~.0p).",
+                            [Thread, Module, Function, Args])
+             end
+         end || Thread <- lists:seq(1, 8)],
     ok.

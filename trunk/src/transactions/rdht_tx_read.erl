@@ -1,5 +1,4 @@
-%% @copyright 2009-2012 Zuse Institute Berlin
-%%            2009 onScale solutions GmbH
+%% @copyright 2009-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,12 +12,12 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%% @author Florian Schintke <schintke@onscale.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc Part of replicated DHT implementation.
 %%      The read operation.
 %% @version $Id$
 -module(rdht_tx_read).
--author('schintke@onscale.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 %-define(TRACE(X,Y), io:format(X,Y)).
@@ -74,6 +73,25 @@ work_phase(ClientPid, ReqId, Request) ->
                      client_key(), ?RT:key(),
                      Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
         -> ok.
+-ifdef(txnew).
+work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
+    ?TRACE("rdht_tx_read:work_phase asynch~n", []),
+    %% PRE: No entry for key in TLog
+    %% find rdht_tx_read process as collector
+    CollectorPid = pid_groups:find_a(?MODULE),
+    %% it is ok to pack the client_is info into the collector pid as
+    %% it is only send around in the local VM but not across the LAN
+    %% or WAN: first to the rbrcseq process and then to the
+    %% rdht_tx_read process. So the reply for the client can be build
+    %% in a single on handler and we do not need to store a state for
+    %% each request.
+    MyCollectorPid =
+        comm:reply_as(CollectorPid, 5,
+                      {work_phase_done, ClientPid, Key, Op, '_'}),
+    kv_on_cseq:work_phase_async(MyCollectorPid, ReqId, HashedKey, Op),
+
+    ok.
+-else.
 work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
@@ -84,6 +102,7 @@ work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     %% inform CollectorPid on whom to inform after quorum reached
     comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key, Op}),
     ok.
+-endif.
 
 -spec quorum_read(CollectorPid::comm:mypid(), ReqId::rdht_tx:req_id() | rdht_tx_write:req_id(),
                   HashedKey::?RT:key(),
@@ -191,7 +210,7 @@ extract_from_tlog(Entry, _Key, Op, EnDecode) ->
     {ValType, EncVal} = tx_tlog:get_entry_value(Entry),
     % note: Value and ValType can either contain the partial read or a failure
     %       from the requested op - nothing else is possible since otherwise a
-    %       full read would have been executed! 
+    %       full read would have been executed!
     case ValType of
         ?partial_value ->
             ClientVal =
@@ -269,7 +288,7 @@ validate(DB, LocalSnapNumber, RTLogEntry) ->
                         ?TRACE_SNAP("rdht_tx_read:validate: ~p~n~p",
                                     [comm:this(), DB]),
                          ?DB:copy_value_to_snapshot_table(DB, db_entry:get_key(DBEntry));
-                     false -> 
+                     false ->
                          DB
                  end,
            %% set locks on entry
@@ -314,7 +333,7 @@ commit(DB, RTLogEntry, ?prepared, _TMSnapNo, OwnSnapNo) ->
                     case (TLogSnapNo < OwnSnapNo) of
                         true -> % we have to apply changes to the snapshot db as well
                             case ?DB:get_snapshot_entry(DB, tx_tlog:get_entry_key(RTLogEntry)) of
-                                {true, SnapEntry} -> 
+                                {true, SnapEntry} ->
                                     ?TRACE_SNAP("rdht_tx_read ~p~nkey in snapdb...reducing lockcount",
                                                 [comm:this()]),
                                     % in this case there was an entry with this key in the snapshot table
@@ -408,6 +427,28 @@ on({client_is, Id, Pid, Key, Op}, {Reps, MajOk, MajDeny, Table} = State) ->
 %            timeout_inform(Entry),
 %            pdb:delete(Id, Table)
 %    end,
+    State;
+
+%% used by new tx protocol
+on({work_phase_done, ClientPid, Key, Op,
+    {work_phase_async_done, Id, {qread_done, _, _, {Val, Vers}}}},
+   {_Reps, _MajOk, _MajDeny, Table} = State) ->
+    Entry = get_entry(Id, Table),
+    T1 = state_set_op(Entry, Op),
+    T2 = state_set_client(T1, ClientPid),
+    T3 = state_set_key(T2, Key),
+
+    T4 = state_set_result(T3, {?ok, Val, Vers}),
+%%    log:log("Seeing: ~p ~p~n", [Val, Vers]),
+    ValType = case Vers of
+                  -1 -> ?not_found;
+                  _ -> ?value
+              end,
+    T5 = case ValType of
+             ?not_found -> state_set_decided(T4, ?ok);
+             ?value -> state_set_decided(T4, ?ok)
+         end,
+    set_and_inform_client(ClientPid, T5, 1, Table, ValType),
     State.
 
 -spec get_entry(rdht_tx:req_id(), atom()) -> read_state().
@@ -443,7 +484,7 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
         false ->
             % false = state_get_decided(Entry), % should always be true here!
             NumReplied = state_get_numreplied(Entry),
-            
+
             % if majority replied, we can given an answer!
             % (but: need all Reps replicas for not_found)
             if NumReplied >= MajOk ->
@@ -455,7 +496,7 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
                           % note: MajDeny =:= 2, so 2 times not_found results
                           % in {fail, not_found} although the 3rd reply may have
                           % contained an actual value. This is to make sure that
-                          % if 'a' is written, then 'b' and then 'c', no matter 
+                          % if 'a' is written, then 'b' and then 'c', no matter
                           % what happens during the write of 'c', 'a' is never
                           % read again!
                           % Example: b is written       => (a, b, b, b), then
@@ -518,7 +559,8 @@ decide_set_and_inform_client_if_ready(Client, Entry, Reps, MajOk, MajDeny, Table
         -> ok.
 set_and_inform_client(Client, Entry, Reps, Table, ValType) ->
     Id = state_get_id(Entry),
-    Msg = msg_reply(Id, make_tlog_entry(Entry, ValType)),
+    TLogEntry = make_tlog_entry(Entry, ValType),
+    Msg = msg_reply(Id, TLogEntry),
     comm:send_local(Client, Msg),
     Entry2 = state_set_client_informed(Entry),
     set_or_delete_if_all_replied(Entry2, Reps, Table).
