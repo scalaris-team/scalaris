@@ -1,4 +1,4 @@
-%% @copyright 2012 Zuse Institute Berlin
+%% @copyright 2012-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -303,23 +303,28 @@ conflicting_tx(_Config) ->
 
 conflicting_tx2(_Config) ->
     %% read non-existing item
+%%% log:log("1 doing read~n"),
     {TLog1a, [ReadRes1a]} =
         api_tx:req_list([{read, "conflicting_tx2_non-existing"}]),
     ?equals(ReadRes1a, {fail, not_found}),
+%%% log:log("2 doing commit for read TLog~n"),
     ?equals(api_tx:commit(TLog1a), {ok}),
 
+%%% log:log("3 doing single write for key (creating it)~n"),
     _ = api_tx:write("conflicting_tx2_non-existing", "Value"),
     %% verify not_found of tlog in commit phase? key now exists!
+%%% log:log("4 doing commit for outdated 'not_found' TLog~n"),
     ?equals(api_tx:commit(TLog1a),
             {fail, abort, ["conflicting_tx2_non-existing"]}),
 
+%%% log:log("5 doing write and commit on outdated 'not_found' TLog~n"),
     ?equals_pattern(api_tx:req_list(TLog1a,
                                     [{write, "conflicting_tx2_non-existing", "NewValue"},
                                      {commit}]),
                     {_TLog, [_WriteRes = {ok},
                              _CommitRes = {fail, abort, ["conflicting_tx2_non-existing"]}]}),
+%%% log:log("6 reading same key again, should return initially written value~n"),
     ?equals(api_tx:read("conflicting_tx2_non-existing"), {ok, "Value"}),
-
 
     ok.
 
