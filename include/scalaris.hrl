@@ -1,4 +1,4 @@
-%  @copyright 2008-2012 Zuse Institute Berlin
+%  @copyright 2008-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -42,7 +42,6 @@
 %-define(RT, rt_frtchord).
 %% Grouped Flexible Routing Table
 %-define(RT, rt_gfrtchord).
-
 %% userdevguide-end scalaris:rt
 
 %% userdevguide-begin scalaris:db
@@ -55,6 +54,8 @@
 -define(DB_ETS_ADDITIONAL_OPS, [protected, named_table]). % better for debugging
 %% userdevguide-end scalaris:db
 
+%% when defined, use new tx protocol (which is not yet complete)
+%% -define(txnew, true).
 
 %% userdevguide-begin scalaris:rm
 %%Standard chord ring maintenance

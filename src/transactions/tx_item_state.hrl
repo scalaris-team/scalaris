@@ -148,6 +148,10 @@ tx_item_newly_decided(State) ->
         false ->
             Prepared = tx_item_get_numprepared(State) =:= tx_item_get_maj_for_prepared(State),
             Abort =    tx_item_get_numabort(State) =:= tx_item_get_maj_for_abort(State),
+            case tx_item_get_numprepared(State) + tx_item_get_numabort(State) of
+                4 -> log:log("Deciding at 4th answer!!!");
+                _ -> ok
+            end,
             if Prepared andalso not Abort -> ?prepared;
                not Prepared andalso Abort -> ?abort;
                true -> false

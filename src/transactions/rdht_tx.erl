@@ -1,4 +1,4 @@
-% @copyright 2009-2012 Zuse Institute Berlin,
+% @copyright 2009-2013 Zuse Institute Berlin,
 %            2009 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +20,7 @@
 -module(rdht_tx).
 -author('schintke@zib.de').
 -author('kruber@zib.de').
--vsn('$Id$').
+-vsn('$Id$ ').
 
 -compile({inline, [req_get_op/1, req_get_key/1]}).
 
@@ -73,7 +73,9 @@ req_list(TLog, ReqList, EnDecode) ->
 
             %% perform all requests based on TLog to compute result
             %% entries
+%%            io:format("Doing work on TLog~n"),
             {NewClientTLog, Results} = do_reqs_on_tlog(TLog2, ReqList1, EnDecode),
+%%            io:format("Doing commit on ~p~n", [NewClientTLog]),
 
             %% do commit (if requested) and append the commit result
             %% to result list
@@ -192,6 +194,7 @@ collect_replies(TLog, [ReqId | RestReqIds] = _ReqIdsList) ->
 collect_replies(TLog, []) ->
     %% Drop outdated results...
     receive_old_answers(),
+%%    io:format("Tlog collected ~p~n", [TLog]),
     tx_tlog:sort_by_key(TLog).
 
 %% @doc Perform all operations on the TLog and generate list of results.
@@ -261,6 +264,48 @@ decode_result(X)           -> X.
 
 %% commit phase
 -spec commit(tx_tlog:tlog()) ->  api_tx:commit_result().
+-ifdef(TXNEW).
+commit(TLog) ->
+    %% set steering parameters, we need for the transactions engine:
+    %% number of retries, etc?
+    %% some parameters are checked via the individual operations
+    %% read, write which implement the behaviour tx_op_beh.
+    case tx_tlog:is_sane_for_commit(TLog) of
+        false -> {fail, abort, tx_tlog:get_insane_keys(TLog)};
+        true ->
+            Client = comm:this(),
+            ClientsId = {?commit_client_id, uid:get_global_uid()},
+            ?TRACE("rdht_tx:commit(Client ~p, ~p, TLog ~p)~n", [Client, ClientsId, TLog]),
+%%%% OLD TX
+%           case pid_groups:find_a(tx_tm) of
+            case pid_groups:find_a(tx_tm_new) of
+                failed ->
+                    Msg = io_lib:format("No tx_tm found.~n", []),
+%%%% OLD TX
+%               tx_tm_rtm:msg_commit_reply(Client, ClientsId, {abort, Msg});
+                    tx_tm:msg_commit_reply(Client, ClientsId, {abort, Msg});
+                TM ->
+%%%% OLD TX
+%               tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
+                    tx_tm:commit(TM, Client, ClientsId, TLog)
+            end,
+            _Result =
+                receive
+                    ?SCALARIS_RECV(
+%%%% OLD TX
+%                  {tx_tm_rtm_commit_reply, ClientsId, commit}, %% ->
+                       {tx_tm_commit_reply, ClientsId, commit}, %% ->
+                         {ok}  %% commit / abort;
+                      );
+                    ?SCALARIS_RECV(
+%%%% OLD TX
+%                  {tx_tm_rtm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
+                       {tx_tm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
+                         {fail, abort, FailedKeys} %% commit / abort;
+                       )
+                end
+    end.
+-else.
 commit(TLog) ->
     %% set steering parameters, we need for the transactions engine:
     %% number of retries, etc?
@@ -283,20 +328,24 @@ commit(TLog) ->
                 receive
                     ?SCALARIS_RECV(
                        {tx_tm_rtm_commit_reply, ClientsId, commit}, %% ->
-                         {ok}  %% commit / abort;
+                       {ok}  %% commit / abort;
                       );
                     ?SCALARIS_RECV(
                        {tx_tm_rtm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
-                         {fail, abort, FailedKeys} %% commit / abort;
-                       )
+                       {fail, abort, FailedKeys} %% commit / abort;
+                      )
                 end
     end.
+-endif.
 
 -spec receive_answer(ReqId::req_id()) -> tx_tlog:tlog_entry().
-receive_answer(ReqId) ->
+-ifdef(txnew).
+ receive_answer(ReqId) ->
     receive
         ?SCALARIS_RECV(
-           {tx_tm_rtm_commit_reply, _, _}, %%->
+%%%% OLD TX
+% {tx_tm_rtm_commit_reply, _, _}, %%->
+           {tx_tm_commit_reply, _, _}, %%->
            %% probably an outdated commit reply: drop it.
              receive_answer(ReqId)
           );
@@ -305,14 +354,39 @@ receive_answer(ReqId) ->
              RdhtTlog
           )
     end.
+-else.
+receive_answer(ReqId) ->
+    receive
+        ?SCALARIS_RECV(
+           {tx_tm_rtm_commit_reply, _, _}, %%->
+           %% probably an outdated commit reply: drop it.
+           receive_answer(ReqId)
+          );
+        ?SCALARIS_RECV(
+           {_Op, ReqId, RdhtTlog}, %% ->
+           RdhtTlog
+          )
+        end.
+-endif.
 
 -spec receive_old_answers() -> ok.
+-ifdef(txnew).
 receive_old_answers() ->
     receive
-        ?SCALARIS_RECV({tx_tm_rtm_commit_reply, _, _}, receive_old_answers());
+%%%% OLD TX
+%   ?SCALARIS_RECV({tx_tm_rtm_commit_reply, _, _}, receive_old_answers());
+        ?SCALARIS_RECV({tx_tm_commit_reply, _, _}, receive_old_answers());
         ?SCALARIS_RECV({_Op, _RdhtId, _RdhtTlog}, receive_old_answers())
     after 0 -> ok
     end.
+-else.
+receive_old_answers() ->
+    receive
+        ?SCALARIS_RECV({tx_tm_commit_reply, _, _}, receive_old_answers());
+        ?SCALARIS_RECV({_Op, _RdhtId, _RdhtTlog}, receive_old_answers())
+    after 0 -> ok
+    end.
+-endif.
 
 -spec req_get_op(api_tx:request_on_key())
                 -> read | write | add_del_on_list | add_on_nr | test_and_set.

@@ -307,7 +307,7 @@ init([]) ->
 %% step 1: Write the tx to the txid store
 on({tx_tm_commit, Client, ClientsID, TLog}, State) ->
     ?TRACE("tx_tm:on({commit, ...}) for TLog ~p as ~p~n",
-           [TransLog, state_get_role(State)]),
+           [TLog, state_get_role(State)]),
 
     TLogUid = uid:get_global_uid(),
     NewTid = {?tx_id, TLogUid},
@@ -372,6 +372,7 @@ on({tx_tm_lock_get_done, TxId, Key, {qwrite_done, _ReqId, NextRound, WrittenVal}
                     %% all locks acquired? -> proceed to next step
                     Round = tx_state_txid_next_write_token(NewTxState),
                     OldVal = tx_state_txid_written_value(NewTxState),
+%%                    io:format("decide commit~n"),
                     gen_component:post_op(
                       State, {tx_tm_write_decision, TxId, commit, Round, OldVal});
                 _ -> State
@@ -393,10 +394,16 @@ on({tx_tm_lock_get_done, TxId, Key, {qwrite_deny, _ReqId, NextRound, WrittenVal,
             NewTxState = tx_state_add_nextround_writtenval_for_commit(
                            T2TxState, Key, NextRound, WrittenVal),
             set_entry(NewTxState, State),
-            Round = tx_state_txid_next_write_token(NewTxState),
-            OldVal = tx_state_txid_written_value(NewTxState),
-            gen_component:post_op(State, {tx_tm_write_decision, TxId, abort,
-                                          Round, OldVal})
+            case NewOpenLocks of
+                [] ->
+                    %% all locks acquired? -> proceed to next step
+                    Round = tx_state_txid_next_write_token(NewTxState),
+                    OldVal = tx_state_txid_written_value(NewTxState),
+%%                    io:format("decide abort~n"),
+                    gen_component:post_op(
+                      State, {tx_tm_write_decision, TxId, abort, Round, OldVal});
+                _ -> State
+            end
     end;
 
 
@@ -406,33 +413,42 @@ on({tx_tm_write_decision, TxId, Decision, WriteRound, OldVal}, State) ->
     ReplyAs = comm:reply_as(self(), 3,
                             {tx_tm_decision_stored, TxId, '_'}),
 
+%%    log:log("Decision ~p~n", [Decision]),
     txid_on_cseq:decide(TxId, Decision, ReplyAs, WriteRound, OldVal),
     State;
 
-on({tx_tm_decision_stored, TxId, {qwrite_done, _ReqId, _Round, _Val}}, State) ->
-    gen_component:post_op(State, {tx_tm_execute_decision, TxId});
+on({tx_tm_decision_stored, TxId, {qwrite_done, _ReqId, _Round, Decision}}, State) ->
+    gen_component:post_op(State, {tx_tm_execute_decision, TxId, Decision});
 
-on({tx_tm_execute_decision, TxId}, State) ->
+on({tx_tm_execute_decision, TxId, Decision}, State) ->
     TxState = get_entry(TxId, State),
     TLog = tx_state_tlog(TxState),
     _ = [ begin
-              ReplyAs = comm:reply_as(self(), 4,
-                                      {tx_tm_wrote_decision, TxId,
-                                       Key, '_'}),
+              ReplyAs = comm:reply_as(self(), 5,
+                                      {tx_tm_executed_decision, TxId,
+                                       Key, Decision, '_'}),
               %% retrieve corresponding TLog Entry
               TLogEntry = tx_tlog:find_entry_by_key(TLog, Key),
               Op = tx_tlog:get_entry_operation(TLogEntry),
-              case Op of
-                  ?read -> kv_on_cseq:commit_read(
-                             TLogEntry, TxId, ReplyAs, NextRound, OldVal);
-                  ?write -> kv_on_cseq:commit_write(
-                              TLogEntry, TxId, ReplyAs, NextRound, OldVal)
+              case {Op, Decision} of
+                  {?read, commit} ->
+                      kv_on_cseq:commit_read(
+                        TLogEntry, TxId, ReplyAs, NextRound, OldVal);
+                  {?write, commit} ->
+                      kv_on_cseq:commit_write(
+                        TLogEntry, TxId, ReplyAs, NextRound, OldVal);
+                  {?read, abort} ->
+                      kv_on_cseq:abort_read(
+                        TLogEntry, TxId, ReplyAs, NextRound, OldVal);
+                  {?write, abort} ->
+                      kv_on_cseq:abort_write(
+                        TLogEntry, TxId, ReplyAs, NextRound, OldVal)
               end
           end
           || {Key, NextRound, OldVal} <- tx_state_open_commits(TxState) ],
     State;
 
-on({tx_tm_wrote_decision, TxId, Key, {qwrite_done, _ReqId, _Round, _Val}}, State) ->
+on({tx_tm_executed_decision, TxId, Key, Decision, {qwrite_done, _ReqId, _Round, _Val}}, State) ->
     case get_entry(TxId, State) of
         %% this should not happen!
         %% undefined ->
@@ -444,9 +460,14 @@ on({tx_tm_wrote_decision, TxId, Key, {qwrite_done, _ReqId, _Round, _Val}}, State
                     %% all keys committed -> inform client
                     Client = tx_state_client(TxState),
                     ClientsId = tx_state_clients_id(TxState),
-                    msg_commit_reply(Client, ClientsId, commit),
+                    case Decision of
+                        commit ->
+                            msg_commit_reply(Client, ClientsId, commit);
+                        abort ->
+                            msg_commit_reply(Client, ClientsId, {abort, tx_state_failed_locks(TxState)})
+                    end,
                     %% proceed to next step
-
+                    
                     gen_component:post_op(State, {tx_tm_delete_txid, TxId});
                 _ ->
                     NewTxState = tx_state_set_open_commits(TxState, NewOpenCommits),

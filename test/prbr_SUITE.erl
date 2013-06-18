@@ -255,7 +255,8 @@ tester_type_check_rbr(_Config) ->
            [ {cc_single_write, 3}, %% cannot create funs
              {cc_set_rl, 3}, %% cannot create funs
              {cc_set_wl, 3},  %% cannot create funs
-             {cc_commit_read, 3}  %% cannot create funs
+             {cc_commit_read, 3},  %% cannot create funs
+             {cc_commit_write, 3}  %% cannot create funs
            ]},
           {tx_tm,
            [{start_link, 2},       %% starts processes
@@ -267,18 +268,23 @@ tester_type_check_rbr(_Config) ->
            ],
            [ {get_entry, 2},         %% could read arb, entries
              %% guessing keys of tx entries...
-             {tx_state_add_nextround_writtenval_for_commit, 4} 
+             {tx_state_add_nextround_writtenval_for_commit, 4}
            ]
           },
           {kv_on_cseq,
            [ {commit_read, 5}, %% tested via feeder
-             {commit_write, 3}, %% tested via feeder
+             {commit_write, 5}, %% tested via feeder
+             {abort_read, 5}, %% tested via feeder
+             {abort_write, 5}, %% tested via feeder
              {set_lock, 3} %% tested via feeder
            ],
            [ {cc_single_write, 3}, %% cannot create funs
              {cc_set_rl, 3}, %% cannot create funs
              {cc_set_wl, 3},  %% cannot create funs
-             {cc_commit_read, 3}  %% cannot create funs
+             {cc_commit_read, 3},  %% cannot create funs
+             {cc_commit_write, 3},  %% cannot create funs
+             {cc_abort_read, 3},  %% cannot create funs
+             {cc_abort_write, 3}  %% cannot create funs
            ]},
           {prbr,
            [ {on, 2},       %% sends messages
