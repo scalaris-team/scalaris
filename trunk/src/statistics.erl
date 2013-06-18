@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -229,13 +229,31 @@ is_valid({failed, _}) ->
 
 -spec getMonitorData(Monitor::pid(), [{Process::atom(), Key::monitor:key()}]) -> [{Process::atom(), Key::monitor:key(), rrd:rrd()}].
 getMonitorData(Monitor, Keys) ->
-    comm:send_local(Monitor, {get_rrds, Keys, comm:this()}),
+    This = comm:this(),
+    comm:send_local(Monitor, {get_rrds, Keys, This}),
+    case gen_component:is_gen_component(self()) of
+        true -> log:log(error, "This must not be called inside a gen_component ~p~n", [pid_groups:group_and_name_of(self())]);
+        false -> ok
+    end,
     receive
         ?SCALARIS_RECV(
             {get_rrds_response, DataL}, %% ->
             [Data || Data = {_Process, _Key, Value} <- DataL,
                      Value =/= undefined]
           )
+    after 1000 ->
+            log:log("getMonitorData(~p, ~p) hangs.~n"
+                    "monitor has messages ~p~n",
+                    [Monitor, Keys,
+                     process_info(Monitor, [messages])
+                     ]),
+                receive
+                    ?SCALARIS_RECV(
+                       {get_rrds_response, DataL}, %% ->
+                       [Data || Data = {_Process, _Key, Value} <- DataL,
+                                Value =/= undefined]
+                      )
+                    end
     end.
 
 -spec monitor_timing_dump_fun_exists(rrd:rrd(), From_us::rrd:internal_time(), To_us::rrd:internal_time(), Value::term())
