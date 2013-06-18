@@ -379,7 +379,7 @@ test_split_with_owner_change_in_step2(Config) ->
                 l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
-    WaitRightLeaseF = fun (Id, Lease) -> ok end,
+    WaitRightLeaseF = fun (_Id, _Lease) -> ok end,
                             % we cannot read the left lease anymore, because
                             % consistent routing will prevent the delivery of
                             % messages
@@ -407,7 +407,7 @@ test_split_with_owner_change_in_step3(Config) ->
                 l_on_cseq:unittest_lease_update(Lease, New)
         end,
     NullF = fun (_Id, _Lease) -> ok end,
-    WaitLeftLeaseF = fun (Id) -> ok end,
+    WaitLeftLeaseF = fun (_Id) -> ok end,
                             % we cannot read the left lease anymore, because
                             % consistent routing will prevent the delivery of
                             % messages

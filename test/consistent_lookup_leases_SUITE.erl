@@ -73,8 +73,8 @@ test_consistent_send(_Config) ->
     api_dht_raw:unreliable_lookup(?RT:hash_key("0"),
                                   Ev),
     receive
-        {unittest_consistent_send, Self, true} = Msg ->
+        {unittest_consistent_send, _Self, true} = Msg ->
             ct:pal("message ~p", [Msg]);
-        {unittest_consistent_send, Self, false} = Msg ->
+        {unittest_consistent_send, _Self, false} = Msg ->
             ct:pal("message ~p", [Msg])
     end.
