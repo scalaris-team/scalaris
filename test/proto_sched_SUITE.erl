@@ -37,7 +37,7 @@ groups() ->
 all() ->
     [
      %{group, tester_tests},
-     %{group, rbr_tests}  <- hier anschalten
+     {group, rbr_tests} %% <- hier anschalten
      ].
 
 suite() -> [ {timetrap, {seconds, 120}} ].
@@ -65,7 +65,7 @@ init_per_testcase(TestCase, Config) ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
             Config
     end.
 
@@ -87,17 +87,11 @@ test_qwrite_qwrite_qread(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     proto_sched:start(),
-    proto_sched:start_deliver(),
     rbrcseq:qwrite(DB, Self, Id, ContentCheck, Value1),
     rbrcseq:qwrite(DB, Self, Id, ContentCheck, Value2),
-    receive
-        X1 ->
-            ct:pal("got ~p", [X1])
-    end,
-    receive
-        X2 ->
-            ct:pal("got ~p", [X2])
-    end,
+    proto_sched:start_deliver(),
+    receive_answer(),
+    receive_answer(),
     proto_sched:stop(),
     proto_sched:cleanup(),
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -106,11 +100,14 @@ test_qwrite_qwrite_qread(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     rbrcseq:qread(DB, Self, Id),
-    receive
-        X3 ->
-            ct:pal("got ~p", [X3])
-    end,
+    receive_answer(),
     ok.
+
+receive_answer() ->
+    receive
+        ?SCALARIS_RECV(X1, ct:pal("got ~p", [X1]))
+        end.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
