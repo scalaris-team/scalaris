@@ -236,7 +236,7 @@ init(_Arg) -> [].
 
 -spec on(send_event() | comm:message(), state()) -> state().
 on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
-    ?TRACE("got msg to schedule: ~.0p~n", [UMsg]),
+    ?TRACE("got msg to schedule ~p -> ~p: ~.0p~n", [From, To, UMsg]),
     TmpEntry = case lists:keyfind(TraceId, 1, State) of
                    false ->
                        add_message(From, To, UMsg, LorG, new(TraceId));

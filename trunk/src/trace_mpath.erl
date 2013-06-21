@@ -102,9 +102,9 @@ start() -> start(default).
 -spec start(trace_id() | passed_state()) -> ok.
 start(TraceId) when is_atom(TraceId) ->
     start(TraceId, []);
-start({TraceId, Logger} = PState) ->
+start({TraceId, Logger} = _PState) ->
     proto_sched:start(TraceId, Logger);
-start({TraceId, Logger, MsgMapFun, FilterFun} = PState) ->
+start({TraceId, Logger, MsgMapFun, FilterFun} = _PState) ->
     start(TraceId, Logger, MsgMapFun, FilterFun).
 
 -spec start(trace_id(), logger() | comm:mypid() | options()) -> ok.
