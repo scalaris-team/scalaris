@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin,
+% @copyright 2007-2013 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -220,15 +220,16 @@ find_a(PidName) ->
                 failed ->
                     %% search others
                     case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
-                        [[Pid] | _] = Pids ->
+                        [[TPid] | _] = Pids ->
                             %% fill process local cache
 
                             %% This should only happen for client
                             %% processes not registered in a pid_group (failed)
                             %% io:format("Ring is created to find a ~p in ~p ~p~n",
                             %% [PidName, self(), pid_groups:group_and_name_of(self())]),
-                            erlang:put(CachedName,
-                                       ring_new(lists:flatten(Pids))),
+                            Ring = ring_new(lists:flatten(Pids)),
+                            {Pid, NewPids} = ring_get(Ring),
+                            erlang:put(CachedName, NewPids),
                             Pid;
                         [] ->
                             io:format("***No pid registered for ~p~n",
@@ -260,10 +261,10 @@ find_a(PidName) ->
     end.
 
 -spec ring_get({list(), list()}) -> {any(), {list(), list()}}.
+ring_get({[], []})        -> {'$dead_code', {[], []}};
 ring_get({[E], []} = Q)   -> {E, Q};
-ring_get({[], [ E | R ]}) -> {E, {R, [E]}};
-ring_get({[ E | R ], L})  -> {E, {R, [E|L]}};
-ring_get({[], []})        -> {'$dead_code', {[], []}}.
+ring_get({[], L}) -> ring_get({lists:reverse(L), []});
+ring_get({[ E | R ], L})  -> {E, {R, [E|L]}}.
 
 -spec ring_new(list()) -> {list(), list()}.
 ring_new(L) -> {L, []}.
