@@ -131,11 +131,18 @@ send(Pid, Msg, Options) ->
         undefined ->
             comm_server:send(RealPid, RealMsg, Options);
         Logger ->
-            trace_mpath:log_send(Logger, self(), RealPid, Msg, global),
-            LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
-                               Logger, self(), RealPid, RealMsg),
-            comm_server:send(RealPid, LogEpidemicMsg, Options)
-    end.
+            Deliver = trace_mpath:log_send(Logger, self(),
+                                           RealPid, RealMsg, global),
+            case Deliver of
+                false -> ok;
+                true ->
+                    %% send infected message to destination
+                    LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
+                                       Logger, self(), RealPid, RealMsg),
+                    comm_server:send(RealPid, LogEpidemicMsg, Options)
+            end
+    end,
+    ok.
 
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()).
@@ -146,34 +153,46 @@ send_local(Pid, Msg) ->
             undefined ->
                 RealPid ! RealMsg;
             Logger ->
-                trace_mpath:log_send(Logger, self(), RealPid, Msg, local),
-                LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
-                                   Logger, self(), RealPid, RealMsg),
-                RealPid ! LogEpidemicMsg
+                Deliver = trace_mpath:log_send(Logger, self(),
+                                               RealPid, RealMsg, local),
+                case Deliver of
+                    false -> ok;
+                    true ->
+                        LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
+                                           Logger, self(), RealPid, RealMsg),
+                        RealPid ! LogEpidemicMsg
+                end
         end,
     ok.
 
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()) after the given delay in milliseconds.
--spec send_local_after(Delay::non_neg_integer(), erl_local_pid(), message() | group_message()) -> reference().
+-spec send_local_after(Delay::non_neg_integer(), erl_local_pid(), message() | group_message()) -> reference() | ok.
 send_local_after(Delay, Pid, Msg) ->
     {RealPid, RealMsg} = unpack_cookie(Pid, Msg),
     case erlang:get(trace_mpath) of
         undefined ->
             erlang:send_after(Delay, RealPid, RealMsg);
         Logger ->
-            trace_mpath:log_send(Logger, self(), RealPid, Msg, local),
-            LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
-                               Logger, self(), RealPid, RealMsg),
-            erlang:send_after(Delay, RealPid, LogEpidemicMsg)
+            Deliver = trace_mpath:log_send(Logger, self(),
+                                           RealPid, RealMsg, local),
+            case Deliver of
+                false -> ok;
+                true ->
+                    LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
+                                       Logger, self(), RealPid, RealMsg),
+                    erlang:send_after(Delay, RealPid, LogEpidemicMsg)
+            end
     end.
 
-%% @doc Convert a local erlang pid to a global pid of type mypid() for
-%%      use in send/2.
--spec make_global(erl_local_pid()) -> mypid().
+%% @doc Convert a local or global erlang pid to a global pid of type
+%%      mypid() for use in send/2.
+-spec make_global(erl_local_pid() | mypid()) -> mypid().
 make_global({Pid, e, Nth, Cookie}) ->
-    {get(Pid, this()), e, Nth, Cookie};
-make_global(Pid) -> get(Pid, this()).
+    {make_global(Pid), e, Nth, Cookie};
+make_global(Pid) when is_pid(Pid) -> get(Pid, this());
+make_global(Pid) when is_atom(Pid) -> get(Pid, this());
+make_global(GlobalPid) -> GlobalPid.
 
 %% @doc Convert a global mypid() of the current node to a local erlang pid.
 -spec make_local(mypid()) -> erl_local_pid().

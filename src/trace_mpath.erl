@@ -62,7 +62,8 @@
 
 -type time()         :: erlang_timestamp() | non_neg_integer().
 -type logger()       :: io_format                       %% | ctpal
-                      | {log_collector, comm:mypid()}.
+                      | {log_collector, comm:mypid()}
+                      | {proto_sched, comm:mypid()}.
 -type pidinfo()      :: {comm:mypid(),
                          {pid_groups:groupname(), pid_groups:pidname()} |
                              no_pid_name |
@@ -82,7 +83,7 @@
 -type filter_fun()   :: fun((trace_event()) -> boolean()).
 -type passed_state() :: {trace_id(), logger(), msg_map_fun(), filter_fun()}.
 -type gc_mpath_msg() :: {'$gen_component', trace_mpath, passed_state(),
-                         Source::pidinfo(), Dest::pidinfo(), comm:message()}.
+                         Source::anypid(), Dest::anypid(), comm:message()}.
 -type options()      :: [{logger, logger() | comm:mypid()} |
                          {map_fun, msg_map_fun()} |
                          {filter_fun, filter_fun()}].
@@ -108,11 +109,11 @@ start(PState) when is_tuple(PState) ->
 
 -spec start(trace_id(), logger() | comm:mypid() | options()) -> ok.
 start(TraceId, Options) when is_list(Options) ->
-    _Logger = proplists:get_value(logger, Options, nil),
-    Logger = if _Logger =:= nil ->
-                    LoggerPid = pid_groups:find_a(trace_mpath),
+    InLogger = proplists:get_value(logger, Options, nil),
+    Logger = if InLogger =:= nil ->
+                    LoggerPid = pid_groups:find_a(?MODULE),
                     comm:make_global(LoggerPid);
-                true -> _Logger
+                true -> InLogger
              end,
     MsgFun = proplists:get_value(map_fun, Options, fun(Msg) -> Msg end),
     FilterFun = proplists:get_value(filter_fun, Options, fun(_) -> true end),
@@ -121,10 +122,10 @@ start(TraceId, Logger) ->
     start(TraceId, [{logger, Logger}]).
 
 -spec start(trace_id(), logger() | comm:mypid(), msg_map_fun(), filter_fun()) -> ok.
-start(TraceId, _Logger, MsgMapFun, FilterFun) ->
-    Logger = case comm:is_valid(_Logger) of
-                 true -> {log_collector, _Logger}; %% just a pid was given
-                 false -> _Logger
+start(TraceId, InLogger, MsgMapFun, FilterFun) ->
+    Logger = case comm:is_valid(InLogger) of
+                 true -> {log_collector, InLogger}; %% just a pid was given
+                 false -> InLogger
              end,
     PState = passed_state_new(TraceId, Logger, MsgMapFun, FilterFun),
     own_passed_state_put(PState).
@@ -501,7 +502,7 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
 epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
     {'$gen_component', trace_mpath, PState, FromPid, ToPid, Msg}.
 
--spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global) -> ok.
+-spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global) -> DeliverAlsoDirectly :: boolean().
 log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
     Now = os:timestamp(),
     MsgMapFun = passed_state_msg_map_fun(PState),
@@ -510,15 +511,19 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
             io:format("~p send ~.0p -> ~.0p:~n  ~.0p.~n",
                       [util:readable_utc_time(Now),
                        normalize_pidinfo(FromPid),
-                       normalize_pidinfo(ToPid), MsgMapFun(Msg)]);
+                       normalize_pidinfo(ToPid), MsgMapFun(Msg)]),
+            true;
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
             send_log_msg(
               PState,
               LoggerPid,
-              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg), LocalOrGlobal})
-    end,
-    ok.
+              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg), LocalOrGlobal}),
+            true;
+        {proto_sched, _} ->
+            proto_sched:log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal),
+            false
+    end.
 
 -spec log_info(anypid(), comm:message()) -> ok.
 log_info(FromPid, Info) ->
@@ -537,7 +542,14 @@ log_info(PState, FromPid, Info) ->
                        Info]);
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
-            send_log_msg(PState, LoggerPid, {log_info, Now, TraceId, FromPid, Info})
+            send_log_msg(PState, LoggerPid, {log_info, Now, TraceId, FromPid, Info});
+        {proto_sched, LoggerPid} ->
+            case Info of
+                {gc_on_done, _Tag} ->
+                    TraceId = passed_state_trace_id(PState),
+                    send_log_msg(PState, LoggerPid, {on_handler_done, TraceId});
+                _ -> ok
+            end
     end,
     ok.
 
@@ -557,11 +569,14 @@ log_recv(PState, FromPid, ToPid, Msg) ->
             send_log_msg(
               PState,
               LoggerPid,
-              {log_recv, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg)})
+              {log_recv, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg)});
+        {proto_sched, _} ->
+            ok
     end,
     ok.
 
--spec send_log_msg(passed_state(), comm:mypid(), trace_event()) -> ok.
+-spec send_log_msg(passed_state(), comm:mypid(),
+                   trace_event() | {on_handler_done, trace_id()}) -> ok.
 send_log_msg(RestoreThis, LoggerPid, Msg) ->
     %% don't log the sending of log messages ...
     FilterFun = passed_state_filter_fun(RestoreThis),
