@@ -65,11 +65,30 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
-%% 1. call proto_sched:start(your_trace_id, your_seed)
-%% 2. perform a request like api_tx:read("a")
-%% 3. call proto_sched:stop() %% trace_id is taken from the calling
+%% Quick start:
+%% 1. call proto_sched:start() %% seed has to be put somehow in
+%% 2. call proto_sched:start_deliver()
+%% 3. perform a synchronous request like api_tx:read("a")
+%% 4. call proto_sched:stop() %% trace_id is taken from the calling
 %%                               process implicitly
+%% 5. call proto_sched:cleanup().
 %%
+%% or
+%%
+%% 1. call proto_sched:start()
+%% 2. start all asynchronous call you want to run interleaved
+%% 3. call proto_sched:start_deliver() to initiate protocol execution
+%% 4. wait until everything is done
+%% 5. call proto_sched:stop()
+%% 6. call proto_sched:get_infos() to retrieve some statistics like
+%%    the number of possible interleavings, the number of local or
+%%    globally send messages, etc.
+%% 7. call proto_sched:cleanup() to forget about the run and
+%%    delete statistics data
+%%
+%% You can also provide a trace_id, so that the module can be used
+%% independently for several protocols at the same time (e.g. in concurrent
+%% unittests). See the interfaces and exported functions below.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(TRACE(X,Y), log:log(X,Y)).
@@ -80,8 +99,9 @@
 -behaviour(gen_component).
 
 %% client functions
--export([start/0, start/1, stop/0]).
+-export([start/0, start/1, start/2, stop/0]).
 -export([start_deliver/0, start_deliver/1]).
+-export([get_infos/0, get_infos/1]).
 -export([cleanup/0, cleanup/1]).
 
 %% report messages from other modules
@@ -156,6 +176,17 @@ stop() ->
     %% stop sending epidemic messages
     erlang:erase(trace_mpath),
     ok.
+
+-spec get_infos() -> [tuple()].
+get_infos() -> get_infos(default).
+
+-spec get_infos(trace_id()) -> [tuple()].
+get_infos(TraceId) ->
+    LoggerPid = pid_groups:find_a(proto_sched),
+    comm:send_local(LoggerPid, {get_infos, comm:this(), TraceId}),
+    receive
+        ?SCALARIS_RECV({get_infos_reply, Infos}, Infos)
+    end.
 
 -spec cleanup() -> ok.
 cleanup() -> cleanup(default).
@@ -256,7 +287,7 @@ on({deliver, TraceId}, State) ->
                     NewEntry = TraceEntry#state{status = start_delivery},
                     lists:keystore(TraceId, 1, State, {TraceId, NewEntry});
                 _ ->
-                    {From, To, LorG, Msg, NumPossible, TmpEntry} =
+                    {From, To, _LorG, Msg, NumPossible, TmpEntry} =
                         pop_random_message(TraceEntry),
                     ?TRACE("Chosen from ~p possible next messages~n", [NumPossible]),
                     NewEntry =
@@ -266,11 +297,7 @@ on({deliver, TraceId}, State) ->
                     PState = TraceEntry#state.passed_state,
                     InfectedMsg = epidemic_reply_msg(PState, From, To, Msg),
                     ?TRACE("delivering msg to execute: ~.0p~n", [InfectedMsg]),
-%%                    case LorG of
-                    case comm:is_local(To) of
-                        false -> comm:send(To, InfectedMsg);
-                        true -> comm:send(comm:make_global(To), InfectedMsg)
-                    end,
+                    comm:send(comm:make_global(To), InfectedMsg),
                     lists:keystore(TraceId, 1, State, {TraceId, NewEntry})
             end
     end;
@@ -278,6 +305,19 @@ on({deliver, TraceId}, State) ->
 on({on_handler_done, TraceId}, State) ->
     ?TRACE("on handler execution done~n", []),
     gen_component:post_op(State, {deliver, TraceId});
+
+on({get_infos, Client, TraceId}, State) ->
+    Entry = lists:keyfind(TraceId, 1, State),
+    case Entry of
+        false ->
+            comm:send(Client, {get_infos_reply, []});
+        {TraceId, TraceEntry} ->
+            Infos =
+                [{num_possible_executions,
+                  TraceEntry#state.num_possible_executions}],
+            comm:send(Client, {get_infos_reply, Infos})
+    end,
+    State;
 
 on({cleanup, TraceId}, State) ->
     case lists:keytake(TraceId, 1, State) of
