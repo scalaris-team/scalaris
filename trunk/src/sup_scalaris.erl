@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -134,6 +134,9 @@ childs(Options) ->
     TraceMPath =
         util:sup_worker_desc(trace_mpath, trace_mpath, start_link,
                              [ServiceGroup]),
+    ProtoSched =
+        util:sup_worker_desc(proto_sched, proto_sched, start_link,
+                             [ServiceGroup]),
     YAWS =
         util:sup_supervisor_desc(yaws, sup_yaws, start_link, []),
 
@@ -153,6 +156,7 @@ childs(Options) ->
         end,
     %% order in the following list is the start order
     BasicServers = [TraceMPath,
+                    ProtoSched,
                     Config,
                     Logger,
                     ClientsDelayer,

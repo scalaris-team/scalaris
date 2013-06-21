@@ -131,8 +131,11 @@
                trace_mpath:log_recv(_ScalPState, _ScalFrom, _ScalTo, _ScalMsg),
                case erlang:get(trace_mpath) of
                    undefined ->
-                       trace_mpath:log_info(_ScalPState, _ScalTo, {tracing_ends, "Tracing ends at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE});
-                   _ -> ok
+                       ok;
+                   _ ->
+                       trace_mpath:log_info(_ScalPState, _ScalTo, {scalaris_recv, "SCALARIS_RECV at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE}),
+                       %% report done for proto_sched to go on...
+                       trace_mpath:log_info(_ScalPState, _ScalTo, {gc_on_done, scalaris_recv})
                end,
                Y;
             X -> Y
