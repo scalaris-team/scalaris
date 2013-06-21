@@ -81,7 +81,8 @@
 -type trace()        :: [trace_event()].
 -type msg_map_fun()  :: fun((comm:message()) -> comm:message()).
 -type filter_fun()   :: fun((trace_event()) -> boolean()).
--type passed_state() :: {trace_id(), logger(), msg_map_fun(), filter_fun()}.
+-type passed_state() :: {trace_id(), logger(), msg_map_fun(), filter_fun()}
+                        | {trace_id(), logger()}.
 -type gc_mpath_msg() :: {'$gen_component', trace_mpath, passed_state(),
                          Source::anypid(), Dest::anypid(), comm:message()}.
 -type options()      :: [{logger, logger() | comm:mypid()} |
@@ -101,11 +102,10 @@ start() -> start(default).
 -spec start(trace_id() | passed_state()) -> ok.
 start(TraceId) when is_atom(TraceId) ->
     start(TraceId, []);
-start(PState) when is_tuple(PState) ->
-    start(passed_state_trace_id(PState),
-          passed_state_logger(PState),
-          passed_state_msg_map_fun(PState),
-          passed_state_filter_fun(PState)).
+start({TraceId, Logger} = PState) ->
+    proto_sched:start(TraceId, Logger);
+start({TraceId, Logger, MsgMapFun, FilterFun} = PState) ->
+    start(TraceId, Logger, MsgMapFun, FilterFun).
 
 -spec start(trace_id(), logger() | comm:mypid() | options()) -> ok.
 start(TraceId, Options) when is_list(Options) ->
@@ -505,15 +505,16 @@ epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
 -spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global) -> DeliverAlsoDirectly :: boolean().
 log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
     Now = os:timestamp(),
-    MsgMapFun = passed_state_msg_map_fun(PState),
     case passed_state_logger(PState) of
         io_format ->
+            MsgMapFun = passed_state_msg_map_fun(PState),
             io:format("~p send ~.0p -> ~.0p:~n  ~.0p.~n",
                       [util:readable_utc_time(Now),
                        normalize_pidinfo(FromPid),
                        normalize_pidinfo(ToPid), MsgMapFun(Msg)]),
             true;
         {log_collector, LoggerPid} ->
+            MsgMapFun = passed_state_msg_map_fun(PState),
             TraceId = passed_state_trace_id(PState),
             send_log_msg(
               PState,
@@ -556,15 +557,16 @@ log_info(PState, FromPid, Info) ->
 -spec log_recv(passed_state(), anypid(), anypid(), comm:message()) -> ok.
 log_recv(PState, FromPid, ToPid, Msg) ->
     Now = os:timestamp(),
-    MsgMapFun = passed_state_msg_map_fun(PState),
     case  passed_state_logger(PState) of
         io_format ->
+            MsgMapFun = passed_state_msg_map_fun(PState),
             io:format("~p recv ~.0p -> ~.0p:~n  ~.0p.~n",
                       [util:readable_utc_time(Now),
                        normalize_pidinfo(FromPid),
                        normalize_pidinfo(ToPid),
                        MsgMapFun(Msg)]);
         {log_collector, LoggerPid} ->
+            MsgMapFun = passed_state_msg_map_fun(PState),
             TraceId = passed_state_trace_id(PState),
             send_log_msg(
               PState,
@@ -579,13 +581,20 @@ log_recv(PState, FromPid, ToPid, Msg) ->
                    trace_event() | {on_handler_done, trace_id()}) -> ok.
 send_log_msg(RestoreThis, LoggerPid, Msg) ->
     %% don't log the sending of log messages ...
-    FilterFun = passed_state_filter_fun(RestoreThis),
-    case FilterFun(Msg) of
-        true ->
+    case passed_state_logger(RestoreThis) of
+        {proto_sched, _} ->
             stop(),
             comm:send(LoggerPid, Msg),
             own_passed_state_put(RestoreThis);
-        false -> ok
+        _ ->
+            FilterFun = passed_state_filter_fun(RestoreThis),
+            case FilterFun(Msg) of
+                true ->
+                    stop(),
+                    comm:send(LoggerPid, Msg),
+                    own_passed_state_put(RestoreThis);
+                false -> ok
+            end
     end.
 
 -spec normalize_pidinfo(anypid()) -> pidinfo().
