@@ -472,6 +472,9 @@ prop_add_data(Data) ->
     true.
 
 tester_add_data(_Config) ->
+    prop_add_data([create_db_entry(?KEY("3"), empty_val, false, 0, -1),
+                   create_db_entry(?KEY("4"), <<"foo">>, false, 5, 230),
+                   create_db_entry(?KEY("5"), empty_val, false, 3, -1)]),
     tester:test(?MODULE, prop_add_data, 1, rw_suite_runs(1000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

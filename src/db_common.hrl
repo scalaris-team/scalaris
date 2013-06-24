@@ -142,6 +142,14 @@ update_entries_(OldDB, NewEntries, Pred, UpdateFun) ->
         end,
     lists:foldl(F, OldDB, NewEntries).
 
+%% @doc Adds all db_entry objects in the Data list.
+-spec add_data(DB::db(), db_as_list()) -> NewDB::db().
+add_data(State, Data) ->
+    lists:foldl(
+      fun(Entry, StateAcc) ->
+              set_entry(StateAcc, Entry)
+      end, State, Data).
+
 %% @doc Checks whether all entries in the DB are valid, i.e.
 %%      - no writelocks and readlocks at the same time
 %%      - no empty_val values (these should only be in the DB temporarily)

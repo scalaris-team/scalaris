@@ -179,19 +179,6 @@ get_load_(State = {{DB, _FileName}, _Subscr, _SnapState}, Interval) ->
                           end, 0, DB)
     end.
 
-%% @doc Adds all db_entry objects in the Data list.
--spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
-add_data_(State = {{DB, _FileName}, _Subscr, _SnapState}, Data) ->
-    % -> do not use set_entry (no further checks for changed keys necessary)
-    _ = lists:foldl(
-          fun(DBEntry, _) ->
-              ok = toke_drv:insert(DB,
-                                   erlang:term_to_binary(db_entry:get_key(DBEntry), [{minor_version, 1}]),
-                                   erlang:term_to_binary(DBEntry, [{minor_version, 1}])),
-              call_subscribers(State, {write, DBEntry})
-          end, ok, Data),
-    State.
-
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
 %%      Note: removes all keys not in MyNewInterval from the list of changed

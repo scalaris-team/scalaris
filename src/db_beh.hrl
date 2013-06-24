@@ -141,9 +141,6 @@ get_split_key(DB, Begin, End, TargetLoad, Direction) ->
 -spec get_data(DB::db()) -> db_as_list().
 get_data(DB) -> get_data_(DB).
 
--spec add_data(DB::db(), db_as_list()) -> NewDB::db().
-add_data(DB, Data) -> add_data_(DB, Data).
-
 % subscriptions:
 -spec set_subscription(DB::db(), subscr_t()) -> db().
 set_subscription(DB, SubscrTuple) ->
