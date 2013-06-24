@@ -468,7 +468,8 @@ send_my_range_req(Pid, ?MODULE, _OldN, _NewN) ->
 %%       
 %%      When a node becomes leader, she merges her local alarms with alarms from
 %%      the ring (alarms on ring overwrite local alarms). See tx_merge_alarms/2.
--spec tx_update_alarms(ToAdd :: alarms(), ToRem :: alarms()) -> ok | fail.
+-spec tx_update_alarms(ToAdd::alarms(), ToRem::alarms()) -> ok | fail;
+                      (ToAdd::alarm(), ToRem::alarm()) -> ok | fail.
 tx_update_alarms(ToAdd, ToRem)
   when erlang:is_tuple(ToAdd) andalso erlang:is_tuple(ToRem) ->
     tx_update_alarms([ToAdd], [ToRem]);

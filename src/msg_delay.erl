@@ -116,7 +116,7 @@ on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
             undefined -> Trigger;
             PState -> trace_mpath:epidemic_reply_msg(PState, comm:this(), comm:this(), Trigger)
         end,
-    comm:send_local_after(1000, self(), ETrigger),
+    _ = comm:send_local_after(1000, self(), ETrigger),
     {TimeTable, Counter + 1};
 
 on({web_debug_info, Requestor}, {TimeTable, Counter} = State) ->

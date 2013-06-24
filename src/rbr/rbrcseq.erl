@@ -614,9 +614,9 @@ on({qwrite_collect, ReqId,
                             %% TODO: maybe record number of retries
                             %% and make timespan chosen from
                             %% dynamically wider
-                            comm:send_local_after(
-                              10 + randoms:rand_uniform(1,90), self(),
-                              NewReq),
+                            _ = comm:send_local_after(
+                                  10 + randoms:rand_uniform(1,90), self(),
+                                  NewReq),
                             ?PDB:delete(element(1, NewEntry), TableName),
                             State;
                         3 ->

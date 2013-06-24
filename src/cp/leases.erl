@@ -58,7 +58,7 @@ is_responsible_([Lease|List], Key) ->
         IsAlive andalso RangeMatches ->
             true;
         RangeMatches ->
-            case is_responsible(List, Key) of
+            case is_responsible_(List, Key) of
                 true ->
                     true;
                 maybe ->
