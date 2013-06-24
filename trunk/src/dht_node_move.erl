@@ -236,8 +236,9 @@ process_move_msg({move, {send_error, Target, Message, _Reason}, {timeouts, Timeo
 process_move_msg({move, {send_error, Target, Message, _Reason}, MoveFullId} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     % delay the actual re-try (it may be a crash or a temporary failure)
-    comm:send_local_after(config:read(move_send_msg_retry_delay), self(),
-                          {move, {send_error_retry, Target, Message, _Reason}, MoveFullId}),
+    _ = comm:send_local_after(
+          config:read(move_send_msg_retry_delay), self(),
+          {move, {send_error_retry, Target, Message, _Reason}, MoveFullId}),
     MyState;
 
 process_move_msg({move, {send_error_retry, Target, Message, _Reason}, MoveFullId} = _Msg, MyState) ->

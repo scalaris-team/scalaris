@@ -222,7 +222,8 @@ on({report_single, Process, Key, NewValue_or_UpdateFun}, State) ->
     State;
 
 on({trigger_check_timeslots}, State) ->
-    comm:send_local_after(get_check_timeslots_interval(), self(), {trigger_check_timeslots}),
+    _ = comm:send_local_after(get_check_timeslots_interval(), self(),
+                              {trigger_check_timeslots}),
     gen_component:post_op(State, {check_timeslots});
 
 on({check_timeslots}, {_Table, OldApiTxReqList} = State) ->
@@ -328,7 +329,8 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(null) -> state().
 init(null) ->
-    comm:send_local_after(get_check_timeslots_interval(), self(), {check_timeslots}),
+    _ = comm:send_local_after(get_check_timeslots_interval(), self(),
+                              {check_timeslots}),
     TableName = pid_groups:my_groupname() ++ ":monitor",
     {ets:new(list_to_atom(TableName), [ordered_set, protected]),
      init_apitx_reqlist_rrd(os:timestamp())}.

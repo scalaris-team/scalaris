@@ -493,7 +493,7 @@ process_join_state({web_debug_info, Requestor} = _Msg,
 process_join_state({?lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _QueuedMessages} = State) ->
     case get_connections(JoinState) of
         [] ->
-            comm:send_local_after(100, self(), FullMsg),
+            _ = comm:send_local_after(100, self(), FullMsg),
             ok;
         [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:
@@ -505,7 +505,7 @@ process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, H
     Connections = get_connections(JoinState),
     case util:first_matching(Connections, fun({_, Pid}) -> not lists:member(Pid, FailedPids) end) of
         failed ->
-            comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
+            _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
             ok;
         {ok, {_, Pid}} ->
             % integrate the list of processes for which the send previously failed:

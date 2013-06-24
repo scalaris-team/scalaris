@@ -216,8 +216,8 @@ on({periodic_alive_check}, State) ->
                    false -> State
     end,
     %% trigger next timeout
-    comm:send_local_after(failureDetectorInterval(),
-                          self(), {periodic_alive_check}),
+    _ = comm:send_local_after(failureDetectorInterval(),
+                              self(), {periodic_alive_check}),
     NewState;
 
 on({send_retry, {send_error, Target, Message, _Reason} = Err, Count}, State) ->

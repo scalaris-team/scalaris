@@ -162,14 +162,14 @@ lookup_fin_leases(State, Key, Hops, Msg) ->
                         Msg::comm:message()) -> ok.
 lookup_aux_failed(State, _Target, {?lookup_aux, Key, Hops, Msg} = _Message) ->
     %io:format("lookup_aux_failed(State, ~p, ~p)~n", [_Target, _Message]),
-    comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
+    _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State.
 
 -spec lookup_fin_failed(dht_node_state:state(), Target::comm:mypid(),
                         Msg::comm:message()) -> ok.
 lookup_fin_failed(State, _Target, {?lookup_fin, Key, Hops, Msg} = _Message) ->
     %io:format("lookup_fin_failed(State, ~p, ~p)~n", [_Target, _Message]),
-    comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
+    _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State.
 
 deliver(State, Msg, Consistency, Hops) ->

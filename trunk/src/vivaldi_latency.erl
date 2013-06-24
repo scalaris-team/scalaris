@@ -62,8 +62,8 @@ on({ping_reply, {pong}, Count},
             comm:send_local(Owner, {update_vivaldi_coordinate, calc_latency(NewLatencies), Token}),
             kill;
         false ->
-            comm:send_local_after(config:read(vivaldi_measurements_delay),
-                                  self(), {start_ping}),
+            _ = comm:send_local_after(config:read(vivaldi_measurements_delay),
+                                      self(), {start_ping}),
             {Owner, RemotePid, Token, unknown, Count, NewLatencies}
     end;
 
@@ -91,7 +91,7 @@ on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _St
 -spec init({comm:erl_local_pid(), comm:mypid(), {vivaldi:network_coordinate(), vivaldi:error()}}) -> state().
 init({Owner, RemotePid, Token}) ->
     %io:format("vivaldi_latency start ~n"),
-    comm:send_local_after(config:read(vivaldi_latency_timeout), self(), {shutdown}),
+    _ = comm:send_local_after(config:read(vivaldi_latency_timeout), self(), {shutdown}),
     comm:send_local(self(), {start_ping}),
     erlang:monitor(process, Owner),
     {Owner, RemotePid, Token, unknown, 0, []}.

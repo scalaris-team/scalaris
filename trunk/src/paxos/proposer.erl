@@ -234,9 +234,9 @@ start_new_higher_round(PaxosID, Round, ETSTableName) ->
                     TmpState = state_reset_state(StateForID),
                     pdb:set(state_set_round(TmpState, NextRound), ETSTableName),
                     NewMsg = {proposer_trigger, PaxosID, NextRound},
-%%                     comm:send_local_after(NextRound, self(),
-%%                                              {proposer_trigger, PaxosID,
-%%                                               NextRound});
+%%                     _ = comm:send_local_after(NextRound, self(),
+%%                                               {proposer_trigger, PaxosID,
+%%                                                NextRound});
                     case randoms:rand_uniform(0, 2) of
                         0 -> comm:send_local(self(), NewMsg);
                         1 -> msg_delay:send_local(0, self(), NewMsg) % delay < 1s

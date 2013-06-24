@@ -261,7 +261,7 @@ on({sample_all}, State) when all =:= element(2, State) ->
                   pdb:set(V1, TableName)
           end
       end || {P, NewVals} <- T, is_pid(P), undefined =/= NewVals],
-    comm:send_local_after(1, self(), {sample_all}),
+    _ = comm:send_local_after(1, self(), {sample_all}),
     inc_counter(State);
 
 on({sample_all}, State) -> State;
@@ -277,7 +277,7 @@ on({sample_pid, Pid}, State) when is_pid(element(2, State)) ->
                    runnable -> true;
                    _ -> false
                end,
-    %% comm:send_local_after(1, self(), {sample_pid, Pid}),
+    %% _ = comm:send_local_after(1, self(), {sample_pid, Pid}),
     comm:send_local(self(), {sample_pid, Pid}),
     case TakeVals of
         true ->
