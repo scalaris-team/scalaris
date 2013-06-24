@@ -133,13 +133,6 @@ get_load_(State = {DB, _Subscr, _SnapState}, Interval) ->
             ets:foldl(F, 0, DB)
     end.
 
-%% @doc Adds all db_entry objects in the Data list.
--spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
-add_data_(State, Data) ->
-    lists:foldl(fun(Entry, StateAcc) ->
-                        set_entry_(StateAcc, Entry)
-                    end, State, Data).
-
 %% @doc Splits the database into a database (first element) which contains all
 %%      keys in MyNewInterval and a list of the other values (second element).
 %%      Note: removes all keys not in MyNewInterval from the list of changed

@@ -161,8 +161,8 @@ get_load_({DB, Counter} = _DB_, Interval) ->
     ?BASE_DB:get_load(DB, Interval).
 
 %% @doc Adds all db_entry objects in the Data list.
--spec add_data_(DB::db_t(), db_as_list()) -> NewDB::db_t().
-add_data_({DB, Counter} = _DB_, Data) ->
+-spec add_data(DB::db_t(), db_as_list()) -> NewDB::db_t().
+add_data({DB, Counter} = _DB_, Data) ->
     ?TRACE2(add_data, _DB_, Data),
     verify_counter(Counter),
     {?BASE_DB:add_data(DB, Data), update_counter(Counter)}.
