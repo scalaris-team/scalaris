@@ -175,6 +175,13 @@ on({tcp_closed, Socket}, State) ->
     log:log(warn,"[ CC ~p ] tcp closed info", [self()]),
     close_connection(Socket, State);
 
+on({tcp_error, Socket, Reason}, State) ->
+    % example Reason: etimedout, ehostunreach 
+    log:log(warn,"[ CC ~p ] tcp_error: ~p", [self(), Reason]),
+    %% may fail, when tcp just closed
+    _ = inet:setopts(Socket, [{active, once}]),
+    send_bundle_if_ready(State);
+
 on({report_stats}, State) ->
     %% re-trigger
     msg_delay:send_local(10, self(), {report_stats}),
