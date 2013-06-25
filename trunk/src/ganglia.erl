@@ -20,46 +20,43 @@
 -author('hoffmann@zib.de').
 -vsn('$Id$').
 
+-behavior(gen_component).
+
 -include("scalaris.hrl").
 
--export([start_link/0, start/0]).
+-export([start_link/1, init/1, on/2]).
 
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), io:format(X, Y)).
 
+-type state() :: {LastUpdated :: integer(), Trigger :: trigger:state()}.
+-type message() :: {ganglia_trigger} | {ganglia_periodic}.
 
--spec start_link() -> {ok, pid()} | ignore.
-start_link() ->
-    case config:read(ganglia_enable) of
-        true ->
-            {ok, spawn_link(?MODULE, start, [])};
-        false ->
-            ignore
-    end.
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(ServiceGroup) ->
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
+                             [{pid_groups_join_as, ServiceGroup, ganglia}]).
 
--spec start() -> no_return().
-start() ->
-    Last = erlang:now(),
-    ganglia_loop(Last).
+-spec init([]) -> state().
+init([]) ->
+    UpdateInterval = case config:read(ganglia_interval) of
+                         failed -> 30000;
+                         X -> X
+                     end,
+    Trigger = trigger:init(trigger_periodic, fun () -> UpdateInterval end, ganglia_trigger),
+    {_LastActive = 0, trigger:next(Trigger)}.
 
--spec ganglia_loop(PreviousTime::erlang_timestamp()) -> no_return().
-ganglia_loop(_Last) ->
+-spec on(message(), state()) -> state().
+on({ganglia_trigger}, {LastActive, TriggerOld}) ->
+    Trigger = trigger:next(TriggerOld),
+    gen_component:post_op(_State = {LastActive, Trigger}, {ganglia_periodic});
+
+on({ganglia_periodic}, State) ->
     % message statistics
     {Received, Sent, _Time} = comm_logger:dump(),
-    update(Received, Sent),
-    Now = erlang:now(),
-    % transaction statistics
-    % TODO: get statistics from the client monitor
-%%     SinceLast = timer:now_diff(Now, Last),
-%%     Timers = [],
-%%     _ = [update_timer(Timer, SinceLast / 1000000.0) || Timer <- Timers],
-    % vivaldi statistics
-    monitor_per_dht_node(fun monitor_vivaldi_errors/2, pid_groups:groups_with(dht_node)),
-    timer:sleep(config:read(ganglia_interval)),
-    ganglia_loop(Now).
-
--spec update(Received::gb_tree(), Sent::gb_tree()) -> ok.
-update(Received, Sent) ->
+    traverse(received, gb_trees:iterator(Received)),
+    traverse(sent, gb_trees:iterator(Sent)),
+    % general erlang status information
     _ = gmetric(both, "Erlang Processes", "int32", erlang:system_info(process_count), "Total Number"),
     _ = gmetric(both, "Memory used by Erlang processes", "int32", erlang:memory(processes_used), "Bytes"),
     _ = gmetric(both, "Memory used by ETS tables", "int32", erlang:memory(ets), "Bytes"),
@@ -69,23 +66,20 @@ update(Received, Sent) ->
     DHTNodesMemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
                                     || P <- pid_groups:find_all(dht_node)]),
     _ = gmetric(both, "Memory used by dht_nodes", "int32", DHTNodesMemoryUsage, "Bytes"),
+    % Statistics in RRD (Load, Latency)
     RRDMetrics = fetch_rrd_metrics(),
+    _ = case RRDMetrics of
+            [] -> ok;
+            _  ->  _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- RRDMetrics],
+                   ok
+        end,
+    % Local Load
     LocalLoad = fetch_local_load(),
-    case RRDMetrics of
-        [] -> ok;
-        _  ->  _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- RRDMetrics]
-    end,
     _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- LocalLoad],
-    traverse(received, gb_trees:iterator(Received)),
-    traverse(sent, gb_trees:iterator(Sent)).
+    % vivaldi statistics
+    monitor_per_dht_node(fun monitor_vivaldi_errors/2, pid_groups:groups_with(dht_node)),
+    set_last_active(State).
 
-%% -spec update_timer({Timer::string(), Count::pos_integer(), Min::number(), Avg::number(), Max::number()}, SinceLast::number()) -> ok.
-%% update_timer({Timer, Count, Min, Avg, Max}, SinceLast) ->
-%%     _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "min"])), "float", Min, "ms"),
-%%     _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "avg"])), "float", Avg, "ms"),
-%%     _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "max"])), "float", Max, "ms"),
-%%     _ = gmetric(both, lists:flatten(io_lib:format("~p_~s", [Timer, "tp"])), "float", Count / SinceLast, "1/s"),
-%%     ok.
 
 -spec traverse(received | sent, Iter1::term()) -> ok.
 traverse(RcvSnd, Iter1) ->
@@ -101,7 +95,7 @@ gmetric(Slope, Metric, Type, Value, Unit) ->
     Cmd = lists:flatten(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n",
                          [Slope, Metric, Type, Value, Unit])),
     Res = os:cmd(Cmd),
-    ?TRACE("~s: ~w~n", [Cmd, Res]),
+    ?TRACE("~s: ~s~n", [Cmd, Res]),
     Res.
 
 -spec monitor_vivaldi_errors(pid_groups:groupname(), non_neg_integer()) -> ok | string().
@@ -134,7 +128,7 @@ fetch_rrd_metrics() ->
         failed -> [];
         ClientMonitor ->
             case monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]) of
-                undefined -> [];
+                [{_,_, undefined}] -> [];
                 [{_, _, RRD}] ->
                     case rrd:dump(RRD) of
                         [H | _] ->
@@ -170,3 +164,7 @@ get_load(Pid) ->
     after 2000 ->
             0
     end.
+
+-spec set_last_active(state()) -> state().
+set_last_active(State) ->
+    setelement(1, State, erlang:now()).

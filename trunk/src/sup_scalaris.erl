@@ -124,7 +124,10 @@ childs(Options) ->
                                        [{DHTNodeGroup, [{my_sup_dht_node_id, DhtNodeId}
                                          | DHTNodeOptions]}]),
     FailureDetector = util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
-    Ganglia = util:sup_worker_desc(ganglia_server, ganglia, start_link),
+    Ganglia = case config:read(ganglia_enable) of
+                  true -> util:sup_worker_desc(ganglia_server, ganglia, start_link, [ServiceGroup]);
+                  _ -> []
+              end,
     Logger = util:sup_worker_desc(logger, log, start_link),
     Monitor =
         util:sup_worker_desc(monitor, monitor, start_link, [ServiceGroup]),
