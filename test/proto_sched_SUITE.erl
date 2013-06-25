@@ -37,7 +37,7 @@ groups() ->
 all() ->
     [
      %{group, tester_tests},
-     {group, rbr_tests} %% <- hier anschalten
+     {group, rbr_tests}
      ].
 
 suite() -> [ {timetrap, {seconds, 120}} ].
@@ -74,6 +74,9 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 test_qwrite_qwrite_qread(_Config) ->
+    iter(fun qwrite_qwrite_qread/0, 20).
+
+qwrite_qwrite_qread() ->
     DB = lease_db1,
     ContentCheck = fun content_check/3,
     Self = comm:reply_as(self(), 2, {test_rbr, '_'}),
@@ -93,6 +96,7 @@ test_qwrite_qwrite_qread(_Config) ->
     receive_answer(),
     receive_answer(),
     proto_sched:stop(),
+    Infos = proto_sched:get_infos(),
     proto_sched:cleanup(),
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -100,20 +104,36 @@ test_qwrite_qwrite_qread(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     rbrcseq:qread(DB, Self, Id),
-    receive_answer(),
+    {test_rbr, {qread_done, _, _, Val}} = receive_answer(),
+    %ct:pal("got ~p", [Val]),
+    %ct:pal("~p", [Infos]),
+    case Val of
+        Value1 -> ok;
+        Value2 -> ok;
+        X ->
+            ct:pal("~p", [Infos]),
+            ?ct_fail("unexpected result ~p", X)
+    end,
     ok.
 
 receive_answer() ->
     receive
-        ?SCALARIS_RECV(X1, ct:pal("got ~p", [X1]))
+        ?SCALARIS_RECV(X1, X1)
         end.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% content checks
+% utlities
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 content_check(_Value, _WriteFilter, _Cookie) ->
     {true, null}.
 
+iter(_Fun, 0) ->
+    ok;
+iter(Fun, 1) ->
+    Fun(), ok;
+iter(Fun, Count) ->
+    Fun(),
+    iter(Fun, Count - 1).
