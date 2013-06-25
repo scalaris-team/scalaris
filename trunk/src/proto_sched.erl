@@ -78,7 +78,7 @@
 %% 1. call proto_sched:start()
 %% 2. start all asynchronous call you want to run interleaved
 %% 3. call proto_sched:start_deliver() to initiate protocol execution
-%% 4. wait until everything is done
+%% 4. wait until everything is done; use ?SCALARIS_RECV to receive answers
 %% 5. call proto_sched:stop()
 %% 6. call proto_sched:get_infos() to retrieve some statistics like
 %%    the number of possible interleavings, the number of local or
@@ -91,8 +91,8 @@
 %% unittests). See the interfaces and exported functions below.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--define(TRACE(X,Y), log:log(X,Y)).
-%%-define(TRACE(X,Y), ok).
+%%-define(TRACE(X,Y), log:log(X,Y)).
+-define(TRACE(X,Y), ok).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -271,7 +271,7 @@ on({deliver, TraceId}, State) ->
     Entry = lists:keyfind(TraceId, 1, State),
     case Entry of
         false ->
-            log:log("Nothing to deliver, unknown trace id!~n"),
+            %%log:log("Nothing to deliver, unknown trace id!~n"),
             State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.msg_queues of
