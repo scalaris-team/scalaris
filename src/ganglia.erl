@@ -18,6 +18,7 @@
 %% @version $Id$
 -module(ganglia).
 -author('hoffmann@zib.de').
+
 -vsn('$Id$').
 
 -behavior(gen_component).
@@ -26,15 +27,22 @@
 
 -export([start_link/1, init/1, on/2]).
 
-%-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format(X, Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X, Y)).
 
--type load_aggregation() :: {AggId :: non_neg_integer(), Pending :: non_neg_integer(), Load :: non_neg_integer()}.
+-type load_aggregation() :: {AggId :: non_neg_integer(),
+                             Pending :: non_neg_integer(),
+                             Load :: non_neg_integer()}.
 
--type state() :: {LastUpdated :: non_neg_integer(), Trigger :: trigger:state(), LoadAggregation :: load_aggregation()}.
--type message() :: {ganglia_trigger} | {ganglia_periodic} |
-                   {ganglia_dht_node_aggregation, DHTNode :: pid(), message()} |
-                   {vivaldi_get_coordinate_response, pid(), message()}.
+-type state() :: {LastUpdated :: non_neg_integer(),
+                  Trigger :: trigger:state(),
+                  LoadAggregation :: load_aggregation()}.
+
+-type message() :: {ganglia_trigger} |
+                   {ganglia_periodic} |
+                   {ganglia_dht_load_aggregation, DHTNode :: pid(), AggId :: non_neg_integer(), message()} |
+                   {ganglia_vivaldi_confidence, pid(), message()} |
+                   {crash, PID :: pid(), {ganglia, AggId :: non_neg_integer()}}.
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
@@ -64,8 +72,11 @@ on({ganglia_periodic}, State) ->
     send_vivaldi_errors(),
     set_last_active(NewState);
 
-on({ganglia_dht_load_aggregation, AggId, Msg} ,State) ->
+% @doc aggregates load information from the dht nodes
+on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
     ?TRACE("~p: ~p~n", [AggId, Msg]),
+    % all went well, we no longer need the failure detector
+    fd:unsubscribe(PID, {ganglia, AggId}),
     {get_node_details_response, [{load, Load}]} = Msg,
     CurAggId = get_agg_id(State),
     if
@@ -77,9 +88,25 @@ on({ganglia_dht_load_aggregation, AggId, Msg} ,State) ->
         true -> State
     end;
 
-on({ganglia_vivaldi_response, DHTName, Msg}, State) ->
+% @doc handler for message from failure detector
+%      if a node crashes before sending out the load data
+%      we ignore its load information
+on({crash, _PID, {ganglia, AggId}}, State) ->
+    ?TRACE("Node failed~n",[]),
+    CurAggId = get_agg_id(State),
+    if
+        AggId == CurAggId ->
+            Pending = get_agg_pending(State),
+            set_agg_pending(Pending - 1, State);
+        true ->
+            State
+    end;
+
+% @doc handler for messages from the vivaldi process
+%      reporting its confidence
+on({ganglia_vivaldi_confidence, DHTName, Msg}, State) ->
     {vivaldi_get_coordinate_response, _, Confidence} = Msg,
-    gmetric(both, lists:flatten(io_lib:format("vivaldi_confidence_~s", [DHTName])), "float", Confidence, "Confidence"),
+    _ = gmetric(both, lists:flatten(io_lib:format("vivaldi_confidence_~s", [DHTName])), "float", Confidence, "Confidence"),
     State.
 
 send_general_metrics() ->
@@ -94,7 +121,7 @@ send_general_metrics() ->
 
 % @doc aggregate the number of key-value pairs
 %      and the amount of memory for this VM
--spec send_dht_node_metrics(state()) -> ok.
+-spec send_dht_node_metrics(state()) -> state().
 send_dht_node_metrics(State) ->
     DHTNodes = pid_groups:find_all(dht_node),
     AggId = get_agg_id(State),
@@ -105,9 +132,11 @@ send_dht_node_metrics(State) ->
     % Query DHT Nodes for load, let them reply to the on handler ganglia_dht_node_reply
     % The FD tells us if a node is down
     lists:foreach(fun (PID) ->
-                          %% TODO FD
-                          Envelope = comm:reply_as(comm:this(), 3,
-                                                   {ganglia_dht_load_aggregation, AggId , '_'}),
+                          GlobalPID = comm:make_global(PID),
+                          %% Let the failure detector inform ganglia about crashes of this DHT node
+                          fd:subscribe(GlobalPID, {ganglia, AggId}),
+                          Envelope = comm:reply_as(comm:this(), 4,
+                                                   {ganglia_dht_load_aggregation, GlobalPID, AggId , '_'}),
                           comm:send_local(PID, {get_node_details, Envelope, [load]})
                   end, DHTNodes),
     set_agg_pending(length(DHTNodes), State).
@@ -119,7 +148,7 @@ send_message_metrics() ->
     traverse(sent, gb_trees:iterator(Sent)),
     ok.
 
--spec send_rrd_metrics() -> fail | ok.
+-spec send_rrd_metrics() -> ok.
 send_rrd_metrics() ->
     % Statistics in RRD (Load, Latency)
     RRDMetrics =
@@ -146,11 +175,15 @@ send_rrd_metrics() ->
 
 -spec send_vivaldi_errors() -> ok.
 send_vivaldi_errors() ->
-    DHTNodeGroups = pid_groups:groups_with(dht_node),
+    DHTNodeGroups = case pid_groups:groups_with(dht_node) of
+                        failed ->
+                            [];
+                        X -> X
+                    end,
     lists:foreach(fun (Group) ->
                           PID = pid_groups:pid_of(Group, vivaldi),
                           Envelope = comm:reply_as(comm:this(), 3,
-                                                   {ganglia_vivaldi_response, Group, '_'}),
+                                                   {ganglia_vivaldi_confidence, Group, '_'}),
                           comm:send_local(PID, {get_coordinate, Envelope})
                   end, DHTNodeGroups),
     ok.
@@ -169,7 +202,7 @@ gmetric(MetricsList) ->
 -spec gmetric(Slope::both | positive, Metric::string(), Type::string(), Value::number(), Unit::string()) -> string().
 gmetric(Slope, Metric, Type, Value, Unit) ->
     Cmd = lists:flatten(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n",
-                         [Slope, Metric, Type, Value, Unit])),
+                                      [Slope, Metric, Type, Value, Unit])),
     Res = os:cmd(Cmd),
     ?TRACE("~s: ~s~n", [Cmd, Res]),
     Res.
@@ -179,8 +212,8 @@ traverse(RcvSnd, Iter1) ->
   case gb_trees:next(Iter1) of
     none -> ok;
     {Key, {Bytes, _Count}, Iter2} ->
-      _ = gmetric(positive, lists:flatten(io_lib:format("~s ~p", [RcvSnd, Key])), "int32", Bytes, "Bytes"),
-      traverse(RcvSnd, Iter2)
+          _ = gmetric(positive, lists:flatten(io_lib:format("~s ~p", [RcvSnd, Key])), "int32", Bytes, "Bytes"),
+          traverse(RcvSnd, Iter2)
   end.
 
 -spec agg_check_pending(state()) -> state().
@@ -195,13 +228,15 @@ agg_check_pending(State) ->
             State
     end.
 
+
 -spec get_last_active(state()) -> non_neg_integer().
 get_last_active(State) ->
     element(1, State).
 
 -spec set_last_active(state()) -> state().
 set_last_active(State) ->
-    setelement(1, State, erlang:now()).
+    {_Megasecs, Secs, _MicroSecs} = erlang:now(),
+    setelement(1, State, Secs).
 
 -spec get_trigger(state()) -> trigger:state().
 get_trigger(State) ->
@@ -239,6 +274,3 @@ set_agg_pending(NumPending, State) ->
 inc_agg_id(State) ->
     {AggId, _Pending, _Load} = element(3,State),
     setelement(3, State, {AggId + 1, 0, 0}).
-
-%reset_load_aggregation(State) ->
-%    {get_last_active(), 0}.
