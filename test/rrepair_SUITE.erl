@@ -154,14 +154,14 @@ no_diff(Config) ->
     FType = proplists:get_value(ftype, Config),
     {Start, End} = start_sync(Config, 4, 1000, [{fprob, 0}, {ftype, FType}], 
                               1, 0.1, get_rep_upd_config(Method)),
-    ?assert(sync_degree(Start) =:= sync_degree(End)).
+    ?equals(sync_degree(Start), sync_degree(End)).
 
 one_node(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     {Start, End} = start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}], 
                               1, 0.2, get_rep_upd_config(Method)),
-    ?assert(sync_degree(Start) =:= sync_degree(End)).    
+    ?equals(sync_degree(Start), sync_degree(End)).    
 
 mpath_map({request_resolve, _, {key_upd, L}, _}) ->
     {key_upd, length(L)};
@@ -210,14 +210,14 @@ simple(Config) ->
     FType = proplists:get_value(ftype, Config),
     {Start, End} = start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}], 
                               1, 0.1, get_rep_upd_config(Method)),
-    ?assert(sync_degree(Start) < sync_degree(End)).
+    ?compare(fun erlang:'<'/2, sync_degree(Start), sync_degree(End)).
 
 multi_round(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     {Start, End} = start_sync(Config, 6, 1000, [{fprob, 10}, {ftype, FType}], 
                               3, 0.1, get_rep_upd_config(Method)),
-    ?assert(sync_degree(Start) < sync_degree(End)).
+    ?compare(fun erlang:'<'/2, sync_degree(Start), sync_degree(End)).
 
 multi_round2(Config) ->
     Method = proplists:get_value(ru_method, Config),
@@ -226,7 +226,7 @@ multi_round2(Config) ->
     RUConf = [{rr_trigger_probability, 40} | proplists:delete(rr_trigger_probability, _RUConf)],
     {Start, End} = start_sync(Config, 6, 1000, [{fprob, 10}, {ftype, FType}], 
                               3, 0.1, RUConf),
-    ?assert(sync_degree(Start) < sync_degree(End)). 
+    ?compare(fun erlang:'<'/2, sync_degree(Start), sync_degree(End)).
 
 dest(Config) ->
     %parameter
@@ -305,7 +305,8 @@ dest_empty_node(Config) ->
             IM, IMNew, IMNew - IM,
             CM, CMNew, CMNew - CM]),
     %clean up
-    ?assert(CM =:= 0) andalso ?assert(CMNew > CM).
+    ?equals(CM, 0),
+    ?compare(fun erlang:'>'/2, CMNew, CM).
 
 parts(Config) ->
     Method = proplists:get_value(ru_method, Config),
@@ -314,7 +315,7 @@ parts(Config) ->
     Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),    
     {Start, End} = start_sync(Config, 4, 1000, [{fprob, 100}, {ftype, FType}], 
                               2, 0.2, Conf),
-    ?assert(sync_degree(Start) < sync_degree(End)).
+    ?compare(fun erlang:'<'/2, sync_degree(Start), sync_degree(End)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Basic Functions Group
@@ -404,7 +405,7 @@ session_ttl(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_get_key_quadrant(?RT:key()) -> boolean().
+-spec prop_get_key_quadrant(?RT:key()) -> true.
 prop_get_key_quadrant(Key) ->
     Q = rr_recon:get_key_quadrant(Key),
     QI = intervals:split(intervals:all(), 4),
@@ -416,11 +417,12 @@ prop_get_key_quadrant(Key) ->
                                 _ -> Acc
                             end
                     end, {no, 1}, QI),
-    ?assert(Q > 0 andalso Q =< ?REP_FACTOR) andalso
-        ?equals(TestStatus, yes) andalso
-        ?equals_w_note(TestQ, Q, 
-                       io_lib:format("Quadrants=~p~nKey=~w~nQuadrant=~w~nCheckQuadrant=~w", 
-                                     [QI, Key, Q, TestQ])).
+    ?compare(fun erlang:'>'/2, Q, 0),
+    ?compare(fun erlang:'=<'/2, Q, ?REP_FACTOR),
+    ?equals(TestStatus, yes),
+    ?equals_w_note(TestQ, Q, 
+                   io_lib:format("Quadrants=~p~nKey=~w~nQuadrant=~w~nCheckQuadrant=~w", 
+                                 [QI, Key, Q, TestQ])).
 
 tester_get_key_quadrant(_) ->
     _ = [prop_get_key_quadrant(Key) || Key <- ?RT:get_replica_keys(?MINUS_INFINITY)],
@@ -468,7 +470,8 @@ prop_map_key_to_interval(L, R, Key) ->
                 [W] -> ?equals(Mapped, W);
                 [_|_] ->
                     NotIn = [Y || Y <- RGrp, Y =/= Key, not intervals:in(Y, I)],
-                    _ = [?assert(rr_recon:map_key_to_interval(Z, I) =/= Mapped) || Z <- NotIn], 
+                    _ = [?compare(fun erlang:'=/='/2, rr_recon:map_key_to_interval(Z, I), Mapped)
+                         || Z <- NotIn], 
                     ?assert(intervals:in(Mapped, I))
             end;
         _ -> true
@@ -490,8 +493,8 @@ prop_find_intersection(KeyA, KeyB, KeyC, KeyD) ->
     SizeSA = rr_recon:get_interval_size(SA),
     SizeSB = rr_recon:get_interval_size(SB),
     ?implies(A =/= B, SA =/= SB) andalso
-        ?assert(rr_recon:find_intersection(A, A) =:= A) andalso
-        ?assert(rr_recon:find_intersection(B, B) =:= B) andalso
+        ?equals(rr_recon:find_intersection(A, A), A) andalso
+        ?equals(rr_recon:find_intersection(B, B), B) andalso
         ?implies(intervals:is_subset(B, A), SB =:= SA) andalso
         ?implies(intervals:is_subset(A, B), SB =:= SA) andalso
         ?assert(intervals:is_subset(SA, A)) andalso
