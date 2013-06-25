@@ -24,6 +24,10 @@
 
 -export([start_link/0, start/0]).
 
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X, Y)).
+
+
 -spec start_link() -> {ok, pid()} | ignore.
 start_link() ->
     case config:read(ganglia_enable) of
@@ -67,7 +71,10 @@ update(Received, Sent) ->
     _ = gmetric(both, "Memory used by dht_nodes", "int32", DHTNodesMemoryUsage, "Bytes"),
     RRDMetrics = fetch_rrd_metrics(),
     LocalLoad = fetch_local_load(),
-    _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- RRDMetrics],
+    case RRDMetrics of
+        [] -> ok;
+        _  ->  _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- RRDMetrics]
+    end,
     _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- LocalLoad],
     traverse(received, gb_trees:iterator(Received)),
     traverse(sent, gb_trees:iterator(Sent)).
@@ -94,7 +101,7 @@ gmetric(Slope, Metric, Type, Value, Unit) ->
     Cmd = lists:flatten(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n",
                          [Slope, Metric, Type, Value, Unit])),
     Res = os:cmd(Cmd),
-    %io:format("~s: ~w~n", [Cmd, Res]),
+    ?TRACE("~s: ~w~n", [Cmd, Res]),
     Res.
 
 -spec monitor_vivaldi_errors(pid_groups:groupname(), non_neg_integer()) -> ok | string().
@@ -127,19 +134,18 @@ fetch_rrd_metrics() ->
         failed -> [];
         ClientMonitor ->
             case monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]) of
-                [] -> [];
+                undefined -> [];
                 [{_, _, RRD}] ->
-                    case RRD of
-                        undefined ->
-                            [];
-                        _ ->
-                            {From_, To_, Value} = hd(rrd:dump(RRD)),
+                    case rrd:dump(RRD) of
+                        [H | _] ->
+                            {From_, To_, Value} = H,
                             Diff_in_s = timer:now_diff(To_, From_) div 1000000,
                             {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
                             AvgPerS = Count / Diff_in_s,
                             Avg = Sum / Count,
                             [{"tx latency", "float", Avg, "ms"},
-                             {"transactions/s", "int32", AvgPerS, "1/s"}]
+                             {"transactions/s", "float", AvgPerS, "1/s"}];
+                        _ -> []
                     end
             end
     end.
