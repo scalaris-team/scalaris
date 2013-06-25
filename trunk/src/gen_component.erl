@@ -619,28 +619,30 @@ on_unknown_event(UnknownMessage, UState, GCState) ->
     ok.
 
 on_exception(Msg, Level, Reason, Stacktrace, UState, GCState) ->
-    log:log(error,
-            "~n** Exception:~n ~.0p:~.0p~n"
-            "** Current message:~n ~.0p~n"
-            "** Module:~n ~.0p~n"
-            "** Handler:~n ~.0p~n"
-            "** Pid:~n ~p ~.0p~n"
-            "** Source linetrace (enable in scalaris.hrl):~n ~.0p~n"
-            "** State:~n ~.0p~n"
-            "** Stacktrace:~n ~.0p~n",
-            [Level, Reason,
-             Msg,
-             gc_mod(GCState),
-             gc_hand(GCState),
-             self(), catch pid_groups:group_and_name_of(self()),
-             erlang:get(test_server_loc),
-             {UState, GCState},
-             Stacktrace]),
+    DbgMsg = "~n** Exception:~n ~.0p:~.0p~n"
+               "** Current message:~n ~.0p~n"
+               "** Module:~n ~.0p~n"
+               "** Handler:~n ~.0p~n"
+               "** Pid:~n ~p ~.0p~n"
+               "** Source linetrace (enable in scalaris.hrl):~n ~.0p~n"
+               "** State:~n ~.0p~n"
+               "** Stacktrace:~n ~.0p~n",
+    DbgVal = [Level, Reason,
+              Msg,
+              gc_mod(GCState),
+              gc_hand(GCState),
+              self(), catch pid_groups:group_and_name_of(self()),
+              erlang:get(test_server_loc),
+              {UState, GCState},
+              Stacktrace],
     case util:is_unittest() of
         true ->
+            % use ct:pal here as logging may have been stopped already
+            ct:pal(DbgMsg, DbgVal),
             catch tester_global_state:log_last_calls(),
             ct:abort_current_testcase(exception_throw);
-        _ -> ok
+        _ ->
+            log:log(error, DbgMsg, DbgVal)
     end,
     ok.
 
