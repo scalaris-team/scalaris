@@ -49,13 +49,17 @@ init([]) ->
 -spec on(message(), state()) -> state().
 on({ganglia_trigger}, {LastActive, TriggerOld}) ->
     Trigger = trigger:next(TriggerOld),
-    gen_component:post_op(_State = {LastActive, Trigger}, {ganglia_periodic});
+    gen_component:post_op(_State = {LastActive, Trigger}, _Message = {ganglia_periodic});
 
 on({ganglia_periodic}, State) ->
-    % message statistics
-    {Received, Sent, _Time} = comm_logger:dump(),
-    traverse(received, gb_trees:iterator(Received)),
-    traverse(sent, gb_trees:iterator(Sent)),
+    send_general_metrics(),
+    send_dht_node_metrics(),
+    send_message_metrics(),
+    send_rrd_metrics(),
+    send_vivaldi_errors(),
+    set_last_active(State).
+
+send_general_metrics() ->
     % general erlang status information
     _ = gmetric(both, "Erlang Processes", "int32", erlang:system_info(process_count), "Total Number"),
     _ = gmetric(both, "Memory used by Erlang processes", "int32", erlang:memory(processes_used), "Bytes"),
@@ -63,23 +67,83 @@ on({ganglia_periodic}, State) ->
     _ = gmetric(both, "Memory used by atoms", "int32", erlang:memory(atom), "Bytes"),
     _ = gmetric(both, "Memory used by binaries", "int32", erlang:memory(binary), "Bytes"),
     _ = gmetric(both, "Memory used by system", "int32", erlang:memory(system), "Bytes"),
-    DHTNodesMemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
-                                    || P <- pid_groups:find_all(dht_node)]),
-    _ = gmetric(both, "Memory used by dht_nodes", "int32", DHTNodesMemoryUsage, "Bytes"),
-    % Statistics in RRD (Load, Latency)
-    RRDMetrics = fetch_rrd_metrics(),
-    _ = case RRDMetrics of
-            [] -> ok;
-            _  ->  _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- RRDMetrics],
-                   ok
-        end,
-    % Local Load
-    LocalLoad = fetch_local_load(),
-    _ = [gmetric(both, Metric, Type, Value, Unit) || {Metric, Type, Value, Unit} <- LocalLoad],
-    % vivaldi statistics
-    monitor_per_dht_node(fun monitor_vivaldi_errors/2, pid_groups:groups_with(dht_node)),
-    set_last_active(State).
+    ok.
 
+% @doc aggregate the number of key-value pairs
+%      and the amount of memory for this VM
+-spec send_dht_node_metrics() -> ok.
+send_dht_node_metrics() ->
+    DHTNodes = pid_groups:find_all(dht_node),
+    % Load of DHT Nodes
+    Pairs = lists:foldl(fun (Pid, Agg) ->
+                                Agg + get_load(Pid)
+                        end, 0, DHTNodes),
+    _ = gmetric(both, "kv pairs", "int32", Pairs, "pairs"),
+    % Memory Usage of DHT Nodes
+    MemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
+                             || P <- DHTNodes]),
+    _ = gmetric(both, "Memory used by dht_nodes", "int32", MemoryUsage, "Bytes"),
+    ok.
+
+-spec send_message_metrics() -> ok.
+send_message_metrics() ->
+    {Received, Sent, _Time} = comm_logger:dump(),
+    traverse(received, gb_trees:iterator(Received)),
+    traverse(sent, gb_trees:iterator(Sent)),
+    ok.
+
+-spec send_rrd_metrics() -> fail | ok.
+send_rrd_metrics() ->
+    % Statistics in RRD (Load, Latency)
+    RRDMetrics =
+        case pid_groups:pid_of("clients_group", monitor) of
+            failed -> [];
+            ClientMonitor ->
+                case monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]) of
+                    [{_,_, undefined}] -> [];
+                    [{_, _, RRD}] ->
+                        case rrd:dump(RRD) of
+                            [H | _] ->
+                                {From_, To_, Value} = H,
+                                Diff_in_s = timer:now_diff(To_, From_) div 1000000,
+                                {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
+                                AvgPerS = Count / Diff_in_s,
+                                Avg = Sum / Count,
+                                [{both, "tx latency", "float", Avg, "ms"},
+                                 {both, "transactions/s", "float", AvgPerS, "1/s"}];
+                            _ -> []
+                        end
+                end
+        end,
+    gmetric(RRDMetrics).
+
+-spec send_vivaldi_errors() -> ok.
+send_vivaldi_errors() ->
+    DHTNodes = lists:sort(pid_groups:groups_with(dht_node)),
+    lists:foldl(fun (Group, Idx) ->
+                        _ = send_vivaldi_errors(Group, Idx),
+                        Idx + 1
+                end, 0, DHTNodes),
+    ok.
+
+
+%%%%%%%%%%%%
+%% Helpers %
+%%%%%%%%%%%%
+
+-spec gmetric(list()) -> ok.
+gmetric(MetricsList) ->
+    lists:foreach(fun({Slope, Metric, Type, Value, Unit}) ->
+                          gmetric(Slope, Metric, Type, Value, Unit)
+                  end, MetricsList).
+
+-spec gmetric(Slope::both | positive, Metric::string(), Type::string(), Value::number(), Unit::string()) -> string().
+gmetric(Slope, Metric, Type, Value, Unit) ->
+    Cmd = lists:flatten(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n",
+                         [Slope, Metric, Type, Value, Unit])),
+    Res = os:cmd(Cmd),
+    ?TRACE("~s: ~s~n", [Cmd, Res]),
+    Res.
 
 -spec traverse(received | sent, Iter1::term()) -> ok.
 traverse(RcvSnd, Iter1) ->
@@ -90,16 +154,8 @@ traverse(RcvSnd, Iter1) ->
       traverse(RcvSnd, Iter2)
   end.
 
--spec gmetric(Slope::both | positive, Metric::string(), Type::string(), Value::number(), Unit::string()) -> string().
-gmetric(Slope, Metric, Type, Value, Unit) ->
-    Cmd = lists:flatten(io_lib:format("gmetric --slope ~p --name ~p --type ~p --value ~p --units ~p~n",
-                         [Slope, Metric, Type, Value, Unit])),
-    Res = os:cmd(Cmd),
-    ?TRACE("~s: ~s~n", [Cmd, Res]),
-    Res.
-
--spec monitor_vivaldi_errors(pid_groups:groupname(), non_neg_integer()) -> ok | string().
-monitor_vivaldi_errors(Group, Idx) ->
+-spec send_vivaldi_errors(pid_groups:groupname(), non_neg_integer()) -> ok | string().
+send_vivaldi_errors(Group, Idx) ->
     case pid_groups:pid_of(Group, vivaldi) of
         failed ->
             ok;
@@ -112,45 +168,6 @@ monitor_vivaldi_errors(Group, Idx) ->
                   )
             end
     end.
-
--spec monitor_per_dht_node(fun((pid_groups:groupname(), Idx::non_neg_integer()) -> any()),
-                           [pid_groups:groupname(),...] | failed) -> non_neg_integer().
-monitor_per_dht_node(F, Nodes) ->
-    DHTNodes = lists:sort(Nodes),
-    lists:foldl(fun (Group, Idx) ->
-                        _ = F(Group, Idx),
-                        Idx + 1
-                end, 0, DHTNodes).
-
--spec fetch_rrd_metrics() -> list().
-fetch_rrd_metrics() ->
-    case pid_groups:pid_of("clients_group", monitor) of
-        failed -> [];
-        ClientMonitor ->
-            case monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]) of
-                [{_,_, undefined}] -> [];
-                [{_, _, RRD}] ->
-                    case rrd:dump(RRD) of
-                        [H | _] ->
-                            {From_, To_, Value} = H,
-                            Diff_in_s = timer:now_diff(To_, From_) div 1000000,
-                            {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
-                            AvgPerS = Count / Diff_in_s,
-                            Avg = Sum / Count,
-                            [{"tx latency", "float", Avg, "ms"},
-                             {"transactions/s", "float", AvgPerS, "1/s"}];
-                        _ -> []
-                    end
-            end
-    end.
-
-% @doc aggregate the number of key-value pairs stored in this VM
--spec fetch_local_load() -> list().
-fetch_local_load() ->
-    Pairs = lists:foldl(fun (Pid, Agg) ->
-                                Agg + get_load(Pid)
-                        end, 0, pid_groups:find_all(dht_node)),
-    [{"kv pairs", "int32", Pairs, "pairs"}].
 
 % @doc get number of key-value pairs stored in given node
 -spec get_load(Pid::comm:erl_local_pid()) -> integer().
