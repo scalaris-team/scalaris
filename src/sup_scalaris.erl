@@ -171,7 +171,7 @@ childs(Options) ->
                     AdminServer,
                     ServicePaxosGroup,
                     AutoscaleServer],
-    Servers = [YAWS, BenchServer, Ganglia],
+    Servers = [YAWS, BenchServer],
     MgmtServers =
         case StartMgmtServer orelse util:is_unittest() of
             true -> [MgmtServerDNCache, MgmtServer];
@@ -182,7 +182,7 @@ childs(Options) ->
             false -> []; %% no dht node requested
             _ -> [DHTNode]
         end,
-    lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer]).
+    lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer, Ganglia]).
 
 -spec add_additional_nodes() -> ok.
 add_additional_nodes() ->
