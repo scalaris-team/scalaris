@@ -1,4 +1,4 @@
-% @copyright 2007-2011 Zuse Institute Berlin
+% @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -26,11 +26,15 @@
 
 -export([start_link/1, init/1, on/2]).
 
--define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), io:format(X, Y)).
+%-define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format(X, Y)).
 
--type state() :: {LastUpdated :: integer(), Trigger :: trigger:state()}.
--type message() :: {ganglia_trigger} | {ganglia_periodic}.
+-type load_aggregation() :: {AggId :: non_neg_integer(), Pending :: non_neg_integer(), Load :: non_neg_integer()}.
+
+-type state() :: {LastUpdated :: non_neg_integer(), Trigger :: trigger:state(), LoadAggregation :: load_aggregation()}.
+-type message() :: {ganglia_trigger} | {ganglia_periodic} |
+                   {ganglia_dht_node_aggregation, DHTNode :: pid(), message()} |
+                   {vivaldi_get_coordinate_response, pid(), message()}.
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
@@ -44,20 +48,39 @@ init([]) ->
                          X -> X
                      end,
     Trigger = trigger:init(trigger_periodic, fun () -> UpdateInterval end, ganglia_trigger),
-    {_LastActive = 0, trigger:next(Trigger)}.
+    {_LastActive = 0, trigger:next(Trigger), {0, 0, 0}}.
 
 -spec on(message(), state()) -> state().
-on({ganglia_trigger}, {LastActive, TriggerOld}) ->
-    Trigger = trigger:next(TriggerOld),
-    gen_component:post_op(_State = {LastActive, Trigger}, _Message = {ganglia_periodic});
+on({ganglia_trigger}, State) ->
+    Trigger = trigger:next(get_trigger(State)),
+    StateNew = inc_agg_id(set_trigger(Trigger, State)),
+    gen_component:post_op(StateNew, _Msg = {ganglia_periodic});
 
 on({ganglia_periodic}, State) ->
+    NewState = send_dht_node_metrics(State),
     send_general_metrics(),
-    send_dht_node_metrics(),
     send_message_metrics(),
     send_rrd_metrics(),
     send_vivaldi_errors(),
-    set_last_active(State).
+    set_last_active(NewState);
+
+on({ganglia_dht_load_aggregation, AggId, Msg} ,State) ->
+    ?TRACE("~p: ~p~n", [AggId, Msg]),
+    {get_node_details_response, [{load, Load}]} = Msg,
+    CurAggId = get_agg_id(State),
+    if
+        % check for correct aggregation id
+        AggId == CurAggId  ->
+            NewState = set_agg_load(Load, State),
+            agg_check_pending(NewState);
+        % otherwise drop this message
+        true -> State
+    end;
+
+on({ganglia_vivaldi_response, DHTName, Msg}, State) ->
+    {vivaldi_get_coordinate_response, _, Confidence} = Msg,
+    gmetric(both, lists:flatten(io_lib:format("vivaldi_confidence_~s", [DHTName])), "float", Confidence, "Confidence"),
+    State.
 
 send_general_metrics() ->
     % general erlang status information
@@ -71,19 +94,23 @@ send_general_metrics() ->
 
 % @doc aggregate the number of key-value pairs
 %      and the amount of memory for this VM
--spec send_dht_node_metrics() -> ok.
-send_dht_node_metrics() ->
+-spec send_dht_node_metrics(state()) -> ok.
+send_dht_node_metrics(State) ->
     DHTNodes = pid_groups:find_all(dht_node),
-    % Load of DHT Nodes
-    Pairs = lists:foldl(fun (Pid, Agg) ->
-                                Agg + get_load(Pid)
-                        end, 0, DHTNodes),
-    _ = gmetric(both, "kv pairs", "int32", Pairs, "pairs"),
+    AggId = get_agg_id(State),
     % Memory Usage of DHT Nodes
     MemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
                              || P <- DHTNodes]),
     _ = gmetric(both, "Memory used by dht_nodes", "int32", MemoryUsage, "Bytes"),
-    ok.
+    % Query DHT Nodes for load, let them reply to the on handler ganglia_dht_node_reply
+    % The FD tells us if a node is down
+    lists:foreach(fun (PID) ->
+                          %% TODO FD
+                          Envelope = comm:reply_as(comm:this(), 3,
+                                                   {ganglia_dht_load_aggregation, AggId , '_'}),
+                          comm:send_local(PID, {get_node_details, Envelope, [load]})
+                  end, DHTNodes),
+    set_agg_pending(length(DHTNodes), State).
 
 -spec send_message_metrics() -> ok.
 send_message_metrics() ->
@@ -119,11 +146,13 @@ send_rrd_metrics() ->
 
 -spec send_vivaldi_errors() -> ok.
 send_vivaldi_errors() ->
-    DHTNodes = lists:sort(pid_groups:groups_with(dht_node)),
-    lists:foldl(fun (Group, Idx) ->
-                        _ = send_vivaldi_errors(Group, Idx),
-                        Idx + 1
-                end, 0, DHTNodes),
+    DHTNodeGroups = pid_groups:groups_with(dht_node),
+    lists:foreach(fun (Group) ->
+                          PID = pid_groups:pid_of(Group, vivaldi),
+                          Envelope = comm:reply_as(comm:this(), 3,
+                                                   {ganglia_vivaldi_response, Group, '_'}),
+                          comm:send_local(PID, {get_coordinate, Envelope})
+                  end, DHTNodeGroups),
     ok.
 
 
@@ -154,34 +183,62 @@ traverse(RcvSnd, Iter1) ->
       traverse(RcvSnd, Iter2)
   end.
 
--spec send_vivaldi_errors(pid_groups:groupname(), non_neg_integer()) -> ok | string().
-send_vivaldi_errors(Group, Idx) ->
-    case pid_groups:pid_of(Group, vivaldi) of
-        failed ->
-            ok;
-        Vivaldi ->
-            comm:send_local(Vivaldi, {get_coordinate, comm:this()}),
-            receive
-                ?SCALARIS_RECV(
-                    {vivaldi_get_coordinate_response, _, Error}, %% ->
-                    gmetric(both, lists:flatten(io_lib:format("vivaldi_error_~p", [Idx])), "float", Error, "error")
-                  )
-            end
+-spec agg_check_pending(state()) -> state().
+agg_check_pending(State) ->
+    Pending = get_agg_pending(State),
+    if
+        Pending == 0 ->
+            Load = get_agg_load(State),
+            _ = gmetric(both, "kv pairs", "int32", Load, "pairs"),
+            State;
+        true ->
+            State
     end.
 
-% @doc get number of key-value pairs stored in given node
--spec get_load(Pid::comm:erl_local_pid()) -> integer().
-get_load(Pid) ->
-    comm:send_local(Pid, {get_node_details, comm:this(), [load]}),
-    receive
-        ?SCALARIS_RECV(
-            {get_node_details_response, Details}, %% ->
-            node_details:get(Details, load)
-          )
-    after 2000 ->
-            0
-    end.
+-spec get_last_active(state()) -> non_neg_integer().
+get_last_active(State) ->
+    element(1, State).
 
 -spec set_last_active(state()) -> state().
 set_last_active(State) ->
     setelement(1, State, erlang:now()).
+
+-spec get_trigger(state()) -> trigger:state().
+get_trigger(State) ->
+    element(2, State).
+
+-spec set_trigger(trigger:state(), state()) -> state().
+set_trigger(Trigger, State) ->
+    setelement(2, State, Trigger).
+
+-spec get_agg_id(state()) -> non_neg_integer().
+get_agg_id(State) ->
+    element(1, element(3, State)).
+
+-spec get_agg_load(state()) -> non_neg_integer().
+get_agg_load(State) ->
+    {_AggId, _Pending, Load} = element(3, State),
+    Load.
+
+-spec set_agg_load(non_neg_integer(), state()) -> state().
+set_agg_load(Load, State) ->
+    {AggId, Pending, OldLoad} = element(3, State),
+    setelement(3, State, {AggId, Pending - 1, OldLoad + Load}).
+
+-spec get_agg_pending(state()) -> non_neg_integer().
+get_agg_pending(State) ->
+    {_AggId, Pending, _Load} = element(3, State),
+    Pending.
+
+-spec set_agg_pending(non_neg_integer(), state()) -> state().
+set_agg_pending(NumPending, State) ->
+    {AggId, _Pending, Load} = element(3, State),
+    setelement(3, State, {AggId, NumPending, Load}).
+
+-spec inc_agg_id(state()) -> state().
+inc_agg_id(State) ->
+    {AggId, _Pending, _Load} = element(3,State),
+    setelement(3, State, {AggId + 1, 0, 0}).
+
+%reset_load_aggregation(State) ->
+%    {get_last_active(), 0}.
