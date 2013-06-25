@@ -103,6 +103,11 @@ a.menu:hover {
   text-decoration: underline;
 }
 
+.pieLabel a {  
+  color: #FFFFFF;
+  text-decoration: underline;
+}
+
 div.submenu {		
   margin-left: 10px;
 }

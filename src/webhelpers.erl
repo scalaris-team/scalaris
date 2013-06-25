@@ -287,8 +287,11 @@ extract_ring_info([RingE]) ->
         _ -> NodeIP1 = NodeIP2 = NodeIP3 = NodeIP4 = 0
     end,
     NodePort = comm:get_port(NodePid),
-    Label = lists:flatten(io_lib:format("~s~s / ~B.~B.~B.~B:~B (~B)",
-                  [MyIndexStr, node_details:get(RingE, hostname),
+    YawsPort = node:yawsPort(Node),
+    Label = lists:flatten(io_lib:format("~s<a href=\\\"http://~B.~B.~B.~B:~B/ring.yaws\\\">~s / ~B.~B.~B.~B:~B</a> (~B)",
+                  [MyIndexStr,
+                   NodeIP1, NodeIP2, NodeIP3, NodeIP4, YawsPort,
+                   node_details:get(RingE, hostname),
                    NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort,
                    node_details:get(RingE, load)])),
     case MyId =:= PredId of
@@ -330,8 +333,11 @@ extract_ring_info2(RingE1, RingE2) ->
         _ -> E1_NodeIP1 = E1_NodeIP2 = E1_NodeIP3 = E1_NodeIP4 = 0
     end,
     E1_NodePort = comm:get_port(E1_NodePid),
-    E1_Label = lists:flatten(io_lib:format("~s~s / ~B.~B.~B.~B:~B (~B)",
-                  [E1_MyIndexStr, node_details:get(RingE1, hostname),
+    E1_YawsPort = node:yawsPort(E1_Node),
+    E1_Label = lists:flatten(io_lib:format("~s<a href=\\\"http://~B.~B.~B.~B:~B/ring.yaws\\\">~s / ~B.~B.~B.~B:~B</a> (~B)",
+                  [E1_MyIndexStr,
+                   E1_NodeIP1, E1_NodeIP2, E1_NodeIP3, E1_NodeIP4, E1_YawsPort,
+                   node_details:get(RingE1, hostname),
                    E1_NodeIP1, E1_NodeIP2, E1_NodeIP3, E1_NodeIP4, E1_NodePort,
                    node_details:get(RingE1, load)])),
     E1_Me_val = io_lib:format("~f", [E1_Diff]),
@@ -467,11 +473,14 @@ renderRing({ok, Details}) ->
         _ -> NodeIP1 = NodeIP2 = NodeIP3 = NodeIP4 = 0
     end,
     NodePort = comm:get_port(NodePid),
+    YawsPort = node:yawsPort(Node),
     {tr, [], 
       [
        {td, [], [get_flag(Hostname),
-                 io_lib:format("~p (~B.~B.~B.~B:~B)",
-                               [Hostname, NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort])]},
+                 io_lib:format("<a href=\"http://~B.~B.~B.~B:~B/ring.yaws\">~p (~B.~B.~B.~B:~B</a>)",
+                               [NodeIP1, NodeIP2, NodeIP3, NodeIP4, YawsPort,
+                                Hostname,
+                                NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort])]},
        {td, [], io_lib:format("~.100p", [[NodeListFun(N) || N <- PredList]])},
        {td, [], io_lib:format("~p:&nbsp;~p", [MyIndexStr, node:id(Node)])},
        {td, [], io_lib:format("~.100p", [[NodeListFun(N) || N <- SuccList]])},
@@ -565,11 +574,14 @@ renderIndexedRing({ok, Details}) ->
         _ -> NodeIP1 = NodeIP2 = NodeIP3 = NodeIP4 = 0
     end,
     NodePort = comm:get_port(NodePid),
-    {tr, [],
+    YawsPort = node:yawsPort(Node),
+    {tr, [], 
       [
        {td, [], [get_flag(Hostname),
-                 io_lib:format("~p (~B.~B.~B.~B:~B)",
-                               [Hostname, NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort])]},
+                 io_lib:format("<a href=\"http://~B.~B.~B.~B:~B/ring.yaws\">~p (~B.~B.~B.~B:~B</a>)",
+                               [NodeIP1, NodeIP2, NodeIP3, NodeIP4, YawsPort,
+                                Hostname,
+                                NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort])]},
        case hd(PredIndex) =:= -1 of
            true->
                {td, [], io_lib:format("~p", [PredIndex])};
