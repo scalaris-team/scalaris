@@ -102,6 +102,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     
     protected boolean initialized = false;
 
+    protected static final Pattern MATCH_WIKI_AUTOIMPORT_FILE = Pattern.compile(".*\\.db.auto$");
     protected static final Pattern MATCH_WIKI_IMPORT_FILE = Pattern.compile(".*((\\.xml(\\.gz|\\.bz2)?)|\\.db)$");
     protected static final Pattern MATCH_WIKI_IMAGE_PX = Pattern.compile("^[0-9]*px-");
     protected static final Pattern MATCH_WIKI_IMAGE_SVG_PNG = Pattern.compile("\\.svg\\.png$");
@@ -177,6 +178,15 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             // integer resolution should be enough
             curReqLogStartTime = (int) (System.currentTimeMillis() / 1000);
         }
+        
+        startAutoImport();
+    }
+
+    /**
+     * Start automatically importing data right after initialisation in
+     * {@link #init()} (if implemented in sub-class).
+     */
+    protected void startAutoImport() {
     }
 
     /**
