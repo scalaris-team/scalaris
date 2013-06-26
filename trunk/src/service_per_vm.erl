@@ -82,7 +82,8 @@ on({get_dht_nodes, Pid}, ok) ->
 on({delete_node, SupPid, SupId}, ok) ->
     util:supervisor_terminate_childs(SupPid),
     _ = supervisor:terminate_child(main_sup, SupId),
-    ok = supervisor:delete_child(main_sup, SupId);
+    _ = supervisor:delete_child(main_sup, SupId),
+    ok;
 
 % message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
 on({hi}, ok) ->
