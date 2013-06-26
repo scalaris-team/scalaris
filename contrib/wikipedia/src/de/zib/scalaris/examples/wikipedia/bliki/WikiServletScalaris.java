@@ -73,6 +73,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
     
     private ConnectionPool cPool;
     protected NodeDiscovery nodeDiscovery;
+    private boolean autoImport;
 
     /**
      * Default constructor creating the servlet.
@@ -120,6 +121,32 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
         if (Options.getInstance().SCALARIS_NODE_DISCOVERY > 0) {
             nodeDiscovery = new NodeDiscovery(cPool);
             nodeDiscovery.startWithFixedDelay(Options.getInstance().SCALARIS_NODE_DISCOVERY);
+        }
+    }
+
+    @Override
+    protected void startAutoImport() {
+        String dumpsPath = getServletContext().getRealPath("/WEB-INF/dumps");
+        if (!initialized && !loadSiteInfo() || !currentImport.isEmpty()) {
+            String req_import = null;
+            // get auto-import dumps:
+            File dumpsDir = new File(dumpsPath);
+            if (dumpsDir.isDirectory()) {
+                List<String> autoImportFiles = Arrays.asList(dumpsDir.list(new FilenameFilter() {
+                    @Override
+                    public boolean accept(File dir, String name) {
+                        return MATCH_WIKI_AUTOIMPORT_FILE.matcher(name).matches();
+                    }
+                }));
+                if (!autoImportFiles.isEmpty()) {
+                    // use the first auto-import file
+                    req_import = autoImportFiles.get(0);
+                    // remove .auto from filename:
+                    req_import = req_import.substring(0, req_import.length() - ".auto".length());
+                    startImport(dumpsPath, req_import, 2, null);
+                    autoImport = true;
+                }
+            }
         }
     }
     
@@ -263,22 +290,9 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             } else {
                 content.append("<h2>Importing \"" + req_import + "\"...</h2>\n");
                 try {
-                    currentImport = req_import;
                     int maxRevisions = parseInt(request.getParameter("max_revisions"), 2);
                     Calendar maxTime = parseDate(request.getParameter("max_time"), null);
-                    importLog = new CircularByteArrayOutputStream(1024 * 1024);
-                    PrintStream ps = new PrintStream(importLog);
-                    ps.println("starting import...");
-                    String fileName = dumpsPath + File.separator + req_import;
-                    if (fileName.endsWith(".db")) {
-                        importHandler = new WikiDumpPreparedSQLiteToScalaris(fileName, Options.getInstance(), 1, 1, cPool.getConnectionFactory());
-                    } else {
-                        importHandler = new WikiDumpToScalarisHandler(
-                                de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist,
-                                null, maxRevisions, null, maxTime, cPool.getConnectionFactory());
-                    }
-                    importHandler.setMsgOut(ps);
-                    this.new ImportThread(importHandler, fileName, ps).start();
+                    startImport(dumpsPath, req_import, maxRevisions, maxTime);
                     response.setHeader("Refresh", "2; url = wiki?import=" + currentImport + serviceUser + "#refresh");
                     content.append("<p>Current log file (refreshed automatically every " + IMPORT_REDIRECT_EVERY + " seconds):</p>\n");
                     content.append("<pre>");
@@ -353,6 +367,24 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
 
         forwardToPageJsp(request, response, connection, page, "page.jsp");
     }
+
+    private void startImport(String dumpsPath, String req_import,
+            int maxRevisions, Calendar maxTime) throws RuntimeException {
+        currentImport = req_import;
+        importLog = new CircularByteArrayOutputStream(1024 * 1024);
+        PrintStream ps = new PrintStream(importLog);
+        ps.println("starting import...");
+        String fileName = dumpsPath + File.separator + req_import;
+        if (fileName.endsWith(".db")) {
+            importHandler = new WikiDumpPreparedSQLiteToScalaris(fileName, Options.getInstance(), 1, 1, cPool.getConnectionFactory());
+        } else {
+            importHandler = new WikiDumpToScalarisHandler(
+                    de.zib.scalaris.examples.wikipedia.data.xml.Main.blacklist,
+                    null, maxRevisions, null, maxTime, cPool.getConnectionFactory());
+        }
+        importHandler.setMsgOut(ps);
+        this.new ImportThread(importHandler, fileName, ps).start();
+    }
     
     private class ImportThread extends Thread {
         private WikiDump handler;
@@ -405,6 +437,9 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
             synchronized (WikiServletScalaris.this) {
                 WikiServletScalaris.this.importHandler = null;
                 WikiServletScalaris.this.updateExistingPages();
+                if (WikiServletScalaris.this.autoImport) {
+                    WikiServletScalaris.this.currentImport = "";
+                }
             }
         }
     }
