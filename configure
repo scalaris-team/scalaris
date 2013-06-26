@@ -608,6 +608,8 @@ ERLANG_TOKE_FLAGS
 ERLANG_LIB_VER_toke
 ERLANG_LIB_DIR_toke
 RUN_TEST
+ERLANG_LIB_VER_hanoidb
+ERLANG_LIB_DIR_hanoidb
 ERLANG_LIB_VER_edoc
 ERLANG_LIB_DIR_edoc
 ERLANG_LIB_VER_common_test
@@ -3372,6 +3374,92 @@ $as_echo "$as_me: erlang-edoc not found - you won't be able to create the docume
 fi
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'hanoidb' library subdirectory" >&5
+$as_echo_n "checking for Erlang/OTP 'hanoidb' library subdirectory... " >&6; }
+if ${ac_cv_erlang_lib_dir_hanoidb+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+     if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+
+start() ->
+	    ReturnValue = case code:lib_dir("hanoidb") of
+	    {error, bad_name} ->
+		file:write_file("conftest.out", "not found\n"),
+		1;
+	    LibDir ->
+		file:write_file("conftest.out", LibDir),
+		0
+	    end,
+	    halt(ReturnValue)
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ac_cv_erlang_lib_dir_hanoidb=`cat conftest.out`
+	 rm -f conftest.out
+else
+  if test ! -f conftest.out; then
+	     { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "test Erlang program execution failed
+See \`config.log' for more details" "$LINENO" 5; }
+	 else
+	     ac_cv_erlang_lib_dir_hanoidb="not found"
+	     rm -f conftest.out
+	 fi
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+     ac_ext=erl
+ac_compile='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5'
+ac_link='$ERLC $ERLCFLAGS -b beam conftest.$ac_ext >&5 && echo "#!/bin/sh" > conftest$ac_exeext && $as_echo "\"$ERL\" -run conftest start -run init stop -noshell" >> conftest$ac_exeext && chmod +x conftest$ac_exeext'
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_dir_hanoidb" >&5
+$as_echo "$ac_cv_erlang_lib_dir_hanoidb" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for Erlang/OTP 'hanoidb' library version" >&5
+$as_echo_n "checking for Erlang/OTP 'hanoidb' library version... " >&6; }
+if ${ac_cv_erlang_lib_ver_hanoidb+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test "$ac_cv_erlang_lib_dir_hanoidb" = "not found"; then :
+  ac_cv_erlang_lib_ver_hanoidb="not found"
+else
+  ac_cv_erlang_lib_ver_hanoidb=`$as_echo "$ac_cv_erlang_lib_dir_hanoidb" | sed -n -e 's,^.*-\([^/-]*\)$,\1,p'`
+fi
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_erlang_lib_ver_hanoidb" >&5
+$as_echo "$ac_cv_erlang_lib_ver_hanoidb" >&6; }
+ERLANG_LIB_DIR_hanoidb=$ac_cv_erlang_lib_dir_hanoidb
+
+ERLANG_LIB_VER_hanoidb=$ac_cv_erlang_lib_ver_hanoidb
+
+if test "$ac_cv_erlang_lib_dir_hanoidb" = "not found"; then :
+  HAVEHANOIDB=""
+                     HAVEHANOIDB_EDOC=""
+                     HAVEHANOIDB_DIALYZER=""
+                     { $as_echo "$as_me:${as_lineno-$LINENO}: erlang-hanoidb not found - you won't be able to use the db_hanoidb back-end (if configured in scalaris.hrl)" >&5
+$as_echo "$as_me: erlang-hanoidb not found - you won't be able to use the db_hanoidb back-end (if configured in scalaris.hrl)" >&6;}
+else
+  HAVEHANOIDB=", {d, have_hanoidb}"
+                     HAVEHANOIDB_EDOC=", {have_hanoidb, true}"
+                     HAVEHANOIDB_DIALYZER=" -Dhave_hanoidb"
+fi
+
+
 as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_common_test/priv/bin/run_test" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_common_test/priv/bin/run_test" >&5
 $as_echo_n "checking for $ERLANG_LIB_DIR_common_test/priv/bin/run_test... " >&6; }
@@ -4177,10 +4265,10 @@ fi
 #
 ###########################################################
 
-EMAKEFILEDEFINES="${HAVETOKE}${GBTREESISBUILTIN}${TERMISBUILTIN}${NODEISBUILTIN}${MODULEISBUILTIN}${BOOLEANISBUILTIN}${TIDISBUILTIN}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}${EXPORTTYPESUPPORT}${HAVE_ERLANG_TIMESTAMP}${CTLINESUPPORT}${CTHOOKS_EMAKEFILE}${CALLBACKSUPPORT}${ERLANG_NATIVE_FLAGS}"
-EDOCMACROS="${HAVETOKE_EDOC}${GBTREESISBUILTIN_EDOC}${TERMISBUILTIN_EDOC}${NODEISBUILTIN_EDOC}${MODULEISBUILTIN_EDOC}${BOOLEANISBUILTIN_EDOC}${TIDISBUILTIN_EDOC}${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}${EXPORTTYPESUPPORT_EDOC}${CTLINESUPPORT_EDOC}${CTHOOKS_EDOC}${CALLBACKSUPPORT_EDOC}"
+EMAKEFILEDEFINES="${HAVEHANOIDB}${HAVETOKE}${GBTREESISBUILTIN}${TERMISBUILTIN}${NODEISBUILTIN}${MODULEISBUILTIN}${BOOLEANISBUILTIN}${TIDISBUILTIN}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}${EXPORTTYPESUPPORT}${HAVE_ERLANG_TIMESTAMP}${CTLINESUPPORT}${CTHOOKS_EMAKEFILE}${CALLBACKSUPPORT}${ERLANG_NATIVE_FLAGS}"
+EDOCMACROS="${HAVEHANOIDB_EDOC}${HAVETOKE_EDOC}${GBTREESISBUILTIN_EDOC}${TERMISBUILTIN_EDOC}${NODEISBUILTIN_EDOC}${MODULEISBUILTIN_EDOC}${BOOLEANISBUILTIN_EDOC}${TIDISBUILTIN_EDOC}${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}${EXPORTTYPESUPPORT_EDOC}${CTLINESUPPORT_EDOC}${CTHOOKS_EDOC}${CALLBACKSUPPORT_EDOC}"
 EDOCMACROS="${EDOCMACROS#, }"
-DIALYZER_FLAGS="${HAVETOKE_DIALYZER}${GBTREESISBUILTIN_DIALYZER}${TERMISBUILTIN_DIALYZER}${NODEISBUILTIN_DIALYZER}${MODULEISBUILTIN_DIALYZER}${BOOLEANISBUILTIN_DIALYZER}${TIDISBUILTIN_DIALYZER}${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${EXPORTTYPESUPPORT_DIALYZER}${HAVE_YAWS_SENDFILE_DIALYZER}${CTLINESUPPORT_DIALYZER}${CTHOOKS_DIALYZER}${CALLBACKSUPPORT_DIALYZER}"
+DIALYZER_FLAGS="${HAVEHANOIDB_DIALYZER}${HAVETOKE_DIALYZER}${GBTREESISBUILTIN_DIALYZER}${TERMISBUILTIN_DIALYZER}${NODEISBUILTIN_DIALYZER}${MODULEISBUILTIN_DIALYZER}${BOOLEANISBUILTIN_DIALYZER}${TIDISBUILTIN_DIALYZER}${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${EXPORTTYPESUPPORT_DIALYZER}${HAVE_YAWS_SENDFILE_DIALYZER}${CTLINESUPPORT_DIALYZER}${CTHOOKS_DIALYZER}${CALLBACKSUPPORT_DIALYZER}"
 
 
 
@@ -5643,4 +5731,5 @@ chmod u+x python-api/scalaris
 chmod u+x python3-api/scalaris
 chmod u+x ruby-api/scalaris
 chmod u+x contrib/init.d/scalaris
+chmod u+x contrib/init.d/scalaris-monitor
 
