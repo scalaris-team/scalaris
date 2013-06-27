@@ -283,9 +283,7 @@ get_chunk_helper({{DB, _FileName}, _Subscr, _SnapState}, StartId, Interval,
                            []      -> {intervals:empty(), Chunk};
                            [H | _] ->
                                Next = GetKeyFromDataFun(H),
-                               % assert ChunkSize > 0, see ChunkSize type
-                               FirstKey = GetKeyFromDataFun(hd(Chunk)),
-                               NextToIntBegin = intervals:new('[', Next, FirstKey, ')'),
+                               NextToIntBegin = intervals:new('[', Next, StartId, ']'),
                                {intervals:intersection(Interval, NextToIntBegin), Chunk}
                        end
             end
