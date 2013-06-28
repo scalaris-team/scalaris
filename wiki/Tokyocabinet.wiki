@@ -1,20 +1,20 @@
-#summary Using Tokyocabinet as the backend.
+#summary Using Tokyo Cabinet as the backend.
 
 = Introduction =
 
-Tokyocabinet can be used to store more data in a Scalaris node than would fit into its main memory.
+Tokyo Cabinet can be used to store more data in a Scalaris node than would fit into its main memory.
 
 Note: you don't get [FAQ#Is_the_store_persisted_on_disk? persistence]!!! DB files are truncated on first access!!!
 
 = Prerequisites =
 
 You will need:
-  * [http://tokyocabinet.sourceforge.net/ Tokyocabinet]
+  * [http://fallabs.com/tokyocabinet/ Tokyo Cabinet]
   * [http://hg.opensource.lshift.net/toke/ toke]
 
 = Switching to toke =
 
-  # Install Tokyocabinet
+  # Install Tokyo Cabinet
   # Install/make toke, e.g. by installing an rpm, provided in our [FAQ#Prebuild_packages repositories])
   # Rerun configure with --enable-toke. configure assumes that you installed toke in your erlang's _lib_ directory, i.e. "`<erlang_dir`>/lib/toke" or "`<erlang_dir`>/lib/toke-`<version`>". If you used a different directory, e.g. /home/scalaris/apps/toke, you have to provide the path to configure:
 {{{
