@@ -140,9 +140,10 @@ on({request_sync, Method, DestKey}, State) ->
     comm:send_local(self(), {request_sync, Method, DestKey, none}),
     State;
 
-% Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
+% - Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
 %   Random leads to sync with a node which is associated with this (e.g. symmetric partner)
-% Principal will get an request_sync_complete message.
+% - Principal will eventually get an request_sync_complete message 
+%   (no result message will be send if request receiver dies etc.).
 on({request_sync, Method, DestKey, Principal}, State = #rrepair_state{ round = Round, 
                                                                        open_recon = OpenRecon,
                                                                        open_sessions = Sessions }) ->
