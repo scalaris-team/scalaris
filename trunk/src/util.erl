@@ -179,10 +179,10 @@ supervisor_terminate_childs(SupPid) ->
                   Pid =/= undefined, is_process_alive(Pid) ],
     ok.
 
--spec wait_for(fun(() -> any())) -> ok.
+-spec wait_for(fun(() -> boolean())) -> ok.
 wait_for(F) -> wait_for(F, 10).
 
--spec wait_for(fun(() -> any()), WaitTimeInMs::pos_integer()) -> ok.
+-spec wait_for(fun(() -> boolean()), WaitTimeInMs::pos_integer()) -> ok.
 wait_for(F, WaitTime) ->
     case F() of
         true  -> ok;
