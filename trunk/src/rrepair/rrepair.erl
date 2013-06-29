@@ -63,7 +63,7 @@
          fork_session/1, session_id_equal/2]).
 
 -ifdef(with_export_type_support).
--export_type([session_id/0]).
+-export_type([session_id/0, session/0]).
 -endif.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -72,11 +72,13 @@
 
 -type round()       :: {non_neg_integer(), non_neg_integer()}.
 -type session_id()  :: {round(), comm:mypid()}.
+-type principal_id():: comm:mypid() | none.
 
 % @doc session contains only data of the sync request initiator thus rs_stats:regen_count represents only 
 %      number of regenerated db items on the initator
 -record(session, 
         { id                = ?required(session, id)            :: session_id(), 
+          principal         = none                              :: principal_id(),
           rc_method         = ?required(session, rc_method)     :: rr_recon:method(), 
           rc_stats          = none                              :: rr_recon_stats:stats() | none,
           rs_stats          = none                              :: rr_resolve:stats() | none,
@@ -106,6 +108,7 @@
     % API
     {request_sync, DestKey::random | ?RT:key()} |
     {request_sync, Method::rr_recon:method(), DestKey::random | ?RT:key()} |
+    {request_sync, Method::rr_recon:method(), DestKey::random | ?RT:key(), Principal::principal_id()} |
     {request_resolve, rr_resolve:operation(), rr_resolve:options()} |
     {get_state, Sender::comm:mypid(), Key::state_field()} |
     % internal
@@ -130,16 +133,21 @@
 
 % Requests db sync with DestKey using default recon method (given in config).
 on({request_sync, DestKey}, State) ->
-    comm:send_local(self(), {request_sync, get_recon_method(), DestKey}),
+    comm:send_local(self(), {request_sync, get_recon_method(), DestKey, none}),
+    State;
+
+on({request_sync, Method, DestKey}, State) ->
+    comm:send_local(self(), {request_sync, Method, DestKey, none}),
     State;
 
 % Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
 %   Random leads to sync with a node which is associated with this (e.g. symmetric partner)
-on({request_sync, Method, DestKey}, State = #rrepair_state{ round = Round, 
-                                                            open_recon = OpenRecon,
-                                                            open_sessions = Sessions }) ->
+% Principal will get an request_sync_complete message.
+on({request_sync, Method, DestKey, Principal}, State = #rrepair_state{ round = Round, 
+                                                                       open_recon = OpenRecon,
+                                                                       open_sessions = Sessions }) ->
     ?TRACE("RR: REQUEST SYNC WITH ~p", [DestKey]),
-    S = new_session(Round, comm:this(), Method),
+    S = new_session(Round, comm:this(), Method, Principal),
     {ok, Pid} = rr_recon:start(S#session.id),
     comm:send_local(Pid, {start, Method, DestKey}),
     State#rrepair_state{ round = next_round(Round),
@@ -209,6 +217,11 @@ on({recon_forked}, State) ->
 %%      Could be used to send request caller a finished Msg.
 on({request_sync_complete, Session}, State = #rrepair_state{ open_sessions = Sessions }) ->
     ?TRACE_COMPLETE("--SESSION COMPLETE--~n~p", [Session]),
+    case Session#session.principal of
+        none -> ok;
+        Pid -> io:format("FINISH!~n~nSEND TO ~p~n", [Pid]), 
+            comm:send(Pid, {request_sync_complete, Session})
+    end,
     NewOpen = lists:delete(Session, Sessions),
     State#rrepair_state{ open_sessions = NewOpen };
 
@@ -227,8 +240,8 @@ on({recon_progress_report, _Sender, false, _Stats}, State = #rrepair_state{ open
     State#rrepair_state{ open_recon = OR - 1 };    
 on({recon_progress_report, _Sender, true, Stats}, State = #rrepair_state{ open_recon = OR,
                                                                           open_sessions = OS }) ->
-    ?TRACE_RECON("~nRECON OK - Sender=~p - Initiator=~p~nStats=~p~nOpenRecon=~p~nSessions=~p", 
-                 [_Sender, Initiator, rr_recon_stats:print(Stats), OR - 1, OS]),    
+    ?TRACE_RECON("~nRECON OK - Sender=~p~nStats=~p~nOpenRecon=~p~nSessions=~p", 
+                 [_Sender, rr_recon_stats:print(Stats), OR - 1, OS]),    
     NewOS = case extract_session(rr_recon_stats:get(session_id, Stats), OS) of
                     {S, TSessions} ->
                         SUpd = update_session_recon(S, Stats),
@@ -283,9 +296,9 @@ on({web_debug_info, Requestor}, #rrepair_state{ round = Round,
 -spec next_round(round()) -> round().
 next_round({R, _Fork}) -> {R + 1, 0}.
 
--spec new_session(round(), comm:mypid(), rr_recon:method()) -> session().
-new_session(Round, Pid, RCMethod) ->
-    #session{ id = {Round, Pid}, rc_method = RCMethod, ttl = get_session_ttl() }.
+-spec new_session(round(), comm:mypid(), rr_recon:method(), principal_id()) -> session().
+new_session(Round, Pid, RCMethod, Principal) ->
+    #session{ id = {Round, Pid}, rc_method = RCMethod, ttl = get_session_ttl(), principal = Principal }.
 
 -spec session_id_equal(session_id(), session_id()) -> boolean().
 session_id_equal({{R, _}, Pid}, {{R, _}, Pid}) -> true;
