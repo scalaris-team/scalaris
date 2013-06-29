@@ -41,13 +41,13 @@ basic_tests() ->
     ].
 
 repair_default() ->
-    [%no_diff,        % ring is not out of sync e.g. no outdated or missing replicas
-     %one_node,       % sync in ring with only one node
+    [no_diff,        % ring is not out of sync e.g. no outdated or missing replicas
+     one_node,       % sync in ring with only one node
      %mpath
-     %dest,           % run one sync with a specified dest node
-     simple         % run one sync round
-     %multi_round,    % run multiple sync rounds with sync probability 1
-     %multi_round2    % run multiple sync rounds with sync probability 0.4     
+     dest,           % run one sync with a specified dest node
+     simple,         % run one sync round
+     multi_round,    % run multiple sync rounds with sync probability 1
+     multi_round2    % run multiple sync rounds with sync probability 0.4     
 	].
 
 regen_special() ->
