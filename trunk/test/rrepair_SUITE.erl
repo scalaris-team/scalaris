@@ -41,13 +41,13 @@ basic_tests() ->
     ].
 
 repair_default() ->
-    [no_diff,        % ring is not out of sync e.g. no outdated or missing replicas
-     one_node,       % sync in ring with only one node
+    [%no_diff,        % ring is not out of sync e.g. no outdated or missing replicas
+     %one_node,       % sync in ring with only one node
      %mpath
-     dest,           % run one sync with a specified dest node
-     simple,         % run one sync round
-     multi_round,    % run multiple sync rounds with sync probability 1
-     multi_round2    % run multiple sync rounds with sync probability 0.4     
+     %dest,           % run one sync with a specified dest node
+     simple         % run one sync round
+     %multi_round,    % run multiple sync rounds with sync probability 1
+     %multi_round2    % run multiple sync rounds with sync probability 0.4     
 	].
 
 regen_special() ->
@@ -292,9 +292,8 @@ dest_empty_node(Config) ->
     CM = count_dbsize(CKey),
     %server starts sync
     api_dht_raw:unreliable_lookup(IKey, {?send_to_group_member, rrepair, 
-                                              {request_sync, Method, CKey}}),
-    %waitForSyncRoundEnd(NodeKeys),
-    waitForSyncRoundEnd([IKey, CKey]),
+                                              {request_sync, Method, CKey, comm:this()}}),
+    wait_for_session_end(),
     %measure sync degree
     IMNew = count_dbsize(IKey),
     CMNew = count_dbsize(CKey),
@@ -510,6 +509,14 @@ tester_find_intersection(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec wait_for_session_end() -> ok.
+wait_for_session_end() ->
+    util:wait_for(fun() -> 
+                          receive 
+                              {request_sync_complete, _} -> true
+                          end
+                  end).
 
 % @doc
 %    runs the bloom filter synchronization [Rounds]-times 
