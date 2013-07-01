@@ -148,15 +148,15 @@ supervisor_terminate_childs(SupPid) ->
     ChildSpecs = supervisor:which_children(SupPid),
     Self = self(),
     _ = [ begin
-              case Self =/= Pid andalso gen_component:is_gen_component(Pid) of
+              case gen_component:is_gen_component(Pid) of
                   true ->
                       gen_component:bp_set_cond_async(
                         Pid, fun(_M, _S) -> true end,
                         about_to_kill);
                   _ -> ok
               end
-          end ||  {_Id, Pid, _Type, _Module} <- ChildSpecs,
-                  Pid =/= undefined, is_process_alive(Pid) ],
+          end ||  {_Id, Pid, worker, _Module} <- ChildSpecs,
+                  Pid =/= undefined, Pid =/= Self, is_process_alive(Pid) ],
     _ = [ try
               case Type of
                   supervisor ->
