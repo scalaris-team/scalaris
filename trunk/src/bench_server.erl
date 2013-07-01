@@ -29,7 +29,13 @@
 -export([run_threads/2]).
 
 -record(state,
-        {load_pid :: pid() | ok
+        {load_pid             :: pid() | ok,
+         bench_owner   = ok   :: pid() | ok,
+         bench_start   = ok   :: erlang_timestamp() | ok,
+         bench_threads = 0    :: ThreadsLeft::non_neg_integer(),
+         bench_data    = null :: {N::non_neg_integer(), Mean::float(), M2::float(),
+                                  Min::non_neg_integer(), Max::non_neg_integer(),
+                                  AggAborts::non_neg_integer()} | null
          }).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -59,11 +65,46 @@ on({bench, Op, Threads, Iterations, Owner, Param}, State) ->
                 read_read ->
                     bench_fun:read_read(Iterations)
             end,
-    {Time, {MeanTime, Variance, MinTime, MaxTime, Aborts}} = util:tc(?MODULE, run_threads,
-                                                        [Threads, Bench]),
-    comm:send(Owner, {done, comm_server:get_local_address_port(),
-                      Time, MeanTime, Variance, MinTime, MaxTime, Aborts}),
-    State.
+    BenchStart = erlang:now(),
+    run_threads(Threads, Bench),
+    State#state{bench_start = BenchStart,
+                bench_owner = Owner,
+                bench_threads = Threads};
+on({done, Time, Aborts},
+   State = #state{bench_owner = BenchOwner,
+                  bench_start = BenchStart,
+                  bench_threads = BenchThreads,
+                  bench_data = BenchData})
+  % see http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#On-line_algorithm
+  when BenchOwner =/= ok andalso BenchStart =/= ok andalso BenchThreads > 0 ->
+    NewBenchData =
+        case BenchData of
+            null ->
+                {1, Time, 0.0, Time, Time, Aborts};
+            {N, Mean, M2, Min, Max, AggAborts} ->
+                Delta = Time - Mean,
+                NewMean = Mean + Delta / (N + 1),
+                {N + 1, NewMean, M2 + Delta*(Time - NewMean),
+                 erlang:min(Time, Min), erlang:max(Time, Max),
+                 AggAborts + Aborts}
+        end,
+    if BenchThreads =:= 1 ->
+           RepTime = timer:now_diff(erlang:now(), BenchStart),
+           {NewN, RepMeanTime, NewM2, RepMinTime, RepMaxTime, RepAborts} = NewBenchData,
+           RepVariance = if NewN =:= 1 -> 0.0;
+                            true       -> NewM2 / (NewN - 1)
+                         end,
+           comm:send(BenchOwner, {done, comm_server:get_local_address_port(),
+                                  RepTime, RepMeanTime, RepVariance,
+                                  RepMinTime, RepMaxTime, RepAborts}),
+           State#state{bench_owner = ok,
+                       bench_start = ok,
+                       bench_threads = 0,
+                       bench_data = null};
+       true ->
+           State#state{bench_threads = BenchThreads - 1,
+                       bench_data = NewBenchData}
+    end.
 
 -spec init([]) -> #state{}.
 init([]) ->
@@ -83,9 +124,7 @@ start_link() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % @doc spawns threads and collect statistics
 -spec run_threads(integer(),
-                  fun((Parent::comm:erl_local_pid()) -> any())) ->
-    {Mean::float(), Variance::float(), Min::non_neg_integer(),
-     Max::non_neg_integer(), Aborts::non_neg_integer()}.
+                  fun((Parent::comm:erl_local_pid()) -> any())) -> ok.
 run_threads(Threads, Bench) ->
     Self = self(),
     TraceMPath = erlang:get(trace_mpath),
@@ -93,31 +132,4 @@ run_threads(Threads, Bench) ->
                                                      erlang:put(trace_mpath, TraceMPath),
                                                      Bench(Self)
                                              end) end),
-    collect(Threads).
-
-% @doc see http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#On-line_algorithm
--spec collect(pos_integer()) ->
-    {Mean::float(), Variance::float(), Min::non_neg_integer(),
-     Max::non_neg_integer(), Aborts::non_neg_integer()}.
-collect(1) ->
-    receive ?SCALARIS_RECV({done, Time, Aborts}, %% ->
-            {Time, 0.0, Time, Time, Aborts})
-    end;
-collect(Threads) ->
-    {Mean, M2, Min, Max, Aborts} =
-        receive ?SCALARIS_RECV({done, Time, TAborts}, %% ->
-                collect(Threads - 1, 1, Time, 0.0, Time, Time, TAborts))
-        end,
-    {Mean, M2 / (Threads - 1), Min, Max, Aborts}.
-
-collect(0, _N, Mean, M2, Min, Max, Aborts) ->
-    {Mean, M2, Min, Max, Aborts};
-collect(ThreadsLeft, N, Mean, M2, Min, Max, AggAborts) ->
-    receive ?SCALARIS_RECV({done, Time, Aborts}, %% ->
-          begin
-            Delta = Time - Mean,
-            NewMean = Mean + Delta / (N + 1),
-            collect(ThreadsLeft - 1, N + 1, NewMean, M2 + Delta*(Time - NewMean),
-                    erlang:min(Time, Min), erlang:max(Time, Max), AggAborts + Aborts)
-          end)
-    end.
+    ok.
