@@ -838,10 +838,10 @@ wait_for_bp_leave(Msg, State, _BP_Active = true) ->
                           get_component_state =:= element(2, GetCompStateMsg) ->
                         {[GetCompStateMsg], false}
                 end;
-            _ ->
+            BPQueue ->
                 ?TRACE_BP("~p process queued bp op ~p.~n",
-                          [self(), hd(gc_bpqueue(State))]),
-                {gc_bpqueue(State), true}
+                          [self(), hd(BPQueue)]),
+                {BPQueue, true}
         end,
     T1State = gc_set_bpqueue(State, tl(Queue)),
     T2State = gc_set_bpactive(T1State, true),
