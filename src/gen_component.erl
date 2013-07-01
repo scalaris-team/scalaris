@@ -63,7 +63,7 @@
          change_handler/2, post_op/2]).
 -export([bp_set/3, bp_set_cond/3, bp_set_cond_async/3,
          bp_del/2, bp_del_async/2]).
--export([bp_step/1, bp_cont/1, bp_barrier/1]).
+-export([bp_step/1, bp_cont/1, bp_barrier/1, bp_barrier_release/1]).
 -export([bp_about_to_kill/1]).
 
 -ifdef(with_export_type_support).
@@ -295,6 +295,11 @@ bp_cont(Pid) ->
 -spec bp_barrier(pid()) -> ok.
 bp_barrier(Pid) ->
     Pid ! {'$gen_component', bp, barrier},
+    ok.
+
+-spec bp_barrier_release(pid()) -> ok.
+bp_barrier_release(Pid) ->
+    Pid ! {'$gen_component', bp, barrier_release},
     ok.
 
 %% @doc Brings the given gen_component into a state that is paused in
@@ -744,6 +749,20 @@ on_gc_msg({'$gen_component', bp, bp_del, BPName, Pid} = Msg, UState, GCState) ->
 on_gc_msg({'$gen_component', bp, barrier} = Msg, UState, GCState) ->
     NewGCState = gc_bp_hold_back(GCState, Msg),
     loop(UState, NewGCState);
+on_gc_msg({'$gen_component', bp, barrier_release} = Msg, UState, GCState) ->
+    %% if barrier in front of bp hold back, release it
+    %% start working on bp hold back queue
+    case gc_bpqueue(GCState) of
+        [{'$gen_component', bp, barrier} | _TL] ->
+            case wait_for_bp_leave(Msg, GCState, true) of
+                {drop_single, GCState1} -> ok;
+                GCState1 -> ok
+            end,
+            loop(UState, GCState1);
+        _ -> %% [] or not bp barrier
+            loop(UState, GCState)
+    end;
+
 on_gc_msg({'$gen_component', bp, breakpoint, step, _Stepper} = Msg,
           UState, GCState) ->
     NewGCState = gc_bp_hold_back(GCState, Msg),
@@ -856,6 +875,10 @@ on_bp_req_in_bp(Msg, State,
     wait_for_bp_leave(Msg, State, true);
 on_bp_req_in_bp(Msg, State,
                 {'$gen_component', bp, barrier}, _IsFromQueue) ->
+    %% we are in breakpoint. Consume this bp message
+    wait_for_bp_leave(Msg, State, true);
+on_bp_req_in_bp(Msg, State,
+                {'$gen_component', bp, barrier_release}, _IsFromQueue) ->
     %% we are in breakpoint. Consume this bp message
     wait_for_bp_leave(Msg, State, true);
 on_bp_req_in_bp(Msg, State,
