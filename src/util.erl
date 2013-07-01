@@ -184,9 +184,10 @@ supervisor_kill_childs(SupPid) ->
               end,
               Tables = ets_tables_of(Pid),
               _ = supervisor:terminate_child(SupPid, Id),
+              supervisor:delete_child(SupPid, Id),
               wait_for_process_to_die(Pid),
               _ = [ wait_for_table_to_disappear(Pid, Tab) || Tab <- Tables ],
-              supervisor:delete_child(SupPid, Id)
+              ok
           catch
               % child may not exist any more due to a parallel process terminating it
               exit:{killed, _} -> ok;
