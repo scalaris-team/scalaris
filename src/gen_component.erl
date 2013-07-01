@@ -64,6 +64,7 @@
 -export([bp_set/3, bp_set_cond/3, bp_set_cond_async/3,
          bp_del/2, bp_del_async/2]).
 -export([bp_step/1, bp_cont/1, bp_barrier/1]).
+-export([bp_about_to_kill/1]).
 
 -ifdef(with_export_type_support).
 -export_type([handler/0]).
@@ -294,6 +295,27 @@ bp_cont(Pid) ->
 -spec bp_barrier(pid()) -> ok.
 bp_barrier(Pid) ->
     Pid ! {'$gen_component', bp, barrier},
+    ok.
+
+%% @doc Brings the given gen_component into a state that is paused in
+%%      preparation of a graceful shutdown of all children of a supervisor.
+%%      Note: A monitor is used to safe-guard the (synchronous) creation of the
+%%      breakpoint in cases of another interfering shutdown process.
+%% @see util:supervisor_terminate_childs/1
+-spec bp_about_to_kill(pid()) -> ok.
+bp_about_to_kill(Pid) ->
+    MonitorRef = erlang:monitor(process, Pid),
+    Pid ! Msg = {'$gen_component', bp, bp_set_cond, fun(_M, _S) -> true end,
+                 about_to_kill, self()},
+    receive
+        Msg -> erlang:demonitor(MonitorRef), ok;
+        {'DOWN', MonitorRef, process, Pid, _Info1} -> ok
+    end,
+    % clear msg queue of DOWN messages, if received:
+    receive
+        {'DOWN', MonitorRef, process, Pid, _Info2} -> ok
+    after 0 -> ok
+    end,
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -143,25 +143,44 @@ supervisor_terminate(SupPid) ->
     wait_for_process_to_die(SupPid),
     ok.
 
+%% @doc Terminates all children of the given supervisor gracefully, i.e. first
+%%      stops all gen_component processes and then terminates all children
+%%      recursively.
 -spec supervisor_terminate_childs(Supervisor::pid() | atom()) -> ok.
 supervisor_terminate_childs(SupPid) ->
+    supervisor_pause_childs(SupPid),
+    supervisor_kill_childs(SupPid),
+    ok.
+
+%% @doc Pauses all children of the given supervisor (recursively) by setting
+%%      an appropriate breakpoint.
+-spec supervisor_pause_childs(Supervisor::pid() | atom()) -> ok.
+supervisor_pause_childs(SupPid) ->
     ChildSpecs = supervisor:which_children(SupPid),
     Self = self(),
     _ = [ begin
-              case gen_component:is_gen_component(Pid) of
-                  true ->
-                      gen_component:bp_set_cond_async(
-                        Pid, fun(_M, _S) -> true end,
-                        about_to_kill);
-                  _ -> ok
-              end
-          end ||  {_Id, Pid, worker, _Module} <- ChildSpecs,
-                  Pid =/= undefined, Pid =/= Self, is_process_alive(Pid) ],
-    _ = [ try
               case Type of
                   supervisor ->
-                      supervisor_terminate_childs(Pid);
-                  _ -> ok
+                      supervisor_pause_childs(Pid);
+                  worker ->
+                      case gen_component:is_gen_component(Pid) of
+                          true -> gen_component:bp_about_to_kill(Pid);
+                          _    -> ok
+                      end
+              end
+          end ||  {_Id, Pid, Type, _Module} <- ChildSpecs,
+                  Pid =/= undefined, Pid =/= Self, is_process_alive(Pid) ],
+    ok.
+
+%% @doc Kills all children of the given supervisor (recursively) after they
+%%      have been paused by supervisor_pause_childs/1.
+-spec supervisor_kill_childs(Supervisor::pid() | atom()) -> ok.
+supervisor_kill_childs(SupPid) ->
+    ChildSpecs = supervisor:which_children(SupPid),
+    _ = [ try
+              case Type of
+                  supervisor -> supervisor_kill_childs(Pid);
+                  worker     -> ok
               end,
               Tables = ets_tables_of(Pid),
               _ = supervisor:terminate_child(SupPid, Id),
