@@ -29,10 +29,10 @@ all() ->
      abort_prepared_w,
      abort_prepared_rc,
      abort_prepared_rmc,
-     abort_prepared_wmc,
-     tm_crash,
-     tp_crash,
-     all_tp_crash
+     abort_prepared_wmc%,
+     %tm_crash,
+     %tp_crash,
+     %all_tp_crash
     ].
 
 suite() -> [{timetrap, {seconds, 120}}].
