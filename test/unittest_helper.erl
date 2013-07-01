@@ -251,7 +251,7 @@ stop_ring(Pid) ->
             error_logger:tty(false),
             error_logger:delete_report_handler(error_logger_log4erl_h),
             log:set_log_level(none),
-            util:supervisor_terminate(main_sup),
+            sup:supervisor_terminate(main_sup),
             catch exit(Pid, kill),
             util:wait_for_process_to_die(Pid),
             stop_pid_groups(),

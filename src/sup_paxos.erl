@@ -73,10 +73,10 @@ childs([{PidGroup, Options}]) ->
                  list_to_atom(PrefixS ++ atom_to_list('_learner'))};
             false -> {paxos_proposer, paxos_acceptor, paxos_learner}
         end,
-    Proposer = util:sup_worker_desc(proposer, proposer,
+    Proposer = sup:worker_desc(proposer, proposer,
                                     start_link, [PidGroup, ProposerName]),
-    Acceptor = util:sup_worker_desc(acceptor, acceptor,
+    Acceptor = sup:worker_desc(acceptor, acceptor,
                                     start_link, [PidGroup, AcceptorName]),
-    Learner = util:sup_worker_desc(learner, learner,
+    Learner = sup:worker_desc(learner, learner,
                                    start_link, [PidGroup, LearnerName]),
     [Proposer, Acceptor, Learner].

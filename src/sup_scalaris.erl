@@ -93,26 +93,26 @@ childs(Options) ->
                           Y -> Y
                       end,
 
-    AdminServer = util:sup_worker_desc(admin_server, admin, start_link),
-    BenchServer = util:sup_worker_desc(bench_server, bench_server, start_link),
-    MgmtServer = util:sup_worker_desc(mgmt_server, mgmt_server, start_link,
+    AdminServer = sup:worker_desc(admin_server, admin, start_link),
+    BenchServer = sup:worker_desc(bench_server, bench_server, start_link),
+    MgmtServer = sup:worker_desc(mgmt_server, mgmt_server, start_link,
                                       [ServiceGroup, []]),
     MgmtServerDNCache =
-        util:sup_worker_desc(deadnodecache, dn_cache, start_link,
+        sup:worker_desc(deadnodecache, dn_cache, start_link,
                              [ServiceGroup]),
     CommLayer =
-        util:sup_supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
+        sup:supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
     CommStats =
-        util:sup_worker_desc(comm_stats, comm_stats, start_link, ["comm_layer"]),
-    Config = util:sup_worker_desc(config, config, start_link, [Options]),
+        sup:worker_desc(comm_stats, comm_stats, start_link, ["comm_layer"]),
+    Config = sup:worker_desc(config, config, start_link, [Options]),
     ClientsDelayer =
-        util:sup_worker_desc(clients_msg_delay, msg_delay, start_link,
+        sup:worker_desc(clients_msg_delay, msg_delay, start_link,
                              ["clients_group"]),
     BasicServicesDelayer =
-        util:sup_worker_desc(basic_services_msg_delay, msg_delay, start_link,
+        sup:worker_desc(basic_services_msg_delay, msg_delay, start_link,
                              [ServiceGroup]),
     ClientsMonitor =
-        util:sup_worker_desc(clients_monitor, monitor, start_link, ["clients_group"]),
+        sup:worker_desc(clients_monitor, monitor, start_link, ["clients_group"]),
     DHTNodeJoinAt = case util:app_get_env(join_at, random) of
                          random -> [];
                          Id     -> [{{dht_node, id}, Id}, {skip_psv_lb}]
@@ -120,40 +120,40 @@ childs(Options) ->
     DhtNodeId = randoms:getRandomString(),
     DHTNodeOptions = DHTNodeJoinAt ++ [{first} | Options], % this is the first dht_node in this VM
     DHTNodeGroup = pid_groups:new("dht_node_"),
-    DHTNode = util:sup_supervisor_desc(DhtNodeId, sup_dht_node, start_link,
+    DHTNode = sup:supervisor_desc(DhtNodeId, sup_dht_node, start_link,
                                        [{DHTNodeGroup, [{my_sup_dht_node_id, DhtNodeId}
                                          | DHTNodeOptions]}]),
-    FailureDetector = util:sup_worker_desc(fd, fd, start_link, [ServiceGroup]),
+    FailureDetector = sup:worker_desc(fd, fd, start_link, [ServiceGroup]),
     Ganglia = case config:read(ganglia_enable) of
-                  true -> util:sup_worker_desc(ganglia_server, ganglia, start_link, [ServiceGroup]);
+                  true -> sup:worker_desc(ganglia_server, ganglia, start_link, [ServiceGroup]);
                   _ -> []
               end,
-    Logger = util:sup_worker_desc(logger, log, start_link),
+    Logger = sup:worker_desc(logger, log, start_link),
     Monitor =
-        util:sup_worker_desc(monitor, monitor, start_link, [ServiceGroup]),
+        sup:worker_desc(monitor, monitor, start_link, [ServiceGroup]),
     Service =
-        util:sup_worker_desc(service_per_vm, service_per_vm, start_link,
+        sup:worker_desc(service_per_vm, service_per_vm, start_link,
                              [ServiceGroup]),
     TraceMPath =
-        util:sup_worker_desc(trace_mpath, trace_mpath, start_link,
+        sup:worker_desc(trace_mpath, trace_mpath, start_link,
                              [ServiceGroup]),
     ProtoSched =
-        util:sup_worker_desc(proto_sched, proto_sched, start_link,
+        sup:worker_desc(proto_sched, proto_sched, start_link,
                              [ServiceGroup]),
     YAWS =
-        util:sup_supervisor_desc(yaws, sup_yaws, start_link, []),
+        sup:supervisor_desc(yaws, sup_yaws, start_link, []),
 
     Top =
-        util:sup_worker_desc(top, top, start_link,
+        sup:worker_desc(top, top, start_link,
                              [ServiceGroup]),
 
-    ServicePaxosGroup = util:sup_supervisor_desc(
+    ServicePaxosGroup = sup:supervisor_desc(
                           sup_service_paxos_group, sup_paxos, start_link,
                           [{ServiceGroup, []}]),
     AutoscaleServer =
         case (config:read(autoscale_server) =:= true) andalso
                  StartMgmtServer of
-            true -> util:sup_worker_desc(autoscale_server, autoscale_server,
+            true -> sup:worker_desc(autoscale_server, autoscale_server,
                                          start_link, [ServiceGroup]);
             _    -> []
         end,

@@ -50,36 +50,36 @@ supspec(_) ->
 -spec childs([pid_groups:groupname()]) ->
                     [ProcessDescr::supervisor:child_spec()].
 childs([DHTNodeGroup]) ->
-    RDHT_tx_read = util:sup_worker_desc(rdht_tx_read, rdht_tx_read, start_link,
+    RDHT_tx_read = sup:worker_desc(rdht_tx_read, rdht_tx_read, start_link,
                                         [DHTNodeGroup]),
-    RDHT_tx_write = util:sup_worker_desc(rdht_tx_write, rdht_tx_write,
+    RDHT_tx_write = sup:worker_desc(rdht_tx_write, rdht_tx_write,
                                          start_link, [DHTNodeGroup]),
-    TX_TM = util:sup_worker_desc(tx_tm, tx_tm_rtm, start_link,
+    TX_TM = sup:worker_desc(tx_tm, tx_tm_rtm, start_link,
                                  [DHTNodeGroup, tx_tm]),
-    TX_TM_Paxos = util:sup_supervisor_desc(
+    TX_TM_Paxos = sup:supervisor_desc(
                     sup_paxos_tm, sup_paxos, start_link,
                     [{DHTNodeGroup, [{sup_paxos_prefix, tx_tm}]}]),
-    TX_RTM0 = util:sup_worker_desc(tx_rtm0, tx_tm_rtm, start_link,
+    TX_RTM0 = sup:worker_desc(tx_rtm0, tx_tm_rtm, start_link,
                                    [DHTNodeGroup, tx_rtm0]),
-    TX_RTM0_Paxos = util:sup_supervisor_desc(
+    TX_RTM0_Paxos = sup:supervisor_desc(
                 sup_paxos_rtm0, sup_paxos, start_link,
                 [{DHTNodeGroup, [{sup_paxos_prefix, tx_rtm0}]}]),
-    TX_RTM1 = util:sup_worker_desc(tx_rtm1, tx_tm_rtm, start_link,
+    TX_RTM1 = sup:worker_desc(tx_rtm1, tx_tm_rtm, start_link,
                                    [DHTNodeGroup, tx_rtm1]),
-    TX_RTM1_Paxos = util:sup_supervisor_desc(
+    TX_RTM1_Paxos = sup:supervisor_desc(
                     sup_paxos_rtm1, sup_paxos, start_link,
                     [{DHTNodeGroup, [{sup_paxos_prefix, tx_rtm1}]}]),
-    TX_RTM2 = util:sup_worker_desc(tx_rtm2, tx_tm_rtm, start_link,
+    TX_RTM2 = sup:worker_desc(tx_rtm2, tx_tm_rtm, start_link,
                                    [DHTNodeGroup, tx_rtm2]),
-    TX_RTM2_Paxos = util:sup_supervisor_desc(
+    TX_RTM2_Paxos = sup:supervisor_desc(
                     sup_paxos_rtm2, sup_paxos, start_link,
                     [{DHTNodeGroup, [{sup_paxos_prefix, tx_rtm2}]}]),
-    TX_RTM3 = util:sup_worker_desc(tx_rtm3, tx_tm_rtm, start_link,
+    TX_RTM3 = sup:worker_desc(tx_rtm3, tx_tm_rtm, start_link,
                                    [DHTNodeGroup, tx_rtm3]),
-    TX_RTM3_Paxos = util:sup_supervisor_desc(
+    TX_RTM3_Paxos = sup:supervisor_desc(
                     sup_paxos_rtm3, sup_paxos, start_link,
                     [{DHTNodeGroup, [{sup_paxos_prefix, tx_rtm3}]}]),
-    TX_TM_New = util:sup_worker_desc(tx_tm_new, tx_tm, start_link,
+    TX_TM_New = sup:worker_desc(tx_tm_new, tx_tm, start_link,
                                  [DHTNodeGroup, tx_tm_new]),
     [
      RDHT_tx_read, RDHT_tx_write,
