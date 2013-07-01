@@ -202,9 +202,10 @@ unpause_node({GroupName, DhtNodeSupChilds}) ->
     % restart the node again:
     _ = [case gen_component:is_gen_component(Pid) of
              true ->
-                 %% all have to reached a breakpoint, otherwise this
+                 %% all have to have reached a breakpoint, otherwise this
                  %% blocks because of the bp_barrier...
-                 %% we do this by sending ping messages
+                 %% -> remove the barrier first (if still present)
+                 gen_component:bp_barrier_release(Pid),
                  gen_component:bp_del_async(Pid, sleep),
                  gen_component:bp_cont(Pid);
              false -> ok
