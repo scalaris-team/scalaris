@@ -453,8 +453,6 @@ tester_type_check_util(_Config) ->
              {split_unique, 4}, %% cannot create funs
              {ssplit_unique, 3}, %% cannot create funs
              {ssplit_unique, 4}, %% cannot create funs
-             {supervisor_terminate, 1}, %% could destroy the system
-             {supervisor_terminate_childs, 1}, %% cannot generate proper gb_trees
              {tc, 1}, {tc, 2}, {tc, 3}, %% don't call arbitrary functions
              {topDumpX, 1},
              {topDumpX, 3},

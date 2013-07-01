@@ -23,7 +23,13 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
--export([sup_start/3]).
+-export([sup_start/3,
+         supervisor_terminate/1,
+         supervisor_terminate_childs/1]).
+-export([worker_desc/3,
+         worker_desc/4,
+         supervisor_desc/3,
+         supervisor_desc/4]).
 
 %% for admin:add_node and unittests
 -export([start_sup_as_child/3]).
@@ -80,7 +86,7 @@ sup_start(Prefix, Supervisor, Module, Options) ->
                    Res; %% return pid of supervisor as it may be linked to externally;
                true ->
                    io:format("Startup raised ~p.~n", [ChildsRes]),
-                   util:supervisor_terminate(SupRef),
+                   sup:supervisor_terminate(SupRef),
                    ChildsRes
             end;
         Error ->
@@ -127,7 +133,7 @@ start_sup_as_child(Prefix, AtSup, SupAsChild) ->
                        true ->
                            io:format("Startup raised ~p.~n", [ChildsRes]),
                            SupName = element(1, SupAsChild),
-                           util:supervisor_terminate_childs(SupRef),
+                           sup:supervisor_terminate_childs(SupRef),
                            _ = supervisor:terminate_child(AtSup, SupName),
                            _ = supervisor:delete_child(AtSup, SupName),
                            ChildsRes
@@ -242,4 +248,98 @@ progress(Fmt) ->
 -spec progress(prefix(), list()) -> ok.
 progress(Fmt, Args) ->
     util:if_verbose(lists:flatten(Fmt), Args),
+    ok.
+
+%% @doc Creates a worker description for a supervisor.
+-spec worker_desc(Name::atom() | string(), Module::module(), Function::atom())
+        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::[]},
+            permanent, brutal_kill, worker, []}.
+worker_desc(Name, Module, Function) ->
+    worker_desc(Name, Module, Function, []).
+
+%% @doc Creates a worker description for a supervisor.
+-spec worker_desc(Name::atom() | string(), Module::module(), Function::atom(), Options::list())
+        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::list()},
+            permanent, brutal_kill, worker, []}.
+worker_desc(Name, Module, Function, Options) ->
+    {Name, {Module, Function, Options}, permanent, brutal_kill, worker, []}.
+
+%% @doc Creates a supervisor description for a supervisor.
+-spec supervisor_desc(Name::atom() | string(), Module::module(), Function::atom())
+        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::[]},
+            permanent, brutal_kill, supervisor, []}.
+supervisor_desc(Name, Module, Function) ->
+    supervisor_desc(Name, Module, Function, []).
+
+%% @doc Creates a supervisor description for a supervisor.
+-spec supervisor_desc(Name::atom() | string(), Module::module(), Function::atom(), Options::list())
+        -> {Name::atom() | string(), {Module::module(), Function::atom(), Options::list()},
+            permanent, brutal_kill, supervisor, []}.
+supervisor_desc(Name, Module, Function, Args) ->
+    {Name, {Module, Function, Args}, permanent, brutal_kill, supervisor, []}.
+
+-spec supervisor_terminate(Supervisor::pid() | atom()) -> ok.
+supervisor_terminate(SupPid) ->
+    supervisor_terminate_childs(SupPid),
+    case is_pid(SupPid) of
+        true -> exit(SupPid, kill);
+        false -> exit(whereis(SupPid), kill)
+    end,
+    util:wait_for_process_to_die(SupPid),
+    ok.
+
+%% @doc Terminates all children of the given supervisor gracefully, i.e. first
+%%      stops all gen_component processes and then terminates all children
+%%      recursively.
+-spec supervisor_terminate_childs(Supervisor::pid() | atom()) -> ok.
+supervisor_terminate_childs(SupPid) ->
+    supervisor_pause_childs(SupPid),
+    supervisor_kill_childs(SupPid),
+    ok.
+
+%% @doc Pauses all children of the given supervisor (recursively) by setting
+%%      an appropriate breakpoint.
+-spec supervisor_pause_childs(Supervisor::pid() | atom()) -> ok.
+supervisor_pause_childs(SupPid) ->
+    ChildSpecs = supervisor:which_children(SupPid),
+    Self = self(),
+    _ = [ begin
+              case Type of
+                  supervisor ->
+                      supervisor_pause_childs(Pid);
+                  worker ->
+                      case gen_component:is_gen_component(Pid) of
+                          true -> gen_component:bp_about_to_kill(Pid);
+                          _    -> ok
+                      end
+              end
+          end ||  {_Id, Pid, Type, _Module} <- ChildSpecs,
+                  Pid =/= undefined, Pid =/= Self, is_process_alive(Pid) ],
+    ok.
+
+%% @doc Kills all children of the given supervisor (recursively) after they
+%%      have been paused by supervisor_pause_childs/1.
+-spec supervisor_kill_childs(Supervisor::pid() | atom()) -> ok.
+supervisor_kill_childs(SupPid) ->
+    ChildSpecs = supervisor:which_children(SupPid),
+    _ = [ try
+              case Type of
+                  supervisor -> supervisor_kill_childs(Pid);
+                  worker     -> ok
+              end,
+              Tables = util:ets_tables_of(Pid),
+              _ = supervisor:terminate_child(SupPid, Id),
+              supervisor:delete_child(SupPid, Id),
+              util:wait_for_process_to_die(Pid),
+              _ = [ util:wait_for_table_to_disappear(Pid, Tab) || Tab <- Tables ],
+              ok
+          catch
+              % child may not exist any more due to a parallel process terminating it
+              exit:{killed, _} -> ok;
+              exit:{noproc, _} -> ok;
+              % exit reason may encapsulate a previous failure
+              exit:{{killed, _}, _} -> ok;
+              exit:{{noproc, _}, _} -> ok
+          end ||  {Id, Pid, Type, _Module} <- ChildSpecs,
+                  Pid =/= undefined, is_process_alive(Pid) ],
     ok.

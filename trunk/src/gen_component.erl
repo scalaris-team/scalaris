@@ -306,7 +306,7 @@ bp_barrier_release(Pid) ->
 %%      preparation of a graceful shutdown of all children of a supervisor.
 %%      Note: A monitor is used to safe-guard the (synchronous) creation of the
 %%      breakpoint in cases of another interfering shutdown process.
-%% @see util:supervisor_terminate_childs/1
+%% @see sup:supervisor_terminate_childs/1
 -spec bp_about_to_kill(pid()) -> ok.
 bp_about_to_kill(Pid) ->
     MonitorRef = erlang:monitor(process, Pid),

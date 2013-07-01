@@ -59,43 +59,43 @@ supspec(_) ->
 childs([{DHTNodeGroup, Options}]) ->
 	Autoscale =
 		case config:read(autoscale) of
-			true -> util:sup_worker_desc(autoscale, autoscale, start_link, [DHTNodeGroup]);
+			true -> sup:worker_desc(autoscale, autoscale, start_link, [DHTNodeGroup]);
 			_ -> []
 		end,
-    Cyclon = util:sup_worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
+    Cyclon = sup:worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
     DC_Clustering =
-        util:sup_worker_desc(dc_clustering, dc_clustering, start_link,
+        sup:worker_desc(dc_clustering, dc_clustering, start_link,
                              [DHTNodeGroup]),
     DeadNodeCache =
-        util:sup_worker_desc(deadnodecache, dn_cache, start_link,
+        sup:worker_desc(deadnodecache, dn_cache, start_link,
                              [DHTNodeGroup]),
     Delayer =
-        util:sup_worker_desc(msg_delay, msg_delay, start_link,
+        sup:worker_desc(msg_delay, msg_delay, start_link,
                              [DHTNodeGroup]),
     Gossip =
-        util:sup_worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
+        sup:worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
     Reregister =
-        util:sup_worker_desc(dht_node_reregister, dht_node_reregister,
+        sup:worker_desc(dht_node_reregister, dht_node_reregister,
                              start_link, [DHTNodeGroup]),
     RoutingTable =
-        util:sup_worker_desc(routing_table, rt_loop, start_link,
+        sup:worker_desc(routing_table, rt_loop, start_link,
                              [DHTNodeGroup]),
     SupDHTNodeCore_AND =
-        util:sup_supervisor_desc(sup_dht_node_core, sup_dht_node_core,
+        sup:supervisor_desc(sup_dht_node_core, sup_dht_node_core,
                                  start_link, [DHTNodeGroup, Options]),
     Vivaldi =
-        util:sup_worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
+        sup:worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
     Monitor =
-        util:sup_worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
+        sup:worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
     MonitorPerf =
-        util:sup_worker_desc(monitor_perf, monitor_perf, start_link, [DHTNodeGroup]),
+        sup:worker_desc(monitor_perf, monitor_perf, start_link, [DHTNodeGroup]),
     RepUpdate =
         case config:read(rrepair_enabled) of
-            true -> util:sup_worker_desc(rrepair, rrepair, start_link, [DHTNodeGroup]);
+            true -> sup:worker_desc(rrepair, rrepair, start_link, [DHTNodeGroup]);
             _ -> []
         end,
     SnapshotLeader =
-        util:sup_worker_desc(snapshot_leader, snapshot_leader, start_link),
+        sup:worker_desc(snapshot_leader, snapshot_leader, start_link),
 	
     lists:flatten([ %% RepUpd may be [] and lists:flatten eliminates this
                     Monitor,

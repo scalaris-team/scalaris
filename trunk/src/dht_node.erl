@@ -138,7 +138,7 @@ on({get_rtm, Source_PID, Key, Process}, State) ->
            Process =/= tx_rtm2 andalso
            Process =/= tx_rtm3 ->
                %% start, if necessary
-               RTM_desc = util:sup_worker_desc(
+               RTM_desc = sup:worker_desc(
                             Process, tx_tm_rtm, start_link,
                             [MyGroup, Process]),
                case supervisor:start_child(SupTx, RTM_desc) of

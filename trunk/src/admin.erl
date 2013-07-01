@@ -52,7 +52,7 @@ add_node_at_id(Id) ->
 add_node(Options) ->
     DhtNodeId = randoms:getRandomString(),
     Group = pid_groups:new("dht_node_"),
-    Desc = util:sup_supervisor_desc(
+    Desc = sup:supervisor_desc(
              DhtNodeId, config:read(dht_node_sup), start_link,
              [{Group,
                [{my_sup_dht_node_id, DhtNodeId} | Options]}]),
@@ -155,7 +155,7 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
                     end
             end;
         false ->
-            util:supervisor_terminate_childs(Pid),
+            sup:supervisor_terminate_childs(Pid),
             _ = supervisor:terminate_child(main_sup, Id),
             supervisor:delete_child(main_sup, Id)
     end.
