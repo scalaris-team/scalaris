@@ -621,24 +621,17 @@ on_unknown_event({web_debug_info, Requestor}, UState, GCState) ->
                                  {"handler", webhelpers:safe_html_string("~.0p", [gc_hand(GCState)])},
                                  {"state", webhelpers:safe_html_string("~.0p", [UState])}]});
 on_unknown_event(UnknownMessage, UState, GCState) ->
-    log:log(error,
-            "~n** Unknown message:~n ~.0p~n"
-            "** Module:~n ~.0p~n"
-            "** Handler:~n ~.0p~n"
-            "** Pid:~n ~p ~.0p~n"
-            "** State:~n ~.0p~n",
-            [UnknownMessage,
-             gc_mod(GCState),
-             gc_hand(GCState),
-             self(), catch pid_groups:group_and_name_of(self()),
-             {UState, GCState}]),
-    case util:is_unittest() of
-        true ->
-            catch tester_global_state:log_last_calls(),
-            ct:abort_current_testcase(unknown_message);
-        _ -> ok
-    end,
-    ok.
+    DbgMsg = "~n** Unknown message:~n ~.0p~n"
+               "** Module:~n ~.0p~n"
+               "** Handler:~n ~.0p~n"
+               "** Pid:~n ~p ~.0p~n"
+               "** State:~n ~.0p~n",
+    DbgVal = [UnknownMessage,
+              gc_mod(GCState),
+              gc_hand(GCState),
+              self(), catch pid_groups:group_and_name_of(self()),
+              {UState, GCState}],
+    log_or_fail(DbgMsg, DbgVal, unknown_message).
 
 on_exception(Msg, Level, Reason, Stacktrace, UState, GCState) ->
     DbgMsg = "~n** Exception:~n ~.0p:~.0p~n"
@@ -657,12 +650,17 @@ on_exception(Msg, Level, Reason, Stacktrace, UState, GCState) ->
               erlang:get(test_server_loc),
               {UState, GCState},
               Stacktrace],
+    log_or_fail(DbgMsg, DbgVal, exception_throw).
+
+-spec log_or_fail(DbgMsg::string(), DbgVal::[term()],
+                  Reason::unknown_message | exception_throw) -> ok.
+log_or_fail(DbgMsg, DbgVal, Reason) ->
     case util:is_unittest() of
         true ->
             % use ct:pal here as logging may have been stopped already
             ct:pal(DbgMsg, DbgVal),
             catch tester_global_state:log_last_calls(),
-            ct:abort_current_testcase(exception_throw);
+            ct:abort_current_testcase(Reason);
         _ ->
             log:log(error, DbgMsg, DbgVal)
     end,
