@@ -916,6 +916,7 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
     NewRT_ext = ?RT:empty_ext(Neighbors),
+    service_per_vm:register_dht_node(node:pidX(Me)),
     dht_node_state:new(NewRT_ext, RMState, DB).
 
 -spec reject_join_response(Succ::node:node_type(), Pred::node:node_type(),

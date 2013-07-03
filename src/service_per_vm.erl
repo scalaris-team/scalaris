@@ -21,16 +21,17 @@
 
 -behaviour(gen_component).
 
--export([dump_node_states/0, kill_nodes/1, get_round_trip/2]).
+-export([dump_node_states/0, kill_nodes/1, get_round_trip/2, register_dht_node/1, deregister_dht_node/1]).
 
 -export([start_link/1, init/1, on/2]).
 
 % state of the module
--type(state() :: ok).
+-type state() :: list(comm:mypid_plain()).
 
 % accepted messages the module
--type(message() :: {get_dht_nodes, Pid::comm:mypid()} |
-                   {delete_node, SupPid::pid(), SupId::nonempty_string()}).
+-type message() :: {get_dht_nodes, ReplyPid :: comm:mypid()} |
+                   {register_dht_node, PidToAdd :: comm:mypid()} |
+                   {deregister_dht_node, PidToRemove :: comm:mypid()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API
@@ -54,6 +55,25 @@ kill_nodes(No) ->
          end || Child <- Childs],
     ok.
 
+% @doc Sends register message to running service_per_vm
+-spec register_dht_node(comm:plain_pid()) -> ok.
+register_dht_node(Pid) ->
+    case get_service() of
+        failed -> ok;
+        Service ->  comm:send_local(Service, {register_dht_node, Pid})
+    end,
+    ok.
+
+% @doc Sends deregister message to running service_per_vm
+-spec deregister_dht_node(comm:plain_pid()) -> ok.
+deregister_dht_node(Pid) ->
+    case get_service() of
+        failed -> ok;
+        Service ->  comm:send_local(Service, {deregister_dht_node, Pid})
+    end,
+    ok.
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Server process
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -66,34 +86,37 @@ start_link(ServiceGroup) ->
 
 -spec init(any()) -> state().
 init(_Arg) ->
-    ok.
+    [].
 
--spec on(Message::message(), State::state()) -> state().
-on({get_dht_nodes, Pid}, ok) ->
+-spec on(Message :: message(), State :: state()) -> state().
+
+% @doc registers a dht node
+on({register_dht_node, Pid}, State) ->
+    [comm:make_global(Pid) | State];
+
+% @doc de-registers a dht node
+on({deregister_dht_node, Pid}, State) ->
+    [Node || Node <- State, Node /= comm:make_global(Pid)];
+
+% @doc replies with the list of registered dht nodes
+on({get_dht_nodes, Pid}, State) ->
     case comm:is_valid(Pid) of
         true ->
-            Nodes = get_live_dht_nodes(),
-            comm:send(Pid, {get_dht_nodes_response, Nodes});
+            comm:send(Pid, {get_dht_nodes_response, State});
         false ->
             ok
     end,
-    ok;
+    State;
 
-on({delete_node, SupPid, SupId}, ok) ->
+on({delete_node, SupPid, SupId}, State) ->
     sup:supervisor_terminate_childs(SupPid),
     _ = supervisor:terminate_child(main_sup, SupId),
     _ = supervisor:delete_child(main_sup, SupId),
-    ok;
+    State;
 
 % message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
-on({hi}, ok) ->
-    ok.
-
--spec get_live_dht_nodes() -> [comm:mypid()].
-get_live_dht_nodes() ->
-    DhtModule = config:read(dht_node),
-    [comm:make_global(Pid) || Pid <- pid_groups:find_all(dht_node),
-                              DhtModule:is_alive(gen_component:get_state(Pid))].
+on({hi}, State) ->
+    State.
 
 -spec get_round_trip(GPid::comm:mypid(), Iterations::pos_integer()) -> float().
 get_round_trip(GPid, Iterations) ->
@@ -109,3 +132,7 @@ get_round_trip_helper(GPid, Iterations) ->
     comm:send(GPid, {ping, comm:this()}),
     receive _Any -> ok end,
     get_round_trip_helper(GPid, Iterations - 1).
+
+-spec get_service() -> comm:mypid() | failed.
+get_service() ->
+    pid_groups:find_a(service_per_vm).
