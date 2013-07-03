@@ -204,8 +204,6 @@ unpause_node({GroupName, DhtNodeSupChilds}) ->
              true ->
                  %% all have to have reached a breakpoint, otherwise this
                  %% blocks because of the bp_barrier...
-                 %% -> remove the barrier first (if still present)
-                 gen_component:bp_barrier_release(Pid),
                  gen_component:bp_del_async(Pid, sleep),
                  gen_component:bp_cont(Pid);
              false -> ok
