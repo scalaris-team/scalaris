@@ -63,7 +63,7 @@
          change_handler/2, post_op/2]).
 -export([bp_set/3, bp_set_cond/3, bp_set_cond_async/3,
          bp_del/2, bp_del_async/2]).
--export([bp_step/1, bp_cont/1, bp_barrier/1, bp_barrier_release/1]).
+-export([bp_step/1, bp_cont/1, bp_barrier/1]).
 -export([bp_about_to_kill/1]).
 
 -ifdef(with_export_type_support).
@@ -297,11 +297,6 @@ bp_barrier(Pid) ->
     Pid ! {'$gen_component', bp, barrier},
     ok.
 
--spec bp_barrier_release(pid()) -> ok.
-bp_barrier_release(Pid) ->
-    Pid ! {'$gen_component', bp, barrier_release},
-    ok.
-
 %% @doc Brings the given gen_component into a state that is paused in
 %%      preparation of a graceful shutdown of all children of a supervisor.
 %%      Note: A monitor is used to safe-guard the (synchronous) creation of the
@@ -310,8 +305,10 @@ bp_barrier_release(Pid) ->
 -spec bp_about_to_kill(pid()) -> ok.
 bp_about_to_kill(Pid) ->
     MonitorRef = erlang:monitor(process, Pid),
-    Pid ! Msg = {'$gen_component', bp, bp_set_cond, fun(_M, _S) -> true end,
-                 about_to_kill, self()},
+    % suspend gen_component independently from break points being set/active
+    % (60s should be enough for the sub-sequent kill)
+    % see sup:supervisor_terminate_childs/1
+    Pid ! Msg = {'$gen_component', sleep, 60000, self()},
     receive
         Msg -> erlang:demonitor(MonitorRef), ok;
         {'DOWN', MonitorRef, process, Pid, _Info1} -> ok
@@ -710,6 +707,10 @@ on_gc_msg({'$gen_component', bp, msg_in_bp_waiting, Pid}, UState, GCState) ->
 on_gc_msg({'$gen_component', sleep, Time}, UState, GCState) ->
     timer:sleep(Time),
     loop(UState, GCState);
+on_gc_msg({'$gen_component', sleep, Time, Pid} = Msg, UState, GCState) ->
+    comm:send_local(Pid, Msg),
+    timer:sleep(Time),
+    loop(UState, GCState);
 on_gc_msg({'$gen_component', get_state, Pid}, UState, GCState) ->
     comm:send_local(
       Pid, {'$gen_component', get_state_response, UState}),
@@ -749,19 +750,6 @@ on_gc_msg({'$gen_component', bp, bp_del, BPName, Pid} = Msg, UState, GCState) ->
 on_gc_msg({'$gen_component', bp, barrier} = Msg, UState, GCState) ->
     NewGCState = gc_bp_hold_back(GCState, Msg),
     loop(UState, NewGCState);
-on_gc_msg({'$gen_component', bp, barrier_release} = Msg, UState, GCState) ->
-    %% if barrier in front of bp hold back, release it
-    %% start working on bp hold back queue
-    case gc_bpqueue(GCState) of
-        [{'$gen_component', bp, barrier} | _TL] ->
-            case wait_for_bp_leave(Msg, GCState, true) of
-                {drop_single, GCState1} -> ok;
-                GCState1 -> ok
-            end,
-            loop(UState, GCState1);
-        _ -> %% [] or not bp barrier
-            loop(UState, GCState)
-    end;
 
 on_gc_msg({'$gen_component', bp, breakpoint, step, _Stepper} = Msg,
           UState, GCState) ->
@@ -878,10 +866,6 @@ on_bp_req_in_bp(Msg, State,
     %% we are in breakpoint. Consume this bp message
     wait_for_bp_leave(Msg, State, true);
 on_bp_req_in_bp(Msg, State,
-                {'$gen_component', bp, barrier_release}, _IsFromQueue) ->
-    %% we are in breakpoint. Consume this bp message
-    wait_for_bp_leave(Msg, State, true);
-on_bp_req_in_bp(Msg, State,
                 {'$gen_component', bp, bp_set_cond, Cond, BPName, Pid} = BPMsg,
                 IsFromQueue) ->
     NextState =
@@ -919,6 +903,12 @@ on_bp_req_in_bp(Msg, State,
                 _IsFromQueue) ->
     comm:send_local(
       Pid, {'$gen_component', get_component_state_response, State}),
+    wait_for_bp_leave(Msg, State, true);
+on_bp_req_in_bp(Msg, State,
+                {'$gen_component', sleep, Time, Pid} = SleepMsg,
+                _IsFromQueue) ->
+    comm:send_local(Pid, SleepMsg),
+    timer:sleep(Time),
     wait_for_bp_leave(Msg, State, true).
 
 
