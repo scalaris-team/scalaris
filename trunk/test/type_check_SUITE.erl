@@ -36,6 +36,7 @@ all()   -> [
             tester_type_check_node,
             tester_type_check_paxos,
             tester_type_check_tx,
+            tester_type_check_rdht_tx,
             tester_type_check_util
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
@@ -277,6 +278,55 @@ tester_type_check_tx(_Config) ->
     tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
     tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
     Modules =
+        [ {tx_op_beh,[], []},
+          {tx_tlog,
+           [ {new_entry, 5}, %% TODO: some combinations of value types are not allowed
+             {new_entry, 6}, %% TODO: some combinations of value types are not allowed
+             {new_entry, 7}, %% TODO: some combinations of value types are not allowed
+             {set_entry_key, 2}, %% split tlog types for client and rt:keys
+             {set_entry_operation, 2}, %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
+             {set_entry_value, 3} %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
+           ],
+           [ {first_req_for_key, 4} %% no type spec available (a 1-element list may not be specified anyway)
+           ]},
+          {tx_tm_rtm,
+           [ {commit, 4},
+             {get_my, 2},
+             {init, 1},
+             {msg_commit_reply, 3},
+             {on,2},
+             {on_init,2},
+             {start_link,2}
+           ],
+           [ {get_paxos_ids, 2}, %% requires item entries in dictionary
+             {msg_tp_do_commit_abort,3}, %% tries to send
+             {init_RTMs, 2}, %% tries to send
+             {init_TPs, 2}, %% tries to send
+             {inform_client, 3}, %% tries to send
+             {inform_rtms, 3}, %% tries to send
+             {inform_tps, 3}, %% tries to send
+             {send_to_rtms, 2}, %% tries to send
+             {state_subscribe, 2}, %% tries to create pids / envelopes
+             {state_unsubscribe, 2}, %% tries to create pids / envelopes
+             {merge_item_states, 6}, %% needs specially-crafted lists
+             {tx_item_new, 3}, %% TODO: not a list error
+             {tx_item_new, 5} %% TODO invalid result type
+           ]}
+          %% {tx_tp,[{init, 0}, {on_do_commit_abort_fwd, 6},
+          %% {on_do_commit_abort, 3}, {on_init_TP, 2}]},
+        ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_type_checker({typedef, rdht_tx, encoded_value}),
+    tester:unregister_value_creator({typedef, rdht_tx, encoded_value}),
+    true.
+
+tester_type_check_rdht_tx(_Config) ->
+    Count = 1000,
+    config:write(no_print_ring_data, true),
+    tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
+    tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
+    Modules =
         [ {rdht_tx,
            [ {decode_value, 1} ], %% not every binary is an erlterm
            [ {collect_replies,2}, %% recv msgs
@@ -320,43 +370,7 @@ tester_type_check_tx(_Config) ->
           {rdht_tx_test_and_set,
            [ {extract_from_tlog, 5}, %% tested via feeder
              {work_phase, 3}
-           ], []},
-          {tx_op_beh,[], []},
-          {tx_tlog,
-           [ {new_entry, 5}, %% TODO: some combinations of value types are not allowed
-             {new_entry, 6}, %% TODO: some combinations of value types are not allowed
-             {new_entry, 7}, %% TODO: some combinations of value types are not allowed
-             {set_entry_key, 2}, %% split tlog types for client and rt:keys
-             {set_entry_operation, 2}, %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
-             {set_entry_value, 3} %% may violate type spec (?partial_value in ?write op) (TODO: prevent via feeder)
-           ],
-           [ {first_req_for_key, 4} %% no type spec available (a 1-element list may not be specified anyway)
-           ]},
-          {tx_tm_rtm,
-           [ {commit, 4},
-             {get_my, 2},
-             {init, 1},
-             {msg_commit_reply, 3},
-             {on,2},
-             {on_init,2},
-             {start_link,2}
-           ],
-           [ {get_paxos_ids, 2}, %% requires item entries in dictionary
-             {msg_tp_do_commit_abort,3}, %% tries to send
-             {init_RTMs, 2}, %% tries to send
-             {init_TPs, 2}, %% tries to send
-             {inform_client, 3}, %% tries to send
-             {inform_rtms, 3}, %% tries to send
-             {inform_tps, 3}, %% tries to send
-             {send_to_rtms, 2}, %% tries to send
-             {state_subscribe, 2}, %% tries to create pids / envelopes
-             {state_unsubscribe, 2}, %% tries to create pids / envelopes
-             {merge_item_states, 6}, %% needs specially-crafted lists
-             {tx_item_new, 3}, %% TODO: not a list error
-             {tx_item_new, 5} %% TODO invalid result type
-           ]}
-          %% {tx_tp,[{init, 0}, {on_do_commit_abort_fwd, 6},
-          %% {on_do_commit_abort, 3}, {on_init_TP, 2}]},
+           ], []}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
