@@ -126,9 +126,15 @@ write(Key, Value) ->
             log:log("~p write hangs at key ~p, ~p~n",
                     [self(), Key, erlang:process_info(self(), messages)]),
             receive
-                ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value}, {ok}); %%;
+                ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value},
+                               begin
+                                   log:log("~p write was only slow at key ~p~n",
+                                           [self(), Key]),
+                                   {ok}
+                               end); %%;
                 ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},
-                               begin log:log("Write failed: ~p~n", [Reason]),
+                               begin log:log("~p Write failed: ~p~n",
+                                             [self(), Reason]),
                                      {ok} end)
                 end
     end.
