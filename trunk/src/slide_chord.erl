@@ -92,10 +92,7 @@ change_my_id(State, SlideOp, ReplyPid) ->
 %%             vivaldi:deactivate(),
             cyclon:deactivate(),
             rt_loop:deactivate(),
-            case pid_groups:get_my(dht_node) of
-                failed -> ok;
-                Pid -> service_per_vm:deregister_dht_node(Pid)
-            end,
+            service_per_vm:deregister_dht_node(comm:this()),
             {ok, State1, SlideOp2};
         _ ->
             % note: subscribe with fully qualified function names, i.e. module:fun/arity

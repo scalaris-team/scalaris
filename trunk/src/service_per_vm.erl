@@ -26,7 +26,7 @@
 -export([start_link/1, init/1, on/2]).
 
 % state of the module
--type state() :: list(comm:mypid_plain()).
+-type state() :: [comm:mypid()].
 
 % accepted messages the module
 -type message() :: {get_dht_nodes, ReplyPid :: comm:mypid()} |
@@ -59,19 +59,17 @@ kill_nodes(No) ->
 -spec register_dht_node(comm:plain_pid()) -> ok.
 register_dht_node(Pid) ->
     case get_service() of
-        failed -> ok;
-        Service ->  comm:send_local(Service, {register_dht_node, Pid})
-    end,
-    ok.
+        failed  -> ok;
+        Service -> comm:send_local(Service, {register_dht_node, Pid})
+    end.
 
 % @doc Sends deregister message to running service_per_vm
 -spec deregister_dht_node(comm:plain_pid()) -> ok.
 deregister_dht_node(Pid) ->
     case get_service() of
-        failed -> ok;
-        Service ->  comm:send_local(Service, {deregister_dht_node, Pid})
-    end,
-    ok.
+        failed  -> ok;
+        Service -> comm:send_local(Service, {deregister_dht_node, Pid})
+    end.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
