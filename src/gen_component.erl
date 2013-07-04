@@ -310,13 +310,8 @@ bp_about_to_kill(Pid) ->
     % see sup:supervisor_terminate_childs/1
     Pid ! Msg = {'$gen_component', sleep, 60000, self()},
     receive
-        Msg -> erlang:demonitor(MonitorRef), ok;
+        Msg -> erlang:demonitor(MonitorRef, [flush]), ok;
         {'DOWN', MonitorRef, process, Pid, _Info1} -> ok
-    end,
-    % clear msg queue of DOWN messages, if received:
-    receive
-        {'DOWN', MonitorRef, process, Pid, _Info2} -> ok
-    after 0 -> ok
     end,
     ok.
 
