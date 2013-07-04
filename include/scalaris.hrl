@@ -124,8 +124,7 @@
 %%         binary_to_term(SnappyMsg)
 %%        ).
 
-
--define(SCALARIS_RECV(X,Y),
+-define(SCALARIS_RECV_PRODUCTION(X,Y),
         {'$gen_component', trace_mpath,
          _ScalPState, _ScalFrom, _ScalTo, X = _ScalMsg} ->
                trace_mpath:log_recv(_ScalPState, _ScalFrom, _ScalTo, _ScalMsg),
@@ -140,6 +139,44 @@
                Y;
             X -> Y
         ).
+
+-define(SCALARIS_RECV_DEBUG(X,Y),
+        {'$gen_component', trace_mpath,
+         _ScalPState, _ScalFrom, _ScalTo, X = _ScalMsg} ->
+               trace_mpath:log_recv(_ScalPState, _ScalFrom, _ScalTo, _ScalMsg),
+               case erlang:get(trace_mpath) of
+                   undefined ->
+                       ok;
+                   _ ->
+                       trace_mpath:log_info(_ScalPState, _ScalTo, {scalaris_recv, "SCALARIS_RECV at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE}),
+                       %% report done for proto_sched to go on...
+                       trace_mpath:log_info(_ScalPState, _ScalTo, {gc_on_done, scalaris_recv})
+               end,
+               case gen_component:is_gen_component(self())
+                   andalso ({current_function, {pid_groups, add, 3}}
+                            =/=  process_info(self(), current_function)) of
+                   false -> ok;
+                   true ->
+                       log:log("?SCALARIS_RECV not allowed inside a gen_component ~p",
+                               [process_info(self(), current_function)]),
+                       erlang:error(scalaris_recv_in_gen_component)
+               end,
+               Y;
+            X ->
+               case gen_component:is_gen_component(self())
+                   andalso ({current_function, {pid_groups, add, 3}}
+                            =/=  process_info(self(), current_function)) of
+                   false -> ok;
+                   true ->
+                       log:log("?SCALARIS_RECV not allowed inside a gen_component ~p",
+                               [process_info(self(), current_function)]),
+                       erlang:error(scalaris_recv_in_gen_component)
+               end,
+               Y
+        ).
+
+-define(SCALARIS_RECV(X,Y), ?SCALARIS_RECV_PRODUCTION(X, Y)).
+%-define(SCALARIS_RECV(X,Y), ?SCALARIS_RECV_DEBUG(X, Y)).
 
 -define(IIF(C, A, B), case C of
                           true -> A;
