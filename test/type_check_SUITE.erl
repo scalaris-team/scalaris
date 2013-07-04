@@ -63,7 +63,7 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 tester_type_check_api(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
@@ -81,7 +81,7 @@ tester_type_check_api(_Config) ->
           {api_monitor, [], []},
           {api_pubsub, [], []},
           {api_rdht, [], [ {delete_collect_results, 3} ]}, %% receives
-          {api_tx, 
+          {api_tx,
            [ {get_system_snapshot, 0} %% receives msgs
            ], []}
         ],
@@ -92,7 +92,7 @@ tester_type_check_api(_Config) ->
     true.
 
 tester_type_check_config(_Config) ->
-    Count = 1000,
+    Count = 500,
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {config,
@@ -120,7 +120,7 @@ tester_type_check_config(_Config) ->
     true.
 
 tester_type_check_gossip(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     Modules =
         [ {gossip_state, [], []}
@@ -130,7 +130,7 @@ tester_type_check_gossip(_Config) ->
     true.
 
 tester_type_check_math(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
@@ -195,7 +195,7 @@ tester_type_check_math(_Config) ->
     true.
 
 tester_type_check_node(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     Modules =
         [
@@ -227,7 +227,7 @@ tester_type_check_node(_Config) ->
     true.
 
 tester_type_check_paxos(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     Modules =
         [ {acceptor,
@@ -273,7 +273,7 @@ tester_type_check_paxos(_Config) ->
     true.
 
 tester_type_check_tx(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
     tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
@@ -322,7 +322,7 @@ tester_type_check_tx(_Config) ->
     true.
 
 tester_type_check_rdht_tx(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
     tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
@@ -379,7 +379,7 @@ tester_type_check_rdht_tx(_Config) ->
     true.
 
 tester_type_check_util(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
