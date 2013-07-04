@@ -329,7 +329,7 @@ supervisor_kill_childs(SupPid) ->
               end,
               Tables = util:ets_tables_of(Pid),
               _ = supervisor:terminate_child(SupPid, Id),
-              supervisor:delete_child(SupPid, Id),
+              _ = supervisor:delete_child(SupPid, Id),
               util:wait_for_process_to_die(Pid),
               _ = [ util:wait_for_table_to_disappear(Pid, Tab) || Tab <- Tables ],
               ok
