@@ -13,7 +13,7 @@
 #    limitations under the License.
 
 import httplib, urlparse, base64, urllib
-import os, threading, numbers
+import os, threading, numbers, socket
 from datetime import datetime, timedelta
 try: import simplejson as json
 except ImportError: import json
@@ -23,8 +23,6 @@ if 'SCALARIS_JSON_URL' in os.environ and os.environ['SCALARIS_JSON_URL'] != '':
 else:
     DEFAULT_URL = 'http://localhost:8000'
 """default URL and port to a scalaris node"""
-DEFAULT_TIMEOUT = 5
-"""socket timeout in seconds"""
 DEFAULT_PATH = '/jsonrpc.yaws'
 """path to the json rpc page"""
 
@@ -33,7 +31,7 @@ class JSONConnection(object):
     Abstracts connections to scalaris using JSON
     """
     
-    def __init__(self, url = DEFAULT_URL, timeout = DEFAULT_TIMEOUT):
+    def __init__(self, url = DEFAULT_URL, timeout = socket.getdefaulttimeout()):
         """
         Creates a JSON connection to the given URL using the given TCP timeout
         """
