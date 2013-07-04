@@ -50,6 +50,12 @@
           <monitoring:unit>Millisecond</monitoring:unit>
           <monitoring:unit_label>Average latency of transactions aggregated over the whole system</monitoring:unit_label>
         </monitoring:monitoring_instruction>
+        <monitoring:monitoring_instruction>
+          <monitoring:id>ScalarisService_LoadEstimate</monitoring:id>
+          <monitoring:metric>Physical memory</monitoring:metric>
+          <monitoring:unit>Count</monitoring:unit>
+          <monitoring:unit_label>Number of overall stored items (estimate)</monitoring:unit_label>
+        </monitoring:monitoring_instruction>
       </monitoring:monitoring_section>
     </bp:ext_property>
   </bp:basic_properties_section>
