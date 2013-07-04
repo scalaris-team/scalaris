@@ -26,7 +26,7 @@
 -export([start_link/1, init/1, on/2]).
 
 % state of the module
--type state() :: [comm:mypid()].
+-type state() :: [{MonitorRef::reference(), DhtNode::comm:mypid()}].
 
 % accepted messages the module
 -type message() :: {get_dht_nodes, ReplyPid :: comm:mypid()} |
@@ -55,16 +55,18 @@ kill_nodes(No) ->
          end || Child <- Childs],
     ok.
 
-% @doc Sends register message to running service_per_vm
--spec register_dht_node(comm:plain_pid()) -> ok.
+%% @doc Sends a register message to a running service_per_vm to register a
+%%      local(!) dht_node process.
+-spec register_dht_node(comm:mypid()) -> ok.
 register_dht_node(Pid) ->
     case get_service() of
         failed  -> ok;
         Service -> comm:send_local(Service, {register_dht_node, Pid})
     end.
 
-% @doc Sends deregister message to running service_per_vm
--spec deregister_dht_node(comm:plain_pid()) -> ok.
+%% @doc Sends a deregister message to a running service_per_vm to remove a
+%%      local(!) dht_node process.
+-spec deregister_dht_node(comm:mypid()) -> ok.
 deregister_dht_node(Pid) ->
     case get_service() of
         failed  -> ok;
@@ -90,17 +92,31 @@ init(_Arg) ->
 
 % @doc registers a dht node
 on({register_dht_node, Pid}, State) ->
-    [comm:make_global(Pid) | State];
+    % only local processes may register!
+    MonRef = erlang:monitor(process, comm:make_local(Pid)),
+    [{MonRef, Pid} | State];
 
 % @doc de-registers a dht node
 on({deregister_dht_node, Pid}, State) ->
-    [Node || Node <- State, Node /= comm:make_global(Pid)];
+    case lists:keytake(Pid, 2, State) of
+        {value, {MonRef, Pid}, Rest} ->
+            % allow erlang_demonitor to take its DOWN message off the message
+            % queue if present!
+            erlang:demonitor(MonRef, [flush]),
+            Rest;
+        false -> State
+    end;
+
+on({'DOWN', MonitorRef, process, _LocalPid, _Info1}, State) ->
+    % compare the monitor reference only (it is tied to the Pid and unique)
+    [X || {MonRef, _Node} = X <- State, MonRef =/= MonitorRef];
 
 % @doc replies with the list of registered dht nodes
 on({get_dht_nodes, Pid}, State) ->
     case comm:is_valid(Pid) of
         true ->
-            comm:send(Pid, {get_dht_nodes_response, State});
+            Nodes = [Node || {_MonRef, Node} <- State],
+            comm:send(Pid, {get_dht_nodes_response, Nodes});
         false ->
             ok
     end,
