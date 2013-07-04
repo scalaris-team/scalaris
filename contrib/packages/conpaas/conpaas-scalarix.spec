@@ -63,7 +63,11 @@ Requires:   scalaris >= %{version}
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 Requires:   ruby >= 1.8
 %else
+%if 0%{?fedora_version} >= 19
+Requires:   ruby(release) >= 1.8
+%else
 Requires:   ruby(abi) >= 1.8
+%endif
 %endif
 Requires:   rubygems
 Requires:   rubygem-json >= 1.4.0
@@ -89,7 +93,11 @@ Conflicts:  conpaas-scalarix-one-manager
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 Requires:   ruby >= 1.8
 %else
+%if 0%{?fedora_version} >= 19
+Requires:   ruby(release) >= 1.8
+%else
 Requires:   ruby(abi) >= 1.8
+%endif
 %endif
 Requires:   rubygems
 Requires:   rubygem-json >= 1.4.0
@@ -112,7 +120,11 @@ Conflicts:  scalaris-one-client
 %if 0%{?mandriva_version} || 0%{?mdkversion}
 Requires:   ruby >= 1.8
 %else
+%if 0%{?fedora_version} >= 19
+Requires:   ruby(release) >= 1.8
+%else
 Requires:   ruby(abi) >= 1.8
+%endif
 %endif
 Requires:   rubygems
 Requires:   rubygem-json >= 1.4.0
