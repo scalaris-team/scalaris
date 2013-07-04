@@ -30,7 +30,7 @@
 
 -record(state,
         {load_pid             :: pid() | ok,
-         bench_owner   = ok   :: pid() | ok,
+         bench_owner   = ok   :: comm:mypid() | ok,
          bench_start   = ok   :: erlang_timestamp() | ok,
          bench_threads = 0    :: ThreadsLeft::non_neg_integer(),
          bench_data    = null :: {N::non_neg_integer(), Mean::float(), M2::float(),
@@ -75,8 +75,8 @@ on({done, Time, Aborts},
                   bench_start = BenchStart,
                   bench_threads = BenchThreads,
                   bench_data = BenchData})
-  % see http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#On-line_algorithm
   when BenchOwner =/= ok andalso BenchStart =/= ok andalso BenchThreads > 0 ->
+  % see http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#On-line_algorithm
     NewBenchData =
         case BenchData of
             null ->
