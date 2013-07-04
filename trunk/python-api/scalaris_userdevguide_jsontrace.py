@@ -13,11 +13,11 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import json
+import json, socket
 import scalaris
 
 class ConnectionWithTrace(scalaris.JSONConnection):
-    def __init__(self, url = scalaris.DEFAULT_URL, timeout = scalaris.DEFAULT_TIMEOUT):
+    def __init__(self, url = scalaris.DEFAULT_URL, timeout = socket.getdefaulttimeout()):
         scalaris.JSONConnection.__init__(self, url = scalaris.DEFAULT_URL, timeout = timeout)
 
     def call(self, function, params):
