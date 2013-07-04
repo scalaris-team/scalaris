@@ -68,8 +68,6 @@ module Scalaris
     DEFAULT_URL = 'http://localhost:8000'
   end
   
-  # socket timeout in seconds
-  DEFAULT_TIMEOUT = 5
   # path to the json rpc page
   DEFAULT_PATH = '/jsonrpc.yaws'
   
@@ -163,8 +161,8 @@ module Scalaris
   
   # Abstracts connections to Scalaris using JSON
   class JSONConnection
-    # Creates a JSON connection to the given URL using the given TCP timeout
-    def initialize(url = DEFAULT_URL, timeout = DEFAULT_TIMEOUT)
+    # Creates a JSON connection to the given URL using the given TCP timeout (or default)
+    def initialize(url = DEFAULT_URL, timeout = nil)
       begin
         @uri = URI.parse(url)
         @timeout = timeout
@@ -177,7 +175,9 @@ module Scalaris
     def start
       if @conn == nil or not @conn.started?
         @conn = Net::HTTP.start(@uri.host, @uri.port)
-        @conn.read_timeout = @timeout
+        unless @timeout.nil?
+          @conn.read_timeout = @timeout
+        end
       end
     end
     private :start
