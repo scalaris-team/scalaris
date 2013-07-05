@@ -26,10 +26,14 @@ BuildRequires:  scalaris-java >= 0.5.0+svn4456
 %else
 %define with_tomcat5 1
 %endif
+%if 0%{?fedora_version} >= 19
+%define with_tomcat6 0
+%else
 %if 0%{?centos_version} >= 600 || 0%{?rhel_version} >= 600 || 0%{?fedora_version}
 %define with_tomcat6 1
 %else
 %define with_tomcat6 0
+%endif
 %endif
 %if 0%{?fedora_version} >= 16
 %define with_tomcat7 1
