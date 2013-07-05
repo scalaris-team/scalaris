@@ -72,7 +72,8 @@ on({ganglia_periodic}, State) ->
     send_vivaldi_errors(),
     set_last_active(NewState);
 
-% @doc aggregates load information from the dht nodes
+% @doc aggregates load information from the dht nodes and
+%      and sends it out to ganglia if all nodes have replied
 on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
     ?TRACE("~p: ~p~n", [AggId, Msg]),
     % all went well, we no longer need the failure detector
@@ -88,7 +89,7 @@ on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
         true -> State
     end;
 
-% @doc handler for message from failure detector
+% @doc handler for messages from failure detector
 %      if a node crashes before sending out the load data
 %      we ignore its load information
 on({crash, _PID, {ganglia, AggId}}, State) ->
@@ -101,6 +102,28 @@ on({crash, _PID, {ganglia, AggId}}, State) ->
         true ->
             State
     end;
+
+% @doc receives requested latency and transactions/s
+%      rrd data from the monitor and sends it to Ganglia
+on({get_rrds_response, Response}, State) ->
+    RRDMetrics =
+        case Response of
+            [{_,_, undefined}] -> [];
+            [{_, _, RRD}] ->
+                case rrd:dump(RRD) of
+                    [H | _] ->
+                    {From_, To_, Value} = H,
+                        Diff_in_s = timer:now_diff(To_, From_) div 1000000,
+                        {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
+                        AvgPerS = Count / Diff_in_s,
+                        Avg = Sum / Count,
+                        [{both, "tx latency", "float", Avg, "ms"},
+                         {both, "transactions/s", "float", AvgPerS, "1/s"}];
+                    _ -> []
+                end
+        end,
+    gmetric(RRDMetrics),
+    State;
 
 % @doc handler for messages from the vivaldi process
 %      reporting its confidence
@@ -150,28 +173,12 @@ send_message_metrics() ->
 
 -spec send_rrd_metrics() -> ok.
 send_rrd_metrics() ->
-    % Statistics in RRD (Load, Latency)
-    RRDMetrics =
-        case pid_groups:pid_of("clients_group", monitor) of
-            failed -> [];
-            ClientMonitor ->
-                case monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]) of
-                    [{_,_, undefined}] -> [];
-                    [{_, _, RRD}] ->
-                        case rrd:dump(RRD) of
-                            [H | _] ->
-                                {From_, To_, Value} = H,
-                                Diff_in_s = timer:now_diff(To_, From_) div 1000000,
-                                {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
-                                AvgPerS = Count / Diff_in_s,
-                                Avg = Sum / Count,
-                                [{both, "tx latency", "float", Avg, "ms"},
-                                 {both, "transactions/s", "float", AvgPerS, "1/s"}];
-                            _ -> []
-                        end
-                end
-        end,
-    gmetric(RRDMetrics).
+    case pid_groups:pid_of("clients_group", monitor) of
+        failed -> ok;
+        ClientMonitor ->
+            % Request statistics in RRD (Load, Latency)
+            comm:send_local(ClientMonitor, {get_rrds, [{api_tx, 'req_list'}], comm:this()})
+    end.
 
 -spec send_vivaldi_errors() -> ok.
 send_vivaldi_errors() ->
