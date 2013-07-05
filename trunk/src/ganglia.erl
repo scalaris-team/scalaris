@@ -28,7 +28,7 @@
 -export([start_link/1, init/1, on/2]).
 
 -define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), io:format(X, Y)).
+%define(TRACE(X,Y), io:format(X, Y)).
 
 -type load_aggregation() :: {AggId :: non_neg_integer(),
                              Pending :: non_neg_integer(),
@@ -72,8 +72,8 @@ on({ganglia_periodic}, State) ->
     send_vivaldi_errors(),
     set_last_active(NewState);
 
-% @doc aggregates load information from the dht nodes and
-%      and sends it out to ganglia if all nodes have replied
+%% @doc aggregates load information from the dht nodes and
+%%     and sends it out to ganglia if all nodes have replied
 on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
     ?TRACE("~p: ~p~n", [AggId, Msg]),
     % all went well, we no longer need the failure detector
@@ -81,17 +81,17 @@ on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
     {get_node_details_response, [{load, Load}]} = Msg,
     CurAggId = get_agg_id(State),
     if
-        % check for correct aggregation id
+        %% check for correct aggregation id
         AggId == CurAggId  ->
             NewState = set_agg_load(Load, State),
             agg_check_pending(NewState);
-        % otherwise drop this message
+        %% otherwise drop this message
         true -> State
     end;
 
-% @doc handler for messages from failure detector
-%      if a node crashes before sending out the load data
-%      we ignore its load information
+%% @doc handler for messages from failure detector
+%%     if a node crashes before sending out the load data
+%%     we ignore its load information
 on({crash, _PID, {ganglia, AggId}}, State) ->
     ?TRACE("Node failed~n",[]),
     CurAggId = get_agg_id(State),
@@ -103,8 +103,8 @@ on({crash, _PID, {ganglia, AggId}}, State) ->
             State
     end;
 
-% @doc receives requested latency and transactions/s
-%      rrd data from the monitor and sends it to Ganglia
+%% @doc receives requested latency and transactions/s
+%%     rrd data from the monitor and sends it to Ganglia
 on({get_rrds_response, Response}, State) ->
     RRDMetrics =
         case Response of
@@ -125,8 +125,8 @@ on({get_rrds_response, Response}, State) ->
     gmetric(RRDMetrics),
     State;
 
-% @doc handler for messages from the vivaldi process
-%      reporting its confidence
+%% @doc handler for messages from the vivaldi process
+%%     reporting its confidence
 on({ganglia_vivaldi_confidence, DHTName, Msg}, State) ->
     {vivaldi_get_coordinate_response, _, Confidence} = Msg,
     _ = gmetric(both, lists:flatten(io_lib:format("vivaldi_confidence_~s", [DHTName])), "float", Confidence, "Confidence"),
@@ -142,18 +142,18 @@ send_general_metrics() ->
     _ = gmetric(both, "Memory used by system", "int32", erlang:memory(system), "Bytes"),
     ok.
 
-% @doc aggregate the number of key-value pairs
-%      and the amount of memory for this VM
+%%@doc aggregate the number of key-value pairs
+%%     and the amount of memory for this VM
 -spec send_dht_node_metrics(state()) -> state().
 send_dht_node_metrics(State) ->
     DHTNodes = pid_groups:find_all(dht_node),
     AggId = get_agg_id(State),
-    % Memory Usage of DHT Nodes
+    %% Memory Usage of DHT Nodes
     MemoryUsage = lists:sum([element(2, erlang:process_info(P, memory))
                              || P <- DHTNodes]),
     _ = gmetric(both, "Memory used by dht_nodes", "int32", MemoryUsage, "Bytes"),
-    % Query DHT Nodes for load, let them reply to the on handler ganglia_dht_node_reply
-    % The FD tells us if a node is down
+    %% Query DHT Nodes for load, let them reply to the on handler ganglia_dht_node_reply
+    %% The FD tells us if a node is down
     lists:foreach(fun (PID) ->
                           GlobalPID = comm:make_global(PID),
                           %% Let the failure detector inform ganglia about crashes of this DHT node
@@ -176,7 +176,7 @@ send_rrd_metrics() ->
     case pid_groups:pid_of("clients_group", monitor) of
         failed -> ok;
         ClientMonitor ->
-            % Request statistics in RRD (Load, Latency)
+            %% Request statistics in RRD (Load, Latency)
             comm:send_local(ClientMonitor, {get_rrds, [{api_tx, 'req_list'}], comm:this()})
     end.
 
@@ -236,9 +236,9 @@ agg_check_pending(State) ->
     end.
 
 
--spec get_last_active(state()) -> non_neg_integer().
-get_last_active(State) ->
-    element(1, State).
+%% -spec get_last_active(state()) -> non_neg_integer().
+%% get_last_active(State) ->
+%%     element(1, State).
 
 -spec set_last_active(state()) -> state().
 set_last_active(State) ->
