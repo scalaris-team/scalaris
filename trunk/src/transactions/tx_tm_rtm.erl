@@ -774,14 +774,16 @@ init_TPs(TxState, ItemStates) ->
     CleanRTMs = [ X || {X} <- rtms_get_rtmpids(RTMs) ],
     Accs = [ X || {X} <- rtms_get_accpids(RTMs) ],
     TM = comm:this(),
+    % ugly hack to find out the dht_node's snapshot number
+    % TODO: let dht_node inform the tx_tm_rtm about snapshot number changes
+    %       and maintain snapshot number in local state
+    {_, Dict} = erlang:process_info(pid_groups:get_my(dht_node), dictionary),
+    {_, LocalSnapNumber} = lists:keyfind("local_snap_number", 1, Dict),
     _ = [ begin
           %% ItemState = lists:keyfind(ItemId, 1, ItemStates),
           ItemId = tx_item_get_itemid(ItemState),
           [ begin
                 Key = tx_tlog:get_entry_key(RTLog),
-                % hack to find out the dht_node's snapshot number
-                {_,Dict} = erlang:process_info(pid_groups:get_my(dht_node), dictionary),
-                {_,LocalSnapNumber} = lists:keyfind("local_snap_number", 1, Dict),
                 Msg1 = {?init_TP, {Tid, CleanRTMs, Accs, TM,
                                    tx_tlog:drop_value(RTLog), ItemId, PaxId, 
                                    LocalSnapNumber}},
