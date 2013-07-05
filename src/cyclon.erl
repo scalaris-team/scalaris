@@ -32,10 +32,9 @@
 
 -export([start_link/1]).
 
-% functions gen_component, the trigger and the config module use
+% functions gen_component and the config module use
 -export([init/1, on_inactive/2, on_active/2,
          activate/0, deactivate/0,
-         get_shuffle_interval/0,
          rm_send_changes/4,
          check_config/0]).
 
@@ -147,7 +146,7 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> state_inactive().
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, fun get_shuffle_interval/0, cy_shuffle),
+    TriggerState = trigger:init(Trigger, get_shuffle_interval(), cy_shuffle),
     {inactive, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

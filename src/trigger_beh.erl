@@ -27,8 +27,8 @@
 -ifdef(have_callback_support).
 -type state() :: term().
 
--callback init(BaseIntervalFun::trigger:interval_fun(), MinIntervalFun::trigger:interval_fun(),
-               MaxIntervalFun::trigger:interval_fun(), comm:msg_tag()) -> state().
+-callback init(BaseInterval::trigger:interval_time(), MinInterval::trigger:interval_time(),
+               MaxInterval::trigger:interval_time(), comm:msg_tag()) -> state().
 -callback now(state()) -> state().
 -callback next(state(), IntervalTag::trigger:interval()) -> state().
 -callback stop(state()) -> state().

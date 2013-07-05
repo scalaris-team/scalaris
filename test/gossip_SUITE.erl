@@ -821,7 +821,7 @@ get_ptrigger_nodelay() ->
     get_ptrigger_delay(0).
 
 get_ptrigger_delay(Delay) ->
-    trigger:init('trigger_periodic', fun () -> Delay end, 'gossip_trigger').
+    trigger:init('trigger_periodic', Delay, 'gossip_trigger').
 
 -spec fake_node(RegisterGroup::pid_groups:groupname(), RegisterName::pid_groups:pidname()) -> pid().
 fake_node(RegisterGroup, RegisterName) ->

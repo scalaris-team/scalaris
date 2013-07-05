@@ -72,7 +72,7 @@
 % functions gen_component, the trigger and the config module use
 -export([init/1, on_inactive/2, on_active/2,
          activate/1, deactivate/0,
-         get_base_interval/0, check_config/0]).
+         check_config/0]).
 
 % interaction with the ring maintenance:
 -export([rm_my_range_changed/3, rm_send_new_range/4]).
@@ -149,7 +149,7 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> full_state_inactive().
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, fun get_base_interval/0, gossip_trigger),
+    TriggerState = trigger:init(Trigger, get_base_interval(), gossip_trigger),
     {uninit, msg_queue:new(), TriggerState, gossip_state:new_state()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

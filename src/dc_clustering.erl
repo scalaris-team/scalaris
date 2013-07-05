@@ -109,8 +109,8 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init({module(), module()}) -> state_inactive().
 init({ResetTrigger, ClusterTrigger}) ->
-    ResetTriggerState = trigger:init(ResetTrigger, fun get_clustering_reset_interval/0, reset_clustering),
-    ClusterTriggerState = trigger:init(ClusterTrigger, fun get_clustering_interval/0, start_clustering_shuffle),
+    ResetTriggerState = trigger:init(ResetTrigger, get_clustering_reset_interval(), reset_clustering),
+    ClusterTriggerState = trigger:init(ClusterTrigger, get_clustering_interval(), start_clustering_shuffle),
     #state_inactive{
         queued_messages = msg_queue:new()
         , reset_trigger_state = ResetTriggerState

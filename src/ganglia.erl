@@ -55,7 +55,7 @@ init([]) ->
                          failed -> 30000;
                          X -> X
                      end,
-    Trigger = trigger:init(trigger_periodic, fun () -> UpdateInterval end, ganglia_trigger),
+    Trigger = trigger:init(trigger_periodic, UpdateInterval, ganglia_trigger),
     {_LastActive = 0, trigger:next(Trigger), {0, 0, 0}}.
 
 -spec on(message(), state()) -> state().

@@ -365,8 +365,8 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module and starts the trigger
 -spec init(module()) -> state().
 init(Trigger) ->	
-    TriggerState = trigger:init(Trigger, fun get_update_interval/0, ?TRIGGER_NAME),
-    GCTrigger   = trigger:init(trigger_periodic, fun get_gc_interval/0, ?GC_TRIGGER),
+    TriggerState = trigger:init(Trigger, get_update_interval(), ?TRIGGER_NAME),
+    GCTrigger   = trigger:init(trigger_periodic, get_gc_interval(), ?GC_TRIGGER),
     #rrepair_state{ trigger_state = trigger:next(TriggerState),
                     gc_trigger = trigger:next(GCTrigger) }.
 

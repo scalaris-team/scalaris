@@ -52,7 +52,7 @@ get_neighbors({Neighbors, _TriggerState}) ->
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
     Trigger = config:read(ringmaintenance_trigger),
-    TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, rm_trigger),
+    TriggerState = trigger:init(Trigger, stabilizationInterval(), rm_trigger),
     NewTriggerState = trigger:now(TriggerState),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     get_successorlist(node:pidX(Succ)),
@@ -61,7 +61,7 @@ init(Me, Pred, Succ) ->
 -spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
 unittest_create_state(Neighbors) ->
     Trigger = config:read(ringmaintenance_trigger),
-    TriggerState = trigger:init(Trigger, fun stabilizationInterval/0, rm_trigger),
+    TriggerState = trigger:init(Trigger, stabilizationInterval(), rm_trigger),
     {Neighbors, TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
