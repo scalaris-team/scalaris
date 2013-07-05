@@ -139,14 +139,13 @@ get_subset_rand_next_interval(N, Pid) ->
 %%      returns its pid for use by a supervisor.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    Trigger = config:read(cyclon_trigger),
-    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, Trigger,
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
                              [{pid_groups_join_as, DHTNodeGroup, cyclon}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> state_inactive().
-init(Trigger) ->
-    TriggerState = trigger:init(Trigger, get_shuffle_interval(), cy_shuffle),
+-spec init([]) -> state_inactive().
+init([]) ->
+    TriggerState = trigger:init(trigger_periodic, get_shuffle_interval(), cy_shuffle),
     {inactive, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -338,8 +337,6 @@ rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_module(cyclon_trigger) and
-    
     config:cfg_is_integer(cyclon_interval) and
     config:cfg_is_greater_than(cyclon_interval, 0) and
     

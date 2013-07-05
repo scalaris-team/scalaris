@@ -57,14 +57,13 @@ deactivate() ->
 %%      dictionary and returns its pid for use by a supervisor.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    Trigger = config:read(dht_node_reregister_trigger),
-    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, Trigger,
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
                              [{pid_groups_join_as, DHTNodeGroup, dht_node_reregister}]).
 
 %% @doc Initialises the module with an uninitialized state.
--spec init(module()) -> state_inactive().
-init(Trigger) ->
-    TriggerState = trigger:init(Trigger, get_base_interval(), register),
+-spec init([]) -> state_inactive().
+init([]) ->
+    TriggerState = trigger:init(trigger_periodic, get_base_interval(), register),
     {inactive, TriggerState}.
       
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

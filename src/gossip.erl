@@ -143,13 +143,13 @@ msg_get_values_all_response(Pid, PreviousValues, CurrentValues, BestValues) ->
 %%      returns its pid for use by a supervisor.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    Trigger = config:read(gossip_trigger),
-    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, Trigger, [{pid_groups_join_as, DHTNodeGroup, gossip}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
+                             [{pid_groups_join_as, DHTNodeGroup, gossip}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> full_state_inactive().
-init(Trigger) ->
-    TriggerState = trigger:init(Trigger, get_base_interval(), gossip_trigger),
+-spec init([]) -> full_state_inactive().
+init([]) ->
+    TriggerState = trigger:init(trigger_periodic, get_base_interval(), gossip_trigger),
     {uninit, msg_queue:new(), TriggerState, gossip_state:new_state()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -735,8 +735,6 @@ rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_module(gossip_trigger) and
-    
     config:cfg_is_integer(gossip_interval) and
     config:cfg_is_greater_than(gossip_interval, 0) and
     

@@ -108,12 +108,12 @@ get_coordinate() ->
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    Trigger = config:read(vivaldi_trigger),
-    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, Trigger, [{pid_groups_join_as, DHTNodeGroup, vivaldi}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
+                             [{pid_groups_join_as, DHTNodeGroup, vivaldi}]).
 
--spec init(module()) -> state_inactive().
-init(Trigger) ->
-    TriggerState = trigger:init(Trigger, get_base_interval(), vivaldi_trigger),
+-spec init([]) -> state_inactive().
+init([]) ->
+    TriggerState = trigger:init(trigger_periodic, get_base_interval(), vivaldi_trigger),
     {inactive, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -268,8 +268,6 @@ update_coordinate(RemoteCoordinate, RemoteError, Latency, Coordinate, Error) ->
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_module(vivaldi_trigger) and
-
     config:cfg_is_integer(vivaldi_interval) and
     config:cfg_is_greater_than(vivaldi_interval, 0) and
 
