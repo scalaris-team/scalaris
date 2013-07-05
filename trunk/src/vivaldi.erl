@@ -33,7 +33,7 @@
 % functions gen_component, the trigger and the config module use
 -export([init/1, on_inactive/2, on_active/2,
          activate/0, deactivate/0,
-         get_base_interval/0, check_config/0]).
+         check_config/0]).
 
 % helpers for creating getter messages:
 -export([get_coordinate/0]).
@@ -113,7 +113,7 @@ start_link(DHTNodeGroup) ->
 
 -spec init(module()) -> state_inactive().
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, fun get_base_interval/0, vivaldi_trigger),
+    TriggerState = trigger:init(Trigger, get_base_interval(), vivaldi_trigger),
     {inactive, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

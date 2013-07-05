@@ -26,8 +26,6 @@
 
 -behavior(rm_beh).
 
--export([get_base_interval/0, get_min_interval/0, get_max_interval/0]).
-
 -opaque state() :: {Neighbors      :: nodelist:neighborhood(),
                     RandomViewSize :: pos_integer(),
                     Interval       :: base_interval | min_interval | max_interval,
@@ -63,8 +61,8 @@ init(Me, Pred, Succ) ->
     Trigger = config:read(ringmaintenance_trigger),
     TriggerState1 =
         trigger:init(
-          Trigger, fun get_base_interval/0, fun get_min_interval/0,
-          fun get_max_interval/0, rm_trigger),
+          Trigger, get_base_interval(), get_min_interval(),
+          get_max_interval(), rm_trigger),
     TriggerState2 = trigger:now(TriggerState1),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
@@ -75,8 +73,8 @@ unittest_create_state(Neighbors) ->
     Trigger = config:read(ringmaintenance_trigger),
     TriggerState1 =
         trigger:init(
-          Trigger, fun get_base_interval/0, fun get_min_interval/0,
-          fun get_max_interval/0, rm_trigger),
+          Trigger, get_base_interval(), get_min_interval(),
+          get_max_interval(), rm_trigger),
     {Neighbors, 1, min_interval, TriggerState1, [], true}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

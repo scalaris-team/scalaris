@@ -28,7 +28,7 @@
 -export([start_link/1]).
 -export([init/1, on_inactive/2, on_active/2,
          activate/1, deactivate/0,
-         get_base_interval/0, check_config/0,
+         check_config/0,
          get_neighb/1, get_rt/1, set_rt/2,
          rm_send_update/4]).
 
@@ -84,7 +84,7 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> state_inactive().
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, fun get_base_interval/0, trigger_rt),
+    TriggerState = trigger:init(Trigger, get_base_interval(), trigger_rt),
     {inactive, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

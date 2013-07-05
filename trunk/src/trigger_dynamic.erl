@@ -17,9 +17,9 @@
 %%
 %% Can be used by a module <code>Module</code> in order to get a configurable
 %% message (by default <code>{trigger}</code>) every
-%% <code>BaseIntervalFun()</code> (default: <code>Module:get_base_interval()</code>),
-%% <code>MinIntervalFun()</code> (default: <code>Module:get_min_interval()</code>) or
-%% <code>MaxIntervalFun()</code> (default: <code>Module:get_max_interval()</code>)
+%% <code>BaseInterval</code>,
+%% <code>MinInterval</code> or
+%% <code>MaxInterval</code>
 %% milliseconds depending on a user-provided interval tag specified with next/2.
 %% 
 %% Use this module through the interface provided by the trigger module,
@@ -35,65 +35,66 @@
 
 -export([init/4, now/1, next/2, stop/1]).
 
--type state() :: {BaseIntervalFun::trigger:interval_fun(),
-                    MinIntervalFun::trigger:interval_fun(),
-                    MaxIntervalFun::trigger:interval_fun(),
-                    MsgTag::comm:msg_tag(), TimerRef::ok | reference()}.
+-type state() :: {BaseInterval::trigger:interval_time(),
+                  MinInterval::trigger:interval_time(),
+                  MaxInterval::trigger:interval_time(),
+                  MsgTag::comm:msg_tag(), TimerRef::ok | reference()}.
 
 %% @doc Initializes the trigger with the given interval functions and the given
 %%      message tag used for the trigger message.
--spec init(BaseIntervalFun::trigger:interval_fun(), MinIntervalFun::trigger:interval_fun(), MaxIntervalFun::trigger:interval_fun(), comm:msg_tag()) -> state().
-init(BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) when is_function(BaseIntervalFun, 0) ->
-    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}.
+-spec init(BaseInterval::trigger:interval_time(), MinInterval::trigger:interval_time(),
+           MaxInterval::trigger:interval_time(), comm:msg_tag()) -> state().
+init(BaseInterval, MinInterval, MaxInterval, MsgTag) when is_integer(BaseInterval) ->
+    {BaseInterval, MinInterval, MaxInterval, MsgTag, ok}.
 
 %% @doc Sets the trigger to send its message immediately, for example after
 %%      its initialization. Any previous trigger will be canceled!
 -spec now(state()) -> state().
-now({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}) ->
+now({BaseInterval, MinInterval, MaxInterval, MsgTag, ok}) ->
     TimerRef = comm:send_local(self(), {MsgTag}),
-    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef};
-now({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}) ->
+    {BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef};
+now({BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef}) ->
     % timer still running
     _ = erlang:cancel_timer(TimerRef),
     NewTimerRef = comm:send_local(self(), {MsgTag}),
-    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef}.
+    {BaseInterval, MinInterval, MaxInterval, MsgTag, NewTimerRef}.
 
 %% @doc Sets the trigger to send its message after some delay. The given
 %%      IntervalTag will determine which of the three interval functions will
 %%      be evaluated in order to get the number of milliseconds of this delay.
 %%      Any previous trigger will be canceled!
 -spec next(state(), IntervalTag::trigger:interval()) -> state().
-next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}, IntervalTag) ->
-    NewTimerRef = send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag),
-    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef};
-next({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}, IntervalTag) ->
+next({BaseInterval, MinInterval, MaxInterval, MsgTag, ok}, IntervalTag) ->
+    NewTimerRef = send_message(IntervalTag, BaseInterval, MinInterval, MaxInterval, MsgTag),
+    {BaseInterval, MinInterval, MaxInterval, MsgTag, NewTimerRef};
+next({BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef}, IntervalTag) ->
     % timer still running?
     _ = erlang:cancel_timer(TimerRef),
-    NewTimerRef = send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag),
-    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, NewTimerRef}.
+    NewTimerRef = send_message(IntervalTag, BaseInterval, MinInterval, MaxInterval, MsgTag),
+    {BaseInterval, MinInterval, MaxInterval, MsgTag, NewTimerRef}.
 
 -spec send_message(IntervalTag::trigger:interval(),
-                   BaseIntervalFun::trigger:interval_fun(),
-                   MinIntervalFun::trigger:interval_fun(),
-                   MaxIntervalFun::trigger:interval_fun(),
+                   BaseInterval::trigger:interval_time(),
+                   MinInterval::trigger:interval_time(),
+                   MaxInterval::trigger:interval_time(),
                    MsgTag::comm:msg_tag()) -> reference().
-send_message(IntervalTag, BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag) ->
+send_message(IntervalTag, BaseInterval, MinInterval, MaxInterval, MsgTag) ->
     case IntervalTag of
         max_interval ->
-            comm:send_local_after(MaxIntervalFun(), self(), {MsgTag});
+            comm:send_local_after(MaxInterval, self(), {MsgTag});
         base_interval ->
-            comm:send_local_after(BaseIntervalFun(), self(), {MsgTag});
+            comm:send_local_after(BaseInterval, self(), {MsgTag});
         min_interval ->
-            comm:send_local_after(MinIntervalFun(), self(), {MsgTag});
+            comm:send_local_after(MinInterval, self(), {MsgTag});
         _ ->
-            comm:send_local_after(BaseIntervalFun(), self(), {MsgTag})
+            comm:send_local_after(BaseInterval, self(), {MsgTag})
      end.
 
 %% @doc Stops the trigger until next or now are called again.
 -spec stop(state()) -> state().
-stop({_BaseIntervalFun, _MinIntervalFun, _MaxIntervalFun, _MsgTag, ok} = State) ->
+stop({_BaseInterval, _MinInterval, _MaxInterval, _MsgTag, ok} = State) ->
     State;
-stop({BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, TimerRef}) ->
+stop({BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef}) ->
     % timer still running?
     _ = erlang:cancel_timer(TimerRef),
-    {BaseIntervalFun, MinIntervalFun, MaxIntervalFun, MsgTag, ok}.
+    {BaseInterval, MinInterval, MaxInterval, MsgTag, ok}.

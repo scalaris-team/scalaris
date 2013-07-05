@@ -25,7 +25,7 @@
 -include("scalaris.hrl").
 
 -export([start_link/1]).
--export([init/1, on/2, get_base_interval/0]).
+-export([init/1, on/2]).
 
 -export([add_zombie_candidate/1, subscribe/0, unsubscribe/0]).
 -type(message() ::
@@ -71,7 +71,7 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(module()) -> state().
 init(Trigger) ->
-    TriggerState = trigger:init(Trigger, ?MODULE),
+    TriggerState = trigger:init(Trigger, get_base_interval()),
     TriggerState2 = trigger:now(TriggerState),
     {fix_queue:new(config:read(zombieDetectorSize)), gb_sets:new(), TriggerState2}.
       
