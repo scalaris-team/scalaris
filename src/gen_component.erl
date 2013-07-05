@@ -312,6 +312,11 @@ bp_about_to_kill(Pid) ->
     receive
         Msg -> erlang:demonitor(MonitorRef, [flush]), ok;
         {'DOWN', MonitorRef, process, Pid, _Info1} -> ok
+    after 2000 ->
+            erlang:demonitor(MonitorRef, [flush]),
+            log:pal("Failed to pause ~p (~p) within 2s~n~.2p",
+                    [Pid, pid_groups:group_and_name_of(Pid),
+                     erlang:process_info(Pid, [registered_name, initial_call, current_function])])
     end,
     ok.
 
