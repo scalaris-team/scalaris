@@ -477,7 +477,7 @@ renderRing({ok, Details}) ->
     {tr, [], 
       [
        {td, [], [get_flag(Hostname),
-                 io_lib:format("<a href=\"http://~B.~B.~B.~B:~B/ring.yaws\">~p (~B.~B.~B.~B:~B</a>)",
+                 io_lib:format("<a href=\"http://~B.~B.~B.~B:~B/ring.yaws\">~p (~B.~B.~B.~B:~B)</a>",
                                [NodeIP1, NodeIP2, NodeIP3, NodeIP4, YawsPort,
                                 Hostname,
                                 NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort])]},
@@ -578,7 +578,7 @@ renderIndexedRing({ok, Details}) ->
     {tr, [], 
       [
        {td, [], [get_flag(Hostname),
-                 io_lib:format("<a href=\"http://~B.~B.~B.~B:~B/ring.yaws\">~p (~B.~B.~B.~B:~B</a>)",
+                 io_lib:format("<a href=\"http://~B.~B.~B.~B:~B/ring.yaws\">~p (~B.~B.~B.~B:~B)</a>",
                                [NodeIP1, NodeIP2, NodeIP3, NodeIP4, YawsPort,
                                 Hostname,
                                 NodeIP1, NodeIP2, NodeIP3, NodeIP4, NodePort])]},
