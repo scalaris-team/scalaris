@@ -165,8 +165,7 @@ If initialized, the node's id, its predecessor, successor and the routing table
 state of the selected implementation (the macro \code{RT} refers to).
 
 \codesnippet{rt_loop.erl}{rt_loop:trigger}{../src/rt_loop.erl}
-Periodically (see \code{routingtable_trigger} and
-\code{pointer_base_stabilization_interval} config parameters) a \code{trigger}
+Periodically (see \code{pointer_base_stabilization_interval} config parameter) a \code{trigger}
 message is sent to the \code{rt_loop} process that starts the periodic
 stabilization implemented by each routing table.
 

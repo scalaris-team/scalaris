@@ -78,13 +78,13 @@ deactivate() ->
 %%      process dictionary and returns its pid for use by a supervisor.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    Trigger = config:read(routingtable_trigger),
-    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, Trigger, [{pid_groups_join_as, DHTNodeGroup, routing_table}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
+                             [{pid_groups_join_as, DHTNodeGroup, routing_table}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> state_inactive().
-init(Trigger) ->
-    TriggerState = trigger:init(Trigger, get_base_interval(), trigger_rt),
+-spec init([]) -> state_inactive().
+init([]) ->
+    TriggerState = trigger:init(trigger_periodic, get_base_interval(), trigger_rt),
     {inactive, msg_queue:new(), TriggerState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

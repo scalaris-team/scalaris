@@ -78,7 +78,7 @@ test_init(Config) ->
     config:write(gossip_interval, 100),
     EmptyMsgQueue = msg_queue:new(),
     GossipNewState = gossip_state:new_state(),
-    InitialState1 = gossip:init('trigger_periodic'),
+    InitialState1 = gossip:init([]),
     ?equals_pattern(InitialState1,
                     {uninit, EmptyMsgQueue, {'trigger_periodic', _TriggerState}, GossipNewState}),
 
@@ -814,8 +814,7 @@ reset_config() ->
     config:write(gossip_max_triggers_per_round, 1000),
     config:write(gossip_converge_avg_epsilon, 5.0),
     config:write(gossip_converge_avg_count, 10),
-    config:write(gossip_converge_avg_count_start_new_round, 20),
-    config:write(gossip_trigger, trigger_periodic).
+    config:write(gossip_converge_avg_count_start_new_round, 20).
 
 get_ptrigger_nodelay() ->
     get_ptrigger_delay(0).

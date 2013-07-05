@@ -15,12 +15,12 @@
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Generic trigger for (parameterized) modules.
 %%
-%% Can be used by a module <code>Module</code> in order to get a configurable
+%% Can be used by a module in order to get a configurable
 %% message (by default <code>{trigger}</code>) in intervals defined by a given
 %% trigger.
 %% The basic pattern for the use of this module is as follows:
 %% <p><code>
-%%  TriggerState = trigger:init(Trigger, TriggerDelay),<br />
+%%  TriggerState = trigger:init(TriggerModule, TriggerDelay),<br />
 %%  TriggerState2 = trigger:now(TriggerState)
 %% </code></p>
 %% Then on each received <code>{trigger}</code> message, the trigger needs to

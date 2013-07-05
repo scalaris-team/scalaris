@@ -98,19 +98,17 @@ deactivate() ->
 start_link(DHTNodeGroup) ->
     case config:read(dc_clustering_enable) of
         true ->
-            ResetTrigger = config:read(dc_clustering_reset_trigger),
-            ClusterTrigger = config:read(dc_clustering_cluster_trigger),
-            gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, {ResetTrigger, ClusterTrigger},
+            gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
                                      [{pid_groups_join_as, DHTNodeGroup, dc_clustering}]);
         _ ->
             ignore
     end.
 
 %% @doc Initialises the module with an empty state.
--spec init({module(), module()}) -> state_inactive().
-init({ResetTrigger, ClusterTrigger}) ->
-    ResetTriggerState = trigger:init(ResetTrigger, get_clustering_reset_interval(), reset_clustering),
-    ClusterTriggerState = trigger:init(ClusterTrigger, get_clustering_interval(), start_clustering_shuffle),
+-spec init([]) -> state_inactive().
+init([]) ->
+    ResetTriggerState = trigger:init(trigger_periodic, get_clustering_reset_interval(), reset_clustering),
+    ClusterTriggerState = trigger:init(trigger_periodic, get_clustering_interval(), start_clustering_shuffle),
     #state_inactive{
         queued_messages = msg_queue:new()
         , reset_trigger_state = ResetTriggerState
@@ -271,8 +269,6 @@ check_config() ->
             config:cfg_is_greater_than(dc_clustering_reset_interval, 0) andalso
             config:cfg_is_integer(dc_clustering_interval) andalso
             config:cfg_is_greater_than(dc_clustering_interval, 0) andalso
-            config:cfg_is_module(dc_clustering_reset_trigger) andalso
-            config:cfg_is_module(dc_clustering_cluster_trigger) andalso
             config:cfg_is_float(dc_clustering_radius) andalso
             config:cfg_is_greater_than(dc_clustering_radius, 0.0);
         _ -> true

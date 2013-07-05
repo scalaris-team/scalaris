@@ -57,7 +57,7 @@ end_per_testcase(_TestCase, Config) ->
 test_init(Config) ->
     config:write(vivaldi_interval, 100),
     EmptyMsgQueue = msg_queue:new(),
-    InitialState1 = vivaldi:init('trigger_periodic'),
+    InitialState1 = vivaldi:init([]),
     ?equals_pattern(InitialState1,
                     {inactive, EmptyMsgQueue, {'trigger_periodic', _TriggerState}}),
     ?expect_no_message(),
@@ -167,8 +167,7 @@ reset_config() ->
     config:write(vivaldi_dimensions, 2),
     config:write(vivaldi_count_measurements, 10),
     config:write(vivaldi_measurements_delay, 1000),
-    config:write(vivaldi_latency_timeout, 60000),
-    config:write(vivaldi_trigger, trigger_periodic).
+    config:write(vivaldi_latency_timeout, 60000).
 
 get_ptrigger_nodelay() ->
     get_ptrigger_delay(0).

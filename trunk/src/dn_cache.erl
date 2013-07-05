@@ -65,13 +65,13 @@ unsubscribe() ->
 %%      dictionary and returns its pid for use by a supervisor.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    Trigger = config:read(dn_cache_trigger),
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, Trigger, [{pid_groups_join_as, DHTNodeGroup, dn_cache}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
+                             [{pid_groups_join_as, DHTNodeGroup, dn_cache}]).
 
 %% @doc Initialises the module with an empty state.
--spec init(module()) -> state().
-init(Trigger) ->
-    TriggerState = trigger:init(Trigger, get_base_interval()),
+-spec init([]) -> state().
+init([]) ->
+    TriggerState = trigger:init(trigger_periodic, get_base_interval()),
     TriggerState2 = trigger:now(TriggerState),
     {fix_queue:new(config:read(zombieDetectorSize)), gb_sets:new(), TriggerState2}.
       

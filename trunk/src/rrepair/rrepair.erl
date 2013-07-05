@@ -358,14 +358,13 @@ check_session_complete(_Session) ->
 %%      and returns its pid for use by a supervisor.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    Trigger = get_update_trigger(),
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, Trigger,
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
                              [{pid_groups_join_as, DHTNodeGroup, ?MODULE}]).
 
 %% @doc Initialises the module and starts the trigger
--spec init(module()) -> state().
-init(Trigger) ->	
-    TriggerState = trigger:init(Trigger, get_update_interval(), ?TRIGGER_NAME),
+-spec init([]) -> state().
+init([]) ->	
+    TriggerState = trigger:init(trigger_periodic, get_update_interval(), ?TRIGGER_NAME),
     GCTrigger   = trigger:init(trigger_periodic, get_gc_interval(), ?GC_TRIGGER),
     #rrepair_state{ trigger_state = trigger:next(TriggerState),
                     gc_trigger = trigger:next(GCTrigger) }.
@@ -374,13 +373,12 @@ init(Trigger) ->
 % Config handling
 %
 % USED CONFIG FIELDS
-%	I) 	 rr_trigger: module name of any trigger
-%	II)  rr_trigger_interval: integer duration until next triggering (milliseconds)
-%	III) rr_recon_method: set reconciliation algorithm name
-%   IV)  rr_trigger_probability: this is the probability of starting a synchronisation 
-%								 with a random node if trigger has fired. ]0,100]
-%   V)   rr_session_ttl: time to live for sessions until they are garbage collected (milliseconds)
-%   VI)  rr_gc_interval: garbage collector execution interval (milliseconds)
+%	* rr_trigger_interval: integer duration until next triggering (milliseconds)
+%	* rr_recon_method: set reconciliation algorithm name
+%   * rr_trigger_probability: this is the probability of starting a synchronisation 
+%                             with a random node if trigger has fired. ]0,100]
+%   * rr_session_ttl: time to live for sessions until they are garbage collected (milliseconds)
+%   * rr_gc_interval: garbage collector execution interval (milliseconds)
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -389,7 +387,6 @@ init(Trigger) ->
 check_config() ->
     case config:read(rrepair_enabled) of
         true ->
-            config:cfg_is_module(rr_trigger) andalso
             config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso % theoretically also 'iblt', but no full support for that yet
             config:cfg_is_integer(rr_session_ttl) andalso
             config:cfg_is_greater_than(rr_session_ttl, 0) andalso
@@ -405,9 +402,6 @@ check_config() ->
 
 -spec get_recon_method() -> rr_recon:method().
 get_recon_method() ->  config:read(rr_recon_method).
-
--spec get_update_trigger() -> Trigger::module().
-get_update_trigger() ->  config:read(rr_trigger).
 
 -spec get_update_interval() -> pos_integer().
 get_update_interval() -> config:read(rr_trigger_interval).
