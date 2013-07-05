@@ -25,7 +25,8 @@
 
 -include("scalaris.hrl").
 
--export([start_link/1, init/1, on/2]).
+-export([start_link/1, init/1, on/2,
+         check_config/0]).
 
 -define(TRACE(X,Y), ok).
 %define(TRACE(X,Y), io:format(X, Y)).
@@ -51,10 +52,7 @@ start_link(ServiceGroup) ->
 
 -spec init([]) -> state().
 init([]) ->
-    UpdateInterval = case config:read(ganglia_interval) of
-                         failed -> 30000;
-                         X -> X
-                     end,
+    UpdateInterval = config:read(ganglia_interval),
     Trigger = trigger:init(trigger_periodic, UpdateInterval, ganglia_trigger),
     {_LastActive = 0, trigger:next(Trigger), {0, 0, 0}}.
 
@@ -281,3 +279,10 @@ set_agg_pending(NumPending, State) ->
 inc_agg_id(State) ->
     {AggId, _Pending, _Load} = element(3,State),
     setelement(3, State, {AggId + 1, 0, 0}).
+
+%% @doc Checks whether config parameters of the ganglia process exist and are
+%%      valid.
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_is_integer(ganglia_interval) and
+    config:cfg_is_greater_than(ganglia_interval, 0).
