@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -47,32 +47,46 @@
 %%      cached in the config.
 -spec read(Key::atom()) -> any() | failed.
 read(Key) ->
-    % If an environment variable sets a config parameter that is present in the
+    %% If an environment variable sets a config parameter that is present in the
     % config, it will override the config (see populate_db/1, process_term/1).
     % We can thus first check the ets table and fall back to the environment
     % check afterwards.
-    case ets:info(config_ets) of
+    case erlang:get({config,Key}) of
         undefined ->
-            io:format("config not started yet (trying to read ~p)\n", [Key]),
-            failed;
-        _ ->
-            case ets:lookup(config_ets, Key) of
-                [{Key, Value}] -> Value;
-                [] -> Value = util:app_get_env(Key, failed),
-                      case Value of
-                          failed -> ok;
-                          _ -> case self() =:= erlang:whereis(config) of
-                                   true -> ets:insert(config_ets, {Key, Value});
-                                   _    -> write(Key, Value)
-                               end
-                      end,
-                      Value
-            end
+            case ets:info(config_ets) of
+                undefined ->
+                    io:format("config not started yet (trying to read ~p)\n",
+                              [Key]),
+                    failed;
+                _ ->
+%%                    log:log("~p config read in hot path ~p", [self(), Key]),
+                    case ets:lookup(config_ets, Key) of
+                        [{Key, Value}] ->
+                            erlang:put({config,Key}, Value),
+                            Value;
+                        [] -> Value = util:app_get_env(Key, failed),
+                              case Value of
+                                  failed -> ok;
+                                  _ -> case self() =:= erlang:whereis(config)
+                                       of
+                                           true -> ets:insert(config_ets,
+                                                              {Key, Value});
+                                           _    -> write(Key, Value)
+                                       end
+                              end,
+                              erlang:put({config,Key}, Value),
+                              Value
+                    end
+            end;
+        Value -> Value
     end.
 
 %% @doc Writes a config parameter.
 -spec write(atom(), any()) -> ok.
 write(Key, Value) ->
+    %% config is not dynamic. But we update the local cache, so one
+    %% can write config in a local context (in unittests).
+    erlang:put({config,Key}, Value),
     comm:send_local(config, {write, self(), Key, Value}),
     receive ?SCALARIS_RECV({write_done}, ok) end.
 
