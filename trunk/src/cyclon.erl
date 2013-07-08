@@ -62,6 +62,7 @@
     {cy_subset, SourcePid::comm:mypid(), PSubset::cyclon_cache:cache()} |
     {cy_subset_response, QSubset::cyclon_cache:cache(), PSubset::cyclon_cache:cache()} |
     {get_node_details_response, node_details:node_details()} |
+    {get_dht_nodes_response, Nodes::[comm:mypid()]} | 
     {get_ages, SourcePid::comm:erl_local_pid()} |
     {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
@@ -176,6 +177,10 @@ on_inactive(Msg = {get_ages, _Pid}, {inactive, QueuedMessages, TriggerState}) ->
 on_inactive(Msg = {get_subset_rand, _N, _Pid}, {inactive, QueuedMessages, TriggerState}) ->
     {inactive, msg_queue:add(QueuedMessages, Msg), TriggerState};
 
+on_inactive({get_dht_nodes_response, _Nodes}, State) ->
+    % ignore possible old message - will be received again if necessary after activation
+    State;
+
 on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
     % get a list of up to 50 queued messages to display:
     MessageListTmp = [{"", webhelpers:safe_html_string("~p", [Message])}
@@ -242,7 +247,30 @@ on_active({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, Tri
                                      node_details:get(NodeDetails, succ));
             _ -> OldCache
         end,
+    case cyclon_cache:size(Cache) of
+        0 -> % try to get the cyclon cache from one of the known_hosts
+            case config:read(known_hosts) of
+                [] -> ok;
+                [_|_] = KnownHosts ->
+                    Pid = util:randomelem(KnownHosts),
+                    comm:send(Pid, {get_dht_nodes, comm:this()}, [quiet])
+            end,
+            ok;
+        _ -> ok
+    end,
     {Cache, Me, Cycles, TriggerState};
+
+on_active({get_dht_nodes_response, Nodes}, {Cache, _Me, _Cycles, _TriggerState} = State) ->
+    Size = cyclon_cache:size(Cache),
+    % get a cyclon cache from one of the nodes if less than 0 in own cache,
+    % otherwise ignore
+    case Nodes of
+        [] -> State;
+        [_|_] when Size > 0 -> State;
+        [Pid | _] ->
+            ?SEND_TO_GROUP_MEMBER(Pid, cyclon, {cy_subset, comm:this(), Cache}),
+            State
+    end;
 
 on_active({get_ages, Pid}, {Cache, _Node, _Cycles, _TriggerState} = State) ->
     msg_get_ages_response(Pid, cyclon_cache:get_ages(Cache)),
