@@ -207,7 +207,7 @@ log(X, B) -> math:log10(X) / math:log10(B).
 -spec log2(X::number()) -> float().
 log2(X) -> log(X, 2).
 
-%% @doc Returns the largest integer not larger than X.
+%% @doc Returns the largest integer not larger than X. 
 -spec floor(X::number()) -> integer().
 floor(X) when X >= 0 ->
     erlang:trunc(X);
@@ -218,7 +218,7 @@ floor(X) ->
         _    -> T - 1
     end.
 
-%% @doc Returns the smallest integer not smaller than X.
+%% @doc Returns the smallest integer not smaller than X. 
 -spec ceil(X::number()) -> integer().
 ceil(X) when X < 0 ->
     erlang:trunc(X);
@@ -512,15 +512,15 @@ randomelem_and_length(List) ->
     Length = length(List) + 1,
     RandomNum = randoms:rand_uniform(1, Length),
     {lists:nth(RandomNum, List), Length - 1}.
-
+    
 %% @doc Removes a random element from the (non-empty!) list and returns the
 %%      resulting list and the removed element.
 -spec pop_randomelem(List::[X,...]) -> {NewList::[X], PoppedElement::X}.
 pop_randomelem(List) ->
     pop_randomelem(List, length(List)).
-
+    
 %% @doc Removes a random element from the first Size elements of a (non-empty!)
-%%      list and returns the resulting list and the removed element.
+%%      list and returns the resulting list and the removed element. 
 -spec pop_randomelem(List::[X,...], Size::non_neg_integer()) -> {NewList::[X], PoppedElement::X}.
 pop_randomelem(List, Size) ->
     {Leading, [H | T]} = lists:split(randoms:rand_uniform(0, Size), List),
@@ -807,11 +807,17 @@ smerge2_helper([], L2, _Lte, _EqSelect, _FirstExist, SecondExist, ML) ->
 %% @doc Try to check whether common-test is running.
 -spec is_unittest() -> boolean().
 is_unittest() ->
-    case catch ct:get_status() of
-        no_tests_running     -> false;
-        {error, _}           -> false;
-        {'EXIT', {undef, _}} -> false;
-        _                    -> true
+    Pid = self(),
+    spawn(fun () ->
+                  case catch ct:get_status() of
+                      no_tests_running -> Pid ! {is_unittest, false};
+                      {error, _} -> Pid ! {is_unittest, false};
+                      {'EXIT', {undef, _}} -> Pid ! {is_unittest, false};
+                      _ -> Pid ! {is_unittest, true}
+                  end
+          end),
+    receive
+        ?SCALARIS_RECV({is_unittest, Result}, Result)
     end.
 
 -spec make_filename([byte()]) -> string().
@@ -1143,12 +1149,12 @@ repeat(Fun, Args, Times) ->
 repeat(Fun, Args, Times, Params) ->
     NewParams = case proplists:is_defined(collect, Params) of
                     false -> Params;
-                    _ -> [{accumulate, fun(I, R) -> [I | R] end, []} |
+                    _ -> [{accumulate, fun(I, R) -> [I | R] end, []} | 
                               proplists:delete(accumulate, Params)]
                 end,
     Acc = lists:keyfind(accumulate, 1, NewParams),
     case proplists:is_defined(parallel, NewParams) of
-        true ->
+        true -> 
             repeat(fun spawn/3, [?MODULE, parallel_run, [self(), Fun, Args, Acc =/= false, ok]], Times),
             case Acc of
                 false -> ok;
@@ -1166,7 +1172,7 @@ i_repeat(_, _, 0, Params, Acc) ->
         true -> Acc;
         _ -> ok
     end;
-i_repeat(Fun, Args, Times, Params, Acc) ->
+i_repeat(Fun, Args, Times, Params, Acc) ->    
     R = apply(Fun, Args),
     NewAcc = case lists:keyfind(accumulate, 1, Params) of
                  false -> Acc;
@@ -1175,7 +1181,7 @@ i_repeat(Fun, Args, Times, Params, Acc) ->
     i_repeat(Fun, Args, Times - 1, Params, NewAcc).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% parallel repeat helper functions
+% parallel repeat helper functions 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec parallel_run(pid(), fun(), args(), boolean(), Id::any()) -> ok.
@@ -1185,7 +1191,7 @@ parallel_run(SrcPid, Fun, Args, DoAnswer, Id) ->
           end,
     case DoAnswer of
         true -> comm:send_local(SrcPid, {parallel_result, Id, Res});
-        _ -> ok
+        _ -> ok 
     end,
     ok.
 
