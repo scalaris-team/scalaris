@@ -220,7 +220,7 @@ find_a(PidName) ->
                 failed ->
                     %% search others
                     case ets:match(?MODULE, {{'_', PidName}, '$1'}) of
-                        [[TPid] | _] = Pids ->
+                        [[_TPid] | _] = Pids ->
                             %% fill process local cache
 
                             %% This should only happen for client
