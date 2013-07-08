@@ -22,6 +22,10 @@
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
+
+-define(LOG_CC_FAILS, false).
+%%-define(LOG_CC_FAILS, true).
+
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
@@ -148,7 +152,7 @@ cc_single_write(no_value_yet, _WriteFilter, _Val) ->
 cc_single_write({RL, WL, Vers}, _WriteFilter, _Val) ->
     Checks = [ { [] =:= RL,    readlock_is_set },
                { false =:= WL, writelock_is_set } ],
-    cc_return_val(cc_single_write, Checks, _UI_if_ok = Vers, _Log = true).
+    cc_return_val(cc_single_write, Checks, _UI_if_ok = Vers, ?LOG_CC_FAILS).
 
 -spec wf_set_vers_val(db_entry() | prbr_bottom, version(),
                       client_value()) -> db_entry().
@@ -212,7 +216,7 @@ cc_set_rl(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
 cc_set_rl({WL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
     Checks = [ { TLogVers =:= Vers, {version_mismatch, TLogVers, Vers} },
                { false =:= WL,      writelock_is_set } ],
-    cc_return_val(cc_set_rl, Checks, _UI_if_ok = none, _Log = true).
+    cc_return_val(cc_set_rl, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_set_rl(db_entry(), UI :: {writelock(), version()} | no_value_yet,
                 {txid_on_cseq:txid(), version()}) -> db_entry().
@@ -239,7 +243,7 @@ cc_set_wl({RL, WL, Vers}, _WF, _Val = {TxId, TLogVers}) ->
           { false =:= WL
             orelse TxId =:= WL, {txid_mismatch, WL, TxId} },
           { [] =:= RL,          {readlock_not_empty, RL} } ],
-    cc_return_val(cc_set_wl, Checks, _UI_if_ok = none, _Log = true).
+    cc_return_val(cc_set_wl, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_set_wl
        (prbr_bottom, UI :: none, {txid_on_cseq:txid(), -1}) -> db_entry();
@@ -247,7 +251,7 @@ cc_set_wl({RL, WL, Vers}, _WF, _Val = {TxId, TLogVers}) ->
 wf_set_wl(prbr_bottom, _UI = none, {TxId, -1}) ->
     set_writelock(new_entry(), TxId);
 wf_set_wl(prbr_bottom, _UI = none, {TxId, _}) ->
-    ct:pal("should only happen in tester unittests~n"),
+%%    ct:pal("should only happen in tester unittests~n"),
     set_writelock(new_entry(), TxId);
 wf_set_wl(DBEntry, _UI = none, {TxId, _Vers}) ->
     set_writelock(DBEntry, TxId).
@@ -302,7 +306,7 @@ cc_commit_read(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
 cc_commit_read({_RL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
     Checks =
         [ { TLogVers =:= Vers,  {version_mismatch, TLogVers, Vers} } ],
-    cc_return_val(cc_commit_read, Checks, _UI_if_ok = none, _Log = true).
+    cc_return_val(cc_commit_read, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_unset_rl
        (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0}) -> prbr_bottom;
@@ -368,13 +372,13 @@ cc_commit_write(no_value_yet, _WF, _Val = {_TxId, _TLogVers, _NewVal}) ->
 cc_commit_write({_WL, Vers}, _WF, _Val = {_TxId, TLogVers, _NewVal}) ->
     Checks =
         [ { Vers =:= TLogVers,  {version_mismatch, TLogVers, Vers} } ],
-    cc_return_val(cc_commit_write, Checks, _UI_if_ok = none, _Log = true);
+    cc_return_val(cc_commit_write, Checks, _UI_if_ok = none, ?LOG_CC_FAILS);
 %% in case of fast write we get the value of the last read as write
 %% value, which here was produced by the read filter of set_lock
 cc_commit_write({_RL, _WL, Vers}, _WF, _Val = {_TxId, TLogVers, _NewVal}) ->
     Checks =
         [ { Vers =:= TLogVers,  {version_mismatch, TLogVers, Vers} } ],
-    cc_return_val(cc_commit_write, Checks, _UI_if_ok = none, _Log = true).
+    cc_return_val(cc_commit_write, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 
 -spec wf_val_unset_wl
