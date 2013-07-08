@@ -30,7 +30,8 @@ groups() ->
     [
      %{tester_tests, [sequence], []},
      {rbr_tests, [sequence], [
-                              test_qwrite_qwrite_qread
+                              test_qwrite_qwrite_qread,
+                              test_kv_on_cseq_write_2
                              ]}
     ].
 
@@ -45,7 +46,7 @@ suite() -> [ {timetrap, {seconds, 120}} ].
 %group(tester_tests) ->
 %    [{timetrap, {seconds, 400}}];
 group(rbr_tests) ->
-    [{timetrap, {seconds, 4}}].
+    [{timetrap, {seconds, 400}}].
 
 
 init_per_suite(Config) ->
@@ -73,8 +74,32 @@ end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
 
+test_kv_on_cseq_write_2(_Config) ->
+    iter(fun kv_on_cseq_write/0, 2000).
+
+kv_on_cseq_write() ->
+    proto_sched:start(),
+    Pid = self(),
+    spawn(fun() ->
+                  proto_sched:start(),
+                  kv_on_cseq:write([], 7),
+                  Pid ! ok
+          end),
+    spawn(fun() ->
+                  proto_sched:start(),
+                  kv_on_cseq:write([], 8),
+                  Pid ! ok
+          end),
+    timer:sleep(10),
+    proto_sched:start_deliver(),
+    receive ok -> ok end,
+    receive ok -> ok end,
+    proto_sched:stop(),
+    _Infos = proto_sched:get_infos(),
+    proto_sched:cleanup().
+
 test_qwrite_qwrite_qread(_Config) ->
-    iter(fun qwrite_qwrite_qread/0, 20).
+    iter(fun qwrite_qwrite_qread/0, 2000).
 
 qwrite_qwrite_qread() ->
     DB = lease_db1,
