@@ -51,26 +51,27 @@
 %%%% Behavior methods
 %%%%%%%%%%%%%%%%%%%%%
 
--spec init() -> fail | ok.
+-spec init() -> failed | ok.
 init() ->
     case get_hosts() of
-        fail -> Hosts =
-                    case config:read(cloud_ssh_hosts) of
-                        failed -> [];
-                        List -> lists:map(fun(Host) -> {Host, inactive} end, List)
-                    end,
-                save_hosts(Hosts);
+        failed ->
+            HostsWithStatus =
+                case config:read(cloud_ssh_hosts) of
+                    failed -> [];
+                    Hostnames -> lists:map(fun(Host) -> {Host, inactive} end, Hostnames)
+                end,
+            save_hosts(HostsWithStatus);
         _ -> ok
     end.
 
--spec get_number_of_vms() -> fail | non_neg_integer().
+-spec get_number_of_vms() -> failed | non_neg_integer().
 get_number_of_vms() ->
     case get_hosts() of
-        fail -> fail;
+        failed -> failed;
         {_, List} -> get_number_of_vms(List)
     end.
 
--spec get_number_of_vms(hostlist()) -> fail | non_neg_integer().
+-spec get_number_of_vms(hostlist()) -> failed | non_neg_integer().
 get_number_of_vms(Hosts) ->
     lists:foldl(fun (VM, NumActive) ->
                         case VM of
@@ -80,21 +81,21 @@ get_number_of_vms(Hosts) ->
                         end
                 end, 0, Hosts).
 
--spec add_vms(pos_integer()) -> fail | ok.
+-spec add_vms(pos_integer()) -> failed | ok.
 add_vms(N) ->
     add_or_remove_vms(add, N).
 
--spec remove_vms(pos_integer()) -> fail | ok.
+-spec remove_vms(pos_integer()) -> failed | ok.
 remove_vms(N) ->
     add_or_remove_vms(remove, N).
 
--spec add_or_remove_vms(add | remove, integer()) ->  fail | ok.
+-spec add_or_remove_vms(add | remove, integer()) ->  failed | ok.
 add_or_remove_vms(Flag, Pending) ->
     case get_hosts() of
     	{TLog, Hosts} ->
             UpdatedHosts = add_or_remove_vms(Flag, Pending, Hosts, []),
             save_hosts(TLog, UpdatedHosts);
-        fail -> fail
+        failed -> failed
     end.
 
 -spec add_or_remove_vms(add | remove, integer(), hostlist(), hostlist()) -> hostlist().
@@ -126,7 +127,7 @@ add_or_remove_vms(remove, Pending, Hosts, UpdatedHosts) ->
 %%%% Helper methods
 %%%%%%%%%%%%%%%%%%%
 
--spec killall_vms() -> fail | ok.
+-spec killall_vms() -> failed | ok.
 killall_vms() ->
     case get_hosts() of
         {_, Hosts} ->
@@ -139,7 +140,7 @@ killall_vms() ->
                                   end
                           end, Hosts),
             ok;
-        fail -> fail
+        failed -> failed
     end.
 
 -spec scalaris_vm(start | stop, string()) -> ok.
@@ -163,22 +164,22 @@ scalaris_vm(Action, Hostname) ->
 format(FormatString, Items) ->
     lists:flatten(io_lib:format(FormatString, Items)).
 
--spec get_hosts() -> fail | {tx_tlog:tlog_ext(), hostlist()}.
+-spec get_hosts() -> failed | {tx_tlog:tlog_ext(), hostlist()}.
 get_hosts() ->
     case api_tx:read(api_tx:new_tlog(), ?cloud_ssh_key) of
         {TLog, {ok, Hosts}} -> {TLog, Hosts};
-        _ -> fail
+        _ -> failed
     end.
 
--spec save_hosts(hostlist()) -> fail | ok.
+-spec save_hosts(hostlist()) -> failed | ok.
 save_hosts(Hosts) ->
     save_hosts(api_tx:new_tlog(), Hosts).
 
--spec save_hosts(tx_tlog:tlog_ext(), hostlist()) -> fail | ok.
+-spec save_hosts(tx_tlog:tlog_ext(), hostlist()) -> failed | ok.
 save_hosts(TLog, Hosts) ->
     case api_tx:req_list(TLog, [{write, ?cloud_ssh_key, Hosts}, {commit}]) of
         {[], [{ok}, {ok}]} -> ok;
-        _ -> fail
+        _ -> failed
     end.
 
 -spec get_scalaris_service() ->  tuple(string(), string()).

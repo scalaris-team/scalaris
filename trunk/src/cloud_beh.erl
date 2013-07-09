@@ -28,10 +28,10 @@
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
 
--callback init() -> fail | ok.
--callback get_number_of_vms() -> fail | non_neg_integer().
--callback add_vms(Count::non_neg_integer()) -> fail | ok.
--callback remove_vms(Count::non_neg_integer()) -> fail | ok.
+-callback init() -> failed | ok.
+-callback get_number_of_vms() -> failed | non_neg_integer().
+-callback add_vms(Count::non_neg_integer()) -> failed | ok.
+-callback remove_vms(Count::non_neg_integer()) -> failed | ok.
 
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
