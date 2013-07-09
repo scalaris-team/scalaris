@@ -126,10 +126,10 @@ send(Pid, Msg) -> send(Pid, Msg, []).
 -spec send(mypid(), message() | group_message(), send_options()) -> ok.
 send(Pid, Msg, Options) ->
     {RealPid, RealMsg1} = unpack_cookie(Pid, Msg),
-    RealMsg = pack_group_member(RealMsg1, Options),
+    {RealMsg, RealOpts} = pack_group_member(RealMsg1, Options),
     case erlang:get(trace_mpath) of
         undefined ->
-            comm_server:send(RealPid, RealMsg, Options);
+            comm_server:send(RealPid, RealMsg, RealOpts);
         Logger ->
             Deliver = trace_mpath:log_send(Logger, self(),
                                            RealPid, RealMsg, global),
@@ -139,7 +139,7 @@ send(Pid, Msg, Options) ->
                     %% send infected message to destination
                     LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
                                        Logger, self(), RealPid, RealMsg),
-                    comm_server:send(RealPid, LogEpidemicMsg, Options)
+                    comm_server:send(RealPid, LogEpidemicMsg, RealOpts)
             end
     end,
     ok.
@@ -265,16 +265,17 @@ unpack_cookie(Pid, Msg)              -> {Pid, Msg}.
 %% @doc Creates a group member message and filter out the send options for the
 %%      comm_server process.
 -ifdef(forward_or_recursive_types_are_not_allowed).
--spec pack_group_member(message() | group_message(), send_options()) -> message() | group_message() | group_message4().
+-spec pack_group_member(message() | group_message(), send_options()) -> {message() | group_message() | group_message4(), send_options()}.
 -else.
--spec pack_group_member(message() | group_message(), send_options()) -> message() | group_message().
+-spec pack_group_member(message() | group_message(), send_options()) -> {message() | group_message(), send_options()}.
 -endif.
-pack_group_member(Msg, [])                      -> Msg;
-pack_group_member(Msg, [{shepherd, _Shepherd}]) -> Msg;
-pack_group_member(Msg, Options)                 ->
-    case lists:keyfind(group_member, 1, Options) of
-        false                   -> Msg;
-        {group_member, Process} -> {?send_to_group_member, Process, Msg}
+pack_group_member(Msg, [] = Opts)                      -> {Msg, Opts};
+pack_group_member(Msg, [{shepherd, _Shepherd}] = Opts) -> {Msg, Opts};
+pack_group_member(Msg, Opts)                           ->
+    case lists:keytake(group_member, 1, Opts) of
+        false                                   -> {Msg, Opts};
+        {value, {group_member, Process}, Opts2} ->
+            {{?send_to_group_member, Process, Msg}, Opts2}
     end.
 
 %% @doc Initializes the comm layer by sending a message to known_hosts. A
