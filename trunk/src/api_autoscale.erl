@@ -135,8 +135,7 @@ write_plot_data() ->
         case MgmtServer = config:read(mgmt_server) of
             failed -> {error, mgmt_server_false};
             _      ->
-                comm:send(MgmtServer, {?send_to_group_member, autoscale_server,
-                                       {write_to_file}})
+                comm:send(MgmtServer, {write_to_file}, [{group_member, autoscale_server}])
         end,
         {error, autoscale_server_false}).
 
@@ -146,8 +145,7 @@ reset_plot_data() ->
         case MgmtServer = config:read(mgmt_server) of
             failed -> {error, mgmt_server_false};
             _      ->
-                comm:send(MgmtServer, {?send_to_group_member, autoscale_server,
-                                       {reset}})
+                comm:send(MgmtServer, {reset}, [{group_member, autoscale_server}])
         end,
         {error, autoscale_server_false}).
 
