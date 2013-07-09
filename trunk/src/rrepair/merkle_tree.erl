@@ -28,9 +28,9 @@
 
 -export([new/1, new/2, new/3,
          insert/2, insert_list/2, empty/0,
-         lookup/2, size/1, size_detail/1, gen_hash/1, 
+         lookup/2, size/1, size_detail/1, gen_hash/1,
          iterator/1, next/1,
-         is_empty/1, is_leaf/1, is_merkle_tree/1, 
+         is_empty/1, is_leaf/1, is_merkle_tree/1,
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_item_count/1, get_bucket_size/1, get_branch_factor/1,
          get_opt_bucket_size/3,
@@ -143,7 +143,7 @@ lookup(I, {_, _, _, NodeI, ChildList} = Node) ->
     case intervals:is_subset(I, NodeI) of
         true when ChildList =:= [] -> Node;
         true ->
-            IChilds = [C || C <- ChildList, 
+            IChilds = [C || C <- ChildList,
                             intervals:is_subset(I, get_interval(C))],
             case IChilds of
                 [] -> not_found;
@@ -227,8 +227,8 @@ insert_to_node(Key, {Hash, Count, Bucket, Interval, []}, Config)
     %TODO: check if key is already in bucket
     {Hash, Count + 1, [Key | Bucket], Interval, []};
 
-insert_to_node(Key, {_, BucketSize, Bucket, Interval, []}, 
-               #mt_config{ branch_factor = BranchFactor, 
+insert_to_node(Key, {_, BucketSize, Bucket, Interval, []},
+               #mt_config{ branch_factor = BranchFactor,
                            bucket_size = BucketSize } = Config) ->    
     ChildI = intervals:split(Interval, BranchFactor),
     NewLeafs = [begin 
@@ -238,7 +238,7 @@ insert_to_node(Key, {_, BucketSize, Bucket, Interval, []},
                                                  true -> {[K | List], Sum + 1}; 
                                                  false -> Acc 
                                              end 
-                                    end, {[], 0}, Bucket), 
+                                    end, {[], 0}, Bucket),
                     {nil, BCount, NewBucket, I, []} 
                 end 
                 || I <- ChildI],
@@ -292,7 +292,7 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
                    Hash = case Count > 0 of
                               true -> run_leaf_hf(Config, erlang:term_to_binary(Bucket));
                               _ -> run_leaf_hf(Config, term_to_binary(0))
-                          end,                    
+                          end,
                    {Hash, Count, ?IIF(KeepBucket, Bucket, []), Interval, []}
            end,
     build_childs(T, Config, [Node | Acc]);
@@ -402,9 +402,9 @@ store_to_DOT_p({merkle_tree, Conf, Root}, FileName, ToPng) ->
 -spec store_node_to_DOT(mt_node(), pid(), pos_integer(), pos_integer(), mt_config()) -> pos_integer().
 store_node_to_DOT({_, C, _, I, []}, Fileid, MyId, NextFreeId, #mt_config{ bucket_size = BuckSize }) ->
     {LBr, _LKey, _RKey, RBr} = intervals:get_bounds(I),
-    io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s ; ~p/~p\", shape=box]~n", 
-              [MyId, erlang:atom_to_list(LBr), 
-               ?DOT_SHORTNAME(_LKey), ?DOT_SHORTNAME(_RKey), 
+    io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s ; ~p/~p\", shape=box]~n",
+              [MyId, erlang:atom_to_list(LBr),
+               ?DOT_SHORTNAME(_LKey), ?DOT_SHORTNAME(_RKey),
                erlang:atom_to_list(RBr), C, BuckSize]),
     NextFreeId;
 store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId, TConf) ->
@@ -418,9 +418,9 @@ store_node_to_DOT({_, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId,
                                          {NodeId + 1 , store_node_to_DOT(Node, Fileid, NodeId, NextFree, TConf)}
                                  end, {NextFreeId, NNFreeId}, Childs),
     {LBr, _LKey, _RKey, RBr} = intervals:get_bounds(I),
-    io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s\"""]~n", 
-              [MyId, erlang:atom_to_list(LBr), 
-               ?DOT_SHORTNAME(_LKey), ?DOT_SHORTNAME(_RKey), 
+    io:fwrite(Fileid, "    ~p [label=\"~s~p,~p~s\"""]~n",
+              [MyId, erlang:atom_to_list(LBr),
+               ?DOT_SHORTNAME(_LKey), ?DOT_SHORTNAME(_RKey),
                erlang:atom_to_list(RBr)]),
     NNNFreeId.
 
@@ -448,7 +448,7 @@ build_config(ParamList) ->
                             leaf_hf -> Conf#mt_config{ leaf_hf = Val };
                             inner_hf -> Conf#mt_config{ inner_hf = Val }
                         end
-                end, 
+                end,
                 #mt_config{}, ParamList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

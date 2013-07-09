@@ -76,10 +76,10 @@
 
 % @doc session contains only data of the sync request initiator thus rs_stats:regen_count represents only 
 %      number of regenerated db items on the initator
--record(session, 
-        { id                = ?required(session, id)            :: session_id(), 
+-record(session,
+        { id                = ?required(session, id)            :: session_id(),
           principal         = none                              :: principal_id(),
-          rc_method         = ?required(session, rc_method)     :: rr_recon:method(), 
+          rc_method         = ?required(session, rc_method)     :: rr_recon:method(),
           rc_stats          = none                              :: rr_recon_stats:stats() | none,
           rs_stats          = none                              :: rr_resolve:stats() | none,
           rs_called         = 0                                 :: non_neg_integer(),
@@ -206,7 +206,7 @@ on({request_sync_complete, Session}, State = #rrepair_state{ open_sessions = Ses
     ?TRACE_COMPLETE("--SESSION COMPLETE--~n~p", [Session]),
     case Session#session.principal of
         none -> ok;
-        Pid -> io:format("FINISH!~n~nSEND TO ~p~n", [Pid]), 
+        Pid -> io:format("FINISH!~n~nSEND TO ~p~n", [Pid]),
             comm:send(Pid, {request_sync_complete, Session})
     end,
     NewOpen = lists:delete(Session, Sessions),
@@ -227,8 +227,8 @@ on({recon_progress_report, _Sender, false, _Stats}, State = #rrepair_state{ open
     State#rrepair_state{ open_recon = OR - 1 };    
 on({recon_progress_report, _Sender, true, Stats}, State = #rrepair_state{ open_recon = OR,
                                                                           open_sessions = OS }) ->
-    ?TRACE_RECON("~nRECON OK - Sender=~p~nStats=~p~nOpenRecon=~p~nSessions=~p", 
-                 [_Sender, rr_recon_stats:print(Stats), OR - 1, OS]),    
+    ?TRACE_RECON("~nRECON OK - Sender=~p~nStats=~p~nOpenRecon=~p~nSessions=~p",
+                 [_Sender, rr_recon_stats:print(Stats), OR - 1, OS]),
     NewOS = case extract_session(rr_recon_stats:get(session_id, Stats), OS) of
                     {S, TSessions} ->
                         SUpd = update_session_recon(S, Stats),
@@ -250,9 +250,9 @@ on({resolve_progress_report, _Sender, Stats}, State = #rrepair_state{open_resolv
                         check_session_complete(SUpd),
                         [SUpd | T]
                 end,
-    ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p ; OldSession=~p~nNewSessions=~p", 
+    ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p ; OldSession=~p~nNewSessions=~p",
                    [_Sender, rr_resolve:print_resolve_stats(Stats),
-                    State#rrepair_state.open_recon, OpenResolve - 1, Sessions, NSessions]),        
+                    State#rrepair_state.open_recon, OpenResolve - 1, Sessions, NSessions]),
     State#rrepair_state{ open_resolve = OpenResolve - 1,
                          open_sessions = NSessions };
 
@@ -260,8 +260,8 @@ on({resolve_progress_report, _Sender, Stats}, State = #rrepair_state{open_resolv
 % misc info messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({web_debug_info, Requestor}, #rrepair_state{ round = Round, 
-                                                open_recon = OpenRecon, 
+on({web_debug_info, Requestor}, #rrepair_state{ round = Round,
+                                                open_recon = OpenRecon,
                                                 open_resolve = OpenResol,
                                                 open_sessions = Sessions } = State) ->
     ?TRACE("WEB DEBUG INFO", []),
@@ -316,7 +316,7 @@ fork_session({{R, F}, Pid}) ->
 extract_session(Id, Sessions) ->
     {Satis, NotSatis} = lists:partition(fun(#session{ id = I }) -> 
                                                 session_id_equal(Id, I)
-                                        end, 
+                                        end,
                                         Sessions),
     case Satis of
         [X] -> {X, NotSatis};
@@ -342,7 +342,7 @@ update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount } = S, New)
     S#session{ rs_stats = Merge, rs_finish = RSCount + 1 }.
 
 -spec check_session_complete(session()) -> ok.
-check_session_complete(#session{ rc_stats = RCStats, 
+check_session_complete(#session{ rc_stats = RCStats,
                                  rs_called = C, rs_finish = C } = S) 
   when RCStats =/= none->
     case rr_recon_stats:get(status, RCStats) of
@@ -356,7 +356,7 @@ check_session_complete(_Session) ->
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Starts the replica update process, 
+%% @doc Starts the replica update process,
 %%      registers it with the process dictionary
 %%      and returns its pid for use by a supervisor.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.

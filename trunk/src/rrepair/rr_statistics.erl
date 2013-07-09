@@ -39,7 +39,7 @@
 -type requests() :: 
           {count_old_replicas, Requestor::comm:mypid(), Interval::intervals:interval()}.
 
--record(state, 
+-record(state,
         {
             dhtNodePid = ?required(state, dhtNodePid) :: comm:erl_local_pid(),
             operation  = {}                           :: requests() | {}
@@ -70,16 +70,16 @@ on({get_state_response, MyI}, State = #state{ operation = Op,
                     comm:send(Req, {count_old_replicas_reply, 0}),
                     comm:send_local(self(), {shutdown});
                 _ ->
-                    comm:send_local(DhtPid, 
-                                    {get_chunk, self(), I, 
+                    comm:send_local(DhtPid,
+                                    {get_chunk, self(), I,
                                      fun(Item) -> db_entry:get_version(Item) =/= -1 end,
                                      fun(Item) -> {db_entry:get_key(Item), db_entry:get_version(Item)} end,
                                      all})                    
             end
-    end,    
+    end,
     State;
 
-on({get_chunk_response, {_, DBList}}, 
+on({get_chunk_response, {_, DBList}},
    State = #state{ operation = {count_old_replicas, Req, _} }) ->
     Outdated = lists:foldl(
                  fun({Key, Ver}, Acc) -> 
@@ -94,7 +94,7 @@ on({get_chunk_response, {_, DBList}},
                              true -> Acc;
                              false -> Acc + 1
                          end
-                 end, 
+                 end,
                  0, DBList),
     comm:send(Req, {count_old_replicas_reply, Outdated}),
     comm:send_local(self(), {shutdown}),

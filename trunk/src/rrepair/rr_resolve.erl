@@ -109,7 +109,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state().
 
-on({start, Operation, Options}, State = #rr_resolve_state{ dhtNodePid = DhtPid, 
+on({start, Operation, Options}, State = #rr_resolve_state{ dhtNodePid = DhtPid,
                                                            stats = Stats }) ->
     FBDest = proplists:get_value(feedback, Options, nil),
     FBResp = proplists:get_value(feedback_response, Options, false),
@@ -118,7 +118,7 @@ on({start, Operation, Options}, State = #rr_resolve_state{ dhtNodePid = DhtPid,
 									   stats = Stats#resolve_stats{ feedback_response = FBResp },
 									   feedback = {FBDest, []},
 									   send_stats = StatsDest },
-    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p", 
+    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p",
            [element(1, Operation), FBDest, FBResp], State),
 	comm:send_local(DhtPid, {get_state, comm:this(), my_range}),
 	NewState;
@@ -142,7 +142,7 @@ on({get_state_response, MyI}, State =
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd_send, _, KeyList},
                           dhtNodePid = DhtPid }) ->    
-    FKeyList = [K || X <- KeyList, K <- ?RT:get_replica_keys(X), 
+    FKeyList = [K || X <- KeyList, K <- ?RT:get_replica_keys(X),
                      intervals:in(K, MyI)],
     KeyTree = gb_sets:from_list(FKeyList),
     comm:send_local(DhtPid, {get_entries, self(),
@@ -155,7 +155,7 @@ on({get_entries_response, KVVList}, State =
                           feedback = {FB, _},
                           stats = Stats }) ->
     Options = ?IIF(FB =/= nil, [{feedback, FB}], []),
-    SendList = make_unique_kvv(lists:keysort(1, KVVList), []),    
+    SendList = make_unique_kvv(lists:keysort(1, KVVList), []),
     case Stats#resolve_stats.session_id of
         null -> comm:send(Dest, {request_resolve, {key_upd, SendList}, Options});
         SID -> comm:send(Dest, {request_resolve, SID, {key_upd, SendList}, Options})
@@ -217,10 +217,10 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
        #rr_resolve_state{ operation = Op,
                           stats = #resolve_stats{ diff_size = Diff,
                                                   regen_count = RegenOk,
-                                                  update_count = UpdOk, 
+                                                  update_count = UpdOk,
                                                   upd_fail_count = UpdFail,
                                                   regen_fail_count = RegenFail
-                                                } = Stats,                          
+                                                } = Stats,
                           feedback = FB = {DoFB, FBItems}
                         }) 
   when element(1, Op) =:= key_upd;
@@ -246,7 +246,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     State#rr_resolve_state{ stats = NewStats, feedback = NewFB };
 
 on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,
-                                     ownerMonitor = Mon, 
+                                     ownerMonitor = Mon,
                                      send_stats = SendStats,
                                      stats = Stats }) ->    
     erlang:demonitor(Mon),
@@ -289,7 +289,7 @@ merge_stats(#resolve_stats{ session_id = ASID,
                             regen_count = ARC,
                             regen_fail_count = AFC,
                             upd_fail_count = AUFC,
-                            update_count = AUC }, 
+                            update_count = AUC },
             #resolve_stats{ session_id = BSID,
                             diff_size = BDiff,
                             feedback_response = BFB,
@@ -318,7 +318,7 @@ merge_stats(#resolve_stats{ session_id = ASID,
 -spec entry_to_kvv(db_entry:entry()) -> {?RT:key(), ?DB:value(), ?DB:version()}.
 entry_to_kvv(Entry) ->
     {rr_recon:map_key_to_quadrant(db_entry:get_key(Entry), 1),
-     db_entry:get_value(Entry), 
+     db_entry:get_value(Entry),
      db_entry:get_version(Entry)}.
 
 make_unique_kvv([], Acc) -> Acc;
@@ -348,10 +348,10 @@ send_stats(SendStats, Stats) ->
 -spec print_resolve_stats(stats()) -> [any()].
 print_resolve_stats(Stats) ->
     FieldNames = record_info(fields, resolve_stats),
-    Res = util:for_to_ex(1, length(FieldNames), 
+    Res = util:for_to_ex(1, length(FieldNames),
                          fun(I) ->
                                  {lists:nth(I, FieldNames), erlang:element(I + 1, Stats)}
-                         end),    
+                         end),
     [erlang:element(1, Stats), lists:flatten(Res)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -371,12 +371,12 @@ start() ->
 start(SID) ->        
     State = get_start_state(),
     Stats = State#rr_resolve_state.stats,
-    gen_component:start(?MODULE, fun ?MODULE:on/2, 
+    gen_component:start(?MODULE, fun ?MODULE:on/2,
                         State#rr_resolve_state{ stats = Stats#resolve_stats{ session_id = SID } }, []).
 
 -spec get_start_state() -> state().
 get_start_state() ->
-    #rr_resolve_state{ ownerLocalPid = self(), 
-                       ownerRemotePid = comm:this(), 
+    #rr_resolve_state{ ownerLocalPid = self(),
+                       ownerRemotePid = comm:this(),
                        dhtNodePid = pid_groups:get_my(dht_node)
                      }.
