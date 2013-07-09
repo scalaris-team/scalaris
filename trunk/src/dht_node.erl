@@ -246,13 +246,13 @@ on({get_entries, Source_PID, FilterFun, ValFun}, State) ->
     State;
 
 on({get_chunk, Source_PID, Interval, MaxChunkSize}, State) ->
-    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), dht_node_state:get(State, node_id),
+    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), dht_node_state:get(State, pred_id),
                           Interval, MaxChunkSize),
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
 on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) ->
-    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), dht_node_state:get(State, node_id),
+    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), dht_node_state:get(State, pred_id),
                           Interval, FilterFun, ValueFun, MaxChunkSize),
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
