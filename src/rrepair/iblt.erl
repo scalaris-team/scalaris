@@ -54,7 +54,7 @@
 -record(iblt, {
                hfs        = ?required(iblt, hfs) :: ?REP_HFS:hfs(),    %HashFunctionSet
                table      = []                   :: table(),
-               cell_count = 0                    :: non_neg_integer(), 
+               cell_count = 0                    :: non_neg_integer(),
                col_size   = 0                    :: non_neg_integer(), %cells per column
                item_count = 0                    :: non_neg_integer()  %number of inserted items
                }).
@@ -85,9 +85,9 @@ new(Hfs, CellCount, Options) ->
     SubTable = [{0, <<0>> ,0, 0, 0} || _ <- lists:seq(1, ColSize)],
     Table = [ {I, SubTable} || I <- lists:seq(1, K)],
     #iblt{
-          hfs = Hfs, 
-          table = Table, 
-          cell_count = Cells, 
+          hfs = Hfs,
+          table = Table,
+          cell_count = Cells,
           col_size = ColSize,
           item_count = 0
           }.
@@ -109,11 +109,11 @@ operation_val(add) -> 1;
 operation_val(remove) -> -1.
 
 -spec change_table(iblt(), cell_operation(), ?RT:key(), value()) -> iblt().
-change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = ColSize } = IBLT, 
+change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = ColSize } = IBLT,
              Operation, Key, Value) ->
     NT = lists:foldl(
            fun({ColNr, Col}, NewT) ->
-                   NCol = change_cell(Col, 
+                   NCol = change_cell(Col,
                                       ?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize,
                                       encode_key(Key), Value, Operation),
                    [{ColNr, NCol} | NewT]
@@ -126,10 +126,10 @@ change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = Col
 change_cell(Column, CellNr, Key, Value, Operation) ->
     {HeadL, [Cell | TailL]} = lists:split(CellNr, Column),
     {Count, KeySum, KHSum, ValSum, VHSum} = Cell,
-    lists:append(HeadL, [{Count + operation_val(Operation), 
-                          util:bin_xor(KeySum, Key), 
+    lists:append(HeadL, [{Count + operation_val(Operation),
+                          util:bin_xor(KeySum, Key),
                           KHSum bxor checksum_fun(Key),
-                          ValSum bxor Value, 
+                          ValSum bxor Value,
                           VHSum bxor checksum_fun(Value)} | TailL]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

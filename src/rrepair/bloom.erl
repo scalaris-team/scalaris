@@ -69,8 +69,8 @@ new_(BitSize, MaxItems, Hfs) ->
 -spec add_list_(bloom_filter_t(), [key()]) -> bloom_filter_t().
 add_list_(Bloom, Items) ->
     #bloom{
-           size = BFSize, 
-           hfs = Hfs, 
+           size = BFSize,
+           hfs = Hfs,
            items_count = FilledCount,
            filter = Filter
           } = Bloom,
@@ -92,25 +92,25 @@ p_add_list(_Hfs, _BFSize, Acc, []) ->
 % @doc returns true if the bloom filter contains item
 -spec is_element_(bloom_filter_t(), key()) -> boolean().
 is_element_(#bloom{size = BFSize, hfs = Hfs, filter = Filter}, Item) -> 
-    Positions = apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]), 
+    Positions = apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]),
     check_Bits(Filter, Positions).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc joins two bloom filter, returned bloom filter represents their union
 -spec join_(bloom_filter(), bloom_filter()) -> bloom_filter().
-join_(#bloom{size = Size1, max_items = ExpItem1, items_count = Items1, 
-             filter = F1, hfs = Hfs}, 
-      #bloom{size = Size2, max_items = ExpItem2, items_count = Items2, 
+join_(#bloom{size = Size1, max_items = ExpItem1, items_count = Items1,
+             filter = F1, hfs = Hfs},
+      #bloom{size = Size2, max_items = ExpItem2, items_count = Items2,
              filter = F2}) when Size1 =:= Size2 ->
     <<F1Val : Size1>> = F1,
     <<F2Val : Size2>> = F2,
     NewFVal = F1Val bor F2Val,
     #bloom{
            size = Size1,
-           filter = <<NewFVal:Size1>>,                            
-           max_items = erlang:max(ExpItem1, ExpItem2), 
-           hfs = Hfs,                              
+           filter = <<NewFVal:Size1>>,
+           max_items = erlang:max(ExpItem1, ExpItem2),
+           hfs = Hfs,
            items_count = Items1 + Items2 %approximation            
            }.
 
@@ -118,7 +118,7 @@ join_(#bloom{size = Size1, max_items = ExpItem1, items_count = Items1,
 
 %% @doc checks equality of two bloom filters
 -spec equals_(bloom_filter(), bloom_filter()) -> boolean().
-equals_(#bloom{ size = Size1, items_count = Items1, filter = Filter1 }, 
+equals_(#bloom{ size = Size1, items_count = Items1, filter = Filter1 },
         #bloom{ size = Size2, items_count = Items2, filter = Filter2 }) ->
     Size1 =:= Size2 andalso
         Items1 =:= Items2 andalso
@@ -128,7 +128,7 @@ equals_(#bloom{ size = Size1, items_count = Items1, filter = Filter1 },
 
 % @doc bloom filter debug information
 -spec print_(bloom_filter_t()) -> [{atom(), any()}].
-print_(#bloom{ max_items = MaxItems, 
+print_(#bloom{ max_items = MaxItems,
                size = Size,
                hfs = Hfs,
                items_count = NumItems } = Bloom) -> 
@@ -166,7 +166,7 @@ get_property(Bloom, Property) ->
 -spec set_Bits(binary(), [integer()]) -> binary().
 set_Bits(Filter, [Pos | Positions]) ->
     PreByteNum = Pos div 8,
-    <<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,    
+    <<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,
     NewByte = OldByte bor (2#10000000 bsr (Pos rem 8)),
     NewBinary = case NewByte of
                     OldByte -> Filter;

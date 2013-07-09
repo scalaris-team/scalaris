@@ -37,7 +37,7 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     {new, 1}, {new, 2}, 
+     {new, 1}, {new, 2},
      {apply_val, 2},
      {apply_val, 3},
      {apply_val_rem, 3},

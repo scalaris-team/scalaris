@@ -30,7 +30,7 @@
 
 %export for testing
 -export([encodeBlob/2, decodeBlob/1,
-         map_interval/2, 
+         map_interval/2,
          get_key_quadrant/1, get_interval_quadrant/1,
          find_intersection/2,
          get_interval_size/1]).
@@ -67,9 +67,9 @@
 -type db_as_list_enc() :: [db_entry_enc()].
 -type db_chunk_enc()   :: {intervals:interval(), db_as_list_enc()}.
 
--record(bloom_recon_struct, 
+-record(bloom_recon_struct,
         {
-         interval = intervals:empty()                       :: intervals:interval(), 
+         interval = intervals:empty()                       :: intervals:interval(),
          bloom    = ?required(bloom_recon_struct, bloom)    :: ?REP_BLOOM:bloom_filter()         
         }).
 -type bloom_recon_struct() :: #bloom_recon_struct{}.
@@ -138,15 +138,15 @@ on({get_state_response, MyI}, State =
                         method = Method,
                         dest_key = DestKey,
                         ownerPid = OwnerL }) ->
-    Msg = {?send_to_group_member, rrepair, 
-           {continue_recon, comm:make_global(OwnerL), rr_recon_stats:get(session_id, Stats), 
+    Msg = {?send_to_group_member, rrepair,
+           {continue_recon, comm:make_global(OwnerL), rr_recon_stats:get(session_id, Stats),
             {continue, Method, req_shared_interval, [{interval, MyI}], false}}},
     DKey = case DestKey of
                random -> select_sync_node(MyI);        
                _ -> DestKey
            end,
     ?TRACE("START_TO_DEST ~p", [DKey]),
-    api_dht_raw:unreliable_lookup(DKey, Msg),    
+    api_dht_raw:unreliable_lookup(DKey, Msg),
     comm:send_local(self(), {shutdown, negotiate_interval}),
     State;
 
@@ -154,7 +154,7 @@ on({get_state_response, MyI}, State =
        #rr_recon_state{ stage = req_shared_interval,
                         initiator = false,
                         method = Method,
-                        struct = Params,                        
+                        struct = Params,
                         dhtNodePid = DhtPid,
                         dest_rr_pid = DestRRPid }) ->
     Method =:= merkle_tree andalso fd:subscribe(DestRRPid),
@@ -172,7 +172,7 @@ on({get_state_response, MyI}, State =
                         method = RMethod,
                         struct = Params,
                         dhtNodePid = DhtPid,
-                        dest_rr_pid = DestRRPid}) ->    
+                        dest_rr_pid = DestRRPid}) ->
     DestI = proplists:get_value(interval, Params),
     DestReconPid = proplists:get_value(reconPid, Params, undefined),
     MyIntersec = find_intersection(MyI, DestI),
@@ -184,7 +184,7 @@ on({get_state_response, MyI}, State =
             comm:send_local(self(), {shutdown, negotiate_interval}),
             DestReconPid =/= undefined andalso
                 comm:send(DestReconPid, {shutdown, empty_interval})
-    end,    
+    end,
     State#rr_recon_state{ stage = build_struct, dest_recon_pid = DestReconPid };
 
 on({get_state_response, MyI}, State = 
@@ -202,12 +202,12 @@ on({get_state_response, MyI}, State =
 
 on({get_chunk_response, {RestI, DBList}}, State =
        #rr_recon_state{ stage = build_struct,
-                        method = RMethod,        
-                        struct = Params,                    
+                        method = RMethod,
+                        struct = Params,
                         dhtNodePid = DhtNodePid,
                         initiator = Initiator,
                         stats = Stats }) ->
-    SyncI = proplists:get_value(interval, Params),    
+    SyncI = proplists:get_value(interval, Params),
     ToBuild = ?IIF(RMethod =:= art, ?IIF(Initiator, merkle_tree, art), RMethod),
     {BuildTime, SyncStruct} =
         case merkle_tree:is_merkle_tree(Params) of
@@ -220,13 +220,13 @@ on({get_chunk_response, {RestI, DBList}}, State =
     if not EmptyRest ->
            SubSyncI = find_intersection(SyncI, RestI),
            case intervals:is_empty(SubSyncI) of
-               false ->            
+               false ->
                    Pid = if RMethod =:= bloom -> 
                                 ForkParams = lists:keyreplace(interval, 1, Params, {interval, SubSyncI}),
                                 erlang:element(2, fork_recon(State#rr_recon_state{ struct = ForkParams }));
                             true -> self()
                          end,
-                   send_chunk_req(DhtNodePid, Pid, find_intersection(RestI, SyncI), SubSyncI, 
+                   send_chunk_req(DhtNodePid, Pid, find_intersection(RestI, SyncI), SubSyncI,
                                   get_max_items(RMethod));
                true -> ok
            end;
@@ -236,8 +236,8 @@ on({get_chunk_response, {RestI, DBList}}, State =
                           not EmptyRest andalso RMethod =:= merkle_tree -> {build_struct, Stats};
                           true -> {reconciliation, Stats}
                        end,
-    State#rr_recon_state{ stage = NStage, 
-                          struct = SyncStruct, 
+    State#rr_recon_state{ stage = NStage,
+                          struct = SyncStruct,
                           stats = rr_recon_stats:set([{build_time, BuildTime}], NStats) };    
 
 on({get_chunk_response, {RestI, DBList}}, State = 
@@ -276,7 +276,7 @@ on({start, Method, DestKey}, State) ->
 
 on({continue, Method, Stage, Struct, Initiator}, State) ->
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
-    State#rr_recon_state{ stage = Stage, 
+    State#rr_recon_state{ stage = Stage,
                           struct = Struct,
                           method = Method,
                           initiator = Initiator orelse Stage =:= res_shared_interval };
@@ -314,18 +314,18 @@ on({check_nodes, SenderPid, ToCheck}, State = #rr_recon_state{ struct = Tree }) 
 on({check_nodes_response, CmpResults}, State =
        #rr_recon_state{ dest_recon_pid = DestReconPid,
                         dest_rr_pid = SrcNode,
-                        stats = Stats, 
+                        stats = Stats,
                         ownerPid = OwnerL,
                         struct = Tree }) ->
     SID = rr_recon_stats:get(session_id, Stats),
     {Req, Res, NStats, RTree} = process_tree_cmp_result(CmpResults, Tree, get_merkle_branch_factor(), Stats),
     Req =/= [] andalso
-        comm:send(DestReconPid, {check_nodes, comm:this(), Req}),    
+        comm:send(DestReconPid, {check_nodes, comm:this(), Req}),
     {Leafs, Resolves} = lists:foldl(fun(Node, {AccL, AccR}) -> 
                                             {LCount, RCount} = resolve_node(Node, {SrcNode, SID, OwnerL}),
                                             {AccL + LCount, AccR + RCount}
                                     end, {0, 0}, Res),
-    FStats = rr_recon_stats:inc([{tree_leafsSynced, Leafs}, 
+    FStats = rr_recon_stats:inc([{tree_leafsSynced, Leafs},
                                  {resolve_started, Resolves}], NStats),
     CompLeft = rr_recon_stats:get(tree_compareLeft, FStats),
     if CompLeft =:= 0 ->
@@ -342,20 +342,20 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                                                 struct = Params,
                                                 ownerPid = OwnerL,
                                                 dest_recon_pid = DestReconPid,
-                                                dest_rr_pid = DestRRPid,                                       
-                                                initiator = Initiator, 
+                                                dest_rr_pid = DestRRPid,
+                                                initiator = Initiator,
                                                 stats = Stats }) ->
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     case Method of
         merkle_tree -> 
             case Initiator of
-                true -> comm:send(DestReconPid, 
+                true -> comm:send(DestReconPid,
                                   {check_nodes, comm:this(), [merkle_tree:get_hash(SyncStruct)]});
                 false ->
                     IntParams = [{interval, merkle_tree:get_interval(SyncStruct)}, {reconPid, comm:this()}],
-                    comm:send(DestRRPid, 
-                              {continue_recon, comm:make_global(OwnerL), SID, 
+                    comm:send(DestRRPid,
+                              {continue_recon, comm:make_global(OwnerL), SID,
                                {continue, merkle_tree, res_shared_interval, IntParams, true}})
             end,
             rr_recon_stats:set(
@@ -372,11 +372,11 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                     true -> art_recon(SyncStruct, proplists:get_value(art, Params), State);                    
                     false ->
                         ArtParams = [{interval, art:get_interval(SyncStruct)}, {art, SyncStruct}],
-                        comm:send(DestRRPid, 
-                                  {continue_recon, comm:make_global(OwnerL), SID, 
+                        comm:send(DestRRPid,
+                                  {continue_recon, comm:make_global(OwnerL), SID,
                                    {continue, art, res_shared_interval, ArtParams, true}}),
                         {no, Stats}
-                end,            
+                end,
             comm:send_local(self(), {shutdown, ?IIF(AOk =:= ok, sync_finished, build_struct)}),
             ARStats
     end.
@@ -410,7 +410,7 @@ p_check_node([Hash | TK], [Node | TN], {AccR, AccN}) ->
         false when IsLeaf -> p_check_node(TK, TN, {[?fail_leaf | AccR], AccN});
         false when not IsLeaf ->
             Childs = merkle_tree:get_childs(Node),
-            p_check_node(TK, TN, {[?fail_inner | AccR], 
+            p_check_node(TK, TN, {[?fail_inner | AccR],
                                   lists:append(lists:reverse(Childs), AccN)}) 
     end.
 
@@ -423,7 +423,7 @@ p_check_node([Hash | TK], [Node | TN], {AccR, AccN}) ->
       is_subtype(Resolve,   [merkle_tree:mt_node()]).
 process_tree_cmp_result(CmpResult, Tree, BranchSize, Stats) ->
     Compared = length(CmpResult),
-    NStats = rr_recon_stats:inc([{tree_compareLeft, -Compared}, 
+    NStats = rr_recon_stats:inc([{tree_compareLeft, -Compared},
                                  {tree_nodesCompared, Compared}], Stats),
     case merkle_tree:is_merkle_tree(Tree) of
         false -> p_process_tree_cmp_result(CmpResult, Tree, BranchSize, NStats, {[], [], []});
@@ -454,13 +454,13 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, {Req, Res,
             Childs = merkle_tree:get_childs(Node),
             NewReq = [merkle_tree:get_hash(X) || X <- Childs],
             NStats = rr_recon_stats:inc([{tree_compareLeft, length(Childs)}], Stats),
-            p_process_tree_cmp_result(TR, TN, BS, NStats, 
-                                      {lists:append(lists:reverse(NewReq), Req), 
-                                       Res, 
+            p_process_tree_cmp_result(TR, TN, BS, NStats,
+                                      {lists:append(lists:reverse(NewReq), Req),
+                                       Res,
                                        lists:append(lists:reverse(Childs), RTree)});
         true -> 
             NewReq = [?omit || _ <- lists:seq(1, BS)],
-            p_process_tree_cmp_result(TR, TN, BS, Stats, 
+            p_process_tree_cmp_result(TR, TN, BS, Stats,
                                       {lists:append(NewReq, Req), [Node | Res], RTree})
     end.
 
@@ -475,10 +475,10 @@ resolve_node(not_found, _) -> {0, 0};
 resolve_node(Node, Conf) ->
     case merkle_tree:is_leaf(Node) of
         true -> {1, resolve_leaf(Node, Conf)};
-        false -> lists:foldl(fun(X, {AccL, AccR}) ->  
+        false -> lists:foldl(fun(X, {AccL, AccR}) ->
                                      {LCount, RCount} = resolve_node(X, Conf),
                                      {AccL + LCount, AccR + RCount} 
-                             end, 
+                             end,
                              {0, 0}, merkle_tree:get_childs(Node))
     end.
 
@@ -543,7 +543,7 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
                     art_get_sync_leafs(ToCheck, Art, NStats, [Node | ToSyncAcc]);
                 false ->
                     art_get_sync_leafs(
-                           lists:append(merkle_tree:get_childs(Node), ToCheck), 
+                           lists:append(merkle_tree:get_childs(Node), ToCheck),
                            Art, Stats, ToSyncAcc)
             end
     end.
@@ -554,19 +554,19 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
       is_subtype(Method,       method()),
       is_subtype(DB_Chunk,     {intervals:interval(), db_as_list_enc()}),
       is_subtype(Recon_Struct, bloom_recon_struct() | merkle_tree:merkle_tree() | art:art()).
-build_recon_struct(bloom, {I, DBItems}) ->    
+build_recon_struct(bloom, {I, DBItems}) ->
     Fpr = get_bloom_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     BF = ?REP_BLOOM:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
     #bloom_recon_struct{ interval = I, bloom = BF };
 build_recon_struct(merkle_tree, {I, DBItems}) ->
-    merkle_tree:new(I, DBItems, [{branch_factor, get_merkle_branch_factor()}, 
+    merkle_tree:new(I, DBItems, [{branch_factor, get_merkle_branch_factor()},
                                  {bucket_size, get_merkle_bucket_size()}]);
 build_recon_struct(art, {I, DBItems}) ->
     Branch = get_merkle_branch_factor(),
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), Branch, 1),
-    Tree = merkle_tree:new(I, DBItems, [{branch_factor, Branch}, 
+    Tree = merkle_tree:new(I, DBItems, [{branch_factor, Branch},
                                         {bucket_size, BucketSize}]),
     art:new(Tree, get_art_config()).
 
@@ -575,7 +575,7 @@ build_recon_struct(art, {I, DBItems}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Sends get_chunk request to local DHT_node process.
-%      Request responses a list of encoded key-version pairs in ChunkI, 
+%      Request responses a list of encoded key-version pairs in ChunkI,
 %      where key is mapped to its assosiated key in MappedI.
 -spec send_chunk_req(DhtPid::LPid, AnswerPid::LPid, ChunkI::I, DestI::I, MaxItems) -> ok when
     is_subtype(LPid,        comm:erl_local_pid()),
@@ -583,8 +583,8 @@ build_recon_struct(art, {I, DBItems}) ->
     is_subtype(MaxItems,    pos_integer()).
 send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
     comm:send_local(
-      DhtPid, 
-      {get_chunk, SrcPid, I, 
+      DhtPid,
+      {get_chunk, SrcPid, I,
        fun(Item) -> db_entry:get_version(Item) =/= -1 end,
        fun(Item) ->
                case map_key_to_interval(db_entry:get_key(Item), DestI) of
@@ -668,7 +668,7 @@ add_quadrants_to_key(Key, Add, RepFactor) ->
 %      Precondition: Interval (I) is continuous!
 %      Result: Continuous left-open interval starting or laying in given RepQuadrant.
 -spec map_interval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
-map_interval(I, Q) ->    
+map_interval(I, Q) ->
     case intervals:is_all(I) of
         false ->
             {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
@@ -727,7 +727,7 @@ encodeBlob(A, B) ->
 -spec decodeBlob(db_entry_enc()) -> {?RT:key(), ?DB:value() | ?DB:version()} | fail.
 decodeBlob(Blob) when is_binary(Blob) ->
     case binary_to_term(Blob) of
-        [Key, "#", X] ->  {Key, X};
+        [Key, "#", X] -> {Key, X};
         _ -> fail
     end;
 decodeBlob(_) -> fail.
@@ -763,7 +763,7 @@ start(SessionId, SenderRRPid) ->
 
 -spec fork_recon(state()) -> {ok, pid()}.
 fork_recon(Conf) ->
-    NStats = rr_recon_stats:set([{session_id, null}], Conf#rr_recon_state.stats),    
+    NStats = rr_recon_stats:set([{session_id, null}], Conf#rr_recon_state.stats),
     State = Conf#rr_recon_state{ stats = NStats },
     comm:send_local(Conf#rr_recon_state.ownerPid, {recon_forked}),
     gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).

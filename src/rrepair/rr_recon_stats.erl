@@ -160,7 +160,7 @@ merge(A, #rr_recon_stats{ tree_size = TS,
 -spec print(stats()) -> [any()].
 print(Stats) ->
     FieldNames = record_info(fields, rr_recon_stats),
-    Res = util:for_to_ex(1, length(FieldNames), 
+    Res = util:for_to_ex(1, length(FieldNames),
                          fun(I) ->
                                  {lists:nth(I, FieldNames), erlang:element(I + 1, Stats)}
                          end),

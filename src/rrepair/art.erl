@@ -50,7 +50,7 @@
 -type config()       :: [config_param()].
 
 -type art() :: { art,
-                 Config     :: config(), 
+                 Config     :: config(),
                  Interval   :: intervals:interval(),
                  InnerNodes :: ?REP_BLOOM:bloom_filter() | empty,
                  Leafs      :: ?REP_BLOOM:bloom_filter() | empty }.
@@ -82,7 +82,7 @@ new(Tree, _Config) ->
     InnerBF = ?REP_BLOOM:new(InnerCount, proplists:get_value(inner_bf_fpr, Config)),
     LeafBF = ?REP_BLOOM:new(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),
-    ?TRACE("INNER=~p~nLeaf=~p", [?REP_BLOOM:print(IBF), ?REP_BLOOM:print(LBF)]),    
+    ?TRACE("INNER=~p~nLeaf=~p", [?REP_BLOOM:print(IBF), ?REP_BLOOM:print(LBF)]),
     {art, Config, merkle_tree:get_interval(Tree), IBF, LBF}.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
