@@ -110,7 +110,7 @@ get_entries_(State, Interval) ->
 %%      interval but at most ChunkSize elements.
 %%      Assumes the ets-table is an ordered_set,
 %%      may return data from "both ends" of the DB-range if the interval is
-%%      ""wrapping around", i.e. its begin is larger than its end.
+%%      "wrapping around", i.e. its begin is larger than its end.
 %%      Returns the chunk and the remaining interval for which the DB may still
 %%      have data (a subset of I).
 %%      Precond: Interval is a subset of the range of the dht_node and continuous!
