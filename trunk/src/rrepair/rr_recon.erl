@@ -88,7 +88,6 @@
 -record(rr_recon_state,
         {
          ownerPid           = ?required(rr_recon_state, ownerPid)       :: comm:erl_local_pid(),
-         ownerMonitor       = null                                      :: null | reference(),
          dhtNodePid         = ?required(rr_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
          dest_key           = random                                    :: recon_dest(),
          dest_rr_pid        = undefined                                 :: comm:mypid() | undefined, %dest rrepair pid
@@ -286,20 +285,12 @@ on({crash, _Pid}, State) ->
     State;
 
 on({shutdown, Reason}, #rr_recon_state{ ownerPid = OwnerL,
-                                        ownerMonitor = OwnerMon,
                                         stats = Stats,
                                         initiator = Initiator }) ->
     ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),
     Status = exit_reason_to_rc_status(Reason),
     NewStats = rr_recon_stats:set([{status, Status}], Stats),
-    if OwnerMon =/= null -> erlang:demonitor(OwnerMon);
-       true -> ok
-    end,
     comm:send_local(OwnerL, {recon_progress_report, self(), Initiator, NewStats}),
-    kill;
-
-on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
-    log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -745,8 +736,7 @@ rep_factor() ->
 %% @doc init module
 -spec init(state()) -> state().
 init(State) ->
-    Mon = erlang:monitor(process, State#rr_recon_state.ownerPid),
-    State#rr_recon_state{ ownerMonitor = Mon }.
+    State.
 
 -spec start(rrepair:session_id() | null) -> {ok, pid()}.
 start(SessionId) -> start(SessionId, undefined).
@@ -759,14 +749,14 @@ start(SessionId, SenderRRPid) ->
                              dhtNodePid = pid_groups:get_my(dht_node),
                              dest_rr_pid = SenderRRPid,
                              stats = rr_recon_stats:new([{session_id, SessionId}]) },
-    gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, State, []).
 
 -spec fork_recon(state()) -> {ok, pid()}.
 fork_recon(Conf) ->
     NStats = rr_recon_stats:set([{session_id, null}], Conf#rr_recon_state.stats),
     State = Conf#rr_recon_state{ stats = NStats },
     comm:send_local(Conf#rr_recon_state.ownerPid, {recon_forked}),
-    gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, State, []).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config parameter handling
