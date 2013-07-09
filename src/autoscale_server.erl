@@ -94,8 +94,8 @@ log(KeyValueList) when erlang:is_list(KeyValueList)  ->
     
     lists:foreach(
       fun({Key, Value}) ->
-              comm:send(MgmtServer, {?send_to_group_member, autoscale_server,
-                                     {collect, Key, NowMs, Value}})
+              comm:send(MgmtServer, {collect, Key, NowMs, Value},
+                        [{group_member, autoscale_server}])
       end, KeyValueList),
     ok.
 
