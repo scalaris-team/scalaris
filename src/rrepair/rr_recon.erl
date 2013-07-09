@@ -60,8 +60,9 @@
                           sync_finished_remote.     %client-side shutdown by merkle-tree recon initiator
 
 -type db_entry_enc()   :: binary().
--type db_as_list_enc() :: [db_entry_enc()].
--type db_chunk_enc()   :: {intervals:interval(), db_as_list_enc()}.
+-type db_chunk_enc()   :: [db_entry_enc()].
+-type db_entry()       :: {?RT:key(), ?DB:version()}.
+-type db_chunk()       :: [db_entry()].
 
 -record(bloom_recon_struct,
         {
@@ -116,8 +117,8 @@
     {check_nodes, InitiatorPid::comm:mypid(), [merkle_cmp_request()]} |
     {check_nodes_response, [merkle_cmp_result()]} |
     %dht node response
-    {get_state_response, intervals:interval()} |
-    {get_chunk_response, db_chunk_enc()} |          
+    {get_state_response, MyI::intervals:interval()} |
+    {rr_recon, data, DestI::intervals:interval(), {get_chunk_response, {intervals:interval(), db_chunk()}}} |
     %internal
     {shutdown, exit_reason()} | 
     {crash, DeadPid::comm:mypid()}.
@@ -195,13 +196,17 @@ on({get_state_response, MyI}, State =
     end,
     State;
 
-on({get_chunk_response, {RestI, DBList}}, State =
+on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
        #rr_recon_state{ stage = build_struct,
                         method = RMethod,
                         struct = Params,
                         dhtNodePid = DhtNodePid,
                         initiator = Initiator,
                         stats = Stats }) ->
+    DBList = [case map_key_to_interval(KeyX, DestI) of
+                  none -> encodeBlob(?MINUS_INFINITY, 0); %TODO should be filtered
+                  Key -> encodeBlob(Key, VersionX)
+              end || {KeyX, VersionX} <- DBList0],
     SyncI = proplists:get_value(interval, Params),
     ToBuild = ?IIF(RMethod =:= art, ?IIF(Initiator, merkle_tree, art), RMethod),
     {BuildTime, SyncStruct} =
@@ -235,7 +240,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
                           struct = SyncStruct,
                           stats = rr_recon_stats:set([{build_time, BuildTime}], NStats) };    
 
-on({get_chunk_response, {RestI, DBList}}, State = 
+on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
        #rr_recon_state{ stage = reconciliation,
                         method = bloom,
                         dhtNodePid = DhtNodePid,
@@ -243,6 +248,10 @@ on({get_chunk_response, {RestI, DBList}}, State =
                         dest_rr_pid = DestRU_Pid,
                         struct = #bloom_recon_struct{ bloom = BF },
                         stats = Stats }) ->
+    DBList = [case map_key_to_interval(KeyX, DestI) of
+                  none -> encodeBlob(?MINUS_INFINITY, 0); %TODO should be filtered
+                  Key -> encodeBlob(Key, VersionX)
+              end || {KeyX, VersionX} <- DBList0],
     %if rest interval is non empty start another sync    
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
@@ -539,7 +548,7 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
 
 -spec build_recon_struct(Method, DB_Chunk) -> Recon_Struct when
       is_subtype(Method,       method()),
-      is_subtype(DB_Chunk,     {intervals:interval(), db_as_list_enc()}),
+      is_subtype(DB_Chunk,     {intervals:interval(), db_chunk_enc()}),
       is_subtype(Recon_Struct, bloom_recon_struct() | merkle_tree:merkle_tree() | art:art()).
 build_recon_struct(bloom, {I, DBItems}) ->
     Fpr = get_bloom_fpr(),
@@ -569,17 +578,16 @@ build_recon_struct(art, {I, DBItems}) ->
     is_subtype(I,           intervals:interval()),
     is_subtype(MaxItems,    pos_integer()).
 send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
+    SrcPidReply = comm:reply_as(SrcPid, 4, {rr_recon, data, DestI, '_'}),
     comm:send_local(
       DhtPid,
-      {get_chunk, SrcPid, I,
-       fun(Item) -> db_entry:get_version(Item) =/= -1 end,
-       fun(Item) ->
-               case map_key_to_interval(db_entry:get_key(Item), DestI) of
-                   none -> encodeBlob(?MINUS_INFINITY, 0); %TODO should be filtered
-                   Key -> encodeBlob(Key, db_entry:get_version(Item))
-               end
-       end,
+      {get_chunk, SrcPidReply, I, fun get_chunk_filter/1, fun get_chunk_value/1,
        MaxItems}).
+
+-spec get_chunk_filter(db_entry:entry()) -> boolean().
+get_chunk_filter(DBEntry) -> db_entry:get_version(DBEntry) =/= -1.
+-spec get_chunk_value(db_entry:entry()) -> db_entry().
+get_chunk_value(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBEntry)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
