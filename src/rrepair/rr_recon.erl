@@ -87,8 +87,7 @@
 
 -record(rr_recon_state,
         {
-         ownerLocalPid      = ?required(rr_recon_state, ownerLocalPid)  :: comm:erl_local_pid(),
-         ownerRemotePid     = ?required(rr_recon_state, ownerRemotePid) :: comm:mypid(),
+         ownerPid           = ?required(rr_recon_state, ownerPid)       :: comm:erl_local_pid(),
          ownerMonitor       = null                                      :: null | reference(),
          dhtNodePid         = ?required(rr_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
          dest_key           = random                                    :: recon_dest(),
@@ -138,9 +137,9 @@ on({get_state_response, MyI}, State =
                         stats = Stats,
                         method = Method,
                         dest_key = DestKey,
-                        ownerRemotePid = OwnerPid }) ->    
+                        ownerPid = OwnerL }) ->
     Msg = {?send_to_group_member, rrepair, 
-           {continue_recon, OwnerPid, rr_recon_stats:get(session_id, Stats), 
+           {continue_recon, comm:make_global(OwnerL), rr_recon_stats:get(session_id, Stats), 
             {continue, Method, req_shared_interval, [{interval, MyI}], false}}},
     DKey = case DestKey of
                random -> select_sync_node(MyI);        
@@ -245,8 +244,7 @@ on({get_chunk_response, {RestI, DBList}}, State =
        #rr_recon_state{ stage = reconciliation,
                         method = bloom,
                         dhtNodePid = DhtNodePid,
-                        ownerLocalPid = Owner,
-                        ownerRemotePid = OwnerR,
+                        ownerPid = OwnerL,
                         dest_rr_pid = DestRU_Pid,
                         struct = #bloom_recon_struct{ bloom = BF },
                         stats = Stats }) ->
@@ -260,7 +258,8 @@ on({get_chunk_response, {RestI, DBList}}, State =
     ?TRACE("Reconcile Bloom Session=~p ; Diff=~p", [SID, length(Diff)]),
     NewStats = if
                    length(Diff) > 0 ->
-                       comm:send_local(Owner, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff}, [{feedback, OwnerR}]}),
+                       comm:send_local(OwnerL, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff},
+                                                [{feedback, comm:make_global(OwnerL)}]}),
                        rr_recon_stats:inc([{resolve_started, 2}], Stats); %feedback causes 2 resolve runs
                    true -> Stats
                end,
@@ -286,7 +285,7 @@ on({crash, _Pid}, State) ->
     comm:send_local(self(), {shutdown, recon_node_crash}),
     State;
 
-on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
+on({shutdown, Reason}, #rr_recon_state{ ownerPid = OwnerL,
                                         ownerMonitor = OwnerMon,
                                         stats = Stats,
                                         initiator = Initiator }) ->
@@ -296,7 +295,7 @@ on({shutdown, Reason}, #rr_recon_state{ ownerLocalPid = Owner,
     if OwnerMon =/= null -> erlang:demonitor(OwnerMon);
        true -> ok
     end,
-    comm:send_local(Owner, {recon_progress_report, self(), Initiator, NewStats}),
+    comm:send_local(OwnerL, {recon_progress_report, self(), Initiator, NewStats}),
     kill;
 
 on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
@@ -316,15 +315,14 @@ on({check_nodes_response, CmpResults}, State =
        #rr_recon_state{ dest_recon_pid = DestReconPid,
                         dest_rr_pid = SrcNode,
                         stats = Stats, 
-                        ownerLocalPid = OwnerL,
-                        ownerRemotePid = OwnerR,
+                        ownerPid = OwnerL,
                         struct = Tree }) ->
     SID = rr_recon_stats:get(session_id, Stats),
     {Req, Res, NStats, RTree} = process_tree_cmp_result(CmpResults, Tree, get_merkle_branch_factor(), Stats),
     Req =/= [] andalso
         comm:send(DestReconPid, {check_nodes, comm:this(), Req}),    
     {Leafs, Resolves} = lists:foldl(fun(Node, {AccL, AccR}) -> 
-                                            {LCount, RCount} = resolve_node(Node, {SrcNode, SID, OwnerL, OwnerR}),
+                                            {LCount, RCount} = resolve_node(Node, {SrcNode, SID, OwnerL}),
                                             {AccL + LCount, AccR + RCount}
                                     end, {0, 0}, Res),
     FStats = rr_recon_stats:inc([{tree_leafsSynced, Leafs}, 
@@ -342,7 +340,7 @@ on({check_nodes_response, CmpResults}, State =
 -spec begin_sync(struct(), state()) -> rr_recon_stats:stats().
 begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                                                 struct = Params,
-                                                ownerRemotePid = OwnerPid,
+                                                ownerPid = OwnerL,
                                                 dest_recon_pid = DestReconPid,
                                                 dest_rr_pid = DestRRPid,                                       
                                                 initiator = Initiator, 
@@ -357,14 +355,14 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                 false ->
                     IntParams = [{interval, merkle_tree:get_interval(SyncStruct)}, {reconPid, comm:this()}],
                     comm:send(DestRRPid, 
-                              {continue_recon, OwnerPid, SID, 
+                              {continue_recon, comm:make_global(OwnerL), SID, 
                                {continue, merkle_tree, res_shared_interval, IntParams, true}})
             end,
             rr_recon_stats:set(
               [{tree_compareLeft, ?IIF(Initiator, 1, 0)},
                {tree_size, merkle_tree:size_detail(SyncStruct)}], Stats);
         bloom ->
-            comm:send(DestRRPid, {continue_recon, OwnerPid, SID,
+            comm:send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                                   {continue, bloom, reconciliation, SyncStruct, true}}),
             comm:send_local(self(), {shutdown, {ok, build_struct}}),
             Stats;
@@ -375,7 +373,7 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                     false ->
                         ArtParams = [{interval, art:get_interval(SyncStruct)}, {art, SyncStruct}],
                         comm:send(DestRRPid, 
-                                  {continue_recon, OwnerPid, SID, 
+                                  {continue_recon, comm:make_global(OwnerL), SID, 
                                    {continue, art, res_shared_interval, ArtParams, true}}),
                         {no, Stats}
                 end,            
@@ -468,8 +466,8 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, {Req, Res,
 
 % @doc Starts one resolve process per leaf node in a given node
 %      Returns: number of visited leaf nodes and number of leaf resovle requests.
--spec resolve_node(Node | not_found, {Dest::RPid, SID, OwnerLocal::LPid, OwnerRemote::RPid}) -> {Leafs::non_neg_integer(), ResolveReq::non_neg_integer()} when
-    is_subtype(LPid,    comm:erl_local_pid()),
+-spec resolve_node(Node | not_found, {Dest::RPid, SID, OwnerRemote::comm:erl_local_pid()})
+        -> {Leafs::non_neg_integer(), ResolveReq::non_neg_integer()} when
     is_subtype(RPid,    comm:mypid() | undefined),
     is_subtype(Node,    merkle_tree:mt_node()),
     is_subtype(SID,     rrepair:session_id()).
@@ -485,13 +483,13 @@ resolve_node(Node, Conf) ->
     end.
 
 % @doc Returns number ob caused resolve requests (requests with feedback count 2)
--spec resolve_leaf(Node, {Dest::RPid, SID, OwnerLocal::LPid, OwnerRemote::RPid}) -> 1 | 2 when
-    is_subtype(LPid,    comm:erl_local_pid()),
+-spec resolve_leaf(Node, {Dest::RPid, SID, OwnerRemote::comm:erl_local_pid()}) -> 1 | 2 when
     is_subtype(RPid,    comm:mypid() | undefined),
     is_subtype(Node,    merkle_tree:mt_node()),
     is_subtype(SID,     rrepair:session_id()).
-resolve_leaf(_, {undefined, _, _, _}) -> erlang:error("Recon Destination PID undefined");
-resolve_leaf(Node, {Dest, SID, OwnerL, OwnerR}) ->
+resolve_leaf(_, {undefined, _, _}) -> erlang:error("Recon Destination PID undefined");
+resolve_leaf(Node, {Dest, SID, OwnerL}) ->
+    OwnerR = comm:make_global(OwnerL),
     case merkle_tree:get_item_count(Node) of
         0 ->
            comm:send(Dest, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), OwnerR}, []}),
@@ -511,15 +509,14 @@ resolve_leaf(Node, {Dest, SID, OwnerL, OwnerR}) ->
     is_subtype(State,  state()),
     is_subtype(Stats,  rr_recon_stats:stats()).
 art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
-                                      ownerLocalPid = OwnerL,
-                                      ownerRemotePid = OwnerR,
+                                      ownerPid = OwnerL,
                                       stats = Stats }) ->
     SID = rr_recon_stats:get(session_id, Stats),
     NStats = case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
                  true -> 
                      {ASyncLeafs, Stats2} = art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, Stats, []),
                      ResolveCalled = lists:foldl(fun(X, Acc) ->
-                                                         Acc + resolve_leaf(X, {DestPid, SID, OwnerL, OwnerR})
+                                                         Acc + resolve_leaf(X, {DestPid, SID, OwnerL})
                                                  end, 0, ASyncLeafs),
                      rr_recon_stats:inc([{resolve_started, ResolveCalled}], Stats2);
                  false -> Stats
@@ -748,7 +745,7 @@ rep_factor() ->
 %% @doc init module
 -spec init(state()) -> state().
 init(State) ->
-    Mon = erlang:monitor(process, State#rr_recon_state.ownerLocalPid),
+    Mon = erlang:monitor(process, State#rr_recon_state.ownerPid),
     State#rr_recon_state{ ownerMonitor = Mon }.
 
 -spec start(rrepair:session_id() | null) -> {ok, pid()}.
@@ -758,8 +755,7 @@ start(SessionId) -> start(SessionId, undefined).
       is_subtype(SessionId,     rrepair:session_id() | null),
       is_subtype(SenderRRPid,   comm:mypid() | undefined).
 start(SessionId, SenderRRPid) ->
-    State = #rr_recon_state{ ownerLocalPid = self(), 
-                             ownerRemotePid = comm:this(), 
+    State = #rr_recon_state{ ownerPid = self(),
                              dhtNodePid = pid_groups:get_my(dht_node),
                              dest_rr_pid = SenderRRPid,
                              stats = rr_recon_stats:new([{session_id, SessionId}]) },
@@ -769,7 +765,7 @@ start(SessionId, SenderRRPid) ->
 fork_recon(Conf) ->
     NStats = rr_recon_stats:set([{session_id, null}], Conf#rr_recon_state.stats),    
     State = Conf#rr_recon_state{ stats = NStats },
-    comm:send_local(Conf#rr_recon_state.ownerLocalPid, {recon_forked}),
+    comm:send_local(Conf#rr_recon_state.ownerPid, {recon_forked}),
     gen_component:start(?MODULE, fun ?MODULE:on/2, State, []).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
