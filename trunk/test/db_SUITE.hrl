@@ -1285,7 +1285,9 @@ tester_get_chunk4(_Config) ->
     prop_get_chunk4([12, 13, 14, 15, 16],0,intervals:new('[', 10, 0, ']'),2),
     prop_get_chunk4([12, 8, 6, 4], 4, intervals:new('[', 10, 0, ']'), 1),
     prop_get_chunk4([3, 4], 10, [{interval,'[',0,9,']'}], 1),
-    
+    prop_get_chunk4([2, 6, 7], 5, intervals:new(4), 3),
+    prop_get_chunk4([2, 6, 7], 5, intervals:new('[',5,9,']'), 3),
+
     tester:test(?MODULE, prop_get_chunk4, 4, rw_suite_runs(10000), [{threads, 2}]).
 
 tester_get_split_key5(_Config) ->

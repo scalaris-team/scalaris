@@ -238,21 +238,22 @@ get_chunk_helper({ETSDB, _Subscr, _SnapStates} = DB, StartId, Interval,
                 forward  ->
                     ETS_first = fun ets:first/1, ETS_next = fun ets:next/2,
                     ETS_last  = fun ets:last/1,  ETS_prev = fun ets:prev/2,
-                    StartFromI = Begin;
+                    StartFromI_first = Begin,    StartFromI_last = End;
                 backward ->
                     ETS_first = fun ets:last/1,  ETS_next = fun ets:prev/2,
                     ETS_last  = fun ets:first/1, ETS_prev = fun ets:next/2,
-                    StartFromI = End
+                    StartFromI_first = End,      StartFromI_last = Begin
             end,
             % get first key which is in the interval and in the ets table:
             IsContinuous = intervals:is_continuous(Interval),
             {FirstKey, ChunkF, ChunkFProcessed} =
                 first_key_in_interval(DB, ETS_first, ETS_next, StartId, Interval,
-                                      StartFromI, AddDataFun, IsContinuous),
+                                      StartFromI_first, AddDataFun, IsContinuous),
             {LastKey, _ChunkL, ChunkLProcessed} =
                 first_key_in_interval(DB, ETS_last, ETS_prev, StartId, Interval,
-                                      StartFromI, AddDataFun, IsContinuous),
-%%             log:pal("first key: ~.0p~nlast key : ~.0p~n", [FirstKey, LastKey]),
+                                      StartFromI_last, AddDataFun, IsContinuous),
+%%             log:pal("~nfirst key (InI?): ~.0p (~p)~nlast key (InI?): ~.0p (~p)~n",
+%%                     [FirstKey, ChunkFProcessed =:= 1, LastKey, ChunkLProcessed =:= 1]),
             
             case FirstKey of
                 LastKey when FirstKey =/= StartId ->
@@ -262,10 +263,19 @@ get_chunk_helper({ETSDB, _Subscr, _SnapStates} = DB, StartId, Interval,
                     % note: the value from Chunk1 is not added by get_chunk_inner!
 %%                     log:pal("get_chunk:~nCSize: ~.2p~nFSize: ~.2p~nRSize: ~.2p",
 %%                             [ChunkSize, ChunkFProcessed, ChunkSize - ChunkFProcessed]),
+                    % speed up common case:
+                    % Interval is continuous, StartId is not in Interval, FirstKey and LastKey are in Interval
+                    % -> FirstKey is first in DB and first in interval order (similar for LastKey)
+                    % -> all elements up to LastKey are in Interval
+                    %    (no further intervals:in/2 checks necessary)
+                    NoInIntCheck = IsContinuous andalso
+                                       not intervals:in(StartId, Interval) andalso
+                                       ChunkFProcessed =:= 1 andalso
+                                       ChunkLProcessed =:= 1,
                     {Next, Chunk, RestChunkSize} =
                         get_chunk_inner(DB, ETS_first, ETS_next, ETS_next(ETSDB, FirstKey), LastKey,
                                         Interval, AddDataFun, ChunkSize - ChunkFProcessed,
-                                        ChunkF),
+                                        ChunkF, NoInIntCheck),
 %%                     log:pal("get_chunk_inner:~nNext:  ~.2p~nChunk: ~.2p~nRSize: ~.2p",
 %%                             [Next, Chunk, RestChunkSize]),
                     
@@ -337,15 +347,15 @@ first_key_in_interval({ETSDB, _Subscr, _SnapState} = DB, ETS_first, ETS_next,
                       Current::?RT:key() | '$end_of_table',
                       End::?RT:key(), Interval::intervals:interval(),
                       AddDataFun::add_data_fun(V), ChunkSize::non_neg_integer(),
-                      Chunk::[] | V)
+                      Chunk::[] | V, NoInIntCheck::boolean())
         -> {?RT:key() | '$end_of_interval', [] | V, Rest::non_neg_integer()}.
 get_chunk_inner(_DB, _ETS_first, _ETS_next, End, End, _Interval, _AddDataFun,
-                ChunkSize, Chunk) ->
+                ChunkSize, Chunk, _NoInIntCheck) ->
     %log:pal("inner: 0: ~p", [RealStart]),
     % we hit the start element, i.e. our whole data set has been traversed
     {'$end_of_interval', Chunk, ChunkSize};
 get_chunk_inner({ETSDB, _Subscr, _SnapState} = _DB, ETS_first, _ETS_next, Current,
-                End, _Interval, _AddDataFun, 0 = ChunkSize, Chunk) ->
+                End, _Interval, _AddDataFun, 0 = ChunkSize, Chunk, _NoInIntCheck) ->
     %log:pal("inner: 1: ~p", [Current]),
     % we hit the chunk size limit
     case Current of
@@ -360,15 +370,15 @@ get_chunk_inner({ETSDB, _Subscr, _SnapState} = _DB, ETS_first, _ETS_next, Curren
             {Current, Chunk, ChunkSize}
     end;
 get_chunk_inner({ETSDB, _Subscr, _SnapState} = DB, ETS_first, ETS_next, '$end_of_table',
-                End, Interval, AddDataFun, ChunkSize, Chunk) ->
+                End, Interval, AddDataFun, ChunkSize, Chunk, NoInIntCheck) ->
     %log:pal("inner: 2: ~p", ['$end_of_table']),
     % reached end of table - start at beginning (may be a wrapping interval)
     get_chunk_inner(DB, ETS_first, ETS_next, ETS_first(ETSDB), End, Interval,
-                    AddDataFun, ChunkSize, Chunk);
+                    AddDataFun, ChunkSize, Chunk, NoInIntCheck);
 get_chunk_inner({ETSDB, _Subscr, _SnapState} = DB, ETS_first, ETS_next, Current,
-                End, Interval, AddDataFun, ChunkSize, Chunk) ->
+                End, Interval, AddDataFun, ChunkSize, Chunk, NoInIntCheck) ->
     %log:pal("inner: 3: ~p", [Current]),
-    case intervals:in(Current, Interval) of
+    case NoInIntCheck orelse intervals:in(Current, Interval) of
         true -> NewChunk = AddDataFun(DB, Current, Chunk),
                 NewChunkSize = ChunkSize - 1;
         _    -> NewChunk = Chunk,
@@ -376,7 +386,7 @@ get_chunk_inner({ETSDB, _Subscr, _SnapState} = DB, ETS_first, ETS_next, Current,
     end,
     Next = ETS_next(ETSDB, Current),
     get_chunk_inner(DB, ETS_first, ETS_next, Next, End, Interval,
-                    AddDataFun, NewChunkSize, NewChunk).
+                    AddDataFun, NewChunkSize, NewChunk, NoInIntCheck).
 
 %% @doc Returns the key that would remove not more than TargetLoad entries
 %%      from the DB when starting at the key directly after Begin in case of
