@@ -17,7 +17,7 @@
 %%      the autoscale process.
 %%      The module is used by autoscale if the following option has been set in
 %%      scalaris.local.cfg:
-%%        {as_cloud_module, cloud_local}
+%%        {autoscale_cloud_module, cloud_local}
 %%      The following options can also be set:
 %%        {cloud_local_min_vms, integer()}.
 %%        {cloud_local_max_vms, integer()}.
@@ -35,6 +35,7 @@
 -behavior(cloud_beh).
 
 -export([init/0, get_number_of_vms/0, add_vms/1, remove_vms/1]).
+-export([check_config/0]).
 
 
 %%%%%%%%%%%%%%%%%%%%%
@@ -43,14 +44,7 @@
 
 -spec init() -> ok.
 init() ->
-    case config:read(cloud_local_min_vms) of
-        failed ->
-            config:write(cloud_local_min_vms, 0),
-            config:write(cloud_local_max_vms, ?PLUS_INFINITY);
-        X -> X
-    end,
     ok.
-
 
 -spec get_vms() -> [string()].
 get_vms() ->
@@ -126,3 +120,10 @@ format(FormatString, Items) ->
 -spec exec(string()) -> pid().
 exec(Cmd) ->
     _ = spawn(os, cmd, [Cmd]).
+
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_is_integer(cloud_local_min_vms) and
+    config:cfg_is_integer(cloud_local_max_vms) and
+    config:cfg_is_greater_than_equal(cloud_local_min_vms, 0) and
+    config:cfg_is_greater_than(cloud_local_max_vms, config:read(cloud_local_min_vms)).

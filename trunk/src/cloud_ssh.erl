@@ -37,6 +37,7 @@
 -behavior(cloud_beh).
 
 -export([init/0, get_number_of_vms/0, add_vms/1, remove_vms/1, killall_vms/0]).
+-export([check_config/0]).
 
 -define(cloud_ssh_key, "2a42cb863313526fca96098a95020db2a904b01157f191a9bb3200829f8596c7").
 -define(scalaris_start, "bin/./scalarisctl -e -detached -s -p 14915 -y 8000 -n node1 start").
@@ -199,3 +200,9 @@ get_additional_services() ->
 -spec exec(string()) -> pid().
 exec(Cmd) ->
     _ = spawn(os, cmd, [Cmd]).
+
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_is_list(cloud_ssh_hosts) and
+    config:cfg_is_string(cloud_ssh_path) and
+    config:cfg_is_list(cloud_ssh_services).

@@ -256,7 +256,12 @@ check_config() ->
                          fun rr_recon:check_config/0,
                          fun sup_yaws:check_config/0,
                          fun dc_clustering:check_config/0,
-                         fun ganglia:check_config/0 ]],
+                         fun ganglia:check_config/0,
+                         fun autoscale:check_config/0,
+                         fun autoscale_server:check_config/0,
+                         fun cloud_local:check_config/0,
+                         fun cloud_ssh:check_config/0
+                       ]],
     lists:foldl(fun(A,B) -> A and B end, true, Checks).
 
 -spec cfg_exists(Key::atom()) -> boolean().

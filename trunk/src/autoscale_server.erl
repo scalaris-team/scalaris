@@ -102,6 +102,5 @@ log(KeyValueList) when erlang:is_list(KeyValueList)  ->
 %% @doc Checks whether config parameters for autoscale_server exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:read(autoscale_server) =:= true andalso
-        config:cfg_exists(autoscale_server_plot_path) andalso
-        config:read(mgmt_server) =/= failed.
+    config:cfg_exists(autoscale_server_plot_path) andalso
+    config:read(mgmt_server) =/= failed.

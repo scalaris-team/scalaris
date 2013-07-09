@@ -74,8 +74,8 @@
 -export([check_config/0]).
 
 -define(TRACE1(X), ?TRACE(X, [])).
--define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
-%% -define(TRACE(_X,_Y), ok).
+%% -define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
+-define(TRACE(_X,_Y), ok).
 
 -define(CLOUD, (config:read(autoscale_cloud_module))).
 -define(AUTOSCALE_TX_KEY, "d9c966df633f8b1577eacff013166db95917a7002999b6fbb").
@@ -557,8 +557,7 @@ get_lock_timeout() ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:read(autoscale) =:= true andalso
-    config:cfg_exists(autoscale_alarms) andalso
+    config:cfg_is_list(autoscale_alarms) andalso
     config:cfg_exists(autoscale_cloud_module) andalso
     config:cfg_is_list(autoscale_alarms, 
                        fun(X) -> erlang:is_record(X, alarm) end,
