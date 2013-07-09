@@ -133,29 +133,15 @@
 
 % Requests db sync with DestKey using default recon method (given in config).
 on({request_sync, DestKey}, State) ->
-    comm:send_local(self(), {request_sync, get_recon_method(), DestKey, none}),
-    State;
+    request_sync(State, get_recon_method(), DestKey, none);
 
 on({request_sync, Method, DestKey}, State) ->
-    comm:send_local(self(), {request_sync, Method, DestKey, none}),
-    State;
+    request_sync(State, Method, DestKey, none);
 
-% - Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
-%   Random leads to sync with a node which is associated with this (e.g. symmetric partner)
-% - Principal will eventually get an request_sync_complete message 
-%   (no result message will be send if request receiver dies etc.).
-on({request_sync, Method, DestKey, Principal}, State = #rrepair_state{ round = Round, 
-                                                                       open_recon = OpenRecon,
-                                                                       open_sessions = Sessions }) ->
-    ?TRACE("RR: REQUEST SYNC WITH ~p", [DestKey]),
-    S = new_session(Round, comm:this(), Method, Principal),
-    {ok, Pid} = rr_recon:start(S#session.id),
-    comm:send_local(Pid, {start, Method, DestKey}),
-    State#rrepair_state{ round = next_round(Round),
-                         open_recon = OpenRecon + 1,
-                         open_sessions = [S | Sessions] };
+on({request_sync, Method, DestKey, Principal}, State) ->
+    request_sync(State, Method, DestKey, Principal);
 
-on({request_resolve, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
+on({request_resolve, Operation, Options}, State = #rrepair_state{open_resolve = OpenResolve}) ->
     {ok, Pid} = rr_resolve:start(),
     comm:send_local(Pid, {start, Operation, Options}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
@@ -293,6 +279,23 @@ on({web_debug_info, Requestor}, #rrepair_state{ round = Round,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % internal functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% - Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
+%   Random leads to sync with a node which is associated with this (e.g. symmetric partner)
+% - Principal will eventually get an request_sync_complete message 
+%   (no result message will be send if request receiver dies etc.).
+-spec request_sync(State::state(), Method::rr_recon:method(),
+                   DestKey::random | ?RT:key(), Principal::principal_id()) -> state().
+request_sync(State = #rrepair_state{round = Round, open_recon = OpenRecon,
+                                    open_sessions = Sessions},
+             Method, DestKey, Principal) ->
+    ?TRACE("RR: REQUEST SYNC WITH ~p", [DestKey]),
+    S = new_session(Round, comm:this(), Method, Principal),
+    {ok, Pid} = rr_recon:start(S#session.id),
+    comm:send_local(Pid, {start, Method, DestKey}),
+    State#rrepair_state{ round = next_round(Round),
+                         open_recon = OpenRecon + 1,
+                         open_sessions = [S | Sessions] }.
 
 -spec next_round(round()) -> round().
 next_round({R, _Fork}) -> {R + 1, 0}.
