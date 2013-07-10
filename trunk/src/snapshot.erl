@@ -1,4 +1,4 @@
-%  @copyright 2012 Zuse Institute Berlin
+%  @copyright 2012-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ snapshot_is_done(DHTNodeState) ->
             ?TRACE("~p snapshot:snapshot_is_done snapshot data: ~p~n",[comm:this(),?DB:get_snapshot_data(DB)]),
             false
     end.
-    
+
 -spec on_do_snapshot(non_neg_integer(),any(),dht_node_state:state()) -> dht_node_state:state().
 on_do_snapshot(SnapNumber, Leader, DHTNodeState) ->
     SnapState = dht_node_state:get(DHTNodeState, snapshot_state),
@@ -85,7 +85,7 @@ on_do_snapshot(SnapNumber, Leader, DHTNodeState) ->
 on_local_snapshot_is_done(DHTNodeState) ->
     Db = dht_node_state:get(DHTNodeState,db),
     SnapState = dht_node_state:get(DHTNodeState,snapshot_state),
-    
+
     % collect local state and send it
     SnapNumber = snapshot_state:get_number(SnapState),
     ?TRACE("snapshot: local snapshot ~p done~n",[SnapNumber]),
@@ -117,6 +117,7 @@ msg_snapshot_leaders_err(_Msg,_SnapNumber,_DBRange,[]) ->
 delete_and_init_snapshot(SnapNumber,Leader,DHTNodeState) ->
     NewDB = ?DB:init_snapshot(dht_node_state:get(DHTNodeState,db)),
     TmpSnapState = snapshot_state:new(SnapNumber, true, [Leader]),
+    %% inform tx_tm_rtm on new SnapNumber
+    comm:send_local(pid_groups:get_my(tx_tm), {update_snapno, SnapNumber}),
     TmpState = dht_node_state:set_db(DHTNodeState, NewDB),
     dht_node_state:set_snapshot_state(TmpState, TmpSnapState).
-

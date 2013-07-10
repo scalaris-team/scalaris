@@ -1,4 +1,4 @@
-% @copyright 2009-2012 Zuse Institute Berlin,
+% @copyright 2009-2013 Zuse Institute Berlin,
 %            2009 onScale solutions GmbH
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -69,18 +69,16 @@
      Role           :: pid_groups:pidname(),
      LocalAcceptor  :: pid(),
      GLocalLearner  :: comm:mypid(),
-     OpenTxNum      :: non_neg_integer()}.
+     OpenTxNum      :: non_neg_integer(),
+     LocalSnapNo    :: non_neg_integer()}.
 
 %% messages a client has to expect when using this module
 -spec msg_commit_reply(comm:mypid(), any(), any()) -> ok.
 msg_commit_reply(Client, ClientsID, Result) ->
     comm:send(Client, {tx_tm_rtm_commit_reply, ClientsID, Result}).
 
--spec msg_tp_do_commit_abort(comm:mypid(), any(), ?commit | ?abort) -> ok.
-msg_tp_do_commit_abort(TP, Id, Result) ->
-    % hack to find out the dht_node's snapshot number
-    {_,Dict} = erlang:process_info(pid_groups:get_my(dht_node), dictionary),
-    {_,LocalSnapNumber} = lists:keyfind("local_snap_number", 1, Dict),
+-spec msg_tp_do_commit_abort(comm:mypid(), any(), ?commit | ?abort, non_neg_integer()) -> ok.
+msg_tp_do_commit_abort(TP, Id, Result, LocalSnapNumber) ->
     comm:send(TP, {?tp_do_commit_abort, Id, Result, LocalSnapNumber}).
 
 %% public interface for transaction validation using Paxos-Commit.
@@ -126,19 +124,20 @@ init([]) ->
     LAcceptor = get_my(Role, acceptor),
     GLLearner = comm:make_global(get_my(Role, learner)),
     %% start getting rtms and maintain them.
+    InitialState = {_RTMs = [], Table, Role, LAcceptor, GLLearner,
+                    _OpenTx = 0, _LocalSnapNo = 0},
     case Role of
         tx_tm ->
             comm:send_local(self(), {get_node_details}),
-            State = {_RTMs = [], Table, Role, LAcceptor, GLLearner, 0},
-            rtm_update(state_get_RTMs(State),
+            rtm_update(state_get_RTMs(InitialState),
                        config:read(tx_rtm_update_interval) div 1000,
                        {update_RTMs}),
             %% subscribe to id changes
             rm_loop:subscribe(self(), ?MODULE,
                               fun rm_loop:subscribe_dneighbor_change_filter/3,
                               fun ?MODULE:rm_send_update/4, inf),
-            gen_component:change_handler(State, fun ?MODULE:on_init/2);
-        _ -> {_RTMs = [], Table, Role, LAcceptor, GLLearner, 0}
+            gen_component:change_handler(InitialState, fun ?MODULE:on_init/2);
+        _ -> InitialState
     end.
 
 -spec on(comm:message(), state()) -> state().
@@ -261,7 +260,7 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
                               ItemStates, [GLLearner]),
     TxState = tx_state_set_status(TmpTxState, ok),
 
-    init_TPs(TxState, ItemStates),
+    init_TPs(TxState, ItemStates, state_get_local_snapno(State)),
     init_RTMs(TxState, ItemStates),
 
     _ = [ set_entry(ItemState, State) || ItemState <- ItemStates ],
@@ -527,7 +526,7 @@ on({?register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
                     {PaxosID, RTLogEntry, _TP} =
                         lists:keyfind(PaxosID, 1,
                           tx_item_get_paxosids_rtlogs_tps(ItemState)),
-                    msg_tp_do_commit_abort(TP, {PaxosID, RTLogEntry, comm:this(), ItemId}, Decision),
+                    msg_tp_do_commit_abort(TP, {PaxosID, RTLogEntry, comm:this(), ItemId}, Decision, state_get_local_snapno(State)),
                     %% record in txstate and try to delete entry?
                     NewTxState = tx_state_inc_numinformed(TxState),
                     trigger_delete_if_done(NewTxState, State),
@@ -597,6 +596,10 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
             end
         end,
     State;
+
+%% sent by snapshot.erl to update tx_tm on new local snapshot numbers
+on({update_snapno, SnapNo}, State) ->
+    state_set_local_snapno(State, SnapNo);
 
 %% failure detector events
 on({crash, Pid, _Cookie}, State) ->
@@ -764,8 +767,8 @@ init_RTMs(TxState, ItemStates) ->
       RTMs, fun(X) -> {?tx_tm_rtm_init_RTM, TxState, ItemStatesForRTM, get_nth(X)}
             end).
 
--spec init_TPs(tx_state(), [tx_item_state()]) -> ok.
-init_TPs(TxState, ItemStates) ->
+-spec init_TPs(tx_state(), [tx_item_state()], non_neg_integer()) -> ok.
+init_TPs(TxState, ItemStates, LocalSnapNumber) ->
     ?TRACE("tx_tm_rtm:init_TPs~n", []),
     %% send to each TP its own record / request including the RTMs to
     %% be used
@@ -774,11 +777,6 @@ init_TPs(TxState, ItemStates) ->
     CleanRTMs = [ X || {X} <- rtms_get_rtmpids(RTMs) ],
     Accs = [ X || {X} <- rtms_get_accpids(RTMs) ],
     TM = comm:this(),
-    % ugly hack to find out the dht_node's snapshot number
-    % TODO: let dht_node inform the tx_tm_rtm about snapshot number changes
-    %       and maintain snapshot number in local state
-    {_, Dict} = erlang:process_info(pid_groups:get_my(dht_node), dictionary),
-    {_, LocalSnapNumber} = lists:keyfind("local_snap_number", 1, Dict),
     _ = [ begin
           %% ItemState = lists:keyfind(ItemId, 1, ItemStates),
           ItemId = tx_item_get_itemid(ItemState),
@@ -844,6 +842,7 @@ inform_client(TxState, State, Result) ->
                            tx_state().
 inform_tps(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform tps~n", []),
+    LocalSnapNumber = state_get_local_snapno(State),
     %% inform TPs
     Informed =
         lists:foldl(
@@ -852,7 +851,7 @@ inform_tps(TxState, State, Result) ->
                   Sum + length(
                     [ msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry,
                                                   comm:this(), ItemId},
-                                             Result)
+                                             Result, LocalSnapNumber)
                         || {PaxId, RTLogEntry, TP}
                                <- tx_item_get_paxosids_rtlogs_tps(ItemState),
                            comm:is_valid(TP) ])
@@ -1055,6 +1054,10 @@ state_inc_opentxnum(State) -> setelement(6, State, element(6, State) + 1).
 -spec state_dec_opentxnum(state()) -> state().
 state_dec_opentxnum(State) ->
     setelement(6, State, erlang:max(0, element(6, State) - 1)).
+-spec state_get_local_snapno(state()) -> non_neg_integer().
+state_get_local_snapno(State) -> element(7, State).
+-spec state_set_local_snapno(state(), non_neg_integer()) -> state().
+state_set_local_snapno(State, No) -> setelement(7, State, No).
 
 -spec state_subscribe(state(), comm:mypid()) -> state().
 state_subscribe(State, Pid) ->
