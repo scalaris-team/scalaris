@@ -31,6 +31,7 @@
 all()   -> [
             tester_type_check_api,
             tester_type_check_config,
+%%            tester_type_check_dht_node,
             tester_type_check_gossip,
             tester_type_check_math,
             tester_type_check_node,
@@ -118,6 +119,26 @@ tester_type_check_config(_Config) ->
           || {Mod, Excl, ExclPriv} <- Modules ],
     log:set_log_level(config:read(log_level)),
     true.
+
+%% tester_type_check_dht_node(_Config) ->
+%%     Count = 1000,
+%%     config:write(no_print_ring_data, true),
+%%     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
+%%     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
+%%     Modules =
+%%         [ %% {dht_node, [], [],}
+%%           %% {dht_node_join, [], [],}
+%%           %% {dht_node_lookup, [], [],}
+%%           %% {dht_node_monitor, [], [],}
+%%           %% {dht_node_move, [], [],}
+%%           %% {dht_node_reregister, [], [],}
+%%           {dht_node_state, [], []}
+%%         ],
+%%     [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+%%       || {Mod, Excl, ExclPriv} <- Modules ],
+%%     tester:unregister_type_checker({typedef, intervals, interval}),
+%%     tester:unregister_value_creator({typedef, intervals, interval}),
+%%    true.
 
 tester_type_check_gossip(_Config) ->
     Count = 500,
@@ -299,9 +320,9 @@ tester_type_check_tx(_Config) ->
              {start_link,2}
            ],
            [ {get_paxos_ids, 2}, %% requires item entries in dictionary
-             {msg_tp_do_commit_abort,3}, %% tries to send
+             {msg_tp_do_commit_abort,4}, %% tries to send
              {init_RTMs, 2}, %% tries to send
-             {init_TPs, 2}, %% tries to send
+             {init_TPs, 3}, %% tries to send
              {inform_client, 3}, %% tries to send
              {inform_rtms, 3}, %% tries to send
              {inform_tps, 3}, %% tries to send

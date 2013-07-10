@@ -54,7 +54,7 @@ get_leaders({_, _, Leaders}) -> Leaders.
 % setters
 
 -spec set_number(snapshot_state(), non_neg_integer()) -> snapshot_state().
-set_number(SnapInfo, NewVal) -> 
+set_number(SnapInfo, NewVal) ->
     erlang:put("local_snap_number", NewVal),
     setelement(1, SnapInfo, NewVal).
 
@@ -62,7 +62,7 @@ set_number(SnapInfo, NewVal) ->
 add_leader(State, none) -> State;
 add_leader({Number, InProgress, Leaders}, NewLeader) ->
     {Number, InProgress, [NewLeader | Leaders]}.
-  
+
 -spec start_progress(snapshot_state()) -> snapshot_state().
 start_progress(SnapInfo) -> setelement(2, SnapInfo, true).
 
