@@ -187,7 +187,7 @@ on_active({cy_cache, [Node] = _Cache},
         false ->
             comm:send(node:pidX(Node),
                       {vivaldi_shuffle, comm:this(), Coordinate, Confidence},
-                      ?SEND_OPTIONS ++ [{group_member, vivaldi}, quiet]);
+                      ?SEND_OPTIONS ++ [{group_member, vivaldi}, {?quiet}]);
         true -> ok
     end,
     State;

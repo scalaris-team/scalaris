@@ -496,7 +496,7 @@ kill_new_processes(OldProcesses, Options) ->
                      X =/= self(),
                      X =/= whereis(timer_server),
                      element(1, CurFun) =/= file_io_server],
-    case lists:member(quiet, Options) of
+    case lists:member({?quiet}, Options) of
         false ->
             ct:pal("Killed processes: ~.0p~n", [Killed]);
         true -> ok

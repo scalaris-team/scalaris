@@ -110,7 +110,7 @@
 
 -type send_options() :: [{shepherd, Pid::erl_local_pid()} |
                          {group_member, Process::atom()} |
-                         {channel, channel()} | quiet].
+                         {channel, channel()} | {?quiet}].
 
 %% @doc Sends a message to a process given by its pid.
 -spec send(mypid(), message() | group_message()) -> ok.
