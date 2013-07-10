@@ -265,13 +265,15 @@ get_chunk_helper({ETSDB, _Subscr, _SnapStates} = DB, StartId, Interval,
 %%                             [ChunkSize, ChunkFProcessed, ChunkSize - ChunkFProcessed]),
                     % speed up common case:
                     % Interval is continuous, StartId is not in Interval, FirstKey and LastKey are in Interval
+                    % or Interval is all (also continuous)
                     % -> FirstKey is first in DB and first in interval order (similar for LastKey)
                     % -> all elements up to LastKey are in Interval
                     %    (no further intervals:in/2 checks necessary)
                     NoInIntCheck = IsContinuous andalso
-                                       not intervals:in(StartId, Interval) andalso
                                        ChunkFProcessed =:= 1 andalso
-                                       ChunkLProcessed =:= 1,
+                                       ChunkLProcessed =:= 1  andalso
+                                       ((not intervals:in(StartId, Interval)) orelse
+                                            intervals:is_all(Interval)),
                     {Next, Chunk, RestChunkSize} =
                         get_chunk_inner(DB, ETS_first, ETS_next, ETS_next(ETSDB, FirstKey), LastKey,
                                         Interval, AddDataFun, ChunkSize - ChunkFProcessed,

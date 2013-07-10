@@ -254,10 +254,11 @@ get_chunk_helper({{DB, _FileName}, _Subscr, _SnapState}, StartId, Interval,
         _ ->
             % try to find the first existing key in the interval, starting at Begin:
             StartInt = intervals:new('[', StartId, ?PLUS_INFINITY, ')'),
+            IsAll = intervals:is_all(Interval),
             % note: N is a helper for filtering out unnecessary items every once in a while
             F = fun (Key_, DBEntry_, {N, Data} = Acc) ->
                          Key = erlang:binary_to_term(Key_),
-                         case intervals:in(Key, Interval) of
+                         case IsAll orelse intervals:in(Key, Interval) of
                              true when ChunkSize =:= all ->
                                  % note: no need to count items here
                                  {0, AddDataFun(Key_, Key, DBEntry_, Data)};
