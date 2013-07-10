@@ -34,7 +34,7 @@
     {rm, {get_node_details_response, NodeDetails::node_details:node_details()}, from_succ | from_node} |
     {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
 
--define(SEND_OPTIONS, [{channel, prio}, quiet]).
+-define(SEND_OPTIONS, [{channel, prio}, {?quiet}]).
 
 % note include after the type definitions for erlang < R13B04!
 -include("rm_beh.hrl").

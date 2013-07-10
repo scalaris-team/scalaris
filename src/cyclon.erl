@@ -70,7 +70,7 @@
 -define(SEND_OPTIONS, [{channel, prio}]).
 % prevent warnings in the log
 % (the entry for a failed node will age and will be removed when it is old enough)
--define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, quiet, {channel, prio}])).
+-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, {?quiet}, {channel, prio}])).
 
 %% @doc Activates the cyclon process. If not activated, the cyclon process will
 %%      queue most messages without processing them.
@@ -253,7 +253,7 @@ on_active({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles, Tri
                 [] -> ok;
                 [_|_] = KnownHosts ->
                     Pid = util:randomelem(KnownHosts),
-                    comm:send(Pid, {get_dht_nodes, comm:this()}, [quiet])
+                    comm:send(Pid, {get_dht_nodes, comm:this()}, [{?quiet}])
             end,
             ok;
         _ -> ok

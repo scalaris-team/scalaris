@@ -1313,6 +1313,7 @@ extint2atom(X) when is_integer(X) ->
         ?send_to_group_member -> ?send_to_group_member_atom;
         ?deliver -> ?deliver_atom;
         ?unpack_msg_bundle -> ?unpack_msg_bundle_atom;
+        ?quiet -> ?quiet_atom;
         %% dht_node
         ?get_key_with_id_reply -> ?get_key_with_id_reply_atom;
         ?get_key -> ?get_key_atom;

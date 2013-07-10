@@ -106,7 +106,7 @@
 
 % prevent warnings in the log
 % (node availability is not that important to gossip)
--define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, quiet])).
+-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, {?quiet}])).
 
 %% @doc Activates the gossip process. If not activated, the gossip process will
 %%      queue most messages without processing them.

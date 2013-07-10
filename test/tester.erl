@@ -69,7 +69,7 @@ test_with_scheduler(Modules, F, Options, Repetitions) ->
                          {ok, Pid} = tester_scheduler:start(Options),
                          (catch register(usscheduler, Pid)),
                          Res = (catch F()),
-                         unittest_helper:kill_new_processes(Processes, [quiet]),
+                         unittest_helper:kill_new_processes(Processes, [{?quiet}]),
                          (catch exit(Pid)),
                          (catch unregister(usscheduler)),
                          Res
