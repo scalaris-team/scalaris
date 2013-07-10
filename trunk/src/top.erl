@@ -216,8 +216,11 @@ print_process_dictionary(Pid) ->
     end,
     io:format("~n"),
     io:format("Process Dictionary:~n"),
-    io:format("~20s ~-60s~n", ["Key", "Value"]),
-    _ = [ io:format("~20s ~-60s~n",
+    {ok, Chars} = io:columns(), %% terminal columns
+    CharsForVal = Chars - 21 - 1,
+    io:format("~20s ~-" ++ integer_to_list(CharsForVal) ++ "s~n",
+              ["Key", "Value"]),
+    _ = [ io:format("~20s ~-" ++ integer_to_list(CharsForVal) ++ "s~n",
                     [ lists:flatten(io_lib:format("~1210.0p",
                                                   [element(1, X)])),
                       lists:flatten(io_lib:format("~111610.0p",
