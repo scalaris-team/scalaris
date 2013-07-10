@@ -1,4 +1,4 @@
-% @copyright 2010-2012 Zuse Institute Berlin
+% @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -43,6 +43,9 @@
 -define(TRACE(_X,_Y), ok).
 %-define(TRACEPONG(X,Y), io:format(X,Y)).
 -define(TRACEPONG(_X,_Y), ok).
+%%-define(TRACE_NOT_SUBSCRIBED_UNSUBSCRIBE(X,Y), log:log(warn, X, Y)).
+-define(TRACE_NOT_SUBSCRIBED_UNSUBSCRIBE(_X,_Y), ok).
+
 -behavior(gen_component).
 -include("scalaris.hrl").
 
@@ -392,10 +395,12 @@ state_del_entry(State, {Subscriber, WatchedPid, Cookie}) ->
     Table = state_get_table(State),
     case pdb:get({Subscriber, WatchedPid}, Table) of
         undefined ->
-            log:log(warn, "got unsubscribe for not registered subscription ~.0p, Subscriber ~.0p, Watching group and name: ~.0p.~n",
-                    [{unsubscribe, Subscriber, WatchedPid, Cookie},
-                     pid_groups:group_and_name_of(Subscriber),
-                    pid_groups:group_and_name_of(comm:make_local(WatchedPid))]),
+            ?TRACE_NOT_SUBSCRIBED_UNSUBSCRIBE(
+               "got unsubscribe for not registered subscription ~.0p, "
+               "Subscriber ~.0p, Watching group and name: ~.0p.~n",
+               [{unsubscribe, Subscriber, WatchedPid, Cookie},
+                pid_groups:group_and_name_of(Subscriber),
+                pid_groups:group_and_name_of(comm:make_local(WatchedPid))]),
             {unchanged, State};
         Entry ->
             %% delete cookie
