@@ -1,4 +1,4 @@
-%  @copyright 2008-2012 Zuse Institute Berlin
+%  @copyright 2008-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -654,7 +654,7 @@ macro_equals_failed(ActualVal, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, 
             _    -> lists:flatten(
                       io_lib:format("(Note: ~.0p)~n", [lists:flatten(Note0)]))
         end,
-    ct:pal("Failed (in ~.0p)~n"
+    log:log(error, "Failed (in ~.0p)~n"
            " Message    ~s evaluated to~n"
            "             \"~.0p\"~n"
            "            which is not ~s the expected ~s that evaluates to~n"
