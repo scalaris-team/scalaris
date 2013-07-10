@@ -1,4 +1,4 @@
-% @copyright 2012 Zuse Institute Berlin,
+% @copyright 2012-2013 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -269,9 +269,12 @@ on({sample_all}, State) -> State;
 %% gather information on a single pid for periodic statistical output
 on({sample_pid, Pid}, State) when is_pid(element(2, State)) ->
     TableName = table(State),
-    NewVals = try_process_info(
-                Pid,
-                [message_queue_len, status]),
+    NewVals = case try_process_info(
+                     Pid,
+                     [message_queue_len, status]) of
+                  undefined -> [];
+                  Infos -> Infos
+              end,
     TakeVals = case process_info_get(NewVals, status, dead_pid) of
                    running -> true;
                    runnable -> true;
