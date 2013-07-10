@@ -474,7 +474,7 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
     io:format("Status: ~s MQLen: ~p Current Function: ~p~n",
               [readable_status(
                  process_info_get(Infos, status, dead_pid)),
-               process_info_get(Infos, message_queueu_len, 0),
+               process_info_get(Infos, message_queue_len, 0),
                erlang:get(current_function)
               ]),
     io:format("FPS: ~.1f~n", [Count / Delay]),
