@@ -387,14 +387,14 @@ on({output_all}, State) when all =:= element(3, State) ->
               ]),
     io:format("FPS: ~.1f~n", [Count / Delay]),
     WordSize = erlang:system_info(wordsize),
-    io:format("~11s ~1s ~1s ~-20s ~9s ~6s ~6s ~5s ~5s~n",
+    io:format("~12s ~1s ~1s ~-20s ~9s ~6s ~6s ~5s ~5s~n",
               [ "PID", "T", "S", "NAME", "W-Msg", "%CPU", "%MEM", "MEM", "STACK" ]),
     _ = [ begin
           Type = case catch(gen_component:is_gen_component(Pid)) of
                      true -> "G";
                      _ -> "E"
                  end,
-          io:format("~11w ~1s ~1s ~-20s ~9.2f ~6.2f ~6.2f ~5s ~5s~n",
+          io:format("~12w ~1s ~1s ~-20s ~9.2f ~6.2f ~6.2f ~5s ~5s~n",
                     [Pid, Type, readable_status(Status),
                      readable_pid_name(Pid), MQLen, CPUUsage,
                      MemUsage / ProcsMemUsed * 100,
@@ -479,7 +479,7 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
               ]),
     io:format("FPS: ~.1f~n", [Count / Delay]),
 
-    io:format("~11s ~-35s ~6s~n",
+    io:format("~12s ~-35s ~6s~n",
               [ "PID", "FUNCTION", "%RTIME"]),
     _ = [ begin
               CFun = element(2, PlotPid),
@@ -498,7 +498,7 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
                                  end;
                             true -> CPUUsage * 100.0 / (100.0 - Idle)
                          end,
-              io:format("~11w ~-35s ~6.2f~n",
+              io:format("~12w ~-35s ~6.2f~n",
                         [element(1, PlotPid), CFunString, FunRTime ])
           end
           || {PlotPid, _Status, _MQLen, CPUUsage, _MemUsage}
