@@ -166,6 +166,16 @@ top_inspect_pid_interactive(TopPid, Pid) ->
                 comm:send_local(TopPid, {enable_output, pid}),
                 comm:send_local(TopPid, {output_pid, Pid}),
                 ok;
+            "m" -> %% show messages
+                comm:send_local(TopPid, {output_off}),
+                comm:send_local(TopPid, {stop_sampling}),
+                print_process_messages(Pid),
+                _ = io:get_chars("Hit return to continue> ", 1),
+                comm:send_local(TopPid, {enable_sampling, Pid}),
+                comm:send_local(TopPid, {sample_pid, Pid}),
+                comm:send_local(TopPid, {enable_output, pid}),
+                comm:send_local(TopPid, {output_pid, Pid}),
+                ok;
             "e" ->
                 comm:send_local(TopPid, {output_off}),
                 Expr = io:parse_erl_exprs('expr>'),
@@ -199,7 +209,7 @@ usage() ->
 usage_inspect() ->
     io:format(
       "~n"
-      " (q)uit, (e)val expr, (g)arb-coll. (d)ictionary"
+      " (q)uit, (e)val expr, (g)arb-coll, (d)ictionary, (m)essages."
       %% ", exclude (t)op itself" %% undocumented feature for top development
       "~n sort by: (c)pu usage~n").
 
@@ -227,6 +237,59 @@ print_process_dictionary(Pid) ->
                                                   [element(2, X)]))])
           || X <- process_info_get(Infos, dictionary, [])],
     ok.
+
+print_process_messages(Pid) ->
+    Infos = try_process_info(
+              Pid, [messages, registered_name]),
+
+    io:format("Pid: ~p~n", [ Pid ]),
+    io:format("Name: ~p",
+              [process_info_get(Infos, registered_name, [])]),
+    case gen_component:is_gen_component(Pid) of
+        true -> io:format(" ~p", [readable_grp_and_pid_name(Pid)]);
+        false -> ok
+    end,
+    io:format("~n"),
+    io:format("Process Messages:~n"),
+    {ok, Chars} = io:columns(), %% terminal columns
+    CharsForVal = Chars - 6 - 9 - 1,
+    io:format("~5s ~8s ~-" ++ integer_to_list(CharsForVal) ++ "s~n",
+              ["Count", "Size", "Example"]),
+    AllMessages0 =
+        lists:foldl(fun(MsgX, TreeX) ->
+                            % note: don't use comm:get_msg_tag/1 - we want to keep the group_message tags
+                            Tag = erlang:element(1, MsgX),
+                            Size = erlang:external_size(MsgX),
+                            case gb_trees:lookup(Tag, TreeX) of
+                                none ->
+                                    MsgX2 = prettyprint_msg(MsgX),
+                                    gb_trees:insert(Tag, {1, Size, MsgX2}, TreeX);
+                                {value, {OldCount, OldSize, OldMsg}} ->
+                                    gb_trees:update(Tag, {OldCount + 1, Size + OldSize, OldMsg}, TreeX)
+                            end
+                    end, gb_trees:empty(), process_info_get(Infos, messages, [])),
+    AllMessages = lists:reverse(
+                    lists:keysort(1, util:gb_trees_foldl(
+                                    fun(_Tag, {TagCnt, TagSize, Example}, L) ->
+                                            [{TagCnt, TagSize, Example} | L]
+                                    end, [], AllMessages0))),
+    _ = [ io:format("~5s ~7sk ~" ++ integer_to_list(CharsForVal) ++ "s~n",
+                    [ lists:flatten(io_lib:format("~1210.0p", [TagCnt])),
+                      lists:flatten(io_lib:format("~1210.0p", [TagSize div 1024])),
+                      lists:flatten(io_lib:format("~111610.0p", [Example]))])
+            || {TagCnt, TagSize, Example} <- AllMessages],
+    ok.
+
+-spec prettyprint_msg(comm:message()) -> comm:message().
+prettyprint_msg({?lookup_aux, Key, Hops, Msg}) ->
+    {util:extint2atom(?lookup_aux), Key, Hops, prettyprint_msg(Msg)};
+prettyprint_msg({?lookup_fin, Key, Hops, Msg}) ->
+    {util:extint2atom(?lookup_fin), Key, Hops, prettyprint_msg(Msg)};
+prettyprint_msg({?send_to_group_member, ProcessName, Msg}) ->
+    {util:extint2atom(?send_to_group_member), ProcessName, prettyprint_msg(Msg)};
+prettyprint_msg(Msg) ->
+    setelement(1, Msg, util:extint2atom(element(1, Msg))).
+    
 
 -spec on(comm:message(), state()) -> state().
 
