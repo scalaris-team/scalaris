@@ -80,15 +80,16 @@ on({get_state_response, MyI}, State = #state{ operation = Op,
 
 on({get_chunk_response, {_, DBList}},
    #state{ operation = {count_old_replicas, Req, _} }) ->
+    This = comm:this(),
     Outdated = lists:foldl(
-                 fun({Key, Ver}, Acc) -> 
-                         _ = [api_dht_raw:unreliable_lookup(K, {get_key_entry, comm:this(), K}) 
+                 fun({Key, Ver}, Acc) ->
+                         _ = [api_dht_raw:unreliable_lookup(K, {?read_op, This, 0, K, ?write})
                                 || K <- ?RT:get_replica_keys(Key), K =/= Key],
                          % note: receive wrapped in anonymous functions to allow
                          %       ?SCALARIS_RECV in multiple receive statements
-                         V1 = db_entry:get_version(fun() -> receive ?SCALARIS_RECV({get_key_entry_reply, E1}, E1) end end()),
-                         V2 = db_entry:get_version(fun() -> receive ?SCALARIS_RECV({get_key_entry_reply, E2}, E2) end end()),
-                         V3 = db_entry:get_version(fun() -> receive ?SCALARIS_RECV({get_key_entry_reply, E3}, E3) end end()),
+                         V1 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _SnapNumber, ?ok, ?value_dropped, Version}, Version) end end(),
+                         V2 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _SnapNumber, ?ok, ?value_dropped, Version}, Version) end end(),
+                         V3 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _SnapNumber, ?ok, ?value_dropped, Version}, Version) end end(),
                          case Ver =:= lists:max([V1, V2, V3]) of
                              true -> Acc;
                              false -> Acc + 1
