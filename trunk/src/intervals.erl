@@ -51,9 +51,9 @@
         ]).
 
 -ifdef(with_export_type_support).
--export_type([interval/0, key/0, left_bracket/0, right_bracket/0]).
+-export_type([interval/0, key/0, left_bracket/0, right_bracket/0, continuous_interval/0]).
 % for tester:
--export_type([invalid_interval/0, invalid_simple_interval/0, simple_interval/0, continuous_interval/0]).
+-export_type([invalid_interval/0, invalid_simple_interval/0, simple_interval/0]).
 -endif.
 
 -type left_bracket() :: '(' | '['.
@@ -64,7 +64,7 @@
 -type invalid_simple_interval() :: {element, key()} | all | simple_interval2().
 -opaque interval() :: [simple_interval()].
 -opaque invalid_interval() :: [simple_interval()].
--opaque continuous_interval() :: [simple_interval()].
+-type continuous_interval() :: interval().
 
 % @type interval() = [simple_interval()].
 % [] -> empty interval
