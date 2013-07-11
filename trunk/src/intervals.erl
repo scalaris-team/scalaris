@@ -243,13 +243,11 @@ tester_create_interval(List) ->
                not (is_tuple(I) andalso element(1, I) =:= element andalso element(2, I) >= ?PLUS_INFINITY)],
     normalize_internal(List1).
 
--spec tester_create_continuous_interval(left_bracket(), key(), key(), right_bracket()) -> continuous_interval().
-tester_create_continuous_interval('[' = LBr, Key, Key, ']' = RBr) ->
-    new(LBr, Key, Key, RBr);
+-spec tester_create_continuous_interval(left_bracket(), key(), key() | ?PLUS_INFINITY, right_bracket()) -> continuous_interval().
 tester_create_continuous_interval(_LBr, Key, Key, _RBr) ->
     new('[', Key, Key, ']');
-tester_create_continuous_interval('(' = LBr, ?PLUS_INFINITY, ?MINUS_INFINITY, ')') ->
-    new(LBr, ?PLUS_INFINITY, ?MINUS_INFINITY, ']');
+tester_create_continuous_interval(LBr, LKey, ?PLUS_INFINITY, _RBr) ->
+    new(LBr, LKey, ?PLUS_INFINITY, ')');
 tester_create_continuous_interval(LBr, LKey, RKey, RBr) ->
     new(LBr, LKey, RKey, RBr).
 
