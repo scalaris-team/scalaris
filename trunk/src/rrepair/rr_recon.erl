@@ -637,17 +637,11 @@ map_key_to_interval(Key, I) ->
 map_key_to_quadrant(Key, N) ->
     lists:nth(N, lists:sort(?RT:get_replica_keys(Key))).
 
-% @doc Returns the replication quadrant number (not null-based) in which key is located.
+% @doc Returns the replication quadrant number (starting at 1) in which Key is located.
 -spec get_key_quadrant(?RT:key()) -> pos_integer().
 get_key_quadrant(Key) ->
     Keys = lists:sort(?RT:get_replica_keys(Key)),
-    erlang:element(2, lists:foldl(fun(X, {Status, Nr} = Acc) ->
-                                          case X =:= Key of
-                                              true when Status =:= no -> {yes, Nr};
-                                              false when Status =:= no -> {no, Nr + 1};
-                                              _ -> Acc
-                                          end
-                                  end, {no, 1}, Keys)).
+    util:lists_index_of(Key, Keys).
 
 % @doc Returns the quadrant in which a given interval begins.
 -spec get_interval_quadrant(intervals:interval()) -> pos_integer().
