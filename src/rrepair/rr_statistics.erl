@@ -59,43 +59,42 @@ on({count_old_replicas, _, _} = Op, State) ->
     comm:send_local(State#state.dhtNodePid, {get_state, comm:this(), my_range}),
     State#state{ operation = Op };
 
-on({get_state_response, MyI}, State = #state{ operation = Op,
-                                              dhtNodePid = DhtPid }) ->
-    case Op of
-        {count_old_replicas, Req, ReqI} ->
-            I = intervals:intersection(MyI, ReqI),
-            case intervals:is_empty(I) of
-                true -> 
-                    comm:send(Req, {count_old_replicas_reply, 0}),
-                    kill;
-                _ ->
-                    comm:send_local(DhtPid,
-                                    {get_chunk, self(), I,
-                                     fun(Item) -> db_entry:get_version(Item) =/= -1 end,
-                                     fun(Item) -> {db_entry:get_key(Item), db_entry:get_version(Item)} end,
-                                     all})                    
-            end
+on({get_state_response, MyI},
+   State = #state{operation = {count_old_replicas, Req, ReqI},
+                  dhtNodePid = DhtPid}) ->
+    I = intervals:intersection(MyI, ReqI),
+    case intervals:is_empty(I) of
+        true -> 
+            comm:send(Req, {count_old_replicas_reply, 0}),
+            kill;
+        _ ->
+            comm:send_local(
+              DhtPid,
+              {get_chunk, self(), I,
+               fun(Item) -> db_entry:get_version(Item) =/= -1 end,
+               fun(Item) -> {db_entry:get_key(Item), db_entry:get_version(Item)} end,
+               all})                    
     end,
     State;
 
 on({get_chunk_response, {_, DBList}},
-   #state{ operation = {count_old_replicas, Req, _} }) ->
+   #state{operation = {count_old_replicas, Req, _}}) ->
     This = comm:this(),
-    Outdated = lists:foldl(
-                 fun({Key, Ver}, Acc) ->
-                         _ = [api_dht_raw:unreliable_lookup(K, {?read_op, This, 0, K, ?write})
-                                || K <- ?RT:get_replica_keys(Key), K =/= Key],
-                         % note: receive wrapped in anonymous functions to allow
-                         %       ?SCALARIS_RECV in multiple receive statements
-                         V1 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _SnapNumber, ?ok, ?value_dropped, Version}, Version) end end(),
-                         V2 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _SnapNumber, ?ok, ?value_dropped, Version}, Version) end end(),
-                         V3 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _SnapNumber, ?ok, ?value_dropped, Version}, Version) end end(),
-                         case Ver =:= lists:max([V1, V2, V3]) of
-                             true -> Acc;
-                             false -> Acc + 1
-                         end
-                 end,
-                 0, DBList),
+    Outdated =
+        lists:foldl(
+          fun({Key, Ver}, Acc) ->
+                  _ = [api_dht_raw:unreliable_lookup(K, {?read_op, This, 0, K, ?write})
+                         || K <- ?RT:get_replica_keys(Key), K =/= Key],
+                  % note: receive wrapped in anonymous functions to allow
+                  %       ?SCALARIS_RECV in multiple receive statements
+                  V1 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _, ?ok, ?value_dropped, V}, V) end end(),
+                  V2 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _, ?ok, ?value_dropped, V}, V) end end(),
+                  V3 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _, ?ok, ?value_dropped, V}, V) end end(),
+                  case Ver =:= lists:max([V1, V2, V3]) of
+                      true -> Acc;
+                      false -> Acc + 1
+                  end
+          end, 0, DBList),
     comm:send(Req, {count_old_replicas_reply, Outdated}),
     kill.
 
