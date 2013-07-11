@@ -42,7 +42,7 @@
          lists_split/2, lists_keystore2/5,
          lists_partition3/2,
          lists_remove_at_indices/2,
-         sublist/3,
+         sublist/3, lists_index_of/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
@@ -1135,6 +1135,18 @@ sublist_(List, ListLength, Start, Length) when Length < 0 ->
     RevList = lists:reverse(List),
     NewStart = ListLength - Start + 1, % note: reverse order!
     {lists:sublist(RevList, NewStart, -Length), ListLength}.
+
+%% @doc If Element is in List, its index is returned (1..length(List) as in lists:nth/2),
+%%      otherwise 'not_found'.
+-spec lists_index_of(Element::T, List::[T]) -> pos_integer() | not_found.
+lists_index_of(Element, List) when is_list(List) ->
+    lists_index_of_(Element, List, 1).
+
+%% @doc Helper for lists_index_of/2
+-spec lists_index_of_(Element::T, List::[T], pos_integer()) -> pos_integer() | not_found.
+lists_index_of_(_E, [], _N)      -> not_found;
+lists_index_of_(E, [E | _TL], N) -> N;
+lists_index_of_(E, [_H | TL], N) -> lists_index_of_(E, TL, N + 1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repeat
