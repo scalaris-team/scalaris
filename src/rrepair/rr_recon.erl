@@ -31,7 +31,7 @@
 %export for testing
 -export([encodeBlob/2, decodeBlob/1,
          map_interval/2,
-         get_key_quadrant/1, get_interval_quadrant/1,
+         get_key_quadrant/1,
          find_intersection/2,
          get_interval_size/1]).
 
@@ -42,6 +42,9 @@
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
+-define(CHECK(X), ok).
+%-define(CHECK(X), X).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -49,6 +52,7 @@
 -export_type([method/0, request/0]).
 -endif.
 
+-type quadrant()       :: 1..4. % 1..rep_factor()
 -type method()         :: bloom | merkle_tree | art | iblt | undefined.
 -type stage()          :: req_shared_interval | res_shared_interval | build_struct | reconciliation.
 
@@ -633,48 +637,52 @@ map_key_to_interval(Key, I) ->
     end.
 
 % @doc Maps an abitrary key to its associated key in replication quadrant N.
--spec map_key_to_quadrant(?RT:key(), pos_integer()) -> ?RT:key().
+-spec map_key_to_quadrant(?RT:key(), quadrant()) -> ?RT:key().
 map_key_to_quadrant(Key, N) ->
-    lists:nth(N, lists:sort(?RT:get_replica_keys(Key))).
+    map_key_to_quadrant_(lists:sort(?RT:get_replica_keys(Key)), N).
+-spec map_key_to_quadrant_(RKeys::[?RT:key(),...], quadrant()) -> ?RT:key().
+map_key_to_quadrant_(RKeys, N) ->
+    lists:nth(N, RKeys).
 
 % @doc Returns the replication quadrant number (starting at 1) in which Key is located.
--spec get_key_quadrant(?RT:key()) -> pos_integer().
+-spec get_key_quadrant(?RT:key()) -> quadrant().
 get_key_quadrant(Key) ->
-    Keys = lists:sort(?RT:get_replica_keys(Key)),
-    util:lists_index_of(Key, Keys).
+    get_key_quadrant_(Key, lists:sort(?RT:get_replica_keys(Key))).
+-spec get_key_quadrant_(?RT:key(), RKeys::[?RT:key(),...]) -> quadrant().
+get_key_quadrant_(Key, RKeys) ->
+    util:lists_index_of(Key, RKeys).
 
-% @doc Returns the quadrant in which a given interval begins.
--spec get_interval_quadrant(intervals:interval()) -> pos_integer().
-get_interval_quadrant(I) ->
-    {LBr, LKey, RKey, _} = intervals:get_bounds(I),
-    case LBr of
-        '[' -> get_key_quadrant(LKey);
-        '(' -> get_key_quadrant(?RT:get_split_key(LKey, RKey, {1, 2}))               
-    end.
-
--spec add_quadrants_to_key(?RT:key(), non_neg_integer(), pos_integer()) -> ?RT:key().
-add_quadrants_to_key(Key, Add, RepFactor) ->
-    Dest = get_key_quadrant(Key) + Add,
-    Rep = RepFactor + 1,
-    case Dest div Rep of
-        1 -> map_key_to_quadrant(Key, (Dest rem Rep) + 1);
-        0 -> map_key_to_quadrant(Key, Dest)
-    end.            
+-spec add_quadrants_to_key(KeyQ::quadrant(), RKeys::[?RT:key(),...],
+                           Add::non_neg_integer(), RepFactor::4) -> ?RT:key().
+add_quadrants_to_key(KeyQ, RKeys, Add, RepFactor) when Add =< RepFactor ->
+    DestQ0 = KeyQ + Add,
+    DestQ = if DestQ0 > RepFactor -> DestQ0 - RepFactor;
+               true               -> DestQ0
+            end,
+    map_key_to_quadrant_(RKeys, DestQ).
 
 % @doc Maps an arbitrary Interval into the given replication quadrant. 
 %      The replication degree X divides the keyspace into X replication quadrants.
 %      Precondition: Interval (I) is continuous!
-%      Result: Continuous left-open interval starting or laying in given RepQuadrant.
--spec map_interval(intervals:interval(), RepQuadrant::pos_integer()) -> intervals:interval().
+%      Result: Continuous left-open interval starting or laying in given RepQuadrant,
+%      i.e. the left key of the interval's bounds is in the first quadrant
+%      (independent of the left bracket).
+-spec map_interval(intervals:continuous_interval(), RepQuadrant::quadrant())
+        -> intervals:continuous_interval().
 map_interval(I, Q) ->
+    ?CHECK(true = intervals:is_continuous(I)),
     case intervals:is_all(I) of
         false ->
             {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
-            LQ = get_key_quadrant(LKey),
+            LRKeys = lists:sort(?RT:get_replica_keys(LKey)),
+            RRKeys = lists:sort(?RT:get_replica_keys(RKey)),
+            LQ = get_key_quadrant_(LKey, LRKeys),
+            RQ = get_key_quadrant_(RKey, RRKeys),
             RepFactor = rep_factor(),
-            QDiff = (RepFactor - LQ + Q) rem RepFactor,
-            NewLKey = add_quadrants_to_key(LKey, QDiff, RepFactor),
-            NewRKey = add_quadrants_to_key(RKey, QDiff, RepFactor),
+            % same as: (Q - LQ + RepFactor) rem RepFactor
+            QDiff = ?IIF(Q > LQ, Q - LQ, Q - LQ + RepFactor),
+            NewLKey = add_quadrants_to_key(LQ, LRKeys, QDiff, RepFactor),
+            NewRKey = add_quadrants_to_key(RQ, RRKeys, QDiff, RepFactor),
             intervals:new(LBr, NewLKey, NewRKey, RBr);
         true -> I
     end.
