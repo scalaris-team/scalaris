@@ -167,17 +167,28 @@ send_local(Pid, Msg) ->
 
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()) after the given delay in milliseconds.
--spec send_local_after(Delay::non_neg_integer(), erl_local_pid(), message() | group_message()) -> reference() | ok.
+-spec send_local_after(Delay::non_neg_integer(), erl_local_pid(), message() | group_message()) -> reference().
 send_local_after(Delay, Pid, Msg) ->
     {RealPid, RealMsg} = unpack_cookie(Pid, Msg),
     case erlang:get(trace_mpath) of
         undefined ->
             erlang:send_after(Delay, RealPid, RealMsg);
         Logger ->
+            %% TODO: put RealMsg into the delayed pool of proto_sched
+            %%       by using new a new send type 'local_after'. Have
+            %%       also to adapt trace_mpath then.
             Deliver = trace_mpath:log_send(Logger, self(),
                                            RealPid, RealMsg, local),
             case Deliver of
-                false -> ok;
+                false ->
+                    %% to keep the -spec we return a reference().  In
+                    %% contrast to erlang:send_after() one cannot
+                    %% cancel this message with a correspondig
+                    %% erlang:cancel_timer(). It still will be
+                    %% delivered after the corresponding attempt to
+                    %% cancel it.  We cannot solve this better, as we
+                    %% cannot track the corresponding cancel_timer().
+                    erlang:make_ref();
                 true ->
                     LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
                                        Logger, self(), RealPid, RealMsg),
