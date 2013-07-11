@@ -126,7 +126,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec on(message(), state()) -> state().
+-spec on(message(), state()) -> state() | kill.
 on({get_state_response, MyI}, State = 
        #rr_recon_state{ stage = req_shared_interval,
                         initiator = true,
@@ -143,8 +143,7 @@ on({get_state_response, MyI}, State =
            end,
     ?TRACE("START_TO_DEST ~p", [DKey]),
     api_dht_raw:unreliable_lookup(DKey, Msg),
-    comm:send_local(self(), {shutdown, negotiate_interval}),
-    State;
+    shutdown(negotiate_interval, State);
 
 on({get_state_response, MyI}, State = 
        #rr_recon_state{ stage = req_shared_interval,
@@ -156,12 +155,15 @@ on({get_state_response, MyI}, State =
     Method =:= merkle_tree andalso fd:subscribe(DestRRPid),
     SrcI = proplists:get_value(interval, Params),
     Intersec = find_intersection(MyI, SrcI),
+    NewState = State#rr_recon_state{stage = build_struct,
+                                    struct = [{interval, Intersec}]},
     case intervals:is_empty(Intersec) of
-        false -> send_chunk_req(DhtPid, self(), Intersec, Intersec, get_max_items(Method));
-        true -> comm:send_local(self(), {shutdown, empty_interval})
-    end,
-    State#rr_recon_state{ stage = build_struct,
-                          struct = [{interval, Intersec}] };
+        false ->
+            send_chunk_req(DhtPid, self(), Intersec, Intersec, get_max_items(Method)),
+            NewState;
+        true ->
+            shutdown(empty_interval, NewState)
+    end;
 
 on({get_state_response, MyI}, State = 
        #rr_recon_state{ stage = res_shared_interval,
@@ -172,16 +174,17 @@ on({get_state_response, MyI}, State =
     DestI = proplists:get_value(interval, Params),
     DestReconPid = proplists:get_value(reconPid, Params, undefined),
     MyIntersec = find_intersection(MyI, DestI),
+    NewState = State#rr_recon_state{stage = build_struct, dest_recon_pid = DestReconPid},
     case intervals:is_subset(MyIntersec, MyI) and not intervals:is_empty(MyIntersec) of
         true ->
             RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
-            send_chunk_req(DhtPid, self(), MyIntersec, DestI, get_max_items(RMethod));
+            send_chunk_req(DhtPid, self(), MyIntersec, DestI, get_max_items(RMethod)),
+            NewState;
         false ->
-            comm:send_local(self(), {shutdown, negotiate_interval}),
             DestReconPid =/= undefined andalso
-                comm:send(DestReconPid, {shutdown, empty_interval})
-    end,
-    State#rr_recon_state{ stage = build_struct, dest_recon_pid = DestReconPid };
+                comm:send(DestReconPid, {shutdown, empty_interval}),
+            shutdown(negotiate_interval, NewState)
+    end;
 
 on({get_state_response, MyI}, State = 
        #rr_recon_state{ stage = reconciliation,
@@ -191,10 +194,12 @@ on({get_state_response, MyI}, State =
                        }) ->
     MySyncI = find_intersection(MyI, BloomI),
     case intervals:is_empty(MySyncI) of
-        false -> send_chunk_req(DhtPid, self(), MySyncI, BloomI, get_max_items(bloom));
-        true -> comm:send_local(self(), {shutdown, empty_interval})
-    end,
-    State;
+        false ->
+            send_chunk_req(DhtPid, self(), MySyncI, BloomI, get_max_items(bloom)),
+            State;
+        true ->
+            shutdown(empty_interval, State)
+    end;
 
 on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
        #rr_recon_state{ stage = build_struct,
@@ -232,10 +237,11 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
            end;
         true -> ok
     end,
-    {NStage, NStats} = if EmptyRest orelse RMethod =:= bloom -> {reconciliation, begin_sync(SyncStruct, State)};
-                          not EmptyRest andalso RMethod =:= merkle_tree -> {build_struct, Stats};
-                          true -> {reconciliation, Stats}
-                       end,
+    {NStage, NStats} =
+        if EmptyRest orelse RMethod =:= bloom -> {reconciliation, begin_sync(SyncStruct, State)};
+           not EmptyRest andalso RMethod =:= merkle_tree -> {build_struct, Stats};
+           true -> {reconciliation, Stats}
+        end,
     State#rr_recon_state{ stage = NStage,
                           struct = SyncStruct,
                           stats = rr_recon_stats:set([{build_time, BuildTime}], NStats) };    
@@ -267,9 +273,10 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
                        rr_recon_stats:inc([{resolve_started, 2}], Stats); %feedback causes 2 resolve runs
                    true -> Stats
                end,
-    SyncFinished andalso
-        comm:send_local(self(), {shutdown, sync_finished}),
-    State#rr_recon_state{ stats = NewStats };
+    NewState = State#rr_recon_state{stats = NewStats},
+    if SyncFinished -> shutdown(sync_finished, NewState);
+       true         -> NewState
+    end;
 
 on({start, Method, DestKey}, State) ->
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
@@ -286,17 +293,10 @@ on({continue, Method, Stage, Struct, Initiator}, State) ->
                           initiator = Initiator orelse Stage =:= res_shared_interval };
 
 on({crash, _Pid}, State) ->
-    comm:send_local(self(), {shutdown, recon_node_crash}),
-    State;
+    shutdown(recon_node_crash, State);
 
-on({shutdown, Reason}, #rr_recon_state{ ownerPid = OwnerL,
-                                        stats = Stats,
-                                        initiator = Initiator }) ->
-    ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),
-    Status = exit_reason_to_rc_status(Reason),
-    NewStats = rr_recon_stats:set([{status, Status}], Stats),
-    comm:send_local(OwnerL, {recon_progress_report, self(), Initiator, NewStats}),
-    kill;
+on({shutdown, Reason}, State) ->
+    shutdown(Reason, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% merkle tree sync messages
@@ -324,12 +324,12 @@ on({check_nodes_response, CmpResults}, State =
     FStats = rr_recon_stats:inc([{tree_leafsSynced, Leafs},
                                  {resolve_started, Resolves}], NStats),
     CompLeft = rr_recon_stats:get(tree_compareLeft, FStats),
+    NewState = State#rr_recon_state{stats = FStats, struct = RTree},
     if CompLeft =:= 0 ->
            comm:send(DestReconPid, {shutdown, sync_finished_remote}),
-           comm:send_local(self(), {shutdown, sync_finished});
-       true -> ok
-    end,
-    State#rr_recon_state{ stats = FStats, struct = RTree }.
+           shutdown(sync_finished, NewState);
+       true -> NewState
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -376,6 +376,15 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
             comm:send_local(self(), {shutdown, ?IIF(AOk =:= ok, sync_finished, build_struct)}),
             ARStats
     end.
+
+-spec shutdown(exit_reason(), state()) -> kill.
+shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
+                                 initiator = Initiator}) ->
+    ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),
+    Status = exit_reason_to_rc_status(Reason),
+    NewStats = rr_recon_stats:set([{status, Status}], Stats),
+    comm:send_local(OwnerL, {recon_progress_report, self(), Initiator, NewStats}),
+    kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Merkle Tree specific

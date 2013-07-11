@@ -48,14 +48,13 @@
 
 -type message() ::
     {get_state_response, intervals:interval()} |
-    {get_chunk_response, {intervals:interval(), [any()]}} |
-    {shutdown}.
+    {get_chunk_response, {intervals:interval(), [any()]}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec on(message(), state()) -> state().
+-spec on(message(), state()) -> state() | kill.
 on({count_old_replicas, _, _} = Op, State) ->
     comm:send_local(State#state.dhtNodePid, {get_state, comm:this(), my_range}),
     State#state{ operation = Op };
@@ -68,7 +67,7 @@ on({get_state_response, MyI}, State = #state{ operation = Op,
             case intervals:is_empty(I) of
                 true -> 
                     comm:send(Req, {count_old_replicas_reply, 0}),
-                    comm:send_local(self(), {shutdown});
+                    kill;
                 _ ->
                     comm:send_local(DhtPid,
                                     {get_chunk, self(), I,
@@ -80,7 +79,7 @@ on({get_state_response, MyI}, State = #state{ operation = Op,
     State;
 
 on({get_chunk_response, {_, DBList}},
-   State = #state{ operation = {count_old_replicas, Req, _} }) ->
+   #state{ operation = {count_old_replicas, Req, _} }) ->
     Outdated = lists:foldl(
                  fun({Key, Ver}, Acc) -> 
                          _ = [api_dht_raw:unreliable_lookup(K, {get_key_entry, comm:this(), K}) 
@@ -97,10 +96,6 @@ on({get_chunk_response, {_, DBList}},
                  end,
                  0, DBList),
     comm:send(Req, {count_old_replicas_reply, Outdated}),
-    comm:send_local(self(), {shutdown}),
-    State;
-
-on({shutdown}, _) ->
     kill.
 
 
