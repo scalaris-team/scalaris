@@ -897,28 +897,31 @@ prop_changed_keys_get_entries4(Data, ChangesInterval, Interval) ->
 -spec prop_get_chunk4(Keys::[?RT:key()], StartId::?RT:key(), Interval::intervals:interval(), ChunkSize::pos_integer() | all) -> true.
 prop_get_chunk4(Keys2, StartId, Interval, ChunkSize) ->
     Keys = lists:usort(Keys2),
+    %ct:pal("prop_get_chunk4(~w, ~w, ~w, ~w)", [Keys2, StartId, Interval, ChunkSize]),
     DB = ?TEST_DB:new(),
     DB2 = lists:foldl(fun(Key, DBA) -> ?TEST_DB:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
     {Next, Chunk} = ?TEST_DB:get_chunk(DB2, StartId, Interval, ChunkSize),
+    % note: prevent erlang default printing from converting small int lists to strings:
+    ChunkKeys = [{db_entry:get_key(C)} || C <- Chunk],
+    %ct:pal("-> ~.2p", [{Next, ChunkKeys}]),
     ?TEST_DB:close(DB2),
-    ?equals(lists:usort(Chunk), lists:sort(Chunk)), % check for duplicates
-    KeysInRange = [Key || Key <- Keys, intervals:in(Key, Interval)],
+    ?equals(lists:usort(ChunkKeys), lists:sort(ChunkKeys)), % check for duplicates
+    KeysInRange = [{Key} || Key <- Keys, intervals:in(Key, Interval)],
     KeysInRangeCount = length(KeysInRange),
     ExpectedChunkSize =
         case ChunkSize of
             all -> KeysInRangeCount;
             _   -> erlang:min(KeysInRangeCount, ChunkSize)
         end,
-    case ExpectedChunkSize =/= length(Chunk) of
-        true ->
-            ?ct_fail("chunk has wrong size ~.0p ~.0p ~.0p, expected size: ~.0p",
-                     [Chunk, Keys, Interval, ExpectedChunkSize]);
-        false ->
-            ?equals([Entry || Entry <- Chunk,
-                              not intervals:in(db_entry:get_key(Entry), Interval)],
-                    [])
+    if ExpectedChunkSize =/= length(ChunkKeys) ->
+           ?ct_fail("chunk has wrong size ~w ~w ~w, expected size: ~w",
+                    [ChunkKeys, Keys, Interval, ExpectedChunkSize]);
+       true -> ok
     end,
-    % Next if subset of Interval, no chunk entry is in Next:
+    % elements in Chunk must be in Interval
+    ?equals([X || X = {Key} <- ChunkKeys, not intervals:in(Key, Interval)],
+            []),
+    % Next is subset of Interval, no chunk entry is in Next:
     ?equals_w_note(intervals:is_subset(Next, Interval), true,
                    io_lib:format("Next ~.0p is not subset of ~.0p",
                                  [Next, Interval])),
@@ -926,18 +929,22 @@ prop_get_chunk4(Keys2, StartId, Interval, ChunkSize) ->
                      ?implies(intervals:is_continuous(I) andalso (not intervals:in(StartId, I)),
                               intervals:is_continuous(N) orelse intervals:is_empty(N))
              end, Next, Interval),
-    ?equals_w_note([Entry || Entry <- Chunk,
-                             intervals:in(db_entry:get_key(Entry), Next)],
+    ?equals_w_note([X || X = {Key} <- ChunkKeys, intervals:in(Key, Next)],
                    [], io_lib:format("Next: ~.0p", [Next])),
+    % keys in Chunk plus keys in Next must be all keys in Interval
+    KeysInChunkPlusNext = lists:usort(ChunkKeys
+                                          ++ [{Key} || Key <- Keys, intervals:in(Key, Next)]),
+    ?equals(KeysInChunkPlusNext, KeysInRange),
+    % if Chunk not empty, first key must be first after StartId:
     if KeysInRangeCount > 0 ->
            FirstAfterStartId =
-               case lists:partition(fun(Key) -> Key >= StartId end, KeysInRange) of
+               case lists:partition(fun({Key}) -> Key >= StartId end, KeysInRange) of
                    {[], [H|_]} -> H;
                    {[H|_], _}  -> H
                end,
-           ?compare(fun(ChunkX, FirstAfterStartIdX) ->
-                            db_entry:get_key(hd(ChunkX)) =:= FirstAfterStartIdX
-                    end, Chunk, FirstAfterStartId);
+           ?compare(fun(ChunkKeysX, FirstAfterStartIdX) ->
+                            hd(ChunkKeysX) =:= FirstAfterStartIdX
+                    end, ChunkKeys, FirstAfterStartId);
        true -> true
     end.
 

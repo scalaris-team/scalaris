@@ -290,27 +290,35 @@ get_chunk_helper({ETSDB, _Subscr, _SnapStates} = DB, StartId, Interval,
                                 true -> Chunk
                              end,
                     
-                    case Next of
-                        '$end_of_interval' ->
-%%                             log:pal("get_chunk:~nNextI: ~.2p~nChunk: ~.2p",
-%%                                     [intervals:empty(), Chunk1]),
-                            {intervals:empty(), Chunk1};
-                        _ ->
-                            TakenInterval =
-                                case ForwardBackward of
-                                    forward when FirstKey =:= LastKey ->
-                                        intervals:new('[', LastKey, Next, ']');
-                                    forward ->
-                                        intervals:new('(', LastKey, Next, ']');
-                                    backward when FirstKey =:= LastKey ->
-                                        intervals:new('[', Next, LastKey, ']');
-                                    backward ->
-                                        intervals:new('[', Next, LastKey, ')')
-                                end,
-%%                             log:pal("get_chunk:~nNextI: ~.2p~nChunk: ~.2p",
-%%                                     [intervals:minus(Interval, TakenInterval), Chunk1]),
-                            {intervals:minus(Interval, TakenInterval), Chunk1}
-                    end
+                    RestInterval = 
+                        case Next of
+                            '$end_of_interval' when ChunkLProcessed =/= 0
+                                                        andalso FirstKey =/= LastKey
+                                                        andalso RestChunkSize =:= 0 ->
+                                % would have added LastKey, but no space in chunk
+                                % -> have taken everything except LastKey
+                                intervals:new(LastKey);
+                            '$end_of_interval' ->
+%%                                 log:pal("get_chunk:~nNextI: ~.2p~nChunk: ~.2p",
+%%                                         [intervals:empty(), Chunk1]),
+                                intervals:empty();
+                            _ ->
+                                TakenInterval =
+                                    case ForwardBackward of
+                                        forward when FirstKey =:= LastKey ->
+                                            intervals:new('[', LastKey, Next, ')');
+                                        forward ->
+                                            intervals:new('(', LastKey, Next, ')');
+                                        backward when FirstKey =:= LastKey ->
+                                            intervals:new('(', Next, LastKey, ']');
+                                        backward ->
+                                            intervals:new('(', Next, LastKey, ')')
+                                    end,
+%%                                 log:pal("get_chunk:~nNextI: ~.2p~nChunk: ~.2p",
+%%                                         [intervals:minus(Interval, TakenInterval), Chunk1]),
+                                intervals:minus(Interval, TakenInterval)
+                        end,
+                    {RestInterval, Chunk1}
             end
     end.
 
@@ -353,7 +361,7 @@ first_key_in_interval({ETSDB, _Subscr, _SnapState} = DB, ETS_first, ETS_next,
         -> {?RT:key() | '$end_of_interval', [] | V, Rest::non_neg_integer()}.
 get_chunk_inner(_DB, _ETS_first, _ETS_next, End, End, _Interval, _AddDataFun,
                 ChunkSize, Chunk, _NoInIntCheck) ->
-    %log:pal("inner: 0: ~p", [RealStart]),
+    %log:pal("inner: 0: ~p", [End]),
     % we hit the start element, i.e. our whole data set has been traversed
     {'$end_of_interval', Chunk, ChunkSize};
 get_chunk_inner({ETSDB, _Subscr, _SnapState} = _DB, ETS_first, _ETS_next, Current,
