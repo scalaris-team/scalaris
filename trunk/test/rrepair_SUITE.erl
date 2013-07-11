@@ -428,28 +428,31 @@ tester_get_key_quadrant(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_map_interval(intervals:key(), intervals:key(), 1..4) -> boolean().
-prop_map_interval(L, R, Q) ->
-    I = unittest_helper:build_interval(L, R),
+-spec prop_map_interval(intervals:continuous_interval(), 1..4) -> boolean().
+prop_map_interval(I, Q) ->
     Mapped = rr_recon:map_interval(I, Q),
     case intervals:is_all(I) of
         false ->
-            {LBr, L1, R1, RBr} = intervals:get_bounds(Mapped),
-            LQ = rr_recon:get_key_quadrant(L1),
-            RQ = rr_recon:get_key_quadrant(R1),
-            L2 = ?RT:get_split_key(L1, ?RT:get_split_key(L1, R1, {1, 100}), {1,100}),
-            L2Q = rr_recon:get_key_quadrant(L2),
-            ?equals(L2Q, Q) andalso
-                ?implies(LBr =:= '[', ?equals(LQ, Q)) andalso        
-                ?implies(RBr =:= ']', ?equals(RQ, Q)) andalso
-                ?implies(LBr =:= '[' andalso RBr =:= LBr, ?equals(LQ, RQ) andalso ?equals(LQ, Q)) andalso
-                ?equals(rr_recon:get_interval_quadrant(Mapped), Q);
-        true -> ?assert(intervals:is_all(Mapped))
+            {LBrI, LI, RI, RBrI} = intervals:get_bounds(I),
+            {LBrM, LM, RM, RBrM} = intervals:get_bounds(Mapped),
+            ?equals(rr_recon:get_key_quadrant(LM), Q),
+            % note: we use 0-based calculation here, but quadrants start with 1
+            % -> since we subtract two quadrants, there is no error!
+            ?equals((rr_recon:get_key_quadrant(RM) - rr_recon:get_key_quadrant(LM) + 4) rem 4,
+                    (rr_recon:get_key_quadrant(RI) - rr_recon:get_key_quadrant(LI) + 4) rem 4),
+            ?equals(LBrM, LBrI),
+            ?equals(RBrM, RBrI);
+        true ->
+            ?assert(intervals:is_all(Mapped))
     end.
     
 tester_map_interval(_) ->
-    _ = [prop_map_interval(?MINUS_INFINITY, ?PLUS_INFINITY, I) || I <- lists:seq(1, 4)],
-    tester:test(?MODULE, prop_map_interval, 3, 16, [{threads, 4}]).
+    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+
+    _ = [prop_map_interval(intervals:all(), I) || I <- lists:seq(1, 4)],
+    tester:test(?MODULE, prop_map_interval, 2, 16, [{threads, 4}]),
+
+    tester:unregister_value_creator({typedef, intervals, continuous_interval}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
