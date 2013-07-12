@@ -99,6 +99,13 @@
 %-compile({parse_transform, ct_line}).
 -endif.
 
+% debug mode:
+-ifdef(enable_debug).
+-define(ASSERT(X), true = X).
+-else.
+-define(ASSERT(X), ok).
+-endif.
+
 % disable compression (the overhead is too high, at least for GbE)
 -define(COMM_COMPRESS_MSG(DeliverMsg, State),
         term_to_binary(DeliverMsg, [{minor_version, 1}])

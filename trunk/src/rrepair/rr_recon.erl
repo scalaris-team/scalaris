@@ -42,9 +42,6 @@
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
--define(CHECK(X), ok).
-%-define(CHECK(X), X).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -635,7 +632,7 @@ add_quadrants_to_key(KeyQ, RKeys, Add, RepFactor) when Add =< RepFactor ->
 -spec map_interval(intervals:continuous_interval(), RepQuadrant::quadrant())
         -> intervals:continuous_interval().
 map_interval(I, Q) ->
-    ?CHECK(true = intervals:is_continuous(I)),
+    ?ASSERT(intervals:is_continuous(I)),
     case intervals:is_all(I) of
         false ->
             {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
