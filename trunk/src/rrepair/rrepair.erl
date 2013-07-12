@@ -144,8 +144,8 @@ on({request_sync, Method, DestKey, Principal}, State) ->
     request_sync(State, Method, DestKey, Principal);
 
 on({request_resolve, Operation, Options}, State = #rrepair_state{open_resolve = OpenResolve}) ->
-    {ok, Pid} = rr_resolve:start(),
-    comm:send_local(Pid, {start, Operation, Options}),
+    {ok, Pid} = rr_resolve:start(Operation, Options),
+    comm:send_local(Pid, {start}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 % request replica repair status
@@ -207,8 +207,8 @@ on({continue_recon, Sender, SessionID, Msg}, State) ->
     State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
 
 on({request_resolve, SessionID, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
-    {ok, Pid} = rr_resolve:start(SessionID),
-    comm:send_local(Pid, {start, Operation, Options}),
+    {ok, Pid} = rr_resolve:start(SessionID, Operation, Options),
+    comm:send_local(Pid, {start}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 on({recon_forked}, State) ->
