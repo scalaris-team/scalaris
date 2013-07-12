@@ -38,7 +38,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start/0, start/1]).
+-export([init/1, on/2, start/2, start/3]).
 -export([get_stats_session_id/1, get_stats_feedback/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
@@ -109,19 +109,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state() | kill.
 
-on({start, Operation, Options}, State = #rr_resolve_state{ dhtNodePid = DhtPid,
-                                                           stats = Stats }) ->
-    FBDest = proplists:get_value(feedback, Options, nil),
-    FBResp = proplists:get_value(feedback_response, Options, false),
-    StatsDest = proplists:get_value(send_stats, Options, nil),
-    NewState = State#rr_resolve_state{ operation = Operation,
-									   stats = Stats#resolve_stats{ feedback_response = FBResp },
-									   feedback = {FBDest, []},
-									   send_stats = StatsDest },
-    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p",
-           [element(1, Operation), FBDest, FBResp], State),
+on({start}, State = #rr_resolve_state{dhtNodePid = DhtPid}) ->
 	comm:send_local(DhtPid, {get_state, comm:this(), my_range}),
-	NewState;
+	State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MODE: key_upd
@@ -360,20 +350,22 @@ print_resolve_stats(Stats) ->
 init(State) ->
     State.
 
--spec start() -> {ok, MyPid::pid()}.
-start() ->        
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, get_start_state(), []).
+-spec start(operation(), options()) -> {ok, MyPid::pid()}.
+start(Operation, Options) ->
+    start(null, Operation, Options).
 
--spec start(rrepair:session_id()) -> {ok, MyPid::pid()}.
-start(SID) ->        
-    State = get_start_state(),
-    Stats0 = State#rr_resolve_state.stats,
-    Stats = Stats0#resolve_stats{ session_id = SID },
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2,
-                             State#rr_resolve_state{ stats = Stats }, []).
-
--spec get_start_state() -> state().
-get_start_state() ->
-    #rr_resolve_state{ ownerPid = self(),
-                       dhtNodePid = pid_groups:get_my(dht_node)
-                     }.
+-spec start(rrepair:session_id() | null, operation(), options()) -> {ok, MyPid::pid()}.
+start(SID, Operation, Options) ->
+    FBDest = proplists:get_value(feedback, Options, nil),
+    FBResp = proplists:get_value(feedback_response, Options, false),
+    StatsDest = proplists:get_value(send_stats, Options, nil),
+    State = #rr_resolve_state{ ownerPid = self(),
+                               dhtNodePid = pid_groups:get_my(dht_node),
+                               operation = Operation,
+                               stats = #resolve_stats{ feedback_response = FBResp,
+                                                       session_id = SID },
+                               feedback = {FBDest, []},
+                               send_stats = StatsDest },
+    ?TRACE("RESOLVE - CREATE~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p",
+           [element(1, Operation), FBDest, FBResp], State),
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, State, []).
