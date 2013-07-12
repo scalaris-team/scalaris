@@ -157,12 +157,12 @@ on({get_state_response, MyI}, State =
     DestReconPid = proplists:get_value(reconPid, Params, undefined),
     MyIntersec = find_intersection(MyI, DestI),
     NewState = State#rr_recon_state{stage = build_struct, dest_recon_pid = DestReconPid},
-    case intervals:is_subset(MyIntersec, MyI) and not intervals:is_empty(MyIntersec) of
-        true ->
+    case intervals:is_empty(MyIntersec) of
+        false ->
             RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
             send_chunk_req(DhtPid, self(), MyIntersec, DestI, get_max_items(RMethod)),
             NewState;
-        false ->
+        true ->
             DestReconPid =/= undefined andalso
                 comm:send(DestReconPid, {shutdown, empty_interval}),
             shutdown(negotiate_interval, NewState)
@@ -553,13 +553,13 @@ build_recon_struct(art, {I, DBItems}) ->
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Sends get_chunk request to local DHT_node process.
-%      Request responses a list of encoded key-version pairs in ChunkI,
-%      where key is mapped to its assosiated key in MappedI.
+%% @doc Sends a get_chunk request to the local DHT_node process.
+%%      Request responds with a list of {Key, Value} tuples.
+%%      The mapping to DestI is not done here!
 -spec send_chunk_req(DhtPid::LPid, AnswerPid::LPid, ChunkI::I, DestI::I, MaxItems) -> ok when
     is_subtype(LPid,        comm:erl_local_pid()),
     is_subtype(I,           intervals:interval()),
-    is_subtype(MaxItems,    pos_integer()).
+    is_subtype(MaxItems,    pos_integer() | all).
 send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
     SrcPidReply = comm:reply_as(SrcPid, 4, {rr_recon, data, DestI, '_'}),
     comm:send_local(
