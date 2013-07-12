@@ -141,19 +141,18 @@ on({get_state_response, MyI}, State =
 
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd_send, _, KeyList},
-                          dhtNodePid = DhtPid }) ->    
-    FKeyList = [K || X <- KeyList, K <- ?RT:get_replica_keys(X),
-                     intervals:in(K, MyI)],
-    KeyTree = gb_sets:from_list(FKeyList),
-    comm:send_local(DhtPid, {get_entries, self(),
-                             fun(X) -> gb_sets:is_element(db_entry:get_key(X), KeyTree) end,
-                             fun(X) -> entry_to_kvv(X) end}),
+                          dhtNodePid = DhtPid }) ->
+    RepKeyInt = intervals:from_elements(
+                    [K || X <- KeyList, K <- ?RT:get_replica_keys(X),
+                          intervals:in(K, MyI)]),
+    comm:send_local(DhtPid, {get_entries, self(), RepKeyInt}),
     State;
 
-on({get_entries_response, KVVList}, State =
+on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {key_upd_send, Dest, _},
                           feedback = {FB, _},
                           stats = Stats }) ->
+    KVVList = [entry_to_kvv(E) || E <- EntryList],
     Options = ?IIF(FB =/= nil, [{feedback, FB}], []),
     SendList = make_unique_kvv(lists:keysort(1, KVVList), []),
     case Stats#resolve_stats.session_id of
