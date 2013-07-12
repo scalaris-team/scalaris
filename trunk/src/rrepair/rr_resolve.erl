@@ -77,8 +77,7 @@
 
 -record(rr_resolve_state,
         {
-         ownerLocalPid  = ?required(rr_resolve_state, ownerLocalPid)    :: comm:erl_local_pid(),
-         ownerRemotePid = ?required(rr_resolve_state, ownerRemotePid)   :: comm:mypid(),
+         ownerPid       = ?required(rr_resolve_state, ownerPid)         :: comm:erl_local_pid(),
          ownerMonitor   = null                                          :: null | reference(),
          dhtNodePid     = ?required(rr_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
          operation      = nil        									:: nil | operation(),
@@ -102,7 +101,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(TRACE(X,Y,State), ok).
-%-define(TRACE(X,Y,State), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, State#rr_resolve_state.ownerLocalPid] ++ Y)).
+%-define(TRACE(X,Y,State), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, State#rr_resolve_state.ownerPid] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
@@ -245,7 +244,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     end,
     State#rr_resolve_state{ stats = NewStats, feedback = NewFB };
 
-on({shutdown, _}, #rr_resolve_state{ ownerLocalPid = Owner,
+on({shutdown, _}, #rr_resolve_state{ ownerPid = Owner,
                                      ownerMonitor = Mon,
                                      send_stats = SendStats,
                                      stats = Stats }) ->    
@@ -360,7 +359,7 @@ print_resolve_stats(Stats) ->
 
 -spec init(state()) -> state().
 init(State) ->
-    Mon = erlang:monitor(process, State#rr_resolve_state.ownerLocalPid),
+    Mon = erlang:monitor(process, State#rr_resolve_state.ownerPid),
     State#rr_resolve_state{ ownerMonitor = Mon }.
 
 -spec start() -> {ok, MyPid::pid()}.
@@ -376,7 +375,6 @@ start(SID) ->
 
 -spec get_start_state() -> state().
 get_start_state() ->
-    #rr_resolve_state{ ownerLocalPid = self(),
-                       ownerRemotePid = comm:this(),
+    #rr_resolve_state{ ownerPid = self(),
                        dhtNodePid = pid_groups:get_my(dht_node)
                      }.
