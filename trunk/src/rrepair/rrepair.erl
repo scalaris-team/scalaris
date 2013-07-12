@@ -19,7 +19,8 @@
 %%         II) resolution       - resolve found differences (rr_resolve.erl)
 %%
 %%         Examples:
-%%            1) remote node should get a single kvv-pair (key,value,version)
+%%            1) remote node should get a single kvv-pair (Key, Value, Version)
+%%               with Key mapped into first quadrant
 %%               >>comm:send(RemoteRRepairPid, {request_resolve, {key_upd, [{Key, Value, Version}]}, []}).
 %%
 %% @end

@@ -72,9 +72,9 @@
 -type stats() :: #resolve_stats{}.
 
 -type operation() ::
-    {key_upd, ?DB:kvv_list()} |
+    {key_upd, SortedKvvListInQ1::?DB:kvv_list()} |
     {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
-    {interval_upd, intervals:interval(), ?DB:kvv_list()} |
+    {interval_upd, intervals:interval(), SortedKvvListInQ1::?DB:kvv_list()} |
     {interval_upd_send, intervals:interval(), DestPid::comm:mypid()}.
 
 -record(rr_resolve_state,
@@ -184,12 +184,12 @@ on({get_entries_response, EntryList}, State =
                           feedback = {FBDest, _},
                           stats = Stats }) ->
     ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
-    %Send entries not in sender interval
-    EntryMapped = [entry_to_kvv(X) || X <- EntryList],
-    SendList = lists:filter(
-                 fun(Y) ->
-                         [] =:= [Z || Z <- KvvList, element(1, Y) =:= element(1, Z)]
-                 end, EntryMapped),
+    % Send entries not in sender interval
+    % convert keys KvvList to a gb_set for faster access checks
+    KSet = gb_sets:from_list([element(1, Z) || Z <- KvvList]),
+    EntryMapped = [MX || X <- EntryList,
+                         not gb_sets:is_element(element(1, (MX = entry_to_kvv(X))), KSet)],
+    SendList = make_unique_kvv(lists:keysort(1, EntryMapped), []),
     FBDest =/= nil andalso
         comm:send(FBDest, {request_resolve, {key_upd, SendList}, []}), %without session id 
     NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
@@ -202,7 +202,8 @@ on({get_entries_response, EntryList}, State =
                           feedback = {FB, _},
                           stats = Stats }) ->
     Options = ?IIF(FB =/= nil, [{feedback, FB}], []),
-    SendList = [entry_to_kvv(X) || X <- EntryList],
+    KVVList = [entry_to_kvv(E) || E <- EntryList],
+    SendList = make_unique_kvv(lists:keysort(1, KVVList), []),
     case Stats#resolve_stats.session_id of
         null -> comm:send(Dest, {request_resolve, {interval_upd, I, SendList}, Options});
         SID -> comm:send(Dest, {request_resolve, SID, {interval_upd, I, SendList}, Options})
@@ -248,16 +249,16 @@ on({shutdown, Reason}, State) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc returns number of send update requests
+%% @doc Starts updating the local entries with the given KvvList.
+%%      -> Returns number of send update requests.
+%%      PreCond: KvvList must be unique by keys.
 -spec start_update_key_entry(?DB:kvv_list(), intervals:interval(), comm:mypid(), comm:erl_local_pid()) -> non_neg_integer().
 start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
-    FullKvvList = [{X, Value, Vers} 
-                   || {K, Value, Vers} <- KvvList,
-                      X <- ?RT:get_replica_keys(K),
-                      intervals:in(X, MyI)],
-    UpdList = make_unique_kvv(lists:keysort(1, FullKvvList), []),
-    _ = [comm:send_local(DhtPid, {update_key_entry, MyPid, Key, Val, Vers}) || {Key, Val, Vers} <- UpdList],
-    length(UpdList).
+    ?ASSERT(length(KvvList) =:= length(lists:ukeysort(1, KvvList))),
+    length([comm:send_local(DhtPid, {update_key_entry, MyPid, RKey, Val, Vers})
+              || {Key, Val, Vers} <- KvvList,
+                 RKey <- ?RT:get_replica_keys(Key),
+                 intervals:in(RKey, MyI)]).
 
 -spec shutdown(exit_reason(), state()) -> kill.
 shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
@@ -331,9 +332,11 @@ make_unique_kvv([H | T], [AccH | AccT] = Acc) ->
 -spec send_feedback(feedback(), rrepair:session_id()) -> ok.
 send_feedback({nil, _}, _) -> ok;
 send_feedback({Dest, Items}, null) ->
-    comm:send(Dest, {request_resolve, {key_upd, gb_sets:to_list(gb_sets:from_list(Items))}, [feedback_response]});
+    SendList = make_unique_kvv(lists:keysort(1, Items), []),
+    comm:send(Dest, {request_resolve, {key_upd, SendList}, [feedback_response]});
 send_feedback({Dest, Items}, SID) ->
-    comm:send(Dest, {request_resolve, SID, {key_upd, gb_sets:to_list(gb_sets:from_list(Items))}, [feedback_response]}).
+    SendList = make_unique_kvv(lists:keysort(1, Items), []),
+    comm:send(Dest, {request_resolve, SID, {key_upd, SendList}, [feedback_response]}).
 
 -spec send_stats(nil | comm:mypid(), stats()) -> ok.
 send_stats(nil, _) -> ok;
