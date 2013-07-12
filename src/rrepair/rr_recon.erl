@@ -646,7 +646,8 @@ map_interval(I, Q) ->
     end.
 
 % @doc Gets intersection of two associated intervals as sub interval of A.
--spec find_intersection(intervals:interval(), intervals:interval()) -> intervals:interval().
+-spec find_intersection(intervals:continuous_interval(), intervals:continuous_interval())
+        -> intervals:continuous_interval().
 find_intersection(A, B) ->
     SecI = lists:foldl(fun(Q, Acc) ->
                                Sec = intervals:intersection(A, map_interval(B, Q)),
@@ -669,7 +670,7 @@ find_intersection(A, B) ->
     end.
 
 % @doc Note: works only on continuous intervals
--spec get_interval_size(intervals:interval()) -> number().
+-spec get_interval_size(intervals:continuous_interval()) -> number().
 get_interval_size(I) ->
     case intervals:is_all(I) of        
         false ->
