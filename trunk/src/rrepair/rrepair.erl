@@ -114,6 +114,7 @@
     % internal
     {?TRIGGER_NAME} |
     {?GC_TRIGGER} |
+    {start_sync, get_range, session_id(), rr_recon:method(), DestKey::random | ?RT:key(), {get_state_response, MyI::intervals:interval()}} |
 	{continue_recon, SenderRRPid::comm:mypid(), session_id() | null, ReqMsg::rr_recon:request()} |
     {request_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
     {recon_forked} |
@@ -185,10 +186,17 @@ on ({?GC_TRIGGER}, State = #rrepair_state{ gc_trigger = GCState,
     State#rrepair_state{ gc_trigger = trigger:next(GCState),
                          open_sessions = NewSessions };
 
-on({request_resolve, SessionID, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
-    {ok, Pid} = rr_resolve:start(SessionID),
-    comm:send_local(Pid, {start, Operation, Options}),
-    State#rrepair_state{ open_resolve = OpenResolve + 1 };
+on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}}, State) ->
+    Msg = {?send_to_group_member, rrepair,
+           {continue_recon, comm:this(), SessionId,
+            {continue, Method, req_shared_interval, [{interval, MyI}], false}}},
+    DKey = case DestKey of
+               random -> select_sync_node(MyI);        
+               _ -> DestKey
+           end,
+    ?TRACE("START_TO_DEST ~p", [DKey]),
+    api_dht_raw:unreliable_lookup(DKey, Msg),
+    State;
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
 on({continue_recon, Sender, SessionID, Msg}, State) ->
@@ -196,6 +204,11 @@ on({continue_recon, Sender, SessionID, Msg}, State) ->
     {ok, Pid} = rr_recon:start(SessionID, Sender),
     comm:send_local(Pid, Msg),
     State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
+
+on({request_resolve, SessionID, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
+    {ok, Pid} = rr_resolve:start(SessionID),
+    comm:send_local(Pid, {start, Operation, Options}),
+    State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 on({recon_forked}, State) ->
     State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
@@ -290,12 +303,21 @@ request_sync(State = #rrepair_state{round = Round, open_recon = OpenRecon,
                                     open_sessions = Sessions},
              Method, DestKey, Principal) ->
     ?TRACE("RR: REQUEST SYNC WITH ~p", [DestKey]),
-    S = new_session(Round, comm:this(), Method, Principal),
-    {ok, Pid} = rr_recon:start(S#session.id),
-    comm:send_local(Pid, {start, Method, DestKey}),
+    This0 = comm:this(),
+    S = new_session(Round, This0, Method, Principal),
+    This = comm:reply_as(This0, 6, {start_sync, get_range, S#session.id, Method, DestKey, '_'}),
+    comm:send_local(pid_groups:get_my(dht_node), {get_state, This, my_range}),
     State#rrepair_state{ round = next_round(Round),
                          open_recon = OpenRecon + 1,
                          open_sessions = [S | Sessions] }.
+
+% @doc selects a random associated key of an interval ending
+-spec select_sync_node(intervals:interval()) -> ?RT:key().
+select_sync_node(Interval) ->
+    {_, LKey, RKey, _} = intervals:get_bounds(Interval),
+    Key = ?RT:get_split_key(LKey, RKey, {1, randoms:rand_uniform(1, 50)}),
+    Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
+    util:randomelem(Keys).
 
 -spec next_round(round()) -> round().
 next_round({R, _Fork}) -> {R + 1, 0}.
