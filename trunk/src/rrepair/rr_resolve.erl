@@ -57,6 +57,8 @@
 -type feedback() :: {nil | comm:mypid(),        %feedback destination adress
                      ?DB:kvv_list()}.
 
+-type exit_reason() :: resolve_ok | resolve_abort.
+
 -record(resolve_stats,
         {
          session_id       = null   :: rrepair:session_id() | null,
@@ -93,7 +95,7 @@
     % internal
     {get_state_response, intervals:interval()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
-    {shutdown, atom()}.
+    {shutdown, exit_reason()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -105,7 +107,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec on(message(), state()) -> state().
+-spec on(message(), state()) -> state() | kill.
 
 on({start, Operation, Options}, State = #rr_resolve_state{ dhtNodePid = DhtPid,
                                                            stats = Stats }) ->
@@ -132,10 +134,10 @@ on({get_state_response, MyI}, State =
                           }) ->
     ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
     ?TRACE("GET INTERVAL - KEY UPD - KVVListLen=~p ; ToUpdate=~p", [length(KvvList), ToUpdate], State),
-    if ToUpdate =:= 0 -> comm:send_local(self(), {shutdown, resolve_ok});
-       true -> ok %shutdown handled by update_key_entry_ack
-    end,
-    State#rr_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
+    NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
+    if ToUpdate =:= 0 -> shutdown(resolve_ok, NewState);
+       true           -> NewState % note: shutdown handled by update_key_entry_ack
+    end;
 
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd_send, _, KeyList},
@@ -158,8 +160,7 @@ on({get_entries_response, KVVList}, State =
         null -> comm:send(Dest, {request_resolve, {key_upd, SendList}, Options});
         SID -> comm:send(Dest, {request_resolve, SID, {key_upd, SendList}, Options})
     end,
-    comm:send_local(self(), {shutdown, resolve_ok}),
-    State;
+    shutdown(resolve_ok, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MODE: interval_upd 
@@ -170,11 +171,12 @@ on({get_state_response, MyI}, State = #rr_resolve_state{ operation = Op,
   when element(1, Op) =:= interval_upd;
        element(1, Op) =:= interval_upd_send ->
     ISec = rr_recon:find_intersection(MyI, element(2, Op)),
+    NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
-        false -> comm:send_local(DhtPid, {get_entries, self(), ISec});
-        true -> comm:send_local(self(), {shutdown, resolve_abort})
-    end,
-    State#rr_resolve_state{ my_range = MyI };
+        false -> comm:send_local(DhtPid, {get_entries, self(), ISec}),
+                 NewState;
+        true  -> shutdown(resolve_abort, NewState)
+    end;
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {interval_upd, _I, KvvList},
@@ -191,10 +193,10 @@ on({get_entries_response, EntryList}, State =
                  end, EntryMapped),
     FBDest =/= nil andalso
         comm:send(FBDest, {request_resolve, {key_upd, SendList}, []}), %without session id 
-    if ToUpdate =:= 0 -> comm:send_local(self(), {shutdown, resolve_ok});
-       true -> ok %shutdown handled by update_key_entry_ack
-    end,
-    State#rr_resolve_state{ stats = Stats#resolve_stats{ diff_size = ToUpdate } };
+    NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
+    if ToUpdate =:= 0 -> shutdown(resolve_ok, NewState);
+       true           -> NewState % note: shutdown handled by update_key_entry_ack
+    end;
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {interval_upd_send, I, Dest},
@@ -206,8 +208,7 @@ on({get_entries_response, EntryList}, State =
         null -> comm:send(Dest, {request_resolve, {interval_upd, I, SendList}, Options});
         SID -> comm:send(Dest, {request_resolve, SID, {interval_upd, I, SendList}, Options})
     end,
-    comm:send_local(self(), {shutdown, resolve_ok}),
-    State;
+    shutdown(resolve_ok, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -234,21 +235,17 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                     {DoFB, [entry_to_kvv(Entry) | FBItems]};
                 true -> FB
             end,
+    NewState = State#rr_resolve_state{ stats = NewStats, feedback = NewFB },
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
                 ?TRACE("UPDATED = ~p - Regen=~p - FB=~p", [Stats#resolve_stats.update_count, Stats#resolve_stats.regen_count, NewFB], State),
                 send_feedback(NewFB, Stats#resolve_stats.session_id),
-                comm:send_local(self(), {shutdown, resolve_ok});
-        true -> ok
-    end,
-    State#rr_resolve_state{ stats = NewStats, feedback = NewFB };
+                shutdown(resolve_ok, NewState);
+        true -> NewState
+    end;
 
-on({shutdown, _}, #rr_resolve_state{ ownerPid = Owner,
-                                     send_stats = SendStats,
-                                     stats = Stats }) ->
-    send_stats(SendStats, Stats),
-    comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
-    kill.
+on({shutdown, Reason}, State) ->
+    shutdown(Reason, State).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -262,6 +259,13 @@ start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
     UpdList = make_unique_kvv(lists:keysort(1, FullKvvList), []),
     _ = [comm:send_local(DhtPid, {update_key_entry, MyPid, Key, Val, Vers}) || {Key, Val, Vers} <- UpdList],
     length(UpdList).
+
+-spec shutdown(exit_reason(), state()) -> kill.
+shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
+                                    stats = Stats}) ->
+    send_stats(SendStats, Stats),
+    comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
+    kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % resolve stats operations
