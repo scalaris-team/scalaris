@@ -190,10 +190,8 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
                         dhtNodePid = DhtNodePid,
                         initiator = Initiator,
                         stats = Stats }) ->
-    DBList = [case map_key_to_interval(KeyX, DestI) of
-                  none -> encodeBlob(?MINUS_INFINITY, 0); %TODO should be filtered
-                  Key -> encodeBlob(Key, VersionX)
-              end || {KeyX, VersionX} <- DBList0],
+    DBList = [encodeBlob(Key, VersionX) || {KeyX, VersionX} <- DBList0,
+                                           none =/= (Key = map_key_to_interval(KeyX, DestI))],
     SyncI = proplists:get_value(interval, Params),
     ToBuild = ?IIF(RMethod =:= art, ?IIF(Initiator, merkle_tree, art), RMethod),
     {BuildTime, SyncStruct} =
@@ -236,10 +234,8 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
                         dest_rr_pid = DestRU_Pid,
                         struct = #bloom_recon_struct{ bloom = BF },
                         stats = Stats }) ->
-    DBList = [case map_key_to_interval(KeyX, DestI) of
-                  none -> encodeBlob(?MINUS_INFINITY, 0); %TODO should be filtered
-                  Key -> encodeBlob(Key, VersionX)
-              end || {KeyX, VersionX} <- DBList0],
+    DBList = [encodeBlob(Key, VersionX) || {KeyX, VersionX} <- DBList0,
+                                           none =/= (Key = map_key_to_interval(KeyX, DestI))],
     %if rest interval is non empty start another sync    
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
