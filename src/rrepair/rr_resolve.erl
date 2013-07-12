@@ -78,7 +78,6 @@
 -record(rr_resolve_state,
         {
          ownerPid       = ?required(rr_resolve_state, ownerPid)         :: comm:erl_local_pid(),
-         ownerMonitor   = null                                          :: null | reference(),
          dhtNodePid     = ?required(rr_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
          operation      = nil        									:: nil | operation(),
          stats          = #resolve_stats{}                              :: stats(),
@@ -245,16 +244,10 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     State#rr_resolve_state{ stats = NewStats, feedback = NewFB };
 
 on({shutdown, _}, #rr_resolve_state{ ownerPid = Owner,
-                                     ownerMonitor = Mon,
                                      send_stats = SendStats,
-                                     stats = Stats }) ->    
-    erlang:demonitor(Mon),
+                                     stats = Stats }) ->
     send_stats(SendStats, Stats),
     comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
-    kill;
-
-on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
-    log:log(info, "shutdown rr_resolve due to rrepair shut down", []),
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -359,19 +352,19 @@ print_resolve_stats(Stats) ->
 
 -spec init(state()) -> state().
 init(State) ->
-    Mon = erlang:monitor(process, State#rr_resolve_state.ownerPid),
-    State#rr_resolve_state{ ownerMonitor = Mon }.
+    State.
 
 -spec start() -> {ok, MyPid::pid()}.
 start() ->        
-    gen_component:start(?MODULE, fun ?MODULE:on/2, get_start_state(), []).
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, get_start_state(), []).
 
 -spec start(rrepair:session_id()) -> {ok, MyPid::pid()}.
 start(SID) ->        
     State = get_start_state(),
-    Stats = State#rr_resolve_state.stats,
-    gen_component:start(?MODULE, fun ?MODULE:on/2,
-                        State#rr_resolve_state{ stats = Stats#resolve_stats{ session_id = SID } }, []).
+    Stats0 = State#rr_resolve_state.stats,
+    Stats = Stats0#resolve_stats{ session_id = SID },
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2,
+                             State#rr_resolve_state{ stats = Stats }, []).
 
 -spec get_start_state() -> state().
 get_start_state() ->
