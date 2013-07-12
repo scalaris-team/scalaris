@@ -88,10 +88,15 @@ suite() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
+    Config2 = unittest_helper:init_per_suite(Config),
+    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    Config2.
 
 end_per_suite(Config) ->
     erlang:erase(?DBSizeKey),
+    tester:unregister_value_creator({typedef, intervals, interval}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
@@ -340,7 +345,7 @@ prop_blob_coding(A, B) ->
                                io_lib:format("B=~p ; Coded=~p ; DecodedB=~p", [B, Coded, DB])).
 
 tester_blob_coding(_) ->
-    tester:test(?MODULE, prop_blob_coding, 2, 50, [{threads, 4}]).
+    tester:test(?MODULE, prop_blob_coding, 2, 100, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -424,7 +429,7 @@ prop_get_key_quadrant(Key) ->
 
 tester_get_key_quadrant(_) ->
     _ = [prop_get_key_quadrant(Key) || Key <- ?RT:get_replica_keys(?MINUS_INFINITY)],
-    tester:test(?MODULE, prop_get_key_quadrant, 1, 16, [{threads, 4}]).
+    tester:test(?MODULE, prop_get_key_quadrant, 1, 100, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -447,39 +452,46 @@ prop_map_interval(I, Q) ->
     end.
     
 tester_map_interval(_) ->
-    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
-
     _ = [prop_map_interval(intervals:all(), I) || I <- lists:seq(1, 4)],
-    tester:test(?MODULE, prop_map_interval, 2, 16, [{threads, 4}]),
-
-    tester:unregister_value_creator({typedef, intervals, continuous_interval}).
+    tester:test(?MODULE, prop_map_interval, 2, 100, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_map_key_to_interval(intervals:key(), intervals:key(), ?RT:key()) -> boolean().
-prop_map_key_to_interval(L, R, Key) ->
-    I = unittest_helper:build_interval(L, R),
+-spec prop_map_key_to_interval(intervals:interval(), ?RT:key()) -> boolean().
+prop_map_key_to_interval(I, Key) ->
     Mapped = rr_recon:map_key_to_interval(Key, I),
+    RGrp = ?RT:get_replica_keys(Key),
+    InGrp = [X || X <- RGrp, intervals:in(X, I)],
     case intervals:in(Key, I) of
-        true -> ?equals_w_note(Mapped, Key,
-                               io_lib:format("Violation: if key is in i than mapped key equals key!~nKey=~p~nMapped=~p", [Key, Mapped]));
+        true ->
+            ?equals_w_note(Mapped, Key,
+                           io_lib:format("Violation: if key is in i than mapped key equals key!~n"
+                                             "Key=~p~nMapped=~p", [Key, Mapped]));
         false when Mapped =/= none ->
-            RGrp = ?RT:get_replica_keys(Key),
-            InGrp = [X || X <- RGrp, intervals:in(X, I)],
+            ?compare(fun erlang:'=/='/2, InGrp, []),
             case InGrp of
-                [] -> true;
                 [W] -> ?equals(Mapped, W);
                 [_|_] ->
                     NotIn = [Y || Y <- RGrp, Y =/= Key, not intervals:in(Y, I)],
-                    _ = [?compare(fun erlang:'=/='/2, rr_recon:map_key_to_interval(Z, I), Mapped)
+%%                     ct:pal("prop_map_key_to_interval(~p, ~p)~nmapped: ~p~nnot in: ~w",
+%%                            [I, Key, Mapped, NotIn]),
+                    _ = [begin
+                             MapZ = rr_recon:map_key_to_interval(Z, I),
+%%                              ct:pal("~p -> ~p", [Z, MapZ]),
+                             ?compare(fun erlang:'=/='/2, MapZ, Mapped)
+                         end
                          || Z <- NotIn], 
                     ?assert(intervals:in(Mapped, I))
             end;
-        _ -> true
+        _ -> ?equals(InGrp, [])
     end.
 
 tester_map_key_to_interval(_) ->
-    tester:test(?MODULE, prop_map_key_to_interval, 3, 40, [{threads, 4}]).
+    [Q1, Q2, Q3 | _] = ?RT:get_replica_keys(?MINUS_INFINITY), 
+    prop_map_key_to_interval(intervals:new('[', Q1, Q2, ']'), Q1), 
+    prop_map_key_to_interval(intervals:new('[', Q1, Q2, ']'), Q2),
+    prop_map_key_to_interval(intervals:new('[', Q1, Q2, ']'), Q3),
+    tester:test(?MODULE, prop_map_key_to_interval, 2, 1000, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -506,7 +518,7 @@ prop_find_intersection(KeyA, KeyB, KeyC, KeyD) ->
         ?implies(not intervals:is_empty(SA), not intervals:is_empty(SB)).
 
 tester_find_intersection(_) ->
-    tester:test(?MODULE, prop_find_intersection, 4, 120, [{threads, 4}]).
+    tester:test(?MODULE, prop_find_intersection, 4, 1000, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
