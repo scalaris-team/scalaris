@@ -25,7 +25,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start/1, start/2, check_config/0]).
+-export([init/1, on/2, start/2, check_config/0]).
 -export([map_key_to_interval/2, map_key_to_quadrant/2]).
 
 %export for testing
@@ -90,8 +90,7 @@
         {
          ownerPid           = ?required(rr_recon_state, ownerPid)       :: comm:erl_local_pid(),
          dhtNodePid         = ?required(rr_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
-         dest_key           = random                                    :: recon_dest(),
-         dest_rr_pid        = undefined                                 :: comm:mypid() | undefined, %dest rrepair pid
+         dest_rr_pid        = ?required(rr_recon_state, dest_rr_pid)    :: comm:mypid(), %dest rrepair pid
          dest_recon_pid     = undefined                                 :: comm:mypid() | undefined, %dest recon process pid
          method             = undefined                                 :: method(),
          struct             = {}                                        :: struct() | {},
@@ -131,24 +130,6 @@
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state() | kill.
-on({get_state_response, MyI}, State = 
-       #rr_recon_state{ stage = req_shared_interval,
-                        initiator = true,
-                        stats = Stats,
-                        method = Method,
-                        dest_key = DestKey,
-                        ownerPid = OwnerL }) ->
-    Msg = {?send_to_group_member, rrepair,
-           {continue_recon, comm:make_global(OwnerL), rr_recon_stats:get(session_id, Stats),
-            {continue, Method, req_shared_interval, [{interval, MyI}], false}}},
-    DKey = case DestKey of
-               random -> select_sync_node(MyI);        
-               _ -> DestKey
-           end,
-    ?TRACE("START_TO_DEST ~p", [DKey]),
-    api_dht_raw:unreliable_lookup(DKey, Msg),
-    shutdown(negotiate_interval, State);
-
 on({get_state_response, MyI}, State = 
        #rr_recon_state{ stage = req_shared_interval,
                         initiator = false,
@@ -281,13 +262,6 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
     if SyncFinished -> shutdown(sync_finished, NewState);
        true         -> NewState
     end;
-
-on({start, Method, DestKey}, State) ->
-    comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
-    State#rr_recon_state{ struct = {},
-                          method = Method,
-                          dest_key = DestKey,
-                          initiator = true };
 
 on({continue, Method, Stage, Struct, Initiator}, State) ->
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
@@ -477,7 +451,7 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, {Req, Res,
 %      Returns: number of visited leaf nodes and number of leaf resovle requests.
 -spec resolve_node(Node | not_found, {Dest::RPid, SID, OwnerRemote::comm:erl_local_pid()})
         -> {Leafs::non_neg_integer(), ResolveReq::non_neg_integer()} when
-    is_subtype(RPid,    comm:mypid() | undefined),
+    is_subtype(RPid,    comm:mypid()),
     is_subtype(Node,    merkle_tree:mt_node()),
     is_subtype(SID,     rrepair:session_id()).
 resolve_node(not_found, _) -> {0, 0};
@@ -493,10 +467,9 @@ resolve_node(Node, Conf) ->
 
 % @doc Returns number ob caused resolve requests (requests with feedback count 2)
 -spec resolve_leaf(Node, {Dest::RPid, SID, OwnerRemote::comm:erl_local_pid()}) -> 1 | 2 when
-    is_subtype(RPid,    comm:mypid() | undefined),
+    is_subtype(RPid,    comm:mypid()),
     is_subtype(Node,    merkle_tree:mt_node()),
     is_subtype(SID,     rrepair:session_id()).
-resolve_leaf(_, {undefined, _, _}) -> erlang:error("Recon Destination PID undefined");
 resolve_leaf(Node, {Dest, SID, OwnerL}) ->
     OwnerR = comm:make_global(OwnerL),
     case merkle_tree:get_item_count(Node) of
@@ -611,14 +584,6 @@ exit_reason_to_rc_status(sync_finished_remote) -> finish;
 exit_reason_to_rc_status(_) -> abort.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% @doc selects a random associated key of an interval ending
--spec select_sync_node(intervals:interval()) -> ?RT:key().
-select_sync_node(Interval) ->
-    {_, LKey, RKey, _} = intervals:get_bounds(Interval),
-    Key = ?RT:get_split_key(LKey, RKey, {1, randoms:rand_uniform(1, 50)}),
-    Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
-    util:randomelem(Keys).
 
 % @doc Maps any key (K) into a given interval (I). If K is already in I, K is returned.
 %      If K has more than one associated keys in I, the closest one is returned.
@@ -753,12 +718,8 @@ rep_factor() ->
 init(State) ->
     State.
 
--spec start(rrepair:session_id() | null) -> {ok, pid()}.
-start(SessionId) -> start(SessionId, undefined).
-
--spec start(SessionId, SenderRRPid) -> {ok, pid()} when
-      is_subtype(SessionId,     rrepair:session_id() | null),
-      is_subtype(SenderRRPid,   comm:mypid() | undefined).
+-spec start(SessionId::rrepair:session_id() | null, SenderRRPid::comm:mypid())
+        -> {ok, pid()}.
 start(SessionId, SenderRRPid) ->
     State = #rr_recon_state{ ownerPid = self(),
                              dhtNodePid = pid_groups:get_my(dht_node),
