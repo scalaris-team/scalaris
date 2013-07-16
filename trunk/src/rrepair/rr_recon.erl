@@ -329,7 +329,7 @@ on({check_nodes_response, CmpResults}, State =
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_struct(DBList::db_chunk_enc(), DestI::I, RestI::I, state()) -> state()
+-spec build_struct(DBList::db_chunk_enc(), DestI::I, RestI::I, state()) -> state() | kill
           when is_subtype(I, intervals:interval()).
 build_struct(DBList, DestI, RestI,
              State = #rr_recon_state{method = RMethod, struct = Params,
@@ -361,56 +361,64 @@ build_struct(DBList, DestI, RestI,
            end;
         true -> ok
     end,
-    {NStage, NStats} =
-        if EmptyRest orelse RMethod =:= bloom -> {reconciliation, begin_sync(SyncStruct, State)};
-           not EmptyRest andalso RMethod =:= merkle_tree -> {build_struct, Stats};
-           true -> {reconciliation, Stats}
-        end,
-    State#rr_recon_state{ stage = NStage,
-                          struct = SyncStruct,
-                          stats = rr_recon_stats:set([{build_time, BuildTime}], NStats) }.
+    Stats1 = rr_recon_stats:set([{build_time, BuildTime}], Stats),
+    NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1},
+    if EmptyRest orelse RMethod =:= bloom ->
+           begin_sync(SyncStruct, Params, NewState#rr_recon_state{stage = reconciliation});
+       not EmptyRest andalso RMethod =:= merkle_tree ->
+           NewState#rr_recon_state{stage = build_struct};
+       true ->
+           NewState#rr_recon_state{stage = reconciliation}
+    end.
 
--spec begin_sync(sync_struct(), state()) -> rr_recon_stats:stats().
-begin_sync(MySyncStruct, State = #rr_recon_state{method = Method,
-                                                 struct = Params,
-                                                 ownerPid = OwnerL,
-                                                 dest_recon_pid = DestReconPid,
-                                                 dest_rr_pid = DestRRPid,
-                                                 initiator = Initiator,
-                                                 stats = Stats }) ->
+-spec begin_sync(MySyncStruct::sync_struct(), OtherSyncStruct::parameters(),
+                 state()) -> state() | kill.
+begin_sync(MySyncStruct, _OtherSyncStruct,
+           State = #rr_recon_state{method = bloom, initiator = false,
+                                   ownerPid = OwnerL, stats = Stats,
+                                   dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
-    case Method of
-        merkle_tree -> 
-            case Initiator of
-                true -> send(DestReconPid,
-                             {check_nodes, comm:this(), [merkle_tree:get_hash(MySyncStruct)]});
-                false ->
-                    SyncI = merkle_tree:get_interval(MySyncStruct),
-                    SyncParams = [{reconPid, comm:this()}],
-                    send(DestRRPid,
-                         {continue_recon, comm:make_global(OwnerL), SID,
-                          {create_struct, Method, SyncI, SyncParams, true}})
-            end,
-            rr_recon_stats:set(
-              [{tree_compareLeft, ?IIF(Initiator, 1, 0)},
-               {tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats);
-        bloom when Initiator =:= false ->
+    send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
+                     {start_recon, bloom, MySyncStruct, true}}),
+    shutdown(build_struct, State);
+begin_sync(MySyncStruct, _OtherSyncStruct,
+           State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
+                                   ownerPid = OwnerL, stats = Stats,
+                                   dest_recon_pid = DestReconPid,
+                                   dest_rr_pid = DestRRPid}) ->
+    ?TRACE("BEGIN SYNC", []),
+    case Initiator of
+        true ->
+            send(DestReconPid,
+                 {check_nodes, comm:this(), [merkle_tree:get_hash(MySyncStruct)]});
+        false ->
+            SID = rr_recon_stats:get(session_id, Stats),
+            SyncI = merkle_tree:get_interval(MySyncStruct),
+            SyncParams = [{reconPid, comm:this()}],
+            send(DestRRPid,
+                 {continue_recon, comm:make_global(OwnerL), SID,
+                  {create_struct, merkle_tree, SyncI, SyncParams, true}})
+    end,
+    Stats1 =
+        rr_recon_stats:set(
+          [{tree_compareLeft, ?IIF(Initiator, 1, 0)},
+           {tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
+    State#rr_recon_state{stats = Stats1};
+begin_sync(MySyncStruct, OtherSyncStruct,
+           State = #rr_recon_state{method = art, initiator = Initiator,
+                                   ownerPid = OwnerL, stats = Stats,
+                                   dest_rr_pid = DestRRPid}) ->
+    ?TRACE("BEGIN SYNC", []),
+    case Initiator of
+        true ->
+            Stats1 = art_recon(MySyncStruct, OtherSyncStruct, State),
+            shutdown(sync_finished, State#rr_recon_state{stats = Stats1});
+        false ->
+            SID = rr_recon_stats:get(session_id, Stats), 
             send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
-                             {start_recon, Method, MySyncStruct, true}}),
-            send_local(self(), {shutdown, {ok, build_struct}}),
-            Stats;
-        art ->
-            {AOk, ARStats} = 
-                case Initiator of
-                    true -> art_recon(MySyncStruct, Params, State);
-                    false ->
-                        send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
-                                         {start_recon, Method, MySyncStruct, true}}),
-                        {no, Stats}
-                end,
-            send_local(self(), {shutdown, ?IIF(AOk =:= ok, sync_finished, build_struct)}),
-            ARStats
+                             {start_recon, art, MySyncStruct, true}}),
+            shutdown(build_struct, State)
     end.
 
 -spec shutdown(exit_reason(), state()) -> kill.
@@ -543,7 +551,7 @@ resolve_leaf(Node, {Dest, SID, OwnerL}) ->
 %% art recon
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec art_recon(MyTree, Art, State) -> {ok, Stats} when
+-spec art_recon(MyTree, Art, State) -> Stats when
     is_subtype(MyTree, merkle_tree:merkle_tree()),
     is_subtype(Art,    art:art()),
     is_subtype(State,  state()),
@@ -561,7 +569,7 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
                      rr_recon_stats:inc([{resolve_started, ResolveCalled}], Stats2);
                  false -> Stats
              end,
-    {ok, rr_recon_stats:set([{tree_size, merkle_tree:size_detail(Tree)}], NStats)}.
+    rr_recon_stats:set([{tree_size, merkle_tree:size_detail(Tree)}], NStats).
 
 -spec art_get_sync_leafs(Nodes::NodeL, Art, Stats, Acc::NodeL) -> {ToSync::NodeL, Stats} when
     is_subtype(NodeL,   [merkle_tree:mt_node()]),
