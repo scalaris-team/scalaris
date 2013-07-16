@@ -23,24 +23,26 @@
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
 
--type(db() :: any()).
+-type db() :: any().
+-type key() :: term().
+-type entry() :: tuple().
 
 -callback new(nonempty_string()) -> db().
 -callback close(db()) -> true.
--callback put(db(), any()) -> db().
--callback get(db(), ?RT:key()) -> any().
--callback delete(db(), ?RT:key()) -> db().
+-callback put(db(), entry()) -> db().
+-callback get(db(), key()) -> entry() | {}.
+-callback delete(db(), key()) -> db().
 
 -callback get_name(db()) -> nonempty_string().
--callback get_load(db()) -> integer().
+-callback get_load(db()) -> non_neg_integer().
 
--callback foldl(db(), fun(), any()) -> any().
--callback foldl(db(), fun(), any(), intervals:simple_interval()) -> any().
--callback foldl(db(), fun(), any(), intervals:simple_interval(), non_neg_integer()) -> any().
+-callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+-callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, intervals:simple_interval()) -> Acc1::A.
+-callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, intervals:simple_interval(), non_neg_integer()) -> Acc1::A.
 
--callback foldr(db(), fun(), any()) -> any().
--callback foldr(db(), fun(), any(), intervals:simple_interval()) -> any().
--callback foldr(db(), fun(), any(), intervals:simple_interval(), non_neg_integer()) -> any().
+-callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+-callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, intervals:simple_interval()) -> Acc1::A.
+-callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, intervals:simple_interval(), non_neg_integer()) -> Acc1::A.
 
 -else.
 
