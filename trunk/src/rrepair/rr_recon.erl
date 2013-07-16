@@ -166,7 +166,7 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
     NewState = State#rr_recon_state{stage = build_struct},
     case intervals:is_empty(SyncI) of
         false ->
-            send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(RMethod)),
+            send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(RMethod), false),
             NewState;
         true ->
             shutdown(empty_interval, NewState)
@@ -202,10 +202,7 @@ on({start_recon, RMethod, SyncStruct} = _Msg, State) ->
     ?ASSERT(not intervals:is_empty(MySyncI)),
     
     DhtNodePid = State#rr_recon_state.dhtNodePid,
-    Self = comm:reply_as(self(), 2, {reconcile, '_'}),
-    send_local(DhtNodePid,
-               {get_chunk, Self, MySyncI, fun get_chunk_filter/1,
-                fun get_chunk_value/1, get_max_items(RMethod)}),
+    send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(RMethod), true),
     State#rr_recon_state{stage = reconciliation, struct = SyncStruct,
                          method = RMethod, initiator = true,
                          dest_recon_pid = DestReconPid};
@@ -225,10 +222,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
-            Self = comm:reply_as(self(), 2, {reconcile, '_'}),
-            send_local(DhtNodePid,
-                       {get_chunk, Self, RestI, fun get_chunk_filter/1,
-                        fun get_chunk_value/1, get_max_items(bloom)});
+           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(bloom), true);
        true -> ok
     end,
     ?TRACE("Reconcile Bloom Session=~p ; Diff=~p", [SID, length(Diff)]),
@@ -254,7 +248,10 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     % keys mapped to our interval
     DBList = [encodeBlob(KeyX, VersionX) || {KeyX, VersionX} <- DBList0],
     MySyncI = case RMethod of
-                  merkle_tree -> SyncStruct#merkle_params.interval;
+                  merkle_tree -> case merkle_tree:is_merkle_tree(SyncStruct) of
+                                     false -> SyncStruct#merkle_params.interval;
+                                     true  -> merkle_tree:get_interval(SyncStruct)
+                                 end;
                   art         -> art:get_interval(SyncStruct)
               end,
     build_struct(DBList, MySyncI, RestI, State);
@@ -310,7 +307,7 @@ on({check_nodes_response, CmpResults}, State =
 build_struct(DBList, DestI, RestI,
              State = #rr_recon_state{method = RMethod, struct = Params,
                                      initiator = Initiator, stats = Stats,
-                                     dhtNodePid = DhtNodePid}) ->
+                                     dhtNodePid = DhtNodePid, stage = Stage}) ->
     {BuildTime, SyncStruct} =
         case merkle_tree:is_merkle_tree(Params) of
             true ->
@@ -328,25 +325,26 @@ build_struct(DBList, DestI, RestI,
            SubSyncI = find_intersection(DestI, RestI),
            case intervals:is_empty(SubSyncI) of
                false ->
+                   MySubSyncI = find_intersection(RestI, DestI), % mapped to my range
+                   Reconcile = Initiator andalso (Stage =:= reconciliation),
                    if RMethod =:= bloom -> 
                           ForkState = State#rr_recon_state{dest_interval = SubSyncI,
                                                            struct = Params},
                           {ok, Pid} = fork_recon(ForkState),
-                          ok;
-                      true -> Pid = self()
-                   end,
-                   send_chunk_req(DhtNodePid, Pid, find_intersection(RestI, DestI), SubSyncI,
-                                  get_max_items(RMethod));
+                          send_chunk_req(DhtNodePid, Pid, MySubSyncI, SubSyncI,
+                                         get_max_items(RMethod), Reconcile);
+                      true ->
+                          send_chunk_req(DhtNodePid, self(), MySubSyncI, SubSyncI,
+                                         get_max_items(RMethod), Reconcile)
+                   end;
                true -> ok
            end;
         true -> ok
     end,
     if EmptyRest orelse RMethod =:= bloom ->
            begin_sync(SyncStruct, Params, NewState#rr_recon_state{stage = reconciliation});
-       not EmptyRest andalso RMethod =:= merkle_tree ->
-           NewState#rr_recon_state{stage = build_struct};
        true ->
-           NewState#rr_recon_state{stage = reconciliation}
+           NewState % keep stage (at initiator: reconciliation, at other: build_struct)
     end.
 
 -spec begin_sync(MySyncStruct::sync_struct(), OtherSyncStruct::parameters(),
@@ -612,16 +610,22 @@ send_local(Pid, Msg) ->
 %% @doc Sends a get_chunk request to the local DHT_node process.
 %%      Request responds with a list of {Key, Value} tuples.
 %%      The mapping to DestI is not done here!
--spec send_chunk_req(DhtPid::LPid, AnswerPid::LPid, ChunkI::I, DestI::I, MaxItems) -> ok when
+-spec send_chunk_req(DhtPid::LPid, AnswerPid::LPid, ChunkI::I, DestI::I,
+                     MaxItems, Reconcile::boolean()) -> ok when
     is_subtype(LPid,        comm:erl_local_pid()),
     is_subtype(I,           intervals:interval()),
     is_subtype(MaxItems,    pos_integer() | all).
-send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
+send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, true) ->
+    ?ASSERT(I =:= _DestI),
+    SrcPidReply = comm:reply_as(SrcPid, 2, {reconcile, '_'}),
+    send_local(DhtPid,
+               {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
+                fun get_chunk_value/1, MaxItems});
+send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems, false) ->
     SrcPidReply = comm:reply_as(SrcPid, 4, {rr_recon, data, DestI, '_'}),
-    send_local(
-      DhtPid,
-      {get_chunk, SrcPidReply, I, fun get_chunk_filter/1, fun get_chunk_value/1,
-       MaxItems}).
+    send_local(DhtPid,
+               {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
+                fun get_chunk_value/1, MaxItems}).
 
 -spec get_chunk_filter(db_entry:entry()) -> boolean().
 get_chunk_filter(DBEntry) -> db_entry:get_version(DBEntry) =/= -1.
