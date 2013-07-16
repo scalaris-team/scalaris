@@ -1,0 +1,67 @@
+# Bloom Reconciliation 
+# by Maik Lange
+
+.PS
+copy "sequence.pic";
+
+# Objects
+actor(U, "");
+object(A,"A:RR");
+placeholder_object(AA);
+placeholder_object(Dummy2); # more space
+placeholder_object(BB);
+object(B,"B:RR");
+step();
+
+# STEP 1
+message(U,A,"Recon Anfrage"); active(A);
+create_message(A,AA,"A:RC");
+
+async(); # use asynchrone messages (not-filled arrowheads)
+
+message(A,AA,"Start"); inactive(A);
+active(AA);
+message(AA,B,"I) Interval Z\sbA\eb"); 
+active(B);
+destroy_message(AA,AA,""); 
+inactive(AA);
+
+# STEP 2
+sync();
+create_message(B,BB,"B:RC");
+async();
+message(B,BB,"cont. Z\sbA\eb"); 
+inactive(B); active(BB);
+step();
+
+#comment(BB,C,0.3 right, wid 2 ht 0.5 \
+#        "1) Ausfalldetektor " \
+#	"   aktivieren fuer A bzw. B" \
+#        "2) erstelle Merkle Tree");
+
+message(BB,A,"II) Bloom Filter BF(\*b(Z\sbAB\eb))");
+active(A);
+dmessage(BB,BB,""); inactive(BB);
+sync();
+cmessage(A,AA,"A:RC");
+async();
+message(A,AA,"cont. BF(\*b(Z\sbAB\eb))");
+inactive(A);
+active(AA);
+step();
+message(AA,A,"\*D \ Reg(A,B)");
+active(A);
+dmessage(AA,AA,""); inactive(AA);
+begin_frame(A,F,"key_upd_s");
+end_frame(A,F);
+step();
+inactive(A);
+
+
+# CLEAN UP
+step();
+complete(A);
+complete(B);
+complete(U);
+
+.PE
