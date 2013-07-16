@@ -24,4 +24,4 @@
 %% -type client_key() :: unicode:chardata().
 -type client_key() :: string().
 -type client_value() :: any().
--type client_version() :: ?DB:version().
+-type client_version() :: non_neg_integer(). %%?DB:version().

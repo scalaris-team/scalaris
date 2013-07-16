@@ -77,7 +77,7 @@ next_hop(_Config) ->
     RMState = rm_loop:unittest_create_state(Neighbors, false),
     % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
-    DB = ?DB:new(),
+    DB = db_dht:new(),
     State = dht_node_state:new(RT, RMState, DB),
     config:write(rt_size_use_neighbors, 0),
     
@@ -96,7 +96,7 @@ next_hop(_Config) ->
 %%     exit(node:pidX(MyNode), kill),
     exit(node:pidX(Succ), kill),
     exit(node:pidX(Pred), kill),
-    ?DB:close(DB),
+    db_dht:close(DB),
     ok.
 
 next_hop2(_Config) ->
@@ -113,7 +113,7 @@ next_hop2(_Config) ->
     RMState = rm_loop:unittest_create_state(Neighbors, false),
     % note: dht_node_state:new/3 will call pid_groups:get_my(paxos_proposer)
     % which will fail here -> however, we don't need this process
-    DB = ?DB:new(),
+    DB = db_dht:new(),
     State = dht_node_state:new(RT, RMState, DB),
     config:write(rt_size_use_neighbors, 10),
     
@@ -133,7 +133,7 @@ next_hop2(_Config) ->
     exit(node:pidX(Succ), kill),
     exit(node:pidX(SuccSucc), kill),
     exit(node:pidX(Pred), kill),
-    ?DB:close(DB),
+    db_dht:close(DB),
     ok.
 
 -spec prop_get_split_key_half(Begin::?RT:key(), End::?RT:key() | plus_infinity) -> true.

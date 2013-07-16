@@ -23,7 +23,7 @@
 
 -compile(export_all).
 
--define(TEST_DB, db_ets).
+-define(TEST_DB, db_dht).
 
 -include("db_SUITE.hrl").
 

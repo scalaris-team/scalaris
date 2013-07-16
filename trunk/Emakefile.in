@@ -1,6 +1,6 @@
 % behaviors first - otherwise there are compile warnings
 {["src/cloud_beh.erl",
-  "src/db_beh.erl",
+  "src/backend_beh.erl",
   "src/gen_component.erl",
   "src/lb_psv_beh.erl",
   "src/pdb_beh.erl",

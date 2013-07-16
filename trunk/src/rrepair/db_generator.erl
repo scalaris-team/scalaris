@@ -41,7 +41,7 @@
                         uniform |
                         {non_uniform, random_bias:distribution_fun()}.
 -type result() :: ?RT:key() | 
-                  {?RT:key(), ?DB:value()}.
+                  {?RT:key(), db_dht:value()}.
 -type option() :: {output, list_key_val | list_key}.
 
 -type failure_type()    :: update | regen | mixed.
@@ -169,7 +169,7 @@ fill_wiki(_Params, DBFile) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec insert_db(?DB:db_as_list()) -> ok.
+-spec insert_db(db_dht:db_as_list()) -> ok.
 insert_db(KVV) ->
     Nodes = get_node_list(),
     _ = lists:foldl(
@@ -205,7 +205,7 @@ remove_keys(Keys) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Generates a consistent db with errors
--spec gen_kvv(ErrorDist::distribution(), [?RT:key()], [db_parameter()]) -> {?DB:db_as_list(), db_status()}.
+-spec gen_kvv(ErrorDist::distribution(), [?RT:key()], [db_parameter()]) -> {db_dht:db_as_list(), db_status()}.
 gen_kvv(EDist, Keys, Params) ->
     FType = proplists:get_value(ftype, Params, update),
     FProb = proplists:get_value(fprob, Params, 50),
@@ -216,7 +216,7 @@ gen_kvv(EDist, Keys, Params) ->
 
 -spec p_gen_kvv(ErrorDist::distribution(), [?RT:key()],
                 KeyCount::non_neg_integer(), failure_type(),
-                failure_dest(), FailCount::non_neg_integer()) -> {?DB:db_as_list(), db_status()}.
+                failure_dest(), FailCount::non_neg_integer()) -> {db_dht:db_as_list(), db_status()}.
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     {FKeys, GoodKeys} = select_random_keys(Keys, FCount, []),
     GoodDB = lists:foldl(fun(Key, AccDb) -> 

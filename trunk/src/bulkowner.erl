@@ -157,7 +157,7 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
         _ ->
             case Msg of
                 {bulk_read_entry, Issuer} ->
-                    Data = ?DB:get_entries(dht_node_state:get(State, db), MyRange),
+                    Data = db_dht:get_entries(dht_node_state:get(State, db), MyRange),
                     ReplyMsg = {bulk_read_entry_response, MyRange, Data},
                     % for aggregation using a tree, activate this instead:
                     % issue_send_reply(Id, Issuer, ReplyMsg, Parents);

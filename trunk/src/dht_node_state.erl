@@ -67,15 +67,17 @@
               | db | tx_tp_db | proposer | load | slide_pred | slide_succ
               | msg_fwd | rm_state | monitor_proc | prbr_state.
 
+-type slide_snap() :: {snapshot_state:snapshot_state(), db_dht:db_as_list()} | {false}.
 
--type slide_data() :: MovingData::?DB:db_as_list().
--type slide_delta() :: {ChangedData::?DB:db_as_list(), DeletedKeys::[?RT:key()]}.
+-type slide_data() :: {MovingData::db_dht:db_as_list(),
+                       slide_snap()}.
+-type slide_delta() :: {ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()]}.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
                 rm_state   = ?required(state, rm_state)  :: rm_loop:state(),
                 join_time  = ?required(state, join_time) :: erlang_timestamp(),
-                db         = ?required(state, db)        :: ?DB:db(),
+                db         = ?required(state, db)        :: db_dht:db(),
                 tx_tp_db   = ?required(state, tx_tp_db)  :: any(),
                 proposer   = ?required(state, proposer)  :: pid(),
                 % slide with pred (must not overlap with 'slide with succ'!):
@@ -102,7 +104,7 @@
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
 
--spec new(?RT:external_rt(), RMState::rm_loop:state(), ?DB:db()) -> state().
+-spec new(?RT:external_rt(), RMState::rm_loop:state(), db_dht:db()) -> state().
 new(RT, RMState, DB) ->
     #state{rt = RT,
            rm_state = RMState,
@@ -169,7 +171,7 @@ new(RT, RMState, DB) ->
          (state(), db_range) -> [{intervals:interval(), slide_op:id()}];
          (state(), succ_range) -> intervals:interval();
          (state(), join_time) -> erlang_timestamp();
-         (state(), db) -> ?DB:db();
+         (state(), db) -> db_dht:db();
          (state(), tx_tp_db) -> any();
          (state(), proposer) -> pid();
          (state(), load) -> integer();
@@ -230,7 +232,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         node         -> nodelist:node(rm_loop:get_neighbors(RMState));
         node_id      -> nodelist:nodeid(rm_loop:get_neighbors(RMState));
         join_time    -> JoinTime;
-        load         -> ?DB:get_load(DB);
+        load         -> db_dht:get_load(DB);
         prbr_kv_db   -> PRBRState;
         txid_db1     -> TxIdDB1;
         txid_db2     -> TxIdDB2;
@@ -325,7 +327,7 @@ get_slide(#state{slide_pred=SlidePred, slide_succ=SlideSucc}, MoveFullId) ->
 -spec set_tx_tp_db(State::state(), NewTxTpDb::any()) -> state().
 set_tx_tp_db(State, DB) -> State#state{tx_tp_db = DB}.
 
--spec set_db(State::state(), NewDB::?DB:db()) -> state().
+-spec set_db(State::state(), NewDB::db_dht:db()) -> state().
 set_db(State, DB) -> State#state{db = DB}.
 
 -spec set_rt(State::state(), NewRT::?RT:external_rt()) -> state().
@@ -428,15 +430,34 @@ details(State) ->
         -> {state(), slide_data()}.
 slide_get_data_start_record(State, MovingInterval) ->
     OldDB = get(State, db),
-    MovingData = ?DB:get_entries(OldDB, MovingInterval),
-    NewDB = ?DB:record_changes(OldDB, MovingInterval),
-    {set_db(State, NewDB), MovingData}.
+    MovingData = db_dht:get_entries(OldDB, MovingInterval),
+    MovingSnapData = case db_dht:snapshot_is_running(OldDB) of
+        true ->
+            {get(State,snapshot_state), db_dht:get_snapshot_data(OldDB, MovingInterval)};
+        false ->
+            {false}
+    end,
+    NewDB = db_dht:record_changes(OldDB, MovingInterval),
+    ?TRACE("~p:slide_get_data_start_record: ~p~nMovingData: ~n~p~nMovingSnapData: ~n~p~nfor
+           interval ~p~n~p~n~p",
+           [?MODULE, comm:this(), MovingData, MovingSnapData, MovingInterval, OldDB, NewDB]),
+    {set_db(State, NewDB), {MovingData, MovingSnapData}}.
 
 %% @doc Adds data from slide_get_data_start_record/2 to the local DB.
 -spec slide_add_data(state(),slide_data()) -> state().
-slide_add_data(State, Data) ->
-    NewDB = ?DB:add_data(get(State, db), Data),
-    set_db(State, NewDB).
+slide_add_data(State, {Data, SnapData}) ->
+    NewDB = db_dht:add_data(get(State, db), Data),
+    ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~p~n~p",
+           [?MODULE, comm:this(), Data, SnapData, NewDB]),
+    case SnapData of
+        {SnapState, SnapEntries} ->
+            NewState = set_db(State,
+                              db_dht:add_snapshot_data(db_dht:init_snapshot(NewDB),
+                                                    SnapEntries)),
+            set_snapshot_state(NewState, SnapState);
+        {false} ->
+            set_db(State, NewDB)
+    end.
 
 %% @doc Gets all DB changes in the given interval, stops recording delta infos
 %%      and removes the entries in this range from the DB.
@@ -444,15 +465,19 @@ slide_add_data(State, Data) ->
         -> {state(), slide_delta()}.
 slide_take_delta_stop_record(State, MovingInterval) ->
     OldDB = get(State, db),
-    ChangedData = ?DB:get_changes(OldDB, MovingInterval),
+    ChangedData = db_dht:get_changes(OldDB, MovingInterval),
     NewState = slide_stop_record(State, MovingInterval, true),
+    ?TRACE("~p:slide_take_delta_stop_record: ~p~nChangedData: ~n~p~n~p",
+           [?MODULE, comm:this(), ChangedData, get(NewState, db)]),
     {NewState, ChangedData}.
 
 %% @doc Adds delta infos from slide_take_delta_stop_record/2 to the local DB.
 -spec slide_add_delta(state(), slide_delta()) -> state().
 slide_add_delta(State, {ChangedData, DeletedKeys}) ->
-    NewDB1 = ?DB:add_data(get(State, db), ChangedData),
-    NewDB2 = ?DB:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
+    NewDB1 = db_dht:add_data(get(State, db), ChangedData),
+    NewDB2 = db_dht:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
+    ?TRACE("~p:slide_add_delta: ~p~nChangedData: ~n~p~n~p",
+           [?MODULE, comm:this(), {ChangedData, DeletedKeys}, NewDB2]),
     set_db(State, NewDB2).
 
 %% @doc Stops recording changes in the given interval.
@@ -460,8 +485,8 @@ slide_add_delta(State, {ChangedData, DeletedKeys}) ->
 -spec slide_stop_record(state(), MovingInterval::intervals:interval(),
                         RemoveDataInInterval::boolean()) -> state().
 slide_stop_record(State, MovingInterval, Remove) ->
-    NewDB1 = ?DB:stop_record_changes(get(State, db), MovingInterval),
-    NewDB = if Remove -> ?DB:delete_entries(NewDB1, MovingInterval);
+    NewDB1 = db_dht:stop_record_changes(get(State, db), MovingInterval),
+    NewDB = if Remove -> db_dht:delete_entries(NewDB1, MovingInterval);
                true   -> NewDB1
             end,
     set_db(State, NewDB).
@@ -471,4 +496,4 @@ slide_stop_record(State, MovingInterval, Remove) ->
 -spec get_split_key(state(), Begin::?RT:key(), End::?RT:key(), TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key(State, Begin, End, TargetLoad, Direction) ->
-    ?DB:get_split_key(get(State, db), Begin, End, TargetLoad, Direction).
+    db_dht:get_split_key(get(State, db), Begin, End, TargetLoad, Direction).

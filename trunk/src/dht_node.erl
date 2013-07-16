@@ -39,17 +39,17 @@
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer() | all} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),
             ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer() | all} |
-      {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::?DB:value(), NewVersion::?DB:version()} |
+      {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::db_dht:value(), NewVersion::db_dht:version()} |
       % DB subscriptions:
-      {db_set_subscription, SubscrTuple::?DB:subscr_t()} |
+      {db_set_subscription, SubscrTuple::db_dht:subscr_t()} |
       {db_get_subscription, Tag::any(), SourcePid::comm:erl_local_pid()} |
       {db_remove_subscription, Tag::any()} |
       % direct DB manipulation:
       {get_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key()} |
       {set_key_entry, Source_PID::comm:mypid(), Entry::db_entry:entry()} |
       {delete_key, Source_PID::comm:mypid(), ClientsId::{delete_client_id, uid:global_uid()}, HashedKey::?RT:key()} |
-      {add_data, Source_PID::comm:mypid(), ?DB:db_as_list()} |
-      {drop_data, Data::?DB:db_as_list(), Sender::comm:mypid()}).
+      {add_data, Source_PID::comm:mypid(), db_dht:db_as_list()} |
+      {drop_data, Data::db_dht:db_as_list(), Sender::comm:mypid()}).
 
 -type(lookup_message() ::
       {?lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
@@ -221,13 +221,13 @@ on(X, State) when is_tuple(X) andalso element(1, X) =:= prbr ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({?get_key, Source_PID, SourceId, HashedKey}, State) ->
     Msg = {?get_key_with_id_reply, SourceId, HashedKey,
-           ?DB:read(dht_node_state:get(State, db), HashedKey)},
+           db_dht:read(dht_node_state:get(State, db), HashedKey)},
     comm:send(Source_PID, Msg),
     State;
 
 on({?read_op, Source_PID, SourceId, HashedKey, Op}, State) ->
     DB = dht_node_state:get(State, db),
-    {ok, Value, Version} = ?DB:read(DB, HashedKey),
+    {ok, Value, Version} = db_dht:read(DB, HashedKey),
     {Ok_Fail, Val_Reason, Vers} = rdht_tx_read:extract_from_value(Value, Version, Op),
     SnapInfo = dht_node_state:get(State, snapshot_state),
     SnapNumber = snapshot_state:get_number(SnapInfo),
@@ -236,30 +236,33 @@ on({?read_op, Source_PID, SourceId, HashedKey, Op}, State) ->
     State;
 
 on({get_entries, Source_PID, Interval}, State) ->
-    Entries = ?DB:get_entries(dht_node_state:get(State, db), Interval),
+    Entries = db_dht:get_entries(dht_node_state:get(State, db), Interval),
     comm:send_local(Source_PID, {get_entries_response, Entries}),
     State;
 
 on({get_entries, Source_PID, FilterFun, ValFun}, State) ->
-    Entries = ?DB:get_entries(dht_node_state:get(State, db), FilterFun, ValFun),
+    Entries = db_dht:get_entries(dht_node_state:get(State, db), FilterFun, ValFun),
     comm:send_local(Source_PID, {get_entries_response, Entries}),
     State;
 
 on({get_chunk, Source_PID, Interval, MaxChunkSize}, State) ->
-    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), dht_node_state:get(State, pred_id),
+    Chunk = db_dht:get_chunk(dht_node_state:get(State, db),
+                             dht_node_state:get(State, pred_id),
                           Interval, MaxChunkSize),
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
 on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) ->
-    Chunk = ?DB:get_chunk(dht_node_state:get(State, db), dht_node_state:get(State, pred_id),
+    Chunk = db_dht:get_chunk(dht_node_state:get(State, db),
+                             dht_node_state:get(State, pred_id),
                           Interval, FilterFun, ValueFun, MaxChunkSize),
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
 % send caller update_key_entry_ack with Entry (if exists) or Key, Exists (Yes/No), Updated (Yes/No)
 on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
-    {Exists, Entry} = ?DB:get_entry2(dht_node_state:get(State, db), Key),
+    Entry = db_dht:get_entry(dht_node_state:get(State, db), Key),
+    Exists = db_entry:is_null(Entry),
     EntryVersion = db_entry:get_version(Entry),
     WL = db_entry:get_writelock(Entry),
     DoUpdate = Exists
@@ -277,11 +280,11 @@ on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
                                    db_entry:reset_locks(UpdEntry);
                                true -> UpdEntry
                             end,
-                NewDB = ?DB:update_entry(dht_node_state:get(State, db), UpdEntry2),
+                NewDB = db_dht:update_entry(dht_node_state:get(State, db), UpdEntry2),
                 {dht_node_state:set_db(State, NewDB), UpdEntry2};
             DoRegen ->
                 RegenEntry = db_entry:new(Key, NewValue, NewVersion),
-                NewDB = ?DB:set_entry(dht_node_state:get(State, db), RegenEntry),
+                NewDB = db_dht:set_entry(dht_node_state:get(State, db), RegenEntry),
                 {dht_node_state:set_db(State, NewDB), RegenEntry};
             true -> {State, Entry}
         end,
@@ -289,47 +292,47 @@ on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
     NewState;
 
 on({db_set_subscription, SubscrTuple}, State) ->
-    DB2 = ?DB:set_subscription(dht_node_state:get(State, db), SubscrTuple),
+    DB2 = db_dht:set_subscription(dht_node_state:get(State, db), SubscrTuple),
     dht_node_state:set_db(State, DB2);
 
 on({db_get_subscription, Tag, SourcePid}, State) ->
-    Subscr = ?DB:get_subscription(dht_node_state:get(State, db), Tag),
+    Subscr = db_dht:get_subscription(dht_node_state:get(State, db), Tag),
     comm:send_local(SourcePid, {db_get_subscription_response, Tag, Subscr}),
     State;
 
 on({db_remove_subscription, Tag}, State) ->
-    DB2 = ?DB:remove_subscription(dht_node_state:get(State, db), Tag),
+    DB2 = db_dht:remove_subscription(dht_node_state:get(State, db), Tag),
     dht_node_state:set_db(State, DB2);
 
 on({delete_key, Source_PID, ClientsId, HashedKey}, State) ->
-    {DB2, Result} = ?DB:delete(dht_node_state:get(State, db), HashedKey),
+    {DB2, Result} = db_dht:delete(dht_node_state:get(State, db), HashedKey),
     comm:send(Source_PID, {delete_key_response, ClientsId, HashedKey, Result}),
     dht_node_state:set_db(State, DB2);
 
 %% for unit testing only: allow direct DB manipulation
 on({get_key_entry, Source_PID, HashedKey}, State) ->
-    Entry = ?DB:get_entry(dht_node_state:get(State, db), HashedKey),
+    Entry = db_dht:get_entry(dht_node_state:get(State, db), HashedKey),
     comm:send(Source_PID, {get_key_entry_reply, Entry}),
     State;
 
 on({set_key_entry, Source_PID, Entry}, State) ->
-    NewDB = ?DB:set_entry(dht_node_state:get(State, db), Entry),
+    NewDB = db_dht:set_entry(dht_node_state:get(State, db), Entry),
     comm:send(Source_PID, {set_key_entry_reply, Entry}),
     dht_node_state:set_db(State, NewDB);
 
 on({add_data, Source_PID, Data}, State) ->
-    NewDB = ?DB:add_data(dht_node_state:get(State, db), Data),
+    NewDB = db_dht:add_data(dht_node_state:get(State, db), Data),
     comm:send(Source_PID, {add_data_reply}),
     dht_node_state:set_db(State, NewDB);
 
 on({delete_keys, Source_PID, HashedKeys}, State) ->
-    DB2 = ?DB:delete_entries(dht_node_state:get(State, db), intervals:from_elements(HashedKeys)),
+    DB2 = db_dht:delete_entries(dht_node_state:get(State, db), intervals:from_elements(HashedKeys)),
     comm:send(Source_PID, {delete_keys_reply}),
     dht_node_state:set_db(State, DB2);
 
 on({drop_data, Data, Sender}, State) ->
     comm:send(Sender, {drop_data_ack}),
-    DB = ?DB:add_data(dht_node_state:get(State, db), Data),
+    DB = db_dht:add_data(dht_node_state:get(State, db), Data),
     dht_node_state:set_db(State, DB);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -382,7 +385,7 @@ on({web_debug_info, Requestor}, State) ->
     % get a list of up to 50 KV pairs to display:
     DataListTmp = [{"",
                     webhelpers:safe_html_string("~p", [DBEntry])}
-                  || DBEntry <- element(2, ?DB:get_chunk(dht_node_state:get(State, db),
+                  || DBEntry <- element(2, db_dht:get_chunk(dht_node_state:get(State, db),
                                                          dht_node_state:get(State, node_id),
                                                          intervals:all(), 50))],
     DataList = case Load > 50 of
@@ -411,7 +414,7 @@ on({web_debug_info, Requestor}, State) ->
 on({unittest_get_bounds_and_data, SourcePid}, State) ->
     MyRange = dht_node_state:get(State, my_range),
     MyBounds = intervals:get_bounds(MyRange),
-    Data = ?DB:get_data(dht_node_state:get(State, db)),
+    Data = db_dht:get_data(dht_node_state:get(State, db)),
     Pred = dht_node_state:get(State, pred),
     Succ = dht_node_state:get(State, succ),
     comm:send(SourcePid, {unittest_get_bounds_and_data_response, MyBounds, Data, Pred, Succ}),
