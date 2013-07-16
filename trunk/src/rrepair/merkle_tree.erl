@@ -191,8 +191,7 @@ is_leaf(_) -> false.
 
 % @doc Returns true if given term is a merkle tree otherwise false.
 -spec is_merkle_tree(any()) -> boolean().
-is_merkle_tree(Tree) when erlang:is_tuple(Tree) ->
-    erlang:element(1, Tree) =:= merkle_tree;
+is_merkle_tree({merkle_tree, _, _}) -> true;
 is_merkle_tree(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

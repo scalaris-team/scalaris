@@ -77,16 +77,20 @@
 -record(bloom_recon_struct,
         {
          interval = intervals:empty()                       :: intervals:interval(),
-         bloom    = ?required(bloom_recon_struct, bloom)    :: ?REP_BLOOM:bloom_filter()         
+         bloom    = ?required(bloom_recon_struct, bloom)    :: ?REP_BLOOM:bloom_filter()
         }).
 
--type internal_param() :: {reconPid, comm:mypid()}.
+-record(merkle_params,
+        {
+         interval = intervals:empty()                       :: intervals:interval(),
+         reconPid = ?required(merkle_param, reconPid)       :: comm:mypid()
+        }).
 
 -type sync_struct() :: #bloom_recon_struct{} |
                        merkle_tree:merkle_tree() |
                        art:art().
 -type parameters() :: sync_struct() |
-                      [internal_param()] |
+                      #merkle_params{} |
                       [merkle_tree:mt_node()].
 -type recon_dest() :: ?RT:key() | random.
 
@@ -116,10 +120,10 @@
 
 -type request() :: 
     {start, method(), DestKey::recon_dest()} |
-    {create_struct, method(), SenderI::intervals:interval(), parameters(), RcvInitiator::boolean()} |
-    {start_recon, bloom, #bloom_recon_struct{}, RcvInitiator::boolean()} |
-    {start_recon, art, art:art(), RcvInitiator::boolean()} |
-    {continue, method(), stage(), parameters(), Initiator::boolean()}.
+    {create_struct, method(), SenderI::intervals:interval()} | % from initiator
+    {start_recon, bloom, #bloom_recon_struct{}} | % to initiator
+    {start_recon, merkle_tree, #merkle_params{}} | % to initiator
+    {start_recon, art, art:art()}. % to initiator
 
 -type message() ::          
     %API
@@ -140,11 +144,12 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state() | kill.
 
-on({create_struct, RMethod, SenderI, Params, RcvInitiator} = _Msg, State) ->
+on({create_struct, RMethod, SenderI} = _Msg, State) ->
     ?TRACE1(_Msg, State),
+    % (first) request from initiator to create a sync struct
     This = comm:reply_as(comm:this(), 2, {create_struct2, '_'}),
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, This, my_range}),
-    State#rr_recon_state{method = RMethod, initiator = RcvInitiator, dest_interval = SenderI, struct = Params};
+    State#rr_recon_state{method = RMethod, initiator = false, dest_interval = SenderI};
 
 on({create_struct2, {get_state_response, MyI}} = _Msg,
    State = #rr_recon_state{stage = req_shared_interval, initiator = false,
@@ -167,40 +172,15 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
             shutdown(empty_interval, NewState)
     end;
 
-on({create_struct2, {get_state_response, MyI}} = _Msg,
-   State = #rr_recon_state{stage = req_shared_interval, initiator = true,
-                           method = RMethod,            dhtNodePid = DhtPid,
-                           dest_rr_pid = DestRRPid,     struct = Params,
-                           dest_interval = SenderI})
-  when (RMethod =:= merkle_tree orelse RMethod =:= art) ->
-    ?TRACE1(_Msg, State),
-    % initiator got interval of client to create his own recon structure (merkle/art)
-    % based on common interval
-    DestReconPid = proplists:get_value(reconPid, Params, undefined),
-    SyncI = find_intersection(MyI, SenderI),
-    NewState = State#rr_recon_state{stage = build_struct,
-                                    dest_recon_pid = DestReconPid},
-    case intervals:is_empty(SyncI) of
-        false ->
-            RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
-            send_chunk_req(DhtPid, self(), SyncI, SyncI, get_max_items(RMethod)),
-            NewState;
-        true when DestReconPid =/= undefined ->
-            send(DestReconPid, {shutdown, empty_interval}),
-            shutdown(negotiate_interval, NewState);
-        true ->
-            shutdown(negotiate_interval, NewState)
-    end;
-
 on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}} = _Msg,
-   State = #rr_recon_state{stage = build_struct}) ->
+   State = #rr_recon_state{stage = build_struct,       initiator = false}) ->
     ?TRACE1(_Msg, State),
     % create recon structure based on all elements in sync interval
     DBList = [encodeBlob(Key, VersionX) || {KeyX, VersionX} <- DBList0,
                                            none =/= (Key = map_key_to_interval(KeyX, DestI))],
     build_struct(DBList, DestI, RestI, State);
 
-on({start_recon, RMethod, SyncStruct, true = Initiator} = _Msg, State) ->
+on({start_recon, RMethod, SyncStruct} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     % initiator got other node's sync struct over sync interval (mapped to own range)
     % -> create own recon structure based on sync interval and reconcile
@@ -210,17 +190,13 @@ on({start_recon, RMethod, SyncStruct, true = Initiator} = _Msg, State) ->
     case RMethod of
         bloom ->
             MySyncI = SyncStruct#bloom_recon_struct.interval,
-            DestReconPid = undefined,
-            ok;
-%%         merkle_tree -> % TODO
-%%             MySyncI = merkle_tree:get_interval(SyncStruct),
-%%             DestReconPid = proplists:get_value(reconPid, Params, undefined),
-%%             fd:subscribe(DestReconPid),
-%%             ok;
+            DestReconPid = undefined;
+        merkle_tree ->
+            #merkle_params{interval = MySyncI, reconPid = DestReconPid} = SyncStruct,
+            fd:subscribe(DestReconPid);
         art ->
             MySyncI = art:get_interval(SyncStruct),
-            DestReconPid = undefined,
-            ok
+            DestReconPid = undefined
     end,
     % client only sends non-empty sync intervals or exits
     ?ASSERT(not intervals:is_empty(MySyncI)),
@@ -231,7 +207,7 @@ on({start_recon, RMethod, SyncStruct, true = Initiator} = _Msg, State) ->
                {get_chunk, Self, MySyncI, fun get_chunk_filter/1,
                 fun get_chunk_value/1, get_max_items(RMethod)}),
     State#rr_recon_state{stage = reconciliation, struct = SyncStruct,
-                         method = RMethod, initiator = Initiator,
+                         method = RMethod, initiator = true,
                          dest_recon_pid = DestReconPid};
 
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
@@ -271,21 +247,17 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
 
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
-                           method = art,               struct = SyncStruct}) ->
+                           method = RMethod,           struct = SyncStruct})
+  when RMethod =:= merkle_tree orelse RMethod =:= art->
     ?TRACE1(_Msg, State),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     DBList = [encodeBlob(KeyX, VersionX) || {KeyX, VersionX} <- DBList0],
-    MySyncI = art:get_interval(SyncStruct),
+    MySyncI = case RMethod of
+                  merkle_tree -> SyncStruct#merkle_params.interval;
+                  art         -> art:get_interval(SyncStruct)
+              end,
     build_struct(DBList, MySyncI, RestI, State);
-
-on({continue, Method, Stage, Struct, Initiator} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
-    send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
-    State#rr_recon_state{ stage = Stage,
-                          struct = Struct,
-                          method = Method,
-                          initiator = Initiator };
 
 on({crash, _Pid} = _Msg, State) ->
     ?TRACE1(_Msg, State),
@@ -386,7 +358,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
-                     {start_recon, bloom, MySyncStruct, true}}),
+                     {start_recon, bloom, MySyncStruct}}),
     shutdown(build_struct, State);
 begin_sync(MySyncStruct, _OtherSyncStruct,
            State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
@@ -400,11 +372,10 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                  {check_nodes, comm:this(), [merkle_tree:get_hash(MySyncStruct)]});
         false ->
             SID = rr_recon_stats:get(session_id, Stats),
-            SyncI = merkle_tree:get_interval(MySyncStruct),
-            SyncParams = [{reconPid, comm:this()}],
-            send(DestRRPid,
-                 {continue_recon, comm:make_global(OwnerL), SID,
-                  {create_struct, merkle_tree, SyncI, SyncParams, true}})
+            SyncParams = #merkle_params{interval = merkle_tree:get_interval(MySyncStruct),
+                                        reconPid = comm:this()},
+            send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
+                             {start_recon, merkle_tree, SyncParams}})
     end,
     Stats1 =
         rr_recon_stats:set(
@@ -423,7 +394,7 @@ begin_sync(MySyncStruct, OtherSyncStruct,
         false ->
             SID = rr_recon_stats:get(session_id, Stats), 
             send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
-                             {start_recon, art, MySyncStruct, true}}),
+                             {start_recon, art, MySyncStruct}}),
             shutdown(build_struct, State)
     end.
 
