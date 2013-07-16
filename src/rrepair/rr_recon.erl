@@ -294,6 +294,10 @@ on({crash, _Pid} = _Msg, State) ->
 on({shutdown, Reason}, State) ->
     shutdown(Reason, State);
 
+on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
+    log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
+    kill;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -795,6 +799,7 @@ rep_factor() ->
 %% @doc init module
 -spec init(state()) -> state().
 init(State) ->
+    _ = erlang:monitor(process, State#rr_recon_state.ownerPid),
     State.
 
 -spec start(SessionId::rrepair:session_id() | null, SenderRRPid::comm:mypid())
