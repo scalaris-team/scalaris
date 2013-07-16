@@ -40,7 +40,15 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+%-define(TRACE(X,Y), log:pal("~w: [ ~.0p ] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
+-define(TRACE_SEND(Pid, Msg), ?TRACE("to ~.0p: ~.0p~n", [Pid, Msg])).
+-define(TRACE1(Msg, State),
+        ?TRACE("~n  Msg: ~.0p~n"
+               "  State: method: ~.0p  stage: ~.0p  initiator: ~.0p~n"
+               "         params: ~.0p~n",
+               [Msg, State#rr_recon_state.method, State#rr_recon_state.stage,
+                State#rr_recon_state.initiator,
+                ?IIF(is_list(State#rr_recon_state.struct), State#rr_recon_state.struct, [])])).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
@@ -127,13 +135,14 @@
 % Message handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state() | kill.
-on({get_state_response, MyI}, State = 
+on({get_state_response, MyI} = _Msg, State = 
        #rr_recon_state{ stage = req_shared_interval,
                         initiator = false,
                         method = Method,
                         struct = Params,
                         dhtNodePid = DhtPid,
                         dest_rr_pid = DestRRPid }) ->
+    ?TRACE1(_Msg, State),
     % target node got sync request, asked for its interval
     % struct contains the interval of the initiator
     % -> client creates recon structure based on common interval, sends it to initiator
@@ -150,13 +159,14 @@ on({get_state_response, MyI}, State =
             shutdown(empty_interval, NewState)
     end;
 
-on({get_state_response, MyI}, State = 
+on({get_state_response, MyI} = _Msg, State =
        #rr_recon_state{ stage = res_shared_interval,
                         initiator = true,
                         method = RMethod,
                         struct = Params,
                         dhtNodePid = DhtPid,
                         dest_rr_pid = DestRRPid }) when (RMethod =:= merkle_tree orelse RMethod =:= art) ->
+    ?TRACE1(_Msg, State),
     % initiator got interval of client to create his own recon structure (merkle/art)
     % based on common interval
     DestI = proplists:get_value(interval, Params),
@@ -168,19 +178,21 @@ on({get_state_response, MyI}, State =
             RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
             send_chunk_req(DhtPid, self(), MyIntersec, DestI, get_max_items(RMethod)),
             NewState;
+        true when DestReconPid =/= undefined ->
+            send(DestReconPid, {shutdown, empty_interval}),
+            shutdown(negotiate_interval, NewState);
         true ->
-            DestReconPid =/= undefined andalso
-                comm:send(DestReconPid, {shutdown, empty_interval}),
             shutdown(negotiate_interval, NewState)
     end;
 
-on({get_state_response, MyI}, State = 
+on({get_state_response, MyI} = _Msg, State =
        #rr_recon_state{ stage = reconciliation,
                         initiator = true,
                         method = bloom,
                         dhtNodePid = DhtPid,
                         struct = #bloom_recon_struct{ interval = BloomI}
                        }) ->
+    ?TRACE1(_Msg, State),
     % initiator got client's bloom recon structure over sync interval
     % -> reconcile own DB with received bloom filter
     MySyncI = find_intersection(MyI, BloomI),
@@ -257,8 +269,8 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
     ?TRACE("Reconcile Bloom Session=~p ; Diff=~p", [SID, length(Diff)]),
     NewStats = if
                    length(Diff) > 0 ->
-                       comm:send_local(OwnerL, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff},
-                                                [{feedback, comm:make_global(OwnerL)}]}),
+                       send_local(OwnerL, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff},
+                                           [{feedback, comm:make_global(OwnerL)}]}),
                        rr_recon_stats:inc([{resolve_started, 2}], Stats); %feedback causes 2 resolve runs
                    true -> Stats
                end,
@@ -267,14 +279,16 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
        true         -> NewState
     end;
 
-on({continue, Method, Stage, Struct, Initiator}, State) ->
-    comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
+on({continue, Method, Stage, Struct, Initiator} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
+    send_local(State#rr_recon_state.dhtNodePid, {get_state, comm:this(), my_range}),
     State#rr_recon_state{ stage = Stage,
                           struct = Struct,
                           method = Method,
                           initiator = Initiator orelse Stage =:= res_shared_interval };
 
-on({crash, _Pid}, State) ->
+on({crash, _Pid} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
     shutdown(recon_node_crash, State);
 
 on({shutdown, Reason}, State) ->
@@ -286,7 +300,7 @@ on({shutdown, Reason}, State) ->
 
 on({check_nodes, SenderPid, ToCheck}, State = #rr_recon_state{ struct = Tree }) ->
     {Result, RestTree} = check_node(ToCheck, Tree),
-    comm:send(SenderPid, {check_nodes_response, Result}),
+    send(SenderPid, {check_nodes_response, Result}),
     State#rr_recon_state{ dest_recon_pid = SenderPid, struct = RestTree };
 
 on({check_nodes_response, CmpResults}, State =
@@ -298,7 +312,7 @@ on({check_nodes_response, CmpResults}, State =
     SID = rr_recon_stats:get(session_id, Stats),
     {Req, Res, NStats, RTree} = process_tree_cmp_result(CmpResults, Tree, get_merkle_branch_factor(), Stats),
     Req =/= [] andalso
-        comm:send(DestReconPid, {check_nodes, comm:this(), Req}),
+        send(DestReconPid, {check_nodes, comm:this(), Req}),
     {Leafs, Resolves} = lists:foldl(fun(Node, {AccL, AccR}) -> 
                                             {LCount, RCount} = resolve_node(Node, {SrcNode, SID, OwnerL}),
                                             {AccL + LCount, AccR + RCount}
@@ -308,7 +322,7 @@ on({check_nodes_response, CmpResults}, State =
     CompLeft = rr_recon_stats:get(tree_compareLeft, FStats),
     NewState = State#rr_recon_state{stats = FStats, struct = RTree},
     if CompLeft =:= 0 ->
-           comm:send(DestReconPid, {shutdown, sync_finished_remote}),
+           send(DestReconPid, {shutdown, sync_finished_remote}),
            shutdown(sync_finished, NewState);
        true -> NewState
     end.
@@ -328,21 +342,21 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
     case Method of
         merkle_tree -> 
             case Initiator of
-                true -> comm:send(DestReconPid,
-                                  {check_nodes, comm:this(), [merkle_tree:get_hash(SyncStruct)]});
+                true -> send(DestReconPid,
+                             {check_nodes, comm:this(), [merkle_tree:get_hash(SyncStruct)]});
                 false ->
                     IntParams = [{interval, merkle_tree:get_interval(SyncStruct)}, {reconPid, comm:this()}],
-                    comm:send(DestRRPid,
-                              {continue_recon, comm:make_global(OwnerL), SID,
-                               {continue, merkle_tree, res_shared_interval, IntParams, true}})
+                    send(DestRRPid,
+                         {continue_recon, comm:make_global(OwnerL), SID,
+                          {continue, merkle_tree, res_shared_interval, IntParams, true}})
             end,
             rr_recon_stats:set(
               [{tree_compareLeft, ?IIF(Initiator, 1, 0)},
                {tree_size, merkle_tree:size_detail(SyncStruct)}], Stats);
         bloom ->
-            comm:send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
-                                  {continue, bloom, reconciliation, SyncStruct, true}}),
-            comm:send_local(self(), {shutdown, {ok, build_struct}}),
+            send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
+                             {continue, bloom, reconciliation, SyncStruct, true}}),
+            send_local(self(), {shutdown, {ok, build_struct}}),
             Stats;
         art ->
             {AOk, ARStats} = 
@@ -350,12 +364,12 @@ begin_sync(SyncStruct, State = #rr_recon_state{ method = Method,
                     true -> art_recon(SyncStruct, proplists:get_value(art, Params), State);                    
                     false ->
                         ArtParams = [{interval, art:get_interval(SyncStruct)}, {art, SyncStruct}],
-                        comm:send(DestRRPid,
-                                  {continue_recon, comm:make_global(OwnerL), SID,
-                                   {continue, art, res_shared_interval, ArtParams, true}}),
+                        send(DestRRPid,
+                             {continue_recon, comm:make_global(OwnerL), SID,
+                              {continue, art, res_shared_interval, ArtParams, true}}),
                         {no, Stats}
                 end,
-            comm:send_local(self(), {shutdown, ?IIF(AOk =:= ok, sync_finished, build_struct)}),
+            send_local(self(), {shutdown, ?IIF(AOk =:= ok, sync_finished, build_struct)}),
             ARStats
     end.
 
@@ -365,7 +379,7 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
     ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),
     Status = exit_reason_to_rc_status(Reason),
     NewStats = rr_recon_stats:set([{status, Status}], Stats),
-    comm:send_local(OwnerL, {recon_progress_report, self(), Initiator, NewStats}),
+    send_local(OwnerL, {recon_progress_report, self(), Initiator, NewStats}),
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -478,10 +492,10 @@ resolve_leaf(Node, {Dest, SID, OwnerL}) ->
     OwnerR = comm:make_global(OwnerL),
     case merkle_tree:get_item_count(Node) of
         0 ->
-           comm:send(Dest, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), OwnerR}, []}),
+           send(Dest, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), OwnerR}, []}),
            1;
        _ ->
-           comm:send_local(OwnerL, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), Dest}, [{feedback, OwnerR}]}),
+           send_local(OwnerL, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), Dest}, [{feedback, OwnerR}]}),
            2
     end.
 
@@ -560,6 +574,16 @@ build_recon_struct(art, {I, DBItems}) ->
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec send(Pid::comm:mypid(), Msg::comm:message() | comm:group_message()) -> ok.
+send(Pid, Msg) ->
+    ?TRACE_SEND(Pid, Msg),
+    comm:send(Pid, Msg).
+
+-spec send_local(Pid::comm:erl_local_pid(), Msg::comm:message() | comm:group_message()) -> ok.
+send_local(Pid, Msg) ->
+    ?TRACE_SEND(Pid, Msg),
+    comm:send_local(Pid, Msg).
+
 %% @doc Sends a get_chunk request to the local DHT_node process.
 %%      Request responds with a list of {Key, Value} tuples.
 %%      The mapping to DestI is not done here!
@@ -569,7 +593,7 @@ build_recon_struct(art, {I, DBItems}) ->
     is_subtype(MaxItems,    pos_integer() | all).
 send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems) ->
     SrcPidReply = comm:reply_as(SrcPid, 4, {rr_recon, data, DestI, '_'}),
-    comm:send_local(
+    send_local(
       DhtPid,
       {get_chunk, SrcPidReply, I, fun get_chunk_filter/1, fun get_chunk_value/1,
        MaxItems}).
@@ -736,7 +760,7 @@ start(SessionId, SenderRRPid) ->
 fork_recon(Conf) ->
     NStats = rr_recon_stats:set([{session_id, null}], Conf#rr_recon_state.stats),
     State = Conf#rr_recon_state{ stats = NStats },
-    comm:send_local(Conf#rr_recon_state.ownerPid, {recon_forked}),
+    send_local(Conf#rr_recon_state.ownerPid, {recon_forked}),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, State, []).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
