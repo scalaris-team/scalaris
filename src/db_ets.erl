@@ -35,10 +35,14 @@
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
 
--type(db() :: ets:tid() | atom()).
--type(key() :: term()).
--type(entry() :: tuple()).
--type(interval() :: intervals:simple_interval()).
+-type db() :: ets:tid() | atom().
+-type key() :: term().
+-type entry() :: tuple().
+-type interval() :: intervals:simple_interval().
+
+-ifdef(with_export_type_support).
+-export_type([db/0]).
+-endif.
 
 -spec new(nonempty_string()) -> db().
 new(DBName) ->
@@ -76,15 +80,15 @@ get_name(DB) ->
 get_load(DB) ->
     ets:info(DB, size).
 
--spec foldl(db(), fun(), term()) -> term().
+-spec foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldl(DB, Fun, Acc) ->
     ets:foldl(Fun, Acc, DB).
 
--spec foldl(db(), fun(), term(), interval()) -> term().
+-spec foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
 foldl(DB, Fun, Acc, Interval) ->
     foldl(DB, Fun, Acc, Interval, ets:info(DB, size)).
 
--spec foldl(db(), fun(), term(), interval(), non_neg_integer()) -> term().
+-spec foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
 foldl(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, '$end_of_table', _End, _}, _MaxNum) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, _Start, '$end_of_table', _}, _MaxNum) -> Acc;
@@ -104,7 +108,6 @@ foldl(DB, Fun, Acc, {interval, '(', Start, End, RBr}, MaxNum) ->
 foldl(DB, Fun, Acc, {interval, LBr, Start, End, ')'}, MaxNum) -> 
     foldl(DB, Fun, Acc, {interval, LBr, Start, ets:prev(DB, End), ']'}, MaxNum);
 foldl(DB, Fun, Acc, {interval, '[', Start, End, ']'}, MaxNum) ->
-
     case ets:lookup(DB, Start) of
         [] ->
             ?TRACE("foldl:~nstart: ~p~nend:   ~p~nmaxnum: ~p~nfound nothing~n",
@@ -118,15 +121,15 @@ foldl(DB, Fun, Acc, {interval, '[', Start, End, ']'}, MaxNum) ->
                                              End, ']'}, MaxNum - 1)
     end.
 
--spec foldr(db(), fun(), term()) -> term().
+-spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldr(DB, Fun, Acc) ->
     ets:foldr(Fun, Acc, DB).
 
--spec foldr(db(), fun(), term(), interval()) -> term().
+-spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
 foldr(DB, Fun, Acc, Interval) ->
     foldr(DB, Fun, Acc, Interval, ets:info(DB, size)).
 
--spec foldr(db(), fun(), term(), interval(), non_neg_integer()) -> term().
+-spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
 foldr(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, _End, '$end_of_table', _}, _MaxNum) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, '$end_of_table', _Start, _}, _MaxNum) -> Acc;

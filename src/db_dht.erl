@@ -56,9 +56,9 @@
 -export([get_live_lc/1,get_snap_lc/1]).
 -export([snapshot_is_running/1,delete_snapshot/1,decrease_snapshot_lockcount/1]).
 
--type(db() :: {?DB:db(), ?DB:db(), {?DB:db() | false,
+-type db() :: {?DB:db(), ?DB:db(), {?DB:db() | false,
                                     non_neg_integer(),
-                                    non_neg_integer()}}).
+                                    non_neg_integer()}}.
 -type version() :: non_neg_integer().
 -type value() :: rdht_tx:encoded_value().
 -type db_as_list() :: [db_entry:entry()].
@@ -66,6 +66,10 @@
 -type subscr_changes_fun_t() :: fun((DB::db(), Tag::any(), Operation::subscr_op_t()) -> db()).
 -type subscr_remove_fun_t() :: fun((Tag::any()) -> any()).
 -type subscr_t() :: {Tag::any(), intervals:interval(), ChangesFun::subscr_changes_fun_t(), CloseDBFun::subscr_remove_fun_t()}.
+
+-ifdef(with_export_type_support).
+-export_type([db/0, value/0, version/0, db_as_list/0]).
+-endif.
 
 %% @doc Initializes a new database.
 -spec new() -> db().
