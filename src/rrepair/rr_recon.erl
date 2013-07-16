@@ -250,31 +250,28 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}},
                           stats = rr_recon_stats:set([{build_time, BuildTime}], NStats) };    
 
 on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
-       #rr_recon_state{ stage = reconciliation,
-                        method = bloom,
-                        dhtNodePid = DhtNodePid,
-                        ownerPid = OwnerL,
-                        dest_rr_pid = DestRU_Pid,
-                        struct = #bloom_recon_struct{ bloom = BF },
-                        stats = Stats }) ->
+       #rr_recon_state{stage = reconciliation,         ownerPid = OwnerL,
+                       method = bloom,                 dhtNodePid = DhtNodePid,
+                       dest_rr_pid = DestRU_Pid,       stats = Stats,
+                       struct = #bloom_recon_struct{ bloom = BF }}) ->
     % need to work in DestI (not SyncI, since that is a sub interval of our interval!)
-    DBList = [encodeBlob(Key, VersionX) || {KeyX, VersionX} <- DBList0,
-                                           none =/= (Key = map_key_to_interval(KeyX, DestI))],
+    Diff = [KeyX || {KeyX, VersionX} <- DBList0,
+                    none =/= (Key = map_key_to_interval(KeyX, DestI)),
+                    not ?REP_BLOOM:is_element(BF, encodeBlob(Key, VersionX))],
     %if rest interval is non empty start another sync    
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
     not SyncFinished andalso
         send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(bloom)),
-    Diff = [erlang:element(1, decodeBlob(KV)) || KV <- DBList,
-                                                 not ?REP_BLOOM:is_element(BF, KV)],
     ?TRACE("Reconcile Bloom Session=~p ; Diff=~p", [SID, length(Diff)]),
-    NewStats = if
-                   length(Diff) > 0 ->
-                       send_local(OwnerL, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff},
-                                           [{feedback, comm:make_global(OwnerL)}]}),
-                       rr_recon_stats:inc([{resolve_started, 2}], Stats); %feedback causes 2 resolve runs
-                   true -> Stats
-               end,
+    NewStats =
+        case Diff of
+            [_|_] ->
+                send_local(OwnerL, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff},
+                                    [{feedback, comm:make_global(OwnerL)}]}),
+                rr_recon_stats:inc([{resolve_started, 2}], Stats); %feedback causes 2 resolve runs
+            [] -> Stats
+        end,
     NewState = State#rr_recon_state{stats = NewStats},
     if SyncFinished -> shutdown(sync_finished, NewState);
        true         -> NewState
