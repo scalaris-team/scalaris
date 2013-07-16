@@ -45,10 +45,10 @@
 -define(TRACE1(Msg, State),
         ?TRACE("~n  Msg: ~.0p~n"
                "  State: method: ~.0p  stage: ~.0p  initiator: ~.0p~n"
-               "          syncI: ~.0p~n"
+               "          destI: ~.0p~n"
                "         params: ~.0p~n",
                [Msg, State#rr_recon_state.method, State#rr_recon_state.stage,
-                State#rr_recon_state.initiator, State#rr_recon_state.sync_interval,
+                State#rr_recon_state.initiator, State#rr_recon_state.dest_interval,
                 ?IIF(is_list(State#rr_recon_state.struct), State#rr_recon_state.struct, [])])).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -98,7 +98,7 @@
          dest_rr_pid        = ?required(rr_recon_state, dest_rr_pid)    :: comm:mypid(), %dest rrepair pid
          dest_recon_pid     = undefined                                 :: comm:mypid() | undefined, %dest recon process pid
          method             = undefined                                 :: method(),
-         sync_interval      = intervals:empty()                         :: intervals:interval(),
+         dest_interval      = intervals:empty()                         :: intervals:interval(),
          struct             = {}                                        :: struct() | {},
          stage              = req_shared_interval                       :: stage(),
          initiator          = false                                     :: boolean(),
@@ -127,7 +127,7 @@
     {check_nodes, InitiatorPid::comm:mypid(), [merkle_cmp_request()]} |
     {check_nodes_response, [merkle_cmp_result()]} |
     %dht node response
-    {create_struct, SenderI::intervals:interval(), {get_state_response, MyI::intervals:interval()}} |
+    {create_struct2, {get_state_response, MyI::intervals:interval()}} |
     {get_state_response, MyI::intervals:interval()} |
     {rr_recon, data, DestI::intervals:interval(), {get_chunk_response, {intervals:interval(), db_chunk()}}} |
     %internal
@@ -141,22 +141,21 @@
 
 on({create_struct, RMethod, SenderI, Params, RcvInitiator} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    This = comm:reply_as(comm:this(), 3, {create_struct, SenderI, '_'}),
+    This = comm:reply_as(comm:this(), 2, {create_struct2, '_'}),
     comm:send_local(State#rr_recon_state.dhtNodePid, {get_state, This, my_range}),
-    State#rr_recon_state{method = RMethod, initiator = RcvInitiator, struct = Params};
+    State#rr_recon_state{method = RMethod, initiator = RcvInitiator, dest_interval = SenderI, struct = Params};
 
-on({create_struct, SenderI, {get_state_response, MyI}} = _Msg,
+on({create_struct2, {get_state_response, MyI}} = _Msg,
    State = #rr_recon_state{stage = req_shared_interval, initiator = false,
                            method = RMethod,            dhtNodePid = DhtPid,
-                           dest_rr_pid = DestRRPid}) ->
+                           dest_rr_pid = DestRRPid,     dest_interval = SenderI}) ->
     ?TRACE1(_Msg, State),
     % target node got sync request, asked for its interval
     % struct contains the interval of the initiator
     % -> client creates recon structure based on common interval, sends it to initiator
     RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
     SyncI = find_intersection(MyI, SenderI),
-    NewState = State#rr_recon_state{stage = build_struct,
-                                    sync_interval = SyncI},
+    NewState = State#rr_recon_state{stage = build_struct},
     case intervals:is_empty(SyncI) of
         false ->
             send_chunk_req(DhtPid, self(), SyncI, SyncI, get_max_items(RMethod)),
@@ -165,10 +164,11 @@ on({create_struct, SenderI, {get_state_response, MyI}} = _Msg,
             shutdown(empty_interval, NewState)
     end;
 
-on({create_struct, SenderI, {get_state_response, MyI}} = _Msg,
+on({create_struct2, {get_state_response, MyI}} = _Msg,
    State = #rr_recon_state{stage = req_shared_interval, initiator = true,
                            method = RMethod,            dhtNodePid = DhtPid,
-                           dest_rr_pid = DestRRPid,     struct = Params })
+                           dest_rr_pid = DestRRPid,     struct = Params,
+                           dest_interval = SenderI})
   when (RMethod =:= merkle_tree orelse RMethod =:= art) ->
     ?TRACE1(_Msg, State),
     % initiator got interval of client to create his own recon structure (merkle/art)
@@ -176,7 +176,6 @@ on({create_struct, SenderI, {get_state_response, MyI}} = _Msg,
     DestReconPid = proplists:get_value(reconPid, Params, undefined),
     SyncI = find_intersection(MyI, SenderI),
     NewState = State#rr_recon_state{stage = build_struct,
-                                    sync_interval = SyncI,
                                     dest_recon_pid = DestReconPid},
     case intervals:is_empty(SyncI) of
         false ->
@@ -209,13 +208,10 @@ on({get_state_response, MyI} = _Msg,
             shutdown(empty_interval, State)
     end;
 
-on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
-       #rr_recon_state{ stage = build_struct,
-                        method = RMethod,
-                        struct = Params,
-                        dhtNodePid = DhtNodePid,
-                        initiator = Initiator,
-                        stats = Stats }) ->
+on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}},
+   State = #rr_recon_state{stage = build_struct,       initiator = Initiator,
+                           method = RMethod,           dhtNodePid = DhtNodePid,
+                           struct = Params,            stats = Stats}) ->
     % create recon structure based on all elements in sync interval
     DBList = [encodeBlob(Key, VersionX) || {KeyX, VersionX} <- DBList0,
                                            none =/= (Key = map_key_to_interval(KeyX, DestI))],
@@ -234,7 +230,7 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
            case intervals:is_empty(SubSyncI) of
                false ->
                    Pid = if RMethod =:= bloom -> 
-                                erlang:element(2, fork_recon(State#rr_recon_state{sync_interval = SubSyncI,
+                                erlang:element(2, fork_recon(State#rr_recon_state{dest_interval = SubSyncI,
                                                                                   struct = Params}));
                             true -> self()
                          end,
