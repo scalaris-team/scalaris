@@ -931,6 +931,8 @@ prop_get_chunk4(Keys2, StartId, Interval, ChunkSize) ->
              end, Next, Interval),
     ?equals_w_note([X || X = {Key} <- ChunkKeys, intervals:in(Key, Next)],
                    [], io_lib:format("Next: ~.0p", [Next])),
+    % if ChunkSize is all, Next must be empty!
+    ?IIF(ChunkSize =:= all, ?equals(Next, intervals:empty()), true),
     % keys in Chunk plus keys in Next must be all keys in Interval
     KeysInChunkPlusNext = lists:usort(ChunkKeys
                                           ++ [{Key} || Key <- Keys, intervals:in(Key, Next)]),

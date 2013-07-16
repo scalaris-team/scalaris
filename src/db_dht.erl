@@ -317,7 +317,9 @@ get_chunk(DB, StartId, Interval, ChunkSize) ->
 get_chunk(_State, _StartId, [], _FilterFun, _ValueFun, _ChunkSize) ->
     {intervals:empty(), []};
 get_chunk(State, StartId, Interval, FilterFun, ValueFun, all) ->
-    get_chunk(State, StartId, Interval, FilterFun, ValueFun, get_load(State));
+    {_Next, Chunk} =
+        get_chunk(State, StartId, Interval, FilterFun, ValueFun, get_load(State)),
+    {intervals:empty(), Chunk};
 %% %% this version iterates over the whole db and filters later
 %% %% was mainly used for debugging
 %% get_chunk({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
