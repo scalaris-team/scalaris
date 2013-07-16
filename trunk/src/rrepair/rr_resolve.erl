@@ -236,7 +236,11 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     end;
 
 on({shutdown, Reason}, State) ->
-    shutdown(Reason, State).
+    shutdown(Reason, State);
+
+on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
+    log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
+    kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -349,6 +353,7 @@ print_resolve_stats(Stats) ->
 
 -spec init(state()) -> state().
 init(State) ->
+    _ = erlang:monitor(process, State#rr_resolve_state.ownerPid),
     State.
 
 -spec start(operation(), options()) -> {ok, MyPid::pid()}.
