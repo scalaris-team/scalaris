@@ -1,0 +1,81 @@
+# Merkle Tree Reconciliation 
+# by Maik Lange
+
+.PS
+copy "sequence.pic";
+
+# OBJEKTE
+actor(U, "");
+object(A,"A:RR");
+placeholder_object(AA);
+placeholder_object(Dummy2); # more space
+placeholder_object(BB);
+object(B,"B:RR");
+step();
+
+#---- Step1 RC sendet Interval an B
+message(U,A,"Recon Anfrage"); active(A);
+create_message(A,AA,"A:RC");
+
+async(); # use asynchrone messages (not-filled arrowheads)
+
+message(A,AA,"Start"); inactive(A);
+active(AA);
+message(AA,B,"Interval Z\sbA\eb"); 
+active(B);
+destroy_message(AA,AA,""); 
+inactive(AA);
+
+#---- Step2
+sync();
+create_message(B,BB,"B:RC");
+async();
+message(B,BB,"cont. Z\sbA\eb"); 
+inactive(B); active(BB);
+step();
+
+comment(BB,C,0.3 right 0.2, wid 1.7 ht 0.5 \
+        "1) Ausfalldetektor " \
+	"   aktivieren f\:ur A bzw. B" \
+        "2) erstelle Merkle Tree");
+
+message(BB,A,"Interval Z\sbAB\eb");
+active(A);
+
+#---- STEP 3
+sync();
+create_message(A,AA,"A:RC");
+async();
+message(A,AA,"cont. Z\sbAB\eb"); inactive(A);
+active(AA);
+step();
+
+connect_to_comment(AA,C);
+
+begin_frame(A,MT,"Loop");
+
+message(AA,BB,"Pr\:ufe Knoten");
+rmessage(BB,AA,"Resultat des Vergleichs");
+step();
+begin_frame(A,MTR,"opt");
+message(AA,A,"Knotendifferenz");
+active(A);
+step();
+begin_frame(A,F,"int_upd_s");
+end_frame(A,F);
+step();
+inactive(A);
+end_frame(AA,MTR);
+step();	
+
+end_frame(BB, MT);
+
+destroy_message(AA,BB,""); inactive(BB);
+destroy_message(AA,AA,""); inactive(AA);
+
+# Complete the lifelines
+step();
+complete(A);
+complete(B);
+complete(U);
+.PE
