@@ -85,7 +85,7 @@ calc_sum2Change(Op) ->
         -> {SplitKey::?RT:key(), TargetLoadNew::non_neg_integer()}.
 split_by_load(DhtNodeState, TargetLoad) ->
     Neighbors = dht_node_state:get(DhtNodeState, neighbors),
-%%     log:pal("[ ~.0p ] data: ~.0p", [self(), ?DB:get_data(DB)]),
+%%     log:pal("[ ~.0p ] data: ~.0p", [self(), db_dht:get_data(DB)]),
     PredId = node:id(nodelist:pred(Neighbors)),
     NodeId = nodelist:nodeid(Neighbors),
     case dht_node_state:get_split_key(DhtNodeState, PredId, NodeId, TargetLoad, forward) of
@@ -101,7 +101,7 @@ split_by_key(DhtNodeState, SelectedKey) ->
     MyPredId = dht_node_state:get(DhtNodeState, pred_id),
     DB = dht_node_state:get(DhtNodeState, db),
     Interval = node:mk_interval_between_ids(MyPredId, SelectedKey),
-    TargetLoadNew = ?DB:get_load(DB, Interval),
+    TargetLoadNew = db_dht:get_load(DB, Interval),
 %%     log:pal("[ ~.0p ]  TN: ~.0p, SK: ~.0p~n", [self(), TargetLoadNew, SelectedKey]),
     {SelectedKey, TargetLoadNew}.
 
@@ -119,5 +119,5 @@ split_my_range(DhtNodeState, SelectedKey) ->
 %%            [self(), MyPredId, MyNodeId, SplitKey, SelectedKey]),
     Interval = node:mk_interval_between_ids(MyPredId, SplitKey),
     DB = dht_node_state:get(DhtNodeState, db),
-    TargetLoadNew = ?DB:get_load(DB, Interval),
+    TargetLoadNew = db_dht:get_load(DB, Interval),
     {SplitKey, TargetLoadNew}.

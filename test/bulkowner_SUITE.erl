@@ -76,6 +76,6 @@ collect(Id, Sum, ExpSum, Msgs) ->
             end
     end.
 
--spec reduce(?DB:db_as_list()) -> integer().
+-spec reduce(db_dht:db_as_list()) -> integer().
 reduce(Entries) ->
     lists:foldl(fun(E, Acc) -> db_entry:get_value(E) + Acc end, 0, Entries).

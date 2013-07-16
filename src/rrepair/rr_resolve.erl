@@ -55,7 +55,7 @@
                     {send_stats, comm:mypid()}. %send stats to pid after completion
 -type options()  :: [option()].
 -type feedback() :: {nil | comm:mypid(),        %feedback destination adress
-                     ?DB:kvv_list()}.
+                     db_dht:kvv_list()}.
 
 -type exit_reason() :: resolve_ok | resolve_abort.
 
@@ -72,9 +72,9 @@
 -type stats() :: #resolve_stats{}.
 
 -type operation() ::
-    {key_upd, SortedKvvListInQ1::?DB:kvv_list()} |
+    {key_upd, SortedKvvListInQ1::db_dht:kvv_list()} |
     {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
-    {interval_upd, intervals:interval(), SortedKvvListInQ1::?DB:kvv_list()} |
+    {interval_upd, intervals:interval(), SortedKvvListInQ1::db_dht:kvv_list()} |
     {interval_upd_send, intervals:interval(), DestPid::comm:mypid()}.
 
 -record(rr_resolve_state,
@@ -242,7 +242,7 @@ on({shutdown, Reason}, State) ->
 %% @doc Starts updating the local entries with the given KvvList.
 %%      -> Returns number of send update requests.
 %%      PreCond: KvvList must be unique by keys.
--spec start_update_key_entry(?DB:kvv_list(), intervals:interval(), comm:mypid(), comm:erl_local_pid()) -> non_neg_integer().
+-spec start_update_key_entry(db_dht:kvv_list(), intervals:interval(), comm:mypid(), comm:erl_local_pid()) -> non_neg_integer().
 start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
     ?ASSERT(length(KvvList) =:= length(lists:ukeysort(1, KvvList))),
     length([comm:send_local(DhtPid, {update_key_entry, MyPid, RKey, Val, Vers})
@@ -301,7 +301,7 @@ merge_stats(#resolve_stats{ session_id = ASID,
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec entry_to_kvv(db_entry:entry()) -> {?RT:key(), ?DB:value(), ?DB:version()}.
+-spec entry_to_kvv(db_entry:entry()) -> {?RT:key(), db_dht:value(), db_dht:version()}.
 entry_to_kvv(Entry) ->
     {rr_recon:map_key_to_quadrant(db_entry:get_key(Entry), 1),
      db_entry:get_value(Entry),

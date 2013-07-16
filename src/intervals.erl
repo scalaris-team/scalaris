@@ -41,7 +41,7 @@
          % operations for intervals
          intersection/2, union/2, minus/2, 
          % getters for certain intervals
-         get_bounds/1, get_elements/1,
+         get_bounds/1, get_elements/1, get_simple_intervals/1,
          %
          % for unit testing only
          is_well_formed/1, tester_create_interval/1,
@@ -703,3 +703,7 @@ split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc) ->
                         Parts - 1, InnerLBr, InnerRBr,
                         [new(LBr, LKey, SplitKey, InnerRBr) | Acc])
     end.
+
+-spec get_simple_intervals(interval()) -> [simple_interval()].
+get_simple_intervals(Interval) ->
+    Interval.

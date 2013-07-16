@@ -52,7 +52,7 @@ end_per_suite(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_insert(10..100, ?RT:key(), ?DB:version()) -> true.
+-spec prop_insert(10..100, ?RT:key(), db_dht:version()) -> true.
 prop_insert(CellCount, Key, Value) ->
     IBLT = iblt:new(get_hfs(), CellCount),
     IBLT2 = iblt:insert(IBLT, Key, Value),
@@ -66,7 +66,7 @@ tester_insert(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_delete(10..100, ?RT:key(), ?DB:version()) -> true.
+-spec prop_delete(10..100, ?RT:key(), db_dht:version()) -> true.
 prop_delete(CellCount, Key, Value) ->
     IBLT = iblt:new(get_hfs(), CellCount),
     IBLT2 = iblt:insert(IBLT, Key, Value),
@@ -107,13 +107,13 @@ tester_prime_vs_noprime(_) ->
     pvp_iblt_test ! {reset, "NON-Prime-ColSize - COLLISIONS:"},    
     true.
 
--spec prop_prime(10..100, [{?RT:key(), ?DB:version()}]) -> true.
+-spec prop_prime(10..100, [{?RT:key(), db_dht:version()}]) -> true.
 prop_prime(Cells, Items) -> prop_get(Cells, Items, [prime]).
 
--spec prop_noprime(10..100, [{?RT:key(), ?DB:version()}]) -> true.
+-spec prop_noprime(10..100, [{?RT:key(), db_dht:version()}]) -> true.
 prop_noprime(Cells, Items) -> prop_get(Cells, Items, []).
 
--spec prop_get(10..100, [{?RT:key(), ?DB:version()}], iblt:options()) -> true.
+-spec prop_get(10..100, [{?RT:key(), db_dht:version()}], iblt:options()) -> true.
 prop_get(CellCount, Items, Options) ->
     IBLT = lists:foldl(fun({Key, Ver}, _IBLT) -> 
                                iblt:insert(_IBLT, Key, Ver) 

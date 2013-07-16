@@ -30,7 +30,7 @@
 
 % accepted messages of the snapshot_leader process
 -type message() ::
-    {local_snapshot_done, From::comm:erl_local_pid(), SnapNumber::non_neg_integer(), DBRange::intervals:interval(), Snapshot::?DB:db_as_list()} |
+    {local_snapshot_done, From::comm:erl_local_pid(), SnapNumber::non_neg_integer(), DBRange::intervals:interval(), Snapshot::db_dht:db_as_list()} |
     {init_snapshot, Client::comm:erl_local_pid()} |
     {local_snapshot_failed, From::comm:erl_local_pid(), SnapNumber::non_neg_integer(), Msg::string()}.
 

@@ -24,6 +24,8 @@
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(X,Y), ok).
+%% -define(TRACE_SNAP(X, Y), ct:pal(X, Y)).
+-define(TRACE_SNAP(X, Y), ?TRACE(X, Y)).
 
 %%% public interface
 
@@ -38,7 +40,7 @@ init() ->
 
 %%
 %% Attention: this is not a separate process!!
-%%            It runs inside the dht_node to get access to the ?DB
+%%            It runs inside the dht_node to get access to the db_dht
 %%
 
 -spec on_init_TP({tx_tm_rtm:tx_id(),
@@ -148,8 +150,8 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DH
         true ->
             ?TRACE("~p tx_tp:update_db_or_forward before commit/abort~n",[comm:this()]),
             ?TRACE("~p tx_tp:update_db_or_forward before db: ~p~n",[comm:this(),DB]),
-            ?TRACE("~p tx_tp:update_db_or_forward before db data: ~p~n",[comm:this(),?DB:get_data(DB)]),
-            ?TRACE("~p tx_tp:update_db_or_forward before snapshot data: ~p~n",[comm:this(),?DB:get_snapshot_data(DB)]),
+            ?TRACE("~p tx_tp:update_db_or_forward before db data: ~p~n",[comm:this(),db_dht:get_data(DB)]),
+            ?TRACE("~p tx_tp:update_db_or_forward before snapshot data: ~p~n",[comm:this(),db_dht:get_snapshot_data(DB)]),
             ?TRACE("~p tx_tp:update_db_or_forward incoming operation: ~p~n",[comm:this(),{tx_tlog:get_entry_operation(RTLogEntry), Result}]),
             Res =
                 case tx_tlog:get_entry_operation(RTLogEntry) of
@@ -165,16 +167,17 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DH
             comm:send(TM, {?tp_committed, TMItemId}),
             % check if snapshot is running and if so, if it's already done
             SnapState = dht_node_state:get(DHT_Node_State, snapshot_state),
-            case {snapshot_state:is_in_progress(SnapState),?DB:snapshot_is_running(Res),?DB:snapshot_is_lockfree(Res)} of
+            case {snapshot_state:is_in_progress(SnapState),db_dht:snapshot_is_running(Res),db_dht:snapshot_is_lockfree(Res)} of
                 {true,true,true} ->
-                    ?TRACE("~p tx_tp:update_db_or_forward snapshot is finally done~n",[comm:this()]),
+                    ?TRACE_SNAP("~p tx_tp:update_db_or_forward snapshot is finally done~n",[comm:this()]),
                     comm:send_local(self(), {local_snapshot_is_done});
                 {true,true,_} ->
-                    ?TRACE("~p tx_tp:update_db_or_forward snapshot is still not done~n",[comm:this()]),
-                    ?TRACE("~p tx_tp:update_db_or_forward db: ~p~n",[comm:this(),Res]),
-                    ?TRACE("~p tx_tp:update_db_or_forward db data: ~p~n",[comm:this(),?DB:get_data(Res)]),
-                    ?TRACE("~p tx_tp:update_db_or_forward snapshot data: ~p~n",[comm:this(),?DB:get_snapshot_data(Res)]);
+                    ?TRACE_SNAP("~p tx_tp:update_db_or_forward snapshot is still
+                                not done~n~p",[comm:this(), Res]),
+                    ok;
                 _ ->
+                    ?TRACE_SNAP("~p tx_tp:update_db_or_forward something
+                                else~n~p~n~p",[comm:this(), X, Res]),
                     ok
             end,
             Res;

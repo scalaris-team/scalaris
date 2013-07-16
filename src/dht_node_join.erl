@@ -110,7 +110,7 @@ join_as_first(Id, IdVersion, _Options) ->
             [self(), Id, IdVersion]),
     Me = node:new(comm:this(), Id, IdVersion),
     % join complete, State is the first "State"
-    finish_join(Me, Me, Me, ?DB:new(), msg_queue:new()).
+    finish_join(Me, Me, Me, db_dht:new(), msg_queue:new()).
 %% userdevguide-end dht_node_join:join_as_first
 
 %% userdevguide-begin dht_node_join:join_as_other
@@ -433,7 +433,7 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId, TargetId, N
                             rm_loop:notify_new_succ(node:pidX(Pred), Me),
                             rm_loop:notify_new_pred(node:pidX(Succ), Me),
                             
-                            finish_join_and_slide(Me, Pred, Succ, ?DB:new(),
+                            finish_join_and_slide(Me, Pred, Succ, db_dht:new(),
                                                   QueuedMessages, MoveId, NextOp)
                     end
             end
@@ -901,7 +901,7 @@ try_next_candidate(JoinState) ->
 %% userdevguide-begin dht_node_join:finish_join
 %% @doc Finishes the join and sends all queued messages.
 -spec finish_join(Me::node:node_type(), Pred::node:node_type(),
-                  Succ::node:node_type(), DB::?DB:db(),
+                  Succ::node:node_type(), DB::db_dht:db(),
                   QueuedMessages::msg_queue:msg_queue())
         -> dht_node_state:state().
 finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
@@ -930,7 +930,7 @@ reject_join_response(Succ, _Pred, MoveId, _CandId) ->
 %% @doc Finishes the join by setting up a slide operation to get the data from
 %%      the other node and sends all queued messages.
 -spec finish_join_and_slide(Me::node:node_type(), Pred::node:node_type(),
-                            Succ::node:node_type(), DB::?DB:db(),
+                            Succ::node:node_type(), DB::db_dht:db(),
                             QueuedMessages::msg_queue:msg_queue(),
                             MoveId::slide_op:id(), NextOp::slide_op:next_op())
         -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}],

@@ -62,7 +62,7 @@
 
 -type db_entry_enc()   :: binary().
 -type db_chunk_enc()   :: [db_entry_enc()].
--type db_entry()       :: {?RT:key(), ?DB:version()}.
+-type db_entry()       :: {?RT:key(), db_dht:version()}.
 -type db_chunk()       :: [db_entry()].
 
 -record(bloom_recon_struct,
@@ -685,11 +685,11 @@ get_interval_size(I) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec encodeBlob(?RT:key(), ?DB:value() | ?DB:version()) -> db_entry_enc().
+-spec encodeBlob(?RT:key(), db_dht:value() | db_dht:version()) -> db_entry_enc().
 encodeBlob(A, B) -> 
     term_to_binary([A, "#", B]).
 
--spec decodeBlob(db_entry_enc()) -> {?RT:key(), ?DB:value() | ?DB:version()} | fail.
+-spec decodeBlob(db_entry_enc()) -> {?RT:key(), db_dht:value() | db_dht:version()} | fail.
 decodeBlob(Blob) when is_binary(Blob) ->
     case binary_to_term(Blob) of
         [Key, "#", X] -> {Key, X};

@@ -51,12 +51,12 @@ isPost(A) ->
 
 -spec lookup(Key::?RT:key())
         -> {TimeInMs::integer(),
-            Result::{Value::?DB:value(), Version::?DB:version()} |
+            Result::{Value::db_dht:value(), Version::db_dht:version()} |
                     {fail, not_found} | {fail, timeout} | {fail, fail}}.
 lookup(Key) ->
     util:tc(api_tx, read, [Key]).
 
--spec set_key(Key::?RT:key(), Value::?DB:value())
+-spec set_key(Key::?RT:key(), Value::db_dht:value())
         -> {TimeInMs::integer(),
             Result::commit | userabort | {fail, not_found} | {fail, timeout} |
                     {fail, fail} | {fail, abort}}.

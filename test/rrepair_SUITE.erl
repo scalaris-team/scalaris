@@ -335,7 +335,7 @@ get_symmetric_keys_test(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_blob_coding(?RT:key(), ?DB:value() | ?DB:version()) -> boolean().
+-spec prop_blob_coding(?RT:key(), db_dht:value() | db_dht:version()) -> boolean().
 prop_blob_coding(A, B) ->
     Coded = rr_recon:encodeBlob(A, B),
     {DA, DB} = rr_recon:decodeBlob(Coded),
@@ -608,7 +608,7 @@ count_dbsize(Key) ->
 
 -spec get_db_status() -> db_generator:db_status().
 get_db_status() ->
-    DBSize = erlang:get(?DBSizeKey),    
+    DBSize = erlang:get(?DBSizeKey),
     Ring = statistics:get_ring_details(),
     Stored = statistics:get_total_load(Ring),
     {DBSize, Stored, DBSize - Stored, count_outdated()}.
@@ -660,4 +660,3 @@ waitForSyncRoundEnd(NodeKeys) ->
 -spec sync_degree(db_generator:db_status()) -> float().
 sync_degree({Count, _Ex, M, O}) ->
     (Count - M - O) / Count.
-    

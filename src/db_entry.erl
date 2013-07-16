@@ -29,7 +29,7 @@
          get_writelock/1, set_writelock/2, unset_writelock/1,
          get_version/1,
          reset_locks/1, is_locked/1,
-         is_empty/1, is_null/1, update_lockcount/3]).
+         is_empty/1, is_null/1, lockcount_delta/2]).
 
 % only for unit tests:
 -export([inc_version/1, dec_version/1]).
@@ -43,36 +43,36 @@
 % note: WriteLock is either false or the version (>= Version) that a write
 % operation is working on (this allows proper cleanup - see rdht_tx_write)
 -type entry_ex() ::
-          {Key::?RT:key(), Value::?DB:value(), WriteLock::false | ?DB:version(),
-           ReadLock::non_neg_integer(), Version::?DB:version()}.
+          {Key::?RT:key(), Value::db_dht:value(), WriteLock::false | db_dht:version(),
+           ReadLock::non_neg_integer(), Version::db_dht:version()}.
 -type entry_empty() ::
-          {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::false | -1 | ?DB:version(),
+          {Key::?RT:key(), empty_val | db_dht:value(), WriteLock::false | -1 | db_dht:version(),
            ReadLock::non_neg_integer(), Version::-1}.
 -type entry() :: entry_ex() | entry_empty().
 
 -spec new(Key::?RT:key()) -> {?RT:key(), empty_val, false, 0, -1}.
 new(Key) -> {Key, empty_val, false, 0, -1}.
 
--spec new(Key::?RT:key(), Value::?DB:value(), Version::?DB:version()) ->
-    {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
-     ReadLock::0, Version::?DB:version()}.
+-spec new(Key::?RT:key(), Value::db_dht:value(), Version::db_dht:version()) ->
+    {Key::?RT:key(), Value::db_dht:value(), WriteLock::false,
+     ReadLock::0, Version::db_dht:version()}.
 new(Key, Value, Version) -> {Key, Value, false, 0, Version}.
 
 -spec get_key(DBEntry::entry()) -> ?RT:key().
 get_key(DBEntry) -> element(1, DBEntry).
 
--spec get_value(DBEntry::entry()) -> ?DB:value().
+-spec get_value(DBEntry::entry()) -> db_dht:value().
 get_value(DBEntry) -> element(2, DBEntry).
 
--spec set_value(DBEntry::entry(), Value::?DB:value(), Version::?DB:version()) -> entry().
+-spec set_value(DBEntry::entry(), Value::db_dht:value(), Version::db_dht:version()) -> entry().
 set_value(DBEntry, Value, Version) ->
     setelement(2, setelement(5, DBEntry, Version), Value).
 
--spec get_writelock(DBEntry::entry()) -> WriteLock::false | -1 | ?DB:version().
+-spec get_writelock(DBEntry::entry()) -> WriteLock::false | -1 | db_dht:version().
 get_writelock(DBEntry) -> element(3, DBEntry).
 
--spec set_writelock(entry_ex(), false | ?DB:version()) -> entry_ex();
-                   (entry_empty(), false | -1 | ?DB:version()) -> entry_empty().
+-spec set_writelock(entry_ex(), false | db_dht:version()) -> entry_ex();
+                   (entry_empty(), false | -1 | db_dht:version()) -> entry_empty().
 set_writelock(DBEntry, WriteLock) -> setelement(3, DBEntry, WriteLock).
 
 -spec unset_writelock(DBEntry::entry()) -> entry().
@@ -94,7 +94,7 @@ dec_readlock(DBEntry) ->
         N -> set_readlock(DBEntry, N - 1)
     end.
 
--spec get_version(DBEntry::entry()) -> ?DB:version() | -1.
+-spec get_version(DBEntry::entry()) -> db_dht:version() | -1.
 get_version(DBEntry) -> element(5, DBEntry).
 
 -spec inc_version(DBEntry::entry()) -> entry().
@@ -104,9 +104,9 @@ inc_version(DBEntry) -> setelement(5, DBEntry, get_version(DBEntry) + 1).
 dec_version(DBEntry) -> setelement(5, DBEntry, get_version(DBEntry) - 1).
 
 -spec reset_locks(DBEntry::entry()) ->
-    {Key::?RT:key(), Value::?DB:value(), WriteLock::false,
-     ReadLock::0, Version::?DB:version()} |
-    {Key::?RT:key(), empty_val | ?DB:value(), WriteLock::false,
+    {Key::?RT:key(), Value::db_dht:value(), WriteLock::false,
+     ReadLock::0, Version::db_dht:version()} |
+    {Key::?RT:key(), empty_val | db_dht:value(), WriteLock::false,
      ReadLock::0, Version::-1}.
 reset_locks(DBEntry) ->
     TmpEntry = set_readlock(DBEntry, 0),
@@ -128,17 +128,13 @@ is_empty(_) -> false.
 is_null({_Key, empty_val, false, 0, -1}) -> true;
 is_null(_) -> false.
 
-%% @doc Helper for lock bookkeeping. Compares two db_entries and updates counter
+%% @doc Helper for lock bookkeeping. Compares two db_entries and returns delta
 %%      accordingly. It assumes that only related entries are compared, i.e. it
 %%      is assumed that no locks are released that are not held in the first
-%%      place. With random parameters it is possible that we return a negative
-%%      number (hence the spec integer() to make the unit tests happy) but that
-%%      shouldn't be a problem if we compare only entries and their immediate
-%%      replacements.
--spec update_lockcount(OldEntry::entry(), NewEntry::entry(), LC::non_neg_integer())
-        -> integer().
-update_lockcount(OldEntry, NewEntry, LC) ->
-    TmpLC = LC + (get_readlock(NewEntry) - get_readlock(OldEntry)),
+%%      place. 
+-spec lockcount_delta(db_entry:entry(), db_entry:entry()) -> integer().
+lockcount_delta(OldEntry, NewEntry) ->
+    TmpLC = get_readlock(NewEntry) - get_readlock(OldEntry),
     WL_old = get_writelock(OldEntry),
     WL_new = get_writelock(NewEntry),
     if WL_new =:= false andalso WL_old =/= false -> TmpLC - 1;

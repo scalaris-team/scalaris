@@ -29,13 +29,13 @@
 snapshot_is_done(DHTNodeState) ->
     SnapState = dht_node_state:get(DHTNodeState, snapshot_state),
     DB = dht_node_state:get(DHTNodeState,db),
-    case {snapshot_state:is_in_progress(SnapState),?DB:snapshot_is_running(DB),?DB:snapshot_is_lockfree(DB)} of
+    case {snapshot_state:is_in_progress(SnapState),db_dht:snapshot_is_running(DB),db_dht:snapshot_is_lockfree(DB)} of
         {true,true,true} ->
             true;
         _ ->
             ?TRACE("~p snapshot:snapshot_is_done db: ~p~n",[comm:this(),DB]),
-            ?TRACE("~p snapshot:snapshot_is_done db data: ~p~n",[comm:this(),?DB:get_data(DB)]),
-            ?TRACE("~p snapshot:snapshot_is_done snapshot data: ~p~n",[comm:this(),?DB:get_snapshot_data(DB)]),
+            ?TRACE("~p snapshot:snapshot_is_done db data: ~p~n",[comm:this(),db_dht:get_data(DB)]),
+            ?TRACE("~p snapshot:snapshot_is_done snapshot data: ~p~n",[comm:this(),db_dht:get_snapshot_data(DB)]),
             false
     end.
 
@@ -89,13 +89,13 @@ on_local_snapshot_is_done(DHTNodeState) ->
     % collect local state and send it
     SnapNumber = snapshot_state:get_number(SnapState),
     ?TRACE("snapshot: local snapshot ~p done~n",[SnapNumber]),
-    Data = ?DB:join_snapshot_data(Db),
+    Data = db_dht:join_snapshot_data(Db),
     Leaders = snapshot_state:get_leaders(SnapState),
     DBRange = dht_node_state:get(DHTNodeState,my_range),
     msg_snapshot_leaders(Data,SnapNumber,DBRange,Leaders),
 
     % cleanup
-    NewDB = ?DB:delete_snapshot(dht_node_state:get(DHTNodeState,db)),
+    NewDB = db_dht:delete_snapshot(dht_node_state:get(DHTNodeState,db)),
     NewSnapState = snapshot_state:stop_progress(SnapState),
     NewState = dht_node_state:set_snapshot_state(DHTNodeState, NewSnapState),
 
@@ -115,7 +115,7 @@ msg_snapshot_leaders_err(_Msg,_SnapNumber,_DBRange,[]) ->
 
 -spec delete_and_init_snapshot(non_neg_integer(),any(),dht_node_state:state()) -> dht_node_state:state().
 delete_and_init_snapshot(SnapNumber,Leader,DHTNodeState) ->
-    NewDB = ?DB:init_snapshot(dht_node_state:get(DHTNodeState,db)),
+    NewDB = db_dht:init_snapshot(dht_node_state:get(DHTNodeState,db)),
     TmpSnapState = snapshot_state:new(SnapNumber, true, [Leader]),
     %% inform tx_tm_rtm on new SnapNumber
     comm:send_local(pid_groups:get_my(tx_tm), {update_snapno, SnapNumber}),

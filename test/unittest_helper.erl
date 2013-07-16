@@ -582,7 +582,7 @@ end_per_group(_Group, Config) ->
 
 -spec get_ring_data() -> [{pid(),
                            {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()},
-                           ?DB:db_as_list(),
+                           db_dht:db_as_list(),
                            {pred, comm:erl_local_pid_plain()},
                            {succ, comm:erl_local_pid_plain()},
                            ok | timeout}] |
@@ -787,7 +787,7 @@ db_entry_not_null(Entry) ->
     not db_entry:is_null(Entry).
 
 %% @doc removes duplicates and db_entries that are null
--spec scrub_data(?DB:db_as_list()) -> ?DB:db_as_list().
+-spec scrub_data(db_dht:db_as_list()) -> db_dht:db_as_list().
 scrub_data(Data) ->
     lists:filter(
         fun db_entry_not_null/1, 

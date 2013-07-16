@@ -298,8 +298,8 @@ tester_set_entry(_Config) ->
 % ?TEST_DB:update_entry/2, ?TEST_DB getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_update_entry(DBEntry1::db_entry:entry(), Value2::?DB:value(), WriteLock2::boolean(),
-                        ReadLock2::0..10, Version2::?DB:version()) -> true.
+-spec prop_update_entry(DBEntry1::db_entry:entry(), Value2::db_dht:value(), WriteLock2::boolean(),
+                        ReadLock2::0..10, Version2::db_dht:version()) -> true.
 prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     DBEntry2 = create_db_entry(db_entry:get_key(DBEntry1), Value2, WriteLock2, ReadLock2, Version2),
     DB = ?TEST_DB:new(),
@@ -406,8 +406,8 @@ tester_write(_Config) ->
 % ?TEST_DB:delete/2, also validate using different getters
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_delete(Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
-                  ReadLock::0..10, Version::?DB:version(), Key2::?RT:key()) -> true.
+-spec prop_delete(Key::?RT:key(), Value::db_dht:value(), WriteLock::boolean(),
+                  ReadLock::0..10, Version::db_dht:version(), Key2::?RT:key()) -> true.
 prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
     DB = ?TEST_DB:new(),
     DBEntry = create_db_entry(Key, Value, WriteLock, ReadLock, Version),
@@ -743,7 +743,7 @@ prop_changed_keys_get_entry(Data, ChangesInterval, Key) ->
 prop_changed_keys_set_entry(Data, ChangesInterval, Entry) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
-    Old = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry)),
+    Old = ?TEST_DB:get_entry(DB2, db_entry:get_key(Entry)),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
     DB4 = ?TEST_DB:set_entry(DB3, Entry),
@@ -768,7 +768,7 @@ prop_changed_keys_update_entry(Data, ChangesInterval, UpdateVal) ->
                                      db_entry:get_key(A) =< db_entry:get_key(B)
                              end, lists:reverse(Data)),
     UpdateElement = util:randomelem(UniqueData),
-    Old = ?TEST_DB:get_entry2(DB2, db_entry:get_key(UpdateElement)),
+    Old = ?TEST_DB:get_entry(DB2, db_entry:get_key(UpdateElement)),
     UpdatedElement = db_entry:set_value(UpdateElement, UpdateVal, db_entry:get_version(UpdateElement) + 1),
     
     case element(1, Old) of
@@ -792,7 +792,7 @@ prop_changed_keys_update_entry(Data, ChangesInterval, UpdateVal) ->
 prop_changed_keys_delete_entry(Data, ChangesInterval, Entry) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
-    Old = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry)),
+    Old = ?TEST_DB:get_entry(DB2, db_entry:get_key(Entry)),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
     DB4 = ?TEST_DB:delete_entry(DB3, Entry),
@@ -826,7 +826,7 @@ prop_changed_keys_read(Data, ChangesInterval, Key) ->
 prop_changed_keys_write(Data, ChangesInterval, Key, Value, Version) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
-    Old = ?TEST_DB:get_entry2(DB2, Key),
+    Old = ?TEST_DB:get_entry(DB2, Key),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
     DB4 = ?TEST_DB:write(DB3, Key, Value, Version),
@@ -845,10 +845,10 @@ prop_changed_keys_write(Data, ChangesInterval, Key, Value, Version) ->
 prop_changed_keys_delete(Data, ChangesInterval, Key) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
-    Old = ?TEST_DB:get_entry2(DB2, Key),
+    Old = ?TEST_DB:get_entry(DB2, Key),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
-    {DB4, _Status} = ?TEST_DB:delete(DB3, Key),
+    {DB4, Status} = ?TEST_DB:delete(DB3, Key),
     check_changes(DB4, ChangesInterval, "delete_1"),
     check_key_in_deleted_no_locks(DB4, ChangesInterval, Key, Old, "delete_2"),
     
@@ -978,8 +978,8 @@ prop_get_split_key5(Keys2, Begin, End, TargetLoad, ForwardBackward) ->
 prop_changed_keys_update_entries(Data, ChangesInterval, Entry1, Entry2) ->
     DB = ?TEST_DB:new(),
     DB2 = ?TEST_DB:add_data(DB, Data),
-    Old1 = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry1)),
-    Old2 = ?TEST_DB:get_entry2(DB2, db_entry:get_key(Entry2)),
+    Old1 = ?TEST_DB:get_entry(DB2, db_entry:get_key(Entry1)),
+    Old2 = ?TEST_DB:get_entry(DB2, db_entry:get_key(Entry2)),
     DB3 = ?TEST_DB:record_changes(DB2, ChangesInterval),
     
     UpdatePred = fun(OldEntry, NewEntry) ->
@@ -991,9 +991,9 @@ prop_changed_keys_update_entries(Data, ChangesInterval, Entry1, Entry2) ->
     NewEntry1 = ?TEST_DB:get_entry(DB4, db_entry:get_key(Entry1)),
     NewEntry2 = ?TEST_DB:get_entry(DB4, db_entry:get_key(Entry2)),
     check_changes(DB4, ChangesInterval, "update_entries_1"),
-    ?implies(db_entry:get_version(element(2, Old1)) < db_entry:get_version(Entry1),
+    ?implies(db_entry:get_version(Old1) < db_entry:get_version(Entry1),
              check_entry_in_changes(DB4, ChangesInterval, NewEntry1, Old1, "update_entries_2")),
-    ?implies(db_entry:get_version(element(2, Old2)) < db_entry:get_version(Entry2),
+    ?implies(db_entry:get_version(Old2) < db_entry:get_version(Entry2),
              check_entry_in_changes(DB4, ChangesInterval, NewEntry2, Old2, "update_entries_3")),
     
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "update_entries_4"),
@@ -1181,25 +1181,25 @@ prop_changed_keys_mult_interval(Data, Entry1, Entry2, Entry3, Entry4) ->
     DB2 = ?TEST_DB:add_data(DB, Data),
     
     DB3 = ?TEST_DB:record_changes(DB2, CI1),
-    Old1 = ?TEST_DB:get_entry2(DB3, db_entry:get_key(Entry1)),
+    Old1 = ?TEST_DB:get_entry(DB3, db_entry:get_key(Entry1)),
     DB4 = ?TEST_DB:set_entry(DB3, Entry1),
     check_changes(DB4, CI1, "changed_keys_mult_interval_1"),
     check_entry_in_changes(DB4, CI1, Entry1, Old1, "changed_keys_mult_interval_2"),
     
     DB5 = ?TEST_DB:record_changes(DB4, CI2),
-    Old2 = ?TEST_DB:get_entry2(DB5, db_entry:get_key(Entry2)),
+    Old2 = ?TEST_DB:get_entry(DB5, db_entry:get_key(Entry2)),
     DB6 = ?TEST_DB:set_entry(DB5, Entry2),
     check_changes(DB6, CI1_2, "changed_keys_mult_interval_3"),
     check_entry_in_changes(DB6, CI1_2, Entry2, Old2, "changed_keys_mult_interval_4"),
     
     DB7 = ?TEST_DB:record_changes(DB6, CI2),
-    Old3 = ?TEST_DB:get_entry2(DB7, db_entry:get_key(Entry3)),
+    Old3 = ?TEST_DB:get_entry(DB7, db_entry:get_key(Entry3)),
     DB8 = ?TEST_DB:set_entry(DB7, Entry3),
     check_changes(DB8, CI1_2, "changed_keys_mult_interval_5"),
     check_entry_in_changes(DB8, CI1_2, Entry3, Old3, "changed_keys_mult_interval_6"),
     
     DB9 = ?TEST_DB:record_changes(DB8, CI2),
-    Old4 = ?TEST_DB:get_entry2(DB9, db_entry:get_key(Entry4)),
+    Old4 = ?TEST_DB:get_entry(DB9, db_entry:get_key(Entry4)),
     DB10 = ?TEST_DB:set_entry(DB9, Entry4),
     check_changes(DB10, CI1_2, "changed_keys_mult_interval_7"),
     check_entry_in_changes(DB10, CI1_2, Entry4, Old4, "changed_keys_mult_interval_8"),
@@ -1224,12 +1224,12 @@ prop_stop_record_changes(Data, Entry1, Entry2, Entry3, Entry4) ->
     DB2 = ?TEST_DB:add_data(DB, Data),
     
     DB3 = ?TEST_DB:record_changes(DB2, CI1_2),
-    Old1 = ?TEST_DB:get_entry2(DB3, db_entry:get_key(Entry1)),
+    Old1 = ?TEST_DB:get_entry(DB3, db_entry:get_key(Entry1)),
     DB4 = ?TEST_DB:set_entry(DB3, Entry1),
     check_changes(DB4, CI1_2, "stop_record_changes_1"),
     check_entry_in_changes(DB4, CI1_2, Entry1, Old1, "stop_record_changes_2"),
     
-    Old3 = ?TEST_DB:get_entry2(DB4, db_entry:get_key(Entry3)),
+    Old3 = ?TEST_DB:get_entry(DB4, db_entry:get_key(Entry3)),
     DB5 = ?TEST_DB:set_entry(DB4, Entry3),
     check_changes(DB5, CI1_2, "stop_record_changes_3"),
     check_entry_in_changes(DB5, CI1_2, Entry3, Old3, "stop_record_changes_4"),
@@ -1238,12 +1238,12 @@ prop_stop_record_changes(Data, Entry1, Entry2, Entry3, Entry4) ->
     check_changes(DB6, CI1_wo2, "stop_record_changes_5"),
     check_entry_in_changes(DB6, CI1_wo2, Entry1, Old1, "stop_record_changes_6"),
     
-    Old2 = ?TEST_DB:get_entry2(DB6, db_entry:get_key(Entry2)),
+    Old2 = ?TEST_DB:get_entry(DB6, db_entry:get_key(Entry2)),
     DB7 = ?TEST_DB:set_entry(DB6, Entry2),
     check_changes(DB7, CI1_wo2, "stop_record_changes_7"),
     check_entry_in_changes(DB7, CI1_wo2, Entry2, Old2, "stop_record_changes_8"),
     
-    Old4 = ?TEST_DB:get_entry2(DB7, db_entry:get_key(Entry4)),
+    Old4 = ?TEST_DB:get_entry(DB7, db_entry:get_key(Entry4)),
     DB8 = ?TEST_DB:set_entry(DB7, Entry4),
     check_changes(DB8, CI1_wo2, "stop_record_changes_9"),
     check_entry_in_changes(DB8, CI1_wo2, Entry4, Old4, "stop_record_changes_10"),
@@ -1353,13 +1353,12 @@ tester_stop_record_changes(_Config) ->
                   ExpRead::{ok, Value::?TEST_DB:value(), Version::?TEST_DB:version()} | {ok, empty_val, -1},
                   ExpExists::boolean(), Note::string()) -> true.
 check_entry(DB, Key, ExpDBEntry, ExpRead, ExpExists, Note) ->
-    ?equals_w_note(?TEST_DB:get_entry2(DB, Key), {ExpExists, ExpDBEntry}, Note),
     ?equals_w_note(?TEST_DB:get_entry(DB, Key), ExpDBEntry, Note),
     ?equals_w_note(?TEST_DB:read(DB, Key), ExpRead, Note).
 
 % note: use manageable values for ReadLock!
--spec create_db_entry(Key::?RT:key(), Value::?DB:value(), WriteLock::boolean(),
-                      ReadLock::0..1000, Version::?DB:version()) -> db_entry:entry();
+-spec create_db_entry(Key::?RT:key(), Value::db_dht:value(), WriteLock::boolean(),
+                      ReadLock::0..1000, Version::db_dht:version()) -> db_entry:entry();
                      (Key::?RT:key(), Value::empty_val, WriteLock::boolean(),
                       ReadLock::0..1000, Version::-1) -> db_entry:entry().
 create_db_entry(Key, Value, WriteLock, ReadLock, Version) ->
@@ -1495,13 +1494,14 @@ check_changes2(DB, ChangesInterval, GetChangesInterval, Note) ->
 %%      previously existing entry.
 -spec check_key_in_deleted_no_locks(
         DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Key::?RT:key(),
-        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> true.
-check_key_in_deleted_no_locks(DB, ChangesInterval, Key, {OldExists, OldEntry}, Note) ->
-    case intervals:in(Key, ChangesInterval) andalso OldExists andalso
-             not db_entry:is_locked(OldEntry) of
+        OldEntry::db_entry:entry(), Note::string()) -> true.
+check_key_in_deleted_no_locks(DB, ChangesInterval, Key, Old, Note) ->
+    case intervals:in(Key, ChangesInterval) andalso not db_entry:is_null(Old) andalso
+             not db_entry:is_locked(Old) of
         true ->
             {_ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
-            check_key_in_deleted_internal(DeletedKeys, ChangesInterval, Key, OldExists, Note);
+            check_key_in_deleted_internal(DeletedKeys, ChangesInterval, Key,
+                                          not db_entry:is_null(Old), Note);
         _    -> true
     end.
 
@@ -1535,8 +1535,8 @@ check_key_in_deleted_internal(DeletedKeys, ChangesInterval, Key, OldExists, Note
 %%      entries returned by ?TEST_DB:get_changes/1.
 -spec check_entry_in_changed_entries(
         DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Entry::db_entry:entry(),
-        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> ok.
-check_entry_in_changed_entries(DB, ChangesInterval, NewEntry, {_OldExists, OldEntry}, Note) ->
+        OldEntry::db_entry:entry(), Note::string()) -> ok.
+check_entry_in_changed_entries(DB, ChangesInterval, NewEntry, OldEntry, Note) ->
     {ChangedEntries, _DeletedKeys} = ?TEST_DB:get_changes(DB),
     check_entry_in_changed_entries_internal(ChangedEntries, ChangesInterval, NewEntry, OldEntry, Note).
 
@@ -1560,12 +1560,14 @@ check_entry_in_changed_entries_internal(ChangedEntries, ChangesInterval, NewEntr
 %%      entries returned by ?TEST_DB:get_changes/1.
 -spec check_entry_in_changes(
         DB::?TEST_DB:db(), ChangesInterval::intervals:interval(), Entry::db_entry:entry(),
-        {OldExists::boolean(), OldEntry::db_entry:entry()}, Note::string()) -> ok.
-check_entry_in_changes(DB, ChangesInterval, NewEntry, {OldExists, OldEntry}, Note) ->
+        OldEntry::db_entry:entry(), Note::string()) -> ok.
+check_entry_in_changes(DB, ChangesInterval, NewEntry, OldEntry, Note) ->
     {ChangedEntries, DeletedKeys} = ?TEST_DB:get_changes(DB),
     case db_entry:is_null(NewEntry) of
         true ->
-            check_key_in_deleted_internal(DeletedKeys, ChangesInterval, db_entry:get_key(NewEntry), OldExists, Note);
+            check_key_in_deleted_internal(DeletedKeys, ChangesInterval,
+                                          db_entry:get_key(NewEntry),
+                                          not db_entry:is_null(OldEntry), Note);
         _ ->
             check_entry_in_changed_entries_internal(ChangedEntries, ChangesInterval, NewEntry, OldEntry, Note)
     end.
