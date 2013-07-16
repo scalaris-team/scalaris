@@ -190,7 +190,7 @@ on ({?GC_TRIGGER}, State = #rrepair_state{ gc_trigger = GCState,
 on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}}, State) ->
     Msg = {?send_to_group_member, rrepair,
            {continue_recon, comm:this(), SessionId,
-            {continue, Method, req_shared_interval, [{interval, MyI}], false}}},
+            {create_struct, Method, MyI, [], false}}},
     DKey = case DestKey of
                random -> select_sync_node(MyI);        
                _ -> DestKey
