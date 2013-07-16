@@ -14,14 +14,14 @@ object(B,"B:RR");
 step();
 
 #---- Step1 RC sendet Interval an B
-message(U,A,"Recon Anfrage"); active(A);
+message(U,A,"request_sync"); active(A);
 create_message(A,AA,"A:RC");
 
 async(); # use asynchrone messages (not-filled arrowheads)
 
-message(A,AA,"Start"); inactive(A);
+message(A,AA,"start"); inactive(A);
 active(AA);
-message(AA,B,"Interval Z\sbA\eb"); 
+message(AA,B,"interval I\sbA\eb"); 
 active(B);
 destroy_message(AA,AA,""); 
 inactive(AA);
@@ -30,23 +30,23 @@ inactive(AA);
 sync();
 create_message(B,BB,"B:RC");
 async();
-message(B,BB,"cont. Z\sbA\eb"); 
+message(B,BB,"cont. I\sbA\eb"); 
 inactive(B); active(BB);
 step();
 
 comment(BB,C,0.3 right 0.2, wid 1.7 ht 0.5 \
-        "1) Ausfalldetektor " \
-	"   aktivieren f\:ur A bzw. B" \
-        "2) erstelle Merkle Tree");
+        "1) activate failure detector" \
+        "for A and B, resp." \
+        "2) create merkle tree");
 
-message(BB,A,"Interval Z\sbAB\eb");
+message(BB,A,"interval I\sbAB\eb");
 active(A);
 
 #---- STEP 3
 sync();
 create_message(A,AA,"A:RC");
 async();
-message(A,AA,"cont. Z\sbAB\eb"); inactive(A);
+message(A,AA,"cont. I\sbAB\eb"); inactive(A);
 active(AA);
 step();
 
@@ -54,11 +54,11 @@ connect_to_comment(AA,C);
 
 begin_frame(A,MT,"Loop");
 
-message(AA,BB,"Pr\:ufe Knoten");
-rmessage(BB,AA,"Resultat des Vergleichs");
+message(AA,BB,"check merkle node");
+rmessage(BB,AA,"result of comparison");
 step();
 begin_frame(A,MTR,"opt");
-message(AA,A,"Knotendifferenz");
+message(AA,A,"merkle node diff");
 active(A);
 step();
 begin_frame(A,F,"int_upd_s");
