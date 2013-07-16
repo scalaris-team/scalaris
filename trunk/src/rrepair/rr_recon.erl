@@ -339,30 +339,32 @@ build_struct(DBList, DestI, RestI,
         case merkle_tree:is_merkle_tree(Params) of
             true ->
                 {BTime, NTree} = util:tc(merkle_tree, insert_list, [DBList, Params]),
-                {rr_recon_stats:get(build_time, Stats) + BTime, merkle_tree:gen_hash(NTree) };
+                {BTime, merkle_tree:gen_hash(NTree) };
             false ->
                 ToBuild = ?IIF(RMethod =:= art, ?IIF(Initiator, merkle_tree, art), RMethod),
                 util:tc(fun() -> build_recon_struct(ToBuild, {DestI, DBList}) end)
         end,
+    Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
+    NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1},
     EmptyRest = intervals:is_empty(RestI),
     % bloom may fork more recon processes if un-synced elements remain
     if not EmptyRest ->
            SubSyncI = find_intersection(DestI, RestI),
            case intervals:is_empty(SubSyncI) of
                false ->
-                   Pid = if RMethod =:= bloom -> 
-                                erlang:element(2, fork_recon(State#rr_recon_state{dest_interval = SubSyncI,
-                                                                                  struct = Params}));
-                            true -> self()
-                         end,
+                   if RMethod =:= bloom -> 
+                          ForkState = State#rr_recon_state{dest_interval = SubSyncI,
+                                                           struct = Params},
+                          {ok, Pid} = fork_recon(ForkState),
+                          ok;
+                      true -> Pid = self()
+                   end,
                    send_chunk_req(DhtNodePid, Pid, find_intersection(RestI, DestI), SubSyncI,
                                   get_max_items(RMethod));
                true -> ok
            end;
         true -> ok
     end,
-    Stats1 = rr_recon_stats:set([{build_time, BuildTime}], Stats),
-    NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1},
     if EmptyRest orelse RMethod =:= bloom ->
            begin_sync(SyncStruct, Params, NewState#rr_recon_state{stage = reconciliation});
        not EmptyRest andalso RMethod =:= merkle_tree ->
