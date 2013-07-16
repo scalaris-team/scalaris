@@ -56,8 +56,6 @@ get_name(DB) ->
 get_load(DB) ->
     ets:info(DB, size).
 
-%% -include("db_range_queries.hrl").
-
 -spec foldl(db(), fun(), term()) -> term().
 foldl(DB, Fun, Acc) ->
     ets:foldl(Fun, Acc, DB).
