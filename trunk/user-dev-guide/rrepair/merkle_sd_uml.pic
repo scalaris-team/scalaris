@@ -15,16 +15,10 @@ step();
 
 #---- Step1 RC sendet Interval an B
 message(U,A,"request_sync"); active(A);
-create_message(A,AA,"A:RC");
-
 async(); # use asynchrone messages (not-filled arrowheads)
-
-message(A,AA,"start"); inactive(A);
-active(AA);
-message(AA,B,"interval I\sbA\eb"); 
+message(A,B,"interval I\sbA\eb"); 
+inactive(A);
 active(B);
-destroy_message(AA,AA,""); 
-inactive(AA);
 
 #---- Step2
 sync();
