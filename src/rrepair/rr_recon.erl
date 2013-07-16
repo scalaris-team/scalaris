@@ -134,6 +134,9 @@ on({get_state_response, MyI}, State =
                         struct = Params,
                         dhtNodePid = DhtPid,
                         dest_rr_pid = DestRRPid }) ->
+    % target node got sync request, asked for its interval
+    % struct contains the interval of the initiator
+    % -> client creates recon structure based on common interval, sends it to initiator
     Method =:= merkle_tree andalso fd:subscribe(DestRRPid),
     SrcI = proplists:get_value(interval, Params),
     Intersec = find_intersection(MyI, SrcI),
@@ -149,10 +152,13 @@ on({get_state_response, MyI}, State =
 
 on({get_state_response, MyI}, State = 
        #rr_recon_state{ stage = res_shared_interval,
+                        initiator = true,
                         method = RMethod,
                         struct = Params,
                         dhtNodePid = DhtPid,
-                        dest_rr_pid = DestRRPid}) ->
+                        dest_rr_pid = DestRRPid }) when (RMethod =:= merkle_tree orelse RMethod =:= art) ->
+    % initiator got interval of client to create his own recon structure (merkle/art)
+    % based on common interval
     DestI = proplists:get_value(interval, Params),
     DestReconPid = proplists:get_value(reconPid, Params, undefined),
     MyIntersec = find_intersection(MyI, DestI),
@@ -170,10 +176,13 @@ on({get_state_response, MyI}, State =
 
 on({get_state_response, MyI}, State = 
        #rr_recon_state{ stage = reconciliation,
+                        initiator = true,
                         method = bloom,
                         dhtNodePid = DhtPid,
                         struct = #bloom_recon_struct{ interval = BloomI}
                        }) ->
+    % initiator got client's bloom recon structure over sync interval
+    % -> reconcile own DB with received bloom filter
     MySyncI = find_intersection(MyI, BloomI),
     case intervals:is_empty(MySyncI) of
         false ->
@@ -190,6 +199,7 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
                         dhtNodePid = DhtNodePid,
                         initiator = Initiator,
                         stats = Stats }) ->
+    % create recon structure based on all elements in sync interval
     DBList = [encodeBlob(Key, VersionX) || {KeyX, VersionX} <- DBList0,
                                            none =/= (Key = map_key_to_interval(KeyX, DestI))],
     SyncI = proplists:get_value(interval, Params),
@@ -202,6 +212,7 @@ on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}}, State =
             false -> util:tc(fun() -> build_recon_struct(ToBuild, {SyncI, DBList}) end)
         end,
     EmptyRest = intervals:is_empty(RestI),
+    % bloom may fork more recon processes if un-synced elements remain
     if not EmptyRest ->
            SubSyncI = find_intersection(SyncI, RestI),
            case intervals:is_empty(SubSyncI) of
