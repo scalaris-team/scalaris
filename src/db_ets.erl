@@ -36,7 +36,7 @@
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
 
--type db() :: ets:tid() | atom().
+-type db() :: tid() | atom().
 -type key() :: term().
 -type entry() :: tuple().
 -type interval() :: intervals:simple_interval().
