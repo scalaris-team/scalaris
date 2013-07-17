@@ -29,9 +29,13 @@
 -type state() :: [{MonitorRef::reference(), DhtNode::comm:mypid()}].
 
 % accepted messages the module
--type message() :: {get_dht_nodes, ReplyPid :: comm:mypid()} |
-                   {register_dht_node, PidToAdd :: comm:mypid()} |
-                   {deregister_dht_node, PidToRemove :: comm:mypid()}.
+-type message() ::
+    {get_dht_nodes, ReplyPid :: comm:mypid()} |
+    {register_dht_node, PidToAdd :: comm:mypid()} |
+    {deregister_dht_node, PidToRemove :: comm:mypid()} |
+    {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()} |
+    {delete_node, SupPid::pid() | atom(), SupId::pid() | term()} |
+    {hi}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Public API

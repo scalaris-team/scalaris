@@ -125,19 +125,24 @@
     {start_recon, merkle_tree, #merkle_params{}} | % to initiator
     {start_recon, art, art:art()}. % to initiator
 
--type message() ::          
-    %API
+-type message() ::
+    % API
     request() |
-    %tree sync msgs
+    % tree sync msgs
     {check_nodes, InitiatorPid::comm:mypid(), [merkle_cmp_request()]} |
     {check_nodes_response, [merkle_cmp_result()]} |
-    %dht node response
+    % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
-    {get_state_response, MyI::intervals:interval()} |
     {rr_recon, data, DestI::intervals:interval(), {get_chunk_response, {intervals:interval(), db_chunk()}}} |
-    %internal
+    {reconcile, {get_chunk_response, {intervals:interval(), db_chunk()}}} |
+    % internal
     {shutdown, exit_reason()} | 
-    {crash, DeadPid::comm:mypid()}.
+    {crash, DeadPid::comm:mypid()} |
+    {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()} |
+    % merkle tree sync messages
+    {check_nodes, SenderPid::comm:mypid(), ToCheck::[merkle_cmp_request()]} |
+    {check_nodes_response, CmpResults::[merkle_cmp_result()]}
+    .
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling

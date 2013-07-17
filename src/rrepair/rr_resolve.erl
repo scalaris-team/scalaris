@@ -96,7 +96,8 @@
     % internal
     {get_state_response, intervals:interval()} |
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
-    {shutdown, exit_reason()}.
+    {shutdown, exit_reason()} |
+    {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug

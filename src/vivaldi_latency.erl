@@ -42,7 +42,7 @@
     {{pong}, Count::pos_integer()} |
     {start_ping} |
     {shutdown} |
-    {'DOWN', MonitorRef::any(), process, Owner::comm:erl_local_pid(), Info::any()}.
+    {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
 
 -define(SEND_OPTIONS, [{channel, prio}, {?quiet}]).
 
