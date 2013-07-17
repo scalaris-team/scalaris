@@ -32,6 +32,7 @@
 %% db info
 -export([get_name/1, get_load/1]).
 
+%% iteration
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
 
@@ -44,20 +45,25 @@
 -export_type([db/0]).
 -endif.
 
--spec new(nonempty_string()) -> db().
+%% @doc Creates new DB handle named DBName.
+-spec new(DBName::nonempty_string()) -> db().
 new(DBName) ->
     ets:new(list_to_atom(DBName), [ordered_set | ?DB_ETS_ADDITIONAL_OPS]).
 
--spec close(db()) -> true.
+%% @doc Closes and deletes the DB named DBName
+-spec close(DBName::db()) -> true.
 close(DBName) ->
     ets:delete(DBName).
 
--spec put(db(), entry()) -> db().
+%% @doc Saves arbitrary tuple Entry in DB DBName and returns the new DB.
+%%      The key is expected to be the first element of Entry.
+-spec put(DBName::db(), Entry::entry()) -> db().
 put(DBName, Entry) ->
     ets:insert(DBName, Entry),
     DBName.
 
--spec get(db(), key()) -> entry() | {}.
+%% @doc Returns the entry that corresponds to Key or {} if no such tuple exists.
+-spec get(DBName::db(), Key::key()) -> entry() | {}.
 get(DBName, Key) ->
     case ets:lookup(DBName, Key) of
         [Entry] ->
@@ -66,29 +72,39 @@ get(DBName, Key) ->
             {}
     end.
 
--spec delete(db(), key()) -> db().
+%% @doc Deletes the tuple saved under Key and returns the new DB.
+%%      If such a tuple does not exists nothing is changed.
+-spec delete(DBName::db(), Key::key()) -> db().
 delete(DBName, Key) ->
     ets:delete(DBName, Key),
     DBName.
 
+%% @doc Returns the name of the DB specified in new/1.
 -spec get_name(DB::db()) -> nonempty_string().
 get_name(DB) ->
-%% @doc Returns the name of the table for open/1.
     erlang:atom_to_list(ets:info(DB, name)).
 
+%% @doc Returns the current load (i.e. number of stored tuples) of the DB.
 -spec get_load(DB::db()) -> non_neg_integer().
 get_load(DB) ->
     ets:info(DB, size).
 
--spec foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+%% @doc Is equivalent to ets:foldl(Fun, Acc0, DB).
+-spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldl(DB, Fun, Acc) ->
     ets:foldl(Fun, Acc, DB).
 
--spec foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
+%% @doc Is equivalent to foldl(DB, Fun, Acc0, Interval, get_load(DB)).
+-spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
+                               Interval::interval()) -> Acc1::A.
 foldl(DB, Fun, Acc, Interval) ->
     foldl(DB, Fun, Acc, Interval, ets:info(DB, size)).
 
--spec foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
+%% @doc foldl iterates over DB and applies Fun(Entry, AccIn) to every element
+%%      encountered in Interval. On the first call AccIn == Acc0. The iteration
+%%      stops as soon as MaxNum elements have been encountered.
+ spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
+                               Intervall::interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldl(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, '$end_of_table', _End, _}, _MaxNum) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, _Start, '$end_of_table', _}, _MaxNum) -> Acc;
@@ -121,14 +137,18 @@ foldl(DB, Fun, Acc, {interval, '[', Start, End, ']'}, MaxNum) ->
                                              End, ']'}, MaxNum - 1)
     end.
 
+%% @doc Is equivalent to ets:foldr(Fun, Acc0, DB).
 -spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldr(DB, Fun, Acc) ->
     ets:foldr(Fun, Acc, DB).
 
+%% @doc Is equivalent to foldr(DB, Fun, Acc0, Interval, get_load(DB)).
 -spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
 foldr(DB, Fun, Acc, Interval) ->
     foldr(DB, Fun, Acc, Interval, ets:info(DB, size)).
 
+%% @doc Behaves like foldl/5 with the difference that it starts at the end of
+%%      Interval and iterates towards the start of Interval.
 -spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
 foldr(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, _End, '$end_of_table', _}, _MaxNum) -> Acc;
