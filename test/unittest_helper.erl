@@ -658,7 +658,7 @@ macro_equals_failed(ActualVal, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, 
            " Message    ~s evaluated to~n"
            "             \"~.0p\"~n"
            "            which is not ~s the expected ~s that evaluates to~n"
-           "             \"~.0p\"~n~.0s"
+           "             \"~.0p\"~n~s"
            " Stacktrace ~p~n"
            " Linetrace  ~p~n",
            [self(), ActualStr, ActualVal, CompFunStr, ExpectedStr, ExpectedVal, Note,
