@@ -704,6 +704,7 @@ split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc) ->
                         [new(LBr, LKey, SplitKey, InnerRBr) | Acc])
     end.
 
--spec get_simple_intervals(interval()) -> [simple_interval()].
+%% @doc returns a list of simple intervals that make up Interval
+-spec get_simple_intervals(Interval::interval()) -> [simple_interval()].
 get_simple_intervals(Interval) ->
     Interval.
