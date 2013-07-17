@@ -103,7 +103,7 @@ foldl(DB, Fun, Acc, Interval) ->
 %% @doc foldl iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
- spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
+-spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldl(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, '$end_of_table', _End, _}, _MaxNum) -> Acc;
