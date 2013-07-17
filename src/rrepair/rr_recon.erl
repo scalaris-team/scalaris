@@ -133,7 +133,7 @@
     {check_nodes_response, [merkle_cmp_result()]} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
-    {rr_recon, data, DestI::intervals:interval(), {get_chunk_response, {intervals:interval(), db_chunk()}}} |
+    {create_struct2, DestI::intervals:interval(), {get_chunk_response, {intervals:interval(), db_chunk()}}} |
     {reconcile, {get_chunk_response, {intervals:interval(), db_chunk()}}} |
     % internal
     {shutdown, exit_reason()} | 
@@ -177,7 +177,7 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
             shutdown(empty_interval, NewState)
     end;
 
-on({rr_recon, data, DestI, {get_chunk_response, {RestI, DBList0}}} = _Msg,
+on({create_struct2, DestI, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = build_struct,       initiator = false}) ->
     ?TRACE1(_Msg, State),
     % create recon structure based on all elements in sync interval
@@ -213,11 +213,11 @@ on({start_recon, RMethod, SyncStruct} = _Msg, State) ->
                          dest_recon_pid = DestReconPid};
 
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
-   State = #rr_recon_state{stage = reconciliation,     ownerPid = OwnerL,
+   State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = bloom,             dhtNodePid = DhtNodePid,
-                           dest_rr_pid = DestRU_Pid,   stats = Stats,
                            struct = #bloom_recon_struct{bloom = BF},
-                           initiator = true}) ->
+                           dest_rr_pid = DestRU_Pid,   stats = Stats,
+                           ownerPid = OwnerL}) ->
     ?TRACE1(_Msg, State),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
@@ -627,7 +627,7 @@ send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, true) ->
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
                 fun get_chunk_value/1, MaxItems});
 send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems, false) ->
-    SrcPidReply = comm:reply_as(SrcPid, 4, {rr_recon, data, DestI, '_'}),
+    SrcPidReply = comm:reply_as(SrcPid, 3, {create_struct2, DestI, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
                 fun get_chunk_value/1, MaxItems}).
