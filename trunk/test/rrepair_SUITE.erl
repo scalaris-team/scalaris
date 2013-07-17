@@ -156,16 +156,14 @@ get_rep_upd_config(Method) ->
 no_diff(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    {Start, End} = start_sync(Config, 4, 1000, [{fprob, 0}, {ftype, FType}], 
-                              1, 0.1, get_rep_upd_config(Method)),
-    ?equals(sync_degree(Start), sync_degree(End)).
+    start_sync(Config, 4, 1000, [{fprob, 0}, {ftype, FType}],
+               1, 0.1, get_rep_upd_config(Method), fun erlang:'=:='/2).
 
 one_node(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    {Start, End} = start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}], 
-                              1, 0.2, get_rep_upd_config(Method)),
-    ?equals(sync_degree(Start), sync_degree(End)).    
+    start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}],
+               1, 0.2, get_rep_upd_config(Method), fun erlang:'=:='/2).
 
 mpath_map({request_resolve, _, {key_upd, L}, _}) ->
     {key_upd, length(L)};
@@ -211,25 +209,22 @@ mpath(Config) ->
 simple(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    {Start, End} = start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}], 
-                              1, 0.1, get_rep_upd_config(Method)),
-    ?compare(fun erlang:'<'/2, sync_degree(Start), sync_degree(End)).
+    start_sync(Config, 4, 1000, [{fprob, 10}, {ftype, FType}],
+               1, 0.1, get_rep_upd_config(Method), fun erlang:'<'/2).
 
 multi_round(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-    {Start, End} = start_sync(Config, 6, 1000, [{fprob, 10}, {ftype, FType}], 
-                              3, 0.1, get_rep_upd_config(Method)),
-    ?compare(fun erlang:'<'/2, sync_degree(Start), sync_degree(End)).
+    start_sync(Config, 6, 1000, [{fprob, 10}, {ftype, FType}],
+               3, 0.1, get_rep_upd_config(Method), fun erlang:'<'/2).
 
 multi_round2(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     _RUConf = get_rep_upd_config(Method),
     RUConf = [{rr_trigger_probability, 40} | proplists:delete(rr_trigger_probability, _RUConf)],
-    {Start, End} = start_sync(Config, 6, 1000, [{fprob, 10}, {ftype, FType}], 
-                              3, 0.1, RUConf),
-    ?compare(fun erlang:'<'/2, sync_degree(Start), sync_degree(End)).
+    start_sync(Config, 6, 1000, [{fprob, 10}, {ftype, FType}],
+               3, 0.1, RUConf, fun erlang:'<'/2).
 
 dest(Config) ->
     %parameter
@@ -313,9 +308,8 @@ parts(Config) ->
     FType = proplists:get_value(ftype, Config),
     OldConf = get_rep_upd_config(Method),
     Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),    
-    {Start, End} = start_sync(Config, 4, 1000, [{fprob, 100}, {ftype, FType}], 
-                              2, 0.2, Conf),
-    ?compare(fun erlang:'<'/2, sync_degree(Start), sync_degree(End)).
+    start_sync(Config, 4, 1000, [{fprob, 100}, {ftype, FType}],
+               2, 0.2, Conf, fun erlang:'<'/2).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Basic Functions Group
@@ -535,14 +529,13 @@ wait_for_session_end() ->
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
 -spec start_sync(Config, Nodes::Int, DBSize::Int, DBParams,
-                 Rounds::Int, Fpr, RRConf::Config) -> {Start::Status, End::Status}
-when
+                 Rounds::Int, Fpr, RRConf::Config, CompFun) -> true when
     is_subtype(Config,      [tuple()]),
     is_subtype(Int,         pos_integer()),
     is_subtype(DBParams,    [db_generator:db_parameter()]),
     is_subtype(Fpr,         float()),
-    is_subtype(Status,      db_generator:db_status()).
-start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig) ->
+    is_subtype(CompFun,     fun((T, T) -> boolean())).
+start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig, CompFun) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
     build_symmetric_ring(NodeCount, Config, [RRConfig, {rr_bloom_fpr, Fpr}]),
     erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
@@ -556,8 +549,10 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig) ->
                                print_status(I, get_db_status())
                        end),
     EndStat = get_db_status(),
+    ?compare_w_note(CompFun, sync_degree(InitDBStat), sync_degree(EndStat),
+                    io_lib:format("CompFun: ~p", [CompFun])),
     unittest_helper:stop_ring(),
-    {InitDBStat, EndStat}.
+    true.
 
 -spec print_status(Round::integer(), db_generator:db_status()) -> ok.
 print_status(R, {_, _, M, O}) ->
