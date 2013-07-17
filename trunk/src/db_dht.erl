@@ -552,7 +552,7 @@ call_subscribers_iter({Tag, I, ChangesFun, RemSubscrFun}, {State, Op}) ->
 
 %% @doc Check that the table storing changed keys exists and creates it if
 %%      necessary.
--spec subscr_delta_check_table(State::db()) -> ets:tid() | atom().
+-spec subscr_delta_check_table(State::db()) -> tid() | atom().
 subscr_delta_check_table({DB, _Subscr, _Snap}) ->
     DeltaDB = case erlang:get('$delta_tab') of
         undefined ->
