@@ -181,8 +181,7 @@ mpath(Config) ->
     FType = proplists:get_value(ftype, Config),
 	TraceName = erlang:list_to_atom(atom_to_list(Method)++atom_to_list(FType)),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
-    config:write(rr_bloom_fpr, Fpr),
+    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
                                                    {fprob, 50}, 
                                                    {distribution, uniform}]),
@@ -240,8 +239,7 @@ dest(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
-    config:write(rr_bloom_fpr, Fpr),
+    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
                                                    {fprob, 50}, 
                                                    {distribution, uniform}]),
@@ -281,8 +279,7 @@ dest_empty_node(Config) ->
     Fpr = 0.1,
     Method = proplists:get_value(ru_method, Config),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, get_rep_upd_config(Method)),
-    config:write(rr_bloom_fpr, Fpr),
+    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, regen}, 
                                                    {fprob, 100}, 
                                                    {distribution, uniform},
@@ -547,8 +544,7 @@ when
     is_subtype(Status,      db_generator:db_status()).
 start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
-    build_symmetric_ring(NodeCount, Config, RRConfig),
-    config:write(rr_bloom_fpr, Fpr),
+    build_symmetric_ring(NodeCount, Config, [RRConfig, {rr_bloom_fpr, Fpr}]),
     erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
     _ = db_generator:fill_ring(random, DBSize, DBParams),    
     InitDBStat = get_db_status(),
