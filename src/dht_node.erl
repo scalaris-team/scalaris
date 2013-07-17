@@ -262,7 +262,7 @@ on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) 
 % send caller update_key_entry_ack with Entry (if exists) or Key, Exists (Yes/No), Updated (Yes/No)
 on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
     Entry = db_dht:get_entry(dht_node_state:get(State, db), Key),
-    Exists = db_entry:is_null(Entry),
+    Exists = not db_entry:is_null(Entry),
     EntryVersion = db_entry:get_version(Entry),
     WL = db_entry:get_writelock(Entry),
     DoUpdate = Exists
@@ -272,6 +272,9 @@ on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
         andalso dht_node_state:is_responsible(Key, State),
     DoRegen = not Exists
         andalso dht_node_state:is_responsible(Key, State),
+%%     log:pal("update_key_entry:~nold: ~p~nnew: ~p~nDoUpdate: ~w, DoRegen: ~w",
+%%             [{db_entry:get_key(Entry), db_entry:get_version(Entry)},
+%%              {Key, NewVersion}, DoUpdate, DoRegen]),
     {NewState, NewEntry} =
         if
             DoUpdate ->
