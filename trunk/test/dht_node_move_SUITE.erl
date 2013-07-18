@@ -28,7 +28,7 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
--define(NUM_SLIDES, 50).
+-define(NUM_SLIDES, 25).
 
 test_cases() -> [].
 
