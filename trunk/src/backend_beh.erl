@@ -20,15 +20,19 @@
 -author('fajerski@zib.de').
 -vsn('$Id$').
 
--ifdef(have_callback_support).
--include("scalaris.hrl").
-
 -type db() :: any().
 -type key() :: term().
 -type entry() :: tuple().
 -type left_bracket() :: '(' | '['.
 -type right_bracket() :: ')' | ']'.
 -type interval() :: {element, key()} | all | {interval, left_bracket(), key(), key(), right_bracket()}.
+
+-ifdef(with_export_type_support).
+-export_type([db/0, key/0, entry/0, interval/0]).
+-endif.
+
+-ifdef(have_callback_support).
+-include("scalaris.hrl").
 
 -callback new(nonempty_string()) -> db().
 -callback close(db()) -> true.

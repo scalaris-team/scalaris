@@ -37,11 +37,8 @@
 -export([foldr/3, foldr/4, foldr/5]).
 
 -type db() :: tid() | atom().
--type key() :: term().
--type entry() :: tuple().
--type left_bracket() :: '(' | '['.
--type right_bracket() :: ')' | ']'.
--type interval() :: {element, key()} | all | {interval, left_bracket(), key(), key(), right_bracket()}.
+-type key() :: backend_beh:key().
+-type entry() :: backend_beh:entry().
 
 -ifdef(with_export_type_support).
 -export_type([db/0]).
@@ -98,7 +95,7 @@ foldl(DB, Fun, Acc) ->
 
 %% @doc Is equivalent to foldl(DB, Fun, Acc0, Interval, get_load(DB)).
 -spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Interval::interval()) -> Acc1::A.
+                               Interval::backend_beh:interval()) -> Acc1::A.
 foldl(DB, Fun, Acc, Interval) ->
     foldl(DB, Fun, Acc, Interval, ets:info(DB, size)).
 
@@ -106,7 +103,7 @@ foldl(DB, Fun, Acc, Interval) ->
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
 -spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Intervall::interval(), MaxNum::non_neg_integer()) -> Acc1::A.
+                               Intervall::backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldl(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, '$end_of_table', _End, _}, _MaxNum) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, _Start, '$end_of_table', _}, _MaxNum) -> Acc;
@@ -145,13 +142,13 @@ foldr(DB, Fun, Acc) ->
     ets:foldr(Fun, Acc, DB).
 
 %% @doc Is equivalent to foldr(DB, Fun, Acc0, Interval, get_load(DB)).
--spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
+-spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, backend_beh:interval()) -> Acc1::A.
 foldr(DB, Fun, Acc, Interval) ->
     foldr(DB, Fun, Acc, Interval, ets:info(DB, size)).
 
 %% @doc Behaves like foldl/5 with the difference that it starts at the end of
 %%      Interval and iterates towards the start of Interval.
--spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
+-spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, backend_beh:interval(), non_neg_integer()) -> Acc1::A.
 foldr(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, _End, '$end_of_table', _}, _MaxNum) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, '$end_of_table', _Start, _}, _MaxNum) -> Acc;
