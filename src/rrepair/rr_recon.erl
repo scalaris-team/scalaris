@@ -165,11 +165,11 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
     % -> client creates recon structure based on common interval, sends it to initiator
     RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
     SyncI = find_intersection(MyI, SenderI),
-    % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
-    SenderSyncI = find_intersection(SenderI, SyncI),
     NewState = State#rr_recon_state{stage = build_struct},
     case intervals:is_empty(SyncI) of
         false ->
+            % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
+            SenderSyncI = find_intersection(SenderI, SyncI),
             send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(RMethod), false),
             NewState;
         true ->
