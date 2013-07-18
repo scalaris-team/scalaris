@@ -26,6 +26,9 @@
 -type db() :: any().
 -type key() :: term().
 -type entry() :: tuple().
+-type left_bracket() :: '(' | '['.
+-type right_bracket() :: ')' | ']'.
+-type interval() :: {element, key()} | all | {interval, left_bracket(), key(), key(), right_bracket()}.
 
 -callback new(nonempty_string()) -> db().
 -callback close(db()) -> true.
@@ -37,12 +40,12 @@
 -callback get_load(db()) -> non_neg_integer().
 
 -callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
--callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, intervals:simple_interval()) -> Acc1::A.
--callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, intervals:simple_interval(), non_neg_integer()) -> Acc1::A.
+-callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
+-callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
 
 -callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
--callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, intervals:simple_interval()) -> Acc1::A.
--callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, intervals:simple_interval(), non_neg_integer()) -> Acc1::A.
+-callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
+-callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
 
 -else.
 
