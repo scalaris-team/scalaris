@@ -411,20 +411,16 @@ init([]) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    case config:read(rrepair_enabled) of
-        true ->
-            config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso % theoretically also 'iblt', but no full support for that yet
-            config:cfg_is_integer(rr_session_ttl) andalso
-            config:cfg_is_greater_than(rr_session_ttl, 0) andalso
-			config:cfg_is_integer(rr_trigger_probability) andalso
-			config:cfg_is_greater_than(rr_trigger_probability, 0) andalso
-			config:cfg_is_less_than_equal(rr_trigger_probability, 100) andalso
-            config:cfg_is_integer(rr_gc_interval) andalso
-            config:cfg_is_greater_than(rr_gc_interval, 0) andalso                
-            config:cfg_is_integer(rr_trigger_interval) andalso
-            config:cfg_is_greater_than(rr_trigger_interval, 0);
-        _ -> true
-    end.
+    config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso % theoretically also 'iblt', but no full support for that yet
+        config:cfg_is_integer(rr_session_ttl) andalso
+        config:cfg_is_greater_than(rr_session_ttl, 0) andalso
+        config:cfg_is_integer(rr_trigger_probability) andalso
+        config:cfg_is_greater_than(rr_trigger_probability, 0) andalso
+        config:cfg_is_less_than_equal(rr_trigger_probability, 100) andalso
+        config:cfg_is_integer(rr_gc_interval) andalso
+        config:cfg_is_greater_than(rr_gc_interval, 0) andalso                
+        config:cfg_is_integer(rr_trigger_interval) andalso
+        config:cfg_is_greater_than(rr_trigger_interval, 0).
 
 -spec get_recon_method() -> rr_recon:method().
 get_recon_method() ->  config:read(rr_recon_method).
