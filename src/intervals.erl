@@ -34,7 +34,7 @@
 
 -export([empty/0, new/1, new/4, all/0, from_elements/1,
          % testing / comparing intervals
-         is_empty/1, is_all/1, is_subset/2, is_continuous/1,
+         is_empty/1, is_non_empty/1, is_all/1, is_subset/2, is_continuous/1,
          is_adjacent/2, in/2,
          is_left_of/2, is_right_of/2,
          split/2,
@@ -45,13 +45,15 @@
          %
          % for unit testing only
          is_well_formed/1, tester_create_interval/1,
-         is_well_formed_simple/1, tester_create_simple_interval/1,
-         tester_create_continuous_interval/4,
+         is_well_formed_simple/1,
+         tester_create_simple_interval/1, tester_create_continuous_interval/4,
+         tester_create_non_empty_interval/2,
          split_feeder/2
         ]).
 
 -ifdef(with_export_type_support).
--export_type([interval/0, key/0, left_bracket/0, right_bracket/0, continuous_interval/0]).
+-export_type([interval/0, key/0, left_bracket/0, right_bracket/0,
+              continuous_interval/0, non_empty_interval/0]).
 % for tester:
 -export_type([invalid_interval/0, invalid_simple_interval/0, simple_interval/0]).
 -endif.
@@ -65,6 +67,7 @@
 -opaque interval() :: [simple_interval()].
 -opaque invalid_interval() :: [simple_interval()].
 -type continuous_interval() :: interval().
+-type non_empty_interval() :: interval().
 
 % @type interval() = [simple_interval()].
 % [] -> empty interval
@@ -121,6 +124,10 @@ from_elements(Elements) ->
 -spec is_empty(interval()) -> boolean().
 is_empty([]) -> true;
 is_empty(_) ->  false.
+
+%% @doc Checks whether the given interval is non-empty (mainly for tester type checker).
+-spec is_non_empty(interval()) -> boolean().
+is_non_empty(I) -> not is_empty(I).
 
 %% @doc Checks whether the given interval is covering everything.
 -spec is_all(interval()) -> boolean().
@@ -242,6 +249,15 @@ tester_create_interval(List) ->
                % filter out {element, X >= ?PLUS_INFINITY} which is invalid:
                not (is_tuple(I) andalso element(1, I) =:= element andalso element(2, I) >= ?PLUS_INFINITY)],
     normalize_internal(List1).
+
+-spec tester_create_non_empty_interval([simple_interval(),...], FallbackElem::key())
+        -> non_empty_interval().
+tester_create_non_empty_interval(List, FallbackElem) ->
+    I = tester_create_interval(List),
+    case is_empty(I) of
+        true  -> new(FallbackElem);
+        false -> I
+    end.
 
 -spec tester_create_continuous_interval(left_bracket(), key(), key() | ?PLUS_INFINITY, right_bracket()) -> continuous_interval().
 tester_create_continuous_interval(_LBr, Key, Key, _RBr) ->
