@@ -39,7 +39,9 @@
 -type db() :: tid() | atom().
 -type key() :: term().
 -type entry() :: tuple().
--type interval() :: intervals:simple_interval().
+-type left_bracket() :: '(' | '['.
+-type right_bracket() :: ')' | ']'.
+-type interval() :: {element, key()} | all | {interval, left_bracket(), key(), key(), right_bracket()}.
 
 -ifdef(with_export_type_support).
 -export_type([db/0]).
