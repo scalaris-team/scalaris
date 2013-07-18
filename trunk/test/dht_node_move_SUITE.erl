@@ -14,6 +14,9 @@
 
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Unit tests for src/dht_node_move.erl (slide and jump operations).
+%%   First executes all tests using the erlang scheduler. Then executes using
+%%   the proto scheduler which produces a random interleaving between the
+%%   different channels.
 %% @end
 %% @version $Id$
 -module(dht_node_move_SUITE).
@@ -25,6 +28,8 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
+-define(NUM_SLIDES, 50).
+
 test_cases() -> [].
 
 all() ->
@@ -32,13 +37,23 @@ all() ->
      {group, send_to_pred},
      {group, send_to_pred_incremental},
      {group, send_to_succ},
-     {group, send_to_succ_incremental}
-    ] ++
-%%     unittest_helper:create_ct_all(test_cases()).
-        test_cases().
+     {group, send_to_succ_incremental}]
+      ++
+    [
+     {group, send_to_pred_proto_sched},
+     {group, send_to_pred_incremental_proto_sched},
+     {group, send_to_succ_proto_sched},
+     {group, send_to_succ_incremental_proto_sched}
+    ].
 
 groups() ->
+    MoveConfig = {move_config, move_config_parameters()},
+    MoveConfigInc = {move_config, move_config_parameters_incremental()},
     GroupOptions = [sequence, {repeat, 1}],
+    Config = [MoveConfig | GroupOptions],
+    ConfigInc = [MoveConfigInc | GroupOptions],
+    ConfigProtoSched = [proto_sched | Config],
+    ConfigIncProtoSched = [proto_sched | ConfigInc],
     SendToPredTestCases =
         [
          symm4_slide_succ_rcv_load,
@@ -57,16 +72,25 @@ groups() ->
          tester_symm4_slide_pred_rcv_load_timeouts_pred,
          tester_symm4_slide_pred_rcv_load_timeouts_node
         ],
-    [
-     {send_to_pred, GroupOptions, SendToPredTestCases},
-     {send_to_pred_incremental, GroupOptions, SendToPredTestCases},
-     {send_to_succ, GroupOptions, SendToSuccTestCases},
-     {send_to_succ_incremental, GroupOptions, SendToSuccTestCases}
-    ] ++
+    [ %% Groups started with normal configuration
+      {send_to_pred, Config, SendToPredTestCases},
+      {send_to_pred_incremental, ConfigInc, SendToPredTestCases},
+      {send_to_succ, Config, SendToSuccTestCases},
+      {send_to_succ_incremental, ConfigInc, SendToSuccTestCases},
+      {send_to_pred, Config, SendToPredTestCases}
+    ]
+      ++
+    [ %% Groups started with proto scheduler
+     {send_to_pred_proto_sched, ConfigProtoSched, SendToPredTestCases},
+     {send_to_pred_incremental_proto_sched, ConfigIncProtoSched, SendToPredTestCases},
+     {send_to_succ_proto_sched, ConfigProtoSched, SendToSuccTestCases},
+     {send_to_succ_incremental_proto_sched, ConfigIncProtoSched, SendToSuccTestCases}
+    ]
+      ++
 %%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
         [].
 
-suite() -> [ {timetrap, {seconds, 20}} ].
+suite() -> [ {timetrap, {seconds, 60}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -76,18 +100,7 @@ end_per_suite(Config) ->
     ok.
 
 init_per_group(Group, Config) ->
-    Config1 = unittest_helper:init_per_group(Group, Config),
-    MoveConf = case Group of
-                   send_to_pred ->
-                       move_config_parameters();
-                   send_to_pred_incremental ->
-                       move_config_parameters_incremental();
-                   send_to_succ ->
-                       move_config_parameters();
-                   send_to_succ_incremental ->
-                       move_config_parameters_incremental()
-               end,
-    [{move_config, MoveConf} | Config1].
+    unittest_helper:init_per_group(Group, Config).
 
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
@@ -95,7 +108,8 @@ init_per_testcase(_TestCase, Config) ->
     % stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    {move_config, MoveConf} = lists:keyfind(move_config, 1, Config),
+    GroupConfig = proplists:get_value(tc_group_properties, Config, []),
+    {move_config, MoveConf} = lists:keyfind(move_config, 1, GroupConfig),
     unittest_helper:make_ring_with_ids(
       fun() -> ?RT:get_replica_keys(?RT:hash_key("0")) end,
       [{config, [{log_path, PrivDir}, {dht_node, mockup_dht_node}, {monitor_perf_interval, 0},
@@ -109,9 +123,25 @@ init_per_testcase(_TestCase, Config) ->
                        end),
     util:wait_for_process_to_die(Pid),
     timer:sleep(500), % wait a bit for the rm-processes to settle
+    %% start proto scheduler if applicable
+    GroupConfig = proplists:get_value(tc_group_properties, Config, []),
+    case proplists:is_defined(proto_sched, GroupConfig) of
+        true -> proto_sched:start(),
+                proto_sched:start_deliver();
+        _ -> ok
+    end,
     Config.
 
-end_per_testcase(_TestCase, _Config) ->
+end_per_testcase(_TestCase, Config) ->
+    %% stop proto scheduler if applicable
+    GroupConfig = proplists:get_value(tc_group_properties, Config, []),
+    case proplists:is_defined(proto_sched, GroupConfig) of
+        true ->
+            proto_sched:stop(),
+            ct:pal("Proto schedluer infos: ~.2p", proto_sched:get_infos()),
+            proto_sched:cleanup();
+        _ -> ok
+    end,
     unittest_helper:stop_ring(),
     ok.
 
@@ -136,10 +166,10 @@ move_config_parameters_incremental() ->
 symm4_slide_succ_rcv_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-                      symm4_slide_load_test(1, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, 50),
-                      symm4_slide_load_test(2, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, 50),
-                      symm4_slide_load_test(3, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, 50),
-                      symm4_slide_load_test(4, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, 50),
+                      symm4_slide_load_test(1, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(2, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(3, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(4, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, ?NUM_SLIDES),
                       erlang:exit(BenchPid, 'kill'),
                       util:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ_rcv_load"),
@@ -150,10 +180,10 @@ symm4_slide_succ_rcv_load(_Config) ->
 symm4_slide_succ_send_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-                      symm4_slide_load_test(1, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, 50),
-                      symm4_slide_load_test(2, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, 50),
-                      symm4_slide_load_test(3, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, 50),
-                      symm4_slide_load_test(4, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, 50),
+                      symm4_slide_load_test(1, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(2, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(3, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(4, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, ?NUM_SLIDES),
                       erlang:exit(BenchPid, 'kill'),
                       util:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_succ_send_load"),
@@ -164,10 +194,10 @@ symm4_slide_succ_send_load(_Config) ->
 symm4_slide_pred_send_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-                      symm4_slide_load_test(1, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, 50),
-                      symm4_slide_load_test(2, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, 50),
-                      symm4_slide_load_test(3, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, 50),
-                      symm4_slide_load_test(4, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, 50),
+                      symm4_slide_load_test(1, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(2, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(3, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(4, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, ?NUM_SLIDES),
                       erlang:exit(BenchPid, 'kill'),
                       util:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred_send_load"),
@@ -178,10 +208,10 @@ symm4_slide_pred_send_load(_Config) ->
 symm4_slide_pred_rcv_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-                      symm4_slide_load_test(1, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, 50),
-                      symm4_slide_load_test(2, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, 50),
-                      symm4_slide_load_test(3, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, 50),
-                      symm4_slide_load_test(4, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, 50),
+                      symm4_slide_load_test(1, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(2, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(3, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, ?NUM_SLIDES),
+                      symm4_slide_load_test(4, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, ?NUM_SLIDES),
                       erlang:exit(BenchPid, 'kill'),
                       util:wait_for_process_to_die(BenchPid)
               end, "symm4_slide_pred_rcv_load"),
@@ -271,7 +301,7 @@ send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
     % cleanup, just in case:
     _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
-    
+
     FailMsg = lists:flatten(io_lib:format("~.0p (~B.*) ignoring messages: ~.0p",
                                           [PredOrSuccOrNode, NthNode, IgnoredMessages])),
     {_PredsPred, Pred, Node, Succ} = get_pred_node_succ(NthNode, FailMsg),
@@ -286,7 +316,7 @@ send_ignore_msg_list_to(NthNode, PredOrSuccOrNode, IgnoredMessages) ->
 -spec prop_symm4_slide_succ_rcv_load_timeouts_succ(IgnoredMessages::[move_message(),...]) -> true.
 prop_symm4_slide_succ_rcv_load_timeouts_succ(IgnoredMessages_) ->
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
-    
+
     send_ignore_msg_list_to(1, succ, IgnoredMessages),
     symm4_slide_load_test(1, succ, "slide_succ_rcv_timeouts_succ", fun id_my_to_succ_1_100/6, 1),
     send_ignore_msg_list_to(2, succ, IgnoredMessages),
@@ -295,7 +325,7 @@ prop_symm4_slide_succ_rcv_load_timeouts_succ(IgnoredMessages_) ->
     symm4_slide_load_test(3, succ, "slide_succ_rcv_timeouts_succ", fun id_my_to_succ_1_100/6, 1),
     send_ignore_msg_list_to(4, succ, IgnoredMessages),
     symm4_slide_load_test(4, succ, "slide_succ_rcv_timeouts_succ", fun id_my_to_succ_1_100/6, 1),
-    
+
     % cleanup, just in case:
     _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
@@ -305,7 +335,7 @@ prop_symm4_slide_succ_rcv_load_timeouts_succ(IgnoredMessages_) ->
 -spec prop_symm4_slide_succ_rcv_load_timeouts_node(IgnoredMessages::[move_message(),...]) -> true.
 prop_symm4_slide_succ_rcv_load_timeouts_node(IgnoredMessages_) ->
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
-    
+
     send_ignore_msg_list_to(1, node, IgnoredMessages),
     symm4_slide_load_test(1, succ, "slide_succ_rcv_timeouts_node", fun id_my_to_succ_1_100/6, 1),
     send_ignore_msg_list_to(2, node, IgnoredMessages),
@@ -314,7 +344,7 @@ prop_symm4_slide_succ_rcv_load_timeouts_node(IgnoredMessages_) ->
     symm4_slide_load_test(3, succ, "slide_succ_rcv_timeouts_node", fun id_my_to_succ_1_100/6, 1),
     send_ignore_msg_list_to(4, node, IgnoredMessages),
     symm4_slide_load_test(4, succ, "slide_succ_rcv_timeouts_node", fun id_my_to_succ_1_100/6, 1),
-    
+
     % cleanup, just in case:
     _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
@@ -340,7 +370,7 @@ tester_symm4_slide_succ_rcv_load_timeouts_node(_Config) ->
 -spec prop_symm4_slide_succ_send_load_timeouts_succ(IgnoredMessages::[move_message(),...]) -> true.
 prop_symm4_slide_succ_send_load_timeouts_succ(IgnoredMessages_) ->
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
-    
+
     send_ignore_msg_list_to(1, succ, IgnoredMessages),
     symm4_slide_load_test(1, succ, "slide_succ_send_timeouts_succ", fun id_pred_to_my_99_100/6, 1),
     send_ignore_msg_list_to(2, succ, IgnoredMessages),
@@ -349,7 +379,7 @@ prop_symm4_slide_succ_send_load_timeouts_succ(IgnoredMessages_) ->
     symm4_slide_load_test(3, succ, "slide_succ_send_timeouts_succ", fun id_pred_to_my_99_100/6, 1),
     send_ignore_msg_list_to(4, succ, IgnoredMessages),
     symm4_slide_load_test(4, succ, "slide_succ_send_timeouts_succ", fun id_pred_to_my_99_100/6, 1),
-    
+
     % cleanup, just in case:
     _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
@@ -359,7 +389,7 @@ prop_symm4_slide_succ_send_load_timeouts_succ(IgnoredMessages_) ->
 -spec prop_symm4_slide_succ_send_load_timeouts_node(IgnoredMessages::[move_message(),...]) -> true.
 prop_symm4_slide_succ_send_load_timeouts_node(IgnoredMessages_) ->
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
-    
+
     send_ignore_msg_list_to(1, node, IgnoredMessages),
     symm4_slide_load_test(1, succ, "slide_succ_send_timeouts_node", fun id_pred_to_my_99_100/6, 1),
     send_ignore_msg_list_to(2, node, IgnoredMessages),
@@ -368,7 +398,7 @@ prop_symm4_slide_succ_send_load_timeouts_node(IgnoredMessages_) ->
     symm4_slide_load_test(3, succ, "slide_succ_send_timeouts_node", fun id_pred_to_my_99_100/6, 1),
     send_ignore_msg_list_to(4, node, IgnoredMessages),
     symm4_slide_load_test(4, succ, "slide_succ_send_timeouts_node", fun id_pred_to_my_99_100/6, 1),
-    
+
     % cleanup, just in case:
     _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
@@ -394,7 +424,7 @@ tester_symm4_slide_succ_send_load_timeouts_node(_Config) ->
 -spec prop_symm4_slide_pred_send_load_timeouts_pred(IgnoredMessages::[move_message(),...]) -> true.
 prop_symm4_slide_pred_send_load_timeouts_pred(IgnoredMessages_) ->
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
-    
+
     send_ignore_msg_list_to(1, pred, IgnoredMessages),
     symm4_slide_load_test(1, pred, "slide_pred_send_timeouts_pred", fun id_pred_to_my_1_100/6, 1),
     send_ignore_msg_list_to(2, pred, IgnoredMessages),
@@ -403,7 +433,7 @@ prop_symm4_slide_pred_send_load_timeouts_pred(IgnoredMessages_) ->
     symm4_slide_load_test(3, pred, "slide_pred_send_timeouts_pred", fun id_pred_to_my_1_100/6, 1),
     send_ignore_msg_list_to(4, pred, IgnoredMessages),
     symm4_slide_load_test(4, pred, "slide_pred_send_timeouts_pred", fun id_pred_to_my_1_100/6, 1),
-    
+
     % cleanup, just in case:
     _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
@@ -413,7 +443,7 @@ prop_symm4_slide_pred_send_load_timeouts_pred(IgnoredMessages_) ->
 -spec prop_symm4_slide_pred_send_load_timeouts_node(IgnoredMessages::[move_message(),...]) -> true.
 prop_symm4_slide_pred_send_load_timeouts_node(IgnoredMessages_) ->
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
-    
+
     send_ignore_msg_list_to(1, node, IgnoredMessages),
     symm4_slide_load_test(1, pred, "slide_pred_send_timeouts_node", fun id_pred_to_my_1_100/6, 1),
     send_ignore_msg_list_to(2, node, IgnoredMessages),
@@ -422,7 +452,7 @@ prop_symm4_slide_pred_send_load_timeouts_node(IgnoredMessages_) ->
     symm4_slide_load_test(3, pred, "slide_pred_send_timeouts_node", fun id_pred_to_my_1_100/6, 1),
     send_ignore_msg_list_to(4, node, IgnoredMessages),
     symm4_slide_load_test(4, pred, "slide_pred_send_timeouts_node", fun id_pred_to_my_1_100/6, 1),
-    
+
     % cleanup, just in case:
     _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
@@ -448,7 +478,7 @@ tester_symm4_slide_pred_send_load_timeouts_node(_Config) ->
 -spec prop_symm4_slide_pred_rcv_load_timeouts_pred(IgnoredMessages::[move_message(),...]) -> true.
 prop_symm4_slide_pred_rcv_load_timeouts_pred(IgnoredMessages_) ->
     IgnoredMessages = fix_tester_ignored_msg_list(IgnoredMessages_),
-    
+
     send_ignore_msg_list_to(1, pred, IgnoredMessages),
     symm4_slide_load_test(1, pred, "slide_pred_rcv_timeouts_pred", fun id_predspred_to_pred_99_100/6, 1),
     send_ignore_msg_list_to(2, pred, IgnoredMessages),
@@ -457,7 +487,7 @@ prop_symm4_slide_pred_rcv_load_timeouts_pred(IgnoredMessages_) ->
     symm4_slide_load_test(3, pred, "slide_pred_rcv_timeouts_pred", fun id_predspred_to_pred_99_100/6, 1),
     send_ignore_msg_list_to(4, pred, IgnoredMessages),
     symm4_slide_load_test(4, pred, "slide_pred_rcv_timeouts_pred", fun id_predspred_to_pred_99_100/6, 1),
-    
+
     % cleanup, just in case:
     _ = [comm:send_local(DhtNodePid, {mockup_dht_node, clear_match_specs})
            || DhtNodePid <- pid_groups:find_all(dht_node)],
@@ -545,9 +575,10 @@ symm4_slide_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
                          pred -> Pred
                      end,
              symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
-             receive Z ->
-                         ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
-                                  [PredOrSucc, NthNode, N, DhtNode, Z])
+             receive
+                 ?SCALARIS_RECV(Z,
+                                ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
+                                         [PredOrSucc, NthNode, N, DhtNode, Z]))
              after 0 -> ok
              end
          end || N <- lists:seq(1, Count)],
@@ -570,15 +601,16 @@ get_pred_node_succ2(NodePid, FailMsg) when is_pid(NodePid) ->
 get_pred_node_succ2(NodePid, FailMsg) ->
     comm:send(NodePid, {get_node_details, comm:this(), [node, pred, succ]}),
     receive
-        {get_node_details_response, NodeDetails} ->
-            Node = node_details:get(NodeDetails, node),
-            Pred = node_details:get(NodeDetails, pred),
-            Succ = node_details:get(NodeDetails, succ),
-            {Pred, Node, Succ};
-        Y ->
-            ?ct_fail("~s: unexpected message while "
-                         "waiting for get_node_details_response: ~.0p",
-                         [FailMsg, Y])
+        ?SCALARIS_RECV({get_node_details_response, NodeDetails},
+                       begin
+                           Node = node_details:get(NodeDetails, node),
+                           Pred = node_details:get(NodeDetails, pred),
+                           Succ = node_details:get(NodeDetails, succ),
+                           {Pred, Node, Succ}
+                       end);
+        ?SCALARIS_RECV(Y, ?ct_fail("~s: unexpected message while "
+                                   "waiting for get_node_details_response: ~.0p",
+                                   [FailMsg, Y]))
     end.
 
 -spec symm4_slide_load_test_slide(DhtNode::pid(), PredOrSucc::pred | succ,
@@ -587,23 +619,27 @@ get_pred_node_succ2(NodePid, FailMsg) ->
 symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other) ->
     comm:send_local(DhtNode, {move, start_slide, PredOrSucc, TargetId, Tag, self()}),
     receive
-        {move, result, Tag, ok} ->
-%%             ct:pal("~p.~p ~.0p -> ~.0p~n", [NthNode, N, node:id(Node), TargetId]),
-            ok;
-        {move, result, Tag, Result} ->
-            case lists:member(Result, [ongoing_slide, wrong_pred_succ_node]) of
-                true ->
-                    ct:pal("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p~nretrying...~n",
-                           [PredOrSucc, NthNode, N, Node, Other, TargetId, Result]),
-                    timer:sleep(100), % wait a bit before trying again
-                    symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other);
-                _ ->
-                    ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p",
-                             [PredOrSucc, NthNode, N, Node, Other, TargetId, Result])
-            end;
-        X ->
-            ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) unexpected message: ~.0p",
-                     [PredOrSucc, NthNode, N, Node, Other, TargetId, X])
+        ?SCALARIS_RECV(
+        {move, result, Tag, ok}, begin
+                                     %% ct:pal("~p.~p ~.0p -> ~.0p~n", [NthNode, N, node:id(Node), TargetId]),
+                                     ok
+                                 end);
+        ?SCALARIS_RECV({move, result, Tag, Result},
+                       begin
+                           case lists:member(Result, [ongoing_slide, wrong_pred_succ_node]) of
+                               true ->
+                                   ct:pal("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p~nretrying...~n",
+                                          [PredOrSucc, NthNode, N, Node, Other, TargetId, Result]),
+                                   timer:sleep(100), % wait a bit before trying again
+                                   symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other);
+                               _ ->
+                                   ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p",
+                                            [PredOrSucc, NthNode, N, Node, Other, TargetId, Result])
+                           end
+                       end);
+        ?SCALARIS_RECV(X,
+                       ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) unexpected message: ~.0p",
+                                [PredOrSucc, NthNode, N, Node, Other, TargetId, X]))
     end.
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
