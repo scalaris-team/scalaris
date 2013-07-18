@@ -55,11 +55,8 @@
 init() ->
     case get_hosts() of
         failed ->
-            HostsWithStatus =
-                case config:read(cloud_ssh_hosts) of
-                    failed -> [];
-                    Hostnames -> lists:map(fun(Host) -> {Host, inactive} end, Hostnames)
-                end,
+            Hostnames = config:read(cloud_ssh_hosts),
+            HostsWithStatus = lists:map(fun(Host) -> {Host, inactive} end, Hostnames),
             save_hosts(HostsWithStatus);
         _ -> ok
     end.
