@@ -178,7 +178,7 @@ send_local_after(Delay, Pid, Msg) ->
             %%       by using new a new send type 'local_after'. Have
             %%       also to adapt trace_mpath then.
             Deliver = trace_mpath:log_send(Logger, self(),
-                                           RealPid, RealMsg, local),
+                                           RealPid, RealMsg, local_after),
             case Deliver of
                 false ->
                     %% to keep the -spec we return a reference().  In

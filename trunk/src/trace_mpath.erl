@@ -502,7 +502,7 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
 epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
     {'$gen_component', trace_mpath, PState, FromPid, ToPid, Msg}.
 
--spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global) -> DeliverAlsoDirectly :: boolean().
+-spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global|local_after) -> DeliverAlsoDirectly :: boolean().
 log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
     Now = os:timestamp(),
     case passed_state_logger(PState) of
@@ -519,7 +519,10 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
             send_log_msg(
               PState,
               LoggerPid,
-              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg), LocalOrGlobal}),
+              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg), ?IIF(LocalOrGlobal =:= local_after, local, LocalOrGlobal)}),
+            true;
+        {proto_sched, _} when LocalOrGlobal =:= local_after ->
+            %% TODO: see comm:send_local_after
             true;
         {proto_sched, _} ->
             proto_sched:log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal),
