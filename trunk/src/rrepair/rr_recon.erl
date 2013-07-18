@@ -59,7 +59,7 @@
 -endif.
 
 -type quadrant()       :: 1..4. % 1..rep_factor()
--type method()         :: bloom | merkle_tree | art | iblt | undefined.
+-type method()         :: bloom | merkle_tree | art.% | iblt.
 -type stage()          :: req_shared_interval | build_struct | reconciliation.
 
 -type exit_reason()    :: empty_interval |          %interval intersection between initator and client is empty
@@ -71,8 +71,7 @@
 
 -type db_entry_enc()   :: binary().
 -type db_chunk_enc()   :: [db_entry_enc()].
--type db_entry()       :: {?RT:key(), db_dht:version()}.
--type db_chunk()       :: [db_entry()].
+-type db_chunk()       :: [{?RT:key(), db_dht:version()}].
 
 -record(bloom_recon_struct,
         {
@@ -100,7 +99,7 @@
          dhtNodePid         = ?required(rr_recon_state, dhtNodePid)     :: comm:erl_local_pid(),
          dest_rr_pid        = ?required(rr_recon_state, dest_rr_pid)    :: comm:mypid(), %dest rrepair pid
          dest_recon_pid     = undefined                                 :: comm:mypid() | undefined, %dest recon process pid
-         method             = undefined                                 :: method(),
+         method             = undefined                                 :: method() | undefined,
          dest_interval      = intervals:empty()                         :: intervals:interval(),
          struct             = {}                                        :: parameters() | {},
          stage              = req_shared_interval                       :: stage(),
@@ -307,12 +306,13 @@ on({check_nodes_response, CmpResults}, State =
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_struct(DBList::db_chunk_enc(), DestI::I, RestI::I, state()) -> state() | kill
-          when is_subtype(I, intervals:interval()).
+-spec build_struct(DBList::db_chunk_enc(), DestI::intervals:non_empty_interval(),
+                   RestI::intervals:interval(), state()) -> state() | kill.
 build_struct(DBList, DestI, RestI,
              State = #rr_recon_state{method = RMethod, struct = Params,
                                      initiator = Initiator, stats = Stats,
                                      dhtNodePid = DhtNodePid, stage = Stage}) ->
+    ?ASSERT(not intervals:is_empty(DestI)),
     {BuildTime, SyncStruct} =
         case merkle_tree:is_merkle_tree(Params) of
             true ->
@@ -495,11 +495,9 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, {Req, Res,
 
 % @doc Starts one resolve process per leaf node in a given node
 %      Returns: number of visited leaf nodes and number of leaf resovle requests.
--spec resolve_node(Node | not_found, {Dest::RPid, SID, OwnerRemote::comm:erl_local_pid()})
-        -> {Leafs::non_neg_integer(), ResolveReq::non_neg_integer()} when
-    is_subtype(RPid,    comm:mypid()),
-    is_subtype(Node,    merkle_tree:mt_node()),
-    is_subtype(SID,     rrepair:session_id()).
+-spec resolve_node(merkle_tree:mt_node() | not_found,
+                   {Dest::comm:mypid(), rrepair:session_id(), OwnerRemote::comm:erl_local_pid()})
+        -> {Leafs::non_neg_integer(), ResolveReq::non_neg_integer()}.
 resolve_node(not_found, _) -> {0, 0};
 resolve_node(Node, Conf) ->
     case merkle_tree:is_leaf(Node) of
@@ -512,10 +510,9 @@ resolve_node(Node, Conf) ->
     end.
 
 % @doc Returns number ob caused resolve requests (requests with feedback count 2)
--spec resolve_leaf(Node, {Dest::RPid, SID, OwnerRemote::comm:erl_local_pid()}) -> 1 | 2 when
-    is_subtype(RPid,    comm:mypid()),
-    is_subtype(Node,    merkle_tree:mt_node()),
-    is_subtype(SID,     rrepair:session_id()).
+-spec resolve_leaf(merkle_tree:mt_node(),
+                   {Dest::comm:mypid(), rrepair:session_id(), OwnerRemote::comm:erl_local_pid()})
+        -> 1 | 2.
 resolve_leaf(Node, {Dest, SID, OwnerL}) ->
     OwnerR = comm:make_global(OwnerL),
     case merkle_tree:get_item_count(Node) of
@@ -531,11 +528,8 @@ resolve_leaf(Node, {Dest, SID, OwnerL}) ->
 %% art recon
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec art_recon(MyTree, Art, State) -> Stats when
-    is_subtype(MyTree, merkle_tree:merkle_tree()),
-    is_subtype(Art,    art:art()),
-    is_subtype(State,  state()),
-    is_subtype(Stats,  rr_recon_stats:stats()).
+-spec art_recon(MyTree::merkle_tree:merkle_tree(), art:art(), state())
+        -> rr_recon_stats:stats().
 art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
                                       ownerPid = OwnerL,
                                       stats = Stats }) ->
@@ -551,9 +545,8 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
              end,
     rr_recon_stats:set([{tree_size, merkle_tree:size_detail(Tree)}], NStats).
 
--spec art_get_sync_leafs(Nodes::NodeL, Art, Stats, Acc::NodeL) -> {ToSync::NodeL, Stats} when
+-spec art_get_sync_leafs(Nodes::NodeL, art:art(), Stats, Acc::NodeL) -> {ToSync::NodeL, Stats} when
     is_subtype(NodeL,   [merkle_tree:mt_node()]),
-    is_subtype(Art,    art:art()),
     is_subtype(Stats,  rr_recon_stats:stats()).
 art_get_sync_leafs([], _Art, Stats, ToSyncAcc) ->
     {ToSyncAcc, Stats};
@@ -578,20 +571,21 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_recon_struct(Method, DB_Chunk) -> Recon_Struct when
-      is_subtype(Method,       method()),
-      is_subtype(DB_Chunk,     {intervals:interval(), db_chunk_enc()}),
-      is_subtype(Recon_Struct, sync_struct()).
+-spec build_recon_struct(method(), {intervals:non_empty_interval(), db_chunk_enc()})
+        -> sync_struct().
 build_recon_struct(bloom, {I, DBItems}) ->
+    ?ASSERT(not intervals:is_empty(I)),
     Fpr = get_bloom_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     BF = ?REP_BLOOM:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
     #bloom_recon_struct{ interval = I, bloom = BF };
 build_recon_struct(merkle_tree, {I, DBItems}) ->
+    ?ASSERT(not intervals:is_empty(I)),
     merkle_tree:new(I, DBItems, [{branch_factor, get_merkle_branch_factor()},
                                  {bucket_size, get_merkle_bucket_size()}]);
 build_recon_struct(art, {I, DBItems}) ->
+    ?ASSERT(not intervals:is_empty(I)),
     Branch = get_merkle_branch_factor(),
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), Branch, 1),
     Tree = merkle_tree:new(I, DBItems, [{branch_factor, Branch},
@@ -616,10 +610,9 @@ send_local(Pid, Msg) ->
 %%      Request responds with a list of {Key, Value} tuples.
 %%      The mapping to DestI is not done here!
 -spec send_chunk_req(DhtPid::LPid, AnswerPid::LPid, ChunkI::I, DestI::I,
-                     MaxItems, Reconcile::boolean()) -> ok when
+                     MaxItems::pos_integer() | all, Reconcile::boolean()) -> ok when
     is_subtype(LPid,        comm:erl_local_pid()),
-    is_subtype(I,           intervals:interval()),
-    is_subtype(MaxItems,    pos_integer() | all).
+    is_subtype(I,           intervals:interval()).
 send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, true) ->
     ?ASSERT(I =:= _DestI),
     SrcPidReply = comm:reply_as(SrcPid, 2, {reconcile, '_'}),
@@ -634,7 +627,7 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems, false) ->
 
 -spec get_chunk_filter(db_entry:entry()) -> boolean().
 get_chunk_filter(DBEntry) -> db_entry:get_version(DBEntry) =/= -1.
--spec get_chunk_value(db_entry:entry()) -> db_entry().
+-spec get_chunk_value(db_entry:entry()) -> {?RT:key(), db_dht:version() | -1}.
 get_chunk_value(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBEntry)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -811,7 +804,7 @@ fork_recon(Conf) ->
 % rr_merkle_bucket_size     - size of merkle tree leaf buckets
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Checks wheter config parameter is float and in [0,1].
+%% @doc Checks whether a config parameter is float and in [0,1].
 -spec check_percent(atom()) -> boolean().
 check_percent(Atom) ->
     config:cfg_is_float(Atom) andalso
