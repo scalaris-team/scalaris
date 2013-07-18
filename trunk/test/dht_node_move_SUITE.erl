@@ -590,9 +590,9 @@ symm4_slide_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
             Node::node:node_type(), Succ::node:node_type()}.
 get_pred_node_succ(NthNode, FailMsg) ->
     DhtNodePid = lists:nth(NthNode, pid_groups:find_all(dht_node)),
-    {Pred, Node, Succ} = get_pred_node_succ2(DhtNodePid, FailMsg),
-    {PredsPred, Pred, Node} = get_pred_node_succ2(node:pidX(Pred), FailMsg),
-    {PredsPred, Pred, Node, Succ}.
+    {Pred1, Node1, Succ} = get_pred_node_succ2(DhtNodePid, FailMsg),
+    {PredsPred, Pred2, Node2} = get_pred_node_succ2(node:pidX(Pred1), FailMsg),
+    {PredsPred, node:newer(Pred1, Pred2), node:newer(Node1, Node2), Succ}.
 
 -spec get_pred_node_succ2(NodePid::pid() | comm:mypid(), FailMsg::string())
         -> {Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()}.
