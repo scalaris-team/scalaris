@@ -37,9 +37,11 @@
 -export_type([distribution/0, db_type/0, db_parameter/0, db_status/0, failure_type/0]).
 -endif.
 
--type distribution() :: random |
-                        uniform |
-                        {non_uniform, random_bias:distribution_fun()}.
+-type distribution()    :: random |
+                           uniform |
+                           {non_uniform, random_bias:distribution_fun()}.
+-type db_distribution() :: uniform |
+                           {non_uniform, random_bias:distribution_fun()}.
 -type result() :: ?RT:key() | 
                   {?RT:key(), db_dht:value()}.
 -type option() :: {output, list_key_val | list_key}.
@@ -49,10 +51,10 @@
 -type failure_dest()    :: all | [failure_quadrant()]. 
 -type db_type()         :: wiki | random.
 -type db_parameter()    :: {ftype, failure_type()} |
-                           {fprob, 0..100} |                                %failure probability
-                           {fdest, failure_dest()} |                        %quadrants in which failures are inserted / if missing all is assumed
-                           {fdistribution, db_generator:distribution()} |   %distribution of failures
-                           {distribution, db_generator:distribution()}.     %data distribution in every quadrant
+                           {fprob, 0..100} |                  %failure probability
+                           {fdest, failure_dest()} |          %quadrants in which failures are inserted / if missing all is assumed
+                           {fdistribution, distribution()} |  %distribution of failures
+                           {distribution, db_distribution()}. %data distribution in every quadrant
 -type db_status() :: {Entries   :: non_neg_integer(),
                       Existing  :: non_neg_integer(),
                       Missing   :: non_neg_integer(),
@@ -62,15 +64,15 @@
 
 % @doc This will generate a list of [ItemCount] keys with requested distribution 
 %      in the given interval.
--spec get_db(intervals:interval(), non_neg_integer(), distribution()) -> [result()].
+-spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution()) -> [result()].
 get_db(I, Count, Distribution) ->
     get_db(I, Count, Distribution, []).
 
--spec get_db(intervals:interval(), non_neg_integer(), distribution(), [option()]) -> [result()].
+-spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution(), [option()]) -> [result()].
 get_db(Interval, ItemCount, Distribution, Options) ->
+    ?ASSERT(intervals:is_continuous(Interval)),
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
-        random -> log:log(error, "random_data_distribution is not implemented");
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
         {non_uniform, Fun} -> non_uniform_key_list(Interval, 1, ItemCount, Fun, [], OutputType)
     end.
@@ -78,7 +80,7 @@ get_db(Interval, ItemCount, Distribution, Options) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec uniform_key_list([{Interval, ToAdd}], Acc::Result, OutputType) -> Result when
-    is_subtype(Interval,   intervals:interval()),
+    is_subtype(Interval,   intervals:continuous_interval()),
     is_subtype(ToAdd,      non_neg_integer()),
     is_subtype(OutputType, list_key_val | list_key),
     is_subtype(Result,     [result()]).
@@ -109,7 +111,7 @@ gen_value() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec non_uniform_key_list(Interval, Step::Int, ToAdd::Int, Fun, Acc::Result, OutputType) -> Result when
-    is_subtype(Interval,    intervals:interval()),
+    is_subtype(Interval,    intervals:continuous_interval()),
     is_subtype(Int,         pos_integer()),
     is_subtype(Fun,         random_bias:distribution_fun()),
     is_subtype(OutputType,  list_key_val | list_key),
@@ -119,10 +121,10 @@ non_uniform_key_list(I, Step, ToAdd, Fun, Acc, AccType) ->
     {_, LKey, RKey, _} = intervals:get_bounds(I),
     Add = erlang:round(V * ToAdd),
     NAcc = if Add >= 1 ->
-                  StepSize = erlang:round((RKey - LKey) / ToAdd),
+                  StepSize = (RKey - LKey) / ToAdd,
                   SubI = intervals:new('(',
-                                       LKey + ((Step - 1) * StepSize),
-                                       LKey + (Step * StepSize),
+                                       LKey + erlang:trunc((Step - 1) * StepSize),
+                                       LKey + ?IIF((X = erlang:trunc(Step * StepSize)) >= ?PLUS_INFINITY, ?MINUS_INFINITY, X),
                                        ']'),
                   uniform_key_list([{SubI, Add}], Acc, AccType);
               true -> Acc
