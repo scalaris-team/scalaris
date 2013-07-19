@@ -130,8 +130,8 @@
 
 -type queue_key()        :: {Src :: comm:mypid(), Dest :: comm:mypid()}.
 -type delay_queue_key()  :: {Dest :: comm:mypid()}.
--type msg_queues()       :: [{queue_key(), queue()}].
--type msg_delay_queues() :: [{delay_queue_key(), queue()}].
+-type msg_queues()       :: [queue_key()].
+-type msg_delay_queues() :: [delay_queue_key()].
 
 -record(state,
         {msg_queues              = ?required(state, msg_queues)
@@ -368,7 +368,8 @@ add_message(Src, Dest, Msg, LorG, #state{msg_queues = OldQueues} = State) ->
                                  Possibilities::pos_integer(),
                                  state_t()}.
 pop_random_message(#state{msg_queues = OldQueues} = State) ->
-    {{{Src, Dest} = Key, Q}, Len} = util:randomelem_and_length(OldQueues),
+    {{Src, Dest} = Key, Len} = util:randomelem_and_length(OldQueues),
+    Q = erlang:get(Key),
     {{value, {LorG, M}}, Q2} = queue:out(Q),
     NewQueues = update_queue_in_list_of_queues(Key, Q2, OldQueues),
     State2 = State#state{msg_queues = NewQueues},
@@ -386,13 +387,13 @@ pop_random_message(#state{msg_queues = OldQueues} = State) ->
         (queue_key(), {local | global, comm:message()}, msg_queues()) -> msg_queues().%;
         %(delay_queue_key(), comm:message(), msg_delay_queues()) -> msg_delay_queues().
 add_to_list_of_queues(Key, M, Queues) ->
-    case lists:keyfind(Key, 1, Queues) of
-        {_, Queue} ->
-            Tuple = {Key, queue:in(M, Queue)},
-            lists:keyreplace(Key, 1, Queues, Tuple);
-        false ->
-            Q = queue:from_list([M]),
-            [{Key, Q} | Queues]
+    case erlang:get(Key) of
+        undefined ->
+            _ = erlang:put(Key, queue:from_list([M])),
+            [Key | Queues];
+        Queue ->
+            _ = erlang:put(Key, queue:in(M, Queue)),
+            Queues
     end.
 
 -spec update_queue_in_list_of_queues
@@ -401,8 +402,9 @@ add_to_list_of_queues(Key, M, Queues) ->
 update_queue_in_list_of_queues(Key, Q, Queues) ->
     case queue:is_empty(Q) of
         true ->
-            lists:keydelete(Key, 1, Queues);
+            erlang:erase(Key),
+            lists:delete(Key, Queues);
         false ->
-            Tuple = {Key, Q},
-            lists:keyreplace(Key, 1, Queues, Tuple)
+            _ = erlang:put(Key, Q),
+            Queues
     end.
