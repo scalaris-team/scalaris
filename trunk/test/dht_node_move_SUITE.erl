@@ -90,7 +90,7 @@ groups() ->
 %%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
         [].
 
-suite() -> [ {timetrap, {seconds, 60}} ].
+suite() -> [ {timetrap, {seconds, 90}} ].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
