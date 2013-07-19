@@ -50,11 +50,20 @@
          }). 
 -type stats() :: #rr_recon_stats{}.
 
--type stats_types() :: non_neg_integer() | 
-                       merkle_tree:mt_size() | 
-                       rrepair:session_id() | null |
-                       status().
--type field_list()  :: [{atom(), stats_types()}]. %atom = any field name of rr_recon_stats record
+-type field_list1()  ::
+          [{tree_size, merkle_tree:mt_size()} |
+               {tree_nodesCompared, non_neg_integer()} |
+               {tree_compareSkipped, non_neg_integer()} |
+               {tree_leafsSynced, non_neg_integer()} |
+               {tree_compareLeft, non_neg_integer()} |
+               {error_count, non_neg_integer()} |
+               {build_time, non_neg_integer()} |
+               {recon_time, non_neg_integer()} |
+               {resolve_started, non_neg_integer()}].
+
+-type field_list2()  ::
+          [{session_id, rrepair:session_id() | null} |
+               {status, status()}] | field_list1().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API Functions
@@ -64,13 +73,12 @@
 new() ->
     #rr_recon_stats{}.
 
--spec new(field_list()) -> stats().
+-spec new(field_list2()) -> stats().
 new(KVList) ->
     set(KVList, #rr_recon_stats{}).
 
 % @doc increases the record field with name key by value
--spec inc(field_list(), Old::Stats) -> New::Stats when
-    is_subtype(Stats, stats()).
+-spec inc(field_list1(), Old::stats()) -> New::stats().
 inc([], Stats) -> 
     Stats;
 inc([{K, V} | L], Stats) ->
@@ -100,8 +108,7 @@ inc([{K, V} | L], Stats) ->
     inc(L, NS).
 
 % @doc sets the value of record field with name of key to the given value
--spec set(field_list(), Old::Stats) -> New::Stats when
-    is_subtype(Stats, stats()).
+-spec set(field_list2(), Old::stats()) -> New::stats().
 set([], Stats) ->
     Stats;
 set([{K, V} | L], Stats) ->
@@ -120,7 +127,17 @@ set([{K, V} | L], Stats) ->
          end,
     set(L, NS).
 
--spec get(atom(), stats()) -> stats_types().
+-spec get(session_id, stats())         -> rrepair:session_id() | null;
+         (tree_size, stats())          -> merkle_tree:mt_size();
+         (tree_nodesCompared, stats()) -> non_neg_integer();
+         (tree_compareSkipped, stats())-> non_neg_integer();
+         (tree_leafsSynced, stats())   -> non_neg_integer();
+         (tree_compareLeft, stats())   -> non_neg_integer();
+         (error_count, stats())        -> non_neg_integer();
+         (build_time, stats())         -> non_neg_integer();
+         (recon_time, stats())         -> non_neg_integer();
+         (resolve_started, stats())    -> non_neg_integer();
+         (status, stats())             -> status().
 get(K, Stats) ->
     case K of
         session_id -> Stats#rr_recon_stats.session_id;
@@ -133,8 +150,7 @@ get(K, Stats) ->
         build_time -> Stats#rr_recon_stats.build_time;
         recon_time -> Stats#rr_recon_stats.recon_time;
         resolve_started -> Stats#rr_recon_stats.resolve_started;
-        status -> Stats#rr_recon_stats.status;
-        _ -> 0
+        status -> Stats#rr_recon_stats.status
     end.
 
 -spec merge(stats(), stats()) -> stats().
