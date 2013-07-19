@@ -268,8 +268,7 @@ on({start_deliver, TraceId}, State) ->
     end;
 
 on({deliver, TraceId}, State) ->
-    Entry = lists:keyfind(TraceId, 1, State),
-    case Entry of
+    case lists:keyfind(TraceId, 1, State) of
         false ->
             %%log:log("Nothing to deliver, unknown trace id!~n"),
             State;
@@ -364,17 +363,17 @@ State) ->
                                  Possibilities::pos_integer(),
                                  state_t()}.
 pop_random_message(#state{msg_queues = OldQueues} = State) ->
-    {{{Src, Dest}, Q}, Len} = util:randomelem_and_length(OldQueues),
+    {{{Src, Dest} = Key, Q}, Len} = util:randomelem_and_length(OldQueues),
     {{value, {LorG, M}}, Q2} = queue:out(Q),
-    NewQueues = update_queue_in_list_of_queues({Src, Dest}, Q2, OldQueues),
+    NewQueues = update_queue_in_list_of_queues(Key, Q2, OldQueues),
     State2 = State#state{msg_queues = NewQueues},
     {Src, Dest, LorG, M, Len, State2}.
 
 -spec pop_random_delay_message(state_t()) -> {comm:mypid(), comm:message(), state_t()}.
 pop_random_delay_message(#state{msg_delay_queues = OldQueues} = State) ->
-    {{Dest}, Q} = util:randomelem(OldQueues),
+    {{Dest} = Key, Q} = util:randomelem(OldQueues),
     {{value, M}, Q2} = queue:out(Q),
-    NewQueues = update_queue_in_list_of_queues({Dest}, Q2, OldQueues),
+    NewQueues = update_queue_in_list_of_queues(Key, Q2, OldQueues),
     State2 = State#state{msg_delay_queues = NewQueues},
     {Dest, M, State2}.
 
@@ -389,10 +388,10 @@ add_to_list_of_queues(Key, M, Queues) ->
     end.
 
 update_queue_in_list_of_queues(Key, Q, Queues) ->
-    case queue:len(Q) of
-        0 ->
+    case queue:is_empty(Q) of
+        true ->
             lists:keydelete(Key, 1, Queues);
-        _ ->
+        false ->
             Tuple = {Key, Q},
             lists:keyreplace(Key, 1, Queues, Tuple)
     end.
