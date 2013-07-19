@@ -369,8 +369,9 @@ check_session_complete(#session{ rc_stats = RCStats,
                                  rs_called = C, rs_finish = C } = S) 
   when RCStats =/= none->
     case rr_recon_stats:get(status, RCStats) of
-        finish -> comm:send_local(self(), {request_sync_complete, S});
-        _ -> ok
+        X when X =:= finish orelse X =:= abort ->
+            comm:send_local(self(), {request_sync_complete, S});
+        wait -> ok
     end;
 check_session_complete(_Session) ->
     ok.
