@@ -37,9 +37,14 @@ all() ->
 suite() -> [ {timetrap, {seconds, 15}} ].
 
 init_per_suite(Config) ->
-    unittest_helper:init_per_suite(Config).
+    Config1 = unittest_helper:init_per_suite(Config),
+    tester:register_type_checker({typedef, backend_beh, key}, backend_beh, tester_is_valid_db_key),
+    tester:register_value_creator({typedef, backend_beh, key}, backend_beh, tester_create_db_key, 1),
+    Config1.
 
 end_per_suite(Config) ->
+    tester:unregister_type_checker({typedef, backend_beh, key}),
+    tester:unregister_value_creator({typedef, backend_beh, key}),
     unittest_helper:end_per_suite(Config).
 
 %% add backend name to list

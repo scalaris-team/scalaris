@@ -21,7 +21,7 @@
 -vsn('$Id$').
 
 -type db() :: any().
--type key() :: term().
+-type key() :: term(). %% '$end_of_table' is not allowed as key() or else iterations won't work with ets!
 -type entry() :: tuple().
 -type left_bracket() :: '(' | '['.
 -type right_bracket() :: ')' | ']'.
@@ -30,6 +30,9 @@
 -ifdef(with_export_type_support).
 -export_type([db/0, key/0, entry/0, interval/0]).
 -endif.
+
+% for tester:
+-export([tester_is_valid_db_key/1, tester_create_db_key/1]).
 
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
@@ -66,3 +69,11 @@ behaviour_info(_Other) ->
     undefined.
 
 -endif.
+
+-spec tester_is_valid_db_key(term()) -> boolean().
+tester_is_valid_db_key('$end_of_table') -> false;
+tester_is_valid_db_key(_) -> true.
+
+-spec tester_create_db_key(term()) -> key().
+tester_create_db_key('$end_of_table') -> end_of_table;
+tester_create_db_key(K) -> K.

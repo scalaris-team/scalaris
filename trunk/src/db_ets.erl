@@ -37,7 +37,7 @@
 -export([foldr/3, foldr/4, foldr/5]).
 
 -type db() :: tid() | atom().
--type key() :: backend_beh:key().
+-type key() :: backend_beh:key(). %% '$end_of_table' is not allowed as key() or else iterations won't work!
 -type entry() :: backend_beh:entry().
 
 -ifdef(with_export_type_support).
@@ -58,6 +58,7 @@ close(DBName) ->
 %%      The key is expected to be the first element of Entry.
 -spec put(DBName::db(), Entry::entry()) -> db().
 put(DBName, Entry) ->
+    ?ASSERT(element(1, Entry) =/= '$end_of_table'),
     ets:insert(DBName, Entry),
     DBName.
 
