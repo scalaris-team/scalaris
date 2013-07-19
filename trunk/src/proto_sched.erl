@@ -128,18 +128,23 @@
 -export_type([passed_state/0]).
 -endif.
 
--record(state, {
-          msg_queues       = ?required(state, msg_queues)
-          :: list({{Src :: comm:mypid(), Dest :: comm:mypid()}, queue()}),
-          msg_delay_queues = ?required(state, msg_delay_queues)
-          :: list({{Dest :: comm:mypid()}, queue()}),
-          status           = ?required(state, status)
-          :: stopped | running | start_delivery,
-          passed_state     = ?required(state, passed_state)
-          :: none | passed_state(),
-          num_possible_executions = ?required(state, passed_state)
-          :: pos_integer()
-         }).
+-type queue_key()        :: {Src :: comm:mypid(), Dest :: comm:mypid()}.
+-type delay_queue_key()  :: {Dest :: comm:mypid()}.
+-type msg_queues()       :: [{queue_key(), queue()}].
+-type msg_delay_queues() :: [{delay_queue_key(), queue()}].
+
+-record(state,
+        {msg_queues              = ?required(state, msg_queues)
+                                       :: msg_queues(),
+         msg_delay_queues        = ?required(state, msg_delay_queues)
+                                       :: msg_delay_queues(),
+         status                  = ?required(state, status)
+                                       :: stopped | running | start_delivery,
+         passed_state            = ?required(state, passed_state)
+                                       :: none | passed_state(),
+         num_possible_executions = ?required(state, passed_state)
+                                       :: pos_integer()
+        }).
 
 -type state_t() :: #state{}.
 -spec start() -> ok.
@@ -344,18 +349,18 @@ new(TraceId) ->
             num_possible_executions = 1
           }.
 
--spec add_message(comm:mypid(), comm:mypid(), local | global, comm:message(), state_t()) -> state_t().
+-spec add_message(comm:mypid(), comm:mypid(), comm:message(), local | global, state_t()) -> state_t().
 add_message(Src, Dest, Msg, LorG, #state{msg_queues = OldQueues} = State) ->
     Key = {Src, Dest},
     NewQueues = add_to_list_of_queues(Key, {LorG, Msg}, OldQueues),
     State#state{msg_queues = NewQueues}.
 
--spec add_delay_message(comm:mypid(), comm:message(), state_t()) -> state_t().
-add_delay_message(Dest, Msg, #state{msg_delay_queues = OldQueues} =
-State) ->
-    Key = {Dest},
-    NewQueues = add_to_list_of_queues(Key, Msg, OldQueues),
-    State#state{msg_delay_queues = NewQueues}.
+%% -spec add_delay_message(comm:mypid(), comm:message(), state_t()) -> state_t().
+%% add_delay_message(Dest, Msg, #state{msg_delay_queues = OldQueues} =
+%% State) ->
+%%     Key = {Dest},
+%%     NewQueues = add_to_list_of_queues(Key, Msg, OldQueues),
+%%     State#state{msg_delay_queues = NewQueues}.
 
 -spec pop_random_message(state_t()) ->
                                 {Src::comm:mypid(), Dest::comm:mypid(),
@@ -369,14 +374,17 @@ pop_random_message(#state{msg_queues = OldQueues} = State) ->
     State2 = State#state{msg_queues = NewQueues},
     {Src, Dest, LorG, M, Len, State2}.
 
--spec pop_random_delay_message(state_t()) -> {comm:mypid(), comm:message(), state_t()}.
-pop_random_delay_message(#state{msg_delay_queues = OldQueues} = State) ->
-    {{Dest} = Key, Q} = util:randomelem(OldQueues),
-    {{value, M}, Q2} = queue:out(Q),
-    NewQueues = update_queue_in_list_of_queues(Key, Q2, OldQueues),
-    State2 = State#state{msg_delay_queues = NewQueues},
-    {Dest, M, State2}.
+%% -spec pop_random_delay_message(state_t()) -> {comm:mypid(), comm:message(), state_t()}.
+%% pop_random_delay_message(#state{msg_delay_queues = OldQueues} = State) ->
+%%     {{Dest} = Key, Q} = util:randomelem(OldQueues),
+%%     {{value, M}, Q2} = queue:out(Q),
+%%     NewQueues = update_queue_in_list_of_queues(Key, Q2, OldQueues),
+%%     State2 = State#state{msg_delay_queues = NewQueues},
+%%     {Dest, M, State2}.
 
+-spec add_to_list_of_queues
+        (queue_key(), {local | global, comm:message()}, msg_queues()) -> msg_queues().%;
+        %(delay_queue_key(), comm:message(), msg_delay_queues()) -> msg_delay_queues().
 add_to_list_of_queues(Key, M, Queues) ->
     case lists:keyfind(Key, 1, Queues) of
         {_, Queue} ->
@@ -387,6 +395,9 @@ add_to_list_of_queues(Key, M, Queues) ->
             [{Key, Q} | Queues]
     end.
 
+-spec update_queue_in_list_of_queues
+        (queue_key(), queue(), msg_queues()) -> msg_queues().%;
+        %(delay_queue_key(), queue(), msg_delay_queues()) -> msg_delay_queues().
 update_queue_in_list_of_queues(Key, Q, Queues) ->
     case queue:is_empty(Q) of
         true ->
