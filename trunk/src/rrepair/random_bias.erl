@@ -25,6 +25,9 @@
 
 -export([binomial/2]).
 
+% for tester:
+-export([tester_create_distribution_fun/3]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -52,6 +55,7 @@
 % creates a new binomial distribution generation fun.
 -spec binomial(pos_integer(), float()) -> distribution_fun().
 binomial(N, P) ->
+    ?ASSERT(P > 0 andalso P < 1),
     UseApprox = approx_valid(N, P),
     create_distribution_fun({ {binom, N, P, 0, UseApprox},
                               fun calc_binomial/1,
@@ -107,7 +111,7 @@ next_state({binom, N, _P, X, _}) when N =:= X + 1 ->
 next_state({binom, N, P, X, Approx}) -> 
     {binom, N, P, X + 1, Approx}.
 
-% @doc apprxoimation is good if this conditions hold
+% @doc approximation is good if this conditions hold
 %      SRC: http://www.vosesoftware.com/ModelRiskHelp/index.htm#Distributions/Approximating_one_distribution_with_another/Approximations_to_the_Binomial_Distribution.htm
 -spec approx_valid(pos_integer(), float()) -> boolean().
 approx_valid(_N, 0) -> false;
@@ -116,3 +120,17 @@ approx_valid(N, P) ->
     One = N > ((9 * P) / (1 - P)),
     Two = N > ((9 * (1 - P)) / P),
     One andalso Two.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Tester
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec tester_create_distribution_fun(pos_integer(), pos_integer(),
+                                     pos_integer()) -> distribution_fun().
+tester_create_distribution_fun(N, P1, P2) when P2 > P1 ->
+    binomial(N, P1 / P2);
+tester_create_distribution_fun(N, P1, P2) when P2 < P1 ->
+    binomial(N, P2 / P1);
+tester_create_distribution_fun(N, P1, P2) when P2 =:= P1 ->
+    binomial(N, (P2 - 1) / P1).
+

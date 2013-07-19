@@ -36,6 +36,7 @@ all()   -> [
             tester_type_check_math,
             tester_type_check_node,
             tester_type_check_paxos,
+            tester_type_check_rrepair,
             tester_type_check_tx,
             tester_type_check_rdht_tx,
             tester_type_check_util
@@ -291,6 +292,33 @@ tester_type_check_paxos(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
+    true.
+
+tester_type_check_rrepair(_Config) ->
+    Count = 500,
+    config:write(no_print_ring_data, true),
+    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
+    tester:register_value_creator({typedef, random_bias, distribution_fun},
+                                  random_bias, tester_create_distribution_fun, 3),
+    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    Modules =
+        [ {rr_recon_stats, [], []}%,
+%%           {db_generator,
+%%            [ {insert_db, 1}, %% tries to send messages
+%%              {remove_keys, 1} %% tries to send messages
+%%            ],
+%%            [ {get_node_list, 0} %% tries to send messages
+%%            ]}
+        ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_value_creator({typedef, random_bias, distribution_fun}),
+    tester:unregister_value_creator({typedef, intervals, interval}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
+    tester:unregister_type_checker({typedef, intervals, interval}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
     true.
 
 tester_type_check_tx(_Config) ->
