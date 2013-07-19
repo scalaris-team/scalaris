@@ -33,6 +33,7 @@
 
 % for tester:
 -export([tester_is_valid_db_key/1, tester_create_db_key/1]).
+-export([tester_is_valid_db_entry/1, tester_create_db_entry/1]).
 
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
@@ -77,3 +78,14 @@ tester_is_valid_db_key(_) -> true.
 -spec tester_create_db_key(term()) -> key().
 tester_create_db_key('$end_of_table') -> end_of_table;
 tester_create_db_key(K) -> K.
+
+-spec tester_is_valid_db_entry(tuple()) -> boolean().
+tester_is_valid_db_entry({}) -> false;
+tester_is_valid_db_entry(E) when element(1, E) =:= '$end_of_table' -> false;
+tester_is_valid_db_entry(_) -> true.
+
+-spec tester_create_db_entry(tuple()) -> key().
+tester_create_db_entry({}) -> {empty_tuple};
+tester_create_db_entry(E) when element(1, E) =:= '$end_of_table' -> 
+    setelement(1, E, end_of_table);
+tester_create_db_entry(K) -> K.
