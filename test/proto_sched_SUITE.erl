@@ -46,7 +46,7 @@ suite() -> [ {timetrap, {seconds, 120}} ].
 %group(tester_tests) ->
 %    [{timetrap, {seconds, 400}}];
 group(rbr_tests) ->
-    [{timetrap, {seconds, 400}}].
+    [{timetrap, {seconds, 200}}].
 
 
 init_per_suite(Config) ->
@@ -75,7 +75,7 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 test_kv_on_cseq_write_2(_Config) ->
-    iter(fun kv_on_cseq_write/0, 2000).
+    iter(fun kv_on_cseq_write/0, 1000).
 
 kv_on_cseq_write() ->
     proto_sched:start(),
@@ -99,7 +99,7 @@ kv_on_cseq_write() ->
     proto_sched:cleanup().
 
 test_qwrite_qwrite_qread(_Config) ->
-    iter(fun qwrite_qwrite_qread/0, 2000).
+    iter(fun qwrite_qwrite_qread/0, 1000).
 
 qwrite_qwrite_qread() ->
     DB = lease_db1,
