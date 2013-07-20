@@ -311,8 +311,7 @@ on({on_handler_done, TraceId}, State) ->
     gen_component:post_op(State, {deliver, TraceId});
 
 on({get_infos, Client, TraceId}, State) ->
-    Entry = lists:keyfind(TraceId, 1, State),
-    case Entry of
+    case lists:keyfind(TraceId, 1, State) of
         false ->
             comm:send(Client, {get_infos_reply, []});
         {TraceId, TraceEntry} ->
@@ -325,7 +324,9 @@ on({get_infos, Client, TraceId}, State) ->
 
 on({cleanup, TraceId}, State) ->
     case lists:keytake(TraceId, 1, State) of
-        {value, _Tuple, TupleList2} -> TupleList2;
+        {value, {TraceId, TraceEntry}, TupleList2} ->
+            state_cleanup(TraceEntry),
+            TupleList2;
         false                       -> State
     end.
 
@@ -348,6 +349,14 @@ new(TraceId) ->
             passed_state = passed_state_new(TraceId, {proto_sched, Logger}),
             num_possible_executions = 1
           }.
+
+%% @doc Clean-up the given state and anything left in the process dictionary.
+-spec state_cleanup(State::state()) -> ok.
+state_cleanup(#state{msg_queues = Queues, msg_delay_queues = DelayQueues}) ->
+    % remove queues from erlang dictionary:
+    _ = [erlang:erase(Key) || Key <- Queues],
+    _ = [erlang:erase(Key) || Key <- DelayQueues],
+    ok.
 
 -spec add_message(comm:mypid(), comm:mypid(), comm:message(), local | global, state_t()) -> state_t().
 add_message(Src, Dest, Msg, LorG, #state{msg_queues = OldQueues} = State) ->
