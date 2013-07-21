@@ -8,6 +8,8 @@
 for file in yaws_xmlrpc.erl yaws_rpc.erl yaws_ls.erl yaws_jsonrpc.erl yaws_exhtml.erl ; do \
   sed -i -e "1i %% -*- coding: Latin-1 -*-" src/$file ; \
 done
+5c) to fix a performance regression for yaws = 1.96: download and apply patch from:
+https://github.com/klacke/yaws/commit/e4bbac37992d77ecc90d6fae482fc8267e1ec298.patch
 6) create <scalaris>/contrib/yaws/src/yaws_configure.hrl with content:
 %-define(HAVE_SENDFILE, true).
 7) that's it, go back to <scalaris>/ and run make clean && ./configure && make
