@@ -55,9 +55,8 @@ load_without_export_all(Module) ->
 % directory should be in ../ebin
 
 reload_with_options(Module, MyOptions) ->
-    Src = get_file_for_module(Module),
+    {Src, Options} = get_src_and_flags_for_module(Module),
     %ct:pal("~p", [file:get_cwd()]),
-    Options = get_compile_flags_for_module(Module),
     %ct:pal("~p", [Options]),
     {ok, CurCWD} = file:get_cwd(),
     ok = fix_cwd_scalaris(),
@@ -114,17 +113,24 @@ reload_with_options(Module, MyOptions) ->
 % misc. helper functions
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec get_file_for_module(module()) -> string().
-get_file_for_module(Module) ->
+-spec get_src_and_flags_for_module(module()) -> {string(), list()}.
+get_src_and_flags_for_module(Module) ->
+    get_src_and_flags_for_module(Module, ["ebin", "test"]).
+    
+-spec get_src_and_flags_for_module(module(), Paths::[string(),...]) -> string().
+get_src_and_flags_for_module(Module, [Path | PathL]) ->
     % we have to be in $SCALARIS/ebin to find the beam file
     {ok, CurCWD} = file:get_cwd(),
-    ok = fix_cwd_ebin(),
+    ok = fix_cwd(Path),
     Res = beam_lib:chunks(Module, [compile_info]),
     ok = file:set_cwd(CurCWD),
     case Res of
         {ok, {Module, [{compile_info, Options}]}} ->
-            {source, Filename} = lists:keyfind(source, 1, Options),
-            Filename;
+            {source, Source} = lists:keyfind(source, 1, Options),
+            {options, Opts} = lists:keyfind(options, 1, Options),
+            {Source, Opts};
+        _ when PathL =/= [] ->
+            get_src_and_flags_for_module(Module, PathL);
         X ->
             ct:pal("~w ~p", [Module, X]),
             ct:pal("~p", [file:get_cwd()]),
@@ -132,31 +138,13 @@ get_file_for_module(Module) ->
             ct:fail(unknown_module)
     end.
 
--spec get_compile_flags_for_module(module()) -> list().
-get_compile_flags_for_module(Module) ->
-    % we have to be in $SCALARIS/ebin to find the beam file
-    {ok, CurCWD} = file:get_cwd(),
-    ok = fix_cwd_ebin(),
-    Res = beam_lib:chunks(Module, [compile_info]),
-    ok = file:set_cwd(CurCWD),
-    case Res of
-        {ok, {Module, [{compile_info, Options}]}} ->
-            {options, Opts} = lists:keyfind(options, 1, Options),
-            Opts;
-        X ->
-            ct:pal("~w ~w", [Module, X]),
-            timer:sleep(1000),
-            ct:fail(unknown_module),
-            []
-    end.
-
-% @doc set cwd to $SCALARIS/ebin
--spec fix_cwd_ebin() -> ok | {error, Reason::file:posix()}.
-fix_cwd_ebin() ->
+% @doc set cwd to $SCALARIS/RelPath
+-spec fix_cwd(RelPath::string()) -> ok | {error, Reason::file:posix()}.
+fix_cwd(RelPath) ->
     case file:get_cwd() of
         {ok, CurCWD} ->
-            case string:rstr(CurCWD, "/ebin") =/= (length(CurCWD) - 4 + 1) of
-                true -> file:set_cwd("../ebin");
+            case string:rstr(CurCWD, "/" ++ RelPath) =/= (length(CurCWD) - 4 + 1) of
+                true -> file:set_cwd("../" ++ RelPath);
                 _    -> ok
             end;
         Error -> Error
