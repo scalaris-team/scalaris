@@ -180,7 +180,7 @@ on({get_entries_response, EntryList}, State =
     EntryMapped = [MX || X <- EntryList,
                          not gb_sets:is_element(element(1, (MX = entry_to_kvv(X))), KSet)],
     %without session id
-    send_feedback(FBDest, EntryMapped, null),
+    send_key_upd(FBDest, EntryMapped, null, []),
     NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
     if ToUpdate =:= 0 -> shutdown(resolve_ok, NewState);
        true           -> NewState % note: shutdown handled by update_key_entry_ack
@@ -229,7 +229,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
                 ?TRACE("UPDATED = ~p - Regen=~p - FB=~p", [Stats#resolve_stats.update_count, Stats#resolve_stats.regen_count, NewFB], State),
-                send_feedback(FBDest, NewFBItems, Stats#resolve_stats.session_id),
+                send_key_upd(FBDest, NewFBItems, Stats#resolve_stats.session_id, [feedback_response]),
                 shutdown(resolve_ok, NewState);
         true -> NewState
     end;
@@ -323,15 +323,17 @@ make_unique_kvv([H | T], [AccH | AccT] = Acc) ->
         false -> make_unique_kvv(T, [H|Acc])
     end.
 
--spec send_feedback(comm:mypid() | undefined, kvv_list(), rrepair:session_id() | null) -> ok.
-send_feedback(undefined, _, _) -> 
+-spec send_key_upd(Dest::comm:mypid() | undefined, Items::kvv_list(), 
+                   rrepair:session_id() | null, options()) -> ok.
+send_key_upd(undefined, _, _, _) ->
     ok;
-send_feedback(Dest, Items, null) ->
+send_key_upd(DestPid, Items, SID, Options) ->
     SendList = make_unique_kvv(lists:keysort(1, Items), []),
-    comm:send(Dest, {request_resolve, {key_upd, SendList}, [feedback_response]});
-send_feedback(Dest, Items, SID) ->
-    SendList = make_unique_kvv(lists:keysort(1, Items), []),
-    comm:send(Dest, {request_resolve, SID, {key_upd, SendList}, [feedback_response]}).
+    if SID =:= null ->
+           comm:send(DestPid, {request_resolve, {key_upd, SendList}, Options});
+       true ->
+           comm:send(DestPid, {request_resolve, SID, {key_upd, SendList}, Options})
+    end.
 
 -spec send_stats(comm:mypid() | undefined, stats()) -> ok.
 send_stats(undefined, _) -> 
