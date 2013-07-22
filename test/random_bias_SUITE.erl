@@ -76,8 +76,8 @@ tester_sum_test(_) ->
 
 -spec prop_value_count(pos_integer()) -> boolean().
 prop_value_count(Count) ->
-    BFun = random_bias:binomial(Count, 0.3),
-    Values = gen_values(BFun, []),
+    R = random_bias:binomial(Count, 0.3),
+    Values = gen_values(R, []),
     Len = length(Values),
     ?equals_w_note(Count, Len, io_lib:format("Count = ~p - Generated=~p", [Count, Len])).
 
@@ -88,12 +88,11 @@ tester_value_count(_) ->
 % helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec gen_values(random_bias:distribution_fun(), [float()]) -> [float()].
-gen_values(Fun, Acc) ->
-    case Fun() of
-        {ok, V} -> gen_values(Fun, [V | Acc]);
-        {last, V} -> [V | Acc];
-        {error, process_died} -> Acc
+-spec gen_values(random_bias:generator(), [float()]) -> [float()].
+gen_values(RanGen, Acc) ->
+    case random_bias:next(RanGen) of
+        {ok, V, RanGen1} -> gen_values(RanGen1, [V | Acc]);
+        {last, V, exit}  -> [V | Acc]
     end.
 
 -spec expected_value([float()]) -> float().

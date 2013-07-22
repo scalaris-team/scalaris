@@ -24,15 +24,16 @@
 -include("scalaris.hrl").
 
 -export([binomial/2]).
+-export([next/1]).
 
 % for tester:
--export([tester_create_distribution_fun/3]).
+-export([tester_create_generator/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([distribution_fun/0]).
+-export_type([generator/0]).
 -endif.
 
 -type binomial_state() :: {binom,
@@ -42,58 +43,33 @@
                            Approx    :: normal | none
                           }.
 
--type distribution_fun() :: fun(() -> {ok | last, float()} | {error, process_died}).
 -type distribution_state() :: binomial_state(). %or others
--type generator_state() :: { State       :: distribution_state(),
-                             CalcFun     :: fun((distribution_state()) -> float()),
-                             NewStateFun :: fun((distribution_state()) -> distribution_state() | exit)}.
+-type generator() :: { State       :: distribution_state(),
+                       CalcFun     :: fun((distribution_state()) -> float()),
+                       NewStateFun :: fun((distribution_state()) -> distribution_state() | exit)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % creates a new binomial distribution generation fun.
--spec binomial(pos_integer(), float()) -> distribution_fun().
+-spec binomial(pos_integer(), float()) -> generator().
 binomial(N, P) when P > 0 andalso P < 1 ->
-    Approx = approx_valid(N, P),
-    create_distribution_fun({ {binom, N, P, 0, Approx},
-                              fun calc_binomial/1,
-                              fun next_state/1 }).
+    {{binom, N, P, 0, approx_valid(N, P)},
+     fun calc_binomial/1, fun next_state/1}.
+
+%% @doc Gets the next random value (and an updated state).
+-spec next(generator()) -> {ok, float(), generator()} | {last, float(), exit}.
+next({DS, CalcFun, NextFun}) ->
+    V = CalcFun(DS),
+    case NextFun(DS) of
+        exit -> {last, V, exit};
+        NewDS -> {ok, V, {NewDS, CalcFun, NextFun}}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec create_distribution_fun(generator_state()) -> distribution_fun().
-create_distribution_fun(State) ->
-    Pid = spawn(fun() -> generator(State) end),
-    fun() ->
-            case erlang:is_process_alive(Pid) of
-                true ->
-                    comm:send_local(Pid, {next, self()}),
-                    receive
-                        ?SCALARIS_RECV({last_response, V}, {last, V});
-                        ?SCALARIS_RECV({next_response, V}, {ok, V})
-                    end;
-                false -> {error, process_died}
-            end
-    end.
-
--spec generator(generator_state()) -> ok.
-generator({ DS, CalcFun, NextFun }) ->
-    receive
-        ?SCALARIS_RECV(
-            {next, Pid}, %% ->
-            begin
-                V = CalcFun(DS),
-                case NextFun(DS) of
-                    exit -> comm:send_local(Pid, {last_response, V});
-                    NewDS -> comm:send_local(Pid, {next_response, V}),
-                             generator({NewDS, CalcFun, NextFun})
-                end
-            end
-          )          
-    end.
 
 -spec calc_normal(X::float(), M::float(), E::float()) -> float().
 calc_normal(X, M, Dev) ->
@@ -142,12 +118,12 @@ approx_valid(N, P) ->
 %% Tester
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec tester_create_distribution_fun(pos_integer(), 1..1000000,
-                                     1..1000000) -> distribution_fun().
-tester_create_distribution_fun(N, P1, P2) when P2 > P1 ->
+-spec tester_create_generator(pos_integer(), 1..1000000, 1..1000000)
+        -> generator().
+tester_create_generator(N, P1, P2) when P2 > P1 ->
     binomial(N, P1 / P2);
-tester_create_distribution_fun(N, P1, P2) when P2 < P1 ->
+tester_create_generator(N, P1, P2) when P2 < P1 ->
     binomial(N, P2 / P1);
-tester_create_distribution_fun(N, P, P) ->
+tester_create_generator(N, P, P) ->
     binomial(N, 0.9999999999).
 
