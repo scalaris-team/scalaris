@@ -28,6 +28,10 @@
 -export([fill_ring/3]).
 -export([insert_db/1, remove_keys/1]).
 
+% for tester:
+-export([get_db_feeder/3, get_db_feeder/4]).
+%% -export([fill_ring_feeder/3]).
+
 -define(ReplicationFactor, 4).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -50,7 +54,7 @@
 
 -type failure_type()    :: update | regen | mixed.
 -type failure_quadrant():: 1..4.
--type failure_dest()    :: all | [failure_quadrant()]. 
+-type failure_dest()    :: all | [failure_quadrant(),...].
 -type db_type()         :: wiki | random.
 -type db_parameter()    :: {ftype, failure_type()} |
                            {fprob, 0..100} |                  %failure probability
@@ -64,11 +68,19 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec get_db_feeder(intervals:continuous_interval(), 0..1000, db_distribution())
+        -> {intervals:continuous_interval(), non_neg_integer(), db_distribution()}.
+get_db_feeder(I, Count, Distribution) -> {I, Count, Distribution}.
+
 %% @doc This will generate a list of up to [ItemCount] keys with the requested
 %%      distribution in the given interval.
 -spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution()) -> [result()].
 get_db(I, Count, Distribution) ->
     get_db(I, Count, Distribution, []).
+
+-spec get_db_feeder(intervals:continuous_interval(), 0..1000, db_distribution(), [option()])
+        -> {intervals:continuous_interval(), non_neg_integer(), db_distribution(), [option()]}.
+get_db_feeder(I, Count, Distribution, Options) -> {I, Count, Distribution, Options}.
 
 -spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution(), [option()]) -> [result()].
 get_db(Interval, ItemCount, Distribution, Options) ->
@@ -127,6 +139,7 @@ uniform_key_list_no_split([{I, Add} | R], Acc, AccType) ->
         end,
     uniform_key_list(R, lists:append(ToAdd, Acc), AccType).
 
+-spec gen_value() -> db_dht:value().
 gen_value() ->
     tester_value_creator:create_value(integer, 0, tester_parse_state:new_parse_state()).
 
@@ -169,14 +182,25 @@ non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccType) ->
 % Helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% not ready yet:
+%% -spec fill_ring_feeder(random, 1..1000, [db_parameter()])
+%%         -> {db_type(), pos_integer(), [db_parameter()]}.
+%% fill_ring_feeder(Type, DBSize, Params) -> {Type, DBSize, Params}.
+
 % @doc  DBSize=Number of Data Entities in DB (without replicas)
 -spec fill_ring(db_type(), pos_integer(), [db_parameter()]) -> db_status().
 fill_ring(Type, DBSize, Params) ->
     case Type of
         random -> fill_random(DBSize, Params);
-        wiki -> fill_wiki(Params)
+        wiki -> fill_wiki(Params, "barwiki-latest-pages-meta-current.db")
     end.
 
+% not ready yet:
+%% -spec fill_random_feeder(1..1000, [db_parameter()])
+%%         -> {pos_integer(), [db_parameter()]}.
+%% fill_random_feeder(DBSize, Params) -> {DBSize, Params}.
+
+-spec fill_random(DBSize::pos_integer(), [db_parameter()]) -> db_status().
 fill_random(DBSize, Params) ->    
     Distr = proplists:get_value(distribution, Params, uniform),
     I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
@@ -187,9 +211,7 @@ fill_random(DBSize, Params) ->
     insert_db(DB),
     DBStatus.
 
-fill_wiki(_Params) ->
-    fill_wiki(_Params, "barwiki-latest-pages-meta-current.db").
-
+-spec fill_wiki([db_parameter()], DBFile::string()) -> db_status().
 fill_wiki(_Params, DBFile) ->
     Result = os:cmd("ant -buildfile ../contrib/wikipedia/build.xml import-db "
                    "-Ddata=\"../contrib/wikipedia/" ++ DBFile ++ "\" "
@@ -306,9 +328,9 @@ p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec add_failures_to_cell([?RT:key()], non_neg_integer(), failure_type(), failure_dest(), Acc) -> Result
-    when is_subtype(Acc,    {[db_entry:entry()], Outdated::non_neg_integer()}),
-         is_subtype(Result, {[db_entry:entry()], Outdated::non_neg_integer(), RestFCount::non_neg_integer()}).
+-spec add_failures_to_cell([?RT:key()], non_neg_integer(), failure_type(), failure_dest(),
+                           Acc::{[db_entry:entry()], Outdated::non_neg_integer()})
+        -> Result::{[db_entry:entry()], Outdated::non_neg_integer(), RestFCount::non_neg_integer()}.
 add_failures_to_cell([], FCount, _FType, _FDest, {AccE, AccO}) ->
     {AccE, AccO, FCount};
 add_failures_to_cell([H | T], 0, FType, FDest, {DB, Out}) ->
@@ -319,8 +341,9 @@ add_failures_to_cell([H | T], FCount, FType, FDest, {AccEntry, AccOut}) ->
     add_failures_to_cell(T, FCount - 1, FType, FDest,
                          {lists:append(AddEntrys, AccEntry), AddOut + AccOut}).
 
--spec build_failure_cells([float()], [?RT:key()], non_neg_integer(), Acc::Res) -> Result::Res
-    when is_subtype(Res, [{float(), [?RT:key()]}]).
+-spec build_failure_cells([float()], [?RT:key()], non_neg_integer(),
+                          Acc::[{float(), [?RT:key()]}])
+        -> Result::[{float(), [?RT:key()]}].
 build_failure_cells([], [], _Next, Acc) ->
     Acc;
 build_failure_cells([], T, _Next, [{P, Cell} | Acc]) ->
@@ -380,11 +403,11 @@ get_error_key(Key, Dest) ->
         QList -> rr_recon:map_key_to_quadrant(Key, util:randomelem(QList))
     end.
 
--spec select_random_keys(L, non_neg_integer(), AccFail::L) -> {Fail::L, Rest::L}
-    when is_subtype(L, [?RT:key()]).
-select_random_keys(RestKeys, 0, Acc) -> 
-    {Acc, RestKeys};
-select_random_keys(Keys, Count, Acc) ->
+-spec select_random_keys([?RT:key()], non_neg_integer(), AccFail::[?RT:key()])
+        -> {Fail::[?RT:key()], Rest::[?RT:key()]}.
+select_random_keys(RestKeys, 0, Acc) ->  {Acc, RestKeys};
+select_random_keys([] = Keys, _Count, Acc) ->  {Acc, Keys};
+select_random_keys([_|_] = Keys, Count, Acc) ->
     FRep = util:randomelem(Keys),
     select_random_keys([X || X <- Keys, X =/= FRep], Count - 1, [FRep | Acc]).
 
