@@ -42,7 +42,7 @@
                            Approx    :: normal | none
                           }.
 
--type distribution_fun() :: fun(() -> {ok | last, float()}).
+-type distribution_fun() :: fun(() -> {ok | last, float()} | {error, process_died}).
 -type distribution_state() :: binomial_state(). %or others
 -type generator_state() :: { State       :: distribution_state(),
                              CalcFun     :: fun((distribution_state()) -> float()),
@@ -68,10 +68,14 @@ binomial(N, P) when P > 0 andalso P < 1 ->
 create_distribution_fun(State) ->
     Pid = spawn(fun() -> generator(State) end),
     fun() ->
-            comm:send_local(Pid, {next, self()}),
-            receive
-                ?SCALARIS_RECV({last_response, V}, {last, V});
-                ?SCALARIS_RECV({next_response, V}, {ok, V})
+            case erlang:is_process_alive(Pid) of
+                true ->
+                    comm:send_local(Pid, {next, self()}),
+                    receive
+                        ?SCALARIS_RECV({last_response, V}, {last, V});
+                        ?SCALARIS_RECV({next_response, V}, {ok, V})
+                    end;
+                false -> {error, process_died}
             end
     end.
 

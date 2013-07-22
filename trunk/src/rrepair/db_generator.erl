@@ -155,14 +155,18 @@ non_uniform_key_list_([], _ToAdd, _Fun, Acc, _AccType) ->
     Acc;
 non_uniform_key_list_([SubI | R], ToAdd, Fun, Acc, AccType) ->
     ?ASSERT(not intervals:is_empty(SubI)),
-    {Status, V} = Fun(),
-    Add = erlang:trunc(V * ToAdd),
-    NAcc = if Add >= 1 -> uniform_key_list([{SubI, Add}], Acc, AccType);
-              true     -> Acc
-           end,
-    case Status of
-        ok   -> non_uniform_key_list_(R, ToAdd, Fun, Acc, AccType);
-        last -> NAcc
+    case Fun() of
+        {Status, V} when Status =:= ok orelse Status =:= last ->
+            Add = erlang:trunc(V * ToAdd),
+            NAcc = if Add >= 1 -> uniform_key_list([{SubI, Add}], Acc, AccType);
+                      true     -> Acc
+                   end,
+            case Status of
+                ok   -> non_uniform_key_list_(R, ToAdd, Fun, Acc, AccType);
+                last -> NAcc
+            end;
+        {error, process_died} ->
+            Acc
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -335,7 +339,8 @@ build_failure_cells([P | T], List, Next, Acc) ->
 get_non_uniform_probs(Fun, Acc) ->
     case Fun() of
         {ok, V} -> get_non_uniform_probs(Fun, [V|Acc]);
-        {last, V} -> lists:reverse([V|Acc])
+        {last, V} -> lists:reverse([V|Acc]);
+        {error, process_died} -> lists:reverse(Acc)
     end.
 
 -spec get_synthetic_entry(?RT:key(), old | new) -> db_entry:entry().
