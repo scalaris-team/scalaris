@@ -43,17 +43,11 @@ end_per_suite(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-get_binom_values(X, Acc) ->
-    case X() of
-        {ok, V} -> get_binom_values(X, [V | Acc]);
-        {last, V} -> lists:reverse([V | Acc])
-    end.
-
 test1(_) ->
     N = 5,
     P = 0.3,
     R = random_bias:binomial(N, P),
-    Vals = get_binom_values(R, []),
+    Vals = lists:reverse(gen_values(R, [])),
     EV = expected_value(Vals),
     ?equals_w_note(1, trunc(EV), io_lib:format("EV=~p~nVals=~p", [EV, Vals])).
 
@@ -61,7 +55,7 @@ test2(_) ->
     N = 10,
     P = 2/7,
     R = random_bias:binomial(N, P),
-    Vals = get_binom_values(R, []),
+    Vals = lists:reverse(gen_values(R, [])),
     EV = expected_value(Vals),
     ct:pal("Binomial N = ~p ; P = ~p~nResult=~p~nSum=~p~nExpectedValue=~p", 
            [N, P, Vals, lists:sum(Vals), EV]),
@@ -71,7 +65,7 @@ test2(_) ->
 sum_test(N) ->
     P = 3/7,
     R = random_bias:binomial(N, P),
-    Vals = get_binom_values(R, []),
+    Vals = lists:reverse(gen_values(R, [])),
     Sum = lists:sum(Vals),
     N2 = lists:foldl(fun(V, Acc) -> Acc + (V * N) end, 0, Vals),
     ?assert_w_note(1 - Sum =< 0.00001, io_lib:format("Sum=~p", [Sum])) andalso
