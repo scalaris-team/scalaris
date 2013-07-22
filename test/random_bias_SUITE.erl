@@ -92,7 +92,8 @@ tester_value_count(_) ->
 gen_values(Fun, Acc) ->
     case Fun() of
         {ok, V} -> gen_values(Fun, [V | Acc]);
-        {last, V} -> [V | Acc]
+        {last, V} -> [V | Acc];
+        {error, process_died} -> Acc
     end.
 
 -spec expected_value([float()]) -> float().
