@@ -304,13 +304,25 @@ tester_type_check_rrepair(_Config) ->
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
     Modules =
-        [ {rr_recon_stats, [], []}%,
-%%           {db_generator,
-%%            [ {insert_db, 1}, %% tries to send messages
-%%              {remove_keys, 1} %% tries to send messages
-%%            ],
-%%            [ {get_node_list, 0} %% tries to send messages
-%%            ]}
+        [ {rr_recon_stats, [], []},
+          {db_generator,
+           [ {get_db, 3}, %% tested via feeder
+             {get_db, 4}, %% tested via feeder
+             {fill_ring, 3} %% tested via feeder
+           ],
+           [ {fill_random, 2}, %% tested via feeder
+             {fill_wiki, 2}, %% no (suitable) wiki file to import
+
+             {uniform_key_list, 3}, %% needs feeder
+             {uniform_key_list_no_split, 3}, %% needs feeder
+             {non_uniform_key_list, 5}, %% needs feeder
+             {non_uniform_key_list_, 5}, %% needs feeder
+             {get_non_uniform_probs, 2}, %% needs feeder
+
+             {gen_kvv, 3}, % TODO: currently fails
+             {p_gen_kvv, 6}, % TODO: currently fails
+             {build_failure_cells, 4} % TODO: currently fails
+           ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
