@@ -51,13 +51,10 @@
 -endif.
 
 -type option()   :: feedback_response |
-                    {feedback, comm:mypid()} | 
+                    {feedback_request, comm:mypid()} | 
                     {send_stats, comm:mypid()}. %send stats to pid after completion
 -type options()  :: [option()].
 -type kvv_list() :: [{?RT:key(), db_dht:value(), db_dht:version()}].
--type feedback() :: {nil | comm:mypid(),        %feedback destination adress
-                     kvv_list()}.
-
 -type exit_reason() :: resolve_ok | resolve_abort.
 
 -record(resolve_stats,
@@ -68,7 +65,7 @@
          update_count     = 0      :: non_neg_integer(),
          upd_fail_count   = 0      :: non_neg_integer(),
          regen_fail_count = 0      :: non_neg_integer(),
-         feedback_response= false  :: boolean()            %true if this is a feedback response
+         feedback_response= false  :: boolean() %true if this is a feedback response
          }).
 -type stats() :: #resolve_stats{}.
 
@@ -82,11 +79,12 @@
         {
          ownerPid       = ?required(rr_resolve_state, ownerPid)         :: comm:erl_local_pid(),
          dhtNodePid     = ?required(rr_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
-         operation      = nil        									:: nil | operation(),
-         stats          = #resolve_stats{}                              :: stats(),
-         my_range       = nil                                           :: nil | intervals:interval(),
-         feedback       = {nil, []}                                     :: feedback(),
-         send_stats     = nil                                           :: nil | comm:mypid()
+         operation      = undefined    									:: undefined | operation(),
+         my_range       = undefined                                     :: undefined | intervals:interval(),
+         feedbackDestPid= undefined                                     :: undefined | comm:mypid(),
+         feedbackKvv    = []                                            :: kvv_list() | [],
+         send_stats     = undefined                                     :: undefined | comm:mypid(),
+         stats          = #resolve_stats{}                              :: stats()
          }).
 -type state() :: #rr_resolve_state{}.
 
@@ -94,7 +92,7 @@
 	% API
 	{start, operation(), options()} |
     % internal
-    {get_state_response, intervals:interval()} |
+    {get_state_response, intervals:interval()} |    
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
     {shutdown, exit_reason()} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
@@ -142,10 +140,10 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {key_upd_send, Dest, _},
-                          feedback = {FB, _},
+                          feedbackDestPid = FBDest,
                           stats = Stats }) ->
     KVVList = [entry_to_kvv(E) || E <- EntryList],
-    Options = ?IIF(FB =/= nil, [{feedback, FB}], []),
+    Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
     SendList = make_unique_kvv(lists:keysort(1, KVVList), []),
     case Stats#resolve_stats.session_id of
         null -> comm:send(Dest, {request_resolve, {key_upd, SendList}, Options});
@@ -173,7 +171,7 @@ on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {interval_upd, _I, KvvList},
                           my_range = MyI,
                           dhtNodePid = DhtPid,
-                          feedback = {FBDest, _},
+                          feedbackDestPid = FBDest,
                           stats = Stats }) ->
     ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
     % Send entries not in sender interval
@@ -181,9 +179,8 @@ on({get_entries_response, EntryList}, State =
     KSet = gb_sets:from_list([element(1, Z) || Z <- KvvList]),
     EntryMapped = [MX || X <- EntryList,
                          not gb_sets:is_element(element(1, (MX = entry_to_kvv(X))), KSet)],
-    SendList = make_unique_kvv(lists:keysort(1, EntryMapped), []),
-    FBDest =/= nil andalso
-        comm:send(FBDest, {request_resolve, {key_upd, SendList}, []}), %without session id 
+    %without session id
+    send_feedback(FBDest, EntryMapped, null),
     NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
     if ToUpdate =:= 0 -> shutdown(resolve_ok, NewState);
        true           -> NewState % note: shutdown handled by update_key_entry_ack
@@ -191,9 +188,9 @@ on({get_entries_response, EntryList}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {interval_upd_send, I, Dest},
-                          feedback = {FB, _},
+                          feedbackDestPid = FBDest,
                           stats = Stats }) ->
-    Options = ?IIF(FB =/= nil, [{feedback, FB}], []),
+    Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
     KVVList = [entry_to_kvv(E) || E <- EntryList],
     SendList = make_unique_kvv(lists:keysort(1, KVVList), []),
     case Stats#resolve_stats.session_id of
@@ -212,7 +209,8 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                                                   upd_fail_count = UpdFail,
                                                   regen_fail_count = RegenFail
                                                 } = Stats,
-                          feedback = FB = {DoFB, FBItems}
+                          feedbackDestPid = FBDest,
+                          feedbackKvv = FBItems
                         }) 
   when element(1, Op) =:= key_upd;
        element(1, Op) =:= interval_upd ->
@@ -222,16 +220,16 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                    not Done and Exists -> Stats#resolve_stats{ upd_fail_count = UpdFail + 1 };
                    not Done and not Exists -> Stats#resolve_stats{ regen_fail_count = RegenFail + 1 }
                end,
-    NewFB = if
-                not Done andalso Exists andalso DoFB =/= nil -> 
-                    {DoFB, [entry_to_kvv(Entry) | FBItems]};
-                true -> FB
-            end,
-    NewState = State#rr_resolve_state{ stats = NewStats, feedback = NewFB },
+    NewFBItems = if
+                     not Done andalso Exists andalso FBDest =/= undefined ->
+                         [entry_to_kvv(Entry) | FBItems];
+                     true -> FBItems
+                 end,
+    NewState = State#rr_resolve_state{ stats = NewStats, feedbackKvv = NewFBItems },
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
                 ?TRACE("UPDATED = ~p - Regen=~p - FB=~p", [Stats#resolve_stats.update_count, Stats#resolve_stats.regen_count, NewFB], State),
-                send_feedback(NewFB, Stats#resolve_stats.session_id),
+                send_feedback(FBDest, NewFBItems, Stats#resolve_stats.session_id),
                 shutdown(resolve_ok, NewState);
         true -> NewState
     end;
@@ -244,10 +242,9 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %% @doc Starts updating the local entries with the given KvvList.
 %%      -> Returns number of send update requests.
-%%      PreCond: KvvList must be unique by keys.
+%%      PreCond: KvvList contains only unique keys
 -spec start_update_key_entry(kvv_list(), intervals:interval(), comm:mypid(), comm:erl_local_pid()) -> non_neg_integer().
 start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
     ?ASSERT(length(KvvList) =:= length(lists:ukeysort(1, KvvList))),
@@ -257,7 +254,8 @@ start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
                  intervals:in(RKey, MyI)]).
 
 -spec shutdown(exit_reason(), state()) -> kill.
-shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
+shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, 
+                                    send_stats = SendStats,
                                     stats = Stats}) ->
     send_stats(SendStats, Stats),
     comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
@@ -325,19 +323,21 @@ make_unique_kvv([H | T], [AccH | AccT] = Acc) ->
         false -> make_unique_kvv(T, [H|Acc])
     end.
 
--spec send_feedback(feedback(), rrepair:session_id()) -> ok.
-send_feedback({nil, _}, _) -> ok;
-send_feedback({Dest, Items}, null) ->
+-spec send_feedback(comm:mypid() | undefined, kvv_list(), rrepair:session_id() | null) -> ok.
+send_feedback(undefined, _, _) -> 
+    ok;
+send_feedback(Dest, Items, null) ->
     SendList = make_unique_kvv(lists:keysort(1, Items), []),
     comm:send(Dest, {request_resolve, {key_upd, SendList}, [feedback_response]});
-send_feedback({Dest, Items}, SID) ->
+send_feedback(Dest, Items, SID) ->
     SendList = make_unique_kvv(lists:keysort(1, Items), []),
     comm:send(Dest, {request_resolve, SID, {key_upd, SendList}, [feedback_response]}).
 
--spec send_stats(nil | comm:mypid(), stats()) -> ok.
-send_stats(nil, _) -> ok;
-send_stats(SendStats, Stats) ->
-    comm:send(SendStats, {resolve_stats, Stats}).
+-spec send_stats(comm:mypid() | undefined, stats()) -> ok.
+send_stats(undefined, _) -> 
+    ok;
+send_stats(DestPid, Stats) ->
+    comm:send(DestPid, {resolve_stats, Stats}).
 
 -spec print_resolve_stats(stats()) -> [any()].
 print_resolve_stats(Stats) ->
@@ -363,15 +363,15 @@ start(Operation, Options) ->
 
 -spec start(rrepair:session_id() | null, operation(), options()) -> {ok, MyPid::pid()}.
 start(SID, Operation, Options) ->
-    FBDest = proplists:get_value(feedback, Options, nil),
+    FBDest = proplists:get_value(feedback_request, Options, undefined),
     FBResp = proplists:get_value(feedback_response, Options, false),
-    StatsDest = proplists:get_value(send_stats, Options, nil),
+    StatsDest = proplists:get_value(send_stats, Options, undefined),
     State = #rr_resolve_state{ ownerPid = self(),
                                dhtNodePid = pid_groups:get_my(dht_node),
                                operation = Operation,
                                stats = #resolve_stats{ feedback_response = FBResp,
                                                        session_id = SID },
-                               feedback = {FBDest, []},
+                               feedbackDestPid = FBDest,
                                send_stats = StatsDest },
     ?TRACE("RESOLVE - CREATE~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p",
            [element(1, Operation), FBDest, FBResp], State),

@@ -234,7 +234,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
         case Diff of
             [_|_] ->
                 send_local(OwnerL, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff},
-                                    [{feedback, comm:make_global(OwnerL)}]}),
+                                    [{feedback_request, comm:make_global(OwnerL)}]}),
                 rr_recon_stats:inc([{resolve_started, 2}], Stats); %feedback causes 2 resolve runs
             [] -> Stats
         end,
@@ -520,7 +520,9 @@ resolve_leaf(Node, {Dest, SID, OwnerL}) ->
            send(Dest, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), OwnerR}, []}),
            1;
        _ ->
-           send_local(OwnerL, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), Dest}, [{feedback, OwnerR}]}),
+           send_local(OwnerL, {request_resolve, SID, 
+                               {interval_upd_send, merkle_tree:get_interval(Node), Dest}, 
+                               [{feedback_request, OwnerR}]}),
            2
     end.
 
