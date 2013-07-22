@@ -684,7 +684,7 @@ split_feeder(I, Parts) ->
 %% @doc Splits a continuous interval in X roughly equally-sized subintervals,
 %%      the result of non-continuous intervals is undefined.
 %%      Returns: List of adjacent intervals
--spec split(interval(), Parts::pos_integer()) -> [interval()].
+-spec split(continuous_interval(), Parts::pos_integer()) -> [continuous_interval()].
 split(I, 1) -> [I];
 split(I, Parts) ->
     {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
