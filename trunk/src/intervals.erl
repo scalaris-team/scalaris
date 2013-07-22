@@ -713,11 +713,11 @@ split2(LBr, LKey, RKey, RBr, 1, _InnerLBr, _InnerRBr, Acc) ->
     [new(LBr, LKey, RKey, RBr) | Acc];
 split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc) ->
     SplitKey = ?RT:get_split_key(LKey, RKey, {1, Parts}),
-    case SplitKey =:= LKey of
-        true -> [new(LBr, LKey, RKey, RBr) | Acc];
-        false -> split2(InnerLBr, SplitKey, RKey, RBr,
-                        Parts - 1, InnerLBr, InnerRBr,
-                        [new(LBr, LKey, SplitKey, InnerRBr) | Acc])
+    if SplitKey =:= LKey ->
+           split2(LBr, LKey, RKey, RBr, Parts - 1, InnerLBr, InnerRBr, Acc);
+       true ->
+           split2(InnerLBr, SplitKey, RKey, RBr, Parts - 1, InnerLBr, InnerRBr,
+                  [new(LBr, LKey, SplitKey, InnerRBr) | Acc])
     end.
 
 %% @doc returns a list of simple intervals that make up Interval
