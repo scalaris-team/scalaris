@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Maik Lange <MLange@informatik.hu-berlin.de>
-%% @doc    Merkle Tree construction.
+%% @doc    Creates test-DBs for rrepair.
 %% @end
 %% @version $Id$
 -module(db_generator).
@@ -34,7 +34,8 @@
 %% TYPES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([distribution/0, db_type/0, db_parameter/0, db_status/0, failure_type/0]).
+-export_type([distribution/0, db_distribution/0,
+              db_type/0, db_parameter/0, db_status/0, failure_type/0]).
 -endif.
 
 -type distribution()    :: random |
@@ -42,9 +43,10 @@
                            {non_uniform, random_bias:distribution_fun()}.
 -type db_distribution() :: uniform |
                            {non_uniform, random_bias:distribution_fun()}.
--type result() :: ?RT:key() | 
-                  {?RT:key(), db_dht:value()}.
--type option() :: {output, list_key_val | list_key}.
+-type result_k()  :: ?RT:key().
+-type result_kv() :: {?RT:key(), db_dht:value()}.
+-type result()    :: result_k() | result_kv().
+-type option()    :: {output, list_key_val | list_key}.
 
 -type failure_type()    :: update | regen | mixed.
 -type failure_quadrant():: 1..4.
@@ -62,8 +64,8 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc This will generate a list of [ItemCount] keys with requested distribution 
-%      in the given interval.
+%% @doc This will generate a list of up to [ItemCount] keys with the requested
+%%      distribution in the given interval.
 -spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution()) -> [result()].
 get_db(I, Count, Distribution) ->
     get_db(I, Count, Distribution, []).
@@ -74,63 +76,92 @@ get_db(Interval, ItemCount, Distribution, Options) ->
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
-        {non_uniform, Fun} -> non_uniform_key_list(Interval, 1, ItemCount, Fun, [], OutputType)
+        {non_uniform, Fun} -> non_uniform_key_list(Interval, ItemCount, Fun, [], OutputType)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec uniform_key_list([{Interval, ToAdd}], Acc::Result, OutputType) -> Result when
-    is_subtype(Interval,   intervals:continuous_interval()),
-    is_subtype(ToAdd,      non_neg_integer()),
-    is_subtype(OutputType, list_key_val | list_key),
-    is_subtype(Result,     [result()]).
+-spec uniform_key_list
+        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
+         Acc::[result_k()], OutputType::list_key) -> [result_k()];
+        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
+         Acc::[result_kv()], OutputType::list_key_val) -> [result_kv()].
 uniform_key_list([], Acc, _) -> Acc;
-uniform_key_list([{I, Add} | R], Acc, AccType) ->    
-    case Add > 100 of
-        true -> 
-            [I1, I2] = intervals:split(I, 2),
-            uniform_key_list([{I1, Add div 2}, {I2, (Add div 2) + (Add rem 2)} | R], Acc, AccType);
-        false ->
-            {LBr, IL, IR, RBr} = intervals:get_bounds(I),
-            End = Add + ?IIF(RBr =:= ')', 1, 0),
-            ToAdd = util:for_to_ex(?IIF(LBr =:= '(', 1, 0),
-                                   Add + ?IIF(LBr =:= '(', 0, -1),
-                                   fun(Index) -> 
-                                           Key = ?RT:get_split_key(IL, IR, {Index, End}),
-                                           case AccType of
-                                               list_key -> Key;
-                                               list_key_val -> {Key, gen_value()}
-                                           end
-                                   end),
-            uniform_key_list(R, lists:append(ToAdd, Acc), AccType)
+uniform_key_list([{I, Add} | R] = Cmd, Acc, AccType) ->
+    if Add > 100 ->
+           case intervals:split(I, 2) of
+               [I1, I2] ->
+                   AddD2 = Add div 2,
+                   uniform_key_list([{I1, AddD2}, {I2, AddD2 + (Add rem 2)} | R],
+                                    Acc, AccType);
+               [I] ->
+                   uniform_key_list_no_split(Cmd, Acc, AccType)
+           end;
+       true ->
+           uniform_key_list_no_split(Cmd, Acc, AccType)
     end.
+
+-spec uniform_key_list_no_split
+        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
+         Acc::[result_k()], OutputType::list_key) -> [result_k()];
+        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
+         Acc::[result_kv()], OutputType::list_key_val) -> [result_kv()].
+uniform_key_list_no_split([{_I, 0} | R], Acc, AccType) ->
+    uniform_key_list(R, Acc, AccType);
+uniform_key_list_no_split([{I, Add} | R], Acc, AccType) ->
+    {LBr, IL, IR, RBr} = intervals:get_bounds(I),
+    Denom = Add + ?IIF(RBr =:= ')', 1, 0),
+    ToAddKeys = lists:usort(
+                  util:for_to_ex(
+                    ?IIF(LBr =:= '(', 1, 0),
+                    Add + ?IIF(LBr =:= '(', 0, -1),
+                    fun(Index) ->
+                            ?RT:get_split_key(IL, IR, {Index, Denom})
+                    end)),
+    ToAdd =
+        case AccType of
+            list_key ->
+                [Key || Key <- ToAddKeys, intervals:in(Key, I)];
+            list_key_val ->
+                [{Key, gen_value()} || Key <- ToAddKeys, intervals:in(Key, I)]
+        end,
+    uniform_key_list(R, lists:append(ToAdd, Acc), AccType).
 
 gen_value() ->
     tester_value_creator:create_value(integer, 0, tester_parse_state:new_parse_state()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec non_uniform_key_list(Interval, Step::Int, ToAdd::Int, Fun, Acc::Result, OutputType) -> Result when
-    is_subtype(Interval,    intervals:continuous_interval()),
-    is_subtype(Int,         pos_integer()),
-    is_subtype(Fun,         random_bias:distribution_fun()),
-    is_subtype(OutputType,  list_key_val | list_key),
-    is_subtype(Result,      [result()]).
-non_uniform_key_list(I, Step, ToAdd, Fun, Acc, AccType) ->
+-spec non_uniform_key_list
+        (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
+         Fun::random_bias:distribution_fun(), Acc::[result_k()],
+         OutputType::list_key) -> [result_k()];
+        (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
+         Fun::random_bias:distribution_fun(), Acc::[result_kv()],
+         OutputType::list_key_val) -> [result_kv()].
+non_uniform_key_list(_I, 0, _Fun, Acc, _AccType) -> Acc;
+non_uniform_key_list(I, ToAdd, Fun, Acc, AccType) ->
+    SubIntervals = intervals:split(I, ToAdd),
+    non_uniform_key_list_(SubIntervals, ToAdd, Fun, Acc, AccType).
+
+-spec non_uniform_key_list_
+        (SubIs::[intervals:continuous_interval()], ToAdd::non_neg_integer(),
+         Fun::random_bias:distribution_fun(), Acc::[result_k()],
+         OutputType::list_key) -> [result_k()];
+        (SubIs::[intervals:continuous_interval()], ToAdd::non_neg_integer(),
+         Fun::random_bias:distribution_fun(), Acc::[result_kv()],
+         OutputType::list_key_val) -> [result_kv()].
+non_uniform_key_list_([], _ToAdd, _Fun, Acc, _AccType) ->
+    Acc;
+non_uniform_key_list_([SubI | R], ToAdd, Fun, Acc, AccType) ->
+    ?ASSERT(not intervals:is_empty(SubI)),
     {Status, V} = Fun(),
-    {_, LKey, RKey, _} = intervals:get_bounds(I),
-    Add = erlang:round(V * ToAdd),
-    NAcc = if Add >= 1 ->
-                  StepSize = (RKey - LKey) / ToAdd,
-                  SubI = intervals:new('(',
-                                       LKey + erlang:trunc((Step - 1) * StepSize),
-                                       LKey + ?IIF((X = erlang:trunc(Step * StepSize)) >= ?PLUS_INFINITY, ?MINUS_INFINITY, X),
-                                       ']'),
-                  uniform_key_list([{SubI, Add}], Acc, AccType);
-              true -> Acc
+    Add = erlang:trunc(V * ToAdd),
+    NAcc = if Add >= 1 -> uniform_key_list([{SubI, Add}], Acc, AccType);
+              true     -> Acc
            end,
     case Status of
-        ok -> non_uniform_key_list(I, Step + 1, ToAdd, Fun, NAcc, AccType);
+        ok   -> non_uniform_key_list_(R, ToAdd, Fun, Acc, AccType);
         last -> NAcc
     end.
 
