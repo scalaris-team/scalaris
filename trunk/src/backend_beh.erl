@@ -38,7 +38,8 @@
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
 
--callback new(nonempty_string()) -> db().
+-callback new(term()) -> db().
+-callback open(term()) -> db().
 -callback close(db()) -> true.
 -callback put(db(), entry()) -> db().
 -callback get(db(), key()) -> entry() | {}.
@@ -61,7 +62,7 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-        {new, 1}, {close, 1}, {put, 2}, {get, 2}, {delete, 2},
+        {new, 1}, {open, 1}, {close, 1}, {put, 2}, {get, 2}, {delete, 2},
         {get_name, 1}, {get_load, 1}, 
         {foldl, 3}, {foldl, 4}, {foldl, 5},
         {foldr, 3}, {foldr, 4}, {foldr, 5}

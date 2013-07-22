@@ -28,7 +28,7 @@
 %% -define(TRACE(X, Y), ct:pal(X, Y)).
 
 %% primitives
--export([new/1, close/1, put/2, get/2, delete/2]).
+-export([new/1, open/1, close/1, put/2, get/2, delete/2]).
 %% db info
 -export([get_name/1, get_load/1]).
 
@@ -48,6 +48,14 @@
 -spec new(DBName::nonempty_string()) -> db().
 new(DBName) ->
     ets:new(list_to_atom(DBName), [ordered_set | ?DB_ETS_ADDITIONAL_OPS]).
+
+%% @doc Open a previously existing database. Not supported by ets.
+%%      A new database is created
+-spec open(DBName::nonempty_string()) -> db().
+open(DBName) ->
+    log:log(warn, "~p: open/1 is not supported by ets, calling new/1 instead",
+            [self()]),
+    new(DBName).
 
 %% @doc Closes and deletes the DB named DBName
 -spec close(DBName::db()) -> true.
