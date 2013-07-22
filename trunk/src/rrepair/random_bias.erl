@@ -125,12 +125,12 @@ approx_valid(N, P) ->
 %% Tester
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec tester_create_distribution_fun(pos_integer(), pos_integer(),
-                                     pos_integer()) -> distribution_fun().
+-spec tester_create_distribution_fun(pos_integer(), 1..1000000,
+                                     1..1000000) -> distribution_fun().
 tester_create_distribution_fun(N, P1, P2) when P2 > P1 ->
     binomial(N, P1 / P2);
 tester_create_distribution_fun(N, P1, P2) when P2 < P1 ->
     binomial(N, P2 / P1);
-tester_create_distribution_fun(N, P1, P2) when P2 =:= P1 ->
-    binomial(N, (P2 - 1) / P1).
+tester_create_distribution_fun(N, P, P) ->
+    binomial(N, 0.9999999999).
 
