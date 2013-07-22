@@ -40,9 +40,9 @@
 
 -type distribution()    :: random |
                            uniform |
-                           {non_uniform, random_bias:distribution_fun()}.
+                           {non_uniform, random_bias:generator()}.
 -type db_distribution() :: uniform |
-                           {non_uniform, random_bias:distribution_fun()}.
+                           {non_uniform, random_bias:generator()}.
 -type result_k()  :: ?RT:key().
 -type result_kv() :: {?RT:key(), db_dht:value()}.
 -type result()    :: result_k() | result_kv().
@@ -76,7 +76,7 @@ get_db(Interval, ItemCount, Distribution, Options) ->
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
-        {non_uniform, Fun} -> non_uniform_key_list(Interval, ItemCount, Fun, [], OutputType)
+        {non_uniform, RanGen} -> non_uniform_key_list(Interval, ItemCount, RanGen, [], OutputType)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -134,39 +134,35 @@ gen_value() ->
 
 -spec non_uniform_key_list
         (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
-         Fun::random_bias:distribution_fun(), Acc::[result_k()],
+         RanGen::random_bias:generator(), Acc::[result_k()],
          OutputType::list_key) -> [result_k()];
         (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
-         Fun::random_bias:distribution_fun(), Acc::[result_kv()],
+         RanGen::random_bias:generator(), Acc::[result_kv()],
          OutputType::list_key_val) -> [result_kv()].
-non_uniform_key_list(_I, 0, _Fun, Acc, _AccType) -> Acc;
-non_uniform_key_list(I, ToAdd, Fun, Acc, AccType) ->
+non_uniform_key_list(_I, 0, _RanGen, Acc, _AccType) -> Acc;
+non_uniform_key_list(I, ToAdd, RanGen, Acc, AccType) ->
     SubIntervals = intervals:split(I, ToAdd),
-    non_uniform_key_list_(SubIntervals, ToAdd, Fun, Acc, AccType).
+    non_uniform_key_list_(SubIntervals, ToAdd, RanGen, Acc, AccType).
 
 -spec non_uniform_key_list_
         (SubIs::[intervals:continuous_interval()], ToAdd::non_neg_integer(),
-         Fun::random_bias:distribution_fun(), Acc::[result_k()],
+         Fun::random_bias:generator(), Acc::[result_k()],
          OutputType::list_key) -> [result_k()];
         (SubIs::[intervals:continuous_interval()], ToAdd::non_neg_integer(),
-         Fun::random_bias:distribution_fun(), Acc::[result_kv()],
+         Fun::random_bias:generator(), Acc::[result_kv()],
          OutputType::list_key_val) -> [result_kv()].
-non_uniform_key_list_([], _ToAdd, _Fun, Acc, _AccType) ->
+non_uniform_key_list_([], _ToAdd, _RanGen, Acc, _AccType) ->
     Acc;
-non_uniform_key_list_([SubI | R], ToAdd, Fun, Acc, AccType) ->
+non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccType) ->
     ?ASSERT(not intervals:is_empty(SubI)),
-    case Fun() of
-        {Status, V} when Status =:= ok orelse Status =:= last ->
-            Add = erlang:trunc(V * ToAdd),
-            NAcc = if Add >= 1 -> uniform_key_list([{SubI, Add}], Acc, AccType);
-                      true     -> Acc
-                   end,
-            case Status of
-                ok   -> non_uniform_key_list_(R, ToAdd, Fun, Acc, AccType);
-                last -> NAcc
-            end;
-        {error, process_died} ->
-            Acc
+    {Status, V, RanGen1} = random_bias:next(RanGen),
+    Add = erlang:trunc(V * ToAdd),
+    NAcc = if Add >= 1 -> uniform_key_list([{SubI, Add}], Acc, AccType);
+              true     -> Acc
+           end,
+    case Status of
+        ok   -> non_uniform_key_list_(R, ToAdd, RanGen1, Acc, AccType);
+        last -> NAcc
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -241,7 +237,10 @@ remove_keys(Keys) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Generates a consistent db with errors
+%% @doc Generates a consistent db with errors
+%%      Note: the random number generator in {non_uniform, RanGen} will start
+%%            from scratch each time this function is called based on the
+%%            initial state!
 -spec gen_kvv(ErrorDist::distribution(), [?RT:key()], [db_parameter()]) -> {db_dht:db_as_list(), db_status()}.
 gen_kvv(EDist, Keys, Params) ->
     FType = proplists:get_value(ftype, Params, update),
@@ -268,8 +267,9 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     Insert = length(GoodDB) + length(BadDB),
     DBSize = KeyCount * ?ReplicationFactor,
     {lists:append(GoodDB, BadDB), {DBSize, Insert, DBSize - Insert, O}};
-p_gen_kvv({non_uniform, Fun}, Keys, KeyCount, FType, FDest, FCount) ->
-    FProbList = get_non_uniform_probs(Fun, []),
+p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
+    FProbList = get_non_uniform_probs(RanGen, []),
+    % note: don't use RanGen any more - we don't get the new state in the last call!
     NextCell = case length(FProbList) of
                    0 -> KeyCount + 1;
                    FProbL -> erlang:round(KeyCount / FProbL)
@@ -335,12 +335,11 @@ build_failure_cells([P | T], List, Next, Acc) ->
          end,
     build_failure_cells(T, LT, Next, [{P, Cell}|Acc]).
 
--spec get_non_uniform_probs(random_bias:distribution_fun(), [float()]) -> [float()].
-get_non_uniform_probs(Fun, Acc) ->
-    case Fun() of
-        {ok, V} -> get_non_uniform_probs(Fun, [V|Acc]);
-        {last, V} -> lists:reverse([V|Acc]);
-        {error, process_died} -> lists:reverse(Acc)
+-spec get_non_uniform_probs(random_bias:generator(), [float()]) -> [float()].
+get_non_uniform_probs(RanGen, Acc) ->
+    case random_bias:next(RanGen) of
+        {ok, V, RanGen1} -> get_non_uniform_probs(RanGen1, [V | Acc]);
+        {last, V, exit}  -> lists:reverse([V | Acc])
     end.
 
 -spec get_synthetic_entry(?RT:key(), old | new) -> db_entry:entry().

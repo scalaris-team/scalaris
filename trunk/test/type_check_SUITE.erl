@@ -299,8 +299,8 @@ tester_type_check_rrepair(_Config) ->
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
-    tester:register_value_creator({typedef, random_bias, distribution_fun},
-                                  random_bias, tester_create_distribution_fun, 3),
+    tester:register_value_creator({typedef, random_bias, generator},
+                                  random_bias, tester_create_generator, 3),
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
     Modules =
@@ -314,7 +314,7 @@ tester_type_check_rrepair(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_value_creator({typedef, random_bias, distribution_fun}),
+    tester:unregister_value_creator({typedef, random_bias, generator}),
     tester:unregister_value_creator({typedef, intervals, interval}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
     tester:unregister_type_checker({typedef, intervals, interval}),

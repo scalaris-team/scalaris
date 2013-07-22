@@ -38,14 +38,14 @@ init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
-    tester:register_value_creator({typedef, random_bias, distribution_fun},
-                                  random_bias, tester_create_distribution_fun, 3),
+    tester:register_value_creator({typedef, random_bias, generator},
+                                  random_bias, tester_create_generator, 3),
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
     Config2.
 
 end_per_suite(Config) ->
-    tester:unregister_value_creator({typedef, random_bias, distribution_fun}),
+    tester:unregister_value_creator({typedef, random_bias, generator}),
     tester:unregister_value_creator({typedef, intervals, interval}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
     tester:unregister_type_checker({typedef, intervals, interval}),
