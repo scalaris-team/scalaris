@@ -174,7 +174,7 @@ non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccType) ->
               true     -> Acc
            end,
     case Status of
-        ok   -> non_uniform_key_list_(R, ToAdd, RanGen1, Acc, AccType);
+        ok   -> non_uniform_key_list_(R, ToAdd, RanGen1, NAcc, AccType);
         last -> NAcc
     end.
 
