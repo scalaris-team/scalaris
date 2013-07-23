@@ -117,7 +117,7 @@ reload_with_options(Module, MyOptions) ->
 get_src_and_flags_for_module(Module) ->
     get_src_and_flags_for_module(Module, ["ebin", "test"]).
     
--spec get_src_and_flags_for_module(module(), Paths::[string(),...]) -> string().
+-spec get_src_and_flags_for_module(module(), Paths::[string(),...]) -> {string(), list()}.
 get_src_and_flags_for_module(Module, [Path | PathL]) ->
     % we have to be in $SCALARIS/ebin to find the beam file
     {ok, CurCWD} = file:get_cwd(),
