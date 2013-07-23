@@ -31,6 +31,7 @@
 % for tester:
 -export([get_db_feeder/3, get_db_feeder/4]).
 %% -export([fill_ring_feeder/3]).
+-export([feeder_fix_rangen/2]).
 
 -define(ReplicationFactor, 4).
 
@@ -70,7 +71,7 @@
 
 -spec get_db_feeder(intervals:continuous_interval(), 0..1000, db_distribution())
         -> {intervals:continuous_interval(), non_neg_integer(), db_distribution()}.
-get_db_feeder(I, Count, Distribution) -> {I, Count, Distribution}.
+get_db_feeder(I, Count, Distribution) -> {I, Count, feeder_fix_rangen(Distribution, Count)}.
 
 %% @doc This will generate a list of up to [ItemCount] keys with the requested
 %%      distribution in the given interval.
@@ -80,11 +81,12 @@ get_db(I, Count, Distribution) ->
 
 -spec get_db_feeder(intervals:continuous_interval(), 0..1000, db_distribution(), [option()])
         -> {intervals:continuous_interval(), non_neg_integer(), db_distribution(), [option()]}.
-get_db_feeder(I, Count, Distribution, Options) -> {I, Count, Distribution, Options}.
+get_db_feeder(I, Count, Distribution, Options) -> {I, Count, feeder_fix_rangen(Distribution, Count), Options}.
 
 -spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution(), [option()]) -> [result()].
 get_db(Interval, ItemCount, Distribution, Options) ->
     ?ASSERT(intervals:is_continuous(Interval)),
+    ?ASSERT(Distribution =:= feeder_fix_rangen(Distribution, ItemCount)),
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
@@ -155,27 +157,40 @@ gen_value() ->
 non_uniform_key_list(_I, 0, _RanGen, Acc, _AccType) -> Acc;
 non_uniform_key_list(I, ToAdd, RanGen, Acc, AccType) ->
     SubIntervals = intervals:split(I, ToAdd),
-    non_uniform_key_list_(SubIntervals, ToAdd, RanGen, Acc, AccType).
+    non_uniform_key_list_(SubIntervals, ToAdd, RanGen, Acc, length(Acc), AccType, 0.0).
 
 -spec non_uniform_key_list_
-        (SubIs::[intervals:continuous_interval()], ToAdd::non_neg_integer(),
-         Fun::random_bias:generator(), Acc::[result_k()],
-         OutputType::list_key) -> [result_k()];
-        (SubIs::[intervals:continuous_interval()], ToAdd::non_neg_integer(),
-         Fun::random_bias:generator(), Acc::[result_kv()],
-         OutputType::list_key_val) -> [result_kv()].
-non_uniform_key_list_([], _ToAdd, _RanGen, Acc, _AccType) ->
-    Acc;
-non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccType) ->
+        (SubIs::[intervals:continuous_interval(),...], ToAdd::non_neg_integer(),
+         Fun::random_bias:generator(), Acc::[result_k()], AccLen::non_neg_integer(),
+         OutputType::list_key, RoundingError::float()) -> [result_k()];
+        (SubIs::[intervals:continuous_interval(),...], ToAdd::non_neg_integer(),
+         Fun::random_bias:generator(), Acc::[result_kv()], AccLen::non_neg_integer(),
+         OutputType::list_key_val, RoundingError::float()) -> [result_kv()].
+non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccLen, AccType, RoundingError) ->
     ?ASSERT(not intervals:is_empty(SubI)),
     {Status, V, RanGen1} = random_bias:next(RanGen),
-    Add = erlang:trunc(V * ToAdd),
-    NAcc = if Add >= 1 -> uniform_key_list([{SubI, Add}], Acc, AccType);
-              true     -> Acc
-           end,
+    Add0 = V * ToAdd + RoundingError,
+    Add1 = erlang:max(0, erlang:trunc(Add0)),
+    Add = if Add1 + AccLen > ToAdd -> ToAdd - AccLen;
+             true -> Add1
+          end,
+    %log:pal("non_uniform_key_list: add: ~p, SubI: ~p", [Add, SubI]),
+    NAcc0 = if Add >= 1 -> uniform_key_list([{SubI, Add}], [], AccType);
+               true     -> []
+            end,
+    NAcc0Len = length(NAcc0),
+    % note: NAcc0 is probably smaller than Acc, so appending this way is faster:
+    NAcc = lists:append(NAcc0, Acc),
+    NAccLen = AccLen + NAcc0Len,
     case Status of
-        ok   -> non_uniform_key_list_(R, ToAdd, RanGen1, NAcc, AccType);
-        last -> NAcc
+        _ when NAccLen =:= ToAdd ->
+            NAcc;
+        ok when R =/= [] ->
+            NewRoundingError = float(Add0 - Add + Add - NAcc0Len),
+            non_uniform_key_list_(R, ToAdd, RanGen1, NAcc, NAccLen, AccType, NewRoundingError);
+        _ when NAccLen < ToAdd ->
+            % add the missing items to the last sub interval
+            uniform_key_list([{SubI, ToAdd - NAccLen}], NAcc, AccType)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -258,6 +273,15 @@ remove_keys(Keys) ->
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Binomial distributions should have an N so that the number of
+%%      random numbers matches the number of e.g. items they should be used for.
+%%      Use this to fix the value of auto-generated generators.
+-spec feeder_fix_rangen(distribution(), pos_integer()) -> distribution().
+feeder_fix_rangen({non_uniform, {{binom, _N, P, X, Approx}, CalcFun, NewStateFun}}, MaxN) ->
+    {non_uniform, {{binom, erlang:max(1, MaxN - 1), P, X, Approx}, CalcFun, NewStateFun}};
+feeder_fix_rangen(RanGen, _MaxN) ->
+    RanGen.
 
 %% @doc Generates a consistent db with errors
 %%      Note: the random number generator in {non_uniform, RanGen} will start

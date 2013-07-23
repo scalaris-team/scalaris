@@ -316,7 +316,7 @@ tester_type_check_rrepair(_Config) ->
              {uniform_key_list, 3}, %% needs feeder
              {uniform_key_list_no_split, 3}, %% needs feeder
              {non_uniform_key_list, 5}, %% needs feeder
-             {non_uniform_key_list_, 5}, %% needs feeder
+             {non_uniform_key_list_, 7}, %% needs feeder
              {get_non_uniform_probs, 2}, %% needs feeder
 
              {gen_kvv, 3}, % TODO: currently fails

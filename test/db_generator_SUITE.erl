@@ -61,16 +61,20 @@ end_per_suite(Config) ->
 
 -spec prop_get_db3(I::intervals:continuous_interval(), ItemCount::1..1000,
                    db_generator:db_distribution()) -> true.
-prop_get_db3(Interval, ItemCount, Distribution) ->
+prop_get_db3(Interval, ItemCount, Distribution0) ->
+    Distribution = db_generator:feeder_fix_rangen(Distribution0, ItemCount),
     Result = db_generator:get_db(Interval, ItemCount, Distribution),
     ?equals([Key || Key <- Result,
                     not intervals:in(Key, Interval)],
             []),
-    ?compare(fun erlang:'=<'/2, length(Result), ItemCount).
+    ?compare(fun erlang:'=<'/2, length(Result), ItemCount),
+    ?implies(length(intervals:split(Interval, ItemCount)) == ItemCount,
+             ?equals(length(Result), ItemCount)).
 
 -spec prop_get_db4(I::intervals:continuous_interval(), ItemCount::1..1000,
                    db_generator:db_distribution(), Options::[db_generator:option()]) -> boolean().
-prop_get_db4(Interval, ItemCount, Distribution, Options) ->
+prop_get_db4(Interval, ItemCount, Distribution0, Options) ->
+    Distribution = db_generator:feeder_fix_rangen(Distribution0, ItemCount),
     Result = db_generator:get_db(Interval, ItemCount, Distribution, Options),
     case proplists:get_value(output, Options, list_key) of
         list_key ->
@@ -82,10 +86,12 @@ prop_get_db4(Interval, ItemCount, Distribution, Options) ->
                             not intervals:in(Key, Interval)],
                     [])
     end,
-    ?compare(fun erlang:'=<'/2, length(Result), ItemCount).
+    ?compare(fun erlang:'=<'/2, length(Result), ItemCount),
+    ?implies(length(intervals:split(Interval, ItemCount)) == ItemCount,
+             ?equals(length(Result), ItemCount)).
 
 tester_get_db3(_Config) ->
-    tester:test(?MODULE, prop_get_db3, 3, 500, [{threads, 2}]).
+    tester:test(?MODULE, prop_get_db3, 3, 500, [{threads, 4}]).
 
 tester_get_db4(_Config) ->
-    tester:test(?MODULE, prop_get_db4, 4, 500, [{threads, 2}]).
+    tester:test(?MODULE, prop_get_db4, 4, 500, [{threads, 4}]).
