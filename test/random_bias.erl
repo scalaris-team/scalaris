@@ -25,6 +25,7 @@
 
 -export([binomial/2]).
 -export([next/1]).
+-export([numbers_left/1]).
 
 % for tester:
 -export([tester_create_generator/3]).
@@ -68,6 +69,10 @@ next({DS, CalcFun, NextFun}) ->
         exit -> {last, V, exit};
         NewDS -> {ok, V, {NewDS, CalcFun, NextFun}}
     end.
+
+-spec numbers_left(generator()) -> pos_integer().
+numbers_left({{binom, N, _P, X, _Approx}, _CalcFun, _NextFun}) ->
+    N + 1 - X.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal Functions
@@ -123,9 +128,14 @@ approx_valid(N, P) ->
 -spec tester_create_generator(pos_integer(), 1..1000000, 1..1000000)
         -> generator().
 tester_create_generator(N, P1, P2) when P2 > P1 ->
-    binomial(N, P1 / P2);
+    case binomial(N, P1 / P2) of
+        {{binom, N, P, X, Approx = none}, CalcFun, NewStateFun} ->
+            % too high factorials slow down the tests too much
+            {{binom, erlang:min(50, N), P, X, Approx}, CalcFun, NewStateFun};
+        X -> X
+    end;
 tester_create_generator(N, P1, P2) when P2 < P1 ->
-    binomial(N, P2 / P1);
+    tester_create_generator(N, P2, P1);
 tester_create_generator(N, P, P) ->
-    binomial(N, 0.9999999999).
+    tester_create_generator(N, 9999999999, 10000000000).
 

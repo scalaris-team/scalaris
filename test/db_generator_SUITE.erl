@@ -61,8 +61,15 @@ end_per_suite(Config) ->
 
 -spec prop_get_db3(I::intervals:continuous_interval(), ItemCount::1..1000,
                    db_generator:db_distribution()) -> true.
-prop_get_db3(Interval, ItemCount, Distribution0) ->
-    Distribution = db_generator:feeder_fix_rangen(Distribution0, ItemCount),
+prop_get_db3(Interval, ItemCount, Distribution = uniform) ->
+    prop_get_db3_(Interval, ItemCount, Distribution);
+prop_get_db3(Interval, ItemCount0, Distribution0 = {non_uniform, RanGen}) ->
+    ItemCount = erlang:min(ItemCount0, random_bias:numbers_left(RanGen)),
+    prop_get_db3_(Interval, ItemCount, db_generator:feeder_fix_rangen(Distribution0, ItemCount)).
+
+-spec prop_get_db3_(I::intervals:continuous_interval(), ItemCount::1..1000,
+                    db_generator:db_distribution()) -> true.
+prop_get_db3_(Interval, ItemCount, Distribution) ->
     Result = db_generator:get_db(Interval, ItemCount, Distribution),
     ?equals([Key || Key <- Result,
                     not intervals:in(Key, Interval)],
@@ -73,8 +80,15 @@ prop_get_db3(Interval, ItemCount, Distribution0) ->
 
 -spec prop_get_db4(I::intervals:continuous_interval(), ItemCount::1..1000,
                    db_generator:db_distribution(), Options::[db_generator:option()]) -> boolean().
-prop_get_db4(Interval, ItemCount, Distribution0, Options) ->
-    Distribution = db_generator:feeder_fix_rangen(Distribution0, ItemCount),
+prop_get_db4(Interval, ItemCount, Distribution = uniform, Options) ->
+    prop_get_db4_(Interval, ItemCount, Distribution, Options);
+prop_get_db4(Interval, ItemCount0, Distribution0 = {non_uniform, RanGen}, Options) ->
+    ItemCount = erlang:min(ItemCount0, random_bias:numbers_left(RanGen)),
+    prop_get_db4_(Interval, ItemCount, db_generator:feeder_fix_rangen(Distribution0, ItemCount), Options).
+
+-spec prop_get_db4_(I::intervals:continuous_interval(), ItemCount::1..1000,
+                    db_generator:db_distribution(), Options::[db_generator:option()]) -> boolean().
+prop_get_db4_(Interval, ItemCount, Distribution, Options) ->
     Result = db_generator:get_db(Interval, ItemCount, Distribution, Options),
     case proplists:get_value(output, Options, list_key) of
         list_key ->
@@ -94,4 +108,7 @@ tester_get_db3(_Config) ->
     tester:test(?MODULE, prop_get_db3, 3, 500, [{threads, 4}]).
 
 tester_get_db4(_Config) ->
+    prop_get_db4(intervals:new(?MINUS_INFINITY), 1,
+                 {non_uniform, random_bias:binomial(50, 0.06755763133001705)},
+                 [{output,list_key}]),
     tester:test(?MODULE, prop_get_db4, 4, 500, [{threads, 4}]).
