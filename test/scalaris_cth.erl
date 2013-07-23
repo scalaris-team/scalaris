@@ -135,9 +135,11 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
             catch
                 exit:undef ->
                     ok;
-                Error ->
-                    ct:pal("Caught ~p while trying to clean up Ring after
-                           timeout~n", [Error])
+                error:undef ->
+                    ok;
+                Error:Reason ->
+                    ct:pal("Caught ~p:~p while trying to clean up Ring after
+                           timeout~n", [Error, Reason])
             end,
             ok;
         {skip, {failed, {_FailedMod, _FailedFun, {timetrap_timeout, TimeTrapTime_ms}}}} ->
