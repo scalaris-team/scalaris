@@ -61,25 +61,27 @@ test2(_) ->
            [N, P, Vals, lists:sum(Vals), EV]),
     ?assert(EV > 2.85) andalso ?assert(EV < 2.87).
 
--spec sum_test(100..100000) -> boolean().
-sum_test(N) ->
-    P = 3/7,
+-spec sum_test(1..100000, 1..1000000, 1..1000000) -> boolean().
+sum_test(N, P1, P1) ->
+    sum_test(N, P1 - 1, P1);
+sum_test(N, P1, P2) ->
+    P = ?IIF(P2 > P1, P1 / P2, P2 / P1),
     R = random_bias:binomial(N, P),
-    Vals = lists:reverse(gen_values(R, [])),
+    Vals = gen_values(R, []),
     Sum = lists:sum(Vals),
+    ?assert_w_note(1 - Sum =< 0.00001, io_lib:format("Sum=~p", [Sum])),
     N2 = lists:foldl(fun(V, Acc) -> Acc + (V * N) end, 0, Vals),
-    ?assert_w_note(1 - Sum =< 0.00001, io_lib:format("Sum=~p", [Sum])) andalso
-        ?assert_w_note(N2 >= 0.99*N, io_lib:format("N2=~p - N=~p - 0.99*N=~p", [N2, N, 0.99*N])).
+    ?assert_w_note(N2 >= 0.99*N, io_lib:format("N2=~p - N=~p - 0.99*N=~p", [N2, N, 0.99*N])).
 
 tester_sum_test(_) ->    
-    tester:test(?MODULE, sum_test, 1, 12, [{threads, 4}]).
+    tester:test(?MODULE, sum_test, 3, 100, [{threads, 4}]).
 
 -spec prop_value_count(pos_integer()) -> boolean().
 prop_value_count(Count) ->
     R = random_bias:binomial(Count, 0.3),
     Values = gen_values(R, []),
     Len = length(Values),
-    ?equals_w_note(Count, Len, io_lib:format("Count = ~p - Generated=~p", [Count, Len])).
+    ?equals_w_note(Count + 1, Len, io_lib:format("Count = ~p - Generated=~p", [Count, Len])).
 
 tester_value_count(_) ->
     tester:test(?MODULE, prop_value_count, 1, 50, [{threads, 4}]).

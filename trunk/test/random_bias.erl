@@ -52,8 +52,10 @@
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% creates a new binomial distribution generation fun.
--spec binomial(pos_integer(), float()) -> generator().
+%% @doc Creates a new generator state for a binomial distribution for use with
+%%      next/1.
+%%      Note: a binomial distribution will generate (N+1) values!
+-spec binomial(N::pos_integer(), P::float()) -> generator().
 binomial(N, P) when P > 0 andalso P < 1 ->
     {{binom, N, P, 0, approx_valid(N, P)},
      fun calc_binomial/1, fun next_state/1}.
@@ -97,7 +99,7 @@ calc_binomial({binom, N, P, X, _Approx = none}) ->
     end.
 
 -spec next_state(distribution_state()) -> distribution_state() | exit.
-next_state({binom, N, _P, X, _}) when N =:= X + 1 -> 
+next_state({binom, X, _P, X, _}) ->
     exit;
 next_state({binom, N, P, X, Approx}) -> 
     {binom, N, P, X + 1, Approx}.
