@@ -71,7 +71,9 @@
 
 -spec get_db_feeder(intervals:continuous_interval(), 0..1000, db_distribution())
         -> {intervals:continuous_interval(), non_neg_integer(), db_distribution()}.
-get_db_feeder(I, Count, Distribution) -> {I, Count, feeder_fix_rangen(Distribution, Count)}.
+get_db_feeder(I0, Count0, Distribution0) ->
+    {I, Count, Distribution, _} = get_db_feeder(I0, Count0, Distribution0, []),
+    {I, Count, Distribution}.
 
 %% @doc This will generate a list of up to [ItemCount] keys with the requested
 %%      distribution in the given interval.
@@ -81,7 +83,11 @@ get_db(I, Count, Distribution) ->
 
 -spec get_db_feeder(intervals:continuous_interval(), 0..1000, db_distribution(), [option()])
         -> {intervals:continuous_interval(), non_neg_integer(), db_distribution(), [option()]}.
-get_db_feeder(I, Count, Distribution, Options) -> {I, Count, feeder_fix_rangen(Distribution, Count), Options}.
+get_db_feeder(I, Count, Distribution = uniform, Options) ->
+    {I, Count, Distribution, Options};
+get_db_feeder(I, Count0, Distribution0 = {non_uniform, RanGen}, Options) ->
+    Count = erlang:min(Count0, random_bias:numbers_left(RanGen)),
+    {I, Count, feeder_fix_rangen(Distribution0, Count), Options}.
 
 -spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution(), [option()]) -> [result()].
 get_db(Interval, ItemCount, Distribution, Options) ->
@@ -277,6 +283,8 @@ remove_keys(Keys) ->
 %% @doc Binomial distributions should have an N so that the number of
 %%      random numbers matches the number of e.g. items they should be used for.
 %%      Use this to fix the value of auto-generated generators.
+%%      Also pay attention that if no approximation is used in the binomial
+%%      calculation, getting random numbers for high N is expensive!
 -spec feeder_fix_rangen(distribution(), pos_integer()) -> distribution().
 feeder_fix_rangen({non_uniform, {{binom, _N, P, X, Approx}, CalcFun, NewStateFun}}, MaxN) ->
     {non_uniform, {{binom, erlang:max(1, MaxN - 1), P, X, Approx}, CalcFun, NewStateFun}};
