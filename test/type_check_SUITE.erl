@@ -29,17 +29,17 @@
 -include("client_types.hrl").
 
 all()   -> [
-            tester_type_check_api,
-            tester_type_check_config,
-%%            tester_type_check_dht_node,
-            tester_type_check_gossip,
-            tester_type_check_math,
-            tester_type_check_node,
-            tester_type_check_paxos,
-            tester_type_check_rrepair,
-            tester_type_check_tx,
-            tester_type_check_rdht_tx,
-            tester_type_check_util
+%%             tester_type_check_api,
+%%             tester_type_check_config,
+%% %%            tester_type_check_dht_node,
+%%             tester_type_check_gossip,
+%%             tester_type_check_math,
+%%             tester_type_check_node,
+%%             tester_type_check_paxos,
+            tester_type_check_rrepair%,
+%%             tester_type_check_tx,
+%%             tester_type_check_rdht_tx,
+%%             tester_type_check_util
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
 
@@ -295,7 +295,7 @@ tester_type_check_paxos(_Config) ->
     true.
 
 tester_type_check_rrepair(_Config) ->
-    Count = 500,
+    Count = 1000,
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
@@ -312,16 +312,14 @@ tester_type_check_rrepair(_Config) ->
            ],
            [ {fill_random, 2}, %% tested via feeder
              {fill_wiki, 2}, %% no (suitable) wiki file to import
+             {gen_kvv, 3}, %% tested via feeder
+             {p_gen_kvv, 6}, %% tested via feeder
 
              {uniform_key_list, 3}, %% needs feeder
              {uniform_key_list_no_split, 3}, %% needs feeder
              {non_uniform_key_list, 5}, %% needs feeder
              {non_uniform_key_list_, 7}, %% needs feeder
-             {get_non_uniform_probs, 2}, %% needs feeder
-
-             {gen_kvv, 3}, % TODO: currently fails
-             {p_gen_kvv, 6}, % TODO: currently fails
-             {build_failure_cells, 4} % TODO: currently fails
+             {get_non_uniform_probs, 2} %% needs feeder
            ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
