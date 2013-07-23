@@ -162,6 +162,7 @@ gen_value() ->
          OutputType::list_key_val) -> [result_kv()].
 non_uniform_key_list(_I, 0, _RanGen, Acc, _AccType) -> Acc;
 non_uniform_key_list(I, ToAdd, RanGen, Acc, AccType) ->
+    ?ASSERT(ToAdd =:= 1 orelse random_bias:numbers_left(RanGen) =:= ToAdd),
     SubIntervals = intervals:split(I, ToAdd),
     non_uniform_key_list_(SubIntervals, ToAdd, RanGen, Acc, length(Acc), AccType, 0.0).
 
@@ -206,7 +207,18 @@ non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccLen, AccType, RoundingE
 % not ready yet:
 %% -spec fill_ring_feeder(random, 1..1000, [db_parameter()])
 %%         -> {db_type(), pos_integer(), [db_parameter()]}.
-%% fill_ring_feeder(Type, DBSize, Params) -> {Type, DBSize, Params}.
+%% fill_ring_feeder(Type, DBSize0, Params) ->
+%%     Params1 =
+%%         case proplists:get_value(distribution, Params, uniform) of
+%%             {non_uniform, RanGen} = EDist0 ->
+%%                 DBSize = erlang:min(DBSize0, random_bias:numbers_left(RanGen)),
+%%                 [{distribution, feeder_fix_rangen(EDist0, DBSize)} |
+%%                      proplists:delete(fdistribution, Params)];
+%%             _ ->
+%%                 DBSize = DBSize0,
+%%                 Params
+%%         end,
+%%     {Type, DBSize, Params1}.
 
 % @doc  DBSize=Number of Data Entities in DB (without replicas)
 -spec fill_ring(db_type(), pos_integer(), [db_parameter()]) -> db_status().
@@ -291,21 +303,52 @@ feeder_fix_rangen({non_uniform, {{binom, _N, P, X, Approx}, CalcFun, NewStateFun
 feeder_fix_rangen(RanGen, _MaxN) ->
     RanGen.
 
+-spec gen_kvv_feeder(ErrorDist::distribution(), [?RT:key()], [db_parameter()])
+        -> {ErrorDist::distribution(), [?RT:key()], [db_parameter()]}.
+gen_kvv_feeder(EDist0, Keys, Params) ->
+    KeysLen0 = length(Keys),
+    case EDist0 of
+        {non_uniform, RanGen} ->
+            KeysLen = erlang:min(KeysLen0, random_bias:numbers_left(RanGen)),
+            EDist = feeder_fix_rangen(EDist0, erlang:max(1, KeysLen)),
+            {EDist, lists:sublist(Keys, KeysLen), Params};
+        _ ->
+            {EDist0, Keys, Params}
+    end.
+
 %% @doc Generates a consistent db with errors
 %%      Note: the random number generator in {non_uniform, RanGen} will start
 %%            from scratch each time this function is called based on the
 %%            initial state!
 -spec gen_kvv(ErrorDist::distribution(), [?RT:key()], [db_parameter()]) -> {db_dht:db_as_list(), db_status()}.
 gen_kvv(EDist, Keys, Params) ->
-    FType = proplists:get_value(ftype, Params, update),
-    FProb = proplists:get_value(fprob, Params, 50),
-    FDest = proplists:get_value(fdest, Params, all),
-    KeyCount = length(Keys),
-    FCount =  erlang:round(KeyCount * (FProb / 100)),
-    p_gen_kvv(EDist, Keys, KeyCount, FType, FDest, FCount).
+    case length(Keys) of
+        0 -> {[], {_Entries = 0, _Existing = 0, _Missing = 0, _Outdated = 0}};
+        KeyCount ->
+            FType = proplists:get_value(ftype, Params, update),
+            FProb = proplists:get_value(fprob, Params, 50),
+            FDest = proplists:get_value(fdest, Params, all),
+            FCount =  erlang:round(KeyCount * (FProb / 100)),
+            p_gen_kvv(EDist, Keys, KeyCount, FType, FDest, FCount)
+    end.
 
--spec p_gen_kvv(ErrorDist::distribution(), [?RT:key()],
-                KeyCount::non_neg_integer(), failure_type(),
+-spec p_gen_kvv_feeder(ErrorDist::distribution(), [?RT:key(),...], KeyCount::0,
+                       failure_type(), failure_dest(), FailCount::non_neg_integer())
+        -> {ErrorDist::distribution(), [?RT:key(),...], KeyCount::pos_integer(),
+            failure_type(), failure_dest(), FailCount::non_neg_integer()}.
+p_gen_kvv_feeder(EDist0, Keys, _WrongKeyCount, FType, FDest, FCount) ->
+    KeysLen0 = length(Keys),
+    case EDist0 of
+        {non_uniform, RanGen} ->
+            KeysLen = erlang:min(KeysLen0, random_bias:numbers_left(RanGen)),
+            EDist = feeder_fix_rangen(EDist0, KeysLen),
+            {EDist, lists:sublist(Keys, KeysLen), KeysLen, FType, FDest, FCount};
+        _ ->
+            {EDist0, Keys, KeysLen0, FType, FDest, FCount}
+    end.
+
+-spec p_gen_kvv(ErrorDist::distribution(), [?RT:key(),...],
+                KeyCount::pos_integer(), failure_type(),
                 failure_dest(), FailCount::non_neg_integer()) -> {db_dht:db_as_list(), db_status()}.
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     {FKeys, GoodKeys} = select_random_keys(Keys, FCount, []),
@@ -322,13 +365,15 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     DBSize = KeyCount * ?ReplicationFactor,
     {lists:append(GoodDB, BadDB), {DBSize, Insert, DBSize - Insert, O}};
 p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
+    % TODO: decide what to do if this is not the case!
+    %?ASSERT(random_bias:numbers_left(RanGen) =< KeyCount),
     FProbList = get_non_uniform_probs(RanGen, []),
     % note: don't use RanGen any more - we don't get the new state in the last call!
-    NextCell = case length(FProbList) of
+    CellLength = case length(FProbList) of
                    0 -> KeyCount + 1;
                    FProbL -> erlang:round(KeyCount / FProbL)
                end,
-    FCells = lists:reverse(lists:keysort(1, build_failure_cells(FProbList, Keys, NextCell, []))),
+    FCells = lists:reverse(lists:keysort(1, build_failure_cells(FProbList, Keys, CellLength, []))),
     {DB, _, Out} = 
         lists:foldl(fun({_P, Cell}, {DB, RestF, ROut}) ->
                             {NewEntry, NewOut, NewF} = add_failures_to_cell(Cell, RestF, FType, FDest, {[], ROut}),
@@ -341,16 +386,17 @@ p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
 p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
     FRate = case FCount of
                 0 -> KeyCount + 1;
-                _ -> util:floor(KeyCount / FCount)
+                _ -> erlang:max(1, erlang:trunc(KeyCount / FCount))
             end,
     {DB, O, _, _} = 
         lists:foldl(
           fun(Key, {AccDb, Out, Count, FCRest}) ->
-                  {{RList, AddOut}, FCNew} = case Count rem FRate of
-                                                 0 when FCRest > 0 -> 
-                                                     {get_failure_rep_group(Key, FType, FDest), FCRest - 1};
-                                                 _ -> {{get_rep_group(Key), 0}, FCRest}
-                                             end,
+                  {{RList, AddOut}, FCNew} =
+                      case Count rem FRate of
+                          0 when FCRest > 0 ->
+                              {get_failure_rep_group(Key, FType, FDest), FCRest - 1};
+                          _ -> {{get_rep_group(Key), 0}, FCRest}
+                      end,
                   {lists:append(RList, AccDb), Out + AddOut, Count + 1, FCNew}
           end,
           {[], 0, 1, FCount}, Keys),
@@ -373,22 +419,23 @@ add_failures_to_cell([H | T], FCount, FType, FDest, {AccEntry, AccOut}) ->
     add_failures_to_cell(T, FCount - 1, FType, FDest,
                          {lists:append(AddEntrys, AccEntry), AddOut + AccOut}).
 
--spec build_failure_cells([float()], [?RT:key()], non_neg_integer(),
+%% @doc Groups Keys into cells of equal size with failure probabilities
+%%      assigned from FProbs.
+-spec build_failure_cells(FProbs::[float()], Keys::[?RT:key()], CellLength::pos_integer(),
                           Acc::[{float(), [?RT:key()]}])
         -> Result::[{float(), [?RT:key()]}].
-build_failure_cells([], [], _Next, Acc) ->
+build_failure_cells([], [], _CellLength, Acc) ->
     Acc;
-build_failure_cells([], T, _Next, [{P, Cell} | Acc]) ->
+build_failure_cells([], T, _CellLength, []) ->
+    [{0.0, T}];
+build_failure_cells([], T, _CellLength, [{P, Cell} | Acc]) ->
     [{P, lists:append(T, Cell)} | Acc];
-build_failure_cells(_P, [], _Next, Acc) ->
+build_failure_cells(_P, [], _CellLength, Acc) ->
     Acc;
-build_failure_cells([P | T], List, Next, Acc) ->
-    Cell = lists:sublist(List, Next),
-    RLen = length(List),
-    LT = if Next > RLen -> [];
-            true -> lists:nthtail(Next, List)
-         end,
-    build_failure_cells(T, LT, Next, [{P, Cell}|Acc]).
+build_failure_cells([P | T], List, CellLength, Acc) ->
+    ?ASSERT(CellLength > 0), % otherwise no progress and endless loop!
+    {Cell, LT} = util:safe_split(CellLength, List),
+    build_failure_cells(T, LT, CellLength, [{P, Cell}|Acc]).
 
 -spec get_non_uniform_probs(random_bias:generator(), [float()]) -> [float()].
 get_non_uniform_probs(RanGen, Acc) ->
