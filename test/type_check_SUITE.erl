@@ -29,17 +29,17 @@
 -include("client_types.hrl").
 
 all()   -> [
-%%             tester_type_check_api,
-%%             tester_type_check_config,
-%% %%            tester_type_check_dht_node,
-%%             tester_type_check_gossip,
-%%             tester_type_check_math,
-%%             tester_type_check_node,
-%%             tester_type_check_paxos,
-            tester_type_check_rrepair%,
-%%             tester_type_check_tx,
-%%             tester_type_check_rdht_tx,
-%%             tester_type_check_util
+            tester_type_check_api,
+            tester_type_check_config,
+%%            tester_type_check_dht_node,
+            tester_type_check_gossip,
+            tester_type_check_math,
+            tester_type_check_node,
+            tester_type_check_paxos,
+            tester_type_check_rrepair,
+            tester_type_check_tx,
+            tester_type_check_rdht_tx,
+            tester_type_check_util
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
 
@@ -295,7 +295,7 @@ tester_type_check_paxos(_Config) ->
     true.
 
 tester_type_check_rrepair(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
