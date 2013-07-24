@@ -30,7 +30,7 @@
 
 % for tester:
 -export([get_db_feeder/3, get_db_feeder/4]).
-%% -export([fill_ring_feeder/3]).
+-export([fill_ring_feeder/3]).
 -export([feeder_fix_rangen/2]).
 
 -define(ReplicationFactor, 4).
@@ -204,21 +204,29 @@ non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccLen, AccType, RoundingE
 % Helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% not ready yet:
-%% -spec fill_ring_feeder(random, 1..1000, [db_parameter()])
-%%         -> {db_type(), pos_integer(), [db_parameter()]}.
-%% fill_ring_feeder(Type, DBSize0, Params) ->
-%%     Params1 =
-%%         case proplists:get_value(distribution, Params, uniform) of
-%%             {non_uniform, RanGen} = EDist0 ->
-%%                 DBSize = erlang:min(DBSize0, random_bias:numbers_left(RanGen)),
-%%                 [{distribution, feeder_fix_rangen(EDist0, DBSize)} |
-%%                      proplists:delete(fdistribution, Params)];
-%%             _ ->
-%%                 DBSize = DBSize0,
-%%                 Params
-%%         end,
-%%     {Type, DBSize, Params1}.
+-spec fill_ring_feeder(random, {1..1000, 1..1000}, [db_parameter()])
+        -> {db_type(), pos_integer(), [db_parameter()]}.
+fill_ring_feeder(Type, {Size0, Size1}, Params) ->
+    % failures must be less than DB size!
+    if Size0 >= Size1 -> DBSize = Size0, FSize = Size1;
+       true           -> DBSize = Size1, FSize = Size0
+    end,
+    Params1 =
+        case proplists:get_value(distribution, Params, uniform) of
+            {non_uniform, _DBRanGen} = DBDist0 ->
+                [{distribution, feeder_fix_rangen(DBDist0, DBSize)} |
+                     proplists:delete(distribution, Params)];
+            _ -> Params
+        end,
+    % set the given number of failures into the random number generator
+    Params2 =
+        case proplists:get_value(fdistribution, Params1, uniform) of
+            {non_uniform, _FRanGen} = EDist0 ->
+                [{fdistribution, feeder_fix_rangen(EDist0, FSize)} |
+                     proplists:delete(fdistribution, Params1)];
+            _ -> Params1
+        end,
+    {Type, DBSize, Params2}.
 
 % @doc  DBSize=Number of Data Entities in DB (without replicas)
 -spec fill_ring(db_type(), pos_integer(), [db_parameter()]) -> db_status().
@@ -228,10 +236,11 @@ fill_ring(Type, DBSize, Params) ->
         wiki -> fill_wiki(Params, "barwiki-latest-pages-meta-current.db")
     end.
 
-% not ready yet:
-%% -spec fill_random_feeder(1..1000, [db_parameter()])
-%%         -> {pos_integer(), [db_parameter()]}.
-%% fill_random_feeder(DBSize, Params) -> {DBSize, Params}.
+-spec fill_random_feeder({1..1000, 1..1000}, [db_parameter()])
+        -> {pos_integer(), [db_parameter()]}.
+fill_random_feeder(Sizes0, Params0) ->
+    {random, DBSize, Params} = fill_ring_feeder(random, Sizes0, Params0),
+    {DBSize, Params}.
 
 -spec fill_random(DBSize::pos_integer(), [db_parameter()]) -> db_status().
 fill_random(DBSize, Params) ->    
