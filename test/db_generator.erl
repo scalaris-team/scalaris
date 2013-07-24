@@ -374,8 +374,7 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     DBSize = KeyCount * ?ReplicationFactor,
     {lists:append(GoodDB, BadDB), {DBSize, Insert, DBSize - Insert, O}};
 p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
-    % TODO: decide what to do if this is not the case!
-    %?ASSERT(random_bias:numbers_left(RanGen) =< KeyCount),
+    ?ASSERT(KeyCount =:= 1 orelse random_bias:numbers_left(RanGen) =< KeyCount),
     FProbList = get_non_uniform_probs(RanGen, []),
     % note: don't use RanGen any more - we don't get the new state in the last call!
     CellLength = case length(FProbList) of
