@@ -82,15 +82,24 @@
 -record(merkle_params,
         {
          interval = intervals:empty()                       :: intervals:interval(),
-         reconPid = ?required(merkle_param, reconPid)       :: comm:mypid()
+         reconPid = ?required(merkle_param, reconPid)       :: comm:mypid(),
+         branch_factor = get_merkle_branch_factor()         :: pos_integer(),
+         bucket_size   = get_merkle_bucket_size()           :: pos_integer()
+        }).
+
+-record(art_recon_struct,
+        {
+         art           = ?required(art_recon_struct, art)           :: art:art(),
+         branch_factor = ?required(art_recon_struct, branch_factor) :: pos_integer(),
+         bucket_size   = ?required(art_recon_struct, bucket_size)   :: pos_integer()
         }).
 
 -type sync_struct() :: #bloom_recon_struct{} |
                        merkle_tree:merkle_tree() |
-                      [merkle_tree:mt_node()] |
-                       art:art().
+                       [merkle_tree:mt_node()] |
+                       #art_recon_struct{}.
 -type parameters() :: #bloom_recon_struct{} |
-                      art:art() |
+                      #art_recon_struct{} |
                       #merkle_params{}.
 -type recon_dest() :: ?RT:key() | random.
 
@@ -124,7 +133,7 @@
     {create_struct, method(), SenderI::intervals:interval()} | % from initiator
     {start_recon, bloom, #bloom_recon_struct{}} | % to initiator
     {start_recon, merkle_tree, #merkle_params{}} | % to initiator
-    {start_recon, art, art:art()}. % to initiator
+    {start_recon, art, #art_recon_struct{}}. % to initiator
 
 -type message() ::
     % API
@@ -202,7 +211,7 @@ on({start_recon, RMethod, Params} = _Msg, State) ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
             fd:subscribe(DestReconPid);
         art ->
-            MySyncI = art:get_interval(Params),
+            MySyncI = art:get_interval(Params#art_recon_struct.art),
             DestReconPid = undefined
     end,
     % client only sends non-empty sync intervals or exits
@@ -256,7 +265,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     DBList = [encodeBlob(KeyX, VersionX) || {KeyX, VersionX} <- DBList0],
     MySyncI = case RMethod of
                   merkle_tree -> Params#merkle_params.interval;
-                  art         -> art:get_interval(Params)
+                  art         -> art:get_interval(Params#art_recon_struct.art)
               end,
     build_struct(DBList, MySyncI, RestI, State);
 
@@ -318,7 +327,7 @@ build_struct(DBList, DestI, RestI,
                  true -> RMethod
               end,
     {BuildTime, SyncStruct} =
-        util:tc(fun() -> build_recon_struct(ToBuild, OldSyncStruct, DestI, DBList) end),
+        util:tc(fun() -> build_recon_struct(ToBuild, OldSyncStruct, DestI, DBList, Params) end),
     Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
     NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1},
     EmptyRest = intervals:is_empty(RestI),
@@ -389,7 +398,7 @@ begin_sync(MySyncStruct, OtherSyncStruct,
     ?TRACE("BEGIN SYNC", []),
     case Initiator of
         true ->
-            Stats1 = art_recon(MySyncStruct, OtherSyncStruct, State),
+            Stats1 = art_recon(MySyncStruct, OtherSyncStruct#art_recon_struct.art, State),
             shutdown(sync_finished, State#rr_recon_state{stats = Stats1});
         false ->
             SID = rr_recon_stats:get(session_id, Stats), 
@@ -571,31 +580,44 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
-                         intervals:non_empty_interval(), db_chunk_enc())
-        -> sync_struct().
-build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems) ->
+                         intervals:non_empty_interval(), db_chunk_enc(),
+                         Params::parameters() | {}) -> sync_struct().
+build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params) ->
+    % note: for bloom, parameters don't need to match - use our own
     ?ASSERT(not intervals:is_empty(I)),
     Fpr = get_bloom_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     BF = ?REP_BLOOM:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
     #bloom_recon_struct{ interval = I, bloom = BF };
-build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems) ->
+build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params) ->
     ?ASSERT(not intervals:is_empty(I)),
-    merkle_tree:new(I, DBItems, [{branch_factor, get_merkle_branch_factor()},
-                                 {bucket_size, get_merkle_bucket_size()}]);
-build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems) ->
+    case Params of
+        {} ->
+            BranchFactor = get_merkle_branch_factor(),
+            BucketSize = get_merkle_bucket_size();
+        #merkle_params{branch_factor = BranchFactor,
+                       bucket_size = BucketSize} ->
+            ok;
+        #art_recon_struct{branch_factor = BranchFactor,
+                          bucket_size = BucketSize} ->
+            ok
+    end,
+    merkle_tree:new(I, DBItems, [{branch_factor, BranchFactor},
+                                 {bucket_size, BucketSize}]);
+build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params) ->
     ?ASSERT(not intervals:is_empty(_I)),
     ?ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
     NTree = merkle_tree:insert_list(DBItems, OldSyncStruct),
     merkle_tree:gen_hash(NTree);
-build_recon_struct(art, _OldSyncStruct = {}, I, DBItems) ->
+build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}) ->
     ?ASSERT(not intervals:is_empty(I)),
     Branch = get_merkle_branch_factor(),
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), Branch, 1),
     Tree = merkle_tree:new(I, DBItems, [{branch_factor, Branch},
                                         {bucket_size, BucketSize}]),
-    art:new(Tree, get_art_config()).
+    #art_recon_struct{art = art:new(Tree, get_art_config()),
+                      branch_factor = Branch, bucket_size = BucketSize}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
