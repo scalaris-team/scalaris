@@ -38,7 +38,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([init/1, on/2, start/2, start/3]).
+-export([init/1, on/2, start/0]).
 -export([get_stats_session_id/1, get_stats_feedback/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
@@ -52,7 +52,8 @@
 
 -type option()   :: feedback_response |
                     {feedback_request, comm:mypid()} | 
-                    {send_stats, comm:mypid()}. %send stats to pid after completion
+                    {send_stats, comm:mypid()} | %send stats to pid after completion
+                    {session_id, rrepair:session_id()}.
 -type options()  :: [option()].
 -type kvv_list() :: [{?RT:key(), db_dht:value(), db_dht:version()}].
 -type exit_reason() :: resolve_ok | resolve_abort.
@@ -109,9 +110,20 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec on(message(), state()) -> state() | kill.
 
-on({start}, State = #rr_resolve_state{dhtNodePid = DhtPid}) ->
-	comm:send_local(DhtPid, {get_state, comm:this(), my_range}),
-	State;
+on({start, Operation, Options}, State) ->
+    FBDest = proplists:get_value(feedback_request, Options, undefined),
+    FBResp = proplists:get_value(feedback_response, Options, false),
+    StatsDest = proplists:get_value(send_stats, Options, undefined),
+    SID = proplists:get_value(session_id, Options, null),
+    NewState = State#rr_resolve_state{ operation = Operation,
+                                       stats = #resolve_stats{ feedback_response = FBResp,
+                                                               session_id = SID },
+                                       feedbackDestPid = FBDest,
+                                       send_stats = StatsDest },
+    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p",
+           [element(1, Operation), FBDest, FBResp], NewState),
+    comm:send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
+    NewState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MODE: key_upd
@@ -357,22 +369,8 @@ init(State) ->
     _ = erlang:monitor(process, State#rr_resolve_state.ownerPid),
     State.
 
--spec start(operation(), options()) -> {ok, MyPid::pid()}.
-start(Operation, Options) ->
-    start(null, Operation, Options).
-
--spec start(rrepair:session_id() | null, operation(), options()) -> {ok, MyPid::pid()}.
-start(SID, Operation, Options) ->
-    FBDest = proplists:get_value(feedback_request, Options, undefined),
-    FBResp = proplists:get_value(feedback_response, Options, false),
-    StatsDest = proplists:get_value(send_stats, Options, undefined),
+-spec start() -> {ok, MyPid::pid()}.
+start() ->
     State = #rr_resolve_state{ ownerPid = self(),
-                               dhtNodePid = pid_groups:get_my(dht_node),
-                               operation = Operation,
-                               stats = #resolve_stats{ feedback_response = FBResp,
-                                                       session_id = SID },
-                               feedbackDestPid = FBDest,
-                               send_stats = StatsDest },
-    ?TRACE("RESOLVE - CREATE~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p",
-           [element(1, Operation), FBDest, FBResp], State),
+                               dhtNodePid = pid_groups:get_my(dht_node) },
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, State, []).
