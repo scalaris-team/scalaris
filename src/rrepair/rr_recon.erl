@@ -63,7 +63,6 @@
 -type stage()          :: req_shared_interval | build_struct | reconciliation.
 
 -type exit_reason()    :: empty_interval |          %interval intersection between initator and client is empty
-                          negotiate_interval |      %rc initiator has send its interval and exits  
                           build_struct |            %client send its struct (bloom/art) to initiator and exits
                           recon_node_crash |        %sync partner node crashed  
                           sync_finished |           %initiator finish recon
@@ -660,7 +659,6 @@ get_chunk_value(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBE
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec exit_reason_to_rc_status(exit_reason()) -> rr_recon_stats:status().
-exit_reason_to_rc_status(negotiate_interval) -> wait;
 exit_reason_to_rc_status(sync_finished) -> finish;
 exit_reason_to_rc_status(sync_finished_remote) -> finish;
 exit_reason_to_rc_status(_) -> abort.
