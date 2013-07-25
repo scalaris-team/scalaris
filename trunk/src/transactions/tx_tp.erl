@@ -76,8 +76,8 @@ on_init_TP({Tid, RTMs, Accs, TM, RTLogEntry, ItemId, PaxId, _SnapNo}, DHT_Node_S
                                    _Maj = 3, _MaxProposers = 5,
                                    0),
             %% send registerTP to each RTM (send with it the learner id)
-            _ = [ comm:send(X, {?register_TP, {Tid, ItemId, PaxId,
-                                               comm:this()}})
+            This = comm:this(),
+            _ = [ comm:send(X, {?register_TP, {Tid, ItemId, PaxId, This}})
                     || X <- [TM | RTMs], unknown =/= X],
             %% (optimized: embed the proposer's accept message in registerTP message)
             %% remember own proposal for lock release
