@@ -320,7 +320,7 @@ build_struct(DBList, DestI, RestI,
                 {BTime, merkle_tree:gen_hash(NTree) };
             false ->
                 ToBuild = ?IIF(RMethod =:= art, ?IIF(Initiator, merkle_tree, art), RMethod),
-                util:tc(fun() -> build_recon_struct(ToBuild, {DestI, DBList}) end)
+                util:tc(fun() -> build_recon_struct(ToBuild, DestI, DBList) end)
         end,
     Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
     NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1},
@@ -573,20 +573,20 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_recon_struct(method(), {intervals:non_empty_interval(), db_chunk_enc()})
+-spec build_recon_struct(method(), intervals:non_empty_interval(), db_chunk_enc())
         -> sync_struct().
-build_recon_struct(bloom, {I, DBItems}) ->
+build_recon_struct(bloom, I, DBItems) ->
     ?ASSERT(not intervals:is_empty(I)),
     Fpr = get_bloom_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     BF = ?REP_BLOOM:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
     #bloom_recon_struct{ interval = I, bloom = BF };
-build_recon_struct(merkle_tree, {I, DBItems}) ->
+build_recon_struct(merkle_tree, I, DBItems) ->
     ?ASSERT(not intervals:is_empty(I)),
     merkle_tree:new(I, DBItems, [{branch_factor, get_merkle_branch_factor()},
                                  {bucket_size, get_merkle_bucket_size()}]);
-build_recon_struct(art, {I, DBItems}) ->
+build_recon_struct(art, I, DBItems) ->
     ?ASSERT(not intervals:is_empty(I)),
     Branch = get_merkle_branch_factor(),
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), Branch, 1),
