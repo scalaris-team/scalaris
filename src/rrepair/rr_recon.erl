@@ -181,7 +181,7 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
         false ->
             % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
             SenderSyncI = find_intersection(SenderI, SyncI),
-            send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(RMethod), false),
+            send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(), false),
             NewState;
         true ->
             shutdown(empty_interval, NewState)
@@ -218,7 +218,7 @@ on({start_recon, RMethod, Params} = _Msg, State) ->
     ?ASSERT(not intervals:is_empty(MySyncI)),
     
     DhtNodePid = State#rr_recon_state.dhtNodePid,
-    send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(RMethod), true),
+    send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), true),
     State#rr_recon_state{stage = reconciliation, params = Params,
                          method = RMethod, initiator = true,
                          dest_recon_pid = DestReconPid};
@@ -238,7 +238,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
-           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(bloom), true);
+           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), true);
        true -> ok
     end,
     ?TRACE("Reconcile Bloom Session=~p ; Diff=~p", [SID, length(Diff)]),
@@ -343,10 +343,10 @@ build_struct(DBList, DestI, RestI,
                                                            params = Params},
                           {ok, Pid} = fork_recon(ForkState),
                           send_chunk_req(DhtNodePid, Pid, MySubSyncI, SubSyncI,
-                                         get_max_items(RMethod), Reconcile);
+                                         get_max_items(), Reconcile);
                       true ->
                           send_chunk_req(DhtNodePid, self(), MySubSyncI, SubSyncI,
-                                         get_max_items(RMethod), Reconcile)
+                                         get_max_items(), Reconcile)
                    end;
                true -> ok
            end;
@@ -822,8 +822,11 @@ fork_recon(Conf) ->
 % Config parameter handling
 %
 % rr_bloom_fpr              - bloom filter false positive rate (fpr)
-% rr_max_items              - max. number of items per bloom filter, if node data count 
-%                             exceeds rr_max_items two or more bloom filter will be used
+% rr_max_items              - max. number of items to retrieve from the
+%                             dht_node at once
+%                             if syncing with bloom filters and node data count
+%                             exceeds rr_max_items, new rr_recon processes will
+%                             be spawned (each creating a new bloom filter)
 % rr_art_inner_fpr          - 
 % rr_art_leaf_fpr           -  
 % rr_art_correction_factor  - 
@@ -843,8 +846,10 @@ check_percent(Atom) ->
 check_config() ->
     config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso
         check_percent(rr_bloom_fpr) andalso
-        config:cfg_is_integer(rr_max_items) andalso
-        config:cfg_is_greater_than(rr_max_items, 0) andalso
+        ?IIF(config:read(rr_max_items) =:= all,
+             true,
+             config:cfg_is_integer(rr_max_items) andalso
+                 config:cfg_is_greater_than(rr_max_items, 0)) andalso
         config:cfg_is_integer(rr_merkle_branch_factor) andalso
         config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
         config:cfg_is_integer(rr_merkle_bucket_size) andalso
@@ -858,13 +863,9 @@ check_config() ->
 get_bloom_fpr() ->
     config:read(rr_bloom_fpr).
 
--spec get_max_items(method()) -> pos_integer() | all.
-get_max_items(Method) ->
-    case Method of
-        merkle_tree -> all;
-        art -> all;
-        _ -> config:read(rr_max_items) % bloom, iblt
-    end.
+-spec get_max_items() -> pos_integer() | all.
+get_max_items() ->
+    config:read(rr_max_items).
 
 -spec get_merkle_branch_factor() -> pos_integer().
 get_merkle_branch_factor() ->
