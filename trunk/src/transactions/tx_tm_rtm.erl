@@ -22,6 +22,8 @@
 -author('schintke@zib.de').
 -vsn('$Id$').
 
+-compile({inline, [get_item_entry/2]}).
+
 %%-define(TRACE_RTM_MGMT(X,Y), io:format(X,Y)).
 %%-define(TRACE_RTM_MGMT(X,Y), log:pal(X,Y)).
 -define(TRACE_RTM_MGMT(X,Y), ok).
@@ -242,6 +244,7 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
     GLLearner = state_get_gllearner(State),
     TLogUid = uid:get_global_uid(),
     NewTid = {?tx_id, TLogUid},
+    This = comm:this(),
     ItemStates = 
         util:map_with_nr(
           fun(TLogEntry, NrX) ->
@@ -250,13 +253,13 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
                   ItemState = tx_item_set_status(TItemState, ok),
                   %% initialize local learner
                   _ = [ learner:start_paxosid(GLLearner, element(1, X),
-                                              Maj, comm:this(), ItemId)
+                                              Maj, This, ItemId)
                           || X <- tx_item_get_paxosids_rtlogs_tps(ItemState) ],
                   ItemState
           end, TransLog, 0),
 
     RTMs = state_get_RTMs(State),
-    TmpTxState = tx_state_new(NewTid, Client, ClientsID, comm:this(), RTMs,
+    TmpTxState = tx_state_new(NewTid, Client, ClientsID, This, RTMs,
                               ItemStates, [GLLearner]),
     TxState = tx_state_set_status(TmpTxState, ok),
 
@@ -556,7 +559,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
             RTMs = tx_state_get_rtms(TxState),
             Role = state_get_role(State),
             ValidAccs = [ X || {X} <- rtms_get_accpids(RTMs)],
-            ValidAccsL = length(ValidAccs),
+            MaxProposers = length(ValidAccs) + 1,
             This = comm:this(),
             case comm:is_valid(This) of
                 false ->
@@ -575,7 +578,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
 %%                          log:pal("initiating proposer~n"),
                           [ begin
                                 learner:start_paxosid(GLLearner, PaxId, Maj,
-                                                      comm:this(), ItemId),
+                                                      This, ItemId),
                                 %% add learner to running paxos acceptors
                                 _ = [ comm:send(X,
                                                 {acceptor_add_learner,
@@ -583,7 +586,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                                       || X <- ValidAccs],
                                 proposer:start_paxosid(
                                   Proposer, PaxId, _Acceptors = ValidAccs, ?abort,
-                                  Maj, ValidAccsL + 1, ThisRTMsNumber),
+                                  Maj, MaxProposers, ThisRTMsNumber),
                                 ok
                             end
                             || {PaxId, _RTLog, _TP}
@@ -742,10 +745,11 @@ on_init({crash, Pid}, State) ->
 %% functions for periodic RTM updates
 -spec rtm_update(rtms(), pos_integer(), {update_RTMs} | {update_RTMs_on_init}) -> ok.
 rtm_update(RTMs, Delay, TriggerMsg) ->
+    This = comm:this(),
     _ = [ begin
               Name = get_nth_rtm_name(get_nth(RTM)),
               Key = get_rtmkey(RTM),
-              api_dht_raw:unreliable_lookup(Key, {get_rtm, comm:this(), Key, Name})
+              api_dht_raw:unreliable_lookup(Key, {get_rtm, This, Key, Name})
           end
           || RTM <- RTMs],
     msg_delay:send_local(Delay, %config:read(tx_rtm_update_interval) div 1000,
@@ -844,17 +848,23 @@ inform_tps(TxState, State, Result) ->
     ?TRACE("tx_tm_rtm:inform tps~n", []),
     LocalSnapNumber = state_get_local_snapno(State),
     %% inform TPs
+    This = comm:this(),
     Informed =
         lists:foldl(
           fun(ItemId, Sum) ->
                   {ok, ItemState} = get_item_entry(ItemId, State),
-                  Sum + length(
-                    [ msg_tp_do_commit_abort(TP, {PaxId, RTLogEntry,
-                                                  comm:this(), ItemId},
-                                             Result, LocalSnapNumber)
-                        || {PaxId, RTLogEntry, TP}
-                               <- tx_item_get_paxosids_rtlogs_tps(ItemState),
-                           comm:is_valid(TP) ])
+                  lists:foldl(
+                    fun({PaxId, RTLogEntry, TP}, Sum2) ->
+                            case comm:is_valid(TP) of
+                                true ->
+                                    msg_tp_do_commit_abort(
+                                      TP,
+                                      {PaxId, RTLogEntry, This, ItemId},
+                                      Result, LocalSnapNumber),
+                                    Sum2 + 1;
+                                _ -> Sum2
+                            end
+                    end, Sum, tx_item_get_paxosids_rtlogs_tps(ItemState))
           end, 0, tx_state_get_txitemids(TxState)),
     tx_state_set_numinformed(TxState, Informed).
 
@@ -958,6 +968,7 @@ merge_item_states(Tid, [EntryId | RestLocal],
 %%               {ok, ItemState} = get_item_entry(X, State),
 %%               {_,_,TPs} =
 %%                   lists:unzip3(tx_item_get_paxosids_rtlogs_tps(ItemState)),
+%%               % TODO: if activated, rather fold over the list of TPs to get the number of valid TPs for better performance(?)
 %%               ValidTPs = [ Y || Y <- TPs, unknown =/= Y],
 %%               length(ValidTPs) >= tx_item_get_maj_for_prepared(ItemState)
 %%           end
@@ -966,17 +977,22 @@ merge_item_states(Tid, [EntryId | RestLocal],
 
 -spec rtms_of_same_dht_node(rtms()) -> boolean().
 rtms_of_same_dht_node(InRTMs) ->
-    GetGroups = lists:usort([pid_groups:group_of(
-                               comm:make_local(element(1,get_rtmpid(X))))
-                             || X <- InRTMs, unknown =/= get_rtmpid(X)]),
     %% group_of may return failed, don't include these
-    Groups = [ X || X <- GetGroups, X =/= failed ],
+    Groups =
+        lists:usort(
+          [G || X <- InRTMs, unknown =/= (RTMPid = get_rtmpid(X)),
+                failed =/= (G = pid_groups:group_of(
+                                  comm:make_local(element(1, RTMPid))))]),
     case length(Groups) of
         4 -> false;
         _ ->
             log:log(info, "RTMs of same DHT node are used. Please start more Scalaris nodes.~n"),
             true
     end.
+
+-compile({inline, [rtm_entry_new/4, get_rtmkey/1, set_rtmkey/2, get_rtmpid/1,
+                   get_nth/1, get_accpid/1,
+                   rtms_get_rtmpids/1, rtms_get_accpids/1]}).
 
 -spec rtm_entry_new(?RT:key(), {comm:mypid()} | unknown,
                     0..3, {comm:mypid()} | unknown) -> rtm().
@@ -1032,6 +1048,13 @@ get_my(Role, PaxosRole) ->
                 atom_to_list(Role) ++ "_" ++ atom_to_list(PaxosRole)),
     pid_groups:get_my(PidName).
 
+-compile({inline, [state_get_RTMs/1, state_set_RTMs/2,
+                   state_get_tablename/1, state_get_role/1, state_get_lacceptor/1,
+                   state_get_gllearner/1, state_set_gllearner/2,
+                   state_get_opentxnum/1, state_inc_opentxnum/1, state_dec_opentxnum/1,
+                   state_get_local_snapno/1, state_set_local_snapno/2,
+                   state_subscribe/2, state_unsubscribe/2]}).
+
 -spec state_get_RTMs(state())      -> rtms().
 state_get_RTMs(State)          -> element(1, State).
 -spec state_set_RTMs(state(), rtms())
@@ -1043,10 +1066,10 @@ state_get_tablename(State)     -> element(2, State).
 state_get_role(State)          -> element(3, State).
 -spec state_get_lacceptor(state())  -> pid().
 state_get_lacceptor(State)     -> element(4, State).
--spec state_set_gllearner(state(), comm:mypid()) -> state().
-state_set_gllearner(State, Pid) -> setelement(5, State, Pid).
 -spec state_get_gllearner(state()) -> comm:mypid().
 state_get_gllearner(State) -> element(5, State).
+-spec state_set_gllearner(state(), comm:mypid()) -> state().
+state_set_gllearner(State, Pid) -> setelement(5, State, Pid).
 -spec state_get_opentxnum(state()) -> non_neg_integer().
 state_get_opentxnum(State) -> element(6, State).
 -spec state_inc_opentxnum(state()) -> state().
@@ -1076,17 +1099,15 @@ get_failed_keys(TxState, State) ->
     case NumAbort of
         0 -> [];
         _ ->
-            TxItems =
-                [ element(2, get_item_entry(TxItemId, State))
-                  || TxItemId <- tx_state_get_txitemids(TxState) ],
             [ tx_tlog:get_entry_key(tx_item_get_tlog(TxItem))
-              || TxItem <- TxItems,
-                 ?abort =:= tx_item_get_decided(TxItem)]
+                || TxItemId <- tx_state_get_txitemids(TxState),
+                   ?abort =:= tx_item_get_decided(
+                     TxItem = element(2, get_item_entry(TxItemId, State)))]
     end,
     case length(Result) of
         NumAbort -> ok;
-        _ -> log:pal("This should not happen: ~p =/= ~p~n",
-                    [NumAbort, length(Result)])
+        ResultL  -> log:pal("This should not happen: ~p =/= ~p~n",
+                    [NumAbort, ResultL])
     end,
     Result.
 
@@ -1097,13 +1118,14 @@ get_failed_keys(TxState, State) ->
                       state()}.
 handle_crash(Pid, State, Handler) ->
     RTMs = state_get_RTMs(State),
+    This = comm:this(),
     NewRTMs = [ case get_rtmpid(RTM) of
                     X when unknown =:= X orelse {Pid} =:= X ->
                         I = get_nth(RTM),
                         Name = get_nth_rtm_name(I),
                         Key = get_rtmkey(RTM),
                         api_dht_raw:unreliable_lookup(
-                          Key, {get_rtm, comm:this(), Key, Name}),
+                          Key, {get_rtm, This, Key, Name}),
                         rtm_entry_new(Key, unknown, I, unknown);
                     _ -> RTM
                 end
