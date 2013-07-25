@@ -119,7 +119,6 @@
 	{continue_recon, SenderRRPid::comm:mypid(), session_id() | null, ReqMsg::rr_recon:request()} |
     {request_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
     {recon_forked} |
-    {request_sync_complete, session()} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     % rr statistics
@@ -214,18 +213,6 @@ on({request_resolve, SessionID, Operation, Options}, State = #rrepair_state{ ope
 on({recon_forked}, State) ->
     State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
 
-%% @doc will be called after finishing a request_sync API call
-%%      Could be used to send request caller a finished Msg.
-on({request_sync_complete, Session}, State = #rrepair_state{ open_sessions = Sessions }) ->
-    ?TRACE_COMPLETE("--SESSION COMPLETE--~n~p", [Session]),
-    case Session#session.principal of
-        none -> ok;
-        Pid -> io:format("FINISH!~n~nSEND TO ~p~n", [Pid]),
-            comm:send(Pid, {request_sync_complete, Session})
-    end,
-    NewOpen = lists:delete(Session, Sessions),
-    State#rrepair_state{ open_sessions = NewOpen };
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({rr_stats, Msg}, State) ->
@@ -246,8 +233,10 @@ on({recon_progress_report, _Sender, true, Stats}, State = #rrepair_state{ open_r
     NewOS = case extract_session(rr_recon_stats:get(session_id, Stats), OS) of
                     {S, TSessions} ->
                         SUpd = update_session_recon(S, Stats),
-                        check_session_complete(SUpd),
-                        [SUpd | TSessions];
+                        case check_session_complete(SUpd) of
+                            true -> TSessions;
+                            _    -> [SUpd | TSessions]
+                        end;
                     not_found ->
                         %caused by error or forked rc instances by bloom filter rc
                         %log:log(error, "[ ~p ] SESSION NOT FOUND BY INITIATOR ~p", [?MODULE, rr_recon_stats:get(session_id, Stats)]),
@@ -259,10 +248,12 @@ on({resolve_progress_report, _Sender, Stats}, State = #rrepair_state{open_resolv
                                                                      open_sessions = Sessions}) ->
     NSessions = case extract_session(rr_resolve:get_stats_session_id(Stats), Sessions) of
                     not_found -> Sessions;
-                    {S, T} -> 
+                    {S, TSessions} -> 
                         SUpd = update_session_resolve(S, Stats),
-                        check_session_complete(SUpd),
-                        [SUpd | T]
+                        case check_session_complete(SUpd) of
+                            true -> TSessions;
+                            _    -> [SUpd | TSessions]
+                        end
                 end,
     ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p ; OldSession=~p~nNewSessions=~p",
                    [_Sender, rr_resolve:print_resolve_stats(Stats),
@@ -364,17 +355,25 @@ update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount } = S, New)
     Merge = rr_resolve:merge_stats(Old, New),
     S#session{ rs_stats = Merge, rs_finish = RSCount + 1 }.
 
--spec check_session_complete(session()) -> ok.
-check_session_complete(#session{ rc_stats = RCStats,
-                                 rs_called = C, rs_finish = C } = S) 
+%% @doc Checks if the session is complete and in this case, informs the
+%%      principal and returns 'true'. Otherwise 'false'.
+-spec check_session_complete(session()) -> boolean().
+check_session_complete(#session{rc_stats = RCStats, principal = PrincipalPid,
+                                rs_called = C, rs_finish = C} = S) 
   when RCStats =/= none->
     case rr_recon_stats:get(status, RCStats) of
         X when X =:= finish orelse X =:= abort ->
-            comm:send_local(self(), {request_sync_complete, S});
-        wait -> ok
+            ?TRACE_COMPLETE("--SESSION COMPLETE--~n~p", [S]),
+            case PrincipalPid of
+                none -> ok;
+                _ -> comm:send(PrincipalPid, {request_sync_complete, S})
+            end,
+            true;
+        wait ->
+            false
     end;
 check_session_complete(_Session) ->
-    ok.
+    false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
