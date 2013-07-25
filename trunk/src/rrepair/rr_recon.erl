@@ -63,9 +63,8 @@
 -type stage()          :: req_shared_interval | build_struct | reconciliation.
 
 -type exit_reason()    :: empty_interval |          %interval intersection between initator and client is empty
-                          build_struct |            %client send its struct (bloom/art) to initiator and exits
                           recon_node_crash |        %sync partner node crashed  
-                          sync_finished |           %initiator finish recon
+                          sync_finished |           %finish recon on local node
                           sync_finished_remote.     %client-side shutdown by merkle-tree recon initiator
 
 -type db_entry_enc()   :: binary().
@@ -367,7 +366,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
     SID = rr_recon_stats:get(session_id, Stats),
     send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                      {start_recon, bloom, MySyncStruct}}),
-    shutdown(build_struct, State);
+    shutdown(sync_finished, State);
 begin_sync(MySyncStruct, _OtherSyncStruct,
            State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
                                    ownerPid = OwnerL, stats = Stats,
@@ -403,7 +402,7 @@ begin_sync(MySyncStruct, OtherSyncStruct,
             SID = rr_recon_stats:get(session_id, Stats), 
             send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                              {start_recon, art, MySyncStruct}}),
-            shutdown(build_struct, State)
+            shutdown(sync_finished, State)
     end.
 
 -spec shutdown(exit_reason(), state()) -> kill.
