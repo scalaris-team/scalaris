@@ -253,15 +253,12 @@ get_entries(State, Interval) ->
     {Elements, RestInterval} = intervals:get_elements(Interval),
     case intervals:is_empty(RestInterval) of
         true ->
-            [E || Key <- Elements, E <- [get_entry(State, Key)], not db_entry:is_empty(E)];
+            [E || Key <- Elements, not db_entry:is_empty(E = get_entry(State, Key))];
         _ ->
             {_, Data} =
                 get_chunk(State, ?RT:hash_key("0"), % any key will work, here!
                            Interval,
-                           fun(DBEntry) ->
-                                   (not db_entry:is_empty(DBEntry)) andalso
-                                       intervals:in(db_entry:get_key(DBEntry), Interval)
-                           end,
+                           fun(DBEntry) -> not db_entry:is_empty(DBEntry) end,
                            fun(E) -> E end, all),
             Data
     end.
@@ -288,9 +285,9 @@ split_data(State = {DB, _Subscr, _SnapState}, MyNewInterval) ->
             case intervals:in(Key, MyNewInterval) of
                 true -> {StateAcc, HisList};
                 _ -> NewHisList = case db_entry:is_empty(DBEntry) of
-                        false -> [DBEntry | HisList];
-                        _ -> HisList
-                    end,
+                                      false -> [DBEntry | HisList];
+                                      _ -> HisList
+                                  end,
                     {delete_entry_at_key(StateAcc, Key, split), NewHisList}
             end
     end,
@@ -382,8 +379,9 @@ get_chunk({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSiz
         [{interval, LBr, L, R, RBr} | Tail] -> 
             case intervals:in(StartId, intervals:new(LBr, L, R, RBr)) of
                 true ->
-                    [{interval, '[', StartId, R, RBr}] ++ Tail ++ Before ++
-                    [{interval, LBr, L, StartId, ')'}];
+                    lists:append([[{interval, '[', StartId, R, RBr}],
+                                  Tail, Before,
+                                  [{interval, LBr, L, StartId, ')'}]]);
                 _ ->
                     After ++ Before
             end
@@ -423,12 +421,12 @@ calc_remaining_interval(StartId, _Remaining, Chunk, Interval) ->
     %% the interval covered by chunk is either the biggest key left of startid
     %% or if there are no keys left of startid simply the biggest key in chunk
     {Left, Right} = lists:splitwith(fun({Key, _, _, _, _}) -> Key < StartId end,
-                                    lists:sort(Chunk)),
+                                    Chunk),
     Last = case Left of
         [] ->
-            element(1, lists:last(Right));
-        _ ->
-            element(1, lists:last(Left))
+            element(1, lists:max(Right));
+        [_|_] ->
+            element(1, lists:max(Left))
     end,
     ?TRACE_CHUNK("left: ~p~nright: ~p~ncalc_remaining:~n~p~nNext is ~p minus ~p",
                  [Left, Right, Chunk, Interval, intervals:new('[', StartId, Last, ']')]),
@@ -510,7 +508,7 @@ remove_subscription({DB, Subscr, SnapState}, Tag) ->
 %%      matching.
 -spec call_subscribers(State::db(), Operation::close_db | subscr_op_t()) -> db().
 call_subscribers(State = {_DB, Subscr, _SnapState}, Operation) ->
-    {NewState, _Op} =?DB:foldl(Subscr,
+    {NewState, _Op} = ?DB:foldl(Subscr,
               fun call_subscribers_iter/2,
               {State, Operation}),
     NewState.
@@ -591,12 +589,12 @@ subscr_delta(State, _Tag, Operation) ->
 -spec subscr_delta_remove(State::db(), I::intervals:interval()) -> ok.
 subscr_delta_remove(State, Interval) ->
     CKDB = subscr_delta_check_table(State),
-    F = fun (DBEntry, _) ->
-                 Key = db_entry:get_key(DBEntry),
-                 case intervals:in(Key, Interval) of
-                     true -> ?CKETS:delete(CKDB, Key);
-                     _    -> true
-                 end
+    F = fun(DBEntry, _) ->
+                Key = db_entry:get_key(DBEntry),
+                case intervals:in(Key, Interval) of
+                    true -> ?CKETS:delete(CKDB, Key);
+                    _    -> true
+                end
         end,
     ?CKETS:foldl(F, true, CKDB),
     ok.
@@ -732,20 +730,20 @@ get_split_key({DB, _Subscr, _Snap}, Begin, End, TargetLoad, backward) ->
               TargetLoad + 1),
     normalize_split_key_b(Split, TargetLoad, End).
 
-normalize_split_key_b({Key, TakenLoad}, TargetLoad, End) when TakenLoad >
-        TargetLoad ->
+normalize_split_key_b({Key, TakenLoad}, TargetLoad, End)
+  when TakenLoad > TargetLoad ->
     normalize_split_key({Key, TakenLoad - 1}, TargetLoad, End);
-normalize_split_key_b({_Key, TakenLoad}, TargetLoad, End) when TakenLoad == TargetLoad ->
+normalize_split_key_b({_Key, TakenLoad}, TargetLoad, End)
+  when TakenLoad == TargetLoad ->
     normalize_split_key({End, TakenLoad}, TargetLoad, End);
 normalize_split_key_b(Split, TargetLoad, End) ->
-normalize_split_key(Split, TargetLoad, End).
-normalize_split_key({Key, TakenLoad}, TargetLoad, End) ->
-    case TakenLoad < TargetLoad of
-        true ->
-            {End, TakenLoad};
-        _ ->
-            {Key, TakenLoad}
-    end.
+    normalize_split_key(Split, TargetLoad, End).
+
+normalize_split_key({_Key, TakenLoad}, TargetLoad, End)
+  when TakenLoad < TargetLoad ->
+    {End, TakenLoad};
+normalize_split_key({Key, TakenLoad}, _TargetLoad, _End) ->
+    {Key, TakenLoad}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Snapshot-related functions
