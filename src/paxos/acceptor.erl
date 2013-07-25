@@ -110,12 +110,15 @@ init([]) ->
 -spec on(comm:message(), atom()) -> atom().
 on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
     ?TRACE("acceptor:initialize for paxos id: Pid ~p Learners ~p~n", [PaxosID, Learners]),
-    {_, StateForID} = get_entry(PaxosID, ETSTableName),
+    StateForID = case pdb:get(PaxosID, ETSTableName) of
+                     undefined -> state_new(PaxosID);
+                     X -> X
+                 end,
     case state_get_learners(StateForID) of
         Learners -> log:log(error, "dupl. acceptor init for id ~p", [PaxosID]);
         _ ->
             NewState = state_set_learners(StateForID, Learners),
-            set_entry(NewState, ETSTableName),
+            pdb:set(NewState, ETSTableName),
             case state_accepted(NewState) of
                 true  -> inform_learners(PaxosID, NewState);
                 false -> ok
@@ -126,16 +129,16 @@ on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
 % need Sender & PaxosID
 on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
     ?TRACE("acceptor:prepare for paxos id: ~p round ~p~n", [PaxosID,InRound]),
-    {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
-    case ErrCode of
-        new -> msg_delay:send_local(
-                 config:read(acceptor_noinit_timeout) div 1000, self(),
-                 {acceptor_delete_if_no_learner, PaxosID});
-        _ -> ok
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined -> StateForID = state_new(PaxosID),
+                     msg_delay:send_local(
+                       config:read(acceptor_noinit_timeout) div 1000, self(),
+                       {acceptor_delete_if_no_learner, PaxosID});
+        StateForID -> ok
     end,
     case state_add_prepare_msg(StateForID, InRound) of
         {ok, NewState} ->
-            set_entry(NewState, ETSTableName),
+            pdb:set(NewState, ETSTableName),
             msg_ack(Proposer, PaxosID, InRound,
                     state_get_value(NewState),
                     state_get_raccepted(NewState));
@@ -145,15 +148,16 @@ on({proposer_prepare, Proposer, PaxosID, InRound}, ETSTableName = State) ->
 
 on({?proposer_accept, Proposer, PaxosID, InRound, InProposal}, ETSTableName = State) ->
     ?TRACE("acceptor:accept for paxos id: ~p round ~p~n", [PaxosID, InRound]),
-    {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
-    case ErrCode of
-        new -> msg_delay:send_local((config:read(tx_timeout) * 4) div 1000, self(),
-                         {acceptor_delete_if_no_learner, PaxosID});
-        _ -> ok
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined -> StateForID = state_new(PaxosID),
+                     msg_delay:send_local(
+                       (config:read(tx_timeout) * 4) div 1000, self(),
+                       {acceptor_delete_if_no_learner, PaxosID});
+        StateForID -> ok
     end,
-    _ = case state_add_accept_msg(StateForID, InRound, InProposal) of
+    case state_add_accept_msg(StateForID, InRound, InProposal) of
         {ok, NewState} ->
-            set_entry(NewState, ETSTableName),
+            pdb:set(NewState, ETSTableName),
             inform_learners(PaxosID, NewState);
         {dropped, NewerRound} -> msg_naccepted(Proposer, PaxosID, NewerRound)
     end,
@@ -166,48 +170,42 @@ on({acceptor_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
 
 on({acceptor_delete_if_no_learner, PaxosID}, ETSTableName = State) ->
     ?TRACE("acceptor:delete_if_no_learner~n", []),
-    {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
-    case ErrCode of
-        new -> ok; %% already deleted
-        _ -> case state_get_learners(StateForID) of
-                 [] ->
-                     %% io:format("Deleting unhosted acceptor id~n"),
-                     pdb:delete(PaxosID, ETSTableName);
-                 [_|_] -> ok %% learners are registered
-             end
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined -> ok; %% already deleted
+        StateForID ->
+            case state_get_learners(StateForID) of
+                [] ->
+                    %% io:format("Deleting unhosted acceptor id~n"),
+                    pdb:delete(PaxosID, ETSTableName);
+                [_|_] -> ok %% learners are registered
+            end
     end,
     State;
 
 on({acceptor_add_learner, PaxosID, Learner}, ETSTableName = State) ->
     ?TRACE("acceptor:add_learner~n", []),
-    {ErrCode, StateForID} = get_entry(PaxosID, ETSTableName),
-    case ErrCode of
-        new -> ok; %% do not support adding learners without prior initialize
-        ok ->
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined -> ok; %% do not support adding learners without prior initialize
+        StateForID ->
             case state_accepted(StateForID) of
-                true -> inform_learner(Learner,  PaxosID, StateForID);
+                true -> inform_learner(Learner, PaxosID, StateForID);
                 false -> ok
             end,
             NewLearners = [Learner | state_get_learners(StateForID)],
             NStateForID = state_set_learners(StateForID, NewLearners),
-            set_entry(NStateForID, ETSTableName)
+            pdb:set(NStateForID, ETSTableName)
     end,
     State.
 
-get_entry(Id, TableName) ->
-    case pdb:get(Id, TableName) of
-        undefined -> {new, state_new(Id)};
-        Entry -> {ok, Entry}
-    end.
-
-set_entry(NewEntry, TableName) ->
-    pdb:set(NewEntry, TableName).
-
+-spec inform_learners(PaxosID::any(), acceptor_state()) -> ok.
 inform_learners(PaxosID, State) ->
     ?TRACE("acceptor:inform_learners: PaxosID ~p Learners ~p Decision ~p~n",
            [PaxosID, state_get_learners(State), state_get_value(State)]),
-    [ inform_learner(X, PaxosID, State)
-      || X <- state_get_learners(State) ].
+    _ = [ inform_learner(X, PaxosID, State)
+            || X <- state_get_learners(State) ],
+    ok.
+
+-compile({inline, [inform_learner/3]}).
 
 inform_learner(Learner, PaxosID, StateForID) ->
     msg_accepted(Learner, PaxosID,
