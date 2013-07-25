@@ -90,10 +90,6 @@ on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
             case Majority =:= state_get_majority(StateForID)
                 andalso ProcessToInform =:= state_get_process_to_inform(StateForID)
             of
-                true ->
-                    log:log(error,
-                            "duplicate learner initialize for id ~p",
-                            [PaxosID]);
                 false ->
                     TmpState = state_set_majority(StateForID, Majority),
                     Tmp2State = state_set_process_to_inform(TmpState, ProcessToInform),
@@ -102,7 +98,11 @@ on({learner_initialize, PaxosID, Majority, ProcessToInform, ClientCookie},
                         true -> decide(PaxosID, NewState);
                         false -> ok
                     end,
-                    pdb:set(NewState, ETSTableName)
+                    pdb:set(NewState, ETSTableName);
+                true ->
+                    log:log(error,
+                            "duplicate learner initialize for id ~p",
+                            [PaxosID])
             end
     end,
     State;
