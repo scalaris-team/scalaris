@@ -124,7 +124,8 @@
     % rr statistics
     {rr_stats, rr_statistics:requests()} |
     % report
-    {recon_progress_report, Sender::comm:erl_local_pid(), Initiator::boolean(), Stats::rr_recon_stats:stats()} |
+    {recon_progress_report, Sender::comm:mypid(), Initiator::boolean(),
+     DestRR::comm:mypid(), DestRC::comm:mypid() | undefined, Stats::rr_recon_stats:stats()} |
     {resolve_progress_report, Sender::comm:erl_local_pid(), Stats::rr_resolve:stats()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -224,10 +225,29 @@ on({rr_stats, Msg}, State) ->
 % report messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({recon_progress_report, _Sender, false, _Stats}, State = #rrepair_state{ open_recon = OR }) ->
+on({recon_progress_report, Sender, _Initiator = false, DestRR, DestRC, Stats},
+   State = #rrepair_state{ open_recon = OR }) ->
+    ?TRACE_RECON("~nRECON-NI OK - Sender=~p~nStats=~p~nOpenRecon=~p, DestRR: ~p, DestRC: ~p",
+                 [Sender, rr_recon_stats:print(Stats), OR - 1, DestRR, DestRC]),
+    % TODO: integrate non-initiator stats into the stats of the initiator?
+    %       -> may need to be integrated into the 'continue_recon' message of rr_recon
+    case rr_recon_stats:get(status, Stats) of
+        abort when DestRC =:= undefined ->
+            % report to Initiator since he still has a session laying around
+            % and no local rr_recon process to terminate it
+            % use empty stats with status abort for now since non-initiator
+            % stats are not integrated in the successful case either
+            SID = rr_recon_stats:get(session_id, Stats),
+            StatsToSend =
+                rr_recon_stats:set([{status, abort}],
+                                   rr_recon_stats:new([{session_id, SID}])),
+            comm:send(DestRR, {recon_progress_report, Sender, true,
+                               comm:this(), undefined, StatsToSend});
+        _ -> ok
+    end,
     State#rrepair_state{ open_recon = OR - 1 };    
-on({recon_progress_report, _Sender, true, Stats}, State = #rrepair_state{ open_recon = OR,
-                                                                          open_sessions = OS }) ->
+on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
+   State = #rrepair_state{ open_recon = OR, open_sessions = OS }) ->
     ?TRACE_RECON("~nRECON OK - Sender=~p~nStats=~p~nOpenRecon=~p~nSessions=~p",
                  [_Sender, rr_recon_stats:print(Stats), OR - 1, OS]),
     NewOS = case extract_session(rr_recon_stats:get(session_id, Stats), OS) of
