@@ -157,7 +157,7 @@ on({get_state, Sender, Key}, State =
                 open_recon -> Recon;
                 open_resolve -> Resolve;
                 round -> Round;
-                open_sessions -> length(Sessions)
+                open_sessions -> Sessions
             end,
     comm:send(Sender, {get_state_response, Value}),
     State;

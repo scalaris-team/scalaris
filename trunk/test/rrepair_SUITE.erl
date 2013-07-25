@@ -380,18 +380,16 @@ session_ttl(Config) ->
     api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair, 
                                               {request_sync, Method, CKey}}),
     Req = {?send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
-    SessionExists = wait_until_true(SKey, Req, fun(X) -> X =/= 0 end, TTL),
+    SessionOpened = wait_until_true(SKey, Req, fun(X) -> length(X) =/= 0 end, TTL),
 
     %check timeout
     api_vm:kill_node(CName),    
     timer:sleep(TTL),
     api_dht_raw:unreliable_lookup(SKey, Req),
-    SessionGCRemoved = receive {get_state_response, R2} -> R2 =:= 0 end,
-    case SessionExists of
+    SessionGarbageCollected = receive {get_state_response, R2} -> length(R2) =:= 0 end,
+    case SessionOpened of
         true ->
-            ?equals_pattern_w_note(SessionExists, SessionGCRemoved, 
-                                   io_lib:format("Session opened = ~p - Session garbage collected = ~p", 
-                                                 [SessionExists, SessionGCRemoved]));
+            ?equals(SessionGarbageCollected, SessionOpened);
         false ->
             ct:pal("Session finished before client node could be killed.")
     end,
@@ -641,8 +639,10 @@ waitForSyncRoundEnd(NodeKeys) ->
                 fun() -> 
                         api_dht_raw:unreliable_lookup(Key, Req),
                         receive 
-							{get_state_response, Val} -> Val =:= 0
-						end
+                            {get_state_response, Val} ->
+                                % ct:pal("open sessions at ~p:~n  ~.4p", [Key, Val]),
+                                length(Val) =:= 0
+                        end
                 end)
       end, 
       NodeKeys),
