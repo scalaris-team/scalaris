@@ -351,7 +351,7 @@ new(TraceId) ->
           }.
 
 %% @doc Clean-up the given state and anything left in the process dictionary.
--spec state_cleanup(State::state()) -> ok.
+-spec state_cleanup(State::state_t()) -> ok.
 state_cleanup(#state{msg_queues = Queues, msg_delay_queues = DelayQueues}) ->
     % remove queues from erlang dictionary:
     _ = [erlang:erase(Key) || Key <- Queues],
