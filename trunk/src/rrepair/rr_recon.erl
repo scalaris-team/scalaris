@@ -841,25 +841,18 @@ check_percent(Atom) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    (config:read(rr_recon_method) =:= bloom andalso
-         check_percent(rr_bloom_fpr) andalso
-         config:cfg_is_integer(rr_max_items) andalso
-         config:cfg_is_greater_than(rr_max_items, 0)) orelse
-        (config:read(rr_recon_method) =:= merkle_tree andalso
-             config:cfg_is_integer(rr_merkle_branch_factor) andalso
-             config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
-             config:cfg_is_integer(rr_merkle_bucket_size) andalso
-             config:cfg_is_greater_than(rr_merkle_bucket_size, 0)) orelse
-        (config:read(rr_recon_method) =:= art andalso
-             config:cfg_is_integer(rr_merkle_branch_factor) andalso
-             config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
-             % NOTE: merkle_tree:get_opt_bucket_size/3 is used to calculate the optimal bucket size
-             config:cfg_is_integer(rr_merkle_bucket_size) andalso
-             config:cfg_is_greater_than(rr_merkle_bucket_size, 0) andalso
-             check_percent(rr_art_inner_fpr) andalso
-             check_percent(rr_art_leaf_fpr) andalso
-             config:cfg_is_integer(rr_art_correction_factor) andalso
-             config:cfg_is_greater_than(rr_art_correction_factor, 0)).
+    config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso
+        check_percent(rr_bloom_fpr) andalso
+        config:cfg_is_integer(rr_max_items) andalso
+        config:cfg_is_greater_than(rr_max_items, 0) andalso
+        config:cfg_is_integer(rr_merkle_branch_factor) andalso
+        config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
+        config:cfg_is_integer(rr_merkle_bucket_size) andalso
+        config:cfg_is_greater_than(rr_merkle_bucket_size, 0) andalso
+        check_percent(rr_art_inner_fpr) andalso
+        check_percent(rr_art_leaf_fpr) andalso
+        config:cfg_is_integer(rr_art_correction_factor) andalso
+        config:cfg_is_greater_than(rr_art_correction_factor, 0).
 
 -spec get_bloom_fpr() -> float().
 get_bloom_fpr() ->
