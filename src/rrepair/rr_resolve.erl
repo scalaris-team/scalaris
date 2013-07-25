@@ -142,13 +142,9 @@ on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {key_upd_send, Dest, _},
                           feedbackDestPid = FBDest,
                           stats = Stats }) ->
-    KVVList = [entry_to_kvv(E) || E <- EntryList],
+    KvvList = [entry_to_kvv(E) || E <- EntryList],
     Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
-    SendList = make_unique_kvv(lists:keysort(1, KVVList), []),
-    case Stats#resolve_stats.session_id of
-        null -> comm:send(Dest, {request_resolve, {key_upd, SendList}, Options});
-        SID -> comm:send(Dest, {request_resolve, SID, {key_upd, SendList}, Options})
-    end,
+    send_key_upd(Dest, KvvList, Stats#resolve_stats.session_id, Options),
     shutdown(resolve_ok, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -191,8 +187,8 @@ on({get_entries_response, EntryList}, State =
                           feedbackDestPid = FBDest,
                           stats = Stats }) ->
     Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
-    KVVList = [entry_to_kvv(E) || E <- EntryList],
-    SendList = make_unique_kvv(lists:keysort(1, KVVList), []),
+    KvvList = [entry_to_kvv(E) || E <- EntryList],
+    SendList = make_unique_kvv(lists:keysort(1, KvvList), []),
     case Stats#resolve_stats.session_id of
         null -> comm:send(Dest, {request_resolve, {interval_upd, I, SendList}, Options});
         SID -> comm:send(Dest, {request_resolve, SID, {interval_upd, I, SendList}, Options})
@@ -228,7 +224,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     NewState = State#rr_resolve_state{ stats = NewStats, feedbackKvv = NewFBItems },
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
-                ?TRACE("UPDATED = ~p - Regen=~p - FB=~p", [Stats#resolve_stats.update_count, Stats#resolve_stats.regen_count, NewFB], State),
+                ?TRACE("UPDATED = ~p - Regen=~p - FB=~p", [Stats#resolve_stats.update_count, Stats#resolve_stats.regen_count, NewFBItems], State),
                 send_key_upd(FBDest, NewFBItems, Stats#resolve_stats.session_id, [feedback_response]),
                 shutdown(resolve_ok, NewState);
         true -> NewState
@@ -245,6 +241,8 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %% @doc Starts updating the local entries with the given KvvList.
 %%      -> Returns number of send update requests.
 %%      PreCond: KvvList contains only unique keys
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec start_update_key_entry(kvv_list(), intervals:interval(), comm:mypid(), comm:erl_local_pid()) -> non_neg_integer().
 start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
     ?ASSERT(length(KvvList) =:= length(lists:ukeysort(1, KvvList))),
