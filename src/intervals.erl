@@ -30,6 +30,13 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+-compile({inline, [in_simple/2, in/2, is_between/5, interval_sort/2, merge_adjacent/2]}).
+-compile({inline, [normalize_internal/1, normalize_simple/1, wraps_around/4]}).
+-compile({inline, [intersection_simple/2, intersection_simple_element/2]}).
+-compile({inline, [union_simple/2, union/2]}).
+-compile({inline, [minus_simple/2, minus_simple2/2]}).
+-compile({inline, [split2/8]}).
+
 -include("scalaris.hrl").
 
 -export([empty/0, new/1, new/4, all/0, from_elements/1,
@@ -285,7 +292,7 @@ tester_create_simple_interval(I0) ->
 
 -spec normalize_internal([simple_interval()]) -> interval(). % for dialyzer
 normalize_internal(List) ->
-    NormalizedList1 = lists:flatmap(fun(I) -> normalize_simple(I) end, List),
+    NormalizedList1 = lists:flatmap(fun normalize_simple/1, List),
     merge_adjacent(lists:usort(fun interval_sort/2, NormalizedList1), []).
 
 %% @doc Normalizes simple intervals (see normalize_internal/1).
@@ -607,15 +614,10 @@ minus_simple2({interval, A0Br, A0, A1, A1Br}, {interval, B0Br, B0, B1, B1Br}) ->
 minus(_A, [all]) -> empty();
 minus(A, [])     -> A;
 minus(A, A)      -> empty();
-minus(A, B) ->
+minus(A, [HB | TB]) ->
     % from every simple interval in A, remove all simple intervals in B
     % note: we cannot use minus_simple in foldl since the result may be a list again
-    normalize_internal(lists:flatten([minus2(IA, B) || IA <- A])).
-
--spec minus2(A::simple_interval(), B::[simple_interval()]) -> [simple_interval()].
-minus2(A, [HB | TB]) ->
-    minus(minus_simple(A, HB), TB);
-minus2(A, []) -> [A].
+    normalize_internal(lists:flatten([minus(minus_simple(IA, HB), TB) || IA <- A])).
 
 %% @private
 %% @doc Determines whether an interval with the given borders wraps around,
