@@ -407,11 +407,12 @@ begin_sync(MySyncStruct, OtherSyncStruct,
 
 -spec shutdown(exit_reason(), state()) -> kill.
 shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
-                                 initiator = Initiator}) ->
+                                 initiator = Initiator, dest_rr_pid = DestRR,
+                                 dest_recon_pid = DestRC}) ->
     ?TRACE("SHUTDOWN Session=~p Reason=~p", [rr_recon_stats:get(session_id, Stats), Reason]),
     Status = exit_reason_to_rc_status(Reason),
     NewStats = rr_recon_stats:set([{status, Status}], Stats),
-    send_local(OwnerL, {recon_progress_report, self(), Initiator, NewStats}),
+    send_local(OwnerL, {recon_progress_report, comm:this(), Initiator, DestRR, DestRC, NewStats}),
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
