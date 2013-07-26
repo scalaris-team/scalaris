@@ -294,15 +294,30 @@ tester_type_check_paxos(_Config) ->
           || {Mod, Excl, ExclPriv} <- Modules ],
     true.
 
+-spec tester_is_db_entry_enc(term()) -> boolean().
+tester_is_db_entry_enc(X) when is_binary(X) ->
+    try rr_recon:decodeBlob(X) of
+        fail -> false;
+        _    -> true
+    catch _:_ -> false
+    end;
+tester_is_db_entry_enc(_X) -> false.
+
 tester_type_check_rrepair(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
+    tester:register_type_checker({typedef, rr_recon, db_entry_enc}, ?MODULE, tester_is_db_entry_enc),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
+    tester:register_type_checker({typedef, intervals, non_empty_interval}, intervals, is_non_empty),
     tester:register_value_creator({typedef, random_bias, generator},
                                   random_bias, tester_create_generator, 3),
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    tester:register_value_creator({typedef, intervals, non_empty_interval}, intervals, tester_create_non_empty_interval, 2),
+    tester:register_value_creator({typedef, rr_recon, db_entry_enc}, rr_recon, encodeBlob, 2),
+    tester:register_value_creator({typedef, merkle_tree, hash_fun}, merkle_tree, tester_create_hash_fun, 1),
+    tester:register_value_creator({typedef, merkle_tree, inner_hash_fun}, merkle_tree, tester_create_inner_hash_fun, 1),
     Modules =
         [ {rr_recon_stats, [], []},
           {db_generator,
@@ -320,15 +335,53 @@ tester_type_check_rrepair(_Config) ->
              {non_uniform_key_list, 5}, %% needs feeder
              {non_uniform_key_list_, 7}, %% needs feeder
              {get_non_uniform_probs, 2} %% needs feeder
+           ]},
+          {rr_recon,
+           [
+             {on, 2}, %% tries to send messages, needs valid state with pid
+             {init, 1}, %% needs a pid in the state
+             {start, 2}, %% tries to spawn processes
+             {map_interval, 2} %% second interval must be in a single quadrant
+           ],
+           [
+             % currently unsupported (bounded funs) by tester:
+             {check_node, 2},
+             {p_check_node, 3},
+             {process_tree_cmp_result, 4},
+             {p_process_tree_cmp_result, 5},
+             {process_tree_cmp_result, 4},
+             {process_tree_cmp_result, 4},
+             {art_get_sync_leafs, 4},
+
+             {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
+             {build_struct, 4}, %% tries to send messages, needs valid state with pid
+             {build_recon_struct, 5}, %% DB items must be in interval
+             {begin_sync, 3}, %% tries to send messages
+             {shutdown, 2}, %% tries to send messages
+             {resolve_node, 2}, %% tries to send messages
+             {resolve_leaf, 2}, %% tries to send messages
+             {art_recon, 3}, %% tries to send messages
+             {send, 2}, %% tries to send messages
+             {send_local, 2}, %% tries to send messages
+             {send_chunk_req, 6}, %% tries to send messages
+             {replicated_intervals, 1}, %% interval must be in a single quadrant
+             {map_key_to_quadrant_, 2}, %% needs lists of specific length
+             {fork_recon, 1} %% tries to spawn processes
            ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_value_creator({typedef, rr_recon, db_entry_enc}),
+    tester:unregister_value_creator({typedef, merkle_tree, hash_fun}),
+    tester:unregister_value_creator({typedef, merkle_tree, inner_hash_fun}),
     tester:unregister_value_creator({typedef, random_bias, generator}),
     tester:unregister_value_creator({typedef, intervals, interval}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
+    tester:unregister_value_creator({typedef, intervals, non_empty_interval}),
+    tester:unregister_type_checker({typedef, rr_recon, db_entry_enc}),
     tester:unregister_type_checker({typedef, intervals, interval}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval}),
+    tester:unregister_type_checker({typedef, intervals, non_empty_interval}),
     true.
 
 tester_type_check_tx(_Config) ->
