@@ -140,10 +140,9 @@ on_active({deactivate_rt}, {Neighbors, _OldRT, TriggerState})  ->
 on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT, TriggerState}) ->
     case ?RT:update(OldRT, OldNeighbors, NewNeighbors) of
         {trigger_rebuild, NewRT} ->
-            % trigger immediate rebuild
-            NewTriggerState = trigger:now(TriggerState),
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
-            new_state(NewNeighbors, NewRT, NewTriggerState)
+            % trigger immediate rebuild
+            gen_component:post_op(new_state(NewNeighbors, NewRT, TriggerState), {periodic_rt_rebuild})
         ;
         {ok, NewRT} ->
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
