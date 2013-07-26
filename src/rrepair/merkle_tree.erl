@@ -38,6 +38,7 @@
 
 % exports for tests
 -export([bulk_build/3]).
+-export([tester_create_hash_fun/1, tester_create_inner_hash_fun/1]).
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
@@ -490,6 +491,16 @@ keys_to_intervals(KList, IList) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec get_XOR_fun() -> inner_hash_fun().
 get_XOR_fun() ->
     (fun([H|T]) -> lists:foldl(fun(X, Acc) -> util:bin_xor(X, Acc) end, H, T) end).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% allow future versions to create more hash funs by having an integer parameter
+-spec tester_create_hash_fun(I::1) -> hash_fun().
+tester_create_hash_fun(1) -> fun crypto:sha/1.
+
+% allow future versions to create more hash funs by having an integer parameter
+-spec tester_create_inner_hash_fun(I::1) -> inner_hash_fun().
+tester_create_inner_hash_fun(1) -> merkle_tree:get_XOR_fun().
