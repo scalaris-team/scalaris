@@ -74,15 +74,17 @@ next({DS, CalcFun, NextFun}) ->
 numbers_left({{binom, N, _P, X, _Approx}, _CalcFun, _NextFun}) ->
     N + 1 - X.
 
+-define(SQRT_2_PI, 2.5066282746310002). % math:sqrt(2 * math:pi()).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec calc_normal(X::float(), M::float(), E::float()) -> float().
 calc_normal(X, M, Dev) ->
-    A = 1 / (Dev * math:sqrt(2 * math:pi())),
+    A = 1 / (Dev * ?SQRT_2_PI),
     B = -1/2 * math:pow(((X-M) / Dev), 2),
-    A * math:pow(math:exp(1), B).
+    A * math:exp(B).
 
 -spec calc_binomial(binomial_state()) -> float().
 calc_binomial({binom, N, P, X, _Approx = normal}) ->
