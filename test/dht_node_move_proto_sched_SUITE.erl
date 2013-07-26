@@ -19,19 +19,20 @@
 %%   different channels.
 %% @end
 %% @version $Id$
--module(dht_node_move_SUITE).
+-module(dht_node_move_proto_sched_SUITE).
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--define(NUM_SLIDES, 50).
+-define(NUM_SLIDES, 25).
 
 -include("dht_node_move_SUITE.hrl").
 
 all() ->
     [
-     {group, send_to_pred},
-     {group, send_to_pred_incremental},
-     {group, send_to_succ},
-     {group, send_to_succ_incremental}].
+     {group, send_to_pred_proto_sched},
+     {group, send_to_pred_incremental_proto_sched},
+     {group, send_to_succ_proto_sched},
+     {group, send_to_succ_incremental_proto_sched}
+    ].
 
-suite() -> [ {timetrap, {seconds, 20}} ].
+suite() -> [ {timetrap, {seconds, 90}} ].
