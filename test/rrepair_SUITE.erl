@@ -35,8 +35,10 @@ basic_tests() ->
     [get_symmetric_keys_test,
      tester_blob_coding,     
      tester_get_key_quadrant,
+     tester_quadrant_intervals,
      tester_map_interval,
      tester_map_key_to_interval,
+     tester_map_key_to_quadrant,
      tester_find_intersection
     ].
 
@@ -422,6 +424,26 @@ tester_get_key_quadrant(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec prop_quadrant_intervals() -> true.
+prop_quadrant_intervals() ->
+    Quadrants = rr_recon:quadrant_intervals(),
+    ?equals(lists:foldl(fun intervals:union/2, intervals:empty(), Quadrants),
+            intervals:all()),
+    % all continuous:
+    ?equals([Q || Q <- Quadrants, not intervals:is_continuous(Q)],
+            []),
+    % pair-wise non-overlapping:
+    ?equals([{Q1, Q2} || Q1 <- Quadrants,
+                         Q2 <- Quadrants,
+                         Q1 =/= Q2,
+                         not intervals:is_empty(intervals:intersection(Q1, Q2))],
+            []).
+
+tester_quadrant_intervals(_) ->
+    tester:test(?MODULE, prop_quadrant_intervals, 0, 100, [{threads, 4}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec prop_map_interval(intervals:continuous_interval(), 1..4) -> boolean().
 prop_map_interval(I, Q) ->
     Mapped = rr_recon:map_interval(I, Q),
@@ -446,8 +468,8 @@ tester_map_interval(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_map_key_to_interval(intervals:interval(), ?RT:key()) -> boolean().
-prop_map_key_to_interval(I, Key) ->
+-spec prop_map_key_to_interval(?RT:key(), intervals:interval()) -> boolean().
+prop_map_key_to_interval(Key, I) ->
     Mapped = rr_recon:map_key_to_interval(Key, I),
     RGrp = ?RT:get_replica_keys(Key),
     InGrp = [X || X <- RGrp, intervals:in(X, I)],
@@ -477,10 +499,18 @@ prop_map_key_to_interval(I, Key) ->
 
 tester_map_key_to_interval(_) ->
     [Q1, Q2, Q3 | _] = ?RT:get_replica_keys(?MINUS_INFINITY), 
-    prop_map_key_to_interval(intervals:new('[', Q1, Q2, ']'), Q1), 
-    prop_map_key_to_interval(intervals:new('[', Q1, Q2, ']'), Q2),
-    prop_map_key_to_interval(intervals:new('[', Q1, Q2, ']'), Q3),
+    prop_map_key_to_interval(Q1, intervals:new('[', Q1, Q2, ']')), 
+    prop_map_key_to_interval(Q2, intervals:new('[', Q1, Q2, ']')),
+    prop_map_key_to_interval(Q3, intervals:new('[', Q1, Q2, ']')),
     tester:test(?MODULE, prop_map_key_to_interval, 2, 1000, [{threads, 4}]).
+
+-spec prop_map_key_to_quadrant(?RT:key(), Quadrant::1..4) -> boolean().
+prop_map_key_to_quadrant(Key, Quadrant) ->
+    ?equals(rr_recon:map_key_to_quadrant(Key, Quadrant),
+            rr_recon:map_key_to_interval(Key, lists:nth(Quadrant, rr_recon:quadrant_intervals()))).
+
+tester_map_key_to_quadrant(_) ->
+    tester:test(?MODULE, prop_map_key_to_quadrant, 2, 1000, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

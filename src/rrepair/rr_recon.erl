@@ -33,7 +33,8 @@
          map_interval/2,
          get_key_quadrant/1,
          find_intersection/2,
-         get_interval_size/1]).
+         get_interval_size/1,
+         quadrant_intervals/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -665,9 +666,9 @@ exit_reason_to_rc_status(_) -> abort.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Maps any key (K) into a given interval (I). If K is already in I, K is returned.
-%      If K has more than one associated keys in I, the closest one is returned.
-%      If all associated keys of K are not in I, none is returned.
+%% @doc Maps any key (K) into a given interval (I). If K is already in I, K is returned.
+%%      If K has more than one associated keys in I, the closest one is returned.
+%%      If all associated keys of K are not in I, none is returned.
 -spec map_key_to_interval(?RT:key(), intervals:interval()) -> ?RT:key() | none.
 map_key_to_interval(Key, I) ->
     RGrp = [K || K <- ?RT:get_replica_keys(Key), intervals:in(K, I)],
@@ -692,13 +693,28 @@ key_dist(Key1, Key2) ->
     Dist2 = ?RT:get_range(Key2, Key1),
     erlang:min(Dist1, Dist2).
 
-% @doc Maps an abitrary key to its associated key in replication quadrant N.
+%% @doc Maps an abitrary key to its associated key in replication quadrant N.
 -spec map_key_to_quadrant(?RT:key(), quadrant()) -> ?RT:key().
 map_key_to_quadrant(Key, N) ->
     map_key_to_quadrant_(lists:sort(?RT:get_replica_keys(Key)), N).
 -spec map_key_to_quadrant_(RKeys::[?RT:key(),...], quadrant()) -> ?RT:key().
 map_key_to_quadrant_(RKeys, N) ->
     lists:nth(N, RKeys).
+
+%% @doc Gets the quadrant intervals.
+-spec quadrant_intervals() -> [intervals:non_empty_interval(),...].
+quadrant_intervals() ->
+    case ?RT:get_replica_keys(?MINUS_INFINITY) of
+        [_]               -> [intervals:all()];
+        [HB,_|_] = Borders -> quadrant_intervals_(Borders, [], HB)
+    end.
+
+-spec quadrant_intervals_(Borders::[?RT:key(),...], ResultIn::[intervals:non_empty_interval()],
+                          HeadB::?RT:key()) -> [intervals:non_empty_interval(),...].
+quadrant_intervals_([K], Res, HB) ->
+    lists:reverse(Res, [intervals:new('[', K, HB, ')')]);
+quadrant_intervals_([A | [B | _] = TL], Res, HB) ->
+    quadrant_intervals_(TL, [intervals:new('[', A, B, ')') | Res], HB).
 
 % @doc Returns the replication quadrant number (starting at 1) in which Key is located.
 -spec get_key_quadrant(?RT:key()) -> quadrant().
