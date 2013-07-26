@@ -239,7 +239,7 @@ rbr_consistency(_Config) ->
     ok.
 
 tester_type_check_rbr(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
