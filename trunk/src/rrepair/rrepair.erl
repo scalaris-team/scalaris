@@ -252,6 +252,8 @@ on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
                  [_Sender, rr_recon_stats:print(Stats), OR - 1, OS]),
     NewOS = case extract_session(rr_recon_stats:get(session_id, Stats), OS) of
                     {S, TSessions} ->
+                        ?TRACE_RECON("~nRECON OK2 - Sender=~p, ~p",
+                                     [_Sender, S]),
                         SUpd = update_session_recon(S, Stats),
                         case check_session_complete(SUpd) of
                             true -> TSessions;

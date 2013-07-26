@@ -33,13 +33,12 @@
 
 basic_tests() ->
     [get_symmetric_keys_test,
-     tester_blob_coding,     
-     tester_get_key_quadrant,
+     tester_blob_coding,
      tester_quadrant_intervals,
-     tester_map_interval,
      tester_map_key_to_interval,
      tester_map_key_to_quadrant,
-     tester_find_intersection
+     tester_map_interval,
+     tester_find_sync_interval
     ].
 
 repair_default() ->
@@ -65,11 +64,11 @@ bloom_special() ->
 all() ->
     [{group, basic},
      session_ttl,
-     {group, repair}     
+     {group, repair}
      ].
 
 groups() ->
-    [{basic,  [parallel], basic_tests()},     
+    [{basic,  [parallel], basic_tests()},
      {repair, [sequence], [{upd_bloom,    [sequence], repair_default() ++ bloom_special()}, %{repeat_until_any_fail, 1000}
                            {upd_merkle,   [sequence], repair_default()},
                            {upd_art,      [sequence], repair_default()},
@@ -87,18 +86,29 @@ suite() ->
      {timetrap, {seconds, 20}}
     ].
 
+group(tester_type_check) ->
+    [{timetrap, {seconds, 60}}].
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
+    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
+    tester:register_type_checker({typedef, intervals, non_empty_interval}, intervals, is_non_empty),
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    tester:register_value_creator({typedef, intervals, non_empty_interval}, intervals, tester_create_non_empty_interval, 2),
     Config2.
 
 end_per_suite(Config) ->
     erlang:erase(?DBSizeKey),
+    tester:unregister_type_checker({typedef, intervals, interval}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
+    tester:unregister_type_checker({typedef, intervals, non_empty_interval}),
     tester:unregister_value_creator({typedef, intervals, interval}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
+    tester:unregister_value_creator({typedef, intervals, non_empty_interval}),
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
@@ -130,7 +140,14 @@ end_per_group(Group, Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-end_per_testcase(_TestCase, _Config) ->
+init_per_testcase(tester_type_check, Config) ->
+    % needs config
+    unittest_helper:start_minimal_procs(Config, [], false);
+init_per_testcase(_TestCase, Config) ->
+    Config.
+
+end_per_testcase(_TestCase, Config) ->
+    unittest_helper:stop_minimal_procs(Config),
     unittest_helper:stop_ring(),
     ok.
 
@@ -283,8 +300,9 @@ dest_empty_node(Config) ->
                                                    {fdest, [1]}]),
     %chose any node not in quadrant 1    
     KeyGrp = ?RT:get_replica_keys(?RT:get_random_node_id()),
-    IKey = util:randomelem([X || X <- KeyGrp, rr_recon:get_key_quadrant(X) =/= 1]),
-    CKey = hd([Y || Y <- KeyGrp, rr_recon:get_key_quadrant(Y) =:= 1]),
+    [Q1 | _] = rr_recon:quadrant_intervals(),
+    IKey = util:randomelem([X || X <- KeyGrp, not intervals:in(X, Q1)]),
+    CKey = hd([Y || Y <- KeyGrp, intervals:in(Y, Q1)]),
     %measure initial sync degree
     IM = count_dbsize(IKey),
     CM = count_dbsize(CKey),
@@ -315,7 +333,7 @@ parts(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Basic Functions Group
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 get_symmetric_keys_test(Config) ->
     Conf2 = unittest_helper:start_minimal_procs(Config, [], true),
@@ -399,31 +417,6 @@ session_ttl(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_get_key_quadrant(?RT:key()) -> true.
-prop_get_key_quadrant(Key) ->
-    Q = rr_recon:get_key_quadrant(Key),
-    QI = intervals:split(intervals:all(), 4),
-    {TestStatus, TestQ} = 
-        lists:foldl(fun(I, {Status, Nr} = Acc) ->
-                            case intervals:in(Key, I) of
-                                true when Status =:= no -> {yes, Nr};
-                                false when Status =:= no -> {no, Nr + 1};
-                                _ -> Acc
-                            end
-                    end, {no, 1}, QI),
-    ?compare(fun erlang:'>'/2, Q, 0),
-    ?compare(fun erlang:'=<'/2, Q, ?REP_FACTOR),
-    ?equals(TestStatus, yes),
-    ?equals_w_note(TestQ, Q, 
-                   io_lib:format("Quadrants=~p~nKey=~w~nQuadrant=~w~nCheckQuadrant=~w", 
-                                 [QI, Key, Q, TestQ])).
-
-tester_get_key_quadrant(_) ->
-    _ = [prop_get_key_quadrant(Key) || Key <- ?RT:get_replica_keys(?MINUS_INFINITY)],
-    tester:test(?MODULE, prop_get_key_quadrant, 1, 100, [{threads, 4}]).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 -spec prop_quadrant_intervals() -> true.
 prop_quadrant_intervals() ->
     Quadrants = rr_recon:quadrant_intervals(),
@@ -441,32 +434,6 @@ prop_quadrant_intervals() ->
 
 tester_quadrant_intervals(_) ->
     tester:test(?MODULE, prop_quadrant_intervals, 0, 100, [{threads, 4}]).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec prop_map_interval(intervals:continuous_interval(), 1..4) -> boolean().
-prop_map_interval(I, Q) ->
-    Mapped = rr_recon:map_interval(I, Q),
-    case intervals:is_all(I) of
-        false ->
-            {LBrI, LI, RI, RBrI} = intervals:get_bounds(I),
-            {LBrM, LM, RM, RBrM} = intervals:get_bounds(Mapped),
-            ?equals(rr_recon:get_key_quadrant(LM), Q),
-            % note: we use 0-based calculation here, but quadrants start with 1
-            % -> since we subtract two quadrants, there is no error!
-            ?equals((rr_recon:get_key_quadrant(RM) - rr_recon:get_key_quadrant(LM) + 4) rem 4,
-                    (rr_recon:get_key_quadrant(RI) - rr_recon:get_key_quadrant(LI) + 4) rem 4),
-            ?equals(LBrM, LBrI),
-            ?equals(RBrM, RBrI);
-        true ->
-            ?assert(intervals:is_all(Mapped))
-    end.
-    
-tester_map_interval(_) ->
-    _ = [prop_map_interval(intervals:all(), I) || I <- lists:seq(1, 4)],
-    tester:test(?MODULE, prop_map_interval, 2, 100, [{threads, 4}]).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_map_key_to_interval(?RT:key(), intervals:interval()) -> boolean().
 prop_map_key_to_interval(Key, I) ->
@@ -514,30 +481,62 @@ tester_map_key_to_quadrant(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_find_intersection(ALeft::intervals:key(), ARight::intervals:key(), 
-                             BLeft::intervals:key(), BRight::intervals:key()) -> boolean().
-prop_find_intersection(KeyA, KeyB, KeyC, KeyD) ->
-    A = unittest_helper:build_interval(KeyA, KeyB),
-    B = unittest_helper:build_interval(KeyC, KeyD),
-    SA = rr_recon:find_intersection(A, B),
-    SB = rr_recon:find_intersection(B, A),
-    IS = intervals:intersection(A, B),
-    SizeSA = rr_recon:get_interval_size(SA),
-    SizeSB = rr_recon:get_interval_size(SB),
-    ?implies(A =/= B, SA =/= SB) andalso
-        ?equals(rr_recon:find_intersection(A, A), A) andalso
-        ?equals(rr_recon:find_intersection(B, B), B) andalso
-        ?implies(intervals:is_subset(B, A), SB =:= SA) andalso
-        ?implies(intervals:is_subset(A, B), SB =:= SA) andalso
-        ?assert(intervals:is_subset(SA, A)) andalso
-        ?assert(intervals:is_subset(SB, B)) andalso
-        ?assert_w_note(SizeSA =:= SizeSB, 
-                       [{a, A}, {b, B}, {sa, SA}, {sb, SB}, {sizeSa, SizeSA}, {sizeSb, SizeSB}]) andalso
-        ?implies(IS =/= [], IS =:= SA andalso IS =:= SB) andalso
-        ?implies(not intervals:is_empty(SA), not intervals:is_empty(SB)).
+-spec prop_map_interval(A::intervals:continuous_interval(), 
+                             B::intervals:continuous_interval()) -> boolean().
+prop_map_interval(A, B) ->
+    Quadrants = rr_recon:quadrant_intervals(),
+    % need a B that is in a single quadrant - just use the first one to get
+    % deterministic behaviour:
+    BQ = hd(rr_recon:quadrant_subints_(B, rr_recon:quadrant_intervals(), [])),
+    SA = rr_recon:map_interval(A, BQ),
+    
+    % SA must be a sub-interval of A
+    ?compare(fun intervals:is_subset/2, SA, A),
+    
+    % SA must be in a single quadrant
+    ?equals([I || Q <- Quadrants,
+                  not intervals:is_empty(
+                    I = intervals:intersection(SA, Q))],
+            ?IIF(intervals:is_empty(SA), [], [SA])),
+    
+    % if mapped back, must at least be a subset of BQ:
+    case intervals:is_empty(SA) of
+        true -> true;
+        _ ->
+            ?compare(fun intervals:is_subset/2, rr_recon:map_interval(BQ, SA), BQ)
+    end.
 
-tester_find_intersection(_) ->
-    tester:test(?MODULE, prop_find_intersection, 4, 1000, [{threads, 4}]).
+tester_map_interval(_) ->
+    prop_map_interval(intervals:new(?MINUS_INFINITY),
+                      intervals:new('[', 45418374902990035001132940685036047259, ?MINUS_INFINITY, ']')),
+    prop_map_interval(intervals:new(?MINUS_INFINITY), intervals:all()),
+    prop_map_interval([{interval,'[',0,52800909270899328435375133601130059363,')'}],
+                      [{interval,'[',234596648080609640182865804133877994395,293423227623586592154289572207917413067,')'}]),
+    tester:test(?MODULE, prop_map_interval, 2, 1000, [{threads, 1}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_find_sync_interval(intervals:continuous_interval(), intervals:continuous_interval()) -> true.
+prop_find_sync_interval(A, B) ->
+    SyncI = rr_recon:find_sync_interval(A, B),
+    case intervals:is_empty(SyncI) of
+        true -> true;
+        _ ->
+            % continuous:
+            ?assert_w_note(intervals:is_continuous(SyncI), io_lib:format("SyncI: ~p", [SyncI])),
+            % mapped to A, subset of A:
+            ?assert_w_note(intervals:is_subset(SyncI, A), io_lib:format("SyncI: ~p", [SyncI])),
+            Quadrants = rr_recon:quadrant_intervals(),
+            % only in a single quadrant:
+            ?equals([SyncI || Q <- Quadrants,
+                              not intervals:is_empty(intervals:intersection(SyncI, Q))],
+                    [SyncI]),
+            % SyncI must be a subset of B if mapped back
+            ?compare(fun intervals:is_subset/2, rr_recon:map_interval(B, SyncI), B)
+    end.
+
+tester_find_sync_interval(_) ->
+    tester:test(?MODULE, prop_find_sync_interval, 2, 100, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
@@ -572,6 +571,7 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig, CompFun) 
     print_status(0, InitDBStat),
     _ = util:for_to_ex(1, Rounds, 
                        fun(I) ->
+                               ct:pal("Starting round ~p", [I]),
                                startSyncRound(NodeKeys),
                                waitForSyncRoundEnd(NodeKeys),
                                print_status(I, get_db_status())

@@ -26,15 +26,11 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start/2, check_config/0]).
--export([map_key_to_interval/2, map_key_to_quadrant/2]).
+-export([map_key_to_interval/2, map_key_to_quadrant/2, map_interval/2]).
 
 %export for testing
 -export([encodeBlob/2, decodeBlob/1,
-         map_interval/2,
-         get_key_quadrant/1,
-         find_intersection/2,
-         get_interval_size/1,
-         quadrant_intervals/0]).
+         quadrant_intervals/0, find_sync_interval/2, quadrant_subints_/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -174,12 +170,12 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
     % dest_interval contains the interval of the initiator
     % -> client creates recon structure based on common interval, sends it to initiator
     RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
-    SyncI = find_intersection(MyI, SenderI),
+    SyncI = find_sync_interval(MyI, SenderI),
     NewState = State#rr_recon_state{stage = build_struct},
     case intervals:is_empty(SyncI) of
         false ->
             % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
-            SenderSyncI = find_intersection(SenderI, SyncI),
+            SenderSyncI = map_interval(SenderI, SyncI),
             send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(), false),
             NewState;
         true ->
@@ -332,10 +328,10 @@ build_struct(DBList, DestI, RestI,
     EmptyRest = intervals:is_empty(RestI),
     % bloom may fork more recon processes if un-synced elements remain
     if not EmptyRest ->
-           SubSyncI = find_intersection(DestI, RestI),
+           SubSyncI = map_interval(DestI, RestI),
            case intervals:is_empty(SubSyncI) of
                false ->
-                   MySubSyncI = find_intersection(RestI, DestI), % mapped to my range
+                   MySubSyncI = map_interval(RestI, DestI), % mapped to my range
                    Reconcile = Initiator andalso (Stage =:= reconciliation),
                    if RMethod =:= bloom -> 
                           ForkState = State#rr_recon_state{dest_interval = SubSyncI,
@@ -696,14 +692,10 @@ key_dist(Key1, Key2) ->
 %% @doc Maps an abitrary key to its associated key in replication quadrant N.
 -spec map_key_to_quadrant(?RT:key(), quadrant()) -> ?RT:key().
 map_key_to_quadrant(Key, N) ->
-    RKeys = case lists:sort(?RT:get_replica_keys(Key)) of
-                [?MINUS_INFINITY|TL] -> lists:append(TL, [?MINUS_INFINITY]);
-                [_|_] = X        -> X
-            end,
-    map_key_to_quadrant_(RKeys, N).
--spec map_key_to_quadrant_(RKeys::[?RT:key(),...], quadrant()) -> ?RT:key().
-map_key_to_quadrant_(RKeys, N) ->
-    lists:nth(N, RKeys).
+    case lists:sort(?RT:get_replica_keys(Key)) of
+        [?MINUS_INFINITY|TL] -> lists:nth(N, lists:append(TL, [?MINUS_INFINITY]));
+        [_|_] = X            -> lists:nth(N, X)
+    end.
 
 %% @doc Gets the quadrant intervals.
 -spec quadrant_intervals() -> [intervals:non_empty_interval(),...].
@@ -724,85 +716,102 @@ quadrant_intervals_([K], Res, HB) ->
 quadrant_intervals_([A | [B | _] = TL], Res, HB) ->
     quadrant_intervals_(TL, [intervals:new('(', A, B, ']') | Res], HB).
 
-% @doc Returns the replication quadrant number (starting at 1) in which Key is located.
--spec get_key_quadrant(?RT:key()) -> quadrant().
-get_key_quadrant(Key) ->
-    get_key_quadrant_(Key, lists:sort(?RT:get_replica_keys(Key))).
--spec get_key_quadrant_(?RT:key(), RKeys::[?RT:key(),...]) -> quadrant().
-get_key_quadrant_(Key, RKeys) ->
-    util:lists_index_of(Key, RKeys).
+%% @doc Gets all sub intervals of the given interval which lay only in
+%%      a single quadrant.
+-spec quadrant_subints_(A::intervals:interval(), Quadrants::[intervals:interval()],
+                        AccIn::[intervals:interval()]) -> AccOut::[intervals:interval()].
+quadrant_subints_(_A, [], Acc) -> Acc;
+quadrant_subints_(A, [Q | QT], Acc) ->
+    Sec = intervals:intersection(A, Q),
+    case intervals:is_empty(Sec) of
+        false when Sec =:= Q ->
+            % if a quadrant is completely covered, only return this
+            % -> this would reconcile all the other keys, too!
+            % it also excludes non-continuous intervals
+            [Q];
+        false -> quadrant_subints_(A, QT, [Sec | Acc]);
+        true  -> quadrant_subints_(A, QT, Acc)
+    end.
 
--spec add_quadrants_to_key(KeyQ::quadrant(), RKeys::[?RT:key(),...],
-                           Add::non_neg_integer(), RepFactor::4) -> ?RT:key().
-add_quadrants_to_key(KeyQ, RKeys, Add, RepFactor) when Add =< RepFactor ->
-    DestQ0 = KeyQ + Add,
-    DestQ = if DestQ0 > RepFactor -> DestQ0 - RepFactor;
-               true               -> DestQ0
-            end,
-    map_key_to_quadrant_(RKeys, DestQ).
-
-% @doc Maps an arbitrary Interval into the given replication quadrant. 
-%      The replication degree X divides the keyspace into X replication quadrants.
-%      Precondition: Interval (I) is continuous!
-%      Result: Continuous left-open interval starting or laying in given RepQuadrant,
-%      i.e. the left key of the interval's bounds is in the first quadrant
-%      (independent of the left bracket).
--spec map_interval(intervals:continuous_interval(), RepQuadrant::quadrant())
-        -> intervals:continuous_interval().
-map_interval(I, Q) ->
+%% @doc Gets all replicated intervals of I.
+%%      PreCond: interval (I) is continuous and is inside a single quadrant!
+-spec replicated_intervals(intervals:continuous_interval())
+        -> [intervals:continuous_interval()].
+replicated_intervals(I) ->
     ?ASSERT(intervals:is_continuous(I)),
+    ?ASSERT(1 =:= length([ok || Q <- quadrant_intervals(),
+                                not intervals:is_empty(
+                                  intervals:intersection(I, Q))])),
     case intervals:is_all(I) of
         false ->
-            {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
-            LRKeys = lists:sort(?RT:get_replica_keys(LKey)),
-            RRKeys = lists:sort(?RT:get_replica_keys(RKey)),
-            LQ = get_key_quadrant_(LKey, LRKeys),
-            RQ = get_key_quadrant_(RKey, RRKeys),
-            RepFactor = rep_factor(),
-            % same as: (Q - LQ + RepFactor) rem RepFactor
-            QDiff = ?IIF(Q > LQ, Q - LQ, Q - LQ + RepFactor),
-            NewLKey = add_quadrants_to_key(LQ, LRKeys, QDiff, RepFactor),
-            NewRKey = add_quadrants_to_key(RQ, RRKeys, QDiff, RepFactor),
-            intervals:new(LBr, NewLKey, NewRKey, RBr);
-        true -> I
-    end.
-
-% @doc Gets intersection of two associated intervals as sub interval of A.
--spec find_intersection(intervals:continuous_interval(), intervals:continuous_interval())
-        -> intervals:continuous_interval().
-find_intersection(A, B) ->
-    SecI = lists:foldl(fun(Q, Acc) ->
-                               Sec = intervals:intersection(A, map_interval(B, Q)),
-                               case intervals:is_empty(Sec) orelse 
-                                         not intervals:is_continuous(Sec) of
-                                   false -> [Sec | Acc];
-                                   true -> Acc
-                               end
-                       end, [], lists:seq(1, rep_factor())),
-    case SecI of
-        [] -> intervals:empty();
-        [I] -> I;
-        [H|T] ->
-            element(2, lists:foldl(fun(X, {ASize, _AI} = XAcc) ->
-                                           XSize = get_interval_size(X),
-                                           if XSize >= ASize -> {XSize, X};
-                                              true -> XAcc
-                                           end
-                                   end, {get_interval_size(H), H}, T))
-    end.
-
-% @doc Note: works only on continuous intervals
--spec get_interval_size(intervals:continuous_interval()) -> number().
-get_interval_size(I) ->
-    case intervals:is_all(I) of        
-        false ->
-            case intervals:is_empty(I) of
-                false ->
-                    {'(', LKey, RKey, ']'} = intervals:get_bounds(I),
-                    ?RT:get_range(LKey, RKey);
-                true -> 0
+            case intervals:get_bounds(I) of
+                {_LBr, ?MINUS_INFINITY, ?PLUS_INFINITY, _RBr} ->
+                    [I]; % this is the only interval possible!
+                {'[', Key, Key, ']'} ->
+                    [intervals:new(X) || X <- ?RT:get_replica_keys(Key)];
+                {LBr, LKey, RKey0, RBr} ->
+                    LKeys = lists:sort(?RT:get_replica_keys(LKey)),
+                    % note: get_bounds may also return ?PLUS_INFINITY but this is not a valid key in ?RT!
+                    RKey = ?IIF(RKey0 =:= ?PLUS_INFINITY, ?MINUS_INFINITY, RKey0),
+                    RKeys = case lists:sort(?RT:get_replica_keys(RKey)) of
+                                [?MINUS_INFINITY | RKeysTL] ->
+                                    lists:append(RKeysTL, [?MINUS_INFINITY]);
+                                X -> X
+                            end,
+                    % since I is in a single quadrant, RKey >= LKey
+                    % -> we can zip the sorted keys to get the replicated intervals
+                    lists:zipwith(
+                      fun(LKeyX, RKeyX) ->
+                              ?ASSERT(?RT:get_range(LKeyX, ?IIF(RKeyX =:= ?MINUS_INFINITY, ?PLUS_INFINITY, RKeyX)) =:=
+                                          ?RT:get_range(LKey, RKey0)),
+                              intervals:new(LBr, LKeyX, RKeyX, RBr)
+                      end, LKeys, RKeys)
             end;
-        true -> ?RT:n()
+        true -> [I]
+    end.
+
+%% @doc Gets a randomly selected sync interval as an intersection of the two
+%%      given intervals as a sub interval of A inside a single quadrant.
+%%      Result may be empty, otherwise it is also continuous!
+-spec find_sync_interval(intervals:continuous_interval(), intervals:continuous_interval())
+        -> intervals:interval().
+find_sync_interval(A, B) ->
+    ?ASSERT(intervals:is_continuous(A)),
+    ?ASSERT(intervals:is_continuous(B)),
+    Quadrants = quadrant_intervals(),
+    InterSecs = [I || AQ <- quadrant_subints_(A, Quadrants, []),
+                      BQ <- quadrant_subints_(B, Quadrants, []),
+                      RBQ <- replicated_intervals(BQ),
+                      not intervals:is_empty(
+                        I = intervals:intersection(AQ, RBQ))],
+    case InterSecs of
+        [] -> intervals:empty();
+        [_|_] -> util:randomelem(InterSecs)
+    end.
+
+%% @doc Maps interval B into interval A.
+%%      PreCond: the second (continuous) interval must be in a single quadrant!
+%%      The result is thus also only in a single quadrant.
+%%      Result may be empty, otherwise it is also continuous!
+-spec map_interval(intervals:continuous_interval(), intervals:continuous_interval())
+        -> intervals:interval().
+map_interval(A, B) ->
+    ?ASSERT(intervals:is_continuous(A)),
+    ?ASSERT(intervals:is_continuous(B)),
+    ?ASSERT(1 =:= length([ok || Q <- quadrant_intervals(),
+                                not intervals:is_empty(
+                                  intervals:intersection(B, Q))])),
+    
+    % note: The intersection may only be non-continuous if A is covering more
+    %       than a quadrant. In this case, another intersection will be larger
+    %       and we can safely ignore this one!
+    InterSecs = [I || RB <- replicated_intervals(B),
+                      not intervals:is_empty(
+                        I = intervals:intersection(A, RB)),
+                      intervals:is_continuous(I)],
+    case InterSecs of
+        [] -> intervals:empty();
+        [_|_] -> util:randomelem(InterSecs)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -818,12 +827,6 @@ decodeBlob(Blob) when is_binary(Blob) ->
         _ -> fail
     end;
 decodeBlob(_) -> fail.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec rep_factor() -> pos_integer().
-rep_factor() ->
-    4.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP
