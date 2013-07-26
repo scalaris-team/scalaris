@@ -90,11 +90,13 @@ all: compile tags
 compile:
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
-test-all: test java-test python-test interop-test performance_SUITE benchmark_SUITE rr_recon_performance_SUITE proto_sched_SUITE dht_node_move_proto_sched_SUITE memtest_SUITE type_check_SUITE java-bench python-bench
+test-all: test test-skipped java-test python-test ruby-test interop-test 
 
 test: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
 	grep " 0 failed" ct.log
+
+test-skipped: performance_SUITE benchmark_SUITE rr_recon_performance_SUITE proto_sched_SUITE dht_node_move_proto_sched_SUITE memtest_SUITE type_check_SUITE
 
 test-with-cover: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -cover test/scalaris.coverspec @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
