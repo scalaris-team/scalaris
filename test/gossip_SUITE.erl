@@ -122,7 +122,9 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
     Self = self(),
     This = comm:this(),
     
-    pid_groups:join_as("gossip_group", dht_node),
+    MyName = erlang:element(2, hd(process_info(self(), [registered_name]))),
+    Group = "gossip_group" ++ MyName,
+    pid_groups:join_as(Group, dht_node),
     
     % recursive anonymous function:
     CyclonRunFun =
@@ -132,7 +134,7 @@ prop_on_trigger(PredId, NodeId, MinTpR, MinToMaxTpR, ConvAvgCntSNR, PreviousStat
                   end
         end,
     Cyclon = element(1, unittest_helper:start_subprocess(
-                       fun() -> pid_groups:join_as("gossip_group", cyclon) end,
+                       fun() -> pid_groups:join_as(Group, cyclon) end,
                        fun() -> CyclonRunFun(CyclonRunFun) end)),
     
     MyRange = node:mk_interval_between_ids(PredId, NodeId),
@@ -264,7 +266,7 @@ test_on_trigger(_Config) ->
     test_on_trigger5(),
     test_on_trigger6(),
     test_on_trigger7(),
-    tester:test(?MODULE, prop_on_trigger, 8, 100).
+    tester:test(?MODULE, prop_on_trigger, 8, 100, [{threads, 4}]).
 
 -spec prop_on_get_node_details_response_local_info(Load::integer(),
         PreviousState::gossip_state:state(), State::gossip_state:state(),
@@ -376,7 +378,7 @@ test_on_get_node_details_response_local_info(_Config) ->
     test_on_get_node_details_response_local_info5(),
     test_on_get_node_details_response_local_info6(),
     test_on_get_node_details_response_local_info7(),
-    tester:test(?MODULE, prop_on_get_node_details_response_local_info, 4, 100).
+    tester:test(?MODULE, prop_on_get_node_details_response_local_info, 4, 100, [{threads, 4}]).
 
 test_on_get_state(Config) ->
     % TODO: implement unit test
