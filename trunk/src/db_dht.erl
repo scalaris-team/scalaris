@@ -232,14 +232,19 @@ delete_entries(State = {DB, _Subscr, _SnapState}, FilterFun) when is_function(Fi
                 end
         end,
     ?DB:foldl(DB, F, State);
-delete_entries(State, Interval) ->
+delete_entries({DB, _Subscr, _SnapState} = State, Interval) ->
     {Elements, RestInterval} = intervals:get_elements(Interval),
     case intervals:is_empty(RestInterval) of
         true ->
             lists:foldl(fun(Key, State1) -> delete_entry_at_key(State1, Key) end, State, Elements);
         _ ->
-            delete_entries(State,
-                            fun(E) -> intervals:in(db_entry:get_key(E), Interval) end)
+            F = fun(DBEntry, StateAcc) ->
+                delete_entry(StateAcc, DBEntry)
+            end,
+            SimpleI = intervals:get_simple_intervals(Interval),
+            lists:foldl(fun(I, AccIn) ->
+                            ?DB:foldl(DB, F, AccIn, I)
+                end, State, SimpleI)
     end.
 
 %% @doc Returns all (including empty, but not null) DB entries.
