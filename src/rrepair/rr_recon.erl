@@ -696,7 +696,11 @@ key_dist(Key1, Key2) ->
 %% @doc Maps an abitrary key to its associated key in replication quadrant N.
 -spec map_key_to_quadrant(?RT:key(), quadrant()) -> ?RT:key().
 map_key_to_quadrant(Key, N) ->
-    map_key_to_quadrant_(lists:sort(?RT:get_replica_keys(Key)), N).
+    RKeys = case lists:sort(?RT:get_replica_keys(Key)) of
+                [?MINUS_INFINITY|TL] -> lists:append(TL, [?MINUS_INFINITY]);
+                [_|_] = X        -> X
+            end,
+    map_key_to_quadrant_(RKeys, N).
 -spec map_key_to_quadrant_(RKeys::[?RT:key(),...], quadrant()) -> ?RT:key().
 map_key_to_quadrant_(RKeys, N) ->
     lists:nth(N, RKeys).
@@ -709,12 +713,16 @@ quadrant_intervals() ->
         [HB,_|_] = Borders -> quadrant_intervals_(Borders, [], HB)
     end.
 
+%% @doc Internal helper for quadrant_intervals/0 - keep in sync with
+%%      map_key_to_quadrant/2!
+%% TODO: use intervals:new('[', A, B, ')') instead so ?MINUS_INFINITY is in quadrant 1?
+%%       -> does not fit ranges that well as they are normally defined as (A,B]
 -spec quadrant_intervals_(Borders::[?RT:key(),...], ResultIn::[intervals:non_empty_interval()],
                           HeadB::?RT:key()) -> [intervals:non_empty_interval(),...].
 quadrant_intervals_([K], Res, HB) ->
-    lists:reverse(Res, [intervals:new('[', K, HB, ')')]);
+    lists:reverse(Res, [intervals:new('(', K, HB, ']')]);
 quadrant_intervals_([A | [B | _] = TL], Res, HB) ->
-    quadrant_intervals_(TL, [intervals:new('[', A, B, ')') | Res], HB).
+    quadrant_intervals_(TL, [intervals:new('(', A, B, ']') | Res], HB).
 
 % @doc Returns the replication quadrant number (starting at 1) in which Key is located.
 -spec get_key_quadrant(?RT:key()) -> quadrant().
