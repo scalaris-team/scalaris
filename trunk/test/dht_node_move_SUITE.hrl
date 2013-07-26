@@ -103,24 +103,12 @@ init_per_testcase(_TestCase, Config) ->
     util:wait_for_process_to_die(Pid),
     timer:sleep(500), % wait a bit for the rm-processes to settle
     %% start proto scheduler if applicable
-    GroupConfig = proplists:get_value(tc_group_properties, Config, []),
-    case proplists:is_defined(proto_sched, GroupConfig) of
-        true -> proto_sched:start(),
-                proto_sched:start_deliver();
-        _ -> ok
-    end,
+    proto_sched(start, Config)
     Config.
 
 end_per_testcase(_TestCase, Config) ->
     %% stop proto scheduler if applicable
-    GroupConfig = proplists:get_value(tc_group_properties, Config, []),
-    case proplists:is_defined(proto_sched, GroupConfig) of
-        true ->
-            proto_sched:stop(),
-            ct:pal("Proto schedluer infos: ~.2p", proto_sched:get_infos()),
-            proto_sched:cleanup();
-        _ -> ok
-    end,
+    proto_sched(stop, Config),
     unittest_helper:stop_ring(),
     ok.
 
@@ -637,3 +625,21 @@ check_size(Size) ->
     unittest_helper:check_ring_size(Size),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size(Size).
+
+%% @doc starts or stops the proto scheduler if applicable
+-spec proto_sched(start | stop, Config::unittest_helper:kv_opts()) -> ok.
+proto_sched(Action, Config) ->
+    GroupConfig = proplists:get_value(tc_group_properties, Config, []),
+    case proplists:is_defined(proto_sched, GroupConfig) of
+        true ->
+            case Action of
+                start ->
+                    proto_sched:start(),
+                    proto_sched:start_deliver();
+                stop ->
+                    proto_sched:stop(),
+                    ct:pal("Proto schedluer infos: ~.2p", proto_sched:get_infos()),
+                    proto_sched:cleanup()
+            end;
+        _ -> ok
+    end.
