@@ -75,9 +75,9 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 test_kv_on_cseq_write_2(_Config) ->
-    iter(fun kv_on_cseq_write/0, 500).
+    util:for_to(1, 500, fun kv_on_cseq_write/1).
 
-kv_on_cseq_write() ->
+kv_on_cseq_write(_I) ->
     proto_sched:start(),
     Pid = self(),
     spawn(fun() ->
@@ -99,9 +99,9 @@ kv_on_cseq_write() ->
     proto_sched:cleanup().
 
 test_qwrite_qwrite_qread(_Config) ->
-    iter(fun qwrite_qwrite_qread/0, 500).
+    util:for_to(1, 500, fun qwrite_qwrite_qread/1).
 
-qwrite_qwrite_qread() ->
+qwrite_qwrite_qread(_I) ->
     DB = lease_db1,
     ContentCheck = fun content_check/3,
     Self = comm:reply_as(self(), 2, {test_rbr, '_'}),
@@ -154,11 +154,3 @@ receive_answer() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 content_check(_Value, _WriteFilter, _Cookie) ->
     {true, null}.
-
-iter(_Fun, 0) ->
-    ok;
-iter(Fun, 1) ->
-    Fun(), ok;
-iter(Fun, Count) ->
-    Fun(),
-    iter(Fun, Count - 1).
