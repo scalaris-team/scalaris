@@ -583,7 +583,7 @@ prop_write_read_not_existing(Key, Value) ->
     ?equals(api_tx:read(Key), {ok, Value}).
 
 tester_write_read_not_existing(_Config) ->
-    tester:test(?MODULE, prop_write_read_not_existing, 2, 10000).
+    tester:test(?MODULE, prop_write_read_not_existing, 2, 5000).
 
 -spec prop_write_read(Key::client_key(), Value1::client_value(), Value2::client_value()) -> true | no_return().
 prop_write_read(Key, Value1, Value2) ->
@@ -592,7 +592,7 @@ prop_write_read(Key, Value1, Value2) ->
     ?equals(api_tx:read(Key), {ok, Value2}).
 
 tester_write_read(_Config) ->
-    tester:test(?MODULE, prop_write_read, 3, 10000).
+    tester:test(?MODULE, prop_write_read, 3, 5000).
 
 -spec prop_add_del_on_list2(Key::client_key(), Initial::client_value(), OldExists::boolean(), ToAdd::client_value(), ToRemove::client_value()) -> true | no_return().
 prop_add_del_on_list2(Key, Initial, OldExists, ToAdd, ToRemove) ->
@@ -1209,7 +1209,7 @@ prop_tester_req_list_on_same_key(Key, InReqList) ->
 
 tester_req_list_on_same_key(_Config) ->
     prop_tester_req_list_on_same_key("a", [{read,"a"},{add_on_nr,"a","*"},{test_and_set,"a",[],{42}}]),
-    tester:test(?MODULE, prop_tester_req_list_on_same_key, 2, 5000).
+    tester:test(?MODULE, prop_tester_req_list_on_same_key, 2, 3000).
 
 req_list_parallelism(_Config) ->
     Partitions = 25,

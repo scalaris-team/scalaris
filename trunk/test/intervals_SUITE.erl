@@ -730,7 +730,7 @@ tester_split_is_well_formed(_Config) ->
     tester:test(?MODULE, prop_split_is_well_formed, 2, 5000, [{threads, 2}]).
 
 tester_split(_Config) ->
-    tester:test(?MODULE, prop_split, 2, 5000, [{threads, 2}]).
+    tester:test(?MODULE, prop_split, 2, 3000, [{threads, 2}]).
 
 split_bounds(_) ->
     Q = intervals:split(intervals:all(), 4), %4=ReplicationFactor

@@ -75,7 +75,7 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 test_kv_on_cseq_write_2(_Config) ->
-    iter(fun kv_on_cseq_write/0, 1000).
+    iter(fun kv_on_cseq_write/0, 500).
 
 kv_on_cseq_write() ->
     proto_sched:start(),
@@ -99,7 +99,7 @@ kv_on_cseq_write() ->
     proto_sched:cleanup().
 
 test_qwrite_qwrite_qread(_Config) ->
-    iter(fun qwrite_qwrite_qread/0, 1000).
+    iter(fun qwrite_qwrite_qread/0, 500).
 
 qwrite_qwrite_qread() ->
     DB = lease_db1,
