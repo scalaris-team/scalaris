@@ -23,16 +23,19 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
+%% start proto scheduler for this suite
+-define(PROTO_SCHED, true).
+%% number of slides without timeouts
 -define(NUM_SLIDES, 25).
 
 -include("dht_node_move_SUITE.hrl").
 
 all() ->
     [
-     {group, send_to_pred_proto_sched},
-     {group, send_to_pred_incremental_proto_sched},
-     {group, send_to_succ_proto_sched},
-     {group, send_to_succ_incremental_proto_sched}
+     {group, send_to_pred},
+     {group, send_to_pred_incremental},
+     {group, send_to_succ},
+     {group, send_to_succ_incremental}
     ].
 
 suite() -> [ {timetrap, {seconds, 90}} ].

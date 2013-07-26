@@ -14,9 +14,11 @@
 
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Unit tests for src/dht_node_move.erl (slide and jump operations).
-%%   First executes all tests using the erlang scheduler. Then executes using
-%%   the proto scheduler which produces a random interleaving between the
-%%   different channels.
+%%   dht_node_move_SUITE.erl:
+%%       The regular execution of the suite.
+%%   dht_node_move_proto_scheduler_SUITE.erl:
+%%       Executes using the proto scheduler which serializes all messages to
+%%       generate a random interleaving of messages on different channels.
 %% @end
 %% @version $Id$
 
@@ -33,8 +35,6 @@ groups() ->
     GroupOptions = [sequence, {repeat, 1}],
     Config = [MoveConfig | GroupOptions],
     ConfigInc = [MoveConfigInc | GroupOptions],
-    ConfigProtoSched = [proto_sched | Config],
-    ConfigIncProtoSched = [proto_sched | ConfigInc],
     SendToPredTestCases =
         [
          symm4_slide_succ_rcv_load,
@@ -53,19 +53,12 @@ groups() ->
          tester_symm4_slide_pred_rcv_load_timeouts_pred,
          tester_symm4_slide_pred_rcv_load_timeouts_node
         ],
-    [ %% Groups started with normal configuration
+    [
       {send_to_pred, Config, SendToPredTestCases},
       {send_to_pred_incremental, ConfigInc, SendToPredTestCases},
       {send_to_succ, Config, SendToSuccTestCases},
       {send_to_succ_incremental, ConfigInc, SendToSuccTestCases},
       {send_to_pred, Config, SendToPredTestCases}
-    ]
-      ++
-    [ %% Groups started with proto scheduler
-     {send_to_pred_proto_sched, ConfigProtoSched, SendToPredTestCases},
-     {send_to_pred_incremental_proto_sched, ConfigIncProtoSched, SendToPredTestCases},
-     {send_to_succ_proto_sched, ConfigProtoSched, SendToSuccTestCases},
-     {send_to_succ_incremental_proto_sched, ConfigIncProtoSched, SendToSuccTestCases}
     ]
       ++
 %%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
@@ -101,14 +94,13 @@ init_per_testcase(_TestCase, Config) ->
                                _ = [api_tx:write(erlang:integer_to_list(X), X) || X <- lists:seq(1, 100)]
                        end),
     util:wait_for_process_to_die(Pid),
-    timer:sleep(500), % wait a bit for the rm-processes to settle
-    %% start proto scheduler if applicable
-    proto_sched(start, Config)
+    % wait a bit for the rm-processes to settle
+    timer:sleep(500),
+    proto_sched(start),
     Config.
 
-end_per_testcase(_TestCase, Config) ->
-    %% stop proto scheduler if applicable
-    proto_sched(stop, Config),
+end_per_testcase(_TestCase, _Config) ->
+    proto_sched(stop),
     unittest_helper:stop_ring(),
     ok.
 
@@ -627,10 +619,9 @@ check_size(Size) ->
     unittest_helper:check_ring_size(Size).
 
 %% @doc starts or stops the proto scheduler if applicable
--spec proto_sched(start | stop, Config::unittest_helper:kv_opts()) -> ok.
-proto_sched(Action, Config) ->
-    GroupConfig = proplists:get_value(tc_group_properties, Config, []),
-    case proplists:is_defined(proto_sched, GroupConfig) of
+-spec proto_sched(start | stop) -> ok.
+proto_sched(Action) ->
+    case ?PROTO_SCHED of
         true ->
             case Action of
                 start ->

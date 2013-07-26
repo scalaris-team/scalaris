@@ -14,15 +14,15 @@
 
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Unit tests for src/dht_node_move.erl (slide and jump operations).
-%%   First executes all tests using the erlang scheduler. Then executes using
-%%   the proto scheduler which produces a random interleaving between the
-%%   different channels.
 %% @end
 %% @version $Id$
 -module(dht_node_move_SUITE).
 -author('kruber@zib.de').
 -vsn('$Id$').
 
+%% no proto scheduler for this suite
+-define(PROTO_SCHED, false).
+%% number of slides without timeouts
 -define(NUM_SLIDES, 50).
 
 -include("dht_node_move_SUITE.hrl").
