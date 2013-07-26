@@ -674,12 +674,23 @@ map_key_to_interval(Key, I) ->
     case RGrp of
         [] -> none;
         [R] -> R;
-        [_|_] -> RGrpDis = [case X of
-                                Key -> {X, 0};
-                                _ -> {X, erlang:min(?RT:get_range(Key, X), ?RT:get_range(X, Key))}
-                            end || X <- RGrp],
-                 element(1, erlang:hd(lists:keysort(2, RGrpDis)))
+        [H|T] ->
+            element(1, lists:foldl(fun(X, {_KeyIn, DistIn} = AccIn) ->
+                                           DistX = key_dist(X, Key),
+                                           if DistX < DistIn -> {X, DistX};
+                                              true -> AccIn
+                                           end
+                                   end, {H, key_dist(H, Key)}, T))
     end.
+
+-compile({inline, [key_dist/2]}).
+
+-spec key_dist(Key1::?RT:key(), Key2::?RT:key()) -> number().
+key_dist(Key, Key) -> 0;
+key_dist(Key1, Key2) ->
+    Dist1 = ?RT:get_range(Key1, Key2),
+    Dist2 = ?RT:get_range(Key2, Key1),
+    erlang:min(Dist1, Dist2).
 
 % @doc Maps an abitrary key to its associated key in replication quadrant N.
 -spec map_key_to_quadrant(?RT:key(), quadrant()) -> ?RT:key().
