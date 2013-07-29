@@ -213,7 +213,7 @@ get_bucket(_) -> [].
 
 -spec insert_list([term()], merkle_tree()) -> merkle_tree().
 insert_list(Terms, Tree) ->
-    lists:foldl(fun(Term, T) -> merkle_tree:insert(Term, T) end, Tree, Terms).
+    lists:foldl(fun insert/2, Tree, Terms).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -248,23 +248,19 @@ insert_to_node(Key, {_, BucketSize, Bucket, Interval, []},
                 || I <- ChildI],
     insert_to_node(Key, {nil, 1 + BranchFactor, [], Interval, NewLeafs}, Config);
 
-insert_to_node(Key, {Hash, Count, [], Interval, Childs} = Node, Config) ->
+insert_to_node(Key, {Hash, Count, [], Interval, Childs = [_|_]} = Node, Config) ->
     {Dest0, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
     case Dest0 of
         [] -> error_logger:error_msg("InsertFailed!"), Node;
-        _ ->
-            Dest = hd(Dest0),
+        [Dest|_] ->
             OldSize = node_size(Dest),
             NewDest = insert_to_node(Key, Dest, Config),
             {Hash, Count + (node_size(NewDest) - OldSize), [], Interval, [NewDest|Rest]}
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec bulk_build(Interval, Params, KeyList) -> MerkleTree when
-    is_subtype(Interval,   mt_interval()),
-    is_subtype(Params,     mt_config_params()),
-    is_subtype(KeyList,    [term()]),
-    is_subtype(MerkleTree, merkle_tree()).
+-spec bulk_build(Interval::mt_interval(), Params::mt_config_params(),
+                 KeyList::[term()]) -> MerkleTree::merkle_tree().
 bulk_build(I, Params, KeyList) ->
     InitNode = {nil, 1, [], I, []},
     Config = build_config(Params),
@@ -283,9 +279,10 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
     Node = case Count > BucketSize of
                true -> p_bulk_build({nil, 1, [], Interval, []}, Config, Bucket);
                false -> 
-                   Hash = case Count > 0 of
-                              true -> run_leaf_hf(Config, erlang:term_to_binary(Bucket));
-                              _ -> run_leaf_hf(Config, term_to_binary(0))
+                   Hash = if Count > 0 ->
+                                 run_leaf_hf(Config, term_to_binary(Bucket));
+                             true ->
+                                 run_leaf_hf(Config, term_to_binary(0))
                           end,
                    {Hash, Count, ?IIF(KeepBucket, Bucket, []), Interval, []}
            end,
@@ -339,24 +336,20 @@ size_detail_node([], InnerNodes, Leafs) ->
 
 % @doc Returns an iterator to visit all tree nodes with next
 %      Iterates over all tree nodes from left to right in a deep first manner.
--spec iterator(Tree) -> Iter when
-      is_subtype(Tree, merkle_tree()),
-      is_subtype(Iter, mt_iter()).
+-spec iterator(Tree::merkle_tree()) -> Iter::mt_iter().
 iterator({merkle_tree, _, Root}) -> [Root].
 
--spec iterator_node(Node, Iter) -> Iter when
-      is_subtype(Node,  mt_node()),
-      is_subtype(Iter, mt_iter()).
+-compile({inline, [get_hash/1, get_interval/1, node_size/1]}).
+
+-spec iterator_node(Node::mt_node(), mt_iter()) -> mt_iter().
 iterator_node({_, _, _, _, [_|_] = Childs}, Iter1) ->
     lists:append(Childs, Iter1);
 iterator_node({_, _, _, _, []}, Iter1) ->
     Iter1.
 
--spec next(Iter) -> none | {Node, Iter} when
-      is_subtype(Iter, mt_iter()),
-      is_subtype(Node,  mt_node()).
+-spec next(mt_iter()) -> none | {Node::mt_node(), mt_iter()}.
 next([Node | Rest]) ->
-        {Node, iterator_node(Node, Rest)};
+    {Node, iterator_node(Node, Rest)};
 next([]) -> 
     none.
 
@@ -451,12 +444,11 @@ build_config(ParamList) ->
 run_leaf_hf(#mt_config{ leaf_hf = Hf, signature_size = SigSize }, X) ->
     Hash = Hf(X),
     Size = erlang:byte_size(Hash),
-    case Size > SigSize of
-        true -> 
-            Start = Size - SigSize,
-            <<_:Start/binary, SmallHash:SigSize/binary>> = Hash,
-            SmallHash;
-        false -> Hash
+    if Size > SigSize  -> 
+           Start = Size - SigSize,
+           <<_:Start/binary, SmallHash:SigSize/binary>> = Hash,
+           SmallHash;
+       true -> Hash
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -481,13 +473,13 @@ p_key_in_I(_Key, _Left, []) ->
     is_subtype(Count, non_neg_integer()).
 keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
-    lists:reverse(lists:foldl(fun(Key, Acc) -> p_key_in_I(Key, [], Acc) end, IBucket, KList)).
+    lists:foldr(fun(Key, Acc) -> p_key_in_I(Key, [], Acc) end, IBucket, KList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec get_XOR_fun() -> inner_hash_fun().
 get_XOR_fun() ->
-    (fun([H|T]) -> lists:foldl(fun(X, Acc) -> util:bin_xor(X, Acc) end, H, T) end).
+    fun([H|T]) -> lists:foldl(fun(X, Acc) -> util:bin_xor(X, Acc) end, H, T) end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
