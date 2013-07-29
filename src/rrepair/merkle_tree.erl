@@ -132,27 +132,34 @@ new(I, KeyList, ConfParams) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec lookup(Interval, Tree) -> Node | not_found when
-      is_subtype(Interval, mt_interval()),
-      is_subtype(Tree,     merkle_tree() | mt_node()),
-      is_subtype(Node,     mt_node()).
+%% @doc Checks whether an interval is present in the merkle tree.
+-spec lookup(mt_interval(), merkle_tree() | mt_node()) -> mt_node() | not_found.
 lookup(I, {merkle_tree, _, Root}) ->
     lookup(I, Root);
-lookup(I, {_, _, _, I, _} = Node) ->
+lookup(I, {_, _, _, I, _ChildList} = Node) ->
     Node;
-lookup(I, {_, _, _, NodeI, ChildList} = Node) ->
+lookup(I, {_, _, _, NodeI, _ChildList} = Node) ->
     case intervals:is_subset(I, NodeI) of
-        true when ChildList =:= [] -> Node;
-        true ->
-            IChilds = [C || C <- ChildList,
-                            intervals:is_subset(I, get_interval(C))],
-            case IChilds of
-                [] -> not_found;
-                [_] -> [IChild] = IChilds,
-                     lookup(I, IChild);
-                _ -> error_logger:error_msg("tree interval not correct splitted")
-            end;
+        true  -> lookup_(I, Node);
         false -> not_found
+    end.
+
+%% @doc Helper for lookup/2. In contrast to lookup/2, assumes that I is a
+%%      subset of the current node's interval.
+-spec lookup_(mt_interval(), merkle_tree() | mt_node()) -> mt_node() | not_found.
+lookup_(I, {_, _, _, I, _ChildList} = Node) ->
+    Node;
+lookup_(_I, {_, _, _, _NodeI, _ChildList = []}) ->
+    not_found;
+lookup_(I, {_, _, _, _NodeI, ChildList = [_|_]}) ->
+    ?ASSERT(1 =:= length([C || C <- ChildList,
+                               intervals:is_subset(I, get_interval(C))])),
+    case util:first_matching(ChildList,
+                             fun(X) ->
+                                     intervals:is_subset(I, get_interval(X))
+                             end) of
+        {ok, IChild} -> lookup_(I, IChild);
+        failed       -> not_found
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
