@@ -224,11 +224,8 @@ insert(Key, {merkle_tree, Config, Root} = Tree) ->
         false -> Tree
     end.
 
--spec insert_to_node(Key, Node, Config) -> NewNode when
-      is_subtype(Key,     term()),
-      is_subtype(Node,    mt_node()),
-      is_subtype(Config,  mt_config()),
-      is_subtype(NewNode, mt_node()).
+-spec insert_to_node(Key::term(), Node::mt_node(), Config::mt_config())
+        -> NewNode::mt_node().
 insert_to_node(Key, {Hash, Count, Bucket, Interval, []}, Config) 
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
     %TODO: check if key is already in bucket
@@ -249,16 +246,6 @@ insert_to_node(Key, {_, BucketSize, Bucket, Interval, []},
                     {nil, BCount, NewBucket, I, []} 
                 end 
                 || I <- ChildI],
-    NewLeafs = lists:map(fun(I) -> 
-                                 {NewBucket, BCount} =
-                                     lists:foldl(fun(K, {List, Sum} = Acc) -> 
-                                                         case intervals:in(K, I) of
-                                                             true -> {[K | List], Sum + 1};
-                                                             false -> Acc
-                                                         end
-                                                 end, {[], 0}, Bucket),
-                              {nil, BCount, NewBucket, I, []}
-                         end, ChildI),
     insert_to_node(Key, {nil, 1 + BranchFactor, [], Interval, NewLeafs}, Config);
 
 insert_to_node(Key, {Hash, Count, [], Interval, Childs} = Node, Config) ->
