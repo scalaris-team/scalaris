@@ -314,7 +314,8 @@ feeder_fix_rangen(RanGen, _MaxN) ->
 
 -spec gen_kvv_feeder(ErrorDist::distribution(), [?RT:key()], [db_parameter()])
         -> {ErrorDist::distribution(), [?RT:key()], [db_parameter()]}.
-gen_kvv_feeder(EDist0, Keys, Params) ->
+gen_kvv_feeder(EDist0, Keys0, Params) ->
+    Keys = lists:usort(Keys0),
     KeysLen0 = length(Keys),
     case EDist0 of
         {non_uniform, RanGen} ->
@@ -345,7 +346,8 @@ gen_kvv(EDist, Keys, Params) ->
                        failure_type(), failure_dest(), FailCount::non_neg_integer())
         -> {ErrorDist::distribution(), [?RT:key(),...], KeyCount::pos_integer(),
             failure_type(), failure_dest(), FailCount::non_neg_integer()}.
-p_gen_kvv_feeder(EDist0, Keys, _WrongKeyCount, FType, FDest, FCount) ->
+p_gen_kvv_feeder(EDist0, Keys0, _WrongKeyCount, FType, FDest, FCount) ->
+    Keys = lists:usort(Keys0),
     KeysLen0 = length(Keys),
     case EDist0 of
         {non_uniform, RanGen} ->
@@ -360,7 +362,8 @@ p_gen_kvv_feeder(EDist0, Keys, _WrongKeyCount, FType, FDest, FCount) ->
                 KeyCount::pos_integer(), failure_type(),
                 failure_dest(), FailCount::non_neg_integer()) -> {db_dht:db_as_list(), db_status()}.
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
-    {FKeys, GoodKeys} = select_random_keys(Keys, FCount, []),
+    ?ASSERT(Keys =:= lists:usort(Keys)), % unique keys
+    {FKeys, GoodKeys} = select_random_keys(Keys, length(Keys), FCount, []),
     GoodDB = lists:foldl(fun(Key, AccDb) -> 
                                  lists:append(get_rep_group(Key), AccDb)
                          end,
@@ -374,6 +377,7 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     DBSize = KeyCount * ?ReplicationFactor,
     {lists:append(GoodDB, BadDB), {DBSize, Insert, DBSize - Insert, O}};
 p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
+    ?ASSERT(Keys =:= lists:usort(Keys)), % unique keys
     ?ASSERT(KeyCount =:= 1 orelse random_bias:numbers_left(RanGen) =< KeyCount),
     FProbList = get_non_uniform_probs(RanGen, []),
     % note: don't use RanGen any more - we don't get the new state in the last call!
@@ -392,6 +396,7 @@ p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
     DBSize = KeyCount * ?ReplicationFactor,
     {DB, {DBSize, Insert, DBSize - Insert, Out}};
 p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
+    ?ASSERT(Keys =:= lists:usort(Keys)), % unique keys
     FRate = case FCount of
                 0 -> KeyCount + 1;
                 _ -> erlang:max(1, erlang:trunc(KeyCount / FCount))
@@ -490,13 +495,21 @@ get_error_key(Key, Dest) ->
         QList -> rr_recon:map_key_to_quadrant(Key, util:randomelem(QList))
     end.
 
--spec select_random_keys([?RT:key()], non_neg_integer(), AccFail::[?RT:key()])
+-spec select_random_keys_feeder([Keys::?RT:key()], KeysLen::non_neg_integer(),
+                                FailureCount::non_neg_integer(), FailAcc::[?RT:key()])
+        -> {[Keys::?RT:key()], KeysLen::non_neg_integer(),
+            FailureCount::non_neg_integer(), FailAcc::[?RT:key()]}.
+select_random_keys_feeder(Keys, _KeysLen, FailureCount, Acc) ->
+    {Keys, erlang:length(Keys), FailureCount, Acc}.
+
+-spec select_random_keys([Keys::?RT:key()], KeysLen::non_neg_integer(),
+                         FailureCount::non_neg_integer(), FailAcc::[?RT:key()])
         -> {Fail::[?RT:key()], Rest::[?RT:key()]}.
-select_random_keys(RestKeys, 0, Acc) ->  {Acc, RestKeys};
-select_random_keys([] = Keys, _Count, Acc) ->  {Acc, Keys};
-select_random_keys([_|_] = Keys, Count, Acc) ->
-    FRep = util:randomelem(Keys),
-    select_random_keys([X || X <- Keys, X =/= FRep], Count - 1, [FRep | Acc]).
+select_random_keys(RestKeys, _KeysLen, 0, Acc) ->  {Acc, RestKeys};
+select_random_keys([] = Keys, 0, _Count, Acc) ->  {Acc, Keys};
+select_random_keys([_|_] = Keys, KeysLen, Count, Acc) ->
+    {NewKeys, FRep} = util:pop_randomelem(Keys, KeysLen),
+    select_random_keys(NewKeys, KeysLen - 1, Count - 1, [FRep | Acc]).
 
 -spec get_node_list() -> [comm:mypid()].
 get_node_list() ->
