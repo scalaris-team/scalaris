@@ -37,11 +37,13 @@
 -export_type([generator/0]).
 -endif.
 
+-type approx() :: none | {normal, M::float(), Dev::float(), A::float()}.
+
 -type binomial_state() :: {binom,
                            N         :: pos_integer(),
                            P         :: float(),             %only works for ]0,1[
                            X         :: non_neg_integer(),
-                           Approx    :: normal | none
+                           Approx    :: approx()
                           }.
 
 -type distribution_state() :: binomial_state(). %or others
@@ -80,29 +82,33 @@ numbers_left({{binom, N, _P, X, _Approx}, _CalcFun, _NextFun}) ->
 %% Internal Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec calc_normal(X::float(), M::float(), E::float()) -> float().
-calc_normal(X, M, Dev) ->
-    A = 1 / (Dev * ?SQRT_2_PI),
+%% -spec calc_normal(X::float(), M::float(), Dev::float()) -> float().
+%% calc_normal(X, M, Dev) ->
+%%     A = 1 / (Dev * ?SQRT_2_PI),
+%%     calc_normal(X, M, Dev, A).
+
+-spec calc_normal(X::float(), M::float(), Dev::float(), A::float()) -> float().
+calc_normal(X, M, Dev, A) ->
     B = -1/2 * math:pow(((X-M) / Dev), 2),
     A * math:exp(B).
 
 -spec calc_binomial(binomial_state()) -> float().
-calc_binomial({binom, N, P, X, _Approx = normal}) ->
-    calc_normal(X, N * P, math:sqrt(N * P * (1 - P)));
+calc_binomial({binom, _N, _P, X, _Approx = {normal, M, Dev, A}}) ->
+    calc_normal(X, M, Dev, A);
 calc_binomial({binom, N, P, X, _Approx = none}) ->
     try begin
             NOverX = mathlib:binomial_coeff(N, X),
             Pow = math:pow(P, X) * math:pow(1 - P, N - X),
             if Pow == 0 ->
                    % rather use approximation because we lost precision
-                   calc_binomial({binom, N, P, X, normal});
+                   calc_binomial({binom, N, P, X, normal_approx_of_binomial(N, P)});
                true -> NOverX * Pow
             end
         end
     catch _:_ ->
               % use approximation instead because cannot calculate the result exactly:
               % log:pal("calc_binomial(~p, ~p, ~p)~n  ~p", [N, P, X, erlang:get_stacktrace()])
-              calc_binomial({binom, N, P, X, normal})
+              calc_binomial({binom, N, P, X, normal_approx_of_binomial(N, P)})
     end.
 
 -spec next_state(distribution_state()) -> distribution_state() | exit.
@@ -113,15 +119,21 @@ next_state({binom, N, P, X, Approx}) ->
 
 % @doc approximation is good if this conditions hold
 %      SRC: http://www.vosesoftware.com/ModelRiskHelp/index.htm#Distributions/Approximating_one_distribution_with_another/Approximations_to_the_Binomial_Distribution.htm
--spec approx_valid(pos_integer(), float()) -> none | normal.
+-spec approx_valid(pos_integer(), float()) -> approx().
 approx_valid(_N, 0) -> none;
 approx_valid(_N, 1) -> none;
 approx_valid(N, P) ->
     if (N > ((9 * P) / (1 - P))) andalso (N > ((9 * (1 - P)) / P)) ->
-           normal;
+           normal_approx_of_binomial(N, P);
        true ->
            none
     end.
+
+-spec normal_approx_of_binomial(N::pos_integer(), P::float())
+        -> {normal, M::float(), Dev::float(), A::float()}. 
+normal_approx_of_binomial(N, P) ->
+    Dev = math:sqrt(N * P * (1 - P)),
+    {normal, N * P, Dev, 1 / (Dev * ?SQRT_2_PI)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Tester
