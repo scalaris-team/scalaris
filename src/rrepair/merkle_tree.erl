@@ -58,7 +58,7 @@
 
 -type mt_node_key()     :: binary().
 -type mt_interval()     :: intervals:interval(). 
--type mt_bucket()       :: [].
+-type mt_bucket()       :: [?RT:key() | rr_recon:db_entry_enc()].
 -type mt_size()         :: {InnerNodes::non_neg_integer(), Leafs::non_neg_integer()}.
 -type hash_fun()        :: fun((binary()) -> mt_node_key()).
 -type inner_hash_fun()  :: fun(([mt_node_key()]) -> mt_node_key()).
@@ -125,7 +125,8 @@ new(I) ->
 new(I, ConfParams) ->
     {merkle_tree, build_config(ConfParams), {nil, 0, [], I, []}}.
 
--spec new(mt_interval(), [term()], mt_config_params()) -> merkle_tree().
+-spec new(mt_interval(), KeyList::mt_bucket(), mt_config_params())
+        -> merkle_tree().
 new(I, KeyList, ConfParams) ->
     gen_hash(bulk_build(I, KeyList, ConfParams)).
 
@@ -203,20 +204,20 @@ is_merkle_tree(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_bucket(merkle_tree() | mt_node()) -> [{Key::term(), Value::term()}].
+-spec get_bucket(merkle_tree() | mt_node()) -> mt_bucket().
 get_bucket({merkle_tree, _, Root}) -> get_bucket(Root);
 get_bucket({_, C, Bucket, _, []}) when C > 0 -> Bucket;
 get_bucket(_) -> [].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec insert_list([term()], merkle_tree()) -> merkle_tree().
+-spec insert_list(mt_bucket(), merkle_tree()) -> merkle_tree().
 insert_list(Terms, Tree) ->
     lists:foldl(fun insert/2, Tree, Terms).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec insert(Key::term(), merkle_tree()) -> merkle_tree().
+-spec insert(Key::?RT:key() | rr_recon:db_entry_enc(), merkle_tree()) -> merkle_tree().
 insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree) ->
     CheckKey = decode_key(Key),
     case intervals:in(CheckKey, get_interval(Root)) of
@@ -224,7 +225,8 @@ insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree)
         false -> Tree
     end.
 
--spec insert_to_node(Key::term(), CheckKey::term(), Node::mt_node(), Config::mt_config())
+-spec insert_to_node(Key::?RT:key() | rr_recon:db_entry_enc(), CheckKey::?RT:key(),
+                     Node::mt_node(), Config::mt_config())
         -> NewNode::mt_node().
 insert_to_node(Key, _CheckKey, {Hash, Count, Bucket, Interval, []}, Config)
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
@@ -263,7 +265,7 @@ insert_to_node(Key, CheckKey, {Hash, Count, [], Interval, Childs = [_|_]} = Node
 
 %% @doc Builds a merkle tree with all given keys but does not create the hash
 %%      values yet (use gen_hash/1 for that).
--spec bulk_build(Interval::mt_interval(), KeyList::[term()],
+-spec bulk_build(Interval::mt_interval(), KeyList::mt_bucket(),
                  Params::mt_config_params()) -> MerkleTree::merkle_tree().
 bulk_build(I, KeyList, Params) ->
     InitNode = {nil, 1, [], I, []},
@@ -277,6 +279,8 @@ p_bulk_build({_, C, _, I, _}, Config, KeyList) ->
     NCount = lists:foldl(fun(N, Acc) -> Acc + node_size(N) end, 0, ChildNodes),
     {nil, C + NCount, [], I, ChildNodes}.
 
+-spec build_childs([{I::intervals:continuous_interval(), Count::non_neg_integer(),
+                     mt_bucket()}], mt_config(), Acc::[mt_node()]) -> [mt_node()].
 build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
     BucketSize = Config#mt_config.bucket_size,
     KeepBucket = Config#mt_config.keep_bucket,
@@ -332,7 +336,7 @@ gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
     Hash = run_leaf_hf(Bucket, LeafHf, SigSize),
     {Hash, Count, ?IIF(CleanBuckets, [], Bucket), I, Childs}.
 
--spec run_leaf_hf([Key::term()], LeafHf::hash_fun(), SigSize::pos_integer()) -> mt_node_key().
+-spec run_leaf_hf(mt_bucket(), LeafHf::hash_fun(), SigSize::pos_integer()) -> mt_node_key().
 run_leaf_hf(Bucket, LeafHf, SigSize) ->
     BinBucket = case Bucket of
                     [_|_] -> term_to_binary(Bucket);
@@ -505,17 +509,16 @@ decode_key(Key) ->
 %      precondition: key fits into one of the given intervals
 -spec p_key_in_I(Key, CheckKey::?RT:key(), ReverseLeft::[Bucket],
                  Right::[Bucket,...]) -> [Bucket,...] when
-    is_subtype(Key,    term()),
-    is_subtype(Bucket, {I::intervals:interval(), Count::non_neg_integer(), [Key]}).
+    is_subtype(Key,    Key::?RT:key() | rr_recon:db_entry_enc()),
+    is_subtype(Bucket, {I::intervals:continuous_interval(), Count::non_neg_integer(), mt_bucket()}).
 p_key_in_I(Key, CheckKey, ReverseLeft, [{Interval, C, L} = P | Right]) ->
     case intervals:in(CheckKey, Interval) of
         true  -> lists:reverse(ReverseLeft, [{Interval, C + 1, [Key | L]} | Right]);
         false -> p_key_in_I(Key, CheckKey, [P | ReverseLeft], Right)
     end.
 
--spec keys_to_intervals([Key], [I,...]) -> [{I, Count, [Key]}] when
-    is_subtype(Key,   term()),
-    is_subtype(I,     intervals:interval()),
+-spec keys_to_intervals(mt_bucket(), [I,...]) -> [{I, Count, mt_bucket()}] when
+    is_subtype(I,     intervals:continuous_interval()),
     is_subtype(Count, non_neg_integer()).
 keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
