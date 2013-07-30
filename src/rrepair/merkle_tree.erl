@@ -324,13 +324,20 @@ node_size({_, C, _, _, [_|_]}) -> C.
 size_detail({merkle_tree, _, Root}) ->
     size_detail_node([Root], 0, 0).
 
--spec size_detail_node([mt_node()], InnerNodes::non_neg_integer(), Leafs::non_neg_integer()) -> mt_size().
+-spec size_detail_node([mt_node() | [mt_node()]], InnerNodes::non_neg_integer(),
+                       Leafs::non_neg_integer()) -> mt_size().
 size_detail_node([{_, _, _, _, [_|_] = Childs} | R], Inner, Leafs) ->
-    size_detail_node(Childs ++ R, Inner + 1, Leafs);
+    size_detail_node([Childs | R], Inner + 1, Leafs);
 size_detail_node([{_, _, _, _, []} | R], Inner, Leafs) ->
     size_detail_node(R, Inner, Leafs + 1);
 size_detail_node([], InnerNodes, Leafs) -> 
-    {InnerNodes, Leafs}.
+    {InnerNodes, Leafs};
+size_detail_node([[{_, _, _, _, [_|_] = Childs} | R1] | R2], Inner, Leafs) ->
+    size_detail_node([Childs, R1 | R2], Inner + 1, Leafs);
+size_detail_node([[{_, _, _, _, []} | R1] | R2], Inner, Leafs) ->
+    size_detail_node([R1 | R2], Inner, Leafs + 1);
+size_detail_node([[] | R2], Inner, Leafs) -> 
+    size_detail_node(R2, Inner, Leafs).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
