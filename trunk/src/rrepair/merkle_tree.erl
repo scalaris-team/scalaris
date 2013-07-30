@@ -466,17 +466,14 @@ run_leaf_hf(#mt_config{ leaf_hf = Hf, signature_size = SigSize }, X) ->
 
 % @doc inserts key into its matching interval
 %      precondition: key fits into one of the given intervals
--spec p_key_in_I(Key, ReverseLeft::[Bucket], Right::[Bucket,...]) -> [Bucket,...] when
+-spec p_key_in_I(Key, CheckKey::?RT:key(), ReverseLeft::[Bucket],
+                 Right::[Bucket,...]) -> [Bucket,...] when
     is_subtype(Key,    term()),
     is_subtype(Bucket, {I::intervals:interval(), Count::non_neg_integer(), [Key]}).
-p_key_in_I(Key, ReverseLeft, [{Interval, C, L} = P | Right]) ->
-    CheckKey = case rr_recon:decodeBlob(Key) of
-                   {K, _} -> K;
-                   _ -> Key
-               end,
+p_key_in_I(Key, CheckKey, ReverseLeft, [{Interval, C, L} = P | Right]) ->
     case intervals:in(CheckKey, Interval) of
         true  -> lists:reverse(ReverseLeft, [{Interval, C + 1, [Key | L]} | Right]);
-        false -> p_key_in_I(Key, [P | ReverseLeft], Right)
+        false -> p_key_in_I(Key, CheckKey, [P | ReverseLeft], Right)
     end.
 
 -spec keys_to_intervals([Key], [I,...]) -> [{I, Count, [Key]}] when
@@ -485,7 +482,13 @@ p_key_in_I(Key, ReverseLeft, [{Interval, C, L} = P | Right]) ->
     is_subtype(Count, non_neg_integer()).
 keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
-    lists:foldr(fun(Key, Acc) -> p_key_in_I(Key, [], Acc) end, IBucket, KList).
+    lists:foldr(fun(Key, Acc) ->
+                        CheckKey = case rr_recon:decodeBlob(Key) of
+                                       {K, _} -> K;
+                                       fail -> Key
+                                   end,
+                        p_key_in_I(Key, CheckKey, [], Acc)
+                end, IBucket, KList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
