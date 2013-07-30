@@ -369,7 +369,7 @@ p_gen_kvv_feeder(EDist0, Keys0, _WrongKeyCount, FType, FDest, FCount) ->
                 failure_dest(), FailCount::non_neg_integer()) -> {db_dht:db_as_list(), db_status()}.
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
-    {FKeys, GoodKeys} = select_random_keys(Keys, length(Keys), FCount, []),
+    {FKeys, GoodKeys} = select_random_keys(Keys, KeyCount, FCount, []),
     GoodDB = lists:foldl(fun(Key, AccDb) -> 
                                  lists:append(get_rep_group(Key), AccDb)
                          end,
