@@ -142,7 +142,7 @@ merkle_tree(_) ->
     {Inner, Leafs} = merkle_tree:size_detail(TestTree),    
     
     BuildT = measure_util:time_avg(
-           fun() -> merkle_tree:bulk_build(I, [], DB) end, 
+           fun() -> merkle_tree:bulk_build(I, DB, []) end, 
            ExecTimes, []),
         
     IterateT = measure_util:time_avg(
