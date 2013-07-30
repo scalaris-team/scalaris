@@ -230,8 +230,11 @@ insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree)
         -> NewNode::mt_node().
 insert_to_node(Key, _CheckKey, {Hash, Count, Bucket, Interval, []}, Config)
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
-    %TODO: check if key is already in bucket
-    {Hash, Count + 1, [Key | Bucket], Interval, []};
+    NewBuckets = case lists:member(Key, Bucket) of
+                     false -> [Key | Bucket];
+                     _     -> Bucket
+                 end,
+    {Hash, Count + 1, NewBuckets, Interval, []};
 
 insert_to_node(Key, CheckKey, {_, BucketSize, Bucket, Interval, []},
                #mt_config{ branch_factor = BranchFactor,
@@ -268,10 +271,15 @@ insert_to_node(Key, CheckKey, {Hash, Count, [], Interval, Childs = [_|_]} = Node
 -spec bulk_build(Interval::mt_interval(), KeyList::mt_bucket(),
                  Params::mt_config_params()) -> MerkleTree::merkle_tree().
 bulk_build(I, KeyList, Params) ->
-    InitNode = {nil, 1, [], I, []},
     Config = build_config(Params),
-    {merkle_tree, Config, p_bulk_build(InitNode, Config, KeyList)}.
+    {merkle_tree, Config,
+     hd(build_childs([{I, length(KeyList), KeyList}], Config, []))}.
 
+%% @doc Builds a merkle node from the given KeyList assuming that the current
+%%      node needs to be split because the KeyList is larger than
+%%      Config#mt_config.bucket_size.
+-spec p_bulk_build(CurNode::mt_node(), mt_config(), KeyList::mt_bucket())
+        -> mt_node().
 p_bulk_build({_, C, _, I, _}, Config, KeyList) ->
     ChildsI = intervals:split(I, Config#mt_config.branch_factor),
     IKList = keys_to_intervals(KeyList, ChildsI),
@@ -291,7 +299,7 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
                   {nil, Count, Bucket, Interval, []};
               true ->
                   % need to hash here since we won't keep the bucket!
-                  Hash = run_leaf_hf(Bucket, Config#mt_config.leaf_hf,
+                  Hash = run_leaf_hf(lists:usort(Bucket), Config#mt_config.leaf_hf,
                                      Config#mt_config.signature_size),
                   {Hash, Count, [], Interval, []}
            end,
@@ -333,9 +341,11 @@ gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf, _LeafHf, _SigSize,
     N;
 gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
               true, CleanBuckets) ->
-    Hash = run_leaf_hf(Bucket, LeafHf, SigSize),
-    {Hash, Count, ?IIF(CleanBuckets, [], Bucket), I, Childs}.
+    Bucket1 = lists:usort(Bucket),
+    Hash = run_leaf_hf(Bucket1, LeafHf, SigSize),
+    {Hash, Count, ?IIF(CleanBuckets, [], Bucket1), I, Childs}.
 
+%% @doc Hashes a leaf with the given (sorted!) bucket.
 -spec run_leaf_hf(mt_bucket(), LeafHf::hash_fun(), SigSize::pos_integer()) -> mt_node_key().
 run_leaf_hf(Bucket, LeafHf, SigSize) ->
     BinBucket = case Bucket of

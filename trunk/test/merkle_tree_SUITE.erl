@@ -147,19 +147,52 @@ tester_branch_bucket(_) ->
 -spec prop_tree_hash(intervals:key(), intervals:key(), 1..100) -> true.
 prop_tree_hash(L, R, ToAdd) ->
     I = unittest_helper:build_interval(L, R),
-    DB = db_generator:get_db(I, ToAdd, uniform),
+    DB1 = db_generator:get_db(I, ToAdd, uniform),
+    DB1a = util:shuffle(DB1),
     
-    Tree1 = merkle_tree:new(I, DB, []),
-    Tree2 = merkle_tree:new(I, DB, []),
-    Tree3 = build_tree(I, ToAdd + 1, uniform),
+    DB1Tree1 = merkle_tree:new(I, DB1, []),
+    DB1Tree2 = merkle_tree:new(I, DB1, []),
+    DB1Tree2a = merkle_tree:gen_hash(merkle_tree:bulk_build(I, DB1, [])),
+    DB1Tree2b = merkle_tree:gen_hash(merkle_tree:insert_list(DB1, merkle_tree:new(I, [{keep_bucket, true}]))),
+    DB1Tree2c = merkle_tree:gen_hash(merkle_tree:insert_list(DB1, merkle_tree:new(I, [{keep_bucket, true}])), true),
     
-    RootHash1 = merkle_tree:get_hash(Tree1),
-    RootHash2 = merkle_tree:get_hash(Tree2),
-    RootHash3 = merkle_tree:get_hash(Tree3),    
-    ?equals(RootHash1, RootHash2),
-    ?compare(fun erlang:'>'/2, RootHash1, 0),
-    ?compare(fun erlang:'>'/2, RootHash3, 0),
-    ?compare(fun erlang:'=/='/2, RootHash3, RootHash1).
+    DB1aTree1 = merkle_tree:new(I, DB1a, []),
+    DB1aTree2 = merkle_tree:new(I, DB1a, []),
+    DB1aTree2a = merkle_tree:gen_hash(merkle_tree:bulk_build(I, DB1a, [])),
+    DB1aTree2b = merkle_tree:gen_hash(merkle_tree:insert_list(DB1a, merkle_tree:new(I, [{keep_bucket, true}]))),
+    DB1aTree2c = merkle_tree:gen_hash(merkle_tree:insert_list(DB1a, merkle_tree:new(I, [{keep_bucket, true}])), true),
+    
+    DB3Tree1 = build_tree(I, ToAdd + 1, uniform),
+    
+    DB1RootHash1 = merkle_tree:get_hash(DB1Tree1),
+    DB1RootHash2 = merkle_tree:get_hash(DB1Tree2),
+    DB1RootHash2a = merkle_tree:get_hash(DB1Tree2a),
+    DB1RootHash2b = merkle_tree:get_hash(DB1Tree2b),
+    DB1RootHash2c = merkle_tree:get_hash(DB1Tree2c),
+    
+    DB1aRootHash1 = merkle_tree:get_hash(DB1aTree1),
+    DB1aRootHash2 = merkle_tree:get_hash(DB1aTree2),
+    DB1aRootHash2a = merkle_tree:get_hash(DB1aTree2a),
+    DB1aRootHash2b = merkle_tree:get_hash(DB1aTree2b),
+    DB1aRootHash2c = merkle_tree:get_hash(DB1aTree2c),
+    
+    DB3RootHash1 = merkle_tree:get_hash(DB3Tree1),
+    
+    ?equals(DB1RootHash1, DB1RootHash2),
+    ?equals(DB1RootHash2, DB1RootHash2a),
+    ?equals(DB1RootHash2, DB1RootHash2b),
+    ?equals(DB1RootHash2, DB1RootHash2c),
+    
+    ?equals(DB1aRootHash1, DB1aRootHash2),
+    ?equals(DB1aRootHash2, DB1aRootHash2a),
+    ?equals(DB1aRootHash2, DB1aRootHash2b),
+    ?equals(DB1aRootHash2, DB1aRootHash2c),
+    
+    ?equals(DB1RootHash1, DB1aRootHash1),
+    
+    ?compare(fun erlang:'>'/2, DB1RootHash1, 0),
+    ?compare(fun erlang:'>'/2, DB3RootHash1, 0),
+    ?compare(fun erlang:'=/='/2, DB3RootHash1, DB1RootHash1).
 
 tester_tree_hash(_) ->
     tester:test(?MODULE, prop_tree_hash, 3, 100, [{threads, 2}]).
