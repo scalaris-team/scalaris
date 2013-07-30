@@ -853,7 +853,7 @@ map_interval(A, B) ->
 encodeBlob(A, B) -> 
     term_to_binary([A, "#", B]).
 
--spec decodeBlob(db_entry_enc()) -> {?RT:key(), db_dht:value() | db_dht:version()} | fail.
+-spec decodeBlob(term()) -> {?RT:key(), db_dht:value() | db_dht:version()} | fail.
 decodeBlob(Blob) when is_binary(Blob) ->
     case binary_to_term(Blob) of
         [Key, "#", X] -> {Key, X};
