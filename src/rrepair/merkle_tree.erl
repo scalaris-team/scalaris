@@ -438,15 +438,18 @@ get_opt_bucket_size(N, V, S) ->
 
 -spec build_config(mt_config_params()) -> mt_config().
 build_config(ParamList) ->
-    lists:foldl(fun({Key, Val}, Conf) ->
-                        case Key of
-                            branch_factor -> Conf#mt_config{ branch_factor = Val };
-                            bucket_size -> Conf#mt_config{ bucket_size = Val };
-                            leaf_hf -> Conf#mt_config{ leaf_hf = Val };
-                            inner_hf -> Conf#mt_config{ inner_hf = Val }
-                        end
-                end,
-                #mt_config{}, ParamList).
+    lists:foldl(
+      fun({Key, Val}, Conf) ->
+              case Key of
+                  branch_factor  -> Conf#mt_config{ branch_factor = Val };
+                  bucket_size    -> Conf#mt_config{ bucket_size = Val };
+                  leaf_hf        -> Conf#mt_config{ leaf_hf = Val };
+                  inner_hf       -> Conf#mt_config{ inner_hf = Val };
+                  keep_bucket    -> Conf#mt_config{ keep_bucket = Val};
+                  signature_size -> Conf#mt_config{ signature_size = Val}
+              end
+      end,
+      #mt_config{}, ParamList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
