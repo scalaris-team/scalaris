@@ -228,13 +228,12 @@ insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree)
 -spec insert_to_node(Key::?RT:key() | rr_recon:db_entry_enc(), CheckKey::?RT:key(),
                      Node::mt_node(), Config::mt_config())
         -> NewNode::mt_node().
-insert_to_node(Key, _CheckKey, {Hash, Count, Bucket, Interval, []}, Config)
+insert_to_node(Key, _CheckKey, {_Hash, Count, Bucket, Interval, []} = N, Config)
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
-    NewBuckets = case lists:member(Key, Bucket) of
-                     false -> [Key | Bucket];
-                     _     -> Bucket
-                 end,
-    {Hash, Count + 1, NewBuckets, Interval, []};
+    case lists:member(Key, Bucket) of
+        false -> {nil, Count + 1, [Key | Bucket], Interval, []};
+        _     -> N
+    end;
 
 insert_to_node(Key, CheckKey, {_, BucketSize, Bucket, Interval, []},
                #mt_config{ branch_factor = BranchFactor,
