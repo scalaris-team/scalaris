@@ -154,8 +154,8 @@ lookup_(I, {_, _, _, I, _ChildList} = Node) ->
 lookup_(_I, {_, _, _, _NodeI, _ChildList = []}) ->
     not_found;
 lookup_(I, {_, _, _, _NodeI, ChildList = [_|_]}) ->
-    ?ASSERT(1 =:= length([C || C <- ChildList,
-                               intervals:is_subset(I, get_interval(C))])),
+    ?ASSERT(1 >= length([C || C <- ChildList,
+                              intervals:is_subset(I, get_interval(C))])),
     case util:first_matching(ChildList,
                              fun(X) ->
                                      intervals:is_subset(I, get_interval(X))
