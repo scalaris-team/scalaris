@@ -40,6 +40,8 @@
 -export([bulk_build/3]).
 -export([tester_create_hash_fun/1, tester_create_inner_hash_fun/1]).
 
+-compile({inline, [get_hash/1, get_interval/1, node_size/1]}).
+
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
 
@@ -80,7 +82,7 @@
                      Child_list  :: [mt_node()]
                     }.
 
--type mt_iter()     :: [mt_node()].
+-type mt_iter()     :: [mt_node() | [mt_node()]].
 -type merkle_tree() :: {merkle_tree, mt_config(), Root::mt_node()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -346,17 +348,19 @@ size_detail_node([[] | R2], Inner, Leafs) ->
 -spec iterator(Tree::merkle_tree()) -> Iter::mt_iter().
 iterator({merkle_tree, _, Root}) -> [Root].
 
--compile({inline, [get_hash/1, get_interval/1, node_size/1]}).
-
 -spec iterator_node(Node::mt_node(), mt_iter()) -> mt_iter().
 iterator_node({_, _, _, _, [_|_] = Childs}, Iter1) ->
-    lists:append(Childs, Iter1);
+    [Childs | Iter1];
 iterator_node({_, _, _, _, []}, Iter1) ->
     Iter1.
 
 -spec next(mt_iter()) -> none | {Node::mt_node(), mt_iter()}.
-next([Node | Rest]) ->
-    {Node, iterator_node(Node, Rest)};
+next([Node | R]) when is_tuple(Node) ->
+    {Node, iterator_node(Node, R)};
+next([[Node | R1] | R2]) when is_tuple(Node) ->
+    {Node, iterator_node(Node, [R1 | R2])};
+next([[] | R2]) ->
+    next(R2);
 next([]) -> 
     none.
 
