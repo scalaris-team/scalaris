@@ -75,6 +75,7 @@ prop_get_db3_(Interval, ItemCount, Distribution) ->
                     not intervals:in(Key, Interval)],
             []),
     ?compare(fun erlang:'=<'/2, length(Result), ItemCount),
+    ?equals(length(Result), length(lists:usort(Result))),
     ?implies(length(intervals:split(Interval, ItemCount)) == ItemCount,
              ?equals(length(Result), ItemCount)).
 
@@ -101,6 +102,7 @@ prop_get_db4_(Interval, ItemCount, Distribution, Options) ->
                     [])
     end,
     ?compare(fun erlang:'=<'/2, length(Result), ItemCount),
+    ?equals(length(Result), length(lists:usort(Result))),
     ?implies(length(intervals:split(Interval, ItemCount)) == ItemCount,
              ?equals(length(Result), ItemCount)).
 
