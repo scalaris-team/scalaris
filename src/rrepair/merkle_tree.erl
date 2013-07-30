@@ -466,19 +466,20 @@ run_leaf_hf(#mt_config{ leaf_hf = Hf, signature_size = SigSize }, X) ->
 
 % @doc inserts key into its matching interval
 %      precondition: key fits into one of the given intervals
-p_key_in_I(Key, Left, [{Interval, C, L} = P | Right]) ->
+-spec p_key_in_I(Key, ReverseLeft::[Bucket], Right::[Bucket,...]) -> [Bucket,...] when
+    is_subtype(Key,    term()),
+    is_subtype(Bucket, {I::intervals:interval(), Count::non_neg_integer(), [Key]}).
+p_key_in_I(Key, ReverseLeft, [{Interval, C, L} = P | Right]) ->
     CheckKey = case rr_recon:decodeBlob(Key) of
                    {K, _} -> K;
                    _ -> Key
                end,
     case intervals:in(CheckKey, Interval) of
-        true -> lists:append([Left, [{Interval, C + 1, [Key | L]}], Right]);
-        false -> p_key_in_I(Key, lists:append(Left, [P]), Right)
-    end;
-p_key_in_I(_Key, _Left, []) ->
-    erlang:error(precondition_violated).
+        true  -> lists:reverse(ReverseLeft, [{Interval, C + 1, [Key | L]} | Right]);
+        false -> p_key_in_I(Key, [P | ReverseLeft], Right)
+    end.
 
--spec keys_to_intervals([Key], [I]) -> [{I, Count, [Key]}] when
+-spec keys_to_intervals([Key], [I,...]) -> [{I, Count, [Key]}] when
     is_subtype(Key,   term()),
     is_subtype(I,     intervals:interval()),
     is_subtype(Count, non_neg_integer()).
