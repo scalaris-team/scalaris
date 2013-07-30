@@ -127,10 +127,7 @@ new(I, ConfParams) ->
 
 -spec new(mt_interval(), [term()], mt_config_params()) -> merkle_tree().
 new(I, KeyList, ConfParams) ->
-    InitNode = {nil, 1, [], I, []},
-    Config = build_config(ConfParams),
-    Root = p_bulk_build(InitNode, Config, KeyList),
-    {merkle_tree, Config, gen_hash_node(Root, Config#mt_config.inner_hf)}.
+    gen_hash(bulk_build(I, KeyList, ConfParams)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -261,9 +258,11 @@ insert_to_node(Key, {Hash, Count, [], Interval, Childs = [_|_]} = Node, Config) 
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec bulk_build(Interval::mt_interval(), Params::mt_config_params(),
-                 KeyList::[term()]) -> MerkleTree::merkle_tree().
-bulk_build(I, Params, KeyList) ->
+%% @doc Builds a merkle tree with all given keys but does not create the hash
+%%      values yet (use gen_hash/1 for that).
+-spec bulk_build(Interval::mt_interval(), KeyList::[term()],
+                 Params::mt_config_params()) -> MerkleTree::merkle_tree().
+bulk_build(I, KeyList, Params) ->
     InitNode = {nil, 1, [], I, []},
     Config = build_config(Params),
     {merkle_tree, Config, p_bulk_build(InitNode, Config, KeyList)}.
