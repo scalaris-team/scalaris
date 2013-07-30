@@ -362,7 +362,7 @@ p_gen_kvv_feeder(EDist0, Keys0, _WrongKeyCount, FType, FDest, FCount) ->
                 KeyCount::pos_integer(), failure_type(),
                 failure_dest(), FailCount::non_neg_integer()) -> {db_dht:db_as_list(), db_status()}.
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
-    ?ASSERT(Keys =:= lists:usort(Keys)), % unique keys
+    ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     {FKeys, GoodKeys} = select_random_keys(Keys, length(Keys), FCount, []),
     GoodDB = lists:foldl(fun(Key, AccDb) -> 
                                  lists:append(get_rep_group(Key), AccDb)
@@ -377,7 +377,7 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     DBSize = KeyCount * ?ReplicationFactor,
     {lists:append(GoodDB, BadDB), {DBSize, Insert, DBSize - Insert, O}};
 p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
-    ?ASSERT(Keys =:= lists:usort(Keys)), % unique keys
+    ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     ?ASSERT(KeyCount =:= 1 orelse random_bias:numbers_left(RanGen) =< KeyCount),
     FProbList = get_non_uniform_probs(RanGen, []),
     % note: don't use RanGen any more - we don't get the new state in the last call!
@@ -396,7 +396,7 @@ p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
     DBSize = KeyCount * ?ReplicationFactor,
     {DB, {DBSize, Insert, DBSize - Insert, Out}};
 p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
-    ?ASSERT(Keys =:= lists:usort(Keys)), % unique keys
+    ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     FRate = case FCount of
                 0 -> KeyCount + 1;
                 _ -> erlang:max(1, erlang:trunc(KeyCount / FCount))
