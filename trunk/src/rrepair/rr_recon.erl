@@ -52,7 +52,7 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([method/0, request/0]).
+-export_type([method/0, request/0, db_entry_enc/0]).
 -endif.
 
 -type quadrant()       :: 1..4. % 1..rep_factor()
@@ -318,36 +318,39 @@ build_struct(DBList, DestI, RestI,
                                      initiator = Initiator, stats = Stats,
                                      dhtNodePid = DhtNodePid, stage = Stage}) ->
     ?ASSERT(not intervals:is_empty(DestI)),
+    % bloom may fork more recon processes if un-synced elements remain
+    FinishRecon =
+        case intervals:is_empty(RestI) of
+            false ->
+                SubSyncI = map_interval(DestI, RestI),
+                case intervals:is_empty(SubSyncI) of
+                    false ->
+                        MySubSyncI = map_interval(RestI, DestI), % mapped to my range
+                        Reconcile = Initiator andalso (Stage =:= reconciliation),
+                        if RMethod =:= bloom -> 
+                               ForkState = State#rr_recon_state{dest_interval = SubSyncI,
+                                                                params = Params},
+                               {ok, Pid} = fork_recon(ForkState),
+                               send_chunk_req(DhtNodePid, Pid, MySubSyncI, SubSyncI,
+                                              get_max_items(), Reconcile),
+                               true;
+                           true ->
+                               send_chunk_req(DhtNodePid, self(), MySubSyncI, SubSyncI,
+                                              get_max_items(), Reconcile),
+                               false
+                        end;
+                    true -> true
+                end;
+            true -> true
+        end,
     ToBuild = if Initiator andalso RMethod =:= art -> merkle_tree;
                  true -> RMethod
               end,
     {BuildTime, SyncStruct} =
-        util:tc(fun() -> build_recon_struct(ToBuild, OldSyncStruct, DestI, DBList, Params) end),
+        util:tc(fun() -> build_recon_struct(ToBuild, OldSyncStruct, DestI, DBList, Params, FinishRecon) end),
     Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
     NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1},
-    EmptyRest = intervals:is_empty(RestI),
-    % bloom may fork more recon processes if un-synced elements remain
-    if not EmptyRest ->
-           SubSyncI = map_interval(DestI, RestI),
-           case intervals:is_empty(SubSyncI) of
-               false ->
-                   MySubSyncI = map_interval(RestI, DestI), % mapped to my range
-                   Reconcile = Initiator andalso (Stage =:= reconciliation),
-                   if RMethod =:= bloom -> 
-                          ForkState = State#rr_recon_state{dest_interval = SubSyncI,
-                                                           params = Params},
-                          {ok, Pid} = fork_recon(ForkState),
-                          send_chunk_req(DhtNodePid, Pid, MySubSyncI, SubSyncI,
-                                         get_max_items(), Reconcile);
-                      true ->
-                          send_chunk_req(DhtNodePid, self(), MySubSyncI, SubSyncI,
-                                         get_max_items(), Reconcile)
-                   end;
-               true -> ok
-           end;
-        true -> ok
-    end,
-    if EmptyRest orelse RMethod =:= bloom ->
+    if FinishRecon ->
            begin_sync(SyncStruct, Params, NewState#rr_recon_state{stage = reconciliation});
        true ->
            NewState % keep stage (at initiator: reconciliation, at other: build_struct)
@@ -576,9 +579,10 @@ art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
-                         intervals:non_empty_interval(), db_chunk_enc(),
-                         Params::parameters() | {}) -> sync_struct().
-build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params) ->
+                         DestI::intervals:non_empty_interval(), db_chunk_enc(),
+                         Params::parameters() | {}, FinishRecon::boolean())
+        -> sync_struct().
+build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     % note: for bloom, parameters don't need to match - use our own
     ?ASSERT(not intervals:is_empty(I)),
     Fpr = get_bloom_fpr(),
@@ -586,7 +590,7 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params) ->
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
     BF = ?REP_BLOOM:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
     #bloom_recon_struct{ interval = I, bloom = BF };
-build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params) ->
+build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, FinishRecon) ->
     ?ASSERT(not intervals:is_empty(I)),
     case Params of
         {} ->
@@ -600,20 +604,49 @@ build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params) ->
             ok
     end,
     merkle_tree:new(I, DBItems, [{branch_factor, BranchFactor},
-                                 {bucket_size, BucketSize}]);
-build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params) ->
+                                 {bucket_size, BucketSize},
+                                 {keep_bucket, not FinishRecon}]);
+build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params, FinishRecon) ->
     ?ASSERT(not intervals:is_empty(_I)),
     ?ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
     NTree = merkle_tree:insert_list(DBItems, OldSyncStruct),
-    merkle_tree:gen_hash(NTree);
-build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}) ->
+    if FinishRecon ->
+           % no more DB items -> finish tree, remove buckets
+           merkle_tree:gen_hash(NTree, true);
+       true ->
+           % don't hash now - there will be new items
+           NTree
+    end;
+build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}, FinishRecon) ->
     ?ASSERT(not intervals:is_empty(I)),
     Branch = get_merkle_branch_factor(),
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), Branch, 1),
     Tree = merkle_tree:new(I, DBItems, [{branch_factor, Branch},
-                                        {bucket_size, BucketSize}]),
-    #art_recon_struct{art = art:new(Tree, get_art_config()),
-                      branch_factor = Branch, bucket_size = BucketSize}.
+                                        {bucket_size, BucketSize},
+                                        {keep_bucket, not FinishRecon}]),
+    if FinishRecon ->
+           % no more DB items -> create art struct:
+           #art_recon_struct{art = art:new(Tree, get_art_config()),
+                             branch_factor = Branch, bucket_size = BucketSize};
+       true ->
+           % more DB items to come... stay with merkle tree
+           Tree
+    end;
+build_recon_struct(art, OldSyncStruct, _I, DBItems, _Params = {}, FinishRecon) ->
+    % similar to continued merkle build
+    ?ASSERT(not intervals:is_empty(_I)),
+    ?ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
+    Tree1 = merkle_tree:insert_list(DBItems, OldSyncStruct),
+    if FinishRecon ->
+           % no more DB items -> finish tree, remove buckets, create art struct:
+           NTree = merkle_tree:gen_hash(Tree1, true),
+           #art_recon_struct{art = art:new(NTree, get_art_config()),
+                             branch_factor = merkle_tree:get_branch_factor(NTree),
+                             bucket_size = merkle_tree:get_bucket_size(NTree)};
+       true ->
+           % don't hash now - there will be new items
+           Tree1
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER

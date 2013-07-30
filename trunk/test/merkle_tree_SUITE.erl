@@ -157,9 +157,9 @@ prop_tree_hash(L, R, ToAdd) ->
     RootHash2 = merkle_tree:get_hash(Tree2),
     RootHash3 = merkle_tree:get_hash(Tree3),    
     ?equals(RootHash1, RootHash2),
-    ?assert(RootHash1 > 0),
-    ?assert(RootHash3 > 0),
-    ?assert(RootHash3 =/= RootHash1).
+    ?compare(fun erlang:'>'/2, RootHash1, 0),
+    ?compare(fun erlang:'>'/2, RootHash3, 0),
+    ?compare(fun erlang:'=/='/2, RootHash3, RootHash1).
 
 tester_tree_hash(_) ->
     tester:test(?MODULE, prop_tree_hash, 3, 100, [{threads, 2}]).

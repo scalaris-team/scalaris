@@ -72,7 +72,7 @@ comparison(_) ->
             DBSize=~p ; Iterations=~p
             -----------------------------------------------
                                 bloom |merkleTree|  art
-            BuildTime Avg ms: ~f | ~f | ~f (~f ohne Merkle)", 
+            BuildTime Avg ms: ~f | ~f | ~f (~f without Merkle)", 
            [DBSize, Iter,
             measure_util:get(BBuildT, avg, ms), 
             measure_util:get(MBuildT, avg, ms), 
@@ -166,7 +166,7 @@ merkle_tree(_) ->
             ------------------------
             PARAMETER: AddedItems=~p ; ExecTimes=~p
             TreeSize: InnerNodes=~p ; Leafs=~p,
-            BuildTime:      ~p (without hashing)
+            BuildTime:      ~p (without inner hashing)
             IterationTime : ~p
             GenHashTime:    ~p
             SimpleSizeTime: ~p

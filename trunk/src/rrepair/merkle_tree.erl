@@ -28,7 +28,7 @@
 
 -export([new/1, new/2, new/3,
          insert/2, insert_list/2, empty/0,
-         lookup/2, size/1, size_detail/1, gen_hash/1,
+         lookup/2, size/1, size_detail/1, gen_hash/1, gen_hash/2,
          iterator/1, next/1,
          is_empty/1, is_leaf/1, is_merkle_tree/1,
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
@@ -218,19 +218,20 @@ insert_list(Terms, Tree) ->
 
 -spec insert(Key::term(), merkle_tree()) -> merkle_tree().
 insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree) ->
-    case intervals:in(Key, get_interval(Root)) of
-        true -> {merkle_tree, Config, insert_to_node(Key, Root, Config)};
+    CheckKey = decode_key(Key),
+    case intervals:in(CheckKey, get_interval(Root)) of
+        true -> {merkle_tree, Config, insert_to_node(Key, CheckKey, Root, Config)};
         false -> Tree
     end.
 
--spec insert_to_node(Key::term(), Node::mt_node(), Config::mt_config())
+-spec insert_to_node(Key::term(), CheckKey::term(), Node::mt_node(), Config::mt_config())
         -> NewNode::mt_node().
-insert_to_node(Key, {Hash, Count, Bucket, Interval, []}, Config) 
+insert_to_node(Key, _CheckKey, {Hash, Count, Bucket, Interval, []}, Config)
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
     %TODO: check if key is already in bucket
     {Hash, Count + 1, [Key | Bucket], Interval, []};
 
-insert_to_node(Key, {_, BucketSize, Bucket, Interval, []},
+insert_to_node(Key, CheckKey, {_, BucketSize, Bucket, Interval, []},
                #mt_config{ branch_factor = BranchFactor,
                            bucket_size = BucketSize } = Config) ->    
     ChildI = intervals:split(Interval, BranchFactor),
@@ -245,15 +246,17 @@ insert_to_node(Key, {_, BucketSize, Bucket, Interval, []},
                     {nil, BCount, NewBucket, I, []} 
                 end 
                 || I <- ChildI],
-    insert_to_node(Key, {nil, 1 + BranchFactor, [], Interval, NewLeafs}, Config);
+    insert_to_node(Key, CheckKey, {nil, 1 + BranchFactor, [], Interval, NewLeafs}, Config);
 
-insert_to_node(Key, {Hash, Count, [], Interval, Childs = [_|_]} = Node, Config) ->
-    {Dest0, Rest} = lists:partition(fun({_, _, _, I, _}) -> intervals:in(Key, I) end, Childs),
+insert_to_node(Key, CheckKey, {Hash, Count, [], Interval, Childs = [_|_]} = Node, Config) ->
+    {Dest0, Rest} = lists:partition(fun({_, _, _, I, _}) ->
+                                            intervals:in(CheckKey, I)
+                                    end, Childs),
     case Dest0 of
         [] -> error_logger:error_msg("InsertFailed!"), Node;
         [Dest|_] ->
             OldSize = node_size(Dest),
-            NewDest = insert_to_node(Key, Dest, Config),
+            NewDest = insert_to_node(Key, CheckKey, Dest, Config),
             {Hash, Count + (node_size(NewDest) - OldSize), [], Interval, [NewDest|Rest]}
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -277,15 +280,16 @@ p_bulk_build({_, C, _, I, _}, Config, KeyList) ->
 build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
     BucketSize = Config#mt_config.bucket_size,
     KeepBucket = Config#mt_config.keep_bucket,
-    Node = case Count > BucketSize of
-               true -> p_bulk_build({nil, 1, [], Interval, []}, Config, Bucket);
-               false -> 
-                   Hash = if Count > 0 ->
-                                 run_leaf_hf(Config, term_to_binary(Bucket));
-                             true ->
-                                 run_leaf_hf(Config, term_to_binary(0))
-                          end,
-                   {Hash, Count, ?IIF(KeepBucket, Bucket, []), Interval, []}
+    Node = if Count > BucketSize ->
+                  p_bulk_build({nil, 1, [], Interval, []}, Config, Bucket);
+              KeepBucket ->
+                  % let gen_hash/1 hash the leafs
+                  {nil, Count, Bucket, Interval, []};
+              true ->
+                  % need to hash here since we won't keep the bucket!
+                  Hash = run_leaf_hf(Bucket, Config#mt_config.leaf_hf,
+                                     Config#mt_config.signature_size),
+                  {Hash, Count, [], Interval, []}
            end,
     build_childs(T, Config, [Node | Acc]);
 build_childs([], _, Acc) ->
@@ -293,19 +297,55 @@ build_childs([], _, Acc) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Assigns hash values to all nodes in the tree.
 -spec gen_hash(merkle_tree()) -> merkle_tree().
-gen_hash({merkle_tree, Config, Root}) ->
-    {merkle_tree, Config, gen_hash_node(Root, Config#mt_config.inner_hf)}.
+gen_hash(Tree = {merkle_tree, #mt_config{keep_bucket = KeepBucket}, _Root}) ->
+    gen_hash(Tree, not KeepBucket).
 
--spec gen_hash_node(Node, InnerHf) -> Node when
-      is_subtype(Node,   mt_node()),
-      is_subtype(InnerHf, inner_hash_fun()).
-gen_hash_node({_, Count, [], I, [_|_] = List}, InnerHf) ->    
-    NewChilds = [gen_hash_node(X, InnerHf) || X <- List],
+%% @doc Assigns hash values to all nodes in the tree, remove the buckets
+%%      afterwards if CleanBuckets is set.
+-spec gen_hash(merkle_tree(), CleanBuckets::boolean()) -> merkle_tree().
+gen_hash({merkle_tree, Config = #mt_config{inner_hf = InnerHf,
+                                           leaf_hf = LeafHf,
+                                           signature_size = SigSize,
+                                           keep_bucket = KeepBucket},
+          Root}, CleanBuckets) ->
+    RootNew = gen_hash_node(Root, InnerHf, LeafHf, SigSize, KeepBucket, CleanBuckets),
+    {merkle_tree, Config#mt_config{keep_bucket = not CleanBuckets}, RootNew}.
+
+-spec gen_hash_node(mt_node(), InnerHf::inner_hash_fun(), LeafHf::hash_fun(),
+                    SigSize::pos_integer(), KeepBucket::boolean(),
+                    CleanBuckets::boolean()) -> mt_node().
+gen_hash_node({_, Count, [], I, [_|_] = List}, InnerHf, LeafHf, SigSize,
+              OldKeepBucket, CleanBuckets) ->    
+    NewChilds = [gen_hash_node(X, InnerHf, LeafHf, SigSize, OldKeepBucket,
+                               CleanBuckets) || X <- List],
     Hash = InnerHf([get_hash(C) || C <- NewChilds]),
     {Hash, Count, [], I, NewChilds};
-gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf) ->
-    N.
+gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf, _LeafHf, _SigSize,
+              false, _CleanBuckets) ->
+    % if keep_bucket was false, we already hashed the value in bulk_build and
+    % cannot insert any more values
+    N;
+gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
+              true, CleanBuckets) ->
+    Hash = run_leaf_hf(Bucket, LeafHf, SigSize),
+    {Hash, Count, ?IIF(CleanBuckets, [], Bucket), I, Childs}.
+
+-spec run_leaf_hf([Key::term()], LeafHf::hash_fun(), SigSize::pos_integer()) -> mt_node_key().
+run_leaf_hf(Bucket, LeafHf, SigSize) ->
+    BinBucket = case Bucket of
+                    [_|_] -> term_to_binary(Bucket);
+                    []    -> term_to_binary(0)
+                end,
+    Hash = LeafHf(BinBucket),
+    Size = erlang:byte_size(Hash),
+    if Size > SigSize  ->
+           Start = Size - SigSize,
+           <<_:Start/binary, SmallHash:SigSize/binary>> = Hash,
+           SmallHash;
+       true -> Hash
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -453,18 +493,13 @@ build_config(ParamList) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec run_leaf_hf(mt_config(), binary()) -> mt_node_key(). 
-run_leaf_hf(#mt_config{ leaf_hf = Hf, signature_size = SigSize }, X) ->
-    Hash = Hf(X),
-    Size = erlang:byte_size(Hash),
-    if Size > SigSize  -> 
-           Start = Size - SigSize,
-           <<_:Start/binary, SmallHash:SigSize/binary>> = Hash,
-           SmallHash;
-       true -> Hash
+%% @doc Decodes a key for use by the merkle_tree.
+-spec decode_key(Key::rr_recon:db_entry_enc() | ?RT:key()) -> ?RT:key().
+decode_key(Key) ->
+    case rr_recon:decodeBlob(Key) of
+        {K, _} -> K;
+        fail -> Key
     end.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc inserts key into its matching interval
 %      precondition: key fits into one of the given intervals
@@ -485,11 +520,7 @@ p_key_in_I(Key, CheckKey, ReverseLeft, [{Interval, C, L} = P | Right]) ->
 keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
     lists:foldr(fun(Key, Acc) ->
-                        CheckKey = case rr_recon:decodeBlob(Key) of
-                                       {K, _} -> K;
-                                       fail -> Key
-                                   end,
-                        p_key_in_I(Key, CheckKey, [], Acc)
+                        p_key_in_I(Key, decode_key(Key), [], Acc)
                 end, IBucket, KList).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

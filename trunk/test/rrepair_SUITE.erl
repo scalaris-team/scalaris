@@ -48,18 +48,14 @@ repair_default() ->
      dest,           % run one sync with a specified dest node
      simple,         % run one sync round
      multi_round,    % run multiple sync rounds with sync probability 1
-     multi_round2    % run multiple sync rounds with sync probability 0.4     
+     multi_round2,   % run multiple sync rounds with sync probability 0.4
+     parts           % get_chunk with limited items (leads to multiple get_chunk calls, in case of bloom also multiple bloom filters)
 	].
 
 regen_special() ->
     [
      dest_empty_node % run one sync with empty dest node
     ].
-
-bloom_special() ->
-    [
-     parts           % get_chunk with limited items / leads to multiple bloom filters
-    ].     
 
 all() ->
     [{group, basic},
@@ -69,13 +65,13 @@ all() ->
 
 groups() ->
     [{basic,  [parallel], basic_tests()},
-     {repair, [sequence], [{upd_bloom,    [sequence], repair_default() ++ bloom_special()}, %{repeat_until_any_fail, 1000}
+     {repair, [sequence], [{upd_bloom,    [sequence], repair_default()}, %{repeat_until_any_fail, 1000}
                            {upd_merkle,   [sequence], repair_default()},
                            {upd_art,      [sequence], repair_default()},
-                           {regen_bloom,  [sequence], repair_default() ++ bloom_special() ++ regen_special()},
+                           {regen_bloom,  [sequence], repair_default() ++ regen_special()},
                            {regen_merkle, [sequence], repair_default() ++ regen_special()},
                            {regen_art,    [sequence], repair_default() ++ regen_special()},
-                           {mixed_bloom,  [sequence], repair_default() ++ bloom_special()}, 
+                           {mixed_bloom,  [sequence], repair_default()},
                            {mixed_merkle, [sequence], repair_default()},
                            {mixed_art,    [sequence], repair_default()}
                           ]}
