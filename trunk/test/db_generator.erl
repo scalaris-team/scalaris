@@ -179,6 +179,9 @@ non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccLen, AccType, RoundingE
     Add0 = V * ToAdd + RoundingError,
     Add1 = erlang:max(0, erlang:trunc(Add0)),
     Add = if Add1 + AccLen > ToAdd -> ToAdd - AccLen;
+              R =:= [] ->
+                  % try to add the missing items to the last sub interval
+                  ToAdd - AccLen;
              true -> Add1
           end,
     %log:pal("non_uniform_key_list: add: ~p, SubI: ~p", [Add, SubI]),
@@ -186,18 +189,21 @@ non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccLen, AccType, RoundingE
                true     -> []
             end,
     NAcc0Len = length(NAcc0),
-    % note: NAcc0 is probably smaller than Acc, so appending this way is faster:
-    NAcc = lists:append(NAcc0, Acc),
     NAccLen = AccLen + NAcc0Len,
+    % note: the ordering of the returned keys is not important
+    %       -> append to smaller list (better performance)
     case Status of
         _ when NAccLen =:= ToAdd ->
-            NAcc;
+            lists:append(NAcc0, Acc);
         ok when R =/= [] ->
+            NAcc = lists:append(NAcc0, Acc),
             NewRoundingError = float(Add0 - Add + Add - NAcc0Len),
             non_uniform_key_list_(R, ToAdd, RanGen1, NAcc, NAccLen, AccType, NewRoundingError);
         _ when NAccLen < ToAdd ->
-            % add the missing items to the last sub interval
-            uniform_key_list([{SubI, ToAdd - NAccLen}], NAcc, AccType)
+            % there may still be missing items -> try to add them to the last
+            % sub interval again - beware not to create duplicate keys!
+            Acc1 = uniform_key_list([{SubI, ToAdd - NAccLen}], NAcc0, AccType),
+            lists:append(lists:usort(Acc1), Acc)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
