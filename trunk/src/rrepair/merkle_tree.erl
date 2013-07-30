@@ -217,7 +217,7 @@ insert_list(Terms, Tree) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec insert(Key::term(), merkle_tree()) -> merkle_tree().
-insert(Key, {merkle_tree, Config, Root} = Tree) ->
+insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree) ->
     case intervals:in(Key, get_interval(Root)) of
         true -> {merkle_tree, Config, insert_to_node(Key, Root, Config)};
         false -> Tree
