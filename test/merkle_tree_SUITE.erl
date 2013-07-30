@@ -170,7 +170,7 @@ tester_tree_hash(_) ->
 prop_insert_list(L, R, Count) ->
     I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, Count, uniform),
-    Tree = merkle_tree:insert_list(DB, merkle_tree:new(I)),
+    Tree = merkle_tree:insert_list(DB, merkle_tree:new(I, [{keep_bucket, true}])),
     ItemCount = iterate(merkle_tree:iterator(Tree), 
                         fun(N, Acc) -> Acc + case merkle_tree:is_leaf(N) of
                                                  true -> merkle_tree:get_item_count(N);
