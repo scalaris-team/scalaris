@@ -532,11 +532,20 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
         {abort, Reason, OrigType} ->
             abort_slide(State, TargetNode, MoveFullId, null, SourcePid, Tag,
                         OrigType, Reason, MsgTag =/= nomsg);
-        {ok, {join, 'send'}} -> % similar to {slide, pred, 'send'}
+        {ok, {join, 'send'} = NewType} -> % similar to {slide, pred, 'send'}
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
-            % TODO: implement step-wise join
-            SlideOp = slide_op:new_sending_slide_join(
-                        MoveFullId, TargetNode, join, Neighbors),
+            UseIncrSlides = use_incremental_slides(),
+            SlideOp =
+                if UseIncrSlides orelse OtherMTE =/= unknown->
+                       IncTargetKey = find_incremental_target_id(
+                                        Neighbors, State,
+                                        TargetId, NewType, OtherMTE),
+                       slide_op:new_sending_slide_join_i(
+                        MoveFullId, TargetNode, IncTargetKey, join, Neighbors);
+                   true ->
+                       slide_op:new_sending_slide_join(
+                        MoveFullId, TargetNode, join, Neighbors)
+                end,
             % note: phase will be set by notify_other/2 and needs to remain null here
             SlideMod = get_slide_mod(),
             case SlideMod:prepare_join_send(State, SlideOp) of
@@ -874,7 +883,9 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
                     PredOrSucc = slide_op:get_predORsucc(SlideOp1),
                     % TODO: support other types
                     case slide_op:get_next_op(SlideOp1) of
-                        {slide, continue, NewTargetId} when Type =:= {slide, PredOrSucc, 'rcv'} ->
+                        {slide, continue, NewTargetId} when Type =:= {slide, PredOrSucc, 'rcv'} orelse
+                                                                Type =:= {join, 'rcv'} ->
+                            Type1 = {slide, PredOrSucc, 'rcv'}, % converts join
                             State2 = dht_node_state:set_slide(State1, PredOrSucc, null),
                             MyNode = dht_node_state:get(State2, node),
                             TargetNode = dht_node_state:get(State2, PredOrSucc),
@@ -886,7 +897,7 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
                             % unsubscribe old slide from fd:
                             fd:unsubscribe([TargetNodePid], {move, MoveFullId}),
                             Command = check_setup_slide_not_found(
-                                        State2, Type, MyNode, TargetNode, NewTargetId),
+                                        State2, Type1, MyNode, TargetNode, NewTargetId),
                             NewMoveFullId = uid:get_global_uid(),
                             case Command of
                                 {ok, {slide, _, 'rcv'} = NewType} ->
@@ -910,11 +921,11 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
                                             send_delta_ack(SlideOp1, {abort, NewMoveFullId, Reason}),
                                             abort_slide(State3, NextSlideOp1, Reason, false)
                                     end;
-                                {abort, Reason, _Type} -> % note: the type returned here is the same as Type
+                                {abort, Reason, NewType} -> % note: the type returned here is the same as Type
                                     % let this op finish and abort the continued one:
                                     send_delta_ack(SlideOp1, {abort, NewMoveFullId, Reason}),
                                     abort_slide(State2, TargetNode, NewMoveFullId, null, SourcePid, Tag,
-                                                Type, Reason, false)
+                                                NewType, Reason, false)
                             end;
                         {jump, continue, _NewTargetId} ->
                             % TODO
@@ -1030,9 +1041,11 @@ finish_delta_ack2B(State, SlideOp, {continue, NewSlideId}) ->
     SourcePid = slide_op:get_source_pid(SlideOp),
     % TODO: support other types
     case slide_op:get_next_op(SlideOp) of
-        {slide, continue, NewTargetId} when Type =:= {slide, PredOrSucc, 'send'} ->
+        {slide, continue, NewTargetId} when Type =:= {slide, PredOrSucc, 'send'} orelse
+                                                Type =:= {join, 'send'} ->
+            Type1 = {slide, PredOrSucc, 'send'}, % converts join
             finish_delta_ack2B(
-              State, SlideOp, {Type, NewSlideId, MyNode,
+              State, SlideOp, {Type1, NewSlideId, MyNode,
                                TargetNode, NewTargetId, Tag, SourcePid});
         {jump, continue, _NewTargetId} ->
             % TODO
