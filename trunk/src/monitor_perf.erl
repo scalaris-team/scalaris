@@ -30,15 +30,17 @@
 -export([start_link/1, init/1, on/2, check_config/0]).
 
 -record(state,
-        {id      = ?required(state, id)      :: uid:global_uid(),
-         perf_rr = ?required(state, perf_rr) :: rrd:rrd(),
-         perf_lh = ?required(state, perf_lh) :: rrd:rrd(),
-         perf_tx = ?required(state, perf_tx) :: rrd:rrd()
+        {id        = ?required(state, id)        :: uid:global_uid(),
+         perf_rr   = ?required(state, perf_rr)   :: rrd:rrd(),
+         perf_lh   = ?required(state, perf_lh)   :: rrd:rrd(),
+         perf_tx   = ?required(state, perf_tx)   :: rrd:rrd()
         }).
 
--type state() :: {AllNodes::#state{}, CollectingAtLeader::#state{}}.
+-type state() :: {AllNodes::#state{}, CollectingAtLeader::#state{}, BenchPid::pid(), IgnoreBenchTimeout::boolean()}.
 -type message() ::
     {bench} |
+    {bench_result, Time::erlang_timestamp(), TimeInMs::non_neg_integer()} |
+    {bench_timeout, Time::erlang_timestamp(), BenchPid::pid()} |
     {collect_system_stats} |
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
@@ -62,14 +64,20 @@ init_bench() ->
     monitor:proc_set_value(
       ?MODULE, 'read_read', rrd:create(60 * 1000000, 1, {timing_with_hist, ms})).
 
--spec run_bench() -> ok.
-run_bench() ->
-    Key1 = randoms:getRandomString(),
-    Key2 = randoms:getRandomString(),
-    ReqList = [{read, Key1}, {read, Key2}, {commit}],
-    {TimeInUs, _Result} = util:tc(fun api_tx:req_list/1, [ReqList]),
-    monitor:proc_set_value(?MODULE, 'read_read',
-                           fun(Old) -> rrd:add_now(TimeInUs / 1000, Old) end).
+-spec bench_service(Owner::comm:erl_local_pid()) -> ok.
+bench_service(Owner) ->
+    receive
+        ?SCALARIS_RECV({bench}, %% ->
+            begin
+                Key1 = randoms:getRandomString(),
+                Key2 = randoms:getRandomString(),
+                ReqList = [{read, Key1}, {read, Key2}, {commit}],
+                Time = os:timestamp(),
+                {TimeInUs, _Result} = util:tc(fun api_tx:req_list/1, [ReqList]),
+                comm:send_local(Owner, {bench_result, Time, TimeInUs / 1000})
+            end)
+    end,
+    bench_service(Owner).
 
 -spec init_system_stats() -> ok.
 init_system_stats() ->
@@ -127,13 +135,42 @@ collect_system_stats() ->
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
-on({bench} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
+on({bench} = Msg, {AllNodes, Leader, BenchPid, _IgnBenchT} = _State) ->
+    ?TRACE1(Msg, _State),
     case get_bench_interval() of
         0 -> ok;
         I -> msg_delay:send_local(I, self(), {bench})
     end,
-    run_bench(),
+    comm:send_local(BenchPid, Msg),
+    % send a timeout so that a haning bench service gets re-started
+    msg_delay:send_local(get_bench_timeout_interval(), self(),
+                         {bench_timeout, os:timestamp(), BenchPid}),
+    {AllNodes, Leader, BenchPid, false};
+
+on({bench_result, Time, TimeInMs} = _Msg,
+   {AllNodes, Leader, BenchPid, _IgnBenchT} = _State) ->
+    ?TRACE1(_Msg, _State),
+    monitor:proc_set_value(?MODULE, 'read_read',
+                           fun(Old) -> rrd:add(Time, TimeInMs, Old) end),
+    % ignore the bench_timeout message that will follow
+    {AllNodes, Leader, BenchPid, true};
+
+on({bench_timeout, Time, BenchPid} = _Msg,
+   {AllNodes, Leader, BenchPid, false} = _State) ->
+    ?TRACE1(_Msg, _State),
+    % the bench service could not reply within get_bench_timeout_interval() seconds
+    % -> re-start service (it may hang) and assume this interval as the reported time
+    erlang:exit(BenchPid, kill),
+    monitor:proc_set_value(
+      ?MODULE, 'read_read',
+      fun(Old) -> rrd:add(Time, get_bench_timeout_interval() * 1000, Old) end),
+    Self = self(),
+    NewBenchPid = erlang:spawn(fun() -> bench_service(Self) end),
+    {AllNodes, Leader, NewBenchPid, false};
+
+on({bench_timeout, _Time, _BenchPid} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
+    % old or ignored timeout message
     State;
 
 on({collect_system_stats} = _Msg, State) ->
@@ -153,7 +190,8 @@ on({propagate} = _Msg, State) ->
     comm:send_local(DHT_Node, {get_node_details, comm:this(), [my_range]}),
     State;
 
-on({get_node_details_response, NodeDetails} = _Msg, {AllNodes, Leader} = State) ->
+on({get_node_details_response, NodeDetails} = _Msg,
+   {AllNodes, Leader, BenchPid, IgnBenchT} = State) ->
     ?TRACE1(_Msg, State),
     case is_leader(node_details:get(NodeDetails, my_range)) of
         false -> State;
@@ -164,7 +202,7 @@ on({get_node_details_response, NodeDetails} = _Msg, {AllNodes, Leader} = State) 
             bulkowner:issue_bulk_owner(NewId, intervals:all(), Msg),
             Leader1 = check_timeslots(Leader),
             broadcast_values(Leader, Leader1),
-            {AllNodes, Leader1#state{id = NewId}}
+            {AllNodes, Leader1#state{id = NewId}, BenchPid, IgnBenchT}
     end;
 
 on({bulkowner, deliver, Id, Range, {gather_stats, SourcePid}, Parents} = _Msg, State) ->
@@ -219,7 +257,8 @@ on({bulkowner, gather, Id, Target, Msgs, Parents}, State) ->
     bulkowner:send_reply(Id, Target, Msg, Parents, pid_groups:get_my(dht_node)),
     State;
 
-on({bulkowner, reply, Id, {gather_stats_response, DataL}} = _Msg, {AllNodes, Leader} = _State)
+on({bulkowner, reply, Id, {gather_stats_response, DataL}} = _Msg,
+   {AllNodes, Leader, BenchPid, IgnBenchT} = _State)
   when Id =:= Leader#state.id ->
     ?TRACE1(_Msg, _State),
     Leader1 =
@@ -240,17 +279,19 @@ on({bulkowner, reply, Id, {gather_stats_response, DataL}} = _Msg, {AllNodes, Lea
                           A#state{perf_tx = rrd:add_with(T, PerfTX, DB, fun rrd:timing_with_hist_merge_fun/3)}
                   end
           end, Leader, DataL),
-    {AllNodes, Leader1};
+    {AllNodes, Leader1, BenchPid, IgnBenchT};
 on({bulkowner, reply, _Id, {gather_stats_response, _Data}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     State;
 
-on({bulkowner, deliver, _Id, _Range, {report_value, OtherState}, _Parents} = _Msg, {AllNodes, Leader} = _State) ->
+on({bulkowner, deliver, _Id, _Range, {report_value, OtherState}, _Parents} = _Msg,
+   {AllNodes, Leader, BenchPid, IgnBenchT} = _State) ->
     ?TRACE1(_Msg, _State),
     AllNodes1 = integrate_values(AllNodes, OtherState),
-    {AllNodes1, Leader};
+    {AllNodes1, Leader, BenchPid, IgnBenchT};
 
-on({get_rrds, KeyList, SourcePid}, {AllNodes, _Leader} = State) ->
+on({get_rrds, KeyList, SourcePid},
+   {AllNodes, _Leader, _BenchPid, _IgnBenchT} = State) ->
     MyData = [begin
                   Value = case FullKey of
                               {?MODULE, 'read_read'} ->
@@ -288,21 +329,23 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(null) -> state().
 init(null) ->
+    Self = self(),
     case get_bench_interval() of
         0 -> ok;
         I -> FirstDelay = randoms:rand_uniform(1, I + 1),
-             msg_delay:send_local(FirstDelay, self(), {bench}),
-             msg_delay:send_local(get_gather_interval(), self(), {propagate})
+             msg_delay:send_local(FirstDelay, Self, {bench}),
+             msg_delay:send_local(get_gather_interval(), Self, {propagate})
     end,
     init_bench(),
     init_system_stats(),
-    msg_delay:send_local(10, self(), {collect_system_stats}),
+    msg_delay:send_local(10, Self, {collect_system_stats}),
     Now = os:timestamp(),
+    BenchPid = erlang:spawn(fun() -> bench_service(Self) end),
     State = #state{id = uid:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
                    perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now),
                    perf_tx = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now)},
-    {State, State}.
+    {State, State, BenchPid, false}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous
@@ -377,6 +420,12 @@ check_config() ->
 -spec get_bench_interval() -> non_neg_integer().
 get_bench_interval() ->
     config:read(monitor_perf_interval).
+
+%% @doc Timeout interval (in seconds) for a bench request.
+%%      NOTE: this must be smaller than get_bench_interval()!
+-spec get_bench_timeout_interval() -> non_neg_integer().
+get_bench_timeout_interval() ->
+    get_bench_interval() div 2.
 
 %% @doc Gets the interval of executing a broadcast gathering all nodes' stats
 %%      (in seconds).
