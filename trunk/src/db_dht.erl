@@ -425,17 +425,29 @@ calc_remaining_interval(_StartId, _Remaining, [], _Interval) ->
 calc_remaining_interval(StartId, _Remaining, Chunk, Interval) ->
     %% the interval covered by chunk is either the biggest key left of startid
     %% or if there are no keys left of startid simply the biggest key in chunk
-    {Left, Right} = lists:splitwith(fun({Key, _, _, _, _}) -> Key < StartId end,
-                                    Chunk),
-    Last = case Left of
-        [] ->
-            element(1, lists:max(Right));
-        [_|_] ->
-            element(1, lists:max(Left))
-    end,
+    Last = calc_last_key_rem_int(Chunk, StartId),
     ?TRACE_CHUNK("left: ~p~nright: ~p~ncalc_remaining:~n~p~nNext is ~p minus ~p",
                  [Left, Right, Chunk, Interval, intervals:new('[', StartId, Last, ']')]),
     intervals:minus(Interval, intervals:new('[', StartId, Last, ']')).
+
+%% @doc Gets the largest key in Chunk left of StartId if there is one,
+%%      otherwise gets the largest key of all items.
+-spec calc_last_key_rem_int(Chunk::[db_entry:entry(),...], StartId::?RT:key()) -> ?RT:key().
+calc_last_key_rem_int([{Key, _, _, _, _} | Rest], StartId) ->
+    calc_last_key_rem_int(Rest, StartId, Key, Key < StartId).
+
+%% @doc Helper for calc_last_key_rem_int/2.
+-spec calc_last_key_rem_int(db_as_list(), StartId::?RT:key(), Max::?RT:key(),
+                            OnlySmallerThanStart::boolean()) -> ?RT:key().
+calc_last_key_rem_int([], _StartId, Max, _OnlySmallerThanStart) -> Max;
+calc_last_key_rem_int([{Key, _, _, _, _} | Rest], StartId, Max, true) when Key < StartId ->
+    calc_last_key_rem_int(Rest, StartId, ?IIF(Key > Max, Key, Max), true);
+calc_last_key_rem_int([_ | Rest], StartId, Max, true) ->
+    calc_last_key_rem_int(Rest, StartId, Max, true);
+calc_last_key_rem_int([{Key, _, _, _, _} | Rest], StartId, _Max, false) when Key < StartId ->
+    calc_last_key_rem_int(Rest, StartId, Key, true);
+calc_last_key_rem_int([{Key, _, _, _, _} | Rest], StartId, Max, false) ->
+    calc_last_key_rem_int(Rest, StartId, ?IIF(Key > Max, Key, Max), false).
 
 %% @doc Updates all (existing or non-existing) non-locked entries from
 %%      NewEntries for which Pred(OldEntry, NewEntry) returns true with
