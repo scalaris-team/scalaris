@@ -460,11 +460,11 @@ process_tree_cmp_result(CmpResult, Tree, BranchSize, Stats) ->
     NStats = rr_recon_stats:inc([{tree_compareLeft, -Compared},
                                  {tree_nodesCompared, Compared}], Stats),
     case merkle_tree:is_merkle_tree(Tree) of
-        false -> p_process_tree_cmp_result(CmpResult, Tree, BranchSize, NStats, {[], [], []});
-        true -> p_process_tree_cmp_result(CmpResult, [merkle_tree:get_root(Tree)], BranchSize, NStats, {[], [], []})
+        false -> p_process_tree_cmp_result(CmpResult, Tree, BranchSize, NStats, [], [], []);
+        true -> p_process_tree_cmp_result(CmpResult, [merkle_tree:get_root(Tree)], BranchSize, NStats, [], [], [])
     end.
 
--spec p_process_tree_cmp_result([merkle_cmp_result()], RestTree, BranchSize, Stats, {Acc::Req, Acc::Res, AccRTree::Res}) 
+-spec p_process_tree_cmp_result([merkle_cmp_result()], RestTree, BranchSize, Stats, Acc::Req, Acc::Res, AccRTree::Res) 
         -> {Req, Res, Stats, RestTree::Res}           
     when
       is_subtype(BranchSize,pos_integer()),
@@ -472,30 +472,30 @@ process_tree_cmp_result(CmpResult, Tree, BranchSize, Stats) ->
       is_subtype(Req,       [merkle_tree:mt_node_key()]),
       is_subtype(Res,       [merkle_tree:mt_node()]),
       is_subtype(RestTree,  [merkle_tree:mt_node()]).
-p_process_tree_cmp_result([], [], _, Stats, {Req, Res, RTree}) ->
+p_process_tree_cmp_result([], [], _, Stats, Req, Res, RTree) ->
     {lists:reverse(Req), Res, Stats, lists:reverse(RTree)};
-p_process_tree_cmp_result([?ok_inner | TR], [Node | TN], BS, Stats, Acc) ->
+p_process_tree_cmp_result([?ok_inner | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     NStats = rr_recon_stats:inc([{tree_compareSkipped, merkle_tree:size(Node)}], Stats),
-    p_process_tree_cmp_result(TR, TN, BS, NStats, Acc);
-p_process_tree_cmp_result([?ok_leaf | TR], [_Node | TN], BS, Stats, Acc) ->
+    p_process_tree_cmp_result(TR, TN, BS, NStats, Req, Res, RTree);
+p_process_tree_cmp_result([?ok_leaf | TR], [_Node | TN], BS, Stats, Req, Res, RTree) ->
     NStats = rr_recon_stats:inc([{tree_compareSkipped, 1}], Stats),
-    p_process_tree_cmp_result(TR, TN, BS, NStats, Acc);
-p_process_tree_cmp_result([?fail_leaf | TR], [Node | TN], BS, Stats, {Req, Res, RTree}) ->
-    p_process_tree_cmp_result(TR, TN, BS, Stats, {Req, [Node | Res], RTree});
-p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, {Req, Res, RTree}) ->
+    p_process_tree_cmp_result(TR, TN, BS, NStats, Req, Res, RTree);
+p_process_tree_cmp_result([?fail_leaf | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
+    p_process_tree_cmp_result(TR, TN, BS, Stats, Req, [Node | Res], RTree);
+p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     case merkle_tree:is_leaf(Node) of
         false -> 
             Childs = merkle_tree:get_childs(Node),
             NewReq = [merkle_tree:get_hash(X) || X <- Childs],
             NStats = rr_recon_stats:inc([{tree_compareLeft, length(Childs)}], Stats),
             p_process_tree_cmp_result(TR, TN, BS, NStats,
-                                      {lists:append(lists:reverse(NewReq), Req),
-                                       Res,
-                                       lists:append(lists:reverse(Childs), RTree)});
+                                      lists:append(lists:reverse(NewReq), Req),
+                                      Res,
+                                      lists:append(lists:reverse(Childs), RTree));
         true -> 
-            NewReq = [?omit || _ <- lists:seq(1, BS)],
+            NewReq = lists:duplicate(BS, ?omit),
             p_process_tree_cmp_result(TR, TN, BS, Stats,
-                                      {lists:append(NewReq, Req), [Node | Res], RTree})
+                                      lists:append(NewReq, Req), [Node | Res], RTree)
     end.
 
 % @doc Starts one resolve process per leaf node in a given node
