@@ -126,17 +126,24 @@ lookup_cf([{Node, CF} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
     ?TRACE("NodeHash=~p~nIsLeaf=~p", [NodeHash, IsLeaf]),
     case ?REP_BLOOM:is_element(BF, NodeHash) of
         false -> false;
-        true -> case IsLeaf of
-                    true -> lookup_cf(L, Art);
-                    false ->
-                        NL = lists:append(
-                               [{X, CF - 1} || X <- merkle_tree:get_childs(Node)],
-                               L),
-                        lookup_cf(NL, Art)
-                end                        
+        true  -> if IsLeaf -> lookup_cf(L, Art);
+                    true   -> Childs = merkle_tree:get_childs(Node),
+                              NL = prepend_merkle_childs(L, Childs, CF - 1),
+                              lookup_cf(NL, Art)
+                 end
     end;
 lookup_cf([], _Art) ->
     true.
+
+%% @doc Prepends the given merkle_tree Childs to the LookupList with the given
+%%      correction factor.
+-spec prepend_merkle_childs(LookupList::[{Node, CF}], Childs::[Node],
+                            ChildCF::non_neg_integer()) -> [{Node, CF}] when
+    is_subtype(Node,   merkle_tree:mt_node()),
+    is_subtype(CF,     non_neg_integer()).        %correction factor
+prepend_merkle_childs(L, [], _ChildCF) -> L;
+prepend_merkle_childs(L, [Child | Rest], ChildCF) ->
+    [{Child, ChildCF} | prepend_merkle_childs(L, Rest, ChildCF)].
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper
