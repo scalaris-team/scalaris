@@ -21,7 +21,8 @@
 -vsn('$Id$').
 
 -export([new_slide/8, new_slide_i/8,
-         new_receiving_slide_join/4, new_sending_slide_join/4,
+         new_receiving_slide_join/4,
+         new_sending_slide_join/4, new_sending_slide_join_i/5,
          new_sending_slide_leave/4, new_sending_slide_leave/5,
          new_sending_slide_jump/4, new_sending_slide_jump/5,
          update_target_id/4,
@@ -181,9 +182,28 @@ new_receiving_slide_join(MoveId, TargetId, Tag, Neighbors) ->
         Tag::any(), Neighbors::nodelist:neighborhood()) -> slide_op().
 new_sending_slide_join(MoveId, JoiningNode, Tag, Neighbors) ->
     JoiningNodeId = node:id(JoiningNode),
-    Pred = nodelist:pred(Neighbors),
-    case (JoiningNodeId =:= node:id(Pred) andalso node:same_process(JoiningNode, Pred)) orelse
-             intervals:in(JoiningNodeId, nodelist:node_range(Neighbors)) of
+    new_sending_slide_join(MoveId, JoiningNode, JoiningNodeId, Tag, Neighbors).
+
+%% @doc Sets up an incremental slide operation of the given type. One of the
+%%      nodes will change its ID to CurTargetId and finally FinalTargetId.
+-spec new_sending_slide_join_i(
+        MoveId::uid:global_uid(), JoiningNode::node:node_type(),
+        CurTargetId::?RT:key(), Tag::any(), Neighbors::nodelist:neighborhood())
+        -> slide_op().
+new_sending_slide_join_i(MoveId, JoiningNode, CurTargetId, Tag, Neighbors) ->
+    FinalTargetId = node:id(JoiningNode),
+    NextOp = case FinalTargetId of
+                 CurTargetId -> {none};
+                 _           -> {slide, continue, FinalTargetId}
+             end,
+    Slide = new_sending_slide_join(MoveId, JoiningNode, CurTargetId, Tag, Neighbors),
+    Slide#slide_op{next_op = NextOp}.
+
+-spec new_sending_slide_join(
+        MoveId::uid:global_uid(), JoiningNode::node:node_type(),
+        TargetId::?RT:key(), Tag::any(), Neighbors::nodelist:neighborhood()) -> slide_op().
+new_sending_slide_join(MoveId, JoiningNode, JoiningNodeId, Tag, Neighbors) ->
+    case intervals:in(JoiningNodeId, nodelist:node_range(Neighbors)) of
         false -> erlang:throw(not_responsible);
         _ ->
             IntervalToSend = node:mk_interval_between_ids(
