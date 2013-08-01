@@ -96,7 +96,9 @@ test: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
 	grep " 0 failed" ct.log
 
-test-skipped: performance_SUITE benchmark_SUITE rr_recon_performance_SUITE proto_sched_SUITE dht_node_move_proto_sched_SUITE memtest_SUITE type_check_SUITE
+test-skipped: compile
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite performance_SUITE benchmark_SUITE rr_recon_performance_SUITE proto_sched_SUITE dht_node_move_proto_sched_SUITE memtest_SUITE type_check_SUITE @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
+	grep " 0 failed" ct.log
 
 test-with-cover: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -cover test/scalaris.coverspec @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
