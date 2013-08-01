@@ -700,10 +700,13 @@ on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
 
 on_init({new_node_id, Id}, State) ->
     tx_tm = state_get_role(State),
-    RTMs = state_get_RTMs(State),
-    IDs = ?RT:get_replica_keys(Id),
-    NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
-    state_set_RTMs(State, NewRTMs);
+    case state_get_RTMs(State) of
+        [] -> State;
+        [_|_] = RTMs ->
+            IDs = ?RT:get_replica_keys(Id),
+            NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
+            state_set_RTMs(State, NewRTMs)
+    end;
 
 %% do not accept new commit requests when not enough rtms are valid
 on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
