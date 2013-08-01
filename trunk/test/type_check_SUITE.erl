@@ -349,7 +349,7 @@ tester_type_check_rrepair(_Config) ->
              {check_node, 2},
              {p_check_node, 3},
              {process_tree_cmp_result, 4},
-             {p_process_tree_cmp_result, 5},
+             {p_process_tree_cmp_result, 7},
              {process_tree_cmp_result, 4},
              {process_tree_cmp_result, 4},
              {art_get_sync_leafs, 4},
