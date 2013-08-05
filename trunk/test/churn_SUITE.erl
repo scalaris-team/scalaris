@@ -188,8 +188,8 @@ pause_node(DhtNodeSupPid) ->
              false -> ok
          end || Pid <- DhtNodeSupChilds],
 
-    _ = [ comm:send_local(fd, {unittest_report_down, comm:make_global(X)})
-          || X <- sup:sup_get_all_children(DhtNodeSupPid)],
+    _ = [ comm:send_local(fd, {unittest_report_down, comm:make_global(Pid)})
+          || Pid <- DhtNodeSupChilds],
 
     pid_groups:hide(GroupName),
     {GroupName, DhtNodeSupChilds}.
