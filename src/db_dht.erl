@@ -132,8 +132,12 @@ delete_entry_at_key(State, Key) ->
 delete_entry_at_key({DB, Subscr, {Snap, LiveLC, SnapLC}} = State,  Key, Reason) ->
     %% TODO count locks
     OldEntry = get_entry(State, Key),
-    NewLiveLC = LiveLC + db_entry:lockcount_delta(OldEntry,db_entry:new(Key)),
-    NewSnapLC = SnapLC + db_entry:lockcount_delta(OldEntry,db_entry:new(Key)),
+    Delta = db_entry:lockcount_delta(OldEntry,db_entry:new(Key)),
+    NewLiveLC = LiveLC + Delta,
+    NewSnapLC = case Snap of
+        false -> SnapLC;
+        _ -> SnapLC + Delta
+    end,
     %% @doc removes all entries from the DB that correspond to Key
     call_subscribers({?DB:delete(DB, Key), Subscr, {Snap, NewLiveLC, NewSnapLC}}, {Reason, Key}).
 
