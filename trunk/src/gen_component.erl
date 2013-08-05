@@ -301,13 +301,13 @@ bp_barrier(Pid) ->
 %%      preparation of a graceful shutdown of all children of a supervisor.
 %%      Note: A monitor is used to safe-guard the (synchronous) creation of the
 %%      breakpoint in cases of another interfering shutdown process.
-%% @see sup:supervisor_terminate_childs/1
+%% @see sup:sup_terminate_childs/1
 -spec bp_about_to_kill(pid()) -> ok.
 bp_about_to_kill(Pid) ->
     MonitorRef = erlang:monitor(process, Pid),
     % suspend gen_component independently from break points being set/active
     % (60s should be enough for the sub-sequent kill)
-    % see sup:supervisor_terminate_childs/1
+    % see sup:sup_terminate_childs/1
     Pid ! Msg = {'$gen_component', sleep, 60000, self()},
     receive
         Msg -> erlang:demonitor(MonitorRef, [flush]), ok;
