@@ -941,8 +941,7 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
                     %       messages so new op suggestions also have a chance to be
                     %       setup instead
                     send_delta_ack(SlideOp1, {none}),
-                    State2 = finish_slide(State1, SlideOp1),
-                    continue_with_next_op(State2, SlideOp1)
+                    finish_slide_and_continue_with_next_op(State1, SlideOp1)
             end;
         {abort, Reason, State1, SlideOp1} ->
             % an abort at this stage is really useless (data has been fully integrated!)
@@ -951,11 +950,18 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
     end.
 
 %% @doc Extracts the next planned operation from OldSlideOp and sets it up.
--spec continue_with_next_op(State::dht_node_state:state(), OldSlideOp::slide_op:slide_op())
+%%      Note: Next ops from incremental slides will be silently ignored here
+%%            and must be handled elsewhere!
+-spec finish_slide_and_continue_with_next_op(State::dht_node_state:state(), OldSlideOp::slide_op:slide_op())
         -> dht_node_state:state().
-continue_with_next_op(State, OldSlideOp) ->
+finish_slide_and_continue_with_next_op(State0, OldSlideOp) ->
+    State = finish_slide(State0, OldSlideOp),
     case slide_op:get_next_op(OldSlideOp) of
         {none} -> State;
+        % ignore incremental slide ops
+        {slide, continue, _Id} -> State;
+        {jump, continue, _Id} -> State;
+        {leave, continue} -> State;
         {slide, PredOrSucc, NewTargetId, NewTag, NewSourcePid} ->
             % continue operation with the same node previously sliding with or
             % try setting up a slide with the other node
@@ -1022,15 +1028,14 @@ finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     % -> do not kill this process
     State1;
 finish_delta_ack2B(State, SlideOp, {none}) ->
-    State1 = finish_slide(State, SlideOp),
-    continue_with_next_op(State1, SlideOp);
+    finish_slide_and_continue_with_next_op(State, SlideOp);
 finish_delta_ack2B(State, SlideOp, {abort, NewSlideId, Reason}) ->
     Type = slide_op:get_type(SlideOp),
     PredOrSucc = slide_op:get_predORsucc(Type),
     TargetNode = dht_node_state:get(State, PredOrSucc),
     Tag = slide_op:get_tag(SlideOp),
     SourcePid = slide_op:get_source_pid(SlideOp),
-    State2 = finish_delta_ack2B(State, SlideOp, {none}),
+    State2 = finish_slide_and_continue_with_next_op(State, SlideOp),
     abort_slide(State2, TargetNode, NewSlideId, null, SourcePid, Tag,
                 Type, Reason, false);
 finish_delta_ack2B(State, SlideOp, {continue, NewSlideId}) ->
