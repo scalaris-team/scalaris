@@ -53,7 +53,7 @@ kill_nodes(No) ->
     _ = [begin
              SupDhtNode = element(2, Child),
              Id = element(1, Child),
-             sup:supervisor_terminate_childs(SupDhtNode),
+             sup:sup_terminate_childs(SupDhtNode),
              _ = supervisor:terminate_child(main_sup, Id),
              supervisor:delete_child(main_sup, Id)
          end || Child <- Childs],
@@ -127,7 +127,7 @@ on({get_dht_nodes, Pid}, State) ->
     State;
 
 on({delete_node, SupPid, SupId}, State) ->
-    sup:supervisor_terminate_childs(SupPid),
+    sup:sup_terminate_childs(SupPid),
     _ = supervisor:terminate_child(main_sup, SupId),
     _ = supervisor:delete_child(main_sup, SupId),
     State;

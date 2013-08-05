@@ -155,7 +155,7 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
                     end
             end;
         false ->
-            sup:supervisor_terminate_childs(Pid),
+            sup:sup_terminate_childs(Pid),
             _ = supervisor:terminate_child(main_sup, Id),
             supervisor:delete_child(main_sup, Id)
     end.

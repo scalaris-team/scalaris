@@ -24,8 +24,8 @@
 -vsn('$Id$').
 
 -export([sup_start/3,
-         supervisor_terminate/1,
-         supervisor_terminate_childs/1]).
+         sup_terminate/1,
+         sup_terminate_childs/1]).
 -export([worker_desc/3,
          worker_desc/4,
          supervisor_desc/3,
@@ -86,7 +86,7 @@ sup_start(Prefix, Supervisor, Module, Options) ->
                    Res; %% return pid of supervisor as it may be linked to externally;
                true ->
                    io:format("Startup raised ~p.~n", [ChildsRes]),
-                   sup:supervisor_terminate(SupRef),
+                   sup_terminate(SupRef),
                    ChildsRes
             end;
         Error ->
@@ -133,7 +133,7 @@ start_sup_as_child(Prefix, AtSup, SupAsChild) ->
                        true ->
                            io:format("Startup raised ~p.~n", [ChildsRes]),
                            SupName = element(1, SupAsChild),
-                           sup:supervisor_terminate_childs(SupRef),
+                           sup_terminate_childs(SupRef),
                            _ = supervisor:terminate_child(AtSup, SupName),
                            _ = supervisor:delete_child(AtSup, SupName),
                            ChildsRes
@@ -278,9 +278,9 @@ supervisor_desc(Name, Module, Function) ->
 supervisor_desc(Name, Module, Function, Args) ->
     {Name, {Module, Function, Args}, permanent, brutal_kill, supervisor, []}.
 
--spec supervisor_terminate(Supervisor::pid() | atom()) -> ok.
-supervisor_terminate(SupPid) ->
-    supervisor_terminate_childs(SupPid),
+-spec sup_terminate(Supervisor::pid() | atom()) -> ok.
+sup_terminate(SupPid) ->
+    sup_terminate_childs(SupPid),
     case is_pid(SupPid) of
         true -> exit(SupPid, kill);
         false -> exit(whereis(SupPid), kill)
@@ -291,22 +291,22 @@ supervisor_terminate(SupPid) ->
 %% @doc Terminates all children of the given supervisor gracefully, i.e. first
 %%      stops all gen_component processes and then terminates all children
 %%      recursively.
--spec supervisor_terminate_childs(Supervisor::pid() | atom()) -> ok.
-supervisor_terminate_childs(SupPid) ->
-    supervisor_pause_childs(SupPid),
-    supervisor_kill_childs(SupPid),
+-spec sup_terminate_childs(Supervisor::pid() | atom()) -> ok.
+sup_terminate_childs(SupPid) ->
+    sup_pause_childs(SupPid),
+    sup_kill_childs(SupPid),
     ok.
 
 %% @doc Pauses all children of the given supervisor (recursively) by setting
 %%      an appropriate breakpoint.
--spec supervisor_pause_childs(Supervisor::pid() | atom()) -> ok.
-supervisor_pause_childs(SupPid) ->
+-spec sup_pause_childs(Supervisor::pid() | atom()) -> ok.
+sup_pause_childs(SupPid) ->
     ChildSpecs = supervisor:which_children(SupPid),
     Self = self(),
     _ = [ begin
               case Type of
                   supervisor ->
-                      supervisor_pause_childs(Pid);
+                      sup_pause_childs(Pid);
                   worker ->
                       case gen_component:is_gen_component(Pid) of
                           true -> gen_component:bp_about_to_kill(Pid);
@@ -318,13 +318,13 @@ supervisor_pause_childs(SupPid) ->
     ok.
 
 %% @doc Kills all children of the given supervisor (recursively) after they
-%%      have been paused by supervisor_pause_childs/1.
--spec supervisor_kill_childs(Supervisor::pid() | atom()) -> ok.
-supervisor_kill_childs(SupPid) ->
+%%      have been paused by sup_pause_childs/1.
+-spec sup_kill_childs(Supervisor::pid() | atom()) -> ok.
+sup_kill_childs(SupPid) ->
     ChildSpecs = supervisor:which_children(SupPid),
     _ = [ try
               case Type of
-                  supervisor -> supervisor_kill_childs(Pid);
+                  supervisor -> sup_kill_childs(Pid);
                   worker     -> ok
               end,
               Tables = util:ets_tables_of(Pid),
