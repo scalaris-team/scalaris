@@ -24,6 +24,7 @@
 -vsn('$Id$').
 
 -export([sup_start/3,
+         sup_get_all_children/1,
          sup_terminate/1,
          sup_terminate_childs/1]).
 -export([worker_desc/3,
@@ -343,3 +344,11 @@ sup_kill_childs(SupPid) ->
           end ||  {Id, Pid, Type, _Module} <- ChildSpecs,
                   Pid =/= undefined, is_process_alive(Pid) ],
     ok.
+
+-spec sup_get_all_children(Supervisor::pid()) -> [pid()].
+sup_get_all_children(Supervisor) ->
+    AllChilds = [X || X = {_, Pid, _, _} <- supervisor:which_children(Supervisor),
+                      Pid =/= undefined],
+    WorkerChilds = [Pid ||  {_Id, Pid, worker, _Modules} <- AllChilds],
+    SupChilds = [Pid || {_Id, Pid, supervisor, _Modules} <- AllChilds],
+    lists:flatten([WorkerChilds | [sup_get_all_children(S) || S <- SupChilds]]).
