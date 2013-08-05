@@ -514,7 +514,9 @@ lmerge_helper(Node1View, Node2View, BaseNode, PredsLength, SuccsLength) ->
     Node1ViewUpdSorted = lists:usort(Ord, Node1ViewUpd),
     Node2ViewUpdSorted = lists:usort(Ord, Node2ViewUpd),
 
-    MergedView = util:smerge2(Node1ViewUpdSorted, Node2ViewUpdSorted, Ord),
+    % favour the newly provided nodes over the present ones (they are probably newer)
+    MergedView = util:smerge2(Node1ViewUpdSorted, Node2ViewUpdSorted, Ord,
+                              fun(_E1, E2) -> [E2] end),
     Preds = lists:sublist(lists:reverse(MergedView), PredsLength),
     Succs = lists:sublist(MergedView, SuccsLength),
     ensure_lists_not_empty(Preds, BaseNode, Succs).
