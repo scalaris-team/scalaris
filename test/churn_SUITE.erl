@@ -180,7 +180,7 @@ pause_node(DhtNodeSupPid) ->
     GroupName = pid_groups:group_of(DhtNodeSupPid),
     DhtNodePid = pid_groups:pid_of(GroupName, dht_node),
     ct:log("Pausing pid ~p~n", [DhtNodePid]),
-    DhtNodeSupChilds = unittest_helper:get_all_children(DhtNodeSupPid),
+    DhtNodeSupChilds = sup:sup_get_all_children(DhtNodeSupPid),
     _ = [case gen_component:is_gen_component(Pid) of
              true ->
                  gen_component:bp_set_cond(Pid, fun(_Msg, _State) -> true end, sleep),
@@ -189,7 +189,7 @@ pause_node(DhtNodeSupPid) ->
          end || Pid <- DhtNodeSupChilds],
 
     _ = [ comm:send_local(fd, {unittest_report_down, comm:make_global(X)})
-          || X <- unittest_helper:get_all_children(DhtNodeSupPid)],
+          || X <- sup:sup_get_all_children(DhtNodeSupPid)],
 
     pid_groups:hide(GroupName),
     {GroupName, DhtNodeSupChilds}.

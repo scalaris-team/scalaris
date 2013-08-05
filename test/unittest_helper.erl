@@ -32,7 +32,6 @@
          wait_for_stable_ring/0, wait_for_stable_ring_deep/0,
          start_process/1, start_process/2,
          start_subprocess/1, start_subprocess/2,
-         get_all_children/1,
          get_processes/0, kill_new_processes/1, kill_new_processes/2,
          init_per_suite/1, end_per_suite/1,
          create_ct_all/1, create_ct_groups/2,
@@ -408,14 +407,6 @@ stop_minimal_procs(CTConfig)  ->
             error_logger:tty(true);
         false -> ok
     end.
-
--spec get_all_children(Supervisor::pid()) -> [pid()].
-get_all_children(Supervisor) ->
-    AllChilds = [X || X = {_, Pid, _, _} <- supervisor:which_children(Supervisor),
-                      Pid =/= undefined],
-    WorkerChilds = [Pid ||  {_Id, Pid, worker, _Modules} <- AllChilds],
-    SupChilds = [Pid || {_Id, Pid, supervisor, _Modules} <- AllChilds],
-    lists:flatten([WorkerChilds | [get_all_children(S) || S <- SupChilds]]).
 
 -type process_info() ::
     {pid(), InitCall::mfa(), CurFun::mfa(), Info::term() | failed | no_further_infos}.
