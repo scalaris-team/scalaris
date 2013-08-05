@@ -33,6 +33,7 @@
 -export([subscribe/1, subscribe/2, subscribe_refcount/2]).
 -export([unsubscribe/1, unsubscribe/2, unsubscribe_refcount/2]).
 -export([update_subscriptions/2]).
+-export([report_graceful_leave/0]).
 %% gen_server & gen_component callbacks
 -export([start_link/1, init/1, on/2]).
 
@@ -144,6 +145,21 @@ update_subscriptions(OldPids, NewPids) ->
     unsubscribe(OnlyOldPids),
     subscribe(OnlyNewPids).
 
+%% @doc Reports the calling process' group as being shut down due to a graceful
+%%      leave operation.
+-spec report_graceful_leave() -> ok.
+report_graceful_leave() ->
+    case pid_groups:get_my(sup_dht_node) of
+        failed ->
+            log:log(error, "[ FD ] call to report_graceful_leave() from ~p "
+                           "outside a valid dht_node group!", [self()]);
+        DhtNodeSupPid ->
+            FD = my_fd_pid(),
+            _ = [ comm:send_local(FD, {report_graceful_leave, comm:make_global(X)})
+                    || X <- sup:sup_get_all_children(DhtNodeSupPid)],
+            ok
+    end.
+
 %% gen_component functions
 %% @doc Starts the failure detector server
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
@@ -235,10 +251,18 @@ on({crashed, WatchedPid} = Msg, State) ->
 %%     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
 %%     State;
 
-on({unittest_report_down, Pid}, State) ->
-    ?TRACE("FD: unittest_report_down ~p~n", [Pid]),
-    forward_to_hbs(
-      Pid, {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down}),
+on({report_graceful_leave, Pid}, State) ->
+    ?TRACE("FD: report_graceful_leave ~p~n", [Pid]),
+    % don't use forward_to_hbs/2 here since we don't want new hbd processes
+    % to be created!
+    FDPid = comm:get(fd, Pid),
+    case pdb:get(FDPid, fd_hbs) of
+        undefined -> ok;
+        Entry ->
+            HBSPid = element(2, Entry),
+            Msg = {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down},
+            comm:send_local(HBSPid, Msg)
+    end,
     State.
 
 %%% Internal functions
