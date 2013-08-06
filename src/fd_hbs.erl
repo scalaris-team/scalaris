@@ -255,11 +255,11 @@ on({crashed, WatchedPid}, State) ->
     Subscriptions = state_get_subscriptions(State, WatchedPid),
     %% only there because of delayed demonitoring?
     RemPids = state_get_rem_pids(State),
-    RemPid = lists:keyfind(WatchedPid, 1, RemPids),
     case Subscriptions of
         [] ->
             %% Report if subcription entry exists not because of a
             %% delayed demonitoring
+            RemPid = lists:keyfind(WatchedPid, 1, RemPids),
             Report = case RemPid of
                          false -> true;
                          RemPid ->
