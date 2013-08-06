@@ -80,7 +80,9 @@ change_my_id(State, SlideOp, ReplyPid) ->
             State1 = State,
             SlideOp2 = slide_op:set_msg_fwd(SlideOp)
     end,
-    case slide_op:is_leave(SlideOp2) of
+    TargetId = slide_op:get_target_id(SlideOp2),
+    case slide_op:is_leave(SlideOp2) andalso
+             slide_op:get_next_op(SlideOp2) =:= {none} of
         true ->
             rm_loop:leave(),
             % de-activate processes not needed anymore:
@@ -97,7 +99,6 @@ change_my_id(State, SlideOp, ReplyPid) ->
         _ ->
             % note: subscribe with fully qualified function names, i.e. module:fun/arity
             % (a so created fun seems to be the same no matter where created)
-            TargetId = slide_op:get_target_id(SlideOp2),
             rm_loop:subscribe(
               ReplyPid, {move, slide_op:get_id(SlideOp2)},
               fun(_OldN, NewN, _IsSlide) ->
