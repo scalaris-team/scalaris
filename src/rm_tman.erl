@@ -212,11 +212,28 @@ new_succ(State, NewSucc) ->
 -spec remove_pred(State::state(), OldPred::node:node_type(),
                   PredsPred::node:node_type()) -> state().
 remove_pred(State, OldPred, PredsPred) ->
-    update_nodes(State, [PredsPred], [OldPred], null).
+    State2 = update_nodes(State, [PredsPred], [OldPred], null),
+    % in order for incremental leaves to finish correctly, we must remove any
+    % out-dated PredsPred in our state here!
+    NewNeighborhood = element(1, State2),
+
+    MyNewPred = nodelist:pred(NewNeighborhood),
+    case node:same_process(MyNewPred, PredsPred) of
+        true -> State2;
+        false ->
+            % assume the pred in my neighborhood is old
+            % (the previous pred must know better about his pred)
+            % -> just in case he was wrong, try to add it:
+            contact_new_nodes([MyNewPred]),
+            % try as long as MyNewPred is the same as PredsPred
+            remove_pred(State2, MyNewPred, PredsPred)
+    end.
 
 -spec remove_succ(State::state(), OldSucc::node:node_type(),
                   SuccsSucc::node:node_type()) -> state().
 remove_succ(State, OldSucc, SuccsSucc) ->
+    % in contrast to remove_pred/3, let rm repair a potentially wrong new succ
+    % on its own
     update_nodes(State, [SuccsSucc], [OldSucc], null).
 
 -spec update_node(State::state(), NewMe::node:node_type()) -> state().
@@ -324,6 +341,11 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
               end,
     {_, _, NewNodes} = util:ssplit_unique(OldView, NewView, ViewOrd),
     
+    contact_new_nodes(NewNodes),
+    OldNeighborhood2.
+
+-spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
+contact_new_nodes(NewNodes) ->
     % TODO: add a local cache of contacted nodes in order not to contact them again
     ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_'}),
     case comm:is_valid(ThisWithCookie) of
@@ -334,8 +356,7 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
                  end || Node <- NewNodes],
             ok;
         false -> ok
-    end,
-    OldNeighborhood2.
+    end.
 
 %% @doc Adds and removes the given nodes from the rm_tman state.
 %%      Note: Sets the new RandViewSize to 0 if NodesToRemove is not empty and
