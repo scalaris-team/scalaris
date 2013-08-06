@@ -97,8 +97,6 @@ change_my_id(State, SlideOp, ReplyPid) ->
             service_per_vm:deregister_dht_node(comm:this()),
             {ok, State1, SlideOp2};
         _ ->
-            % note: subscribe with fully qualified function names, i.e. module:fun/arity
-            % (a so created fun seems to be the same no matter where created)
             rm_loop:subscribe(
               ReplyPid, {move, slide_op:get_id(SlideOp2)},
               fun(_OldN, NewN, _IsSlide) ->
