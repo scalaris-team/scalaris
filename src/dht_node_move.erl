@@ -276,7 +276,6 @@ process_move_msg({move, timeout, MoveFullId} = _Msg, MyState) ->
         end,
     safe_operation(WorkerFun, MyState, MoveFullId, all, timeout);
 
-% no reply from the target node within get_wait_for_reply_timeout() ms
 process_move_msg({move, continue, MoveFullId, Operation, EmbeddedMsg} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
     WorkerFun = fun(SlideOp, State) ->
