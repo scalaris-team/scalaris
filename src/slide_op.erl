@@ -23,7 +23,7 @@
 -export([new_slide/8, new_slide_i/8,
          new_receiving_slide_join/4,
          new_sending_slide_join/4, new_sending_slide_join_i/5,
-         new_sending_slide_leave/4, new_sending_slide_leave/5,
+         new_sending_slide_leave/5,
          new_sending_slide_jump/4, new_sending_slide_jump/5,
          update_target_id/4,
          other_type_to_my_type/1,
@@ -216,15 +216,6 @@ new_sending_slide_join(MoveId, JoiningNode, JoiningNodeId, Tag, Neighbors) ->
                       tag = Tag,
                       source_pid = null}
     end.
-
-%% @doc Sets up a new slide operation for a node which is about to leave its
-%%      position in the ring and transfer its data to its successor.
--spec new_sending_slide_leave(MoveId::id(), Tag::any(),
-        SourcePid::comm:erl_local_pid() | null,
-        Neighbors::nodelist:neighborhood()) -> slide_op().
-new_sending_slide_leave(MoveId, Tag, SourcePid, Neighbors) ->
-    TargetId = node:id(nodelist:pred(Neighbors)),
-    new_sending_slide_leave(MoveId, TargetId, Tag, SourcePid, Neighbors).
 
 %% @doc Sets up a new slide operation for a node which is about to leave its
 %%      position in the ring incrementally (current step is to move to
