@@ -259,8 +259,7 @@ on({crashed, WatchedPid}, State) ->
         [] ->
             %% Report if subcription entry exists not because of a
             %% delayed demonitoring
-            RemPid = lists:keyfind(WatchedPid, 1, RemPids),
-            Report = case RemPid of
+            Report = case lists:keyfind(WatchedPid, 1, RemPids) of
                          false -> true;
                          RemPid ->
                              not rempid_get_pending_demonitor(RemPid)
