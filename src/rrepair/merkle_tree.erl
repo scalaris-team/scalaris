@@ -67,7 +67,7 @@
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
-         signature_size = 2                 :: pos_integer(),   %node signature size in byte
+         signature_size = 4                 :: pos_integer(),   %node signature size in byte
          leaf_hf        = fun crypto:sha/1  :: hash_fun(),      %hash function for leaf signature creation
          inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation -
          keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled          
