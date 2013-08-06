@@ -460,9 +460,9 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
                     andalso Type =/= {join, 'send'}
                     andalso Type =/= {leave, 'rcv'}) orelse
                (PredOrSucc =:= succ andalso node:id(MyNode) =:= TId),
+    HasLeft = dht_node_state:has_left(State),
     Command =
-        case CanSlide andalso NodesCorrect andalso not MoveDone of
-            true ->
+        if CanSlide andalso NodesCorrect andalso not MoveDone andalso not HasLeft ->
                 SendOrReceive = slide_op:get_sendORreceive(Type),
                 case slide_op:is_leave(Type) of
                     true when SendOrReceive =:= 'send' ->
@@ -472,13 +472,11 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
                         case slide_op:is_jump(Type) of
                             true ->
                                 TIdInRange = intervals:in(TId, nodelist:node_range(Neighbors)),
-                                HasLeft = dht_node_state:has_left(State),
                                 TIdInSuccRange =
                                     intervals:in(TId, nodelist:succ_range(Neighbors)),
                                 if % convert jump to slide?
                                     TIdInRange     -> {ok, {slide, succ, 'send'}};
                                     TIdInSuccRange -> {ok, {slide, succ, 'rcv'}};
-                                    HasLeft        -> {abort, target_id_not_in_range, Type};
                                     true ->
                                         SlideSucc =
                                             dht_node_state:get(State, slide_succ),
@@ -504,9 +502,10 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
                             _    -> {ok, Type}
                         end
                 end;
-            _ when not CanSlide -> {abort, ongoing_slide, Type};
-            _ when not NodesCorrect -> {abort, wrong_pred_succ_node, Type};
-            _ ->
+            not CanSlide -> {abort, ongoing_slide, Type};
+            not NodesCorrect -> {abort, wrong_pred_succ_node, Type};
+            HasLeft -> {abort, target_down, Type};
+            true ->
                 case slide_op:is_leave(Type) of
                     false -> {ok, move_done}; % MoveDone, i.e. target id already reached (noop)
                     true  -> {abort, leave_no_partner_found, Type}
