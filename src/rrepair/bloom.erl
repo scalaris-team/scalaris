@@ -166,11 +166,11 @@ get_property(Bloom, Property) ->
 -spec set_Bits(binary(), [integer()]) -> binary().
 set_Bits(Filter, [Pos | Positions]) ->
     PreByteNum = Pos div 8,
+    PosInByte = Pos rem 8,
     <<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,
-    NewByte = OldByte bor (2#10000000 bsr (Pos rem 8)),
-    NewBinary = case NewByte of
+    NewBinary = case (OldByte bor (2#10000000 bsr PosInByte)) of
                     OldByte -> Filter;
-                    _ -> <<PreBin/binary, NewByte:8, PostBin/binary>>
+                    NewByte -> <<PreBin/binary, NewByte:8, PostBin/binary>>
                 end,
     set_Bits(NewBinary, Positions);
 set_Bits(Filter, []) -> 
@@ -211,13 +211,10 @@ check_Bits(_, []) ->
 %% helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec ln(X::number()) -> float().
-ln(X) -> 
-    util:log(X, math:exp(1)).
-
 % @doc Increases Val until Val rem Div == 0.
--spec resize(integer(), integer()) -> integer().
-resize(Val, Div) when (Val rem Div) =:= 0 -> 
-    Val;
-resize(Val, Div) -> 
-    resize(Val + 1, Div).
+-spec resize(Val::integer(), Div::integer()) -> NewVal::integer().
+resize(Val, Div) ->
+    case Val rem Div of
+        0   -> Val;
+        Rem -> Val + Div - Rem
+    end.

@@ -90,14 +90,14 @@ calc_HF_num(M, N) ->
 %      a given compression rate of C.
 -spec calc_HF_num(pos_integer()) -> pos_integer().
 calc_HF_num(C) when C > 0 ->
-    K = C * ln(2),
+    K = C * math:log(2),
     K_Min = util:floor(K),
     K_Max = util:ceil(K),
     A = calc_FPR(C, K_Max),
     B = calc_FPR(C, K_Min),
-    case util:min(A, B) =:= A of
-        true -> K_Max;
-        _ -> K_Min
+    case erlang:min(A, B) of
+        A -> K_Max;
+        B -> K_Min
     end.
 
 % @doc Calculates opt. number of hash functions to
@@ -110,10 +110,10 @@ calc_HF_numEx(N, FPR) ->
 % @doc  Calculates leasts bit size of a bloom filter
 %       with a bounded false-positive rate FPR up to N-Elements.
 -spec calc_least_size(non_neg_integer(), float()) -> pos_integer().
-calc_least_size(_, FPR) when FPR =:= 0 -> 1;
+calc_least_size(_, FPR) when FPR == 0 -> 1;
 calc_least_size(0, _) -> 1;
 calc_least_size(N, FPR) ->
-    util:ceil((N * util:log(math:exp(1), 2) * util:log(1 / FPR, 2))). 
+    util:ceil((N * util:log2(math:exp(1)) * util:log2(1 / FPR))).
 
 % @doc  Calculates FPR for an M-bit large bloom_filter with K Hashfuntions 
 %       and a maximum of N elements.
@@ -121,8 +121,8 @@ calc_least_size(N, FPR) ->
 %       M = number of BF-Bits
 -spec calc_FPR(pos_integer(), pos_integer(), pos_integer()) -> float().
 calc_FPR(M, N, K) -> 
-    math:pow(1 - math:pow(math:exp(1), (-K*N) / M), K).
+    math:pow(1 - math:exp((-K * N) / M), K).
 
 -spec calc_FPR(pos_integer(), pos_integer()) -> float().
 calc_FPR(C, K) ->
-    math:pow(1 - math:pow(math:exp(1), -K / C), K).
+    math:pow(1 - math:exp(-K / C), K).

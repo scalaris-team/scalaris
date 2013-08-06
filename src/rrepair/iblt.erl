@@ -207,7 +207,7 @@ is_element(#iblt{ hfs = Hfs, table = T, col_size = ColSize }, Key) ->
 -spec get_fpr(iblt()) -> float().
 get_fpr(#iblt{  hfs = Hfs, cell_count = M, item_count = N }) ->
     K = ?REP_HFS:size(Hfs),
-    math:pow(1 - math:pow(math:exp(1), (-K*N)/M), K).
+    math:pow(1 - math:exp((-K * N) / M), K).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
