@@ -26,12 +26,13 @@
 
 -behavior(rm_beh).
 
--opaque state() :: {Neighbors      :: nodelist:neighborhood(),
+-type state_t() :: {Neighbors      :: nodelist:neighborhood(),
                     RandomViewSize :: pos_integer(),
                     Interval       :: base_interval | min_interval | max_interval,
                     TriggerState   :: trigger:state(),
                     Cache          :: [node:node_type()], % random cyclon nodes
                     Churn          :: boolean()}.
+-opaque state() :: state_t().
 
 % accepted messages of an initialized rm_tman process in addition to rm_loop
 -type(custom_message() ::
@@ -212,6 +213,14 @@ new_succ(State, NewSucc) ->
 -spec remove_pred(State::state(), OldPred::node:node_type(),
                   PredsPred::node:node_type()) -> state().
 remove_pred(State, OldPred, PredsPred) ->
+    remove_pred_(State, OldPred, PredsPred).
+
+-compile({inline, [remove_pred_/3]}).
+
+% private fun with non-opaque types to make dialyzer happy:
+-spec remove_pred_(State::state_t(), OldPred::node:node_type(),
+                   PredsPred::node:node_type()) -> state_t().
+remove_pred_(State, OldPred, PredsPred) ->
     State2 = update_nodes(State, [PredsPred], [OldPred], null),
     % in order for incremental leaves to finish correctly, we must remove any
     % out-dated PredsPred in our state here!
@@ -226,7 +235,7 @@ remove_pred(State, OldPred, PredsPred) ->
             % -> just in case he was wrong, try to add it:
             contact_new_nodes([MyNewPred]),
             % try as long as MyNewPred is the same as PredsPred
-            remove_pred(State2, MyNewPred, PredsPred)
+            remove_pred_(State2, MyNewPred, PredsPred)
     end.
 
 -spec remove_succ(State::state(), OldSucc::node:node_type(),
@@ -364,11 +373,11 @@ contact_new_nodes(NewNodes) ->
 %%      occurred or was already determined, min_interval if chosen for the next
 %%      interval, otherwise max_interval. If the successor or predecessor
 %%      changes, the trigger will be called immediately.
--spec update_nodes(State::state(),
+-spec update_nodes(State::state_t(),
                    NodesToAdd::[node:node_type()],
                    NodesToRemove::[node:node_type() | comm:mypid() | pid()],
                    RemoveNodeEvalFun::fun((node:node_type()) -> any()) | null)
-        -> NewState::state().
+        -> NewState::state_t().
 update_nodes(State, [], [], _RemoveNodeEvalFun) ->
     State;
 update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, Churn},
