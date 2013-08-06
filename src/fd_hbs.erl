@@ -253,9 +253,24 @@ on({crashed, WatchedPid}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
     %% inform all local subscribers
     Subscriptions = state_get_subscriptions(State, WatchedPid),
+    %% only there because of delayed demonitoring?
+    RemPids = state_get_rem_pids(State),
+    RemPid = lists:keyfind(WatchedPid, 1, RemPids),
     case Subscriptions of
-        [] -> log:log(warn, "No one to inform on crash of ~.0p~n",
-                      [WatchedPid]);
+        [] ->
+            %% Report if subcription entry exists not because of a
+            %% delayed demonitoring
+            Report = case RemPid of
+                         false -> true;
+                         RemPid ->
+                             not rempid_get_pending_demonitor(RemPid)
+                     end,
+            case Report of
+                true ->
+                    log:log(warn, "No one to inform on crash of ~.0p~n",
+                            [WatchedPid]);
+                false -> ok
+            end;
         _ -> ok
     end,
     _ = [ case Cookie of
@@ -270,7 +285,7 @@ on({crashed, WatchedPid}, State) ->
           end
           || {X, Cookie} <- Subscriptions ],
     %% delete from remote_pids
-    NewRemPids = lists:keydelete(WatchedPid, 1, state_get_rem_pids(State)),
+    NewRemPids = lists:keydelete(WatchedPid, 1, RemPids),
     S1 = state_set_rem_pids(State, NewRemPids),
     %% delete subscription entries with this pid
     lists:foldl(fun({Sub, Cook}, StAgg) ->
