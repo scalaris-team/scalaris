@@ -31,7 +31,6 @@ test_cases() ->
      tester_join_at,
      add_9, rm_5, add_9_rm_5,
      add_2x3_load,
-     add_1_rm_1_load,
      add_3_rm_1_load,
      add_3_rm_2_load,
      add_3_rm_3_load,
@@ -69,8 +68,6 @@ init_per_testcase(TestCase, Config) ->
         % note: the craceful leave tests only work if transactions are
         % transferred to new TMs if the TM dies or the bench_server restarts
         % the transactions
-        add_1_rm_1_load ->
-            {skip, "graceful leave not fully supported yet"};
         add_3_rm_1_load ->
             {skip, "graceful leave not fully supported yet"};
         add_3_rm_2_load ->
@@ -190,16 +187,16 @@ add_2x3_load(Config) ->
     unittest_helper:check_ring_data().
 
 add_2x3_load_test() ->
-    BenchPid = erlang:spawn(fun() -> bench:increment(1, 1000) end),
+    BenchPid = erlang:spawn(fun() -> bench:increment(1, 5000) end),
+    ct:pal("######## starting join 1 ########"),
     _ = api_vm:add_nodes(3),
     check_size(4),
     timer:sleep(500),
+    ct:pal("######## starting join 2 ########"),
     _ = api_vm:add_nodes(3),
     check_size(7),
+    ct:pal("######## waiting for bench finish ########"),
     util:wait_for_process_to_die(BenchPid).
-
-add_1_rm_1_load(Config) ->
-    add_x_rm_y_load(Config, 1, 1).
 
 add_3_rm_1_load(Config) ->
     add_x_rm_y_load(Config, 3, 1).
@@ -220,13 +217,18 @@ add_x_rm_y_load(Config, X, Y) ->
 
 -spec add_x_rm_y_load_test(X::non_neg_integer(), Y::pos_integer()) -> ok.
 add_x_rm_y_load_test(X, Y) ->
-    BenchPid = erlang:spawn(fun() -> bench:increment(1, 1000) end),
+    BenchPid = erlang:spawn(fun() -> bench:increment(1, 10000) end),
     _ = api_vm:add_nodes(X),
     check_size(X + 1),
     timer:sleep(500),
-    % let Y nodes gracefully leave
-    _ = [comm:send_local(Pid, {leave, null}) || Pid <- util:random_subset(Y, pid_groups:find_all(dht_node))],
+    % let Y nodes gracefully leave, one after another - not more than minority of tm_tms can die!
+    [begin
+         ct:pal("Killing #~p: ~p", [I, Pid]),
+         comm:send_local(Pid, {leave, null}),
+         check_size(X + 1 - I)
+     end || {I, Pid} <- lists:zip(lists:seq(1, Y), util:random_subset(Y, pid_groups:find_all(dht_node)))],
     check_size(X + 1 - Y),
+    ct:pal("######## waiting for bench finish ########"),
     util:wait_for_process_to_die(BenchPid).
 
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key(), Incremental::boolean()) -> true.
