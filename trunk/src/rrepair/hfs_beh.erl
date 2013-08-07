@@ -27,12 +27,12 @@
 -ifdef(have_callback_support).
 -type itemKey() :: any().
 -type hfs()     :: term().
--callback new(integer()) -> hfs().
--callback new([function()], integer()) -> hfs().
--callback apply_val(hfs(), itemKey()) -> [integer()].
--callback apply_val(hfs(), pos_integer(), itemKey()) -> integer().
--callback apply_val_rem(hfs(), itemKey(), pos_integer()) -> [integer()].
--callback size(hfs()) -> integer().
+-callback new(pos_integer()) -> hfs().
+-callback new([function(),...], pos_integer()) -> hfs().
+-callback apply_val(hfs(), itemKey()) -> [non_neg_integer(),...].
+-callback apply_val(hfs(), pos_integer(), itemKey()) -> non_neg_integer().
+-callback apply_val_rem(hfs(), itemKey(), pos_integer()) -> [non_neg_integer(),...].
+-callback size(hfs()) -> pos_integer().
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
