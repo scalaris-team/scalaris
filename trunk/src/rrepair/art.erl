@@ -40,8 +40,6 @@
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
 
--define(REP_BLOOM, bloom). % bloom filter implemenation selection
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -54,8 +52,8 @@
 -type art() :: { art,
                  Config     :: config(),
                  Interval   :: intervals:interval(),
-                 InnerNodes :: ?REP_BLOOM:bloom_filter() | empty,
-                 Leafs      :: ?REP_BLOOM:bloom_filter() | empty }.
+                 InnerNodes :: bloom:bloom_filter() | empty,
+                 Leafs      :: bloom:bloom_filter() | empty }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Functions
@@ -81,10 +79,10 @@ new(Tree) ->
 new(Tree, _Config) ->
     Config = merge_prop_lists(default_config(), _Config),
     {InnerCount, LeafCount} = merkle_tree:size_detail(Tree),
-    InnerBF = ?REP_BLOOM:new(InnerCount, proplists:get_value(inner_bf_fpr, Config)),
-    LeafBF = ?REP_BLOOM:new(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
+    InnerBF = bloom:new(InnerCount, proplists:get_value(inner_bf_fpr, Config)),
+    LeafBF = bloom:new(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),
-    ?TRACE("INNER=~p~nLeaf=~p", [?REP_BLOOM:print(IBF), ?REP_BLOOM:print(LBF)]),
+    ?TRACE("INNER=~p~nLeaf=~p", [bloom:print(IBF), bloom:print(LBF)]),
     {art, Config, merkle_tree:get_interval(Tree), IBF, LBF}.    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -120,13 +118,13 @@ lookup_cf([{Node, 0} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
     NodeHash = merkle_tree:get_hash(Node),
     BF = ?IIF(merkle_tree:is_leaf(Node), LBF, IBF),
     ?TRACE("NodeHash=~p", [NodeHash]),
-    ?REP_BLOOM:is_element(BF, NodeHash) andalso lookup_cf(L, Art);
+    bloom:is_element(BF, NodeHash) andalso lookup_cf(L, Art);
 lookup_cf([{Node, CF} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
     NodeHash = merkle_tree:get_hash(Node),
     IsLeaf = merkle_tree:is_leaf(Node),
     BF = ?IIF(IsLeaf, LBF, IBF),
     ?TRACE("NodeHash=~p~nIsLeaf=~p", [NodeHash, IsLeaf]),
-    case ?REP_BLOOM:is_element(BF, NodeHash) of
+    case bloom:is_element(BF, NodeHash) of
         false -> false;
         true  -> if IsLeaf -> lookup_cf(L, Art);
                     true   -> Childs = merkle_tree:get_childs(Node),
@@ -152,10 +150,10 @@ prepend_merkle_childs(L, [Child | Rest], ChildCF) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec fill_bloom(merkle_tree:mt_iter(), Inner1::BF, Leaf1::BF) -> {Inner2::BF, Leaf2::BF} when
-      is_subtype(BF,        ?REP_BLOOM:bloom_filter()).
+      is_subtype(BF,        bloom:bloom_filter()).
 fill_bloom(Iter, IBF, LBF) ->
     {InnerHashes, LeafHashes} = merkle_get_hashes(Iter, [], []),
-    {?REP_BLOOM:add(IBF, InnerHashes), ?REP_BLOOM:add(LBF, LeafHashes)}.
+    {bloom:add(IBF, InnerHashes), bloom:add(LBF, LeafHashes)}.
 
 -spec merkle_get_hashes(merkle_tree:mt_iter(), InnerHashes1::HashL, LeafHashes1::HashL)
         -> {InnerHashes2::HashL, LeafHashes2::HashL} when
