@@ -5,7 +5,6 @@
   "src/lb_psv_beh.erl",
   "src/pdb_beh.erl",
   "src/rm_beh.erl",
-  "src/rrepair/bloom_beh.erl",
   "src/rrepair/hfs_beh.erl",
   "src/rt_beh.erl",
   "src/slide_beh.erl",
