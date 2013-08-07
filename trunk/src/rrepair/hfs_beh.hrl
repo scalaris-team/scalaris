@@ -31,22 +31,22 @@
 
 % API functions
 
--spec new([function()], integer()) -> hfs().
+-spec new([hfs_fun(),...], pos_integer()) -> hfs().
 new(HashFunList, HashFunCount) -> new_(HashFunList, HashFunCount).
 
--spec new(integer()) -> hfs().
+-spec new(pos_integer()) -> hfs().
 new(HFCount) -> new_(HFCount).
 
--spec apply_val(hfs(), itemKey()) -> [integer()].
+-spec apply_val(hfs(), itemKey()) -> [non_neg_integer()].
 apply_val(Hfs, Item) -> apply_val_(Hfs, Item).
 
 % @doc apply Item on hash function I of function set Hfs; I = 1..hfs_size
--spec apply_val(hfs(), pos_integer(), itemKey()) -> integer().
+-spec apply_val(hfs(), pos_integer(), itemKey()) -> non_neg_integer().
 apply_val(Hfs, I, Item) -> apply_val_(Hfs, I, Item).
 
--spec apply_val_rem(hfs(), itemKey(), pos_integer()) -> [integer()].
+-spec apply_val_rem(hfs(), itemKey(), pos_integer()) -> [non_neg_integer()].
 apply_val_rem(Hfs, Item, Rem) -> apply_val_rem_(Hfs, Item, Rem).
 
-% @doc retruns numer ob hash functions in the set
--spec size(hfs()) -> non_neg_integer().
+% @doc returns the number of hash functions in the set
+-spec size(hfs()) -> pos_integer().
 size(Hfsc) -> size_(Hfsc).
