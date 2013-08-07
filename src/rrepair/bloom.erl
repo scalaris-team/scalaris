@@ -82,7 +82,7 @@ add_list_(Bloom, Items) ->
 
 % faster than lists:foldl
 p_add_list(Hfs, BFSize, Acc, [Item | Items]) ->
-    Pos = apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]),
+    Pos = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
     p_add_list(Hfs, BFSize, set_Bits(Acc, Pos), Items);
 p_add_list(_Hfs, _BFSize, Acc, []) -> 
     Acc.    
@@ -92,7 +92,7 @@ p_add_list(_Hfs, _BFSize, Acc, []) ->
 % @doc returns true if the bloom filter contains item
 -spec is_element_(bloom_filter_t(), key()) -> boolean().
 is_element_(#bloom{size = BFSize, hfs = Hfs, filter = Filter}, Item) -> 
-    Positions = apply(element(1, Hfs), apply_val_rem, [Hfs, Item, BFSize]),
+    Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
     check_Bits(Filter, Positions).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -132,7 +132,7 @@ print_(#bloom{ max_items = MaxItems,
                size = Size,
                hfs = Hfs,
                items_count = NumItems } = Bloom) -> 
-    HCount = apply(element(1, Hfs), size, [Hfs]),
+    HCount = ?REP_HFS:size(Hfs),
     [{filter_bit_size, Size},
      {struct_byte_size, byte_size(term_to_binary(Bloom))},
      {hash_fun_num, HCount},
@@ -145,7 +145,7 @@ print_(#bloom{ max_items = MaxItems,
 
 -spec get_property(bloom_filter_t(), atom()) -> not_found | term().
 get_property(#bloom{ size = Size, hfs = Hfs, items_count = NumItems }, fpr) ->
-    calc_FPR(Size, NumItems, apply(element(1, Hfs), size, [Hfs]));
+    calc_FPR(Size, NumItems, ?REP_HFS:size(Hfs));
 get_property(Bloom, Property) ->
     FieldNames = record_info(fields, bloom),
     {_, N} = lists:foldl(fun(I, {Nr, Res}) -> case I =:= Property of
