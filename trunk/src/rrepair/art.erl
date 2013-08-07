@@ -151,20 +151,26 @@ prepend_merkle_childs(L, [Child | Rest], ChildCF) ->
 %% Helper
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec fill_bloom(Iterator, Inner1::BF, Leaf1::BF) -> {Inner2::BF, Leaf2::BF} when
-      is_subtype(Iterator,  merkle_tree:mt_iter()),
+-spec fill_bloom(merkle_tree:mt_iter(), Inner1::BF, Leaf1::BF) -> {Inner2::BF, Leaf2::BF} when
       is_subtype(BF,        ?REP_BLOOM:bloom_filter()).
 fill_bloom(Iter, IBF, LBF) ->
-    Next = merkle_tree:next(Iter),
-    case Next of
-        none -> {IBF, LBF};
+    {InnerHashes, LeafHashes} = merkle_get_hashes(Iter, [], []),
+    {?REP_BLOOM:add(IBF, InnerHashes), ?REP_BLOOM:add(LBF, LeafHashes)}.
+
+-spec merkle_get_hashes(merkle_tree:mt_iter(), InnerHashes1::HashL, LeafHashes1::HashL)
+        -> {InnerHashes2::HashL, LeafHashes2::HashL} when
+          is_subtype(HashL, [merkle_tree:mt_node_key()]).
+merkle_get_hashes(Iter, InnerHashes, LeafHashes) ->
+    case merkle_tree:next(Iter) of
+        none -> {InnerHashes, LeafHashes};
         {Node, Iter2} ->
-            {IBF2, LBF2} = 
-                case merkle_tree:is_leaf(Node) of
-                    true -> {IBF, ?REP_BLOOM:add(LBF, merkle_tree:get_hash(Node))};
-                    false -> {?REP_BLOOM:add(IBF, merkle_tree:get_hash(Node)), LBF} 
-                end,
-            fill_bloom(Iter2, IBF2, LBF2)
+            NodeHash = merkle_tree:get_hash(Node),
+            case merkle_tree:is_leaf(Node) of
+                true ->
+                    merkle_get_hashes(Iter2, InnerHashes, [NodeHash | LeafHashes]);
+                false ->
+                    merkle_get_hashes(Iter2, [NodeHash | InnerHashes], LeafHashes)
+            end
     end.
 
 merge_prop_lists(DefList, ListB) ->
