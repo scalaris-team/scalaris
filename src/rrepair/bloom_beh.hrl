@@ -36,19 +36,19 @@
 %% Functions
 
 % @doc Creates new bloom filter with default hash function set
--spec new(integer(), float()) -> bloom_filter().
+-spec new(non_neg_integer(), float()) -> bloom_filter().
 new(MaxItems, FPR) ->
     Hfs = ?REP_HFS:new(calc_HF_numEx(MaxItems, FPR)),
     new(MaxItems, FPR, Hfs).
 
--spec new(integer(), float() | integer(), ?REP_HFS:hfs()) -> bloom_filter().
+-spec new(non_neg_integer(), float() | integer(), ?REP_HFS:hfs()) -> bloom_filter().
 new(MaxItems, FPR, Hfs) when is_float(FPR) ->
     Size = resize(calc_least_size(MaxItems, FPR), 8),
     new_(Size, MaxItems, Hfs);
 new(MaxItems, BitPerItem, Hfs) ->
     new_(resize(BitPerItem * MaxItems, 8), MaxItems, Hfs).
 
--spec new(integer(), float(), ?REP_HFS:hfs(), [key()]) -> bloom_filter().
+-spec new(non_neg_integer(), float(), ?REP_HFS:hfs(), [key()]) -> bloom_filter().
 new(MaxItems, FPR, Hfs, Items) ->
     BF = new(MaxItems, FPR, Hfs),
     add(BF, Items).
@@ -102,7 +102,7 @@ calc_HF_num(C) when C > 0 ->
 
 % @doc Calculates opt. number of hash functions to
 %      code N elements into a bloom filter with false positive rate of FPR.
--spec calc_HF_numEx(integer(), float()) -> integer().
+-spec calc_HF_numEx(non_neg_integer(), float()) -> pos_integer().
 calc_HF_numEx(N, FPR) ->
     M = calc_least_size(N, FPR),
     calc_HF_num(M, N).
