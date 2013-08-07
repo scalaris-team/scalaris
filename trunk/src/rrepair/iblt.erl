@@ -45,9 +45,9 @@
 -type value()   :: integer().
 -type cell()    :: {Count       :: non_neg_integer(),
                     KeySum      :: binary(),
-                    KeyHashSum  :: integer(),   %sum c(x) of all inserted keys x, for c = any hashfunction not in hfs
+                    KeyHashSum  :: non_neg_integer(),   %sum c(x) of all inserted keys x, for c = any hashfunction not in hfs
                     ValSum      :: value(),
-                    ValHashSum  :: integer()}.  %sum c(y) of all inserted values y, for c = any hashfunction not in hfs
+                    ValHashSum  :: non_neg_integer()}.  %sum c(y) of all inserted values y, for c = any hashfunction not in hfs
 
 -type table() :: [] | [{ColNr :: pos_integer(), Cells :: [cell()]}].
 
@@ -224,12 +224,12 @@ get_prop(Prop, IBLT) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Hash function for checksum building.
--spec checksum_fun(binary() | integer()) -> integer().
+-spec checksum_fun(binary() | integer()) -> non_neg_integer().
 checksum_fun(X) when is_integer(X) -> erlang:crc32(integer_to_list(X));
 checksum_fun(X) -> erlang:crc32(X).
 
 % @doc Increases Val until Val rem Div == 0.
--spec resize(Val::integer(), Div::integer()) -> NewVal::integer().
+-spec resize(Val::non_neg_integer(), Div::pos_integer()) -> NewVal::non_neg_integer().
 resize(Val, Div) ->
     case Val rem Div of
         0   -> Val;

@@ -51,7 +51,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc creates a new bloom filter
--spec new_(integer(), integer(), ?REP_HFS:hfs()) -> bloom_filter_t().
+-spec new_(non_neg_integer(), non_neg_integer(), ?REP_HFS:hfs()) -> bloom_filter_t().
 new_(BitSize, MaxItems, Hfs) when BitSize rem 8 =:= 0 ->
     #bloom{
            size = BitSize,
@@ -163,7 +163,7 @@ get_property(Bloom, Property) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Sets all filter-bits at given positions to 1
--spec set_Bits(binary(), [integer()]) -> binary().
+-spec set_Bits(binary(), [non_neg_integer()]) -> binary().
 set_Bits(Filter, [Pos | Positions]) ->
     PreByteNum = Pos div 8,
     PosInByte = Pos rem 8,
@@ -186,7 +186,7 @@ set_Bits(Filter, []) ->
 %%     set_Bits(NewBinary, Positions).
 
 % @doc Checks if all bits are set on a given position list
--spec check_Bits(binary(), [integer()]) -> boolean().
+-spec check_Bits(binary(), [non_neg_integer()]) -> boolean().
 % V1
 %% check_Bits(Filter, [Pos | Positions]) -> 
 %%     PreBytes = Pos div 8,
@@ -212,7 +212,7 @@ check_Bits(_, []) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Increases Val until Val rem Div == 0.
--spec resize(Val::integer(), Div::integer()) -> NewVal::integer().
+-spec resize(Val::non_neg_integer(), Div::pos_integer()) -> NewVal::non_neg_integer().
 resize(Val, Div) ->
     case Val rem Div of
         0   -> Val;
