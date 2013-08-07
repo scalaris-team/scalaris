@@ -80,7 +80,6 @@
 -define(DEBUG_REGISTER(PROCESS,PID),ok).
 
 % Replica Repair
--define(REP_BLOOM, bloom). % bloom filter implemenation selection
 -define(REP_HFS, hfs_lhsp). %HashFunctionSet selection for usage by bloom filter
 
 % Back-end of the pdb module
