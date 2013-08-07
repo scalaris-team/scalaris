@@ -229,11 +229,12 @@ checksum_fun(X) when is_integer(X) -> erlang:crc32(integer_to_list(X));
 checksum_fun(X) -> erlang:crc32(X).
 
 % @doc Increases Val until Val rem Div == 0.
--spec resize(pos_integer(), pos_integer()) -> pos_integer().
-resize(Val, Div) when Val rem Div == 0 -> 
-    Val;
-resize(Val, Div) when Val rem Div /= 0 -> 
-    resize(Val + 1, Div).
+-spec resize(Val::integer(), Div::integer()) -> NewVal::integer().
+resize(Val, Div) ->
+    case Val rem Div of
+        0   -> Val;
+        Rem -> Val + Div - Rem
+    end.
 
 -spec encode_key(?RT:key()) -> binary().
 encode_key(Key) ->
