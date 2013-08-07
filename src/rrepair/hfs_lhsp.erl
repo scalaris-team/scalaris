@@ -70,7 +70,7 @@ new([H1, H2], HFCount) ->
 % @doc Applies Val to all hash functions in container HC
 -spec apply_val(hfs_t(), itemKey()) -> [non_neg_integer(),...].
 apply_val({hfs_lhsp, K, H1, H2}, Val) ->
-    ValBin = term_to_binary(Val),
+    ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
     HV2 = hash_value(ValBin, H2),
     util:for_to_ex(0, K - 1, fun(I) -> HV1 + I * HV2 end).
@@ -78,7 +78,7 @@ apply_val({hfs_lhsp, K, H1, H2}, Val) ->
 % @doc Applies Val to all hash functions in container HC and returns only remainders 
 -spec apply_val_rem(hfs_t(), itemKey(), pos_integer()) -> [non_neg_integer(),...].
 apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) ->
-    ValBin = term_to_binary(Val),
+    ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
     HV2 = hash_value(ValBin, H2),
     util:for_to_ex(0, K - 1, fun(I) -> (HV1 + I * HV2) rem Rem end).
@@ -91,7 +91,7 @@ apply_val_feeder({hfs_lhsp, K, H1, H2}, I, Val) ->
 % @doc Apply hash function I to given value; I = 1..hfs_size
 -spec apply_val(hfs_t(), pos_integer(), itemKey()) -> non_neg_integer().
 apply_val({hfs_lhsp, K, H1, H2}, I, Val) when I =< K ->
-    ValBin = term_to_binary(Val),
+    ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
     HV2 = hash_value(ValBin, H2),
     HV1 + (I - 1) * HV2.   
@@ -105,15 +105,16 @@ size({hfs_lhsp, K, _, _}) ->
 % private functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec hash_value(binary(), hfs_fun()) -> pos_integer().
+-compile({inline, [hash_value/2]}).
+
+-spec hash_value(binary(), hfs_fun()) -> non_neg_integer().
 hash_value(Val, HashFun) ->
     H = HashFun(Val),
-    case erlang:is_binary(H) of
-        true ->
-            Size = erlang:bit_size(H),
-            <<R:Size>> = H,
-            R;
-        false -> H
+    if erlang:is_binary(H) ->
+           Size = erlang:bit_size(H),
+           <<R:Size>> = H,
+           R;
+       true -> H
     end.
 
 -spec tester_create_hfs_fun(1..2) -> hfs_fun().
