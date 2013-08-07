@@ -31,6 +31,7 @@
 -define(Fpr_Test_NumTests, 25).
 
 all() -> [
+          tester_p_add_list,
           tester_add,
           tester_add_list,
           tester_join,
@@ -54,6 +55,24 @@ end_per_suite(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec prop_p_add_list(BF0Items::[bloom:key()], Items::[bloom:key()]) -> true.
+prop_p_add_list(BF0Items, Items) ->
+    BF0 = newBloom(erlang:max(10, erlang:length(Items)), 0.1),
+    BF = bloom:add(BF0, BF0Items),
+    Hfs = bloom:get_property(BF, hfs),
+    BFSize = bloom:get_property(BF, size),
+    BFBin = bloom:get_property(BF, filter),
+    
+    ?equals(bloom:p_add_list_v1(Hfs, BFSize, BFBin, Items),
+            bloom:p_add_list_v2(Hfs, BFSize, BFBin, Items)).
+
+tester_p_add_list(_) ->
+    prop_p_add_list([], [6,7,8]),
+    prop_p_add_list([6,7,8], [88,103,15,128,219]),
+    tester:test(?MODULE, prop_p_add_list, 2, 10000, [{threads, 2}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 -spec prop_add(?BLOOM:key(), ?BLOOM:key()) -> true.
 prop_add(X, Y) ->
     B1 = newBloom(10, 0.1),
@@ -67,6 +86,7 @@ prop_add(X, Y) ->
     ?equals(?BLOOM:get_property(B3, items_count), 2).
 
 tester_add(_) ->
+    prop_add(one, 0.5359298222471391),
     tester:test(?MODULE, prop_add, 2, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

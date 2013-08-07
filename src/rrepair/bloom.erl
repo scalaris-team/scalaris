@@ -34,7 +34,9 @@
          calc_least_size/2,
          calc_FPR/2, calc_FPR/3]).
 
--export([get_property/2]). %for Tests
+% for tests:
+-export([get_property/2]).
+-export([p_add_list_v1/4, p_add_list_v2/4, resize/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Types
@@ -101,7 +103,12 @@ add(Bloom, Items) when is_list(Items) ->
            items_count = FilledCount,
            filter = Filter
           } = Bloom,
-    F = p_add_list(Hfs, BFSize, Filter, Items),
+    % choose version according to the number of elements to add:
+    F = case Items of
+            []      -> p_add_list_v1(Hfs, BFSize, Filter, Items);
+            [_]     -> p_add_list_v1(Hfs, BFSize, Filter, Items);
+            [_|_]   -> p_add_list_v2(Hfs, BFSize, Filter, Items)
+        end,
     Bloom#bloom{
                 filter = F,
                 items_count = FilledCount + length(Items)
@@ -109,12 +116,51 @@ add(Bloom, Items) when is_list(Items) ->
 add(Bloom, Item) ->
     add(Bloom, [Item]).
 
+% V1 - good for few items / positions to set
 % faster than lists:foldl
-p_add_list(Hfs, BFSize, Acc, [Item | Items]) ->
-    Pos = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
-    p_add_list(Hfs, BFSize, set_Bits(Acc, Pos), Items);
-p_add_list(_Hfs, _BFSize, Acc, []) -> 
-    Acc.    
+-spec p_add_list_v1(Hfs::?REP_HFS:hfs(), BFSize::non_neg_integer(),
+                    BF1::binary(), Items::[key()]) -> BF2::binary().
+p_add_list_v1(Hfs, BFSize, BF, [Item | Items]) ->
+    Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
+    p_add_list_v1(Hfs, BFSize, set_bits(BF, Positions), Items);
+p_add_list_v1(_Hfs, _BFSize, BF, []) ->
+    BF.
+
+% V2 - good for large number of items / positions to set
+-spec p_add_list_v2(Hfs::?REP_HFS:hfs(), BFSize::non_neg_integer(),
+                    BF1::binary(), Items::[key()]) -> BF2::binary().
+p_add_list_v2(_Hfs, _BFSize, BF, []) -> BF;
+p_add_list_v2(Hfs, BFSize, BF, Items) ->
+    Positions = lists:flatten([?REP_HFS:apply_val_rem(Hfs, Item, BFSize)
+                                 || Item <- Items]),
+    [Pos | Rest] = lists:usort(Positions),
+    PosInByte = Pos rem 8,
+    PreBitsNum = Pos - PosInByte,
+    AccPosBF = (2#10000000 bsr PosInByte),
+    p_add_list_v2_(Rest, AccPosBF, <<0:PreBitsNum>>, BF).
+
+p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, BF) when Pos - erlang:bit_size(AccBF) < 8 ->
+    % Pos in same byte
+    PosInByte = Pos rem 8,
+    AccPosBF2 = AccPosBF bor (2#10000000 bsr PosInByte),
+    p_add_list_v2_(Rest, AccPosBF2, AccBF, BF);
+p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, BF) ->
+    PosInByte = Pos rem 8,
+    PreBitsNum2 = Pos - PosInByte,
+    DiffBits = PreBitsNum2 - erlang:bit_size(AccBF) - 8,
+    % add AccPosBF to AccBF
+    AccBF2 = <<AccBF/binary, AccPosBF:8, 0:DiffBits>>,
+    % make new AccPosBF
+    AccPosBF2 = (2#10000000 bsr PosInByte),
+    p_add_list_v2_(Rest, AccPosBF2, AccBF2, BF);
+p_add_list_v2_([], AccPosBF, AccBF, BF) ->
+    BFSize = erlang:bit_size(BF),
+    RestBits = BFSize - erlang:bit_size(AccBF) - 8,
+    <<AccBF2Nr:BFSize>> = <<AccBF/binary, AccPosBF:8, 0:RestBits>>,
+    % merge AccBF2 and BF
+    <<BFNr:BFSize>> = BF,
+    ResultNr = AccBF2Nr bor BFNr,
+    <<ResultNr:BFSize>>.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -191,8 +237,8 @@ get_property(Bloom, Property) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Sets all filter-bits at given positions to 1
--spec set_Bits(binary(), [non_neg_integer()]) -> binary().
-set_Bits(Filter, [Pos | Positions]) ->
+-spec set_bits(binary(), [non_neg_integer()]) -> binary().
+set_bits(Filter, [Pos | Positions]) ->
     PreByteNum = Pos div 8,
     PosInByte = Pos rem 8,
     <<PreBin:PreByteNum/binary, OldByte:8, PostBin/binary>> = Filter,
@@ -200,18 +246,18 @@ set_Bits(Filter, [Pos | Positions]) ->
                     OldByte -> Filter;
                     NewByte -> <<PreBin/binary, NewByte:8, PostBin/binary>>
                 end,
-    set_Bits(NewBinary, Positions);
-set_Bits(Filter, []) -> 
+    set_bits(NewBinary, Positions);
+set_bits(Filter, []) ->
     Filter.
 
-% ->V2 -> 1/3 slower than V1
-%% set_Bits(Filter, [Pos | Positions]) ->
+%% V2 -> 1/3 slower than V1
+%% set_bits(Filter, [Pos | Positions]) ->
 %%     <<A:Pos/bitstring, B:1/bitstring, C/bitstring>> = Filter,
 %%     NewBinary = case B of
 %%                     0 -> Filter;
 %%                     _ -> <<A:Pos/bitstring, 1:1, C/bitstring>>
 %%                 end,
-%%     set_Bits(NewBinary, Positions).
+%%     set_bits(NewBinary, Positions).
 
 % @doc Checks if all bits are set on a given position list
 -spec check_Bits(binary(), [non_neg_integer()]) -> boolean().
