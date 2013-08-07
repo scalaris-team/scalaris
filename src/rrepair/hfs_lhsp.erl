@@ -68,7 +68,7 @@ new([H1, H2], HFCount) ->
     {hfs_lhsp, HFCount, H1, H2}.
 
 % @doc Applies Val to all hash functions in container HC
--spec apply_val(hfs_t(), itemKey()) -> [non_neg_integer()].
+-spec apply_val(hfs_t(), itemKey()) -> [non_neg_integer(),...].
 apply_val({hfs_lhsp, K, H1, H2}, Val) ->
     ValBin = term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
@@ -76,7 +76,7 @@ apply_val({hfs_lhsp, K, H1, H2}, Val) ->
     util:for_to_ex(0, K - 1, fun(I) -> HV1 + I * HV2 end).
 
 % @doc Applies Val to all hash functions in container HC and returns only remainders 
--spec apply_val_rem(hfs_t(), itemKey(), pos_integer()) -> [non_neg_integer()].
+-spec apply_val_rem(hfs_t(), itemKey(), pos_integer()) -> [non_neg_integer(),...].
 apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) ->
     ValBin = term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
@@ -97,7 +97,7 @@ apply_val({hfs_lhsp, K, H1, H2}, I, Val) when I =< K ->
     HV1 + (I - 1) * HV2.   
 
 % @doc Returns number of hash functions in the container
--spec size(hfs_t()) -> non_neg_integer().
+-spec size(hfs_t()) -> pos_integer().
 size({hfs_lhsp, K, _, _}) -> 
     K.
 
@@ -105,7 +105,7 @@ size({hfs_lhsp, K, _, _}) ->
 % private functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec hash_value(binary(), hfs_fun()) -> non_neg_integer().
+-spec hash_value(binary(), hfs_fun()) -> pos_integer().
 hash_value(Val, HashFun) ->
     H = HashFun(Val),
     case erlang:is_binary(H) of
