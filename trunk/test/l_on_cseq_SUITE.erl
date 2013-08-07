@@ -70,11 +70,11 @@ suite() -> [ {timetrap, {seconds, 120}} ].
 group(tester_tests) ->
     [{timetrap, {seconds, 400}}];
 group(renew_tests) ->
-    [{timetrap, {seconds, 4}}];
+    [{timetrap, {seconds, 10}}];
 group(split_tests) ->
-    [{timetrap, {seconds, 4}}];
+    [{timetrap, {seconds, 10}}];
 group(handover_tests) ->
-    [{timetrap, {seconds, 4}}].
+    [{timetrap, {seconds, 10}}].
 
 
 init_per_suite(Config) ->
