@@ -318,6 +318,7 @@ tester_type_check_rrepair(_Config) ->
     tester:register_value_creator({typedef, rr_recon, db_entry_enc}, rr_recon, encodeBlob, 2),
     tester:register_value_creator({typedef, merkle_tree, hash_fun}, merkle_tree, tester_create_hash_fun, 1),
     tester:register_value_creator({typedef, merkle_tree, inner_hash_fun}, merkle_tree, tester_create_inner_hash_fun, 1),
+    tester:register_value_creator({typedef, hfs_lhsp, hfs_fun}, hfs_lhsp, tester_create_hfs_fun, 1),
     Modules =
         [ {rr_recon_stats, [], []},
           {db_generator,
@@ -336,6 +337,13 @@ tester_type_check_rrepair(_Config) ->
              {non_uniform_key_list, 5}, %% needs feeder
              {non_uniform_key_list_, 7}, %% needs feeder
              {get_non_uniform_probs, 2} %% needs feeder
+           ]},
+          {hfs_lhsp,
+           [ {new, 2}, %% tested via feeder
+             {apply_val, 3} %% tested via feeder
+           ],
+           [ {new_, 2}, %% tested via feeder
+             {apply_val_, 3} %% tested via feeder
            ]},
           {rr_recon,
            [
