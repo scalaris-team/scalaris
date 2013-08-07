@@ -71,7 +71,7 @@
 -record(bloom_recon_struct,
         {
          interval = intervals:empty()                       :: intervals:interval(),
-         bloom    = ?required(bloom_recon_struct, bloom)    :: ?REP_BLOOM:bloom_filter()
+         bloom    = ?required(bloom_recon_struct, bloom)    :: bloom:bloom_filter()
         }).
 
 -record(merkle_params,
@@ -228,7 +228,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     Diff = [KeyX || {KeyX, VersionX} <- DBList0,
-                    not ?REP_BLOOM:is_element(BF, encodeBlob(KeyX, VersionX))],
+                    not bloom:is_element(BF, encodeBlob(KeyX, VersionX))],
     %if rest interval is non empty start another sync    
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
@@ -588,7 +588,7 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     Fpr = get_bloom_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
-    BF = ?REP_BLOOM:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
+    BF = bloom:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
     #bloom_recon_struct{ interval = I, bloom = BF };
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, FinishRecon) ->
     ?ASSERT(not intervals:is_empty(I)),

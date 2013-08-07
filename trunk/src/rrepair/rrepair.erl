@@ -294,7 +294,6 @@ on({web_debug_info, Requestor}, #rrepair_state{ round = Round,
     ?TRACE("WEB DEBUG INFO", []),
     KeyValueList =
         [{"Recon Method:",      webhelpers:safe_html_string("~p", [get_recon_method()])},
-         {"Bloom Module:",      webhelpers:safe_html_string("~p", [?REP_BLOOM])},
          {"Sync Round:",        webhelpers:safe_html_string("~p", [Round])},
          {"Open Recon Jobs:",   webhelpers:safe_html_string("~p", [OpenRecon])},
          {"Open Resolve Jobs:", webhelpers:safe_html_string("~p", [OpenResol])},
