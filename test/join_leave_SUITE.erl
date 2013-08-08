@@ -31,9 +31,6 @@ test_cases() ->
      tester_join_at,
      add_9, rm_5, add_9_rm_5,
      add_2x3_load,
-     add_3_rm_1_load,
-     add_3_rm_2_load,
-     add_3_rm_3_load,
      tester_join_at_timeouts
     ].
 
@@ -42,13 +39,15 @@ all() ->
     unittest_helper:create_ct_all([join_lookup]) ++
         unittest_helper:create_ct_all([add_3_rm_3_data]) ++
         unittest_helper:create_ct_all([add_3_rm_3_data_inc]) ++
+        [{group, graceful_leave_load}] ++
         test_cases().
 
 groups() ->
 %%     unittest_helper:create_ct_groups(test_cases(), [{add_9_rm_5, [sequence, {repeat_until_any_fail, forever}]}]).
     unittest_helper:create_ct_groups([join_lookup], [{join_lookup, [sequence, {repeat_until_any_fail, 20}]}]) ++
     unittest_helper:create_ct_groups([add_3_rm_3_data], [{add_3_rm_3_data, [sequence, {repeat_until_any_fail, 20}]}]) ++
-    unittest_helper:create_ct_groups([add_3_rm_3_data_inc], [{add_3_rm_3_data_inc, [sequence, {repeat_until_any_fail, 20}]}]).
+    unittest_helper:create_ct_groups([add_3_rm_3_data_inc], [{add_3_rm_3_data_inc, [sequence, {repeat_until_any_fail, 20}]}]) ++
+    [{graceful_leave_load, [sequence, {repeat_until_any_fail, 5}], [make_4_add_1_rm_1_load, make_4_add_2_rm_2_load, make_4_add_3_rm_3_load]}].
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 
@@ -63,22 +62,10 @@ init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
-init_per_testcase(TestCase, Config) ->
-    case TestCase of
-        % note: the craceful leave tests only work if transactions are
-        % transferred to new TMs if the TM dies or the bench_server restarts
-        % the transactions
-        add_3_rm_1_load ->
-            {skip, "graceful leave not fully supported yet"};
-        add_3_rm_2_load ->
-            {skip, "graceful leave not fully supported yet"};
-        add_3_rm_3_load ->
-            {skip, "graceful leave not fully supported yet"};
-        _ ->
-            % stop ring from previous test case (it may have run into a timeout)
-            unittest_helper:stop_ring(),
-            Config
-    end.
+init_per_testcase(_TestCase, Config) ->
+    % stop ring from previous test case (it may have run into a timeout)
+    unittest_helper:stop_ring(),
+    Config.
 
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
@@ -198,36 +185,49 @@ add_2x3_load_test() ->
     ct:pal("######## waiting for bench finish ########"),
     util:wait_for_process_to_die(BenchPid).
 
-add_3_rm_1_load(Config) ->
-    add_x_rm_y_load(Config, 3, 1).
+make_4_add_1_rm_1_load(Config) ->
+    make_4_add_x_rm_y_load(Config, 1, 1, true).
 
-add_3_rm_2_load(Config) ->
-    add_x_rm_y_load(Config, 3, 2).
+make_4_add_2_rm_2_load(Config) ->
+    make_4_add_x_rm_y_load(Config, 2, 2, true).
 
-add_3_rm_3_load(Config) ->
-    add_x_rm_y_load(Config, 3, 3).
+make_4_add_3_rm_3_load(Config) ->
+    make_4_add_x_rm_y_load(Config, 3, 3, true).
 
--spec add_x_rm_y_load(Config::[tuple()], X::non_neg_integer(), Y::pos_integer()) -> boolean().
-add_x_rm_y_load(Config, X, Y) ->
+-spec make_4_add_x_rm_y_load(Config::[tuple()], X::non_neg_integer(), Y::pos_integer(),
+                             StartOnlyAdded::boolean()) -> boolean().
+make_4_add_x_rm_y_load(Config, X, Y, StartOnlyAdded) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0} | join_parameters_list()]}]),
-    stop_time(fun() -> add_x_rm_y_load_test(X, Y) end, lists:flatten(io_lib:format("add_~B_rm_~B_load", [X, Y]))),
-    unittest_helper:check_ring_load(4),
+    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?MINUS_INFINITY), [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0} | join_parameters_list()]}]),
+    stop_time(fun() -> add_x_rm_y_load_test(X, Y, StartOnlyAdded) end, lists:flatten(io_lib:format("add_~B_rm_~B_load", [X, Y]))),
+    unittest_helper:check_ring_load(40),
     unittest_helper:check_ring_data().
 
--spec add_x_rm_y_load_test(X::non_neg_integer(), Y::pos_integer()) -> ok.
-add_x_rm_y_load_test(X, Y) ->
-    BenchPid = erlang:spawn(fun() -> bench:increment(1, 10000) end),
-    _ = api_vm:add_nodes(X),
-    check_size(X + 1),
+-spec add_x_rm_y_load_test(X::non_neg_integer(), Y::pos_integer(), StartOnlyAdded::boolean()) -> ok.
+add_x_rm_y_load_test(X, Y, StartOnlyAdded) ->
+    BenchPid = erlang:spawn(fun() -> bench:increment(10, 1000) end),
+    {Started, []} = api_vm:add_nodes(X),
+    check_size(X + 4),
     timer:sleep(500),
+    Ring = [begin
+                Pred = hd(node_details:get(Details, predlist)),
+                Node = node_details:get(Details, node),
+                {node:id(Node), ?RT:get_range(node:id(Pred), node:id(Node)) / ?RT:n()}
+            end || {ok, Details} <- statistics:get_ring_details()],
+    ct:pal("RING: ~.2p", [Ring]),
+    ct:pal("######## finish join ########"),
     % let Y nodes gracefully leave, one after another - not more than minority of tm_tms can die!
+    ToShutdown =
+        if StartOnlyAdded -> util:random_subset(Y, Started);
+           true -> [pid_groups:group_of(Pid)|| Pid <- util:random_subset(Y, pid_groups:find_all(dht_node))]
+        end,
     [begin
-         ct:pal("Killing #~p: ~p", [I, Pid]),
+         Pid = pid_groups:pid_of(Group, dht_node),
+         ct:pal("Killing #~p: ~p (~p)", [I, Pid, Group]),
          comm:send_local(Pid, {leave, null}),
-         check_size(X + 1 - I)
-     end || {I, Pid} <- lists:zip(lists:seq(1, Y), util:random_subset(Y, pid_groups:find_all(dht_node)))],
-    check_size(X + 1 - Y),
+         check_size(X + 4 - I)
+     end || {I, Group} <- lists:zip(lists:seq(1, Y), ToShutdown)],
+    check_size(X + 4 - Y),
     ct:pal("######## waiting for bench finish ########"),
     util:wait_for_process_to_die(BenchPid).
 
