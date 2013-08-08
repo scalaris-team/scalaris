@@ -84,7 +84,6 @@ new(MaxItems, FPR, Hfs, Items) ->
 new_(BitSize, MaxItems, Hfs) when BitSize rem 8 =:= 0 ->
     #bloom{
            size = BitSize,
-           filter = <<0:BitSize>>,
            max_items = MaxItems,
            hfs = Hfs,
            items_count = 0
@@ -116,14 +115,24 @@ add(Bloom, Items) when is_list(Items) ->
 add(Bloom, Item) ->
     add(Bloom, [Item]).
 
+-compile({inline, [p_add_list_v1/4, p_add_list_v1_/4,
+                   p_add_list_v2/4]}).
+
 % V1 - good for few items / positions to set
 % faster than lists:foldl
 -spec p_add_list_v1(Hfs::?REP_HFS:hfs(), BFSize::non_neg_integer(),
                     BF1::binary(), Items::[key()]) -> BF2::binary().
-p_add_list_v1(Hfs, BFSize, BF, [Item | Items]) ->
+p_add_list_v1(Hfs, BFSize, <<>>, Items) ->
+    p_add_list_v1(Hfs, BFSize, <<0:BFSize>>, Items);
+p_add_list_v1(Hfs, BFSize, BF, Items) ->
+    p_add_list_v1_(Hfs, BFSize, BF, Items).
+
+-spec p_add_list_v1_(Hfs::?REP_HFS:hfs(), BFSize::non_neg_integer(),
+                    BF1::binary(), Items::[key()]) -> BF2::binary().
+p_add_list_v1_(Hfs, BFSize, BF, [Item | Items]) ->
     Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
-    p_add_list_v1(Hfs, BFSize, set_bits(BF, Positions), Items);
-p_add_list_v1(_Hfs, _BFSize, BF, []) ->
+    p_add_list_v1_(Hfs, BFSize, set_bits(BF, Positions), Items);
+p_add_list_v1_(_Hfs, _BFSize, BF, []) ->
     BF.
 
 % V2 - good for large number of items / positions to set
@@ -137,14 +146,14 @@ p_add_list_v2(Hfs, BFSize, BF, Items) ->
     PosInByte = Pos rem 8,
     PreBitsNum = Pos - PosInByte,
     AccPosBF = (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF, <<0:PreBitsNum>>, BF).
+    p_add_list_v2_(Rest, AccPosBF, <<0:PreBitsNum>>, BF, BFSize).
 
-p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, BF) when Pos - erlang:bit_size(AccBF) < 8 ->
+p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, BF, BFSize) when Pos - erlang:bit_size(AccBF) < 8 ->
     % Pos in same byte
     PosInByte = Pos rem 8,
     AccPosBF2 = AccPosBF bor (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF2, AccBF, BF);
-p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, BF) ->
+    p_add_list_v2_(Rest, AccPosBF2, AccBF, BF, BFSize);
+p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, BF, BFSize) ->
     PosInByte = Pos rem 8,
     PreBitsNum2 = Pos - PosInByte,
     DiffBits = PreBitsNum2 - erlang:bit_size(AccBF) - 8,
@@ -152,20 +161,25 @@ p_add_list_v2_([Pos | Rest], AccPosBF, AccBF, BF) ->
     AccBF2 = <<AccBF/binary, AccPosBF:8, 0:DiffBits>>,
     % make new AccPosBF
     AccPosBF2 = (2#10000000 bsr PosInByte),
-    p_add_list_v2_(Rest, AccPosBF2, AccBF2, BF);
-p_add_list_v2_([], AccPosBF, AccBF, BF) ->
-    BFSize = erlang:bit_size(BF),
+    p_add_list_v2_(Rest, AccPosBF2, AccBF2, BF, BFSize);
+p_add_list_v2_([], AccPosBF, AccBF, BF, BFSize) ->
     RestBits = BFSize - erlang:bit_size(AccBF) - 8,
-    <<AccBF2Nr:BFSize>> = <<AccBF/binary, AccPosBF:8, 0:RestBits>>,
-    % merge AccBF2 and BF
-    <<BFNr:BFSize>> = BF,
-    ResultNr = AccBF2Nr bor BFNr,
-    <<ResultNr:BFSize>>.
+    case BF of
+        <<>> -> <<AccBF/binary, AccPosBF:8, 0:RestBits>>;
+        _ ->
+            <<AccBF2Nr:BFSize>> = <<AccBF/binary, AccPosBF:8, 0:RestBits>>,
+            % merge AccBF2 and BF
+            <<BFNr:BFSize>> = BF,
+            ResultNr = AccBF2Nr bor BFNr,
+            <<ResultNr:BFSize>>
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc returns true if the bloom filter contains item
 -spec is_element(bloom_filter(), key()) -> boolean().
+is_element(#bloom{filter = <<>>}, _Item) ->
+    false;
 is_element(#bloom{size = BFSize, hfs = Hfs, filter = Filter}, Item) -> 
     Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
     check_Bits(Filter, Positions).
@@ -175,17 +189,31 @@ is_element(#bloom{size = BFSize, hfs = Hfs, filter = Filter}, Item) ->
 %% @doc joins two bloom filter, returned bloom filter represents their union
 -spec join(bloom_filter(), bloom_filter()) -> bloom_filter().
 join(#bloom{size = Size, max_items = ExpItem1, items_count = Items1,
+            filter = <<>>, hfs = Hfs},
+     #bloom{size = Size, max_items = ExpItem2, items_count = Items2,
+            filter = F2}) ->
+    #bloom{size = Size, filter = F2, hfs = Hfs,
+           max_items = erlang:max(ExpItem1, ExpItem2),
+           items_count = Items1 + Items2 %approximation
+           };
+join(#bloom{size = Size, max_items = ExpItem1, items_count = Items1,
+            filter = F1, hfs = Hfs},
+     #bloom{size = Size, max_items = ExpItem2, items_count = Items2,
+            filter = <<>>}) ->
+    #bloom{size = Size, filter = F1, hfs = Hfs,
+           max_items = erlang:max(ExpItem1, ExpItem2),
+           items_count = Items1 + Items2 %approximation
+           };
+join(#bloom{size = Size, max_items = ExpItem1, items_count = Items1,
             filter = F1, hfs = Hfs},
      #bloom{size = Size, max_items = ExpItem2, items_count = Items2,
             filter = F2}) ->
     <<F1Val : Size>> = F1,
     <<F2Val : Size>> = F2,
     NewFVal = F1Val bor F2Val,
-    #bloom{size = Size,
-           filter = <<NewFVal:Size>>,
+    #bloom{size = Size, filter = <<NewFVal:Size>>, hfs = Hfs,
            max_items = erlang:max(ExpItem1, ExpItem2),
-           hfs = Hfs,
-           items_count = Items1 + Items2 %approximation            
+           items_count = Items1 + Items2 %approximation
            }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -202,10 +230,8 @@ equals(#bloom{ size = Size1, items_count = Items1, filter = Filter1 },
 
 %% @doc Return bloom filter debug information.
 -spec print(bloom_filter()) -> [{atom(), any()}].
-print(#bloom{ max_items = MaxItems,
-               size = Size,
-               hfs = Hfs,
-               items_count = NumItems } = Bloom) -> 
+print(#bloom{max_items = MaxItems, size = Size, hfs = Hfs,
+             items_count = NumItems} = Bloom) ->
     HCount = ?REP_HFS:size(Hfs),
     [{filter_bit_size, Size},
      {struct_byte_size, byte_size(term_to_binary(Bloom))},
@@ -218,7 +244,7 @@ print(#bloom{ max_items = MaxItems,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec get_property(bloom_filter(), atom()) -> not_found | term().
-get_property(#bloom{ size = Size, hfs = Hfs, items_count = NumItems }, fpr) ->
+get_property(#bloom{size = Size, hfs = Hfs, items_count = NumItems}, fpr) ->
     calc_FPR(Size, NumItems, ?REP_HFS:size(Hfs));
 get_property(Bloom, Property) ->
     FieldNames = record_info(fields, bloom),
