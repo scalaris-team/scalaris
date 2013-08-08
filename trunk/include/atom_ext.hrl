@@ -23,7 +23,7 @@
 
 %% TAKE EXTRA CARE THAT ALL VALUES ARE UNIQUE! %%
 
--ifdef(DEBUG).
+-ifdef(enable_debug).
 -define(int_or_atom(Int, Atom), Atom).
 -else.
 -define(int_or_atom(Int, Atom), Int).
