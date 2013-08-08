@@ -624,7 +624,8 @@ on({crash, Pid}, State) ->
 %%     State;
 
 on({new_node_id, Id}, State) ->
-    tx_tm = state_get_role(State),
+    %% only in tx_tm not in rtm processes!
+    ?ASSERT(tx_tm =:= state_get_role(State)),
     RTMs = state_get_RTMs(State),
     IDs = ?RT:get_replica_keys(Id),
     NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
@@ -632,7 +633,8 @@ on({new_node_id, Id}, State) ->
 %% periodic RTM update
 on({update_RTMs}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:update_RTMs in Pid ~p ~n", [self()]),
-    tx_tm = state_get_role(State),
+    %% only in tx_tm not in rtm processes!
+    ?ASSERT(tx_tm =:= state_get_role(State)),
     RTMs = state_get_RTMs(State),
     rtm_update(RTMs, config:read(tx_rtm_update_interval) div 1000,
                {update_RTMs}),
@@ -642,7 +644,8 @@ on({update_RTMs_on_init}, State) ->
 %% accept RTM updates
 on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:get_rtm_reply in Pid ~p for Pid ~p and State ~p~n", [self(), InPid, _State]),
-    tx_tm = state_get_role(State),
+    %% only in tx_tm not in rtm processes!
+    ?ASSERT(tx_tm =:= state_get_role(State)),
     RTMs = state_get_RTMs(State),
     NewRTMs = rtms_upd_entry(RTMs, InKey, InPid, InAcceptor),
     rtms_of_same_dht_node(NewRTMs),
@@ -688,7 +691,8 @@ on_init({update_RTMs_on_init}, State) ->
 
 on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:get_rtm_reply in Pid ~p for Pid ~p State ~p~n", [self(), InPid, _State]),
-    tx_tm = state_get_role(State),
+    %% only in tx_tm not in rtm processes!
+    ?ASSERT(tx_tm =:= state_get_role(State)),
     RTMs = state_get_RTMs(State),
     NewRTMs = rtms_upd_entry(RTMs, InKey, InPid, InAcceptor),
     case lists:keymember(unknown, 2, NewRTMs) of %% filled all entries?
@@ -699,10 +703,17 @@ on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     end;
 
 on_init({new_node_id, Id}, State) ->
-    tx_tm = state_get_role(State),
+    %% only in tx_tm not in rtm processes!
+    ?ASSERT(tx_tm =:= state_get_role(State)),
     case state_get_RTMs(State) of
-        [] -> State;
+        [] ->
+            %% new_node_id before first get_node_details: delay this info.
+            comm:send_local(self(), {new_node_id, Id}),
+            State;
         [_|_] = RTMs ->
+            %% tx_tm processes have always #replicas entries here,
+            %% crashed rtms are listed as 'unknown' (so using
+            %% lists:zip is safe here)
             IDs = ?RT:get_replica_keys(Id),
             NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
             state_set_RTMs(State, NewRTMs)
@@ -710,8 +721,8 @@ on_init({new_node_id, Id}, State) ->
 
 %% do not accept new commit requests when not enough rtms are valid
 on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
-    %% only in tx_tm
-    tx_tm = state_get_role(State),
+    %% only in tx_tm not in rtm processes!
+    ?ASSERT(tx_tm =:= state_get_role(State)),
     %% forward request to a node which is ready to serve requests
     DHTNode = pid_groups:get_my(dht_node),
     %% there, redirect message to tx_tm
