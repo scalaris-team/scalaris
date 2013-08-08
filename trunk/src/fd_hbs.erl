@@ -131,9 +131,12 @@ on({check_delayed_del_watching_of, WatchedPid, Time} = _Msg, State) ->
     %% entry time is still unmodified since this message was triggered
     RemPids = state_get_rem_pids(State),
     case lists:keyfind(WatchedPid, 1, RemPids) of
-        false -> log:log(warn, "req. to delete non watched pid ~p.~n",
-                         [WatchedPid]),
-                 State;
+        false ->
+            %% WatchedPid may be crashed and therefore the entry was
+            %% already removed in on({crashed, ...}, ...).
+            log:log(warn, "req. to delete non watched/crashed pid ~p.~n",
+                    [WatchedPid]),
+            State;
         Entry ->
             NewRemPids =
                 case rempid_get_last_modified(Entry) of
