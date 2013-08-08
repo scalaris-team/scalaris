@@ -95,25 +95,27 @@ new_(BitSize, MaxItems, Hfs) ->
 
 %% @doc Adds one or more items to the bloom filter.
 -spec add(bloom_filter(), key() | [key()]) -> bloom_filter().
-add(Bloom, Items) when is_list(Items) ->
-    #bloom{
-           size = BFSize,
+add(#bloom{size = BFSize,
            hfs = Hfs,
            items_count = FilledCount,
            filter = Filter
-          } = Bloom,
+          } = Bloom, Items) when is_list(Items) ->
     % choose version according to the number of elements to add:
-    F = case Items of
-            []      -> p_add_list_v1(Hfs, BFSize, Filter, Items);
-            [_]     -> p_add_list_v1(Hfs, BFSize, Filter, Items);
-            [_|_]   -> p_add_list_v2(Hfs, BFSize, Filter, Items)
+    % when setting around 16*3 positions, V2 is faster
+    MinLengthForV2 = erlang:max(1, (16 * 3) div ?REP_HFS:size(Hfs)),
+    F = case util:lists_check_min_length(Items, MinLengthForV2) of
+            true -> p_add_list_v2(Hfs, BFSize, Filter, Items);
+            _    -> p_add_list_v1(Hfs, BFSize, Filter, Items)
         end,
-    Bloom#bloom{
-                filter = F,
-                items_count = FilledCount + length(Items)
-               };
-add(Bloom, Item) ->
-    add(Bloom, [Item]).
+    Bloom#bloom{filter = F,
+                items_count = FilledCount + length(Items)};
+add(#bloom{size = BFSize,
+           hfs = Hfs,
+           items_count = FilledCount,
+           filter = Filter
+          } = Bloom, Item) ->
+    Bloom#bloom{filter = p_add_list_v1(Hfs, BFSize, Filter, [Item]),
+                items_count = FilledCount + 1}.
 
 -compile({inline, [p_add_list_v1/4, p_add_list_v1_/4,
                    p_add_list_v2/4]}).
