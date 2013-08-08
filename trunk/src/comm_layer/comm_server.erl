@@ -58,7 +58,8 @@ send({{_IP1, _IP2, _IP3, _IP4} = TargetIP, TargetPort, TargetPid} = Target,
     {MyIP, MyPort} = get_local_address_port(),
     if MyIP =:= TargetIP andalso MyPort =:= TargetPort andalso is_pid(TargetPid) ->
            % local process identified by PID
-           case is_process_alive(TargetPid) of
+           case is_process_alive(TargetPid) andalso
+                    erlang:process_info(TargetPid, priority) =/= {priority, low} of
                true ->
                    %% minor gap of error reporting, if PID
                    %% dies at this moment, but better than a

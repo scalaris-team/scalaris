@@ -227,7 +227,9 @@ find_a(PidName) ->
                             %% processes not registered in a pid_group (failed)
                             %% io:format("Ring is created to find a ~p in ~p ~p~n",
                             %% [PidName, self(), pid_groups:group_and_name_of(self())]),
-                            Ring = ring_new(lists:flatten(Pids)),
+                            Ring = ring_new([PidX || PidX <- lists:flatten(Pids),
+                                                     erlang:is_process_alive(PidX),
+                                                     erlang:process_info(PidX, priority) =/= {priority, low}]),
                             {Pid, NewPids} = ring_get(Ring),
                             erlang:put(CachedName, NewPids),
                             Pid;
@@ -242,7 +244,8 @@ find_a(PidName) ->
             end;
         Pid when is_pid(Pid) ->
             %% clean process local cache if entry is outdated
-            case erlang:is_process_alive(Pid) of
+            case erlang:is_process_alive(Pid) andalso
+                     erlang:process_info(Pid, priority) =/= {priority, low} of
                 true ->
                     Pid;
                 false -> erlang:erase(CachedName),
@@ -251,7 +254,8 @@ find_a(PidName) ->
         Pids ->
             %% clean process local cache if entry is outdated
             {Pid, NewPids} = ring_get(Pids),
-            case erlang:is_process_alive(Pid) of
+            case erlang:is_process_alive(Pid) andalso
+                     erlang:process_info(Pid, priority) =/= {priority, low} of
                 true ->
                     erlang:put(CachedName, NewPids),
                     Pid;

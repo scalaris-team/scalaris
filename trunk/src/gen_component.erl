@@ -84,6 +84,7 @@
 -type gc_msg() ::
           bp_msg()
         | {'$gen_component', sleep, pos_integer()}
+        | {'$gen_component', about_to_kill, pos_integer(), pid()}
         | {'$gen_component', get_state, pid()}
         | {'$gen_component', get_component_state, pid()}
         | {'$gen_component', trace_mpath, trace_mpath:passed_state(),
@@ -308,7 +309,7 @@ bp_about_to_kill(Pid) ->
     % suspend gen_component independently from break points being set/active
     % (60s should be enough for the sub-sequent kill)
     % see sup:sup_terminate_childs/1
-    Pid ! Msg = {'$gen_component', sleep, 60000, self()},
+    Pid ! Msg = {'$gen_component', about_to_kill, 60000, self()},
     receive
         Msg -> erlang:demonitor(MonitorRef, [flush]), ok;
         {'DOWN', MonitorRef, process, Pid, _Info1} -> ok
@@ -707,9 +708,11 @@ on_gc_msg({'$gen_component', bp, msg_in_bp_waiting, Pid}, UState, GCState) ->
 on_gc_msg({'$gen_component', sleep, Time}, UState, GCState) ->
     timer:sleep(Time),
     loop(UState, GCState);
-on_gc_msg({'$gen_component', sleep, Time, Pid} = Msg, UState, GCState) ->
+on_gc_msg({'$gen_component', about_to_kill, Time, Pid} = Msg, UState, GCState) ->
     comm:send_local(Pid, Msg),
+    process_flag(priority, low),
     timer:sleep(Time),
+    process_flag(priority, normal),
     loop(UState, GCState);
 on_gc_msg({'$gen_component', get_state, Pid}, UState, GCState) ->
     comm:send_local(
@@ -905,10 +908,12 @@ on_bp_req_in_bp(Msg, State,
       Pid, {'$gen_component', get_component_state_response, State}),
     wait_for_bp_leave(Msg, State, true);
 on_bp_req_in_bp(Msg, State,
-                {'$gen_component', sleep, Time, Pid} = SleepMsg,
+                {'$gen_component', about_to_kill, Time, Pid} = SleepMsg,
                 _IsFromQueue) ->
     comm:send_local(Pid, SleepMsg),
+    process_flag(priority, low),
     timer:sleep(Time),
+    process_flag(priority, normal),
     wait_for_bp_leave(Msg, State, true).
 
 
