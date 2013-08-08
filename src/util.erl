@@ -43,6 +43,7 @@
          lists_partition3/2,
          lists_remove_at_indices/2,
          sublist/3, lists_index_of/2,
+         lists_check_min_length/2,
          sleep_for_ever/0, shuffle/1, get_proc_in_vms/1,random_subset/2,
          gb_trees_largest_smaller_than/2, gb_trees_foldl/3, pow/2,
          zipfoldl/5, safe_split/2, '=:<'/2,
@@ -1147,6 +1148,14 @@ lists_index_of(Element, List) when is_list(List) ->
 lists_index_of_(_E, [], _N)      -> not_found;
 lists_index_of_(E, [E | _TL], N) -> N;
 lists_index_of_(E, [_H | TL], N) -> lists_index_of_(E, TL, N + 1).
+
+%% @doc Checks whether the given list is at least the given length long without
+%%      going through the whole list like erlang:length/1.
+-spec lists_check_min_length(List::[any()], non_neg_integer()) -> boolean().
+lists_check_min_length([], I) when I > 0 -> false;
+lists_check_min_length(_, 0) -> true;
+lists_check_min_length([_|T], I) ->
+    lists_check_min_length(T, I - 1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % repeat
