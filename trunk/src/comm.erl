@@ -144,6 +144,32 @@ send(Pid, Msg, Options) ->
     end,
     ok.
 
+-ifdef(enable_debug).
+-define(SEND_LOCAL_CHECK_PID(Pid, Msg),
+        if is_atom(Pid) ->
+               case whereis(Pid) of
+                   undefined ->
+                       log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, "
+                                   "drop message ~.0p due to ~p",
+                               [self(), pid_groups:my_pidname(), RealPid,
+                                RealMsg, local_target_not_alive]);
+                   _ -> ok
+               end;
+           is_pid(Pid) ->
+               case is_process_alive(Pid) andalso
+                        erlang:process_info(Pid, priority) =/= {priority, low} of
+                   true -> ok;
+                   false ->
+                       log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, "
+                                   "drop message ~.0p due to ~p",
+                               [self(), pid_groups:my_pidname(), RealPid,
+                                RealMsg, local_target_not_alive])
+               end
+        end).
+-else.
+-define(SEND_LOCAL_CHECK_PID(Pid, Msg), ok).
+-endif.
+
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()).
 -spec send_local(erl_local_pid(), message() | group_message()) -> ok.
@@ -151,6 +177,7 @@ send_local(Pid, Msg) ->
     {RealPid, RealMsg} = unpack_cookie(Pid, Msg),
     _ = case erlang:get(trace_mpath) of
             undefined ->
+                ?SEND_LOCAL_CHECK_PID(RealPid, RealMsg),
                 RealPid ! RealMsg;
             Logger ->
                 Deliver = trace_mpath:log_send(Logger, self(),
