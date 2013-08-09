@@ -421,31 +421,32 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 
 -spec check_node([merkle_cmp_request()], merkle_tree:merkle_tree() | RestTree) 
         -> {[merkle_cmp_result()], RestTree}
-    when
-        is_subtype(RestTree, [merkle_tree:mt_node()]).
+    when is_subtype(RestTree, [merkle_tree:mt_node()]).
 check_node(L, Tree) ->
     case merkle_tree:is_merkle_tree(Tree) of
-        false -> p_check_node(L, Tree, {[], []});
-        true -> p_check_node(L, [merkle_tree:get_root(Tree)], {[], []})
+        false -> p_check_node(L, Tree, [], []);
+        true -> p_check_node(L, [merkle_tree:get_root(Tree)], [], [])
     end.
 
--spec p_check_node([merkle_cmp_request()], [merkle_tree:mt_node()], Acc::Res) -> Res
-    when
-        is_subtype(Res, {[merkle_cmp_result()], [merkle_tree:mt_node()]}).
-p_check_node([], [], {AccR, AccN}) ->
-    {lists:reverse(AccR), lists:reverse(AccN)};
-p_check_node([?omit | TK], [_Node | TN], Acc) ->
-    p_check_node(TK, TN, Acc);
-p_check_node([Hash | TK], [Node | TN], {AccR, AccN}) ->
+%% @doc Compares the given Hashes from the other node with my merkle_tree nodes.
+%%      Returns the comparison results and the rest nodes to check in a next
+%%      step.
+-spec p_check_node(Hashes::[merkle_cmp_request()], MyNodes::[merkle_tree:mt_node()],
+                   [merkle_cmp_result()], RestTreeIn::[[merkle_tree:mt_node()]])
+        -> {[merkle_cmp_result()], RestTreeOut::[merkle_tree:mt_node()]}.
+p_check_node([], [], AccR, AccN) ->
+    {lists:reverse(AccR), lists:append(lists:reverse(AccN))};
+p_check_node([?omit | TK], [_Node | TN], AccR, AccN) ->
+    p_check_node(TK, TN, AccR, AccN);
+p_check_node([Hash | TK], [Node | TN], AccR, AccN) ->
     IsLeaf = merkle_tree:is_leaf(Node),
     case merkle_tree:get_hash(Node) =:= Hash of
-        true when IsLeaf -> p_check_node(TK, TN, {[?ok_leaf | AccR], AccN});
-        true when not IsLeaf -> p_check_node(TK, TN, {[?ok_inner | AccR], AccN});
-        false when IsLeaf -> p_check_node(TK, TN, {[?fail_leaf | AccR], AccN});
+        true when IsLeaf -> p_check_node(TK, TN, [?ok_leaf | AccR], AccN);
+        true when not IsLeaf -> p_check_node(TK, TN, [?ok_inner | AccR], AccN);
+        false when IsLeaf -> p_check_node(TK, TN, [?fail_leaf | AccR], AccN);
         false when not IsLeaf ->
             Childs = merkle_tree:get_childs(Node),
-            p_check_node(TK, TN, {[?fail_inner | AccR],
-                                  lists:append(lists:reverse(Childs), AccN)}) 
+            p_check_node(TK, TN, [?fail_inner | AccR], [Childs | AccN])
     end.
 
 -spec process_tree_cmp_result([merkle_cmp_result()], merkle_tree:merkle_tree() | RestTree, pos_integer(), Stats) ->
@@ -489,9 +490,9 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, 
             NewReq = [merkle_tree:get_hash(X) || X <- Childs],
             NStats = rr_recon_stats:inc([{tree_compareLeft, length(Childs)}], Stats),
             p_process_tree_cmp_result(TR, TN, BS, NStats,
-                                      lists:append(lists:reverse(NewReq), Req),
+                                      lists:reverse(NewReq, Req),
                                       Res,
-                                      lists:append(lists:reverse(Childs), RTree));
+                                      lists:reverse(Childs, RTree));
         true -> 
             NewReq = lists:duplicate(BS, ?omit),
             p_process_tree_cmp_result(TR, TN, BS, Stats,
