@@ -854,12 +854,12 @@ set_entry(NewEntry, State) ->
 
 -spec get_paxos_ids(State::state(), TxState::tx_state()) -> [paxos_id()].
 get_paxos_ids(State, TxState) ->
-    lists:append(
-      [ begin
-            {ok, ItemState} = get_item_entry(ItemId, State),
-            [ PaxId || {PaxId, _RTLog, _TP}
-                           <- tx_item_get_paxosids_rtlogs_tps(ItemState) ]
-        end || ItemId <- tx_state_get_txitemids(TxState) ]).
+    lists:flatmap(
+      fun(ItemId) ->
+              {ok, ItemState} = get_item_entry(ItemId, State),
+              [PaxId || {PaxId, _RTLog, _TP}
+                            <- tx_item_get_paxosids_rtlogs_tps(ItemState)]
+      end, tx_state_get_txitemids(TxState)).
 
 -spec inform_client(tx_state(), state(), ?commit | ?abort) -> ok.
 inform_client(TxState, State, Result) ->
@@ -955,7 +955,7 @@ merge_item_states(Tid, [EntryId | RestLocal],
                   [{EntryId, Maj_for_prepared, Maj_for_abort, TLogEntry} | RestNew],
                   State, Learners, LAcceptor) ->
     {LocalItemStatus, LocalItem} = get_item_entry(EntryId, State),
-    {TmpItem, TmpItemHoldBackQ} =
+    {TmpItem, TmpItemHoldBackQR} =
         case LocalItemStatus of
             new -> %% nothing known locally
                 {tx_item_new(
@@ -967,7 +967,7 @@ merge_item_states(Tid, [EntryId | RestLocal],
                 Entry = tx_item_new(
                           EntryId, Tid, TLogEntry, Maj_for_prepared,
                           Maj_for_abort),
-                {Entry, IHoldBQ};
+                {Entry, lists:reverse(IHoldBQ)};
             ok ->
                 log:log(error, "Duplicate init_RTM for an item", []),
                 %% hold back queue should be empty!
@@ -977,7 +977,7 @@ merge_item_states(Tid, [EntryId | RestLocal],
     _ = set_entry(NewItem, State),
     _ = [ acceptor:start_paxosid_local(LAcceptor, PaxId, Learners)
             || {PaxId, _RTlog, _TP} <- tx_item_get_paxosids_rtlogs_tps(NewItem) ],
-    [lists:reverse(TmpItemHoldBackQ) |
+    [TmpItemHoldBackQR |
          merge_item_states(Tid, RestLocal, RestNew, State, Learners, LAcceptor)].
 
 %% -spec count_messages_for_type(Type::term()) ->

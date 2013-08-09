@@ -801,9 +801,9 @@ smerge2_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, FirstExist, Second
            smerge2_helper(L1, T2, Lte, EqSelect, FirstExist, SecondExist, lists:reverse(SecondExist(H2)) ++ ML)
     end;
 smerge2_helper(L1, [], _Lte, _EqSelect, FirstExist, _SecondExist, ML) ->
-    lists:reverse(ML, lists:append([FirstExist(X) || X <- L1]));
+    lists:reverse(ML, lists:flatmap(FirstExist, L1));
 smerge2_helper([], L2, _Lte, _EqSelect, _FirstExist, SecondExist, ML) ->
-    lists:reverse(ML, lists:append([SecondExist(X) || X <- L2])).
+    lists:reverse(ML, lists:flatmap(SecondExist, L2)).
 
 %% @doc Try to check whether common-test is running.
 -spec is_unittest() -> boolean().
