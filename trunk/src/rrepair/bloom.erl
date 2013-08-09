@@ -142,8 +142,9 @@ p_add_list_v1_(_Hfs, _BFSize, BF, []) ->
                     BF1::binary(), Items::[key()]) -> BF2::binary().
 p_add_list_v2(_Hfs, _BFSize, BF, []) -> BF;
 p_add_list_v2(Hfs, BFSize, BF, Items) ->
-    Positions = lists:flatten([?REP_HFS:apply_val_rem(Hfs, Item, BFSize)
-                                 || Item <- Items]),
+    Positions = lists:flatmap(fun(Item) ->
+                                      ?REP_HFS:apply_val_rem(Hfs, Item, BFSize)
+                              end, Items),
     [Pos | Rest] = lists:usort(Positions),
     PosInByte = Pos rem 8,
     PreBitsNum = Pos - PosInByte,

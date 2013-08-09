@@ -123,16 +123,18 @@ get_ring_details_neighbors(RecursionLvl, Ring, Nodes) ->
         true -> NewRing;
         _ -> % gather nodes for the next recursion:
             NextNodes =
-                lists:append(
-                  [begin
-                     case RingE of
-                         {ok, Details} ->
-                             [node:pidX(Node) || Node <- node_details:get(Details, predlist)] ++
-                             [node:pidX(Node) || Node <- node_details:get(Details, succlist)];
-                         {failed, _Pid} ->
-                             []
-                     end
-                 end || RingE <- NewRing]),
+                lists:flatmap(
+                  fun(RingE) ->
+                          case RingE of
+                              {ok, Details} ->
+                                  PredList = node_details:get(Details, predlist),
+                                  SuccList = node_details:get(Details, succlist),
+                                  [node:pidX(Node) || Node <- PredList] ++
+                                      [node:pidX(Node) || Node <- SuccList];
+                              {failed, _Pid} ->
+                                  []
+                          end
+                  end, NewRing),
             get_ring_details_neighbors(RecursionLvl - 1, NewRing, NextNodes)
     end.
 

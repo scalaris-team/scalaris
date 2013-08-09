@@ -180,4 +180,4 @@ print(Stats) ->
                          fun(I) ->
                                  {lists:nth(I, FieldNames), erlang:element(I + 1, Stats)}
                          end),
-    [erlang:element(1, Stats), lists:flatten(lists:reverse(Res))].
+    [erlang:element(1, Stats), lists:reverse(Res)].

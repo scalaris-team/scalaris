@@ -358,7 +358,7 @@ print_resolve_stats(Stats) ->
                          fun(I) ->
                                  {lists:nth(I, FieldNames), erlang:element(I + 1, Stats)}
                          end),
-    [erlang:element(1, Stats), lists:flatten(Res)].
+    [erlang:element(1, Stats), Res].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP

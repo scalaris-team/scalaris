@@ -617,7 +617,8 @@ minus(A, A)      -> empty();
 minus(A, [HB | TB]) ->
     % from every simple interval in A, remove all simple intervals in B
     % note: we cannot use minus_simple in foldl since the result may be a list again
-    normalize_internal(lists:flatten([minus(minus_simple(IA, HB), TB) || IA <- A])).
+    normalize_internal(
+      lists:flatmap(fun(IA) -> minus(minus_simple(IA, HB), TB) end, A)).
 
 %% @private
 %% @doc Determines whether an interval with the given borders wraps around,
