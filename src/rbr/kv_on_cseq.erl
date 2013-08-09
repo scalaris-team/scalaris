@@ -550,7 +550,7 @@ readlock(Entry) -> element(1, Entry).
 set_readlock(prbr_bottom, TxId) ->
     set_readlock(new_entry(), TxId);
 set_readlock(Entry, TxId) ->
-    NewRL = lists:append(element(1, Entry), [TxId]),
+    NewRL = [TxId | element(1, Entry)],
     setelement(1, Entry, NewRL).
 -spec unset_readlock(db_entry(), ?RT:key()) -> db_entry().
 unset_readlock(Entry, TxId) ->
