@@ -46,7 +46,7 @@
                 size          = 0                     :: non_neg_integer(),%bit-length of the bloom filter - requirement: size rem 8 = 0
                 filter        = <<>>                  :: binary(),         %length = size div 8
                 hfs           = ?required(bloom, hfs) :: ?REP_HFS:hfs(),   %HashFunctionSet
-                max_items     = undefined             :: non_neg_integer() | undefined, %extected number of items
+                max_items     = undefined             :: non_neg_integer() | undefined, %expected number of items
                 items_count   = 0                     :: non_neg_integer() %number of inserted items
                }).
 %-opaque bloom_filter() :: #bloom{}.
@@ -103,12 +103,13 @@ add(#bloom{size = BFSize,
     % choose version according to the number of elements to add:
     % when setting around 16*3 positions, V2 is faster
     MinLengthForV2 = erlang:max(1, (16 * 3) div ?REP_HFS:size(Hfs)),
-    F = case util:lists_check_min_length(Items, MinLengthForV2) of
-            true -> p_add_list_v2(Hfs, BFSize, Filter, Items);
-            _    -> p_add_list_v1(Hfs, BFSize, Filter, Items)
+    ItemsL = length(Items),
+    F = if ItemsL >= MinLengthForV2 ->
+               p_add_list_v2(Hfs, BFSize, Filter, Items);
+           true ->
+               p_add_list_v1(Hfs, BFSize, Filter, Items)
         end,
-    Bloom#bloom{filter = F,
-                items_count = FilledCount + length(Items)};
+    Bloom#bloom{filter = F, items_count = FilledCount + ItemsL};
 add(#bloom{size = BFSize,
            hfs = Hfs,
            items_count = FilledCount,
