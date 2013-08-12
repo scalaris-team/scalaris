@@ -294,10 +294,7 @@ on({check_nodes_response, CmpResults}, State =
     {Req, Res, NStats, RTree} = process_tree_cmp_result(CmpResults, Tree, get_merkle_branch_factor(), Stats),
     Req =/= [] andalso
         send(DestReconPid, {check_nodes, comm:this(), Req}),
-    {Leafs, Resolves} = lists:foldl(fun(Node, {AccL, AccR}) -> 
-                                            {LCount, RCount} = resolve_node(Node, {SrcNode, SID, OwnerL}),
-                                            {AccL + LCount, AccR + RCount}
-                                    end, {0, 0}, Res),
+    {Leafs, Resolves} = resolve_nodes(Res, SrcNode, SID, OwnerL, comm:make_global(OwnerL), 0, 0),
     FStats = rr_recon_stats:inc([{tree_leafsSynced, Leafs},
                                  {resolve_started, Resolves}], NStats),
     CompLeft = rr_recon_stats:get(tree_compareLeft, FStats),
@@ -501,26 +498,26 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, 
 
 % @doc Starts one resolve process per leaf node in a given node
 %      Returns: number of visited leaf nodes and number of leaf resolve requests.
--spec resolve_node(merkle_tree:mt_node() | not_found,
-                   {Dest::comm:mypid(), rrepair:session_id(), OwnerRemote::comm:erl_local_pid()})
-        -> {Leafs::non_neg_integer(), ResolveReq::non_neg_integer()}.
-resolve_node(not_found, _) -> {0, 0};
-resolve_node(Node, Conf) ->
-    case merkle_tree:is_leaf(Node) of
-        true -> {1, resolve_leaf(Node, Conf)};
-        false -> lists:foldl(fun(X, {AccL, AccR}) ->
-                                     {LCount, RCount} = resolve_node(X, Conf),
-                                     {AccL + LCount, AccR + RCount} 
-                             end,
-                             {0, 0}, merkle_tree:get_childs(Node))
-    end.
+-spec resolve_nodes([merkle_tree:mt_node()], Dest::comm:mypid(), rrepair:session_id(),
+                    OwnerLocal::comm:erl_local_pid(), OwnerRemote::comm:mypid(),
+                    LeafCountIn::non_neg_integer(), ResolveReqCountIn::non_neg_integer())
+        -> {LeafCountOut::non_neg_integer(), ResolveReqCountOut::non_neg_integer()}.
+resolve_nodes([], _Dest, _SID, _OwnerL, _OwnerR, Leafs, ResolveReqs) -> {Leafs, ResolveReqs};
+resolve_nodes([Node | Rest], Dest, SID, OwnerL, OwnerR, Leafs, ResolveReqs) ->
+    {LCount, RCount} =
+        case merkle_tree:is_leaf(Node) of
+            true -> {1, resolve_leaf(Node, Dest, SID, OwnerL, OwnerR)};
+            false -> resolve_nodes(merkle_tree:get_childs(Node), Dest, SID, OwnerL,
+                                   OwnerR, 0, 0)
+        end,
+    resolve_nodes(Rest, Dest, SID, OwnerL, OwnerR, Leafs + LCount, ResolveReqs + RCount).
 
 % @doc Returns number of caused resolve requests (requests with feedback count 2)
--spec resolve_leaf(merkle_tree:mt_node(),
-                   {Dest::comm:mypid(), rrepair:session_id(), OwnerRemote::comm:erl_local_pid()})
+-spec resolve_leaf(merkle_tree:mt_node(), Dest::comm:mypid(), rrepair:session_id(),
+                   OwnerLocal::comm:erl_local_pid(), OwnerRemote::comm:mypid())
         -> 1 | 2.
-resolve_leaf(Node, {Dest, SID, OwnerL}) ->
-    Options = [{feedback_request, comm:make_global(OwnerL)}],
+resolve_leaf(Node, Dest, SID, OwnerL, OwnerR) ->
+    Options = [{feedback_request, OwnerR}],
     LeafInterval = merkle_tree:get_interval(Node),
     case merkle_tree:get_item_count(Node) of
         0 ->
@@ -547,8 +544,9 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
     NStats = case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
                  true -> 
                      {ASyncLeafs, Stats2} = art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, Stats, []),
+                     OwnerR = comm:make_global(OwnerL),
                      ResolveCalled = lists:foldl(fun(X, Acc) ->
-                                                         Acc + resolve_leaf(X, {DestPid, SID, OwnerL})
+                                                         Acc + resolve_leaf(X, DestPid, SID, OwnerL, OwnerR)
                                                  end, 0, ASyncLeafs),
                      rr_recon_stats:inc([{resolve_started, ResolveCalled}], Stats2);
                  false -> Stats

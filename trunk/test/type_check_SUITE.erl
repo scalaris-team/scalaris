@@ -364,8 +364,8 @@ tester_type_check_rrepair(_Config) ->
              {build_recon_struct, 6}, %% DB items must be in interval
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
-             {resolve_node, 2}, %% tries to send messages
-             {resolve_leaf, 2}, %% tries to send messages
+             {resolve_nodes, 7}, %% tries to send messages
+             {resolve_leaf, 5}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
              {send, 2}, %% tries to send messages
              {send_local, 2}, %% tries to send messages
