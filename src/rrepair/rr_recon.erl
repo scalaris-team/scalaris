@@ -169,11 +169,11 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
     % target node got sync request, asked for its interval
     % dest_interval contains the interval of the initiator
     % -> client creates recon structure based on common interval, sends it to initiator
-    RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
     SyncI = find_sync_interval(MyI, SenderI),
     NewState = State#rr_recon_state{stage = build_struct},
     case intervals:is_empty(SyncI) of
         false ->
+            RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
             % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
             SenderSyncI = map_interval(SenderI, SyncI),
             send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(), false),
@@ -258,7 +258,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                            method = RMethod,           params = Params})
   when RMethod =:= merkle_tree orelse RMethod =:= art->
     ?TRACE1(_Msg, State),
-    % no need to map keys since the other node's bloom filter was created with
+    % no need to map keys since the other node's sync struct was created with
     % keys mapped to our interval
     DBList = [encodeBlob(KeyX, VersionX) || {KeyX, VersionX} <- DBList0],
     MySyncI = case RMethod of
