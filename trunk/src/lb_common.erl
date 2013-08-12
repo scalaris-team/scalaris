@@ -112,6 +112,7 @@ split_by_key(DhtNodeState, SelectedKey) ->
 split_my_range(DhtNodeState, SelectedKey) ->
     MyNodeId = dht_node_state:get(DhtNodeState, node_id),
     MyPredId = dht_node_state:get(DhtNodeState, pred_id),
+    % note: MyNodeId cannot be ?PLUS_INFINITY so this split key is valid
     SplitKey = try ?RT:get_split_key(MyPredId, MyNodeId, {1, 2})
                catch throw:not_supported -> SelectedKey
                end,

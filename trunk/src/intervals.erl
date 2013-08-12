@@ -266,7 +266,7 @@ tester_create_non_empty_interval(List, FallbackElem) ->
         false -> I
     end.
 
--spec tester_create_continuous_interval(left_bracket(), key(), key() | ?PLUS_INFINITY, right_bracket()) -> continuous_interval().
+-spec tester_create_continuous_interval(left_bracket(), key(), key() | ?PLUS_INFINITY_TYPE, right_bracket()) -> continuous_interval().
 tester_create_continuous_interval(_LBr, Key, Key, _RBr) ->
     new('[', Key, Key, ']');
 tester_create_continuous_interval(LBr, LKey, ?PLUS_INFINITY, _RBr) ->
@@ -624,7 +624,7 @@ minus(A, [HB | TB]) ->
 %% @doc Determines whether an interval with the given borders wraps around,
 %%      i.e. the interval would cover the (non-existing) gap between
 %%      ?PLUS_INFINITY and ?MINUS_INFINITY.
--spec wraps_around(left_bracket(), key(), key(), right_bracket()) -> boolean().
+-spec wraps_around(left_bracket(), key(), key() | ?PLUS_INFINITY_TYPE, right_bracket()) -> boolean().
 wraps_around(_LeftBr, X, X, _RightBr) ->
     false;
 wraps_around(_LeftBr, ?MINUS_INFINITY, _, _RightBr) ->
@@ -690,7 +690,7 @@ split_feeder(I, Parts) ->
 -spec split(continuous_interval(), Parts::pos_integer()) -> [continuous_interval()].
 split(I, 1) -> [I];
 split(I, Parts) ->
-    {LBr, LKey, RKey, RBr} = intervals:get_bounds(I),
+    {LBr, LKey, RKey, RBr} = get_bounds(I),
     % keep brackets inside the split interval if they are different
     % (i.e. one closed, the other open), otherwise exclude split keys
     % from each first interval at each split
@@ -701,14 +701,20 @@ split(I, Parts) ->
         end,
     lists:reverse(split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, [])).
 
--spec split2_feeder(left_bracket(), key(), key(), right_bracket(), Parts::1..255,
-                    InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()])
+-spec split2_feeder
+        (left_bracket(), key(), key(), right_bracket(), Parts::1..255,
+         InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()])
         -> {left_bracket(), key(), key(), right_bracket(), Parts::pos_integer(),
+            InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()]};
+        (left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')', Parts::1..255,
+         InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()])
+        -> {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')', Parts::pos_integer(),
             InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()]}.
 split2_feeder(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc) ->
     {LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc}.
 
--spec split2(left_bracket(), key(), key(), right_bracket(), Parts::pos_integer(),
+-spec split2(left_bracket(), key(), key() | ?PLUS_INFINITY_TYPE,  %% then right_bracket is ')'
+             right_bracket(), Parts::pos_integer(),
              InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()]) -> [interval()].
 split2(LBr, Key, Key, RBr, _, _InnerLBr, _InnerRBr, Acc) ->
     [new(LBr, Key, Key, RBr) | Acc];

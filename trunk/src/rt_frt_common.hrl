@@ -292,7 +292,7 @@ get_range_(Begin, End) when End < Begin -> (n_() - Begin) + End.
 %%      Beware: SplitFactor must be in [0, 1]; the final key will be rounded
 %%      down and may thus be Begin.
 -spec get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
-                    SplitFraction::{Num::non_neg_integer(), Denom::pos_integer()}) -> key().
+                    SplitFraction::{Num::non_neg_integer(), Denom::pos_integer()}) -> key() | ?PLUS_INFINITY_TYPE.
 get_split_key(Begin, _End, {Num, _Denom}) when Num == 0 -> Begin;
 get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
 get_split_key(Begin, End, {Num, Denom}) ->
