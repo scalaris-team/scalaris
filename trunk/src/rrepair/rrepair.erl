@@ -195,9 +195,26 @@ on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}
                random -> select_sync_node(MyI);        
                _ -> DestKey
            end,
-    ?TRACE("START_TO_DEST ~p", [DKey]),
-    api_dht_raw:unreliable_lookup(DKey, Msg),
-    State;
+    % skip if no key outside my range found
+    case DKey of
+        not_found ->
+            #rrepair_state{open_recon = OR, open_sessions = OS} = State,
+            % similar to handling of recon_progress_report as initiator
+            % assume the session is present (request_sync has created it!)
+            {S, TSessions} = extract_session(SessionId, OS),
+            ?TRACE_RECON("~nRECON OK3 - ~p", [_Sender, S]),
+            % this session is aborted, so it is complete!
+            Stats = rr_recon_stats:new([{session_id, SessionId},
+                                        {status, finish}]),
+            SUpd = update_session_recon(S, Stats),
+            true = check_session_complete(SUpd),
+            State#rrepair_state{open_recon = OR - 1,
+                                open_sessions = [SUpd | TSessions]};
+        _ ->
+            ?TRACE("START_TO_DEST ~p", [DKey]),
+            api_dht_raw:unreliable_lookup(DKey, Msg),
+            State
+    end;
 
 %% @doc receive sync request and spawn a new process which executes a sync protocol
 on({continue_recon, Sender, SessionID, Msg}, State) ->
@@ -324,13 +341,19 @@ request_sync(State = #rrepair_state{round = Round, open_recon = OpenRecon,
                          open_recon = OpenRecon + 1,
                          open_sessions = [S | Sessions] }.
 
-% @doc selects a random associated key of an interval ending
--spec select_sync_node(intervals:interval()) -> ?RT:key().
+%% @doc Selects a random key in the given (continuous) interval and returns one
+%%      of its replicas which is not in the interval.
+-spec select_sync_node(intervals:continuous_interval()) -> ?RT:key() | not_found.
 select_sync_node(Interval) ->
+    ?ASSERT(intervals:is_continuous(Interval)),
     {_, LKey, RKey, _} = intervals:get_bounds(Interval),
     Key = ?RT:get_split_key(LKey, RKey, {1, randoms:rand_uniform(1, 50)}),
-    Keys = lists:delete(Key, ?RT:get_replica_keys(Key)),
-    util:randomelem(Keys).
+    Keys = [K || K <- ?RT:get_replica_keys(Key),
+                 not intervals:in(K, Interval)],
+    case Keys of
+        [] -> not_found;
+        [_|_] -> util:randomelem(Keys)
+    end.
 
 -spec next_round(round()) -> round().
 next_round({R, _Fork}) -> {R + 1, 0}.
