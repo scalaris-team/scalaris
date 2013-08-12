@@ -227,8 +227,11 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     ?TRACE1(_Msg, State),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
-    Diff = [KeyX || {KeyX, VersionX} <- DBList0,
-                    not bloom:is_element(BF, encodeBlob(KeyX, VersionX))],
+    Diff = case bloom:item_count(BF) of
+               0 -> [KeyX || {KeyX, _VersionX} <- DBList0];
+               _ -> [KeyX || {KeyX, VersionX} <- DBList0,
+                             not bloom:is_element(BF, encodeBlob(KeyX, VersionX))]
+           end,
     %if rest interval is non empty start another sync    
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
