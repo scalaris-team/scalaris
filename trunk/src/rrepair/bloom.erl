@@ -27,7 +27,7 @@
 
 -include("scalaris.hrl").
 
--export([new/2, new/3, new/4, add/2, is_element/2]).
+-export([new/2, new/3, new/4, add/2, is_element/2, item_count/1]).
 -export([equals/2, join/2, print/1]).
 
 -export([calc_HF_num/1, calc_HF_num/2, calc_HF_numEx/2,
@@ -187,6 +187,12 @@ is_element(#bloom{filter = <<>>}, _Item) ->
 is_element(#bloom{size = BFSize, hfs = Hfs, filter = Filter}, Item) -> 
     Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
     check_Bits(Filter, Positions).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Gets the number of items inserted into this bloom filter.
+-spec item_count(bloom_filter()) -> non_neg_integer().
+item_count(#bloom{items_count = ItemsCount}) -> ItemsCount.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
