@@ -117,11 +117,43 @@ tester_lookup(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 test_empty(_) ->
-    Tree = merkle_tree:new(intervals:empty()),
-    Empty = merkle_tree:empty(),    
-    ?equals(Tree, Empty),
-    ?assert(merkle_tree:is_empty(Tree)),
-    ?assert(merkle_tree:is_empty(Empty)).    
+    Tree1 = merkle_tree:new(intervals:empty()),
+    Tree1a = merkle_tree:gen_hash(Tree1),
+    Tree2 = merkle_tree:new(intervals:all()),
+    Tree2a = merkle_tree:gen_hash(Tree2),
+    Tree3 = merkle_tree:new(intervals:empty(), [], []),
+    Tree3a = merkle_tree:gen_hash(Tree3),
+    Tree4 = merkle_tree:new(intervals:all(), [], []),
+    Tree4a = merkle_tree:gen_hash(Tree4),
+    Tree5 = merkle_tree:new(intervals:empty(), [], [{keep_bucket, true}]),
+    Tree5a = merkle_tree:gen_hash(Tree5),
+    Tree6 = merkle_tree:new(intervals:all(), [], [{keep_bucket, true}]),
+    Tree6a = merkle_tree:gen_hash(Tree6),
+
+    ?assert(merkle_tree:is_empty(Tree1)),
+    ?assert(merkle_tree:is_empty(Tree1a)),
+    ?assert(merkle_tree:is_empty(Tree2)),
+    ?assert(merkle_tree:is_empty(Tree2a)),
+    ?assert(merkle_tree:is_empty(Tree3)),
+    ?assert(merkle_tree:is_empty(Tree3a)),
+    ?assert(merkle_tree:is_empty(Tree4)),
+    ?assert(merkle_tree:is_empty(Tree4a)),
+    ?assert(merkle_tree:is_empty(Tree5)),
+    ?assert(merkle_tree:is_empty(Tree5a)),
+    ?assert(merkle_tree:is_empty(Tree6)),
+    ?assert(merkle_tree:is_empty(Tree6a)),
+
+    ?equals(Tree1, Tree1a),
+    ?equals(Tree2, Tree2a),
+    ?equals(Tree3, Tree3a),
+    ?equals(Tree4, Tree4a),
+    ?equals(Tree5, Tree5a),
+    ?equals(Tree6, Tree6a),
+
+    ?equals(Tree1, Tree3),
+    ?equals(Tree2, Tree4),
+    ?equals(merkle_tree:get_root(Tree3), merkle_tree:get_root(Tree5)),
+    ?equals(merkle_tree:get_root(Tree4), merkle_tree:get_root(Tree6)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

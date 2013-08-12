@@ -27,7 +27,7 @@
 -include("scalaris.hrl").
 
 -export([new/1, new/2, new/3,
-         insert/2, insert_list/2, empty/0,
+         insert/2, insert_list/2,
          lookup/2, size/1, size_detail/1, gen_hash/1, gen_hash/2,
          iterator/1, next/1,
          is_empty/1, is_leaf/1, is_merkle_tree/1,
@@ -103,14 +103,8 @@ get_root(_) -> undefined.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Insert on empty tree will fail. First operation on an empty tree should be set_interval.
-%      Returns an empty merkle tree ready for work.
--spec empty() -> merkle_tree().
-empty() ->
-    {merkle_tree, #mt_config{}, {nil, 0, [], intervals:empty(), []}}.
-
 -spec is_empty(merkle_tree()) -> boolean().
-is_empty({merkle_tree, _, {nil, 0, [], I, []}}) -> intervals:is_empty(I);
+is_empty({merkle_tree, _, {_, 0, [], _I, []}}) -> true;
 is_empty(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -123,7 +117,9 @@ new(I) ->
 %       e.g. [{branch_factor, 32}, {bucket_size, 16}]
 -spec new(mt_interval(), mt_config_params()) -> merkle_tree().
 new(I, ConfParams) ->
-    {merkle_tree, build_config(ConfParams), {nil, 0, [], I, []}}.
+    Config = build_config(ConfParams),
+    [Root] = build_childs([{I, 0, []}], Config, []),
+    gen_hash({merkle_tree, Config, Root}).
 
 -spec new(mt_interval(), KeyList::mt_bucket(), mt_config_params())
         -> merkle_tree().
