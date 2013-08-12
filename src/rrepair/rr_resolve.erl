@@ -188,7 +188,7 @@ on({get_entries_response, EntryList}, State =
     EntryMapped = [MX || X <- EntryList,
                          not gb_sets:is_element(element(1, (MX = entry_to_kvv(X))), KSet)],
     %without session id
-    send_key_upd(FBDest, EntryMapped, null, []),
+    send_key_upd(FBDest, EntryMapped, Stats#resolve_stats.session_id, []),
     NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
     if ToUpdate =:= 0 -> shutdown(resolve_ok, NewState);
        true           -> NewState % note: shutdown handled by update_key_entry_ack

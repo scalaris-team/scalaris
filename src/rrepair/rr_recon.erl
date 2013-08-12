@@ -500,7 +500,7 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, 
     end.
 
 % @doc Starts one resolve process per leaf node in a given node
-%      Returns: number of visited leaf nodes and number of leaf resovle requests.
+%      Returns: number of visited leaf nodes and number of leaf resolve requests.
 -spec resolve_node(merkle_tree:mt_node() | not_found,
                    {Dest::comm:mypid(), rrepair:session_id(), OwnerRemote::comm:erl_local_pid()})
         -> {Leafs::non_neg_integer(), ResolveReq::non_neg_integer()}.
@@ -515,21 +515,23 @@ resolve_node(Node, Conf) ->
                              {0, 0}, merkle_tree:get_childs(Node))
     end.
 
-% @doc Returns number ob caused resolve requests (requests with feedback count 2)
+% @doc Returns number of caused resolve requests (requests with feedback count 2)
 -spec resolve_leaf(merkle_tree:mt_node(),
                    {Dest::comm:mypid(), rrepair:session_id(), OwnerRemote::comm:erl_local_pid()})
         -> 1 | 2.
 resolve_leaf(Node, {Dest, SID, OwnerL}) ->
-    OwnerR = comm:make_global(OwnerL),
+    Options = [{feedback_request, comm:make_global(OwnerL)}],
+    LeafInterval = merkle_tree:get_interval(Node),
     case merkle_tree:get_item_count(Node) of
         0 ->
-           send(Dest, {request_resolve, SID, {interval_upd_send, merkle_tree:get_interval(Node), OwnerR}, []}),
-           1;
-       _ ->
-           send_local(OwnerL, {request_resolve, SID, 
-                               {interval_upd_send, merkle_tree:get_interval(Node), Dest}, 
-                               [{feedback_request, OwnerR}]}),
-           2
+            send(Dest, {request_resolve, SID, {interval_upd, LeafInterval, []},
+                        [{session_id, SID} | Options]}),
+            1;
+        _ ->
+            send_local(OwnerL, {request_resolve, SID,
+                                {interval_upd_send, LeafInterval, Dest},
+                                Options}),
+            2
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
