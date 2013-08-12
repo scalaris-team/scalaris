@@ -52,7 +52,9 @@
 
 -callback n() -> number().
 -callback get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
--callback get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE, SplitFraction::{Num::0..100, Denom::0..100}) -> key().
+-callback get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                        SplitFraction::{Num::non_neg_integer(), Denom::pos_integer()})
+        -> key() | ?PLUS_INFINITY_TYPE.
 
 -callback dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 

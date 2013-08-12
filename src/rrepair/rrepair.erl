@@ -346,13 +346,18 @@ request_sync(State = #rrepair_state{round = Round, open_recon = OpenRecon,
 -spec select_sync_node(intervals:continuous_interval()) -> ?RT:key() | not_found.
 select_sync_node(Interval) ->
     ?ASSERT(intervals:is_continuous(Interval)),
-    {_, LKey, RKey, _} = intervals:get_bounds(Interval),
-    Key = ?RT:get_split_key(LKey, RKey, {1, randoms:rand_uniform(1, 50)}),
-    Keys = [K || K <- ?RT:get_replica_keys(Key),
-                 not intervals:in(K, Interval)],
-    case Keys of
-        [] -> not_found;
-        [_|_] -> util:randomelem(Keys)
+    case intervals:is_all(Interval) of
+        true  -> not_found; % no sync partner here!
+        false ->
+            {_, LKey, RKey, _} = intervals:get_bounds(Interval),
+            ?ASSERT(RKey =/= ?PLUS_INFINITY), % should not occur
+            Key = ?RT:get_split_key(LKey, RKey, {1, randoms:rand_uniform(1, 50)}),
+            Keys = [K || K <- ?RT:get_replica_keys(Key),
+                         not intervals:in(K, Interval)],
+            case Keys of
+                [] -> not_found;
+                [_|_] -> util:randomelem(Keys)
+            end
     end.
 
 -spec next_round(round()) -> round().
