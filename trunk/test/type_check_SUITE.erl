@@ -352,11 +352,8 @@ tester_type_check_rrepair(_Config) ->
            [
              % currently unsupported (bounded funs) by tester:
              {check_node, 2},
-             {p_check_node, 3},
              {process_tree_cmp_result, 4},
              {p_process_tree_cmp_result, 7},
-             {process_tree_cmp_result, 4},
-             {process_tree_cmp_result, 4},
              {art_get_sync_leafs, 4},
 
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
@@ -364,6 +361,7 @@ tester_type_check_rrepair(_Config) ->
              {build_recon_struct, 6}, %% DB items must be in interval
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
+             {p_check_node, 4}, %% needs same-length lists
              {resolve_nodes, 7}, %% tries to send messages
              {resolve_leaf, 5}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
