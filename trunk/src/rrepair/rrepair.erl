@@ -208,7 +208,7 @@ on({continue_recon, Sender, SessionID, Msg}, State) ->
 
 on({request_resolve, SessionID, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
     {ok, Pid} = rr_resolve:start(),
-    comm:send_local(Pid, {start, Operation, Options ++ [{session_id, SessionID}]}),
+    comm:send_local(Pid, {start, Operation, [{session_id, SessionID} | Options]}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 on({recon_forked}, State) ->
