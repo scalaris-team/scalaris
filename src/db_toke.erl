@@ -119,14 +119,14 @@ new_db(FileName, TokeOptions) ->
     end.
 
 %% @doc Closes the DB named DBName
--spec close(DBName::db()) -> true.
+-spec close(DB::db()) -> true.
 close({DB, _FileName}) ->
     toke_drv:close(DB),
     toke_drv:delete(DB),
     toke_drv:stop(DB).
 
 %% @doc Closes and deletes the DB named DBName
--spec close_and_delete(DBName::db()) -> true.
+-spec close_and_delete(DB::db()) -> true.
 close_and_delete({DB, FileName}) ->
     close({DB, FileName}),
     case file:delete(FileName) of
@@ -139,13 +139,13 @@ close_and_delete({DB, FileName}) ->
 
 %% @doc Saves arbitrary tuple Entry in DB DBName and returns the new DB.
 %%      The key is expected to be the first element of Entry.
--spec put(DBName::db(), Entry::entry()) -> db().
+-spec put(DB::db(), Entry::entry()) -> db().
 put({DB, FileName}, Entry) ->
     toke_drv:insert(DB, ?IN(element(1, Entry)), ?IN(Entry)),
     {DB, FileName}.
 
 %% @doc Returns the entry that corresponds to Key or {} if no such tuple exists.
--spec get(DBName::db(), Key::key()) -> entry() | {}.
+-spec get(DB::db(), Key::key()) -> entry() | {}.
 get({DB, _FileName}, Key) ->
     case toke_drv:get(DB, ?IN(Key)) of
         not_found -> {};
@@ -154,7 +154,7 @@ get({DB, _FileName}, Key) ->
 
 %% @doc Deletes the tuple saved under Key and returns the new DB.
 %%      If such a tuple does not exists nothing is changed.
--spec delete(DBName::db(), Key::key()) -> db().
+-spec delete(DB::db(), Key::key()) -> db().
 delete({DB, FileName}, Key) ->
     toke_drv:delete(DB, ?IN(Key)),
     {DB, FileName}.
