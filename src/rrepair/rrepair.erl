@@ -352,9 +352,8 @@ select_sync_node(Interval, ExcludeInterval) ->
     case intervals:is_all(Interval) of
         true when ExcludeInterval -> not_found; % no sync partner here!
         _ ->
-            {_, LKey, RKey, _} = intervals:get_bounds(Interval),
-            ?ASSERT(RKey =/= ?PLUS_INFINITY), % should not occur
-            Key = ?RT:get_split_key(LKey, RKey, {1, randoms:rand_uniform(1, 50)}),
+            Bounds = intervals:get_bounds(Interval),
+            Key = ?RT:get_random_in_interval(Bounds),
             Keys = if ExcludeInterval ->
                           [K || K <- ?RT:get_replica_keys(Key),
                                 not intervals:in(K, Interval)];
