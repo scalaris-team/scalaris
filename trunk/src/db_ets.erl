@@ -14,6 +14,7 @@
 
 %% @author Jan Fajerski <fajerski@zib.de>
 %% @doc    DB back-end using ets.
+%%         Two keys K and L are considered equal if K == L yields true.
 %% @end
 %% @version $Id$
 -module(db_ets).
@@ -139,8 +140,8 @@ foldl(DB, Fun, Acc, {interval, '[', Start, End, ']'}, MaxNum) ->
             foldl(DB, Fun, Acc, {interval, '[', ets:next(DB, Start), End, ']'},
                   MaxNum);
         [Entry] ->
-            ?TRACE("foldl:~nstart: ~p~nend:   ~p~nmaxnum: ~p~nfound ~p~n",
-                   [Start, End, MaxNum, Entry]),
+            ?TRACE("foldl:~nstart: ~p~nend:   ~p~nmaxnum: ~p~ninterval: ~p~nfound ~p~n",
+                   [Start, End, MaxNum, {interval, '[', Start, End, ']'}, Entry]),
             foldl(DB, Fun, Fun(Entry, Acc), {interval, '[', ets:next(DB, Start),
                                              End, ']'}, MaxNum - 1)
     end.
