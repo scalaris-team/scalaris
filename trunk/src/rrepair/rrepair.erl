@@ -202,7 +202,7 @@ on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}
             % similar to handling of recon_progress_report as initiator
             % assume the session is present (request_sync has created it!)
             {S, TSessions} = extract_session(SessionId, OS),
-            ?TRACE_RECON("~nRECON OK3 - ~p", [_Sender, S]),
+            ?TRACE_RECON("~nRECON OK3 - ~p", [S]),
             % this session is aborted, so it is complete!
             Stats = rr_recon_stats:new([{session_id, SessionId},
                                         {status, finish}]),
