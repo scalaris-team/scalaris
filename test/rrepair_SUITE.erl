@@ -177,8 +177,9 @@ no_diff(Config) ->
 one_node(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
+    % atm, there is no rrepair with self (we wouldn't need a complex protocol for that)
     start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}],
-               1, 0.2, get_rep_upd_config(Method), fun erlang:'=<'/2).
+               1, 0.2, get_rep_upd_config(Method), fun erlang:'=:='/2).
 
 mpath_map({request_resolve, _, {key_upd, L}, _}) ->
     {key_upd, length(L)};
