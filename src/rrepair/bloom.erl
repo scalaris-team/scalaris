@@ -249,7 +249,7 @@ print(#bloom{max_items = MaxItems, size = Size, hfs = Hfs,
      {max_items, MaxItems},
      {items_inserted, NumItems},
      {act_fpr, get_property(Bloom, fpr)},
-     {compression_rate, Size / MaxItems}].
+     {compression_rate, ?IIF(MaxItems =:= 0, 0.0, Size / MaxItems)}].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
