@@ -38,8 +38,8 @@
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
 
--callback new(term()) -> db().
--callback open(term()) -> db().
+-callback new(DBName::nonempty_string()) -> db().
+-callback open(DBName::nonempty_string()) -> db().
 -callback close(db()) -> true.
 -callback put(db(), entry()) -> db().
 -callback get(db(), key()) -> entry() | {}.
