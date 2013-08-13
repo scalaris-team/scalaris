@@ -103,7 +103,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(TRACE(X,Y,State), ok).
-%-define(TRACE(X,Y,State), io:format("~w [~p] " ++ X ++ "~n", [?MODULE, State#rr_resolve_state.ownerPid] ++ Y)).
+%-define(TRACE(X,Y,State), log:pal("~w [~p] " ++ X ++ "~n", [?MODULE, State#rr_resolve_state.ownerPid] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
