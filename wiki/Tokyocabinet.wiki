@@ -15,12 +15,12 @@ You will need:
 = Switching to toke =
 
   # Install Tokyo Cabinet
-  # Install/make toke, e.g. by installing an rpm, provided in our [FAQ#Prebuild_packages repositories])
-  # Rerun configure with --enable-toke. configure assumes that you installed toke in your erlang's _lib_ directory, i.e. "`<erlang_dir`>/lib/toke" or "`<erlang_dir`>/lib/toke-`<version`>". If you used a different directory, e.g. /home/scalaris/apps/toke, you have to provide the path to configure:
+  # Install/make toke, e.g. by installing an rpm, provided by our [FAQ#Prebuild_packages repositories] for some linux distributions
+  # Rerun configure with --enable-toke. configure assumes that you installed toke in your erlang's _lib_ directory, i.e. "`<erlang_dir`>/lib/toke" or "`<erlang_dir`>/lib/toke-`<version`>". If you use a different directory, e.g. /home/scalaris/apps/toke, you have to provide the path to configure:
 {{{
 ./configure --enable-toke=/home/scalaris/apps/toke/
 }}}
-  # Switch the database in include/scalaris.hrl to db_toke
+  # Change the database used by db_dht to db_toke (in `db_dht.erl`):
 {{{
 -define(DB, db_toke).
 %-define(DB, db_ets).
