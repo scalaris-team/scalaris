@@ -15,6 +15,24 @@
 %% @author Jan Fajerski <fajerski@zib.de>
 %% @doc    DB back-end using tokyo cabinet via toke.
 %%         Two keys K and L are considered equal if they match, i.e. K =:= L
+%%
+%%         To use this backend you have to install 
+%%         Tokyo Cabinet [http://fallabs.com/tokyocabinet] and 
+%%         Toke [http://hg.opensource.lshift.net/toke/] (a simple Erlang
+%%         wrapper for Tokyo Cabinet).
+%%         For development Tokyo Cabinet V1.4.48-1 and the at-the-time 
+%%         latest commit to the toke-repository (f178e55bb6b5) was used.
+%%
+%%         After building and installing Tokyo Cabinet and toke
+%%         rerun configure with --enable-toke. configure assumes that you
+%%         installed toke in your erlang's lib directory, i.e.
+%%         `<erlang_dir>/lib/toke' or `<erlang_dir>/lib/toke-<version>'. If you
+%%         used a different directory, e.g. /home/scalaris/apps/toke, you have
+%%         to provide the path to configure:
+%%
+%%         `./configure --enable-toke=/home/scalaris/apps/toke/'
+%%
+%%         Rerun make and you can use db_toke.
 %% @end
 %% @version $Id$
 -module(db_toke).
