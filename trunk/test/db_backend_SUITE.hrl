@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Jan Fajerski <fajerski@zib.de>
-%% @doc    Unit tests for db backends that fullfill src/backend_beh.erl.
+%% @doc    Unit tests for db backends that fullfill src/db_backend_beh.erl.
 %%         just define ?TEST_DB and include this file.
 %%         The default to determine equality of keys is == (ets with ordered_set
 %%         uses this). If a backend only considers matching keys equal (i.e.
@@ -40,7 +40,7 @@ tests_avail() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test put/2 of available backends
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_put([backend_beh:entry()]) -> true.
+-spec prop_put([db_backend_beh:entry()]) -> true.
 prop_put(Data) ->
     {DB1, ScrubbedData} =
         write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()),
@@ -55,7 +55,7 @@ tester_put(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test get/2 of available backends
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_get([backend_beh:entry()]) -> true.
+-spec prop_get([db_backend_beh:entry()]) -> true.
 prop_get(Data) ->
     {DB1, ScrubbedData} =
         write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()), Data),
@@ -74,7 +74,7 @@ tester_get(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test delete/2 of available backends
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_delete([backend_beh:entry()], [backend_beh:key()]) -> true.
+-spec prop_delete([db_backend_beh:entry()], [db_backend_beh:key()]) -> true.
 prop_delete(Data, ToDelete) ->
     {DB1, ScrubbedData} =
         write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()), Data),
@@ -95,7 +95,7 @@ tester_delete(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test foldl/2 of available backends
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_foldl([backend_beh:entry()], backend_beh:interval(),
+-spec prop_foldl([db_backend_beh:entry()], db_backend_beh:interval(),
                  non_neg_integer()) -> true.
 prop_foldl(Data, Interval, MaxNum) ->
     {DB1, ScrubbedData} =
@@ -126,7 +126,7 @@ tester_foldl(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % test foldr/2 of available backends
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec prop_foldr([backend_beh:entry()], backend_beh:interval(),
+-spec prop_foldr([db_backend_beh:entry()], db_backend_beh:interval(),
                  non_neg_integer()) -> true.
 prop_foldr(Data, Interval, MaxNum) ->
     {DB1, ScrubbedData} =

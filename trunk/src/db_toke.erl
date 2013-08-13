@@ -41,7 +41,7 @@
 
 -include("scalaris.hrl").
 
--behaviour(backend_beh).
+-behaviour(db_backend_beh).
 
 -define(TRACE(_X, _Y), ok).
 %% -define(TRACE(X, Y), ct:pal(X, Y)).
@@ -60,8 +60,8 @@
 -export([foldr/3, foldr/4, foldr/5]).
 
 -type db() :: {DB::pid(), FileName::nonempty_string()}.
--type key() :: backend_beh:key(). %% '$end_of_table' is not allowed as key() or else iterations won't work!
--type entry() :: backend_beh:entry().
+-type key() :: db_backend_beh:key(). %% '$end_of_table' is not allowed as key() or else iterations won't work!
+-type entry() :: db_backend_beh:entry().
 
 -ifdef(with_export_type_support).
 -export_type([db/0]).
@@ -180,7 +180,7 @@ foldl({DB, _FileName}, Fun, Acc) ->
 
 %% @doc Is equivalent to foldl(DB, Fun, Acc0, Interval, get_load(DB)).
 -spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Interval::backend_beh:interval()) -> Acc1::A.
+                               Interval::db_backend_beh:interval()) -> Acc1::A.
 foldl({DB, _FileName}, Fun, Acc, Interval) ->
     Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
                                  DeCoded = ?OUT(Entry),
@@ -197,7 +197,7 @@ foldl({DB, _FileName}, Fun, Acc, Interval) ->
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
 -spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Intervall::backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
+                               Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldl({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
     {_Left, Data} = toke_drv:fold(
                       fun(_Key, _Entry, {0, _} = AccIn) ->
@@ -223,7 +223,7 @@ foldr({DB, _FileName}, Fun, Acc) ->
 
 %% @doc Is equivalent to foldr(DB, Fun, Acc0, Interval, get_load(DB)).
 -spec foldr(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Interval::backend_beh:interval()) -> Acc1::A.
+                               Interval::db_backend_beh:interval()) -> Acc1::A.
 foldr({DB, _FileName}, Fun, Acc, Interval) ->
     Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
                                  DeCoded = ?OUT(Entry),
@@ -240,7 +240,7 @@ foldr({DB, _FileName}, Fun, Acc, Interval) ->
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
 -spec foldr(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
-                               Intervall::backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
+                               Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldr({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
     Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
                                  DeCoded = ?OUT(Entry),
