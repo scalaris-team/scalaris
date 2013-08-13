@@ -192,7 +192,7 @@ on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}
            {continue_recon, comm:this(), SessionId,
             {create_struct, Method, MyI}}},
     DKey = case DestKey of
-               random -> select_sync_node(MyI);        
+               random -> select_sync_node(MyI, true);
                _ -> DestKey
            end,
     % skip if no key outside my range found
@@ -342,18 +342,24 @@ request_sync(State = #rrepair_state{round = Round, open_recon = OpenRecon,
                          open_sessions = [S | Sessions] }.
 
 %% @doc Selects a random key in the given (continuous) interval and returns one
-%%      of its replicas which is not in the interval.
--spec select_sync_node(intervals:continuous_interval()) -> ?RT:key() | not_found.
-select_sync_node(Interval) ->
+%%      of its replicas which is not in the interval (if ExcludeInterval is true).
+%%      If ExcludeInterval is false, any of its replica keys is returned.
+-spec select_sync_node
+        (intervals:continuous_interval(), ExcludeInterval::false) -> ?RT:key();
+        (intervals:continuous_interval(), ExcludeInterval::true)  -> ?RT:key() | not_found.
+select_sync_node(Interval, ExcludeInterval) ->
     ?ASSERT(intervals:is_continuous(Interval)),
     case intervals:is_all(Interval) of
-        true  -> not_found; % no sync partner here!
-        false ->
+        true when ExcludeInterval -> not_found; % no sync partner here!
+        _ ->
             {_, LKey, RKey, _} = intervals:get_bounds(Interval),
             ?ASSERT(RKey =/= ?PLUS_INFINITY), % should not occur
             Key = ?RT:get_split_key(LKey, RKey, {1, randoms:rand_uniform(1, 50)}),
-            Keys = [K || K <- ?RT:get_replica_keys(Key),
-                         not intervals:in(K, Interval)],
+            Keys = if ExcludeInterval ->
+                          [K || K <- ?RT:get_replica_keys(Key),
+                                not intervals:in(K, Interval)];
+                      true -> ?RT:get_replica_keys(Key)
+                   end,
             case Keys of
                 [] -> not_found;
                 [_|_] -> util:randomelem(Keys)
