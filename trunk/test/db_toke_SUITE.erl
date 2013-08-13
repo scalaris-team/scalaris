@@ -28,8 +28,11 @@
 
 -include("db_backend_SUITE.hrl").
 
-all() ->
-    tests_avail().
+-ifdef(have_toke).
+all() -> tests_avail().
+-else.
+all() -> [].
+-endif.
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 
