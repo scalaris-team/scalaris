@@ -71,18 +71,18 @@
 -spec new(DBName::nonempty_string()) -> db().
 new(_DBName) ->
     Dir = util:make_filename(atom_to_list(node())),
-    FullDir = lists:flatten([config:read(db_directory), "/", Dir]),
+    FullDir = [config:read(db_directory), "/", Dir],
     _ = case file:make_dir(FullDir) of
         ok -> ok;
         {error, eexist} -> ok;
-        {error, Error} -> exit({db_toke, 'cannot create dir', FullDir, Error})
+        {error, Error} -> erlang:exit({db_toke, 'cannot create dir', FullDir, Error})
     end,
     {_Now_Ms, _Now_s, Now_us} = Now = erlang:now(),
     {{Year, Month, Day}, {Hour, Minute, Second}} =
-                                                   calendar:now_to_local_time(Now),
+        calendar:now_to_local_time(Now),
     FileBaseName = util:make_filename(
-            io_lib:format("db_~B~B~B-~B~B~B\.~B.tch",
-                          [Year, Month, Day, Hour, Minute, Second, Now_us])),
+                     io_lib:format("db_~B~B~B-~B~B~B\.~B.tch",
+                                   [Year, Month, Day, Hour, Minute, Second, Now_us])),
     FullFileName = lists:flatten([FullDir, "/", FileBaseName]),
     new_db(FullFileName, [read, write, create, truncate]).
 
@@ -109,8 +109,8 @@ new_db(FileName, TokeOptions) ->
         ok ->
             case toke_drv:open(DB, FileName, TokeOptions) of
                 ok -> {DB, FileName};
-                Error2 -> log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(),
-                                                                      Error2]),
+                Error2 ->
+                    log:log(error, "[ Node ~w:db_toke ] ~.0p", [self(), Error2]),
                     erlang:error({toke_failed, Error2})
             end;
         Error1 ->
@@ -127,8 +127,8 @@ close({DB, _FileName}) ->
 
 %% @doc Closes and deletes the DB named DBName
 -spec close_and_delete(DB::db()) -> true.
-close_and_delete({DB, FileName}) ->
-    close({DB, FileName}),
+close_and_delete({_DB, FileName} = State) ->
+    close(State),
     case file:delete(FileName) of
         ok -> ok;
         {error, Reason} ->
@@ -140,9 +140,9 @@ close_and_delete({DB, FileName}) ->
 %% @doc Saves arbitrary tuple Entry in DB DBName and returns the new DB.
 %%      The key is expected to be the first element of Entry.
 -spec put(DB::db(), Entry::entry()) -> db().
-put({DB, FileName}, Entry) ->
+put({DB, _FileName} = State, Entry) ->
     toke_drv:insert(DB, ?IN(element(1, Entry)), ?IN(Entry)),
-    {DB, FileName}.
+    State.
 
 %% @doc Returns the entry that corresponds to Key or {} if no such tuple exists.
 -spec get(DB::db(), Key::key()) -> entry() | {}.
@@ -155,9 +155,9 @@ get({DB, _FileName}, Key) ->
 %% @doc Deletes the tuple saved under Key and returns the new DB.
 %%      If such a tuple does not exists nothing is changed.
 -spec delete(DB::db(), Key::key()) -> db().
-delete({DB, FileName}, Key) ->
+delete({DB, _FileName} = State, Key) ->
     toke_drv:delete(DB, ?IN(Key)),
-    {DB, FileName}.
+    State.
 
 %% @doc Returns the name of the DB specified in new/1.
 -spec get_name(DB::db()) -> nonempty_string().
@@ -199,16 +199,18 @@ foldl({DB, _FileName}, Fun, Acc, Interval) ->
 -spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldl({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
-    {_Left, Data} = toke_drv:fold(fun(_Key, Entry, {Max, AccIn}) ->
-                                 DeCoded = ?OUT(Entry),
-                                 case is_in(Interval, element(1, DeCoded))
-                                      andalso Max > 0 of
-                                     true ->
-                                         {Max - 1, [DeCoded | AccIn]};
-                                     _ ->
-                                         {Max, AccIn}
-                                 end
-                         end, {MaxNum, []}, DB),
+    {_Left, Data} = toke_drv:fold(
+                      fun(_Key, _Entry, {0, _} = AccIn) ->
+                              AccIn;
+                         (_Key, Entry, {Max, AccIn}) ->
+                              DeCoded = ?OUT(Entry),
+                              case is_in(Interval, element(1, DeCoded)) of
+                                  true ->
+                                      {Max - 1, [DeCoded | AccIn]};
+                                  _ ->
+                                      {Max, AccIn}
+                              end
+                      end, {MaxNum, []}, DB),
     lists:foldl(Fun, Acc, Data).
 
 %% @doc Is equivalent to ets:foldr(Fun, Acc0, DB).
