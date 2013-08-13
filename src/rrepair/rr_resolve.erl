@@ -373,4 +373,6 @@ init(State) ->
 start() ->
     State = #rr_resolve_state{ ownerPid = self(),
                                dhtNodePid = pid_groups:get_my(dht_node) },
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, State, []).
+    PidName = lists:flatten(io_lib:format("~s.~s", [?MODULE, randoms:getRandomString()])),
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, State,
+                             [{pid_groups_join_as, pid_groups:my_groupname(), PidName}]).
