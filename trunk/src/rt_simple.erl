@@ -149,6 +149,30 @@ get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
 get_split_key(Begin, End, {Num, Denom}) ->
     normalize(Begin + (get_range_(Begin, End) * Num) div Denom).
 
+%% @doc Gets input similar to what intervals:get_bounds/1 returns and
+%%      calculates a random key in this range. Fails with an exception if there
+%%      is no key.
+-spec get_random_in_interval(
+        {intervals:left_bracket(), key(), key(), intervals:right_bracket()} |
+        {intervals:left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'}) -> key().
+get_random_in_interval({LBr, L, R, RBr}) ->
+    case intervals:wraps_around(LBr, L, R, RBr) of
+        false -> normalize(get_random_in_interval2(LBr, L, R, RBr));
+        true  -> normalize(get_random_in_interval2(LBr, L, ?PLUS_INFINITY + R, RBr))
+    end.
+
+% TODO: return a failure constant if the interval is empty? (currently fails with an exception)
+-spec get_random_in_interval2(intervals:left_bracket(), key(), non_neg_integer(),
+                              intervals:right_bracket()) -> non_neg_integer().
+get_random_in_interval2('[', L, R, ')') ->
+    randoms:rand_uniform(L, R);
+get_random_in_interval2('(', L, R, ')') ->
+    randoms:rand_uniform(L + 1, R);
+get_random_in_interval2('(', L, R, ']') ->
+    randoms:rand_uniform(L + 1, R + 1);
+get_random_in_interval2('[', L, R, ']') ->
+    randoms:rand_uniform(L, R + 1).
+
 %% userdevguide-begin rt_simple:get_replica_keys
 %% @doc Returns the replicas of the given key.
 -spec get_replica_keys(key()) -> [key()].

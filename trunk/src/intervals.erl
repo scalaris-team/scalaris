@@ -49,6 +49,8 @@
          intersection/2, union/2, minus/2, 
          % getters for certain intervals
          get_bounds/1, get_elements/1, get_simple_intervals/1,
+         % various
+         wraps_around/4,
          %
          % for unit testing only
          is_well_formed/1, tester_create_interval/1,
@@ -620,7 +622,6 @@ minus(A, [HB | TB]) ->
     normalize_internal(
       lists:flatmap(fun(IA) -> minus(minus_simple(IA, HB), TB) end, A)).
 
-%% @private
 %% @doc Determines whether an interval with the given borders wraps around,
 %%      i.e. the interval would cover the (non-existing) gap between
 %%      ?PLUS_INFINITY and ?MINUS_INFINITY.

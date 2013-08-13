@@ -33,7 +33,7 @@
          init_stabilize/2, update/3,
          filter_dead_node/2, to_pid_list/1, get_size/1, get_replica_keys/1,
          get_key_segment/1,
-         n/0, get_range/2, get_split_key/3,
+         n/0, get_range/2, get_split_key/3, get_random_in_interval/1,
          dump/1, to_list/1, export_rt_to_dht_node/2,
          handle_custom_message/2,
          check/4, check/5,

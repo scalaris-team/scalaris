@@ -55,6 +55,9 @@
 -callback get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
                         SplitFraction::{Num::non_neg_integer(), Denom::pos_integer()})
         -> key() | ?PLUS_INFINITY_TYPE.
+-callback get_random_in_interval(
+            {intervals:left_bracket(), key(), key(), intervals:right_bracket()} |
+            {intervals:left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'}) -> key().
 
 -callback dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
 
