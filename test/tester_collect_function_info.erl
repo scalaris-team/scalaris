@@ -105,7 +105,21 @@ parse_chunk({attribute, _Line, opaque, {TypeName, ATypeSpec, _List}},
                                      NewParseState);
 parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
             Module, ParseState) ->
-    {TheFunSpec, NewParseState} = parse_type({union_fun, AFunSpec}, Module, ParseState),
+    %ct:pal("~w:~w ~w ~w", [Module, _Line, FunName, AFunSpec]),
+    FunSpec = case AFunSpec of
+                  [{type, _,bounded_fun, [_TypeFun, ConstraintType]}] ->
+                      Substitutions = parse_constraints(ConstraintType, gb_trees:empty()),
+                      try
+                          substitute_constraints(AFunSpec, Substitutions)
+                      catch
+                          {subst_error, Description} ->
+                              ct:pal("substitution error ~w in ~w:~w ~w", [Description, Module, FunName, AFunSpec]),
+                              exit(foobar)
+                      end;
+                  _ ->
+                      AFunSpec
+              end,
+    {TheFunSpec, NewParseState} = parse_type({union_fun, FunSpec}, Module, ParseState),
     tester_parse_state:add_type_spec({'fun', Module, FunName, FunArity},
                                      TheFunSpec, NewParseState);
 parse_chunk({attribute, _Line, record, {TypeName, TypeList}}, Module, ParseState) ->
@@ -330,6 +344,8 @@ parse_type_({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
             {{typedef, Module, TypeName},
              tester_parse_state:add_unknown_type(Module, TypeName, ParseState)}
     end;
+parse_type_({ann_type,_Line,[Left,Right]}, _Module, ParseState) ->
+    {{ann_type, [Left, Right]}, ParseState};
 parse_type_(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
     {unkown, ParseState}.
@@ -345,3 +361,56 @@ parse_type_list(List, Module, ParseState) ->
             {TypeList, ParseState3} = parse_type_list(Tail, Module, ParseState2),
             {[Type | TypeList], ParseState3}
     end.
+
+parse_constraints([], Substitutions) ->
+    Substitutions;
+parse_constraints([ConstraintType | Rest], Substitutions) ->
+    case ConstraintType of
+        {type,_,constraint,[{atom,_,is_subtype},[{var,_,Variable},Type]]} ->
+            NewSubstitutions = gb_trees:insert(Variable, Type, Substitutions),
+            parse_constraints(Rest, NewSubstitutions);
+        _ ->
+            ct:pal("unknown constraint ~w", [ConstraintType]),
+            parse_constraints(Rest, Substitutions)
+    end.
+
+substitute_constraints(FunSpecs, Substitutions) when is_list(FunSpecs)->
+    [substitute_constraints(FunSpec, Substitutions) ||  FunSpec <- FunSpecs];
+% type variable
+substitute_constraints({var,_Line,VarName}, Substitutions) ->
+    case gb_trees:lookup(VarName, Substitutions) of
+        {value, Substitution} -> Substitution;
+        none -> {var,_Line,VarName}
+    end;
+
+substitute_constraints({type, Line,bounded_fun, [FunType, _Constraints]}, Substitutions) ->
+    substitute_constraints(FunType, Substitutions);
+
+% generic types
+substitute_constraints({type, Line,TypeType, Types}, Substitutions) ->
+    Types2 = substitute_constraints(Types, Substitutions),
+    {type,Line,TypeType,Types2};
+
+% special types
+substitute_constraints({ann_type,Line,[Left,Right]}, Substitutions) ->
+    Left2 = substitute_constraints(Left, Substitutions),
+    Right2 = substitute_constraints(Right, Substitutions),
+    {ann_type,Line,[Left2,Right2]};
+substitute_constraints({remote_type,Line,[Left,Right,[]]}, Substitutions) ->
+    Left2 = substitute_constraints(Left, Substitutions),
+    Right2 = substitute_constraints(Right, Substitutions),
+    {remote_type,Line,[Left2,Right2,[]]};
+substitute_constraints(any, _Substitutions) ->
+    any;
+
+% value types
+substitute_constraints({atom,Line,Value}, _Substitutions) ->
+    {atom,Line,Value};
+substitute_constraints({integer,Line,Value}, _Substitutions) ->
+    {integer,Line,Value};
+
+substitute_constraints(Unknown, Substitutions) ->
+    ct:pal("Unknown: ~w", [Unknown]),
+    ct:pal("~w", [Substitutions]),
+    throw({subst_error, unknown_expression}),
+    exit(foobar).
