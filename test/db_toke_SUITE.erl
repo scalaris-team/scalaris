@@ -38,19 +38,19 @@ suite() -> [ {timetrap, {seconds, 30}} ].
 
 init_per_suite(Config) ->
     Config1 = unittest_helper:init_per_suite(Config),
-    tester:register_type_checker({typedef, backend_beh, key}, backend_beh, tester_is_valid_db_key),
-    tester:register_value_creator({typedef, backend_beh, key}, backend_beh, tester_create_db_key, 1),
+    tester:register_type_checker({typedef, db_backend_beh, key}, db_backend_beh, tester_is_valid_db_key),
+    tester:register_value_creator({typedef, db_backend_beh, key}, db_backend_beh, tester_create_db_key, 1),
 
-    tester:register_type_checker({typedef, backend_beh, entry}, backend_beh, tester_is_valid_db_entry),
-    tester:register_value_creator({typedef, backend_beh, entry}, backend_beh, tester_create_db_entry, 1),
+    tester:register_type_checker({typedef, db_backend_beh, entry}, db_backend_beh, tester_is_valid_db_entry),
+    tester:register_value_creator({typedef, db_backend_beh, entry}, db_backend_beh, tester_create_db_entry, 1),
     unittest_helper:start_minimal_procs(Config1, [], false).
 
 end_per_suite(Config) ->
-    tester:unregister_type_checker({typedef, backend_beh, key}),
-    tester:unregister_value_creator({typedef, backend_beh, key}),
+    tester:unregister_type_checker({typedef, db_backend_beh, key}),
+    tester:unregister_value_creator({typedef, db_backend_beh, key}),
 
-    tester:unregister_type_checker({typedef, backend_beh, entry}),
-    tester:unregister_value_creator({typedef, backend_beh, entry}),
+    tester:unregister_type_checker({typedef, db_backend_beh, entry}),
+    tester:unregister_value_creator({typedef, db_backend_beh, entry}),
     unittest_helper:end_per_suite(Config),
     unittest_helper:stop_minimal_procs(Config).
 

@@ -16,7 +16,7 @@
 %% @doc    Behaviour for DB back-ends.
 %% @end
 %% @version $Id$
--module(backend_beh).
+-module(db_backend_beh).
 -author('fajerski@zib.de').
 -vsn('$Id$').
 
