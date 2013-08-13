@@ -29,7 +29,7 @@
 -include("db_backend_SUITE.hrl").
 
 -ifdef(have_toke).
-all() -> tests_avail().
+all() -> lists:append(tests_avail(), [tester_reopen]).
 -else.
 all() -> [].
 -endif.
@@ -56,3 +56,25 @@ end_per_suite(Config) ->
 
 rw_suite_runs(N) ->
     erlang:min(N, 200).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% db_toke:open/1, db_toke getters
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec prop_reopen(Key::?RT:key()) -> true.
+prop_reopen(Key) ->
+    DB = db_toke:new(randoms:getRandomString()),
+    FileName = db_toke:get_name(DB),
+    check_db(DB, [], "check_db_reopen_1"),
+    ?equals(db_toke:get(DB, Key), {}),
+    DB1 = db_toke:put(DB, {Key}),
+    db_toke:close(DB1),
+    DB2 = db_toke:open(FileName),
+    check_db(DB2, [{Key}], "check_db_reopen_2"),
+    ?equals(db_toke:get(DB2, Key), {Key}),
+    db_toke:close_and_delete(DB2),
+    true.
+
+tester_reopen(_Config) ->
+    tester:test(?MODULE, prop_reopen, 1, rw_suite_runs(10)).
