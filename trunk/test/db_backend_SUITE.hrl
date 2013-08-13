@@ -15,11 +15,20 @@
 %% @author Jan Fajerski <fajerski@zib.de>
 %% @doc    Unit tests for db backends that fullfill src/backend_beh.erl.
 %%         just define ?TEST_DB and include this file.
+%%         The default to determine equality of keys is == (ets with ordered_set
+%%         uses this). If a backend only considers matching keys equal (i.e.
+%%         =:=) the EQ macro has to defined to =:= in the file that includes
+%%         this one.
 %% @end
 %% @version $Id$
 
 -include("scalaris.hrl").
 -include("unittest.hrl").
+
+%% default equality
+-ifndef(EQ).
+-define(EQ, ==).
+-endif.
 
 tests_avail() ->
     [tester_put,
@@ -75,11 +84,13 @@ prop_delete(Data, ToDelete) ->
             fun(Key, DBAcc) ->
                 ?TEST_DB:delete(DBAcc, Key)
             end, DB1, ToDelete),
-    ExpData = lists:foldl(
-            fun(Key, AccIn) ->
-                lists:keydelete(Key, 1, AccIn)
-            end, ScrubedData, ToDelete),
-    check_db(DB2, ExpData, "check_db_put1"),
+    ExpData = lists:filter(
+                fun(El) ->
+                        not lists:any(fun(Key) ->
+                                          element(1, El) ?EQ Key
+                                  end, ToDelete)
+                end, ScrubedData),
+    check_db(DB2, ExpData, "check_db_delete"),
     ?TEST_DB:close(DB2),
     true.
 
@@ -96,28 +107,11 @@ prop_foldl(Data, Interval, MaxNum) ->
                          write_scrubed_to_db(?TEST_DB:new(randoms:getRandomString()),
                                              Data),
     {ExpInInterval, _NotIn} = lists:partition(
-            fun(E) -> 
-                    case Interval of
-                        all ->
-                            true;
-                        {element, Key} ->
-                            element(1, E) == Key;
-                        {interval, '(', L, R, ')'} ->
-                            element(1, E) > L andalso
-                            element(1, E) < R;
-                        {interval, '(', L, R, ']'} ->
-                            element(1, E) > L andalso
-                            element(1, E) =< R;
-                        {interval, '[', L, R, ')'} ->
-                            element(1, E) >= L andalso
-                            element(1, E) < R;
-                        {interval, '[', L, R, ']'} ->
-                            element(1, E) >= L andalso
-                            element(1, E) =< R
-                    end
-            end,
-            ScrubedData),
-    ExpInIntervalCounted = lists:sublist(ExpInInterval, MaxNum),
+                                fun(E) ->
+                                        is_in(Interval, element(1, E))
+                                end,
+                                ScrubedData),
+    ExpInIntervalCounted = lists:sublist(lists:keysort(1, ExpInInterval), MaxNum),
     AllFold = ?TEST_DB:foldl(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldl(DB1,
                                  fun(E, AccIn) -> [E | AccIn] end,
@@ -148,28 +142,11 @@ prop_foldr(Data, Interval, MaxNum) ->
                          write_scrubed_to_db(?TEST_DB:new(randoms:getRandomString()),
                                              Data),
     {ExpInInterval, _NotIn} = lists:partition(
-            fun(E) -> 
-                    case Interval of
-                        all ->
-                            true;
-                        {element, Key} ->
-                            element(1, E) == Key;
-                        {interval, '(', L, R, ')'} ->
-                            element(1, E) > L andalso
-                            element(1, E) < R;
-                        {interval, '(', L, R, ']'} ->
-                            element(1, E) > L andalso
-                            element(1, E) =< R;
-                        {interval, '[', L, R, ')'} ->
-                            element(1, E) >= L andalso
-                            element(1, E) < R;
-                        {interval, '[', L, R, ']'} ->
-                            element(1, E) >= L andalso
-                            element(1, E) =< R
-                    end
-            end,
-            ScrubedData),
-    ExpInIntervalCounted = lists:sublist(lists:reverse(ExpInInterval), MaxNum),
+                                fun(E) ->
+                                        is_in(Interval, element(1, E))
+                                end,
+                                ScrubedData),
+    ExpInIntervalCounted = lists:sublist(lists:reverse(lists:keysort(1, ExpInInterval)), MaxNum),
     AllFold = ?TEST_DB:foldr(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldr(DB1,
                                  fun(E, AccIn) -> [E | AccIn] end,
@@ -205,10 +182,19 @@ write_scrubed_to_db(DB, Data) ->
 
 scrub_data(Data) ->
     %% Entries should be unique
-    SortFun = fun(A, B) -> element(1, A) =< element(1, B) end,
+    SortFun = fun(A, B) -> (element(1, A) < element(1, B)) or
+                           (element(1, A) ?EQ element(1, B)) end,
     lists:usort(SortFun, [Entry || Entry <- Data]).
 
 check_db(DB, ExpData, Note) ->
     InDb = ?TEST_DB:foldl(DB, fun(E, AIn) -> [E | AIn] end, []),
     ?equals_w_note(lists:sort(InDb), lists:sort(ExpData), Note),
     ?equals_w_note(?TEST_DB:get_load(DB), length(ExpData), Note).
+
+
+is_in({element, Key}, OtherKey) -> Key ?EQ OtherKey;
+is_in(all, _Key) -> true;
+is_in({interval, '(', L, R, ')'}, Key) -> Key > L andalso Key < R;
+is_in({interval, '(', L, R, ']'}, Key) -> Key > L andalso ((Key < R) or (Key ?EQ R));
+is_in({interval, '[', L, R, ')'}, Key) -> ((Key > L) or (Key ?EQ L)) andalso Key < R;
+is_in({interval, '[', L, R, ']'}, Key) -> ((Key > L) or (Key ?EQ L)) andalso ((Key < R) or (Key ?EQ R)).
