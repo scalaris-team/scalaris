@@ -42,10 +42,10 @@ tests_avail() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_put([backend_beh:entry()]) -> true.
 prop_put(Data) ->
-    {DB1, ScrubedData} =
-                         write_scrubed_to_db(?TEST_DB:new(randoms:getRandomString()),
-                                             Data),
-    check_db(DB1, ScrubedData, "check_db_put1"),
+    {DB1, ScrubbedData} =
+        write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()),
+                             Data),
+    check_db(DB1, ScrubbedData, "check_db_put1"),
     ?TEST_DB:close(DB1),
     true.
 
@@ -57,14 +57,13 @@ tester_put(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_get([backend_beh:entry()]) -> true.
 prop_get(Data) ->
-    {DB1, ScrubedData} =
-                         write_scrubed_to_db(?TEST_DB:new(randoms:getRandomString()),
-                                             Data),
+    {DB1, ScrubbedData} =
+        write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()), Data),
     GetData = lists:foldl(
             fun(Entry, AccIn) ->
                 [?TEST_DB:get(DB1, element(1, Entry)) | AccIn]
-            end, [], ScrubedData),
-    ?equals_w_note(lists:sort(ScrubedData), lists:sort(GetData), "check_db_put1"),
+            end, [], ScrubbedData),
+    ?equals_w_note(lists:sort(ScrubbedData), lists:sort(GetData), "check_db_put1"),
     check_db(DB1, GetData, "check_db_put1"),
     ?TEST_DB:close(DB1),
     true.
@@ -77,19 +76,15 @@ tester_get(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec prop_delete([backend_beh:entry()], [backend_beh:key()]) -> true.
 prop_delete(Data, ToDelete) ->
-    {DB1, ScrubedData} =
-                         write_scrubed_to_db(?TEST_DB:new(randoms:getRandomString()),
-                                             Data),
+    {DB1, ScrubbedData} =
+        write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()), Data),
     DB2 = lists:foldl(
             fun(Key, DBAcc) ->
                 ?TEST_DB:delete(DBAcc, Key)
             end, DB1, ToDelete),
-    ExpData = lists:filter(
-                fun(El) ->
-                        not lists:any(fun(Key) ->
-                                          element(1, El) ?EQ Key
-                                  end, ToDelete)
-                end, ScrubedData),
+    ExpData = [El || El <- ScrubbedData,
+                     not lists:any(fun(Key) -> element(1, El) ?EQ Key end,
+                                   ToDelete)],
     check_db(DB2, ExpData, "check_db_delete"),
     ?TEST_DB:close(DB2),
     true.
@@ -103,14 +98,10 @@ tester_delete(_Config) ->
 -spec prop_foldl([backend_beh:entry()], backend_beh:interval(),
                  non_neg_integer()) -> true.
 prop_foldl(Data, Interval, MaxNum) ->
-    {DB1, ScrubedData} =
-                         write_scrubed_to_db(?TEST_DB:new(randoms:getRandomString()),
-                                             Data),
-    {ExpInInterval, _NotIn} = lists:partition(
-                                fun(E) ->
-                                        is_in(Interval, element(1, E))
-                                end,
-                                ScrubedData),
+    {DB1, ScrubbedData} =
+        write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()), Data),
+    ExpInInterval = [El || El <- ScrubbedData,
+                           is_in(Interval, element(1, El))],
     ExpInIntervalCounted = lists:sublist(lists:keysort(1, ExpInInterval), MaxNum),
     AllFold = ?TEST_DB:foldl(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldl(DB1,
@@ -122,7 +113,7 @@ prop_foldl(Data, Interval, MaxNum) ->
                             [],
                             Interval,
                             MaxNum),
-    ?equals_w_note(lists:sort(ScrubedData), lists:sort(AllFold), "test_foldl1"),
+    ?equals_w_note(lists:sort(ScrubbedData), lists:sort(AllFold), "test_foldl1"),
     ?equals_w_note(lists:sort(ExpInInterval), lists:sort(IntervalFold), "test_foldl2"),
     ?equals_w_note(lists:sort(ExpInIntervalCounted),
                    lists:sort(IntervalCountFold), "test_foldl3"),
@@ -138,14 +129,10 @@ tester_foldl(_Config) ->
 -spec prop_foldr([backend_beh:entry()], backend_beh:interval(),
                  non_neg_integer()) -> true.
 prop_foldr(Data, Interval, MaxNum) ->
-    {DB1, ScrubedData} =
-                         write_scrubed_to_db(?TEST_DB:new(randoms:getRandomString()),
-                                             Data),
-    {ExpInInterval, _NotIn} = lists:partition(
-                                fun(E) ->
-                                        is_in(Interval, element(1, E))
-                                end,
-                                ScrubedData),
+    {DB1, ScrubbedData} =
+        write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()), Data),
+    ExpInInterval = [El || El <- ScrubbedData,
+                           is_in(Interval, element(1, El))],
     ExpInIntervalCounted = lists:sublist(lists:reverse(lists:keysort(1, ExpInInterval)), MaxNum),
     AllFold = ?TEST_DB:foldr(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldr(DB1,
@@ -159,7 +146,7 @@ prop_foldr(Data, Interval, MaxNum) ->
                             MaxNum),
     %% ct:pal("ExpInInterval: ~p~nIntervalFold: ~p~nInterval: ~p~n", [ExpInInterval,
     %%                                                  IntervalFold, Interval]),
-    ?equals_w_note(lists:sort(ScrubedData), lists:sort(AllFold), "test_foldr1"),
+    ?equals_w_note(lists:sort(ScrubbedData), lists:sort(AllFold), "test_foldr1"),
     ?equals_w_note(lists:sort(ExpInInterval), lists:sort(IntervalFold), "test_foldr2"),
     ?equals_w_note(lists:sort(ExpInIntervalCounted),
                    lists:sort(IntervalCountFold), "test_foldr3"),
@@ -172,17 +159,17 @@ tester_foldr(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-write_scrubed_to_db(DB, Data) ->
-    ScrubedData = scrub_data(Data),
+write_scrubbed_to_db(DB, Data) ->
+    ScrubbedData = scrub_data(Data),
     DB1 = lists:foldl(
             fun(Entry, DBAcc) ->
                 ?TEST_DB:put(DBAcc, Entry)
-            end, DB, ScrubedData),
-    {DB1, ScrubedData}.
+            end, DB, ScrubbedData),
+    {DB1, ScrubbedData}.
 
 scrub_data(Data) ->
     %% Entries should be unique
-    SortFun = fun(A, B) -> (element(1, A) < element(1, B)) or
+    SortFun = fun(A, B) -> (element(1, A) < element(1, B)) orelse
                            (element(1, A) ?EQ element(1, B)) end,
     lists:usort(SortFun, [Entry || Entry <- Data]).
 
@@ -195,6 +182,6 @@ check_db(DB, ExpData, Note) ->
 is_in({element, Key}, OtherKey) -> Key ?EQ OtherKey;
 is_in(all, _Key) -> true;
 is_in({interval, '(', L, R, ')'}, Key) -> Key > L andalso Key < R;
-is_in({interval, '(', L, R, ']'}, Key) -> Key > L andalso ((Key < R) or (Key ?EQ R));
-is_in({interval, '[', L, R, ')'}, Key) -> ((Key > L) or (Key ?EQ L)) andalso Key < R;
-is_in({interval, '[', L, R, ']'}, Key) -> ((Key > L) or (Key ?EQ L)) andalso ((Key < R) or (Key ?EQ R)).
+is_in({interval, '(', L, R, ']'}, Key) -> Key > L andalso ((Key < R) orelse (Key ?EQ R));
+is_in({interval, '[', L, R, ')'}, Key) -> ((Key > L) orelse (Key ?EQ L)) andalso Key < R;
+is_in({interval, '[', L, R, ']'}, Key) -> ((Key > L) orelse (Key ?EQ L)) andalso ((Key < R) orelse (Key ?EQ R)).
