@@ -209,7 +209,7 @@ on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}
             SUpd = update_session_recon(S, Stats),
             true = check_session_complete(SUpd),
             State#rrepair_state{open_recon = OR - 1,
-                                open_sessions = [SUpd | TSessions]};
+                                open_sessions = TSessions};
         _ ->
             ?TRACE("START_TO_DEST ~p", [DKey]),
             api_dht_raw:unreliable_lookup(DKey, Msg),
