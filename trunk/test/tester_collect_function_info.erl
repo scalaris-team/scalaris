@@ -108,12 +108,15 @@ parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
     %ct:pal("~w:~w ~w ~w", [Module, _Line, FunName, AFunSpec]),
     FunSpec = case AFunSpec of
                   [{type, _,bounded_fun, [_TypeFun, ConstraintType]}] ->
-                      Substitutions = parse_constraints(ConstraintType, gb_trees:empty()),
                       try
+                          Substitutions = parse_constraints(ConstraintType, gb_trees:empty()),
                           substitute_constraints(AFunSpec, Substitutions)
                       catch
                           {subst_error, Description} ->
                               ct:pal("substitution error ~w in ~w:~w ~w", [Description, Module, FunName, AFunSpec]),
+                              exit(foobar);
+                          {parse_error, Description} ->
+                              ct:pal("parse error ~w in ~w:~w ~w", [Description, Module, FunName, AFunSpec]),
                               exit(foobar)
                       end;
                   _ ->
@@ -367,8 +370,19 @@ parse_constraints([], Substitutions) ->
 parse_constraints([ConstraintType | Rest], Substitutions) ->
     case ConstraintType of
         {type,_,constraint,[{atom,_,is_subtype},[{var,_,Variable},Type]]} ->
-            NewSubstitutions = gb_trees:insert(Variable, Type, Substitutions),
-            parse_constraints(Rest, NewSubstitutions);
+            case gb_trees:lookup(Variable, Substitutions) of
+                {value,Val} ->
+                    case equal_types(Val, Type) of
+                        true ->
+                            NewSubstitutions = gb_trees:enter(Variable, Type, Substitutions),
+                            parse_constraints(Rest, NewSubstitutions);
+                        false ->
+                            throw({parse_error, Val})
+                    end;
+                none ->
+                    NewSubstitutions = gb_trees:insert(Variable, Type, Substitutions),
+                    parse_constraints(Rest, NewSubstitutions)
+            end;
         _ ->
             ct:pal("unknown constraint ~w", [ConstraintType]),
             parse_constraints(Rest, Substitutions)
@@ -383,7 +397,7 @@ substitute_constraints({var,_Line,VarName}, Substitutions) ->
         none -> {var,_Line,VarName}
     end;
 
-substitute_constraints({type, Line,bounded_fun, [FunType, _Constraints]}, Substitutions) ->
+substitute_constraints({type, _Line,bounded_fun, [FunType, _Constraints]}, Substitutions) ->
     substitute_constraints(FunType, Substitutions);
 
 % generic types
@@ -414,3 +428,14 @@ substitute_constraints(Unknown, Substitutions) ->
     ct:pal("~w", [Substitutions]),
     throw({subst_error, unknown_expression}),
     exit(foobar).
+
+% type equality minus line number
+equal_types(Left, Right)  when is_list(Left) andalso is_list(Right) ->
+    lists:all(fun ({L, R}) ->
+                      equal_types(L, R)
+              end, lists:zip(Left, Right));
+equal_types({type,_, Type, LeftList}, {type,_, Type, RightList} ) ->
+    equal_types(LeftList, RightList);
+equal_types(_, _) ->
+    false.
+
