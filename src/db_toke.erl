@@ -173,33 +173,15 @@ get_load({DB, _FileName}) ->
 %% @doc Equivalent to toke_drv:fold(Fun, Acc0, DB).
 %%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
-foldl({DB, _FileName}, Fun, Acc) ->
-    Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
-                                 [?OUT(Entry) | AccIn]
-                         end, [], DB),
-    %% HINT
-    %% Fun can only be applied in a second pass. It could do a delete (or other
-    %% write op) and toke can not handle writes whiles folding.
-    %% Since we reversed the order while accumulating reverse it by using lists
-    %% fold but "from the other side"
-    lists:foldr(Fun, Acc, Data).
+foldl(State, Fun, Acc) ->
+    foldl_helper(State, Fun, Acc, all, -1).
 
 %% @equiv foldl(DB, Fun, Acc0, Interval, get_load(DB))
 %% @doc   Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Interval::db_backend_beh:interval()) -> Acc1::A.
-foldl({DB, _FileName}, Fun, Acc, Interval) ->
-    Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
-                                 DeCoded = ?OUT(Entry),
-                                 case is_in(Interval, element(1, DeCoded)) of
-                                     true ->
-                                         [DeCoded | AccIn];
-                                     _ ->
-                                         AccIn
-                                 end
-                         end, [], DB),
-    %% see HINT in foldl/3
-    lists:foldr(Fun, Acc, Data).
+foldl(State, Fun, Acc, Interval) ->
+    foldl_helper(State, Fun, Acc, Interval, -1).
 
 %% @doc foldl iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
@@ -207,48 +189,37 @@ foldl({DB, _FileName}, Fun, Acc, Interval) ->
 %%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
-foldl({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
-    {_Left, Data} = toke_drv:fold(
-                      fun(_Key, _Entry, {0, _} = AccIn) ->
-                              AccIn;
-                         (_Key, Entry, {Max, AccIn}) ->
-                              DeCoded = ?OUT(Entry),
-                              case is_in(Interval, element(1, DeCoded)) of
-                                  true ->
-                                      {Max - 1, [DeCoded | AccIn]};
-                                  _ ->
-                                      {Max, AccIn}
-                              end
-                      end, {MaxNum, []}, DB),
-    %% see HINT in foldl/3
-    lists:foldr(Fun, Acc, Data).
+foldl(State, Fun, Acc, Interval, MaxNum) ->
+    %% HINT
+    %% Fun can only be applied in a second pass. It could do a delete (or other
+    %% write op) and toke can not handle writes whiles folding.
+    %% Since we reversed the order while accumulating reverse it by using lists
+    %% fold but "from the other side"
+    foldl_helper(State, Fun, Acc, Interval, MaxNum).
+
+%% @private this helper enables us to use -1 as MaxNum. MaxNum == -1 signals that all
+%%          data is to be retrieved.
+-spec foldl_helper(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
+                               Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
+foldl_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
+    Keys = get_all_keys(DB, Interval, MaxNum),
+    lists:foldr(fun(Key, AccIn) ->
+                        Entry = toke_drv:get(DB, ?IN(Key)),
+                        Fun(?OUT(Entry), AccIn)
+                end, Acc, Keys).
 
 %% @doc makes a foldr over the whole dataset.
 %%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldr(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
-foldr({DB, _FileName}, Fun, Acc) ->
-    Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
-                                 [?OUT(Entry) | AccIn]
-                         end, [], DB),
-    %% see HINT in foldl/3
-    lists:foldl(Fun, Acc, Data).
+foldr(State, Fun, Acc) ->
+    foldr_helper(State, Fun, Acc, all, -1).
 
 %% @equiv foldr(DB, Fun, Acc0, Interval, get_load(DB))
 %% @doc   Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldr(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Interval::db_backend_beh:interval()) -> Acc1::A.
-foldr({DB, _FileName}, Fun, Acc, Interval) ->
-    Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
-                                 DeCoded = ?OUT(Entry),
-                                 case is_in(Interval, element(1, DeCoded)) of
-                                     true ->
-                                         [DeCoded | AccIn];
-                                     _ ->
-                                         AccIn
-                                 end
-                         end, [], DB),
-    %% see HINT in foldl/3
-    lists:foldl(Fun, Acc, Data).
+foldr(State, Fun, Acc, Interval) ->
+    foldr_helper(State, Fun, Acc, Interval, -1).
 
 %% @doc foldr iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
@@ -256,24 +227,48 @@ foldr({DB, _FileName}, Fun, Acc, Interval) ->
 %%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldr(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
-foldr({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
+foldr(State, Fun, Acc, Interval, MaxNum) ->
+    foldr_helper(State, Fun, Acc, Interval, MaxNum).
+
+%% @private this helper enables us to use -1 as MaxNum. MaxNum == -1 signals that all
+%%          data is to be retrieved.
+-spec foldr_helper(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
+                               Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
+foldr_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
     %% first only retrieve keys so we don't have to load the whole db into memory
-    Keys = toke_drv:fold(fun(Key, _Entry, AccIn) ->
-                                 DeCoded = ?OUT(Key),
-                                 case is_in(Interval, DeCoded) of
-                                     true ->
-                                         [DeCoded | AccIn];
-                                     _ ->
-                                         AccIn
-                                 end
-                         end, [], DB),
-    CutData = lists:sublist(Keys, MaxNum),
-    %% see HINT in foldl/3
+    Keys = get_all_keys(DB, Interval, -1),
+    CutData = case MaxNum of
+                  N when N < 0 ->
+                      Keys;
+                  _ ->
+                      lists:sublist(Keys, MaxNum)
+              end,
+    %% see HINT in foldl/5
     %% now retrieve actual data
     lists:foldl(fun(Key, AccIn) ->
                         Entry = toke_drv:get(DB, ?IN(Key)),
                         Fun(?OUT(Entry), AccIn)
                 end, Acc, CutData).
+
+%% @private get_all_keys/3 retrieves all keys in DB that fall into Interval but
+%%          not more than MaxNum. If MaxNum == -1 all Keys are retrieved. If
+%%          MaxNum is positive it starts from the left in term order.
+-spec get_all_keys(pid(), db_backend_beh:interval(), -1 | non_neg_integer()) ->
+    [key()].
+get_all_keys(DB, Interval, MaxNum) ->
+    {_Rest, Keys} = toke_drv:fold(fun(_Key, _Entry, {0, _} = AccIn) ->
+                              AccIn;
+                         (Key, _Entry, {Max, KeyAcc} = AccIn) ->
+                          DeCoded = ?OUT(Key),
+                          case is_in(Interval, DeCoded) of
+                              true ->
+                                  {Max - 1, [DeCoded | KeyAcc]};
+                              _ ->
+                                  AccIn
+                          end
+                  end, {MaxNum, []}, DB),
+    Keys.
+
 
 is_in({element, Key}, OtherKey) -> Key =:= OtherKey;
 is_in(all, _Key) -> true;
