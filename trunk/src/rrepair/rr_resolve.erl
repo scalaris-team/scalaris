@@ -22,6 +22,8 @@
 %%                            sends all own db entries which are not in received kvv-list
 %%                            to the feedback pid (if given)
 %%           4) interval_upd_send: creates kvv-list from given interval and sends it to dest
+%%           5) interval_upd_my: tries to resolve items from the given interval by
+%%                               requesting data from replica nodes
 %%         Options:
 %%           1) Feedback: sends data ids to Node (A) which are outdated at (A)
 %%           2) Send_Stats: sends resolution stats to given pid
@@ -74,7 +76,8 @@
     {key_upd, SortedKvvListInQ1::kvv_list()} |
     {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
     {interval_upd, intervals:interval(), SortedKvvListInQ1::kvv_list()} |
-    {interval_upd_send, intervals:interval(), DestPid::comm:mypid()}.
+    {interval_upd_send, intervals:interval(), DestPid::comm:mypid()} |
+    {interval_upd_my, intervals:interval()}.
 
 -record(rr_resolve_state,
         {
@@ -207,6 +210,36 @@ on({get_entries_response, EntryList}, State =
         SID -> comm:send(Dest, {request_resolve, SID, {interval_upd, I, SendList}, Options})
     end,
     shutdown(resolve_ok, State);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% MODE: interval_upd_my
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+on({get_state_response, MyI} = _Msg,
+   State = #rr_resolve_state{operation = {interval_upd_my, I} = _Operation}) ->
+    ?TRACE("RESOLVE - START~nOperation=~.2p~nState=~.2p",
+           [_Operation, _Msg], State),
+    ISec = intervals:intersection(MyI, I),
+    NewState = State#rr_resolve_state{ my_range = MyI },
+    case intervals:is_empty(ISec) of
+        false -> case rrepair:select_sync_node(ISec, true) of
+                     not_found ->
+                         shutdown(resolve_abort, NewState);
+                     DKey ->
+                         % TODO: keep trying to resolve the whole intersection
+                         %       e.g. by removing each sync interval and
+                         %       continuing with the rest until the whole
+                         %       interval is covered (at each step check with
+                         %       the range reported from the dht_node!)
+                         % -> the current implementation only tries once!
+                         % note: bloom and art may not fully re-generate the
+                         %       own range -> choose merkle_tree instead
+                         comm:send_local(pid_groups:get_my(rrepair),
+                                         {request_sync, merkle_tree, DKey}),
+                         shutdown(resolve_ok, NewState)
+                 end;
+        true  -> shutdown(resolve_abort, NewState)
+    end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
