@@ -151,7 +151,7 @@ end_per_testcase(_TestCase, Config) ->
 
 get_rep_upd_config(Method) ->
     [{rrepair_enabled, true},
-     {rr_trigger_interval, 100000000}, %stop trigger
+     {rr_trigger_interval, 0}, %stop trigger
      {rr_recon_method, Method},
      {rr_session_ttl, 100000},
      {rr_gc_interval, 60000},

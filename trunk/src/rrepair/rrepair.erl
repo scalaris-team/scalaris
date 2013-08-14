@@ -91,7 +91,7 @@
 
 -record(rrepair_state,
         {
-         trigger_state  = ?required(rrepair_state, trigger_state)   :: trigger:state(),
+         trigger_state  = ?required(rrepair_state, trigger_state)   :: trigger:state() | null,
          gc_trigger     = ?required(rrepair_state, gc_trigger)      :: trigger:state(),     %garbage collector trigger to remove dead sessions
          round          = {0, 0}                                    :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
@@ -175,7 +175,9 @@ on({?TRIGGER_NAME}, State) ->
            comm:send_local(self(), {request_sync, get_recon_method(), random});
        true -> ok
     end,
-    NewTriggerState = trigger:next(State#rrepair_state.trigger_state),
+    NewTriggerState =
+        ?IIF(State#rrepair_state.trigger_state =:= null, null,
+             trigger:next(State#rrepair_state.trigger_state)),
     State#rrepair_state{ trigger_state = NewTriggerState };
 
 on ({?GC_TRIGGER}, State = #rrepair_state{ gc_trigger = GCState,
@@ -443,17 +445,21 @@ start_link(DHTNodeGroup) ->
 
 %% @doc Initialises the module and starts the trigger
 -spec init([]) -> state().
-init([]) ->	
-    TriggerState = trigger:init(trigger_periodic, get_update_interval(), ?TRIGGER_NAME),
-    GCTrigger   = trigger:init(trigger_periodic, get_gc_interval(), ?GC_TRIGGER),
-    #rrepair_state{ trigger_state = trigger:next(TriggerState),
-                    gc_trigger = trigger:next(GCTrigger) }.
+init([]) ->
+    TriggerState = case get_update_interval() of
+                       0 -> null;
+                       X -> trigger:next(
+                              trigger:init(trigger_periodic, X, ?TRIGGER_NAME))
+                   end,
+    GCTrigger = trigger:next(
+                  trigger:init(trigger_periodic, get_gc_interval(), ?GC_TRIGGER)),
+    #rrepair_state{trigger_state = TriggerState, gc_trigger = GCTrigger}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
 %
 % USED CONFIG FIELDS
-%	* rr_trigger_interval: integer duration until next triggering (milliseconds)
+%	* rr_trigger_interval: integer duration until next triggering (milliseconds) (0 = de-activate)
 %	* rr_recon_method: set reconciliation algorithm name
 %   * rr_trigger_probability: this is the probability of starting a synchronisation 
 %                             with a random node if trigger has fired. ]0,100]
@@ -474,12 +480,12 @@ check_config() ->
         config:cfg_is_integer(rr_gc_interval) andalso
         config:cfg_is_greater_than(rr_gc_interval, 0) andalso                
         config:cfg_is_integer(rr_trigger_interval) andalso
-        config:cfg_is_greater_than(rr_trigger_interval, 0).
+        config:cfg_is_greater_than_equal(rr_trigger_interval, 0).
 
 -spec get_recon_method() -> rr_recon:method().
 get_recon_method() ->  config:read(rr_recon_method).
 
--spec get_update_interval() -> pos_integer().
+-spec get_update_interval() -> non_neg_integer().
 get_update_interval() -> config:read(rr_trigger_interval).
 
 -spec get_start_prob() -> pos_integer().
