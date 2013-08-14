@@ -79,7 +79,8 @@
                          Source::pidinfo(), Dest::pidinfo(), comm:message()}.
 -type trace_event()  :: send_event() | info_event() | recv_event().
 -type trace()        :: [trace_event()].
--type msg_map_fun()  :: fun((comm:message()) -> comm:message()).
+-type msg_map_fun()  :: fun((comm:message(), Source::pid() | comm:mypid(),
+                             Dest::pid() | comm:mypid()) -> comm:message()).
 -type filter_fun()   :: fun((trace_event()) -> boolean()).
 -type passed_state() :: {trace_id(), logger(), msg_map_fun(), filter_fun()}
                         | {trace_id(), logger()}.
@@ -511,7 +512,7 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
             io:format("~p send ~.0p -> ~.0p:~n  ~.0p.~n",
                       [util:readable_utc_time(Now),
                        normalize_pidinfo(FromPid),
-                       normalize_pidinfo(ToPid), MsgMapFun(Msg)]),
+                       normalize_pidinfo(ToPid), MsgMapFun(Msg, FromPid, ToPid)]),
             true;
         {log_collector, LoggerPid} ->
             MsgMapFun = passed_state_msg_map_fun(PState),
@@ -519,7 +520,7 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
             send_log_msg(
               PState,
               LoggerPid,
-              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg), ?IIF(LocalOrGlobal =:= local_after, local, LocalOrGlobal)}),
+              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg, FromPid, ToPid), ?IIF(LocalOrGlobal =:= local_after, local, LocalOrGlobal)}),
             true;
         {proto_sched, _} when LocalOrGlobal =:= local_after ->
             %% TODO: see comm:send_local_after
@@ -567,14 +568,14 @@ log_recv(PState, FromPid, ToPid, Msg) ->
                       [util:readable_utc_time(Now),
                        normalize_pidinfo(FromPid),
                        normalize_pidinfo(ToPid),
-                       MsgMapFun(Msg)]);
+                       MsgMapFun(Msg, FromPid, ToPid)]);
         {log_collector, LoggerPid} ->
             MsgMapFun = passed_state_msg_map_fun(PState),
             TraceId = passed_state_trace_id(PState),
             send_log_msg(
               PState,
               LoggerPid,
-              {log_recv, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg)});
+              {log_recv, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg, FromPid, ToPid)});
         {proto_sched, _} ->
             ok
     end,
