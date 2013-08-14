@@ -273,6 +273,7 @@ get_all_keys(DB, Interval, MaxNum) ->
 is_in({element, Key}, OtherKey) -> Key =:= OtherKey;
 is_in(all, _Key) -> true;
 is_in({interval, '(', L, R, ')'}, Key) -> Key > L andalso Key < R;
-is_in({interval, '(', L, R, ']'}, Key) -> Key > L andalso ((Key < R) or (Key =:= R));
-is_in({interval, '[', L, R, ')'}, Key) -> ((Key > L) or (Key =:= L)) andalso Key < R;
-is_in({interval, '[', L, R, ']'}, Key) -> ((Key > L) or (Key =:= L)) andalso ((Key < R) or (Key =:= R)).
+is_in({interval, '(', L, R, ']'}, Key) -> Key > L andalso ((Key < R) orelse (Key =:= R));
+is_in({interval, '[', L, R, ')'}, Key) -> ((Key > L) orelse (Key =:= L)) andalso Key < R;
+is_in({interval, '[', L, R, ']'}, Key) -> ((Key > L) orelse (Key =:= L)) andalso
+                                          ((Key < R) orelse (Key =:= R)).
