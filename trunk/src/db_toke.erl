@@ -258,18 +258,23 @@ foldr({DB, _FileName}, Fun, Acc, Interval) ->
 -spec foldr(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldr({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
-    Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
-                                 DeCoded = ?OUT(Entry),
-                                 case is_in(Interval, element(1, DeCoded)) of
+    %% first only retrieve keys so we don't have to load the whole db into memory
+    Keys = toke_drv:fold(fun(Key, _Entry, AccIn) ->
+                                 DeCoded = ?OUT(Key),
+                                 case is_in(Interval, DeCoded) of
                                      true ->
                                          [DeCoded | AccIn];
                                      _ ->
                                          AccIn
                                  end
                          end, [], DB),
-    CutData = lists:sublist(Data, MaxNum),
+    CutData = lists:sublist(Keys, MaxNum),
     %% see HINT in foldl/3
-    lists:foldr(Fun, Acc, CutData).
+    %% now retrieve actual data
+    lists:foldr(fun(Key, AccIn) ->
+                        Entry = toke_drv:get(DB, ?IN(Key)),
+                        Fun(?OUT(Entry), AccIn)
+                end, Acc, CutData).
 
 is_in({element, Key}, OtherKey) -> Key =:= OtherKey;
 is_in(all, _Key) -> true;
