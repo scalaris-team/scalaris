@@ -37,7 +37,7 @@ if not exist Emakefile (
     for /f "tokens=1,* delims=&&&" %%a in (Emakefile.in) do (
         set "line=%%a"
         if defined line (
-            call set "line=echo.%%line:  @EMAKEFILEDEFINES@=, {d, tid_not_builtin}, {d, have_ctline_support}, {d, have_cthooks_support}, {d, with_export_type_support}%%"
+            call set "line=echo.%%line:  @EMAKEFILEDEFINES@=, {d, tid_not_builtin}, {d, have_cthooks_support}, {d, with_export_type_support}%%"
             call set "line=%%line:@EMAKEFILECOMPILECOMPAT@=%%"
             call set "line=%%line:  @HAVE_YAWS_SENDFILE@=, {d, 'NO_FILE_SENDFILE'}%%"
             for /f "delims=" %%X in ('"echo."%%line%%""') do %%~X >> Emakefile
