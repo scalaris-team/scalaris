@@ -167,6 +167,7 @@ on({get_state_response, MyI}, State = #rr_resolve_state{ operation = Op,
                                                          dhtNodePid = DhtPid }) 
   when element(1, Op) =:= interval_upd;
        element(1, Op) =:= interval_upd_send ->
+    % TODO: the interval from Op may not be in a single quadrant!
     ISec = rr_recon:map_interval(MyI, element(2, Op)),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
