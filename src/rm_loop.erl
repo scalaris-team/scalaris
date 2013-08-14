@@ -329,7 +329,28 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
 -spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
 crashed_node(State = {RM_State, _HasLeft, _SubscrTable}, DeadPid) ->
     RMFun = fun() -> ?RM:crashed_node(RM_State, DeadPid) end,
-    update_state(State, RMFun, DeadPid).
+    NewState = update_state(State, RMFun, DeadPid),
+    case config:read(rrepair_after_crash) of
+        true ->
+            OldPred = nodelist:pred(?RM:get_neighbors(RM_State)),
+            NewNeighb = ?RM:get_neighbors(element(1, NewState)),
+            NewPred = nodelist:pred(NewNeighb),
+            case NewPred of
+                OldPred -> ok;
+                _       ->
+                    case intervals:in(node:id(OldPred), nodelist:node_range(NewNeighb)) of
+                        true ->
+                            CrashInterval = node:mk_interval_between_nodes(NewPred, OldPred),
+                            comm:send_local(
+                              pid_groups:get_my(rrepair),
+                              {request_resolve, {interval_upd_my, CrashInterval}, []});
+                        false ->
+                            ok
+                    end
+            end;
+        false -> ok
+    end,
+    NewState.
 
 % dead-node-cache reported dead node to be alive again
 -spec zombie_node(State::state(), Node::node:node_type()) -> state().
@@ -364,12 +385,12 @@ get_web_debug_info({RM_State, _HasLeft, SubscrTable}) ->
 %% @doc Calls RMFun (which may update the Neighborhood), then calls all
 %%      subscribers and updates the failure detector if necessary.
 -spec update_state(OldState::state_t(), RMFun::fun(() -> ?RM:state()))
-        -> NewState::state().
+        -> NewState::state_t().
 update_state(OldState, RMFun) ->
     update_state(OldState, RMFun, null).
 
 -spec update_state(OldState::state_t(), RMFun::fun(() -> ?RM:state()),
-                   CrashedPid::comm:mypid() | null) -> NewState::state().
+                   CrashedPid::comm:mypid() | null) -> NewState::state_t().
 update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun, CrashedPid) ->
     OldNeighborhood = ?RM:get_neighbors(OldRM_State),
     NewRM_State = RMFun(),
