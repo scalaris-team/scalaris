@@ -180,10 +180,9 @@ foldl({DB, _FileName}, Fun, Acc) ->
     %% HINT
     %% Fun can only be applied in a second pass. It could do a delete (or other
     %% write op) and toke can not handle writes whiles folding.
-    %% It seems like toke_drv:fold is acting as foldr would in repect to the
-    %% order of terms. So accumulating reverses it and we have the correct term
-    %% order.
-    lists:foldl(Fun, Acc, Data).
+    %% Since we reversed the order while accumulating reverse it by using lists
+    %% fold but "from the other side"
+    lists:foldr(Fun, Acc, Data).
 
 %% @equiv foldl(DB, Fun, Acc0, Interval, get_load(DB))
 %% @doc   Returns a potentially larger-than-memory dataset. Use with care.
@@ -200,7 +199,7 @@ foldl({DB, _FileName}, Fun, Acc, Interval) ->
                                  end
                          end, [], DB),
     %% see HINT in foldl/3
-    lists:foldl(Fun, Acc, Data).
+    lists:foldr(Fun, Acc, Data).
 
 %% @doc foldl iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
@@ -222,7 +221,7 @@ foldl({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
                               end
                       end, {MaxNum, []}, DB),
     %% see HINT in foldl/3
-    lists:foldl(Fun, Acc, Data).
+    lists:foldr(Fun, Acc, Data).
 
 %% @doc makes a foldr over the whole dataset.
 %%      Returns a potentially larger-than-memory dataset. Use with care.
@@ -232,7 +231,7 @@ foldr({DB, _FileName}, Fun, Acc) ->
                                  [?OUT(Entry) | AccIn]
                          end, [], DB),
     %% see HINT in foldl/3
-    lists:foldr(Fun, Acc, Data).
+    lists:foldl(Fun, Acc, Data).
 
 %% @equiv foldr(DB, Fun, Acc0, Interval, get_load(DB))
 %% @doc   Returns a potentially larger-than-memory dataset. Use with care.
@@ -249,7 +248,7 @@ foldr({DB, _FileName}, Fun, Acc, Interval) ->
                                  end
                          end, [], DB),
     %% see HINT in foldl/3
-    lists:foldr(Fun, Acc, Data).
+    lists:foldl(Fun, Acc, Data).
 
 %% @doc foldr iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
@@ -271,7 +270,7 @@ foldr({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
     CutData = lists:sublist(Keys, MaxNum),
     %% see HINT in foldl/3
     %% now retrieve actual data
-    lists:foldr(fun(Key, AccIn) ->
+    lists:foldl(fun(Key, AccIn) ->
                         Entry = toke_drv:get(DB, ?IN(Key)),
                         Fun(?OUT(Entry), AccIn)
                 end, Acc, CutData).
