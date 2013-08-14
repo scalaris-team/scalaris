@@ -159,7 +159,7 @@ delete({DB, _FileName} = State, Key) ->
     toke_drv:delete(DB, ?IN(Key)),
     State.
 
-%% @doc Returns the name of the DB specified in new/1.
+%% @doc Returns the name of the DB specified in @see new/1.
 -spec get_name(DB::db()) -> nonempty_string().
 get_name({_DB, FileName}) ->
     FileName.
@@ -170,15 +170,23 @@ get_load({DB, _FileName}) ->
     %% TODO: not really efficient (maybe store the load in the DB?)
     toke_drv:fold(fun (_K, _V, Load) -> Load + 1 end, 0, DB).
 
-%% @doc Is equivalent to ets:foldl(Fun, Acc0, DB).
+%% @doc Equivalent to toke_drv:fold(Fun, Acc0, DB).
+%%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldl({DB, _FileName}, Fun, Acc) ->
     Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
                                  [?OUT(Entry) | AccIn]
                          end, [], DB),
+    %% HINT
+    %% Fun can only be applied in a second pass. It could do a delete (or other
+    %% write op) and toke can not handle writes whiles folding.
+    %% It seems like toke_drv:fold is acting as foldr would in repect to the
+    %% order of terms. So accumulating reverses it and we have the correct term
+    %% order.
     lists:foldl(Fun, Acc, Data).
 
-%% @doc Is equivalent to foldl(DB, Fun, Acc0, Interval, get_load(DB)).
+%% @equiv foldl(DB, Fun, Acc0, Interval, get_load(DB))
+%% @doc   Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Interval::db_backend_beh:interval()) -> Acc1::A.
 foldl({DB, _FileName}, Fun, Acc, Interval) ->
@@ -191,11 +199,13 @@ foldl({DB, _FileName}, Fun, Acc, Interval) ->
                                          AccIn
                                  end
                          end, [], DB),
+    %% see HINT in foldl/3
     lists:foldl(Fun, Acc, Data).
 
 %% @doc foldl iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
+%%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldl({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
@@ -211,17 +221,21 @@ foldl({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
                                       {Max, AccIn}
                               end
                       end, {MaxNum, []}, DB),
+    %% see HINT in foldl/3
     lists:foldl(Fun, Acc, Data).
 
-%% @doc Is equivalent to ets:foldr(Fun, Acc0, DB).
+%% @doc makes a foldr over the whole dataset.
+%%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldr(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldr({DB, _FileName}, Fun, Acc) ->
     Data = toke_drv:fold(fun(_Key, Entry, AccIn) ->
                                  [?OUT(Entry) | AccIn]
                          end, [], DB),
+    %% see HINT in foldl/3
     lists:foldr(Fun, Acc, Data).
 
-%% @doc Is equivalent to foldr(DB, Fun, Acc0, Interval, get_load(DB)).
+%% @equiv foldr(DB, Fun, Acc0, Interval, get_load(DB))
+%% @doc   Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldr(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Interval::db_backend_beh:interval()) -> Acc1::A.
 foldr({DB, _FileName}, Fun, Acc, Interval) ->
@@ -234,11 +248,13 @@ foldr({DB, _FileName}, Fun, Acc, Interval) ->
                                          AccIn
                                  end
                          end, [], DB),
+    %% see HINT in foldl/3
     lists:foldr(Fun, Acc, Data).
 
 %% @doc foldr iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
+%%      Returns a potentially larger-than-memory dataset. Use with care.
 -spec foldr(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldr({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
@@ -252,6 +268,7 @@ foldr({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
                                  end
                          end, [], DB),
     CutData = lists:sublist(Data, MaxNum),
+    %% see HINT in foldl/3
     lists:foldr(Fun, Acc, CutData).
 
 is_in({element, Key}, OtherKey) -> Key =:= OtherKey;
