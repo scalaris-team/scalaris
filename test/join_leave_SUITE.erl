@@ -212,7 +212,8 @@ add_x_rm_y_load_test(X, Y, StartOnlyAdded) ->
     Ring = [begin
                 Pred = hd(node_details:get(Details, predlist)),
                 Node = node_details:get(Details, node),
-                {node:id(Node), ?RT:get_range(node:id(Pred), node:id(Node)) / ?RT:n()}
+                {comm:make_local(node:pidX(Node)), node:id(Node),
+                 ?RT:get_range(node:id(Pred), node:id(Node)) / ?RT:n()}
             end || {ok, Details} <- statistics:get_ring_details()],
     ct:pal("RING: ~.2p", [Ring]),
     ct:pal("######## finish join ########"),
