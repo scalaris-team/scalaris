@@ -1,14 +1,35 @@
 \chapter{Introduction}
 
 \scalaris{} is a scalable, transactional, distributed key-value store based
-on the peer-to-peer principle. It can be used to build scalable Web 2.0
-services. The concept of \scalaris{} is quite simple: Its architecture
-consists of three layers.
+on the principles of structured peer-to-peer overlay networks.  It can be
+used as a flexible elastic data store backend to build scalable online
+services. Without system interruption it scales from a few PCs to thousands
+of servers. Servers can be added or removed on the fly without any service
+downtime.
 
-It provides self-management and scalability by replicating services and data
-among peers. Without system interruption it scales from a few PCs to
-thousands of servers. Servers can be added or removed on the fly without any
-service downtime.
+\scalaris{} takes care of
+
+\begin{center}
+\begin{tabular}{lp{10cm}}
+\emph{replication and fail-over} & for fault-tolerance \\
+\emph{self-management} & for low maintenance overhead \\
+\emph{automatic data partitioning} & for elasticity, load balancing and scalability \\
+\emph{strong consistency} & to ease
+development of applications on top of it, as inconsistencies have not to be
+dealt with \\
+\emph{transactions} & to support safe atomic updates of several data items
+at once \\
+\end{tabular}
+\end{center}
+
+The \scalaris{} project was initiated and is mainly developed by
+\href{http://www.zib.de/DAS/}{Zuse Institute Berlin} (ZIB) and was partly
+funded by the EU projects Selfman, XtreemOS, Contrail and 4CaaST. Additional
+information can be found at the project homepage
+(\url{http://scalaris.googlecode.com}) and the corresponding project web
+page at ZIB (\url{http://www.zib.de/en/das/projekte/projektdetails/article/scalaris.html}).
+
+The conceptual architecture of \scalaris{} consists of four layers:
 
 \definecolor{layer_bg}{RGB}{55,96,146}
 \definecolor{layer_bluefont}{RGB}{31,73,128}
@@ -17,7 +38,7 @@ service downtime.
  [layer/.style={rectangle,fill=layer_bg,text=white,
   drop shadow={opacity=0.4},
   minimum width=7cm,
-  minimum height=1.4cm,
+  minimum height=1.1cm,
   align=center},
   layer_desc/.style={text width=3.5cm,align=left}]
 \sffamily
@@ -25,23 +46,26 @@ service downtime.
   %% draw the layers
   \node[layer] (tx_layer) at (0,2.7)
      {Transaction Layer};
-  \node[layer,below=0.2 of tx_layer, minimum height=0.8cm] (rep_layer)
+  \node[layer,below=0.2 of tx_layer, minimum height=0.9cm] (rep_layer)
      {Replication Layer};
-  \node[layer,below=0.2 of rep_layer] (ov_layer)
-     {P2P Layer};
+  \node[layer,below=0.2 of rep_layer] (son_layer)
+     {Structured Overlay Network};
+  \node[layer,below=0.2 of son_layer, minimum height=0.9cm] (unstructured_layer)
+     {Unstructured P2P Layer};
 
   %% fitting the underlying bounding box
   \begin{pgfonlayer}{background}
-  \node[draw,color=layer_bg,fit=(tx_layer) (rep_layer) (ov_layer),
+    \node[draw,color=layer_bg,fit=(tx_layer) (rep_layer)
+                                  (son_layer) (unstructured_layer),
         inner sep=0.3cm,drop shadow, fill=white] {};
   \end{pgfonlayer}
 
   %% text above the box
   \node[above=0.4 of tx_layer, text=layer_bg]
-     {\textbf{\color{layer_bluefont}{Web 2.0 Application}}};
+     {\textbf{\color{layer_bluefont}{Scalable Application using \scalaris{}}}};
 
   %% text below the box
-  \node[inner sep=0, below=0.6 of ov_layer]
+  \node[inner sep=0, below=0.6 of unstructured_layer]
      {\textbf{\color{layer_bluefont}{Standard Internet Nodes for Data Storage}}};
 
   %% description on the right side
@@ -52,8 +76,10 @@ service downtime.
       \phantom{\ldots~}atomicity, isolation};
   \node[layer_desc,right=0.9 of rep_layer] (rep_layer_desc)
      {\smaller \ldots~availability};
-  \node[layer_desc,right=0.9 of ov_layer] (ov_layer_desc)
+  \node[layer_desc,right=0.9 of son_layer] (son_layer_desc)
      {\smaller \ldots~scalability};
+  \node[layer_desc,right=0.9 of unstructured_layer] (unstructured_layer_desc)
+     {\smaller \ldots~connectivity};
 
   %% arrows
   \begin{scope}[every node/.style={single arrow,
@@ -64,35 +90,21 @@ service downtime.
               minimum width=0.2cm}]
     \node[right=0.15 of tx_layer] {};
     \node[right=0.15 of rep_layer] {};
-    \node[right=0.15 of ov_layer] {};
+    \node[right=0.15 of son_layer] {};
+    \node[right=0.15 of unstructured_layer] {};
   \end{scope}
 \end{tikzpicture}
 \end{center}
 
-\scalaris{} takes care of:
 
-\begin{itemize}
-\item Fail-over
-\item Data distribution
-\item Replication
-\item Strong consistency
-\item Transactions
-\end{itemize}
+\section{\scalaris{} provides strong consistency and partition tolerance}
 
-The \scalaris{} project was initiated by Zuse Institute Berlin and onScale
-solutions and was partly funded by the EU projects Selfman, XtreemOS,
-Contrail and 4CaaST. Additional information (papers, videos) can be found at
-\url{http://www.zib.de/de/pvs/projekte/projektdetails/article/scalaris.html}
-and \url{http://www.onscale.de/scalarix.html}.
-
-\section{Brewer's CAP Theorem}
-
-In distributed computing there exists the so called CAP theorem. It
-basically says that there are three desirable properties for distributed
-systems but one can only have any two of them.
+In distributed computing the so called CAP theorem says that there are three
+desirable properties for distributed systems, but one can only have any two
+of them.
 
 \begin{description}
-\item {Strict Consistency.} Any read operation has to return the
+\item {Strong Consistency.} Any read operation has to return the
   result of the latest write operation on the same data item.
 
 \item {Availability.} Items can be read and modified at any time.
@@ -107,54 +119,341 @@ systems but one can only have any two of them.
   Pacific) are interrupted for a few hours and then get repaired.
 \end{description}
 
-The goal of \scalaris{} is to provide strict consistency and partition
-tolerance. We are willing to sacrifice availability to make sure that
-the stored data is always consistent. I.e. when you are running
-\scalaris{} with a replication degree of 4 and the network splits into
-two partitions, one partition with three replicas and one partition
-with one replica, you will be able to continue to use the service only
-in the larger partition. All requests in the smaller partition will
-time out until the two networks merge again. Note, most other
-key-value stores tend to sacrifice consistency.
+The goal of \scalaris{} is to provide strong consistency and partition
+tolerance. We are willing to sacrifice availability to make sure that the
+stored data is always consistent. I.e. when you are running \scalaris{} with
+a replication degree of four and the network splits into two partitions --
+one partition with three replicas and one partition with one replica -- you
+will be able to continue to use the service only in the larger
+partition. All requests in the smaller partition will time out or retried
+until the two networks merge again. Note, most other key-value stores tend
+to sacrifice consistency, which may make it hard for the application
+developer to detect and handle appearing inconsistencies properly.
 
-\section{Scientific Background}
+\section{Scientific background}
 
-{\bf Basics.} The general structure of \scalaris{} is modelled after
-Chord. The Chord paper~\cite{chord-sigcomm} describes the ring
-structure, the routing algorithms, and basic ring maintenance.
+\scalaris{} is backed by tons of research. It implements both algorithms
+from the literature and our own research results and combines all of them to
+a practical overall system. Several aspects of \scalaris{} were analyzed
+or/and developed as part of bachelor, diploma, master or PhD theses.
 
-The main routines of our Chord node are in \code{src/dht\_node.erl} and
-the join protocol is implemented in \code{src/dht\_node\_join.erl} (see
-also Chap.~\sieheref{chapter.join}). Our implementation of the routing
-algorithms is described in more detail in Sect.~\sieheref{chapter.routing}
-and the actual implementation is in \code{src/rt\_chord.erl}.
+\subsection*{\scalaris{} in General}
 
-{\bf Transactions.} The most interesting part is probably the
-transaction algorithms. The most current description of the algorithms
-and background is in \cite{enhanced-paxos}.
+{\bf Publications of the \scalaris{} team}
+\begin{quote} \small
+  F. Schintke. \emph{XtreemFS \& Scalaris.}
+  Science \& Technology, pp. 54-55, 2013.
 
-The implementation consists of the paxos algorithm in \code{src/paxos} and
+  A. Reinefeld, F. Schintke, T. Schütt, S. Haridi.
+  \emph{A Scalable, Transactional Data Store for Future Internet Services.}
+  Towards the Future Internet - A European Research Perspective,
+  G. Tselentis et al. (Eds.) IOS Press, pp. 148-159, 2009.
+
+  Thorsten Schütt, Monika Moser, Stefan Plantikow, Florian Schintke,
+  Alexander Reinefeld. \emph{A Transactional Scalable Distributed Data
+    Store.}  1st IEEE International Scalable Computing Challenge, co-located
+  with CCGrid'08, 2008.
+
+  Thorsten Schütt, Florian Schintke, Alexander Reinefeld.  \emph{Scalaris:
+    Reliable Transactional P2P Key/Value Store.} ACM SIGPLAN Erlang
+  Workshop, 2008.
+
+\end{quote}
+
+\subsection*{Structured Overlay Networks and Routing}
+The general structure of \scalaris{} is modelled after Chord. The Chord
+paper~\cite{chord-sigcomm} describes the ring structure, the routing
+algorithms, and basic ring maintenance.
+
+The main routines of our Chord node are in \code{src/dht\_node.erl} and the
+join protocol is implemented in \code{src/dht\_node\_join.erl} (see also
+Chap.~\sieheref{chapter.join}). Our implementation of the routing algorithms
+is described in more detail in Sect.~\sieheref{chapter.routing} and the
+actual implementation is in \code{src/rt\_chord.erl}. We also implemented
+Flexible Routing Tables according to~\cite{frtchord} which can be found in
+\code{src/rt\_frtchord.erl} and {src/rt\_gfrtchord.erl}.
+
+{\bf Publications of the \scalaris{} team}
+\begin{quote} \small
+
+  Mikael Högqvist. \emph{Consistent Key-Based Routing in Decentralized and
+    Reconfigurable Data Services.} Doctoral thesis, HU-Berlin, 2012.
+
+  Philipp Borgers. \emph{Erweiterung eines verteilten Key-Value-Stores
+    (Riak) um einen räumlichen Index.} Bachelor thesis, FU-Berlin, 2012.
+
+  Thorsten Schütt. \emph{Range queries in distributed hash tables.} Doctoral
+  thesis, 2010.
+
+  Christian von Prollius. \emph{Ein Peer-to-Peer System mit Bereichsabfragen
+    in PlanetLab.} Diploma thesis, FU-Berlin, 2008.
+
+  Jeroen Vlek. \emph{Reducing latency: Log b routing for Chord$^{\#}$.}
+  Bachelor thesis, Uni Amsterdam, 2008.
+
+  Thorsten Schütt, Florian Schintke, Alexander Reinefeld.  \emph{Range
+    Queries on structured overlay networks.} Computer Communications, 31(2),
+  pp. 280-291, 2008.
+
+  Thorsten Schütt, Florian Schintke, Alexander Reinefeld. \emph{A Structured
+    Overlay for Multi-dimensional Range Queries.} Euro-Par Conference, Luc
+  Anne-Marie Kermarrec (Ed.)pp. 503-513, Vol.4641, LNCS, 2007.
+
+  Alexander Reinefeld, Florian Schintke, Thorsten Schütt. \emph{P2P Routing
+    of Range Queries in Skewed Multidimensional Data Sets.} ZIB
+  report ZR-07-23, 2007.
+
+  Thorsten Schütt, Florian Schintke, Alexander Reinefeld. \emph{Structured
+    Overlay without Consistent Hashing.} Sixth Workshop on Global and
+  Peer-to-Peer Computing (GP2PC'06) at Sixth IEEE International Symposium on
+  Cluster Computing and the Grid (CCGrid 2006), 16-19 May 2006, Singapore,
+  p. 8, 2006.
+
+  Thorsten Schütt, Florian Schintke, Alexander
+  Reinefeld. \emph{Chord$^{\#}$: Structured Overlay Network for Non-Uniform
+    Load-Distribution.} ZIB report ZR-05-40, 2005.
+\end{quote}
+
+\paragraph{Related work}
+\begin{quote} \small
+
+  \cite{frtchord} Hiroya Nagao, Kazuyuki Shudo.
+  \emph{Flexible routing tables: Designing routing
+    algorithms for overlays based on a total order on a routing table set.}
+  In: Peer-to-Peer Computing, IEEE, 2011.
+
+  P. Ganesan, B. Yang, H. Garcia-Molina. \emph{One torus to rule them all:
+    Multi- dimensional queries in P2P systems.} In: WebDB2004, 2004.
+
+  Luc Onana Alima, Sameh El-Ansary, Per Brand and Seif Haridi. \emph{DKS(N,
+    k, f) A family of Low-Communication, Scalable and Fault-tolerant
+    Infrastructures for P2P applications.} The 3rd International workshop on
+    Global and P2P Computing on Large Scale Distributed Systems, (CCGRID
+    2003), May 2003.
+
+  \cite{chord-sigcomm} Ion Stoica, Robert Morris, David Karger, M. Frans
+  Kaashoek and Hari Balakrishnan.  \emph{Chord: A Scalable Peer-to-peer
+    Lookup Service for Internet Applications.}  ACM SIGCOMM 2001, San Deigo,
+  CA, August 2001, pp. 149-160.
+  \url{http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf}
+\end{quote}
+
+\subsection*{Transactions}
+The most interesting part is probably the transaction algorithms. The last
+description of the algorithms and background is in~\cite{enhanced-paxos}.
+
+The implementation consists of the Paxos algorithm in \code{src/paxos} and
 the transaction algorithms itself in \code{src/transactions} (see also
 Chap.~\sieheref{chapter.transactions}).
 
-{\bf Ring Maintenance.} We changed the ring maintenance algorithm in
-\scalaris{}. It is not the standard Chord one, but a variation of
-T-Man~\cite{t-man}. It is supposed to fix the ring structure
-faster. In some situations, the standard Chord algorithm is not able
-to fix the ring structure while T-Man can still fix it. For node sampling,
-our implementation relies on Cyclon~\cite{cyclon}.
+{\bf Publications of the \scalaris{} team}
+\begin{quote} \small
 
-The T-Man implementation can be found in \code{src/rm\_tman.erl} and
-the Cyclon implementation in \code{src/cyclon}.
+  \cite{enhanced-paxos} Florian Schintke, Alexander Reinefeld, Seif Haridi,
+  Thorsten Schütt.  \emph{Enhanced Paxos Commit for Transactions on DHTs.}
+  CCGRID, pp. 448-454, 2010.
 
-{\bf Vivaldi Coordinates.} For some experiments, we implemented so
-called Vivaldi coordinates~\cite{vivaldi}. They can be used to
-estimate the network latency between arbitrary nodes.
+  Florian Schintke. \emph{Management verteilter Daten in Grid- und
+    Peer-to-Peer-Systemen.} Doctoral thesis, HU-Berlin, 2010.
+
+  Monika Moser, Seif Haridi, Tallat Shafaat, Thorsten Schütt, Mikael
+  Högqvist, Alexander Reinefeld. \emph{Transactional DHT Algorithms.}  ZIB
+  report ZR-09-34, 2009.
+
+  Stefan Plantikow, Alexander Reinefeld, Florian
+  Schintke. \emph{Transactions and Concurrency Control for
+    Peer-to-Peer-Wikis.} In: Making Grids Work, Marco Danelutto, Paraskevi
+  Fragopoulo, Vladimir Getov (Eds.)pp. 337-349, 2008.
+
+  B. Mejías, M. Högqvist, P. Van Roy. \emph{Visualizing Transactional Algorithms
+    for DHTs.} IEEE P2P Conference, 2008.
+
+  Monika Moser, Seif Haridi. \emph{Atomic Commitment in Transactional DHTs.}
+  Proceedings of the CoreGRID Symposium, 2007.
+
+  S. Plantikow, A. Reinefeld, F. Schintke. \emph{Distributed Wikis on
+    Structured Overlays.} CoreGrid Workshop on Grid Programming Models, Grid
+  and P2P System Architecture, Grid Systems, Tools and Environments, 2007.
+
+  S. Plantikow, A. Reinefeld, F. Schintke. \emph{Transactions for
+    Distributed Wikis on Structured Overlays.} DSOM, Alexander Clemm,
+  Lisandro Granville, Rolf Stadler (Eds.)pp. 256-267, Vol.4785, LNCS, 2007.
+
+  Stefan Plantikow. \emph{Transaktionen für verteilte Wikis auf
+    strukturierten Overlay-Netzwerken.} Diploma thesis, HU-Berlin, 2007.
+\end{quote}
+
+\paragraph{Related work}
+\begin{quote} \small
+
+  Björn Kolbeck, Mikael Högqvist, Jan Stender, Felix Hupfeld. \emph{Flease
+    -- Lease Coordination Without a Lock Server.} Intl. Parallel and
+  Distributed Processing Symposium, pp. 978-988, 2011.
+
+  J. Gray, L. Lamport. \emph{Consensus on transaction commit.} ACM
+  Trans. Database Syst., 31(1):133--160, 2006.
+
+  L. Lamport. \emph{Fast Paxos.} Distributed Computing, 19(2):79--103, 2006.
+
+  L. Lamport. \emph{Paxos Made Simple.} SIGACT News, 32(4):51--58, December
+  2001.
+
+  L. Lamport. \emph{The Part-Time Parliament.} ACM Trans. Comput. Syst.,
+  16(2):133--169, 1998.
+
+
+\end{quote}
+
+\subsection*{Ring Maintenance}
+We changed the ring maintenance algorithm in \scalaris{}. It is not the
+standard Chord one, but a variation of T-Man~\cite{t-man}. It is supposed to
+fix the ring structure faster. In some situations, the standard Chord
+algorithm is not able to fix the ring structure while T-Man can still fix
+it. For node sampling, our implementation relies on Cyclon~\cite{cyclon}.
+
+The T-Man implementation can be found in \code{src/rm\_tman.erl} and the
+Cyclon implementation in \code{src/cyclon}.
+
+{\bf Publications of the \scalaris{} team}
+\begin{quote} \small
+  Paolo Costa, Guillaume Pierre, Alexander Reinefeld, Thorsten Schütt,
+  Maarten van Steen. \emph{Sloppy Management of Structured P2P Services.}
+  Proceedings of the 3$^{rd}$ International Workshop on Hot Topics in
+  Autonomic Computing (HotAC III), co-located with IEEE ICAC'08, 2008.
+\end{quote}
+
+\paragraph{Related work}
+\begin{quote} \small
+
+  \cite{t-man} M{\'a}rk Jelasity, Alberto Montresor, Ozalp Babaoglu.
+  \emph{T-Man: Gossip-based fast overlay topology construction.}  Computer
+  Networks (CN) 53(13):2321-2339, 2009.
+
+  \cite{cyclon} Spyros Voulgaris, Daniela Gavidia, Maarten van Steen.
+  \emph{CYCLON: Inexpensive Membership Management for Unstructured P2P
+    Overlays.} J. Network Syst. Manage. 13(2): 2005.
+
+%% Tallat loopy rings, tallat thesis
+\end{quote}
+
+\subsection*{Gossiping and Topology Inference}
+For some experiments, we implemented so called Vivaldi
+coordinates~\cite{vivaldi}. They can be used to estimate the network latency
+between arbitrary nodes.
 
 The implementation can be found in \code{src/vivaldi.erl}.
 
-{\bf Gossipping.} For some algorithms, we use estimates of global
-information. These estimates are aggregated with the help of
-gossipping techniques~\cite{gossip}.
+For some algorithms, we use estimates of global
+information. These estimates are aggregated with the help of gossiping
+techniques~\cite{gossip}.
 
 The implementation can be found in \code{src/gossip.erl}.
+
+{\bf Publications of the \scalaris{} team}
+\begin{quote} \small
+  Marie Hoffmann. \emph{Approximate Algorithms for Distributed Systems.} Master
+  thesis, FU-Berlin, 2012.
+
+  Thorsten Schütt, Alexander Reinefeld, Florian Schintke, Marie Hoffmann.
+  \emph{Gossip-based Topology Inference for Efficient Overlay Mapping on
+    Data Centers.} Peer-to-Peer Computing, pp. 147-150, 2009.
+\end{quote}
+
+\paragraph{Related work}
+\begin{quote} \small
+\cite{gossip} M{\'a}rk Jelasity, Alberto Montresor, Ozalp Babaoglu.
+ \emph{Gossip-based aggregation in large dynamic networks.}
+ ACM Trans. Comput. Syst. 23(3), 219-252 (2005).
+
+ \cite{vivaldi} Frank Dabek, Russ Cox, Frans Kaahoek, Robert Morris.
+ \emph{Vivaldi: A Decentralized Network Coordinate System.}  ACM SIGCOMM
+ 2004.
+\end{quote}
+
+\subsection*{Load-Balancing}
+
+{\bf Publications of the \scalaris{} team}
+\begin{quote} \small
+
+  Mikael Högqvist, Nico Kruber. \emph{Passive/Active Load Balancing with
+    Informed Node Placement in DHTs.} IWSOS, Thrasyvoulos Spyropoulos, Karin
+  Hummel (Eds.)pp. 101-112, Vol.5918, Lecture Notes in Computer Science,
+  2009.
+
+  Nico Kruber. \emph{DHT Load Balancing with Estimated Global
+    Information.} Diploma thesis, HU-Berlin, 2009.
+
+  Mikael Högqvist, Seif Haridi, Nico Kruber, Alexander Reinefeld, Thorsten
+  Schütt. \emph{Using Global Information for Load Balancing in DHTs.}
+  Workshop on Decentralized Self Management for Grids, P2P, and User
+  Communities, 2008.
+
+  Simon Rieche. \emph{Lastbalancierung in Peer-to-Peer Systemen.} Diploma
+  thesis, FU-Berlin, 2003.
+\end{quote}
+
+\paragraph{Related work}
+\begin{quote} \small
+
+  David R. Karger, Matthias Ruhl. \emph{Simple efficient load-balancing
+    algorithms for peer-to-peer systems.} Theory of Computing Systems,
+  39(6):787--804, November 2006.
+
+  Ashwin R. Bharambe, Mukesh Agrawal, Srinivasan Seshan. \emph{Mercury:
+    support- ing scalable multi-attribute range queries.} SIGCOMM
+  Comput. Commun. Rev., 34(4):353--366, 2004.
+
+\end{quote}
+
+\subsection*{Self-Management}
+
+{\bf Publications of the \scalaris{} team}
+\begin{quote} \small
+
+T. Schütt, A. Reinefeld, F. Schintke, C. Hennig. \emph{Self-Adaptation in
+  Large-Scale Systems.} Architectures and Languages for Self-Managing
+Distributed Systems (SelfMan@SASO), 2009.
+
+P. Van Roy, S. Haridi, A. Reinefeld, J.-B. Stefani, R. Yap,
+T. Coupaye. \emph{Self Management for Large-Scale Distributed Systems.}
+Formal Methods for Components and Objects 2007 (FMCO 2007), 2008.
+
+P. Van Roy, A. Ghodsi, S. Haridi, J.-B. Stefani, T. Coupaye, A. Reinefeld,
+E. Winter, R. Yap. \emph{Self Management of Large-Scale Distributed Systems
+  by Combining Peer-to-Peer Networks and Components}, 2005.
+\end{quote}
+
+\subsection*{Other Topics}
+
+{\bf Publications of the \scalaris{} team}
+\begin{quote} \small
+
+  {\bf Data Placement}
+
+  M. Högqvist, S. Plantikow. \emph{Towards Explicit Data Placement in
+    Scalable Key/Value Stores.}  Architectures and Languages for
+  Self-Managing Distributed Systems (SelfMan@SASO), 2009.
+
+  {\bf Consistency}
+
+  Tallat Shafaat, Monika Moser, Ali Ghodsi, Thorsten Schütt, Seif Haridi,
+  Alexander Reinefeld. \emph{Key-Based Consistency and Availability in
+    Structured Overlay Networks.}  International ICST Conference on Scalable
+  Information Systems, 2008.
+
+  Tallat Shafaat, Monika Moser, Ali Ghodsi, Thorsten Schütt, Alexander
+  Reinefeld. \emph{On Consistency of Data in Structured Overlay Networks.}
+  Coregrid Integration Workshop, 2008.
+
+  {\bf Snapshots}
+
+  Stefan Keidel. \emph{Snapshots in Scalaris.} Diploma thesis, HU-Berlin,
+  2012.
+
+  {\bf Replication and Replica Repair}
+
+  Maik Lange. \emph{Redundanzverwaltung in konsistenten verteilten
+    Datenbanken.} Diploma thesis, HU-Berlin, 2012.
+
+\end{quote}
+

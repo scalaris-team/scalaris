@@ -1056,9 +1056,11 @@ In a shell (from now on called \code{S1}), start the first node ("premier"):
 ./bin/scalarisctl -m -n premier@127.0.0.1 -p 14195 -y 8000 -s -f start
 \end{lstlisting}
 The \code{-m} and \code{-f} options instruct \code{scalarisctl} to start the
-management server and the first\_node. Note that the command above will
+management server and the first\_node
+(see Section~\sieheref{user.config.scalarisctl} for further details on \code{scalarisctl}).
+Note that the command above will
 produce some output about unknown nodes. This is expected, as some nodes
-defined in the configuration file above do not exist yet.
+defined in the configuration file above are not started yet.
 
 After you run the above command and no further error occurred, you can query
 the locally available nodes using \code{scalarisctl}. Enter into a new shell
