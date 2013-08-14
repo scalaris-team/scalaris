@@ -117,7 +117,8 @@
 
 %\definecolor{rltblue}{rgb}{0,0,0.75}
 \definecolor{rltblue}{HTML}{1F4980}
-\definecolor{rltred}{HTML}{80491F}
+%\definecolor{rltred}{HTML}{80491F}
+%\definecolor{rltred}{HTML}{C35E22}
 \definecolor{lightgray}{gray}{0.9}
 
 \setlength{\parindent}{0pt}
@@ -242,43 +243,44 @@
 \makeindex
 
 \begin{document}
-\vspace*{4cm}
+\enlargethispage{1.6cm}
+\vspace*{3.8cm}
 \thispagestyle{empty}
 \setlength{\parskip}{1ex}
-\begin{tabular}{p{4cm}p{0.5cm}p{10cm}}
-%\vspace*{-5cm}\includegraphics[width=5cm]{scalaris-layers}
-\parbox{4cm}{\includegraphics[width=4cm]{scalaris-layers}}
-& &\sffamily\bfseries\Huge
-  \bigskip {\textcolor{rltblue}{\scalaris{}:}}
+\includegraphics[width=8cm]{scalaris-logo}
 
-\medskip
- \mdseries Users and Developers Guide
-
-\bigskip\medskip
-\LARGE Version \docversion{} \hfill \today\\
-\end{tabular}
 \vfill
-{\scriptsize
+
+\hfill\begin{tabular}{@{}l@{}}
+\mdseries \Huge \hfill Users and Developers Guide\\
+\\ \\
+\LARGE Version \docversion{} \hfill \today\\
+\\
+\LARGE \hfill\href{http://scalaris.googlecode.com}{scalaris.googlecode.com}\\
+\end{tabular}
+
+\vspace*{3.8cm}
+
+\hrule
+\smallskip
+\parbox{\textwidth}{\scriptsize \setlength{\parskip}{1ex}
 \doccopyright{}.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-\url{\doclicenseurl}
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License.  You may obtain a copy
+of the License at \url{\doclicenseurl}
 
 Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-}
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+License for the specific language governing permissions and limitations
+under the License.  }
 
 \tableofcontents
 
-\part{Users Guide}
-
 \input{user-intro}
+
+\part{Users Guide}
 
 \input{user-install}
 
@@ -345,6 +347,12 @@ Ion Stoica, Robert Morris, David Karger, M. Frans Kaashoek and Hari Balakrishnan
 M{\'a}rk Jelasity, Alberto Montresor, Ozalp Babaoglu.
 \newblock \emph{T-Man: Gossip-based fast overlay topology construction.}
 \newblock Computer Networks (CN) 53(13):2321-2339, 2009.
+
+\bibitem{frtchord}
+  Hiroya Nagao, Kazuyuki Shudo.
+  \newblock \emph{Flexible routing tables: Designing routing
+    algorithms for overlays based on a total order on a routing table set.}
+  \newblock In: Peer-to-Peer Computing, IEEE, 2011.
 
 \bibitem{enhanced-paxos}
 F. Schintke, A. Reinefeld, S. Haridi, T. Sch{\"u}tt.
