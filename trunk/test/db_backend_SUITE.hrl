@@ -102,7 +102,7 @@ prop_foldl(Data, Interval, MaxNum) ->
         write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()), Data),
     ExpInInterval = [El || El <- ScrubbedData,
                            is_in(Interval, element(1, El))],
-    ExpInIntervalCounted = lists:sublist(lists:keysort(1, ExpInInterval), MaxNum),
+    ExpInIntervalCounted = lists:sublist(ExpInInterval, MaxNum),
     AllFold = ?TEST_DB:foldl(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldl(DB1,
                                  fun(E, AccIn) -> [E | AccIn] end,
@@ -113,10 +113,12 @@ prop_foldl(Data, Interval, MaxNum) ->
                             [],
                             Interval,
                             MaxNum),
-    ?equals_w_note(lists:sort(ScrubbedData), lists:sort(AllFold), "test_foldl1"),
-    ?equals_w_note(lists:sort(ExpInInterval), lists:sort(IntervalFold), "test_foldl2"),
-    ?equals_w_note(lists:sort(ExpInIntervalCounted),
-                   lists:sort(IntervalCountFold), "test_foldl3"),
+    %% we expect all data from fold to be in reversed order because of list
+    %% accumulation. we need to reverse ScrubbedData, ExpInInterval and
+    %% ExpInIntervalCounted.
+    ?equals_w_note(lists:reverse(ScrubbedData), AllFold, "test_foldl1"),
+    ?equals_w_note(lists:reverse(ExpInInterval), IntervalFold, "test_foldl2"),
+    ?equals_w_note(lists:reverse(ExpInIntervalCounted), IntervalCountFold, "test_foldl3"),
     ?TEST_DB:close(DB1),
     true.
 
@@ -133,7 +135,12 @@ prop_foldr(Data, Interval, MaxNum) ->
         write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()), Data),
     ExpInInterval = [El || El <- ScrubbedData,
                            is_in(Interval, element(1, El))],
-    ExpInIntervalCounted = lists:sublist(lists:reverse(lists:keysort(1, ExpInInterval)), MaxNum),
+    ExpInIntervalCounted = case MaxNum >= length(ExpInInterval) of
+                               true ->
+                                   ExpInInterval;
+                               _ ->
+                                   lists:nthtail(length(ExpInInterval) - MaxNum, ExpInInterval)
+                           end,
     AllFold = ?TEST_DB:foldr(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldr(DB1,
                                  fun(E, AccIn) -> [E | AccIn] end,
@@ -146,10 +153,9 @@ prop_foldr(Data, Interval, MaxNum) ->
                             MaxNum),
     %% ct:pal("ExpInInterval: ~p~nIntervalFold: ~p~nInterval: ~p~n", [ExpInInterval,
     %%                                                  IntervalFold, Interval]),
-    ?equals_w_note(lists:sort(ScrubbedData), lists:sort(AllFold), "test_foldr1"),
-    ?equals_w_note(lists:sort(ExpInInterval), lists:sort(IntervalFold), "test_foldr2"),
-    ?equals_w_note(lists:sort(ExpInIntervalCounted),
-                   lists:sort(IntervalCountFold), "test_foldr3"),
+    ?equals_w_note(ScrubbedData, AllFold, "test_foldr1"),
+    ?equals_w_note(ExpInInterval, IntervalFold, "test_foldr2"),
+    ?equals_w_note(ExpInIntervalCounted, IntervalCountFold, "test_foldr3"),
     ?TEST_DB:close(DB1),
     true.
 
@@ -171,7 +177,7 @@ scrub_data(Data) ->
     %% Entries should be unique
     SortFun = fun(A, B) -> (element(1, A) < element(1, B)) orelse
                            (element(1, A) ?EQ element(1, B)) end,
-    lists:usort(SortFun, [Entry || Entry <- Data]).
+    lists:usort(SortFun, Data).
 
 check_db(DB, ExpData, Note) ->
     InDb = ?TEST_DB:foldl(DB, fun(E, AIn) -> [E | AIn] end, []),
