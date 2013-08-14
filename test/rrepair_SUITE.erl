@@ -181,9 +181,9 @@ one_node(Config) ->
     start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}],
                1, 0.2, get_rep_upd_config(Method), fun erlang:'=:='/2).
 
-mpath_map({request_resolve, _, {key_upd, L}, _}) ->
+mpath_map({request_resolve, _, {key_upd, L}, _}, _Source, _Dest) ->
     {key_upd, length(L)};
-mpath_map(Msg) ->
+mpath_map(Msg, _Source, _Dest) ->
     {element(1, Msg)}.
 
 mpath(Config) ->
@@ -203,7 +203,7 @@ mpath(Config) ->
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
     %server starts sync
-	%trace_mpath:start(TraceName, fun mpath_map/1),
+	%trace_mpath:start(TraceName, fun mpath_map/3),
     trace_mpath:start(TraceName),
     api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair, 
                                               {request_sync, Method, CKey}}),
