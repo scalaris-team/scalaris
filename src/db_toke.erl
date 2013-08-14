@@ -19,7 +19,7 @@
 %%         To use this backend you have to install 
 %%         Tokyo Cabinet [http://fallabs.com/tokyocabinet] and 
 %%         Toke [http://hg.opensource.lshift.net/toke/] (a simple Erlang
-%%         wrapper for Tokyo Cabinet).
+%%         wrapper for Tokyo Cabinets hash API tchdb*).
 %%         For development Tokyo Cabinet V1.4.48-1 and the at-the-time 
 %%         latest commit to the toke-repository (f178e55bb6b5) was used.
 %%
