@@ -325,9 +325,10 @@ on({get_infos, Client, TraceId}, State) ->
 on({cleanup, TraceId}, State) ->
     case lists:keytake(TraceId, 1, State) of
         {value, {TraceId, TraceEntry}, TupleList2} ->
-            state_cleanup(TraceEntry),
+            send_out_pending_messages(TraceEntry#state.msg_queues),
+            send_out_pending_messages(TraceEntry#state.msg_delay_queues),
             TupleList2;
-        false                       -> State
+        false -> State
     end.
 
 passed_state_new(TraceId, Logger) ->
@@ -350,13 +351,15 @@ new(TraceId) ->
             num_possible_executions = 1
           }.
 
-%% @doc Clean-up the given state and anything left in the process dictionary.
--spec state_cleanup(State::state_t()) -> ok.
-state_cleanup(#state{msg_queues = Queues, msg_delay_queues = DelayQueues}) ->
-    % remove queues from erlang dictionary:
-    _ = [erlang:erase(Key) || Key <- Queues],
-    _ = [erlang:erase(Key) || Key <- DelayQueues],
-    ok.
+%% @doc Sends out all messages remaining in queues
+send_out_pending_messages(Queues) ->
+    lists:foreach(fun(Key) ->
+                          {_Src, Dest} = Key,
+                          Queue = queue:to_list(erlang:erase(Key)),
+                          To = comm:make_global(Dest),
+                          _ = [comm:send(To, Msg) || {_LorG, Msg} <- Queue]
+                  end,
+                  Queues).
 
 -spec add_message(comm:mypid(), comm:mypid(), comm:message(), local | global, state_t()) -> state_t().
 add_message(Src, Dest, Msg, LorG, #state{msg_queues = OldQueues} = State) ->
