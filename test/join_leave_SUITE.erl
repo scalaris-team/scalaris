@@ -99,7 +99,8 @@ join_lookup(Config) ->
     unittest_helper:stop_minimal_procs(Config2),
 
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+    unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
+                                            {rrepair_after_crash, false}]}]),
     %% do as less as possible between make_ring and sending the lookups
     This = comm:this(),
     _ = [ comm:send_local(pid_groups:find_a(dht_node),
@@ -110,7 +111,9 @@ join_lookup(Config) ->
 
 add_9(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
+                                            {rrepair_after_crash, false}
+                                           | join_parameters_list()]}]),
     stop_time(fun add_9_test/0, "add_9").
 
 add_9_test() ->
@@ -119,7 +122,9 @@ add_9_test() ->
 
 rm_5(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
+                                            {rrepair_after_crash, false}
+                                           | join_parameters_list()]}]),
     _ = api_vm:add_nodes(9),
     check_size(10),
     stop_time(fun rm_5_test/0, "rm_5").
@@ -130,7 +135,9 @@ rm_5_test() ->
 
 add_9_rm_5(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir} | join_parameters_list()]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
+                                            {rrepair_after_crash, false}
+                                           | join_parameters_list()]}]),
     stop_time(fun add_9_rm_5_test/0, "add_9_rm_5").
 
 add_9_rm_5_test() ->
@@ -154,7 +161,9 @@ add_3_rm_3_data(Config, Incremental) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{move_max_transport_entries, 25},
                                             {move_use_incremental_slides, Incremental},
-                                            {log_path, PrivDir} | join_parameters_list()]}]),
+                                            {log_path, PrivDir},
+                                            {rrepair_after_crash, false}
+                                           | join_parameters_list()]}]),
 
     _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),
     % wait for late write messages to arrive at the original nodes
@@ -176,7 +185,10 @@ add_3_rm_3_data(Config, Incremental) ->
 
 add_2x3_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0} | join_parameters_list()]}]),
+    unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
+                                            {rrepair_after_crash, false},
+                                            {monitor_perf_interval, 0}
+                                           | join_parameters_list()]}]),
     stop_time(fun add_2x3_load_test/0, "add_2x3_load"),
     unittest_helper:check_ring_load(4),
     unittest_helper:check_ring_data().
@@ -206,7 +218,10 @@ make_4_add_3_rm_3_load(Config) ->
                              StartOnlyAdded::boolean()) -> boolean().
 make_4_add_x_rm_y_load(Config, X, Y, StartOnlyAdded) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-    unittest_helper:make_ring_with_ids(?RT:get_replica_keys(?MINUS_INFINITY), [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0} | join_parameters_list()]}]),
+    unittest_helper:make_ring_with_ids(
+      ?RT:get_replica_keys(?MINUS_INFINITY),
+      [{config, [{log_path, PrivDir}, {rrepair_after_crash, false},
+                 {monitor_perf_interval, 0} | join_parameters_list()]}]),
     stop_time(fun() -> add_x_rm_y_load_test(X, Y, StartOnlyAdded) end, lists:flatten(io_lib:format("add_~B_rm_~B_load", [X, Y]))),
     unittest_helper:check_ring_load(40),
     unittest_helper:check_ring_data().
@@ -252,7 +267,7 @@ prop_join_at(FirstId, SecondId, Incremental) ->
       [FirstId],
       [{config, [{move_max_transport_entries, 25},
                  {move_use_incremental_slides, Incremental},
-                 pdb:get(log_path, ?MODULE),
+                 pdb:get(log_path, ?MODULE), {rrepair_after_crash, false},
                  {monitor_perf_interval, 0} | join_parameters_list()]}]),
     
     _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),
@@ -401,7 +416,9 @@ prop_join_at_timeouts(FirstId, SecondId, IgnoredMessages_, IgnMsgAt1st, IgnMsgAt
 
     unittest_helper:make_ring_with_ids(
       [FirstId],
-      [{config, [{dht_node, mockup_dht_node}, pdb:get(log_path, ?MODULE), {monitor_perf_interval, 0} | join_parameters_list()]}]),
+      [{config, [{dht_node, mockup_dht_node}, pdb:get(log_path, ?MODULE),
+                 {rrepair_after_crash, false}, {monitor_perf_interval, 0}
+                | join_parameters_list()]}]),
     if IgnMsgAt1st -> send_ignore_msg_list_to(1, node, IgnoredMessages);
        true        -> ok
     end,
