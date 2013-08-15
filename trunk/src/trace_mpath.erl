@@ -116,7 +116,7 @@ start(TraceId, Options) when is_list(Options) ->
                     comm:make_global(LoggerPid);
                 true -> InLogger
              end,
-    MsgFun = proplists:get_value(map_fun, Options, fun(Msg) -> Msg end),
+    MsgFun = proplists:get_value(map_fun, Options, fun(Msg, _Src, _Dest) -> Msg end),
     FilterFun = proplists:get_value(filter_fun, Options, fun(_) -> true end),
     start(TraceId, Logger, MsgFun, FilterFun);
 start(TraceId, Logger) ->
