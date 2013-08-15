@@ -71,7 +71,7 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:make_ring_with_ids(
               fun() ->
                       ?RT:get_replica_keys(?RT:hash_key("0"))
-              end, [{config, [{log_path, PrivDir}]}]),
+              end, [{config, [{log_path, PrivDir}, {rrepair_after_crash, false}]}]),
             unittest_helper:check_ring_size_fully_joined(4),
             Config
 %%             {skip, "temporarily"}
