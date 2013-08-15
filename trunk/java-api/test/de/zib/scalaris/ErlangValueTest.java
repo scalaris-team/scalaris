@@ -188,10 +188,10 @@ public class ErlangValueTest {
         assertEquals(true, trueValOtp.boolValue());
         assertEquals(false, falseVal.boolValue());
         assertEquals(false, falseValOtp.boolValue());
-        assertTrue(trueVal.equals(trueValOtp));
-        assertTrue(trueValOtp.equals(trueVal));
-        assertTrue(falseVal.equals(falseValOtp));
-        assertTrue(falseValOtp.equals(falseVal));
+        assertEquals(trueVal, trueValOtp);
+        assertEquals(trueValOtp, trueVal);
+        assertEquals(falseVal, falseValOtp);
+        assertEquals(falseValOtp, falseVal);
     }
 
     /**
@@ -219,8 +219,8 @@ public class ErlangValueTest {
 
         assertEquals(value, eVal.intValue());
         assertEquals(value, eValOtp.intValue());
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -248,8 +248,8 @@ public class ErlangValueTest {
 
         assertEquals(value, eVal.longValue());
         assertEquals(value, eValOtp.longValue());
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -277,8 +277,8 @@ public class ErlangValueTest {
 
         assertEquals(value, eVal.bigIntValue());
         assertEquals(value, eValOtp.bigIntValue());
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -306,8 +306,8 @@ public class ErlangValueTest {
 
         assertEquals(value, eVal.doubleValue(), 0.0);
         assertEquals(value, eValOtp.doubleValue(), 0.0);
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -335,8 +335,8 @@ public class ErlangValueTest {
 
         assertEquals(value, eVal.stringValue());
         assertEquals(value, eValOtp.stringValue());
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -363,8 +363,8 @@ public class ErlangValueTest {
 
         assertArrayEquals(value, eVal.binaryValue());
         assertArrayEquals(value, eValOtp.binaryValue());
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -418,8 +418,8 @@ public class ErlangValueTest {
 
         compareList(value, eVal.listValue());
         compareList(value, eValOtp.listValue());
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     private static void compareList(final List<Object> expected, final List<ErlangValue> actual) {
@@ -480,8 +480,8 @@ public class ErlangValueTest {
 
         assertEquals(value, eVal.longListValue());
         assertEquals(value, eValOtp.longListValue());
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -519,8 +519,8 @@ public class ErlangValueTest {
 
         assertEquals(value, eVal.doubleListValue());
         assertEquals(value, eValOtp.doubleListValue());
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -558,8 +558,8 @@ public class ErlangValueTest {
 
         assertEquals(value, eVal.stringListValue());
         assertEquals(value, eValOtp.stringListValue());
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -603,8 +603,8 @@ public class ErlangValueTest {
             assertArrayEquals(value.get(j), actual.get(j));
             assertArrayEquals(value.get(j), actualOtp.get(j));
         }
-        assertTrue(eVal.equals(eValOtp));
-        assertTrue(eValOtp.equals(eVal));
+        assertEquals(eVal, eValOtp);
+        assertEquals(eValOtp, eVal);
     }
 
     /**
@@ -633,8 +633,8 @@ public class ErlangValueTest {
         final Map<String, Object> actual = eVal.jsonValue();
         compareMap(value, actual);
         final ErlangValue eVal2 = new ErlangValue(value);
-        assertTrue(eVal.equals(eVal2));
-        assertTrue(eVal2.equals(eVal));
+        assertEquals(eVal, eVal2);
+        assertEquals(eVal2, eVal);
     }
 
     private final void compareMap(final Map<String, Object> expected, final Map<String, Object> actual) {
@@ -704,8 +704,8 @@ public class ErlangValueTest {
             assertEquals(map.get("e"), actual.getE());
             assertEquals(map.get("f"), actual.getF());
             final ErlangValue value2 = new ErlangValue(actual);
-            assertTrue(value.equals(value2));
-            assertTrue(value2.equals(value));
+            assertEquals(value, value2);
+            assertEquals(value2, value);
         }
     }
 
@@ -739,8 +739,8 @@ public class ErlangValueTest {
             assertEquals(bean1.getE(), actual.getE(), 0.0);
             assertEquals(bean1.getF(), actual.getF());
             final ErlangValue value2 = new ErlangValue(actual);
-            assertTrue(value.equals(value2));
-            assertTrue(value2.equals(value));
+            assertEquals(value, value2);
+            assertEquals(value2, value);
         }
     }
 
@@ -828,8 +828,8 @@ public class ErlangValueTest {
             assertEquals(bean1.get("f"), bean1_act.getF());
             compareMap(map2, actual.getI2());
             final ErlangValue value2 = new ErlangValue(actual);
-            assertTrue(value.equals(value2));
-            assertTrue(value2.equals(value));
+            assertEquals(value, value2);
+            assertEquals(value2, value);
         }
     }
 
@@ -883,8 +883,8 @@ public class ErlangValueTest {
             assertEquals(bean1.getF(), bean1_act.getF());
             compareMap(map2, actual.getI2());
             final ErlangValue value2 = new ErlangValue(actual);
-            assertTrue(value.equals(value2));
-            assertTrue(value2.equals(value));
+            assertEquals(value, value2);
+            assertEquals(value2, value);
         }
     }
 
@@ -962,8 +962,8 @@ public class ErlangValueTest {
                 assertEquals(map1.get(key).get("f"), actual_b3.get(key).getF());
             }
             final ErlangValue value2 = new ErlangValue(actual);
-            assertTrue(value.equals(value2));
-            assertTrue(value2.equals(value));
+            assertEquals(value, value2);
+            assertEquals(value2, value);
         }
     }
 
@@ -1027,8 +1027,8 @@ public class ErlangValueTest {
                 assertEquals(map1.get(key).getF(), actual_b3.get(key).getF());
             }
             final ErlangValue value2 = new ErlangValue(actual);
-            assertTrue(value.equals(value2));
-            assertTrue(value2.equals(value));
+            assertEquals(value, value2);
+            assertEquals(value2, value);
         }
     }
 }
