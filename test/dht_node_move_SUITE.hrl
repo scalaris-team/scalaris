@@ -96,11 +96,9 @@ init_per_testcase(_TestCase, Config) ->
     util:wait_for_process_to_die(Pid),
     % wait a bit for the rm-processes to settle
     timer:sleep(500),
-    proto_sched(start),
     Config.
 
 end_per_testcase(_TestCase, _Config) ->
-    proto_sched(stop),
     unittest_helper:stop_ring(),
     ok.
 
@@ -533,7 +531,9 @@ symm4_slide_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
                          succ -> Succ;
                          pred -> Pred
                      end,
+             proto_sched(start),
              symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
+             proto_sched(stop),
              receive
                  ?SCALARIS_RECV(Z,
                                 ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
@@ -599,7 +599,7 @@ symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node
         ?SCALARIS_RECV(X,
                        ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) unexpected message: ~.0p",
                                 [PredOrSucc, NthNode, N, Node, Other, TargetId, X]))
-    end.
+        end.
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->
@@ -629,7 +629,7 @@ proto_sched(Action) ->
                     proto_sched:start_deliver();
                 stop ->
                     proto_sched:stop(),
-                    ct:pal("Proto schedluer infos: ~.2p", proto_sched:get_infos()),
+                    ct:pal("Proto scheduler stats: ~.2p", proto_sched:get_infos()),
                     proto_sched:cleanup()
             end;
         _ -> ok
