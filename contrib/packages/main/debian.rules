@@ -43,7 +43,8 @@ clean:
 
 	dh_clean
 
-BUILD_DIR:=$(CURDIR)/debian/tmp
+BUILD_DIR_MAIN:=$(CURDIR)/debian/scalaris
+BUILD_DIR_DOC:=$(CURDIR)/debian/scalaris-doc
 install: build
 	dh_testdir
 	dh_testroot
@@ -51,15 +52,18 @@ install: build
 	dh_installdirs
 
 	# Add here commands to install the package into debian/gentoo.
-	make install DESTDIR=$(BUILD_DIR)
-	make install-doc DESTDIR=$(BUILD_DIR)
+	make install DESTDIR=$(BUILD_DIR_MAIN)
+	make install-doc DESTDIR=$(BUILD_DIR_MAIN)
+	# move some doc to the doc sub-package:
+	mkdir -p $(BUILD_DIR_DOC)/usr/share/doc/scalaris
+	mkdir -p $(BUILD_DIR_DOC)/usr/lib
+	mv -t $(BUILD_DIR_MAIN)/usr/share/doc/scalaris/erlang \
+		  $(BUILD_DIR_MAIN)/usr/share/doc/scalaris/user-dev-guide.pdf \
+		  $(BUILD_DIR_MAIN)/usr/lib/scalaris/docroot/doc
 	
 	# handle config files:
 	cp $(BUILD_DIR)/etc/scalaris/scalaris.cfg \
 	   $(BUILD_DIR)/etc/scalaris/scalaris.cfg.example
-
-	# move sub-package files into the correct folders:
-	dh_install --sourcedir=$(BUILD_DIR)
 
 # Build architecture-independent files here.
 binary-indep: build install

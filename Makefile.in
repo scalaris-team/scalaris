@@ -506,6 +506,8 @@ install-doc: doc
 	install -m 644 -t $(DOCDIR)/erlang \
 	           doc/*.html \
 	           doc/*.png
+	install -d $(DOCROOTDIR)
+	ln -sf @docdir@/erlang $(DOCROOTDIR)/doc
 
 install-java-doc: java-doc
 	install -d $(DOCDIR)/java-api
