@@ -16,6 +16,7 @@ Package: scalaris-ruby1.8
 Section: ruby
 Architecture: all
 Depends: ruby, ruby1.8, rubygems1.8, ruby1.8-dev
+Provides: scalaris-ruby
 Description: Ruby-API and Ruby-client for scalaris
  Ruby bindings and Ruby command line client for scalaris.
 
