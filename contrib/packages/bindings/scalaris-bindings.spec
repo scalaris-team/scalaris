@@ -180,6 +180,9 @@ Python3 bindings and Python3 command line client for scalaris
 %setup -q -n %{name}-%{version}
 
 %build
+%if 0%{?fedora_version} >= 18
+export PATH="%{_bindir}:$PATH"
+%endif
 ./configure --prefix=%{_prefix} \
     --exec-prefix=%{_exec_prefix} \
     --bindir=%{_bindir} \
