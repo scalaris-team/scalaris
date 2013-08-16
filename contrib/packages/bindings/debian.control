@@ -2,7 +2,7 @@ Source: scalaris-bindings
 Section: devel
 Priority: optional
 Maintainer: Nico Kruber <kruber@zib.de>
-Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, java6-sdk, pkg-config, ruby, ruby1.8, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev
+Build-Depends: debhelper (>= 4.1.16), erlang-dev (>= 13.b.1), erlang-tools (>= 13.b.1), erlang-edoc (>= 13.b.1), erlang-crypto (>= 13.b.1), ant, java6-sdk, pkg-config, ruby, python-dev (>= 2.6.0), python-epydoc, graphviz, python3-dev
 Homepage: http://code.google.com/p/scalaris
 
 Package: scalaris-java
@@ -12,11 +12,10 @@ Depends: java6-runtime
 Description: Java-API and Java-Client for scalaris
  Java Bindings and command line client for scalaris.
 
-Package: scalaris-ruby1.8
+Package: scalaris-ruby
 Section: ruby
 Architecture: all
-Depends: ruby, ruby1.8, rubygems1.8, ruby1.8-dev
-Provides: scalaris-ruby
+Depends: ruby, rubygems, ruby-dev
 Description: Ruby-API and Ruby-client for scalaris
  Ruby bindings and Ruby command line client for scalaris.
 

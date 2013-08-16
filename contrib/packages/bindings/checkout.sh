@@ -61,7 +61,7 @@ if [ ${result} -eq 0 ]; then
   cp  ${sourcefolder}/debian.compat                      ./debian.compat && \
   cp  ${sourcefolder}/debian.control                     ./debian.control && \
   cp  ${sourcefolder}/debian.rules                       ./debian.rules && \
-  cp  ${sourcefolder}/debian.scalaris-ruby1.8.postinst   ./debian.scalaris-ruby1.8.postinst
+  cp  ${sourcefolder}/debian.scalaris-ruby.postinst      ./debian.scalaris-ruby.postinst
   result=$?
 fi
 
