@@ -61,11 +61,9 @@ if [ ${result} -eq 0 ]; then
   cp  ${sourcefolder}/debian.compat                  ./debian.compat && \
   cp  ${sourcefolder}/debian.control                 ./debian.control && \
   cp  ${sourcefolder}/debian.rules                   ./debian.rules && \
-  cp  ${sourcefolder}/debian.scalaris.install        ./debian.scalaris.install && \
   cp  ${sourcefolder}/debian.scalaris.prerm          ./debian.scalaris.prerm && \
   cp  ${sourcefolder}/debian.scalaris.postrm         ./debian.scalaris.postrm && \
-  cp  ${sourcefolder}/debian.scalaris.postinst       ./debian.scalaris.postinst && \
-  cp  ${sourcefolder}/debian.scalaris-doc.install    ./debian.scalaris-doc.install
+  cp  ${sourcefolder}/debian.scalaris.postinst       ./debian.scalaris.postinst
   result=$?
 fi
 
