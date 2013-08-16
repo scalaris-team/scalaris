@@ -29,7 +29,8 @@ API:
 - Ruby-API: use default socket timeout
 - all APIs: support lists of composite types
 
-Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/):
+Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+	                         and Contrail http://contrail-project.eu):
 
 - allow monitoring via JMX in the FourCaastMonitoringPlugin
 - support for getting random articles via the new partial read op
@@ -201,7 +202,8 @@ API:
 - fixed api_tx:req_list_commit_each/1 not running requests in parallel
   -> do not assure any order of requests, even if on same key!
 
-Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/):
+Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+	                         and Contrail http://contrail-project.eu):
 
 - allow different partitioned data models for better performance and
   scalability
