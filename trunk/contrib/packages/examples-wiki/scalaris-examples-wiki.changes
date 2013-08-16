@@ -1,4 +1,24 @@
 -------------------------------------------------------------------
+Fri Aug 16 21:20:13 UTC 2013 - kruber@zib.de
+
+- Scalaris 0.6.0 (codename "Conus scalaris")
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
+    - allow monitoring via JMX in the FourCaastMonitoringPlugin
+    - support for getting random articles via the new partial read op
+    - new optimisation scheme "Buckets with Write Cache" - uses a single big
+      list to read from and the rest of the buckets to write to
+    - improve import and dump-processing (faster, more memory-efficient)
+    - add on-the-fly conversion to the different optimisation schemes during
+      import (only one prepared DB dump needed now)
+    - several UI enhancements and rendering fixes
+    - update bliki lib (includes code ported to upstream)
+    - add auto-import ability
+    - use tomcat 7.0.33
+  * Bugs:
+    - fix numerous bugs
+
+-------------------------------------------------------------------
 Thu Oct 11 10:30:00 UTC 2012 - kruber@zib.de
 
 - Scalaris 0.5.0 (codename "Saperda scalaris")

@@ -1,8 +1,171 @@
-scalaris (0.5.0+svn-1) unstable; urgency=low
+scalaris (0.6.0+svn-1) unstable; urgency=low
 
   * svn snapshot from trunk
 
- -- Nico Kruber <kruber@zib.de>  Thu, 11 Oct 2012 12:30:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
+
+scalaris (0.6.0-1) stable; urgency=low
+
+  * Packaging:
+    - add ArchLinux packages
+    - add support for new distribution versions
+  * API:
+    - no more timeouts in client APIs
+    - Java-API: re-worked the request and result list handling
+      -> move result processing to the operation classes
+    - Java-API: better support for custom operations
+    - Java-API: support the new partial reads:
+                ReadRandomFromListOp and ReadSublistOp
+    - Java-API: compile with "vars" debug info
+    - Java-API: integrate new OtpErlang library (1.5.8 from R16B) with fixed
+                support for compressed binaries
+    - Java-API: add back-ports from the Wiki on Scalaris demonstrator:
+      * list-change operations: ScalarisChangeListOp and
+                                ScalarisListAppendRemoveOp
+      * MultiMap classes are now in de.zib.tools
+      * CircularByteArrayOutputStream
+    - Java-API: fix hostname issues with Erlang and Java
+    - Java-API: slightly changed the delete API
+    - JSON-API: add API for auto-scale requests
+    - Python-API: add API for auto-scale requests
+    - Python-API: use default socket timeout
+    - Ruby-API: use default socket timeout
+    - all APIs: support lists of composite types
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
+    - allow monitoring via JMX in the FourCaastMonitoringPlugin
+    - support for getting random articles via the new partial read op
+    - new optimisation scheme "Buckets with Write Cache" - uses a single big
+      list to read from and the rest of the buckets to write to
+    - improve import and dump-processing (faster, more memory-efficient)
+    - add on-the-fly conversion to the different optimisation schemes during
+      import (only one prepared DB dump needed now)
+    - several UI enhancements and rendering fixes
+    - update bliki lib (includes code ported to upstream)
+    - add auto-import ability
+    - use tomcat 7.0.33
+  * Business Logic:
+    - replace common message tags with integers to reduce bandwidth
+    - more flexible read operations (easier to extend)
+    - add support for the following partial reads: random_from_list and sublist
+    - save bandwidth by not returning the full value for write operations
+      (only the version is required)
+    - new DB back-end implementation with a smaller and cleaner interface
+    - faster DB get_chunk processing
+    - tx: allow overwriting old/outdated DB entries
+    - tx: allow overwriting old/outdated write-locked entries
+    - tx: allow setting write lock on old/outdated read-locked entries
+    - tx: always reply when the majority replied during read
+    - tx: make sure that if not_found is reported to the user (while reading),
+          a write cannot go through if it is not also based on not_found
+    - tx: committing a test_and_set op on a non-existing entry now fails as well
+          (the op itself already returned the failure)
+    - tx: add a 2s delay to wait for slow learner_decide answers before cleaning
+          up (results in a faster state cleanup after the fourth response)
+    - tx: small performance improvements in several modules
+    - rm: only add alive, non-leaving nodes
+    - rm: if a predecessor crashes, start repairing the range (rrepair)
+    - rrepair: stabilised rrepair (not considered experimental any more)
+    - rrepair: also update entries with existing but outdated WriteLocks
+    - rrepair: several performance improvements
+               (bloom, merkle_tree, art and rrepair processes in general)
+    - rrepair: re-design of rr_recon
+    - rrepair: don't offload heavy work onto the dht_node (increases
+               responsiveness of the dht_node process during replica repair)
+    - rrepair: improve db_generator tool and random_bias binomial distribution
+               used for tests
+    - rrepair: support differently configured nodes (use the same reconciliation
+               structure parameters)
+    - rrepair: de-activate self-repair (a node with multiple copies of the same
+               items does not need a reconciliation structure to repair some of
+               them)
+    - rrepair: activate rrepair periodically every 10 minutes with a probability
+               of 33%
+    - slide v2.0: fewer message to initiate a slide
+    - slide v2.0: generic (asynchronous) call-backs for different ring
+                  maintenance algorithms
+    - slide v2.0: re-work handling of planned next operations, e.g. used by
+                  incremental slides
+    - slide v2.0: don't directly work on the DB any more (there may be more
+                  data needed to slide) - let dht_node_state decide
+    - slide v2.0: activate incremental join and leave operations
+    - slide v2.0: actively report graceful node shutdown to the local FD of the
+                  leaving node to inform subscribers
+    - slide v2.0: code clean-up
+    - slide v2.0: some fixes for incremental slides
+    - slide v2.0: more robust in general
+    - more smooth node joins by also reporting when a join is not possible due
+      to a running slide at the existing node
+    - passive load balancing: random selection of (equally qualified) nodes
+    - add new routing algorithms FRT-Chord (flexible routing tables) and
+      GFRT-Chord (supports proximity routing and data centers) as alternatives
+      to Chord (see rt_frtchord and rt_gfrtchord modules)
+    - add auto-scale framework, e.g. for cloud environments (supported by
+      Contrail http://contrail-project.eu/) which is able to scale the
+      deployment to maintain a given target latency of executed transactions
+    - cache config reads in the process dictionary for better performance
+    - cyclon: if the cache is empty, try one of the nodes in known_hosts
+    - add support for consistent snapshots (experimental)
+  * Infrastructure:
+    - add a daemon to monitor Scalaris via JMX
+    - disable message compression (only client values are compressed - the rest
+      is too expensive, at least on GbE)
+    - support for distributions with python3 available as "python" and
+      python2 as "python2"
+    - support for Ruby 1.9
+    - yaws 1.96 (with patch to compile on otp master and a patch to fix a
+      performance regression)
+    - support for Erlang R13B01 up to R16B01 and current otp master
+  * Tests:
+    - add test suite to find memory leaks
+    - let "make test" run the major test suites and "make test-skipped" for
+      some more (time-consuming) tests
+    - clean-up ring after timetrap timeout failures via common test hook
+    - new ?compare macro for custom comparison functions
+    - higher test coverage with more random-testing via the "tester"
+  * Documentation:
+    - user-dev-guide: add user tutorial on using scalaris
+    - user-dev-guide: add a section about the slide protocol
+    - user-dev-guide: extended description of scientific background
+    - add replica repair sequence diagrams
+    - better code descriptions
+  * Tools:
+    - gen_component: synchronous breakpoint set and delete for more
+                     deterministic usage
+    - trace_mpath: allow selective tracing via filter fun
+    - trace_mpath: fix several triggers becoming infected by trace_mpath
+                   resulting in infinite tracing
+    - trace_mpath: improve latex output of traces
+    - tester: copy dictionary to worker threads
+    - tester: add support for more types, e.g. neg_integer(), gb_rees
+    - tester: better type check error reporting
+    - tester: print tester last calls when aborting unit tests
+              (timeout or exception)
+    - tester: add support for constraints in type specs ("when is_subtype(A,B)")
+    - web debug interface: add cluster graph visualisation
+    - web debug interface: display vivaldi distance
+    - web debug interface: add IP addresses and ports to the ring charts and
+                           tables
+    - web debug interface: allow navigating to the web interfaces of shown nodes
+    - top: support for showing messages in message queue of an inspected PID
+    - top: support for showing larger dictionary values
+    - allow recursive reply_as envelopes
+    - experimental protocol scheduler to check protocols with random message
+      interleavings (see proto_sched module)
+  * Bugs:
+    - fix RM handling of (out-dated) nodes with the same ID as newly added nodes
+    - fix ganglia integration not working any more
+    - restore the ability to start nodes at a specific key via
+      "scalarisctl -k <key> ..."
+    - fix some memory leaks in the tx system
+    - fix statistics of comm_connection (not send in some cases, not
+      overflow-aware)
+    - use /bin/bash instead of /bin/sh which may not result in a bash session
+    - fix init.d scripts not checking for existing processes correctly
+    - fix dc_clustering
+    - fix numerous other bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
 
 scalaris (0.5.0-1) stable; urgency=low
 
