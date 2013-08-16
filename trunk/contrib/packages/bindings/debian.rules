@@ -17,6 +17,7 @@ build-stamp:
 	dh_testdir
 
 	# Add here commands to compile the package.
+	export ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6"
 	if [ "$(WITH_PYTHON3)" = 1 ]; then \
 	  ./configure --prefix=/usr \
 	  --sysconfdir=/etc \

@@ -119,7 +119,7 @@ Wikipedia-like application.
 %setup -q -n %{name}-%{version}
 
 %build
-export ANT_OPTS=-Dfile.encoding=utf8
+export ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6"
 
 ln -s %{_javadir}/scalaris/scalaris.jar ./contrib/
 export JINTERFACE_VERSION=`ls %{_javadir}/scalaris/lib/ | grep ^OtpErlang- | sed "s|OtpErlang-||" | sed "s|.jar||"`

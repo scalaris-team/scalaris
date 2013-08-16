@@ -180,6 +180,8 @@ Python3 bindings and Python3 command line client for scalaris
 %setup -q -n %{name}-%{version}
 
 %build
+export ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6"
+
 %if 0%{?fedora_version} >= 18
 export PATH="%{_bindir}:$PATH"
 %endif
@@ -208,7 +210,7 @@ make python3
 %endif
 
 %install
-# see http://en.opensuse.org/Java/Packaging/Cookbook#bytecode_version_error
+# see http://en.opensuse.org/openSUSE:Packaging_Java#bytecode_version_error
 export NO_BRP_CHECK_BYTECODE_VERSION=true
 rm -rf $RPM_BUILD_ROOT
 make install-java DESTDIR=$RPM_BUILD_ROOT
