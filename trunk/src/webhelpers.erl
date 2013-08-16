@@ -41,6 +41,12 @@
 -type html_type() :: {atom(), [attribute_type()], html_type() | [html_type()] | string()}.
 -endif.
 
+% countries for which icons are available in the docroot/icons directory:
+-define(COUNTRIES, ["aa", "au", "br", "ch", "cz", "edu", "fr", "hk", "il",
+                    "it", "kr", "no", "pr", "se", "tw", "at", "be", "ca", "cn",
+                    "de", "es", " gr", "hu", "in", "jp", "nl", "pl", "pt",
+                    "sg", "uk", "us"]).
+
 % @doc Checks whether the current request is a post operation.
 -spec isPost(A::#arg{req::#http_request{method::atom()}}) -> boolean().
 isPost(A) ->
@@ -888,7 +894,10 @@ get_indexed_succ_id(Node, MyIndex) ->
 -spec get_flag(Hostname::node_details:hostname()) -> html_type().
 get_flag(Hostname) ->
     Country = string:substr(Hostname, 1 + string:rchr(Hostname, $.)),
-    URL = "icons/" ++ Country ++ ".gif",
+    URL = case lists:member(Country, ?COUNTRIES) of
+              true  -> "icons/" ++ Country ++ ".gif";
+              false -> "icons/unknown.gif"
+          end,
     {img, [{src, URL}, {width, 26}, {height, 16}], []}.
 
 %% @doc Formats the data with the format string and escapes angle brackets with
