@@ -5,7 +5,7 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-RUBY_SITELIB:=$(shell ruby1.8 -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')
+RUBY_SITELIB:=$(shell ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')
 PYTHON_SITELIB:=$(shell python -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null || echo PYTHON-NOT-FOUND)
 PYTHON3_SITELIB:=$(shell python3 -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null || echo PYTHON3-NOT-FOUND)
 
@@ -48,7 +48,7 @@ clean:
 	dh_clean
 
 BUILD_DIR_JAVA:=$(CURDIR)/debian/scalaris-java
-BUILD_DIR_RUBY:=$(CURDIR)/debian/scalaris-ruby1.8
+BUILD_DIR_RUBY:=$(CURDIR)/debian/scalaris-ruby
 BUILD_DIR_PYTHON:=$(CURDIR)/debian/python-scalaris
 BUILD_DIR_PYTHON3:=$(CURDIR)/debian/python3-scalaris
 install: build
