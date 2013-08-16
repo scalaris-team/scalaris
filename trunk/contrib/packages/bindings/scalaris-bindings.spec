@@ -224,16 +224,22 @@ make install-python-doc-pdf DESTDIR=$RPM_BUILD_ROOT
 make install-python3 DESTDIR=$RPM_BUILD_ROOT
 %endif
 
+%pre
+# note: use "-r" instead of "--system" for old systems like CentOS5, RHEL5
+getent group %{scalaris_group} >/dev/null || groupadd -r %{scalaris_group}
+getent passwd %{scalaris_user} >/dev/null || mkdir -p %{scalaris_home} && useradd -r -g %{scalaris_group} -d %{scalaris_home} -M -s /sbin/nologin -c "user for scalaris" %{scalaris_user} && chown %{scalaris_user}:%{scalaris_group} %{scalaris_home}
+exit 0
+
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files -n scalaris-java
 %defattr(-,root,root,-)
 %{_javadir}/scalaris
-%dir %{_sysconfdir}/scalaris
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris-java.conf
-%config %{_sysconfdir}/scalaris/scalaris-java.conf.sample
-%config(noreplace) %{_sysconfdir}/scalaris/scalaris.properties
+%attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris-java.conf
+%attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris-java.conf.sample
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.properties
 %{_bindir}/scalaris
 %dir %{_docdir}/scalaris/
 %doc %{_docdir}/scalaris/java-api
