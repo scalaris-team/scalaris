@@ -173,6 +173,6 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root,-)
 %doc %{_docdir}/scalaris/erlang
 %doc %{_docdir}/scalaris/user-dev-guide.pdf
-%{_prefix}/lib/scalaris/doc
+%{_prefix}/lib/scalaris/docroot/doc
 
 %changelog
