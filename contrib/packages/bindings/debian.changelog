@@ -1,8 +1,46 @@
-scalaris-bindings (0.5.0+svn-1) unstable; urgency=low
+scalaris-bindings (0.6.0+svn-1) unstable; urgency=low
 
   * svn snapshot from trunk
 
- -- Nico Kruber <kruber@zib.de>  Thu, 11 Oct 2012 12:30:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
+
+scalaris (0.6.0-1) stable; urgency=low
+
+  * Packaging:
+    - add ArchLinux packages
+    - add support for new distribution versions
+  * API:
+    - no more timeouts in client APIs
+    - Java-API: re-worked the request and result list handling
+      -> move result processing to the operation classes
+    - Java-API: better support for custom operations
+    - Java-API: support the new partial reads:
+                ReadRandomFromListOp and ReadSublistOp
+    - Java-API: compile with "vars" debug info
+    - Java-API: integrate new OtpErlang library (1.5.8 from R16B) with fixed
+                support for compressed binaries
+    - Java-API: add back-ports from the Wiki on Scalaris demonstrator:
+      * list-change operations: ScalarisChangeListOp and
+                                ScalarisListAppendRemoveOp
+      * MultiMap classes are now in de.zib.tools
+      * CircularByteArrayOutputStream
+    - Java-API: fix hostname issues with Erlang and Java
+    - Java-API: slightly changed the delete API
+    - JSON-API: add API for auto-scale requests
+    - Python-API: add API for auto-scale requests
+    - Python-API: use default socket timeout
+    - Ruby-API: use default socket timeout
+    - all APIs: support lists of composite types
+  * Infrastructure:
+    - add a daemon to monitor Scalaris via JMX
+    - support for distributions with python3 available as "python" and
+      python2 as "python2"
+    - support for Ruby 1.9
+  * Bugs:
+    - use /bin/bash instead of /bin/sh which may not result in a bash session
+    - fix numerous other bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
 
 scalaris-bindings (0.5.0-1) stable; urgency=low
   * API:

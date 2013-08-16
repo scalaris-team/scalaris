@@ -1,4 +1,4 @@
-Scalaris 0.6.0 (codename "Conus scalaris") - August 16, 2013
+Scalaris 0.6.0 (codename "Conus scalaris") - August 19, 2013
 ===============================================================
 
 Packaging:
@@ -30,7 +30,7 @@ API:
 - all APIs: support lists of composite types
 
 Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
-	                         and Contrail http://contrail-project.eu):
+                                 and Contrail http://contrail-project.eu):
 
 - allow monitoring via JMX in the FourCaastMonitoringPlugin
 - support for getting random articles via the new partial read op
