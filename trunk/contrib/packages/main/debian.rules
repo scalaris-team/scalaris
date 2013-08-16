@@ -62,8 +62,8 @@ install: build
 		  $(BUILD_DIR_MAIN)/usr/lib/scalaris/docroot/doc
 	
 	# handle config files:
-	cp $(BUILD_DIR)/etc/scalaris/scalaris.cfg \
-	   $(BUILD_DIR)/etc/scalaris/scalaris.cfg.example
+	cp $(BUILD_DIR_MAIN)/etc/scalaris/scalaris.cfg \
+	   $(BUILD_DIR_MAIN)/etc/scalaris/scalaris.cfg.example
 
 # Build architecture-independent files here.
 binary-indep: build install
