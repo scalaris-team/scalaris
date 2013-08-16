@@ -122,6 +122,12 @@ sudo curl "http://download.opensuse.org/repositories/home:/scalaris/Fedora_16/ho
 }}}
 . Afterwards you can install Scalaris using the usual `yum install scalaris` command (similarly for the other packages).
 
+==== Ruby on CentOS and RHEL ====
+
+CentOS and RHEL do not come with the needed packages for our ruby bindings. If you have not already done so, add the appropriate EPEL repositories which provide them - follow https://fedoraproject.org/wiki/EPEL for further instructions.
+
+Note that the rubygem-json package provided by rpmforge for version 5 of CentOS and RHEL has a critical bug which makes it unusable - the EPEL packages have a fix (ref. https://bugzilla.redhat.com/show_bug.cgi?id=634380)
+
 === How to add our repository to Mandriva-based distributions (Mandriva)? ===
 
 This is currently not possible because the Open Build Service does not export a repository structure compatible with the Mandriva package management. You will need to manually download and install the RPMs from the repositories listed above.
