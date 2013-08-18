@@ -123,7 +123,7 @@ pid_prompt() ->
     try list_to_pid(InspectPidString)
     catch _:_ ->
             try
-                InspectPidAtom = list_to_atom(InspectPidString),
+                InspectPidAtom = list_to_existing_atom(InspectPidString),
                 case whereis(InspectPidAtom) of
                     undefined ->
                         case pid_groups:find_all(InspectPidAtom) of
