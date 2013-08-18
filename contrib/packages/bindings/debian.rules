@@ -17,19 +17,11 @@ build-stamp:
 	dh_testdir
 
 	# Add here commands to compile the package.
-	if [ "$(WITH_PYTHON3)" = 1 ]; then \
-	  ./configure --prefix=/usr \
+	./configure --prefix=/usr \
 	  --sysconfdir=/etc \
 	  --localstatedir=/var \
 	  --docdir=/usr/share/doc/scalaris \
-	  --with-ruby-sitelibdir=$(RUBY_SITELIB) ; \
-	else \
-	  ./configure --prefix=/usr \
-	  --sysconfdir=/etc \
-	  --localstatedir=/var \
-	  --docdir=/usr/share/doc/scalaris \
-	  --with-ruby-sitelibdir=$(RUBY_SITELIB) ; \
-	fi
+	  --with-ruby-sitelibdir=$(RUBY_SITELIB)
 	ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6" \
 	  make java java-doc
 	if [ "$(WITH_PYTHON)" = 1 ]; then make python ; fi
