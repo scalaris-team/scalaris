@@ -440,6 +440,8 @@ clean:
 	-rm -rf src/comm_layer/*.beam
 	-rm -rf contrib/yaws/ebin/*.beam
 	-rm -rf contrib/log4erl/ebin/*.beam
+	-rm -f contrib/log4erl/src/log4erl_lex.erl
+	-rm -f contrib/log4erl/src/log4erl_parser.erl
 	-rm -rf test/*.beam
 	-rm -rf doc/*.html
 	-rm -rf doc/*.css
