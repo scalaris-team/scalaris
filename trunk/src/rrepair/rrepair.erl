@@ -97,7 +97,7 @@
          round          = {0, 0}                                    :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
          open_resolve   = 0                                         :: non_neg_integer(),
-         open_sessions  = []                                        :: [] | [session()]   % List of running request_sync calls (only rounds initiated by this process) 
+         open_sessions  = []                                        :: [session()]   % List of running request_sync calls (only rounds initiated by this process) 
          }).
 -type state() :: #rrepair_state{}.
 
