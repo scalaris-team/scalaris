@@ -88,7 +88,8 @@ all: compile tags
 
 #cp priv/xbin/*beam bin/
 compile:
-	cd contrib/log4erl/src && $(ERLC) log4erl_lex.xrl log4erl_parser.yrl
+	cd contrib/log4erl/src && $(ERLC) log4erl_parser.yrl
+	cd contrib/log4erl/src && $(ERL) -noinput -noshell -s leex file log4erl_lex.xrl -s init stop
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
 test-all: test test-skipped java-test python-test ruby-test interop-test 
