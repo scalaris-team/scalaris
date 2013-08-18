@@ -884,7 +884,7 @@ start(SessionId, SenderRRPid) ->
                              stats = rr_recon_stats:new([{session_id, SessionId}]) },
     PidName = lists:flatten(io_lib:format("~s_~p.~s", [?MODULE, SessionId, randoms:getRandomString()])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, State,
-                             [{pid_groups_join_as, pid_groups:my_groupname(), PidName}]).
+                             [{pid_groups_join_as, pid_groups:my_groupname(), {short_lived, PidName}}]).
 
 -spec fork_recon(state()) -> {ok, pid()}.
 fork_recon(Conf) ->
@@ -893,7 +893,7 @@ fork_recon(Conf) ->
     send_local(Conf#rr_recon_state.ownerPid, {recon_forked}),
     PidName = lists:flatten(io_lib:format("~s_~p.~s", [?MODULE, null, randoms:getRandomString()])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, State,
-                             [{pid_groups_join_as, pid_groups:my_groupname(), PidName}]).
+                             [{pid_groups_join_as, pid_groups:my_groupname(), {short_lived, PidName}}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config parameter handling
