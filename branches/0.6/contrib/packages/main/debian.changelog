@@ -1,11 +1,5 @@
 scalaris (0.6.0-1) stable; urgency=low
 
-  * svn snapshot from trunk
-
- -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
-
-scalaris (0.6.0-1) stable; urgency=low
-
   * Packaging:
     - add ArchLinux packages
     - add support for new distribution versions
