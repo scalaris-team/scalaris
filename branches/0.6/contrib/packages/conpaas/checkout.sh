@@ -3,7 +3,7 @@
 SCALARIS_VERSION="0.6.0"
 date=`date +"%Y%m%d"`
 name="conpaas-scalarix" # folder base name (without version)
-url="http://scalaris.googlecode.com/svn/trunk/"
+url="http://scalaris.googlecode.com/svn/branches/0.6/"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
