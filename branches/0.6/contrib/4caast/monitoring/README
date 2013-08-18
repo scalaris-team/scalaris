@@ -1,0 +1,45 @@
+=== How to use JASMINe monitoring probes with Scalaris === 
+
+1) configure, build, run Scalaris
+
+cd <scalaris-dir>
+./configure && make && ./bin/firstnode.sh
+
+2) start the JMX wrapper (reads monitoring values from Scalaris and exposes these via JMX):
+
+cd java-api
+./scalaris --jvmopts "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=14193 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false" -jmx firstnode@localhost
+
+=== How to use JASMINe monitoring probes with "Wiki on Scalaris" === 
+
+1) build Wiki on Scalaris
+
+cd <scalaris-dir>/contrib/wikipedia/
+ant
+
+2) start the Tomcat server with specific JMX port:
+
+ant run -Dscalaris.node="node1@localhost" -Dscalaris.cookie="chocolate chip cookie" -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=14192 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false
+
+=== Setup JASMINe monitoring probes === 
+
+3) download, extract, configure JASMINe probe standalone
+
+wget http://download.forge.objectweb.org/jasmine/jasmine-probe-standalone-1.1.1.zip
+unzip jasmine-probe-standalone-1.1.1.zip
+
+3a)
+cp <scalaris-dir>/contrib/4caast/probe-config.xml jasmine-probe-standalone-1.1.1/conf/probe-config.xml
+
+3b)
+cp <scalaris-dir>/contrib/4caast/probe-config.wiki.xml jasmine-probe-standalone-1.1.1/conf/probe-config.xml
+
+4) run JASMINe probe standalone
+
+cd jasmine-probe-standalone-1.1.1
+export JPROBE_ROOT=$PWD
+./jasmine-probe.sh start
+
+5) stop JASMINe probe standalone when finished
+
+./jasmine-probe.sh stop

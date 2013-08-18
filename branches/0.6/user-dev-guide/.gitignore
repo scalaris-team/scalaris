@@ -1,0 +1,14 @@
+/*.aux
+/*.log
+/*.idx
+/*.toc
+/*.out
+/*.ilg
+/*.ind
+.project
+.settings
+.texlipse
+tmp
+/Thumbs.db
+/*.eps
+/*.synctex.gz

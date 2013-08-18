@@ -1,0 +1,56 @@
+# Bloom Reconciliation 
+# by Maik Lange
+
+.PS
+copy "sequence.pic";
+
+# Objects
+actor(U, "");
+object(A,"A:RR");
+placeholder_object(AA);
+placeholder_object(Dummy2); # more space
+placeholder_object(BB);
+object(B,"B:RR");
+step();
+
+# STEP 1
+message(U,A,"request_sync"); active(A);
+async(); # use asynchrone messages (not-filled arrowheads)
+message(A,B,"interval I\sbA\eb"); 
+inactive(A);
+active(B);
+
+# STEP 2
+sync();
+create_message(B,BB,"B:RC");
+async();
+message(B,BB,"cont. I\sbA\eb"); 
+inactive(B); active(BB);
+step();
+
+message(BB,A,"bloom filter BF(\*b(I\sbAB\eb))");
+active(A);
+dmessage(BB,BB,""); inactive(BB);
+sync();
+create_message(A,AA,"A:RC");
+async();
+message(A,AA,"cont. BF(\*b(I\sbAB\eb))");
+inactive(A);
+active(AA);
+step();
+message(AA,A,"\*D \ Reg(A,B)");
+active(A);
+dmessage(AA,AA,""); inactive(AA);
+begin_frame(A,F,"key_upd_s");
+end_frame(A,F);
+step();
+inactive(A);
+
+
+# CLEAN UP
+step();
+complete(A);
+complete(B);
+complete(U);
+
+.PE

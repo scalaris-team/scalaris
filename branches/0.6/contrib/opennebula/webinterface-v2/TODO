@@ -1,0 +1,5 @@
+- the head-node currently gets its vmid via the context file. on other
+  clouds, this is maybe not possible
+
+- we need to provide the head-node with enough credentials, so that it
+  is able to create and destroy vms

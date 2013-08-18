@@ -1,0 +1,44 @@
+#!/bin/bash
+
+set -e
+
+scalaris_user=scalaris
+scalaris_group=scalaris
+scalaris_home=/var/lib/scalaris
+
+# use automatic handling for now...
+# # Copy config file if not existing yet
+# 
+#   if [ ! -f /etc/scalaris/scalaris.cfg ]; then
+#     cp /etc/scalaris/scalaris.cfg.example /etc/scalaris/scalaris.cfg
+#   fi
+
+create_scalaris_user() {
+  getent group $scalaris_group >/dev/null || addgroup --quiet --system $scalaris_group
+  getent passwd $scalaris_user >/dev/null || mkdir -p $scalaris_home && adduser --quiet --system --ingroup $scalaris_group --home $scalaris_home --no-create-home --shell /sbin/nologin $scalaris_user && chown $scalaris_user:$scalaris_group $scalaris_home
+  chown $scalaris_user:$scalaris_group \
+    /var/log/scalaris \
+    /etc/scalaris/ \
+    /etc/scalaris/scalaris.cfg \
+    /etc/scalaris/scalaris.local.cfg \
+    /etc/scalaris/scalarisctl.conf
+}
+
+if grep -e '^cookie=\w\+' /etc/scalaris/scalarisctl.conf > /dev/null 2>&1; then
+  echo $RANDOM"-"$RANDOM"-"$RANDOM"-"$RANDOM >> /etc/scalaris/scalarisctl.conf
+fi
+
+create_scalaris_user
+
+echo "Installing Scalaris RC-links..."
+update-rc.d scalaris defaults > /dev/null
+
+echo "Re-starting Scalaris service if started..."
+if which invoke-rc.d >/dev/null 2>&1; then
+  invoke-rc.d scalaris try-restart
+else
+  /etc/init.d/scalaris try-restart
+fi
+
+#DEBHELPER#
+

@@ -1,0 +1,72 @@
+From 6a4a28b903f7dd0abe43c21d8c19d536580d68a3 Mon Sep 17 00:00:00 2001
+From: Nico Kruber <kruber@zib.de>
+Date: Tue, 29 Jan 2013 12:31:35 +0100
+Subject: [PATCH] rt_chord: reduce key size to 16 bits for better debugging
+
+---
+ include/scalaris.hrl |  4 ++--
+ src/rt_chord.erl     | 14 +++++++-------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/include/scalaris.hrl b/include/scalaris.hrl
+index a44022e..83b21a2 100644
+--- a/include/scalaris.hrl
++++ b/include/scalaris.hrl
+@@ -35,8 +35,8 @@
+ -define(MINUS_INFINITY, 0).
+ -define(MINUS_INFINITY_TYPE, 0).
+ % first invalid key:
+--define(PLUS_INFINITY, 16#100000000000000000000000000000000).
+--define(PLUS_INFINITY_TYPE, 16#100000000000000000000000000000000).
++-define(PLUS_INFINITY, 16#10000).
++-define(PLUS_INFINITY_TYPE, 16#10000).
+ 
+ %%Simple routingtable
+ %-define(RT, rt_simple).
+diff --git a/src/rt_chord.erl b/src/rt_chord.erl
+index 8804127..4aeabf5 100644
+--- a/src/rt_chord.erl
++++ b/src/rt_chord.erl
+@@ -62,7 +62,7 @@ hash_key(Key) -> hash_key_(Key).
+ %%      opaque key type).
+ -spec hash_key_(client_key()) -> key_t().
+ hash_key_(Key) ->
+-    <<N:128>> = erlang:md5(client_key_to_binary(Key)),
++    <<N:16,_:112>> = erlang:md5(client_key_to_binary(Key)),
+     N.
+ 
+ %% @doc Generates a random node id, i.e. a random 128-bit number, based on the
+@@ -115,14 +115,14 @@ get_size(RT) ->
+ 
+ %% @doc Keep a key in the address space. See n/0.
+ -spec normalize(non_neg_integer()) -> key_t().
+-normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
++normalize(Key) -> Key band 16#FFFF.
+ 
+ %% @doc Returns the size of the address space.
+ -spec n() -> integer().
+ n() -> n_().
+ %% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
+--spec n_() -> 16#100000000000000000000000000000000.
+-n_() -> 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF + 1.
++-spec n_() -> 16#10000.
++n_() -> 16#FFFF + 1.
+ 
+ %% @doc Gets the number of keys in the interval (Begin, End]. In the special
+ %%      case of Begin==End, the whole key range as specified by n/0 is returned.
+@@ -153,9 +153,9 @@ get_split_key(Begin, End, {Num, Denom}) ->
+ -spec get_replica_keys(key()) -> [key()].
+ get_replica_keys(Key) ->
+     [Key,
+-     Key bxor 16#40000000000000000000000000000000,
+-     Key bxor 16#80000000000000000000000000000000,
+-     Key bxor 16#C0000000000000000000000000000000
++     Key bxor 16#4000,
++     Key bxor 16#8000,
++     Key bxor 16#C000
+     ].
+ 
+ -spec get_key_segment(key()) -> pos_integer().
+-- 
+1.8.1.1
+

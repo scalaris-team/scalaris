@@ -1,0 +1,382 @@
+% Copyright 2007-2013 Zuse Institute Berlin
+
+% Licensed under the Apache License, Version 2.0 (the "License");
+% you may not use this file except in compliance with the License.
+% You may obtain a copy of the License at
+%
+%     http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS,
+% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+% See the License for the specific language governing permissions and
+% limitations under the License.
+\newcommand{\scalaris}{Scalaris}
+\newcommand{\doctitle}{\scalaris{}: Users and Developers Guide}
+\newcommand{\docauthor}{Zuse Institute Berlin, onScale solutions}
+\newcommand{\docsubject}{\scalaris{}}
+\newcommand{\doccreator}{LaTeX2e and pdfLaTeX with hyperref-package}
+\newcommand{\docproducer}{}
+\newcommand{\dockeywords}{\scalaris{}, P2P, DHT, Manual}
+\newcommand{\doccopyright}{Copyright 2007-2013 Zuse Institute Berlin}
+\newcommand{\doclicenseurl}{http://www.apache.org/licenses/LICENSE-2.0}
+\newcommand{\docversion}{\input{../VERSION}}
+
+\title{\doctitle}
+
+\documentclass[a4paper]{scrreprt}
+\usepackage{typearea}
+\areaset[1cm]{165mm}{240mm}
+
+\usepackage[T1]{fontenc}
+\usepackage[latin1]{inputenc}
+
+\usepackage{relsize}
+\usepackage{graphicx}
+%\usepackage{color}
+%\usepackage{colortbl}
+\usepackage{pifont} % for carriage return symbol
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{makeidx}
+\usepackage{ifthen}
+\usepackage{fancyhdr}
+\usepackage{fancyvrb}
+\usepackage{lastpage}
+\usepackage{relsize}
+\usepackage{xcolor}
+\usepackage{threeparttable}
+
+\input{pdfoptions}
+
+\usepackage{listings}
+\usepackage{etextools}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usetikzlibrary{shadows}
+\usetikzlibrary{fit}
+\usetikzlibrary{shapes.arrows}
+\usetikzlibrary{backgrounds}
+\usetikzlibrary{calc}
+
+\renewcommand{\headrulewidth}{0pt}    % Width of head rule
+\renewcommand{\footrulewidth}{0.3pt}  % Width of head rule
+
+\usepackage{calc}
+
+% normal pages
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+%\fancyhead[RE,LO]{}
+\fancyhead[R]{}%
+\fancyfoot[R]{\bfseries\thepage\ / \pageref{LastPage}}%
+\chead{}%
+\cfoot{}%
+
+% beginning of a chapter
+\fancypagestyle{plain}{%
+\fancyhf{} % clear all header and footer fields
+%\fancyhead[RE,LO]{}
+\fancyhead[R]{}%
+\fancyfoot[R]{\bfseries\thepage\ / \pageref{LastPage}}%
+\chead{}%
+\cfoot{}%
+}
+
+% Clear Header Style on the Last Empty Odd pages
+\makeatletter
+\def\cleardoublepage{\clearpage\if@twoside \ifodd\c@page\else%
+    \hbox{}%
+    \thispagestyle{empty}%              % Empty header styles
+    \newpage%
+    \if@twocolumn\hbox{}\newpage\fi\fi\fi}
+\makeatother
+
+%% Bold typewriter font
+%\renewcommand{\ttdefault}{pcr}
+%\renewcommand{\rmdefault}{ptm} % Times
+%\renewcommand{\rmdefault}{ppl} % Palatino
+%%\renewcommand{\rmdefault}{pnc} % NewCenturySchoolbook
+%%\renewcommand{\rmdefault}{pbk} % BookMan
+%\renewcommand{\rmdefault}{pag} % Avantgarde (sans serif)
+%% \renewcommand{\rmdefault}{pzc} % ZapfChancery (slanted)
+%\renewcommand{\rmdefault}{put} % Utopia
+\renewcommand{\rmdefault}{bch} % CharterBT
+
+\newcommand{\carriagereturn}{\scriptsize\Pisymbol{psy}{191}}
+
+
+%%% colors %%%%%%%%%%%%%%%%%%%%%%%%
+
+\definecolor{lightyellow}{rgb}{1.0, 1.0, 0.5}
+\definecolor{rltred}{rgb}{0.75,0,0}
+\definecolor{rltgreen}{rgb}{0,0.5,0}
+
+
+%\definecolor{rltblue}{rgb}{0,0,0.75}
+\definecolor{rltblue}{HTML}{1F4980}
+%\definecolor{rltred}{HTML}{80491F}
+%\definecolor{rltred}{HTML}{C35E22}
+\definecolor{lightgray}{gray}{0.9}
+
+\setlength{\parindent}{0pt}
+
+% 31 73 128 blue
+
+\definecolor{lightyellow}{rgb}{1.0, 1.0, 0.5}
+\definecolor{codebackground}{HTML}{EEEEEE}
+\definecolor{commandinput}{rgb}{0.8,0.8,1}
+
+%\thicklines
+\lstset{
+  basicstyle=\scriptsize\ttfamily,
+  backgroundcolor=\color{codebackground},
+  keywordstyle=\color{rltblue}\bfseries,
+  % underlined bold black keywords
+  identifierstyle=\bfseries, % nothing happens
+  commentstyle=\color{rltred}\bfseries, % white comments
+  stringstyle=\sffamily, % typewriter type for strings
+  showstringspaces=false,
+  xleftmargin=3pt,
+  xrightmargin=3pt,
+  fancyvrb=true,
+  frame=single,
+%  frameround=tttt,
+%  framexleftmargin=0pt,
+  framextopmargin=3pt,
+  framexbottommargin=3pt,
+%  framexrightmargin=5pt,
+  rulecolor=\color{codebackground},
+  language=erlang,
+%  fillcolor=\color{red},
+%  rulesepcolor=\color{black}
+%  rulesep=1cm,
+}
+\lstset{rangebeginprefix=\%\%\ userdevguide-begin\ }
+\lstset{rangeendprefix=\%\%\ userdevguide-end\ }
+\lstset{includerangemarker=false}
+
+% \codesnippet[lstsettings]{filename-label}{range-label}{src-file with path}
+% \codesnippet[language=erlang]{dht_node.erl}{dht_node:start_link}{../src/dht_node.erl}
+\newcommand{\codesnippet}[4][language=erlang]{
+{%% File: \url{#4}
+\lstset{numbers=left}
+\lstinputlisting[
+  title=\filetitle{#2},
+  linerange=#3-#3,
+  #1
+]
+{#4}
+}
+}
+
+% \codefile[lstsettings]{filename-label}{src-file with path}
+% \codefile[language=erlang]{admin.erl}{../src/admin.erl}
+\newcommand{\codefile}[3][language=erlang]{
+{
+\lstinputlisting[
+  title=\filetitle{#2},
+  #1]
+{#3}
+}
+}
+\newcommand{\bfref}[1]{\textbf{\hyperpage{#1}}}
+\newcommand{\sieheref}[1]{\ref{#1} on page~\pageref{#1}}
+\newcommand{\code}[1]{\lstinline[basicstyle=\ttfamily]!#1!}
+\newcommand{\filetitle}[1]{\hbox to \linewidth{~~File \code{#1:}\hfill}}
+\newcommand{\todo}[1]{{\color{red}{\em TODO: #1}}}
+\newcommand{\svnrev}[1]
+{\hfill\emph{Description is based on SVN revision #1.}\medskip}
+
+\newcommand{\erlparamsorarity}[1]{%
+\ifthenelse{\equal{0}{\gettokslistindex{/}{#1}}}{\texttt{#1}}{(\texttt{#1})}}
+\newcommand{\erlfun}[4][index]{%
+\ifthenelse{\equal{index}{#1}}%
+{\index{#2@\texttt{#2}!#3@\texttt{#3}}}%
+{}%
+\texttt{#2}:\-\texttt{#3}\texttt{\erlparamsorarity{#4}}}
+
+\newcommand{\erlfunindex}[2]{%
+\index{#1@\texttt{#1}!#2@\texttt{#2}|bfref}}%
+
+\newcommand{\erlmodule}[2][index]{%
+\ifthenelse{\equal{index}{#1}}%
+{\index{#2@\texttt{#2}}}{}%
+\texttt{#2}}
+
+\newcommand{\erlmoduleindex}[1]{%
+\index{#1@\texttt{#1}|bfref}}%
+
+\makeatletter
+\newenvironment{erlfunparams}
+{
+\list{}{
+    \labelwidth\z@ \makeatother \itemindent-\leftmargin
+    \let\makelabel\descriptionlabel
+\setlength\leftmargin{4em}
+\setlength{\parskip}{0pt}
+\setlength{\parsep}{0pt}
+\setlength{\itemsep}{0pt}
+}}
+{\endlist}
+\makeatother
+\newcommand{\erlparam}[2]{\item[\texttt{#1}:] #2}
+
+\newenvironment{wikitext}
+{\catcode`\#=13\catcode`\$=13\catcode`\_=11\catcode`\==13
+}{\catcode`\#=6\catcode`\$=3\catcode`\_=8}
+
+%shortcut for multi columns
+\newcommand{\mc}[3]{\multicolumn{#1}{#2}{#3}}
+% new left-justified column types
+\newcolumntype{P}[1]{>{\raggedright}p{#1}}
+\newcolumntype{M}[1]{>{\raggedright}m{#1}}
+\newcolumntype{B}[1]{>{\raggedright}m{#1}}
+\newcommand{\tn}{\tabularnewline} % need to use this instead of \\ in these columns
+
+% allow footnotes in tables:
+\usepackage{footnote}
+\makesavenoteenv{tabular}
+
+\makeindex
+
+\begin{document}
+\enlargethispage{1.6cm}
+\vspace*{3.8cm}
+\thispagestyle{empty}
+\setlength{\parskip}{1ex}
+\includegraphics[width=8cm]{scalaris-logo}
+
+\vfill
+
+\hfill\begin{tabular}{@{}l@{}}
+\mdseries \Huge \hfill Users and Developers Guide\\
+\\ \\
+\LARGE Version \docversion{} \hfill \today\\
+\\
+\LARGE \hfill\href{http://scalaris.googlecode.com}{scalaris.googlecode.com}\\
+\end{tabular}
+
+\vspace*{3.8cm}
+
+\hrule
+\smallskip
+\parbox{\textwidth}{\scriptsize \setlength{\parskip}{1ex}
+\doccopyright{}.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use this file except in compliance with the License.  You may obtain a copy
+of the License at \url{\doclicenseurl}
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+License for the specific language governing permissions and limitations
+under the License.  }
+
+\tableofcontents
+
+\input{user-intro}
+
+\part{Users Guide}
+
+\input{user-install}
+
+\input{user-config}
+
+\input{user-systemuse}
+
+\input{user-tests}
+
+\input{user-troubleshoot}
+
+\part{Developers Guide}
+
+\input{dev-hints}
+
+\input{dev-infrastructure}
+
+\input{dev-overlay}
+
+\input{dev-tx}
+
+\input{dev-join}
+
+\input{dev-slide}
+
+\input{dev-dirs}
+
+%\chapter{System Components}
+
+%\chapter{Processes}
+
+%\chapter{Troubleshooting}
+
+%\section{ApplicationMonitor appmon:start()}
+
+\input{dev-java}
+
+\bibliographystyle{plainnat}
+
+\begin{thebibliography}{9}
+
+\bibitem{erlang-book}
+Joe Armstrong.
+\newblock \emph{Programming Erlang: Software for a Concurrent World.}
+\newblock Pragmatic Programmers, ISBN: 978-1-9343560-0-5, July 2007
+
+\bibitem{vivaldi}
+Frank Dabek, Russ Cox, Frans Kaahoek, Robert Morris.
+\newblock \emph{Vivaldi: A Decentralized Network Coordinate System.}
+\newblock ACM SIGCOMM 2004.
+
+\bibitem{rachid-book}
+Rachid Guerraoui and Luis Rodrigues.
+\newblock \emph{Introduction to Reliable Distributed Programming.}
+\newblock Springer-Verlag, 2006.
+
+\bibitem{chord-sigcomm}
+Ion Stoica, Robert Morris, David Karger, M. Frans Kaashoek and Hari Balakrishnan.
+\newblock \emph{Chord: A Scalable Peer-to-peer Lookup Service for Internet Applications.}
+\newblock ACM SIGCOMM 2001, San Deigo, CA, August 2001, pp. 149-160.
+\newblock \href{http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf}{http://pdos.csail.mit.edu/papers/chord:sigcomm01/chord\_sigcomm.pdf}
+
+\bibitem{t-man}
+M{\'a}rk Jelasity, Alberto Montresor, Ozalp Babaoglu.
+\newblock \emph{T-Man: Gossip-based fast overlay topology construction.}
+\newblock Computer Networks (CN) 53(13):2321-2339, 2009.
+
+\bibitem{frtchord}
+  Hiroya Nagao, Kazuyuki Shudo.
+  \newblock \emph{Flexible routing tables: Designing routing
+    algorithms for overlays based on a total order on a routing table set.}
+  \newblock In: Peer-to-Peer Computing, IEEE, 2011.
+
+\bibitem{enhanced-paxos}
+F. Schintke, A. Reinefeld, S. Haridi, T. Sch{\"u}tt.
+\newblock \emph{Enhanced Paxos Commit for Transactions on DHTs.}
+\newblock 10th IEEE/ACM Int. Conf. on Cluster, Cloud and Grid Computing, pp. 448-454,
+May 2010.
+
+\bibitem{cyclon}
+Spyros Voulgaris, Daniela Gavidia, Maarten van Steen.
+\newblock \emph{CYCLON: Inexpensive Membership Management for Unstructured P2P Overlays.}
+\newblock J. Network Syst. Manage. 13(2): 2005.
+
+\bibitem{gossip}
+M{\'a}rk Jelasity, Alberto Montresor, Ozalp Babaoglu.
+\newblock \emph{Gossip-based aggregation in large dynamic networks.}
+\newblock ACM Trans. Comput. Syst. 23(3), 219-252 (2005).
+
+\end{thebibliography}
+
+\printindex
+
+\end{document}
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: t
+%%% End: 
+

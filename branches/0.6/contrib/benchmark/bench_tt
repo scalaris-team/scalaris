@@ -1,0 +1,114 @@
+#!/bin/bash
+#######################################
+#PBS -N [% name %]_[% server %]_4_de
+#PBS -l nodes=[% server %]:ppn=4
+#PBS -l walltime=8:00:00
+#PBS -q gbe 
+#PBS -M hennig@zib.de 
+
+#init
+source /etc/profile
+source $HOME/.bashrc
+
+#echo "running on $HOSTNAME"
+UUID=`uuidgen`
+SERVER=[% server %]
+RESULT_DIR=[% resdir %]
+
+ITERATIONS_PER_SERVER=20000
+
+START_TIME=`date +%m%d%y%H%M%S`
+cp -r  [% scalaris %] ~/$START_TIME-$SERVER-$UUID
+WORKING_DIR=~/$START_TIME-$SERVER-$UUID/bin
+
+cd $WORKING_DIR
+
+LOG_FILE="bench_log_de-$SERVER-$START_TIME"
+LOG_FILE_CLEAN="bench_sum_de-$SERVER-$START_TIME"
+#HOSTS="localhost"
+HOSTS=`cat $PBS_NODEFILE |  sort -u`
+for host in $HOSTS
+do
+        ssh $host "killall -9 bench_master.sh"
+        ssh $host "killall -9 bench_slave.sh"
+        ssh $host "killall -9 beam.smp "
+done 
+VMS_PER_SERVER_LIST="1 2 4"
+CLIENTS_PER_SERVER_LIST="1 2 5 10 50 100 200"
+CSNODES_PER_SERVER_LIST="4 16 32"
+
+date
+for CLIENTS_PER_SERVER in $CLIENTS_PER_SERVER_LIST
+do
+for VMS_PER_SERVER in $VMS_PER_SERVER_LIST
+do
+  for CSNODES_PER_SERVER in $CSNODES_PER_SERVER_LIST
+  do
+        
+	NODES_VM=$((CSNODES_PER_SERVER/VMS_PER_SERVER))
+	CLIENTS_PER_VM=$((CLIENTS_PER_SERVER/VMS_PER_SERVER))
+        ITERATIONS_PER_CLIENT=$((ITERATIONS_PER_SERVER/(CLIENTS_PER_SERVER)))
+	#ITERATION=$((ITERATIONS/(VMS_PER_SERVER*SERVER)))
+	if [ $NODES_VM -gt 0 ]; then
+	if [ $CLIENTS_PER_VM -gt 0 ]; then 
+	        i=0
+	        RING_SIZE=$((SERVER*VMS_PER_SERVER*NODES_VM))
+	        echo "######################"
+	        echo "RS $RING_SIZE VPS $VMS_PER_SERVER NPS $CSNODES_PER_SERVER NPV $NODES_VM C: $CLIENTS_PER_SERVER IT: $ITERATIONS_PER_CLIENT"
+		    for host in $HOSTS
+	        do
+	                for vm in `seq 1 $VMS_PER_SERVER`
+	                do
+	                        i=$((i+1))
+	                        
+	                        case "$i" in
+	                                1 )     BOOTIP=`/sbin/ifconfig  eth1 | grep inet\ | awk '{ print $2 }' | cut -c 6- | sed 's/\./,/g'`
+                              						cd $WORKING_DIR
+[% IF cl == 'tcp' %]  
+                                          echo "{boot_host,{{$BOOTIP},14195,boot}}." > scalaris.local.cfg
+                                          echo "{log_host,{{$BOOTIP},14195,boot_logger}}." >> scalaris.local.cfg
+[% ELSE %]
+                                          echo "{boot_host, {boot,'boot@$host.1001.zib.de'}}." > scalaris.local.cfg
+	                                        echo "{log_host,{boot_logger,'boot@$host.1001.zib.de'}}." >> scalaris.local.cfg
+[% END %]
+					                                echo "####################################################################################" >> $LOG_FILE
+	                                        echo "SV: $SERVER RS $RING_SIZE VPS $VMS_PER_SERVER NPS $CSNODES_PER_SERVER NPV $NODES_VM C: $CLIENTS_PER_SERVER IT: $ITERATIONS_PER_CLIENT" >> $LOG_FILE
+                              						ssh $host " cd ~/$START_TIME-$SERVER-$UUID/bin ; ./bench_master.sh $NODES_VM $CLIENTS_PER_VM $ITERATIONS_PER_CLIENT $RING_SIZE >> $LOG_FILE" &
+                              						BOOTPID=$! 
+					                                ;;
+	                                * )     ssh $host "cd ~/$START_TIME-$SERVER-$UUID/bin ; ./bench_slave.sh  $NODES_VM $i >> log_$host-$i"  & ;;
+	                        esac
+	
+	                done
+	        done
+		
+		eval "sleep 1000 ; kill  $BOOTPID " &		
+	    	wait $BOOTPID
+		if [ $? -eq 143 ]; then
+			echo "WARNING bench_master.sh reached  timeout of 1000 secs "
+		fi
+                killall sleep
+		sleep 1
+		for host in $HOSTS 
+		do
+		    ssh $host "killall -9 bench_master.sh"
+		    ssh $host "killall -9 bench_slave.sh "
+		    ssh $host "killall beam.smp "
+                    ssh $host "killall epmd"
+		done 
+		sleep 5
+	fi
+	fi
+  done
+done
+done
+cat $LOG_FILE | egrep 1\/s\|NPV | awk '{ if($1 == "SV:") {  b = $0;  x=1} if($1 == "1/s:") {  b = b " " $0;  x++}if($1 == "1/s:") {  b = b " " $0;  x++}if(x==3) print b}' | sort -r -n -k 16 > $LOG_FILE_CLEAN
+echo "Best config for your System:"
+head -n1 $LOG_FILE_CLEAN
+cp  $LOG_FILE  $RESULT_DIR
+cp   $LOG_FILE_CLEAN   $RESULT_DIR
+rm -rf  ~/$START_TIME-$SERVER-$UUID
+date
+
+#XPBS -o testjob.out
+

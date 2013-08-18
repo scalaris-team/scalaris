@@ -1,0 +1,16 @@
+/bin
+/.settings
+/.classpath
+/.project
+/*pages-articles.xml*
+/*pages-articles*.db
+/*pages-meta-history.xml*
+/*pages-meta-history*.db
+/*pages-meta-current.xml*
+/*pages-meta-current*.db
+/scalaris-wiki.war
+/scalaris-wiki-plugin-api.jar
+/.ant-targets-build.xml
+/build
+/demo*.txt
+/*.log

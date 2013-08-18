@@ -1,0 +1,34 @@
+set terminal pdf
+
+set xrange [<%= min_server - 1%>:<%= max_server + 1%>]
+set yrange [0:]
+
+set output "gnuplot/all_reads.pdf"
+set xlabel "server"
+set ylabel "reads/s"
+plot "all.data" using 1:6 title "Reads/s"
+
+set output "gnuplot/all_increments.pdf"
+set xlabel "server"
+set ylabel "increments/s"
+plot "all.data" using 1:7 title "Increments/s"
+
+
+
+
+
+
+set output "gnuplot/top1_reads.pdf"
+set xlabel "server"
+set ylabel "reads/s"
+plot "top1read.data" using 1:6 title "Reads/s" with lines
+
+set output "gnuplot/top1_increments.pdf"
+set xlabel "server"
+set ylabel "increments/s"
+plot "top1write.data" using 1:7 title "Increments/s" with lines
+
+
+
+
+

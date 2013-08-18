@@ -1,0 +1,29 @@
+div.nothighlighted {		
+  width: 120px;
+}
+
+div.nothighlightedlast {		
+  width: 120px;
+}
+
+div.highlighted {		
+  width: 120px;
+}
+
+div.highlightedlast {		
+  width: 120px;
+}
+
+div.subnothighlighted {		
+  width: 100px;
+}
+div.subnothighlightedlast {		
+  width: 100px;
+}
+
+div.subhighlighted {		
+  width: 100px;
+}
+div.subhighlightedlast {		
+  width: 100px;
+}

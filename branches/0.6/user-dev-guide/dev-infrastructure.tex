@@ -1,0 +1,151 @@
+\chapter{System Infrastructure}
+
+\section{Groups of Processes}
+\label{sec:pid_groups}
+\erlmoduleindex{pid\_groups}
+
+\begin{itemize}
+\item What is it? How to distinguish from Erlangs internal named processes?
+\item Joining a process group
+\item Why do we do this... (managing several independent nodes inside a single
+  Erlang VM for testing)
+\end{itemize}
+
+\section{\texorpdfstring{The Communication Layer \erlmodule{comm}}
+          {The Communication Layer comm}}
+\label{sec:comm}
+\erlmoduleindex{comm}
+
+\begin{itemize}
+\item in general
+\item format of messages (tuples)
+\item use messages with cookies (server and client side)
+\item What is a message tag?
+\end{itemize}
+
+\input{gen_component}
+
+\section{The Process' Database (\texttt{pdb})}
+\erlmoduleindex{pdb}
+
+\begin{itemize}
+\item How to use it and how to switch from erlang:put/set to ets and implied
+  limitations.
+\end{itemize}
+
+\section{Failure Detectors (\texttt{fd})}
+\erlmoduleindex{fd}
+
+\begin{itemize}
+\item uses Erlang monitors locally
+\item is independent of component load
+\item uses heartbeats between Erlang virtual machines
+\item uses a single proxy heartbeat server per Erlang virtual machine, which
+  itself uses Erlang monitors to monitor locally
+\item uses dynamic timeouts to implement an eventually perfect failure detector.
+\end{itemize}
+
+\section{Monitoring Statistics (\texttt{monitor}, \texttt{rrd})}
+\erlmoduleindex{monitor}
+\svnrev{r2546}
+
+The \erlmodule{monitor} module offers several methods to gather meaningful
+statistics using the \code{rrd()} data type defined in \erlmodule{rrd}.
+
+\erlmoduleindex{rrd}
+\code{rrd()} records work with time slots, i.e. a fixed slot length is given
+at creation and items which should be inserted will be either put into the
+current slot, or a new slot will be created.
+Each data item thus needs a time stamp associated with it. It must not be a
+real time, but can also be a virtual time stamp.
+
+The \erlmodule{rrd} module thus offers two different APIs:
+one with transparent time handling, e.g.
+ \erlfun{rrd}{create}{/3}, \erlfun{rrd}{add\_now}{/2}, and
+one with manual time handling, e.g.
+ \erlfun{rrd}{create}{/4}, \erlfun{rrd}{add}{/3}.
+
+To allow different evaluations of the stored data, the following types of data
+are supported:
+\begin{itemize}
+  \item \code{gauge}: only stores the newest value of a time slot, e.g. for thermometers,
+  \item \code{counter}: sums up all values inside a time slot,
+  \item \code{timing}: records time spans and stores values to easily calculate e.g. the sum, the
+  standard deviation, the number of events, the min and max,
+  \item \code{timing_with_hist}: similar to \code{timing} but also records a more detailed
+  (approximated) histogram of the data,
+  \item \code{event}: records each event (including its time stamp) inside a time slot in a list
+  (this should be rarely used as the amount of data stored may be very big).
+\end{itemize}
+
+The \erlmodule{monitor} offers functions to conveniently store and retrieve
+such values. It is also started as a process in each \code{dht_node} and
+\code{basic_services} group as well as inside each \code{clients_group}.
+This process ultimately stores the whole rrd() structure
+There are three paradigms how values can be stored:
+\begin{enumerate}
+  \item Values are gathered in the process that is generating the values.
+        Inside this process, the \code{rrd()} is stored in the erlang
+        dictionary.
+        Whenever a new time slot is started, the values will be
+        reported to the monitor process of the gathering process' group.
+  \item Values are gathered in the process that is generating the values.
+        Inside this process, the \code{rrd()} is handled manually.
+        After changing the \code{rrd()}, a manual check for reporting needs to
+        be issued using \erlfun{monitor}{check\_report}{/4}.
+  \item Values are immediately send to the monitor process where it undergoes
+        the same procedures until it is finally stored and available to other
+        processes. This is especially useful if the process generating the
+        values does not live long or does not regularly create new data, e.g.
+        the client.
+\end{enumerate}
+
+The following example illustrates the first mode, i.e. gathering data in the
+generating process. It has been taken from the \erlmodule{cyclon} module which
+uses a \code{counter} data type:
+
+\begin{lstlisting}
+% initialise the monitor with an empty rrd() using a 60s monitoring interval
+monitor:proc_set_value(?MODULE, 'shuffle', rrd:create(60 * 1000000, 3, counter)),
+% update the value by adding one
+monitor:proc_set_value(?MODULE, 'shuffle', fun(Old) -> rrd:add_now(1, Old) end),
+% check regularly whether to report the data to the monitor:
+monitor:proc_check_timeslot(?MODULE, 'shuffle')
+\end{lstlisting}
+
+The first two parameters of \erlfun{monitor}{proc\_set\_value}{/3} define the
+name of a monitored value, the module's name and a unique key. The second can
+be either an \code{rrd()} or an update fun.
+The \erlfun{monitor}{proc\_check\_timeslot}{/3} function can be used if your
+module does not regularly create new data. In this case, the monitor process
+would not have the latest data for others to retrieve. This function forces a
+check and creates the new time slot if needed (thus reporting the data).
+
+This is how forwarding works (taken from \erlmodule{api\_tx}):
+
+\begin{lstlisting}
+monitor:client_monitor_set_value(
+  ?MODULE, 'req_list',
+  fun(Old) ->
+    Old2 = case Old of
+             % 10s monitoring interval, only keep newest in the client process
+             undefined -> rrd:create(10 * 1000000, 1, {timing, ms});
+             _ -> Old
+           end,
+    rrd:add_now(TimeInUs / 1000, Old2)
+  end),
+\end{lstlisting}
+
+As in this case there is no safe way of initialising the value, it is more
+useful to provide an update fun to
+\erlfun{monitor}{client\_monitor\_set\_value}{/3}. This function is only useful
+for the client processes as it reports to the monitor in the
+\code{clients_group} (recall that client processes do not belong to any group).
+All other processes should use \erlfun{monitor}{monitor\_set\_value}{/3} with
+the same semantics.
+
+\section{Writing Unittests}
+
+\subsection{Plain unittests}
+
+\subsection{Randomized Testing using \texttt{tester.erl}}
