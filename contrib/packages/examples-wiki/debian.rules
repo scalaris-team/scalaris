@@ -10,12 +10,11 @@ build-stamp:
 	dh_testdir
 
 	# Add here commands to compile the package.
-	export ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6"
-
 	ln -s /usr/share/java/scalaris/scalaris.jar ./contrib/
 	JINTERFACE_VERSION=`ls /usr/share/java/scalaris/lib/ | grep ^OtpErlang- | sed "s|OtpErlang-||" | sed "s|.jar||"`; \
 	ln -s /usr/share/java/scalaris/lib/OtpErlang-$$JINTERFACE_VERSION.jar ./contrib/
-	ant build
+	ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6" \
+	  ant build
 
 	touch build-stamp
 
