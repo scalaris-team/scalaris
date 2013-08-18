@@ -68,9 +68,9 @@ childs([{PidGroup, Options}]) ->
         case lists:keyfind(sup_paxos_prefix, 1, Options) of
             {sup_paxos_prefix, Prefix} ->
                 PrefixS = atom_to_list(Prefix),
-                {list_to_atom(PrefixS ++ atom_to_list('_proposer')),
-                 list_to_atom(PrefixS ++ atom_to_list('_acceptor')),
-                 list_to_atom(PrefixS ++ atom_to_list('_learner'))};
+                {list_to_atom(PrefixS ++ "_proposer"),
+                 list_to_atom(PrefixS ++ "_acceptor"),
+                 list_to_atom(PrefixS ++ "_learner")};
             false -> {paxos_proposer, paxos_acceptor, paxos_learner}
         end,
     Proposer = sup:worker_desc(proposer, proposer,
