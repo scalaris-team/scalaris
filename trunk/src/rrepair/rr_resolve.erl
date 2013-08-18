@@ -409,4 +409,4 @@ start() ->
                                dhtNodePid = pid_groups:get_my(dht_node) },
     PidName = lists:flatten(io_lib:format("~s.~s", [?MODULE, randoms:getRandomString()])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, State,
-                             [{pid_groups_join_as, pid_groups:my_groupname(), PidName}]).
+                             [{pid_groups_join_as, pid_groups:my_groupname(), {short_lived, PidName}}]).

@@ -339,6 +339,14 @@ start(Module, Handler, Args, Options) ->
 start(Module, DefaultHandler, Args, Options, Supervisor) ->
     %?SPAWNED(Module),
     case lists:keyfind(pid_groups_join_as, 1, Options) of
+        {pid_groups_join_as, GroupId, {short_lived, PidName}} ->
+            % if short-lived processes are spawned multiple times, we cannot
+            % create a new atom for each spawn or we will run out of atoms!
+            pid_groups:join_as(GroupId, PidName),
+            log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p", [Supervisor, self(), Module, GroupId, PidName]),
+            ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
+                                         ++ randoms:getRandomString()), self()),
+            ok;
         {pid_groups_join_as, GroupId, PidName} ->
             pid_groups:join_as(GroupId, PidName),
             log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p", [Supervisor, self(), Module, GroupId, PidName]),
