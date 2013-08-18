@@ -49,7 +49,7 @@ if not exist Emakefile (
 @echo on
 pushd "%~dp0""\contrib\log4erl\src"
 %ERLANG_HOME%\bin\erlc.exe log4erl_parser.yrl
-%ERLANG_HOME%\bin\erlc.exe log4erl_lex.xrl
+%ERLANG_HOME%\bin\erl.exe -noinput -noshell -s leex file log4erl_lex.xrl -s init stop
 popd
 %ERLANG_HOME%\bin\erl.exe -pa contrib\yaws -pa ebin -noinput +B -eval "case make:all() of up_to_date -> halt(0); error -> halt(1) end."
 @echo off
