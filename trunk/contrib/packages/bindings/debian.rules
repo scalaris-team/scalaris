@@ -17,7 +17,6 @@ build-stamp:
 	dh_testdir
 
 	# Add here commands to compile the package.
-	export ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6"
 	if [ "$(WITH_PYTHON3)" = 1 ]; then \
 	  ./configure --prefix=/usr \
 	  --sysconfdir=/etc \
@@ -31,8 +30,8 @@ build-stamp:
 	  --docdir=/usr/share/doc/scalaris \
 	  --with-ruby-sitelibdir=$(RUBY_SITELIB) ; \
 	fi
-	make java
-	make java-doc
+	ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6" \
+	  make java java-doc
 	if [ "$(WITH_PYTHON)" = 1 ]; then make python ; fi
 	if [ "$(WITH_PYTHON3)" = 1 ]; then make python3 ; fi
 
