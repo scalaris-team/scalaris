@@ -4,7 +4,7 @@ scalaris-examples-wiki (0.6.0+svn-1) unstable; urgency=low
 
  -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
 
-scalaris (0.6.0-1) stable; urgency=low
+scalaris-examples-wiki (0.6.0-1) stable; urgency=low
 
   * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
                                      and Contrail http://contrail-project.eu):
