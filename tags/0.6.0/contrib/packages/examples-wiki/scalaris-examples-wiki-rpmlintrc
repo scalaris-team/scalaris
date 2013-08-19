@@ -1,0 +1,1 @@
+addFilter("arch-independent-package-contains-binary-or-object.*/usr/share/tomcat.*/webapps/scalaris-wiki/WEB-INF/lib/libsqlite4java.*")

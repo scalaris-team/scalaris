@@ -1,0 +1,98 @@
+#!/usr/bin/make -f
+# Sample debian/rules that uses debhelper.
+# GNU copyright 1997 to 1999 by Joey Hess.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+RUBY_SITELIB:=$(shell ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"] ')
+PYTHON_SITELIB:=$(shell python -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null || echo PYTHON-NOT-FOUND)
+PYTHON3_SITELIB:=$(shell python3 -c 'from distutils.sysconfig import get_python_lib; print (get_python_lib())'  2>/dev/null || echo PYTHON3-NOT-FOUND)
+
+WITH_PYTHON:=$(shell python -c "import sys; a,b=sys.version_info[:2]; print a >= 2 and b >= 6 and '1' or '0'")
+WITH_PYTHON3:=$(shell python3 -c 'print('1');'  2>/dev/null || echo 0)
+
+build: build-stamp
+build-stamp:
+	dh_testdir
+
+	# Add here commands to compile the package.
+	./configure --prefix=/usr \
+	  --sysconfdir=/etc \
+	  --localstatedir=/var \
+	  --docdir=/usr/share/doc/scalaris \
+	  --with-ruby-sitelibdir=$(RUBY_SITELIB)
+	ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6" \
+	  make java java-doc
+	if [ "$(WITH_PYTHON)" = 1 ]; then make python ; fi
+	if [ "$(WITH_PYTHON3)" = 1 ]; then make python3 ; fi
+
+	touch build-stamp
+
+clean:
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp
+
+	# Add here commands to clean up after the build process.
+	rm -rf build_dir
+
+	dh_clean
+
+BUILD_DIR_JAVA:=$(CURDIR)/debian/scalaris-java
+BUILD_DIR_RUBY:=$(CURDIR)/debian/scalaris-ruby
+BUILD_DIR_PYTHON:=$(CURDIR)/debian/python-scalaris
+BUILD_DIR_PYTHON3:=$(CURDIR)/debian/python3-scalaris
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	# Add here commands to install the package into debian/gentoo.
+	make install-java DESTDIR=$(BUILD_DIR_JAVA)
+	make install-java-doc DESTDIR=$(BUILD_DIR_JAVA)
+	make install-ruby DESTDIR=$(BUILD_DIR_RUBY)
+	if [ "$(WITH_PYTHON)" = 1 ]; then make install-python DESTDIR=$(BUILD_DIR_PYTHON) ; make install-python-doc-html DESTDIR=$(BUILD_DIR_PYTHON) ; fi
+	if [ "$(WITH_PYTHON3)" = 1 ]; then make install-python3 DESTDIR=$(BUILD_DIR_PYTHON3) ; fi
+	
+	# handle config files:
+	cp $(BUILD_DIR_JAVA)/etc/scalaris/scalaris.properties \
+	   $(BUILD_DIR_JAVA)/etc/scalaris/scalaris.properties.example
+
+# Build architecture-independent files here.
+binary-indep: build install
+	# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+#	dh_installdebconf
+	dh_installdocs
+	dh_installexamples
+	dh_installmenu
+#	dh_installlogrotate
+#	dh_installemacsen
+#	dh_installpam
+#	dh_installmime
+#	dh_installinit
+	dh_installcron
+	dh_installman
+	dh_installinfo
+#	dh_undocumented
+	dh_installchangelogs
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
+#	dh_makeshlibs
+	dh_installdeb
+#	dh_perl
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install

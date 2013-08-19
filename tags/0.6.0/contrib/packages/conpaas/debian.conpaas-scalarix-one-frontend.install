@@ -1,0 +1,8 @@
+usr/lib/scalaris/contrib/opennebula/frontend.rb
+usr/lib/scalaris/contrib/opennebula/database.rb
+usr/lib/scalaris/contrib/opennebula/hadoophelper.rb
+usr/lib/scalaris/contrib/opennebula/jsonrpc.rb
+usr/lib/scalaris/contrib/opennebula/opennebulahelper.rb
+usr/lib/scalaris/contrib/opennebula/scalarishelper.rb
+usr/lib/scalaris/contrib/opennebula/*.erb
+usr/lib/scalaris/contrib/opennebula/fe_views/*
