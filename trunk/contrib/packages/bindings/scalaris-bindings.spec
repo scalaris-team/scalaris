@@ -1,6 +1,9 @@
 # norootforbuild
 
 %define pkg_version 0.6.0+svn
+%define scalaris_user scalaris
+%define scalaris_group scalaris
+%define scalaris_home /var/lib/scalaris
 Name:           scalaris-bindings
 Summary:        Scalable Distributed key-value store
 Version:        %{pkg_version}
@@ -124,6 +127,18 @@ Requires:   jre >= 1.6.0
 %else
 BuildArch:  noarch
 %endif
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+Requires(pre):  shadow-utils
+Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
+%endif
+%if 0%{?mandriva_version} || 0%{?mdkversion}
+Requires(pre):  shadow-utils
+Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
+%endif
+%if 0%{?suse_version}
+Requires(pre):  pwdutils
+PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
+%endif
 
 %description -n scalaris-java
 Java Bindings and command line client for scalaris
@@ -229,7 +244,7 @@ make install-python-doc-pdf DESTDIR=$RPM_BUILD_ROOT
 make install-python3 DESTDIR=$RPM_BUILD_ROOT
 %endif
 
-%pre
+%pre -n scalaris-java
 # note: use "-r" instead of "--system" for old systems like CentOS5, RHEL5
 getent group %{scalaris_group} >/dev/null || groupadd -r %{scalaris_group}
 getent passwd %{scalaris_user} >/dev/null || mkdir -p %{scalaris_home} && useradd -r -g %{scalaris_group} -d %{scalaris_home} -M -s /sbin/nologin -c "user for scalaris" %{scalaris_user} && chown %{scalaris_user}:%{scalaris_group} %{scalaris_home}
