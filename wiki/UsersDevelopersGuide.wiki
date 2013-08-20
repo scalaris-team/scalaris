@@ -1,6 +1,4 @@
 #summary Users and Developers Guide.
 #labels Featured
 
-The Users and Developers Guide is available as [https://scalaris.googlecode.com/svn/trunk/user-dev-guide/main.pdf pdf].
-
 <wiki:gadget url="http://scalaris.googlecode.com/svn/trunk/user-dev-guide/user-dev-guide-gadget.xml" height="700" width="100%" border="0" />
