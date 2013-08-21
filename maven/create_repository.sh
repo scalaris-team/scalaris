@@ -2,9 +2,17 @@
 #########
 ### Generates the Scalaris Maven repository
 ###
+### Input: pom.xml
 ###
-### Input: pom.xml and jar files
+### The script must be supplied with the maven pom.xml that contains
+### the dependencies to build the project.  The goal of this script is
+### to create a maven repository for Scalaris specific dependencies
+### that cannot be found in any official maven repositories. Commonly
+### these dependencies will be the jinterface and the java-api of
+### Scalaris. The script will ask for a jar for each dependencies it
+### finds. Unneeded dependencies can be skipped.
 ###
+### Example: ./create_repository.sh ../YCSB/scalaris/pom.xml
 
 
 ###
@@ -59,19 +67,23 @@ function readValue {
 # Parse Maven xml
 for line in $OUTPUT
 do
-  if [ $line == "dependency" ] && [ $groupId != "com.yahoo.ycsb" ]; then
-      echo "Jar path for $artifactId-$version, belonging to $groupId: "
-      echo -n "> "
-      read -e path
-      addJar $path $groupId $artifactId $version
-  fi
-  if [[ $line == groupId* ]]; then
-    groupId=$(readValue $line)
-  elif [[ $line == artifactId* ]]; then
-    artifactId=$(readValue $line)
-  elif [[ $line == version* ]]; then
-    version=$(readValue $line)
-  fi
+    if [[ $line == "dependency" && $groupId != "com.yahoo.ycsb" ]]; then
+        echo "Jar path for $artifactId-$version, belonging to $groupId: "
+        echo "Press Return to skip this dependency. It won't be added to the repository then."
+        echo -n "> "
+        read -e path
+        if [[ $path ]]; then
+            echo "Adding $artifactId-$version to the repo."
+            addJar $path $groupId $artifactId $version
+        fi
+    fi
+    if [[ $line == groupId* ]]; then
+        groupId=$(readValue $line)
+    elif [[ $line == artifactId* ]]; then
+        artifactId=$(readValue $line)
+    elif [[ $line == version* ]]; then
+        version=$(readValue $line)
+    fi
 done
 
 echo "Local repository generated."
