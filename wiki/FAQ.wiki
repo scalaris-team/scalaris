@@ -152,6 +152,24 @@ apt-get install scalaris
 
 Refer to http://en.opensuse.org/openSUSE:Build_Service_Debian_builds#Configuring_sources.list if you are having trouble adding .deb-based repositories.
 
+=== How to add our repository to ArchLinux? ===
+If one doesn't want to use the AUR packet, our repository needs to be added to pacman.
+First the public key needs to be added to the pacman keyring:
+{{{
+wget http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/repodata/repomd.xml.key
+pacman-key -a repomd.xml.key
+}}}
+
+Now the repository url can be added to `/etc/pacman.conf`
+{{{
+echo -e "[home_scalaris_ArchLinux]\nSigLevel = Optional TrustAll\nServer = http://download.opensuse.org/repositories/home:/scalaris/ArchLinux/\$arch/" >> /etc/pacman.conf
+}}}
+
+Now install scalaris and scalaris-bindings:
+{{{
+pacman -Syy scalaris scalaris-bindings
+}}}
+
 == How to build an rpm? ==
 On openSUSE, for example, do the following:
 {{{
