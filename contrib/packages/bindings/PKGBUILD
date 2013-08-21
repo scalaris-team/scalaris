@@ -24,7 +24,8 @@ build() {
   cd "$srcdir/$pkgname-$pkgver"
   ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
     --with-ruby-sitelibdir=$RUBY_SITELIB
-  make java
+  ANT_OPTS="-Dfile.encoding=utf8 -Dant.build.javac.source=1.6 -Dant.build.javac.target=1.6" \
+    make java
   make java-doc
   make python
   make python3
