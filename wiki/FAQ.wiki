@@ -153,7 +153,9 @@ apt-get install scalaris
 Refer to http://en.opensuse.org/openSUSE:Build_Service_Debian_builds#Configuring_sources.list if you are having trouble adding .deb-based repositories.
 
 === How to add our repository to Arch Linux? ===
-If one doesn't want to use the AUR packet, our repository needs to be added to pacman.
+
+We offer official Scalaris packages in our OBS repositories but an externally-maintained package also exists in AUR. In order to use our repository, you can follow the following steps.
+
 First the public key needs to be added to the pacman keyring:
 {{{
 wget -q http://download.opensuse.org/repositories/home:/scalaris/openSUSE_Factory/repodata/repomd.xml.key -O - | pacman-key -a -
