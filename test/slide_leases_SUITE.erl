@@ -31,9 +31,9 @@ groups() ->
                                  tester_type_check_slide_leases
                               ]},
      {join_tests, [sequence], [
-                               test_single_join
-                               %test_double_join
-                               %test_triple_join
+                               test_single_join,
+                               test_double_join,
+                               test_triple_join
                                ]}
     ].
 
