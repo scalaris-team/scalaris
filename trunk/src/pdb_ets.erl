@@ -1,5 +1,4 @@
-%% @copyright 2010-2012 Zuse Institute Berlin
-%%            and onScale solutions GmbH
+%% @copyright 2010-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,14 +12,14 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%% @author Florian Schintke <schintke@onscale.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc DB for a process internal state (lika a gen_component).
 %% This abstraction allows for easy switching between
 %% erlang:put/get/erase and ets:insert/lookup/delete
 %% @end
 %% @version $Id$
 -module(pdb_ets).
--author('schintke@onscale.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
 
 -behaviour(pdb_beh).

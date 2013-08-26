@@ -25,7 +25,7 @@
 -define(TRACE(X,Y), ok).
 -include("scalaris.hrl").
 
--define(PDB, pdb_ets).
+-define(PDB, db_prbr).
 
 %%% the prbr has to be embedded into a gen_component using it.
 %%% The state it operates on has to be passed to the on handler
@@ -64,7 +64,7 @@
 %% -> custom_data()
 -type write_filter() :: fun((term(), term(), term()) -> term()).
 
--type state() :: ?PDB:tableid().
+-type state() :: ?PDB:db().
 
 -type message() ::
         {prbr, read, DB :: dht_node_state:db_selector(),
@@ -126,7 +126,7 @@ noop_write_filter(_, _, X) -> X.
 
 %% initialize: return initial state.
 -spec init(atom()) -> state().
-init(DBName) -> ?PDB:new(DBName, [ordered_set, protected]).
+init(_DBName) -> ?PDB:new().
 
 -spec on(message(), state()) -> state().
 on({prbr, read, _DB, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
@@ -161,14 +161,14 @@ on({prbr, write, _DB, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter
 
 -spec get_entry(any(), state()) -> entry().
 get_entry(Id, TableName) ->
-    case ?PDB:get(Id, TableName) of
-        undefined -> new(Id);
+    case ?PDB:get(TableName, Id) of
+        {}    -> new(Id);
         Entry -> Entry
     end.
 
 -spec set_entry(entry(), state()) -> state().
 set_entry(NewEntry, TableName) ->
-    ?PDB:set(NewEntry, TableName),
+    ?PDB:set(TableName, NewEntry),
     TableName.
 
 %% As the round number contains the client's pid, they are still
