@@ -253,7 +253,7 @@
   <!-- ########## Scalaris targets (begin) ########## -->
   <target name='scalaris.compile' depends="tools.compile">
     <mkdir dir='${scalaris.classes.dirname}' />
-    <javac source="1.6" target="1.6" encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java de/zib/scalaris/executor/*.java de/zib/scalaris/jmx/*.java de/zib/scalaris/operations/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
+    <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/*.java de/zib/scalaris/executor/*.java de/zib/scalaris/jmx/*.java de/zib/scalaris/operations/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
   </target>
   <target name='scalaris.examples.compile' depends="scalaris.compile">
     <javac encoding="UTF-8" srcdir='src' destdir='${scalaris.classes.dirname}' classpathref="scalaris.classpath" includes="de/zib/scalaris/examples/*.java" debug="true" debuglevel="${debuglevel}" includeAntRuntime="false" />
