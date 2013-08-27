@@ -129,6 +129,8 @@ public class Options {
         for (ScalarisOpType op : ScalarisOpType.values()) {
             OPTIMISATIONS.put(op, new APPEND_INCREMENT());
         }
+        OPTIMISATIONS.put(ScalarisOpType.PAGE_COUNT, null);
+        OPTIMISATIONS.put(ScalarisOpType.CATEGORY_PAGE_COUNT, null);
     }
 
     /**
@@ -876,7 +878,10 @@ public class Options {
                             optimisation = new APPEND_INCREMENT();
                         }
                         for (ScalarisOpType op : ScalarisOpType.values()) {
-                            options.OPTIMISATIONS.put(op, optimisation);
+                            if (!(op.equals(ScalarisOpType.PAGE_COUNT) ||
+                                    op.equals(ScalarisOpType.CATEGORY_PAGE_COUNT))) {
+                                options.OPTIMISATIONS.put(op, optimisation);
+                            }
                         }
                     } else {
                         ScalarisOpType operation = ScalarisOpType.fromString(operationStr);

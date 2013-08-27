@@ -343,16 +343,36 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                 switch (convOp.listOrCount) {
                     case LIST:
                         try {
+                            List<ErlangValue> listVal = WikiDumpPrepareSQLiteForScalarisHandler
+                                    .objectFromBytes2(value).listValue();
                             HashMap<String, List<ErlangValue>> newLists = SQLiteWriteBucketListJob
-                                    .splitList(optimisation, value);
+                                    .splitList(optimisation, listVal);
                             for (Entry<String, List<ErlangValue>> newList : newLists.entrySet()) {
                                 // write list
                                 final String key2 = key + newList.getKey();
                                 requests.addOp(new WriteOp(key2, newList.getValue()));
                                 // write count (if available)
-                                if (convOp.countKey != null) {
+                                if (convOp.countKey != null && convOp.countKeyOptimisation == null) {
+                                    // integrated counter
                                     final String countKey2 = convOp.countKey + newList.getKey();
                                     requests.addOp(new WriteOp(countKey2, newList.getValue().size()));
+                                }
+                            }
+                            if (convOp.countKey != null && convOp.countKeyOptimisation != null) {
+                                // separate counter:
+                                int listSize = listVal.size();
+                                if (convOp.countKeyOptimisation instanceof IBuckets) {
+                                    // similar to "case COUNTER" below:
+                                    Collection<KVPair<Integer>> newCounters = SQLiteWriteBucketCounterJob
+                                            .splitCounter(
+                                                    (IBuckets) convOp.countKeyOptimisation,
+                                                    convOp.countKey, listSize);
+                                    for (KVPair<Integer> kvPair : newCounters) {
+                                        requests.addOp(new WriteOp(kvPair.key, kvPair.value));
+                                    }
+                                } else {
+                                    // copy counter
+                                    requests.addOp(new WriteOp(convOp.countKey, listSize));
                                 }
                             }
                         } catch (Exception e) {
@@ -373,6 +393,7 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                         break;
                 }
             } else if (convOp.optimisation != null ) {
+                assert (convOp.countKeyOptimisation == null);
                 if (convOp.listOrCount == ListOrCountOp.LIST) {
                     Collection<KVPair<Object>> operations = SQLiteCopyList.splitOp(key, convOp.countKey, value);
                     for (KVPair<Object> kvPair : operations) {
