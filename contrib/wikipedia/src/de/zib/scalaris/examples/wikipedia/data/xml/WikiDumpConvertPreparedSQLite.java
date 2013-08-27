@@ -478,7 +478,6 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             this.value = value;
             this.stWrite = stWrite;
             this.optimisation = optimisation;
-            assert optimisation.getBuckets() > 1;
         }
         
         public static Collection<KVPair<Integer>> splitCounter(IBuckets optimisation, String key, int value) {
@@ -598,16 +597,12 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                                         optimisation));
                                 break;
                             case COUNTER:
-                                if (optimisation.getBuckets() > 1) {
-                                    addSQLiteJob(new SQLiteWriteBucketCounterJob(
-                                            this, key,
-                                            WikiDumpPrepareSQLiteForScalarisHandler
-                                            .objectFromBytes2(value)
-                                            .intValue(), stWrite,
-                                            optimisation));
-                                } else {
-                                    addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
-                                }
+                                addSQLiteJob(new SQLiteWriteBucketCounterJob(
+                                        this, key,
+                                        WikiDumpPrepareSQLiteForScalarisHandler
+                                        .objectFromBytes2(value)
+                                        .intValue(), stWrite,
+                                        optimisation));
                                 break;
                             default:
                                 break;
