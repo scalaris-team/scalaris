@@ -449,7 +449,7 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
             Connection connection, NormalisedTitle title) {
         final long timeAtStart = System.currentTimeMillis();
         final String statName = "CAT_CNT:" + title;
-        return getInteger2(connection, ScalarisOpType.CATEGORY_PAGE_LIST,
+        return getInteger2(connection, ScalarisOpType.CATEGORY_PAGE_COUNT,
                 getCatPageCountKey(title), false, timeAtStart,
                 statName);
     }
@@ -463,6 +463,10 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
      *            operation type indicating what is being updated
      * @param pageList_key
      *            Scalaris key for the page list
+     * @param countOpType
+     *            operation type indicating what is being updated for
+     *            updating the count key (if there is no count key, this may
+     *            be <tt>null</tt>)
      * @param pageCount_key
      *            Scalaris key for the number of pages in the list (may be null
      *            if not used)
@@ -476,7 +480,8 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
      * @return the result of the operation
      */
     public static ValueResult<Integer> updatePageList(Transaction scalaris_tx,
-            ScalarisOpType opType, String pageList_key, String pageCount_key,
+            ScalarisOpType opType, String pageList_key,
+            ScalarisOpType countOpType, String pageCount_key,
             List<NormalisedTitle> entriesToAdd, List<NormalisedTitle> entriesToRemove,
             final String statName) {
         final long timeAtStart = System.currentTimeMillis();
@@ -491,7 +496,8 @@ public class ScalarisDataHandlerNormalised extends ScalarisDataHandler {
 
             executor.addAppendRemove(opType, pageList_key,
                     normList2normStringList(entriesToAdd),
-                    normList2normStringList(entriesToRemove), pageCount_key);
+                    normList2normStringList(entriesToRemove),
+                    countOpType, pageCount_key);
             
             executor.getExecutor().run();
             return new ValueResult<Integer>(involvedKeys, null, statName,

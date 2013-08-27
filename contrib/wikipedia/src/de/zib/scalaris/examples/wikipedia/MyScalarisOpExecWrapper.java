@@ -5,12 +5,15 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Random;
 
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM;
+import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
+import de.zib.scalaris.examples.wikipedia.Options.IReadBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
 import de.zib.scalaris.executor.ScalarisIncrementOp1;
 import de.zib.scalaris.executor.ScalarisIncrementOp2;
@@ -56,33 +59,39 @@ public class MyScalarisOpExecWrapper {
     /**
      * Creates a new list append operation.
      * 
-     * @param opType    the type of the operation
-     * @param key       the key to append the value to
-     * @param toAdd     the value to add
-     * @param countKey  the key for the counter of the entries in the list
-     *                  (may be <tt>null</tt>)
+     * @param opType      the type of the operation
+     * @param key         the key to append the value to
+     * @param toAdd       the value to add
+     * @param countOpType the type of the countKey operation (may be the same
+     *                    as <tt>opType</tt> or <tt>null</tt> if
+     *                    <tt>countKey</tt> is)
+     * @param countKey    the key for the counter of the entries in the list
+     *                    (may be <tt>null</tt>)
      * 
-     * @param <T>       type of the value to add
+     * @param <T>         type of the value to add
      */
     @SuppressWarnings("unchecked")
-    public <T> void addAppend(ScalarisOpType opType, String key, T toAdd, String countKey) {
-        addAppendRemove(opType, key, Arrays.asList(toAdd), new ArrayList<T>(0), countKey);
+    public <T> void addAppend(ScalarisOpType opType, String key, T toAdd, ScalarisOpType countOpType, String countKey) {
+        addAppendRemove(opType, key, Arrays.asList(toAdd), new ArrayList<T>(0), countOpType, countKey);
     }
 
     /**
      * Creates a new list remove operation.
      * 
-     * @param opType    the type of the operation
-     * @param key       the key to remove the value from
-     * @param toRemove  the value to remove
-     * @param countKey  the key for the counter of the entries in the list
-     *                  (may be <tt>null</tt>)
+     * @param opType      the type of the operation
+     * @param key         the key to remove the value from
+     * @param toRemove    the value to remove
+     * @param countOpType the type of the countKey operation (may be the same
+     *                    as <tt>opType</tt> or <tt>null</tt> if
+     *                    <tt>countKey</tt> is)
+     * @param countKey    the key for the counter of the entries in the list
+     *                    (may be <tt>null</tt>)
      * 
-     * @param <T>       type of the value to remove
+     * @param <T>         type of the value to remove
      */
     @SuppressWarnings("unchecked")
-    public <T> void addRemove(ScalarisOpType opType, String key, T toRemove, String countKey) {
-        addAppendRemove(opType, key, new ArrayList<T>(0), Arrays.asList(toRemove), countKey);
+    public <T> void addRemove(ScalarisOpType opType, String key, T toRemove, ScalarisOpType countOpType, String countKey) {
+        addAppendRemove(opType, key, new ArrayList<T>(0), Arrays.asList(toRemove), countOpType, countKey);
     }
 
     /**
@@ -122,19 +131,49 @@ public class MyScalarisOpExecWrapper {
     /**
      * Creates a new append+remove operation.
      * 
-     * @param opType    the type of the operation
-     * @param key       the key to append/remove the values to/from
-     * @param toAdd     the values to add
-     * @param toRemove  the values to remove
-     * @param countKey  the key for the counter of the entries in the list
-     *                  (may be <tt>null</tt>)
+     * @param opType      the type of the operation
+     * @param key         the key to append/remove the values to/from
+     * @param toAdd       the values to add
+     * @param toRemove    the values to remove
+     * @param countOpType the type of the countKey operation (may be the same
+     *                    as <tt>opType</tt> or <tt>null</tt> if
+     *                    <tt>countKey</tt> is)
+     * @param countKey    the key for the counter of the entries in the list
+     *                    (may be <tt>null</tt>)
      * 
-     * @param <T>       type of the value to remove
+     * @param <T>         type of the value to remove
      */
     public <T> void addAppendRemove(final ScalarisOpType opType,
             final String key, final List<T> toAdd, final List<T> toRemove,
-            final String countKey) {
+            final ScalarisOpType countOpType, String countKey) {
+        final Optimisation countOptimisation = Options.getInstance().OPTIMISATIONS.get(countOpType);
 
+        if (countKey != null && countOptimisation != null) {
+            // separate optimisation for the count key
+            int countInc = toAdd.size() - toRemove.size();
+            if (countOptimisation instanceof APPEND_INCREMENT) {
+                executor.addOp(new ScalarisIncrementOp1<Integer>(countKey, countInc));
+            } else {
+                assert(countOptimisation instanceof IBuckets);
+                Random rand = new Random();
+                String bucketStr;
+                if (countOptimisation instanceof IReadBuckets) {
+                    final IReadBuckets optimisation2 = (IReadBuckets) countOptimisation;
+                    final int writeBuckets = optimisation2.getBuckets() - optimisation2.getReadBuckets();
+                    final int bucket = optimisation2.getReadBuckets() + rand.nextInt(writeBuckets);
+                    bucketStr = ":" + bucket;
+                } else if (countOptimisation instanceof APPEND_INCREMENT_BUCKETS) {
+                    final APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) countOptimisation;
+                    bucketStr = ":" + rand.nextInt(optimisation2.getBuckets());
+                } else {
+                    throw new RuntimeException("unsupported optimisation: " + countOptimisation);
+                }
+                executor.addOp(new ScalarisIncrementOp1<Integer>(countKey + bucketStr, countInc));
+            }
+            // prevent the code below to write to a counter:
+            countKey = null;
+        }
+        
         final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(opType);
         if (optimisation instanceof APPEND_INCREMENT) {
             executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, toAdd, toRemove, countKey));
