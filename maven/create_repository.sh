@@ -48,6 +48,7 @@ fi
 function addJar {
   if [ -f $1 ];then
     mvn install:install-file -Dfile=$1 -DgroupId=$2 -DartifactId=$3 -Dversion=$4 -Dpackaging=jar -DlocalRepositoryPath=. -DcreateChecksum=true &> /dev/null
+	 echo
   else
     echo "Invalid path! Aborting."
     exit 1
@@ -68,13 +69,36 @@ function readValue {
 for line in $OUTPUT
 do
     if [[ $line == "dependency" && $groupId != "com.yahoo.ycsb" ]]; then
-        echo "Jar path for $artifactId-$version, belonging to $groupId: "
-        echo "Press Return to skip this dependency. It won't be added to the repository then."
-        echo -n "> "
-        read -e path
-        if [[ $path ]]; then
-            echo "Adding $artifactId-$version to the repo."
-            addJar $path $groupId $artifactId $version
+        # no concrete version supplied but a range like [1.5.6-custom,), meaning >=1.5.6-custom
+        if [[ $version == \[* || $version == \(* ]]; then
+            echo "Version range $version supplied for $artifactId"
+            echo "Will now ask you for all version you want to include."
+            echo "If you're done, just hinter Enter when prompted for the next version."
+            echo "In the following, please specify the version and the jar file."
+            while true; do
+                version=""
+                echo "Version:"
+                echo -n "> "
+                read -e version
+                echo "Path:"
+                echo -n "> "
+                read -e path
+                if [[ $version && $path ]]; then
+                   echo "Adding $artifactId-$version to the repo."
+                   addJar $path $groupId $artifactId $version
+                else
+                   break
+                fi
+            done
+        else
+            echo "Jar path for $artifactId-$version, belonging to $groupId: "
+            echo "Press Return to skip this dependency. It won't be added to the repository then."
+            echo -n "> "
+            read -e path
+            if [[ $path ]]; then
+                echo "Adding $artifactId-$version to the repo."
+                addJar $path $groupId $artifactId $version
+            fi
         fi
     fi
     if [[ $line == groupId* ]]; then
