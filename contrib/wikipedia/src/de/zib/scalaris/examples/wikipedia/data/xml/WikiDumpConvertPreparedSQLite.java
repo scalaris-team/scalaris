@@ -562,11 +562,9 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     protected static final Pattern contributionListPattern = Pattern.compile("^(.*):user:contrib$", Pattern.DOTALL);
     
     protected static class ConvertOp {
-        boolean copyValue = false;
-        ScalarisOpType opType = null;
         ListOrCountOp listOrCount = ListOrCountOp.NONE;
         String countKey = null;
-        IBuckets optimisation2 = null;
+        Optimisation optimisation = null;
     }
     
     /**
@@ -591,33 +589,34 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                         convOp = new ConvertOp();
                     }
                     
-                    if (convOp.copyValue) {
-                        if (convOp.listOrCount == ListOrCountOp.LIST) {
-                            addSQLiteJob(new SQLiteCopyList(this, key, value, convOp.countKey, stWrite));
-                        } else {
-                            addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
-                        }
-                    } else if (convOp.optimisation2 != null) {
+                    if (convOp.optimisation instanceof IBuckets) {
+                        IBuckets optimisation = (IBuckets) convOp.optimisation;
                         switch (convOp.listOrCount) {
                             case LIST:
                                 addSQLiteJob(new SQLiteWriteBucketListJob(this,
                                         key, value, convOp.countKey, stWrite,
-                                        convOp.optimisation2));
+                                        optimisation));
                                 break;
                             case COUNTER:
-                                if (convOp.optimisation2.getBuckets() > 1) {
+                                if (optimisation.getBuckets() > 1) {
                                     addSQLiteJob(new SQLiteWriteBucketCounterJob(
                                             this, key,
                                             WikiDumpPrepareSQLiteForScalarisHandler
                                             .objectFromBytes2(value)
                                             .intValue(), stWrite,
-                                            convOp.optimisation2));
+                                            optimisation));
                                 } else {
                                     addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
                                 }
                                 break;
                             default:
                                 break;
+                        }
+                    } else if (convOp.optimisation != null ) {
+                        if (convOp.listOrCount == ListOrCountOp.LIST) {
+                            addSQLiteJob(new SQLiteCopyList(this, key, value, convOp.countKey, stWrite));
+                        } else {
+                            addSQLiteJob(new SQLiteWriteBytesJob(this, key, value, stWrite));
                         }
                     }
                     if ((importedKeys % PRINT_SCALARIS_KV_PAIRS_EVERY) == 0) {
@@ -656,6 +655,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
      */
     public static ConvertOp getConvertOp(String key, Options dbWriteOptions) throws NumberFormatException {
         ConvertOp convOp = new ConvertOp();
+        ScalarisOpType opType = null;
 
         final Matcher pageListMatcher = pageListPattern.matcher(key);
         final Matcher pageCountMatcher = pageCountPattern.matcher(key);
@@ -669,70 +669,63 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         final Matcher contributionListMatcher = contributionListPattern.matcher(key);
         
         if (key.equals(ScalarisDataHandler.getSiteInfoKey())) {
-            convOp.copyValue = true;
+            convOp.optimisation = new Options.TRADITIONAL();
         } else if (pageListMatcher.matches()) {
             int namespace = Integer.parseInt(pageListMatcher.group(1));
             convOp.countKey = ScalarisDataHandler.getPageCountKey(namespace);
-            convOp.opType = ScalarisOpType.PAGE_LIST;
+            opType = ScalarisOpType.PAGE_LIST;
             convOp.listOrCount = ListOrCountOp.LIST;
         } else if (pageCountMatcher.matches()) {
-            // ignore (written during page list partitioning (see below)
+            // ignore (written during page list partitioning (see above)
             convOp.listOrCount = ListOrCountOp.COUNTER;
         } else if (key.equals(ScalarisDataHandler.getArticleCountKey())) {
             convOp.countKey = null;
-            convOp.opType = ScalarisOpType.ARTICLE_COUNT;
+            opType = ScalarisOpType.ARTICLE_COUNT;
             convOp.listOrCount = ListOrCountOp.COUNTER;
         } else if (revMatcher.matches()) {
-            convOp.opType = ScalarisOpType.REVISION;
-            convOp.copyValue = true;
+            opType = ScalarisOpType.REVISION;
         } else if (pageMatcher.matches()) {
-            convOp.opType = ScalarisOpType.PAGE;
-            convOp.copyValue = true;
+            opType = ScalarisOpType.PAGE;
         } else if (revListMatcher.matches()) {
             convOp.countKey = null;
-            convOp.opType = ScalarisOpType.SHORTREV_LIST;
+            opType = ScalarisOpType.SHORTREV_LIST;
             convOp.listOrCount = ListOrCountOp.LIST;
         } else if (catPageListMatcher.matches()) {
             String title = catPageListMatcher.group(1);
             convOp.countKey = title + ":cpages:count";
-            convOp.opType = ScalarisOpType.CATEGORY_PAGE_LIST;
+            opType = ScalarisOpType.CATEGORY_PAGE_LIST;
             convOp.listOrCount = ListOrCountOp.LIST;
         } else if (catPageCountMatcher.matches()) {
-            // ignore (written during page list partitioning (see below)
+            // ignore (written during page list partitioning (see above)
             convOp.listOrCount = ListOrCountOp.COUNTER;
         } else if (tplPageListMatcher.matches()) {
             convOp.countKey = null;
-            convOp.opType = ScalarisOpType.TEMPLATE_PAGE_LIST;
+            opType = ScalarisOpType.TEMPLATE_PAGE_LIST;
             convOp.listOrCount = ListOrCountOp.LIST;
         } else if (backLinksPageListMatcher.matches()) {
             // omit if disabled
             if (dbWriteOptions.WIKI_USE_BACKLINKS) {
                 convOp.countKey = null;
-                convOp.opType = ScalarisOpType.BACKLINK_PAGE_LIST;
+                opType = ScalarisOpType.BACKLINK_PAGE_LIST;
                 convOp.listOrCount = ListOrCountOp.LIST;
             }
         } else if (key.matches(ScalarisDataHandler.getStatsPageEditsKey())) {
             convOp.countKey = null;
-            convOp.opType = ScalarisOpType.EDIT_STAT;
+            opType = ScalarisOpType.EDIT_STAT;
             convOp.listOrCount = ListOrCountOp.COUNTER;
         } else if (contributionListMatcher.matches()) {
             // omit if disabled
             if (dbWriteOptions.WIKI_STORE_CONTRIBUTIONS != STORE_CONTRIB_TYPE.NONE) {
                 convOp.countKey = null;
-                convOp.opType = ScalarisOpType.CONTRIBUTION;
+                opType = ScalarisOpType.CONTRIBUTION;
                 convOp.listOrCount = ListOrCountOp.LIST;
             }
         } else {
             return null;
         }
 
-        if (convOp.opType != null) {
-            final Optimisation optimisation = dbWriteOptions.OPTIMISATIONS.get(convOp.opType);
-            if (optimisation instanceof IBuckets) {
-                convOp.optimisation2 = (IBuckets) optimisation;
-            } else {
-                convOp.copyValue = true;
-            }
+        if (opType != null) {
+            convOp.optimisation = dbWriteOptions.OPTIMISATIONS.get(opType);
         }
         return convOp;
     }
