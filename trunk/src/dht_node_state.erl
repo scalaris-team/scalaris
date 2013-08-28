@@ -123,7 +123,7 @@ new(RT, RMState, DB) ->
            lease_db3 = prbr:init(lease_db3),
            lease_db4 = prbr:init(lease_db4),
            lease_list = l_on_cseq:empty_lease_list(),
-		   snapshot_state = snapshot_state:new()
+           snapshot_state = snapshot_state:new()
           }.
 
 %% @doc Gets the given property from the dht_node state.
@@ -151,6 +151,7 @@ new(RT, RMState, DB) ->
 %%        <li>slide_pred = information about the node's current slide operation with its predecessor.</li>
 %%        <li>slide_succ = information about the node's current slide operation with its successor.</li>
 %%        <li>snapshot_state = snapshot algorithm state information</li>
+%%        <li>lease_list = the list of all leases</li>
 %%      </ul>
 %%      Beware of race conditions sing the neighborhood may have changed at
 %%      the next call.
