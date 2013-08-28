@@ -736,7 +736,7 @@ split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc) ->
 get_simple_intervals(Interval) ->
     Interval.
 
-%% @doc checks whether two intervals cover the same range
--spec are_equal(interval(), interval()) -> boolean().
+%% @doc checks whether two interval lists cover the same range
+-spec are_equal(list(interval()), list(interval())) -> boolean().
 are_equal(A, B) ->
     is_subset(A, B) andalso is_subset(B, A).
