@@ -66,6 +66,11 @@ init_bench() ->
 
 -spec bench_service(Owner::comm:erl_local_pid()) -> ok.
 bench_service(Owner) ->
+    erlang:monitor(process, Owner),
+    bench_service_loop(Owner).
+
+-spec bench_service_loop(Owner::comm:erl_local_pid()) -> ok.
+bench_service_loop(Owner) ->
     receive
         ?SCALARIS_RECV({bench}, %% ->
             begin
@@ -74,10 +79,11 @@ bench_service(Owner) ->
                 ReqList = [{read, Key1}, {read, Key2}, {commit}],
                 Time = os:timestamp(),
                 {TimeInUs, _Result} = util:tc(fun api_tx:req_list/1, [ReqList]),
-                comm:send_local(Owner, {bench_result, Time, TimeInUs / 1000})
-            end)
-    end,
-    bench_service(Owner).
+                comm:send_local(Owner, {bench_result, Time, TimeInUs / 1000}),
+                bench_service_loop(Owner)
+            end);
+        {'DOWN', _MonitorRef, process, Owner, _Info1} -> ok
+    end.
 
 -spec init_system_stats() -> ok.
 init_system_stats() ->
