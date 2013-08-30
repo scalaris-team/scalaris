@@ -253,20 +253,19 @@ print(#bloom{max_items = MaxItems, size = Size, hfs = Hfs,
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_property(bloom_filter(), atom()) -> not_found | term().
+-spec get_property(bloom_filter(), fpr) -> float();
+                  (bloom_filter(), size) -> non_neg_integer();
+                  (bloom_filter(), filter) -> binary();
+                  (bloom_filter(), hfs) -> ?REP_HFS:hfs();
+                  (bloom_filter(), max_items) -> non_neg_integer() | undefined;
+                  (bloom_filter(), items_count) -> non_neg_integer().
 get_property(#bloom{size = Size, hfs = Hfs, items_count = NumItems}, fpr) ->
     calc_FPR(Size, NumItems, ?REP_HFS:size(Hfs));
-get_property(Bloom, Property) ->
-    FieldNames = record_info(fields, bloom),
-    {_, N} = lists:foldl(fun(I, {Nr, Res}) -> case I =:= Property of
-                                                  true -> {Nr + 1, Nr};
-                                                  false -> {Nr + 1, Res}
-                                              end 
-                         end, {1, -1}, FieldNames),
-    if
-        N =:= -1 -> not_found;
-        true -> erlang:element(N + 1, Bloom)
-    end.
+get_property(#bloom{size = X}       , size)        -> X;
+get_property(#bloom{filter = X}     , filter)      -> X;
+get_property(#bloom{hfs = X}        , hfs)         -> X;
+get_property(#bloom{max_items = X}  , max_items)   -> X;
+get_property(#bloom{items_count = X}, items_count) -> X.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% bit operations
