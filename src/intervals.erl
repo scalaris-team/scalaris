@@ -46,7 +46,7 @@
          is_left_of/2, is_right_of/2,
          split/2,
          % operations for intervals
-         intersection/2, union/2, minus/2, 
+         intersection/2, union/2, minus/2,
          % getters for certain intervals
          get_bounds/1, get_elements/1, get_simple_intervals/1,
          % various
