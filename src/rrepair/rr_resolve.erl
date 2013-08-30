@@ -387,12 +387,9 @@ send_stats(DestPid, Stats) ->
 
 -spec print_resolve_stats(stats()) -> [any()].
 print_resolve_stats(Stats) ->
+    StatsL = tl(erlang:tuple_to_list(Stats)),
     FieldNames = record_info(fields, resolve_stats),
-    Res = util:for_to_ex(1, length(FieldNames),
-                         fun(I) ->
-                                 {lists:nth(I, FieldNames), erlang:element(I + 1, Stats)}
-                         end),
-    [erlang:element(1, Stats), Res].
+    [resolve_stats, lists:zip(FieldNames, StatsL)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP
