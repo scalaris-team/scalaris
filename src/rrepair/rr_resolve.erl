@@ -170,16 +170,19 @@ on({get_state_response, MyI}, State = #rr_resolve_state{ operation = Op,
                                                          dhtNodePid = DhtPid }) 
   when element(1, Op) =:= interval_upd;
        element(1, Op) =:= interval_upd_send ->
-    % TODO: the interval from Op may not be continuous!
-    OpI = element(2, Op),
+    OpSIs = intervals:get_simple_intervals(element(2, Op)),
     ISec = lists:foldl(
-             fun(Q, AccI) ->
-                     I = intervals:intersection(OpI, Q),
-                     case intervals:is_empty(I) of
-                         true  -> AccI;
-                         false -> MI = rr_recon:map_interval(MyI, I),
-                                  intervals:union(AccI, MI)
-                     end
+             fun(Q, AccJ) ->
+                     lists:foldl(
+                       fun(OpSI, AccI) ->
+                               OpI = intervals:simple_interval_to_interval(OpSI),
+                               I = intervals:intersection(OpI, Q),
+                               case intervals:is_empty(I) of
+                                   true  -> AccI;
+                                   false -> MI = rr_recon:map_interval(MyI, I),
+                                            intervals:union(AccI, MI)
+                               end
+                       end, AccJ, OpSIs)
              end, intervals:empty(), rr_recon:quadrant_intervals()),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
