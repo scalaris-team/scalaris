@@ -44,7 +44,7 @@ all() ->
      tester_union_well_formed, tester_union, tester_not_union, tester_union_continuous,
      tester_is_adjacent, tester_is_adjacent_union,
      tester_is_left_right_of,
-     tester_is_subset, tester_is_subset2,
+     tester_is_subset, tester_is_subset2, tester_is_double_subset_equality,
      tester_minus_well_formed, tester_minus, tester_minus2, tester_minus3,
      tester_not_minus, tester_not_minus2,
      tester_get_bounds_continuous, tester_get_bounds, tester_get_elements,
@@ -570,6 +570,13 @@ prop_is_subset2(X, Y) ->
 
 tester_is_subset2(_Config) ->
     tester:test(?MODULE, prop_is_subset2, 2, 5000, [{threads, 2}]).
+
+-spec prop_is_double_subset_equality(intervals:interval(), intervals:interval()) -> boolean().
+prop_is_double_subset_equality(X, Y) ->
+    (X =:= Y) =:= (intervals:is_subset(X, Y) andalso intervals:is_subset(Y, X)).
+
+tester_is_double_subset_equality(_Config) ->
+    tester:test(?MODULE, prop_is_double_subset_equality, 2, 5000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
