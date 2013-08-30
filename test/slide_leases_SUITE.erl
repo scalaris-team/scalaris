@@ -294,8 +294,7 @@ check_leases_per_node() ->
 
 check_local_leases(DHTNode) ->
     {ActiveLeases, PassiveLeases} = get_dht_node_state(DHTNode, lease_list),
-    ActiveIntervals = lists:flatten(
-                        [ l_on_cseq:get_range(Lease) || Lease <- ActiveLeases]),
+    ActiveIntervals = [ l_on_cseq:get_range(Lease) || Lease <- ActiveLeases],
     MyRange = get_dht_node_state(DHTNode, my_range),
     LocalCorrect = are_equal(MyRange, ActiveIntervals),
     %case LocalCorrect of
@@ -308,15 +307,7 @@ check_local_leases(DHTNode) ->
 
 
 %% @doc checks whether two interval lists cover the same range
--spec are_equal(intervals:simple_interval(), list(intervals:simple_interval())) -> boolean().
+-spec are_equal(intervals:interval(), list(intervals:interval())) -> boolean().
 are_equal(A, B) ->
-    case length(B) of
-        0 ->
-            false;
-        1 ->
-            intervals:is_subset(A, B) andalso intervals:is_subset(B, A);
-        _ ->
-            {B1, B2} = lists:split(1, B),
-            B_ = intervals:union(B1, B2), % normalize
-            intervals:is_subset(A, B_) andalso intervals:is_subset(B_, A)
-    end.
+    B_ = lists:foldl(fun intervals:union/2, [], B),
+    intervals:is_subset(A, B_) andalso intervals:is_subset(B_, A).
