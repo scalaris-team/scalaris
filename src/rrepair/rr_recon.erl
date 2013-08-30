@@ -26,11 +26,12 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start/2, check_config/0]).
--export([map_key_to_interval/2, map_key_to_quadrant/2, map_interval/2]).
+-export([map_key_to_interval/2, map_key_to_quadrant/2, map_interval/2,
+         quadrant_intervals/0]).
 
 %export for testing
 -export([encodeBlob/2, decodeBlob/1,
-         quadrant_intervals/0, find_sync_interval/2, quadrant_subints_/3]).
+         find_sync_interval/2, quadrant_subints_/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
