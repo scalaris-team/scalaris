@@ -107,7 +107,7 @@ wait_for(F, WaitTime) ->
     case F() of
         true  -> ok;
         false -> timer:sleep(WaitTime),
-                 wait_for(F)
+                 wait_for(F, WaitTime)
     end.
 
 -spec wait_for_process_to_die(pid() | atom()) -> ok.
