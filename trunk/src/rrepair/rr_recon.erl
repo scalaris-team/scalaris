@@ -532,7 +532,7 @@ resolve_leaves(Nodes, Dest, SID, OwnerL) ->
 -spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid(),
                      Interval::intervals:interval(), Items::non_neg_integer())
-        -> 1 | 2.
+        -> 0..2.
 resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
     LeafInterval = merkle_tree:get_interval(Node),
     IntervalNew = intervals:union(Interval, LeafInterval),
@@ -540,18 +540,22 @@ resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
     resolve_leaves(Rest, Dest, SID, OwnerL, IntervalNew, ItemsNew);
 resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
     Options = [{feedback_request, comm:make_global(OwnerL)}],
-    if Items > 0 ->
-           send_local(OwnerL, {request_resolve, SID,
-                               {interval_upd_send, Interval, Dest},
-                               Options}),
-           2;
-       true ->
-           % we know that we don't have data in this range, so we must
-           % regenerate it from the other node
-           % -> send him this request directly!
-           send(Dest, {request_resolve, SID, {interval_upd, Interval, []},
-                       [{session_id, SID} | Options]}),
-           1
+    case intervals:is_empty(Interval) of
+        true -> 0;
+        _ ->
+            if Items > 0 ->
+                   send_local(OwnerL, {request_resolve, SID,
+                                       {interval_upd_send, Interval, Dest},
+                                       Options}),
+                   2;
+               true ->
+                   % we know that we don't have data in this range, so we must
+                   % regenerate it from the other node
+                   % -> send him this request directly!
+                   send(Dest, {request_resolve, SID, {interval_upd, Interval, []},
+                               [{session_id, SID} | Options]}),
+                   1
+            end
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
