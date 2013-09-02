@@ -168,11 +168,11 @@ on({get_entries_response, EntryList}, State =
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = Op, dhtNodePid = DhtPid, stats = Stats })
+       #rr_resolve_state{ operation = Op, dhtNodePid = DhtPid, stats = _Stats })
   when element(1, Op) =:= interval_upd;
        element(1, Op) =:= interval_upd_send ->
     ?TRACE("RESOLVE - START~nOperation=~p - SessionId:~p~n Interval=~p~n MyInterval=~p~n",
-           [element(1, Op), Stats#resolve_stats.session_id, element(2, Op), MyI], State),
+           [element(1, Op), _Stats#resolve_stats.session_id, element(2, Op), MyI], State),
     OpSIs = intervals:get_simple_intervals(element(2, Op)),
     ISec = lists:foldl(
              fun(Q, AccJ) ->
