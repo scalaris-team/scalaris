@@ -562,6 +562,20 @@ wait_for_session_end() ->
 start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig, CompFun) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
     build_symmetric_ring(NodeCount, Config, [RRConfig, {rr_bloom_fpr, Fpr}]),
+    Nodes = [begin
+                 comm:send_local(NodePid, {get_node_details, comm:this(), [node]}),
+                 receive
+                     ?SCALARIS_RECV({get_node_details_response, NodeDetails},
+                                    begin
+                                        Node = node_details:get(NodeDetails, node),
+                                        {node:id(Node), node:pidX(Node)}
+                                    end);
+                     ?SCALARIS_RECV(Y, ?ct_fail("unexpected message while "
+                                                "waiting for get_node_details_response: ~.0p",
+                                                [Y]))
+                 end
+             end || NodePid <- pid_groups:find_all(dht_node)],
+    ct:pal(">>Nodes: ~.2p", [Nodes]),
     erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
     _ = db_generator:fill_ring(random, DBSize, DBParams),    
     InitDBStat = get_db_status(),
@@ -665,10 +679,12 @@ waitForSyncRoundEnd(NodeKeys) ->
               util:wait_for(
                 fun() -> 
                         api_dht_raw:unreliable_lookup(Key, Req),
-                        receive 
-                            {get_state_response, Val} ->
-                                % ct:pal("open sessions at ~p:~n  ~.4p", [Key, Val]),
-                                length(Val) =:= 0
+                        receive
+                            {get_state_response, []} ->
+                                true;
+                            {get_state_response, [_|_] = _Val} ->
+                                % ct:pal("open sessions at ~p:~n  ~.4p", [Key, _Val]),
+                                false
                         end
                 end)
       end, 

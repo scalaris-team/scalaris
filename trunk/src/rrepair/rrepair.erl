@@ -247,8 +247,8 @@ on({rr_stats, Msg}, State) ->
 
 on({recon_progress_report, Sender, _Initiator = false, DestRR, DestRC, Stats},
    State = #rrepair_state{ open_recon = OR }) ->
-    ?TRACE_RECON("~nRECON-NI OK - Sender=~p~nStats=~p~nOpenRecon=~p, DestRR: ~p, DestRC: ~p",
-                 [Sender, rr_recon_stats:print(Stats), OR - 1, DestRR, DestRC]),
+    ?TRACE_RECON("~nRECON-NI OK - Sender=~p~nStats=~p~nOpenRecon=~p~nSessions=~p,~nDestRR: ~p, DestRC: ~p",
+                 [Sender, rr_recon_stats:print(Stats), OR - 1, State#rrepair_state.open_sessions, DestRR, DestRC]),
     % TODO: integrate non-initiator stats into the stats of the initiator?
     %       -> may need to be integrated into the 'continue_recon' message of rr_recon
     case rr_recon_stats:get(status, Stats) of
@@ -272,8 +272,8 @@ on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
                  [_Sender, rr_recon_stats:print(Stats), OR - 1, OS]),
     NewOS = case extract_session(rr_recon_stats:get(session_id, Stats), OS) of
                     {S, TSessions} ->
-                        ?TRACE_RECON("~nRECON OK2 - Sender=~p, ~p",
-                                     [_Sender, S]),
+                        ?TRACE_RECON("~nRECON OK2 - Sender=~p,~n~.2p~nOpenRecon=~p~nSessions=~p,~n~p",
+                                     [_Sender, S, OR - 1, OS, rr_recon_stats:print(Stats)]),
                         SUpd = update_session_recon(S, Stats),
                         case check_session_complete(SUpd) of
                             true -> TSessions;
@@ -284,12 +284,12 @@ on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
                         %log:log(error, "[ ~p ] SESSION NOT FOUND BY INITIATOR ~p", [?MODULE, rr_recon_stats:get(session_id, Stats)]),
                         OS
                 end,
-    State#rrepair_state{ open_recon = OR - 1, open_sessions = NewOS };
+    State#rrepair_state{open_recon = OR - 1, open_sessions = NewOS};
 
-on({resolve_progress_report, _Sender, Stats}, State = #rrepair_state{open_resolve = OpenResolve,
-                                                                     open_sessions = Sessions}) ->
-    NSessions = case extract_session(rr_resolve:get_stats_session_id(Stats), Sessions) of
-                    not_found -> Sessions;
+on({resolve_progress_report, _Sender, Stats},
+   State = #rrepair_state{open_resolve = OR, open_sessions = OS}) ->
+    NSessions = case extract_session(rr_resolve:get_stats_session_id(Stats), OS) of
+                    not_found -> OS;
                     {S, TSessions} -> 
                         SUpd = update_session_resolve(S, Stats),
                         case check_session_complete(SUpd) of
@@ -297,11 +297,10 @@ on({resolve_progress_report, _Sender, Stats}, State = #rrepair_state{open_resolv
                             _    -> [SUpd | TSessions]
                         end
                 end,
-    ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p ; OldSession=~p~nNewSessions=~p",
+    ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p~nOldSessions=~p~nNewSessions=~p",
                    [_Sender, rr_resolve:print_resolve_stats(Stats),
-                    State#rrepair_state.open_recon, OpenResolve - 1, Sessions, NSessions]),
-    State#rrepair_state{ open_resolve = OpenResolve - 1,
-                         open_sessions = NSessions };
+                    State#rrepair_state.open_recon, OR - 1, OS, NSessions]),
+    State#rrepair_state{open_resolve = OR - 1, open_sessions = NSessions};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % misc info messages
