@@ -322,12 +322,7 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
          KUDest, KUItems, KUOptions) ->
     ?TRACE("SHUTDOWN ~p - key_upd to ~p - items: ~.2p",
            [_Reason, KUDest, KUItems], _State),
-    case KUDest of
-        undefined -> ok;
-        _ ->
-            SID = Stats#resolve_stats.session_id,
-            send_key_upd(KUDest, KUItems, SID, KUOptions)
-    end,
+    send_key_upd(KUDest, KUItems, Stats#resolve_stats.session_id, KUOptions),
     send_stats(SendStats, Stats),
     comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
     kill.
