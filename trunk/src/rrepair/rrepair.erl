@@ -127,7 +127,7 @@
     % report
     {recon_progress_report, Sender::comm:mypid(), Initiator::boolean(),
      DestRR::comm:mypid(), DestRC::comm:mypid() | undefined, Stats::rr_recon_stats:stats()} |
-    {resolve_progress_report, Sender::comm:mypid(), Stats::rr_resolve:stats()}.
+    {resolve_progress_report, Sender::comm:erl_local_pid(), Stats::rr_resolve:stats()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % API messages
