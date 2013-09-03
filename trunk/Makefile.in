@@ -103,7 +103,7 @@ test: compile
 	grep " 0 failed" ct.log
 
 test-skipped: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite performance_SUITE benchmark_SUITE rr_recon_performance_SUITE proto_sched_SUITE dht_node_move_proto_sched_SUITE memtest_SUITE type_check_SUITE @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
+	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite performance_SUITE benchmark_SUITE rr_recon_performance_SUITE proto_sched_SUITE dht_node_move_proto_sched_SUITE join_leave_proto_sched_SUITE memtest_SUITE type_check_SUITE @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
 	! grep -E " [1-9]+ failed" ct.log
 
 test-with-cover: compile
