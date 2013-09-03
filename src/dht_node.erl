@@ -39,7 +39,7 @@
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer() | all} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),
             ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer() | all} |
-      {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::db_dht:value(), NewVersion::db_dht:version()} |
+      {update_key_entry, Source_PID::comm:mypid(), [{HashedKey::?RT:key(), NewValue::db_dht:value(), NewVersion::db_dht:version()}]} |
 %%      % DB subscriptions:
 %%      {db_set_subscription, SubscrTuple::db_dht:subscr_t()} |
 %%      {db_get_subscription, Tag::any(), SourcePid::comm:erl_local_pid()} |
@@ -259,40 +259,12 @@ on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) 
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
-% send caller update_key_entry_ack with Entry (if exists) or Key, Exists (Yes/No), Updated (Yes/No)
-on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
-    Entry = db_dht:get_entry(dht_node_state:get(State, db), Key),
-    Exists = not db_entry:is_null(Entry),
-    EntryVersion = db_entry:get_version(Entry),
-    WL = db_entry:get_writelock(Entry),
-    DoUpdate = Exists
-        andalso EntryVersion =/= -1
-        andalso EntryVersion < NewVersion
-        andalso (WL =:= false orelse WL < NewVersion)
-        andalso dht_node_state:is_responsible(Key, State),
-    DoRegen = not Exists
-        andalso dht_node_state:is_responsible(Key, State),
-%%     log:pal("update_key_entry:~nold: ~p~nnew: ~p~nDoUpdate: ~w, DoRegen: ~w",
-%%             [{db_entry:get_key(Entry), db_entry:get_version(Entry)},
-%%              {Key, NewVersion}, DoUpdate, DoRegen]),
-    {NewState, NewEntry} =
-        if
-            DoUpdate ->
-                UpdEntry = db_entry:set_value(Entry, NewValue, NewVersion),
-                UpdEntry2 = if WL < NewVersion ->
-                                   db_entry:reset_locks(UpdEntry);
-                               true -> UpdEntry
-                            end,
-                NewDB = db_dht:update_entry(dht_node_state:get(State, db), UpdEntry2),
-                {dht_node_state:set_db(State, NewDB), UpdEntry2};
-            DoRegen ->
-                RegenEntry = db_entry:new(Key, NewValue, NewVersion),
-                NewDB = db_dht:set_entry(dht_node_state:get(State, db), RegenEntry),
-                {dht_node_state:set_db(State, NewDB), RegenEntry};
-            true -> {State, Entry}
-        end,
-    comm:send(Source_PID, {update_key_entry_ack, NewEntry, Exists, DoUpdate orelse DoRegen}),
-    NewState;
+on({update_key_entry, Source_PID, KvvList}, State) ->
+    DB = dht_node_state:get(State, db),
+    {NewDB, NewEntryList} = update_key_entries(KvvList, DB, State, []),
+    % send caller update_key_entry_ack with list of {Entry, Exists (Yes/No), Updated (Yes/No)}
+    comm:send(Source_PID, {update_key_entry_ack, NewEntryList}),
+    dht_node_state:set_db(State, NewDB);
 
 %%on({db_set_subscription, SubscrTuple}, State) ->
 %%    DB2 = db_dht:set_subscription(dht_node_state:get(State, db), SubscrTuple),
@@ -531,3 +503,44 @@ is_alive_fully_joined(State) ->
         (SlidePred =:= null orelse not slide_op:is_join(SlidePred, 'rcv'))
     catch _:_ -> false
     end.
+
+-spec update_key_entries(Entries::[{?RT:key(), db_dht:value(), db_dht:version()}],
+                         DB, dht_node_state:state(), NewEntries) -> {DB, NewEntries}
+    when is_subtype(DB, db_dht:db()),
+         is_subtype(NewEntries, [{db_entry:entry(), Exists::boolean(), Done::boolean()}]).
+update_key_entries([], DB, _State, NewEntries) ->
+    {DB, lists:reverse(NewEntries)};
+update_key_entries([{Key, NewValue, NewVersion} | Entries], DB, State, NewEntries) ->
+    IsResponsible = dht_node_state:is_responsible(Key, State),
+    Entry = db_dht:get_entry(DB, Key),
+    Exists = not db_entry:is_null(Entry),
+    EntryVersion = db_entry:get_version(Entry),
+    WL = db_entry:get_writelock(Entry),
+    DoUpdate = Exists
+                   andalso EntryVersion =/= -1
+                   andalso EntryVersion < NewVersion
+                   andalso (WL =:= false orelse WL < NewVersion)
+                   andalso IsResponsible,
+    DoRegen = (not Exists) andalso IsResponsible,
+%%     log:pal("update_key_entry:~nold: ~p~nnew: ~p~nDoUpdate: ~w, DoRegen: ~w",
+%%             [{db_entry:get_key(Entry), db_entry:get_version(Entry)},
+%%              {Key, NewVersion}, DoUpdate, DoRegen]),
+    if
+        DoUpdate ->
+            UpdEntry = db_entry:set_value(Entry, NewValue, NewVersion),
+            NewEntry = if WL < NewVersion -> db_entry:reset_locks(UpdEntry);
+                          true -> UpdEntry
+                       end,
+            NewDB = db_dht:update_entry(DB, NewEntry),
+            ok;
+        DoRegen ->
+            NewEntry = db_entry:new(Key, NewValue, NewVersion),
+            NewDB = db_dht:set_entry(DB, NewEntry),
+            ok;
+        true ->
+            NewDB = DB,
+            NewEntry = Entry,
+            ok
+    end,
+    update_key_entries(Entries, NewDB, State,
+                       [{NewEntry, Exists, DoUpdate orelse DoRegen} | NewEntries]).
