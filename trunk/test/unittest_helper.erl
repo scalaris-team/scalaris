@@ -301,7 +301,7 @@ check_ring_size(Size, CheckFun) ->
               BootSize =
                   try
                       mgmt_server:number_of_nodes(),
-                      receive {get_list_length_response, L} -> L end
+                      receive ?SCALARIS_RECV({get_list_length_response, L}, L) end
                   catch _:_ -> Size
                   end,
               erlang:whereis(config) =/= undefined andalso
