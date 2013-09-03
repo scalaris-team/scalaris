@@ -49,12 +49,17 @@ groups() ->
                              test_split_with_owner_change_in_step3,
                              test_split_with_aux_change_in_step1
                             ]},
+     {merge_tests, [sequence], [
+                               ]}, % @todo
      {handover_tests, [sequence], [
                                 test_handover,
                                 test_handover_with_concurrent_renew,
                                 test_handover_with_concurrent_aux_change,
                                 test_handover_with_concurrent_owner_change
-                                ]}
+                                ]},
+     {gc_tests, [sequence], [
+                             test_garbage_collector
+                            ]}
     ].
 
 all() ->
@@ -62,10 +67,11 @@ all() ->
      {group, tester_tests},
      {group, renew_tests},
      {group, split_tests},
-     {group, handover_tests}
+     {group, handover_tests},
+     {group, gc_tests}
      ].
 
-suite() -> [ {timetrap, {seconds, 120}} ].
+suite() -> [ {timetrap, {seconds, 10}} ].
 
 group(tester_tests) ->
     [{timetrap, {seconds, 400}}];
@@ -90,12 +96,21 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
+        test_garbage_collector ->
+            %% stop ring from previous test case (it may have run into a timeout
+            unittest_helper:stop_ring(),
+            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+            unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
+                                                    {leases, true},
+                                                    {leases_gc, true}]}]),
+            Config;
         _ ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
-                                                    {leases, true}]}]),
+                                                    {leases, true},
+                                                    {leases_gc, false}]}]),
             Config
     end.
 
@@ -114,7 +129,7 @@ tester_type_check_l_on_cseq(_Config) ->
              {lease_handover, 3}, %% sends messages
              {lease_takeover, 1}, %% sends messages
              {lease_split, 4}, %% sends messages
-             {lease_merge, 2}, %% sends messages
+             {lease_merge, 3}, %% sends messages
              {lease_send_lease_to_node, 2}, %% sends messages
              {lease_split_and_change_owner, 5}, %% sends messages
              {id, 1}, %% todo
@@ -128,7 +143,10 @@ tester_type_check_l_on_cseq(_Config) ->
              {update_lease_in_dht_node_state, 3}, %% cannot create reference (bulkowner uses one in dht_node_state
              {remove_lease_from_dht_node_state, 3}, %% cannot create dht_node_state (reference for bulkowner)
              {disable_lease_in_dht_node_state, 2}, %% cannot create dht_node_state (reference for bulkowner)
-             {get_mode, 2} %% gb_trees not supported by type_checker
+             {get_mode, 2}, %% gb_trees not supported by type_checker
+             {find_adjacent, 1}, %% sends messages
+             {check_last_and_first, 1}, %% sends messages
+             {trigger_garbage_collection, 1} %% sends messages
            ]}
         ],
     %% join a dht_node group to be able to call lease trigger functions
@@ -511,6 +529,29 @@ test_handover_with_concurrent_owner_change(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
+% garbage collector unit tests
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_garbage_collector(_Config) ->
+    wait_for_ring_size(1),
+    wait_for_correct_ring(),
+    [L] = lists:flatten([A|| {A, _P} <- get_all_leases()]),
+    ct:pal("~p", [L]),
+    % only works because we have exactly one node
+    pid_groups:join_as(pid_groups:group_with(dht_node), ct_garbage_collector_test),
+    {ok, R1, R2} = l_on_cseq:split_range(l_on_cseq:get_range(L),
+                                         ?RT:get_random_node_id()),
+    l_on_cseq:lease_split(L, R1, R2, self()),
+    receive
+        {split, success, L2, L1} ->
+            ct:pal("~p ~p", [L1, L2]),
+            ok
+    end,
+    wait_for_number_of_leases(1),
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
 % handover helper
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -686,6 +727,12 @@ wait_for_split_fail_msg() ->
             ok
     end.
 
+wait_for_ring_size(Size) ->
+    wait_for(fun () -> api_vm:number_of_nodes() == Size end).
+
+wait_for_correct_ring() ->
+    wait_for(fun () -> admin:check_ring_deep() == ok end).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % renew helper
@@ -765,6 +812,15 @@ get_dht_node_state(Pid, What) ->
             Data
     end.
 
+get_all_leases() ->
+    [ get_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ].
+
+get_all_active_leases() ->
+    lists:flatten([ A || {A, _P} <- get_all_leases() ]).
+
+get_leases(Pid) ->
+    get_dht_node_state(Pid, lease_list).
+
 wait_for_simple_update(Id, Old) ->
     OldVersion = l_on_cseq:get_version(Old),
     OldEpoch   = l_on_cseq:get_epoch(Old),
@@ -792,6 +848,11 @@ wait_for_delete(Id) ->
                      lists:all(fun(Lease) ->
                                        l_on_cseq:get_id(Lease) =/= Id
                                end, L)
+             end).
+
+wait_for_number_of_leases(Nr) ->
+    wait_for(fun() ->
+                     length(get_all_active_leases()) == Nr
              end).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
