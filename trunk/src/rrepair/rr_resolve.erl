@@ -97,7 +97,7 @@
 	{start, operation(), options()} |
     % internal
     {get_state_response, intervals:interval()} |    
-    {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
+    {update_key_entry_ack, [{db_entry:entry(), Exists::boolean(), Done::boolean()}]} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -263,9 +263,9 @@ on({get_state_response, MyI} = _Msg,
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({update_key_entry_ack, Entry, Exists, Done}, State =
+on({update_key_entry_ack, NewEntryList}, State =
        #rr_resolve_state{ operation = Op,
-                          stats = #resolve_stats{ diff_size = Diff,
+                          stats = #resolve_stats{ diff_size = _Diff,
                                                   regen_count = RegenOk,
                                                   update_count = UpdOk,
                                                   upd_fail_count = UpdFail,
@@ -276,26 +276,22 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                         }) 
   when element(1, Op) =:= key_upd;
        element(1, Op) =:= interval_upd ->
-    NewStats = if
-                   Done andalso Exists -> Stats#resolve_stats{ update_count = UpdOk +1 };
-                   Done andalso not Exists -> Stats#resolve_stats{ regen_count = RegenOk +1 };
-                   not Done and Exists -> Stats#resolve_stats{ upd_fail_count = UpdFail + 1 };
-                   not Done and not Exists -> Stats#resolve_stats{ regen_fail_count = RegenFail + 1 }
-               end,
-    NewFBItems = if
-                     not Done andalso Exists andalso FBDest =/= undefined ->
-                         [entry_to_kvv(Entry) | FBItems];
-                     true -> FBItems
-                 end,
-    NewState = State#rr_resolve_state{ stats = NewStats, feedbackKvv = NewFBItems },
-    if
-        (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
-                ?TRACE("UPDATED = ~p - Regen=~p",
-                       [Stats#resolve_stats.update_count,
-                        Stats#resolve_stats.regen_count], State),
-                shutdown(resolve_ok, NewState, FBDest, NewFBItems, [feedback_response]);
-        true -> NewState
-    end;
+    
+    {NewUpdOk, NewUpdFail, NewRegenOk, NewRegenFail, NewFBItems} =
+        integrate_update_key_entry_ack(
+          NewEntryList, UpdOk, UpdFail, RegenOk, RegenFail, FBItems,
+          FBDest =/= undefined),
+    
+    NewStats = Stats#resolve_stats{update_count     = NewUpdOk + 1,
+                                   regen_count      = NewRegenOk +1,
+                                   upd_fail_count   = NewUpdFail + 1,
+                                   regen_fail_count = NewRegenFail + 1},
+    NewState = State#rr_resolve_state{stats = NewStats, feedbackKvv = NewFBItems},
+    ?ASSERT(_Diff =:= (NewRegenOk + NewUpdOk + NewUpdFail + NewRegenFail)),
+    ?TRACE("UPDATED = ~p - Regen=~p",
+           [Stats#resolve_stats.update_count,
+            Stats#resolve_stats.regen_count], State),
+    shutdown(resolve_ok, NewState, FBDest, NewFBItems, [feedback_response]);
 
 on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
@@ -307,13 +303,47 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %%      PreCond: KvvList contains only unique keys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_update_key_entry(kvv_list(), intervals:interval(), comm:mypid(), comm:erl_local_pid()) -> non_neg_integer().
+-spec start_update_key_entry(kvv_list(), intervals:interval(), comm:mypid(),
+                             comm:erl_local_pid()) -> non_neg_integer().
 start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
     ?ASSERT(length(KvvList) =:= length(lists:ukeysort(1, KvvList))),
-    length([comm:send_local(DhtPid, {update_key_entry, MyPid, RKey, Val, Vers})
-              || {Key, Val, Vers} <- KvvList,
-                 RKey <- ?RT:get_replica_keys(Key),
-                 intervals:in(RKey, MyI)]).
+    ReplicatedKvvList =
+        [{RKey, Val, Vers} || {Key, Val, Vers} <- KvvList,
+                              RKey <- ?RT:get_replica_keys(Key),
+                              intervals:in(RKey, MyI)],
+    comm:send_local(DhtPid, {update_key_entry, MyPid, ReplicatedKvvList}),
+    length(ReplicatedKvvList).
+
+-spec integrate_update_key_entry_ack(
+        [{Entry::db_entry:entry(), Exists::boolean(), Done::boolean()}],
+        UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
+        RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
+        FBItems::kvv_list(), FBOn::boolean())
+        -> {UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
+            RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
+            FBItems::kvv_list()}.
+integrate_update_key_entry_ack([], UpdOk, UpdFail, RegenOk, RegenFail, FBItems,
+                               _FBOn) ->
+    {UpdOk, UpdFail, RegenOk, RegenFail, FBItems};
+integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
+                               RegenOk, RegenFail, FBItems, FBOn) ->
+    NewFBItems = if not Done andalso Exists andalso FBOn ->
+                        [entry_to_kvv(Entry) | FBItems];
+                    true -> FBItems
+                 end,
+    if Done andalso Exists ->
+           integrate_update_key_entry_ack(
+             Rest, UpdOk + 1, UpdFail, RegenOk, RegenFail, NewFBItems, FBOn);
+       Done andalso not Exists ->
+           integrate_update_key_entry_ack(
+             Rest, UpdOk, UpdFail, RegenOk + 1, RegenFail, NewFBItems, FBOn);
+       not Done and Exists ->
+           integrate_update_key_entry_ack(
+             Rest, UpdOk, UpdFail + 1, RegenOk, RegenFail, NewFBItems, FBOn);
+       not Done and not Exists ->
+           integrate_update_key_entry_ack(
+             Rest, UpdOk, UpdFail, RegenOk, RegenFail + 1, NewFBItems, FBOn)
+    end.
 
 -spec shutdown(exit_reason(), state(), undefined | comm:mypid(), kvv_list(),
                options()) -> kill.
