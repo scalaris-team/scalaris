@@ -21,7 +21,7 @@
 -vsn('$Id$').
 
 %% no proto scheduler for this suite
--define(PROTO_SCHED, false).
+-define(proto_sched(_Action), ok).
 %% number of slides without timeouts
 -define(NUM_SLIDES, 50).
 

@@ -531,9 +531,9 @@ symm4_slide_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
                          succ -> Succ;
                          pred -> Pred
                      end,
-             proto_sched(start),
+             ?proto_sched(start),
              symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
-             proto_sched(stop),
+             ?proto_sched(stop),
              receive
                  ?SCALARIS_RECV(Z,
                                 ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
@@ -617,20 +617,3 @@ check_size(Size) ->
     unittest_helper:check_ring_size(Size),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size(Size).
-
-%% @doc starts or stops the proto scheduler if applicable
--spec proto_sched(start | stop) -> ok.
-proto_sched(Action) ->
-    case ?PROTO_SCHED of
-        true ->
-            case Action of
-                start ->
-                    proto_sched:start(),
-                    proto_sched:start_deliver();
-                stop ->
-                    proto_sched:stop(),
-                    ct:pal("Proto scheduler stats: ~.2p", proto_sched:get_infos()),
-                    proto_sched:cleanup()
-            end;
-        _ -> ok
-    end.

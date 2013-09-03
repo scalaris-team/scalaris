@@ -24,7 +24,20 @@
 -vsn('$Id$').
 
 %% start proto scheduler for this suite
--define(PROTO_SCHED, true).
+-define(proto_sched(Action),
+        fun() ->
+                case Action of
+                    start ->
+                        ct:pal("Starting proto scheduler"),
+                        proto_sched:start(),
+                        proto_sched:start_deliver();
+                    stop ->
+                        proto_sched:stop(),
+                        ct:pal("Proto scheduler stats: ~.2p", proto_sched:get_infos()),
+                        proto_sched:cleanup()
+                end
+        end()).
+
 %% number of slides without timeouts
 -define(NUM_SLIDES, 25).
 
