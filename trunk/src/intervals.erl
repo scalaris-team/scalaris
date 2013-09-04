@@ -54,7 +54,6 @@
          wraps_around/4,
          %
          % for unit testing only
-         interval_sort/2,
          is_well_formed/1, tester_create_interval/1,
          is_well_formed_simple/1,
          tester_create_simple_interval/1, tester_create_continuous_interval/4,
