@@ -67,8 +67,8 @@ all() ->
      {group, tester_tests},
      {group, renew_tests},
      {group, split_tests},
-     {group, handover_tests},
-     {group, gc_tests}
+     {group, handover_tests}
+     %{group, gc_tests}
      ].
 
 suite() -> [ {timetrap, {seconds, 10}} ].
