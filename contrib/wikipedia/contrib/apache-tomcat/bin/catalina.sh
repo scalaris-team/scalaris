@@ -94,7 +94,7 @@
 #                   Example (all one line)
 #                   LOGGING_MANAGER="-Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager"
 #
-# $Id: catalina.sh 1202062 2011-11-15 06:50:02Z mturk $
+# $Id: catalina.sh 1498485 2013-07-01 14:37:43Z markt $
 # -----------------------------------------------------------------------------
 
 # OS specific support.  $var _must_ be set to either true or false.
@@ -228,9 +228,7 @@ if [ -z "$LOGGING_CONFIG" ]; then
 fi
 
 if [ -z "$LOGGING_MANAGER" ]; then
-  JAVA_OPTS="$JAVA_OPTS -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager"
-else
-  JAVA_OPTS="$JAVA_OPTS $LOGGING_MANAGER"
+  LOGGING_MANAGER="-Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager"
 fi
 
 # Uncomment the following line to make the umask available when using the
@@ -283,7 +281,7 @@ if [ "$1" = "debug" ] ; then
         echo "Using Security Manager"
       fi
       shift
-      exec "$_RUNJDB" "$LOGGING_CONFIG" $JAVA_OPTS $CATALINA_OPTS \
+      exec "$_RUNJDB" "$LOGGING_CONFIG" $LOGGING_MANAGER $JAVA_OPTS $CATALINA_OPTS \
         -Djava.endorsed.dirs="$JAVA_ENDORSED_DIRS" -classpath "$CLASSPATH" \
         -sourcepath "$CATALINA_HOME"/../../java \
         -Djava.security.manager \
@@ -293,7 +291,7 @@ if [ "$1" = "debug" ] ; then
         -Djava.io.tmpdir="$CATALINA_TMPDIR" \
         org.apache.catalina.startup.Bootstrap "$@" start
     else
-      exec "$_RUNJDB" "$LOGGING_CONFIG" $JAVA_OPTS $CATALINA_OPTS \
+      exec "$_RUNJDB" "$LOGGING_CONFIG" $LOGGING_MANAGER $JAVA_OPTS $CATALINA_OPTS \
         -Djava.endorsed.dirs="$JAVA_ENDORSED_DIRS" -classpath "$CLASSPATH" \
         -sourcepath "$CATALINA_HOME"/../../java \
         -Dcatalina.base="$CATALINA_BASE" \
@@ -311,7 +309,7 @@ elif [ "$1" = "run" ]; then
       echo "Using Security Manager"
     fi
     shift
-    eval exec \"$_RUNJAVA\" \"$LOGGING_CONFIG\" $JAVA_OPTS $CATALINA_OPTS \
+    eval exec \"$_RUNJAVA\" \"$LOGGING_CONFIG\" $LOGGING_MANAGER $JAVA_OPTS $CATALINA_OPTS \
       -Djava.endorsed.dirs=\"$JAVA_ENDORSED_DIRS\" -classpath \"$CLASSPATH\" \
       -Djava.security.manager \
       -Djava.security.policy==\"$CATALINA_BASE/conf/catalina.policy\" \
@@ -320,7 +318,7 @@ elif [ "$1" = "run" ]; then
       -Djava.io.tmpdir=\"$CATALINA_TMPDIR\" \
       org.apache.catalina.startup.Bootstrap "$@" start
   else
-    eval exec \"$_RUNJAVA\" \"$LOGGING_CONFIG\" $JAVA_OPTS $CATALINA_OPTS \
+    eval exec \"$_RUNJAVA\" \"$LOGGING_CONFIG\" $LOGGING_MANAGER $JAVA_OPTS $CATALINA_OPTS \
       -Djava.endorsed.dirs=\"$JAVA_ENDORSED_DIRS\" -classpath \"$CLASSPATH\" \
       -Dcatalina.base=\"$CATALINA_BASE\" \
       -Dcatalina.home=\"$CATALINA_HOME\" \
@@ -375,7 +373,7 @@ elif [ "$1" = "start" ] ; then
       echo "Using Security Manager"
     fi
     shift
-    eval \"$_RUNJAVA\" \"$LOGGING_CONFIG\" $JAVA_OPTS $CATALINA_OPTS \
+    eval \"$_RUNJAVA\" \"$LOGGING_CONFIG\" $LOGGING_MANAGER $JAVA_OPTS $CATALINA_OPTS \
       -Djava.endorsed.dirs=\"$JAVA_ENDORSED_DIRS\" -classpath \"$CLASSPATH\" \
       -Djava.security.manager \
       -Djava.security.policy==\"$CATALINA_BASE/conf/catalina.policy\" \
@@ -386,7 +384,7 @@ elif [ "$1" = "start" ] ; then
       >> "$CATALINA_OUT" 2>&1 "&"
 
   else
-    eval \"$_RUNJAVA\" \"$LOGGING_CONFIG\" $JAVA_OPTS $CATALINA_OPTS \
+    eval \"$_RUNJAVA\" \"$LOGGING_CONFIG\" $LOGGING_MANAGER $JAVA_OPTS $CATALINA_OPTS \
       -Djava.endorsed.dirs=\"$JAVA_ENDORSED_DIRS\" -classpath \"$CLASSPATH\" \
       -Dcatalina.base=\"$CATALINA_BASE\" \
       -Dcatalina.home=\"$CATALINA_HOME\" \
@@ -436,7 +434,7 @@ elif [ "$1" = "stop" ] ; then
     fi
   fi
 
-  eval \"$_RUNJAVA\" $JAVA_OPTS \
+  eval \"$_RUNJAVA\" $LOGGING_MANAGER $JAVA_OPTS \
     -Djava.endorsed.dirs=\"$JAVA_ENDORSED_DIRS\" -classpath \"$CLASSPATH\" \
     -Dcatalina.base=\"$CATALINA_BASE\" \
     -Dcatalina.home=\"$CATALINA_HOME\" \
@@ -471,6 +469,7 @@ elif [ "$1" = "stop" ] ; then
     fi
   fi
 
+  KILL_SLEEP_INTERVAL=5
   if [ $FORCE -eq 1 ]; then
     if [ -z "$CATALINA_PID" ]; then
       echo "Kill failed: \$CATALINA_PID not set"
@@ -479,9 +478,22 @@ elif [ "$1" = "stop" ] ; then
         PID=`cat "$CATALINA_PID"`
         echo "Killing Tomcat with the PID: $PID"
         kill -9 $PID
-        rm -f "$CATALINA_PID" >/dev/null 2>&1
-        if [ $? != 0 ]; then
-          echo "Tomcat was killed but the PID file could not be removed."
+        while [ $KILL_SLEEP_INTERVAL -ge 0 ]; do
+            kill -0 `cat "$CATALINA_PID"` >/dev/null 2>&1
+            if [ $? -gt 0 ]; then
+                rm -f "$CATALINA_PID" >/dev/null 2>&1
+                if [ $? != 0 ]; then
+                    echo "Tomcat was killed but the PID file could not be removed."
+                fi
+                break
+            fi
+            if [ $KILL_SLEEP_INTERVAL -gt 0 ]; then
+                sleep 1
+            fi
+            KILL_SLEEP_INTERVAL=`expr $KILL_SLEEP_INTERVAL - 1 `
+        done
+        if [ $KILL_SLEEP_INTERVAL -gt 0 ]; then
+            echo "Tomcat has not been killed completely yet. The process might be waiting on some system call or might be UNINTERRUPTIBLE."
         fi
       fi
     fi
@@ -489,7 +501,7 @@ elif [ "$1" = "stop" ] ; then
 
 elif [ "$1" = "configtest" ] ; then
 
-    eval \"$_RUNJAVA\" $JAVA_OPTS \
+    eval \"$_RUNJAVA\" $LOGGING_MANAGER $JAVA_OPTS \
       -Djava.endorsed.dirs=\"$JAVA_ENDORSED_DIRS\" -classpath \"$CLASSPATH\" \
       -Dcatalina.base=\"$CATALINA_BASE\" \
       -Dcatalina.home=\"$CATALINA_HOME\" \
