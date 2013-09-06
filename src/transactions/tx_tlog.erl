@@ -338,7 +338,7 @@ set_entry_status(Element, Val) -> setelement(4, Element, Val).
 -spec get_entry_snapshot(tlog_entry()) -> snap_number().
 get_entry_snapshot(Element)    -> element(5, Element).
 
--spec set_entry_snapshot(tlog_entry(), tx_status()) -> tlog_entry().
+-spec set_entry_snapshot(tlog_entry(), snap_number()) -> tlog_entry().
 set_entry_snapshot(Element, Val)    -> setelement(5, Element, Val).
 
 -spec get_entry_value_type(tlog_entry()) -> value_type_r() | value_type_w().
