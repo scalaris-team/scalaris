@@ -459,6 +459,7 @@ on({?tx_tm_rtm_init_RTM, TxState, ItemStates, _InRole} = _Msg, State) ->
         case LocalTxStatus of
             new ->
                 %% nothing known locally
+                %% rtms subscribe to tm crashes for running tx.
                 TmpState = state_subscribe(State, tx_state_get_tm(TxState)),
                 {TxState, [], TmpState};
             uninitialized ->
@@ -612,13 +613,11 @@ on({update_snapno, SnapNo}, State) ->
 
 %% failure detector events
 on({crash, Pid, _Cookie}, State) ->
-    %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    %% in tx_tm and rtm processes! (rtms subscribe to the tm for running tx)
     on({crash, Pid}, State);
 on({crash, Pid}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
-    %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    %% in tx_tm and rtm processes! (rtms subscribe to the tm for running tx)
     handle_crash(Pid, State, on);
 %% on({crash, _Pid, _Cookie},
 %%    {_RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
@@ -943,7 +942,7 @@ trigger_delete_if_done(TxState, State) ->
 
 %% @doc Merges the item states transferred in a ?tx_tm_rtm_init_RTM message
 %%      into the locally known state, initiates new paxos processes and
-%%      returns the holdback (message) queue. 
+%%      returns the holdback (message) queue.
 -spec merge_item_states(Tid::tx_id(), [tx_item_id()],
                         [{EntryId::tx_item_id(),
                           Maj_for_prepared::non_neg_integer(),
@@ -1055,7 +1054,8 @@ rtms_upd_entry(RTMs, InKey, InPid, InAccPid) ->
               case {InPid} =/= RTM of
                   true -> case RTM of
                               unknown -> ok;
-                              _ -> fd:unsubscribe_refcount(element(1, RTM), tx_tm_rtm_fd_cookie)
+                              _ ->
+                                  fd:unsubscribe_refcount(element(1, RTM), tx_tm_rtm_fd_cookie)
                           end,
                           fd:subscribe_refcount(InPid, tx_tm_rtm_fd_cookie);
                   false -> ok
@@ -1151,6 +1151,10 @@ get_failed_keys(TxState, State) ->
                       [{on_handler, fun((comm:message(), state()) -> state())}],
                       state()}.
 handle_crash(Pid, State, Handler) ->
+    %% tm: update rtms
+    %% rtm: take over tx
+
+    %% in case an rtm crashed: (RTMs is an empty list for rtms)
     RTMs = state_get_RTMs(State),
     This = comm:this(),
     NewRTMs = [ case get_rtmpid(RTM) of
@@ -1165,22 +1169,29 @@ handle_crash(Pid, State, Handler) ->
                 end
                 || RTM <- RTMs ],
 
+    %% in case a tm crashed:
     %% scan over all running transactions and delete this Pid
     %% if necessary, takeover the tx and try deciding with abort
-    NewState = State,
-%%     NewState = lists:foldl(
-%%                  fun(X,StateIter) ->
-%%                          case is_tx_state(X) of
-%%                              true ->
-%%                                  log:pal("propose yourself (~.0p/~.0p) for: ~.0p~n",
-%%                                         [self(),
-%%                                          pid_groups:group_and_name_of(self()),
-%%                                          tx_state_get_tid(X)]),
-%%                                  on({tx_tm_rtm_propose_yourself, tx_state_get_tid(X)}, StateIter);
-%%                              false -> StateIter
-%%                          end
-%%                 end, State, pdb:tab2list(state_get_tablename(State))),
+    NewState =
+        case state_get_role(State) of
+            tx_tm -> State;
+            _ -> %% tx_rtm
+                lists:foldl(
+                  fun(X,StateIter) ->
+                          case is_tx_state(X) of
+                              true ->
+                                  log:pal(
+                                    "propose yourself (~.0p/~.0p) for: ~.0p~n",
+                                    [self(),
+                                     pid_groups:group_and_name_of(self()),
+                                     tx_state_get_tid(X)]),
+                                  on({tx_tm_rtm_propose_yourself, tx_state_get_tid(X)}, StateIter);
+                              false -> StateIter
+                          end
+                  end, State, pdb:tab2list(state_get_tablename(State)))
+        end,
 
+    %% in case an rtm crashed: (RTMs is an empty list for rtms)
     %% no longer use this RTM
     ValidRTMs = [ X || X <- NewRTMs, unknown =/= get_rtmpid(X) ],
     case length(ValidRTMs) < 3
@@ -1194,10 +1205,10 @@ handle_crash(Pid, State, Handler) ->
         false -> state_set_RTMs(NewState, NewRTMs)
     end.
 
-
-
-
-
+-spec is_tx_state(tx_state() | tx_item_state()) -> boolean().
+is_tx_state(X) when is_tuple(X) ->
+    ?tx_state =:= element(2, X);
+is_tx_state(_) -> false.
 
 %% @doc Checks whether config parameters for tx_tm_rtm exist and are
 %%      valid.
