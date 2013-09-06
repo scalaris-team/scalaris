@@ -48,7 +48,7 @@ prepare_join_send(State, SlideOp) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_rcv_data(State, SlideOp) ->
     % do nothing
-    io:format("prepare_rcv_data~n", []),
+    %io:format("prepare_rcv_data~n", []),
     {ok, State, SlideOp}.
 
 -spec prepare_send_data1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
@@ -56,7 +56,7 @@ prepare_rcv_data(State, SlideOp) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_data1(State, SlideOp, ReplyPid) ->
     % do nothing
-    io:format("prepare_send_data1~n", []),
+    %io:format("prepare_send_data1~n", []),
     send_continue_msg(ReplyPid),
     {ok, State, SlideOp}.
 
@@ -65,7 +65,7 @@ prepare_send_data1(State, SlideOp, ReplyPid) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_data2(State, SlideOp, {continue}) ->
     % do nothing
-    io:format("prepare_send_data2~n", []),
+    %io:format("prepare_send_data2~n", []),
     {ok, State, SlideOp}.
 
 -spec update_rcv_data1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
@@ -73,7 +73,7 @@ prepare_send_data2(State, SlideOp, {continue}) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 update_rcv_data1(State, SlideOp, ReplyPid) ->
     % do nothing
-    io:format("update_rcv_data1~n", []),
+    %io:format("update_rcv_data1~n", []),
     send_continue_msg(ReplyPid),
     {ok, State, SlideOp}.
 
@@ -82,7 +82,7 @@ update_rcv_data1(State, SlideOp, ReplyPid) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 update_rcv_data2(State, SlideOp, {continue}) ->
     % do nothing
-    io:format("update_rcv_data2~n", []),
+    %io:format("update_rcv_data2~n", []),
     {ok, State, SlideOp}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -95,7 +95,7 @@ update_rcv_data2(State, SlideOp, {continue}) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
     % start to split own range
-    log:log("prepare_send_delta1~n", []),
+    log:log("prepare_send_delta1 ~p~n", [slide_op:get_type(OldSlideOp)]),
     case find_lease(State, OldSlideOp) of
         {ok, Lease} ->
             Id = l_on_cseq:id(l_on_cseq:get_range(Lease)),
@@ -127,10 +127,14 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
                     NewOwner = node:pidX(slide_op:get_node(OldSlideOp)),
                     l_on_cseq:lease_handover(Lease, NewOwner, ReplyPid),
                     {ok, State, OldSlideOp}
-                    %error
             end;
         error ->
             % @todo
+            {ActiveLeaseList, PassiveLeaseList} = dht_node_state:get(State, lease_list),
+            Interval = slide_op:get_interval(OldSlideOp),
+            log:log("unknown lease in prepare_send_delta1~n"),
+            log:log("~p:~p~n", [ActiveLeaseList, PassiveLeaseList]),
+            log:log("~p~n", [Interval]),
             error
     end.
 
@@ -159,7 +163,6 @@ prepare_send_delta2(State, SlideOp, Msg) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 finish_delta1(State, OldSlideOp, ReplyPid) ->
     % do nothing
-    io:format("finish_delta1~n", []),
     send_continue_msg(ReplyPid),
     {ok, State, OldSlideOp}.
 
@@ -167,7 +170,6 @@ finish_delta1(State, OldSlideOp, ReplyPid) ->
                     EmbeddedMsg::{continue}) -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 finish_delta2(State, SlideOp, {continue}) ->
     % do nothing
-    io:format("finish_delta2~n", []),
     {ok, State, SlideOp}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
