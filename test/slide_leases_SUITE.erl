@@ -46,17 +46,19 @@ groups() ->
 
 all() ->
     [
-%     {group, tester_tests},
-%     {group, join_tests},
-%     {group, join_and_leave_tests}
+     %{group, tester_tests},
+     {group, join_tests},
+     {group, join_and_leave_tests}
      ].
 
-suite() -> [ {timetrap, {seconds, 120}} ].
+suite() -> [ {timetrap, {seconds, 300}} ].
 
 group(tester_tests) ->
     [{timetrap, {seconds, 400}}];
 group(join_tests) ->
-    [{timetrap, {seconds, 4}}].
+    [{timetrap, {seconds, 10}}];
+group(join_and_leave_tests) ->
+    [{timetrap, {seconds, 30}}].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -77,7 +79,7 @@ init_per_testcase(TestCase, Config) ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
                                                     {leases, true},
-                                                    {leases_gc, false}]}]),
+                                                    {leases_gc, true}]}]),
             Config
     end.
 
@@ -195,12 +197,16 @@ join_leave_test(JoinTargetSize, LeaveTargetSize) ->
 leave_until(TargetSize, TargetSize) ->
     ok;
 leave_until(CurrentSize, TargetSize) ->
-    Node = pid_groups:find_a(dht_node),
-    ct:pal("~w", [Node]),
-    api_vm:shutdown_nodes(1),
+    Group = pid_groups:group_with(dht_node),
+    Node = pid_groups:pid_of(Group, dht_node),
+    ct:pal("shuting down node: ~w ~w", [Group, Node]),
+    ok = api_vm:shutdown_node(Group),
     wait_for_ring_size(CurrentSize - 1),
+    ct:pal("have correct ring size ~w", [Node]),
     wait_for_correct_ring(),
+    ct:pal("have correct ring ~w", [Node]),
     wait_for_correct_leases(CurrentSize - 1),
+    ct:pal("shuting down node: success"),
     leave_until(CurrentSize - 1, TargetSize).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -223,7 +229,11 @@ wait_for_ring_size(Size) ->
     wait_for(fun () -> api_vm:number_of_nodes() == Size end).
 
 wait_for_correct_ring() ->
-    wait_for(fun () -> admin:check_ring_deep() == ok end).
+    wait_for(fun () -> ct:pal("->admin:check_ring_deep()"),
+                       Res = admin:check_ring_deep(),
+                       ct:pal("<-admin:check_ring_deep()"),
+                       Res == ok
+             end).
 
 
 get_dht_node_state(Pid, What) ->
@@ -241,7 +251,9 @@ get_leases(Pid) ->
 
 wait_for_correct_leases(TargetSize) ->
     wait_for(lease_checker(TargetSize)),
-    wait_for(fun check_leases_per_node/0).
+    ct:pal("have correct lease_checker"),
+    wait_for(fun check_leases_per_node/0),
+    ct:pal("have correct leases_per_node").
 
 is_disjoint([]) ->
     true;
@@ -290,7 +302,7 @@ lease_checker(TargetSize) ->
             %end,
             IsAll andalso
                 IsDisjoint andalso
-                %HaveAllActiveLeases andalso % @todo enable after garbage collection is implemented
+                HaveAllActiveLeases andalso % @todo enable after garbage collection is implemented
                 HaveNoPassiveLeases
     end.
 
@@ -302,12 +314,6 @@ check_local_leases(DHTNode) ->
     ActiveIntervals = [ l_on_cseq:get_range(Lease) || Lease <- ActiveLeases],
     MyRange = get_dht_node_state(DHTNode, my_range),
     LocalCorrect = are_equal(MyRange, ActiveIntervals),
-    %case LocalCorrect of
-    %    false ->
-    %        log:log("~p ~p~n", [MyRange, ActiveIntervals]);
-    %    true ->
-    %        ok
-    %end,
     length(PassiveLeases) == 0 andalso LocalCorrect.
 
 
