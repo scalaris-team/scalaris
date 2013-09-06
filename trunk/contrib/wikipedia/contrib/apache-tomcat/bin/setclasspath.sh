@@ -20,14 +20,17 @@
 #  are valid and consistent with the selected start-up options and set up the
 #  endorsed directory.
 #
-#  $Id: setclasspath.sh 1202062 2011-11-15 06:50:02Z mturk $
+#  $Id: setclasspath.sh 1430568 2013-01-08 22:08:57Z schultz $
 # -----------------------------------------------------------------------------
 
 # Make sure prerequisite environment variables are set
 if [ -z "$JAVA_HOME" -a -z "$JRE_HOME" ]; then
-  # Bugzilla 37284 (reviewed).
   if $darwin; then
-    if [ -d "/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Home" ]; then
+    # Bugzilla 54390
+    if [ -x '/usr/libexec/java_home' ] ; then
+      export JAVA_HOME=`/usr/libexec/java_home`
+    # Bugzilla 37284 (reviewed).
+    elif [ -d "/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Home" ]; then
       export JAVA_HOME="/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Home"
     fi
   else
