@@ -250,34 +250,54 @@ print_process_messages(Pid) ->
         false -> ok
     end,
     io:format("~n"),
-    io:format("Process Messages:~n"),
     {ok, Chars} = io:columns(), %% terminal columns
-    CharsForVal = Chars - 6 - 9 - 1,
-    io:format("~5s ~8s ~-" ++ integer_to_list(CharsForVal) ++ "s~n",
-              ["Count", "Size", "Example"]),
-    AllMessages0 =
-        lists:foldl(fun(MsgX, TreeX) ->
+    {MsgCount, AllMessages0} =
+        lists:foldl(fun(MsgX, {I, TreeX}) ->
                             % note: don't use comm:get_msg_tag/1 - we want to keep the group_message tags
                             Tag = erlang:element(1, MsgX),
                             Size = erlang:external_size(MsgX),
                             case gb_trees:lookup(Tag, TreeX) of
                                 none ->
                                     MsgX2 = prettyprint_msg(MsgX),
-                                    gb_trees:insert(Tag, {1, Size, MsgX2}, TreeX);
-                                {value, {OldCount, OldSize, OldMsg}} ->
-                                    gb_trees:update(Tag, {OldCount + 1, Size + OldSize, OldMsg}, TreeX)
+                                    {I + 1, gb_trees:insert(Tag, {1, I, I, Size, MsgX2}, TreeX)};
+                                {value, {OldCount, OldFirstPos, _OldLastPos, OldSize, OldMsg}} ->
+                                    {I + 1, gb_trees:update(Tag, {OldCount + 1, OldFirstPos, I, Size + OldSize, OldMsg}, TreeX)}
                             end
-                    end, gb_trees:empty(), process_info_get(Infos, messages, [])),
+                    end, {0, gb_trees:empty()}, process_info_get(Infos, messages, [])),
     AllMessages = lists:reverse(
                     lists:keysort(1, util:gb_trees_foldl(
-                                    fun(_Tag, {TagCnt, TagSize, Example}, L) ->
-                                            [{TagCnt, TagSize, Example} | L]
+                                    fun(_Tag, {TagCnt, TagFirstPos, TagLastPos, TagSize, Example}, L) ->
+                                            [{TagCnt, TagFirstPos, TagLastPos, TagSize, Example} | L]
                                     end, [], AllMessages0))),
-    _ = [ io:format("~5s ~7sk ~" ++ integer_to_list(CharsForVal) ++ "s~n",
-                    [ lists:flatten(io_lib:format("~1210.0p", [TagCnt])),
-                      lists:flatten(io_lib:format("~1210.0p", [TagSize div 1024])),
-                      lists:flatten(io_lib:format("~111610.0p", [Example]))])
-            || {TagCnt, TagSize, Example} <- AllMessages],
+    io:format("Process Messages (total ~p):~n", [MsgCount]),
+    CharsForVal = Chars - 7 - 9 - 13 - 1,
+    io:format("~6s ~8s ~12s ~-" ++ integer_to_list(CharsForVal) ++ "s~n",
+              ["Count", "Size", "Positions", "First Message"]),
+    _ = [begin
+             FirstMessage = lists:flatten(io_lib:format("~111610.0p", [Example])),
+             {FirstMessage1, FirstMessage2} = util:safe_split(CharsForVal, FirstMessage),
+             {AddStr, AddVal} =
+                 case FirstMessage2 of
+                     [] -> {[], []};
+                     _  ->
+                         {FirstMessage2a, FirstMessage2b} = util:safe_split(CharsForVal - 1, FirstMessage2),
+                         case FirstMessage2b of
+                             [] ->
+                                 {"~29s ~-" ++ integer_to_list(CharsForVal-1) ++ "s~n",
+                                  ["", FirstMessage2a]};
+                             _  ->
+                                 {"~29s ~-" ++ integer_to_list(CharsForVal-1) ++ "s~n"
+                                  "~29s ~-" ++ integer_to_list(CharsForVal-1) ++ "s~n",
+                                  ["", FirstMessage2a, "", FirstMessage2b]}
+                         end
+                 end,
+             io:format("~6s ~7sk ~12s ~-" ++ integer_to_list(CharsForVal) ++ "s~n" ++ AddStr,
+                       [ lists:flatten(io_lib:format("~1210.0p", [TagCnt])),
+                         lists:flatten(io_lib:format("~1210.0p", [TagSize div 1024])),
+                         lists:flatten(io_lib:format("~1210.0p-~1210.0p", [TagFirstPos, TagLastPos])),
+                         FirstMessage1] ++ AddVal)
+         end
+            || {TagCnt, TagFirstPos, TagLastPos, TagSize, Example} <- AllMessages],
     ok.
 
 -spec prettyprint_msg(comm:message()) -> comm:message().
