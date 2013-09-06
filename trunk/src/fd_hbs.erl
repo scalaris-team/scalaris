@@ -252,7 +252,7 @@ on({send_retry, {send_error, Target, Message, _Reason} = Err, Count}, State) ->
             report_crash(State)
     end;
 
-on({crashed, WatchedPid}, State) ->
+on({crashed, WatchedPid, Warn}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
     %% inform all local subscribers
     Subscriptions = state_get_subscriptions(State, WatchedPid),
@@ -267,9 +267,9 @@ on({crashed, WatchedPid}, State) ->
                          RemPid ->
                              not rempid_get_pending_demonitor(RemPid)
                      end,
-            case Report of
+            case Report andalso (nowarn =/= Warn) of
                 true ->
-                    log:log(warn, "No one to inform on crash of ~.0p~n",
+                    log:log(info, "No one to inform on crash of ~.0p~n",
                             [WatchedPid]);
                 false -> ok
             end;
@@ -297,11 +297,20 @@ on({crashed, WatchedPid}, State) ->
                 end,
                 S1, Subscriptions);
 
+on({'DOWN', _Monref, process, WatchedPid, unittest_down}, State) ->
+    ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n", [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
+    %% send crash report to remote end.
+    comm:send(state_get_rem_hbs(State),
+              {crashed, comm:make_global(WatchedPid), nowarn}, ?SEND_OPTIONS),
+    %% delete WatchedPid and MonRef locally (MonRef is already
+    %% invalid, as Pid crashed)
+    _S1 = state_del_monitor(State, comm:make_global(WatchedPid));
+
 on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
     ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n", [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
     %% send crash report to remote end.
     comm:send(state_get_rem_hbs(State),
-              {crashed, comm:make_global(WatchedPid)}, ?SEND_OPTIONS),
+              {crashed, comm:make_global(WatchedPid), warn}, ?SEND_OPTIONS),
     %% delete WatchedPid and MonRef locally (MonRef is already
     %% invalid, as Pid crashed)
     _S1 = state_del_monitor(State, comm:make_global(WatchedPid)).
@@ -330,7 +339,7 @@ report_crash(State) ->
     comm:send_local(FD, {hbs_finished, state_get_rem_hbs(State)}),
     erlang:unlink(FD),
     _ = try
-            lists:foldl(fun(X, S) -> on({crashed, X}, S) end,
+            lists:foldl(fun(X, S) -> on({crashed, X, warn}, S) end,
                         State, [ rempid_get_rempid(RemPidEntry)
                                  || RemPidEntry <- state_get_rem_pids(State)])
         catch _:_ -> ignore_exception
