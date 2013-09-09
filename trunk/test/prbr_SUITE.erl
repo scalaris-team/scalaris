@@ -318,21 +318,27 @@ tester_type_check_rbr(_Config) ->
 
 modify_rbr_at_key(R, N) ->
     %% get a valid round number
+    %% let fill in whether lookup was consistent
+    LookupReadEnvelope = dht_node_lookup:envelope(
+                       4,
+                       {prbr, read, kv, '_', comm:this(),
+                        R, unittest_rbr_consistency1,
+                        fun prbr:noop_read_filter/1}),
     comm:send_local(pid_groups:find_a(dht_node),
-                    {?lookup_aux, R, 0,
-                     {prbr, read, kv, comm:this(),
-                      R, unittest_rbr_consistency1,
-                      fun prbr:noop_read_filter/1}}),
+                    {?lookup_aux, R, 0, LookupReadEnvelope}),
     receive
         {read_reply, AssignedRound, _, _} ->
             ok
     end,
     %% perform a write
+    %% let fill in whether lookup was consistent
+    LookupWriteEnvelope = dht_node_lookup:envelope(
+                            4,
+                            {prbr, write, kv, '_', comm:this(),
+                             R, AssignedRound, {[], false, N+1, N}, null,
+                             fun prbr:noop_write_filter/3}),
     comm:send_local(pid_groups:find_a(dht_node),
-                    {?lookup_aux, R, 0,
-                     {prbr, write, kv, comm:this(),
-                      R, AssignedRound, {[], false, N+1, N}, null,
-                      fun prbr:noop_write_filter/3}}),
+                    {?lookup_aux, R, 0, LookupWriteEnvelope}),
     receive
         {write_reply, R, _, _NextRound} ->
             ok
