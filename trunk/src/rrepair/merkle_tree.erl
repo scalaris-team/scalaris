@@ -294,7 +294,8 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
                   {nil, Count, Bucket, Interval, []};
               true ->
                   % need to hash here since we won't keep the bucket!
-                  Hash = run_leaf_hf(lists:usort(Bucket), Config#mt_config.leaf_hf,
+                  Hash = run_leaf_hf(lists:usort(Bucket), Interval,
+                                     Config#mt_config.leaf_hf,
                                      Config#mt_config.signature_size),
                   {Hash, Count, [], Interval, []}
            end,
@@ -337,15 +338,16 @@ gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf, _LeafHf, _SigSize,
 gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
               true, CleanBuckets) ->
     Bucket1 = lists:usort(Bucket),
-    Hash = run_leaf_hf(Bucket1, LeafHf, SigSize),
+    Hash = run_leaf_hf(Bucket1, I, LeafHf, SigSize),
     {Hash, Count, ?IIF(CleanBuckets, [], Bucket1), I, Childs}.
 
 %% @doc Hashes a leaf with the given (sorted!) bucket.
--spec run_leaf_hf(mt_bucket(), LeafHf::hash_fun(), SigSize::pos_integer()) -> mt_node_key().
-run_leaf_hf(Bucket, LeafHf, SigSize) ->
+-spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun(),
+                  SigSize::pos_integer()) -> mt_node_key().
+run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
     BinBucket = case Bucket of
-                    [_|_] -> term_to_binary(Bucket);
-                    []    -> term_to_binary(0)
+                    [_|_] -> term_to_binary({Bucket, I});
+                    []    -> term_to_binary({0, I})
                 end,
     Hash = LeafHf(BinBucket),
     Size = erlang:byte_size(Hash),
