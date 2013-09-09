@@ -59,7 +59,7 @@
 
 -type subscriber_filter_fun() :: fun((OldNeighbors::nodelist:neighborhood(),
                                       NewNeighbors::nodelist:neighborhood(),
-                                      IsSlide::slide()) -> boolean()).
+                                      SlideType::slide()) -> boolean()).
 -type subscriber_exec_fun() :: fun((Subscriber::pid() | null, Tag::any(),
                                     OldNeighbors::nodelist:neighborhood(),
                                     NewNeighbors::nodelist:neighborhood()) -> any()).
@@ -77,7 +77,7 @@
     {rm, init_check_ring, Token::non_neg_integer()} |
     {rm, notify_new_pred, NewPred::node:node_type()} |
     {rm, notify_new_succ, NewSucc::node:node_type()} |
-    {rm, notify_slide_finished, IsSlide::slide()} |
+    {rm, notify_slide_finished, SlideType::slide()} |
     {rm, leave} |
     {rm, pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {rm, succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
@@ -136,9 +136,9 @@ notify_new_pred(Node, NewPred) ->
 %% @doc Sends a message to the local node's dht_node process notifying
 %%      it of a finished slide.
 -spec notify_slide_finished(slide()) -> ok.
-notify_slide_finished(IsSlide) ->
+notify_slide_finished(SlideType) ->
     Pid = pid_groups:get_my(dht_node),
-    comm:send_local(Pid, {rm, notify_slide_finished, IsSlide}).
+    comm:send_local(Pid, {rm, notify_slide_finished, SlideType}).
 
 %% @doc Updates a dht node's id and sends the ring maintenance a message about
 %%      the change.
@@ -152,8 +152,8 @@ update_id(NewId) ->
 
 %% @doc Filter function for subscriptions that returns true if a
 %%      direct neighbor, i.e. pred, succ or base node, changed.
--spec subscribe_dneighbor_change_filter(OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(), IsSlide::slide()) -> boolean().
-subscribe_dneighbor_change_filter(OldNeighbors, NewNeighbors, _IsSlide) ->
+-spec subscribe_dneighbor_change_filter(OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(), SlideType::slide()) -> boolean().
+subscribe_dneighbor_change_filter(OldNeighbors, NewNeighbors, _SlideType) ->
     nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors) orelse
         nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors) orelse
         nodelist:succ(OldNeighbors) =/= nodelist:succ(NewNeighbors).
@@ -161,9 +161,9 @@ subscribe_dneighbor_change_filter(OldNeighbors, NewNeighbors, _IsSlide) ->
 %% @doc Filter function for subscriptions that returns true if a
 %%      direct neighbor, i.e. pred, succ or base node, changed or a slide
 %%      operation finished.
--spec subscribe_dneighbor_change_slide_filter(OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(), IsSlide::slide()) -> boolean().
-subscribe_dneighbor_change_slide_filter(OldNeighbors, NewNeighbors, IsSlide) ->
-    IsSlide =/= none orelse
+-spec subscribe_dneighbor_change_slide_filter(OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood(), SlideType::slide()) -> boolean().
+subscribe_dneighbor_change_slide_filter(OldNeighbors, NewNeighbors, SlideType) ->
+    SlideType =/= none orelse
         nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors) orelse
         nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors) orelse
         nodelist:succ(OldNeighbors) =/= nodelist:succ(NewNeighbors).
@@ -224,9 +224,9 @@ on({rm, notify_new_succ, NewSucc}, State = {RM_State, _HasLeft, _SubscrTable}) -
     RMFun = fun() -> ?RM:new_succ(RM_State, NewSucc) end,
     update_state(State, RMFun);
 
-on({rm, notify_slide_finished, IsSlide}, State = {RM_State, _HasLeft, SubscrTable}) ->
+on({rm, notify_slide_finished, SlideType}, State = {RM_State, _HasLeft, SubscrTable}) ->
     Neighborhood = ?RM:get_neighbors(RM_State),
-    call_subscribers(Neighborhood, Neighborhood, IsSlide, SubscrTable),
+    call_subscribers(Neighborhood, Neighborhood, SlideType, SubscrTable),
     State;
 
 on({rm, pred_left, OldPred, PredsPred}, State = {RM_State, _HasLeft, _SubscrTable}) ->
@@ -431,35 +431,35 @@ update_failuredetector(OldNeighborhood, NewNeighborhood, CrashedPid) ->
 
 %% @doc Inform the dht_node of a new neighborhood.
 -spec call_subscribers(OldNeighbors::nodelist:neighborhood(),
-        NewNeighbors::nodelist:neighborhood(), IsSlide::slide(),
+        NewNeighbors::nodelist:neighborhood(), SlideType::slide(),
         SubscrTable::tid()) -> ok.
-call_subscribers(OldNeighborhood, NewNeighborhood, IsSlide, SubscrTable) ->
-    call_subscribers_iter(OldNeighborhood, NewNeighborhood, IsSlide, SubscrTable, ets:first(SubscrTable)).
+call_subscribers(OldNeighborhood, NewNeighborhood, SlideType, SubscrTable) ->
+    call_subscribers_iter(OldNeighborhood, NewNeighborhood, SlideType, SubscrTable, ets:first(SubscrTable)).
 
 %% @doc Iterates over all susbcribers and calls their subscribed functions.
 -spec call_subscribers_iter(OldNeighbors::nodelist:neighborhood(),
-        NewNeighbors::nodelist:neighborhood(), IsSlide::slide(), SubscrTable::tid(),
+        NewNeighbors::nodelist:neighborhood(), SlideType::slide(), SubscrTable::tid(),
         CurrentKey::{Pid::pid() | null, Tag::any()} | '$end_of_table') -> ok.
-call_subscribers_iter(_OldNeighborhood, _NewNeighborhood, _IsSlide, _SubscrTable, '$end_of_table') ->
+call_subscribers_iter(_OldNeighborhood, _NewNeighborhood, _SlideType, _SubscrTable, '$end_of_table') ->
     ok;
-call_subscribers_iter(OldNeighborhood, NewNeighborhood, IsSlide, SubscrTable, CurrentKey) ->
+call_subscribers_iter(OldNeighborhood, NewNeighborhood, SlideType, SubscrTable, CurrentKey) ->
     % assume the key exists (it should since we are iterating over the table!)
     [SubscrTuple] = ets:lookup(SubscrTable, CurrentKey),
-    call_subscribers_check(OldNeighborhood, NewNeighborhood, IsSlide, SubscrTuple, SubscrTable),
-    call_subscribers_iter(OldNeighborhood, NewNeighborhood, IsSlide, SubscrTable,
+    call_subscribers_check(OldNeighborhood, NewNeighborhood, SlideType, SubscrTuple, SubscrTable),
+    call_subscribers_iter(OldNeighborhood, NewNeighborhood, SlideType, SubscrTable,
                           ets:next(SubscrTable, CurrentKey)).
 
 %% @doc Checks whether FilterFun for the current subscription tuple is true
 %%      and executes ExecFun. Unsubscribes the tuple, if ExecFun has been
 %%      called MaxCalls times.
 -spec call_subscribers_check(OldNeighbors::nodelist:neighborhood(),
-        NewNeighbors::nodelist:neighborhood(), IsSlide::slide(),
+        NewNeighbors::nodelist:neighborhood(), SlideType::slide(),
         {{Pid::pid() | null, Tag::any()}, FilterFun::subscriber_filter_fun(),
          ExecFun::subscriber_exec_fun(), MaxCalls::pos_integer() | inf},
         SubscrTable::tid()) -> ok.
-call_subscribers_check(OldNeighborhood, NewNeighborhood, IsSlide,
+call_subscribers_check(OldNeighborhood, NewNeighborhood, SlideType,
         {{Pid, Tag}, FilterFun, ExecFun, MaxCalls}, SubscrTable) ->
-    case FilterFun(OldNeighborhood, NewNeighborhood, IsSlide) of
+    case FilterFun(OldNeighborhood, NewNeighborhood, SlideType) of
         true -> ExecFun(Pid, Tag, OldNeighborhood, NewNeighborhood),
                 case MaxCalls of
                     inf -> ok;
