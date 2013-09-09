@@ -33,7 +33,7 @@
     <distributionManagement>
         <repository>
             <id>scalaris</id>
-            <url>file:../../maven</url>
+            <url>file:.maven</url>
         </repository>
     </distributionManagement>
 
@@ -54,13 +54,31 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <executions>
                     <execution>
-                        <id>Deploy latest Otp Erlang jinterface release</id>
+                        <id>Check out maven repository from svn</id>
+                        <!-- Execute before deploy phase -->
+                        <!-- http://maven.apache.org/guides/introduction/introduction-to-the-lifecycle.html -->
+                        <phase>install</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>maven_svn_hook.sh</executable>
+                            <arguments>
+                                <argument>checkout</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>Update the scalaris maven repository</id>
                         <phase>deploy</phase>
                         <goals>
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>maven-add-latest-erlang.sh</executable>
+                            <executable>maven_svn_hook.sh</executable>
+                            <arguments>
+                                <argument>commit</argument>
+                            </arguments>
                         </configuration>
                     </execution>
                 </executions>
