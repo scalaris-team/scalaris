@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@
 
 -spec envelope(pos_integer(), comm:message()) -> enveloped_message().
 envelope(Nth, Msg) ->
+    ?ASSERT('_' =:= element(Nth, Msg)),
     {Nth, f, Msg}.
 
 %% userdevguide-begin dht_node_lookup:routing

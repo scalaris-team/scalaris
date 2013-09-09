@@ -129,7 +129,7 @@ noop_write_filter(_, _, X) -> X.
 init(_DBName) -> ?PDB:new().
 
 -spec on(message(), state()) -> state().
-on({prbr, read, _DB, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
+on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
     ?TRACE("prbr:read: ~p in round ~p~n", [Key, ProposerUID]),
     KeyEntry = get_entry(Key, TableName),
 
@@ -144,7 +144,7 @@ on({prbr, read, _DB, Proposer, Key, ProposerUID, ReadFilter}, TableName) ->
     _ = set_entry(NewKeyEntry, TableName),
     TableName;
 
-on({prbr, write, _DB, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
+on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, WriteFilter}, TableName) ->
     ?TRACE("prbr:write for key: ~p in round ~p~n", [Key, InRound]),
     KeyEntry = get_entry(Key, TableName),
     _ = case writable(KeyEntry, InRound) of
