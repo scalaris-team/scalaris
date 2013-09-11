@@ -84,7 +84,7 @@ unittest_create_state(Neighbors) ->
 
 %% @doc Message handler when the module is fully initialized.
 -spec handle_custom_message(custom_message(), state())
-        -> state() | unknown_event.
+        -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
 handle_custom_message({rm_trigger},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
     % Trigger an update of the Random view
@@ -95,7 +95,7 @@ handle_custom_message({rm_trigger},
             % no need to set a new trigger - we will be actively called by
             % any new node and set the trigger then (see handling of
             % notify_new_succ and notify_new_pred)
-            State;
+            {{unknown}, State};
         _ -> % there is another node in the system
             RndView = get_RndView(RandViewSize, Cache),
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
@@ -119,7 +119,8 @@ handle_custom_message({rm_trigger},
                 _    -> ok
             end,
             NewTriggerState = trigger:next(TriggerState, Interval),
-            {Neighborhood, RandViewSize, base_interval, NewTriggerState, Cache, Churn}
+            {{unknown}, {Neighborhood, RandViewSize, base_interval,
+                         NewTriggerState, Cache, Churn}}
     end;
 
 % got empty cyclon cache
@@ -128,7 +129,7 @@ handle_custom_message({rm, {cy_cache, []}},
     % ignore empty cache from cyclon
     cyclon:get_subset_rand_next_interval(RandViewSize,
                                          comm:reply_as(self(), 2, {rm, '_'})),
-    State;
+    {{unknown}, State};
 
 % got cyclon cache
 handle_custom_message({rm, {cy_cache, NewCache}},
@@ -147,7 +148,8 @@ handle_custom_message({rm, {cy_cache, NewCache}},
         nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
                                  get_pred_list_length(), get_succ_list_length()),
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighborhood),
-    {NewNeighborhood, RandViewSizeNew, Interval, TriggerState, NewCache, Churn};
+    {{node_discovery}, {NewNeighborhood, RandViewSizeNew, Interval,
+                        TriggerState, NewCache, Churn}};
 
 % got shuffle request
 handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
@@ -175,7 +177,8 @@ handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, Request
     comm:send(node:pidX(nodelist:node(OtherNeighbors)),
               {rm, buffer_response, NeighborsToSend}, ?SEND_OPTIONS),
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
-    {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
+    {{node_discovery}, {NewNeighborhood, RandViewSize, Interval,
+                        TriggerState, Cache, Churn}};
 
 handle_custom_message({rm, buffer_response, OtherNeighbors},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
@@ -187,14 +190,19 @@ handle_custom_message({rm, buffer_response, OtherNeighbors},
             true ->  RandViewSize + 1;
             false -> RandViewSize
         end,
-    {NewNeighborhood, NewRandViewSize, Interval, TriggerState, Cache, Churn};
+    {{node_discovery}, {NewNeighborhood, NewRandViewSize, Interval,
+                        TriggerState, Cache, Churn}};
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
 handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
     case node_details:get(NodeDetails, is_leaving) of
-        false -> update_nodes(State, [node_details:get(NodeDetails, node)], [], null);
-        true  -> State
+        false ->
+            NewState =
+                update_nodes(State, [node_details:get(NodeDetails, node)], [], null),
+            {{node_discovery}, NewState};
+        true ->
+            {{unknown}, State}
     end;
 
 handle_custom_message(_, _State) -> unknown_event.
@@ -328,6 +336,8 @@ has_churn(OldNeighborhood, NewNeighborhood) ->
 
 %% @doc Triggers the integration of new nodes from OtherNeighborhood and
 %%      RndView into our Neighborhood by contacting every useful node.
+%%      NOTE: no node is (directly) added by this function, the returned
+%%            neighborhood may contain updated node IDs though!
 -spec trigger_update(OldNeighborhood::nodelist:neighborhood(),
                      RndView::[node:node_type()],
                      OtherNeighborhood::nodelist:neighborhood())

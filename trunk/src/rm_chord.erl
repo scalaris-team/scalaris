@@ -70,7 +70,7 @@ unittest_create_state(Neighbors) ->
 
 %% @doc Message handler when the module is fully initialized.
 -spec handle_custom_message(custom_message(), state())
-        -> state() | unknown_event.
+        -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
 handle_custom_message({rm_trigger}, {Neighborhood, TriggerState}) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
@@ -80,14 +80,14 @@ handle_custom_message({rm_trigger}, {Neighborhood, TriggerState}) ->
                           ?SEND_OPTIONS);
         _    -> ok
     end,
-    {Neighborhood, trigger:next(TriggerState)};
+    {{unknown}, {Neighborhood, trigger:next(TriggerState)}};
 
 handle_custom_message({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
     comm:send(Source_Pid, {rm, get_succlist_response,
                            nodelist:node(Neighborhood),
                            nodelist:succs(Neighborhood)},
               ?SEND_OPTIONS),
-    State;
+    {{unknown}, State};
 
 % got node_details from our successor
 handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_succ}, State)  ->
@@ -96,7 +96,7 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_succ},
               {get_node_details,
                comm:reply_as(comm:this(), 2, {rm, '_', from_node}), [node, is_leaving]},
               ?SEND_OPTIONS),
-    State;
+    {{unknown}, State};
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
@@ -117,8 +117,8 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_node},
                                             nodelist:node(NewNeighborhood));
                 false -> ok
             end,
-            {NewNeighborhood, TriggerState};
-        true  -> State
+            {{node_discovery}, {NewNeighborhood, TriggerState}};
+        true  -> {{unknown}, State}
     end;
 
 handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
@@ -144,7 +144,7 @@ handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
             ok;
         false -> ok
     end,
-    State;
+    {{unknown}, State};
 
 handle_custom_message(_, _State) -> unknown_event.
 
