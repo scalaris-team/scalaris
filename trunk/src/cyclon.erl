@@ -162,7 +162,7 @@ init([]) ->
 on_inactive({activate_cyclon}, {inactive, QueuedMessages, TriggerState}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
     rm_loop:subscribe(self(), cyclon,
-                      fun(OldN, NewN, _SlideType) -> OldN =/= NewN end,
+                      fun(OldN, NewN, _Reason) -> OldN =/= NewN end,
                       fun cyclon:rm_send_changes/4, inf),
     request_node_details([node, pred, succ]),
     TriggerState2 = trigger:now(TriggerState),
