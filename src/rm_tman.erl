@@ -207,22 +207,25 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
 
 handle_custom_message(_, _State) -> unknown_event.
 
--spec new_pred(State::state(), NewPred::node:node_type()) -> state().
+-spec new_pred(State::state(), NewPred::node:node_type()) ->
+          {ChangeReason::rm_loop:reason(), state()}.
 new_pred(State, NewPred) ->
     % if we do not want to trust notify_new_pred messages to provide an alive node, use this instead:
 %%     trigger_update(OldNeighborhood, [], nodelist:new_neighborhood(nodelist:node(OldNeighborhood), NewPred)),
     % we trust NewPred to be alive -> integrate node:
-    update_nodes(State, [NewPred], [], null).
+    {{unknown}, update_nodes(State, [NewPred], [], null)}.
 
--spec new_succ(State::state(), NewSucc::node:node_type()) -> state().
+-spec new_succ(State::state(), NewSucc::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 new_succ(State, NewSucc) ->
     % similar to new_pred/2
-    update_nodes(State, [NewSucc], [], null).
+    {{unknown}, update_nodes(State, [NewSucc], [], null)}.
 
 -spec remove_pred(State::state(), OldPred::node:node_type(),
-                  PredsPred::node:node_type()) -> state().
+                  PredsPred::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 remove_pred(State, OldPred, PredsPred) ->
-    remove_pred_(State, OldPred, PredsPred).
+    {{unknown}, remove_pred_(State, OldPred, PredsPred)}.
 
 -compile({inline, [remove_pred_/3]}).
 
@@ -248,31 +251,37 @@ remove_pred_(State, OldPred, PredsPred) ->
     end.
 
 -spec remove_succ(State::state(), OldSucc::node:node_type(),
-                  SuccsSucc::node:node_type()) -> state().
+                  SuccsSucc::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 remove_succ(State, OldSucc, SuccsSucc) ->
     % in contrast to remove_pred/3, let rm repair a potentially wrong new succ
     % on its own
-    update_nodes(State, [SuccsSucc], [OldSucc], null).
+    {{unknown}, update_nodes(State, [SuccsSucc], [OldSucc], null)}.
 
--spec update_node(State::state(), NewMe::node:node_type()) -> state().
+-spec update_node(State::state(), NewMe::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}, NewMe) ->
     NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
     NewTriggerState = trigger:now(TriggerState), % inform neighbors
-    {NewNeighborhood, RandViewSize, Interval, NewTriggerState, Cache, Churn}.
+    {{unknown}, {NewNeighborhood, RandViewSize, Interval,
+                 NewTriggerState, Cache, Churn}}.
 
 -spec leave(State::state()) -> ok.
 leave(_State) -> ok.
 
 % failure detector reported dead node
--spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
+-spec crashed_node(State::state(), DeadPid::comm:mypid())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 crashed_node(State, DeadPid) ->
-    update_nodes(State, [], [DeadPid], fun dn_cache:add_zombie_candidate/1).
+    {{node_crashed, DeadPid},
+     update_nodes(State, [], [DeadPid], fun dn_cache:add_zombie_candidate/1)}.
 
 % dead-node-cache reported dead node to be alive again
--spec zombie_node(State::state(), Node::node:node_type()) -> state().
+-spec zombie_node(State::state(), Node::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 zombie_node(State, Node) ->
     % this node could potentially be useful as it has been in our state before
-    update_nodes(State, [Node], [], null).
+    {{node_discovery}, update_nodes(State, [Node], [], null)}.
 
 -spec get_web_debug_info(State::state()) -> [{string(), string()}].
 get_web_debug_info(_State) -> [].
