@@ -148,54 +148,61 @@ handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
 
 handle_custom_message(_, _State) -> unknown_event.
 
--spec new_pred(State::state(), NewPred::node:node_type()) -> state().
+-spec new_pred(State::state(), NewPred::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 new_pred({OldNeighborhood, TriggerState}, NewPred) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewPred,
                                         predListLength(), succListLength()),
-    {NewNeighborhood, TriggerState}.
+    {{unknown}, {NewNeighborhood, TriggerState}}.
 
--spec new_succ(State::state(), NewSucc::node:node_type()) -> state().
+-spec new_succ(State::state(), NewSucc::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 new_succ({OldNeighborhood, TriggerState}, NewSucc) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewSucc,
                                         predListLength(), succListLength()),
-    {NewNeighborhood, TriggerState}.
+    {{unknown}, {NewNeighborhood, TriggerState}}.
 
 -spec remove_pred(State::state(), OldPred::node:node_type(),
-                  PredsPred::node:node_type()) -> state().
+                  PredsPred::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 remove_pred({OldNeighborhood, TriggerState}, OldPred, PredsPred) ->
     NewNbh1 = nodelist:remove(OldPred, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, PredsPred, predListLength(), succListLength()),
-    {NewNbh2, TriggerState}.
+    {{unknown}, {NewNbh2, TriggerState}}.
 
 -spec remove_succ(State::state(), OldSucc::node:node_type(),
-                  SuccsSucc::node:node_type()) -> state().
+                  SuccsSucc::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 remove_succ({OldNeighborhood, TriggerState}, OldSucc, SuccsSucc) ->
     NewNbh1 = nodelist:remove(OldSucc, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, predListLength(), succListLength()),
-    {NewNbh2, TriggerState}.
+    {{unknown}, {NewNbh2, TriggerState}}.
 
--spec update_node(State::state(), NewMe::node:node_type()) -> state().
+-spec update_node(State::state(), NewMe::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({OldNeighborhood, TriggerState}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
     NewTriggerState = trigger:now(TriggerState), % inform neighbors
-    {NewNeighborhood, NewTriggerState}.
+    {{unknown}, {NewNeighborhood, NewTriggerState}}.
 
 -spec leave(State::state()) -> ok.
 leave(_State) -> ok.
 
 % failure detector reported dead node
--spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
+-spec crashed_node(State::state(), DeadPid::comm:mypid())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 crashed_node({OldNeighborhood, TriggerState}, DeadPid) ->
     NewNeighborhood = nodelist:remove(DeadPid, OldNeighborhood),
-    {NewNeighborhood, TriggerState}.
+    {{node_crashed, DeadPid}, {NewNeighborhood, TriggerState}}.
 
 % dead-node-cache reported dead node to be alive again
--spec zombie_node(State::state(), Node::node:node_type()) -> state().
+-spec zombie_node(State::state(), Node::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 zombie_node({OldNeighborhood, TriggerState}, Node) ->
     % this node could potentially be useful as it has been in our state before
     NewNeighborhood = nodelist:add_node(OldNeighborhood, Node,
                                         predListLength(), succListLength()),
-    {NewNeighborhood, TriggerState}.
+    {{node_discovery}, {NewNeighborhood, TriggerState}}.
 
 -spec get_web_debug_info(State::state()) -> [{string(), string()}].
 get_web_debug_info(_State) -> [].
