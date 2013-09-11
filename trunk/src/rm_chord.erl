@@ -69,8 +69,9 @@ unittest_create_state(Neighbors) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Message handler when the module is fully initialized.
--spec on(custom_message(), state()) -> state() | unknown_event.
-on({rm_trigger}, {Neighborhood, TriggerState}) ->
+-spec handle_custom_message(custom_message(), state())
+        -> state() | unknown_event.
+handle_custom_message({rm_trigger}, {Neighborhood, TriggerState}) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
         true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
@@ -81,7 +82,7 @@ on({rm_trigger}, {Neighborhood, TriggerState}) ->
     end,
     {Neighborhood, trigger:next(TriggerState)};
 
-on({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
+handle_custom_message({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
     comm:send(Source_Pid, {rm, get_succlist_response,
                            nodelist:node(Neighborhood),
                            nodelist:succs(Neighborhood)},
@@ -89,7 +90,7 @@ on({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
     State;
 
 % got node_details from our successor
-on({rm, {get_node_details_response, NodeDetails}, from_succ}, State)  ->
+handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_succ}, State)  ->
     SuccsPred = node_details:get(NodeDetails, pred),
     comm:send(node:pidX(SuccsPred),
               {get_node_details,
@@ -99,7 +100,7 @@ on({rm, {get_node_details_response, NodeDetails}, from_succ}, State)  ->
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
-on({rm, {get_node_details_response, NodeDetails}, from_node},
+handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_node},
    {OldNeighborhood, TriggerState} = State)  ->
     case node_details:get(NodeDetails, is_leaving) of
         false ->
@@ -120,7 +121,7 @@ on({rm, {get_node_details_response, NodeDetails}, from_node},
         true  -> State
     end;
 
-on({rm, get_succlist_response, Succ, SuccsSuccList},
+handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
    {OldNeighborhood, _TriggerState} = State) ->
     
     NewNeighborhood = nodelist:add_nodes(OldNeighborhood, [Succ | SuccsSuccList],
@@ -145,7 +146,7 @@ on({rm, get_succlist_response, Succ, SuccsSuccList},
     end,
     State;
 
-on(_, _State) -> unknown_event.
+handle_custom_message(_, _State) -> unknown_event.
 
 -spec new_pred(State::state(), NewPred::node:node_type()) -> state().
 new_pred({OldNeighborhood, TriggerState}, NewPred) ->

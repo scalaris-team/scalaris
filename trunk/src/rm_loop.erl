@@ -320,7 +320,7 @@ on({rm, init_check_ring, Token}, {RM_State, _HasLeft, _SubscrTable} = State) ->
 on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
     % similar to update_state/2 but handle unknown_event differently
     OldNeighborhood = ?RM:get_neighbors(RM_State),
-    case ?RM:on(Message, RM_State) of
+    case ?RM:handle_custom_message(Message, RM_State) of
         unknown_event ->
             log:log(error, "unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",
                     [Message, ?MODULE, on, OldState]),
