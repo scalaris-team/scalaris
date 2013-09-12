@@ -409,6 +409,19 @@ type_check_private_funs(Module, ExcludePrivate, Count) ->
 
     ct:pal("*** Private funs of ~p:~n~.0p~n", [Module, PrivateFuns]),
 
+    %% only excluded existing functions?
+    ErrList = [ case lists:member(X, PrivateFuns) of
+                    true -> true;
+                    false ->
+                        ct:pal("Excluded non existing private function ~p:~p~n", [Module,X]),
+                        false
+                end ||
+                  X <- ExcludePrivate ],
+    case lists:all(fun(X) -> X end, ErrList) of
+        true -> ok;
+        false -> throw(error)
+    end,
+
     _ = type_check_module_funs(Module, PrivateFuns, ExcludePrivate, Count),
 
     tester_helper:load_without_export_all(Module).
