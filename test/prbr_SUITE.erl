@@ -252,12 +252,8 @@ tester_type_check_rbr(_Config) ->
              {delete, 2}, %% cannot create pids
              {read, 2} %% cannot create pids
            ],
-           [ {cc_single_write, 3}, %% cannot create funs
-             {cc_set_rl, 3}, %% cannot create funs
-             {cc_set_wl, 3},  %% cannot create funs
-             {cc_commit_read, 3},  %% cannot create funs
-             {cc_commit_write, 3}  %% cannot create funs
-           ]},
+           [ ]
+          },
           {tx_tm,
            [{start_link, 2},       %% starts processes
             {init, 1},             %% needs to be pid_group member
@@ -290,10 +286,9 @@ tester_type_check_rbr(_Config) ->
            [ {on, 2},       %% sends messages
              {set_entry, 2} %% needs valid tid()
           ],
-           [ {msg_read_reply, 4},  %% sends messages
-             {msg_read_deny, 3},   %% sends messages
-             {msg_write_reply, 4}, %% sends messages
-             {msg_write_deny, 3},  %% sends messages
+           [ {msg_read_reply, 5},  %% sends messages
+             {msg_write_reply, 5}, %% sends messages
+             {msg_write_deny, 4},  %% sends messages
              {get_entry, 2}        %% needs valid tid()
             ]},
           {rbrcseq,
@@ -327,7 +322,7 @@ modify_rbr_at_key(R, N) ->
     comm:send_local(pid_groups:find_a(dht_node),
                     {?lookup_aux, R, 0, LookupReadEnvelope}),
     receive
-        {read_reply, AssignedRound, _, _} ->
+        {read_reply, _, AssignedRound, _, _} ->
             ok
     end,
     %% perform a write
@@ -340,7 +335,7 @@ modify_rbr_at_key(R, N) ->
     comm:send_local(pid_groups:find_a(dht_node),
                     {?lookup_aux, R, 0, LookupWriteEnvelope}),
     receive
-        {write_reply, R, _, _NextRound} ->
+        {write_reply, _, R, _, _NextRound} ->
             ok
     end.
 

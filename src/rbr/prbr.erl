@@ -105,18 +105,21 @@
                  }.
 
 %% Messages to expect from this module
--spec msg_read_reply(comm:mypid(), r_with_id(), any(), r_with_id())
+-spec msg_read_reply(comm:mypid(), Consistency::boolean(),
+                     r_with_id(), any(), r_with_id())
              -> ok.
-msg_read_reply(Client, YourRound, Val, LastWriteRound) ->
-    comm:send(Client, {read_reply, YourRound, Val, LastWriteRound}).
+msg_read_reply(Client, Cons, YourRound, Val, LastWriteRound) ->
+    comm:send(Client, {read_reply, Cons, YourRound, Val, LastWriteRound}).
 
--spec msg_write_reply(comm:mypid(), any(), r_with_id(), r_with_id()) -> ok.
-msg_write_reply(Client, Key, UsedWriteRound, YourNextRoundForWrite) ->
-    comm:send(Client, {write_reply, Key, UsedWriteRound, YourNextRoundForWrite}).
+-spec msg_write_reply(comm:mypid(), Consistency::boolean(),
+                      any(), r_with_id(), r_with_id()) -> ok.
+msg_write_reply(Client, Cons, Key, UsedWriteRound, YourNextRoundForWrite) ->
+    comm:send(Client, {write_reply, Cons, Key, UsedWriteRound, YourNextRoundForWrite}).
 
--spec msg_write_deny(comm:mypid(), any(), r_with_id()) -> ok.
-msg_write_deny(Client, Key, NewerRound) ->
-    comm:send(Client, {write_deny, Key, NewerRound}).
+-spec msg_write_deny(comm:mypid(), Consistency::boolean(), any(), r_with_id())
+                    -> ok.
+msg_write_deny(Client, Cons, Key, NewerRound) ->
+    comm:send(Client, {write_deny, Cons, Key, NewerRound}).
 
 -spec noop_read_filter(term()) -> term().
 noop_read_filter(X) -> X.
@@ -136,7 +139,7 @@ on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) -
     %% assign a valid next read round number
     TheRound = next_read_round(KeyEntry, ProposerUID),
 %%    trace_mpath:log_info(self(), {list_to_atom(lists:flatten(io_lib:format("read:~p", [entry_val(KeyEntry)])))}),
-    msg_read_reply(Proposer, TheRound,
+    msg_read_reply(Proposer, Cons, TheRound,
                    ReadFilter(entry_val(KeyEntry)),
                    entry_r_write(KeyEntry)),
 
@@ -151,11 +154,11 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
             {ok, NewKeyEntry, NextWriteRound} ->
                 NewVal = WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value),
-                msg_write_reply(Proposer, Key, InRound, NextWriteRound),
+                msg_write_reply(Proposer, Cons, Key, InRound, NextWriteRound),
                 set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
             {dropped, NewerRound} ->
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
-                msg_write_deny(Proposer, Key, NewerRound)
+                msg_write_deny(Proposer, Cons, Key, NewerRound)
         end,
     TableName.
 
