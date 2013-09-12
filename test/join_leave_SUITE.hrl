@@ -51,14 +51,6 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
-init_per_group(graceful_leave_load, _Config) ->
-    % TODO: occasionally the bench server (as a Scalaris client) hangs because
-    %       it connected to the node being shut down
-    %       -> in a real-life system where the client is on the same node as
-    %          the Scalaris node and both are being shut down together this has
-    %          no influence on the rest of the nodes (a stale transaction is
-    %          cleaned up by the RTMs after some time)
-    {skip, "graceful leave not fully supported yet"};
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
