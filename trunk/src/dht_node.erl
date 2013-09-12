@@ -511,7 +511,7 @@ is_alive_fully_joined(State) ->
 update_key_entries([], DB, _State, NewEntries) ->
     {DB, lists:reverse(NewEntries)};
 update_key_entries([{Key, NewValue, NewVersion} | Entries], DB, State, NewEntries) ->
-    IsResponsible = dht_node_state:is_responsible(Key, State),
+    IsResponsible = dht_node_state:is_db_responsible(Key, State),
     Entry = db_dht:get_entry(DB, Key),
     Exists = not db_entry:is_null(Entry),
     EntryVersion = db_entry:get_version(Entry),
