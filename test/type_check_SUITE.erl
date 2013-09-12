@@ -186,9 +186,7 @@ tester_type_check_math(_Config) ->
              {u, 1}, %% needs non zero number in list
              {zeros, 1} %% slow for large integers, tested via feeder
            ],
-           [ {closestPointsForI, 6}, %% needs feeder
-             {closestPointsForJ, 7}, %% needs same length lists and funs
-             {aggloClusteringHelper, 5}, %% spec suspicious (-1 for lists:nth())
+           [ {aggloClusteringHelper, 5}, %% spec suspicious (-1 for lists:nth())
              {choose, 4}, %% slow for large integers
              {factorial, 2} %% slow for large integers, done by feeder
            ]},
@@ -264,8 +262,6 @@ tester_type_check_paxos(_Config) ->
            [ {msg_ack,5}, %% sends msgs
              {msg_nack,3}, %% sends msgs
              {msg_naccepted,3}, %% sends msgs
-             {get_entry,2}, %% no spec
-             {set_entry,2}, %% no spec
              {inform_learners,2}, %% sends msgs
              {inform_learner,3} %% sends msgs
            ]},
@@ -369,7 +365,6 @@ tester_type_check_rrepair(_Config) ->
              {send_local, 2}, %% tries to send messages
              {send_chunk_req, 6}, %% tries to send messages
              {replicated_intervals, 1}, %% interval must be in a single quadrant
-             {map_key_to_quadrant_, 2}, %% needs lists of specific length
              {fork_recon, 1} %% tries to spawn processes
            ]}
         ],
@@ -464,7 +459,6 @@ tester_type_check_rdht_tx(_Config) ->
              {work_phase, 3}
            ],
            [ {quorum_read, 4}, %% needs collector pid
-             {inform_client, 2}, %% needs collector pid
              {make_tlog_entry, 2} %% tested via feeder
            ]},
           {rdht_tx_write,
