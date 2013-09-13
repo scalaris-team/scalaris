@@ -495,10 +495,17 @@ dialyzer-all-col:
 
 plt: compile
 	$(DIALYZER) --plt_info > /dev/null ; \
-	FAILED=$$? ; \
-	if [ $$FAILED -ne 0 ]; then \
+	EXISTSFAILED=$$? ; \
+	$(DIALYZER) --check_plt > /dev/null ; \
+	CHECKFAILED=$$? ; \
+	if [ $$EXISTSFAILED -ne 0 ]; then \
+	  echo "building plt" ; \
+	  $(DIALYZER) --build_plt  $(DIALYZER_PLT_LIBS) ; \
+	elif [ $$CHECKFAILED -ne 0 ]; then \
+	  echo "rebuilding outdated plt" ; \
 	  $(DIALYZER) --build_plt  $(DIALYZER_PLT_LIBS) ; \
 	else \
+	  echo "adding Scalaris modules to plt" ; \
 	  $(DIALYZER) --add_to_plt  $(DIALYZER_PLT_LIBS) ; \
 	fi
 
