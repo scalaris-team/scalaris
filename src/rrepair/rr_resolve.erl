@@ -123,8 +123,8 @@ on({start, Operation, Options}, State) ->
                                                                session_id = SID },
                                        feedbackDestPid = FBDest,
                                        send_stats = StatsDest },
-    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p",
-           [element(1, Operation), FBDest, FBResp], NewState),
+    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p~n SessionId:~p",
+           [element(1, Operation), FBDest, FBResp, SID], NewState),
     comm:send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
     NewState;
 
