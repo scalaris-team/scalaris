@@ -32,7 +32,7 @@
 -callback get_neighbors(state()) -> nodelist:neighborhood().
 -callback init(Me::node:node_type(), Pred::node:node_type(), Succ::node:node_type()) -> state().
 -callback handle_custom_message(custom_message(), state())
-        -> state() | unknown_event.
+        -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
 -callback zombie_node(State::state(), Node::node:node_type()) -> state().
 -callback crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
 -callback new_pred(State::state(), NewPred::node:node_type()) -> state().

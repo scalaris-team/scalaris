@@ -55,10 +55,11 @@
 -export_type([state/0, reason/0]).
 -endif.
 
--type reason() :: {slide_finished, pred | succ | none} |
-                  {node_crashed, Node::comm:mypid()} |
-                  {add_subscriber} |
-                  {unknown}.
+-type reason() :: {slide_finished, pred | succ | none} | % a slide finished
+                  {node_crashed, Node::comm:mypid()} | % the given node crashed
+                  {add_subscriber} | % a subscriber was added
+                  {node_discovery} | % a new/changed node was discovered
+                  {unknown}. % any other reason, e.g. changes during slides
 
 -type subscriber_filter_fun() :: fun((OldNeighbors::nodelist:neighborhood(),
                                       NewNeighbors::nodelist:neighborhood(),
@@ -325,9 +326,9 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
             log:log(error, "unknown message: ~.0p~n in Module: ~p and handler ~p~n in State ~.0p",
                     [Message, ?MODULE, on, OldState]),
             OldState;
-        NewRM_State   ->
+        {Reason, NewRM_State}   ->
             NewNeighborhood = ?RM:get_neighbors(NewRM_State),
-            call_subscribers(OldNeighborhood, NewNeighborhood, {unknown}, SubscrTable),
+            call_subscribers(OldNeighborhood, NewNeighborhood, Reason, SubscrTable),
             update_failuredetector(OldNeighborhood, NewNeighborhood, null),
             NewState = {NewRM_State, HasLeft, SubscrTable},
             ?TRACE_STATE(_OldState, NewState),
