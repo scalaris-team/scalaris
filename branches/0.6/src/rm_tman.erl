@@ -83,8 +83,9 @@ unittest_create_state(Neighbors) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Message handler when the module is fully initialized.
--spec on(custom_message(), state()) -> state() | unknown_event.
-on({rm_trigger},
+-spec handle_custom_message(custom_message(), state())
+        -> state() | unknown_event.
+handle_custom_message({rm_trigger},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
     % Trigger an update of the Random view
     % Test for being alone:
@@ -122,7 +123,7 @@ on({rm_trigger},
     end;
 
 % got empty cyclon cache
-on({rm, {cy_cache, []}},
+handle_custom_message({rm, {cy_cache, []}},
    {_Neighborhood, RandViewSize, _Interval, _TriggerState, _Cache, _Churn} = State)  ->
     % ignore empty cache from cyclon
     cyclon:get_subset_rand_next_interval(RandViewSize,
@@ -130,7 +131,7 @@ on({rm, {cy_cache, []}},
     State;
 
 % got cyclon cache
-on({rm, {cy_cache, NewCache}},
+handle_custom_message({rm, {cy_cache, NewCache}},
    {Neighborhood, RandViewSize, Interval, TriggerState, _Cache, Churn}) ->
     % increase RandViewSize (no error detected):
     RandViewSizeNew =
@@ -149,7 +150,7 @@ on({rm, {cy_cache, NewCache}},
     {NewNeighborhood, RandViewSizeNew, Interval, TriggerState, NewCache, Churn};
 
 % got shuffle request
-on({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
+handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
     MyRndView = get_RndView(RandViewSize, Cache),
     MyView = lists:append(MyRndView, nodelist:to_list(Neighborhood)),
@@ -176,7 +177,7 @@ on({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
     {NewNeighborhood, RandViewSize, Interval, TriggerState, Cache, Churn};
 
-on({rm, buffer_response, OtherNeighbors},
+handle_custom_message({rm, buffer_response, OtherNeighbors},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}) ->
     MyRndView = get_RndView(RandViewSize, Cache),
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
@@ -190,13 +191,13 @@ on({rm, buffer_response, OtherNeighbors},
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
-on({rm, {get_node_details_response, NodeDetails}}, State) ->
+handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
     case node_details:get(NodeDetails, is_leaving) of
         false -> update_nodes(State, [node_details:get(NodeDetails, node)], [], null);
         true  -> State
     end;
 
-on(_, _State) -> unknown_event.
+handle_custom_message(_, _State) -> unknown_event.
 
 -spec new_pred(State::state(), NewPred::node:node_type()) -> state().
 new_pred(State, NewPred) ->
