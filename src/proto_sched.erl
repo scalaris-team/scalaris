@@ -301,7 +301,9 @@ on({deliver, TraceId}, State) ->
                     PState = TraceEntry#state.passed_state,
                     InfectedMsg = epidemic_reply_msg(PState, From, To, Msg),
                     ?TRACE("delivering msg to execute: ~.0p~n", [InfectedMsg]),
-                    comm:send(comm:make_global(To), InfectedMsg),
+                    %% Send infected message with a shepherd. In case of send errors,
+                    %% we will be informed by a {send_error, Pid, Msg, Reason} message.
+                    comm:send(comm:make_global(To), InfectedMsg, [{shepherd, self()}]),
                     lists:keystore(TraceId, 1, State, {TraceId, NewEntry})
             end
     end;
@@ -309,6 +311,12 @@ on({deliver, TraceId}, State) ->
 on({on_handler_done, TraceId}, State) ->
     ?TRACE("on handler execution done~n", []),
     gen_component:post_op(State, {deliver, TraceId});
+
+on({send_error, _Pid, Msg, _Reason} = _ShepherdMsg, State) ->
+    %% call on_handler_done and continue with message delivery
+    TraceId = get_trace_id(get_passed_state(Msg)),
+    ?TRACE("send error for trace id ~p: ~p calling on_handler_done~n", [TraceId, _ShepherdMsg]),
+    gen_component:post_op(State, {on_handler_done, TraceId});
 
 on({get_infos, Client, TraceId}, State) ->
     case lists:keyfind(TraceId, 1, State) of
@@ -420,3 +428,11 @@ update_queue_in_list_of_queues(Key, Q, Queues) ->
             _ = erlang:put(Key, Q),
             Queues
     end.
+
+-spec get_passed_state(gc_mpath_msg()) -> passed_state().
+get_passed_state(Msg) ->
+    element(3, Msg).
+
+-spec get_trace_id(passed_state()) -> trace_id().
+get_trace_id(State) ->
+    element(1, State).
