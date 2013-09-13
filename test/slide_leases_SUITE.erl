@@ -309,5 +309,4 @@ check_local_leases(DHTNode) ->
 %% @doc checks whether two interval lists cover the same range
 -spec are_equal(intervals:interval(), list(intervals:interval())) -> boolean().
 are_equal(A, B) ->
-    B_ = lists:foldl(fun intervals:union/2, [], B),
-    intervals:is_subset(A, B_) andalso intervals:is_subset(B_, A).
+    A =:= lists:foldl(fun intervals:union/2, intervals:empty(), B).
