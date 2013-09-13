@@ -544,39 +544,51 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
                                       ownerPid = OwnerL,
                                       stats = Stats }) ->
     SID = rr_recon_stats:get(session_id, Stats),
-    NStats = case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
-                 true -> 
-                     {ASyncLeafs, Stats2} = art_get_sync_leafs([merkle_tree:get_root(Tree)], Art, Stats, []),
-                     OwnerR = comm:make_global(OwnerL),
-                     ResolveCalled = lists:foldl(fun(X, Acc) ->
-                                                         Acc + resolve_leaf(X, DestPid, SID, OwnerL, OwnerR)
-                                                 end, 0, ASyncLeafs),
-                     rr_recon_stats:inc([{resolve_started, ResolveCalled}], Stats2);
-                 false -> Stats
-             end,
+    NStats =
+        case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
+            true ->
+                {ASyncLeafs, NComp, NSkip, NLSync} =
+                    art_get_sync_leaves([merkle_tree:get_root(Tree)], Art,
+                                        [], 0, 0, 0),
+                OwnerR = comm:make_global(OwnerL),
+                ResolveCalled =
+                    lists:foldl(
+                      fun(X, Acc) ->
+                              Acc + resolve_leaf(X, DestPid, SID, OwnerL, OwnerR)
+                      end, 0, ASyncLeafs),
+                rr_recon_stats:inc([{tree_nodesCompared, NComp},
+                                    {tree_compareSkipped, NSkip},
+                                    {tree_leafsSynced, NLSync},
+                                    {resolve_started, ResolveCalled}], Stats);
+            false -> Stats
+        end,
     rr_recon_stats:set([{tree_size, merkle_tree:size_detail(Tree)}], NStats).
 
--spec art_get_sync_leafs(Nodes::NodeL, art:art(), Stats, Acc::NodeL) -> {ToSync::NodeL, Stats} when
-    is_subtype(NodeL,   [merkle_tree:mt_node()]),
-    is_subtype(Stats,  rr_recon_stats:stats()).
-art_get_sync_leafs([], _Art, Stats, ToSyncAcc) ->
-    {ToSyncAcc, Stats};
-art_get_sync_leafs([Node | ToCheck], Art, OStats, ToSyncAcc) ->
-    Stats = rr_recon_stats:inc([{tree_nodesCompared, 1}], OStats),
+%% @doc Gets all leaves in the merkle node list (recursively) which are not
+%%      present in the art structure.
+-spec art_get_sync_leaves(Nodes::NodeL, art:art(), ToSyncAcc::NodeL,
+                          NCompAcc::non_neg_integer(), NSkipAcc::non_neg_integer(),
+                          NLSyncAcc::non_neg_integer())
+        -> {ToSync::NodeL, NComp::non_neg_integer(), NSkip::non_neg_integer(),
+            NLSync::non_neg_integer()} when
+    is_subtype(NodeL,  [merkle_tree:mt_node()]).
+art_get_sync_leaves([], _Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc) ->
+    {ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc};
+art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc) ->
+    NComp = NCompAcc + 1,
     IsLeaf = merkle_tree:is_leaf(Node),
     case art:lookup(Node, Art) of
         true ->
-            NStats = rr_recon_stats:inc([{tree_compareSkipped, ?IIF(IsLeaf, 0, merkle_tree:size(Node))}], Stats),
-            art_get_sync_leafs(ToCheck, Art, NStats, ToSyncAcc);
+            NSkip = NSkipAcc + ?IIF(IsLeaf, 0, merkle_tree:size(Node)),
+            art_get_sync_leaves(Rest, Art, ToSyncAcc, NComp, NSkip, NLSyncAcc);
         false ->
-            case IsLeaf of
-                true ->
-                    NStats = rr_recon_stats:inc([{tree_leafsSynced, 1}], Stats),
-                    art_get_sync_leafs(ToCheck, Art, NStats, [Node | ToSyncAcc]);
-                false ->
-                    art_get_sync_leafs(
-                           lists:append(merkle_tree:get_childs(Node), ToCheck),
-                           Art, Stats, ToSyncAcc)
+            if IsLeaf ->
+                   art_get_sync_leaves(Rest, Art, [Node | ToSyncAcc],
+                                       NComp, NSkipAcc, NLSyncAcc + 1);
+               true ->
+                   art_get_sync_leaves(
+                     lists:append(merkle_tree:get_childs(Node), Rest), Art,
+                     ToSyncAcc, NComp, NSkipAcc, NLSyncAcc)
             end
     end.
 
