@@ -254,7 +254,9 @@ get(Name, {IP, Port, _Pid} = _Node) -> {IP, Port, Name}.
 %%      message at the Nth position of the given envelope.
 -spec reply_as(plain_pid(), pos_integer(), tuple()) ->
                       mypid_with_reply_as() | erl_local_pid_with_reply_as().
-reply_as(Target, Nth, Envelope) -> {Target, e, Nth, Envelope}.
+reply_as(Target, Nth, Envelope) ->
+    ?ASSERT('_' =:= element(Nth, Envelope)),
+    {Target, e, Nth, Envelope}.
 
 %% @doc Check whether the given pid is well formed.
 -spec is_valid(mypid() | any()) -> boolean().
