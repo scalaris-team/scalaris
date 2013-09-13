@@ -37,15 +37,18 @@ groups() ->
                                test_quadruple_join
                                ]},
      {join_and_leave_tests, [sequence], [
-                                         test_quadruple_join_single_leave
+                                         test_quadruple_join_single_leave,
+                                         test_quadruple_join_double_leave,
+                                         test_quadruple_join_triple_leave,
+                                         test_quadruple_join_quadruple_leave
                                          ]}
     ].
 
 all() ->
     [
-     {group, tester_tests},
-     {group, join_tests},
-     {group, join_and_leave_tests}
+%     {group, tester_tests},
+%     {group, join_tests},
+%     {group, join_and_leave_tests}
      ].
 
 suite() -> [ {timetrap, {seconds, 120}} ].
@@ -73,7 +76,8 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
-                                                    {leases, true}]}]),
+                                                    {leases, true},
+                                                    {leases_gc, false}]}]),
             Config
     end.
 
@@ -124,40 +128,28 @@ tester_type_check_slide_leases(_Config) ->
 
 
 test_single_join(_Config) ->
-    wait_for_ring_size(1),
-    wait_for_correct_ring(),
-    %ct:pal("leases ~p", [get_all_leases()]),
-    join_until(2),
-    true.
+    join_test(2).
 
 test_double_join(_Config) ->
-    wait_for_ring_size(1),
-    wait_for_correct_ring(),
-    %ct:pal("leases ~p", [get_all_leases()]),
-    join_until(3),
-    true.
+    join_test(3).
 
 test_triple_join(_Config) ->
-    wait_for_ring_size(1),
-    wait_for_correct_ring(),
-    %ct:pal("leases ~p", [get_all_leases()]),
-    join_until(4),
-    true.
+    join_test(4).
 
 test_quadruple_join(_Config) ->
-    wait_for_ring_size(1),
-    wait_for_correct_ring(),
-    %ct:pal("leases ~p", [get_all_leases()]),
-    join_until(5),
-    true.
+    join_test(5).
 
 test_quadruple_join_single_leave(_Config) ->
-    wait_for_ring_size(1),
-    wait_for_correct_ring(),
-    %ct:pal("leases ~p", [get_all_leases()]),
-    join_until(5),
-    leave_until(5, 4),
-    true.
+    join_leave_test(5, 4).
+
+test_quadruple_join_double_leave(_Config) ->
+    join_leave_test(5, 3).
+
+test_quadruple_join_triple_leave(_Config) ->
+    join_leave_test(5, 2).
+
+test_quadruple_join_quadruple_leave(_Config) ->
+    join_leave_test(5, 1).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -165,6 +157,12 @@ test_quadruple_join_single_leave(_Config) ->
 % join helper
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+join_test(TargetSize) ->
+    wait_for_ring_size(1),
+    wait_for_correct_ring(),
+    join_until(TargetSize),
+    true.
 
 join_until(TargetSize) ->
     joiner_helper(1, TargetSize).
@@ -186,6 +184,13 @@ synchronous_join(TargetSize) ->
 % leave helper
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+join_leave_test(JoinTargetSize, LeaveTargetSize) ->
+    wait_for_ring_size(1),
+    wait_for_correct_ring(),
+    join_until(JoinTargetSize),
+    leave_until(JoinTargetSize, LeaveTargetSize),
+    true.
 
 leave_until(TargetSize, TargetSize) ->
     ok;
