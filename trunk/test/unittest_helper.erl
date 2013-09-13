@@ -254,8 +254,6 @@ stop_ring(Pid) ->
             catch exit(Pid, kill),
             util:wait_for_process_to_die(Pid),
             stop_pid_groups(),
-            catch(unregister(ct_test_ring)),
-            error_logger:tty(true),
             ct:pal("unittest_helper:stop_ring done."),
             ok
         end
@@ -263,6 +261,9 @@ stop_ring(Pid) ->
         Level:Reason ->
             ct:pal("~s in stop_ring: ~p~n~.0p", [Level, Reason, erlang:get_stacktrace()]),
             erlang:Level(Reason)
+    after
+            catch(unregister(ct_test_ring)),
+            error_logger:tty(true)
     end.
 
 -spec stop_pid_groups() -> ok.
