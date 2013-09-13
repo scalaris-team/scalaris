@@ -95,30 +95,45 @@ update_rcv_data2(State, SlideOp, {continue}) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
     % start to split own range
-    io:format("prepare_send_delta1~n", []),
+    log:log("prepare_send_delta1~n", []),
     case find_lease(State, OldSlideOp) of
         {ok, Lease} ->
             Id = l_on_cseq:id(l_on_cseq:get_range(Lease)),
             % check slide direction
             Interval = slide_op:get_interval(OldSlideOp),
-            {R1, R2} = case intervals:in(Id, Interval) of
-                           true ->
-                               % ->
-                               {intervals:minus(l_on_cseq:get_range(Lease), Interval), Interval};
-                           false ->
-                               % <-
-                               {Interval, intervals:minus(l_on_cseq:get_range(Lease), Interval)}
-                       end,
-            io:format("R1 ~p ~n", [R1]),
-            io:format("R2 ~p ~n", [R2]),
-            Node = slide_op:get_node(OldSlideOp),
-            NewOwner = node:pidX(Node),
-            l_on_cseq:lease_split_and_change_owner(Lease, R1, R2, NewOwner, ReplyPid),
-            {ok, State, OldSlideOp};
+            case Interval =:= l_on_cseq:get_range(Lease) of
+                false ->
+                    {R1, R2} = case intervals:in(Id, Interval) of
+                                   true ->
+                                                % ->
+                                       {intervals:minus(l_on_cseq:get_range(Lease), Interval), Interval};
+                                   false ->
+                                                % <-
+                                       {Interval, intervals:minus(l_on_cseq:get_range(Lease), Interval)}
+                               end,
+                    NewOwner = node:pidX(slide_op:get_node(OldSlideOp)),
+                    l_on_cseq:lease_split_and_change_owner(Lease, R1, R2, NewOwner, ReplyPid),
+                    {ok, State, OldSlideOp};
+                true ->
+                    %log:log("only change owner instead of split and change owner", []),
+                    %% @todo
+                    %log:log("Id ~p ~n", [Id]),
+                    %log:log("Interval     ~p", [Interval]),
+                    %log:log("intervals:in ~p", [intervals:in(Id, Interval)]),
+                    %log:log("lease        ~p", [Lease]),
+                    %log:log("lease range  ~p", [l_on_cseq:get_range(Lease)]),
+                    %log:log("bounds       ~p", [intervals:get_bounds(l_on_cseq:get_range(Lease))]),
+                    %log:log("id           ~p", [l_on_cseq:id(l_on_cseq:get_range(Lease))]),
+                    NewOwner = node:pidX(slide_op:get_node(OldSlideOp)),
+                    l_on_cseq:lease_handover(Lease, NewOwner, ReplyPid),
+                    {ok, State, OldSlideOp}
+                    %error
+            end;
         error ->
             % @todo
             error
     end.
+
 
 -spec prepare_send_delta2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                           EmbeddedMsg::any())
@@ -128,7 +143,7 @@ prepare_send_delta2(State, SlideOp, Msg) ->
     case Msg of
         {handover, success, NewLease} ->
             % disable new lease
-            io:format("prepare_send_delta2 ~p~n", [Msg]),
+            log:log("prepare_send_delta2 ~p~n", [Msg]),
             State1 = locally_disable_lease(State, NewLease),
             {ok, State1, SlideOp};
         {split, fail, _Lease} ->
