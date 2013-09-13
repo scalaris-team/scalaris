@@ -1239,15 +1239,29 @@ split_range(Range, Key) ->
             {ok, R1, R2}
     end.
 
+-spec lease_sort(list(lease_t())) -> list(lease_t()).
+lease_sort(Leases) ->
+    lists:sort(fun (X, Y) ->
+                       I1 = get_range(X), I2 = get_range(Y),
+                       case {intervals:is_empty(I1), intervals:is_empty(I2)} of
+                           {true,  true} -> false;
+                           {true,  false} -> true;
+                           {false, true} -> false;
+                           {false, false} ->
+                               {_, L1, _, _} = intervals:get_bounds(I1),
+                               {_, L2, _, _} = intervals:get_bounds(I2),
+                               L1 < L2
+                       end
+               end,
+               Leases).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % garbage collector
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec find_adjacent(list(intervals:interval())) -> boolean().
-find_adjacent([]) ->
-    false;
+-spec find_adjacent(list(lease_t())) -> boolean().
 find_adjacent([_]) ->
     false;
 find_adjacent([X, Y|Rest]) ->
@@ -1260,8 +1274,7 @@ find_adjacent([X, Y|Rest]) ->
             find_adjacent([Y|Rest])
     end.
 
--spec check_last_and_first(list(intervals:interval())) -> ok.
-check_last_and_first([]) -> ok;
+-spec check_last_and_first(list(lease_t())) -> ok.
 check_last_and_first([_]) -> ok;
 check_last_and_first([First|Rest]) ->
     Last = lists:last(Rest),
@@ -1273,17 +1286,13 @@ check_last_and_first([First|Rest]) ->
             ok
 end.
 
--spec trigger_garbage_collection(list(intervals:interval())) -> ok.
+-spec trigger_garbage_collection(list(lease_t())) -> ok.
 trigger_garbage_collection(ActiveLeaseList) ->
     Leases = [L || L <- ActiveLeaseList, get_aux(L) =:= empty],
     case Leases of
         [] -> ok;
         _ ->
-            SortedLeases = lists:sort(fun (X, Y) ->
-                                              I1 = get_range(X), I2 = get_range(Y),
-                                              intervals:interval_sort(I1, I2)
-                                      end,
-                                      Leases),
+            SortedLeases = lease_sort(Leases),
             case find_adjacent(SortedLeases) of
                 true ->
                     ok;
