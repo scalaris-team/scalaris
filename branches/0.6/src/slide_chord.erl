@@ -99,7 +99,7 @@ change_my_id(State, SlideOp, ReplyPid) ->
         _ ->
             rm_loop:subscribe(
               ReplyPid, {move, slide_op:get_id(SlideOp2)},
-              fun(_OldN, NewN, _SlideType) ->
+              fun(_OldN, NewN, _Reason) ->
                       nodelist:nodeid(NewN) =:= TargetId
               % note: no need to check the id version
               end,
@@ -176,7 +176,7 @@ send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid) ->
             OldPred = slide_op:get_node(SlideOp),
             rm_loop:subscribe(
               ReplyPid, {move, slide_op:get_id(SlideOp)},
-              fun(RMOldN, RMNewN, _SlideType) ->
+              fun(RMOldN, RMNewN, _Reason) ->
                       RMNewPred = nodelist:pred(RMNewN),
                       RMOldPred = nodelist:pred(RMOldN),
                       RMOldPred =/= RMNewPred orelse
