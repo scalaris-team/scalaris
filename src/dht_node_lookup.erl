@@ -99,7 +99,7 @@ lookup_fin_chord(State, Key, Hops, Msg) ->
     FwdList = [P || {I, P} <- MsgFwd, intervals:in(Key, I)],
     case FwdList of
         []    ->
-            case dht_node_state:is_db_responsible(Key, State) of
+            case dht_node_state:is_db_responsible__no_msg_fwd_check(Key, State) of
                 true ->
                     %comm:send_local(dht_node_state:get(State, monitor_proc),
                     %                {lookup_hops, Hops}),
