@@ -310,11 +310,20 @@ start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
                  intervals:in(RKey, MyI)]).
 
 -spec shutdown(exit_reason(), state()) -> kill.
-shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, 
-                                    send_stats = SendStats,
-                                    stats = Stats}) ->
+shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
+                                    stats = Stats, feedbackDestPid = FBDest}) ->
     send_stats(SendStats, Stats),
-    comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
+    comm:send_local(Owner, {resolve_progress_report, comm:this(), Stats}),
+    case FBDest of
+        undefined -> ok;
+        FBDest when Stats#resolve_stats.diff_size =:= 0 ->
+            % need to send a fake resolve_progress_report so that the other
+            % rrepair process can clean up its session
+            SID = Stats#resolve_stats.session_id,
+            FBStats = #resolve_stats{feedback_response = true, session_id = SID},
+            comm:send(FBDest, {resolve_progress_report, comm:this(), FBStats});
+        _ -> ok
+    end,
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
