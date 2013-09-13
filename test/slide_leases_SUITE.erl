@@ -35,13 +35,17 @@ groups() ->
                                test_double_join,
                                test_triple_join,
                                test_quadruple_join
-                               ]}
+                               ]},
+     {join_and_leave_tests, [sequence], [
+                                         test_quadruple_join_single_leave
+                                         ]}
     ].
 
 all() ->
     [
      {group, tester_tests},
      {group, join_tests}
+     %{group, join_and_leave_tests}
      ].
 
 suite() -> [ {timetrap, {seconds, 120}} ].
@@ -118,53 +122,87 @@ tester_type_check_slide_leases(_Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-synchronous_join(TargetSize) ->
-    api_vm:add_nodes(1),
-    wait_for_ring_size(TargetSize),
-    wait_for_correct_ring(),
-    wait_for_correct_leases(TargetSize).
 
 test_single_join(_Config) ->
     wait_for_ring_size(1),
     wait_for_correct_ring(),
     %ct:pal("leases ~p", [get_all_leases()]),
-    synchronous_join(2),
+    join_until(2),
     true.
 
 test_double_join(_Config) ->
     wait_for_ring_size(1),
     wait_for_correct_ring(),
     %ct:pal("leases ~p", [get_all_leases()]),
-    synchronous_join(2),
-    synchronous_join(3),
+    join_until(3),
     true.
 
 test_triple_join(_Config) ->
     wait_for_ring_size(1),
     wait_for_correct_ring(),
     %ct:pal("leases ~p", [get_all_leases()]),
-    synchronous_join(2),
-    synchronous_join(3),
-    synchronous_join(4),
+    join_until(4),
     true.
 
 test_quadruple_join(_Config) ->
     wait_for_ring_size(1),
     wait_for_correct_ring(),
     %ct:pal("leases ~p", [get_all_leases()]),
-    synchronous_join(2),
-    synchronous_join(3),
-    synchronous_join(4),
-    synchronous_join(5),
+    join_until(5),
     true.
 
+test_quadruple_join_single_leave(_Config) ->
+    wait_for_ring_size(1),
+    wait_for_correct_ring(),
+    %ct:pal("leases ~p", [get_all_leases()]),
+    join_until(5),
+    leave_until(5, 4),
+    true.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% join helper
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+join_until(TargetSize) ->
+    joiner_helper(1, TargetSize).
+
+joiner_helper(Target, Target) ->
+    ok;
+joiner_helper(Current, Target) ->
+    synchronous_join(Current+1),
+    joiner_helper(Current+1, Target).
+
+synchronous_join(TargetSize) ->
+    api_vm:add_nodes(1),
+    wait_for_ring_size(TargetSize),
+    wait_for_correct_ring(),
+    wait_for_correct_leases(TargetSize).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% leave helper
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+leave_until(TargetSize, TargetSize) ->
+    ok;
+leave_until(CurrentSize, TargetSize) ->
+    Node = pid_groups:find_a(dht_node),
+    ct:pal("~w", Node),
+    api_vm:shutdown_nodes(pid_groups:find_a(dht_node)),
+    wait_for_ring_size(CurrentSize - 1),
+    wait_for_correct_ring(),
+    wait_for_correct_leases(CurrentSize - 1),
+    leave_until(CurrentSize - 1, TargetSize).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % wait helper
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 wait_for(F) ->
     case F() of
         true ->
@@ -197,7 +235,8 @@ get_leases(Pid) ->
     get_dht_node_state(Pid, lease_list).
 
 wait_for_correct_leases(TargetSize) ->
-    wait_for(lease_checker(TargetSize)).
+    wait_for(lease_checker(TargetSize)),
+    wait_for(fun check_leases_per_node/0).
 
 is_disjoint([]) ->
     true;
@@ -229,12 +268,18 @@ lease_checker(TargetSize) ->
     end.
 
 check_leases_per_node() ->
-    lists:all([ check_local_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ]).
+    lists:all(fun (B) -> B end, [ check_local_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ]).
 
 check_local_leases(DHTNode) ->
     {ActiveLeases, PassiveLeases} = get_dht_node_state(DHTNode, lease_list),
     ActiveIntervals = lists:flatten(
                         [ l_on_cseq:get_range(Lease) || Lease <- ActiveLeases]),
     MyRange = get_dht_node_state(DHTNode, my_range),
-    LocalCorrect = intervals:are_equal(MyRange, ActiveIntervals),
+    LocalCorrect = are_equal(MyRange, ActiveIntervals),
     length(PassiveLeases) == 0 andalso LocalCorrect.
+
+
+%% @doc checks whether two interval lists cover the same range
+-spec are_equal(intervals:simple_interval(), list(intervals:simple_interval())) -> boolean().
+are_equal(A, B) ->
+    intervals:is_subset(A, B) andalso intervals:is_subset(B, A).
