@@ -83,27 +83,32 @@ inc([], Stats) ->
     Stats;
 inc([{K, V} | L], Stats) ->
     NS = case K of
-             tree_size -> Stats#rr_recon_stats{ tree_size = V };
-             tree_compareLeft -> 
-                 Stats#rr_recon_stats{ tree_compareLeft = 
-                                           V + Stats#rr_recon_stats.tree_compareLeft };
+             tree_size ->
+                 Stats#rr_recon_stats{tree_size = V};
+             tree_compareLeft ->
+                 X = V + Stats#rr_recon_stats.tree_compareLeft,
+                 Stats#rr_recon_stats{tree_compareLeft = X};
              tree_nodesCompared ->
-                 Stats#rr_recon_stats { tree_nodesCompared =
-                                            V + Stats#rr_recon_stats.tree_nodesCompared };
+                 X = V + Stats#rr_recon_stats.tree_nodesCompared,
+                 Stats#rr_recon_stats {tree_nodesCompared = X};
              tree_leafsSynced ->
-                 Stats#rr_recon_stats{ tree_leafsSynced = 
-                                           V + Stats#rr_recon_stats.tree_leafsSynced };
+                 X = V + Stats#rr_recon_stats.tree_leafsSynced,
+                 Stats#rr_recon_stats{tree_leafsSynced = X};
              tree_compareSkipped ->
-                 Stats#rr_recon_stats{ tree_compareSkipped = 
-                                           V + Stats#rr_recon_stats.tree_compareSkipped };
+                 X = V + Stats#rr_recon_stats.tree_compareSkipped,
+                 Stats#rr_recon_stats{tree_compareSkipped = X};
              error_count ->
-                 Stats#rr_recon_stats{ error_count = V + Stats#rr_recon_stats.error_count };
+                 X = V + Stats#rr_recon_stats.error_count,
+                 Stats#rr_recon_stats{error_count = X};
              build_time ->
-                 Stats#rr_recon_stats{ build_time = V + Stats#rr_recon_stats.build_time };
+                 X = V + Stats#rr_recon_stats.build_time,
+                 Stats#rr_recon_stats{build_time = X};
              recon_time ->
-                 Stats#rr_recon_stats{ recon_time = V + Stats#rr_recon_stats.recon_time };
+                 X = V + Stats#rr_recon_stats.recon_time,
+                 Stats#rr_recon_stats{recon_time = X};
              resolve_started ->
-                 Stats#rr_recon_stats{ resolve_started = V + Stats#rr_recon_stats.resolve_started }
+                 X = V + Stats#rr_recon_stats.resolve_started,
+                 Stats#rr_recon_stats{resolve_started = X}
          end,
     inc(L, NS).
 
@@ -113,17 +118,17 @@ set([], Stats) ->
     Stats;
 set([{K, V} | L], Stats) ->
     NS = case K of
-             session_id -> Stats#rr_recon_stats{ session_id = V };
-             tree_size -> Stats#rr_recon_stats{ tree_size = V };
-             tree_compareLeft -> Stats#rr_recon_stats{ tree_compareLeft = V };
-             tree_nodesCompared -> Stats#rr_recon_stats { tree_nodesCompared = V };
-             tree_leafsSynced -> Stats#rr_recon_stats{ tree_leafsSynced = V };
-             tree_compareSkipped -> Stats#rr_recon_stats{ tree_compareSkipped = V };
-             error_count -> Stats#rr_recon_stats{ error_count = V };
-             build_time -> Stats#rr_recon_stats{ build_time = V };
-             recon_time -> Stats#rr_recon_stats{ recon_time = V };             
-             resolve_started -> Stats#rr_recon_stats{ resolve_started = V };
-             status -> Stats#rr_recon_stats{ status = V }
+             session_id          -> Stats#rr_recon_stats{session_id = V};
+             tree_size           -> Stats#rr_recon_stats{tree_size = V};
+             tree_compareLeft    -> Stats#rr_recon_stats{tree_compareLeft = V};
+             tree_nodesCompared  -> Stats#rr_recon_stats{tree_nodesCompared = V};
+             tree_leafsSynced    -> Stats#rr_recon_stats{tree_leafsSynced = V};
+             tree_compareSkipped -> Stats#rr_recon_stats{tree_compareSkipped = V};
+             error_count         -> Stats#rr_recon_stats{error_count = V};
+             build_time          -> Stats#rr_recon_stats{build_time = V};
+             recon_time          -> Stats#rr_recon_stats{recon_time = V};
+             resolve_started     -> Stats#rr_recon_stats{resolve_started = V};
+             status              -> Stats#rr_recon_stats{status = V}
          end,
     set(L, NS).
 
@@ -138,20 +143,17 @@ set([{K, V} | L], Stats) ->
          (recon_time, stats())         -> non_neg_integer();
          (resolve_started, stats())    -> non_neg_integer();
          (status, stats())             -> status().
-get(K, Stats) ->
-    case K of
-        session_id -> Stats#rr_recon_stats.session_id;
-        tree_size -> Stats#rr_recon_stats.tree_size;
-        tree_compareLeft -> Stats#rr_recon_stats.tree_compareLeft;
-        tree_nodesCompared -> Stats#rr_recon_stats.tree_nodesCompared;
-        tree_leafsSynced -> Stats#rr_recon_stats.tree_leafsSynced;
-        tree_compareSkipped -> Stats#rr_recon_stats.tree_compareSkipped;
-        error_count -> Stats#rr_recon_stats.error_count;
-        build_time -> Stats#rr_recon_stats.build_time;
-        recon_time -> Stats#rr_recon_stats.recon_time;
-        resolve_started -> Stats#rr_recon_stats.resolve_started;
-        status -> Stats#rr_recon_stats.status
-    end.
+get(session_id         , #rr_recon_stats{session_id          = X}) -> X;
+get(tree_size          , #rr_recon_stats{tree_size           = X}) -> X;
+get(tree_compareLeft   , #rr_recon_stats{tree_compareLeft    = X}) -> X;
+get(tree_nodesCompared , #rr_recon_stats{tree_nodesCompared  = X}) -> X;
+get(tree_leafsSynced   , #rr_recon_stats{tree_leafsSynced    = X}) -> X;
+get(tree_compareSkipped, #rr_recon_stats{tree_compareSkipped = X}) -> X;
+get(error_count        , #rr_recon_stats{error_count         = X}) -> X;
+get(build_time         , #rr_recon_stats{build_time          = X}) -> X;
+get(recon_time         , #rr_recon_stats{recon_time          = X}) -> X;
+get(resolve_started    , #rr_recon_stats{resolve_started     = X}) -> X;
+get(status             , #rr_recon_stats{status              = X}) -> X.
 
 -spec merge(stats(), stats()) -> stats().
 merge(A, #rr_recon_stats{ tree_size = TS,
