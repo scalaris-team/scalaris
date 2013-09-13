@@ -31,9 +31,7 @@
          set_rt/2, set_rm/2, set_db/2, set_lease_list/2,
          details/1, details/2]).
 %% node responsibility:
--export([has_left/1,
-        is_responsible/2,
-        is_db_responsible/2]).
+-export([has_left/1, is_db_responsible/2]).
 %% transactions:
 -export([set_tx_tp_db/2]).
 %% node moves:
@@ -286,23 +284,13 @@ set_lease_list(State, LeaseList) ->
 has_left(#state{rm_state=RMState}) ->
     rm_loop:has_left(RMState).
 
-%% @doc Checks whether the given key is in the node's range, i.e. the node is
-%%      responsible for this key.
-%%      Beware of race conditions sing the neighborhood may have changed at
-%%      the next call.
--spec is_responsible(Key::intervals:key(), State::state()) -> boolean().
-is_responsible(Key, #state{rm_state=RMState}) ->
-    rm_loop:is_responsible(Key, RMState).
-
 %% @doc Checks whether the node is responsible for the given key either by its
 %%      current range or for a range the node is temporarily responsible for
 %%      during a slide operation, i.e. we temporarily read/modify data a
 %%      neighbor is responsible for but hasn't yet received the data from us.
-%%      Beware of race conditions sing the neighborhood may have changed at
-%%      the next call.
 -spec is_db_responsible(Key::intervals:key(), State::state()) -> boolean().
-is_db_responsible(Key, State = #state{db_range = DBRange}) ->
-    is_responsible(Key, State) orelse
+is_db_responsible(Key, #state{db_range = DBRange, rm_state = RMState}) ->
+    rm_loop:is_responsible(Key, RMState) orelse
         lists:any(fun({Interval, _Id}) ->
                           intervals:in(Key, Interval)
                   end, DBRange).
