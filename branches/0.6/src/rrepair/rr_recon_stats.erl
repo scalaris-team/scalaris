@@ -84,7 +84,10 @@ inc([], Stats) ->
 inc([{K, V} | L], Stats) ->
     NS = case K of
              tree_size ->
-                 Stats#rr_recon_stats{tree_size = V};
+                 {OldI, OldF} = Stats#rr_recon_stats.tree_size,
+                 {IncI, IncF} = V,
+                 X = {OldI + IncI, OldF + IncF},
+                 Stats#rr_recon_stats{tree_size = X};
              tree_compareLeft ->
                  X = V + Stats#rr_recon_stats.tree_compareLeft,
                  Stats#rr_recon_stats{tree_compareLeft = X};
