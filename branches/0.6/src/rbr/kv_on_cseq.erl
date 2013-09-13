@@ -324,9 +324,9 @@ wf_unset_rl(DBEntry, _UI = none, {TxId, _TLogVers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% commit write releases the write lock of a given entry, if it was
 %% set, and writes the new value.
- 
+
 %% erlang shell test call: api_tx:write("a", 1).
- 
+
 -spec commit_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), ok,
                           prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                  {tx_tlog:tlog_entry_write(), ?RT:key(),
@@ -435,7 +435,7 @@ cc_abort_read(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
     {true, none};
 cc_abort_read({_RL, _Vers}, _WF, _Val = {_TxId, _TLogVers}) ->
     {true, none}.
-                                                        
+
 %.%% in case of fast write we get the value of the last read as
 %.  %% value, which here was produced by the read filter of set_lock
 %.  cc_abort_read({_RL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
@@ -451,9 +451,9 @@ cc_abort_read({_RL, _Vers}, _WF, _Val = {_TxId, _TLogVers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% abort write releases the write lock of a given entry, if it was
 %% set.
- 
+
 %% erlang shell test call: api_tx:write("a", 1).
- 
+
 -spec abort_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), ok,
                           prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                  {tx_tlog:tlog_entry_write(), ?RT:key(),
@@ -519,6 +519,12 @@ wf_unset_wl(DBEntry, _UI = none, {TxId, _TLogVers, _Val}) ->
 cc_return_val(WhichCC, Checks, UI, Log) ->
     lists:foldl(
       fun({Xbool, Xreason}, {Result, UI_or_Reasons}) ->
+              %% log is defined as macro ?LOG_CC_FAILS. Unfortunately
+              %% dialyzer claims Log to be always false. But for
+              %% debugging purposes we can alter this for individual
+              %% content checks or enable logging for all of them by
+              %% redefining the macro. So it seems we have to live
+              %% with dialyzer's warning here.
               case Log andalso not Xbool of
                   true -> log:log("~p cc failed: ~.0p~n", [WhichCC, Xreason]);
                   false -> ok
