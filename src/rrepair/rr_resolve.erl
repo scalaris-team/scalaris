@@ -98,7 +98,6 @@
     % internal
     {get_state_response, intervals:interval()} |    
     {update_key_entry_ack, db_entry:entry(), Exists::boolean(), Done::boolean()} |
-    {shutdown, exit_reason()} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -291,9 +290,6 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
                 shutdown(resolve_ok, NewState);
         true -> NewState
     end;
-
-on({shutdown, Reason}, State) ->
-    shutdown(Reason, State);
 
 on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
