@@ -267,7 +267,7 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
 %%                  -> trigger write_through to stabilize an open consens
 %%               otherwise just register the reply.
 on({qread_collect,
-    {read_reply, MyRwithId, Val, AckRound}}, State) ->
+    {read_reply, Cons, MyRwithId, Val, AckRound}}, State) ->
     ?TRACE("rbrcseq:on qread_collect read_reply MyRwithId: ~p~n", [MyRwithId]),
     %% collect a majority of answers and select that one with the highest
     %% round number.
@@ -379,7 +379,7 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
     end;
 
 on({qread_write_through_collect, ReqId,
-    {write_reply, _Key, Round, NextRound}}, State) ->
+    {write_reply, Cons, _Key, Round, NextRound}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_collect reply ~p~n", [ReqId]),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -403,7 +403,7 @@ on({qread_write_through_collect, ReqId,
     State;
 
 on({qread_write_through_collect, ReqId,
-    {write_deny, Key, NewerRound}}, State) ->
+    {write_deny, Cons, Key, NewerRound}}, State) ->
     ?TRACE("rbrcseq:on qread_write_through_collect deny ~p~n", [ReqId]),
     TableName = tablename(State),
     Entry = get_entry(ReqId, TableName),
@@ -569,7 +569,7 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
 %%                when      majority reached, -> finish.
 %%                otherwise just register the reply.
 on({qwrite_collect, ReqId,
-    {write_reply, _Key, Round, NextRound}}, State) ->
+    {write_reply, Cons, _Key, Round, NextRound}}, State) ->
     ?TRACE("rbrcseq:on qwrite_collect write_reply~n", []),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
@@ -593,7 +593,7 @@ on({qwrite_collect, ReqId,
 %%                when      majority reached, -> finish.
 %%                otherwise just register the reply.
 on({qwrite_collect, ReqId,
-    {write_deny, _Key, NewerRound}}, State) ->
+    {write_deny, Cons, _Key, NewerRound}}, State) ->
     ?TRACE("rbrcseq:on qwrite_collect write_deny~n", []),
     TableName = tablename(State),
     Entry = get_entry(ReqId, TableName),
