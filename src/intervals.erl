@@ -49,6 +49,7 @@
          intersection/2, union/2, minus/2,
          % getters for certain intervals
          get_bounds/1, get_elements/1, get_simple_intervals/1,
+         simple_interval_to_interval/1,
          % various
          wraps_around/4,
          %
@@ -734,3 +735,9 @@ split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc) ->
 -spec get_simple_intervals(Interval::interval()) -> [simple_interval()].
 get_simple_intervals(Interval) ->
     Interval.
+
+%% @doc Converts a simple interval (e.g. from get_simple_intervals/1) to a
+%%      valid interval().
+-spec simple_interval_to_interval(SInterval::simple_interval()) -> interval().
+simple_interval_to_interval(SInterval) ->
+    normalize_simple(SInterval).
