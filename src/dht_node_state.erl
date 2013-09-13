@@ -69,9 +69,10 @@
 
 -type slide_snap() :: {snapshot_state:snapshot_state(), db_dht:db_as_list()} | {false}.
 
--type slide_data() :: {MovingData::db_dht:db_as_list(),
-                       slide_snap()}.
--type slide_delta() :: {ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()]}.
+-type slide_data() :: {{MovingData::db_dht:db_as_list(), slide_snap()},
+                       [{db_selector(), db_prbr:db_as_list()}]}.
+-type slide_delta() :: {{ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()]},
+                        [{db_selector(), {Changed::db_prbr:db_as_list(), Deleted::[?RT:key()]}}]}.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
@@ -461,12 +462,12 @@ slide_get_data_start_record(State, MovingInterval) ->
            [?MODULE, comm:this(), MovingData, MovingSnapData,
             MovingInterval, OldDB, NewDB]),
     NewState = set_db(T1State, NewDB),
-    {NewState, [{MovingData, MovingSnapData} | MoveRBRData]}.
+    {NewState, {{MovingData, MovingSnapData}, MoveRBRData}}.
 
 
 %% @doc Adds data from slide_get_data_start_record/2 to the local DB.
 -spec slide_add_data(state(),slide_data()) -> state().
-slide_add_data(State, [{Data, SnapData} | PRBRData]) ->
+slide_add_data(State, {{Data, SnapData}, PRBRData}) ->
     T1DB = db_dht:add_data(get(State, db), Data),
     ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~p~n~p",
            [?MODULE, comm:this(), Data, SnapData, NewDB]),
@@ -516,11 +517,11 @@ slide_take_delta_stop_record(State, MovingInterval) ->
     NewState = slide_stop_record(State, MovingInterval, true),
     ?TRACE("~p:slide_take_delta_stop_record: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), ChangedData, get(NewState, db)]),
-    {NewState, [ChangedData | DeltaRBR]}.
+    {NewState, {ChangedData, DeltaRBR}}.
 
 %% @doc Adds delta infos from slide_take_delta_stop_record/2 to the local DB.
 -spec slide_add_delta(state(), slide_delta()) -> state().
-slide_add_delta(State, [{ChangedData, DeletedKeys} | PRBRDelta]) ->
+slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta}) ->
     NewDB1 = db_dht:add_data(get(State, db), ChangedData),
     NewDB2 = db_dht:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
     ?TRACE("~p:slide_add_delta: ~p~nChangedData: ~n~p~n~p",
