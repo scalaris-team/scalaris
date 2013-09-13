@@ -394,20 +394,18 @@ get_web_debug_info({RM_State, _HasLeft, SubscrTable}) ->
 
 %% @doc Calls RMFun (which may update the Neighborhood), then calls all
 %%      subscribers and updates the failure detector if necessary.
--spec update_state(OldState::state_t(), RMFun::fun((?RM:state()) -> ?RM:state()))
+-spec update_state(OldState::state_t(), RMFun::fun((?RM:state()) -> {reason(), ?RM:state()}))
         -> NewState::state_t().
 update_state(OldState, RMFun) ->
     update_state(OldState, RMFun, null).
 
--spec update_state(OldState::state_t(), RMFun::fun((?RM:state()) -> ?RM:state()),
+-spec update_state(OldState::state_t(), RMFun::fun((?RM:state()) -> {reason(), ?RM:state()}),
                    CrashedPid::comm:mypid() | null) -> NewState::state_t().
 update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun, CrashedPid) ->
     OldNeighborhood = ?RM:get_neighbors(OldRM_State),
-    NewRM_State = RMFun(OldRM_State),
+    {Reason, NewRM_State} = RMFun(OldRM_State),
     NewNeighborhood = ?RM:get_neighbors(NewRM_State),
-    call_subscribers(OldNeighborhood, NewNeighborhood,
-                     ?IIF(CrashedPid =/= null, {node_crashed, CrashedPid}, {unknown}),
-                     SubscrTable),
+    call_subscribers(OldNeighborhood, NewNeighborhood, Reason, SubscrTable),
     update_failuredetector(OldNeighborhood, NewNeighborhood, CrashedPid),
     NewState = {NewRM_State, HasLeft, SubscrTable},
     ?TRACE_STATE(_OldState, NewState),
