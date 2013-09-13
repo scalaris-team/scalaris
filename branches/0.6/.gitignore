@@ -20,6 +20,7 @@
 *.beam
 *~
 /ct.log
+/ct_*_SUITE.log
 /ct_log_cache
 /result_increment_10_1000.txt
 /result_increment_1_10000.txt

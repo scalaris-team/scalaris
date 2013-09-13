@@ -114,8 +114,8 @@ test-with-cover: compile
 # use non standard ports to run a single SUITE, so it can be executed
 # in parallel to a full test suite run or a locally running default
 # scalaris session.
-	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
-	grep " 0 failed" ct.log
+	SCALARIS_UNITTEST_PORT=14193 SCALARIS_UNITTEST_YAWS_PORT=7999 @RUN_TEST@ $(UNITTESTARGS) -name $@_$(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $@ @CTHOOKS_FLAGS@ -noshell | tee ct_$@.log ; \
+	grep " 0 failed" ct_$@.log
 
 %_SUITE-with-cover: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -suite $*_SUITE -cover test/scalaris.coverspec @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
@@ -125,7 +125,7 @@ test-vts: compile
 	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ @CTHOOKS_FLAGS@
 
 test-clean:
-	-rm -rf ct_run.*@* ct.log index.html all_runs.html variables-*@* \
+	-rm -rf ct_run.*@* ct.log ct_*_SUITE.log index.html all_runs.html variables-*@* \
             result_increment_10_1000.txt result_increment_1_10000.txt \
             result_read_10_10000.txt result_read_1_100000.txt \
             data/ct*@*
