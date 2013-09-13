@@ -239,9 +239,16 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
     MyId = {my_id(), ReqId},
     Dest = pid_groups:find_a(dht_node),
     DB = db_selector(State),
-    _ = [ comm:send_local(Dest,
-                          {?lookup_aux, X, 0,
-                           {prbr, read, DB, This, X, MyId, ReadFilter}})
+    _ = [ begin
+              %% let fill in whether lookup was consistent
+              LookupEnvelope =
+                  dht_node_lookup:envelope(
+                    4,
+                    {prbr, read, DB, '_', This, X, MyId, ReadFilter}),
+              comm:send_local(Dest,
+                              {?lookup_aux, X, 0,
+                               LookupEnvelope})
+          end
           || X <- ?RT:get_replica_keys(Key) ],
 
     %% retriggering of the request is done via the periodic dictionary scan
@@ -338,13 +345,20 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
 
             Dest = pid_groups:find_a(dht_node),
             DB = db_selector(State),
-            _ = [ comm:send_local(Dest,
-                                  {?lookup_aux, X, 0,
-                                   {prbr, write, DB, Collector, X,
-                                    entry_my_round(ReadEntry),
-                                    entry_val(ReadEntry),
-                                    null,
-                                    fun prbr:noop_write_filter/3}})
+            _ = [ begin
+                      %% let fill in whether lookup was consistent
+                      LookupEnvelope =
+                          dht_node_lookup:envelope(
+                            4,
+                            {prbr, write, DB, '_', Collector, X,
+                             entry_my_round(ReadEntry),
+                             entry_val(ReadEntry),
+                             null,
+                             fun prbr:noop_write_filter/3}),
+                      comm:send_local(Dest,
+                                      {?lookup_aux, X, 0,
+                                       LookupEnvelope})
+                  end
                   || X <- ?RT:get_replica_keys(entry_key(Entry)) ],
             set_entry(Entry, tablename(State)),
             State;
@@ -532,12 +546,16 @@ on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
             %% own proposal possible as next instance in the consens sequence
             This = comm:reply_as(comm:this(), 3, {qwrite_collect, ReqId, '_'}),
             DB = db_selector(State),
-                [ api_dht_raw:unreliable_lookup(X,
-                               {prbr, write, DB, This, X, Round,
-                                WriteValue,
-                                PassedToUpdate,
-                                WriteFilter})
-              || X <- ?RT:get_replica_keys(entry_key(Entry)) ];
+                [ begin
+                      %% let fill in whether lookup was consistent
+                      LookupEnvelope =
+                          dht_node_lookup:envelope(
+                            4,
+                            {prbr, write, DB, '_', This, X, Round,
+                             WriteValue, PassedToUpdate, WriteFilter}),
+                      api_dht_raw:unreliable_lookup(X, LookupEnvelope)
+                  end
+                  || X <- ?RT:get_replica_keys(entry_key(Entry)) ];
         {false, Reason} = _Err ->
             %% own proposal not possible as of content check
             comm:send_local(entry_client(Entry),
