@@ -31,7 +31,7 @@
          set_rt/2, set_rm/2, set_db/2, set_lease_list/2,
          details/1, details/2]).
 %% node responsibility:
--export([has_left/1, is_db_responsible/2]).
+-export([has_left/1, is_db_responsible/2, is_db_responsible__no_msg_fwd_check/2]).
 %% transactions:
 -export([set_tx_tp_db/2]).
 %% node moves:
@@ -289,7 +289,18 @@ has_left(#state{rm_state=RMState}) ->
 %%      during a slide operation, i.e. we temporarily read/modify data a
 %%      neighbor is responsible for but hasn't yet received the data from us.
 -spec is_db_responsible(Key::intervals:key(), State::state()) -> boolean().
-is_db_responsible(Key, #state{db_range = DBRange, rm_state = RMState}) ->
+is_db_responsible(Key, State) ->
+    is_db_responsible__no_msg_fwd_check(Key, State) andalso
+        lists:all(fun({Interval, _Pid}) ->
+                          not intervals:in(Key, Interval)
+                  end, get(State, msg_fwd)).
+
+%% @doc Checks whether the node is responsible for the given key either by its
+%%      current range or for a range the node is temporarily responsible for
+%%      during a slide operation, i.e. we temporarily read/modify data a
+%%      neighbor is responsible for but hasn't yet received the data from us.
+-spec is_db_responsible__no_msg_fwd_check(Key::intervals:key(), State::state()) -> boolean().
+is_db_responsible__no_msg_fwd_check(Key, #state{db_range = DBRange, rm_state = RMState}) ->
     rm_loop:is_responsible(Key, RMState) orelse
         lists:any(fun({Interval, _Id}) ->
                           intervals:in(Key, Interval)
