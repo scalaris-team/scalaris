@@ -717,8 +717,8 @@ is_leader(MyRange) ->
 %%      itself or its pred changed.
 -spec rm_my_range_changed(OldNeighbors::nodelist:neighborhood(),
                           NewNeighbors::nodelist:neighborhood(),
-                          IsSlide::rm_loop:slide()) -> boolean().
-rm_my_range_changed(OldNeighbors, NewNeighbors, _IsSlide) ->
+                          SlideType::rm_loop:slide()) -> boolean().
+rm_my_range_changed(OldNeighbors, NewNeighbors, _SlideType) ->
     nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors) orelse
         nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors).
 
