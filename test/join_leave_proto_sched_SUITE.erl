@@ -17,14 +17,25 @@
 %%         src/dht_node_move.erl.
 %% @end
 %% @version $Id$
--module(join_leave_SUITE).
+-module(join_leave_proto_sched_SUITE).
 -author('kruber@zib.de').
 -vsn('$Id$').
 
 -compile(export_all).
 
 %% start proto scheduler for this suite
--define(proto_sched(Action), ok).
+-define(proto_sched(Action),
+        fun() ->
+                case Action of
+                    start ->
+                        proto_sched:start(),
+                        proto_sched:start_deliver();
+                    stop ->
+                        proto_sched:stop(),
+                        ct:pal("Proto scheduler stats: ~.2p", proto_sched:get_infos()),
+                        proto_sched:cleanup()
+                end
+        end()).
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
