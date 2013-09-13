@@ -506,7 +506,7 @@ tester_type_check_util(_Config) ->
              {is_local, 1}, %% cannot create correct envelopes
              {send, 2}, {send, 3}, %% cannot send msgs
              {send_local, 2}, {send_local_after, 3}, %% cannot send msgs
-             {unpack_cookie, 2} %% cannot create correct envelopes
+             {unpack_cookie, 2}, {reply_as, 3} %% cannot create correct envelopes
            ], []},
           {db_entry,
            [ {inc_version, 1}, % WL -1 is only allowed for empty_val
