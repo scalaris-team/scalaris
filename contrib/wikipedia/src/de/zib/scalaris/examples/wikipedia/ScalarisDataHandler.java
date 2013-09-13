@@ -353,7 +353,7 @@ public class ScalarisDataHandler {
             scalaris_keys.add(getPageCountKey(ns.getId()));
         }
         final String statName = "PAGE_COUNT";
-        return getInteger2(connection, ScalarisOpType.PAGE_LIST, scalaris_keys,
+        return getInteger2(connection, ScalarisOpType.PAGE_COUNT, scalaris_keys,
                 false, timeAtStart, statName);
     }
 
@@ -371,7 +371,7 @@ public class ScalarisDataHandler {
     public final static ValueResult<BigInteger> getPageCount(int namespace, Connection connection) {
         final long timeAtStart = System.currentTimeMillis();
         final String statName = "PAGE_COUNT:" + namespace;
-        return getInteger2(connection, ScalarisOpType.PAGE_LIST,
+        return getInteger2(connection, ScalarisOpType.PAGE_COUNT,
                 getPageCountKey(namespace), false, timeAtStart, statName);
     }
 
@@ -534,8 +534,25 @@ public class ScalarisDataHandler {
         final MyScalarisSingleOpExecutor executor = new MyScalarisSingleOpExecutor(
                 new TransactionSingleOp(connection), involvedKeys);
 
+        Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(opType);
+        if (optimisation == null) {
+            switch (opType) {
+                case PAGE_COUNT:
+                    // fall back to PAGE_LIST optimisation as in this case, the counter
+                    // follows the partitions
+                    optimisation = Options.getInstance().OPTIMISATIONS.get(ScalarisOpType.PAGE_LIST);
+                    break;
+                case CATEGORY_PAGE_COUNT:
+                    // fall back to CATEGORY_PAGE_LIST optimisation as in this case, the counter
+                    // follows the partitions
+                    optimisation = Options.getInstance().OPTIMISATIONS.get(ScalarisOpType.CATEGORY_PAGE_LIST);
+                    break;
+                default:
+                    break;
+            }
+        }
         final ScalarisReadNumberOp1 readOp = new ScalarisReadNumberOp1(scalaris_keys,
-                Options.getInstance().OPTIMISATIONS.get(opType), failNotFound);
+                optimisation, failNotFound);
         executor.addOp(readOp);
         try {
             executor.run();

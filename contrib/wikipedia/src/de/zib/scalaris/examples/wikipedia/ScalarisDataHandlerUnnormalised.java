@@ -441,7 +441,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
                                 wikiModel.getCategoryNamespace() + ":" + name,
                                 nsObject);
                     }
-                }, ScalarisOpType.CATEGORY_PAGE_LIST);
+                }, ScalarisOpType.CATEGORY_PAGE_LIST, ScalarisOpType.CATEGORY_PAGE_COUNT);
         final Set<String> newTpls = wikiModel.getTemplates();
         Difference tplDiff = new Difference(oldTpls, newTpls,
                 new Difference.GetPageListKey() {
@@ -451,7 +451,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
                                 wikiModel.getTemplateNamespace() + ":" + name,
                                 nsObject);
                     }
-                }, ScalarisOpType.TEMPLATE_PAGE_LIST);
+                }, ScalarisOpType.TEMPLATE_PAGE_LIST, null);
         // use empty link lists to turn back-links off
         final Set<String> newLnks = Options.getInstance().WIKI_USE_BACKLINKS ? wikiModel.getLinks() : new HashSet<String>();
         Difference lnkDiff = new Difference(oldLnks, newLnks,
@@ -460,7 +460,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
                     public String getPageListKey(String name) {
                         return getBackLinksPageListKey(name, nsObject);
                     }
-                }, ScalarisOpType.BACKLINK_PAGE_LIST);
+                }, ScalarisOpType.BACKLINK_PAGE_LIST, null);
         
 
         // now save the changes:
@@ -485,7 +485,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             }
 
             //  PAGE LISTS UPDATE, step 1: append to / remove from old lists
-            executor.addAppend(ScalarisOpType.SHORTREV_LIST, getRevListKey(title0, nsObject), new ShortRevision(newRev), null);
+            executor.addAppend(ScalarisOpType.SHORTREV_LIST, getRevListKey(title0, nsObject), new ShortRevision(newRev), null, null);
             if (articleCountChange != 0) {
                 executor.addIncrement(ScalarisOpType.ARTICLE_COUNT, getArticleCountKey(), articleCountChange);
             }
@@ -499,7 +499,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             if (oldPage == null) {
                 final String pageListKey = getPageListKey(normTitle.namespace);
                 final String pageCountKey = getPageCountKey(normTitle.namespace);
-                executor.addAppend(ScalarisOpType.PAGE_LIST, pageListKey, normTitleStr, pageCountKey);
+                executor.addAppend(ScalarisOpType.PAGE_LIST, pageListKey, normTitleStr, ScalarisOpType.PAGE_COUNT, pageCountKey);
             }
 
             executor.addWrite(ScalarisOpType.PAGE, getPageKey(title0, nsObject), newPage);
@@ -584,7 +584,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
 
         String scalaris_key = getContributionListKey(newPage.getCurRev().getContributor().toString());
         executor.addAppend(ScalarisOpType.CONTRIBUTION, scalaris_key,
-                Arrays.asList(new Contribution(oldPage, newPage)), null);
+                Arrays.asList(new Contribution(oldPage, newPage)), null, null);
         try {
             executor.getExecutor().run();
         } catch (Exception e) {
@@ -603,6 +603,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
         private Set<String>[] changes = new Set[2];
         private GetPageListKey keyGen;
         final private ScalarisOpType opType;
+        final private ScalarisOpType countOpType;
         
         /**
          * Creates a new object calculating differences of two sets.
@@ -616,9 +617,14 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
          *            on a set entry)
          * @param opType
          *            operation type indicating what is being updated
+         * @param countOpType
+         *            operation type indicating what is being updated for
+         *            updating count keys (if there are no count keys, this may
+         *            be <tt>null</tt>)
          */
         public Difference(Set<String> oldSet, Set<String> newSet,
-                GetPageListKey keyGen, ScalarisOpType opType) {
+                GetPageListKey keyGen, ScalarisOpType opType,
+                ScalarisOpType countOpType) {
             this.onlyOld = new HashSet<String>(oldSet);
             this.onlyNew = new HashSet<String>(newSet);
             this.onlyOld.removeAll(newSet);
@@ -627,6 +633,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             this.changes[1] = this.onlyNew;
             this.keyGen = keyGen;
             this.opType = opType;
+            this.countOpType = countOpType;
         }
 
         static public interface GetPageListKey {
@@ -662,6 +669,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             String scalaris_key;
             GetPageListAndCountKey keyCountGen = null;
             if (keyGen instanceof GetPageListAndCountKey) {
+                assert(null != countOpType);
                 keyCountGen = (GetPageListAndCountKey) keyGen;
             }
             // remove from old page list
@@ -669,14 +677,14 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
                 scalaris_key = keyGen.getPageListKey(name);
 //                System.out.println(scalaris_key + " -= " + title);
                 String scalaris_countKey = keyCountGen == null ? null : keyCountGen.getPageCountKey(name);
-                executor.addRemove(opType, scalaris_key, title, scalaris_countKey);
+                executor.addRemove(opType, scalaris_key, title, countOpType, scalaris_countKey);
             }
             // add to new page list
             for (String name: onlyNew) {
                 scalaris_key = keyGen.getPageListKey(name);
 //              System.out.println(scalaris_key + " += " + title);
                 String scalaris_countKey = keyCountGen == null ? null : keyCountGen.getPageCountKey(name);
-                executor.addAppend(opType, scalaris_key, title, scalaris_countKey);
+                executor.addAppend(opType, scalaris_key, title, countOpType, scalaris_countKey);
             }
         }
     }
