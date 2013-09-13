@@ -298,7 +298,8 @@ on({check_nodes_response, CmpResults}, State =
     {Req, Res, NStats, RTree} = process_tree_cmp_result(CmpResults, Tree, get_merkle_branch_factor(), Stats),
     Req =/= [] andalso
         send(DestReconPid, {check_nodes, comm:this(), Req}),
-    {Leafs, Resolves} = resolve_nodes(Res, SrcNode, SID, OwnerL, comm:make_global(OwnerL), 0, 0),
+    {LeafNodes, Leafs} = merkle_get_sync_leaves(Res, [], 0),
+    Resolves = resolve_leaves(LeafNodes, SrcNode, SID, OwnerL),
     FStats = rr_recon_stats:inc([{tree_leafsSynced, Leafs},
                                  {resolve_started, Resolves}], NStats),
     CompLeft = rr_recon_stats:get(tree_compareLeft, FStats),
@@ -500,42 +501,21 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, 
                                       lists:append(NewReq, Req), [Node | Res], RTree)
     end.
 
-% @doc Starts one resolve process per leaf node in a given node
-%      Returns: number of visited leaf nodes and number of leaf resolve requests.
--spec resolve_nodes([merkle_tree:mt_node()], Dest::comm:mypid(), rrepair:session_id(),
-                    OwnerLocal::comm:erl_local_pid(), OwnerRemote::comm:mypid(),
-                    LeafCountIn::non_neg_integer(), ResolveReqCountIn::non_neg_integer())
-        -> {LeafCountOut::non_neg_integer(), ResolveReqCountOut::non_neg_integer()}.
-resolve_nodes([], _Dest, _SID, _OwnerL, _OwnerR, Leafs, ResolveReqs) -> {Leafs, ResolveReqs};
-resolve_nodes([Node | Rest], Dest, SID, OwnerL, OwnerR, Leafs, ResolveReqs) ->
-    {LCount, RCount} =
-        case merkle_tree:is_leaf(Node) of
-            true -> {1, resolve_leaf(Node, Dest, SID, OwnerL, OwnerR)};
-            false -> resolve_nodes(merkle_tree:get_childs(Node), Dest, SID, OwnerL,
-                                   OwnerR, 0, 0)
-        end,
-    resolve_nodes(Rest, Dest, SID, OwnerL, OwnerR, Leafs + LCount, ResolveReqs + RCount).
-
-% @doc Returns number of caused resolve requests (requests with feedback count 2)
--spec resolve_leaf(merkle_tree:mt_node(), Dest::comm:mypid(), rrepair:session_id(),
-                   OwnerLocal::comm:erl_local_pid(), OwnerRemote::comm:mypid())
-        -> 1 | 2.
-resolve_leaf(Node, Dest, SID, OwnerL, OwnerR) ->
-    Options = [{feedback_request, OwnerR}],
-    LeafInterval = merkle_tree:get_interval(Node),
-    case merkle_tree:get_item_count(Node) of
-        0 ->
-            % we know that we don't have data in this range, so we must
-            % regenerate it from the other node
-            % -> send him this request directly!
-            send(Dest, {request_resolve, SID, {interval_upd, LeafInterval, []},
-                        [{session_id, SID} | Options]}),
-            1;
-        _ ->
-            send_local(OwnerL, {request_resolve, SID,
-                                {interval_upd_send, LeafInterval, Dest},
-                                Options}),
-            2
+%% @doc Gets all leaves in the given merkle node list (recursively).
+-spec merkle_get_sync_leaves(Nodes::NodeL, LeafAcc::NodeL,
+                             NLSyncAcc::non_neg_integer())
+        -> {ToSync::NodeL, NLSync::non_neg_integer()} when
+                  is_subtype(NodeL,  [merkle_tree:mt_node()]).
+merkle_get_sync_leaves([], ToSyncAcc, NLSyncAcc) ->
+    {ToSyncAcc, NLSyncAcc};
+merkle_get_sync_leaves([Node | Rest], ToSyncAcc, NLSyncAcc) ->
+    case merkle_tree:is_leaf(Node) of
+        true  ->
+            merkle_get_sync_leaves(Rest, [Node | ToSyncAcc], NLSyncAcc + 1);
+        false ->
+            merkle_get_sync_leaves(
+              lists:append(merkle_tree:get_childs(Node), Rest),
+              ToSyncAcc, NLSyncAcc)
     end.
 
 %% @doc Starts a single resolve request for all given leave nodes by joining
