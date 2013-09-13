@@ -361,20 +361,12 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                         }
                         break;
                     case COUNTER:
-                        if (optimisation.getBuckets() > 1) {
-                            int counter = WikiDumpPrepareSQLiteForScalarisHandler
-                                    .objectFromBytes2(value)
-                                    .intValue();
-                            Collection<KVPair<Integer>> newCounters = SQLiteWriteBucketCounterJob
-                                    .splitCounter(optimisation, key, counter);
-                            for (KVPair<Integer> kvPair : newCounters) {
-                                requests.addOp(new WriteOp(kvPair.key, kvPair.value));
-                            }
-                        } else {
-                            // write object as is
-                            OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
-                                    .objectFromBytes(value);
-                            requests.addOp(new WriteCompressedOp(key, valueOtp));
+                        int counter = WikiDumpPrepareSQLiteForScalarisHandler
+                                .objectFromBytes2(value).intValue();
+                        Collection<KVPair<Integer>> newCounters = SQLiteWriteBucketCounterJob
+                                .splitCounter(optimisation, key, counter);
+                        for (KVPair<Integer> kvPair : newCounters) {
+                            requests.addOp(new WriteOp(kvPair.key, kvPair.value));
                         }
                         break;
                     default:
