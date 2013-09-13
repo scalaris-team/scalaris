@@ -60,10 +60,12 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
+        %% the ring maintenance fixes network split situations, which
+        %% can lead to two separate rings and consistency violation.
         transactions_2_failures_4_nodes_networksplit_write ->
-            {skip, "cannot handle network split yet - see issue 59"};
+            {skip, "ring maint. cannot handle network split yet - see issue 59"};
         transactions_3_failures_4_nodes_networksplit_write ->
-            {skip, "cannot handle network split yet - see issue 59"};
+            {skip, "ring maint. cannot handle network split yet - see issue 59"};
         _ ->
             % stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
