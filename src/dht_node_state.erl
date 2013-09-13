@@ -429,67 +429,144 @@ details(State) ->
 -spec slide_get_data_start_record(state(), MovingInterval::intervals:interval())
         -> {state(), slide_data()}.
 slide_get_data_start_record(State, MovingInterval) ->
-    OldDB = get(State, db),
+    %% all prbr dbs:
+    {T1State, MoveRBRData} =
+        lists:foldl(
+          fun(X, {AccState, AccData}) ->
+                  Old = get_prbr_state(State, X),
+                  MoveData = db_prbr:get_entries(Old, MovingInterval),
+                  New = db_prbr:record_changes(Old, MovingInterval),
+                  {set_prbr_state(AccState, X, New), [{X, MoveData} | AccData]}
+          end,
+          {State, []},
+          [kv,
+           txid_1, txid_2, txid_3, txid_4,
+           leases_1, leases_2, leases_3, leases_4]
+         ),
+
+    OldDB = get(T1State, db),
     MovingData = db_dht:get_entries(OldDB, MovingInterval),
-    MovingSnapData = case db_dht:snapshot_is_running(OldDB) of
-        true ->
-            {get(State,snapshot_state), db_dht:get_snapshot_data(OldDB, MovingInterval)};
-        false ->
-            {false}
-    end,
+    MovingSnapData =
+        case db_dht:snapshot_is_running(OldDB) of
+            true ->
+                {get(T1State, snapshot_state),
+                 db_dht:get_snapshot_data(OldDB, MovingInterval)};
+            false ->
+                {false}
+        end,
     NewDB = db_dht:record_changes(OldDB, MovingInterval),
     ?TRACE("~p:slide_get_data_start_record: ~p~nMovingData: ~n~p~nMovingSnapData: ~n~p~nfor
            interval ~p~n~p~n~p",
-           [?MODULE, comm:this(), MovingData, MovingSnapData, MovingInterval, OldDB, NewDB]),
-    {set_db(State, NewDB), {MovingData, MovingSnapData}}.
+           [?MODULE, comm:this(), MovingData, MovingSnapData,
+            MovingInterval, OldDB, NewDB]),
+    NewState = set_db(T1State, NewDB),
+    {NewState, [{MovingData, MovingSnapData} | MoveRBRData]}.
+
 
 %% @doc Adds data from slide_get_data_start_record/2 to the local DB.
 -spec slide_add_data(state(),slide_data()) -> state().
-slide_add_data(State, {Data, SnapData}) ->
-    NewDB = db_dht:add_data(get(State, db), Data),
+slide_add_data(State, [{Data, SnapData} | PRBRData]) ->
+    T1DB = db_dht:add_data(get(State, db), Data),
     ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~p~n~p",
            [?MODULE, comm:this(), Data, SnapData, NewDB]),
-    case SnapData of
-        {SnapState, SnapEntries} ->
-            NewState = set_db(State,
-                              db_dht:add_snapshot_data(db_dht:init_snapshot(NewDB),
-                                                    SnapEntries)),
-            set_snapshot_state(NewState, SnapState);
-        {false} ->
-            set_db(State, NewDB)
-    end.
+    T2State =
+        case SnapData of
+            {false} ->
+                set_db(State, T1DB);
+            {SnapState, SnapEntries} ->
+                T2DB = db_dht:init_snapshot(T1DB),
+                T3DB = db_dht:add_snapshot_data(T2DB, SnapEntries),
+                T1State = set_db(State, T3DB),
+                set_snapshot_state(T1State, SnapState)
+        end,
+
+    %% all prbr dbs
+    lists:foldl(
+      fun({X, XData}, AccState) ->
+              DB = get_prbr_state(AccState, X),
+              NewDB = db_prbr:add_data(DB, XData),
+              set_prbr_state(AccState, X, NewDB)
+      end,
+      T2State,
+      PRBRData).
 
 %% @doc Gets all DB changes in the given interval, stops recording delta infos
 %%      and removes the entries in this range from the DB.
 -spec slide_take_delta_stop_record(state(), MovingInterval::intervals:interval())
         -> {state(), slide_delta()}.
 slide_take_delta_stop_record(State, MovingInterval) ->
+    %% all prbr dbs:
+    DeltaRBR =
+        lists:foldl(
+          fun(X, AccData) ->
+                  DB = get_prbr_state(State, X),
+                  Delta = db_prbr:get_changes(DB, MovingInterval),
+                  [{X, Delta} | AccData]
+          end,
+          [],
+          [kv,
+           txid_1, txid_2, txid_3, txid_4,
+           leases_1, leases_2, leases_3, leases_4]
+         ),
+
     OldDB = get(State, db),
     ChangedData = db_dht:get_changes(OldDB, MovingInterval),
+
     NewState = slide_stop_record(State, MovingInterval, true),
     ?TRACE("~p:slide_take_delta_stop_record: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), ChangedData, get(NewState, db)]),
-    {NewState, ChangedData}.
+    {NewState, [ChangedData | DeltaRBR]}.
 
 %% @doc Adds delta infos from slide_take_delta_stop_record/2 to the local DB.
 -spec slide_add_delta(state(), slide_delta()) -> state().
-slide_add_delta(State, {ChangedData, DeletedKeys}) ->
+slide_add_delta(State, [{ChangedData, DeletedKeys} | PRBRDelta]) ->
     NewDB1 = db_dht:add_data(get(State, db), ChangedData),
     NewDB2 = db_dht:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
     ?TRACE("~p:slide_add_delta: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), {ChangedData, DeletedKeys}, NewDB2]),
-    set_db(State, NewDB2).
+    T1State = set_db(State, NewDB2),
+
+    %% all prbr dbs
+    lists:foldl(
+      fun({X, {XData, DelKeys}}, AccState) ->
+              DB = get_prbr_state(AccState, X),
+              TDB = db_prbr:add_data(DB, XData),
+              NewDB = db_prbr:delete_entries(
+                        TDB,
+                        intervals:from_elements(DelKeys)),
+              set_prbr_state(AccState, X, NewDB)
+      end,
+      T1State,
+      PRBRDelta).
 
 %% @doc Stops recording changes in the given interval.
 %%      Optionally, the data in this range can be deleted.
 -spec slide_stop_record(state(), MovingInterval::intervals:interval(),
                         RemoveDataInInterval::boolean()) -> state().
 slide_stop_record(State, MovingInterval, Remove) ->
-    NewDB1 = db_dht:stop_record_changes(get(State, db), MovingInterval),
+    %% all prbr dbs:
+    T1State =
+        lists:foldl(
+          fun(X, AccState) ->
+                  DB = get_prbr_state(AccState, X),
+                  TDB = db_prbr:stop_record_changes(DB, MovingInterval),
+                  XDB =
+                      if Remove -> db_prbr:delete_entries(TDB, MovingInterval);
+                         true   -> TDB
+                      end,
+                  set_prbr_state(AccState, X, XDB)
+          end,
+          State,
+          [kv,
+           txid_1, txid_2, txid_3, txid_4,
+           leases_1, leases_2, leases_3, leases_4]
+         ),
+
+    NewDB1 = db_dht:stop_record_changes(get(T1State, db), MovingInterval),
     NewDB = if Remove -> db_dht:delete_entries(NewDB1, MovingInterval);
                true   -> NewDB1
             end,
-    set_db(State, NewDB).
+    set_db(T1State, NewDB).
 
 %% @doc Returns a key so that there are no more than TargetLoad entries
 %%      between Begin and this key in the DBs.
