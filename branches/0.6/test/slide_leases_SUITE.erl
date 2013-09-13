@@ -33,7 +33,8 @@ groups() ->
      {join_tests, [sequence], [
                                test_single_join,
                                test_double_join,
-                               test_triple_join
+                               test_triple_join,
+                               test_quadruple_join
                                ]}
     ].
 
@@ -147,6 +148,16 @@ test_triple_join(_Config) ->
     synchronous_join(4),
     true.
 
+test_quadruple_join(_Config) ->
+    wait_for_ring_size(1),
+    wait_for_correct_ring(),
+    %ct:pal("leases ~p", [get_all_leases()]),
+    synchronous_join(2),
+    synchronous_join(3),
+    synchronous_join(4),
+    synchronous_join(5),
+    true.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -169,7 +180,7 @@ wait_for_ring_size(Size) ->
     wait_for(fun () -> api_vm:number_of_nodes() == Size end).
 
 wait_for_correct_ring() ->
-    wait_for(fun () -> admin:check_ring() == ok end).
+    wait_for(fun () -> admin:check_ring_deep() == ok end).
 
 
 get_dht_node_state(Pid, What) ->
@@ -216,3 +227,14 @@ lease_checker(TargetSize) ->
                 length(ActiveLeases) == TargetSize andalso
                 length(PassiveLeases) == 0
     end.
+
+check_leases_per_node() ->
+    lists:all([ check_local_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ]).
+
+check_local_leases(DHTNode) ->
+    {ActiveLeases, PassiveLeases} = get_dht_node_state(DHTNode, lease_list),
+    ActiveIntervals = lists:flatten(
+                        [ l_on_cseq:get_range(Lease) || Lease <- ActiveLeases]),
+    MyRange = get_dht_node_state(DHTNode, my_range),
+    LocalCorrect = intervals:are_equal(MyRange, ActiveIntervals),
+    length(PassiveLeases) == 0 andalso LocalCorrect.
