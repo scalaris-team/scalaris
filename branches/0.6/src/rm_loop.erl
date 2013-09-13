@@ -216,12 +216,12 @@ unittest_create_state(Neighbors, HasLeft) ->
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message() | ?RM:custom_message(), state()) -> state().
-on({rm, notify_new_pred, NewPred}, State = {RM_State, _HasLeft, _SubscrTable}) ->
-    RMFun = fun() -> ?RM:new_pred(RM_State, NewPred) end,
+on({rm, notify_new_pred, NewPred}, State) ->
+    RMFun = fun(RM_State) -> ?RM:new_pred(RM_State, NewPred) end,
     update_state(State, RMFun);
 
-on({rm, notify_new_succ, NewSucc}, State = {RM_State, _HasLeft, _SubscrTable}) ->
-    RMFun = fun() -> ?RM:new_succ(RM_State, NewSucc) end,
+on({rm, notify_new_succ, NewSucc}, State) ->
+    RMFun = fun(RM_State) -> ?RM:new_succ(RM_State, NewSucc) end,
     update_state(State, RMFun);
 
 on({rm, notify_slide_finished, SlideType}, State = {RM_State, _HasLeft, SubscrTable}) ->
@@ -229,24 +229,25 @@ on({rm, notify_slide_finished, SlideType}, State = {RM_State, _HasLeft, SubscrTa
     call_subscribers(Neighborhood, Neighborhood, SlideType, SubscrTable),
     State;
 
-on({rm, pred_left, OldPred, PredsPred}, State = {RM_State, _HasLeft, _SubscrTable}) ->
-    RMFun = fun() -> ?RM:remove_pred(RM_State, OldPred, PredsPred) end,
+on({rm, pred_left, OldPred, PredsPred}, State) ->
+    RMFun = fun(RM_State) -> ?RM:remove_pred(RM_State, OldPred, PredsPred) end,
     update_state(State, RMFun);
 
-on({rm, succ_left, OldSucc, SuccsSucc}, State = {RM_State, _HasLeft, _SubscrTable}) ->
-    RMFun = fun() -> ?RM:remove_succ(RM_State, OldSucc, SuccsSucc) end,
+on({rm, succ_left, OldSucc, SuccsSucc}, State) ->
+    RMFun = fun(RM_State) -> ?RM:remove_succ(RM_State, OldSucc, SuccsSucc) end,
     update_state(State, RMFun);
 
-on({rm, update_id, NewId}, State = {RM_State, _HasLeft, _SubscrTable}) ->
-    Neighborhood = ?RM:get_neighbors(RM_State),
+on({rm, update_id, NewId}, State) ->
+    Neighborhood = ?RM:get_neighbors(element(1, State)),
     OldMe = nodelist:node(Neighborhood),
-    case node:id(OldMe) =/= NewId of
-        true ->
+    case node:id(OldMe) of
+        NewId -> State;
+        _ ->
             NewMe = node:update_id(OldMe, NewId),
             % note: nodelist can't update the base node if the new id is not
             % between pred id and succ id
             try begin
-                    RMFun = fun() -> ?RM:update_node(RM_State, NewMe) end,
+                    RMFun = fun(RM_State) -> ?RM:update_node(RM_State, NewMe) end,
                     update_state(State, RMFun)
                 end
             catch
@@ -257,8 +258,7 @@ on({rm, update_id, NewId}, State = {RM_State, _HasLeft, _SubscrTable}) ->
                              nodelist:succ(Neighborhood),
                              Reason]),
                     State
-            end;
-        _ -> State
+            end
     end;
 
 on({rm, leave}, {RM_State, _HasLeft, SubscrTable}) ->
@@ -327,12 +327,12 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
 
 % failure detector reported dead node
 -spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
-crashed_node(State = {RM_State, _HasLeft, _SubscrTable}, DeadPid) ->
-    RMFun = fun() -> ?RM:crashed_node(RM_State, DeadPid) end,
+crashed_node(State, DeadPid) ->
+    RMFun = fun(RM_State) -> ?RM:crashed_node(RM_State, DeadPid) end,
     NewState = update_state(State, RMFun, DeadPid),
     case config:read(rrepair_after_crash) of
         true ->
-            OldPred = nodelist:pred(?RM:get_neighbors(RM_State)),
+            OldPred = nodelist:pred(?RM:get_neighbors(element(1, State))),
             NewNeighb = ?RM:get_neighbors(element(1, NewState)),
             NewPred = nodelist:pred(NewNeighb),
             case NewPred of
@@ -354,8 +354,8 @@ crashed_node(State = {RM_State, _HasLeft, _SubscrTable}, DeadPid) ->
 
 % dead-node-cache reported dead node to be alive again
 -spec zombie_node(State::state(), Node::node:node_type()) -> state().
-zombie_node(State = {RM_State, _HasLeft, _SubscrTable}, Node) ->
-    RMFun = fun() -> ?RM:zombie_node(RM_State, Node) end,
+zombie_node(State, Node) ->
+    RMFun = fun(RM_State) -> ?RM:zombie_node(RM_State, Node) end,
     update_state(State, RMFun).
 
 -spec get_web_debug_info(State::state()) -> [{string(), string()}].
@@ -384,16 +384,16 @@ get_web_debug_info({RM_State, _HasLeft, SubscrTable}) ->
 
 %% @doc Calls RMFun (which may update the Neighborhood), then calls all
 %%      subscribers and updates the failure detector if necessary.
--spec update_state(OldState::state_t(), RMFun::fun(() -> ?RM:state()))
+-spec update_state(OldState::state_t(), RMFun::fun((?RM:state()) -> ?RM:state()))
         -> NewState::state_t().
 update_state(OldState, RMFun) ->
     update_state(OldState, RMFun, null).
 
--spec update_state(OldState::state_t(), RMFun::fun(() -> ?RM:state()),
+-spec update_state(OldState::state_t(), RMFun::fun((?RM:state()) -> ?RM:state()),
                    CrashedPid::comm:mypid() | null) -> NewState::state_t().
 update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun, CrashedPid) ->
     OldNeighborhood = ?RM:get_neighbors(OldRM_State),
-    NewRM_State = RMFun(),
+    NewRM_State = RMFun(OldRM_State),
     NewNeighborhood = ?RM:get_neighbors(NewRM_State),
     call_subscribers(OldNeighborhood, NewNeighborhood, none, SubscrTable),
     update_failuredetector(OldNeighborhood, NewNeighborhood, CrashedPid),
