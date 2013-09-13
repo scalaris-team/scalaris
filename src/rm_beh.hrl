@@ -21,7 +21,7 @@
 -export_type([state/0, custom_message/0]).
 -endif.
 
--export([init/3, on/2,
+-export([init/3, handle_custom_message/2,
          zombie_node/2, crashed_node/2,
          new_pred/2, new_succ/2,
          leave/1, remove_pred/3, remove_succ/3,
