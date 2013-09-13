@@ -86,7 +86,7 @@
          operation      = undefined    									:: undefined | operation(),
          my_range       = undefined                                     :: undefined | intervals:interval(),
          feedbackDestPid= undefined                                     :: undefined | comm:mypid(),
-         feedbackKvv    = []                                            :: kvv_list() | [],
+         feedbackKvv    = []                                            :: kvv_list(),
          send_stats     = undefined                                     :: undefined | comm:mypid(),
          stats          = #resolve_stats{}                              :: stats()
          }).
@@ -139,8 +139,12 @@ on({get_state_response, MyI}, State =
     ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
     ?TRACE("GET INTERVAL - KEY UPD - KVVListLen=~p ; ToUpdate=~p", [length(KvvList), ToUpdate], State),
     NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
-    if ToUpdate =:= 0 -> shutdown(resolve_ok, NewState);
-       true           -> NewState % note: shutdown handled by update_key_entry_ack
+    if ToUpdate =:= 0 ->
+           shutdown(resolve_ok, NewState,
+                    State#rr_resolve_state.feedbackDestPid, [], []);
+       true ->
+           % note: shutdown and feedback handled by update_key_entry_ack
+           NewState
     end;
 
 on({get_state_response, MyI}, State =
@@ -154,12 +158,10 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {key_upd_send, Dest, _},
-                          feedbackDestPid = FBDest,
-                          stats = Stats }) ->
+                          feedbackDestPid = FBDest }) ->
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
-    send_key_upd(Dest, KvvList, Stats#resolve_stats.session_id, Options),
-    shutdown(resolve_ok, State);
+    shutdown(resolve_ok, State, Dest, KvvList, Options);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MODE: interval_upd 
@@ -185,9 +187,12 @@ on({get_state_response, MyI}, State = #rr_resolve_state{ operation = Op,
              end, intervals:empty(), rr_recon:quadrant_intervals()),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
-        false -> comm:send_local(DhtPid, {get_entries, self(), ISec}),
-                 NewState;
-        true  -> shutdown(resolve_abort, NewState)
+        false ->
+            comm:send_local(DhtPid, {get_entries, self(), ISec}),
+            NewState;
+        true ->
+            shutdown(resolve_abort, NewState,
+                     State#rr_resolve_state.feedbackDestPid, [], [])
     end;
 
 on({get_entries_response, EntryList}, State =
@@ -202,15 +207,12 @@ on({get_entries_response, EntryList}, State =
     KSet = gb_sets:from_list([element(1, Z) || Z <- KvvList]),
     MissingOnOther = [MX || X <- EntryList,
                             not gb_sets:is_element(element(1, (MX = entry_to_kvv(X))), KSet)],
-    NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate},
-                                      feedbackKvv = MissingOnOther},
+    NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
     if ToUpdate =:= 0 ->
-           % need to send feedback (if set):
-           send_key_upd(FBDest, MissingOnOther, Stats#resolve_stats.session_id, []),
-           shutdown(resolve_ok, NewState);
+           shutdown(resolve_ok, NewState, FBDest, MissingOnOther, []);
        true ->
            % note: shutdown and feedback handled by update_key_entry_ack
-           NewState
+           NewState#rr_resolve_state{feedbackKvv = MissingOnOther}
     end;
 
 on({get_entries_response, EntryList}, State =
@@ -224,7 +226,7 @@ on({get_entries_response, EntryList}, State =
         null -> comm:send(Dest, {request_resolve, {interval_upd, I, SendList}, Options});
         SID -> comm:send(Dest, {request_resolve, SID, {interval_upd, I, SendList}, Options})
     end,
-    shutdown(resolve_ok, State);
+    shutdown(resolve_ok, State, undefined, [], []);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MODE: interval_upd_my
@@ -234,12 +236,13 @@ on({get_state_response, MyI} = _Msg,
    State = #rr_resolve_state{operation = {interval_upd_my, I} = _Operation}) ->
     ?TRACE("RESOLVE - START~nOperation=~.2p~nState=~.2p",
            [_Operation, _Msg], State),
+    ?ASSERT(State#rr_resolve_state.feedbackDestPid =:= undefined),
     ISec = intervals:intersection(MyI, I),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
         false -> case rrepair:select_sync_node(ISec, true) of
                      not_found ->
-                         shutdown(resolve_abort, NewState);
+                         shutdown(resolve_abort, NewState, undefined, [], []);
                      DKey ->
                          % TODO: keep trying to resolve the whole intersection
                          %       e.g. by removing each sync interval and
@@ -251,9 +254,9 @@ on({get_state_response, MyI} = _Msg,
                          %       own range -> choose merkle_tree instead
                          comm:send_local(pid_groups:get_my(rrepair),
                                          {request_sync, merkle_tree, DKey}),
-                         shutdown(resolve_ok, NewState)
+                         shutdown(resolve_ok, NewState, undefined, [], [])
                  end;
-        true  -> shutdown(resolve_abort, NewState)
+        true  -> shutdown(resolve_abort, NewState, undefined, [], [])
     end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -286,8 +289,7 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
                 ?TRACE("UPDATED = ~p - Regen=~p - FB=~p", [Stats#resolve_stats.update_count, Stats#resolve_stats.regen_count, NewFBItems], State),
-                send_key_upd(FBDest, NewFBItems, Stats#resolve_stats.session_id, [feedback_response]),
-                shutdown(resolve_ok, NewState);
+                shutdown(resolve_ok, NewState, FBDest, NewFBItems, [feedback_response]);
         true -> NewState
     end;
 
@@ -309,10 +311,18 @@ start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
                  RKey <- ?RT:get_replica_keys(Key),
                  intervals:in(RKey, MyI)]).
 
--spec shutdown(exit_reason(), state()) -> kill.
+-spec shutdown(exit_reason(), state(), undefined | comm:mypid(), kvv_list(),
+               options()) -> kill.
 shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, 
                                     send_stats = SendStats,
-                                    stats = Stats}) ->
+                                    stats = Stats},
+         KUDest, KUItems, KUOptions) ->
+    case KUDest of
+        undefined -> ok;
+        _ ->
+            SID = Stats#resolve_stats.session_id,
+            send_key_upd(KUDest, KUItems, SID, KUOptions)
+    end,
     send_stats(SendStats, Stats),
     comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
     kill.
