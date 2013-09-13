@@ -366,29 +366,25 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     static class SQLiteWriteBucketListJob implements Runnable {
         protected final String key;
         protected final String countKey;
-        protected byte[] valueBytes;
+        protected List<ErlangValue> value;
         protected final SQLiteStatement stWrite;
         protected final IBuckets optimisation;
         private final WikiDump importer;
         
         public SQLiteWriteBucketListJob(WikiDump importer, String key,
-                byte[] value, String countKey,
+                List<ErlangValue> value, String countKey,
                 SQLiteStatement stWrite,
                 IBuckets optimisation) {
             this.importer = importer;
             this.key = key;
-            this.valueBytes = value;
+            this.value = value;
             this.stWrite = stWrite;
             this.optimisation = optimisation;
             this.countKey = countKey;
         }
 
-        protected static HashMap<String, List<ErlangValue>> splitList(IBuckets optimisation, byte[] valueBytes)
+        protected static HashMap<String, List<ErlangValue>> splitList(IBuckets optimisation, List<ErlangValue> value)
                 throws RuntimeException, ClassNotFoundException, IOException {
-            List<ErlangValue> value;
-                value = WikiDumpPrepareSQLiteForScalarisHandler
-                        .objectFromBytes2(valueBytes).listValue();
-                valueBytes = null;
             // split lists:
             int bucketsToUse;
             if (optimisation instanceof IReadBuckets) {
@@ -424,7 +420,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         @Override
         public void run() {
             try {
-                HashMap<String, List<ErlangValue>> newLists = splitList(optimisation, valueBytes);
+                HashMap<String, List<ErlangValue>> newLists = splitList(optimisation, value);
                 for (Entry<String, List<ErlangValue>> newList : newLists.entrySet()) {
                     try {
                         // write list
@@ -564,6 +560,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
         ListOrCountOp listOrCount = ListOrCountOp.NONE;
         String countKey = null;
         Optimisation optimisation = null;
+        Optimisation countKeyOptimisation = null;
     }
     
     /**
@@ -592,22 +589,47 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
                         IBuckets optimisation = (IBuckets) convOp.optimisation;
                         switch (convOp.listOrCount) {
                             case LIST:
-                                addSQLiteJob(new SQLiteWriteBucketListJob(this,
-                                        key, value, convOp.countKey, stWrite,
-                                        optimisation));
+                                List<ErlangValue> listVal = WikiDumpPrepareSQLiteForScalarisHandler
+                                        .objectFromBytes2(value).listValue();
+                                String countKey;
+                                if (convOp.countKeyOptimisation == null) {
+                                    // integrated counter
+                                    countKey = convOp.countKey;
+                                } else {
+                                    // separate counter
+                                    countKey = null;
+                                    int listSize = listVal.size();
+                                    if (convOp.countKeyOptimisation instanceof IBuckets) {
+                                        // similar to "case COUNTER" below:
+                                        final int countValue = listSize;
+                                        addSQLiteJob(new SQLiteWriteBucketCounterJob(
+                                                this, convOp.countKey, countValue, stWrite,
+                                                (IBuckets) convOp.countKeyOptimisation));
+                                    } else {
+                                        // copy counter
+                                        final byte[] countValue = WikiDumpPrepareSQLiteForScalarisHandler
+                                                .objectToBytes(listSize);
+                                        addSQLiteJob(new SQLiteWriteBytesJob(
+                                                this, convOp.countKey,
+                                                countValue, stWrite));
+                                    }
+                                }
+                                addSQLiteJob(new SQLiteWriteBucketListJob(
+                                        this, key, listVal, countKey,
+                                        stWrite, optimisation));
                                 break;
                             case COUNTER:
+                                final int countValue = WikiDumpPrepareSQLiteForScalarisHandler
+                                        .objectFromBytes2(value).intValue();
                                 addSQLiteJob(new SQLiteWriteBucketCounterJob(
-                                        this, key,
-                                        WikiDumpPrepareSQLiteForScalarisHandler
-                                        .objectFromBytes2(value)
-                                        .intValue(), stWrite,
+                                        this, key, countValue, stWrite,
                                         optimisation));
                                 break;
                             default:
                                 break;
                         }
                     } else if (convOp.optimisation != null ) {
+                        assert (convOp.countKeyOptimisation == null);
                         if (convOp.listOrCount == ListOrCountOp.LIST) {
                             addSQLiteJob(new SQLiteCopyList(this, key, value, convOp.countKey, stWrite));
                         } else {
@@ -651,6 +673,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
     public static ConvertOp getConvertOp(String key, Options dbWriteOptions) throws NumberFormatException {
         ConvertOp convOp = new ConvertOp();
         ScalarisOpType opType = null;
+        ScalarisOpType opTypeCount = null;
 
         final Matcher pageListMatcher = pageListPattern.matcher(key);
         final Matcher pageCountMatcher = pageCountPattern.matcher(key);
@@ -669,6 +692,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             int namespace = Integer.parseInt(pageListMatcher.group(1));
             convOp.countKey = ScalarisDataHandler.getPageCountKey(namespace);
             opType = ScalarisOpType.PAGE_LIST;
+            opTypeCount = ScalarisOpType.PAGE_COUNT;
             convOp.listOrCount = ListOrCountOp.LIST;
         } else if (pageCountMatcher.matches()) {
             // ignore (written during page list partitioning (see above)
@@ -689,6 +713,7 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
             String title = catPageListMatcher.group(1);
             convOp.countKey = title + ":cpages:count";
             opType = ScalarisOpType.CATEGORY_PAGE_LIST;
+            opTypeCount = ScalarisOpType.CATEGORY_PAGE_COUNT;
             convOp.listOrCount = ListOrCountOp.LIST;
         } else if (catPageCountMatcher.matches()) {
             // ignore (written during page list partitioning (see above)
@@ -721,6 +746,9 @@ public class WikiDumpConvertPreparedSQLite implements WikiDump {
 
         if (opType != null) {
             convOp.optimisation = dbWriteOptions.OPTIMISATIONS.get(opType);
+        }
+        if (opTypeCount != null) {
+            convOp.countKeyOptimisation = dbWriteOptions.OPTIMISATIONS.get(opTypeCount);
         }
         return convOp;
     }

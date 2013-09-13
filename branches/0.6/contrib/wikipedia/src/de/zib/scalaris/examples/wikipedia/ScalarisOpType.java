@@ -11,9 +11,17 @@ public enum ScalarisOpType {
      */
     PAGE_LIST("PAGE_LIST"),
     /**
+     * Operation involving a counter of a (central) page list.
+     */
+    PAGE_COUNT("PAGE_COUNT"),
+    /**
      * Operation involving a category page list.
      */
     CATEGORY_PAGE_LIST("CATEGORY_PAGE_LIST"),
+    /**
+     * Operation involving a counter of a category page list.
+     */
+    CATEGORY_PAGE_COUNT("CATEGORY_PAGE_COUNT"),
     /**
      * Operation involving a template page list.
      */

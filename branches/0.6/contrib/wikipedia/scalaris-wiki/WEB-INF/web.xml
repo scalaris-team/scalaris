@@ -54,7 +54,7 @@
             <param-value>OUTSIDE_TX</param-value>
         </init-param>
         <init-param>
-            <!-- IMPORTANT: When changing this file, leae both -name and -value on the same line.
+            <!-- IMPORTANT: When changing this file, leave both -name and -value on the same line.
                             Otherwise 'sed' will fail to match it. -->
             <param-name>WIKI_OPTIMISATIONS</param-name>
 <!--
@@ -62,11 +62,13 @@ optimisations are executed in the same order as mentioned
 format: "|"-separated list of the following (no spaces!): 
  <operation>:<optimisation>([<parameter>[,<parameter>[,<parameter>]...]])
 available operations:
- to set all to one optimisation, use:
+ to set all (except PAGE_COUNT and CATEGORY_PAGE_COUNT) to one optimisation, use:
   ALL
  otherwise use values from de.zib.scalaris.examples.wikipedia.ScalarisOpType:
   PAGE_LIST,
+  PAGE_COUNT (if set to buckets, PAGE_LIST must also use buckets for now!),
   CATEGORY_PAGE_LIST,
+  CATEGORY_PAGE_COUNT (if set to buckets, CATEGORY_PAGE_LIST must also use buckets for now!),
   TEMPLATE_PAGE_LIST,
   BACKLINK_PAGE_LIST,
   SHORTREV_LIST,

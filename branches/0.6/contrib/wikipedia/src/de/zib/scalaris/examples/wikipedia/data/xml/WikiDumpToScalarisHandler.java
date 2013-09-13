@@ -242,7 +242,8 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             scalaris_key = ScalarisDataHandler.getPageListKey(ns.getId());
             worker = new MyScalarisAddToPageListRunnable(this, scalaris_key,
                     newPages.get(ns), scalaris_tx, ScalarisOpType.PAGE_LIST,
-                    ScalarisDataHandler.getPageCountKey(ns.getId()));
+                    ScalarisDataHandler.getPageCountKey(ns.getId()),
+                    ScalarisOpType.PAGE_COUNT);
             pageListExecutor.execute(worker);
         }
         initNewPagesList();
@@ -258,7 +259,8 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             scalaris_key = ScalarisDataHandlerNormalised.getCatPageListKey(category.getKey());
             worker = new MyScalarisAddToPageListRunnable(this, scalaris_key,
                     category.getValue(), scalaris_tx, ScalarisOpType.CATEGORY_PAGE_LIST,
-                    ScalarisDataHandlerNormalised.getCatPageCountKey(category.getKey()));
+                    ScalarisDataHandlerNormalised.getCatPageCountKey(category.getKey()),
+                    ScalarisOpType.CATEGORY_PAGE_COUNT);
             pageListExecutor.execute(worker);
         }
 
@@ -267,7 +269,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             scalaris_key = ScalarisDataHandlerNormalised.getTplPageListKey(template.getKey());
             worker = new MyScalarisAddToPageListRunnable(this, scalaris_key,
                     template.getValue(), scalaris_tx,
-                    ScalarisOpType.TEMPLATE_PAGE_LIST, null);
+                    ScalarisOpType.TEMPLATE_PAGE_LIST, null, null);
             pageListExecutor.execute(worker);
         }
         
@@ -276,7 +278,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             scalaris_key = ScalarisDataHandlerNormalised.getBackLinksPageListKey(backlinks.getKey());
             worker = new MyScalarisAddToPageListRunnable(this, scalaris_key,
                     backlinks.getValue(), scalaris_tx,
-                    ScalarisOpType.BACKLINK_PAGE_LIST, null);
+                    ScalarisOpType.BACKLINK_PAGE_LIST, null, null);
             pageListExecutor.execute(worker);
         }
         initLinkLists();
@@ -370,18 +372,21 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
         private final ArrayBlockingQueue<Transaction> scalaris_tx;
         private final String scalaris_pageCount_key;
         private final ScalarisOpType opType;
+        private final ScalarisOpType countOpType;
         private final WikiDump importer;
         
         public MyScalarisAddToPageListRunnable(WikiDump importer,
                 String scalaris_pageList_key, List<NormalisedTitle> newEntries,
                 ArrayBlockingQueue<Transaction> scalaris_tx,
-                ScalarisOpType opType, String scalaris_pageCount_key) {
+                ScalarisOpType opType, String scalaris_pageCount_key,
+                ScalarisOpType countOpType) {
             this.importer = importer;
             this.scalaris_pageList_key = scalaris_pageList_key;
             this.newEntries = newEntries;
             this.scalaris_tx = scalaris_tx;
             this.opType = opType;
             this.scalaris_pageCount_key = scalaris_pageCount_key;
+            this.countOpType = countOpType;
         }
         
         @Override
@@ -396,7 +401,7 @@ public class WikiDumpToScalarisHandler extends WikiDumpPageHandler {
             
             ValueResult<Integer> result = ScalarisDataHandlerNormalised.updatePageList(
                     scalaris_tx, opType, scalaris_pageList_key,
-                    scalaris_pageCount_key, newEntries,
+                    countOpType, scalaris_pageCount_key, newEntries,
                     new LinkedList<NormalisedTitle>(), "");
             if (!result.success) {
                 importer.error(result.message);
