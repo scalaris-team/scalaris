@@ -1,5 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
-%            2009 onScale solutions GmbH
+% @copyright 2007-2013 Zuse Institute Berlin
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
 %  you may not use this file except in compliance with the License.
@@ -219,7 +218,7 @@ on({del_watching_of_via_fd, Subscriber, Pid}, State) ->
     forward_to_hbs(Subscriber, {del_watching_of, Pid}),
     State;
 
-on({crashed, WatchedPid} = Msg, State) ->
+on({crashed, WatchedPid, _Warn} = Msg, State) ->
     ?TRACE("FD: crashed message via fd for watched pid ~p~n", [WatchedPid]),
     forward_to_hbs(WatchedPid, Msg),
     State;
