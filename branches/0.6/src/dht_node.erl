@@ -40,10 +40,10 @@
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),
             ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer() | all} |
       {update_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key(), NewValue::db_dht:value(), NewVersion::db_dht:version()} |
-      % DB subscriptions:
-      {db_set_subscription, SubscrTuple::db_dht:subscr_t()} |
-      {db_get_subscription, Tag::any(), SourcePid::comm:erl_local_pid()} |
-      {db_remove_subscription, Tag::any()} |
+%%      % DB subscriptions:
+%%      {db_set_subscription, SubscrTuple::db_dht:subscr_t()} |
+%%      {db_get_subscription, Tag::any(), SourcePid::comm:erl_local_pid()} |
+%%      {db_remove_subscription, Tag::any()} |
       % direct DB manipulation:
       {get_key_entry, Source_PID::comm:mypid(), HashedKey::?RT:key()} |
       {set_key_entry, Source_PID::comm:mypid(), Entry::db_entry:entry()} |
@@ -294,18 +294,18 @@ on({update_key_entry, Source_PID, Key, NewValue, NewVersion}, State) ->
     comm:send(Source_PID, {update_key_entry_ack, NewEntry, Exists, DoUpdate orelse DoRegen}),
     NewState;
 
-on({db_set_subscription, SubscrTuple}, State) ->
-    DB2 = db_dht:set_subscription(dht_node_state:get(State, db), SubscrTuple),
-    dht_node_state:set_db(State, DB2);
-
-on({db_get_subscription, Tag, SourcePid}, State) ->
-    Subscr = db_dht:get_subscription(dht_node_state:get(State, db), Tag),
-    comm:send_local(SourcePid, {db_get_subscription_response, Tag, Subscr}),
-    State;
-
-on({db_remove_subscription, Tag}, State) ->
-    DB2 = db_dht:remove_subscription(dht_node_state:get(State, db), Tag),
-    dht_node_state:set_db(State, DB2);
+%%on({db_set_subscription, SubscrTuple}, State) ->
+%%    DB2 = db_dht:set_subscription(dht_node_state:get(State, db), SubscrTuple),
+%%    dht_node_state:set_db(State, DB2);
+%%
+%%on({db_get_subscription, Tag, SourcePid}, State) ->
+%%    Subscr = db_dht:get_subscription(dht_node_state:get(State, db), Tag),
+%%    comm:send_local(SourcePid, {db_get_subscription_response, Tag, Subscr}),
+%%    State;
+%%
+%%on({db_remove_subscription, Tag}, State) ->
+%%    DB2 = db_dht:remove_subscription(dht_node_state:get(State, db), Tag),
+%%    dht_node_state:set_db(State, DB2);
 
 on({delete_key, Source_PID, ClientsId, HashedKey}, State) ->
     {DB2, Result} = db_dht:delete(dht_node_state:get(State, db), HashedKey),

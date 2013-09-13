@@ -492,7 +492,7 @@ slide_stop_record(State, MovingInterval, Remove) ->
     set_db(State, NewDB).
 
 %% @doc Returns a key so that there are no more than TargetLoad entries
-%%      between Begin and this key in the DB.
+%%      between Begin and this key in the DBs.
 -spec get_split_key(state(), Begin::?RT:key(), End::?RT:key(), TargetLoad::pos_integer(), forward | backward)
         -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key(State, Begin, End, TargetLoad, Direction) ->

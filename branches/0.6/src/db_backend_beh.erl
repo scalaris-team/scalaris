@@ -63,7 +63,7 @@
 behaviour_info(callbacks) ->
     [
         {new, 1}, {open, 1}, {close, 1}, {put, 2}, {get, 2}, {delete, 2},
-        {get_name, 1}, {get_load, 1}, 
+        {get_name, 1}, {get_load, 1},
         {foldl, 3}, {foldl, 4}, {foldl, 5},
         {foldr, 3}, {foldr, 4}, {foldr, 5}
     ];
@@ -87,6 +87,6 @@ tester_is_valid_db_entry(_) -> true.
 
 -spec tester_create_db_entry(tuple()) -> key().
 tester_create_db_entry({}) -> {empty_tuple};
-tester_create_db_entry(E) when element(1, E) =:= '$end_of_table' -> 
+tester_create_db_entry(E) when element(1, E) =:= '$end_of_table' ->
     setelement(1, E, end_of_table);
 tester_create_db_entry(K) -> K.
