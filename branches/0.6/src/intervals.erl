@@ -45,7 +45,6 @@
          is_adjacent/2, in/2,
          is_left_of/2, is_right_of/2,
          split/2,
-         are_equal/2,
          % operations for intervals
          intersection/2, union/2, minus/2, 
          % getters for certain intervals
@@ -735,8 +734,3 @@ split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, Acc) ->
 -spec get_simple_intervals(Interval::interval()) -> [simple_interval()].
 get_simple_intervals(Interval) ->
     Interval.
-
-%% @doc checks whether two interval lists cover the same range
--spec are_equal(list(interval()), list(interval())) -> boolean().
-are_equal(A, B) ->
-    is_subset(A, B) andalso is_subset(B, A).
