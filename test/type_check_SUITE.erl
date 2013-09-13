@@ -354,7 +354,7 @@ tester_type_check_rrepair(_Config) ->
              {check_node, 2},
              {process_tree_cmp_result, 4},
              {p_process_tree_cmp_result, 7},
-             {art_get_sync_leafs, 4},
+             {art_get_sync_leaves, 6},
 
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
              {build_struct, 4}, %% tries to send messages, needs valid state with pid
@@ -362,8 +362,8 @@ tester_type_check_rrepair(_Config) ->
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
              {p_check_node, 4}, %% needs same-length lists
-             {resolve_nodes, 7}, %% tries to send messages
-             {resolve_leaf, 5}, %% tries to send messages
+             {resolve_leaves, 4}, %% tries to send messages
+             {resolve_leaves, 6}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
              {send, 2}, %% tries to send messages
              {send_local, 2}, %% tries to send messages
