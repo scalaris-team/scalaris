@@ -180,9 +180,6 @@ merge(A, #rr_recon_stats{ tree_size = TS,
 
 -spec print(stats()) -> [any()].
 print(Stats) ->
+    StatsL = tl(erlang:tuple_to_list(Stats)),
     FieldNames = record_info(fields, rr_recon_stats),
-    Res = util:for_to_ex(1, length(FieldNames),
-                         fun(I) ->
-                                 {lists:nth(I, FieldNames), erlang:element(I + 1, Stats)}
-                         end),
-    [erlang:element(1, Stats), lists:reverse(Res)].
+    [rr_recon_stats, lists:zip(FieldNames, StatsL)].
