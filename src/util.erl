@@ -1323,6 +1323,10 @@ bin_xor(Binary1, Binary2) ->
     ResSize = erlang:max(BitSize1, BitSize2),
     <<ResNr:ResSize>>.
 
+-ifdef(enable_debug).
+-spec extint2atom(atom()) -> atom().
+extint2atom(X) when is_atom(X) -> X.
+-else.
 -spec extint2atom(atom() | integer()) -> atom().
 extint2atom(X) when is_atom(X) -> X;
 extint2atom(X) when is_integer(X) ->
@@ -1373,6 +1377,7 @@ extint2atom(X) when is_integer(X) ->
         ?empty_list -> ?empty_list_atom;
         ?not_a_list -> ?not_a_list_atom
     end.
+-endif.
 
 -spec sets_map(Fun :: fun((A :: any()) -> B :: any()), Set :: set()) -> [any()].
 sets_map(Fun, Set) ->
