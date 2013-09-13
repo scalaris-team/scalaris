@@ -71,7 +71,7 @@ all() ->
      %{group, gc_tests}
      ].
 
-suite() -> [ {timetrap, {seconds, 20}} ].
+suite() -> [ {timetrap, {seconds, 40}} ].
 
 group(tester_tests) ->
     [{timetrap, {seconds, 400}}];
@@ -602,11 +602,11 @@ test_split_prepare() ->
     l_on_cseq:lease_split(L, R1, R2, self()),               % trigger step
     ct:pal("intercepting msg"),
     StartMsg = receive                                           % intercept msg
-                   M = {l_on_cseq, split, _, _, _, _} ->
+                   M = {l_on_cseq, split, _, _, _, _, _} ->
                        M
                end,
     ct:pal("intercepted msg"),
-    {l_on_cseq, split, Lease, _R1, _R2, _ReplyTo} = StartMsg,
+    {l_on_cseq, split, Lease, _R1, _R2, _ReplyTo, _PostAux} = StartMsg,
     {Lease, LeftId, RightId, StartMsg}.
 
 
@@ -697,7 +697,7 @@ split_helper_do_step(StepTag, ModifyBeforeStep, Id) ->
     ct:pal("doing ~p", [StepTag]),
     DHTNode = pid_groups:find_a(dht_node),
     ReplyMsg = receive
-                   M = {l_on_cseq, StepTag, Lease, _R1, _R2, _ReplyTo, _Resp} ->
+                   M = {l_on_cseq, StepTag, Lease, _R1, _R2, _ReplyTo, _PostAux, _Resp} ->
                        M
                end,
     ModifyBeforeStep(Id, Lease),
@@ -708,7 +708,7 @@ wait_for_split_message(StepTag) ->
     DHTNode = pid_groups:find_a(dht_node),
     ct:pal("waiting for ~p", [StepTag]),
     receive
-        M = {l_on_cseq, StepTag, _Lease, _R1, _R2, _ReplyTo, _Resp} ->
+        M = {l_on_cseq, StepTag, _Lease, _R1, _R2, _ReplyTo, _PostAux, _Resp} ->
             ct:pal("got ~p", [M]),
             gen_component:bp_del(DHTNode, StepTag),
             watch_message(DHTNode, M)
@@ -907,7 +907,7 @@ block_message(Pid, WatchedMessage) ->
 block_split_request(Pid) ->
     fun (Message, _State) ->
             case Message of
-                {l_on_cseq, split, _Lease, _R1, _R2, _ReplyTo} ->
+                {l_on_cseq, split, _Lease, _R1, _R2, _ReplyTo, _PostAux} ->
                     comm:send_local(Pid, Message),
                     drop_single;
                 _ ->
@@ -918,7 +918,7 @@ block_split_request(Pid) ->
 block_split_reply(Pid, StepTag) ->
     fun (Message, _State) ->
             case Message of
-                {l_on_cseq, StepTag, _Lease, _R1, _R2, _ReplyTo, _Resp} ->
+                {l_on_cseq, StepTag, _Lease, _R1, _R2, _ReplyTo, _PostAux, _Resp} ->
                     comm:send_local(Pid, Message),
                     drop_single;
                 _ ->
