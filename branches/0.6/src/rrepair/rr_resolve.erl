@@ -167,10 +167,12 @@ on({get_entries_response, EntryList}, State =
 % MODE: interval_upd 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_state_response, MyI}, State = #rr_resolve_state{ operation = Op,
-                                                         dhtNodePid = DhtPid }) 
+on({get_state_response, MyI}, State =
+       #rr_resolve_state{ operation = Op, dhtNodePid = DhtPid, stats = Stats })
   when element(1, Op) =:= interval_upd;
        element(1, Op) =:= interval_upd_send ->
+    ?TRACE("RESOLVE - START~nOperation=~p - SessionId:~p~n Interval=~p~n MyInterval=~p~n",
+           [element(1, Op), Stats#resolve_stats.session_id, element(2, Op), MyI], State),
     OpSIs = intervals:get_simple_intervals(element(2, Op)),
     ISec = lists:foldl(
              fun(Q, AccJ) ->
@@ -288,7 +290,9 @@ on({update_key_entry_ack, Entry, Exists, Done}, State =
     NewState = State#rr_resolve_state{ stats = NewStats, feedbackKvv = NewFBItems },
     if
         (Diff -1) =:= (RegenOk + UpdOk + UpdFail + RegenFail) ->
-                ?TRACE("UPDATED = ~p - Regen=~p - FB=~p", [Stats#resolve_stats.update_count, Stats#resolve_stats.regen_count, NewFBItems], State),
+                ?TRACE("UPDATED = ~p - Regen=~p",
+                       [Stats#resolve_stats.update_count,
+                        Stats#resolve_stats.regen_count], State),
                 shutdown(resolve_ok, NewState, FBDest, NewFBItems, [feedback_response]);
         true -> NewState
     end;
@@ -313,10 +317,11 @@ start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
 
 -spec shutdown(exit_reason(), state(), undefined | comm:mypid(), kvv_list(),
                options()) -> kill.
-shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, 
-                                    send_stats = SendStats,
-                                    stats = Stats},
+shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
+                                    stats = Stats} = _State,
          KUDest, KUItems, KUOptions) ->
+    ?TRACE("SHUTDOWN ~p - key_upd to ~p - items: ~.2p",
+           [_Reason, KUDest, KUItems], _State),
     case KUDest of
         undefined -> ok;
         _ ->
