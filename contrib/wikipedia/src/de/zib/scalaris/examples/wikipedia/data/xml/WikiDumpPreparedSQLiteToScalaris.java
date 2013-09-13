@@ -45,6 +45,7 @@ import de.zib.scalaris.RoundRobinConnectionPolicy;
 import de.zib.scalaris.TransactionSingleOp;
 import de.zib.scalaris.examples.wikipedia.Options;
 import de.zib.scalaris.examples.wikipedia.SQLiteDataHandler;
+import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpConvertPreparedSQLite.ConvertOp;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpConvertPreparedSQLite.KVPair;
 import de.zib.scalaris.examples.wikipedia.data.xml.WikiDumpConvertPreparedSQLite.ListOrCountOp;
@@ -337,7 +338,49 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                 convOp = new ConvertOp();
             }
 
-            if (convOp.copyValue) {
+            if (convOp.optimisation instanceof IBuckets) {
+                IBuckets optimisation = (IBuckets) convOp.optimisation;
+                switch (convOp.listOrCount) {
+                    case LIST:
+                        try {
+                            HashMap<String, List<ErlangValue>> newLists = SQLiteWriteBucketListJob
+                                    .splitList(optimisation, value);
+                            for (Entry<String, List<ErlangValue>> newList : newLists.entrySet()) {
+                                // write list
+                                final String key2 = key + newList.getKey();
+                                requests.addOp(new WriteOp(key2, newList.getValue()));
+                                // write count (if available)
+                                if (convOp.countKey != null) {
+                                    final String countKey2 = convOp.countKey + newList.getKey();
+                                    requests.addOp(new WriteOp(countKey2, newList.getValue().size()));
+                                }
+                            }
+                        } catch (Exception e) {
+                            println("write of " + key + " failed (error: " + e.toString() + ")");
+                            return;
+                        }
+                        break;
+                    case COUNTER:
+                        if (optimisation.getBuckets() > 1) {
+                            int counter = WikiDumpPrepareSQLiteForScalarisHandler
+                                    .objectFromBytes2(value)
+                                    .intValue();
+                            Collection<KVPair<Integer>> newCounters = SQLiteWriteBucketCounterJob
+                                    .splitCounter(optimisation, key, counter);
+                            for (KVPair<Integer> kvPair : newCounters) {
+                                requests.addOp(new WriteOp(kvPair.key, kvPair.value));
+                            }
+                        } else {
+                            // write object as is
+                            OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
+                                    .objectFromBytes(value);
+                            requests.addOp(new WriteCompressedOp(key, valueOtp));
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            } else if (convOp.optimisation != null ) {
                 if (convOp.listOrCount == ListOrCountOp.LIST) {
                     Collection<KVPair<Object>> operations = SQLiteCopyList.splitOp(key, convOp.countKey, value);
                     for (KVPair<Object> kvPair : operations) {
@@ -356,47 +399,6 @@ public class WikiDumpPreparedSQLiteToScalaris implements WikiDump {
                     OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
                             .objectFromBytes(value);
                     requests.addOp(new WriteCompressedOp(key, valueOtp));
-                }
-            } else if (convOp.optimisation2 != null) {
-                switch (convOp.listOrCount) {
-                    case LIST:
-                        try {
-                            HashMap<String, List<ErlangValue>> newLists = SQLiteWriteBucketListJob
-                                    .splitList(convOp.optimisation2, value);
-                            for (Entry<String, List<ErlangValue>> newList : newLists.entrySet()) {
-                                // write list
-                                final String key2 = key + newList.getKey();
-                                requests.addOp(new WriteOp(key2, newList.getValue()));
-                                // write count (if available)
-                                if (convOp.countKey != null) {
-                                    final String countKey2 = convOp.countKey + newList.getKey();
-                                    requests.addOp(new WriteOp(countKey2, newList.getValue().size()));
-                                }
-                            }
-                        } catch (Exception e) {
-                            println("write of " + key + " failed (error: " + e.toString() + ")");
-                            return;
-                        }
-                        break;
-                    case COUNTER:
-                        if (convOp.optimisation2.getBuckets() > 1) {
-                            int counter = WikiDumpPrepareSQLiteForScalarisHandler
-                                    .objectFromBytes2(value)
-                                    .intValue();
-                            Collection<KVPair<Integer>> newCounters = SQLiteWriteBucketCounterJob
-                                    .splitCounter(convOp.optimisation2, key, counter);
-                            for (KVPair<Integer> kvPair : newCounters) {
-                                requests.addOp(new WriteOp(kvPair.key, kvPair.value));
-                            }
-                        } else {
-                            // write object as is
-                            OtpErlangObject valueOtp = WikiDumpPrepareSQLiteForScalarisHandler
-                                    .objectFromBytes(value);
-                            requests.addOp(new WriteCompressedOp(key, valueOtp));
-                        }
-                        break;
-                    default:
-                        break;
                 }
             }
         }
