@@ -1,7 +1,7 @@
 /Makefile
 /Emakefile
 /config.status
-/ct_run.ct*@*
+/ct_run.*ct*@*
 /all_runs.html
 /index.html
 /.project
