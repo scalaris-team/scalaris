@@ -525,6 +525,9 @@ resolve_leaf(Node, Dest, SID, OwnerL, OwnerR) ->
     LeafInterval = merkle_tree:get_interval(Node),
     case merkle_tree:get_item_count(Node) of
         0 ->
+            % we know that we don't have data in this range, so we must
+            % regenerate it from the other node
+            % -> send him this request directly!
             send(Dest, {request_resolve, SID, {interval_upd, LeafInterval, []},
                         [{session_id, SID} | Options]}),
             1;
@@ -533,6 +536,42 @@ resolve_leaf(Node, Dest, SID, OwnerL, OwnerR) ->
                                 {interval_upd_send, LeafInterval, Dest},
                                 Options}),
             2
+    end.
+
+%% @doc Starts a single resolve request for all given leave nodes by joining
+%%      their intervals.
+%%      Returns the number of resolve requests (requests with feedback count 2).
+-spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
+                     rrepair:session_id(), OwnerLocal::comm:erl_local_pid())
+        -> 0..2.
+resolve_leaves([], _Dest, _SID, _OwnerL) -> 0;
+resolve_leaves(Nodes, Dest, SID, OwnerL) ->
+    resolve_leaves(Nodes, Dest, SID, OwnerL, intervals:empty(), 0).
+
+% @doc Returns number of caused resolve requests (requests with feedback count 2).
+-spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
+                     rrepair:session_id(), OwnerLocal::comm:erl_local_pid(),
+                     Interval::intervals:interval(), Items::non_neg_integer())
+        -> 1 | 2.
+resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
+    LeafInterval = merkle_tree:get_interval(Node),
+    IntervalNew = intervals:union(Interval, LeafInterval),
+    ItemsNew = Items + merkle_tree:get_item_count(Node),
+    resolve_leaves(Rest, Dest, SID, OwnerL, IntervalNew, ItemsNew);
+resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
+    Options = [{feedback_request, comm:make_global(OwnerL)}],
+    if Items > 0 ->
+           send_local(OwnerL, {request_resolve, SID,
+                               {interval_upd_send, Interval, Dest},
+                               Options}),
+           2;
+       true ->
+           % we know that we don't have data in this range, so we must
+           % regenerate it from the other node
+           % -> send him this request directly!
+           send(Dest, {request_resolve, SID, {interval_upd, Interval, []},
+                       [{session_id, SID} | Options]}),
+           1
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -551,12 +590,7 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
                 {ASyncLeafs, NComp, NSkip, NLSync} =
                     art_get_sync_leaves([merkle_tree:get_root(Tree)], Art,
                                         [], 0, 0, 0),
-                OwnerR = comm:make_global(OwnerL),
-                ResolveCalled =
-                    lists:foldl(
-                      fun(X, Acc) ->
-                              Acc + resolve_leaf(X, DestPid, SID, OwnerL, OwnerR)
-                      end, 0, ASyncLeafs),
+                ResolveCalled = resolve_leaves(ASyncLeafs, DestPid, SID, OwnerL),
                 rr_recon_stats:inc([{tree_nodesCompared, NComp},
                                     {tree_compareSkipped, NSkip},
                                     {tree_leafsSynced, NLSync},
