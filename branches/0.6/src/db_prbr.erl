@@ -41,7 +41,7 @@
 -export([close/1]).
 -export([get_load/1, get_load/2]).
 
-%% raw whole db_entry operations
+%% raw whole db entry operations
 -export([get/2]).
 -export([set/2]).
 
@@ -61,9 +61,10 @@
                                SnapLockCount :: non_neg_integer()}}.
 -type version() :: non_neg_integer().
 -type value() :: rdht_tx:encoded_value().
--type db_as_list() :: [db_entry:entry()].
+-type entry() :: tuple(). %% first element must be the key().
+-type db_as_list() :: [entry()].
 
--type subscr_op_t() :: {write, db_entry:entry()} | {delete | split, ?RT:key()}.
+-type subscr_op_t() :: {write, entry()} | {delete | split, ?RT:key()}.
 -type subscr_changes_fun_t() :: fun((DB::db(), Tag::any(), Operation::subscr_op_t()) -> db()).
 -type subscr_remove_fun_t() :: fun((Tag::any()) -> any()).
 -type subscr_t() :: {Tag::any(), intervals:interval(), ChangesFun::subscr_changes_fun_t(), CloseDBFun::subscr_remove_fun_t()}.
@@ -112,7 +113,7 @@ get_load({DB, _Subscr, _Snap}, Interval) ->
     ?DB:foldl(
             DB,
             fun(Entry, AccIn) ->
-                case intervals:in(db_entry:get_key(Entry), Interval) of
+                case intervals:in(entry_key(Entry), Interval) of
                     true -> AccIn + 1;
                     _ -> AccIn
                 end
@@ -120,20 +121,20 @@ get_load({DB, _Subscr, _Snap}, Interval) ->
 
 
 %%%%%%
-%%% raw whole db_entry operations
+%%% raw whole db entry operations
 %%%%%%
 
 %% @doc Gets an entry from the DB. If there is no entry with the given key,
 %%      an empty entry will be returned.
--spec get(db(), Key::?RT:key()) -> db_entry:entry() | {}.
+-spec get(db(), Key::?RT:key()) -> entry() | {}.
 get({KVStore, _Subscr, _Snap}, Key) ->
     ?DB:get(KVStore, Key).
 
--spec set(db(), Entry::db_entry:entry()) -> db().
+-spec set(db(), entry()) -> db().
 set(DB, Entry) ->
     set_entry(DB, Entry, 1, 2).
 
--spec set_entry(db(), Entry::db_entry:entry(), non_neg_integer(),
+-spec set_entry(db(), entry(), non_neg_integer(),
                  non_neg_integer()) -> db().
 set_entry(State, Entry, _TLogSnapNo, _OwnSnapNo) ->
     {KVStore, Subscr, Snap} = State,
@@ -142,9 +143,9 @@ set_entry(State, Entry, _TLogSnapNo, _OwnSnapNo) ->
     call_subscribers(NewDB, {write, Entry}).
 
 %% @doc Removes all values with the given entry's key from the DB.
--spec delete_entry(DB::db(), Entry::db_entry:entry()) -> NewDB::db().
+-spec delete_entry(DB::db(), entry()) -> NewDB::db().
 delete_entry(State, Entry) ->
-    delete_entry_at_key(State, db_entry:get_key(Entry)).
+    delete_entry_at_key(State, entry_key(Entry)).
 
 -spec delete_entry_at_key(DB::db(), ?RT:key()) -> NewDB::db().
 delete_entry_at_key(State, Key) ->
@@ -169,8 +170,8 @@ delete_entry_at_key({DB, Subscr, {Snap, LiveLC, SnapLC}} = State,  Key, Reason) 
 %%      have data (a subset of I).
 %%      Precond: Interval is a subset of the range of the dht_node and continuous!
 -spec get_chunk(DB::db(), StartId::?RT:key(), Interval::intervals:interval(),
-                FilterFun::fun((db_entry:entry()) -> boolean()),
-                ValueFun::fun((db_entry:entry()) -> V),
+                FilterFun::fun((entry()) -> boolean()),
+                ValueFun::fun((entry()) -> V),
                 ChunkSize::pos_integer() | all)
         -> {intervals:interval(), [V]}.
 get_chunk(_State, _StartId, [], _FilterFun, _ValueFun, _ChunkSize) ->
@@ -243,7 +244,7 @@ get_chunk({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSiz
 %%% slide: slide DB (see dht_node_state.erl)
 %%%%%%
 
-%% @doc Adds all db_entry objects in the Data list.
+%% @doc Adds all db entry objects in the Data list.
 -spec add_data(DB::db(), db_as_list()) -> NewDB::db().
 add_data(DB, Data) ->
     lists:foldl(fun(Entry, DBAcc) ->
@@ -253,18 +254,18 @@ add_data(DB, Data) ->
                         end
                 end, DB, Data).
 
-%% @doc Gets (non-empty) db_entry objects in the given range.
+%% @doc Gets (non-empty) db entry objects in the given range.
 -spec get_entries(DB::db(), Range::intervals:interval()) -> db_as_list().
 get_entries(State, Interval) ->
     {Elements, RestInterval} = intervals:get_elements(Interval),
     case intervals:is_empty(RestInterval) of
         true ->
-            [E || Key <- Elements, not db_entry:is_empty(E = get(State, Key))];
+            [E || Key <- Elements, {} =/= (E = get(State, Key))];
         _ ->
             {_, Data} =
                 get_chunk(State, ?RT:hash_key("0"), % any key will work, here!
                            Interval,
-                           fun(DBEntry) -> not db_entry:is_empty(DBEntry) end,
+                           fun(DBEntry) -> {} =/= DBEntry end,
                            fun(E) -> E end, all),
             Data
     end.
@@ -308,9 +309,9 @@ stop_record_changes(State, Interval) ->
     end.
 
 
-%% @doc Gets all db_entry objects in the given interval which have
-%%      (potentially) been changed or deleted (might return objects that have
-%%      not changed but have been touched by one of the DB setters).
+%% @doc Gets all db entries in the given interval which have
+%% (potentially) been changed or deleted (might return objects that
+%% have not changed but have been touched by one of the DB setters).
 -spec get_changes(DB::db(), intervals:interval()) -> {Changed::db_as_list(), Deleted::[?RT:key()]}.
 get_changes(State, Interval) ->
     case erlang:get('$delta_tab') of
@@ -321,23 +322,25 @@ get_changes(State, Interval) ->
 %% @doc Helper for get_changes/2 that adds the entry of a changed key either to
 %%      the list of changed entries or to the list of deleted entries.
 -spec get_changes_helper(State::db(), ChangedKeys::[{?RT:key()}],
-        Interval::intervals:interval(), ChangedEntries::[db_entry:entry()],
+        Interval::intervals:interval(), ChangedEntries::[entry()],
         DeletedKeys::[?RT:key()])
-            -> {ChangedEntries::[db_entry:entry()], DeletedKeys::[?RT:key()]}.
+            -> {ChangedEntries::[entry()], DeletedKeys::[?RT:key()]}.
 get_changes_helper(_State, [], _Interval, ChangedEntries, DeletedKeys) ->
     {ChangedEntries, DeletedKeys};
 get_changes_helper(State, [{CurKey} | RestKeys], Interval, ChangedEntries, DeletedKeys) ->
     case intervals:in(CurKey, Interval) of
         true ->
             Entry = get(State, CurKey),
-            case db_entry:is_null(Entry) of
-                false -> ?TRACE("~p get_changes: ~p was changed~n", [self(), CurKey]),
-                    get_changes_helper(State, RestKeys, Interval, [Entry | ChangedEntries], DeletedKeys);
-                _    -> ?TRACE("~p get_changes: ~p was deleted~n", [self(), CurKey]),
-                    get_changes_helper(State, RestKeys, Interval, ChangedEntries, [CurKey | DeletedKeys])
+            case Entry of
+                {} ->
+                    ?TRACE("~p get_changes: ~p was deleted~n", [self(), CurKey]),
+                    get_changes_helper(State, RestKeys, Interval, ChangedEntries, [CurKey | DeletedKeys]);
+                _ ->
+                    ?TRACE("~p get_changes: ~p was changed~n", [self(), CurKey]),
+                    get_changes_helper(State, RestKeys, Interval, [Entry | ChangedEntries], DeletedKeys)
             end;
         _ -> ?TRACE("~p get_changes: key ~p is not in ~p~n", [self(), CurKey, Interval]),
-            get_changes_helper(State, RestKeys, Interval, ChangedEntries, DeletedKeys)
+             get_changes_helper(State, RestKeys, Interval, ChangedEntries, DeletedKeys)
     end.
 
 %% @doc Inserts/removes the key into the table of changed keys depending on the
@@ -347,7 +350,7 @@ subscr_delta(State, _Tag, Operation) ->
     CKDB = subscr_delta_check_table(State),
     ?TRACE("subscr_delta is called for op ~p~n", [Operation]),
     case Operation of
-        {write, Entry} -> ?CKETS:insert(CKDB, {db_entry:get_key(Entry)});
+        {write, Entry} -> ?CKETS:insert(CKDB, {entry_key(Entry)});
         {delete, Key}  -> ?CKETS:insert(CKDB, {Key});
         {split, Key}   -> ?CKETS:delete(CKDB, Key)
     end,
@@ -382,7 +385,7 @@ subscr_delta_check_table({DB, _Subscr, _Snap}) ->
 subscr_delta_remove(State, Interval) ->
     CKDB = subscr_delta_check_table(State),
     F = fun(DBEntry, _) ->
-                Key = db_entry:get_key(DBEntry),
+                Key = entry_key(DBEntry),
                 case intervals:in(Key, Interval) of
                     true -> ?CKETS:delete(CKDB, Key);
                     _    -> true
@@ -395,7 +398,7 @@ subscr_delta_remove(State, Interval) ->
 %%      for which the FilterFun returns true from the DB.
 -spec delete_entries(DB::db(),
                      RangeOrFun::intervals:interval() |
-                                 fun((DBEntry::db_entry:entry()) -> boolean()))
+                                 fun((entry()) -> boolean()))
         -> NewDB::db().
 delete_entries(State = {DB, _Subscr, _SnapState}, FilterFun)
   when is_function(FilterFun) ->
@@ -479,7 +482,7 @@ call_subscribers_iter({Tag, I, ChangesFun, RemSubscrFun}, {State, Op}) ->
                 State;
             Operation ->
                 Key = case Operation of
-                    {write, Entry} -> db_entry:get_key(Entry);
+                    {write, Entry} -> entry_key(Entry);
                     {delete, K}  -> K;
                     {split, K}  -> K
                 end,
@@ -526,9 +529,9 @@ calc_remaining_interval(StartId, _Remaining, Chunk, Interval) ->
 
 %% @doc Gets the largest key in Chunk left of StartId if there is one,
 %%      otherwise gets the largest key of all items.
--spec calc_last_key_rem_int(Chunk::[db_entry:entry(),...], StartId::?RT:key()) -> ?RT:key().
+-spec calc_last_key_rem_int(Chunk::[entry(),...], StartId::?RT:key()) -> ?RT:key().
 calc_last_key_rem_int([X | Rest], StartId) ->
-    Key = element(1, X),
+    Key = entry_key(X),
     calc_last_key_rem_int(Rest, StartId, Key, Key < StartId).
 
 %% @doc Helper for calc_last_key_rem_int/2.
@@ -536,7 +539,7 @@ calc_last_key_rem_int([X | Rest], StartId) ->
                             OnlySmallerThanStart::boolean()) -> ?RT:key().
 calc_last_key_rem_int([], _StartId, Max, _OnlySmallerThanStart) -> Max;
 calc_last_key_rem_int([X | Rest], StartId, Max, true) ->
-    Key = element(1, X),
+    Key = entry_key(X),
     case Key < StartId of
         true ->
             calc_last_key_rem_int(Rest, StartId,
@@ -545,7 +548,7 @@ calc_last_key_rem_int([X | Rest], StartId, Max, true) ->
             calc_last_key_rem_int(Rest, StartId, Max, true)
     end;
 calc_last_key_rem_int([X | Rest], StartId, Max, false) ->
-    Key = element(1, X),
+    Key = entry_key(X),
     case Key < StartId of
         true ->
             calc_last_key_rem_int(Rest, StartId, Key, true);
@@ -553,3 +556,5 @@ calc_last_key_rem_int([X | Rest], StartId, Max, false) ->
             calc_last_key_rem_int(Rest, StartId,
                                   ?IIF(Key > Max, Key, Max), false)
     end.
+
+entry_key(E) -> element(1, E).
