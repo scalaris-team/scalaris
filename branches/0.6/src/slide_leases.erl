@@ -40,7 +40,7 @@
 -spec prepare_join_send(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_join_send(State, SlideOp) ->
-    ct:pal("prepare_join_send", []),
+    log:log("prepare_join_send", []),
     % can be ignored for leases
     {ok, State, SlideOp}.
 
