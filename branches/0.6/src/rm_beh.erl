@@ -33,16 +33,23 @@
 -callback init(Me::node:node_type(), Pred::node:node_type(), Succ::node:node_type()) -> state().
 -callback handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
--callback zombie_node(State::state(), Node::node:node_type()) -> state().
--callback crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
--callback new_pred(State::state(), NewPred::node:node_type()) -> state().
--callback new_succ(State::state(), NewSucc::node:node_type()) -> state().
+-callback zombie_node(State::state(), Node::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+-callback crashed_node(State::state(), DeadPid::comm:mypid())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+-callback new_pred(State::state(), NewPred::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+-callback new_succ(State::state(), NewSucc::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 -callback leave(State::state()) -> ok.
 -callback remove_pred(State::state(), OldPred::node:node_type(),
-                      PredsPred::node:node_type()) -> state().
+                      PredsPred::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 -callback remove_succ(State::state(), OldSucc::node:node_type(),
-                      SuccsSucc::node:node_type()) -> state().
--callback update_node(State::state(), NewMe::node:node_type()) -> state().
+                      SuccsSucc::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+-callback update_node(State::state(), NewMe::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 
 -callback get_web_debug_info(State::state()) -> [{string(), string()}].
 -callback check_config() -> boolean().
