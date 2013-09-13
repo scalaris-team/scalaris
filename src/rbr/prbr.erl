@@ -168,7 +168,7 @@ get_entry(Id, TableName) ->
 
 -spec set_entry(entry(), state()) -> state().
 set_entry(NewEntry, TableName) ->
-    ?PDB:set(TableName, NewEntry),
+    _ = ?PDB:set(TableName, NewEntry),
     TableName.
 
 %% As the round number contains the client's pid, they are still
