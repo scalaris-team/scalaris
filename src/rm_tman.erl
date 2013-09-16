@@ -37,6 +37,7 @@
 % accepted messages of an initialized rm_tman process in addition to rm_loop
 -type(custom_message() ::
     {rm_trigger} |
+    {rm_trigger_action} |
     {{cy_cache, Cache::[node:node_type()]}, rm} |
     {rm, {get_node_details_response, NodeDetails::node_details:node_details()}} |
     {rm, buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
@@ -86,6 +87,12 @@ unittest_create_state(Neighbors) ->
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
 handle_custom_message({rm_trigger},
+   {Neighborhood, RandViewSize, _Interval, TriggerState, Cache, Churn}) ->
+    NewTriggerState = trigger:next(TriggerState),
+    handle_custom_message({rm_trigger_action}, {Neighborhood, RandViewSize, base_interval,
+                                                NewTriggerState, Cache, Churn});
+
+handle_custom_message({rm_trigger_action},
    {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
     % Trigger an update of the Random view
     % Test for being alone:
@@ -118,9 +125,8 @@ handle_custom_message({rm_trigger},
                 true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
                 _    -> ok
             end,
-            NewTriggerState = trigger:next(TriggerState, Interval),
-            {{unknown}, {Neighborhood, RandViewSize, base_interval,
-                         NewTriggerState, Cache, Churn}}
+            {{unknown}, {Neighborhood, RandViewSize, Interval,
+                         TriggerState, Cache, Churn}}
     end;
 
 % got empty cyclon cache
@@ -262,9 +268,10 @@ remove_succ(State, OldSucc, SuccsSucc) ->
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}, NewMe) ->
     NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
-    NewTriggerState = trigger:now(TriggerState), % inform neighbors
-    {{unknown}, {NewNeighborhood, RandViewSize, Interval,
-                 NewTriggerState, Cache, Churn}}.
+    % inform neighbors
+    handle_custom_message({rm_trigger_action}, {NewNeighborhood, RandViewSize, 
+                                                Interval, TriggerState, Cache, Churn}).
+
 
 -spec leave(State::state()) -> ok.
 leave(_State) -> ok.
@@ -358,18 +365,18 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
                             nodelist:to_list(OtherNeighborhood)),
     PredL = get_pred_list_length(),
     SuccL = get_succ_list_length(),
-    NewNeighborhood1 = 
+    NewNeighborhood1 =
         nodelist:add_nodes(OldNeighborhood2, MyRndView, PredL, SuccL),
     NewNeighborhood2 =
         nodelist:merge(NewNeighborhood1, OtherNeighborhood, PredL, SuccL),
-    
+
     OldView = nodelist:to_list(OldNeighborhood2),
     NewView = nodelist:to_list(NewNeighborhood2),
     ViewOrd = fun(A, B) ->
                       nodelist:succ_ord_node(A, B, nodelist:node(OldNeighborhood2))
               end,
     {_, _, NewNodes} = util:ssplit_unique(OldView, NewView, ViewOrd),
-    
+
     contact_new_nodes(NewNodes),
     OldNeighborhood2.
 
@@ -413,27 +420,26 @@ update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, 
             Nbh1 = nodelist:filter(OldNeighborhood, FilterFun),
             NewCache = nodelist:lfilter(OldCache, FilterFun)
     end,
-    
+
     NewNeighborhood = nodelist:add_nodes(Nbh1, NodesToAdd,
                                          get_pred_list_length(),
                                          get_succ_list_length()),
-    
+
     NewChurn = has_churn(OldNeighborhood, NewNeighborhood),
     NewInterval = case Churn orelse NewChurn of
                       true -> min_interval; % increase ring maintenance frequency
                       _    -> max_interval
                   end,
-    NewTriggerState =
-        case nodelist:pred(OldNeighborhood) =/= nodelist:pred(NewNeighborhood) orelse
-                 nodelist:succ(OldNeighborhood) =/= nodelist:succ(NewNeighborhood) of
-            true -> trigger:now(TriggerState);
-            _    -> TriggerState
-        end,
     NewRandViewSize = case NewChurn andalso NodesToRemove =/= [] of
                           true -> 0;
                           _    -> RandViewSize
                       end,
-    {NewNeighborhood, NewRandViewSize, NewInterval, NewTriggerState, NewCache, NewChurn}.
+    NewState = {NewNeighborhood, NewRandViewSize, NewInterval, TriggerState, NewCache, NewChurn},
+    case nodelist:pred(OldNeighborhood) =/= nodelist:pred(NewNeighborhood) orelse
+        nodelist:succ(OldNeighborhood) =/= nodelist:succ(NewNeighborhood) of
+        true -> element(2, handle_custom_message({rm_trigger_action}, NewState));
+        _    -> NewState
+    end.
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() -> config:read(stabilization_interval_base).
