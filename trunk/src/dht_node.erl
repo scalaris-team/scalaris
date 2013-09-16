@@ -109,7 +109,8 @@ on(Msg, State) when element(1, Msg) =:= rm ->
     RMState = dht_node_state:get(State, rm_state),
     RMState1 = rm_loop:on(Msg, RMState),
     dht_node_state:set_rm(State, RMState1);
-on(Msg, State) when element(1, Msg) =:= rm_trigger ->
+on(Msg, State) when element(1, Msg) =:= rm_trigger orelse
+                    element(1, Msg) =:= rm_trigger_action ->
     RMState = dht_node_state:get(State, rm_state),
     RMState1 = rm_loop:on(Msg, RMState),
     dht_node_state:set_rm(State, RMState1);
