@@ -188,7 +188,7 @@ remove_succ({OldNeighborhood, TriggerState}, OldSucc, SuccsSucc) ->
 update_node({OldNeighborhood, TriggerState}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
     % inform neighbors
-    element(2, handle_custom_message({rm_trigger_action}, {NewNeighborhood, TriggerState})).
+    handle_custom_message({rm_trigger_action}, {NewNeighborhood, TriggerState}).
 
 -spec leave(State::state()) -> ok.
 leave(_State) -> ok.
