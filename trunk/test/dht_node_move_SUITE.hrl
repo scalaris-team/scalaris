@@ -589,7 +589,7 @@ symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node
                                true ->
                                    ct:pal("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p~nretrying...~n",
                                           [PredOrSucc, NthNode, N, Node, Other, TargetId, Result]),
-                                   timer:sleep(100), % wait a bit before trying again
+                                   timer:sleep(25), % wait a bit before trying again
                                    symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other);
                                _ ->
                                    ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) result: ~.0p",
