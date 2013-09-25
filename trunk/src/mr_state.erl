@@ -51,8 +51,7 @@
 
 -type(state() :: #state{}).
 
--spec get(state(), my_range)        -> intervals:interval();
-         (state(), client)          -> comm:mypid().
+-spec get(state(), client)          -> comm:mypid().
 get(#state{client     = Client
            , master   = Master
            , jobid    = JobId
@@ -130,3 +129,49 @@ merge_with_default_options(UserOptions, DefaultOptions) ->
     lists:keymerge(1, 
                    lists:keysort(1, UserOptions), 
                    lists:keysort(1, DefaultOptions)).
+
+-spec split_slide_state(state(), intervals:interval()) -> {OldState::state(),
+                                                         SlideState::state()}.
+split_slide_state(#state{phases = Phases} = State, Interval) ->
+    {StayingPhases, SildePhases} = lists:foldl(
+                    fun({Nr, MoR, Fun, Data}, {Staying, Slide}) ->
+                            {New, Old} = lists:partition(
+                                           fun({K, _V}) ->
+                                                   intervals:in(?RT:hash_key(K),
+                                                                Interval)
+                                           end, Data),
+                            {[{Nr, MoR, Fun, Old} | Staying],
+                             [{Nr, MoR, Fun, New} | Slide]}
+                    end,
+                    {[],[]},
+                    Phases),
+    {State#state{phases = StayingPhases}, State#state{phases = SildePhases}}.
+
+-spec get_slide_delta(state(), intervals:interval()) ->
+    {RemaingState::state(), SlideData::{Round::pos_integer(), [{string(), term()}]}}.
+get_slide_delta(#state{phases = Phases, current = Cur} = State, Interval) ->
+    case lists:keyfind(Cur + 1, 1, Phases) of
+        false ->
+            {State, []};
+        {Nr, MoR, Fun, Data} ->
+            {Staying, Moving} = lists:partition(
+                                  fun(K, _V) ->
+                                          intervals:in(K, Interval)
+                                  end, Data),
+        {State#state{phases = lists:keyreplace(Nr, 1, Phases,
+                                               {Nr, MoR, Fun, Staying})},
+         {Nr, Moving}}
+    end.
+
+-spec add_slide_delta(state(), Data::{Round::pos_integer(), [{string(),
+                                                              term()}]}) ->
+    state().
+add_slide_delta(#state{phases = Phases} = State, {Round, SlideData}) ->
+    case lists:keyfind(Round, 1, Phases) of
+        false ->
+            %% no further rounds; slide data should be empty in this case
+            State;
+        {Round, MoR, Fun, Data} ->
+            State#state{phases = lists:keyreplace(Round, MoR, Fun, SlideData ++
+                                                  Data)}
+    end.
