@@ -74,6 +74,21 @@ on({mr, phase_completed, Range}, {JobId, I}) ->
             {JobId, []}
     end;
 
+on({mr, job_completed, Range}, {JobId, I}) ->
+    NewInterval = intervals:union(I, Range),
+    case intervals:is_all(NewInterval) of
+        false ->
+            {JobId, NewInterval};
+        _ ->
+            ?TRACE("mr_master_~s: job completed...shutting down~n",
+                     [JobId]),
+            bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
+                                       {mr, terminate_job, JobId}),
+            exit(self(), shutdown),
+            %% Supervisor = pid_groups:get_my("sup_mr_job_" ++ JobId),
+            {JobId, []}
+    end;
+
 on(Msg, State) ->
     ?TRACE("~p mr_master: revceived ~p~n",
            [comm:this(), Msg]),
