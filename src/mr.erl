@@ -61,7 +61,7 @@ on({bulk_distribute, Id, Interval,
     %% send acc to master
     %% comm:send(Master, {mr, ack_init, Range}),
     %% start worker thread for first phase
-    work_on_phase(JobId, mr_state:get_phase(JobState)),
+    work_on_phase(JobId, JobState),
     dht_node_state:set_mr_state(State, JobId, JobState);
 
 on({mr, phase_result, JobId, {work_done, Data}}, State) ->
@@ -69,10 +69,6 @@ on({mr, phase_result, JobId, {work_done, Data}}, State) ->
            [JobId, self(), lists:sublist(Data, 5)]),
     Ref = uid:get_global_uid(),
     NewMRState = mr_state:set_acked(dht_node_state:get_mr_state(State, JobId), {Ref, []}),
-    io:format("is_last: ~p current: ~p last: ~p~n",
-              [mr_state:is_last_phase(NewMRState), mr_state:get(NewMRState,
-                                                               current),
-              length(mr_state:get(NewMRState, phases))]),
     case mr_state:is_last_phase(NewMRState) of
         false ->
             Reply = comm:reply_as(comm:this(), 4, {mr, next_phase_data_ack, {JobId,
@@ -113,17 +109,32 @@ on({mr, next_phase, JobId}, State) ->
     %% io:format("master initiating next phase ~p~n~p",
     %%           [JobId, State]),
     MrState = mr_state:next_phase(dht_node_state:get_mr_state(State, JobId)),
-    work_on_phase(JobId, mr_state:get_phase(MrState)),
+    work_on_phase(JobId, MrState),
     dht_node_state:set_mr_state(State, JobId, MrState);
 
 on(Msg, State) ->
     ?TRACE("~p mr: unknown message ~p~n", [comm:this(), Msg]),
     State.
 
-work_on_phase(JobId, Phase) ->
-    Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_'}),
-    comm:send_local(pid_groups:get_my(wpool), 
-                    {do_work, Reply, Phase}).
+work_on_phase(JobId, MRState) ->
+    case mr_state:get_phase(MRState) of
+        {_Round, _MoR, _FunTerm, _Keep, []} ->
+            case mr_state:is_last_phase(MRState) of
+                false ->
+                    Master = mr_state:get(MRState, master),
+                    MyRange = mr_state:get(MRState, my_range),
+                    comm:send(Master, {mr, phase_completed, MyRange}),
+                    ?TRACE("no data for phase...done...~p informs master~n", [self()]);
+                _ ->
+                    Client = mr_state:get(MRState, client),
+                    comm:send(Client, {mr_results, [], mr_state:get(MRState,
+                                                                      my_range)})
+            end;
+        Phase ->
+            Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_'}),
+            comm:send_local(pid_groups:get_my(wpool), 
+                            {do_work, Reply, Phase})
+    end.
 
 sup_job_desc(Options) ->
     DHTNodeGroup = pid_groups:my_groupname(),
