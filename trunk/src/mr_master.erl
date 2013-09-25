@@ -45,7 +45,6 @@ init({JobId, Client, Job}) ->
     Data = filter_data(api_tx:get_system_snapshot(),
                           element(2, Job)),
     ?TRACE("mr_master: job ~p started~n", [JobId]),
-    %% TODO do we need an ack?
     bulkowner:issue_bulk_distribute(uid:get_global_uid(),
                                     dht_node, 7, {mr, job, JobId, comm:this(),
                                                   Client, Job, '_'},
