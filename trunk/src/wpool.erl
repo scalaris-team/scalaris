@@ -31,7 +31,6 @@
 
 -define(TRACE(X, Y), ok).
 %% -define(TRACE(X, Y), io:format(X, Y)).
--compile([export_all]).
 
 -behaviour(gen_component).
 
@@ -172,7 +171,7 @@ work(DHTNodeGroup, {_Round, map, {erlanon, FunBin}, Data}) ->
     return(DHTNodeGroup, lists:flatten([apply_erl(Fun, X) || X <- Data]));
 work(DHTNodeGroup, {_Round, reduce, {erlanon, FunBin}, Data}) ->
     Fun = binary_to_term(FunBin, [safe]),
-    return(DHTNodeGroup, apply_erl(Fun, Data));
+    return(DHTNodeGroup, apply_erl(Fun, aggregate_reduce(Data)));
 
 work(DHTNodeGroup, {_Round, map, {jsanon, FunBin}, Data}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
@@ -187,12 +186,27 @@ work(DHTNodeGroup, {_Round, reduce, {jsanon, FunBin}, Data}) ->
 apply_erl(Fun, Data) ->
     Fun(Data).
 
+-spec aggregate_reduce([{string(), term()}, ...]) 
+          -> [{string(), [term()]}, ...].
+aggregate_reduce([{_K, _V} | _T] = Data) ->
+    Fun = fun({K, V}, AccIn) ->
+                  case lists:keyfind(K, 1, AccIn) of
+                      false ->
+                          [{K, [V]} | AccIn];
+                      {K, VL} ->
+                          lists:keyreplace(K, 1, AccIn, {K, [V | VL]})
+                  end
+          end,
+    lists:foldl(Fun, [], Data).
+
+
 %% @doc applies Fun with Args withing JSVM.
 -spec apply_js(Fun::binary(), Args::[term()], JSVM::port()) -> term().
 apply_js(FunBin, Data, VM) ->
     AutoJS = define_auto_js(FunBin, Data),
     {ok, Result} = js:eval(VM, AutoJS),
-    Result.
+    io:format("js:eval returned ~p~n", [Result]),
+    decode(Result).
 
 %% @doc create a self calling JS function.
 %%      takes a anonymous JS function (as a binary string) and a list of
@@ -210,9 +224,41 @@ define_auto_js(FunBin, Args) ->
 encode_args([], Acc) ->
     lists:reverse(Acc);
 encode_args([H | []], Acc) ->
-    encode_args([], [js_mochijson2:encode(H) | Acc]);
+    encode_args([], [js_mochijson2:encode(encode(H)) | Acc]);
 encode_args([H | T], Acc) ->
-    encode_args(T, [[js_mochijson2:encode(H), ","] | Acc]).
+    encode_args(T, [[js_mochijson2:encode(encode(H)), ","] | Acc]).
+
+-spec encode(term()) -> term().
+encode({K, V}) ->
+    {struct, [{encode(K), encode(V)}]};
+encode([{_K, _V} | _T] = KVList) ->
+    %% {struct, [{encode(K), encode(V)} || {K, V} <- KVList]};
+    %% [{struct, [{key, encode(K)}, {value, encode(V)}]} || {K, V} <- KVList];
+    Fun = fun({K, V}, AccIn) ->
+                  EnK = encode(K), EnV = encode(V),
+                  case lists:keyfind(EnK, 1, AccIn) of
+                      false ->
+                          [{EnK, [EnV]} | AccIn];
+                      {EnK, VL} ->
+                          lists:keyreplace(EnK, 1, AccIn, {EnK, [EnV | VL]})
+                  end
+          end,
+    Data = lists:foldl(Fun, [], KVList),
+    {struct, Data};
+encode(String) when is_list(String) ->
+    list_to_binary(String);
+encode(X) -> X.
+
+-spec decode(term()) -> term().
+decode({struct, [{K, V}]}) ->
+    {decode(K), decode(V)};
+decode({struct, [{_K, _V} | _T] = KVList}) ->
+    [{decode(K), decode(V)} || {K, V} <- KVList];
+decode([{struct, _KV} | _T] = List) ->
+    [{decode(K), decode(V)} || {struct, [{K, V}]} <- List];
+decode(BinString) when is_binary(BinString) ->
+    binary_to_list(BinString);
+decode(X) -> X.
 
 %% send results back to wpool
 -spec return(pid_groups:groupname(), any()) -> ok.
