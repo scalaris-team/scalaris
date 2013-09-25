@@ -70,8 +70,18 @@
 init([]) ->
     case config:read(wpool_js) of
         true ->
-            ok = application:start(sasl),
-            ok = application:start(erlang_js);
+            case util:app_check_running(sasl) of
+                true ->
+                    ok;
+                false ->
+                    ok = application:start(sasl)
+            end,
+            case util:app_check_running(erlang_js) of
+                true ->
+                    ok;
+                false ->
+                    ok = application:start(erlang_js)
+            end;
         _ ->
             ok
     end,
