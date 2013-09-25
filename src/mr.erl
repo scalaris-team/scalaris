@@ -44,11 +44,11 @@
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state().
 on({mr, init, Client, JobId, Job}, State) ->
     %% this is the inital message
-    %% it creates a JobID and starts the job supervisor and the master process,
+    %% it creates a JobID and starts the master process,
     %% which in turn starts the worker supervisor on all nodes.
     ?TRACE("mr: ~p~n received init message from ~p~n starting job ~p~n",
            [comm:this(), Client, Job]),
-    JobDesc = sup_job_desc({JobId, Client, Job}),
+    JobDesc = job_desc({JobId, Client, Job}),
     SupDHT = pid_groups:get_my(sup_dht_node),
     %% TODO handle failed starts
     supervisor:start_child(SupDHT, JobDesc),
@@ -149,8 +149,8 @@ work_on_phase(JobId, MRState) ->
                             {do_work, Reply, Phase})
     end.
 
-sup_job_desc(Options) ->
+job_desc(Options) ->
     DHTNodeGroup = pid_groups:my_groupname(),
-    {"sup_mr_job_" ++ element(1, Options), {sup_mr_job, start_link, [{DHTNodeGroup,
-                                                       Options}]},
-     transient, brutal_kill, supervisor, []}.
+    {"mr_master_" ++ element(1, Options), {mr_master, start_link,
+                                            [DHTNodeGroup, Options]}, transient,
+      brutal_kill, worker, []}.
