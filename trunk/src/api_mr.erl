@@ -36,7 +36,7 @@ wait_for_results(Data, [all], _Id) ->
     Data;
 wait_for_results(Data, Interval, Id) ->
     {NewData, NewInterval} = receive
-        ?SCALARIS_RECV({mr_results, PartData, PartInterval},
+        ?SCALARIS_RECV({mr_results, PartData, PartInterval, Id},
                        {PartData ++ Data, intervals:union(PartInterval, Interval)})
     end,
     case intervals:is_all(NewInterval) of

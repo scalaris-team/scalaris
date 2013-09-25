@@ -88,7 +88,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
             ?TRACE("jobs last phase done...sending to client~n", []),
             Client = mr_state:get(NewMRState, client),
             comm:send(Client, {mr_results, Data, mr_state:get(NewMRState,
-                                                              my_range)})
+                                                              my_range), JobId})
             %% TODO clean up job (processes, data, state)
             %% just inform master that job is done and let master shutdown
             %% everything
