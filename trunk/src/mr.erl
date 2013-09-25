@@ -80,6 +80,9 @@ on({mr, phase_result, JobId, {work_done, Data}}, State) ->
             Client = mr_state:get(NewMRState, client),
             comm:send(Client, {mr_results, Data, mr_state:get(NewMRState,
                                                               my_range)})
+            %% TODO clean up job (processes, data, state)
+            %% just inform master that job is done and let master shutdown
+            %% everything
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
