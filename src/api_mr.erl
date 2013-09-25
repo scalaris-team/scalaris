@@ -20,6 +20,8 @@
 -author('fajerski@zib.de').
 -vsn('$Id$').
 
+-define(TRACE(X, Y), io:format(X, Y)).
+
 -export([start_job/1]).
 
 -include("scalaris.hrl").
@@ -39,6 +41,7 @@ wait_for_results(Data, Interval, Id) ->
         ?SCALARIS_RECV({mr_results, PartData, PartInterval, Id},
                        {PartData ++ Data, intervals:union(PartInterval, Interval)})
     end,
+    ?TRACE("mr_api: received data for job ~p: ~p~n", [Id, hd(NewData)]),
     case intervals:is_all(NewInterval) of
         true ->
             lists:sort(NewData);
