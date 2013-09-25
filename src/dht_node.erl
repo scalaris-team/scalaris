@@ -326,12 +326,6 @@ on({bulk_distribute, _Id, _Range, InnerMsg, _Parents} = Msg, State)
     mr:on(Msg, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% data distribution messages (see ddist.erl)
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on(Msg, State) when ddist =:= element(1, Msg) ->
-    ddist:on(Msg, State);
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % map reduce related messages (see mr.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on(Msg, State) when mr =:= element(1, Msg) ->
