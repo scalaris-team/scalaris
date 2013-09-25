@@ -314,12 +314,28 @@ on({drop_data, Data, Sender}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bulk owner messages (see bulkowner.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on(Msg, State) when bulkowner =:= element(1, Msg)->
+on(Msg, State) when bulkowner =:= element(1, Msg) ->
     bulkowner:on(Msg, State);
 
 on({send_error, _FailedTarget, FailedMsg, _Reason} = Msg, State)
   when bulkowner =:= element(1, FailedMsg) ->
     bulkowner:on(Msg, State);
+
+on({bulk_distribute, _Id, _Range, InnerMsg, _Parents} = Msg, State) 
+  when mr =:= element(1, InnerMsg) ->
+    mr:on(Msg, State);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% data distribution messages (see ddist.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on(Msg, State) when ddist =:= element(1, Msg) ->
+    ddist:on(Msg, State);
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% map reduce related messages (see mr.erl)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on(Msg, State) when mr =:= element(1, Msg) ->
+    mr:on(Msg, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handling of failed sends

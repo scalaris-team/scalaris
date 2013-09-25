@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 
 % public API:
--export([issue_bulk_owner/3, issue_send_reply/4,
+-export([issue_bulk_owner/3, issue_send_reply/4, issue_bulk_distribute/5,
          send_reply/5, send_reply_failed/6]).
 
 % only use inside the dht_node process:
@@ -64,6 +64,11 @@ issue_send_reply(Id, Target, Msg, Parents) ->
     DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode, {bulkowner, reply, Id, Target, Msg, Parents}).
 
+issue_bulk_distribute(Id, Proc, Pos, Msg, Data) ->
+    DHTNode = pid_groups:find_a(dht_node),
+    comm:send_local(DHTNode, {bulkowner, start, Id, intervals:all(), {bulk_distribute, Proc,
+                                                        Pos, Msg, Data}}).
+
 -spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid()) -> ok.
 send_reply(Id, Target, {?send_to_group_member, Proc, Msg}, [], Shepherd) ->
     comm:send(Target, {bulkowner, reply, Id, Msg}, [{shepherd, Shepherd}, {group_member, Proc}]);
@@ -88,8 +93,20 @@ bulk_owner(State, Id, I, Msg, Parents) ->
     case intervals:is_empty(SuccIntI) of
         true  -> ok;
         false ->
-            comm:send(node:pidX(nodelist:succ(Neighbors)),
-                      {bulkowner, deliver, Id, SuccIntI, Msg, Parents})
+            case Msg of
+                {bulk_distribute, Proc, N, Env, Data} ->
+                    {SuccData, _Rest} = lists:partition(
+                            fun(Entry) ->
+                                intervals:in(?RT:hash_key(element(1, Entry)),
+                                            SuccIntI)
+                            end, Data),
+                    comm:send(node:pidX(nodelist:succ(Neighbors)),
+                              {bulkowner, deliver, Id, SuccIntI,
+                              {bulk_distribute, Proc, N, Env, SuccData}, Parents});
+                _ ->
+                    comm:send(node:pidX(nodelist:succ(Neighbors)),
+                              {bulkowner, deliver, Id, SuccIntI, Msg, Parents})
+            end
     end,
     case I =:= SuccIntI of
         true  -> ok;
@@ -123,8 +140,22 @@ bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
 %%     log:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
     NewLimit =
         case intervals:is_empty(Range) of
-            false -> comm:send(node:pidX(Head), {bulkowner, Id, Range, Msg, Parents}),
-                     node:id(Head);
+            false ->
+                case Msg of
+                    {bulk_distribute, Proc, N, Env, Data} ->
+                        {RangeData, _Rest} = lists:partition(
+                                fun(Entry) ->
+                                    intervals:in(?RT:hash_key(element(1, Entry)),
+                                                Range)
+                                end, Data),
+                        comm:send(node:pidX(Head),
+                              {bulkowner, Id, Range,
+                              {bulk_distribute, Proc, N, Env, RangeData}, Parents});
+                    _ ->
+                        comm:send(node:pidX(Head),
+                                  {bulkowner, Id, Range, Msg, Parents})
+                end,
+                node:id(Head);
             true  -> Limit
         end,
     bulk_owner_iter(Tail, Id, I, Msg, NewLimit, Parents).
@@ -162,10 +193,16 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                     % for aggregation using a tree, activate this instead:
                     % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
                     comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
+                {bulk_distribute, Proc, N, Msg1, Data} ->
+                    comm:send_local(pid_groups:get_my(Proc),
+                                    {bulk_distribute, Id, Range, 
+                                     setelement(N, Msg1, Data), Parents});
                 {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
                     comm:send_local(pid_groups:get_my(Proc),
                                     {bulkowner, deliver, Id, Range, Msg1, Parents});
                 {do_snapshot, _SnapNo, _Leader} ->
+                    comm:send_local(pid_groups:get_my(dht_node), Msg);
+                MrMsg when mr =:= element(1, MrMsg) ->
                     comm:send_local(pid_groups:get_my(dht_node), Msg)
             end
     end,
