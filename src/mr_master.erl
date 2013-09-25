@@ -38,9 +38,10 @@
 -type state() :: {JobID::nonempty_string(),
                   AckedInterval::intervals:interval()}.
 
--type(message() :: {mr, phase_completed, intervals:interval()}).
+-type(message() :: {mr, phase_completed, intervals:interval()} |
+                   {mr, job_completed, intervals:interval()}).
 
--spec init({nonempty_string(), comm:mypid(), mr:mr_job_description()}) -> state().
+-spec init({nonempty_string(), comm:mypid(), mr:job_description()}) -> state().
 init({JobId, Client, Job}) ->
     Data = filter_data(api_tx:get_system_snapshot(),
                           element(2, Job)),
@@ -92,6 +93,8 @@ on(Msg, State) ->
            [comm:this(), Msg]),
     State.
 
+-spec filter_data(mr_state:data() | [{atom(), string(), term()}], [mr:option()]) ->
+    mr_state:data().
 filter_data(Data, Options) ->
     case lists:keyfind(tag, 1, Options) of
         {tag, FilterTag} ->

@@ -28,18 +28,35 @@
         on/2
         ]).
 
+-ifdef(with_export_type_support).
+-export_type([job_description/0, option/0]).
+-endif.
+
 -include("scalaris.hrl").
 
--type(mr_phase() :: {map | reduce,
+-type(phase_desc() :: {map | reduce,
                      {erlanon | jsanon, binary()}}).
 
--type(mr_option() :: {atom(), term()}).
+-type(option() :: {atom(), term()}).
 
--type(mr_job_description() :: {[mr_phase()], [mr_option()]}).
+-type(job_description() :: {[phase_desc()], [option()]}).
 
--type(message() :: {mr, init, Client::comm:mypid(), JobId::nonempty_string(),
-                    JobSpec::mr_job_description()}
-                   | any()).
+-type(bulk_message() :: {mr, job, mr_state:jobid(), comm:mypid(), comm:mypid(),
+                         job_description(), mr_state:data()} |
+                        {mr, next_phase_data, mr_state:jobid(), comm:mypid(),
+                         mr_state:data()}).
+
+-type(message() :: {mr, init, Client::comm:mypid(), mr_state:jobid(),
+                    JobSpec::job_description()} |
+                   {bulk_distribute, uid:global_uid(), intervals:interval(),
+                    bulk_message(), Parents::[comm:mypid(),...]} |
+                   {mr, phase_results, mr_state:jobid(), comm:message(),
+                    intervals:interval()} |
+                   {mr, next_phase_data_ack, {mr_state:jobid(), reference(),
+                                              intervals:interval()},
+                    intervals:interval()} |
+                   {mr, next_phase, mr_state:jobid()} |
+                   {mr, terminate_job, mr_state:jobid()}).
 
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state().
 on({mr, init, Client, JobId, Job}, State) ->
@@ -48,10 +65,13 @@ on({mr, init, Client, JobId, Job}, State) ->
     %% which in turn starts the worker supervisor on all nodes.
     ?TRACE("mr: ~p~n received init message from ~p~n starting job ~p~n",
            [comm:this(), Client, Job]),
-    JobDesc = job_desc({JobId, Client, Job}),
+    JobDesc = {"mr_master_" ++ JobId, 
+               {mr_master, start_link, 
+                [pid_groups:my_groupname(), {JobId, Client, Job}]}, 
+               transient, brutal_kill, worker, []},
     SupDHT = pid_groups:get_my(sup_dht_node),
     %% TODO handle failed starts
-    supervisor:start_child(SupDHT, JobDesc),
+    _Res = supervisor:start_child(SupDHT, JobDesc),
     State;
 
 on({bulk_distribute, _Id, _Interval,
@@ -75,7 +95,8 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
     ?TRACE("mr_~s on ~p: received phase results: ~p...~ndistributing...~n",
            [JobId, self(), hd(Data)]),
     Ref = uid:get_global_uid(),
-    NewMRState = mr_state:set_acked(dht_node_state:get_mr_state(State, JobId), {Ref, []}),
+    NewMRState = mr_state:set_acked(dht_node_state:get_mr_state(State, JobId),
+                                    {Ref, intervals:empty()}),
     case mr_state:is_last_phase(NewMRState) of
         false ->
             Reply = comm:reply_as(comm:this(), 4, {mr, next_phase_data_ack,
@@ -131,6 +152,7 @@ on(Msg, State) ->
     ?TRACE("~p mr: unknown message ~p~n", [comm:this(), Msg]),
     State.
 
+-spec work_on_phase(mr_state:jobid(), mr_state:state(), intervals:interval()) -> ok.
 work_on_phase(JobId, MRState, MyRange) ->
     case mr_state:get_phase(MRState) of
         {_Round, _MoR, _FunTerm, []} ->
@@ -149,9 +171,3 @@ work_on_phase(JobId, MRState, MyRange) ->
             comm:send_local(pid_groups:get_my(wpool), 
                             {do_work, Reply, Phase})
     end.
-
-job_desc(Options) ->
-    DHTNodeGroup = pid_groups:my_groupname(),
-    {"mr_master_" ++ element(1, Options), {mr_master, start_link,
-                                            [DHTNodeGroup, Options]}, transient,
-      brutal_kill, worker, []}.
