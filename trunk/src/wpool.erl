@@ -153,20 +153,16 @@ init_worker(DHTNodeGroup, Workload) ->
     {ok, Pid}.
 
 %% do the actual work
-%% TODO join pid_group as worker_RANDOMID so more than one worker can be active
 -spec work(pid_groups:groupname(), job()) -> ok.
 work(DHTNodeGroup, {_Round, map, {erlanon, FunBin}, _Keep, Data}) ->
-    pid_groups:join_as(DHTNodeGroup, worker),
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     Fun = binary_to_term(FunBin, [safe]),
-    return(lists:flatten([Fun(X) || X <- Data]));
+    return(DHTNodeGroup, lists:flatten([Fun(X) || X <- Data]));
 work(DHTNodeGroup, {_Round, reduce, {erlanon, FunBin}, _Keep, Data}) ->
-    pid_groups:join_as(DHTNodeGroup, worker),
     Fun = binary_to_term(FunBin, [safe]),
-    return(Fun(Data)).
+    return(DHTNodeGroup, Fun(Data)).
 
 %% send results back to wpool
--spec return(any()) -> ok.
-return(Data) ->
-    MyPool = pid_groups:get_my(wpool),
-    comm:send_local(MyPool, {data, self(), Data}).
+-spec return(pid_groups:groupname(), any()) -> ok.
+return(DHTNodeGroup, Data) ->
+    comm:send_local(pid_groups:pid_of(DHTNodeGroup, wpool), {data, self(), Data}).
