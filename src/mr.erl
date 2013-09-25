@@ -86,12 +86,10 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
                                             Data);
         _ ->
             ?TRACE("jobs last phase done...sending to client~n", []),
+            Master = mr_state:get(NewMRState, master),
+            comm:send(Master, {mr, job_completed, Range}), 
             Client = mr_state:get(NewMRState, client),
-            comm:send(Client, {mr_results, Data, mr_state:get(NewMRState,
-                                                              my_range), JobId})
-            %% TODO clean up job (processes, data, state)
-            %% just inform master that job is done and let master shutdown
-            %% everything
+            comm:send(Client, {mr_results, Data, Range, JobId})
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
@@ -122,6 +120,9 @@ on({mr, next_phase, JobId}, State) ->
     MrState = mr_state:next_phase(dht_node_state:get_mr_state(State, JobId)),
     work_on_phase(JobId, MrState),
     dht_node_state:set_mr_state(State, JobId, MrState);
+
+on({mr, terminate_job, JobId}, State) ->
+    dht_node_state:delete_mr_state(State, JobId);
 
 on(Msg, State) ->
     ?TRACE("~p mr: unknown message ~p~n", [comm:this(), Msg]),
