@@ -162,19 +162,19 @@ init_worker(DHTNodeGroup, Workload) ->
 
 %% do the actual work
 -spec work(pid_groups:groupname(), job()) -> ok.
-work(DHTNodeGroup, {_Round, map, {erlanon, FunBin}, _Keep, Data}) ->
+work(DHTNodeGroup, {_Round, map, {erlanon, FunBin}, Data}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     Fun = binary_to_term(FunBin, [safe]),
     return(DHTNodeGroup, lists:flatten([apply_erl(Fun, X) || X <- Data]));
-work(DHTNodeGroup, {_Round, reduce, {erlanon, FunBin}, _Keep, Data}) ->
+work(DHTNodeGroup, {_Round, reduce, {erlanon, FunBin}, Data}) ->
     Fun = binary_to_term(FunBin, [safe]),
     return(DHTNodeGroup, apply_erl(Fun, Data));
 
-work(DHTNodeGroup, {_Round, map, {jsanon, FunBin}, _Keep, Data}) ->
+work(DHTNodeGroup, {_Round, map, {jsanon, FunBin}, Data}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     {ok, VM} = js_driver:new(),
     return(DHTNodeGroup, lists:flatten([apply_js(FunBin, X, VM) || X <- Data]));
-work(DHTNodeGroup, {_Round, reduce, {jsanon, FunBin}, _Keep, Data}) ->
+work(DHTNodeGroup, {_Round, reduce, {jsanon, FunBin}, Data}) ->
     {ok, VM} = js_driver:new(),
     return(DHTNodeGroup, apply_js(FunBin, Data, VM)).
 

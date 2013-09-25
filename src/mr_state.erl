@@ -22,6 +22,8 @@
 -define(TRACE(X, Y), ok).
 %% -define(TRACE(X, Y), io:format(X, Y)).
 
+-define(DEF_OPTIONS, []).
+
 %% -export([new/6
 %%         , get/2
 %%         , get_next_phase/1
@@ -34,7 +36,7 @@
 
 -type(fun_term() :: {erlanon, binary()} | {jsanon, binary()}).
 
--type(mr_phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(), Keep::boolean(), Input::[any()]}).
+-type(mr_phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(), Input::[any()]}).
 
 -type(jobid() :: nonempty_string()).
 
@@ -42,6 +44,7 @@
                 , client    = null :: comm:mypid() | null
                 , master    = null :: comm:mypid() | null
                 , phases    = ?required(state, phases) :: [mr_phase()]
+                , options   = ?required(state, options) :: [mr:mr_option()]
                 , my_range  = ?required(state, myrange) :: intervals:interval()
                 , current   = 1 :: pos_integer()
                 , acked     = {null, []} :: {null | reference(), intervals:interval()}
@@ -51,40 +54,47 @@
 
 -spec get(state(), my_range)        -> intervals:interval();
          (state(), client)          -> comm:mypid().
-get(#state{client = Client
-           , master = Master
-           , jobid = JobId
+get(#state{client     = Client
+           , master   = Master
+           , jobid    = JobId
            , my_range = Range
-           , phases = Phases
-           , current = Cur
+           , phases   = Phases
+           , options  = Options
+           , current  = Cur
           }, Key) ->
     case Key of
-        client -> Client;
-        master -> Master;
+        client   -> Client;
+        master   -> Master;
         my_range -> Range;
-        phases -> Phases;
-        current -> Cur;
-        jobid  -> JobId
+        phases   -> Phases;
+        options  -> Options;
+        current  -> Cur;
+        jobid    -> JobId
     end.
 
--spec new(jobid(), comm:mypid(), comm:mypid(), [tuple()], [mr_phase],
+-spec new(jobid(), comm:mypid(), comm:mypid(), [tuple()],
+          [mr:mr_job_description()],
           intervals:interval()) ->
     state().
-new(JobId, Client, Master, InitalData, Phases, Range) ->
+new(JobId, Client, Master, InitalData, {Phases, Options}, Range) ->
     ?TRACE("mr_state: ~p~nnew state from: ~p~n", [comm:this(), {JobId, Client,
                                                                 Master,
                                                                 InitalData,
-                                                                Phases, Range}]),
+                                                                {Phases,
+                                                                 Options}, Range}]),
     PhasesWithData = lists:zipwith(
-            fun({MoR, Fun, Keep}, {Round, Data}) -> 
-                    {Round, MoR, Fun, Keep, Data}
+            fun({MoR, Fun}, {Round, Data}) -> 
+                    {Round, MoR, Fun, Data}
             end, Phases, [{1, InitalData} | [{I, []} || I <- lists:seq(2,
                                                              length(Phases))]]),
-    NewState = #state{jobid = JobId
-           , client = Client
-           , master = Master
-           , phases = PhasesWithData
-           , my_range = Range
+    JobOptions = merge_with_default_options(Options, ?DEF_OPTIONS),
+    NewState = #state{
+                  jobid      = JobId
+                  , client   = Client
+                  , master   = Master
+                  , phases   = PhasesWithData
+                  , options  = JobOptions
+                  , my_range = Range
           },
     NewState.
 
@@ -113,9 +123,15 @@ set_acked(State = #state{acked = {Ref, Interval}}, {Ref, NewInterval}) ->
 
 -spec add_data_to_next_phase(state(), [any()]) -> state().
 add_data_to_next_phase(State = #state{phases = Phases, current = Cur}, NewData) ->
-    {Round, MoR, Fun, Keep, Data} = lists:keyfind(Cur + 1, 1, Phases),
+    {Round, MoR, Fun, Data} = lists:keyfind(Cur + 1, 1, Phases),
     State#state{phases = lists:keyreplace(Cur + 1, 1, Phases, {Round, MoR, Fun,
-                                                            Keep, NewData ++
-                                                            Data})}.
+                                                            NewData ++ Data})}.
 
-
+-spec merge_with_default_options(UserOptions::[mr:mr_option()],
+                                 DefaultOptions::[mr:mr_option()]) ->
+      JobOptions::[mr:mr_option()].
+merge_with_default_options(UserOptions, DefaultOptions) ->
+    %% TODO merge by hand and skip everything that is not in DefaultOptions 
+    lists:keymerge(1, 
+                   lists:keysort(1, UserOptions), 
+                   lists:keysort(1, DefaultOptions)).
