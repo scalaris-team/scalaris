@@ -52,6 +52,7 @@
          smerge2/2, smerge2/3, smerge2/4,
          is_unittest/0, make_filename/1,
          app_get_env/2,
+         app_check_running/1,
          timestamp2us/1, us2timestamp/1,
          time_plus_s/2, time_plus_ms/2, time_plus_us/2,
          readable_utc_time/1,
@@ -857,6 +858,16 @@ app_check_known() ->
             ok
     end.
 
+%% @doc check if App is allready running.
+-spec app_check_running(App::atom()) -> boolean().
+app_check_running(App) ->
+    Running = application:which_applications(),
+    case lists:keyfind(App, 1, Running) of
+        false ->
+            false;
+        _Tuple ->
+            true
+    end.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
