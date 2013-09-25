@@ -52,7 +52,6 @@
 -type(mr_job() :: {Round::pos_integer(),
                    map | reduce,
                    {erlanon | jsanon, binary()},
-                   Keep::boolean(),
                    Data::[tuple()]}).
 
 -type(generic_job() :: {erlanon | jsanon, binary(), [tuple()]}).
@@ -72,8 +71,8 @@
 init([]) ->
     case config:read(wpool_js) of
         true ->
-            application:start(sasl),
-            application:start(erlang_js);
+            ok = application:start(sasl),
+            ok = application:start(erlang_js);
         _ ->
             ok
     end,
@@ -113,12 +112,13 @@ on(Msg, State) ->
     ?TRACE("~200p~nwpool: unknown message~n", [Msg]),
     State.
 
-%% starts worker under the supervisor sup_wpool and also sets up a monitor. The
-%% supvervisor does not restart the worker in case of failure. Its main purpose
-%% is to shut workers down when scalaris is shuting down.
-%% The monitor (between wpool and the worker) is used mainly for error
-%% reporting. A link could also be used, but wpool would have to call
-%% ``process_flag(trap_exit, true)'' for every link.
+%% @doc start a worker
+%%     starts worker under the supervisor sup_wpool and also sets up a monitor. The
+%%     supvervisor does not restart the worker in case of failure. Its main purpose
+%%     is to shut workers down when scalaris is shuting down.
+%%     The monitor (between wpool and the worker) is used mainly for error
+%%     reporting. A link could also be used, but wpool would have to call
+%%     `process_flag(trap_exit, true)' for every link.
 -spec start_worker(comm:mypid(), job(), state()) -> state().
 start_worker(Source, Workload, State) ->
     Sup = pid_groups:get_my(sup_wpool),
@@ -136,13 +136,15 @@ start_worker(Source, Workload, State) ->
             State
     end.
 
-%% monitor worker and put it into the Working queue
+%% @doc monitor a working process
 -spec monitor_worker(pid(), comm:my_pid(), state()) -> state().
 monitor_worker(Pid, Source, {Max, Working, Waiting}) ->
     monitor(process, Pid),
     {Max, [{Pid, Source} | Working], Waiting}.
 
-%% remove worker from Working queue and start a waiting job if present
+%% @doc cleanup wortker after it is finished.
+%%      when a worker finishes (either normal or crashed) it is removed from the
+%%      working queue and the next wainting job is started.
 -spec cleanup_worker(pid(), state()) -> state().
 cleanup_worker(Pid, {Max, Working, Waiting}) ->
     NewWorking = lists:keydelete(Pid, 1, Working),
@@ -154,13 +156,15 @@ cleanup_worker(Pid, {Max, Working, Waiting}) ->
             start_worker(Source, Workload, {Max, NewWorking, Rest})
     end.
 
-%% actual worker functions
+%% @doc initialize the worker.
 -spec init_worker(pid_groups:groupname(), job()) -> {ok, pid()}.
 init_worker(DHTNodeGroup, Workload) ->
     Pid = spawn_link(?MODULE, work, [DHTNodeGroup, Workload]),
     {ok, Pid}.
 
-%% do the actual work
+%% @doc do the actual work.
+%%      executes Job and returns results to the local wpool. wpool associates
+%%      the worker pid to the jobs client and knows where the results go.
 -spec work(pid_groups:groupname(), job()) -> ok.
 work(DHTNodeGroup, {_Round, map, {erlanon, FunBin}, Data}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
@@ -173,38 +177,42 @@ work(DHTNodeGroup, {_Round, reduce, {erlanon, FunBin}, Data}) ->
 work(DHTNodeGroup, {_Round, map, {jsanon, FunBin}, Data}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     {ok, VM} = js_driver:new(),
-    return(DHTNodeGroup, lists:flatten([apply_js(FunBin, X, VM) || X <- Data]));
+    return(DHTNodeGroup, lists:flatten([apply_js(FunBin, [X], VM) || X <- Data]));
 work(DHTNodeGroup, {_Round, reduce, {jsanon, FunBin}, Data}) ->
     {ok, VM} = js_driver:new(),
-    return(DHTNodeGroup, apply_js(FunBin, Data, VM)).
+    return(DHTNodeGroup, apply_js(FunBin, [Data], VM)).
 
+%% @doc applies Fun with Args.
+-spec apply_erl(Fun::fun((Arg::term()) -> Res::A), Args::term()) -> A.
 apply_erl(Fun, Data) ->
     Fun(Data).
 
+%% @doc applies Fun with Args withing JSVM.
+-spec apply_js(Fun::binary(), Args::[term()], JSVM::port()) -> term().
 apply_js(FunBin, Data, VM) ->
     AutoJS = define_auto_js(FunBin, Data),
     {ok, Result} = js:eval(VM, AutoJS),
     Result.
 
+%% @doc create a self calling JS function.
+%%      takes a anonymous JS function (as a binary string) and a list of
+%%      arguments and returns a self calling JS (`function(arg) {...}(args)') 
+%%      function as a binary string.
+-spec define_auto_js(Fun::binary(), [term()]) -> binary().
 define_auto_js(FunBin, Args) ->
     EncodedArgs = encode_args(Args, []),
     iolist_to_binary([FunBin, "(", EncodedArgs, ")"]).
 
+%% @doc build argument list for JS function.
+%%      takes a list of terms and returns an iolist of the encoded (mochijson2)
+%%      terms with commas in between.
+-spec encode_args([term()], [term()]) -> term().
 encode_args([], Acc) ->
     lists:reverse(Acc);
 encode_args([H | []], Acc) ->
-    encode_args([], [value_to_json(H) | Acc]);
+    encode_args([], [js_mochijson2:encode(H) | Acc]);
 encode_args([H | T], Acc) ->
-    encode_args(T, [[value_to_json(H), ","] | Acc]).
-
-value_to_json({Key, Value}) ->
-    js_mochijson2:encode({struct, [{Key, value_to_json(Value)}]});
-value_to_json([{_, _} | _] = List) ->
-    js_mochijson2:encode({struct, [{K, value_to_json(V)} || {K, V} <- List]});
-value_to_json(List) when is_list(List) ->
-    js_mochijson2:encode(List);
-value_to_json(X) ->
-    js_mochijson2:encode(X).
+    encode_args(T, [[js_mochijson2:encode(H), ","] | Acc]).
 
 %% send results back to wpool
 -spec return(pid_groups:groupname(), any()) -> ok.
