@@ -34,7 +34,7 @@
 
 -type(fun_term() :: {erlanon, binary()} | {jsanon, binary()}).
 
--type(mr_phase() :: {map | reduce, fun_term(), Keep::boolean(), Input::[any()]}).
+-type(mr_phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(), Keep::boolean(), Input::[any()]}).
 
 -type(jobid() :: nonempty_string()).
 
