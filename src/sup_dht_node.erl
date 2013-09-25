@@ -83,6 +83,11 @@ childs([{DHTNodeGroup, Options}]) ->
     SupDHTNodeCore_AND =
         sup:supervisor_desc(sup_dht_node_core, sup_dht_node_core,
                                  start_link, [DHTNodeGroup, Options]),
+    %% SupMr = case config:read(mr_enable) of
+    %%     true -> 
+    %%         util:sup_supervisor_desc(sup_mr, sup_mr, start_link, [DHTNodeGroup]);
+    %%     _ -> []
+    %% end,
     Vivaldi =
         sup:worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
     Monitor =
@@ -96,6 +101,9 @@ childs([{DHTNodeGroup, Options}]) ->
         end,
     SnapshotLeader =
         sup:worker_desc(snapshot_leader, snapshot_leader, start_link),
+    SupWPool = 
+        sup:supervisor_desc(sup_wpool, sup_wpool, start_link, [DHTNodeGroup]),
+    WPool = sup:worker_desc(wpool, wpool, start_link, [DHTNodeGroup, Options]),
 	
     lists:flatten([ %% RepUpd may be [] and lists:flatten eliminates this
                     Monitor,
@@ -108,6 +116,8 @@ childs([{DHTNodeGroup, Options}]) ->
                     DC_Clustering,
                     Gossip,
                     SupDHTNodeCore_AND,
+                    SupWPool,
+                    WPool,
                     MonitorPerf,
                     RepUpdate,
 					Autoscale,

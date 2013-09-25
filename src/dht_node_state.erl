@@ -51,6 +51,9 @@
 -export([set_prbr_state/3]).
 %% snapshots
 -export([set_snapshot_state/2]).
+%% map reduce
+-export([set_mr_state/3, get_mr_state/2]).
+
 
 -ifdef(with_export_type_support).
 -export_type([state/0, name/0, db_selector/0, slide_data/0, slide_delta/0]).
@@ -98,7 +101,8 @@
                 lease_db3 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db4 = ?required(state, prbr_state) :: prbr:state(),
                 lease_list = ?required(state, lease_list) :: l_on_cseq:lease_list_state(),
-                snapshot_state   = null :: snapshot_state:snapshot_state() | null
+                snapshot_state   = null :: snapshot_state:snapshot_state() | null,
+                mr_state   = ?required(state, mr_state)  :: orddict:orddict()
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -122,7 +126,8 @@ new(RT, RMState, DB) ->
            lease_db3 = prbr:init(lease_db3),
            lease_db4 = prbr:init(lease_db4),
            lease_list = l_on_cseq:empty_lease_list(),
-           snapshot_state = snapshot_state:new()
+		   snapshot_state = snapshot_state:new(),
+           mr_state = orddict:new()
           }.
 
 %% @doc Gets the given property from the dht_node state.
@@ -190,14 +195,15 @@ new(RT, RMState, DB) ->
          (state(), lease_db2) -> prbr:state();
          (state(), lease_db3) -> prbr:state();
          (state(), lease_db4) -> prbr:state();
-         (state(), lease_list) -> l_on_cseq:lease_list_state().
+         (state(), lease_list) -> l_on_cseq:lease_list_state();
+         (state(), mr_state) -> orddict:orddict().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
            db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState,
            txid_db1=TxIdDB1, txid_db2=TxIdDB2, txid_db3=TxIdDB3, txid_db4=TxIdDB4,
            lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4, lease_list=LeaseList,
-           snapshot_state=SnapState}, Key) ->
+		   snapshot_state=SnapState, mr_state=MRState}, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -242,7 +248,8 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         lease_db2    -> LeaseDB2;
         lease_db3    -> LeaseDB3;
         lease_db4    -> LeaseDB4;
-        lease_list   -> LeaseList
+        lease_list   -> LeaseList;
+        mr_state     -> MRState
     end.
 
 -spec get_prbr_state(state(), db_selector()) -> prbr:state().
@@ -343,6 +350,14 @@ set_slide(State, succ, SlideSucc) -> State#state{slide_succ=SlideSucc}.
 
 -spec set_snapshot_state(State::state(),NewInfo::snapshot_state:snapshot_state()) -> state().
 set_snapshot_state(State,NewInfo) -> State#state{snapshot_state=NewInfo}.
+
+-spec get_mr_state(State::state(), mr_state:jobid()) -> mr_state:state().
+get_mr_state(#state{mr_state=MRStateList}, JobId) ->
+    orddict:fetch(JobId, MRStateList).
+
+-spec set_mr_state(State::state(), nonempty_string(), mr_state:state()) -> state().
+set_mr_state(#state{mr_state=MRStateList} = State, JobId, MRState) -> 
+    State#state{mr_state=orddict:store(JobId, MRState, MRStateList)}.
 
 -spec add_db_range(State::state(), Interval::intervals:interval(),
                    SlideId::slide_op:id()) -> state().
