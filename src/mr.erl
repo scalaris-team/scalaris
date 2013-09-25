@@ -61,15 +61,14 @@ on({bulk_distribute, _Id, _Interval,
     %% @doc
     %% this message starts the worker supervisor and adds a job specific state
     %% to the dht node
-    %% TODO are my_range and db_range allways continous?
-    Range = lists:foldl(fun({I, _SlideOp}, AccIn) -> intervals:union(I, AccIn) end,
-                        dht_node_state:get(State, my_range),
-                        dht_node_state:get(State, db_range)),
-    JobState = mr_state:new(JobId, Client, Master, InitalData, Job, Range),
+    JobState = mr_state:new(JobId, Client, Master, InitalData, Job),
     %% send acc to master
     %% comm:send(Master, {mr, ack_init, Range}),
     %% start worker thread for first phase
-    work_on_phase(JobId, JobState),
+    Range = lists:foldl(fun({I, _SlideOp}, AccIn) -> intervals:union(I, AccIn) end,
+                        dht_node_state:get(State, my_range),
+                        dht_node_state:get(State, db_range)),
+    work_on_phase(JobId, JobState, Range),
     dht_node_state:set_mr_state(State, JobId, JobState);
 
 on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
@@ -93,12 +92,13 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
-on({bulk_distribute, _Id, _Interval,
+on({bulk_distribute, _Id, Interval,
    {mr, next_phase_data, JobId, Source, Data}, _Parents}, State) ->
     NewMRState = mr_state:add_data_to_next_phase(dht_node_state:get_mr_state(State,
                                                                             JobId), 
                                                  Data),
-    comm:send(Source, mr_state:get(NewMRState, my_range)),
+    %% send ack with delivery interval
+    comm:send(Source, Interval),
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
 on({mr, next_phase_data_ack, {JobId, Ref, Range}, Interval}, State) ->
@@ -118,7 +118,10 @@ on({mr, next_phase, JobId}, State) ->
     %% io:format("master initiating next phase ~p~n~p",
     %%           [JobId, State]),
     MrState = mr_state:next_phase(dht_node_state:get_mr_state(State, JobId)),
-    work_on_phase(JobId, MrState),
+    Range = lists:foldl(fun({I, _SlideOp}, AccIn) -> intervals:union(I, AccIn) end,
+                        dht_node_state:get(State, my_range),
+                        dht_node_state:get(State, db_range)),
+    work_on_phase(JobId, MrState, Range),
     dht_node_state:set_mr_state(State, JobId, MrState);
 
 on({mr, terminate_job, JobId}, State) ->
@@ -128,8 +131,7 @@ on(Msg, State) ->
     ?TRACE("~p mr: unknown message ~p~n", [comm:this(), Msg]),
     State.
 
-work_on_phase(JobId, MRState) ->
-    MyRange = mr_state:get(MRState, my_range),
+work_on_phase(JobId, MRState, MyRange) ->
     case mr_state:get_phase(MRState) of
         {_Round, _MoR, _FunTerm, []} ->
             case mr_state:is_last_phase(MRState) of
@@ -139,8 +141,7 @@ work_on_phase(JobId, MRState) ->
                     ?TRACE("no data for phase...done...~p informs master~n", [self()]);
                 _ ->
                     Client = mr_state:get(MRState, client),
-                    comm:send(Client, {mr_results, [], mr_state:get(MRState,
-                                                                      my_range)})
+                    comm:send(Client, {mr_results, [], MyRange})
             end;
         Phase ->
             Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
