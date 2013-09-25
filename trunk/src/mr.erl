@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Jan Fajerski <fajerski@informatik.hu-berlin.de>
-%% @doc Map Reduce helper functions
+%% @doc Map Reduce functions
 %%      this is part of the dht node
 %%         
 %% @end

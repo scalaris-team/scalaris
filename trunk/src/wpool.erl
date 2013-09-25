@@ -19,7 +19,7 @@
 %%      the results of the computation or an error.
 %%      Jobs will run concurrently in seperate processes. The maximum number of
 %%      concurrent jobs must be configured via the wpool_maxw setting in
-%%      scaralis.[local.]config.
+%%      scalaris.[local.]config.
 %%      when the maximum number of jobs is reached new jobs are queued and run
 %%      as soon as a running job finishes.
 %%         

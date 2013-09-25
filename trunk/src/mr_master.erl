@@ -15,9 +15,9 @@
 %% @author Jan Fajerski <fajerski@informatik.hu-berlin.de>
 %% @doc Map reduce master file
 %%      The master is in charge of orchestrating the single phases of the job.
+%% @end
 %%      So far it is the single point of failiure. It should be replicated and
 %%      it should have a mechanism to recover to an earlier stage of the job
-%% @end
 %% @version $Id$
 -module(mr_master).
 -author('fajerski@zib.de').
