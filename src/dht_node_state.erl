@@ -52,7 +52,9 @@
 %% snapshots
 -export([set_snapshot_state/2]).
 %% map reduce
--export([set_mr_state/3, get_mr_state/2]).
+-export([set_mr_state/3,
+         get_mr_state/2,
+         delete_mr_state/2]).
 
 
 -ifdef(with_export_type_support).
@@ -352,12 +354,16 @@ set_slide(State, succ, SlideSucc) -> State#state{slide_succ=SlideSucc}.
 set_snapshot_state(State,NewInfo) -> State#state{snapshot_state=NewInfo}.
 
 -spec get_mr_state(State::state(), mr_state:jobid()) -> mr_state:state().
-get_mr_state(#state{mr_state=MRStateList}, JobId) ->
+get_mr_state(#state{mr_state = MRStateList}, JobId) ->
     orddict:fetch(JobId, MRStateList).
 
 -spec set_mr_state(State::state(), nonempty_string(), mr_state:state()) -> state().
-set_mr_state(#state{mr_state=MRStateList} = State, JobId, MRState) -> 
-    State#state{mr_state=orddict:store(JobId, MRState, MRStateList)}.
+set_mr_state(#state{mr_state = MRStateList} = State, JobId, MRState) ->
+    State#state{mr_state = orddict:store(JobId, MRState, MRStateList)}.
+
+-spec delete_mr_state(State::state(), nonempty_string()) -> state().
+delete_mr_state(#state{mr_state = MRStateList} = State, JobId) ->
+    State#state{mr_state = orddict:erase(JobId, MRStateList)}.
 
 -spec add_db_range(State::state(), Interval::intervals:interval(),
                    SlideId::slide_op:id()) -> state().
