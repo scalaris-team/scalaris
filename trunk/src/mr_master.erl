@@ -85,7 +85,6 @@ on({mr, job_completed, Range}, {JobId, I}) ->
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                        {mr, terminate_job, JobId}),
             exit(self(), shutdown),
-            %% Supervisor = pid_groups:get_my("sup_mr_job_" ++ JobId),
             {JobId, []}
     end;
 
