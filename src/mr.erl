@@ -72,15 +72,15 @@ on({bulk_distribute, Id, Interval,
     work_on_phase(JobId, JobState),
     dht_node_state:set_mr_state(State, JobId, JobState);
 
-on({mr, phase_result, JobId, {work_done, Data}}, State) ->
+on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
     ?TRACE("mr_~s on ~p: received phase results: ~p...~ndistributing...~n",
            [JobId, self(), lists:sublist(Data, 5)]),
     Ref = uid:get_global_uid(),
     NewMRState = mr_state:set_acked(dht_node_state:get_mr_state(State, JobId), {Ref, []}),
     case mr_state:is_last_phase(NewMRState) of
         false ->
-            Reply = comm:reply_as(comm:this(), 4, {mr, next_phase_data_ack, {JobId,
-                                                                              Ref}, '_'}),
+            Reply = comm:reply_as(comm:this(), 4, {mr, next_phase_data_ack,
+                                                   {JobId, Ref, Range}, '_'}),
             bulkowner:issue_bulk_distribute(Ref, dht_node,
                                             5, {mr, next_phase_data, JobId, Reply, '_'},
                                             Data);
@@ -103,14 +103,13 @@ on({bulk_distribute, Id, Interval,
     comm:send(Source, mr_state:get(NewMRState, my_range)),
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
-on({mr, next_phase_data_ack, {JobId, Ref}, Interval}, State) ->
+on({mr, next_phase_data_ack, {JobId, Ref, Range}, Interval}, State) ->
     NewMRState = mr_state:set_acked(dht_node_state:get_mr_state(State, JobId),
                                     {Ref, Interval}),
     case mr_state:is_acked_complete(NewMRState) of
         true ->
             Master = mr_state:get(NewMRState, master),
-            MyRange = mr_state:get(NewMRState, my_range),
-            comm:send(Master, {mr, phase_completed, MyRange}),
+            comm:send(Master, {mr, phase_completed, Range}),
             ?TRACE("Phase complete...~p informing master~n", [self()]);
         false ->
             ?TRACE("~p is still waiting for phase to complete~n", [self()])
@@ -129,12 +128,12 @@ on(Msg, State) ->
     State.
 
 work_on_phase(JobId, MRState) ->
+    MyRange = mr_state:get(MRState, my_range),
     case mr_state:get_phase(MRState) of
         {_Round, _MoR, _FunTerm, []} ->
             case mr_state:is_last_phase(MRState) of
                 false ->
                     Master = mr_state:get(MRState, master),
-                    MyRange = mr_state:get(MRState, my_range),
                     comm:send(Master, {mr, phase_completed, MyRange}),
                     ?TRACE("no data for phase...done...~p informs master~n", [self()]);
                 _ ->
@@ -143,7 +142,8 @@ work_on_phase(JobId, MRState) ->
                                                                       my_range)})
             end;
         Phase ->
-            Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_'}),
+            Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
+                                                  MyRange}),
             comm:send_local(pid_groups:get_my(wpool), 
                             {do_work, Reply, Phase})
     end.
