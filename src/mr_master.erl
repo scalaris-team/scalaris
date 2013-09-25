@@ -16,11 +16,11 @@
 %% @doc Map reduce master file
 %%      The master is in charge of orchestrating the single phases of the job.
 %%      So far it is the single point of failiure. It should be replicated and
-%%      it hsould have a mechanism to recover to an earlier stage of the job
+%%      it should have a mechanism to recover to an earlier stage of the job
 %% @end
 %% @version $Id$
 -module(mr_master).
--author('fajerski@informatik.hu-berlin.de').
+-author('fajerski@zib.de').
 -vsn('$Id$ ').
 
 -define(TRACE(X, Y), io:format(X, Y)).
@@ -35,10 +35,10 @@
 
 -include("scalaris.hrl").
 
--type state() :: nonempty_string(). % jobid
+-type state() :: {JobID::nonempty_string(),
+                  AckedInterval::intervals:interval()}.
 
--type(message() ::
-      any()).
+-type(message() :: {mr, phase_completed, intervals:interval()}).
 
 -spec init({nonempty_string(), comm:mypid(), mr_state:state()}) -> state().
 init({JobId, Client, Job}) ->
@@ -67,7 +67,7 @@ on({mr, phase_completed, Range}, {JobId, I}) ->
         false ->
             {JobId, NewInterval};
         _ ->
-            io:format("mr_master_~s: phase completed...initiating next phase~n",
+            ?TRACE("mr_master_~s: phase completed...initiating next phase~n",
                      [JobId]),
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                        {mr, next_phase, JobId}),
@@ -78,97 +78,3 @@ on(Msg, State) ->
     ?TRACE("~p mr_master: revceived ~p~n",
            [comm:this(), Msg]),
     State.
-
-%% on({read_finished, Range}, State) ->
-%%     OldRange = state_get(completedrange, State),
-%%     NewRange = intervals:union(OldRange, Range),
-%%     case intervals:is_all(NewRange) of
-%%         true ->
-%%             JobId = state_get(jobid, State),
-%%             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
-%%                                        {?send_to_group_member, "mr",
-%%                                         {mr_send_to_worker, "mr_reader_" ++
-%%                                          JobId, {check_consistency}}}),
-%%             state_set({completedrange, intervals:empty()}, State);
-%%         _ ->
-%%             state_set({completedrange, NewRange}, State)
-%%     end;
-%% on({worker_finished, Range}, State) ->
-%%     OldRange = state_get(completedrange, State),
-%%     NewRange = intervals:union(OldRange, Range),
-%%     case intervals:is_all(NewRange) of
-%%         true ->
-%%             io:format("~s: Phase ~p of job ~s completed~n",
-%%                       [pid_groups:my_pidname(), element(1,
-%%                                                         hd(state_get(currentphase,
-%%                                                                   State))),
-%%                        state_get(jobid, State)]),
-%%             start_next_phase(State);
-%%         _ ->
-%%             state_set({completedrange, NewRange}, State)
-%%     end;
-%% 
-%% on({mr_results, Results, Range}, State) ->
-%%     OldRange = state_get(completedrange, State),
-%%     NewRange = intervals:union(OldRange, Range),
-%%     NewState = state_append({results, Results}, State),
-%%     case intervals:is_all(NewRange) of
-%%         true ->
-%%             io:format("~s: Phase ~p of job ~s completed~n",
-%%                       [pid_groups:my_pidname(), element(1,
-%%                                                         hd(state_get(currentphase,
-%%                                                                   NewState))),
-%%                        state_get(jobid, NewState)]),
-%%             finish_job(NewState);
-%%         _ ->
-%%             state_set({completedrange, NewRange}, NewState)
-%%     end;
-%% 
-%% % start the next phase found in openphases
-%% % assumes openphases is not empty
-%% start_next_phase(State) ->
-%%     {NextPhase, NewState} = get_next_phase(State),
-%%     JobId = state_get(jobid, NewState),
-%%     Phase = case element(1, NextPhase) of
-%%         last ->
-%%             Completed = state_get(completedphases, NewState),
-%%             integer_to_list(length(Completed));
-%%         I ->
-%%             integer_to_list(I)
-%%     end,
-%%     if
-%%         Phase == "0" ->
-%%             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
-%%                                        {?send_to_group_member, "mr",
-%%                                         {mr_send_to_worker, "mr_reader_" ++
-%%                                          JobId, {read_from_node, comm:this()}}});
-%%         true ->
-%%             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
-%%                                        {?send_to_group_member, "mr",
-%%                                         {mr_send_to_worker, "mr_worker_" ++ JobId ++
-%%                                          "_" ++ Phase, {setup_worker, comm:this(), NextPhase}}})
-%%     end,
-%%     NewState.
-%% 
-%% get_next_phase(State) ->
-%%     % move current to completed
-%%     Current = state_get(currentphase, State),
-%%     State1 = state_rem(currentphase, State),
-%%     State2 = state_append({completedphases, Current}, State1),
-%%     % pop one phase off open and set it to current
-%%     {NextPhase, RemainingOpenPhases} = lists:split(1, state_get(openphases,
-%%                                                                 State2)),
-%%     State3 = state_set([{currentphase, NextPhase}
-%%                        , {completedrange, intervals:empty()}
-%%                        , {openphases, RemainingOpenPhases}]
-%%                        , State2),
-%%     {hd(NextPhase), State3}.
-%% 
-%% finish_job(State) ->
-%%     JobId = state_get(jobid, State),
-%%     comm:send(state_get(client, State), {mr_results, JobId,
-%%                                          state_get(results, State)}),
-%%     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
-%%                                          {?send_to_group_member, "mr",
-%%                                          {terminate_job, JobId}}),
-%%     State.

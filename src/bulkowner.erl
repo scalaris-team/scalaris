@@ -64,6 +64,8 @@ issue_send_reply(Id, Target, Msg, Parents) ->
     DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode, {bulkowner, reply, Id, Target, Msg, Parents}).
 
+-spec issue_bulk_distribute(ID::uid:global_uid(), atom(), pos_integer(),
+                           comm:message(), [tuple()]) -> ok.
 issue_bulk_distribute(Id, Proc, Pos, Msg, Data) ->
     DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode, {bulkowner, start, Id, intervals:all(), {bulk_distribute, Proc,

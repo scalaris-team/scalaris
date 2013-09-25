@@ -100,9 +100,11 @@ is_last_phase(#state{current = Cur, phases = Phases}) ->
 get_phase(#state{phases = Phases, current = Cur}) ->
     lists:keyfind(Cur, 1, Phases).
 
+-spec is_acked_complete(state()) -> boolean().
 is_acked_complete(#state{acked = {_Ref, Interval}}) ->
     intervals:is_all(Interval).
 
+-spec set_acked(state(), {reference(), intervals:interval()}) -> state().
 %% TODO find a robust way to check for the same ref but only when not resetting
 set_acked(State = #state{acked = {_OldRef, _Interval}}, {NewRef, []}) ->
     State#state{acked = {NewRef, []}};

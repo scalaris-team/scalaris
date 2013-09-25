@@ -35,11 +35,24 @@
 
 -include("scalaris.hrl").
 
--type(message() :: any()).
+-type(message() :: {do_work, Source::comm:my_pid(), job()} |
+                   %% TODO find better spec for Info
+                   {'DOWN', reference(), process, pid(), Info::any()} |
+                   {data, pid(), [tuple()]}).
 
--type(active_jobs() :: any()).
+-type(mr_job() :: {Round::pos_integer(),
+                   map | reduce,
+                   {erlanon | jsanon, binary()},
+                   Keep::boolean(),
+                   Data::[tuple()]}).
 
--type(waiting_jobs() :: any()).
+-type(generic_job() :: {erlanon | jsanon, binary(), [tuple()]}).
+
+-type(job() :: mr_job() | generic_job()).
+
+-type(active_jobs() :: [job()]).
+
+-type(waiting_jobs() :: [job()]).
 
 -type(state() :: {MaxWorkers::pos_integer(), active_jobs(), waiting_jobs()}).
 
@@ -62,8 +75,7 @@ on({do_work, Source, Workload}, State) ->
 
 on({'DOWN', _Ref, process, Pid, Reason}, State) ->
     ?TRACE("worker finished with reason ~p~n", [Reason]),
-    %% TODO
-    %% in case of error send some report back
+    %% TODO in case of error send some report back
     cleanup_worker(Pid, State);
 
 on({data, Pid, Data}, {_Max, Working, _Waiting} = State) ->
