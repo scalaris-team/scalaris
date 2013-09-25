@@ -43,7 +43,7 @@
 
 -include("scalaris.hrl").
 
--type(message() :: {do_work, Source::comm:my_pid(), job()} |
+-type(message() :: {do_work, Source::comm:mypid(), job()} |
                    %% TODO find better spec for Info
                    {'DOWN', reference(), process, pid(), Info::any()} |
                    {data, pid(), [tuple()]}).
@@ -103,7 +103,7 @@ on({do_work, Source, Workload}, State) ->
 
 %% worker terminated; clear it from the working list and do error reporting if
 %% necessarry
-on({'DOWN', _Ref, process, Pid, Reason}, State) ->
+on({'DOWN', _Ref, process, Pid, _Reason}, State) ->
     ?TRACE("worker finished with reason ~p~n", [Reason]),
     %% TODO in case of error send some report back
     cleanup_worker(Pid, State);
@@ -117,7 +117,7 @@ on({data, Pid, Data}, {_Max, Working, _Waiting} = State) ->
     comm:send(Source, {work_done, Data}),
     State;
 
-on(Msg, State) ->
+on(_Msg, State) ->
     ?TRACE("~200p~nwpool: unknown message~n", [Msg]),
     State.
 
@@ -139,14 +139,14 @@ start_worker(Source, Workload, State) ->
             monitor_worker(Pid, Source, State);
         {ok, Pid, _Info} ->
             monitor_worker(Pid, Source, State);
-        X ->
+        _X ->
             ?TRACE("start child failed ~p~n", [X]),
             %% handle failures
             State
     end.
 
 %% @doc monitor a working process
--spec monitor_worker(pid(), comm:my_pid(), state()) -> state().
+-spec monitor_worker(pid(), comm:mypid(), state()) -> state().
 monitor_worker(Pid, Source, {Max, Working, Waiting}) ->
     monitor(process, Pid),
     {Max, [{Pid, Source} | Working], Waiting}.

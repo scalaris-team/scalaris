@@ -26,7 +26,7 @@
 
 -include("scalaris.hrl").
 
--spec start_job(mr:mr_job_description()) -> [any()].
+-spec start_job(mr:job_description()) -> [any()].
 start_job(Job) ->
     Id = randoms:getRandomString(),
     comm:send_local(pid_groups:find_a(dht_node), 
@@ -34,8 +34,6 @@ start_job(Job) ->
     wait_for_results([], intervals:empty(), Id).
 
 -spec wait_for_results([any()], intervals:interval(), nonempty_string()) -> [any()].
-wait_for_results(Data, [all], _Id) ->
-    Data;
 wait_for_results(Data, Interval, Id) ->
     {NewData, NewInterval} = receive
         ?SCALARIS_RECV({mr_results, PartData, PartInterval, Id},

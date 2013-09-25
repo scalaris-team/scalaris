@@ -34,24 +34,39 @@
 %% for ?required macro
 -include("record_helpers.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([data/0, jobid/0, state/0]).
+-endif.
+
 -type(fun_term() :: {erlanon, binary()} | {jsanon, binary()}).
 
--type(mr_phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(), Input::[any()]}).
+-type(data() :: [{string(), term()}]).
+
+-type(phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(),
+                     Input::data()}).
 
 -type(jobid() :: nonempty_string()).
 
 -record(state, {jobid       = ?required(state, jobid) :: jobid()
                 , client    = null :: comm:mypid() | null
                 , master    = null :: comm:mypid() | null
-                , phases    = ?required(state, phases) :: [mr_phase()]
-                , options   = ?required(state, options) :: [mr:mr_option()]
+                , phases    = ?required(state, phases) :: [phase()]
+                , options   = ?required(state, options) :: [mr:option()]
                 , current   = 1 :: pos_integer()
-                , acked     = {null, []} :: {null | reference(), intervals:interval()}
+                , acked     = {null, intervals:empty()} :: {null | uid:global_uid(),
+                                                            intervals:interval()}
                }).
 
 -type(state() :: #state{}).
 
--spec get(state(), client)          -> comm:mypid().
+-type(pub_props() :: client  |
+                     master  |
+                     jobid   |
+                     phases  |
+                     options |
+                     current).
+
+-spec get(state(), pub_props())          -> comm:mypid().
 get(#state{client     = Client
            , master   = Master
            , jobid    = JobId
@@ -68,8 +83,8 @@ get(#state{client     = Client
         jobid    -> JobId
     end.
 
--spec new(jobid(), comm:mypid(), comm:mypid(), [tuple()],
-          [mr:mr_job_description()]) ->
+-spec new(jobid(), comm:mypid(), comm:mypid(), data(),
+          mr:job_description()) ->
     state().
 new(JobId, Client, Master, InitalData, {Phases, Options}) ->
     ?TRACE("mr_state: ~p~nnew state from: ~p~n", [comm:this(), {JobId, Client,
@@ -100,7 +115,7 @@ next_phase(State = #state{current = Cur}) ->
 is_last_phase(#state{current = Cur, phases = Phases}) ->
     Cur =:= length(Phases).
 
--spec get_phase(state()) -> mr_phase().
+-spec get_phase(state()) -> phase().
 get_phase(#state{phases = Phases, current = Cur}) ->
     lists:keyfind(Cur, 1, Phases).
 
@@ -108,10 +123,10 @@ get_phase(#state{phases = Phases, current = Cur}) ->
 is_acked_complete(#state{acked = {_Ref, Interval}}) ->
     intervals:is_all(Interval).
 
--spec set_acked(state(), {reference(), intervals:interval()}) -> state().
+-spec set_acked(state(), {uid:global_uid(), intervals:interval()}) -> state().
 %% TODO find a robust way to check for the same ref but only when not resetting
 set_acked(State = #state{acked = {_OldRef, _Interval}}, {NewRef, []}) ->
-    State#state{acked = {NewRef, []}};
+    State#state{acked = {NewRef, intervals:empty()}};
 set_acked(State = #state{acked = {Ref, Interval}}, {Ref, NewInterval}) ->
     State#state{acked = {Ref, intervals:union(Interval, NewInterval)}}.
 
@@ -121,9 +136,9 @@ add_data_to_next_phase(State = #state{phases = Phases, current = Cur}, NewData) 
     State#state{phases = lists:keyreplace(Cur + 1, 1, Phases, {Round, MoR, Fun,
                                                             NewData ++ Data})}.
 
--spec merge_with_default_options(UserOptions::[mr:mr_option()],
-                                 DefaultOptions::[mr:mr_option()]) ->
-      JobOptions::[mr:mr_option()].
+-spec merge_with_default_options(UserOptions::[mr:option()],
+                                 DefaultOptions::[mr:option()]) ->
+      JobOptions::[mr:option()].
 merge_with_default_options(UserOptions, DefaultOptions) ->
     %% TODO merge by hand and skip everything that is not in DefaultOptions 
     lists:keymerge(1, 
@@ -148,14 +163,14 @@ split_slide_state(#state{phases = Phases} = State, Interval) ->
     {State#state{phases = StayingPhases}, State#state{phases = SildePhases}}.
 
 -spec get_slide_delta(state(), intervals:interval()) ->
-    {RemaingState::state(), SlideData::{Round::pos_integer(), [{string(), term()}]}}.
+    {RemaingState::state(), SlideData::{Round::pos_integer(), data()}}.
 get_slide_delta(#state{phases = Phases, current = Cur} = State, Interval) ->
     case lists:keyfind(Cur + 1, 1, Phases) of
         false ->
             {State, []};
         {Nr, MoR, Fun, Data} ->
             {Staying, Moving} = lists:partition(
-                                  fun(K, _V) ->
+                                  fun({K, _V}) ->
                                           intervals:in(K, Interval)
                                   end, Data),
         {State#state{phases = lists:keyreplace(Nr, 1, Phases,
@@ -172,6 +187,7 @@ add_slide_delta(#state{phases = Phases} = State, {Round, SlideData}) ->
             %% no further rounds; slide data should be empty in this case
             State;
         {Round, MoR, Fun, Data} ->
-            State#state{phases = lists:keyreplace(Round, MoR, Fun, SlideData ++
-                                                  Data)}
+            State#state{phases = lists:keyreplace(Round, 1, Phases,
+                                                  {Round, MoR, Fun, SlideData ++
+                                                  Data})}
     end.
