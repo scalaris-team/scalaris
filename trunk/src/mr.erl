@@ -54,10 +54,10 @@ on({mr, init, Client, JobId, Job}, State) ->
     supervisor:start_child(SupDHT, JobDesc),
     State;
 
-on({bulk_distribute, Id, Interval,
-    {mr, job, JobId, Master, Client, Job, InitalData}, Parents}, State) ->
+on({bulk_distribute, _Id, _Interval,
+    {mr, job, JobId, Master, Client, Job, InitalData}, _Parents}, State) ->
     ?TRACE("mr_~s on ~p: received job with initial data: ~p...~n",
-           [JobId, self(), lists:sublist(InitalData, 5)]),
+           [JobId, self(), hd(InitalData)]),
     %% @doc
     %% this message starts the worker supervisor and adds a job specific state
     %% to the dht node
@@ -74,7 +74,7 @@ on({bulk_distribute, Id, Interval,
 
 on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
     ?TRACE("mr_~s on ~p: received phase results: ~p...~ndistributing...~n",
-           [JobId, self(), lists:sublist(Data, 5)]),
+           [JobId, self(), hd(Data)]),
     Ref = uid:get_global_uid(),
     NewMRState = mr_state:set_acked(dht_node_state:get_mr_state(State, JobId), {Ref, []}),
     case mr_state:is_last_phase(NewMRState) of
@@ -93,8 +93,8 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
-on({bulk_distribute, Id, Interval,
-   {mr, next_phase_data, JobId, Source, Data}, Parents}, State) ->
+on({bulk_distribute, _Id, _Interval,
+   {mr, next_phase_data, JobId, Source, Data}, _Parents}, State) ->
     NewMRState = mr_state:add_data_to_next_phase(dht_node_state:get_mr_state(State,
                                                                             JobId), 
                                                  Data),

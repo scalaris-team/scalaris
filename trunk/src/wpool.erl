@@ -111,7 +111,7 @@ on({'DOWN', _Ref, process, Pid, Reason}, State) ->
 %% worker sends results; forward to source
 on({data, Pid, Data}, {_Max, Working, _Waiting} = State) ->
     ?TRACE("wpool: received data from ~p:~n~p...~n",
-            [Pid, lists:sublist(Data, 4)]),
+            [Pid, hd(Data)]),
     %% send results to source
     {_Pid, Source} = lists:keyfind(Pid, 1, Working),
     comm:send(Source, {work_done, Data}),
