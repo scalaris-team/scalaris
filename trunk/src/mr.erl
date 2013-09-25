@@ -30,11 +30,19 @@
 
 -include("scalaris.hrl").
 
--type(message() :: any()).
+-type(mr_phase() :: {map | reduce,
+                     {erlanon | jsanon, binary()}}).
+
+-type(mr_option() :: {atom(), term()}).
+
+-type(mr_job_description() :: {[mr_phase()], [mr_option()]}).
+
+-type(message() :: {mr, init, Client::comm:mypid(), JobId::nonempty_string(),
+                    JobSpec::mr_job_description()}
+                   | any()).
 
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state().
 on({mr, init, Client, JobId, Job}, State) ->
-    %% @doc
     %% this is the inital message
     %% it creates a JobID and starts the job supervisor and the master process,
     %% which in turn starts the worker supervisor on all nodes.
@@ -77,6 +85,7 @@ on({mr, phase_result, JobId, {work_done, Data}}, State) ->
                                             5, {mr, next_phase_data, JobId, Reply, '_'},
                                             Data);
         _ ->
+            ?TRACE("jobs last phase done...sending to client~n", []),
             Client = mr_state:get(NewMRState, client),
             comm:send(Client, {mr_results, Data, mr_state:get(NewMRState,
                                                               my_range)})
@@ -102,7 +111,7 @@ on({mr, next_phase_data_ack, {JobId, Ref}, Interval}, State) ->
             Master = mr_state:get(NewMRState, master),
             MyRange = mr_state:get(NewMRState, my_range),
             comm:send(Master, {mr, phase_completed, MyRange}),
-            ?TRACE("Phase complete...~p informs master~n", [self()]);
+            ?TRACE("Phase complete...~p informing master~n", [self()]);
         false ->
             ?TRACE("~p is still waiting for phase to complete~n", [self()])
     end,
@@ -121,7 +130,7 @@ on(Msg, State) ->
 
 work_on_phase(JobId, MRState) ->
     case mr_state:get_phase(MRState) of
-        {_Round, _MoR, _FunTerm, _Keep, []} ->
+        {_Round, _MoR, _FunTerm, []} ->
             case mr_state:is_last_phase(MRState) of
                 false ->
                     Master = mr_state:get(MRState, master),

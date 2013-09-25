@@ -24,7 +24,7 @@
 
 -include("scalaris.hrl").
 
--spec start_job([any()]) -> [any()].
+-spec start_job(mr:mr_job_description()) -> [any()].
 start_job(Job) ->
     Id = randoms:getRandomString(),
     comm:send_local(pid_groups:find_a(dht_node), 
