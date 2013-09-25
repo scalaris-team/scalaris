@@ -40,16 +40,16 @@
 
 -type(message() :: {mr, phase_completed, intervals:interval()}).
 
--spec init({nonempty_string(), comm:mypid(), mr_state:state()}) -> state().
+-spec init({nonempty_string(), comm:mypid(), mr:mr_job_description()}) -> state().
 init({JobId, Client, Job}) ->
-    Data = api_tx:get_system_snapshot(),
+    Data = filter_data(api_tx:get_system_snapshot(),
+                          element(2, Job)),
     ?TRACE("mr_master: job ~p started~n", [JobId]),
     %% TODO do we need an ack?
     bulkowner:issue_bulk_distribute(uid:get_global_uid(),
                                     dht_node, 7, {mr, job, JobId, comm:this(),
                                                   Client, Job, '_'},
-                                   [{X, Y} || {_Hashed, {X, Y}, _Version} <-
-                                              Data]),
+                                    Data),
     {JobId, []}.
 
 -spec start_link(pid_groups:groupname(), tuple()) -> {ok, pid()}.
@@ -78,3 +78,12 @@ on(Msg, State) ->
     ?TRACE("~p mr_master: revceived ~p~n",
            [comm:this(), Msg]),
     State.
+
+filter_data(Data, Options) ->
+    case lists:keyfind(tag, 1, Options) of
+        {tag, FilterTag} ->
+            ?TRACE("Filtering! tag is ~p~n", [FilterTag]),
+            [{K, V} || {_HashedKey, {Tag, K, V}, _Version} <- Data, Tag =:= FilterTag];
+        false ->
+            [{K, V} || {_HashedKey, {K, V}, _Version} <- Data]
+    end.
