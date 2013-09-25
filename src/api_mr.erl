@@ -14,6 +14,41 @@
 
 %% @author Jan Fajerski <fajerski@zib.de>
 %% @doc    API functions for the Map-Reduce system
+%%
+%%         The Map-Reduce system will snapshot the database and apply the the
+%%         supplied job to that data. Since snapshots work on the overlay level
+%%         only the hashed keys are available.
+%%         Since hashed keys are not useful in this context, the MR system will
+%%         only considers values of the following structure as inputs:
+%%         ```
+%%         {Key::string(), Value::term()}
+%%         or
+%%         {Tag::atom(), Key:string(), Value::term()}
+%%         '''
+%%         Either all 2-tuples are considered to be input or, if
+%%         `{tag, some_tag}' is found in the options list, all 3-tuples with `some_tag'
+%%         as the first element are.
+%%
+%%         A job description is a 2-tuple where the first element is a list of
+%%         phase specifications and the second element a list of options.
+%%         A simple example job could look like this:
+%%         ```
+%%            Map = fun({_Key, Line}) ->
+%%                Tokens = string:tokens(Line, " \n,.;:?!()\"'-_"),
+%%                [{string:to_lower(X),1} || X <- Tokens]
+%%            end,
+%%            Reduce = fun(KVList) ->
+%%                    lists:map(fun({K, V}) ->
+%%                                      {K, lists:sum(V)}
+%%                                end, KVList)
+%%            end,
+%%            api_mr:start_job({[{map, {erlanon, term_to_binary(Map)}},
+%%                               {reduce, {erlanon, term_to_binary(Reduce)}}],
+%%                              []}).
+%%         '''
+%%         It considers all `{string(), string()}' as input and returns the word count of all
+%%         values.
+%%
 %% @end
 %% @version $Id$
 -module(api_mr).
@@ -26,6 +61,8 @@
 
 -include("scalaris.hrl").
 
+%% @doc synchronous call to start a map reduce job.
+%%      it will return the results of the job.
 -spec start_job(mr:job_description()) -> [any()].
 start_job(Job) ->
     Id = randoms:getRandomString(),

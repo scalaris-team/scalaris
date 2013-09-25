@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Jan Fajerski <fajerski@zib.de>
-%% @doc state for one map reduce job including the mr database
+%% @doc state for one map reduce job
 %% @version $Id$
 -module(mr_state).
 -author('fajerski@zib.de').
@@ -24,11 +24,17 @@
 
 -define(DEF_OPTIONS, []).
 
-%% -export([new/6
-%%         , get/2
-%%         , get_next_phase/1
-%%         , add_data_to_next_phase/2]).
--compile[export_all].
+-export([new/5
+        , get/2
+        , get_phase/1
+        , is_acked_complete/1
+        , set_acked/2
+        , next_phase/1
+        , is_last_phase/1
+        , add_data_to_next_phase/2
+        , split_slide_state/2
+        , get_slide_delta/2
+        , add_slide_delta/2]).
 
 -include("scalaris.hrl").
 %% for ?required macro
