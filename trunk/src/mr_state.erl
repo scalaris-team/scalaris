@@ -45,7 +45,6 @@
                 , master    = null :: comm:mypid() | null
                 , phases    = ?required(state, phases) :: [mr_phase()]
                 , options   = ?required(state, options) :: [mr:mr_option()]
-                , my_range  = ?required(state, myrange) :: intervals:interval()
                 , current   = 1 :: pos_integer()
                 , acked     = {null, []} :: {null | reference(), intervals:interval()}
                }).
@@ -57,7 +56,6 @@
 get(#state{client     = Client
            , master   = Master
            , jobid    = JobId
-           , my_range = Range
            , phases   = Phases
            , options  = Options
            , current  = Cur
@@ -65,7 +63,6 @@ get(#state{client     = Client
     case Key of
         client   -> Client;
         master   -> Master;
-        my_range -> Range;
         phases   -> Phases;
         options  -> Options;
         current  -> Cur;
@@ -73,15 +70,14 @@ get(#state{client     = Client
     end.
 
 -spec new(jobid(), comm:mypid(), comm:mypid(), [tuple()],
-          [mr:mr_job_description()],
-          intervals:interval()) ->
+          [mr:mr_job_description()]) ->
     state().
-new(JobId, Client, Master, InitalData, {Phases, Options}, Range) ->
+new(JobId, Client, Master, InitalData, {Phases, Options}) ->
     ?TRACE("mr_state: ~p~nnew state from: ~p~n", [comm:this(), {JobId, Client,
                                                                 Master,
                                                                 InitalData,
                                                                 {Phases,
-                                                                 Options}, Range}]),
+                                                                 Options}}]),
     PhasesWithData = lists:zipwith(
             fun({MoR, Fun}, {Round, Data}) -> 
                     {Round, MoR, Fun, Data}
@@ -94,7 +90,6 @@ new(JobId, Client, Master, InitalData, {Phases, Options}, Range) ->
                   , master   = Master
                   , phases   = PhasesWithData
                   , options  = JobOptions
-                  , my_range = Range
           },
     NewState.
 
