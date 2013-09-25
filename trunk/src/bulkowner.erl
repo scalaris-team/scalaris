@@ -179,7 +179,23 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                 case intervals:is_subset(FwdInt, AccI) of
                     true ->
                         FwdRange = intervals:intersection(AccI, FwdInt),
-                        comm:send(FwdPid, {bulkowner, deliver, Id, FwdRange, Msg, Parents}),
+                        case Msg of
+                            %% when Msg = bulk_distribute only forward the
+                            %% FwdInt part of the data. otherwise we get duplicate
+                            %% data
+                            {bulk_distribute, Proc, N, Msg1, Data} ->
+                                {RangeData, _Rest} = lists:partition(
+                                        fun(Entry) ->
+                                            intervals:in(?RT:hash_key(element(1, Entry)),
+                                                        FwdRange)
+                                        end, Data),
+                                comm:send(FwdPid,
+                                      {bulkowner, deliver, Id, FwdRange,
+                                      {bulk_distribute, Proc, N, Msg1, RangeData},
+                                      Parents});
+                            _ ->
+                                comm:send(FwdPid, {bulkowner, deliver, Id, FwdRange, Msg, Parents})
+                        end,
                         intervals:minus(AccI, FwdRange);
                     _    -> AccI
                 end
@@ -196,11 +212,19 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                     % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
                     comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
                 {bulk_distribute, Proc, N, Msg1, Data} ->
+                    {RangeData, _Rest} = lists:partition(
+                            fun(Entry) ->
+                                intervals:in(?RT:hash_key(element(1, Entry)),
+                                            MyRange)
+                            end, Data),
+                    %% only deliver data in MyRange as data outside of it was
+                    %% forwarded
                     comm:send_local(pid_groups:get_my(Proc),
-                                    {bulk_distribute, Id, Range, 
-                                     setelement(N, Msg1, Data), Parents});
+                                    {bulk_distribute, Id, MyRange, 
+                                     setelement(N, Msg1, RangeData), Parents});
                 {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
                     comm:send_local(pid_groups:get_my(Proc),
+                                    %% TODO shoudn't we only deliver MyRange
                                     {bulkowner, deliver, Id, Range, Msg1, Parents});
                 {do_snapshot, _SnapNo, _Leader} ->
                     comm:send_local(pid_groups:get_my(dht_node), Msg);
