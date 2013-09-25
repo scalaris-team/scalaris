@@ -33,14 +33,13 @@
 -type(message() :: any()).
 
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state().
-on({mr, init, Client, Job}, State) ->
+on({mr, init, Client, JobId, Job}, State) ->
     %% @doc
     %% this is the inital message
     %% it creates a JobID and starts the job supervisor and the master process,
     %% which in turn starts the worker supervisor on all nodes.
     ?TRACE("mr: ~p~n received init message from ~p~n starting job ~p~n",
            [comm:this(), Client, Job]),
-    JobId = randoms:getRandomString(),
     JobDesc = sup_job_desc({JobId, Client, Job}),
     SupDHT = pid_groups:get_my(sup_dht_node),
     %% TODO handle failed starts
@@ -83,7 +82,7 @@ on({mr, phase_result, JobId, {work_done, Data}}, State) ->
                                             Data);
         _ ->
             Client = mr_state:get(NewMRState, client),
-            comm:send_local(Client, {mr_results, Data, mr_state:get(NewMRState,
+            comm:send(Client, {mr_results, Data, mr_state:get(NewMRState,
                                                               my_range)})
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
