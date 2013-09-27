@@ -37,4 +37,4 @@ all() ->
      {group, send_to_both_incremental}
     ].
 
-suite() -> [ {timetrap, {seconds, 20}} ].
+suite() -> [ {timetrap, {seconds, 60}} ].
