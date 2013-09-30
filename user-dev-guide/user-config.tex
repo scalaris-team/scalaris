@@ -8,23 +8,26 @@
 \scalaris{} reads two configuration files from the working directory:
 \code{bin/scalaris.cfg} (mandatory) and \code{bin/scalaris.local.cfg}
 (optional). The former defines default settings and is included in the
-release. The latter can be created by the user to alter settings.  A
-sample file is provided as \code{bin/scalaris.local.cfg.example}. To run
-\scalaris{} distributed over several nodes, each node requires a
-\code{bin/scalaris.local.cfg}:
+release. The latter can be created by the user to alter settings.
+A sample file is provided as \code{bin/scalaris.local.cfg.example}
+and needs to be altered for a distributed setup (see
+Section~\sieheref{user.config.distributed}).
+A third way to alter the configuration of \scalaris{}, e.g. port numbers,
+is to use parameters for the \code{scalarisctl} script
+(ref. Section~\sieheref{user.config.scalarisctl}. The following
+example changes the port to 14195 and the YAWS port to 8080:
 
-\codesnippet{scalaris.local.cfg}{local_cfg:distributed}
-            {../bin/scalaris.local.cfg.example}
+\begin{lstlisting}[language=sh]
+%> ./bin/scalarisctl -p 14194 -y 8080
+\end{lstlisting}
 
-A \scalaris{} deployment can have a management server and several nodes. The
-management-server is optional and provides a global view on all nodes of a
-\scalaris{} deployment which contact this server, i.e. have its address
-specified in the \code{mgmt_server} configuration setting.
+The configuration precedence is as follows:
+\begin{enumerate}
+  \item configuration parameters of \code{scalarisctl}
+  \item \code{bin/scalaris.local.cfg}
+  \item \code{bin/scalaris.cfg}
+\end{enumerate}
 
-In this example, the \code{mgmt_server}'s location is defined as
-an IP address plus a TCP port and its Erlang-internal process name.
-If the deployment should not use a management server, replace the setting with
-an invalid address, e.g. \code{'null'}.
 
 \subsection{Logging}
 \label{sec:logging}
@@ -55,16 +58,13 @@ detail, here the {\tt info} level provides more detailed information.
 
 \section{Running \scalaris{}}
 
-As mentioned above, \scalaris{} consists of:
-\begin{itemize}
-\setlength{\itemsep}{0pt}
-\setlength{\parskip}{0pt}
-\item management servers and
-\item regular nodes
-\end{itemize}
 
-The management server will maintain a list of nodes participating in the
-system. A regular node is either the first node in a system or joins an
+A \scalaris{} deployment can have a \emph{management server} as well as
+\emph{regular nodes}. The
+management server is optional and provides a global view on all nodes of a
+\scalaris{} deployment which contact this server, i.e. have its address
+specified in the \code{mgmt_server} configuration setting.
+A regular node is either the first node in a system or joins an
 existing system deployment.
 
 \subsection{Running on a local machine}
@@ -115,17 +115,26 @@ named \code{node1}.
 The web pages at \url{http://localhost:8000} should show the additional nodes.
 
 \subsection{Running distributed}
+\label{user.config.distributed}
 
 \scalaris{} can be installed on other machines in the same way as
 described in Section~\sieheref{sec:install}. In the default configuration,
-nodes will look for the management server on \code{127.0.0.1} on port 14195. You
-should create a \code{scalaris.local.cfg} pointing to the node running
-the management server. You should also add a list of known nodes.
+nodes will look for the management server on \code{127.0.0.1} on port 14195.
+To run \scalaris{} distributed over several nodes, each node requires a
+\code{bin/scalaris.local.cfg} pointing to the node running
+the management server (if available) and containing a list of known nodes.
+Without a list of known nodes, a joining node will not know where to join.
 
-\codesnippet{scalaris.local.cfg}{local_cfg:distributed}{../bin/scalaris.local.cfg.example}
+In the following example, the \code{mgmt_server}'s location is defined as
+an IP address plus a TCP port and its Erlang-internal process name.
+If the deployment should not use a management server, replace the setting with
+an invalid address, e.g. \code{'null'}.
+
+\codesnippet{scalaris.local.cfg}{local_cfg:distributed}
+            {../bin/scalaris.local.cfg.example}
 
 If you are starting the management server using \code{firstnode.sh}, it will
-listen on port 14195 and you have to change the port and the IP address in the
+listen on port 14195 and you only have to change the the IP address in the
 configuration file. Otherwise the other nodes will not find the management
 server. Calling \code{./bin/joining_node.sh} on a remote machine will start the
 node and automatically contact the configured management server.
