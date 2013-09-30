@@ -184,11 +184,10 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                             %% FwdInt part of the data. otherwise we get duplicate
                             %% data
                             {bulk_distribute, Proc, N, Msg1, Data} ->
-                                {RangeData, _Rest} = lists:partition(
-                                        fun(Entry) ->
-                                            intervals:in(?RT:hash_key(element(1, Entry)),
-                                                        FwdRange)
-                                        end, Data),
+                                RangeData =
+                                    [Entry || Entry <- Data,
+                                              intervals:in(?RT:hash_key(element(1, Entry)),
+                                                           FwdRange)],
                                 comm:send(FwdPid,
                                       {bulkowner, deliver, Id, FwdRange,
                                       {bulk_distribute, Proc, N, Msg1, RangeData},
@@ -212,11 +211,10 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                     % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
                     comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
                 {bulk_distribute, Proc, N, Msg1, Data} ->
-                    {RangeData, _Rest} = lists:partition(
-                            fun(Entry) ->
-                                intervals:in(?RT:hash_key(element(1, Entry)),
-                                            MyRange)
-                            end, Data),
+                    RangeData =
+                        [Entry || Entry <- Data,
+                                  intervals:in(?RT:hash_key(element(1, Entry)),
+                                               MyRange)],
                     %% only deliver data in MyRange as data outside of it was
                     %% forwarded
                     comm:send_local(pid_groups:get_my(Proc),
