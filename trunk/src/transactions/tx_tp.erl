@@ -127,7 +127,7 @@ on_do_commit_abort({PaxosId, RTLogEntry, TM, TMItemId} = Id, Result, TMSnapNo, D
                     % we don't have an own proposal yet (no validate seen), so we forward msg as is.
                     dht_node_lookup:lookup_aux(DHT_Node_State, Key, 0,
                                                {?tp_do_commit_abort, Id,
-                                                Result})
+                                                Result, TMSnapNo})
             end,
             DHT_Node_State
     end.
