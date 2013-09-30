@@ -175,7 +175,7 @@ AC_ERLANG_CHECK_LIB(hanoidb,
                      HAVEHANOIDB_DIALYZER=""
                      AC_MSG_NOTICE([erlang-hanoidb not found - you won't be able to use the db_hanoidb back-end (if configured in scalaris.hrl)])])
 
-AC_ERLANG_CHECK_LIB(erlang_js, , AC_MSG_NOTICE([erlang_js not found - you won't be able to use the Map-Reduce framework]))
+AC_ERLANG_CHECK_LIB(erlang_js, , AC_MSG_NOTICE([erlang_js not found - you won't be able to use javascript Map-Reduce jobs]))
 
 AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
               [AC_SUBST(RUN_TEST,[$ERLANG_LIB_DIR_common_test/priv/bin/run_test])],
