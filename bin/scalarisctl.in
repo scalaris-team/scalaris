@@ -365,7 +365,7 @@ checkinstallation() {
         echo -e "$MSG_FAILED"
         echo "$CHECKCONFIGMSG"
         echo "WARNING: unable to start the erlang_js application"
-        echo " You won't be able to use Scalaris' Map-Reduce framework."
+        echo " You won't be able to use JavaScript Map-Reduce jobs"
         echo "We were trying to run: $ERL -noinput -sasl sasl_error_logger false -boot start_sasl -eval \"ok = application:start(erlang_js), {ok, JS} = js_driver:new(), ok = js:define(JS, <<\"var addOne = function(a){ return a + 1; }\">>), {ok,4} = js:call(JS, <<\"addOne\">>, [3]), halt(0).\""
         echo -n "Continuing basic tests..."
     fi

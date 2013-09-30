@@ -3557,8 +3557,8 @@ ERLANG_LIB_DIR_erlang_js=$ac_cv_erlang_lib_dir_erlang_js
 ERLANG_LIB_VER_erlang_js=$ac_cv_erlang_lib_ver_erlang_js
 
 if test "$ac_cv_erlang_lib_dir_erlang_js" = "not found"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: erlang_js not found - you won't be able to use the Map-Reduce framework" >&5
-$as_echo "$as_me: erlang_js not found - you won't be able to use the Map-Reduce framework" >&6;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: erlang_js not found - you won't be able to use JavaScript Map-Reduce jobs" >&5
+$as_echo "$as_me: erlang_js not found - you won't be able to use JavaScript Map-Reduce jobs" >&6;}
 fi
 
 
