@@ -659,6 +659,7 @@ scalarisstart(){
  -pa $SCALARISDIR/contrib/yaws/ebin\
  -pa $SCALARISDIR/contrib/log4erl/ebin\
  -pa $BEAMDIR $TOKEFLAGS $BACKGROUND\
+ -sasl sasl_error_logger false\
  -yaws embedded true\
  -scalaris log_path \"\\\"$LOGDIR/$NODE_NAME\\\"\"\
  -scalaris docroot \"\\\"$DOCROOTDIR\\\"\"\
