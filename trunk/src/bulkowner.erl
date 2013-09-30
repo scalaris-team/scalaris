@@ -222,8 +222,7 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                                      setelement(N, Msg1, RangeData), Parents});
                 {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
                     comm:send_local(pid_groups:get_my(Proc),
-                                    %% TODO shoudn't we only deliver MyRange
-                                    {bulkowner, deliver, Id, Range, Msg1, Parents});
+                                    {bulkowner, deliver, Id, MyRange, Msg1, Parents});
                 {do_snapshot, _SnapNo, _Leader} ->
                     comm:send_local(pid_groups:get_my(dht_node), Msg);
                 MrMsg when mr =:= element(1, MrMsg) ->
