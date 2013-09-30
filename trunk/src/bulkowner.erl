@@ -59,7 +59,8 @@ issue_bulk_owner(Id, I, Msg) ->
     DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode, {bulkowner, start, Id, I, Msg}).
 
--spec issue_send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()]) -> ok.
+-spec issue_send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(),
+                       Parents::[comm:mypid()]) -> ok.
 issue_send_reply(Id, Target, Msg, Parents) ->
     DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode, {bulkowner, reply, Id, Target, Msg, Parents}).
@@ -71,7 +72,8 @@ issue_bulk_distribute(Id, Proc, Pos, Msg, Data) ->
     comm:send_local(DHTNode, {bulkowner, start, Id, intervals:all(), {bulk_distribute, Proc,
                                                         Pos, Msg, Data}}).
 
--spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid()) -> ok.
+-spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(),
+                 Parents::[comm:mypid()], Shepherd::comm:erl_local_pid()) -> ok.
 send_reply(Id, Target, {?send_to_group_member, Proc, Msg}, [], Shepherd) ->
     comm:send(Target, {bulkowner, reply, Id, Msg}, [{shepherd, Shepherd}, {group_member, Proc}]);
 send_reply(Id, Target, Msg, [], Shepherd) ->
@@ -79,7 +81,9 @@ send_reply(Id, Target, Msg, [], Shepherd) ->
 send_reply(Id, Target, Msg, [Parent | Rest], Shepherd) ->
     comm:send(Parent, {bulkowner, reply, Id, Target, Msg, Rest}, [{shepherd, Shepherd}]).
 
--spec send_reply_failed(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(), Parents::[comm:mypid()], Shepherd::comm:erl_local_pid(), FailedPid::comm:mypid()) -> ok.
+-spec send_reply_failed(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(),
+                        Parents::[comm:mypid()], Shepherd::comm:erl_local_pid(),
+                        FailedPid::comm:mypid()) -> ok.
 send_reply_failed(_Id, Target, Msg, [], _Shepherd, Target) ->
     log:log(warn, "[ ~p ] cannot send bulkowner_reply with message ~p (target node not available)",
             [pid_groups:pid_to_name(self()), Msg]);
@@ -87,7 +91,9 @@ send_reply_failed(Id, Target, Msg, Parents, Shepherd, _FailedPid) ->
     send_reply(Id, Target, Msg, Parents, Shepherd).
 
 %% @doc main routine. It spans a broadcast tree over the nodes in I
--spec bulk_owner(State::dht_node_state:state(), Id::uid:global_uid(), I::intervals:interval(), Msg::comm:message(), Parents::[comm:mypid()]) -> ok.
+-spec bulk_owner(State::dht_node_state:state(), Id::uid:global_uid(),
+                 I::intervals:interval(), Msg::comm:message(),
+                 Parents::[comm:mypid()]) -> ok.
 bulk_owner(State, Id, I, Msg, Parents) ->
 %%     log:pal("bulk_owner:~n self:~p,~n int :~p,~n rt  :~p~n", [dht_node_state:get(State, node), I, ?RT:to_list(State)]),
     Neighbors = dht_node_state:get(State, neighbors),
@@ -199,7 +205,12 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                     _    -> AccI
                 end
         end,
-    MyRange = lists:foldl(F, Range, MsgFwd),
+    % we are responsible for the intersection of the BulkOwner range and our
+    % ring maintenance range (plus DB range from ongoing slides).
+    MyDBRange = intervals:union(dht_node_state:get(State, my_range),
+                                dht_node_state:get(State, db_range)),
+    MyRange0 = lists:foldl(F, Range, MsgFwd),
+    MyRange = intervals:intersection(MyRange0, MyDBRange),
     case intervals:is_empty(MyRange) of
         true -> ok;
         _ ->
@@ -229,6 +240,9 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                     comm:send_local(pid_groups:get_my(dht_node), Msg)
             end
     end,
+    RestRange = intervals:minus(MyRange0, MyRange),
+    % no need to check whether non-empty - this is a no-op anyway
+    bulk_owner(State, Id, RestRange, Msg, Parents),
     State;
 
 on({bulkowner, reply, Id, Target, Msg, Parents}, State) ->
