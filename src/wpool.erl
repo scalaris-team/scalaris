@@ -43,11 +43,6 @@
 
 -include("scalaris.hrl").
 
--type(message() :: {do_work, Source::comm:mypid(), job()} |
-                   %% TODO find better spec for Info
-                   {'DOWN', reference(), process, pid(), Info::any()} |
-                   {data, pid(), [tuple()]}).
-
 -type(mr_job() :: {Round::pos_integer(),
                    map | reduce,
                    {erlanon | jsanon, binary()},
@@ -56,6 +51,11 @@
 -type(generic_job() :: {erlanon | jsanon, binary(), [tuple()]}).
 
 -type(job() :: mr_job() | generic_job()).
+
+-type(message() :: {do_work, Source::comm:mypid(), job()} |
+                   %% TODO find better spec for Info
+                   {'DOWN', reference(), process, pid(), Info::any()} |
+                   {data, pid(), [tuple()]}).
 
 %% running jobs are defined by the pid the worker process has and the source of
 %% the job
@@ -148,7 +148,7 @@ start_worker(Source, Workload, State) ->
 %% @doc monitor a working process
 -spec monitor_worker(pid(), comm:mypid(), state()) -> state().
 monitor_worker(Pid, Source, {Max, Working, Waiting}) ->
-    monitor(process, Pid),
+    erlang:monitor(process, Pid),
     {Max, [{Pid, Source} | Working], Waiting}.
 
 %% @doc cleanup wortker after it is finished.
@@ -177,10 +177,10 @@ init_worker(DHTNodeGroup, Workload) ->
 -spec work(pid_groups:groupname(), job()) -> ok.
 work(DHTNodeGroup, {_Round, map, {erlanon, FunBin}, Data}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
-    Fun = binary_to_term(FunBin, [safe]),
+    Fun = erlang:binary_to_term(FunBin, [safe]),
     return(DHTNodeGroup, lists:flatten([apply_erl(Fun, X) || X <- Data]));
 work(DHTNodeGroup, {_Round, reduce, {erlanon, FunBin}, Data}) ->
-    Fun = binary_to_term(FunBin, [safe]),
+    Fun = erlang:binary_to_term(FunBin, [safe]),
     return(DHTNodeGroup, apply_erl(Fun, aggregate_reduce(Data)));
 
 work(DHTNodeGroup, {_Round, map, {jsanon, FunBin}, Data}) ->
