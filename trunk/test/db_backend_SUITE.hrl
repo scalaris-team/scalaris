@@ -46,7 +46,7 @@ prop_put(Data) ->
         write_scrubbed_to_db(?TEST_DB:new(randoms:getRandomString()),
                              Data),
     check_db(DB1, ScrubbedData, "check_db_put1"),
-    ?TEST_DB:close(DB1),
+    ?TEST_DB:?CLOSE(DB1),
     true.
 
 tester_put(_Config) ->
@@ -65,7 +65,7 @@ prop_get(Data) ->
             end, [], ScrubbedData),
     ?equals_w_note(lists:sort(ScrubbedData), lists:sort(GetData), "check_db_put1"),
     check_db(DB1, GetData, "check_db_put1"),
-    ?TEST_DB:close(DB1),
+    ?TEST_DB:?CLOSE(DB1),
     true.
 
 tester_get(_Config) ->
@@ -86,7 +86,7 @@ prop_delete(Data, ToDelete) ->
                      not lists:any(fun(Key) -> element(1, El) ?EQ Key end,
                                    ToDelete)],
     check_db(DB2, ExpData, "check_db_delete"),
-    ?TEST_DB:close(DB2),
+    ?TEST_DB:?CLOSE(DB2),
     true.
 
 tester_delete(_Config) ->
@@ -119,7 +119,7 @@ prop_foldl(Data, Interval, MaxNum) ->
     ?equals_w_note(lists:reverse(ScrubbedData), AllFold, "test_foldl1"),
     ?equals_w_note(lists:reverse(ExpInInterval), IntervalFold, "test_foldl2"),
     ?equals_w_note(lists:reverse(ExpInIntervalCounted), IntervalCountFold, "test_foldl3"),
-    ?TEST_DB:close(DB1),
+    ?TEST_DB:?CLOSE(DB1),
     true.
 
 tester_foldl(_Config) ->
@@ -156,7 +156,7 @@ prop_foldr(Data, Interval, MaxNum) ->
     ?equals_w_note(ScrubbedData, AllFold, "test_foldr1"),
     ?equals_w_note(ExpInInterval, IntervalFold, "test_foldr2"),
     ?equals_w_note(ExpInIntervalCounted, IntervalCountFold, "test_foldr3"),
-    ?TEST_DB:close(DB1),
+    ?TEST_DB:?CLOSE(DB1),
     true.
 
 tester_foldr(_Config) ->
