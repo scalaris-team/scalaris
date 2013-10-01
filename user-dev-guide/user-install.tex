@@ -158,7 +158,7 @@ directly from the source directory. Note: \code{make install} will install
 and install it.
 On openSUSE, for example, do the following:
 
-\begin{lstlisting}{language=sh}
+\begin{lstlisting}[language=sh]
 export SCALARIS_SVN=http://scalaris.googlecode.com/svn/trunk
 for package in main bindings; do
   mkdir -p ${package}
@@ -214,3 +214,15 @@ repository.
 package from the EPEL repository of RHEL~6.
   \item For Debian~5.0 we included the Erlang package of Ubuntu 11.04.
 \end{itemize}
+
+\section{Testing the Installation}
+
+After installing \scalaris{} you can check your installation and perform
+some basic tests using
+
+\begin{lstlisting}[language=sh]
+%> scalarisctl checkinstallation
+\end{lstlisting}
+
+For further details on \code{scalarisctl} see
+Section~\sieheref{user.config.scalarisctl}.
