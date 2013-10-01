@@ -53,12 +53,18 @@ groups() ->
          tester_symm4_slide_pred_rcv_load_timeouts_pred,
          tester_symm4_slide_pred_rcv_load_timeouts_node
         ],
+    SendToBothTestCases =
+        [
+         test_slide_with_pred_and_succ,
+         test_slide_simultaneously
+        ],
     [
       {send_to_pred, Config, SendToPredTestCases},
       {send_to_pred_incremental, ConfigInc, SendToPredTestCases},
       {send_to_succ, Config, SendToSuccTestCases},
       {send_to_succ_incremental, ConfigInc, SendToSuccTestCases},
-      {send_to_pred, Config, SendToPredTestCases}
+      {send_to_both, Config, SendToBothTestCases},
+      {send_to_both_incremental, ConfigInc, SendToBothTestCases}
     ]
       ++
 %%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
@@ -600,6 +606,64 @@ symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node
                        ?ct_fail("slide_~.0p(~B.~B, ~.0p, ~.0p, ~.0p) unexpected message: ~.0p",
                                 [PredOrSucc, NthNode, N, Node, Other, TargetId, X]))
         end.
+
+%% @doc Let a node slide with its pred and succ,
+%%      i.e. send data to the pred and receive from the succ
+-spec slide_with_pred_and_succ(DhtNode::pid(), {Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()}) -> ok.
+slide_with_pred_and_succ(DhtNode, {Pred, Node, Succ} = _Nodes) ->
+    Tag = slide_with_pred_and_suc,
+    TargetId1 = ?RT:get_split_key(node:id(Pred), node:id(Node), {1, 2}),
+    TargetId2 = ?RT:get_split_key(node:id(Node), node:id(Succ), {1, 2}),
+    comm:send_local(DhtNode, {move, start_slide, pred, TargetId1, {pred, Tag}, self()}),
+    comm:send_local(DhtNode, {move, start_slide, succ, TargetId2, {succ, Tag}, self()}),
+    Result1 = fun() -> receive ?SCALARIS_RECV(X,X) end end(),
+    Result2 = fun() -> receive ?SCALARIS_RECV(Y,Y) end end(),
+    ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
+    ?assert(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok).
+
+%% @doc Slide with all dht nodes' pred and succ
+test_slide_with_pred_and_succ(_Config) ->
+    _BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+    timer:sleep(50),
+    DhtNodes = pid_groups:find_all(dht_node),
+    _ = [begin
+             Nodes = get_pred_node_succ2(DhtNode, "error fetching node details"),
+             ?proto_sched(start),
+             slide_with_pred_and_succ(DhtNode, Nodes),
+             ?proto_sched(stop),
+             unittest_helper:check_ring_load(440),
+             unittest_helper:check_ring_data()
+         end || DhtNode <- DhtNodes].
+
+%% @doc Let two adjacent nodes slide with each other at the same time,
+%%      i.e. send data to pred and receive data from pred simultaneously
+-spec slide_simultaneously({Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()}) -> ok.
+slide_simultaneously({Pred, Node, Succ}) ->
+    Tag = slide_simultaneously,
+    TargetId1 = ?RT:get_split_key(node:id(Pred), node:id(Node), {1, 2}),
+    TargetId2 = ?RT:get_split_key(node:id(Node), node:id(Succ), {1, 2}),
+    comm:send(node:pidX(Node),  {move, start_slide, succ, TargetId1, {succ, Tag}, self()}),
+    comm:send(node:pidX(Succ),  {move, start_slide, pred, TargetId2, {pred, Tag}, self()}),
+    Result1 = fun() -> receive ?SCALARIS_RECV(X,X) end end(),
+    Result2 = fun() -> receive ?SCALARIS_RECV(Y,Y) end end(),
+    ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
+    % at least one slide may succeed
+    ?assert(not(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok)).
+
+%% @doc Slide simultaneously with all dht nodes
+test_slide_simultaneously(_Config) ->
+    _BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+    timer:sleep(50),
+    DhtNodes = pid_groups:find_all(dht_node),
+    _ = [ begin
+              Nodes = get_pred_node_succ2(DhtNode, "error fetching node details"),
+              ?proto_sched(start),
+              slide_simultaneously(Nodes),
+              ?proto_sched(stop),
+              unittest_helper:check_ring_load(440),
+              unittest_helper:check_ring_data()
+          end || DhtNode <- DhtNodes].
+
 
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->
