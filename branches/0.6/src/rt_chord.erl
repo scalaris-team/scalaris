@@ -224,10 +224,39 @@ stabilize(Neighbors, RT, Index, Node) ->
 %% userdevguide-begin rt_chord:update
 %% @doc Updates the routing table due to a changed node ID, pred and/or succ.
 -spec update(OldRT::rt(), OldNeighbors::nodelist:neighborhood(),
-             NewNeighbors::nodelist:neighborhood()) -> {trigger_rebuild, rt()}.
-update(_OldRT, _OldNeighbors, NewNeighbors) ->
-    % to be on the safe side ...
-    {trigger_rebuild, empty(NewNeighbors)}.
+             NewNeighbors::nodelist:neighborhood())
+        -> {ok | trigger_rebuild, rt()}.
+update(OldRT, OldNeighbors, NewNeighbors) ->
+    OldPred = nodelist:pred(OldNeighbors),
+    NewPred = nodelist:pred(NewNeighbors),
+    OldSucc = nodelist:succ(OldNeighbors),
+    NewSucc = nodelist:succ(NewNeighbors),
+    NewNodeId = nodelist:nodeid(NewNeighbors),
+    % if only the ID of a succ or pred changed but both are still the same
+    % process, only re-build if the new node ID is not between Pred and Succ
+    % any more (which should not happen since this must come from a slide!)
+    % if not rebuild, update the node IDs though
+    case node:same_process(OldPred, NewPred) andalso
+             node:same_process(OldSucc, NewSucc) andalso
+             intervals:in(NewNodeId, node:mk_interval_between_nodes(NewPred, NewSucc)) of
+        true ->
+            NewRT = gb_trees:map(
+                      fun(_K, N) ->
+                              case node:same_process(N, NewPred) of
+                                  true  ->
+                                      node:newer(N, NewPred);
+                                  false ->
+                                      case node:same_process(N, NewSucc) of
+                                          true  -> node:newer(N, NewSucc);
+                                          false -> N
+                                      end
+                              end
+                      end, OldRT),
+            {ok, NewRT};
+        false ->
+            % to be on the safe side ...
+            {trigger_rebuild, empty(NewNeighbors)}
+    end.
 %% userdevguide-end rt_chord:update
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
