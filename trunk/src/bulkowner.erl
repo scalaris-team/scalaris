@@ -207,8 +207,11 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
         end,
     % we are responsible for the intersection of the BulkOwner range and our
     % ring maintenance range (plus DB range from ongoing slides).
-    MyDBRange = intervals:union(dht_node_state:get(State, my_range),
-                                dht_node_state:get(State, db_range)),
+    DBRange = lists:foldl(fun({I, _SlideId}, AccI) ->
+                                  intervals:union(AccI, I)
+                          end, intervals:empty(),
+                          dht_node_state:get(State, db_range)),
+    MyDBRange = intervals:union(dht_node_state:get(State, my_range), DBRange),
     MyRange0 = lists:foldl(F, Range, MsgFwd),
     MyRange = intervals:intersection(MyRange0, MyDBRange),
     case intervals:is_empty(MyRange) of
