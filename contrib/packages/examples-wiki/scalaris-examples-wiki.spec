@@ -13,7 +13,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  scalaris-java >= 0.6.0
+BuildRequires:  scalaris-java >= 0.6.1
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -81,7 +81,7 @@ Wikipedia-like application.
 Summary:    Wikipedia on Scalaris example using tomcat5
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat5
-Requires:   scalaris-java >= 0.6.0
+Requires:   scalaris-java >= 0.6.1
 BuildArch:  noarch
 
 %description -n scalaris-examples-wiki-tomcat5
@@ -94,7 +94,7 @@ Wikipedia-like application.
 Summary:    Wikipedia on Scalaris example using tomcat6
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat6
-Requires:   scalaris-java >= 0.6.0
+Requires:   scalaris-java >= 0.6.1
 BuildArch:  noarch
 
 %description -n scalaris-examples-wiki-tomcat6
@@ -107,7 +107,7 @@ Wikipedia-like application.
 Summary:    Wikipedia on Scalaris example using tomcat7
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat >= 7.0.0
-Requires:   scalaris-java >= 0.6.0
+Requires:   scalaris-java >= 0.6.1
 BuildArch:  noarch
 
 %description -n scalaris-examples-wiki-tomcat7
