@@ -23,6 +23,7 @@
 
 -compile(export_all).
 
+-include("scalaris.hrl").
 -include("unittest.hrl").
 
 all() ->
@@ -266,12 +267,8 @@ get_keys_for_replica_string(_Config) ->
     ok.
 
 md5(_Config) ->
-    iter(count(), fun () ->
-                          crypto:md5("42")
-               end, "crypto:md5"),
-    iter(count(), fun () ->
-                          erlang:md5("42")
-               end, "erlang:md5"),
+    iter(count(), fun () -> ?CRYPTO_MD5("42") end, "crypto:md5"),
+    iter(count(), fun () -> erlang:md5("42") end, "erlang:md5"),
     ok.
 
 next_hop_setup() ->

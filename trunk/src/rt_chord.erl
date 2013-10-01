@@ -64,7 +64,7 @@ hash_key(Key) -> hash_key_(Key).
 hash_key_(Key) when not is_binary(Key) ->
     hash_key_(client_key_to_binary(Key));
 hash_key_(Key) ->
-    <<N:128>> = crypto:md5(Key),
+    <<N:128>> = ?CRYPTO_MD5(Key),
     N.
 
 %% @doc Generates a random node id, i.e. a random 128-bit number, based on the
