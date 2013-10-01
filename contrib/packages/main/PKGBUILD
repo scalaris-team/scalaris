@@ -1,7 +1,7 @@
 # Maintainer: Nico Kruber <kruber at zib dot de>
 # Contributor: Roman Parykin <donderom at ymail dot com>
 pkgname=scalaris
-pkgver=0.6.0+svn
+pkgver=0.6.1+svn
 pkgrel=1
 pkgdesc="A scalable, transactional, distributed key-value store."
 arch=('i686' 'x86_64')
