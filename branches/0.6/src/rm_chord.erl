@@ -30,6 +30,7 @@
 % accepted messages of an initialized rm_chord process in addition to rm_loop
 -type(custom_message() ::
     {rm_trigger} |
+    {rm_trigger_action} |
     {rm, get_succlist, Source_Pid::comm:mypid()} |
     {rm, {get_node_details_response, NodeDetails::node_details:node_details()}, from_succ | from_node} |
     {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
@@ -72,6 +73,10 @@ unittest_create_state(Neighbors) ->
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
 handle_custom_message({rm_trigger}, {Neighborhood, TriggerState}) ->
+    NewTriggerState = trigger:next(TriggerState),
+    handle_custom_message({rm_trigger_action}, {Neighborhood, NewTriggerState});
+
+handle_custom_message({rm_trigger_action}, {Neighborhood, _TriggerState} = State) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
         true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
@@ -80,7 +85,7 @@ handle_custom_message({rm_trigger}, {Neighborhood, TriggerState}) ->
                           ?SEND_OPTIONS);
         _    -> ok
     end,
-    {{unknown}, {Neighborhood, trigger:next(TriggerState)}};
+    {{unknown}, State};
 
 handle_custom_message({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
     comm:send(Source_Pid, {rm, get_succlist_response,
@@ -182,8 +187,8 @@ remove_succ({OldNeighborhood, TriggerState}, OldSucc, SuccsSucc) ->
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({OldNeighborhood, TriggerState}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
-    NewTriggerState = trigger:now(TriggerState), % inform neighbors
-    {{unknown}, {NewNeighborhood, NewTriggerState}}.
+    % inform neighbors
+    element(2, handle_custom_message({rm_trigger_action}, {NewNeighborhood, TriggerState})).
 
 -spec leave(State::state()) -> ok.
 leave(_State) -> ok.
