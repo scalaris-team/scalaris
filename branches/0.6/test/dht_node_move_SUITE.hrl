@@ -27,6 +27,21 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
+
+-type(node_type() :: predspred | pred | node | succ).
+
+-type(node_tuple() :: {node_type(), node_type(), node_type(), node_type()}).
+
+-type(targetid_fun() :: fun((node_tuple()) -> ?RT:key())).
+
+-record(slideconf, {name :: atom(),
+                    node :: node_type(),
+                    slide_with :: node_type(),
+                    targetid ::  targetid_fun()}).
+
+-type(slide_config_record() :: #slideconf{}).
+
+
 test_cases() -> [].
 
 groups() ->
@@ -55,8 +70,8 @@ groups() ->
         ],
     SendToBothTestCases =
         [
-         test_slide_with_pred_and_succ,
-         test_slide_simultaneously
+         test_slide_adjacent,
+         test_slide_conflict
         ],
     [
       {send_to_pred, Config, SendToPredTestCases},
@@ -607,64 +622,6 @@ symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node
                                 [PredOrSucc, NthNode, N, Node, Other, TargetId, X]))
         end.
 
-%% @doc Let a node slide with its pred and succ,
-%%      i.e. send data to the pred and receive from the succ
--spec slide_with_pred_and_succ(DhtNode::pid(), {Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()}) -> ok.
-slide_with_pred_and_succ(DhtNode, {Pred, Node, Succ} = _Nodes) ->
-    Tag = slide_with_pred_and_suc,
-    TargetId1 = ?RT:get_split_key(node:id(Pred), node:id(Node), {1, 2}),
-    TargetId2 = ?RT:get_split_key(node:id(Node), node:id(Succ), {1, 2}),
-    comm:send_local(DhtNode, {move, start_slide, pred, TargetId1, {pred, Tag}, self()}),
-    comm:send_local(DhtNode, {move, start_slide, succ, TargetId2, {succ, Tag}, self()}),
-    Result1 = fun() -> receive ?SCALARIS_RECV(X,X) end end(),
-    Result2 = fun() -> receive ?SCALARIS_RECV(Y,Y) end end(),
-    ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
-    ?assert(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok).
-
-%% @doc Slide with all dht nodes' pred and succ
-test_slide_with_pred_and_succ(_Config) ->
-    _BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    timer:sleep(50),
-    DhtNodes = pid_groups:find_all(dht_node),
-    _ = [begin
-             Nodes = get_pred_node_succ2(DhtNode, "error fetching node details"),
-             ?proto_sched(start),
-             slide_with_pred_and_succ(DhtNode, Nodes),
-             ?proto_sched(stop),
-             unittest_helper:check_ring_load(440),
-             unittest_helper:check_ring_data()
-         end || DhtNode <- DhtNodes].
-
-%% @doc Let two adjacent nodes slide with each other at the same time,
-%%      i.e. send data to pred and receive data from pred simultaneously
--spec slide_simultaneously({Pred::node:node_type(), Node::node:node_type(), Succ::node:node_type()}) -> ok.
-slide_simultaneously({Pred, Node, Succ}) ->
-    Tag = slide_simultaneously,
-    TargetId1 = ?RT:get_split_key(node:id(Pred), node:id(Node), {1, 2}),
-    TargetId2 = ?RT:get_split_key(node:id(Node), node:id(Succ), {1, 2}),
-    comm:send(node:pidX(Node),  {move, start_slide, succ, TargetId1, {succ, Tag}, self()}),
-    comm:send(node:pidX(Succ),  {move, start_slide, pred, TargetId2, {pred, Tag}, self()}),
-    Result1 = fun() -> receive ?SCALARIS_RECV(X,X) end end(),
-    Result2 = fun() -> receive ?SCALARIS_RECV(Y,Y) end end(),
-    ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
-    % at least one slide may succeed
-    ?assert(not(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok)).
-
-%% @doc Slide simultaneously with all dht nodes
-test_slide_simultaneously(_Config) ->
-    _BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
-    timer:sleep(50),
-    DhtNodes = pid_groups:find_all(dht_node),
-    _ = [ begin
-              Nodes = get_pred_node_succ2(DhtNode, "error fetching node details"),
-              ?proto_sched(start),
-              slide_simultaneously(Nodes),
-              ?proto_sched(stop),
-              unittest_helper:check_ring_load(440),
-              unittest_helper:check_ring_data()
-          end || DhtNode <- DhtNodes].
-
-
 -spec stop_time(F::fun(() -> any()), Tag::string()) -> ok.
 stop_time(F, Tag) ->
     Start = erlang:now(),
@@ -681,3 +638,204 @@ check_size(Size) ->
     unittest_helper:check_ring_size(Size),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size(Size).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Helper functions simultaneous slides %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec gen_split_key_fun(node_type(), {integer(), integer()}) -> targetid_fun().
+gen_split_key_fun(Selector, Fraction) ->
+    fun(Nodes) ->
+            From = select_from_nodes(Selector, Nodes),
+            To = select_from_nodes(succ(Selector), Nodes),
+            ?RT:get_split_key(node:id(From), node:id(To), Fraction)
+    end.
+
+-spec pred(node_type()) -> node_type().
+pred(pred) -> predspred;
+pred(node) -> pred;
+pred(succ) -> node.
+
+-spec succ(node_type()) -> node_type().
+succ(predspred) -> pred;
+succ(pred)      -> node;
+succ(node)      -> succ.
+
+-spec generate_slide_variation(slide_config_record()) -> [slide_config_record()].
+generate_slide_variation(SlideConf) ->
+    SlideWith = ?IIF(SlideConf#slideconf.slide_with =:= succ, pred, succ),
+    Node =
+        case SlideWith of
+            pred -> succ(SlideConf#slideconf.node);
+            succ -> pred(SlideConf#slideconf.node)
+        end,
+    Name = list_to_atom(string:concat(atom_to_list(SlideConf#slideconf.name), "var")),
+    Variation = #slideconf{name = Name,
+                           node = Node,
+                           slide_with = SlideWith,
+                           targetid = SlideConf#slideconf.targetid},
+    [SlideConf, Variation].
+
+-spec select_from_nodes(Selector::node_type(), Nodes::node_tuple()) -> node:node_type().
+select_from_nodes(Selector, Nodes) ->
+    N =
+        case Selector of
+            predspred -> 1;
+            pred -> 2;
+            node -> 3;
+            succ -> 4
+        end,
+    element(N, Nodes).
+
+-spec get_predspred_pred_node_succ(DhtNode::pid()) -> node_tuple().
+get_predspred_pred_node_succ(DhtNode) ->
+    {Pred, Node, Succ} = get_pred_node_succ2(DhtNode, "error fetching nodes"),
+    {PredsPred, _Pred2, _Node2} = get_pred_node_succ2(node:pidX(Pred), "error fetching nodes"),
+    {PredsPred, Pred, Node, Succ}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Execute simultaneous slides %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Execute simultaneous slides between two adjacent nodes,
+%%      i.e. send data to the pred and receive from the succ
+-spec slide_simultaneously(DhtNode::pid(), {SlideConf1::slide_config_record(), SlideConf2::slide_config_record()}, VerifyFun::fun()) -> ok.
+slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
+    SlideVariations1 = generate_slide_variation(SlideConf1),
+    SlideVariations2 = generate_slide_variation(SlideConf2),
+    _ = [ begin
+              Nodes = get_predspred_pred_node_succ(DhtNode),
+              Node1 = select_from_nodes(Slide1#slideconf.node, Nodes),
+              Node2 = select_from_nodes(Slide2#slideconf.node, Nodes),
+              Direction1 = Slide1#slideconf.slide_with,
+              Direction2 = Slide2#slideconf.slide_with,
+              TargetId1 = (Slide1#slideconf.targetid)(Nodes),
+              TargetId2 = (Slide2#slideconf.targetid)(Nodes),
+              Tag1 = Slide1#slideconf.name,
+              Tag2 = Slide2#slideconf.name,
+              ct:pal("Beginning ~p, ~p", [Tag1, Tag2]),
+              ?proto_sched(start),
+              comm:send(node:pidX(Node1), {move, start_slide, Direction1, TargetId1, {first,  Direction1, Tag1}, self()}),
+              comm:send(node:pidX(Node2), {move, start_slide, Direction2, TargetId2, {second, Direction2, Tag2}, self()}),
+              Result1 = fun() -> receive ?SCALARIS_RECV(X,X) end end(),
+              Result2 = fun() -> receive ?SCALARIS_RECV(Y,Y) end end(),
+              ?proto_sched(stop),
+              ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
+              VerifyFun(Result1, Result2),
+              timer:sleep(10)
+          end || Slide1 <- SlideVariations1, Slide2 <- SlideVariations2],
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Test cases for simultaneous slides %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Test slides for two adjacent nodes
+test_slide_adjacent(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench:increment(10, 100000) end),
+    % make sure all keys have been created...
+    timer:sleep(50),
+    VerifyFun =
+        fun(Result1, Result2) ->
+                unittest_helper:check_ring_load(440),
+                unittest_helper:check_ring_data(),
+                %% both slides should be successfull
+                ?assert(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok
+                        orelse %% rarely, one slides fails because the neighbor information hasn't been updated yet
+                          (element(4, Result1) =:= wrong_pred_succ_node) xor (element(4, Result2) =:= wrong_pred_succ_node))
+        end,
+    Actions =
+        [{
+           #slideconf{name = action1slide1,
+                      node = pred,
+                      slide_with = succ,
+                      targetid = gen_split_key_fun(pred, {1, 2})},
+           #slideconf{name = action1slide2,
+                      node = node,
+                      slide_with = succ,
+                      targetid = gen_split_key_fun(node, {1, 2})}
+         },
+         {
+           #slideconf{name = action2slide1,
+                      node = pred,
+                      slide_with = succ,
+                      targetid = gen_split_key_fun(pred, {1, 3})},
+           #slideconf{name = action2slide2,
+                      node = node,
+                      slide_with = succ,
+                      targetid = gen_split_key_fun(pred, {2, 3})}
+         },
+         {
+           #slideconf{name = action3slide1,
+                      node = pred,
+                      slide_with = succ,
+                      targetid = gen_split_key_fun(predspred, {1, 2})},
+           #slideconf{name = action3slide2,
+                      node = node,
+                      slide_with = succ,
+                      targetid = gen_split_key_fun(pred, {1, 2})}
+         },
+         {
+           #slideconf{name = action4slide1,
+                      node = pred,
+                      slide_with = succ,
+                      targetid = gen_split_key_fun(predspred, {1, 2})},
+           #slideconf{name = action4slide2,
+                      node = node,
+                      slide_with = succ,
+                      targetid = gen_split_key_fun(node, {1, 2})}
+         }],
+    DhtNodes = pid_groups:find_all(dht_node),
+    _ = [begin
+             slide_simultaneously(DhtNode, Action, VerifyFun)
+         end || DhtNode <- DhtNodes, Action <- Actions],
+    erlang:exit(BenchPid, 'kill'),
+    util:wait_for_process_to_die(BenchPid).
+
+
+%% @doc Test for two slides in conflict with each other
+test_slide_conflict(_Config) ->
+    BenchPid = erlang:spawn(fun() -> bench:increment(10, 100000) end),
+    % make sure all keys have been created...
+    timer:sleep(50),
+    DhtNodes = pid_groups:find_all(dht_node),
+    VerifyFun =
+        fun (Result1, Result2) ->
+                unittest_helper:check_ring_load(440),
+                unittest_helper:check_ring_data(),
+                %% at most one slide may succeed
+                ?assert(not(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok))
+        end,
+    Actions = [
+               {
+                 #slideconf{name = action1slide1,
+                            node = pred,
+                            slide_with = succ,
+                            targetid = gen_split_key_fun(pred, {3, 4})},
+                 #slideconf{name = action1slide2,
+                            node = node,
+                            slide_with = succ,
+                            targetid = gen_split_key_fun(pred, {1, 4})}
+               },
+               {
+                 #slideconf{name = action2slide1,
+                            node = node,
+                            slide_with = succ,
+                            targetid = gen_split_key_fun(pred, {1, 2})},
+                 #slideconf{name = action2slide2,
+                            node = node,
+                            slide_with = succ,
+                            targetid = gen_split_key_fun(node, {1, 2})}
+               }],
+    _ = [ begin
+              slide_simultaneously(DhtNode, Action, VerifyFun)
+          end || DhtNode <- DhtNodes, Action <- Actions],
+    erlang:exit(BenchPid, 'kill'),
+    util:wait_for_process_to_die(BenchPid).
