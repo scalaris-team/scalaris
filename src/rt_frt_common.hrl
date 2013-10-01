@@ -128,7 +128,7 @@ hash_key(Key) -> hash_key_(Key).
 %%      opaque key type).
 -spec hash_key_(client_key() | binary()) -> key_t().
 hash_key_(Key) ->
-    <<N:128>> = crypto:md5(client_key_to_binary(Key)),
+    <<N:128>> = ?CRYPTO_MD5(client_key_to_binary(Key)),
     N.
 %% userdevguide-end rt_frtchord:hash_key
 

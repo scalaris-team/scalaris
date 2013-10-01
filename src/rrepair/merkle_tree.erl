@@ -68,7 +68,7 @@
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
          signature_size = 4                 :: pos_integer(),   %node signature size in byte
-         leaf_hf        = fun crypto:sha/1  :: hash_fun(),      %hash function for leaf signature creation
+         leaf_hf        = fun(V) -> ?CRYPTO_SHA(V) end  :: hash_fun(),      %hash function for leaf signature creation
          inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation -
          keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled          
          }).
@@ -543,7 +543,7 @@ get_XOR_fun() ->
 
 % allow future versions to create more hash funs by having an integer parameter
 -spec tester_create_hash_fun(I::1) -> hash_fun().
-tester_create_hash_fun(1) -> fun crypto:sha/1.
+tester_create_hash_fun(1) -> fun(V) -> ?CRYPTO_SHA(V) end.
 
 % allow future versions to create more hash funs by having an integer parameter
 -spec tester_create_inner_hash_fun(I::1) -> inner_hash_fun().
