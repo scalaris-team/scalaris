@@ -4138,22 +4138,8 @@ $as_echo "$as_me: forward declarations or recursive types are not allowed" >&6;}
    FORWARDORRECURSIVE_DIALYZER=" -Dforward_or_recursive_types_are_not_allowed"
 fi
 
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
-
-start() ->
-crypto:start()
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
+crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [crypto:start()]), erlang:halt().' | tail -1`
+if test "${crypto_start}" = "ok"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:start() is available" >&5
 $as_echo "$as_me: crypto:start() is available" >&6;}
 else
@@ -4162,37 +4148,15 @@ $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
 as_fn_error $? "cannot start the crypto subsystem
 See \`config.log' for more details" "$LINENO" 5; }
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
 
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
-
-start() ->
-crypto:start(), crypto:hash(md5, <<1>>), crypto:hash(sha, <<1>>)
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
+crypto_hash=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [erlang:function_exported(crypto,hash,2)]), erlang:halt().' | tail -1`
+if test "${crypto_hash}" = "true"; then :
   CRYPTOHASHSUPPORT=", {d, with_crypto_hash}"; CRYPTOHASHSUPPORT_EDOC=", {with_crypto_hash, true}"; CRYPTOHASHSUPPORT_DIALYZER=" -Dwith_crypto_hash"; { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:hash/2 is available and usable" >&5
 $as_echo "$as_me: crypto:hash/2 is available and usable" >&6;}
 else
   CRYPTOHASHSUPPORT=""; CRYPTOHASHSUPPORT_EDOC=""; CRYPTOHASHSUPPORT_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1" >&5
 $as_echo "$as_me: crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1" >&6;}
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
 
 if test "$cross_compiling" = yes; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
@@ -4223,31 +4187,13 @@ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
 fi
 
 
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
-
-start() ->
- {ok, {_Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}} =
-             beam_lib:chunks(code:where_is_file("erlang.beam"), [abstract_code]),
-          Res = lists:any(fun(X) ->
-            case X of
-              {attribute,_,type,{timestamp,_,_}} -> true;
-               _ -> false
-            end
-          end,
-          AbstractCode),
-          case Res of true -> ok; false -> halt(1) end
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
+erlang_timestamp_avail=`"${ERL}" -noshell -eval \
+  '{ok, {_Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}} =
+       beam_lib:chunks(code:where_is_file("erlang.beam"), [abstract_code]),
+   Res = lists:any(fun({attribute,_,type,{timestamp,_,_}}) -> true;
+                      (_) -> false end, AbstractCode),
+   io:format("~p~n", [Res]), erlang:halt().' | tail -1`
+if test "${erlang_timestamp_avail}" = "true"; then :
   HAVE_ERLANG_TIMESTAMP=", {d, have_erlang_timestamp}";
         { $as_echo "$as_me:${as_lineno-$LINENO}: erlang:timestamp() type is available" >&5
 $as_echo "$as_me: erlang:timestamp() type is available" >&6;}
@@ -4256,66 +4202,26 @@ else
         { $as_echo "$as_me:${as_lineno-$LINENO}: the type erlang:timestamp() is not available" >&5
 $as_echo "$as_me: the type erlang:timestamp() is not available" >&6;}
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
 
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
-
-start() ->
-httpc:set_option(max_sessions, 1)
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
+httpc_avail=`"${ERL}" -noshell -eval 'io:format("~p~n", [httpc:set_option(max_sessions, 1)]), erlang:halt().' | tail -1`
+if test "${httpc_avail}" = "ok"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: httpc is available" >&5
 $as_echo "$as_me: httpc is available" >&6;}
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: httpc unavailable, using wrapper module" >&5
 $as_echo "$as_me: httpc unavailable, using wrapper module" >&6;};EMAKEFILECOMPILECOMPAT="{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
 
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--compile({parse_transform, ct_line}).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
+ct_line=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [erlang:function_exported(ct_line,parse_transform,2)]), erlang:halt().' | tail -1`
+if test "${ct_line}" = "true"; then :
   CTLINESUPPORT=", {d, have_ctline_support}"; CTLINESUPPORT_EDOC=", {have_ctline_support, true}"; CTLINESUPPORT_DIALYZER=" -Dhave_ctline_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is available" >&5
 $as_echo "$as_me: ct_line is available" >&6;}
 else
   CTLINESUPPORT=""; CTLINESUPPORT_EDOC=""; CTLINESUPPORT_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is not available" >&5
 $as_echo "$as_me: ct_line is not available" >&6;}
 fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
 
-
-$ERL -noshell -s ct_run script_start -s erlang halt --help | grep "ct_hooks" 2>/dev/null 1>/dev/null
+"${ERL}" -noshell -s ct_run script_start -s erlang halt --help | grep "ct_hooks" 2>/dev/null 1>/dev/null
 if test $? -eq 0 ; then :
   CTHOOKS_FLAGS="-ct_hooks scalaris_cth"; CTHOOKS_EMAKEFILE=", {d, have_cthooks_support}"; CTHOOKS_EDOC=", {have_cthooks_support, true}"; CTHOOKS_DIALYZER=" -Dhave_cthooks_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_hooks is available" >&5
 $as_echo "$as_me: ct_hooks is available" >&6;}

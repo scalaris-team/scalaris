@@ -279,49 +279,44 @@ if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
    FORWARDORRECURSIVE_DIALYZER=" -Dforward_or_recursive_types_are_not_allowed"
 fi
 
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([], [crypto:start()])],
-       [AC_MSG_NOTICE([crypto:start() is available])],
-       [AC_MSG_FAILURE([cannot start the crypto subsystem])])
+crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [[crypto:start()]]), erlang:halt().' | tail -1`
+AS_IF([test "${crypto_start}" = "ok"],
+      [AC_MSG_NOTICE([crypto:start() is available])],
+      [AC_MSG_FAILURE([cannot start the crypto subsystem])])
 
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([], [crypto:start(), crypto:hash(md5, <<1>>), crypto:hash(sha, <<1>>)])],
-       [CRYPTOHASHSUPPORT=", {d, with_crypto_hash}"; CRYPTOHASHSUPPORT_EDOC=", {with_crypto_hash, true}"; CRYPTOHASHSUPPORT_DIALYZER=" -Dwith_crypto_hash"; AC_MSG_NOTICE([crypto:hash/2 is available and usable])],
-       [CRYPTOHASHSUPPORT=""; CRYPTOHASHSUPPORT_EDOC=""; CRYPTOHASHSUPPORT_DIALYZER=""; AC_MSG_NOTICE([crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1])])
+crypto_hash=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [[erlang:function_exported(crypto,hash,2)]]), erlang:halt().' | tail -1`
+AS_IF([test "${crypto_hash}" = "true"],
+      [CRYPTOHASHSUPPORT=", {d, with_crypto_hash}"; CRYPTOHASHSUPPORT_EDOC=", {with_crypto_hash, true}"; CRYPTOHASHSUPPORT_DIALYZER=" -Dwith_crypto_hash"; AC_MSG_NOTICE([crypto:hash/2 is available and usable])],
+      [CRYPTOHASHSUPPORT=""; CRYPTOHASHSUPPORT_EDOC=""; CRYPTOHASHSUPPORT_DIALYZER=""; AC_MSG_NOTICE([crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1])])
 
 AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::{ok, arity()}).], [ok])],
        [AC_MSG_NOTICE([arity() is available])],
        [AC_MSG_FAILURE([the type arity() is not available; you are probably using Erlang < R13 which is not supported anymore])])
 
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([],
-        [ {ok, {_Module, [[{abstract_code, {_AbstVersion, AbstractCode}}]]}} =
-             beam_lib:chunks(code:where_is_file("erlang.beam"), [[abstract_code]]),
-          Res = lists:any(fun(X) ->
-            case X of
-              {attribute,_,type,{timestamp,_,_}} -> true;
-               _ -> false
-            end
-          end,
-          AbstractCode),
-          case Res of true -> ok; false -> halt(1) end])],
-       [HAVE_ERLANG_TIMESTAMP=", {d, have_erlang_timestamp}";
+erlang_timestamp_avail=`"${ERL}" -noshell -eval \
+  '{ok, {_Module, [[{abstract_code, {_AbstVersion, AbstractCode}}]]}} =
+       beam_lib:chunks(code:where_is_file("erlang.beam"), [[abstract_code]]),
+   Res = lists:any(fun({attribute,_,type,{timestamp,_,_}}) -> true;
+                      (_) -> false end, AbstractCode),
+   io:format("~p~n", [[Res]]), erlang:halt().' | tail -1`
+AS_IF([test "${erlang_timestamp_avail}" = "true"],
+      [HAVE_ERLANG_TIMESTAMP=", {d, have_erlang_timestamp}";
         AC_MSG_NOTICE([erlang:timestamp() type is available])],
-       [HAVE_ERLANG_TIMESTAMP="";
+      [HAVE_ERLANG_TIMESTAMP="";
         AC_MSG_NOTICE([the type erlang:timestamp() is not available])])
 
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([], [httpc:set_option(max_sessions, 1)])],
-       [AC_MSG_NOTICE([httpc is available])],
-       [AC_MSG_NOTICE([httpc unavailable, using wrapper module]);EMAKEFILECOMPILECOMPAT=["{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."]])
+httpc_avail=`"${ERL}" -noshell -eval 'io:format("~p~n", [[httpc:set_option(max_sessions, 1)]]), erlang:halt().' | tail -1`
+AS_IF([test "${httpc_avail}" = "ok"],
+      [AC_MSG_NOTICE([httpc is available])],
+      [AC_MSG_NOTICE([httpc unavailable, using wrapper module]);EMAKEFILECOMPILECOMPAT=["{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."]])
 
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-compile({parse_transform, ct_line}).], [ok])],
-       [CTLINESUPPORT=", {d, have_ctline_support}"; CTLINESUPPORT_EDOC=", {have_ctline_support, true}"; CTLINESUPPORT_DIALYZER=" -Dhave_ctline_support"; AC_MSG_NOTICE([ct_line is available])],
-       [CTLINESUPPORT=""; CTLINESUPPORT_EDOC=""; CTLINESUPPORT_DIALYZER=""; AC_MSG_NOTICE([ct_line is not available])])
+ct_line=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [[erlang:function_exported(ct_line,parse_transform,2)]]), erlang:halt().' | tail -1`
+AS_IF([test "${ct_line}" = "true"],
+      [CTLINESUPPORT=", {d, have_ctline_support}"; CTLINESUPPORT_EDOC=", {have_ctline_support, true}"; CTLINESUPPORT_DIALYZER=" -Dhave_ctline_support"; AC_MSG_NOTICE([ct_line is available])],
+      [CTLINESUPPORT=""; CTLINESUPPORT_EDOC=""; CTLINESUPPORT_DIALYZER=""; AC_MSG_NOTICE([ct_line is not available])])
 
-$ERL -noshell -s ct_run script_start -s erlang halt --help | grep "ct_hooks" 2>/dev/null 1>/dev/null
+"${ERL}" -noshell -s ct_run script_start -s erlang halt --help | grep "ct_hooks" 2>/dev/null 1>/dev/null
 AS_IF(
        [test $? -eq 0 ],
        [CTHOOKS_FLAGS="-ct_hooks scalaris_cth"; CTHOOKS_EMAKEFILE=", {d, have_cthooks_support}"; CTHOOKS_EDOC=", {have_cthooks_support, true}"; CTHOOKS_DIALYZER=" -Dhave_cthooks_support"; AC_MSG_NOTICE([ct_hooks is available])],
