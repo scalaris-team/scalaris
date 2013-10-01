@@ -89,45 +89,11 @@ unittest_create_state(Neighbors) ->
 handle_custom_message({rm_trigger},
    {Neighborhood, RandViewSize, _Interval, TriggerState, Cache, Churn}) ->
     NewTriggerState = trigger:next(TriggerState),
-    handle_custom_message({rm_trigger_action}, {Neighborhood, RandViewSize, base_interval,
-                                                NewTriggerState, Cache, Churn});
+    rm_trigger_action({Neighborhood, RandViewSize, base_interval,
+                       NewTriggerState, Cache, Churn});
 
-handle_custom_message({rm_trigger_action},
-   {Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
-    % Trigger an update of the Random view
-    % Test for being alone:
-    case nodelist:has_real_pred(Neighborhood) andalso
-             nodelist:has_real_succ(Neighborhood) of
-        false -> % our node is the only node in the system
-            % no need to set a new trigger - we will be actively called by
-            % any new node and set the trigger then (see handling of
-            % notify_new_succ and notify_new_pred)
-            {{unknown}, State};
-        _ -> % there is another node in the system
-            RndView = get_RndView(RandViewSize, Cache),
-            %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
-            {Pred, Succ} = get_safe_pred_succ(Neighborhood, RndView),
-            %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
-            RequestPredsMinCount =
-                case nodelist:has_real_pred(Neighborhood) of
-                    true -> get_pred_list_length() - length(nodelist:preds(Neighborhood));
-                    _    -> get_pred_list_length()
-                end,
-            RequestSuccsMinCount =
-                case nodelist:has_real_succ(Neighborhood) of
-                    true -> get_succ_list_length() - length(nodelist:succs(Neighborhood));
-                    _    -> get_succ_list_length()
-                end,
-            % send succ and pred our known nodes and request their nodes
-            Message = {rm, buffer, Neighborhood, RequestPredsMinCount, RequestSuccsMinCount},
-            comm:send(node:pidX(Succ), Message, ?SEND_OPTIONS),
-            case Pred =/= Succ of
-                true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
-                _    -> ok
-            end,
-            {{unknown}, {Neighborhood, RandViewSize, Interval,
-                         TriggerState, Cache, Churn}}
-    end;
+handle_custom_message({rm_trigger_action}, State) ->
+    rm_trigger_action(State);
 
 % got empty cyclon cache
 handle_custom_message({rm, {cy_cache, []}},
@@ -213,6 +179,44 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
 
 handle_custom_message(_, _State) -> unknown_event.
 
+-spec rm_trigger_action(State::state_t())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+rm_trigger_action({Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn} = State) ->
+    % Trigger an update of the Random view
+    % Test for being alone:
+    case nodelist:has_real_pred(Neighborhood) andalso
+             nodelist:has_real_succ(Neighborhood) of
+        false -> % our node is the only node in the system
+            % no need to set a new trigger - we will be actively called by
+            % any new node and set the trigger then (see handling of
+            % notify_new_succ and notify_new_pred)
+            {{unknown}, State};
+        _ -> % there is another node in the system
+            RndView = get_RndView(RandViewSize, Cache),
+            %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
+            {Pred, Succ} = get_safe_pred_succ(Neighborhood, RndView),
+            %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
+            RequestPredsMinCount =
+                case nodelist:has_real_pred(Neighborhood) of
+                    true -> get_pred_list_length() - length(nodelist:preds(Neighborhood));
+                    _    -> get_pred_list_length()
+                end,
+            RequestSuccsMinCount =
+                case nodelist:has_real_succ(Neighborhood) of
+                    true -> get_succ_list_length() - length(nodelist:succs(Neighborhood));
+                    _    -> get_succ_list_length()
+                end,
+            % send succ and pred our known nodes and request their nodes
+            Message = {rm, buffer, Neighborhood, RequestPredsMinCount, RequestSuccsMinCount},
+            comm:send(node:pidX(Succ), Message, ?SEND_OPTIONS),
+            case Pred =/= Succ of
+                true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
+                _    -> ok
+            end,
+            {{unknown}, {Neighborhood, RandViewSize, Interval,
+                         TriggerState, Cache, Churn}}
+    end.
+
 -spec new_pred(State::state(), NewPred::node:node_type()) ->
           {ChangeReason::rm_loop:reason(), state()}.
 new_pred(State, NewPred) ->
@@ -269,8 +273,8 @@ remove_succ(State, OldSucc, SuccsSucc) ->
 update_node({Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}, NewMe) ->
     NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
     % inform neighbors
-    handle_custom_message({rm_trigger_action}, {NewNeighborhood, RandViewSize, 
-                                                Interval, TriggerState, Cache, Churn}).
+    rm_trigger_action({NewNeighborhood, RandViewSize, Interval,
+                       TriggerState, Cache, Churn}).
 
 
 -spec leave(State::state()) -> ok.
@@ -437,7 +441,7 @@ update_nodes({OldNeighborhood, RandViewSize, _Interval, TriggerState, OldCache, 
     NewState = {NewNeighborhood, NewRandViewSize, NewInterval, TriggerState, NewCache, NewChurn},
     case nodelist:pred(OldNeighborhood) =/= nodelist:pred(NewNeighborhood) orelse
         nodelist:succ(OldNeighborhood) =/= nodelist:succ(NewNeighborhood) of
-        true -> element(2, handle_custom_message({rm_trigger_action}, NewState));
+        true -> element(2, rm_trigger_action(NewState));
         _    -> NewState
     end.
 
