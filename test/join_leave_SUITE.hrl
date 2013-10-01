@@ -249,6 +249,7 @@ add_x_rm_y_load_test(X, Y, StartOnlyAdded) ->
 
 -spec prop_join_at(FirstId::?RT:key(), SecondId::?RT:key(), Incremental::boolean()) -> true.
 prop_join_at(FirstId, SecondId, Incremental) ->
+    OldProcesses = unittest_helper:get_processes(),
     BenchSlaves = 2, BenchRuns = 50,
     RandomKeys = [randoms:getRandomString() || _ <- lists:seq(1,100)],
     % note: there may be hash collisions -> count the number of unique DB entries!
@@ -278,6 +279,7 @@ prop_join_at(FirstId, SecondId, Incremental) ->
     unittest_helper:check_ring_load(ExpLoad + BenchSlaves * 4),
     unittest_helper:check_ring_data(),
     unittest_helper:stop_ring(),
+    unittest_helper:kill_new_processes(OldProcesses),
     true.
 
 tester_join_at(Config) ->
