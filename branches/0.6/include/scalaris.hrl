@@ -184,5 +184,13 @@
                           _ -> B
                       end).
 
+-ifdef(with_crypto_hash).
+-define(CRYPTO_MD5(V), crypto:hash(md5, V)).
+-define(CRYPTO_SHA(V), crypto:hash(sha, V)).
+-else.
+-define(CRYPTO_MD5(V), crypto:md5(V)).
+-define(CRYPTO_SHA(V), crypto:sha(V)).
+-endif.
+
 -include("types.hrl").
 -include("atom_ext.hrl").
