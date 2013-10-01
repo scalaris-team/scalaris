@@ -24,6 +24,7 @@
 -compile(export_all).
 
 -define(TEST_DB, db_ets).
+-define(CLOSE, close).
 
 -include("db_backend_SUITE.hrl").
 

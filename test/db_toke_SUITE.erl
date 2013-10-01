@@ -24,6 +24,7 @@
 -compile(export_all).
 
 -define(TEST_DB, db_toke).
+-define(CLOSE, close_and_delete).
 -define(EQ, =:=).
 
 -include("db_backend_SUITE.hrl").
