@@ -81,6 +81,7 @@ init(Trigger, BaseInterval, MinInterval, MaxInterval, MsgTag)
 %%      its initialization. Any previous trigger will be canceled!
 -spec now(state()) -> state().
 now({Trigger, TriggerState}) ->
+    ?ASSERT(erlang:get(trace_mpath) =:= undefined),
     {Trigger, Trigger:now(TriggerState)}.
 
 %% @doc Sets the trigger to send its message after BaseInterval
@@ -93,6 +94,7 @@ next(State) ->
 %%      of milliseconds. Any previous trigger will be canceled!
 -spec next(state(), IntervalTag::interval()) -> state().
 next({Trigger, TriggerState}, IntervalTag) ->
+    ?ASSERT(erlang:get(trace_mpath) =:= undefined),
     {Trigger, Trigger:next(TriggerState, IntervalTag)}.
 
 %% @doc Stops the trigger until next or now are called again.
