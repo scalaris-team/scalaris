@@ -47,9 +47,11 @@ test_cases() -> [].
 groups() ->
     MoveConfig = {move_config, move_config_parameters()},
     MoveConfigInc = {move_config, move_config_parameters_incremental()},
+    MoveConfigInc2 = {move_config, move_config_parameters_incremental2()},
     GroupOptions = [sequence, {repeat, 1}],
     Config = [MoveConfig | GroupOptions],
     ConfigInc = [MoveConfigInc | GroupOptions],
+    ConfigInc2 = [MoveConfigInc2 | GroupOptions],
     SendToPredTestCases =
         [
          symm4_slide_succ_rcv_load,
@@ -79,7 +81,7 @@ groups() ->
       {send_to_succ, Config, SendToSuccTestCases},
       {send_to_succ_incremental, ConfigInc, SendToSuccTestCases},
       {send_to_both, Config, SendToBothTestCases},
-      {send_to_both_incremental, ConfigInc, SendToBothTestCases}
+      {send_to_both_incremental, ConfigInc2, SendToBothTestCases}
     ]
       ++
 %%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
@@ -139,6 +141,12 @@ move_config_parameters_incremental() ->
         [{move_use_incremental_slides, true},
          {move_max_transport_entries, 2},
          {move_send_msg_retry_delay, 0}].
+
+%% @doc Config like above but more entries are moved at once
+-spec move_config_parameters_incremental2() -> unittest_helper:kv_opts().
+move_config_parameters_incremental2() ->
+    move_config_parameters_incremental() ++
+        [{move_max_transport_entries, 10}].
 
 %% @doc Test slide with successor, receiving data from it (using api_tx in the bench server).
 symm4_slide_succ_rcv_load(_Config) ->
