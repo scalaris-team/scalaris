@@ -152,7 +152,7 @@ new(RT, RMState, DB) ->
 %%        <li>snapshot_state = snapshot algorithm state information</li>
 %%        <li>lease_list = the list of all leases</li>
 %%      </ul>
-%%      Beware of race conditions sing the neighborhood may have changed at
+%%      Beware of race conditions since the neighborhood may have changed at
 %%      the next call.
 -spec get(state(), rt) -> ?RT:external_rt();
          (state(), rt_size) -> non_neg_integer();
@@ -445,6 +445,7 @@ slide_get_data_start_record(State, MovingInterval) ->
            leases_1, leases_2, leases_3, leases_4]
          ),
 
+    %% snapshot state and db
     OldDB = get(T1State, db),
     MovingData = db_dht:get_entries(OldDB, MovingInterval),
     MovingSnapData =
