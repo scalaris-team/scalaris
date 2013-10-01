@@ -33,10 +33,10 @@
                         proto_sched:start_deliver();
                     stop ->
                         proto_sched:stop(),
-                        case pid_groups:find_a(proto_sched) of
-                            failed -> ok;
-                            _ -> ct:pal("Proto scheduler stats: ~.2p", proto_sched:get_infos()),
-                                 proto_sched:cleanup()
+                        case erlang:whereis(pid_groups) =:= undefined orelse pid_groups:find_a(proto_sched) =:= failed of
+                            true -> ok;
+                            false -> ct:pal("Proto scheduler stats: ~.2p", proto_sched:get_infos()),
+                                     proto_sched:cleanup()
                         end
                 end
         end()).
