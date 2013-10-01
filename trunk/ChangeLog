@@ -1,3 +1,75 @@
+Scalaris 0.6.1+svn - 
+============================================================
+
+Business Logic:
+
+- add an experimental Map-Reduce framework on top of Scalaris
+
+Scalaris 0.6.1 - 
+============================================================
+
+Packaging:
+
+- add ArchLinux ruby API packages
+
+API:
+
+- Java-API: add Maven build support
+
+Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                 and Contrail http://contrail-project.eu):
+
+- separate list counters from their list partitions for a better data layout
+- fix high memory use of the Scalaris import if the import is slow
+- use tomcat 7.0.42
+
+Business Logic:
+
+- rrepair: reduce overhead of ART reconciliation
+- rrepair: allow resolving of multiple merkle node leaves with a single
+           resolve request
+- rrepair: don't create resolve requests for empty intervals
+- rrepair: reduce overhead of update_key_entry requests (use a single request
+           with all the data instead of one request for each item)
+- rrepair: allow arbitrary intervals in interval_upd and interval_upd_send
+           resolve requests again
+- rrepair: when hashing merkle_tree/ART children, also include the represented
+           interval (fixes indistinguishable empty leaf nodes in ART)
+- tx_tm_rtm: re-enable takeover by rtms on tm crash
+- rt_chord: only re-build the RT if the pred or succ processes change or the
+            own new node ID is not between the new pred and succ any more
+
+Infrastructure:
+
+- fd: get rid of annoying, wrongly raised log warnings
+- RM: provide a more generic Reason for RM subscriptions
+- RM: remove trigger infections
+- RT: don't trigger an update when a slide finishes
+
+Tests:
+
+- add protocol scheduler tests for slide, join and leave
+
+Documentation:
+
+- user-dev-guide: add section on scalarisctl checkinstallation
+- user-dev-guide: clarify the section about how to set up Scalaris
+
+Tools:
+
+- proto scheduler: continue in case of send errors
+- top: improve process messages output
+
+Bugs:
+
+- tx_tm_rtm: fix wrong asserts
+- fix node resposibility check not always including message forward and
+  db_range intervals
+- tx_tp: add missing snapshot number in tp_do_commit_abort message
+- bulkowner: respect the nodes' DB ranges and forward requests for
+             non-responsible ranges
+- fix some more (less severe) bugs
+
 Scalaris 0.6.0 (codename "Conus scalaris") - August 19, 2013
 ============================================================
 
