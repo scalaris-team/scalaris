@@ -818,8 +818,15 @@ test_slide_conflict(_Config) ->
         fun (Result1, Result2) ->
                 unittest_helper:check_ring_load(440),
                 unittest_helper:check_ring_data(),
-                %% at most one slide may succeed
-                ?assert(not(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok))
+                %% Outcome: at most one slide may succeed.
+                %% Currently, breakpoints can't be used with the proto scheduler. This possibly
+                %% can lead to a sequential processing of the slides, i.e. first slide finishes
+                %% before the second slide starts. Hence, for now, we need to also allow both
+                %% slides to return OK.
+                %% TODO: ?assert(not(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok))
+                Vals = [ok, ongoing_slide, target_id_not_in_range, wrong_pred_succ_node],
+                ?assert(lists:member(element(4, Result1), Vals)),
+                ?assert(lists:member(element(4, Result2), Vals))
         end,
     Actions = [
                {
