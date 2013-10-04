@@ -60,6 +60,14 @@ public class CircularByteArrayOutputStream extends OutputStream {
     }
 
     /**
+     * Clears all contents of the buffer.
+     */
+    public synchronized void clear() {
+        pos = 0;
+        filled = false;
+    }
+
+    /**
      * Creates a newly allocated byte array. Its size is the current
      * size of this output stream and the valid contents of the buffer
      * have been copied into it.
