@@ -269,12 +269,15 @@ stop_ring(Pid) ->
 
 -spec stop_pid_groups() -> ok.
 stop_pid_groups() ->
-    PidGroups = whereis(pid_groups),
-    gen_component:kill(PidGroups),
-    util:wait_for_table_to_disappear(PidGroups, pid_groups),
-    util:wait_for_table_to_disappear(PidGroups, pid_groups_hidden),
-    catch unregister(pid_groups),
-    ok.
+    case whereis(pid_groups) of
+        PidGroups when is_pid(PidGroups) ->
+            gen_component:kill(PidGroups),
+            util:wait_for_table_to_disappear(PidGroups, pid_groups),
+            util:wait_for_table_to_disappear(PidGroups, pid_groups_hidden),
+            catch unregister(pid_groups),
+            ok;
+        _ -> ok
+    end.
 
 
 -spec wait_for_stable_ring() -> ok.
