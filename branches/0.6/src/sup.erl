@@ -187,7 +187,7 @@ add_child(Prefix, SupRef, Child) ->
                 Error ->
                     progress("~nFailed to start ~p reason ~p~n", [Child, Error]),
                     progress("Supervisor ~p has childs: ~p~n",
-                              [SupRef, supervisor:which_children(SupRef)]),
+                              [SupRef, sup_which_children(SupRef)]),
                     Error
             end,
             Res;
@@ -197,7 +197,7 @@ add_child(Prefix, SupRef, Child) ->
     end.
 
 show_started_childs(Prefix, SupRef) ->
-    Childs = supervisor:which_children(SupRef),
+    Childs = sup_which_children(SupRef),
     show_childs(Prefix, Childs).
 
 show_childs(_Prefix, []) -> ok;
@@ -284,7 +284,11 @@ sup_terminate(SupPid) ->
     sup_terminate_childs(SupPid),
     case is_pid(SupPid) of
         true -> exit(SupPid, kill);
-        false -> exit(whereis(SupPid), kill)
+        false ->
+            case whereis(SupPid) of
+                SupPid2 when is_pid(SupPid2) -> exit(SupPid2, kill);
+                _ -> ok
+            end
     end,
     util:wait_for_process_to_die(SupPid),
     ok.
@@ -302,7 +306,7 @@ sup_terminate_childs(SupPid) ->
 %%      an appropriate breakpoint.
 -spec sup_pause_childs(Supervisor::pid() | atom()) -> ok.
 sup_pause_childs(SupPid) ->
-    ChildSpecs = supervisor:which_children(SupPid),
+    ChildSpecs = sup_which_children(SupPid),
     Self = self(),
     _ = [ begin
               case Type of
@@ -322,7 +326,7 @@ sup_pause_childs(SupPid) ->
 %%      have been paused by sup_pause_childs/1.
 -spec sup_kill_childs(Supervisor::pid() | atom()) -> ok.
 sup_kill_childs(SupPid) ->
-    ChildSpecs = supervisor:which_children(SupPid),
+    ChildSpecs = sup_which_children(SupPid),
     _ = [ try
               case Type of
                   supervisor -> sup_kill_childs(Pid);
@@ -345,10 +349,22 @@ sup_kill_childs(SupPid) ->
                   Pid =/= undefined, is_process_alive(Pid) ],
     ok.
 
--spec sup_get_all_children(Supervisor::pid()) -> [pid()].
+-spec sup_get_all_children(Supervisor::pid() | atom()) -> [pid()].
 sup_get_all_children(Supervisor) ->
-    AllChilds = [X || X = {_, Pid, _, _} <- supervisor:which_children(Supervisor),
+    AllChilds = [X || X = {_, Pid, _, _} <- sup_which_children(Supervisor),
                       Pid =/= undefined],
     WorkerChilds = [Pid ||  {_Id, Pid, worker, _Modules} <- AllChilds],
     SupChilds = [Pid || {_Id, Pid, supervisor, _Modules} <- AllChilds],
     lists:flatten([WorkerChilds | [sup_get_all_children(S) || S <- SupChilds]]).
+
+%% @doc Hardened version of supervisor:which_children/1 which returns an empty
+%%      list of childs if the supervisor has been killed, e.g. by another
+%%      process.
+-spec sup_which_children(Supervisor::pid() | atom()) ->
+          [{Id::term(), Pid::pid | undefined, Type::worker | supervisor,
+            Modules::[module()] | dynamic}].
+sup_which_children(Supervisor) ->
+    try supervisor:which_children(Supervisor)
+    catch exit:{killed, _} -> [];
+          exit:{noproc, _} -> []
+    end.
