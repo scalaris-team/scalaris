@@ -228,7 +228,7 @@ process_move_msg({move, {send_error, Target, Message, _Reason}, {timeouts, Timeo
     case NewTimeouts =< MaxRetries of
         true -> send_no_slide(Target, Message, NewTimeouts);
         _    -> log:log(warn,
-                        "[ dht_node_move ~.0p ] giving up to send ~.0p to ~p (~p unsuccessful retries)",
+                        "[ dht_node_move ~.0p ] giving up to send ~.0p to ~.0p (~p unsuccessful retries)",
                         [comm:this(), Message, Target, NewTimeouts])
     end,
     MyState;
