@@ -73,7 +73,11 @@ start_link() ->
             % now register log4erl error logger:
             log4erl:error_logger_handler(),
             %% check whether erlang error_logger only reports to log4erl
-            [error_logger_log4erl_h] = gen_event:which_handlers(error_logger),
+            case gen_event:which_handlers(error_logger) of
+                [error_logger_log4erl_h] -> ok;
+                Loggers -> log(info, "additional error loggers installed: ~.0p",
+                               [[L || L <- Loggers, L =/= error_logger_log4erl_h]])
+            end,
             ok
     end,
     Link.
