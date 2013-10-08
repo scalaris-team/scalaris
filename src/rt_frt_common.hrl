@@ -478,9 +478,9 @@ handle_custom_message({rt_get_node, From}, State) ->
 
 handle_custom_message({rt_learn_node, NewNode}, State) ->
     OldRT = rt_loop:get_rt(State),
-    NewRT = case ?RT:rt_lookup_node(node:id(NewNode), OldRT) of
-        none -> RT = ?RT:add_normal_entry(NewNode, OldRT),
-                ?RT:check(OldRT, RT, rt_loop:get_neighb(State), true),
+    NewRT = case rt_lookup_node(node:id(NewNode), OldRT) of
+        none -> RT = add_normal_entry(NewNode, OldRT),
+                check(OldRT, RT, rt_loop:get_neighb(State), true),
                 RT
             ;
         {value, _RTEntry} -> OldRT
@@ -620,14 +620,13 @@ export_rt_to_dht_node_helper(RT) ->
     % From each rt_entry, we extract only the field "node" and add it to the tree
     % under the node id. The source node is filtered.
     {RT#rt_t.nodes_in_ring, util:gb_trees_foldl(
-    util:gb_trees_foldl(
-        fun(_K, V, Acc) ->
-                case entry_type(V) of
-                    source -> Acc;
-                    _Else -> Node = rt_entry_node(V),
-                        gb_trees:enter(node:id(Node), Node, Acc)
-                end
-                end, gb_trees:empty(),get_rt_tree(RT)))}.
+            fun(_K, V, Acc) ->
+                    case entry_type(V) of
+                        source -> Acc;
+                        _Else -> Node = rt_entry_node(V),
+                            gb_trees:enter(node:id(Node), Node, Acc)
+                    end
+            end, gb_trees:empty(),get_rt_tree(RT))}.
 
 -spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
 export_rt_to_dht_node(RT, _Neighbors) ->
@@ -1124,27 +1123,32 @@ check_rt_integrity(#rt_t{} = RT) ->
     {'$wrapped', comm:mypid(), comm:message()} | comm:message().
 wrap_message(_Key, Msg, State, 0) -> {'$wrapped', dht_node_state:get(State, node), Msg};
 wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
-    MyId = dht_node_state:get(State, node_id),
-    SenderId = node:id(Issuer),
-    SenderPid = node:pidX(Issuer),
-    NextHop = next_hop_(State, Key),
-    SendMsg = case external_rt_get_ring_size(dht_node_state:get(State, rt)) of
-        unknown -> true;
-        RingSize ->
-            FirstDist = get_range(SenderId, MyId),
-            TotalDist = get_range(SenderId, node:id(NextHop)),
-            % reduction ratio > optimal/convergent ratio?
-            1 - FirstDist / TotalDist >
-                case config:read(rt_frt_reduction_ratio_strategy) of
-                    best_rt_reduction_ratio -> best_rt_reduction_ratio(RingSize);
-                    convergent_rt_reduction_ratio -> convergent_rt_reduction_ratio(RingSize)
-                end
-    end,
+    %% The reduction ratio is only useful if this is not the last hop
+    case intervals:in(Key, nodelist:succ_range(dht_node_state:get(State, neighbors))) of
+        true -> ok;
+        false ->
+            MyId = dht_node_state:get(State, node_id),
+            SenderId = node:id(Issuer),
+            SenderPid = node:pidX(Issuer),
+            NextHop = next_hop_(State, Key),
+            SendMsg = case external_rt_get_ring_size(dht_node_state:get(State, rt)) of
+                unknown -> true;
+                RingSize ->
+                    FirstDist = get_range(SenderId, MyId),
+                    TotalDist = get_range(SenderId, node:id(NextHop)),
+                    % reduction ratio > optimal/convergent ratio?
+                    1 - FirstDist / TotalDist >
+                    case config:read(rt_frt_reduction_ratio_strategy) of
+                        best_rt_reduction_ratio -> best_rt_reduction_ratio(RingSize);
+                        convergent_rt_reduction_ratio -> convergent_rt_reduction_ratio(RingSize)
+                    end
+            end,
 
-    case SendMsg of
-        true -> comm:send(SenderPid, {?send_to_group_member, routing_table,
-                                      {rt_learn_node, NextHop}});
-        false -> ok
+            case SendMsg of
+                true -> comm:send(SenderPid, {?send_to_group_member, routing_table,
+                                              {rt_learn_node, NextHop}});
+                false -> ok
+            end
     end,
 
     learn_on_forward(Issuer),
