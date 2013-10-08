@@ -112,13 +112,15 @@
 -export([start_link/1, init/1]).
 -export([on/2]). %% internal message handler as gen_component
 
+-type state()        :: [{trace_id(), state_t()}].
+
 -type logger()       :: {proto_sched, comm:mypid()}.
 -type anypid()       :: pid() | comm:mypid().
 -type trace_id()     :: atom().
 -type send_event()   :: {log_send, Time::'_', trace_id(),
                          Source::anypid(), Dest::anypid(), comm:message(),
                          local | global}.
--type trace()        :: [send_event()].
+
 -type passed_state() :: {trace_id(), logger()}.
 -type gc_mpath_msg() :: {'$gen_component', trace_mpath, passed_state(),
                          Src::anypid(), Dest::anypid(), comm:message()}.
@@ -227,8 +229,6 @@ send_log_msg(RestoreThis, LoggerPid, Msg) ->
     comm:send(LoggerPid, Msg),
     own_passed_state_put(RestoreThis).
 
-
--type state() :: [{trace_id(), trace()}].
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
