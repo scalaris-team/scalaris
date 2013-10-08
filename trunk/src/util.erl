@@ -809,24 +809,30 @@ smerge2_helper([], L2, _Lte, _EqSelect, _FirstExist, SecondExist, ML) ->
 %% @doc Try to check whether common-test is running.
 -spec is_unittest() -> boolean().
 is_unittest() ->
-    Pid = self(),
-    % old erlang versions, e.g. R14B04, may not clean up old DOWN messages in
-    % demonitor and thus pollute the message queue and cause 'unknown message'
-    % warnings in gen_components
-    % -> spawn the ct:get_status() call into a separate process
-    % Note: no comm:send_local and no SCALARIS_RECV needed (we are not
-    % interested in tracing this)
-    spawn(fun () ->
-                  case catch ct:get_status() of
-                      no_tests_running -> Pid ! {is_unittest, false};
-                      {error, _} -> Pid ! {is_unittest, false};
-                      {'EXIT', {undef, _}} -> Pid ! {is_unittest, false};
-                      _ -> Pid ! {is_unittest, true}
-                  end
-          end),
-    receive
-        {is_unittest, Result} -> Result
-    end.
+    case erlang:get({util, is_unittest}) of
+        undefined ->
+            Pid = self(),
+            % old erlang versions, e.g. R14B04, may not clean up old DOWN messages in
+            % demonitor and thus pollute the message queue and cause 'unknown message'
+            % warnings in gen_components
+            % -> spawn the ct:get_status() call into a separate process
+            % Note: no comm:send_local and no SCALARIS_RECV needed (we are not
+            % interested in tracing this)
+            spawn(fun () ->
+                           case catch ct:get_status() of
+                               no_tests_running -> Pid ! {is_unittest, false};
+                               {error, _} -> Pid ! {is_unittest, false};
+                               {'EXIT', {undef, _}} -> Pid ! {is_unittest, false};
+                               _ -> Pid ! {is_unittest, true}
+                           end
+                  end),
+            receive
+                {is_unittest, Result} ->
+                    erlang:put({util, is_unittest}, Result),
+                    Result
+            end;
+        Value -> Value
+  end.
 
 -spec make_filename([byte()]) -> string().
 make_filename(Name) ->
