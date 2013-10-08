@@ -113,8 +113,6 @@
 -export([start_link/1, init/1]).
 -export([on/2]). %% internal message handler as gen_component
 
--type state()        :: [{trace_id(), state_t()}].
-
 -type logger()       :: {proto_sched, comm:mypid()}.
 -type anypid()       :: pid() | comm:mypid().
 -type trace_id()     :: atom().
@@ -155,6 +153,7 @@
         }).
 
 -type state_t() :: #state{}.
+-type state()   :: [{trace_id(), state_t()}].
 
 -spec start() -> ok.
 start() -> start(default).
