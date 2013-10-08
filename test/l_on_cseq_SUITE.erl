@@ -71,7 +71,7 @@ all() ->
      %{group, gc_tests}
      ].
 
-suite() -> [ {timetrap, {seconds, 40}} ].
+suite() -> [ {timetrap, {seconds, 60}} ].
 
 group(tester_tests) ->
     [{timetrap, {seconds, 400}}];
