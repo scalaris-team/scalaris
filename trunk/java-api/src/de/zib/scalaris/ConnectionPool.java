@@ -106,7 +106,9 @@ public class ConnectionPool {
         Connection conn;
         while ((conn = getConnection()) == null) {
             try {
-                Thread.currentThread().wait(timeout);
+                synchronized (this) {
+                    wait(timeout);
+                }
             } catch (final InterruptedException e) {
             }
             final long timeAtEnd = System.currentTimeMillis();
@@ -127,7 +129,9 @@ public class ConnectionPool {
         availableConns.add(conn);
         --checkedOut;
         // need to notify all waiting threads so they do not exceed their timeouts
-        notifyAll();
+        synchronized (this) {
+            notifyAll();
+        }
     }
 
     /**
