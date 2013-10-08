@@ -102,6 +102,7 @@
 -export([start/0, start/1, start/2, stop/0]).
 -export([start_deliver/0, start_deliver/1]).
 -export([get_infos/0, get_infos/1]).
+-export([register_callback/1, register_callback/2]).
 -export([cleanup/0, cleanup/1]).
 
 %% report messages from other modules
@@ -135,6 +136,9 @@
 -type msg_queues()       :: [queue_key()].
 -type msg_delay_queues() :: [delay_queue_key()].
 
+-type callback_on_deliver() ::
+        fun((Src::comm:mypid(), Dest::comm:mypid(), Msg::comm:message()) -> ok).
+
 -record(state,
         {msg_queues              = ?required(state, msg_queues)
                                        :: msg_queues(),
@@ -145,10 +149,13 @@
          passed_state            = ?required(state, passed_state)
                                        :: none | passed_state(),
          num_possible_executions = ?required(state, passed_state)
-                                       :: pos_integer()
+                                       :: pos_integer(),
+         callback_on_deliver     = ?required(state, callback_on_deliver)
+                                       :: callback_on_deliver()
         }).
 
 -type state_t() :: #state{}.
+
 -spec start() -> ok.
 start() -> start(default).
 
@@ -183,6 +190,24 @@ stop() ->
     %% stop sending epidemic messages
     erlang:erase(trace_mpath),
     ok.
+
+-spec register_callback(CallbackFun::callback_on_deliver()) -> ok | failed.
+register_callback(CallbackFun) ->
+    register_callback(CallbackFun, default).
+
+-spec register_callback(CallbackFun::callback_on_deliver(), trace_id()) -> ok | failed.
+register_callback(CallbackFun, TraceId) ->
+    %% clear infection
+    PState = erlang:get(trace_mpath),
+    stop(),
+    %% register the callback function
+    LoggerPid = pid_groups:find_a(proto_sched),
+    comm:send_local(LoggerPid, {register_callback, CallbackFun, TraceId, comm:this()}),
+    %% restore infection
+    own_passed_state_put(PState),
+    receive
+        ?SCALARIS_RECV({register_callback_reply, Result}, Result)
+    end.
 
 -spec get_infos() -> [tuple()].
 get_infos() -> get_infos(default).
@@ -301,6 +326,10 @@ on({deliver, TraceId}, State) ->
                     PState = TraceEntry#state.passed_state,
                     InfectedMsg = epidemic_reply_msg(PState, From, To, Msg),
                     ?TRACE("delivering msg to execute: ~.0p~n", [InfectedMsg]),
+                    %% call the callback function (if any) before sending out the msg
+                    ?TRACE("executing callback function~n", []),
+                    CallbackFun = TraceEntry#state.callback_on_deliver,
+                    CallbackFun(From, To, Msg),
                     %% Send infected message with a shepherd. In case of send errors,
                     %% we will be informed by a {send_error, Pid, Msg, Reason} message.
                     comm:send(comm:make_global(To), InfectedMsg, [{shepherd, self()}]),
@@ -317,6 +346,17 @@ on({send_error, _Pid, Msg, _Reason} = _ShepherdMsg, State) ->
     TraceId = get_trace_id(get_passed_state(Msg)),
     ?TRACE("send error for trace id ~p: ~p calling on_handler_done~n", [TraceId, _ShepherdMsg]),
     gen_component:post_op(State, {on_handler_done, TraceId});
+
+on({register_callback, CallbackFun, TraceId, Client}, State) ->
+    case lists:keyfind(TraceId, 1, State) of
+        false ->
+            comm:send(Client, {register_callback_reply, failed}),
+            State;
+        {TraceId, TraceEntry} ->
+            comm:send(Client, {register_callback_reply, ok}),
+            NewEntry = TraceEntry#state{callback_on_deliver = CallbackFun},
+            lists:keyreplace(TraceId, 1, State, {TraceId, NewEntry})
+    end;
 
 on({get_infos, Client, TraceId}, State) ->
     case lists:keyfind(TraceId, 1, State) of
@@ -356,7 +396,8 @@ new(TraceId) ->
             msg_delay_queues = [],
             status = stopped,
             passed_state = passed_state_new(TraceId, {proto_sched, Logger}),
-            num_possible_executions = 1
+            num_possible_executions = 1,
+            callback_on_deliver = fun(_From, _To, _Msg) -> ok end
           }.
 
 %% @doc Sends out all messages remaining in queues
