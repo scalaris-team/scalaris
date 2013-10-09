@@ -40,31 +40,43 @@ allowed_nodes(RT) ->
 
     % If $E_G = \emptyset$, we know that we can allow all nodes to be filtered.
     % Otherwise, check if $E_\text{leap} \neq \emptyset$.
-    OnlyNonGroupMembers = case E_G of
-        [] -> true;
+    {OnlyNonGroupMembers, {E_a, E_b}} = case E_G of
+        [] -> {true, ignore, ignore};
         [First|_] ->
+            Predecessor = predecessor_node(RT, Source),
             FirstDist = get_range(SourceId, rt_entry_id(First)),
 
-            % Compute the distance to the group $d(s, e_\alpha)$
-            E_alphaDist = lists:foldl(
-                fun (Node, Min) ->
+            % Compute $e_\alpha$, $e_\beta$ and the respective distances
+            {{E_alpha, E_alphaDist}, {E_beta, _E_betaDist}} = lists:foldl(
+                fun (Node, {{MinNode, MinDist}, {MaxNode, MaxDist}}) ->
                         NodeDist = get_range(SourceId, rt_entry_id(Node)),
-                        erlang:min(Min, NodeDist)
-                end, FirstDist, E_G),
-
-            Predecessor = predecessor_node(RT, Source),
+                        NewE_alpha = case erlang:min(MinDist, NodeDist) of
+                            MinDist -> {MinNode, MinDist};
+                            _ -> {Node, NodeDist}
+                        end,
+                        NewE_beta = case erlang:max(MaxDist, NodeDist) of
+                            MinDist -> {MaxNode, MaxDist};
+                            _ -> {Node, NodeDist}
+                        end,
+                        {NewE_alpha, NewE_beta}
+                end, {{First, FirstDist}, {First, FirstDist}}, E_G),
 
             % Is there any non-group entry $n$ such that $d(s, e_\alpha) \leq d(s, n)$ and
             % $n \neq s.pred$? The following line basically computes $E_leap$ and checks
             % if that set is empty.
-            lists:any(fun(P) when P =:= Predecessor -> false;
+            {lists:any(fun(P) when P =:= Predecessor -> false;
                          (N) -> get_range(SourceId, rt_entry_id(N)) >= E_alphaDist andalso
                             not is_sticky(N) andalso not is_source(N)
-                      end, E_NG)
+                      end, E_NG),
+                  {E_alpha, E_beta}}
     end,
 
-    if OnlyNonGroupMembers -> [N || N <- E_NG, not is_sticky(N) and not is_source(N)];
-       true -> [N || N <- Nodes, not is_sticky(N) and not is_source(N)]
+    if OnlyNonGroupMembers -> [N || N <- E_NG, not is_sticky(N),
+                                               not is_source(N)];
+       not OnlyNonGroupMembers andalso E_a =/= ignore andalso E_b =/= ignore ->
+           [N || N <- Nodes, not is_sticky(N), not is_source(N),
+                                               N =/= E_a,
+                                               N =/= E_b]
     end.
 
 -spec rt_entry_info(Node :: node:node_type(), Type :: entry_type(),
