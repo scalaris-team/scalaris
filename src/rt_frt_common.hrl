@@ -264,7 +264,7 @@ get_size_without_special_nodes(#rt_t{} = RT) ->
 %% @doc Returns the size of the routing table.
 -spec get_size(rt() | external_rt()) -> non_neg_integer().
 get_size(#rt_t{} = RT) -> gb_trees:size(get_rt_tree(RT));
-get_size(RT) -> external_rt_get_ring_size(RT). % size of external rt
+get_size(RT) -> external_rt_get_size(RT).
 %% userdevguide-end rt_frtchord:get_size
 
 %% userdevguide-begin rt_frtchord:n
@@ -590,8 +590,9 @@ next_hop_(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true -> nodelist:succ(Neighbors);
-        _ -> RT = external_rt_get_tree(dht_node_state:get(State, rt)),
-             RTSize = get_size(RT),
+        _ -> ExtRT = dht_node_state:get(State, rt),
+             RT = external_rt_get_tree(ExtRT),
+             RTSize = get_size(ExtRT),
              NodeRT = case util:gb_trees_largest_smaller_than(Id, RT) of
                  {value, _Key, N} -> N;
                  nil when RTSize =:= 0 -> nodelist:succ(Neighbors);
@@ -989,7 +990,7 @@ rt_set_nodes(#rt_t{source=undefined}, _) -> erlang:error(source_node_undefined);
 rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 
 % @doc Set the size estimate of the ring
--spec rt_set_ring_size(RT :: rt(), Size :: unknown | gossip_state:size()) -> rt().
+-spec rt_set_ring_size(RT :: rt_t(), Size :: unknown | gossip_state:size()) -> rt_t().
 rt_set_ring_size(RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
 
 % @doc Get the ring size estimate from the external routing table
@@ -1002,6 +1003,11 @@ external_rt_get_ring_size(RT) when element(1, RT) >= 0 orelse
 -spec external_rt_get_tree(RT :: external_rt()) -> gb_tree().
 external_rt_get_tree(RT) when is_tuple(RT) ->
     element(2, RT).
+
+% @doc Get the size of the external rt
+-spec external_rt_get_size(RT :: external_rt()) -> non_neg_integer().
+external_rt_get_size(RT) ->
+    gb_trees:size(external_rt_get_tree(RT)).
 
 %% Get the node with the given Id. This function will crash if the node doesn't exist.
 -spec rt_get_node(NodeId :: key(), RT :: rt()) -> rt_entry().
