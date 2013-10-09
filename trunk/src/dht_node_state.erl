@@ -78,8 +78,8 @@
 -type slide_delta() :: {{ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()]},
                         [{db_selector(), {Changed::db_prbr:db_as_list(),
                                           Deleted::[?RT:key()]}}],
-                        {MRJobId::nonempty_string(), {RoundNr::pos_integer(),
-                                                      [{string(), term()}]}}}.
+                        [{MRJobId::nonempty_string(), {RoundNr::pos_integer(),
+                                                       [{string(), term()}]}}]}.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),

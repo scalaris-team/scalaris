@@ -994,7 +994,7 @@ rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 rt_set_ring_size(RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
 
 % @doc Get the ring size estimate from the external routing table
--spec external_rt_get_ring_size(RT :: external_rt()) -> gossip:size() | unknown.
+-spec external_rt_get_ring_size(RT :: external_rt()) -> gossip_state:size() | unknown.
 external_rt_get_ring_size(RT) when element(1, RT) >= 0 orelse
                                    element(1, RT) == unknown ->
     element(1, RT).
