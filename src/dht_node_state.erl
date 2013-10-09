@@ -153,6 +153,9 @@ new(RT, RMState, DB) ->
 %%        <li>node_id = the ID of the own node (provided for convenience),</li>
 %%        <li>my_range = the range of the own node,</li>
 %%        <li>succ_range = the range of the successor,</li>
+%%        <li>db_range = temporarily added range (during slides),</li>
+%%        <li>msg_fwd = temporarily removed range and their current destination (during slides),</li>
+%%        <li>full_range = the real responsibility range of the own node (see is_db_responsible/2),</li>
 %%        <li>join_time = the time the node was created, i.e. joined the system,</li>
 %%        <li>db = DB storing the items,</li>
 %%        <li>tx_tp_db = transaction participant DB,</li>
@@ -182,6 +185,7 @@ new(RT, RMState, DB) ->
          (state(), my_range) -> intervals:interval();
          (state(), db_range) -> [{intervals:interval(), slide_op:id()}];
          (state(), succ_range) -> intervals:interval();
+         (state(), full_range) -> intervals:interval();
          (state(), join_time) -> erlang_timestamp();
          (state(), db) -> db_dht:db();
          (state(), tx_tp_db) -> any();
@@ -210,7 +214,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState,
            txid_db1=TxIdDB1, txid_db2=TxIdDB2, txid_db3=TxIdDB3, txid_db4=TxIdDB4,
            lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4, lease_list=LeaseList,
-		   snapshot_state=SnapState, mr_state=MRState}, Key) ->
+		   snapshot_state=SnapState, mr_state=MRState} = State, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -218,6 +222,14 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         my_range     -> Neighbors = rm_loop:get_neighbors(RMState),
                         nodelist:node_range(Neighbors);
         db_range     -> DBRange;
+        full_range   -> Range1 = lists:foldl(fun({I, _SlideId}, AccI) ->
+                                                     intervals:union(AccI, I)
+                                             end, get(State, my_range),
+                                             DBRange),
+                        MsgFwd = get(State, msg_fwd),
+                        lists:foldl(fun({FwdInt, _FwdPid}, AccI) ->
+                                            intervals:minus(AccI, FwdInt)
+                                    end, Range1, MsgFwd);
         succ_range   -> Neighbors = rm_loop:get_neighbors(RMState),
                         nodelist:succ_range(Neighbors);
         msg_fwd      -> MsgFwdPred = slide_op:get_msg_fwd(SlidePred),
