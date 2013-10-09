@@ -313,7 +313,8 @@ on({get_rrds, KeyList, SourcePid},
     comm:send(SourcePid, {get_rrds_response, MyData}),
     State;
 
-on({web_debug_info, Requestor} = _Msg, {AllNodes, Leader} = State) ->
+on({web_debug_info, Requestor} = _Msg,
+   {AllNodes, Leader, _BenchPid, _IgnBenchT} = State) ->
     ?TRACE1(_Msg, _State),
     KeyValueList =
         [{"all nodes", webhelpers:safe_html_string("~p", [AllNodes])},
