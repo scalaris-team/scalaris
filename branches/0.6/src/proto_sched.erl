@@ -103,6 +103,8 @@
 -export([start_deliver/0, start_deliver/1]).
 -export([get_infos/0, get_infos/1]).
 -export([register_callback/1, register_callback/2]).
+-export([infected/0]).
+-export([clear_infection/0, restore_infection/0]).
 -export([cleanup/0, cleanup/1]).
 
 %% report messages from other modules
@@ -197,13 +199,12 @@ register_callback(CallbackFun) ->
 -spec register_callback(CallbackFun::callback_on_deliver(), trace_id()) -> ok | failed.
 register_callback(CallbackFun, TraceId) ->
     %% clear infection
-    PState = erlang:get(trace_mpath),
-    stop(),
+    clear_infection(),
     %% register the callback function
     LoggerPid = pid_groups:find_a(proto_sched),
     comm:send_local(LoggerPid, {register_callback, CallbackFun, TraceId, comm:this()}),
     %% restore infection
-    own_passed_state_put(PState),
+    restore_infection(),
     receive
         ?SCALARIS_RECV({register_callback_reply, Result}, Result)
     end.
@@ -218,6 +219,18 @@ get_infos(TraceId) ->
     receive
         ?SCALARIS_RECV({get_infos_reply, Infos}, Infos)
     end.
+
+-spec infected() -> boolean().
+infected() ->
+    trace_mpath:infected().
+
+-spec clear_infection() -> ok.
+clear_infection() ->
+    trace_mpath:clear_infection().
+
+-spec restore_infection() -> ok.
+restore_infection() ->
+    trace_mpath:restore_infection().
 
 -spec cleanup() -> ok.
 cleanup() -> cleanup(default).
