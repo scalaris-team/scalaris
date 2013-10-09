@@ -63,6 +63,9 @@ childs([{DHTNodeGroup, Options}]) ->
 			_ -> []
 		end,
     Cyclon = sup:worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
+    DBValCache =
+        sup:worker_desc(dht_node_db_cache, dht_node_db_cache, start_link,
+                             [DHTNodeGroup]),
     DC_Clustering =
         sup:worker_desc(dc_clustering, dc_clustering, start_link,
                              [DHTNodeGroup]),
@@ -109,6 +112,7 @@ childs([{DHTNodeGroup, Options}]) ->
                     Monitor,
                     Delayer,
                     Reregister,
+                    DBValCache,
                     DeadNodeCache,
                     RoutingTable,
                     Cyclon,
