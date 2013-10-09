@@ -1,10 +1,9 @@
 package de.zib.scalaris.jmx;
 
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
 
 import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.Monitor;
 import de.zib.scalaris.UnknownException;
 
 /**
@@ -65,22 +64,13 @@ public class MonitorNode implements MonitorNodeMBean {
      * @see jmx.MonitorNodeMBean#getCurLatencyAvg()
      */
     public double getCurLatencyAvg() throws ConnectionException, UnknownException {
-        return getCurrentPerfValue(monitor.getNodePerformance().latencyAvg);
+        return Monitor.getCurrentPerfValue(monitor.getNodePerformance().latencyAvg);
     }
     /* (non-Javadoc)
      * @see jmx.MonitorNodeMBean#getCurLatencyStddev()
      */
     public double getCurLatencyStddev() throws ConnectionException, UnknownException {
-        return getCurrentPerfValue(monitor.getNodePerformance().latencyStddev);
-    }
-
-    static Double getCurrentPerfValue(final Map<Long, Double> map) {
-        final Set<Entry<Long, Double>> entrySet = map.entrySet();
-        if (entrySet.isEmpty()) {
-            return null;
-        } else {
-            return entrySet.iterator().next().getValue();
-        }
+        return Monitor.getCurrentPerfValue(monitor.getNodePerformance().latencyStddev);
     }
 
 }

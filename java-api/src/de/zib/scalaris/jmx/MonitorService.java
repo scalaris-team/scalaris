@@ -3,6 +3,7 @@ package de.zib.scalaris.jmx;
 import java.util.Map;
 
 import de.zib.scalaris.ConnectionException;
+import de.zib.scalaris.Monitor;
 import de.zib.scalaris.UnknownException;
 
 /**
@@ -56,13 +57,13 @@ public class MonitorService implements MonitorServiceMBean {
      * @see jmx.MonitorServiceMBean#getCurLatencyAvg()
      */
     public double getCurLatencyAvg() throws ConnectionException, UnknownException {
-        return MonitorNode.getCurrentPerfValue(monitor.getServicePerformance().latencyAvg);
+        return Monitor.getCurrentPerfValue(monitor.getServicePerformance().latencyAvg);
     }
     /* (non-Javadoc)
      * @see jmx.MonitorServiceMBean#getCurLatencyStddev()
      */
     public double getCurLatencyStddev() throws ConnectionException, UnknownException {
-        return MonitorNode.getCurrentPerfValue(monitor.getServicePerformance().latencyStddev);
+        return Monitor.getCurrentPerfValue(monitor.getServicePerformance().latencyStddev);
     }
 
 }
