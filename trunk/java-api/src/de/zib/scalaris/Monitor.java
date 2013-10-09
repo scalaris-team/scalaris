@@ -17,6 +17,8 @@ package de.zib.scalaris;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import com.ericsson.otp.erlang.OtpErlangAtom;
 import com.ericsson.otp.erlang.OtpErlangList;
@@ -416,5 +418,24 @@ public class Monitor {
      */
     public void closeConnection() {
         connection.close();
+    }
+
+    /**
+     * Extracts the current performance value of a timestamp-to-double map like
+     * in the members of {@link GetNodePerformanceResult} or
+     * {@link GetServicePerformanceResult}.
+     *
+     * @param map
+     *            the map to extract from
+     *
+     * @return the latest reported performance or <tt>null</tt> if there is none
+     */
+    public static Double getCurrentPerfValue(final Map<Long, Double> map) {
+        final Set<Entry<Long, Double>> entrySet = map.entrySet();
+        if (entrySet.isEmpty()) {
+            return null;
+        } else {
+            return entrySet.iterator().next().getValue();
+        }
     }
 }
