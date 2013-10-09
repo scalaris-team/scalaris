@@ -103,13 +103,13 @@ prop_foldl(Data, Interval, MaxNum) ->
     ExpInInterval = [El || El <- ScrubbedData,
                            is_in(Interval, element(1, El))],
     ExpInIntervalCounted = lists:sublist(ExpInInterval, MaxNum),
-    AllFold = ?TEST_DB:foldl(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
+    AllFold = ?TEST_DB:foldl(DB1, fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldl(DB1,
-                                 fun(E, AccIn) -> [E | AccIn] end,
+                                 fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end,
                                  [],
                                  Interval),
     IntervalCountFold = ?TEST_DB:foldl(DB1,
-                            fun(E, AccIn) -> [E | AccIn] end,
+                            fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end,
                             [],
                             Interval,
                             MaxNum),
@@ -141,13 +141,13 @@ prop_foldr(Data, Interval, MaxNum) ->
                                _ ->
                                    lists:nthtail(length(ExpInInterval) - MaxNum, ExpInInterval)
                            end,
-    AllFold = ?TEST_DB:foldr(DB1, fun(E, AccIn) -> [E | AccIn] end, []),
+    AllFold = ?TEST_DB:foldr(DB1, fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end, []),
     IntervalFold = ?TEST_DB:foldr(DB1,
-                                 fun(E, AccIn) -> [E | AccIn] end,
+                                 fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end,
                                  [],
                                  Interval),
     IntervalCountFold = ?TEST_DB:foldr(DB1,
-                            fun(E, AccIn) -> [E | AccIn] end,
+                            fun(K, AccIn) -> [?TEST_DB:get(DB1, K) | AccIn] end,
                             [],
                             Interval,
                             MaxNum),
@@ -180,7 +180,7 @@ scrub_data(Data) ->
     lists:usort(SortFun, Data).
 
 check_db(DB, ExpData, Note) ->
-    InDb = ?TEST_DB:foldl(DB, fun(E, AIn) -> [E | AIn] end, []),
+    InDb = ?TEST_DB:foldl(DB, fun(K, AIn) -> [?TEST_DB:get(DB, K) | AIn] end, []),
     ?equals_w_note(lists:sort(InDb), lists:sort(ExpData), Note),
     ?equals_w_note(?TEST_DB:get_load(DB), length(ExpData), Note).
 

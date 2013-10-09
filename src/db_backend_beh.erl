@@ -48,13 +48,13 @@
 -callback get_name(db()) -> nonempty_string().
 -callback get_load(db()) -> non_neg_integer().
 
--callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
--callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
--callback foldl(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
+-callback foldl(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+-callback foldl(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
+-callback foldl(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
 
--callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
--callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
--callback foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
+-callback foldr(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+-callback foldr(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A, interval()) -> Acc1::A.
+-callback foldr(db(), fun((key(), AccIn::A) -> AccOut::A), Acc0::A, interval(), non_neg_integer()) -> Acc1::A.
 
 -else.
 
