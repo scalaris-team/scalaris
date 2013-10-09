@@ -524,13 +524,13 @@ process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
 -spec process_join_msg(join_message(), dht_node_state:state()) -> dht_node_state:state().
 process_join_msg({join, number_of_samples_request, SourcePid, LbPsv, Conn} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    LbPsv:get_number_of_samples_remote(SourcePid, Conn),
+    call_lb_psv(LbPsv, get_number_of_samples_remote, [SourcePid, Conn]),
     State;
 
 %% userdevguide-begin dht_node_join:get_candidate
 process_join_msg({join, get_candidate, Source_PID, Key, LbPsv, Conn} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    LbPsv:create_join(State, Key, Source_PID, Conn);
+    call_lb_psv(LbPsv, create_join, [State, Key, Source_PID, Conn]);
 %% userdevguide-end dht_node_join:get_candidate
 
 %% userdevguide-begin dht_node_join:join_request1
@@ -600,16 +600,23 @@ process_join_msg({join, join_request_timeout, _Timeouts, _CandId, _JoinId} = _Ms
 % -> forward to the module
 process_join_msg({join, LbPsv, Msg, LbPsvState} = _Msg, State) ->
     ?TRACE1(_Msg, State),
+    call_lb_psv(LbPsv, process_join_msg, [Msg, LbPsvState, State]);
+process_join_msg({join, timeout, _JoinId} = _Msg, State) ->
+    State.
+
+-spec call_lb_psv(LbPsv::term(), Function::atom(), Parameters::[term()]) -> term().
+call_lb_psv(LbPsv, Function, Parameters)
+  when is_atom(Function) andalso is_list(Parameters) ->
+    Module =
     case lists:member(LbPsv, ?VALID_PASSIVE_ALGORITHMS) of
-        true -> LbPsv:process_join_msg(Msg, LbPsvState, State);
+        true -> LbPsv;
         _    -> MyLbPsv = config:read(join_lb_psv),
                 log:log(error, "[ Node ~.0p ] unknown passive load balancing "
                                "algorithm requested: ~.0p - using ~.0p instead",
                         [LbPsv, MyLbPsv]),
-                MyLbPsv:process_join_msg(Msg, LbPsvState, State)
-    end;
-process_join_msg({join, timeout, _JoinId} = _Msg, State) ->
-    State.
+                MyLbPsv
+    end,
+    erlang:apply(Module, Function, Parameters).
 
 %% @doc Contacts all nodes set in the known_hosts config parameter and request
 %%      a list of dht_node instances in their VMs.
