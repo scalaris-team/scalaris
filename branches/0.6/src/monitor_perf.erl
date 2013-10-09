@@ -315,9 +315,17 @@ on({get_rrds, KeyList, SourcePid},
 on({web_debug_info, Requestor} = _Msg,
    {AllNodes, Leader, _BenchPid, _IgnBenchT} = State) ->
     ?TRACE1(_Msg, _State),
-    KeyValueList =
-        [{"all nodes", webhelpers:safe_html_string("~p", [AllNodes])},
-         {"leader",    webhelpers:safe_html_string("~p", [Leader])}],
+    [KVAllNodes, KVLeader] =
+        [begin
+             PerfRR5 = rrd:reduce_timeslots(5, Data#state.perf_rr),
+             PerfLH5 = rrd:reduce_timeslots(5, Data#state.perf_lh),
+             PerfTX5 = rrd:reduce_timeslots(5, Data#state.perf_tx),
+             [monitor:web_debug_info_merge_values(perf_rr, PerfRR5),
+              monitor:web_debug_info_merge_values(perf_lh, PerfLH5),
+              monitor:web_debug_info_merge_values(perf_tx, PerfTX5)]
+         end || Data <- [AllNodes, Leader]],
+    KeyValueList = lists:flatten([{"all nodes:", ""}, KVAllNodes,
+                                  {"leader:",    ""}, KVLeader]),
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
 
