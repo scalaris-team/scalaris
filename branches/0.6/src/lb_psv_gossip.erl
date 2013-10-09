@@ -38,7 +38,9 @@
 -export_type([custom_message/0]).
 -endif.
 
--type custom_message() :: {gossip_get_values_best_response, gossip_state:values()}.
+-type custom_message() ::
+          {gossip_get_values_best_response, gossip_state:values()} |
+          {get_split_key_response, SplitKey::{?RT:key(), TakenLoad::non_neg_integer()}}.
 
 %% @doc Gets the number of IDs to sample during join.
 %%      Note: this is executed at the joining node.
@@ -70,7 +72,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
         null ->
             SPid = comm:reply_as(self(), 3,
                                  {join, ?MODULE, '_',
-                                  {create_join, SelectedKey, SourcePid, Conn}}),
+                                  {create_join2, SelectedKey, SourcePid, Conn}}),
             GossipPid = pid_groups:get_my(gossip),
             Msg = {get_values_best, SPid},
             ?TRACE_SEND(GossipPid, Msg),
@@ -90,43 +92,79 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
 create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
     case dht_node_state:get(DhtNodeState, slide_pred) of
         null ->
+            Neighbors = dht_node_state:get(DhtNodeState, neighbors),
+            MyNodeId = nodelist:nodeid(Neighbors),
+            try
+                MyLoad = dht_node_state:get(DhtNodeState, load),
+                if MyLoad >= 2 ->
+%%                        log:pal("[ ~.0p ] trying split by load", [self()]),
+                       TargetLoad =
+                           case gossip_state:get(BestValues, avgLoad) of
+                               unknown -> util:floor(MyLoad / 2);
+                               AvgLoad when AvgLoad > 0 andalso MyLoad > AvgLoad ->
+                                   util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
+                               _       -> util:floor(MyLoad / 2)
+                           end,
+%%                        log:pal("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
+                       MyPredId = node:id(nodelist:pred(Neighbors)),
+                       SPid = comm:reply_as(self(), 3,
+                                            {join, ?MODULE, '_',
+                                             {create_join3, SelectedKey, SourcePid, Conn}}),
+                       DBCache = pid_groups:get_my(dht_node_db_cache),
+                       
+                       Msg = {get_split_key, dht_node_state:get(DhtNodeState, db),
+                              dht_node_state:get(DhtNodeState, full_range), MyPredId, MyNodeId,
+                              TargetLoad, forward, SPid},
+                       ?TRACE_SEND(DBCache, Msg),
+                       comm:send_local(DBCache, Msg),
+                       DhtNodeState;
+                   true -> % fall-back
+                       create_join3(DhtNodeState, SelectedKey, SourcePid, {MyNodeId, 0}, Conn)
+                end
+            catch
+                Error:Reason -> % fall-back
+                    log:log(error, "[ Node ~w ] failed to get split key "
+                                "for another node: ~.0p:~.0p~n"
+                                "  SelectedKey: ~.0p, SourcePid: ~.0p~n  State: ~.0p",
+                            [self(), Error, Reason, SelectedKey, SourcePid, DhtNodeState]),
+                    create_join3(DhtNodeState, SelectedKey, SourcePid, {MyNodeId, 0}, Conn)
+            end;
+        _ ->
+            % postpone message:
+            SPid = comm:reply_as(self(), 3,
+                                 {join, ?MODULE, '_',
+                                  {create_join2, SelectedKey, SourcePid, Conn}}),
+            GossipPid = pid_groups:get_my(gossip),
+            Msg = {get_values_best, SPid},
+            ?TRACE_SEND(GossipPid, Msg),
+            _ = comm:send_local_after(100, GossipPid, Msg),
+            DhtNodeState
+    end.
+
+-spec create_join3(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(),
+                   SourcePid::comm:mypid(),
+                   SplitKey::{?RT:key(), TakenLoad::non_neg_integer()},
+                   Conn::dht_node_join:connection()) -> dht_node_state:state().
+create_join3(DhtNodeState, SelectedKey, SourcePid, SplitKey0, Conn) ->
+    case dht_node_state:get(DhtNodeState, slide_pred) of
+        null ->
             Candidate =
                 try
                     MyNode = dht_node_state:get(DhtNodeState, node),
                     MyNodeId = node:id(MyNode),
-                    MyLoad = dht_node_state:get(DhtNodeState, load),
                     {SplitKey, OtherLoadNew} =
-                        if MyLoad >= 2 ->
-%%                                log:pal("[ ~.0p ] trying split by load", [self()]),
-                               TargetLoad =
-                                   case gossip_state:get(BestValues, avgLoad) of
-                                       unknown -> util:floor(MyLoad / 2);
-                                       AvgLoad when AvgLoad > 0 andalso MyLoad > AvgLoad ->
-                                           util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
-                                       _       -> util:floor(MyLoad / 2)
-                                   end,
-%%                                log:pal("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
-                               try lb_common:split_by_load(DhtNodeState, TargetLoad)
-                               catch
-                                   throw:'no key in range' ->
-%%                                        log:log(info, "[ Node ~w ] could not split load - no key in my range, "
-%%                                                    "using fall-back instead", [self()]),
-                                       case config:read(lb_psv_split_fallback) of
-                                           split_address -> % split address range:
-%%                                                log:pal("[ ~.0p ] trying split by address range", [self()]),
-                                               lb_common:split_my_range(DhtNodeState, SelectedKey);
-                                           keep_key -> % keep (randomly selected) key:
-                                               lb_common:split_by_key(DhtNodeState, SelectedKey)
-                                       end
-                               end;
-                            true -> % fall-back
+                        case SplitKey0 of
+                            {MyNodeId, _TargetLoadNew} -> % fall-back
+%%                                 log:log(info, "[ Node ~w ] could not split load - no key in my range, "
+%%                                             "using fall-back instead", [self()]),
                                 case config:read(lb_psv_split_fallback) of
                                     split_address -> % split address range:
 %%                                         log:pal("[ ~.0p ] trying split by address range", [self()]),
                                         lb_common:split_my_range(DhtNodeState, SelectedKey);
                                     keep_key -> % keep (randomly selected) key:
                                         lb_common:split_by_key(DhtNodeState, SelectedKey)
-                                end
+                                end;
+                            X -> X
                         end,
                     MyPredId = node:id(dht_node_state:get(DhtNodeState, pred)),
                     case SplitKey of
@@ -139,6 +177,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                                         "sending no_op...", [self(), MyPredId]),
                             lb_op:no_op();
                         _ ->
+                            MyLoad = dht_node_state:get(DhtNodeState, load),
                             MyLoadNew = MyLoad - OtherLoadNew,
                             MyNodeDetails1 = node_details:set(node_details:new(), node, MyNode),
                             MyNodeDetails = node_details:set(MyNodeDetails1, load, MyLoad),
@@ -163,10 +202,10 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
             ?TRACE_SEND(SourcePid, Msg),
             comm:send(SourcePid, Msg);
         _ ->
-            % postpone message:
+            % re-start with create_join2 (it can then create a new up-to-date request for a split key):
             SPid = comm:reply_as(self(), 3,
                                  {join, ?MODULE, '_',
-                                  {create_join, SelectedKey, SourcePid, Conn}}),
+                                  {create_join2, SelectedKey, SourcePid, Conn}}),
             GossipPid = pid_groups:get_my(gossip),
             Msg = {get_values_best, SPid},
             ?TRACE_SEND(GossipPid, Msg),
@@ -187,7 +226,8 @@ sort_candidates(Ops) ->
 
 -spec process_join_msg(custom_message(),
         {get_samples, SourcePid::comm:mypid(), Conn::dht_node_join:connection()} |
-            {create_join, SelectedKey::?RT:key(), SourcePid::comm:mypid(), Conn::dht_node_join:connection()},
+            {create_join2, SelectedKey::?RT:key(), SourcePid::comm:mypid(), Conn::dht_node_join:connection()} |
+            {create_join3, SelectedKey::?RT:key(), SourcePid::comm:mypid(), BestValues::gossip_state:values(), Conn::dht_node_join:connection()},
         DhtNodeState::dht_node_state:state()) -> dht_node_state:state().
 process_join_msg({gossip_get_values_best_response, BestValues},
                  {get_samples, SourcePid, Conn}, DhtNodeState) ->
@@ -200,8 +240,11 @@ process_join_msg({gossip_get_values_best_response, BestValues},
     comm:send(SourcePid, {join, get_number_of_samples, Samples, Conn}),
     DhtNodeState;
 process_join_msg({gossip_get_values_best_response, BestValues},
-                 {create_join, SelectedKey, SourcePid, Conn}, DhtNodeState) ->
-    create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn).
+                 {create_join2, SelectedKey, SourcePid, Conn}, DhtNodeState) ->
+    create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn);
+process_join_msg({get_split_key_response, SplitKey},
+                 {create_join3, SelectedKey, SourcePid, Conn}, DhtNodeState) ->
+    create_join3(DhtNodeState, SelectedKey, SourcePid, SplitKey, Conn).
 
 %% @doc Checks whether config parameters of the passive load balancing
 %%      algorithm exist and are valid.
