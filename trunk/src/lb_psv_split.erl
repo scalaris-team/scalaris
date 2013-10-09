@@ -38,7 +38,8 @@
 
 -export([my_sort_fun/2]).
 
--type custom_message() :: none().
+-type custom_message() ::
+          {get_split_key_response, SplitKey::{?RT:key(), TakenLoad::non_neg_integer()}}.
 
 %% @doc Gets the number of IDs to sample during join.
 %%      Note: this is executed at the joining node.
@@ -65,25 +66,63 @@ get_number_of_samples_remote(SourcePid, Connection) ->
 create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
     case dht_node_state:get(DhtNodeState, slide_pred) of
         null ->
+            Neighbors = dht_node_state:get(DhtNodeState, neighbors),
+            MyNodeId = nodelist:nodeid(Neighbors),
+            try
+                MyLoad = dht_node_state:get(DhtNodeState, load),
+                if MyLoad >= 2 ->
+%%                        log:pal("[ ~.0p ] trying split by load", [self()]),
+                       TargetLoad = util:floor(MyLoad / 2),
+%%                        log:pal("T: ~.0p, My: ~.0p~n", [TargetLoad, MyLoad]),
+                       MyPredId = node:id(nodelist:pred(Neighbors)),
+                       SPid = comm:reply_as(self(), 3,
+                                            {join, ?MODULE, '_',
+                                             {create_join2, SelectedKey, SourcePid, Conn}}),
+                       DBCache = pid_groups:get_my(dht_node_db_cache),
+                       
+                       Msg = {get_split_key, dht_node_state:get(DhtNodeState, db),
+                              dht_node_state:get(DhtNodeState, full_range), MyPredId, MyNodeId,
+                              TargetLoad, forward, SPid},
+                       ?TRACE_SEND(DBCache, Msg),
+                       comm:send_local(DBCache, Msg),
+                       DhtNodeState;
+                   true -> % fall-back
+                       create_join2(DhtNodeState, SelectedKey, SourcePid, {MyNodeId, 0}, Conn)
+                end
+            catch
+                Error:Reason -> % fall-back
+                    log:log(error, "[ Node ~w ] failed to get split key "
+                                "for another node: ~.0p:~.0p~n"
+                                "  SelectedKey: ~.0p, SourcePid: ~.0p~n  State: ~.0p",
+                            [self(), Error, Reason, SelectedKey, SourcePid, DhtNodeState]),
+                    create_join2(DhtNodeState, SelectedKey, SourcePid, {MyNodeId, 0}, Conn)
+            end;
+        _ ->
+            % postpone message:
+            Msg = {join, get_candidate, SourcePid, SelectedKey, ?MODULE, Conn},
+            ?TRACE_SEND(SourcePid, Msg),
+            _ = comm:send_local_after(100, self(), Msg),
+            DhtNodeState
+    end.
+
+-spec create_join2(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(),
+                   SourcePid::comm:mypid(),
+                   SplitKey::{?RT:key(), TakenLoad::non_neg_integer()},
+                   Conn::dht_node_join:connection()) -> dht_node_state:state().
+create_join2(DhtNodeState, SelectedKey, SourcePid, SplitKey0, Conn) ->
+    case dht_node_state:get(DhtNodeState, slide_pred) of
+        null ->
             Candidate =
                 try
                     MyNode = dht_node_state:get(DhtNodeState, node),
                     MyNodeId = node:id(MyNode),
-                    MyLoad = dht_node_state:get(DhtNodeState, load),
                     {SplitKey, OtherLoadNew} =
-                        case MyLoad >= 2 of
-                            true ->
-                                TargetLoad = util:floor(MyLoad / 2),
-%%                                 log:pal("T: ~.0p, My: ~.0p~n", [TargetLoad, MyLoad]),
-                                try lb_common:split_by_load(DhtNodeState, TargetLoad)
-                                catch
-                                    throw:'no key in range' ->
-                                        %%                                 log:log(info, "[ Node ~w ] could not split load - no key in my range, "
-                                        %%                                             "splitting address range instead", [self()]),
-                                        lb_common:split_my_range(DhtNodeState, SelectedKey)
-                                end;
-                            _ -> % split address range (fall-back):
-                                lb_common:split_my_range(DhtNodeState, SelectedKey)
+                        case SplitKey0 of
+                            {MyNodeId, _TargetLoadNew} -> % fall-back
+%%                                 log:log(info, "[ Node ~w ] could not split load - no key in my range, "
+%%                                             "splitting address range instead", [self()]),
+                                lb_common:split_my_range(DhtNodeState, SelectedKey);
+                            X -> X
                         end,
                     MyPredId = node:id(dht_node_state:get(DhtNodeState, pred)),
                     case SplitKey of
@@ -97,6 +136,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
                             lb_op:no_op();
                         _ ->
 %%                             log:pal("MK: ~.0p, SK: ~.0p~n", [MyNodeId, SplitKey]),
+                            MyLoad = dht_node_state:get(DhtNodeState, load),
                             MyLoadNew = MyLoad - OtherLoadNew,
                             MyNodeDetails1 = node_details:set(node_details:new(), node, MyNode),
                             MyNodeDetails = node_details:set(MyNodeDetails1, load, MyLoad),
@@ -121,7 +161,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
             ?TRACE_SEND(SourcePid, Msg),
             comm:send(SourcePid, Msg);
         _ ->
-            % postpone message:
+            % re-start with create_join (it can then create a new up-to-date request for a split key):
             Msg = {join, get_candidate, SourcePid, SelectedKey, ?MODULE, Conn},
             ?TRACE_SEND(SourcePid, Msg),
             _ = comm:send_local_after(100, self(), Msg),
@@ -169,6 +209,9 @@ sort_candidates(Ops) ->
 
 -spec process_join_msg(comm:message(), State::any(),
         DhtNodeState::dht_node_state:state()) -> unknown_event.
+process_join_msg({get_split_key_response, SplitKey},
+                 {create_join2, SelectedKey, SourcePid, Conn}, DhtNodeState) ->
+    create_join2(DhtNodeState, SelectedKey, SourcePid, SplitKey, Conn);
 process_join_msg(_Msg, _State, _DhtNodeState) ->
     unknown_event.
 
