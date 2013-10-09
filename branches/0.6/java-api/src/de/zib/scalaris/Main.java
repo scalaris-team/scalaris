@@ -16,6 +16,7 @@
 package de.zib.scalaris;
 
 import java.lang.management.ManagementFactory;
+import java.text.DecimalFormat;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +36,11 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionGroup;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+
+import de.zib.scalaris.Monitor.GetNodeInfoResult;
+import de.zib.scalaris.Monitor.GetNodePerformanceResult;
+import de.zib.scalaris.Monitor.GetServiceInfoResult;
+import de.zib.scalaris.Monitor.GetServicePerformanceResult;
 
 /**
  * Class to test basic functionality of the package and to use scalaris
@@ -63,6 +69,7 @@ public class Main {
      *                                              (default: all benchmarks, 500
      *                                              operations, 10 threads per
      *                                              Scalaris node)
+     *  -m,--monitor <node>                         print monitoring information
      *  -r,--read <key>                             read an item
      *  -w,--write <key> <value>                    write an item
      *     --test-and-set <key> <old> <new>         atomic test and set, i.e.
@@ -82,6 +89,9 @@ public class Main {
      *  -s,--subscribe <topic> <url>                subscribe to a topic
      *  -u,--unsubscribe <topic> <url>              unsubscribe from a topic
      *  -g,--getsubscribers <topic>                 get subscribers of a topic
+     *  -jmx,--jmxservice <node>                    starts a service exposing
+     *                                              Scalaris monitoring values
+     *                                              via JMX
      * </code>
      * </pre>
      *
@@ -291,6 +301,40 @@ public class Main {
             }
         } else if (line.hasOption("lh")) { // get local host name
             System.out.println(ConnectionFactory.getLocalhostName());
+        } else if (line.hasOption("monitor")) { // print monitoring data
+            final String node = line.getOptionValue("monitor");
+            checkArguments(node, options, "monitor");
+            try {
+                final Monitor monitor = new Monitor(node);
+                final GetNodeInfoResult nodeInfo = monitor.getNodeInfo();
+                final GetNodePerformanceResult nodePerf = monitor.getNodePerformance();
+                final GetServiceInfoResult srvInfo = monitor.getServiceInfo();
+                final GetServicePerformanceResult srvPerf = monitor.getServicePerformance();
+
+                final Double nodePerfCurLatAvg = Monitor.getCurrentPerfValue(nodePerf.latencyAvg);
+                final Double nodePerfCurLatStddev = Monitor.getCurrentPerfValue(nodePerf.latencyStddev);
+                final Double srvPerfCurLatAvg = Monitor.getCurrentPerfValue(srvPerf.latencyAvg);
+                final Double srcPerfCurLatStddev = Monitor.getCurrentPerfValue(srvPerf.latencyStddev);
+
+                final DecimalFormat df = new DecimalFormat("0.##");
+                System.out.println("== Node Info ==");
+                System.out.println("Scalaris version: " + nodeInfo.scalarisVersion);
+                System.out.println("Erlang   version: " + nodeInfo.erlangVersion);
+                System.out.println("# of DHT nodes  : " + nodeInfo.dhtNodes);
+                System.out.println("== Service Info (from mgmt_server) ==");
+                System.out.println("Total # of nodes: " + srvInfo.nodes);
+                System.out.println("Total load      : " + srvInfo.totalLoad);
+                System.out.println("== Node Performance ==");
+                System.out.println("Current latency : " + (nodePerfCurLatAvg == null ? "n/a" : df.format(nodePerfCurLatAvg)));
+                System.out.println("Current stddev  : " + (nodePerfCurLatStddev == null ? "n/a" : df.format(nodePerfCurLatStddev)));
+                System.out.println("== Service Performance ==");
+                System.out.println("Current latency : " + (srvPerfCurLatAvg == null ? "n/a" : df.format(srvPerfCurLatAvg)));
+                System.out.println("Current stddev  : " + (srcPerfCurLatStddev == null ? "n/a" : df.format(srcPerfCurLatStddev)));
+            } catch (final ConnectionException e) {
+                printException("monitor failed with connection error", e, verbose);
+            } catch (final UnknownException e) {
+                printException("monitor failed with unknown error", e, verbose);
+            }
         } else if (line.hasOption("jmx")) { // start JMX monitoring service
             final String node = line.getOptionValue("jmx");
             checkArguments(node, options, "jmx");
@@ -309,30 +353,32 @@ public class Main {
                         return 3;
                     } else if (option.getLongOpt().equals("minibench")) {
                         return 4;
-                    } else if (option.getLongOpt().equals("read")) {
+                    } else if (option.getLongOpt().equals("monitor")) {
                         return 5;
-                    } else if (option.getLongOpt().equals("write")) {
+                    } else if (option.getLongOpt().equals("read")) {
                         return 6;
-                    } else if (option.getLongOpt().equals("test-and-set")) {
+                    } else if (option.getLongOpt().equals("write")) {
                         return 7;
-                    } else if (option.getLongOpt().equals("add-del-on-list")) {
+                    } else if (option.getLongOpt().equals("test-and-set")) {
                         return 8;
-                    } else if (option.getLongOpt().equals("add-on-nr")) {
+                    } else if (option.getLongOpt().equals("add-del-on-list")) {
                         return 9;
-                    } else if (option.getLongOpt().equals("delete")) {
+                    } else if (option.getLongOpt().equals("add-on-nr")) {
                         return 10;
-                    } else if (option.getLongOpt().equals("publish")) {
+                    } else if (option.getLongOpt().equals("delete")) {
                         return 11;
-                    } else if (option.getLongOpt().equals("subscribe")) {
+                    } else if (option.getLongOpt().equals("publish")) {
                         return 12;
-                    } else if (option.getLongOpt().equals("unsubscribe")) {
+                    } else if (option.getLongOpt().equals("subscribe")) {
                         return 13;
-                    } else if (option.getLongOpt().equals("getsubscribers")) {
+                    } else if (option.getLongOpt().equals("unsubscribe")) {
                         return 14;
-                    } else if (option.getLongOpt().equals("jmxservice")) {
+                    } else if (option.getLongOpt().equals("getsubscribers")) {
                         return 15;
-                    } else {
+                    } else if (option.getLongOpt().equals("jmxservice")) {
                         return 16;
+                    } else {
+                        return 17;
                     }
                 }
 
@@ -470,6 +516,12 @@ public class Main {
         bench.setArgs(20);
         bench.setOptionalArg(true);
         group.addOption(bench);
+
+        final Option monitor = new Option("m", "monitor", true, "print monitoring information");
+        monitor.setArgName("node");
+        monitor.setArgs(1);
+        monitor.setOptionalArg(true);
+        group.addOption(monitor);
 
         final Option jmx = new Option("jmx", "jmxservice", true, "starts a service exposing Scalaris monitoring values via JMX");
         jmx.setArgName("node");
