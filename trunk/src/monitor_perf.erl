@@ -82,6 +82,9 @@ bench_service_loop(Owner) ->
                 comm:send_local(Owner, {bench_result, Time, TimeInUs / 1000}),
                 bench_service_loop(Owner)
             end);
+        ?SCALARIS_RECV({tx_tm_rtm_commit_reply, _, _}, %% ->
+            % left-over commit information from bench, more specifically api_tx:req_list/1
+            bench_service_loop(Owner));
         {'DOWN', _MonitorRef, process, Owner, _Info1} -> ok
     end.
 
@@ -183,10 +186,6 @@ on({collect_system_stats} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     msg_delay:send_local(10, self(), {collect_system_stats}),
     collect_system_stats(),
-    State;
-
-on({tx_tm_rtm_commit_reply, _, _} = _Msg, State) ->
-    % left-over commit information from bench, more specifically api_tx:req_list/1
     State;
 
 on({propagate} = _Msg, State) ->
