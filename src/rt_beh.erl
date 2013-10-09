@@ -71,7 +71,7 @@
             NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
 
 -callback check_config() -> boolean().
--callback wrap_message(Msg::comm:message(), State::dht_node_state:state(), Hops::non_neg_integer()) -> comm:message().
+-callback wrap_message(Key::key(), Msg::comm:message(), State::dht_node_state:state(), Hops::non_neg_integer()) -> comm:message().
 -callback unwrap_message(Msg::comm:message(), State::dht_node_state:state()) ->
     comm:message().
 
@@ -115,7 +115,7 @@ behaviour_info(callbacks) ->
      {check, 4}, {check, 5},
      {check_config, 0},
      % wrap and unwrap lookup messages
-     {wrap_message, 3},
+     {wrap_message, 4},
      {unwrap_message, 2}
     ];
 behaviour_info(_Other) ->
