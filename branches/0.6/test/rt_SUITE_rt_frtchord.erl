@@ -28,11 +28,12 @@
 number_to_key(N) -> N.
 
 create_rt(RT_Keys, [_Succ | _DHTNodes] = Nodes) ->
-    gb_trees:from_orddict(
-      [begin
-           Key = number_to_key(N),
-           {Key, node:new(lists:nth(Idx, Nodes), Key, 0)}
-       end || {N, Idx} <- RT_Keys]).
+    {length(Nodes), 
+        gb_trees:from_orddict(
+            [begin
+                        Key = number_to_key(N),
+                        {Key, node:new(lists:nth(Idx, Nodes), Key, 0)}
+                end || {N, Idx} <- RT_Keys])}.
 
 check_next_hop(State, _Succ, N, NodeExp) ->
     ?equals_w_note(?RT:next_hop(State, number_to_key(N)), NodeExp, io_lib:format("~B", [N])).

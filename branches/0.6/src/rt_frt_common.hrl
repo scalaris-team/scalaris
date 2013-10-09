@@ -57,7 +57,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
--type external_rt_t() :: gb_tree().
+-type external_rt_t() :: {unknown | gossip_state:size(),
+                          gb_tree()}.
 
 % define the possible types of nodes in the routing table:
 %  - normal nodes are nodes which have been added by entry learning
@@ -84,6 +85,7 @@
         source = undefined :: key_t() | undefined
         , num_active_learning_lookups = 0 :: non_neg_integer()
         , nodes = gb_trees:empty() :: gb_tree()
+        , nodes_in_ring = unknown :: unknown | gossip_state:size()
     }).
 
 -type(rt_t() :: #rt_t{}).
@@ -110,13 +112,18 @@ maximum_entries() -> config:read(rt_frt_max_entries).
 -spec init(nodelist:neighborhood()) -> rt().
 init(Neighbors) ->
     % trigger a random lookup after initializing the table
-    case config:read(rt_frtchord_al) of
+    case config:read(rt_frt_al) of
         true -> comm:send_local(self(), {trigger_random_lookup});
         false -> ok
     end,
+
     % ask the successor node for its routing table
     Msg = {?send_to_group_member, routing_table, {get_rt, comm:this()}},
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
+
+    % request approximated ring size
+    comm:send_local(pid_groups:get_my(gossip), {get_values_best, self()}),
+
     update_entries(Neighbors, add_source_entry(nodelist:node(Neighbors), #rt_t{})).
 
 %% @doc Hashes the key to the identifier space.
@@ -257,7 +264,7 @@ get_size_without_special_nodes(#rt_t{} = RT) ->
 %% @doc Returns the size of the routing table.
 -spec get_size(rt() | external_rt()) -> non_neg_integer().
 get_size(#rt_t{} = RT) -> gb_trees:size(get_rt_tree(RT));
-get_size(RT) -> gb_trees:size(RT). % size of external rt
+get_size(RT) -> external_rt_get_ring_size(RT). % size of external rt
 %% userdevguide-end rt_frtchord:get_size
 
 %% userdevguide-begin rt_frtchord:n
@@ -377,10 +384,16 @@ check_config() ->
                                 "{int(), int()}");
             _ -> false
         end and
-    config:cfg_is_bool(rt_frtchord_al) and
-    config:cfg_is_greater_than_equal(rt_frtchord_al_interval, 0) and
+    config:cfg_is_bool(rt_frt_al) and
+    config:cfg_is_greater_than_equal(rt_frt_al_interval, 0) and
     config:cfg_is_integer(rt_frt_max_entries) and
     config:cfg_is_greater_than(rt_frt_max_entries, 0) and
+    config:cfg_is_integer(rt_frt_max_entries) and
+    config:cfg_is_greater_than(rt_frt_max_entries, 0) and
+    config:cfg_is_integer(rt_frt_gossip_interval) and
+    config:cfg_is_greater_than(rt_frt_gossip_interval, 0) and
+    config:cfg_is_in(rt_frt_reduction_ratio_strategy,
+        [best_rt_reduction_ratio, convergent_rt_reduction_ratio]) and
     frt_check_config()
     .
 
@@ -449,7 +462,7 @@ handle_custom_message({trigger_random_lookup}, State) ->
     Key = get_random_key_from_generator(SourceNodeId, PredId, SuccId),
 
     % schedule the next random lookup
-    Interval = config:read(rt_frtchord_al_interval),
+    Interval = config:read(rt_frt_al_interval),
     msg_delay:send_local(Interval, self(), {trigger_random_lookup}),
 
     api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, routing_table,
@@ -472,8 +485,15 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
             ;
         {value, _RTEntry} -> OldRT
     end,
-    rt_loop:set_rt(State, NewRT)
-    ;
+    rt_loop:set_rt(State, NewRT);
+
+handle_custom_message({gossip_get_values_best_response, Vals}, State) ->
+    RT = rt_loop:get_rt(State),
+    NewRT = rt_set_ring_size(RT, gossip_state:get(Vals, size_kr)),
+    msg_delay:send_local(config:read(rt_frt_gossip_interval), pid_groups:get_my(gossip),{get_values_best, self()}),
+    RTExt = export_rt_to_dht_node(NewRT, rt_loop:get_neighb(State)),
+    comm:send_local(pid_groups:get_my(dht_node), {rt_update, RTExt}),
+    rt_loop:set_rt(State, NewRT);
 
 handle_custom_message(_Message, _State) -> unknown_event.
 %% userdevguide-end rt_frtchord:handle_custom_message
@@ -560,35 +580,35 @@ update_fd(#rt_t{} = OldRT, #rt_t{} = NewRT) ->
 
 %% userdevguide-begin rt_frtchord:empty_ext
 -spec empty_ext(nodelist:neighborhood()) -> external_rt().
-empty_ext(_Neighbors) -> gb_trees:empty().
+empty_ext(_Neighbors) -> {unknown, gb_trees:empty()}.
 %% userdevguide-end rt_frtchord:empty_ext
 
 %% userdevguide-begin rt_frtchord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
-next_hop(State, Id) ->
+-spec next_hop_(dht_node_state:state(), key()) -> node:node_type().
+next_hop_(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
-        true -> node:pidX(nodelist:succ(Neighbors));
-        _ ->
-            % check routing table:
-            RT = dht_node_state:get(State, rt),
-            RTSize = get_size(RT),
-            NodeRT = case util:gb_trees_largest_smaller_than(Id, RT) of
-                {value, _Key, N} -> N;
-                nil when RTSize =:= 0 -> nodelist:succ(Neighbors);
-                nil -> % forward to largest finger
-                    {_Key, N} = gb_trees:largest(RT),
-                    N
-            end,
-            FinalNode =
-                case RTSize < config:read(rt_size_use_neighbors) of
-                    false -> NodeRT;
-                    _     -> % check neighborhood:
-                             nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
-                end,
-            node:pidX(FinalNode)
+        true -> nodelist:succ(Neighbors);
+        _ -> RT = external_rt_get_tree(dht_node_state:get(State, rt)),
+             RTSize = get_size(RT),
+             NodeRT = case util:gb_trees_largest_smaller_than(Id, RT) of
+                 {value, _Key, N} -> N;
+                 nil when RTSize =:= 0 -> nodelist:succ(Neighbors);
+                 nil -> % forward to largest finger
+                     {_Key, N} = gb_trees:largest(RT),
+                     N
+             end,
+             case RTSize < config:read(rt_size_use_neighbors) of
+                 false -> NodeRT;
+                 _     -> % check neighborhood:
+                     nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
+             end
     end.
+
+-spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
+next_hop(State, Id) ->
+    node:pidX(next_hop_(State, Id)).
 %% userdevguide-end rt_frtchord:next_hop
 
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
@@ -599,6 +619,7 @@ next_hop(State, Id) ->
 export_rt_to_dht_node_helper(RT) ->
     % From each rt_entry, we extract only the field "node" and add it to the tree
     % under the node id. The source node is filtered.
+    {RT#rt_t.nodes_in_ring, util:gb_trees_foldl(
     util:gb_trees_foldl(
         fun(_K, V, Acc) ->
                 case entry_type(V) of
@@ -606,7 +627,7 @@ export_rt_to_dht_node_helper(RT) ->
                     _Else -> Node = rt_entry_node(V),
                         gb_trees:enter(node:id(Node), Node, Acc)
                 end
-        end, gb_trees:empty(),get_rt_tree(RT)).
+                end, gb_trees:empty(),get_rt_tree(RT)))}.
 
 -spec export_rt_to_dht_node(rt(), Neighbors::nodelist:neighborhood()) -> external_rt().
 export_rt_to_dht_node(RT, _Neighbors) ->
@@ -619,11 +640,10 @@ export_rt_to_dht_node(RT, _Neighbors) ->
 %%      third=next longer finger,...
 -spec to_list(dht_node_state:state()) -> nodelist:snodelist().
 to_list(State) -> % match external RT
-    RT = dht_node_state:get(State, rt),
+    {_, RT} = dht_node_state:get(State, rt),
     Neighbors = dht_node_state:get(State, neighbors),
     nodelist:mk_nodelist([nodelist:succ(Neighbors) | gb_trees:values(RT)],
-        nodelist:node(Neighbors))
-    .
+        nodelist:node(Neighbors)).
 
 %% @doc Converts the internal representation of the routing table to a list
 %%      in the order of the fingers, i.e. first=succ, second=shortest finger,
@@ -969,6 +989,21 @@ rt_get_nodes(RT) -> gb_trees:values(get_rt_tree(RT)).
 rt_set_nodes(#rt_t{source=undefined}, _) -> erlang:error(source_node_undefined);
 rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 
+% @doc Set the size estimate of the ring
+-spec rt_set_ring_size(RT :: rt(), Size :: unknown | gossip_state:size()) -> rt().
+rt_set_ring_size(RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
+
+% @doc Get the ring size estimate from the external routing table
+-spec external_rt_get_ring_size(RT :: external_rt()) -> gossip:size() | unknown.
+external_rt_get_ring_size(RT) when element(1, RT) >= 0 orelse
+                                   element(1, RT) == unknown ->
+    element(1, RT).
+
+% @doc Get the tree of an external rt
+-spec external_rt_get_tree(RT :: external_rt()) -> gb_tree().
+external_rt_get_tree(RT) when is_tuple(RT) ->
+    element(2, RT).
+
 %% Get the node with the given Id. This function will crash if the node doesn't exist.
 -spec rt_get_node(NodeId :: key(), RT :: rt()) -> rt_entry().
 rt_get_node(NodeId, RT)  -> gb_trees:get(NodeId, get_rt_tree(RT)).
@@ -1079,33 +1114,63 @@ check_rt_integrity(#rt_t{} = RT) ->
                     _Else ->
                         false
                 end end || {P, C, S} <- lists:zip3(Preds, Currents, Succs)],
-    lists:all(fun(X) -> X end, Checks)
-    .
+    lists:all(fun(X) -> X end, Checks).
 
 %% userdevguide-begin rt_frtchord:wrap_message
 %% @doc Wrap lookup messages.
 %% For node learning in lookups, a lookup message is wrapped with the global Pid of the
--spec wrap_message(Msg::comm:message(), State::dht_node_state:state(),
+-spec wrap_message(Key::key_t(), Msg::comm:message(), State::dht_node_state:state(),
                    Hops::non_neg_integer()) ->
     {'$wrapped', comm:mypid(), comm:message()} | comm:message().
-wrap_message(Msg, State, 0) -> {'$wrapped', dht_node_state:get(State, node), Msg};
-wrap_message({'$wrapped', Issuer, _} = Msg, _State, _) ->
-    % learn a node when forwarding it's request
-    comm:send_local(self(), {?send_to_group_member, routing_table,
-                             {rt_learn_node, Issuer}}),
+wrap_message(_Key, Msg, State, 0) -> {'$wrapped', dht_node_state:get(State, node), Msg};
+wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
+    MyId = dht_node_state:get(State, node_id),
+    SenderId = node:id(Issuer),
+    SenderPid = node:pidX(Issuer),
+    NextHop = next_hop_(State, Key),
+    SendMsg = case external_rt_get_ring_size(dht_node_state:get(State, rt)) of
+        unknown -> true;
+        RingSize ->
+            FirstDist = get_range(SenderId, MyId),
+            TotalDist = get_range(SenderId, node:id(NextHop)),
+            % reduction ratio > optimal/convergent ratio?
+            1 - FirstDist / TotalDist >
+                case config:read(rt_frt_reduction_ratio_strategy) of
+                    best_rt_reduction_ratio -> best_rt_reduction_ratio(RingSize);
+                    convergent_rt_reduction_ratio -> convergent_rt_reduction_ratio(RingSize)
+                end
+    end,
+
+    case SendMsg of
+        true -> comm:send(SenderPid, {?send_to_group_member, routing_table,
+                                      {rt_learn_node, NextHop}});
+        false -> ok
+    end,
+
+    learn_on_forward(Issuer),
+    Msg;
+    
+wrap_message(_Key, {'$wrapped', Issuer, _} = Msg, _State, _) ->
+    learn_on_forward(Issuer),
     Msg.
+
+best_rt_reduction_ratio(RingSize) ->
+    1 - math:pow(1 / RingSize, 2 / (maximum_entries() - 1)).
+convergent_rt_reduction_ratio(RingSize) ->
+    1 - math:pow(1 / RingSize, 4 / (maximum_entries() - 2)).
+
+-spec learn_on_forward(Issuer::node:node_type()) -> ok.
+learn_on_forward(Issuer) ->
+    comm:send_local(self(), {?send_to_group_member, routing_table,
+                             {rt_learn_node, Issuer}}).
+
 %% userdevguide-end rt_frtchord:wrap_message
 
 %% userdevguide-begin rt_frtchord:unwrap_message
 %% @doc Unwrap lookup messages.
 %% The Pid is retrieved and the Pid of the current node is sent to the retrieved Pid
 -spec unwrap_message(Msg::comm:message(), State::dht_node_state:state()) -> comm:message().
-unwrap_message({'$wrapped', Issuer, UnwrappedMessage}, State) ->
-    comm:send(node:pidX(Issuer),
-         {?send_to_group_member, routing_table,
-             {rt_learn_node, dht_node_state:get(State, node)}
-         }),
-    UnwrappedMessage.
+unwrap_message({'$wrapped', _Issuer, UnwrappedMessage}, _State) -> UnwrappedMessage.
 %% userdevguide-end rt_frtchord:unwrap_message
 
 % @doc Check that the adjacent fingers of a RT are building a ring
