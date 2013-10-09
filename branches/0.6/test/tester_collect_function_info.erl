@@ -245,6 +245,8 @@ parse_type_({type, _Line, array, []}, _Module, ParseState) ->
     {{builtin_type, array}, ParseState};
 parse_type_({type, _Line, dict, []}, _Module, ParseState) ->
     {{builtin_type, dict}, ParseState};
+parse_type_({type, _Line, queue, []}, _Module, ParseState) ->
+    {{builtin_type, queue}, ParseState};
 parse_type_({type, _Line, gb_set, []}, _Module, ParseState) ->
     {{builtin_type, gb_set}, ParseState};
 parse_type_({type, _Line, gb_tree, []}, _Module, ParseState) ->
