@@ -74,7 +74,7 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
         maybe ->
             ok;
         false ->
-            WrappedMsg = ?RT:wrap_message(Msg, State, Hops),
+            WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
             %log:log("lookup_aux_leases route ~p~n", [self()]),
             P = ?RT:next_hop(State, Key),
             %log:log("lookup_aux_leases route ~p -> ~p~n", [self(), P]),
