@@ -112,8 +112,8 @@ get_load(_State, []) -> 0;
 get_load({DB, _Subscr, _Snap}, Interval) ->
     ?DB:foldl(
             DB,
-            fun(Entry, AccIn) ->
-                case intervals:in(entry_key(Entry), Interval) of
+            fun(Key, AccIn) ->
+                case intervals:in(Key, Interval) of
                     true -> AccIn + 1;
                     _ -> AccIn
                 end
@@ -217,7 +217,8 @@ get_chunk({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSiz
                     After ++ Before
             end
     end,
-    AddDataFun = fun(Entry, {Acc, RemainingChunkSize}) ->
+    AddDataFun = fun(Key, {Acc, RemainingChunkSize}) ->
+                         Entry = ?DB:get(DB, Key),
                          case FilterFun(Entry) of
                              true -> {[Entry | Acc],
                                       RemainingChunkSize - 1};
@@ -402,7 +403,8 @@ subscr_delta_remove(State, Interval) ->
         -> NewDB::db().
 delete_entries(State = {DB, _Subscr, _SnapState}, FilterFun)
   when is_function(FilterFun) ->
-    F = fun(DBEntry, StateAcc) ->
+    F = fun(Key, StateAcc) ->
+                DBEntry = ?DB:get(DB, Key),
                 case FilterFun(DBEntry) of
                     false -> StateAcc;
                     _     -> delete_entry(StateAcc, DBEntry)
@@ -417,8 +419,9 @@ delete_entries({DB, _Subscr, _SnapState} = State, Interval) ->
                                 delete_entry_at_key(State1, Key)
                         end, State, Elements);
         _ ->
-            F = fun(DBEntry, StateAcc) ->
-                        delete_entry(StateAcc, DBEntry)
+            F = fun(Key, StateAcc) ->
+                        Entry = ?DB:get(DB, Key),
+                        delete_entry(StateAcc, Entry)
                 end,
             SimpleI = intervals:get_simple_intervals(Interval),
             lists:foldl(fun(I, AccIn) ->
@@ -473,8 +476,9 @@ call_subscribers(State = {_DB, Subscr, _SnapState}, Operation) ->
                                          subscr_op_t()}) -> {db(),
                                                              Operation::close_db
                                                              | subscr_op_t()}.
-call_subscribers_iter({Tag, I, ChangesFun, RemSubscrFun}, {State, Op}) ->
+call_subscribers_iter(Tag, {{_DB, Subscr, _SnapState} = State, Op}) ->
     % assume the key exists (it should since we are iterating over the table!)
+    {Tag, I, ChangesFun, RemSubscrFun} = ?DB:get(Subscr, Tag),
     NewState =
         case Op of
             close_db ->

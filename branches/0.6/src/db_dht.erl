@@ -147,8 +147,8 @@ get_load(_State, []) -> 0;
 get_load({DB, _Subscr, _Snap}, Interval) ->
     ?DB:foldl(
             DB,
-            fun(Entry, AccIn) ->
-                case intervals:in(db_entry:get_key(Entry), Interval) of
+            fun(Key, AccIn) ->
+                case intervals:in(Key, Interval) of
                     true -> AccIn + 1;
                     _ -> AccIn
                 end
@@ -329,7 +329,8 @@ get_chunk({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSiz
                     After ++ Before
             end
     end,
-    AddDataFun = fun(Entry, {Acc, RemainingChunkSize}) ->
+    AddDataFun = fun(Key, {Acc, RemainingChunkSize}) ->
+                         Entry = ?DB:get(DB, Key),
                          case FilterFun(Entry) of
                              true -> {[Entry | Acc],
                                       RemainingChunkSize - 1};
@@ -368,19 +369,19 @@ get_split_key({DB, _Subscr, _Snap}, Begin, End, TargetLoad, forward)
         when Begin > End ->
     %% when Begin and End wrap around do two folds
     {Key, Taken1} = ?DB:foldl(DB,
-              fun({E, _, _, _, _}, {_El, Taken}) -> {E, Taken + 1} end,
+              fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {End, 0},
               {interval, '(', Begin, ?PLUS_INFINITY, ')'},
               TargetLoad),
     Split = ?DB:foldl(DB,
-              fun({E, _, _, _, _}, {_El, Taken}) -> {E, Taken + 1} end,
+              fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {Key, Taken1},
               {interval, '[', ?MINUS_INFINITY, End, ']'},
               TargetLoad - Taken1),
     normalize_split_key(Split, TargetLoad, End);
 get_split_key({DB, _Subscr, _Snap}, Begin, End, TargetLoad, forward) ->
     Split = ?DB:foldl(DB,
-              fun({E, _, _, _, _}, {_El, Taken}) -> {E, Taken + 1} end,
+              fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {End, 0},
               {interval, '(', Begin, End, ']'},
               TargetLoad),
@@ -390,21 +391,21 @@ get_split_key({DB, _Subscr, _Snap}, Begin, End, TargetLoad, backward)
         when Begin < End ->
     %% when Begin and End wrap around do two folds
     {Key, Taken1} = ?DB:foldr(DB,
-              fun({E, _, _, _, _}, {_El, Taken}) -> {E, Taken + 1} end,
+              fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {End, 0},
               {interval, '[', ?MINUS_INFINITY, Begin, ']'},
               TargetLoad + 1),
     ?TRACE("first fold done~nnew target:~p~nstart: ~p~nend: ~p~nacc: ~p",
            [TargetLoad - Taken1, ?PLUS_INFINITY, End, {Key, Taken1}]),
     Split = ?DB:foldr(DB,
-              fun({E, _, _, _, _}, {_El, Taken}) -> {E, Taken + 1} end,
+              fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {Key, Taken1},
               {interval, '(', End, ?PLUS_INFINITY, ')'},
               TargetLoad - Taken1 + 1),
     normalize_split_key_b(Split, TargetLoad, End);
 get_split_key({DB, _Subscr, _Snap}, Begin, End, TargetLoad, backward) ->
     Split = ?DB:foldr(DB,
-              fun({E, _, _, _, _}, {_El, Taken}) -> {E, Taken + 1} end,
+              fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {End, 0},
               {interval, '(', End, Begin, ']'},
               TargetLoad + 1),
@@ -432,8 +433,8 @@ normalize_split_key_b(Split, TargetLoad, End) ->
 %% keys!
 -spec split_data(DB::db(), MyNewInterval::intervals:interval()) -> {NewDB::db(), db_as_list()}.
 split_data(State = {DB, _Subscr, _SnapState}, MyNewInterval) ->
-    F = fun (DBEntry, {StateAcc, HisList}) ->
-            Key = db_entry:get_key(DBEntry),
+    F = fun (Key, {StateAcc, HisList}) ->
+            DBEntry = ?DB:get(DB, Key),
             case intervals:in(Key, MyNewInterval) of
                 true -> {StateAcc, HisList};
                 _ -> NewHisList = case db_entry:is_empty(DBEntry) of
@@ -621,7 +622,8 @@ subscr_delta_remove(State, Interval) ->
         -> NewDB::db().
 delete_entries(State = {DB, _Subscr, _SnapState}, FilterFun)
   when is_function(FilterFun) ->
-    F = fun(DBEntry, StateAcc) ->
+    F = fun(Key, StateAcc) ->
+                DBEntry = ?DB:get(DB, Key),
                 case FilterFun(DBEntry) of
                     false -> StateAcc;
                     _     -> delete_entry(StateAcc, DBEntry)
@@ -636,7 +638,8 @@ delete_entries({DB, _Subscr, _SnapState} = State, Interval) ->
                                 delete_entry_at_key(State1, Key)
                         end, State, Elements);
         _ ->
-            F = fun(DBEntry, StateAcc) ->
+            F = fun(Key, StateAcc) ->
+                        DBEntry = ?DB:get(DB, Key),
                         delete_entry(StateAcc, DBEntry)
                 end,
             SimpleI = intervals:get_simple_intervals(Interval),
@@ -674,7 +677,7 @@ add_snapshot_data(State, Entries) ->
 get_snapshot_data({_DB, _Subscr, {false, _, _}}, _Interval) ->
     [];
 get_snapshot_data({_DB, _Subscr, {SnapTable, _, _}}, [all]) ->
-    ?DB:foldl(SnapTable, fun(E, AccIn) -> [E | AccIn] end, []);
+    ?DB:foldl(SnapTable, fun(K, AccIn) -> [?DB:get(SnapTable, K) | AccIn] end, []);
 get_snapshot_data({_DB, _Subscr, {SnapTable, _, _}}, Interval) ->
     %% TODO usort is only to make test suite happy since it thinks [all, all] is
     %% a sensible interval and double entries where returned
@@ -682,7 +685,8 @@ get_snapshot_data({_DB, _Subscr, {SnapTable, _, _}}, Interval) ->
                     lists:foldl(
         fun(I, Acc) ->
             ?DB:foldl(SnapTable,
-                      fun(Entry, AccIn) ->
+                      fun(Key, AccIn) ->
+                            Entry = ?DB:get(SnapTable, Key),
                             ?TRACE("get_snapshot_data: adding ~p to data",
                                    [Entry]),
                             [Entry | AccIn]
@@ -735,8 +739,9 @@ call_subscribers(State = {_DB, Subscr, _SnapState}, Operation) ->
                                          subscr_op_t()}) -> {db(),
                                                              Operation::close_db
                                                              | subscr_op_t()}.
-call_subscribers_iter({Tag, I, ChangesFun, RemSubscrFun}, {State, Op}) ->
+call_subscribers_iter(Tag, {{_DB, Subscr, _SnapState} = State, Op}) ->
     % assume the key exists (it should since we are iterating over the table!)
+    {Tag, I, ChangesFun, RemSubscrFun} = ?DB:get(Subscr, Tag),
     NewState =
         case Op of
             close_db ->
@@ -974,7 +979,7 @@ delete_snapshot_entry_at_key(State = {DB, Subscr, {SnapTable, LiveLC, SnapLC}}, 
 %%      Used in unittests.
 -spec check_db(DB::db()) -> {true, []} | {false, InvalidEntries::db_as_list()}.
 check_db({DB, _Subscr, _Snap}) ->
-    Data = ?DB:foldl(DB, fun(E, A) -> [E | A] end, []),
+    Data = ?DB:foldl(DB, fun(K, A) -> [?DB:get(DB, K) | A] end, []),
     ValidFun = fun(DBEntry) ->
                        not db_entry:is_empty(DBEntry) andalso
                            not (db_entry:get_writelock(DBEntry) =/= false andalso

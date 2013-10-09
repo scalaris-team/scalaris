@@ -99,12 +99,12 @@ get_load(DB) ->
     ets:info(DB, size).
 
 %% @doc Is equivalent to ets:foldl(Fun, Acc0, DB).
--spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+-spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldl(DB, Fun, Acc) ->
-    ets:foldl(Fun, Acc, DB).
+    foldl(DB, Fun, Acc, {interval, '[', ets:first(DB), ets:last(DB), ']'}, ets:info(DB, size)).
 
 %% @doc Is equivalent to foldl(DB, Fun, Acc0, Interval, get_load(DB)).
--spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
+-spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Interval::db_backend_beh:interval()) -> Acc1::A.
 foldl(DB, Fun, Acc, Interval) ->
     foldl(DB, Fun, Acc, Interval, ets:info(DB, size)).
@@ -112,7 +112,7 @@ foldl(DB, Fun, Acc, Interval) ->
 %% @doc foldl iterates over DB and applies Fun(Entry, AccIn) to every element
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
--spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
+-spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldl(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, '$end_of_table', _End, _}, _MaxNum) -> Acc;
@@ -122,8 +122,8 @@ foldl(DB, Fun, Acc, {element, El}, _MaxNum) ->
     case ets:lookup(DB, El) of
         [] ->
             Acc;
-        [Entry] ->
-            Fun(Entry, Acc)
+        [_Entry] ->
+            Fun(El, Acc)
     end;
 foldl(DB, Fun, Acc, all, MaxNum) ->
     foldl(DB, Fun, Acc, {interval, '[', ets:first(DB), ets:last(DB), ']'},
@@ -135,30 +135,38 @@ foldl(DB, Fun, Acc, {interval, LBr, Start, End, ')'}, MaxNum) ->
 foldl(DB, Fun, Acc, {interval, '[', Start, End, ']'}, MaxNum) ->
     case ets:lookup(DB, Start) of
         [] ->
-            ?TRACE("foldl:~nstart: ~p~nend:   ~p~nmaxnum: ~p~nfound nothing~n",
-                   [Start, End, MaxNum]),
             foldl(DB, Fun, Acc, {interval, '[', ets:next(DB, Start), End, ']'},
-                  MaxNum);
-        [Entry] ->
-            ?TRACE("foldl:~nstart: ~p~nend:   ~p~nmaxnum: ~p~ninterval: ~p~nfound ~p~n",
-                   [Start, End, MaxNum, {interval, '[', Start, End, ']'}, Entry]),
-            foldl(DB, Fun, Fun(Entry, Acc), {interval, '[', ets:next(DB, Start),
-                                             End, ']'}, MaxNum - 1)
+                       MaxNum);
+        [_Entry] ->
+            foldl_iter(DB, Fun, Acc, {interval, '[', Start, End, ']'},
+                       MaxNum)
     end.
 
+-spec foldl_iter(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
+                               Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
+foldl_iter(_DB, _Fun, Acc, _Interval, 0) -> Acc;
+foldl_iter(_DB, _Fun, Acc, {interval, _, '$end_of_table', _End, _}, _MaxNum) -> Acc;
+foldl_iter(_DB, _Fun, Acc, {interval, _, _Start, '$end_of_table', _}, _MaxNum) -> Acc;
+foldl_iter(_DB, _Fun, Acc, {interval, _, Start, End, _}, _MaxNum) when Start > End -> Acc;
+foldl_iter(DB, Fun, Acc, {interval, '[', Start, End, ']'}, MaxNum) ->
+    ?TRACE("foldl:~nstart: ~p~nend:   ~p~nmaxnum: ~p~ninterval: ~p~n",
+           [Start, End, MaxNum, {interval, '[', Start, End, ']'}]),
+    foldl_iter(DB, Fun, Fun(Start, Acc),
+               {interval, '[', ets:next(DB, Start), End, ']'}, MaxNum - 1).
+
 %% @doc Is equivalent to ets:foldr(Fun, Acc0, DB).
--spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+-spec foldr(db(), fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldr(DB, Fun, Acc) ->
-    ets:foldr(Fun, Acc, DB).
+    foldr(DB, Fun, Acc, {interval, '[', ets:first(DB), ets:last(DB), ']'}, ets:info(DB, size)).
 
 %% @doc Is equivalent to foldr(DB, Fun, Acc0, Interval, get_load(DB)).
--spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, db_backend_beh:interval()) -> Acc1::A.
+-spec foldr(db(), fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A, db_backend_beh:interval()) -> Acc1::A.
 foldr(DB, Fun, Acc, Interval) ->
     foldr(DB, Fun, Acc, Interval, ets:info(DB, size)).
 
 %% @doc Behaves like foldl/5 with the difference that it starts at the end of
 %%      Interval and iterates towards the start of Interval.
--spec foldr(db(), fun((entry(), AccIn::A) -> AccOut::A), Acc0::A, db_backend_beh:interval(), non_neg_integer()) -> Acc1::A.
+-spec foldr(db(), fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A, db_backend_beh:interval(), non_neg_integer()) -> Acc1::A.
 foldr(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, _End, '$end_of_table', _}, _MaxNum) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, '$end_of_table', _Start, _}, _MaxNum) -> Acc;
@@ -167,8 +175,8 @@ foldr(DB, Fun, Acc, {element, El}, _MaxNum) ->
     case ets:lookup(DB, El) of
         [] ->
             Acc;
-        [Entry] ->
-            Fun(Entry, Acc)
+        [_Entry] ->
+            Fun(El, Acc)
     end;
 foldr(DB, Fun, Acc, all, MaxNum) ->
     foldr(DB, Fun, Acc, {interval, '[', ets:first(DB), ets:last(DB), ']'},
@@ -180,12 +188,20 @@ foldr(DB, Fun, Acc, {interval, LBr, End, Start, ')'}, MaxNum) ->
 foldr(DB, Fun, Acc, {interval, '[', End, Start, ']'}, MaxNum) ->
     case ets:lookup(DB, Start) of
         [] ->
-            ?TRACE("foldr:~nstart: ~p~nend~p~nmaxnum: ~p~nfound nothing~n",
-                   [Start, End, MaxNum]),
-            foldr(DB, Fun, Acc, {interval, '[', End, ets:prev(DB, Start), ']'}, MaxNum);
-        [Entry] ->
-            ?TRACE("foldr:~nstart: ~p~nend ~p~nmaxnum: ~p~nfound ~p~n",
-                   [Start, End, MaxNum, Entry]),
-            foldr(DB, Fun, Fun(Entry, Acc), {interval, '[', End, ets:prev(DB, Start), ']'}, MaxNum -
-                  1)
+            foldr(DB, Fun, Acc, {interval, '[', End, ets:prev(DB, Start), ']'},
+                       MaxNum);
+        [_Entry] ->
+            foldr_iter(DB, Fun, Acc, {interval, '[', End, Start, ']'},
+                       MaxNum)
     end.
+
+-spec foldr_iter(db(), fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A, db_backend_beh:interval(), non_neg_integer()) -> Acc1::A.
+foldr_iter(_DB, _Fun, Acc, _Interval, 0) -> Acc;
+foldr_iter(_DB, _Fun, Acc, {interval, _, _End, '$end_of_table', _}, _MaxNum) -> Acc;
+foldr_iter(_DB, _Fun, Acc, {interval, _, '$end_of_table', _Start, _}, _MaxNum) -> Acc;
+foldr_iter(_DB, _Fun, Acc, {interval, _, End, Start, _}, _MaxNum) when Start < End -> Acc;
+foldr_iter(DB, Fun, Acc, {interval, '[', End, Start, ']'}, MaxNum) ->
+    ?TRACE("foldr:~nstart: ~p~nend ~p~nmaxnum: ~p~nfound",
+           [Start, End, MaxNum]),
+    foldr_iter(DB, Fun, Fun(Start, Acc), {interval, '[', End, ets:prev(DB, Start), ']'}, MaxNum -
+          1).

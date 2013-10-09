@@ -37,6 +37,15 @@ all() ->
      ets_ordset_insert2,
      ets_ordset_lookup1,
      ets_ordset_lookup2,
+     ets_ordset_foldl,
+     ets_ordset_next_iteration,
+     ets_ordset_lists_foldl,
+     ets_ordset_match,
+     ets_ordset_match_with_limit,
+     ets_ordset_select,
+     ets_ordset_select_with_limit,
+     ets_ordset_select_with_guards,
+     ets_ordset_select_with_guards_with_limit,
      erlang_put,
      erlang_get,
      pdb_set,
@@ -89,6 +98,9 @@ end_per_suite(Config) ->
 count() ->
     1000000.
 
+data_count() ->
+    1000000.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 empty(_Config) ->
@@ -128,6 +140,134 @@ ets_ordset_insert2(_Config) ->
     iter(count(), fun() ->
                           ets:insert(Table, {"performance", "abc"})
                   end, "ets(ordered_set_unnamed):insert"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_foldl(_Config) ->
+    Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
+    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+                                                                      data_count())], 
+    ets:insert(Table, Data),
+    iter(10, fun() ->
+                      ets:foldl(fun(_E, _Acc) -> ok end, ok, Table)
+              end, "ets:foldl"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_next_iteration(_Config) ->
+    Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
+    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+                                                                      data_count())], 
+    ets:insert(Table, Data),
+    iter(10, fun() ->
+                      Keys = ets_next(Table, ets:first(Table), []),
+                      lists:foldl(fun(_E, _Acc) -> ok end, ok, Keys)
+              end, "ets:next_iteration"),
+    ets:delete(Table),
+    ok.
+
+ets_next(_Table, '$end_of_table', Acc) -> Acc;
+ets_next(Table, Key, Acc) -> 
+    ets_next(Table, ets:next(Table, Key), [Key | Acc]).
+
+ets_ordset_lists_foldl(_Config) ->
+    Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
+    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+                                                                      data_count())], 
+    ets:insert(Table, Data),
+    iter(10, fun() ->
+                      List = ets:tab2list(Table),
+                      lists:foldl(fun(_E, _Acc) -> ok end, ok, List)
+              end, "lists:foldl"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_match(_Config) ->
+    Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
+    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+                                                                      data_count())], 
+    ets:insert(Table, Data),
+    iter(10, fun() ->
+                      List = ets:match(Table, {'$1', '_', '_', '_', '_'}),
+                      lists:foldl(fun(_E, _Acc) -> ok end, ok, List)
+              end, "ets:match"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_match_with_limit(_Config) ->
+    Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
+    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+                                                                      data_count()
+                                                                      * 2)], 
+    ets:insert(Table, Data),
+    iter(10, fun() ->
+                     {List, _Cont} = ets:match(Table, {'$1', '_', '_', '_', '_'},
+                                       data_count()),
+                      lists:foldl(fun(_E, _Acc) -> ok end, ok, List)
+              end, "ets:match_with_limit"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_select(_Config) ->
+    Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
+    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+                                                                      data_count())], 
+    ets:insert(Table, Data),
+    iter(10, fun() ->
+                      List = ets:select(Table, [{{'$1', '_', '_', '_', '_'},
+                                                [],
+                                                [{{'$1'}}]}]),
+                      lists:foldl(fun(_E, _Acc) -> ok end, ok, List)
+              end, "ets:select"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_select_with_limit(_Config) ->
+    Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
+    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+                                                                      data_count()
+                                                                      * 2)], 
+    ets:insert(Table, Data),
+    iter(10, fun() ->
+                     {List, _Cont} = ets:select(Table, [{{'$1', '_', '_', '_', '_'},
+                                                [],
+                                                [{{'$1'}}]}],
+                                       data_count()),
+                      lists:foldl(fun(_E, _Acc) -> ok end, ok, List)
+              end, "ets:select_with_limit"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_select_with_guards(_Config) ->
+    Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
+    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+                                                                      data_count())], 
+    ets:insert(Table, Data),
+    iter(10, fun() ->
+                     End = data_count() -1,
+                     List = ets:select(Table, [{{'$1', '_', '_', '_', '_'},
+                                                [{'>=', '$1', 2}, {'=<', '$1',
+                                                                   End}],
+                                                ['$_']}]),
+                      lists:foldl(fun(_E, _Acc) -> ok end, ok, List)
+              end, "ets:select_with_guards"),
+    ets:delete(Table),
+    ok.
+
+ets_ordset_select_with_guards_with_limit(_Config) ->
+    Table = ets:new(db_ets_perf_comp1, [ordered_set, private, named_table]),
+    Data = [{X, crypto:rand_bytes(50), false, 1, -1} || X <- lists:seq(1,
+                                                                      data_count()
+                                                                      * 2)], 
+    ets:insert(Table, Data),
+    iter(10, fun() ->
+                     End = data_count() -1,
+                     {List, _Cont} = ets:select(Table, [{{'$1', '_', '_', '_', '_'},
+                                                [{'>=', '$1', 2}, {'=<', '$1',
+                                                                   End}],
+                                                ['$_']}], data_count()),
+                      lists:foldl(fun(_E, _Acc) -> ok end, ok, List)
+              end, "ets:select_with_guards_with_limit"),
     ets:delete(Table),
     ok.
 
