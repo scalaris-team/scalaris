@@ -58,7 +58,7 @@ deactivate() ->
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
-                             [{pid_groups_join_as, DHTNodeGroup, dht_node_reregister}]).
+                             [{pid_groups_join_as, DHTNodeGroup, ?MODULE}]).
 
 %% @doc Initialises the module with an uninitialized state.
 -spec init([]) -> state_inactive().
