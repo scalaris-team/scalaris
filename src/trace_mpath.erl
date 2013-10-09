@@ -43,6 +43,8 @@
 
 %% client functions
 -export([start/0, start/1, start/2, stop/0]).
+-export([infected/0]).
+-export([clear_infection/0, restore_infection/0]).
 -export([get_trace/0, get_trace/1, get_trace_raw/1, cleanup/0, cleanup/1]).
 
 %% trace analysis
@@ -136,6 +138,29 @@ stop() ->
     %% stop sending epidemic messages
     erlang:erase(trace_mpath),
     ok.
+
+-spec infected() -> boolean().
+infected() ->
+    case erlang:get(trace_mpath) of
+        {_TraceId, _Logger} -> true;
+        _                   -> false
+    end.
+
+-spec clear_infection() -> ok.
+clear_infection() ->
+    case erlang:erase(trace_mpath) of
+        undefined -> ok;
+        PState    -> erlang:put(trace_mpath_bak, PState),
+                     ok
+    end.
+
+-spec restore_infection() -> ok.
+restore_infection() ->
+    case erlang:get(trace_mpath_bak) of
+        undefined -> ok;
+        PState    -> erlang:put(trace_mpath, PState),
+                     ok
+    end.
 
 -spec get_trace() -> trace().
 get_trace() -> get_trace(default).
