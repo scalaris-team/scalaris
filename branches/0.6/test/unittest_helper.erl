@@ -254,7 +254,7 @@ stop_ring(Pid) ->
             catch exit(Pid, kill),
             util:wait_for_process_to_die(Pid),
             stop_pid_groups(),
-            inets:stop(),
+            _ = inets:stop(),
             ct:pal("unittest_helper:stop_ring done."),
             ok
         end
