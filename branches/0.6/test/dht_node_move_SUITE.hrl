@@ -698,11 +698,72 @@ select_from_nodes(Selector, Nodes) ->
         end,
     element(N, Nodes).
 
+get_node_details(DhtNode) ->
+    comm:send(comm:make_global(DhtNode), {get_node_details, comm:this(), [node, pred, succ]}),
+    receive
+        ?SCALARIS_RECV({get_node_details_response, NodeDetails},
+                       begin
+                           Node = node_details:get(NodeDetails, node),
+                           Pred = node_details:get(NodeDetails, pred),
+                           Succ = node_details:get(NodeDetails, succ),
+                           {Pred, Node, Succ}
+                       end)
+        end.
+
 -spec get_predspred_pred_node_succ(DhtNode::pid()) -> node_tuple().
 get_predspred_pred_node_succ(DhtNode) ->
-    {Pred, Node, Succ} = get_pred_node_succ2(DhtNode, "error fetching nodes"),
-    {PredsPred, _Pred2, _Node2} = get_pred_node_succ2(node:pidX(Pred), "error fetching nodes"),
+    {Pred, Node, Succ} = get_node_details(DhtNode),
+    {PredsPred, _Pred2, _Node2} = get_node_details(node:pidX(Pred)),
     {PredsPred, Pred, Node, Succ}.
+
+-spec set_breakpoint(Pid::pid(), gen_component:bp_name()) -> ok.
+set_breakpoint(Pid, Tag) ->
+    gen_component:bp_set(Pid, move, Tag),
+    gen_component:bp_barrier(Pid).
+
+wait(Pid, Tag) ->
+    gen_component:bp_del(Pid, Tag).
+
+continue(Pid) ->
+    gen_component:bp_cont(Pid).
+
+-spec proto_sched_callback_fun() -> proto_sched:callback_on_deliver().
+proto_sched_callback_fun() ->
+    This = self(),
+    fun(_From, _To, Msg) ->
+            case Msg of
+                {move, start_slide, _, _, Tag, _} -> comm:send_local(This, {begin_of_slide, Tag});
+                {move, result, Tag, _Result}      -> comm:send_local(This, {end_of_slide,   Tag});
+                _    -> ok
+            end
+    end.
+
+receive_result() ->
+    receive
+        ?SCALARIS_RECV(X, X)
+    end.
+
+%% check for interleaving of slides using
+%% FIFO properties of erlang message channels
+-spec slide_interleaving() -> boolean().
+slide_interleaving() ->
+    case proto_sched:infected() of
+        false -> true;
+        true  ->
+            %% first message
+            {begin_of_slide, Tag} = receive_result(),
+            %% next message
+            Result =
+                case receive_result() of
+                    {end_of_slide, Tag}     -> false;
+                    {begin_of_slide, _Tag2} -> true
+                end,
+            %% clear pending messages
+            _ = receive_result(),
+            _ = receive_result(),
+            Result
+    end.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -728,13 +789,38 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
               Tag2 = Slide2#slideconf.name,
               ct:pal("Beginning ~p, ~p", [Tag1, Tag2]),
               ?proto_sched(start),
-              comm:send(node:pidX(Node1), {move, start_slide, Direction1, TargetId1, {first,  Direction1, Tag1}, self()}),
-              comm:send(node:pidX(Node2), {move, start_slide, Direction2, TargetId2, {second, Direction2, Tag2}, self()}),
-              Result1 = fun() -> receive ?SCALARIS_RECV(X,X) end end(),
-              Result2 = fun() -> receive ?SCALARIS_RECV(Y,Y) end end(),
-              ?proto_sched(stop),
+              PidLocal1 = comm:make_local(node:pidX(Node1)),
+              PidLocal2 = comm:make_local(node:pidX(Node2)),
+              %% We use breakpoints to assure simultaneous slides.
+              %% As these don't work with the proto scheduler, we test the timing of the slides using
+              %% a callback function instead. The function sends out messages begin_of_slide and
+              %% end_of_slide messages for each slide.
+              case proto_sched:infected() of
+                  false ->
+                      set_breakpoint(PidLocal1, slide1),
+                      ?IIF(PidLocal1 =/= PidLocal2, set_breakpoint(PidLocal2, slide2), ok);
+                  true  ->
+                      proto_sched:register_callback(proto_sched_callback_fun())
+              end,
+              %% send out slides
+              comm:send(node:pidX(Node1), {move, start_slide, Direction1, TargetId1, {slide1, Direction1, Tag1}, self()}),
+              comm:send(node:pidX(Node2), {move, start_slide, Direction2, TargetId2, {slide2, Direction2, Tag2}, self()}),
+              %% Continue once both slides have reached the gen_component
+              case proto_sched:infected() of
+                  false ->
+                      wait(PidLocal1, slide1),
+                      ?IIF(PidLocal1 =/= PidLocal2, wait(PidLocal2, slide2), ok),
+                      continue(PidLocal1),
+                      ?IIF(PidLocal1 =/= PidLocal2, continue(PidLocal2), ok);
+                  true  ->
+                      ok
+              end,
+              %% receive results
+              Result1 = fun() -> receive ?SCALARIS_RECV({move, result, _Tag1, Result}, Result) end end(),
+              Result2 = fun() -> receive ?SCALARIS_RECV({move, result, _Tag2, Result}, Result) end end(),
               ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
-              VerifyFun(Result1, Result2),
+              VerifyFun(Result1, Result2, slide_interleaving()),
+              ?proto_sched(stop),
               timer:sleep(10)
           end || Slide1 <- SlideVariations1, Slide2 <- SlideVariations2],
     ok.
@@ -751,13 +837,13 @@ test_slide_adjacent(_Config) ->
     % make sure all keys have been created...
     timer:sleep(50),
     VerifyFun =
-        fun(Result1, Result2) ->
+        fun(Result1, Result2, _Interleaved) ->
                 unittest_helper:check_ring_load(440),
                 unittest_helper:check_ring_data(),
                 %% both slides should be successfull
-                ?assert(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok
+                ?assert(Result1 =:= ok andalso Result2 =:= ok
                         orelse %% rarely, one slides fails because the neighbor information hasn't been updated yet
-                          (element(4, Result1) =:= wrong_pred_succ_node) xor (element(4, Result2) =:= wrong_pred_succ_node))
+                          (Result1 =:= wrong_pred_succ_node) xor (Result2 =:= wrong_pred_succ_node))
         end,
     Actions =
         [{
@@ -815,18 +901,20 @@ test_slide_conflict(_Config) ->
     timer:sleep(50),
     DhtNodes = pid_groups:find_all(dht_node),
     VerifyFun =
-        fun (Result1, Result2) ->
+        fun (Result1, Result2, Interleaved) ->
                 unittest_helper:check_ring_load(440),
                 unittest_helper:check_ring_data(),
                 %% Outcome: at most one slide may succeed.
-                %% Currently, breakpoints can't be used with the proto scheduler. This possibly
-                %% can lead to a sequential processing of the slides, i.e. first slide finishes
-                %% before the second slide starts. Hence, for now, we need to also allow both
-                %% slides to return OK.
-                %% TODO: ?assert(not(element(4, Result1) =:= ok andalso element(4, Result2) =:= ok))
-                Vals = [ok, ongoing_slide, target_id_not_in_range, wrong_pred_succ_node],
-                ?assert(lists:member(element(4, Result1), Vals)),
-                ?assert(lists:member(element(4, Result2), Vals))
+                %% We ensure slide interleaving using breakpoints. When using the proto scheduler
+                %% we test for interleaving as we cannot use breakpoints.
+                case Interleaved of
+                    true ->
+                        ?assert(not(Result1 =:= ok andalso Result2 =:= ok));
+                    false ->
+                        Vals = [ok, ongoing_slide, target_id_not_in_range, wrong_pred_succ_node],
+                        ?assert(lists:member(Result1, Vals)),
+                        ?assert(lists:member(Result2, Vals))
+                end
         end,
     Actions = [
                {
