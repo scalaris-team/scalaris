@@ -23,7 +23,7 @@
 -include("scalaris.hrl").
 
 -export([calculateStddev/2, bestStddev/2, bestStddev/3,
-         split_by_load/2, split_by_key/2, split_my_range/2]).
+         split_by_key/2, split_my_range/2]).
 
 
 % Avg2 = average of load ^2
@@ -76,21 +76,6 @@ calc_sum2Change(Op) ->
             N3NewLoad = node_details:get(lb_op:get(Op, n3_new), load),
             (Sum2ChangeOp1 - (N3Load * N3Load) + (N3NewLoad * N3NewLoad));
         _ -> Sum2ChangeOp1
-    end.
-
-%% @doc Returns the SplitKey that takes (at most) TargetLoad keys from the
-%%      current node.
-%%      Precond: Load is larger than or equal to 2.
--spec split_by_load(DhtNodeState::dht_node_state:state(), TargetLoad::pos_integer())
-        -> {SplitKey::?RT:key(), TargetLoadNew::non_neg_integer()}.
-split_by_load(DhtNodeState, TargetLoad) ->
-    Neighbors = dht_node_state:get(DhtNodeState, neighbors),
-%%     log:pal("[ ~.0p ] data: ~.0p", [self(), db_dht:get_data(DB)]),
-    PredId = node:id(nodelist:pred(Neighbors)),
-    NodeId = nodelist:nodeid(Neighbors),
-    case dht_node_state:get_split_key(DhtNodeState, PredId, NodeId, TargetLoad, forward) of
-        {NodeId, _TargetLoadNew} -> erlang:throw('no key in range');
-        X -> X
     end.
 
 %% @doc Returns the given SplitKey and the load that would be split off by
