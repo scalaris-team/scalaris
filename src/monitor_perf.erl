@@ -320,9 +320,9 @@ on({web_debug_info, Requestor} = _Msg,
              PerfRR5 = rrd:reduce_timeslots(5, Data#state.perf_rr),
              PerfLH5 = rrd:reduce_timeslots(5, Data#state.perf_lh),
              PerfTX5 = rrd:reduce_timeslots(5, Data#state.perf_tx),
-             [monitor:web_debug_info_merge_values(perf_rr, PerfRR5),
-              monitor:web_debug_info_merge_values(perf_lh, PerfLH5),
-              monitor:web_debug_info_merge_values(perf_tx, PerfTX5)]
+             [monitor:web_debug_info_merge_values({?MODULE, perf_rr}, PerfRR5),
+              monitor:web_debug_info_merge_values({dht_node, perf_lh}, PerfLH5),
+              monitor:web_debug_info_merge_values({api_tx, perf_tx}, PerfTX5)]
          end || Data <- [AllNodes, Leader]],
     KeyValueList = lists:flatten([{"all nodes:", ""}, KVAllNodes,
                                   {"leader:",    ""}, KVLeader]),
