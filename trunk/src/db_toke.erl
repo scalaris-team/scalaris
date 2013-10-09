@@ -172,13 +172,13 @@ get_load({DB, _FileName}) ->
 
 %% @doc Equivalent to toke_drv:fold(Fun, Acc0, DB).
 %%      Returns a potentially larger-than-memory dataset. Use with care.
--spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+-spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldl(State, Fun, Acc) ->
     foldl_helper(State, Fun, Acc, all, -1).
 
 %% @equiv foldl(DB, Fun, Acc0, Interval, get_load(DB))
 %% @doc   Returns a potentially larger-than-memory dataset. Use with care.
--spec foldl(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
+-spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Interval::db_backend_beh:interval()) -> Acc1::A.
 foldl(State, Fun, Acc, Interval) ->
     foldl_helper(State, Fun, Acc, Interval, -1).
@@ -187,7 +187,7 @@ foldl(State, Fun, Acc, Interval) ->
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
 %%      Returns a potentially larger-than-memory dataset. Use with care.
--spec foldl(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
+-spec foldl(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldl(State, Fun, Acc, Interval, MaxNum) ->
     %% HINT
@@ -199,24 +199,21 @@ foldl(State, Fun, Acc, Interval, MaxNum) ->
 
 %% @private this helper enables us to use -1 as MaxNum. MaxNum == -1 signals that all
 %%          data is to be retrieved.
--spec foldl_helper(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
+-spec foldl_helper(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
 foldl_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
     Keys = get_all_keys(DB, Interval, MaxNum),
-    lists:foldr(fun(Key, AccIn) ->
-                        Entry = toke_drv:get(DB, ?IN(Key)),
-                        Fun(?OUT(Entry), AccIn)
-                end, Acc, Keys).
+    lists:foldr(Fun, Acc, Keys).
 
 %% @doc makes a foldr over the whole dataset.
 %%      Returns a potentially larger-than-memory dataset. Use with care.
--spec foldr(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
+-spec foldr(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A) -> Acc1::A.
 foldr(State, Fun, Acc) ->
     foldr_helper(State, Fun, Acc, all, -1).
 
 %% @equiv foldr(DB, Fun, Acc0, Interval, get_load(DB))
 %% @doc   Returns a potentially larger-than-memory dataset. Use with care.
--spec foldr(DB::db(), Fun::fun((entry(), AccIn::A) -> AccOut::A), Acc0::A,
+-spec foldr(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Interval::db_backend_beh:interval()) -> Acc1::A.
 foldr(State, Fun, Acc, Interval) ->
     foldr_helper(State, Fun, Acc, Interval, -1).
@@ -225,14 +222,14 @@ foldr(State, Fun, Acc, Interval) ->
 %%      encountered in Interval. On the first call AccIn == Acc0. The iteration
 %%      stops as soon as MaxNum elements have been encountered.
 %%      Returns a potentially larger-than-memory dataset. Use with care.
--spec foldr(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
+-spec foldr(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::non_neg_integer()) -> Acc1::A.
 foldr(State, Fun, Acc, Interval, MaxNum) ->
     foldr_helper(State, Fun, Acc, Interval, MaxNum).
 
 %% @private this helper enables us to use -1 as MaxNum. MaxNum == -1 signals that all
 %%          data is to be retrieved.
--spec foldr_helper(DB::db(), Fun::fun((Entry::entry(), AccIn::A) -> AccOut::A), Acc0::A,
+-spec foldr_helper(DB::db(), Fun::fun((Key::key(), AccIn::A) -> AccOut::A), Acc0::A,
                                Intervall::db_backend_beh:interval(), MaxNum::integer()) -> Acc1::A.
 foldr_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
     %% first only retrieve keys so we don't have to load the whole db into memory
@@ -245,10 +242,7 @@ foldr_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
               end,
     %% see HINT in foldl/5
     %% now retrieve actual data
-    lists:foldl(fun(Key, AccIn) ->
-                        Entry = toke_drv:get(DB, ?IN(Key)),
-                        Fun(?OUT(Entry), AccIn)
-                end, Acc, CutData).
+    lists:foldl(Fun, Acc, CutData).
 
 %% @private get_all_keys/3 retrieves all keys in DB that fall into Interval but
 %%          not more than MaxNum. If MaxNum == -1 all Keys are retrieved. If
