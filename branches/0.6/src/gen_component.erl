@@ -447,7 +447,7 @@ on(GCMsg, UState, GCState)
     on_gc_msg(GCMsg, UState, GCState);
 on({ping, Pid}, UState, GCState) ->
     %% handle failure detector messages
-    comm:send(Pid, {pong}, [{channel, prio}]),
+    comm:send(Pid, {pong, pid_groups:my_pidname()}, [{channel, prio}]),
     loop(UState, GCState);
 on({?send_to_group_member, Processname, Msg}, UState, GCState) ->
     %% forward a message to group member by its process name
@@ -531,7 +531,7 @@ on_traced_msg(GCMsg, UState, GCState)
     on_gc_msg(GCMsg, UState, GCState);
 on_traced_msg({ping, Pid}, UState, GCState) ->
     %% handle failure detector messages
-    comm:send(Pid, {pong}, [{channel, prio}]),
+    comm:send(Pid, {pong, pid_groups:my_pidname()}, [{channel, prio}]),
     MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
     trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
     trace_mpath:stop(),

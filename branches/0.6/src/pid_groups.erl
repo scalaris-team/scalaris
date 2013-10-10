@@ -148,7 +148,7 @@ add(GrpName, PidName, Pid) ->
 -spec my_groupname() -> groupname() | undefined.
 my_groupname() -> erlang:get('$@groupname').
 
--spec my_pidname() -> pidname().
+-spec my_pidname() -> pidname() | undefined.
 my_pidname() -> erlang:get('$@pidname').
 
 %% @doc Gets the Pid of the current process' group member with the given name.
