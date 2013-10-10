@@ -100,7 +100,7 @@ test_on_vivaldi_shuffle(Config) ->
     _NewState = vivaldi:on_active({vivaldi_shuffle, comm:this(), [0.0, 0.0], 1.0},
                                  InitialState),
     receive
-        {ping, SourcePid} -> comm:send(SourcePid, {pong})
+        {ping, SourcePid} -> comm:send(SourcePid, {pong, vivaldi})
     end,
 
     ?expect_message({update_vivaldi_coordinate, _Latency, {[0.0, 0.0], 1.0}}),
