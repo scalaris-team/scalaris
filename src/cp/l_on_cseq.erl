@@ -34,13 +34,15 @@
 
 -export([lease_renew/2]).
 -export([lease_handover/3]).
--export([lease_takeover/1]).
+-export([lease_takeover/2]).
 -export([lease_split/4]).
 -export([lease_merge/3]).
 -export([lease_send_lease_to_node/2]).
 -export([lease_split_and_change_owner/5]).
 -export([disable_lease/2]).
 -export([remove_lease_from_dht_node_state/2]).
+
+-export([id/1]).
 
 % for unit tests
 -export([unittest_lease_update/2]).
@@ -61,7 +63,6 @@
 
 -export([add_first_lease_to_db/2]).
 -export([empty_lease_list/0]).
--export([id/1]).
 
 -ifdef(with_export_type_support).
 -export_type([lease_list_state/0]).
@@ -161,11 +162,11 @@ lease_handover(Lease, NewOwner, ReplyTo) ->
                     {l_on_cseq, handover, Lease, NewOwner, ReplyTo}),
     ok.
 
--spec lease_takeover(lease_t()) -> ok.
-lease_takeover(Lease) ->
+-spec lease_takeover(lease_t(), comm:erl_local_pid()) -> ok.
+lease_takeover(Lease, ReplyTo) ->
     % @todo precondition: Lease has timeouted
     comm:send_local(pid_groups:get_my(dht_node),
-                    {l_on_cseq, takeover, Lease}),
+                    {l_on_cseq, takeover, Lease, ReplyTo}),
     ok.
 
 -spec lease_split(lease_t(), intervals:interval(),
@@ -406,26 +407,28 @@ on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
 % lease takeover
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
-   State) ->
+on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}, 
+    ReplyTo}, State) ->
     New = Old#lease{epoch   = OldEpoch + 1,
                     version = 0,
                     owner   = comm:this(),
                     timeout = new_timeout()},
     ContentCheck = is_valid_takeover(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
-    Self = comm:reply_as(self(), 3, {l_on_cseq, takeover_reply, '_'}),
+    Self = comm:reply_as(self(), 4, {l_on_cseq, takeover_reply, ReplyTo, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
     State;
 
-on({l_on_cseq, takeover_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
-    % @todo if success update lease in State
-    State;
+on({l_on_cseq, takeover_reply, ReplyTo, {qwrite_done, _ReqId, _Round, Value}}, State) ->
+    %% log:log("takeover success ~p~n", [Value]),
+    comm:send_local(ReplyTo, {takeover, success, Value}),
+    update_lease_in_dht_node_state(Value, State, active);
 
-on({l_on_cseq, takeover_reply, {qwrite_deny, _ReqId, _Round, _Value, _Reason}}, State) ->
-    % @todo if success update lease in State
+on({l_on_cseq, takeover_reply, ReplyTo, {qwrite_deny, _ReqId, _Round, Value, Reason}}, State) ->
+    %% log:log("takeover failed ~p ~p~n", [Value, Reason]),
+    comm:send_local(ReplyTo, {takeover, failed, Value}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
