@@ -69,7 +69,7 @@ all() ->
 
 suite() ->
     [
-     {timetrap, {seconds, 30}}
+     {timetrap, {seconds, 60}}
     ].
 
 groups() ->
