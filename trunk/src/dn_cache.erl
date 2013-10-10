@@ -30,7 +30,7 @@
 -export([add_zombie_candidate/1, subscribe/0, unsubscribe/0]).
 -type(message() ::
     {trigger} |
-    {trigger_reply, {pong}, node:node_type()} |
+    {trigger_reply, {pong, PidName::pid_groups:pidname() | undefined}, node:node_type()} |
     {add_zombie_candidate, node:node_type()} |
     {subscribe, comm:erl_local_pid()} |
     {unsubscribe, comm:erl_local_pid()} |
@@ -97,10 +97,16 @@ on({trigger}, {Queue, Subscribers, TriggerState}) ->
     NewTriggerState = trigger:next(TriggerState),
     {fix_queue:new(config:read(zombieDetectorSize)), Subscribers, NewTriggerState};
 
-on({trigger_reply, {pong}, Zombie}, {Queue, Subscribers, TriggerState}) ->
+on({trigger_reply, {pong, dht_node}, Zombie},
+   {_Queue, Subscribers, _TriggerState} = State) ->
     log:log(warn,"[ dn_cache ~p ] found zombie ~.0p", [comm:this(), Zombie]),
     report_zombie(Subscribers, Zombie),
-    {Queue, Subscribers, TriggerState};
+    State;
+
+on({trigger_reply, {pong, PidName}, Zombie}, State) ->
+    log:log(warn,"[ dn_cache ~p ] found zombie ~.0p but no dht_node process (reports as ~.0p)",
+            [comm:this(), Zombie, PidName]),
+    State;
 
 on({add_zombie_candidate, Node}, {Queue, Subscribers, TriggerState}) ->
     {add_to_queue(Queue, Node), Subscribers, TriggerState};

@@ -102,7 +102,7 @@ join_lookup(Config) ->
                           {?lookup_aux, X, 0, {ping, This}}) || X <- Keys ],
 
     %% got all 4 replies? ok
-    [ receive ?SCALARIS_RECV({pong}, ok) end || _ <- Keys ].
+    [ receive ?SCALARIS_RECV({pong, dht_node}, ok) end || _ <- Keys ].
 
 add_9(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),

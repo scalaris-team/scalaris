@@ -73,7 +73,7 @@ fake_node() ->
 fake_process() ->
     receive
         {ping, Pid} ->
-            comm:send(Pid, {pong}),
+            comm:send(Pid, {pong, dht_node}),
             fake_process();
         {sleep} ->
             receive

@@ -39,7 +39,7 @@
 
 % accepted messages of vivaldi_latency processes
 -type message() ::
-    {{pong}, Count::pos_integer()} |
+    {{pong, PidName::pid_groups:pidname() | undefined}, Count::pos_integer()} |
     {start_ping} |
     {shutdown} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
@@ -52,7 +52,7 @@
 
 %% @doc message handler
 -spec on(Message::message(), State::state()) -> state().
-on({ping_reply, {pong}, Count},
+on({ping_reply, {pong, vivaldi}, Count},
    {Owner, RemotePid, Token, Start, Count, Latencies})
   when Start =/= unknown ->
     Stop = erlang:now(),
@@ -67,7 +67,7 @@ on({ping_reply, {pong}, Count},
             {Owner, RemotePid, Token, unknown, Count, NewLatencies}
     end;
 
-on({ping_reply, {pong}, _Count}, State) ->
+on({ping_reply, {pong, _PidName}, _Count}, State) ->
     % ignore unrelated pong messages
     State;
 
