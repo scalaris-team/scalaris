@@ -51,6 +51,9 @@ groups() ->
                             ]},
      {merge_tests, [sequence], [
                                ]}, % @todo
+     {takeover_tests, [sequence], [
+                                   test_takeover
+                               ]},
      {handover_tests, [sequence], [
                                 test_handover,
                                 test_handover_with_concurrent_renew,
@@ -67,7 +70,8 @@ all() ->
      {group, tester_tests},
      {group, renew_tests},
      {group, split_tests},
-     {group, handover_tests}
+     {group, handover_tests},
+     {group, takeover_tests}
      %{group, gc_tests}
      ].
 
@@ -79,6 +83,8 @@ group(renew_tests) ->
     [{timetrap, {seconds, 10}}];
 group(split_tests) ->
     [{timetrap, {seconds, 10}}];
+group(takeover_tests) ->
+    [{timetrap, {seconds, 5}}];
 group(handover_tests) ->
     [{timetrap, {seconds, 10}}].
 
@@ -127,7 +133,7 @@ tester_type_check_l_on_cseq(_Config) ->
            [ {add_first_lease_to_db, 2}, %% cannot create DB refs for State
              {lease_renew, 2}, %% sends messages
              {lease_handover, 3}, %% sends messages
-             {lease_takeover, 1}, %% sends messages
+             {lease_takeover, 2}, %% sends messages
              {lease_split, 4}, %% sends messages
              {lease_merge, 3}, %% sends messages
              {lease_send_lease_to_node, 2}, %% sends messages
@@ -552,6 +558,69 @@ test_garbage_collector(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
+% takeover unit tests
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_takeover(_Config) ->
+    ModifyF = fun(Old) -> Old end,
+    WaitF = fun (Id, _Lease, OriginalOwner) ->
+                    ct:pal("takeover: wait_for_lease_owner ~p", [OriginalOwner]),
+                    wait_for_lease_owner(Id, OriginalOwner),
+                    ct:pal("takeover: wait_for_lease_owner done"),
+                    receive
+                        {takeover, success, _} -> ok
+                    end
+            end,
+    test_takeover_helper(_Config, ModifyF, WaitF),
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% takeover helper
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+test_takeover_helper(_Config, ModifyF, WaitF) ->
+    pid_groups:join(pid_groups:group_with(dht_node)),
+
+    % intercept lease renew
+    {l_on_cseq, renew, Old, _Mode} = intercept_lease_renew(),
+    OriginalOwner = l_on_cseq:get_owner(Old),
+    ct:pal("takeover: old lease ~p", [Old]),
+    Id = l_on_cseq:get_id(Old),
+    % now we change the owner of the lease
+    l_on_cseq:lease_handover(Old, comm:this(), self()),
+    ct:pal("new owner ~p", [comm:this()]),
+    HandoverWaitF = fun (_Id, _Lease) ->
+                            wait_for_lease_owner(_Id, comm:this()),
+                            receive
+                                {handover, success, _} -> ok
+                            end
+                    end,
+    HandoverWaitF(Id, Old),
+    ct:pal("takeover: now we update the lease"),
+    % now we update the lease
+    {ok, Current} = l_on_cseq:read(Id),
+    ct:pal("takeover: current lease: ~p", [Current]),
+    New = ModifyF(Current),
+    case New =/= Current of
+        true ->
+            Res = l_on_cseq:unittest_lease_update(Current, New),
+            ct:pal("takeover: lease_update: ~p (~p -> ~p)", [Res, Current, New]),
+            wait_for_lease(New);
+        false ->
+            ok
+    end,
+    ct:pal("takeover: takeover"),
+    % now the error handling of lease_takeover is going to be tested
+    l_on_cseq:lease_takeover(Current, self()),
+    ct:pal("takeover: wait_for_lease2"),
+    WaitF(Id, Current, OriginalOwner),
+    ct:pal("takeover: done"),
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
 % handover helper
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -791,12 +860,12 @@ wait_for_lease_owner(Id, NewOwner) ->
 wait_for_lease_helper(Id, F) ->
     wait_for(fun () ->
                      DHTNode = pid_groups:find_a(dht_node),
-                     comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
-                     {A, P} = receive
-                             {get_state_response, {ActiveList, PassiveList}} ->
-                                 {ActiveList, PassiveList}
-                         end,
-                     ct:pal("~p ~p", [A, P]),
+                     %comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
+                     %{A, P} = receive
+                     %        {get_state_response, {ActiveList, PassiveList}} ->
+                     %            {ActiveList, PassiveList}
+                     %    end,
+                     %ct:pal("~p ~p", [A, P]),
                      case l_on_cseq:read(Id) of
                          {ok, Lease} ->
                              F(Lease);
