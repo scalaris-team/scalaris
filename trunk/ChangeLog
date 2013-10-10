@@ -15,6 +15,13 @@ Packaging:
 API:
 
 - Java-API: add Maven build support
+- Java-API: add CircularByteArrayOutputStream#clear()
+- Java-API: fix ConnectionPool#getConnection(timeout) throwing
+            IllegalMonitorStateException if a single ConnectionPool is used
+            by multiple threads and no more connections are available
+- Java-API: add a "-monitor" command line parameter
+- api_monitor: return the latency and stddev values of the micro-benchmark
+               executed by monitor_perf for node and service performance
 
 Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
                                  and Contrail http://contrail-project.eu):
@@ -41,10 +48,13 @@ Business Logic:
 
 Infrastructure:
 
-- fd: get rid of annoying, wrongly raised log warnings
+- DB: improve performance of fold[lr] implementations by a factor of 2
+- FD: get rid of annoying, wrongly raised log warnings
 - RM: provide a more generic Reason for RM subscriptions
 - RM: remove trigger infections
 - RT: don't trigger an update when a slide finishes
+- RT, FRT: reduce the number of messages sent on lookups
+- log: don't exit with a badmatch if our error_logger is not the only one
 
 Tests:
 
@@ -62,12 +72,15 @@ Tools:
 
 Bugs:
 
+- node join: fix not being able to join a system with passive load balancer
+             if the number of items in the DB is too high
 - tx_tm_rtm: fix wrong asserts
 - fix node resposibility check not always including message forward and
   db_range intervals
 - tx_tp: add missing snapshot number in tp_do_commit_abort message
 - bulkowner: respect the nodes' DB ranges and forward requests for
              non-responsible ranges
+- dn_cache: fix reporting wrong PIDs back as zombies after node reboots
 - fix some more (less severe) bugs
 
 Scalaris 0.6.0 (codename "Conus scalaris") - August 19, 2013
