@@ -30,8 +30,8 @@
 -export([add_zombie_candidate/1, subscribe/0, unsubscribe/0]).
 -type(message() ::
     {trigger} |
-    {{pong}, node:node_type() | comm:mypid()} |
-    {add_zombie_candidate, node:node_type() | comm:mypid()} |
+    {trigger_reply, {pong}, node:node_type()} |
+    {add_zombie_candidate, node:node_type()} |
     {subscribe, comm:erl_local_pid()} |
     {unsubscribe, comm:erl_local_pid()} |
     {send_error, Target::comm:mypid(), {ping, ThisWithCookie::comm:mypid()}, Reason::atom()} |
@@ -46,7 +46,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Adds a dht_node PID to the dead node cache for further alive-checks.
--spec add_zombie_candidate(node:node_type() | comm:mypid()) -> ok.
+-spec add_zombie_candidate(node:node_type()) -> ok.
 add_zombie_candidate(Node) ->
     comm:send_local(get_pid(), {add_zombie_candidate, Node}).
 
@@ -128,7 +128,7 @@ on({web_debug_info, Requestor}, {Queue, Subscribers, _TriggerState} = State) ->
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
 
--spec add_to_queue(Queue::fix_queue:fix_queue(), Node::node:node_type() | comm:mypid())
+-spec add_to_queue(Queue::fix_queue:fix_queue(), Node::node:node_type())
         -> fix_queue:fix_queue().
 add_to_queue(Queue, Node) ->
     case node:is_valid(Node) of
@@ -138,16 +138,11 @@ add_to_queue(Queue, Node) ->
                                           fun(_Old, New) -> New end)
     end.
 
--spec report_zombie(Subscribers::gb_set(), Zombie::node:node_type() | comm:mypid()) -> ok.
+-spec report_zombie(Subscribers::gb_set(), Zombie::node:node_type()) -> ok.
 report_zombie(Subscribers, Zombie) ->
-    case node:is_valid(Zombie) of % comm:mypid() or node:node_type()?
-        true -> gb_sets:fold(fun(X, _) ->
-                                     comm:send_local(X, {zombie, Zombie})
-                             end, ok, Subscribers);
-        _    -> gb_sets:fold(fun(X, _) ->
-                                     comm:send_local(X, {zombie_pid, Zombie})
-                             end, ok, Subscribers)
-    end,
+    gb_sets:fold(fun(X, _) ->
+                         comm:send_local(X, {zombie, Zombie})
+                 end, ok, Subscribers),
     ok.
 
 %% @doc Gets the pid of the dn_cache process in the same group as the calling
