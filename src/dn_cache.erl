@@ -45,6 +45,7 @@
 % Public Interface
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Adds a dht_node PID to the dead node cache for further alive-checks.
 -spec add_zombie_candidate(node:node_type() | comm:mypid()) -> ok.
 add_zombie_candidate(Node) ->
     comm:send_local(get_pid(), {add_zombie_candidate, Node}).

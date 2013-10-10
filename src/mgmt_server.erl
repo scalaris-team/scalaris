@@ -36,14 +36,13 @@
 % accepted messages of the mgmt_server process
 -type(message() ::
     {crash, PID::comm:mypid()} |
-    {get_list, Ping_PID::comm:mypid()} |
-    {be_the_first, Ping_PID::comm:mypid()} |
-    {get_list_length, Ping_PID::comm:mypid()} |
-    {register, Ping_PID::comm:mypid()} |
+    {get_list, SourcePid::comm:mypid()} |
+    {get_list_length, SourcePid::comm:mypid()} |
+    {register, Node::node:node_type()} |
     {connect}).
 
 % internal state (known nodes)
--type(state()::Nodes::gb_set()).
+-type(state()::Nodes::gb_tree()).
 
 %% @doc trigger a message with the number of nodes known to the mgmt server
 -spec number_of_nodes() -> ok.
@@ -83,36 +82,35 @@ node_list(UseShepherd) ->
 
 -spec on(message(), state()) -> state().
 on({crash, PID}, Nodes) ->
-    NewNodes = gb_sets:delete_any(PID, Nodes),
-    dn_cache:add_zombie_candidate(PID),
-    NewNodes;
+    case gb_trees:lookup(PID, Nodes) of
+        {value, Node} -> dn_cache:add_zombie_candidate(Node),
+                         gb_trees:delete(PID, Nodes);
+        none          -> Nodes
+    end;
 
-on({get_list, Ping_PID}, Nodes) ->
-    comm:send(Ping_PID, {get_list_response, gb_sets:to_list(Nodes)}),
+on({get_list, SourcePid}, Nodes) ->
+    comm:send(SourcePid, {get_list_response, gb_trees:keys(Nodes)}),
     Nodes;
 
-on({get_list_length, Ping_PID}, Nodes) ->
-    L = length(gb_sets:to_list(Nodes)),
-    comm:send(Ping_PID, {get_list_length_response, L}),
+on({get_list_length, SourcePid}, Nodes) ->
+    comm:send(SourcePid, {get_list_length_response, gb_trees:size(Nodes)}),
     Nodes;
 
-on({register, Ping_PID}, Nodes) ->
-    fd:subscribe(Ping_PID),
-    NewNodes = gb_sets:add(Ping_PID, Nodes),
-    NewNodes;
+on({register, Node}, Nodes) ->
+    NodePid = node:pidX(Node),
+    fd:subscribe(NodePid),
+    gb_trees:insert(NodePid, Node, Nodes);
 
 on({connect}, State) ->
     % ugly work around for finding the local ip by setting up a socket first
     State;
 
 % dead-node-cache reported dead node to be alive again
-on({zombie_pid, Ping_PID}, Nodes) ->
-    fd:subscribe(Ping_PID),
-    NewNodes = gb_sets:add(Ping_PID, Nodes),
-    NewNodes;
+on({zombie, Node}, Nodes) ->
+    on({register, Node}, Nodes);
 
 on({web_debug_info, Requestor}, Nodes) ->
-    RegisteredPids = gb_sets:to_list(Nodes),
+    RegisteredPids = gb_trees:to_list(Nodes),
     % resolve (local and remote) pids to names:
     PidNames = pid_groups:pids_to_names(RegisteredPids, 1000),
     KeyValueList =
@@ -131,7 +129,7 @@ init(_Options) ->
         _ -> ok
     end,
     dn_cache:subscribe(),
-    gb_sets:empty().
+    gb_trees:empty().
 
 %% @doc starts the server; called by the mgmt supervisor
 %% @see sup_scalaris
