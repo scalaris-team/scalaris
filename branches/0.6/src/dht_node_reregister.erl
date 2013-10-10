@@ -92,7 +92,12 @@ on_active({deactivate_reregister}, TriggerState)  ->
     gen_component:change_handler({inactive, TriggerState}, fun ?MODULE:on_inactive/2);
 
 on_active({register}, TriggerState) ->
-    RegisterMessage = {register, get_dht_node_this()},
+    comm:send_local(pid_groups:get_my(dht_node),
+                    {get_node_details, comm:this(), [node]}),
+    trigger:next(TriggerState);
+
+on_active({get_node_details_response, NodeDetails}, TriggerState) ->
+    RegisterMessage = {register, node_details:get(NodeDetails, node)},
     _ = case config:read(register_hosts) of
             failed -> MgmtServer = mgmtServer(),
                       case comm:is_valid(MgmtServer) of
@@ -101,8 +106,7 @@ on_active({register}, TriggerState) ->
                       end;
             Hosts  -> [comm:send(Host, RegisterMessage) || Host <- Hosts]
         end,
-    NewTriggerState = trigger:next(TriggerState),
-    NewTriggerState;
+    TriggerState;
 
 on_active({web_debug_info, Requestor}, TriggerState) ->
     KeyValueList =
@@ -118,12 +122,6 @@ on_active({web_debug_info, Requestor}, TriggerState) ->
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
     config:read(reregister_interval).
-
-%% @doc Gets the pid of the dht_node process in the same group as the calling
-%%      process.
--spec get_dht_node_this() -> comm:mypid().
-get_dht_node_this() ->
-    comm:make_global(pid_groups:get_my(dht_node)).
 
 %% @doc pid of the mgmt server (may be invalid)
 -spec mgmtServer() -> comm:mypid() | any().
