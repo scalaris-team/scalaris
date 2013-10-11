@@ -34,15 +34,13 @@
 
 -export([lease_renew/2]).
 -export([lease_handover/3]).
--export([lease_takeover/2]).
+-export([lease_takeover/1]).
 -export([lease_split/4]).
 -export([lease_merge/3]).
 -export([lease_send_lease_to_node/2]).
 -export([lease_split_and_change_owner/5]).
 -export([disable_lease/2]).
 -export([remove_lease_from_dht_node_state/2]).
-
--export([id/1]).
 
 % for unit tests
 -export([unittest_lease_update/2]).
@@ -53,7 +51,7 @@
 % lease accessors
 -export([get_version/1,set_version/2,
          get_epoch/1, set_epoch/2,
-         new_timeout/0, set_timeout/1, get_pretty_timeout/1,
+         new_timeout/0, set_timeout/1,
          get_id/1,
          get_owner/1, set_owner/2,
          get_aux/1, set_aux/2,
@@ -63,6 +61,7 @@
 
 -export([add_first_lease_to_db/2]).
 -export([empty_lease_list/0]).
+-export([id/1]).
 
 -ifdef(with_export_type_support).
 -export_type([lease_list_state/0]).
@@ -162,11 +161,11 @@ lease_handover(Lease, NewOwner, ReplyTo) ->
                     {l_on_cseq, handover, Lease, NewOwner, ReplyTo}),
     ok.
 
--spec lease_takeover(lease_t(), comm:erl_local_pid()) -> ok.
-lease_takeover(Lease, ReplyTo) ->
+-spec lease_takeover(lease_t()) -> ok.
+lease_takeover(Lease) ->
     % @todo precondition: Lease has timeouted
     comm:send_local(pid_groups:get_my(dht_node),
-                    {l_on_cseq, takeover, Lease, ReplyTo}),
+                    {l_on_cseq, takeover, Lease}),
     ok.
 
 -spec lease_split(lease_t(), intervals:interval(),
@@ -407,28 +406,26 @@ on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
 % lease takeover
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}, 
-    ReplyTo}, State) ->
+on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}},
+   State) ->
     New = Old#lease{epoch   = OldEpoch + 1,
                     version = 0,
                     owner   = comm:this(),
                     timeout = new_timeout()},
     ContentCheck = is_valid_takeover(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
-    Self = comm:reply_as(self(), 4, {l_on_cseq, takeover_reply, ReplyTo, '_'}),
+    Self = comm:reply_as(self(), 3, {l_on_cseq, takeover_reply, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
                    ContentCheck,
                    New),
     State;
 
-on({l_on_cseq, takeover_reply, ReplyTo, {qwrite_done, _ReqId, _Round, Value}}, State) ->
-    %% log:log("takeover success ~p~n", [Value]),
-    comm:send_local(ReplyTo, {takeover, success, Value}),
-    update_lease_in_dht_node_state(Value, State, active);
+on({l_on_cseq, takeover_reply, {qwrite_done, _ReqId, _Round, _Value}}, State) ->
+    % @todo if success update lease in State
+    State;
 
-on({l_on_cseq, takeover_reply, ReplyTo, {qwrite_deny, _ReqId, _Round, Value, Reason}}, State) ->
-    %% log:log("takeover failed ~p ~p~n", [Value, Reason]),
-    comm:send_local(ReplyTo, {takeover, failed, Value}),
+on({l_on_cseq, takeover_reply, {qwrite_deny, _ReqId, _Round, _Value, _Reason}}, State) ->
+    % @todo if success update lease in State
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -846,8 +843,7 @@ is_valid_takeover(Epoch, Version) ->
                 andalso (Current#lease.range == Next#lease.range)
                 andalso (Current#lease.aux == Next#lease.aux)
                 andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout)
-                andalso not is_valid(Current), % Current has to be invalid!
+                andalso (os:timestamp() <  Next#lease.timeout),
             {Res, null}
     end.
 
@@ -1139,10 +1135,6 @@ set_timeout(Lease) -> Lease#lease{timeout=new_timeout()}.
 -spec get_timeout(lease_t()) -> erlang_timestamp().
 get_timeout(#lease{timeout=Timeout}) -> Timeout.
 
--spec get_pretty_timeout(lease_t()) -> string().
-get_pretty_timeout(L) ->
-    format_utc_timestamp(get_timeout(L)).
-
 -spec get_id(lease_t()) -> ?RT:key().
 get_id(#lease{id=Id}) -> Id.
 
@@ -1374,11 +1366,3 @@ trigger_garbage_collection(ActiveLeaseList) ->
 %                true ->
 %                    {true, null}
 %            end
-
--spec format_utc_timestamp(erlang_timestamp()) -> string().
-format_utc_timestamp({_,_,Micro} = TS) ->
-    {{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_local_time(TS),
-    Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul", "Aug","Sep",
-                          "Oct","Nov","Dec"}),
-    lists:flatten(io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w",
-                  [Day,Mstr,Year,Hour,Minute,Second,Micro])).

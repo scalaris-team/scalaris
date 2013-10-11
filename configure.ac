@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 AC_PREREQ(2.65)
-AC_INIT(scalaris, 0.6.1+svn, scalaris@googlegroups.com)
+AC_INIT(scalaris, 0.6.1, scalaris@googlegroups.com)
 
 ###########################################################
 #
@@ -174,8 +174,6 @@ AC_ERLANG_CHECK_LIB(hanoidb,
                      HAVEHANOIDB_EDOC=""
                      HAVEHANOIDB_DIALYZER=""
                      AC_MSG_NOTICE([erlang-hanoidb not found - you won't be able to use the db_hanoidb back-end (if configured in scalaris.hrl)])])
-
-AC_ERLANG_CHECK_LIB(erlang_js, , AC_MSG_NOTICE([erlang_js not found - you won't be able to use JavaScript Map-Reduce jobs]))
 
 AC_CHECK_FILE($ERLANG_LIB_DIR_common_test/priv/bin/run_test,
               [AC_SUBST(RUN_TEST,[$ERLANG_LIB_DIR_common_test/priv/bin/run_test])],

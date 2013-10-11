@@ -51,11 +51,6 @@
 -export([set_prbr_state/3]).
 %% snapshots
 -export([set_snapshot_state/2]).
-%% map reduce
--export([set_mr_state/3,
-         get_mr_state/2,
-         delete_mr_state/2]).
-
 
 -ifdef(with_export_type_support).
 -export_type([state/0, name/0, db_selector/0, slide_data/0, slide_delta/0]).
@@ -73,13 +68,9 @@
 -type slide_snap() :: {snapshot_state:snapshot_state(), db_dht:db_as_list()} | {false}.
 
 -type slide_data() :: {{MovingData::db_dht:db_as_list(), slide_snap()},
-                       [{db_selector(), db_prbr:db_as_list()}],
-                       MovingMRState::orddict:orddict()}.
+                       [{db_selector(), db_prbr:db_as_list()}]}.
 -type slide_delta() :: {{ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()]},
-                        [{db_selector(), {Changed::db_prbr:db_as_list(),
-                                          Deleted::[?RT:key()]}}],
-                        [{MRJobId::nonempty_string(), {RoundNr::pos_integer(),
-                                                       [{string(), term()}]}}]}.
+                        [{db_selector(), {Changed::db_prbr:db_as_list(), Deleted::[?RT:key()]}}]}.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
@@ -107,8 +98,7 @@
                 lease_db3 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db4 = ?required(state, prbr_state) :: prbr:state(),
                 lease_list = ?required(state, lease_list) :: l_on_cseq:lease_list_state(),
-                snapshot_state   = null :: snapshot_state:snapshot_state() | null,
-                mr_state   = ?required(state, mr_state)  :: orddict:orddict()
+                snapshot_state   = null :: snapshot_state:snapshot_state() | null
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -132,8 +122,7 @@ new(RT, RMState, DB) ->
            lease_db3 = prbr:init(lease_db3),
            lease_db4 = prbr:init(lease_db4),
            lease_list = l_on_cseq:empty_lease_list(),
-		   snapshot_state = snapshot_state:new(),
-           mr_state = orddict:new()
+           snapshot_state = snapshot_state:new()
           }.
 
 %% @doc Gets the given property from the dht_node state.
@@ -165,7 +154,6 @@ new(RT, RMState, DB) ->
 %%        <li>slide_succ = information about the node's current slide operation with its successor.</li>
 %%        <li>snapshot_state = snapshot algorithm state information</li>
 %%        <li>lease_list = the list of all leases</li>
-%%        <li>mr_state = a dictionary containing all map reduce states currently running on this node</li>
 %%      </ul>
 %%      Beware of race conditions since the neighborhood may have changed at
 %%      the next call.
@@ -206,15 +194,14 @@ new(RT, RMState, DB) ->
          (state(), lease_db2) -> prbr:state();
          (state(), lease_db3) -> prbr:state();
          (state(), lease_db4) -> prbr:state();
-         (state(), lease_list) -> l_on_cseq:lease_list_state();
-         (state(), mr_state) -> orddict:orddict().
+         (state(), lease_list) -> l_on_cseq:lease_list_state().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
            db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState,
            txid_db1=TxIdDB1, txid_db2=TxIdDB2, txid_db3=TxIdDB3, txid_db4=TxIdDB4,
            lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4, lease_list=LeaseList,
-		   snapshot_state=SnapState, mr_state=MRState} = State, Key) ->
+           snapshot_state=SnapState} = State, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -267,8 +254,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         lease_db2    -> LeaseDB2;
         lease_db3    -> LeaseDB3;
         lease_db4    -> LeaseDB4;
-        lease_list   -> LeaseList;
-        mr_state     -> MRState
+        lease_list   -> LeaseList
     end.
 
 -spec get_prbr_state(state(), db_selector()) -> prbr:state().
@@ -369,18 +355,6 @@ set_slide(State, succ, SlideSucc) -> State#state{slide_succ=SlideSucc}.
 
 -spec set_snapshot_state(State::state(),NewInfo::snapshot_state:snapshot_state()) -> state().
 set_snapshot_state(State,NewInfo) -> State#state{snapshot_state=NewInfo}.
-
--spec get_mr_state(State::state(), mr_state:jobid()) -> mr_state:state().
-get_mr_state(#state{mr_state = MRStateList}, JobId) ->
-    orddict:fetch(JobId, MRStateList).
-
--spec set_mr_state(State::state(), nonempty_string(), mr_state:state()) -> state().
-set_mr_state(#state{mr_state = MRStateList} = State, JobId, MRState) ->
-    State#state{mr_state = orddict:store(JobId, MRState, MRStateList)}.
-
--spec delete_mr_state(State::state(), nonempty_string()) -> state().
-delete_mr_state(#state{mr_state = MRStateList} = State, JobId) ->
-    State#state{mr_state = orddict:erase(JobId, MRStateList)}.
 
 -spec add_db_range(State::state(), Interval::intervals:interval(),
                    SlideId::slide_op:id()) -> state().
@@ -483,44 +457,29 @@ slide_get_data_start_record(State, MovingInterval) ->
            leases_1, leases_2, leases_3, leases_4]
          ),
 
-    %% map reduce state
-    {StayingMrState, MovingMRState} =
-        orddict:fold(
-          fun(K, MRState, {StayingAcc, MovingAcc}) ->
-                  {Staying, Moving} = mr_state:split_slide_state(MRState, MovingInterval),
-                  {orddict:store(K, Staying, StayingAcc),
-                   orddict:store(K, Moving, MovingAcc)}
-
-          end,
-          {orddict:new(), orddict:new()},
-          get(T1State, mr_state)),
-    T2State = T1State#state{mr_state = StayingMrState},
-
     %% snapshot state and db
-    OldDB = get(T2State, db),
+    OldDB = get(T1State, db),
+    MovingData = db_dht:get_entries(OldDB, MovingInterval),
     MovingSnapData =
         case db_dht:snapshot_is_running(OldDB) of
             true ->
-                {get(T2State, snapshot_state),
+                {get(T1State, snapshot_state),
                  db_dht:get_snapshot_data(OldDB, MovingInterval)};
             false ->
                 {false}
         end,
-
-    %% dht db
-    MovingData = db_dht:get_entries(OldDB, MovingInterval),
     NewDB = db_dht:record_changes(OldDB, MovingInterval),
     ?TRACE("~p:slide_get_data_start_record: ~p~nMovingData: ~n~p~nMovingSnapData: ~n~p~nfor
            interval ~p~n~p~n~p",
            [?MODULE, comm:this(), MovingData, MovingSnapData,
             MovingInterval, OldDB, NewDB]),
-    NewState = set_db(T2State, NewDB),
-    {NewState, {{MovingData, MovingSnapData}, MoveRBRData, MovingMRState}}.
+    NewState = set_db(T1State, NewDB),
+    {NewState, {{MovingData, MovingSnapData}, MoveRBRData}}.
 
 
 %% @doc Adds data from slide_get_data_start_record/2 to the local DB.
 -spec slide_add_data(state(),slide_data()) -> state().
-slide_add_data(State, {{Data, SnapData}, PRBRData, MRState}) ->
+slide_add_data(State, {{Data, SnapData}, PRBRData}) ->
     T1DB = db_dht:add_data(get(State, db), Data),
     ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~p~n~p",
            [?MODULE, comm:this(), Data, SnapData, NewDB]),
@@ -535,9 +494,6 @@ slide_add_data(State, {{Data, SnapData}, PRBRData, MRState}) ->
                 set_snapshot_state(T1State, SnapState)
         end,
 
-    %% mr state
-    T3State = T2State#state{mr_state = MRState},
-
     %% all prbr dbs
     lists:foldl(
       fun({X, XData}, AccState) ->
@@ -545,7 +501,7 @@ slide_add_data(State, {{Data, SnapData}, PRBRData, MRState}) ->
               NewDB = db_prbr:add_data(DB, XData),
               set_prbr_state(AccState, X, NewDB)
       end,
-      T3State,
+      T2State,
       PRBRData).
 
 %% @doc Gets all DB changes in the given interval, stops recording delta infos
@@ -567,50 +523,22 @@ slide_take_delta_stop_record(State, MovingInterval) ->
            leases_1, leases_2, leases_3, leases_4]
          ),
 
-    %% mr delta
-    {StayingMRState, MRDelta} = orddict:fold(
-                         fun(K, MRState, {StateAcc, DeltaAcc}) ->
-                             {Staying, Delta} =
-                                 mr_state:get_slide_delta(MRState,
-                                                          MovingInterval),
-                             {orddict:store(K, Staying, StateAcc),
-                              [{K, Delta} | DeltaAcc]}
-                         end,
-                         {orddict:new(), []},
-                         get(State, mr_state)),
-    T1State = State#state{mr_state = StayingMRState},
-
-
-    %% db
-    OldDB = get(T1State, db),
+    OldDB = get(State, db),
     ChangedData = db_dht:get_changes(OldDB, MovingInterval),
 
-    NewState = slide_stop_record(T1State, MovingInterval, true),
+    NewState = slide_stop_record(State, MovingInterval, true),
     ?TRACE("~p:slide_take_delta_stop_record: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), ChangedData, get(NewState, db)]),
-    {NewState, {ChangedData, DeltaRBR, MRDelta}}.
+    {NewState, {ChangedData, DeltaRBR}}.
 
 %% @doc Adds delta infos from slide_take_delta_stop_record/2 to the local DB.
 -spec slide_add_delta(state(), slide_delta()) -> state().
-slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta, MRDelta}) ->
+slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta}) ->
     NewDB1 = db_dht:add_data(get(State, db), ChangedData),
     NewDB2 = db_dht:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
     ?TRACE("~p:slide_add_delta: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), {ChangedData, DeletedKeys}, NewDB2]),
     T1State = set_db(State, NewDB2),
-
-    %% mr delta
-    MRState = lists:foldl(
-                fun({_K, {_Round, []}}, StateAcc) -> StateAcc;
-                   ({K, Delta}, StateAcc) ->
-                        WithDelta = mr_state:add_slide_delta(
-                                      orddict:fetch(K, StateAcc),
-                                      Delta),
-                        orddict:store(K, WithDelta, StateAcc)
-                end,
-                get(T1State, mr_state),
-                MRDelta),
-    T2State = T1State#state{mr_state = MRState},
 
     %% all prbr dbs
     lists:foldl(
@@ -622,7 +550,7 @@ slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta, MRDelta}) ->
                         intervals:from_elements(DelKeys)),
               set_prbr_state(AccState, X, NewDB)
       end,
-      T2State,
+      T1State,
       PRBRDelta).
 
 %% @doc Stops recording changes in the given interval.
