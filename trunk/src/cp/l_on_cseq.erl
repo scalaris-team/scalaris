@@ -53,7 +53,7 @@
 % lease accessors
 -export([get_version/1,set_version/2,
          get_epoch/1, set_epoch/2,
-         new_timeout/0, set_timeout/1,
+         new_timeout/0, set_timeout/1, get_pretty_timeout/1,
          get_id/1,
          get_owner/1, set_owner/2,
          get_aux/1, set_aux/2,
@@ -846,7 +846,8 @@ is_valid_takeover(Epoch, Version) ->
                 andalso (Current#lease.range == Next#lease.range)
                 andalso (Current#lease.aux == Next#lease.aux)
                 andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout),
+                andalso (os:timestamp() <  Next#lease.timeout)
+                andalso not is_valid(Current), % Current has to be invalid!
             {Res, null}
     end.
 
@@ -1138,6 +1139,10 @@ set_timeout(Lease) -> Lease#lease{timeout=new_timeout()}.
 -spec get_timeout(lease_t()) -> erlang_timestamp().
 get_timeout(#lease{timeout=Timeout}) -> Timeout.
 
+-spec get_pretty_timeout(lease_t()) -> string().
+get_pretty_timeout(L) ->
+    format_utc_timestamp(get_timeout(L)).
+
 -spec get_id(lease_t()) -> ?RT:key().
 get_id(#lease{id=Id}) -> Id.
 
@@ -1369,3 +1374,10 @@ trigger_garbage_collection(ActiveLeaseList) ->
 %                true ->
 %                    {true, null}
 %            end
+
+format_utc_timestamp({_,_,Micro} = TS) ->
+    {{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_local_time(TS),
+    Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul", "Aug","Sep",
+                          "Oct","Nov","Dec"}),
+    lists:flatten(io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w",
+                  [Day,Mstr,Year,Hour,Minute,Second,Micro])).

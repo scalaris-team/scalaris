@@ -70,8 +70,8 @@ all() ->
      {group, tester_tests},
      {group, renew_tests},
      {group, split_tests},
-     {group, handover_tests},
-     {group, takeover_tests}
+     {group, handover_tests}
+     %{group, takeover_tests}
      %{group, gc_tests}
      ].
 
@@ -84,7 +84,7 @@ group(renew_tests) ->
 group(split_tests) ->
     [{timetrap, {seconds, 10}}];
 group(takeover_tests) ->
-    [{timetrap, {seconds, 5}}];
+    [{timetrap, {seconds, 30}}];
 group(handover_tests) ->
     [{timetrap, {seconds, 10}}].
 
@@ -566,10 +566,7 @@ test_takeover(_Config) ->
     WaitF = fun (Id, _Lease, OriginalOwner) ->
                     ct:pal("takeover: wait_for_lease_owner ~p", [OriginalOwner]),
                     wait_for_lease_owner(Id, OriginalOwner),
-                    ct:pal("takeover: wait_for_lease_owner done"),
-                    receive
-                        {takeover, success, _} -> ok
-                    end
+                    ct:pal("takeover: wait_for_lease_owner done")
             end,
     test_takeover_helper(_Config, ModifyF, WaitF),
     true.
@@ -613,11 +610,25 @@ test_takeover_helper(_Config, ModifyF, WaitF) ->
     end,
     ct:pal("takeover: takeover"),
     % now the error handling of lease_takeover is going to be tested
-    l_on_cseq:lease_takeover(Current, self()),
+    takeover_loop(Current),
     ct:pal("takeover: wait_for_lease2"),
     WaitF(Id, Current, OriginalOwner),
     ct:pal("takeover: done"),
     true.
+
+takeover_loop(L) ->
+    l_on_cseq:lease_takeover(L, self()),
+    M = receive
+            {takeover, _ , _} = _M -> _M
+        end,
+    case M of
+        {takeover, success, _} ->
+            ct:pal("takeover succeed"),
+            ok;
+        {takeover, failed, L2} ->
+            ct:pal("retrying takeover ~p ~p", [L2, l_on_cseq:get_pretty_timeout(L2)]),
+            takeover_loop(L2)
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
