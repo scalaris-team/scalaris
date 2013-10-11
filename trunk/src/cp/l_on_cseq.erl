@@ -1375,6 +1375,7 @@ trigger_garbage_collection(ActiveLeaseList) ->
 %                    {true, null}
 %            end
 
+-spec format_utc_timestamp(erlang_timestamp()) -> string().
 format_utc_timestamp({_,_,Micro} = TS) ->
     {{Year,Month,Day},{Hour,Minute,Second}} = calendar:now_to_local_time(TS),
     Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul", "Aug","Sep",

@@ -143,6 +143,7 @@ tester_type_check_l_on_cseq(_Config) ->
              {unittest_lease_update, 2}, %% only for unittests
              {disable_lease, 2}, %% requires dht_node_state
              {on, 2}, %% cannot create dht_node_state (reference for bulkowner)
+             {get_pretty_timeout, 1}, %% cannot create valid timestamps
              {remove_lease_from_dht_node_state, 2} %% cannot create dht_node_state (reference for bulkowner)
            ],
            [ {read, 2}, %% cannot create pids
@@ -152,7 +153,8 @@ tester_type_check_l_on_cseq(_Config) ->
              {get_mode, 2}, %% gb_trees not supported by type_checker
              {find_adjacent, 1}, %% sends messages
              {check_last_and_first, 1}, %% sends messages
-             {trigger_garbage_collection, 1} %% sends messages
+             {trigger_garbage_collection, 1}, %% sends messages
+             {format_utc_timestamp, 1} %% cannot create valid timestamps
            ]}
         ],
     %% join a dht_node group to be able to call lease trigger functions
