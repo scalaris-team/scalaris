@@ -8,6 +8,18 @@ scalaris-examples-wiki (0.6.0-1) stable; urgency=low
 
   * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
                                      and Contrail http://contrail-project.eu):
+    - separate list counters from their list partitions for a better data layout
+    - fix high memory use of the Scalaris import if the import is slow
+    - use tomcat 7.0.42
+  * Bugs:
+    - fix some more (less severe) bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 11 Oct 2013 15:00:00 +0200
+
+scalaris-examples-wiki (0.6.0-1) stable; urgency=low
+
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
     - allow monitoring via JMX in the FourCaastMonitoringPlugin
     - support for getting random articles via the new partial read op
     - new optimisation scheme "Buckets with Write Cache" - uses a single big
@@ -22,7 +34,7 @@ scalaris-examples-wiki (0.6.0-1) stable; urgency=low
   * Bugs:
     - fix numerous bugs
 
- -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
+ -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 23:20:13 +0200
 
 scalaris-examples-wiki (0.5.0-1) stable; urgency=low
   * Demonstrator "Wiki on Scalaris"
