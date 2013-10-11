@@ -1,4 +1,4 @@
-scalaris-examples-wiki (0.6.1-1) stable; urgency=low
+scalaris-bindings (0.6.1-1) stable; urgency=low
 
   * Packaging:
     - add ArchLinux ruby API packages
