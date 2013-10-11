@@ -1,0 +1,30 @@
+<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.4/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mediawiki.org/xml/export-0.4/ http://www.mediawiki.org/xml/export-0.4.xsd" version="0.4" xml:lang="de">
+  <siteinfo>
+    <sitename>Wikipedia</sitename>
+    <base>http://de.wikipedia.org/wiki/Wikipedia:Hauptseite</base>
+    <generator>MediaWiki 1.16alpha-wmf</generator>
+    <case>first-letter</case>
+    <namespaces>
+      <namespace key="-2">Media</namespace>
+      <namespace key="-1">Spezial</namespace>
+      <namespace key="0" />
+      <namespace key="1">Diskussion</namespace>
+      <namespace key="2">Benutzer</namespace>
+      <namespace key="3">Benutzer Diskussion</namespace>
+      <namespace key="4">Wikipedia</namespace>
+      <namespace key="5">Wikipedia Diskussion</namespace>
+      <namespace key="6">Datei</namespace>
+      <namespace key="7">Datei Diskussion</namespace>
+      <namespace key="8">MediaWiki</namespace>
+      <namespace key="9">MediaWiki Diskussion</namespace>
+      <namespace key="10">Vorlage</namespace>
+      <namespace key="11">Vorlage Diskussion</namespace>
+      <namespace key="12">Hilfe</namespace>
+      <namespace key="13">Hilfe Diskussion</namespace>
+      <namespace key="14">Kategorie</namespace>
+      <namespace key="15">Kategorie Diskussion</namespace>
+      <namespace key="100">Portal</namespace>
+      <namespace key="101">Portal Diskussion</namespace>
+    </namespaces>
+  </siteinfo>
+</mediawiki>

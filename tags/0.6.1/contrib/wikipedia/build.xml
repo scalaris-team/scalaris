@@ -1,0 +1,425 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project basedir="." default="build" name="WikiOnScalaris">
+  <!-- version of the OtpErlang jar file to bundle and compile against (OtpErlang-<version>.jar) -->
+  <property name="opterlang.version" value="1.5.8" />
+  <!-- debug level to use during compilation -->
+  <property name="debuglevel" value="source,lines,vars" />
+
+  <!-- All libraries needed to run the import task -->
+  <path id="import.classpath">
+    <pathelement location="contrib/scalaris.jar"/>
+    <pathelement location="contrib/OtpErlang-${opterlang.version}.jar"/>
+    <pathelement location="contrib/commons-compress-1.1.jar"/>
+    <pathelement location="contrib/commons-codec-1.6.jar"/>
+    <pathelement location="contrib/commons-lang-2.6.jar"/>
+    <pathelement location="contrib/commons-logging-1.1.1.jar"/>
+    <pathelement location="contrib/bliki-core-3.0.20-SNAPSHOT.jar"/>
+    <pathelement location="contrib/java-bloomfilter-1.0.jar"/>
+    <pathelement location="contrib/sqlite4java.jar"/>
+  </path>
+
+  <property name="tomcat.home" value="contrib/apache-tomcat" />
+
+  <!-- All libraries needed to build the sources -->
+  <path id="build.classpath">
+    <path refid="import.classpath"/>
+    <pathelement location="${tomcat.home}/lib/servlet-api.jar"/>
+  </path>
+
+  <!-- Create build directory and copy static files -->
+  <macrodef name="scalaris.check.jars">
+    <sequential>
+      <condition property="scalaris.jars.available.contrib">
+        <and>
+          <available file="contrib/scalaris.jar" type="file" />
+          <available file="contrib/OtpErlang-${opterlang.version}.jar" type="file" />
+        </and>
+      </condition>
+      <condition property="scalaris.src.available">
+        <available file="../../java-api/build.xml" type="file" />
+      </condition>
+      <condition property="scalaris.src.jars.available">
+        <and>
+          <available file="../../java-api/scalaris.jar" type="file" />
+          <available file="../../java-api/lib/OtpErlang-${opterlang.version}.jar" type="file" />
+        </and>
+      </condition>
+    </sequential>
+  </macrodef>
+  <target name="scalaris.check.jars">
+    <scalaris.check.jars />
+  </target>
+  <target name="scalaris.build.jars" depends="scalaris.check.jars" if="scalaris.src.available">
+    <ant dir="../../java-api/"/>
+    <scalaris.check.jars />
+  </target>
+  <target name="scalaris.get.jars" depends="scalaris.check.jars,scalaris.build.jars" if="scalaris.src.available">
+    <fail unless="scalaris.src.jars.available" message="missing ../../java-api/scalaris.jar and ../../java-api/lib/OtpErlang-${opterlang.version}.jar" />
+    <copy todir="contrib" flatten="true" preservelastmodified="true">
+      <fileset dir="../../java-api/">
+        <include name="scalaris.jar" />
+        <include name="lib/OtpErlang-${opterlang.version}.jar" />
+      </fileset>
+    </copy>
+    <scalaris.check.jars />
+  </target>
+  <target name="scalaris.update.jars" depends="scalaris.get.jars">
+    <scalaris.check.jars />
+    <fail unless="scalaris.jars.available.contrib" message="missing scalaris.jar and OtpErlang-${opterlang.version}.jar and no sources found in ../../java-api/" />
+  </target>
+
+  <target name="init" depends="scalaris.update.jars">
+    <mkdir dir="scalaris-wiki/WEB-INF/classes"/>
+    <mkdir dir="scalaris-wiki/WEB-INF/lib"/>
+    <copy todir="scalaris-wiki/WEB-INF/lib" flatten="true" preservelastmodified="true">
+      <fileset dir="contrib" includes="*.jar"/>
+      <fileset dir="contrib" includes="*.so"/>
+      <fileset dir="contrib" includes="*.jnilib"/>
+      <fileset dir="contrib" includes="*.dll"/>
+    </copy>
+  </target>
+
+  <!-- Compile Servlets, Beans and other java files -->
+  <target name="build" depends="init">
+    <echo message="Download Wiktionary dump:                'ant download'"/>
+    <echo message="Import dump into Scalaris (interactive): 'ant import-xml'"/>
+    <echo message="Import dump into Scalaris (batch):       'ant import-xml -Ddata=&lt;file&gt; -Dmax_revisions=&lt;number&gt; -Dmin_time=&lt;date&gt; -Dmax_time=&lt;date&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;'"/>
+    <echo message="Import prepared DB into Scalaris (int.): 'ant import-db'"/>
+    <echo message="Import prepared DB into Scalaris (batch):'ant import-db' -Ddata=&lt;file&gt; -Dnumber_of_importers=&lt;number&gt; -Dmy_import_number=&lt;number&gt; -Dweb_xml=&lt;patch to web.xml&gt; -Dscalaris.node=&lt;node&gt; -Dscalaris.cookie=&lt;cookie&gt;"/>
+    <echo message="Run tomcat web server:                   'ant run [-Dscalaris.node=&lt;node&gt;] [-Dscalaris.cookie=&lt;cookie&gt;]'"/>
+    <javac encoding="UTF-8" debug="true" debuglevel="${debuglevel}" destdir="scalaris-wiki/WEB-INF/classes" includeAntRuntime="false">
+      <src path="src"/>
+      <classpath refid="build.classpath"/>
+    </javac>
+  </target>
+
+  <!-- Deletes the generated class files and the temporary files (compiled classes, jsps, logs,...) -->
+  <target name="clean">
+    <delete dir="scalaris-wiki/WEB-INF/classes"/>
+    <delete dir="scalaris-wiki/WEB-INF/lib"/>
+    <delete file="scalaris-wiki.war"/>
+    <delete file="scalaris-wiki-plugin-api.jar"/>
+    <delete>
+      <fileset dir="contrib" includes="scalaris.jar, OtpErlang-*.jar"/>
+    </delete>
+  </target>
+  
+  <target name="run" depends="run-tomcat" />
+
+  <!-- starts a tomcat server which provides the wiki website -->
+  <target name="run-tomcat" depends="build,scalaris.properties">
+    <java classname="org.apache.catalina.startup.Bootstrap" fork="true">
+      <classpath>
+        <pathelement location="${tomcat.home}/bin/bootstrap.jar"/>
+        <pathelement location="${tomcat.home}/bin/tomcat-juli.jar"/>
+      </classpath>
+      <sysproperty key="catalina.home" value="${tomcat.home}" />
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+    </java>
+  </target>
+
+  <target name="import.get.data_xml_sql" unless="data">
+    <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.bz2" message="Wikipedia dump file (*.xml, *.xml.gz, *.xml.bz2, *.db)"/>
+  </target>
+
+  <target name="import.get.data_xml" unless="data">
+    <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.bz2" message="Wikipedia dump file (*.xml, *.xml.gz, *.xml.bz2)"/>
+  </target>
+
+  <target name="import.get.data_sql" unless="data">
+    <input addproperty="data" defaultvalue="simplewiktionary-latest-pages-meta-history.xml.db" message="Wikipedia dump file (*.db)"/>
+  </target>
+
+  <target name="import.get.allowed_pages" unless="allowed_pages">
+    <input addproperty="allowed_pages" defaultvalue="" message="Text file with additional page titles to include (one per line)"/>
+  </target>
+
+  <target name="import.get.whitelist" unless="whitelist">
+    <input addproperty="whitelist" defaultvalue="" message="Text file with page titles to import (one per line)"/>
+  </target>
+
+  <target name="import.get.max_revisions" unless="max_revisions">
+    <input addproperty="max_revisions" defaultvalue="2" message="Maximum number of revisions per page starting with the most recent one (-1 for all revisions)"/>
+  </target>
+
+  <target name="import.get.min_time" unless="min_time">
+    <input addproperty="min_time" defaultvalue="" message="Import at most one revision older than this date in ISO8601 format, e.g. 2004-01-07T08:09:29Z, (empty for all revisions)"/>
+  </target>
+
+  <target name="import.get.max_time" unless="max_time">
+    <input addproperty="max_time" defaultvalue="" message="Maximum date of revisions to import in ISO8601 format, e.g. 2004-01-07T08:09:29Z, (empty for all revisions)"/>
+  </target>
+
+  <target name="import.get.recursion_lvl" unless="recursion_lvl">
+    <input addproperty="recursion_lvl" defaultvalue="1" message="Recursively import pages this deep"/>
+  </target>
+
+  <target name="import.get.category1" unless="category1">
+    <input addproperty="category1" defaultvalue="" message="Import pages in this category"/>
+  </target>
+
+  <target name="import.get.category2" unless="category2">
+    <input addproperty="category2" defaultvalue="" message="Import pages in this category"/>
+  </target>
+
+  <target name="import.get.category3" unless="category3">
+    <input addproperty="category3" defaultvalue="" message="Import pages in this category"/>
+  </target>
+  
+  <property name="category4" value="" />
+  <property name="category5" value="" />
+  <property name="category6" value="" />
+  <property name="category7" value="" />
+  <property name="category8" value="" />
+  <property name="category9" value="" />
+  <property name="category10" value="" />
+
+  <target name="import.get.filtered_pagelist" unless="filtered_pagelist">
+    <input addproperty="filtered_pagelist" defaultvalue="${data}-filtered_pagelist.txt" message="Write filtered pagelist to this file (will be created or overwritten)"/>
+  </target>
+
+  <target name="import.get.prepare_db" unless="prepare_db">
+    <input addproperty="prepare_db" defaultvalue="${data}-1.db" message="Write pre-processed K/V pairs to this database (file must not exist yet!)"/>
+  </target>
+
+  <target name="download">
+    <get usetimestamp="true" dest="simplewiktionary-latest-pages-meta-history.xml.bz2" src="http://dumps.wikimedia.org/simplewiktionary/latest/simplewiktionary-latest-pages-meta-history.xml.bz2"/>
+  </target>
+
+  <target name="scalaris.properties.get.node" unless="scalaris.node">
+    <input addproperty="scalaris.node" defaultvalue="firstnode@localhost,node1@localhost,node2@localhost,node3@localhost,node4@localhost" message="URL to a scalaris node"/>
+  </target>
+  <target name="scalaris.properties.get.cookie" unless="scalaris.cookie">
+    <input addproperty="scalaris.cookie" defaultvalue="chocolate chip cookie" message="Cookie the scalaris node uses for connections"/>
+  </target>
+
+  <target name="scalaris.properties" depends="scalaris.properties.get.node,scalaris.properties.get.cookie" />
+
+  <target name="import-xml" depends="build,import.get.data_xml_sql,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,scalaris.properties">
+    <fail unless="data">You must specify the data property for 'ant import-xml'.</fail>
+    <fail unless="max_revisions">You must specify the max_revisions property for 'ant import-xml'.</fail>
+    <fail unless="max_time">You must specify the max_time property for 'ant import-xml'.</fail>
+    <fail unless="whitelist">You must specify the whitelist property for 'ant import-xml'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main" failonerror="true">
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+      <arg value="${data}"/>
+      <arg value="import-xml"/>
+      <arg value="${max_revisions}"/>
+      <arg value="${min_time}"/>
+      <arg value="${max_time}"/>
+      <arg value="${whitelist}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="import.get.number_of_importers" unless="number_of_importers">
+    <input addproperty="number_of_importers" defaultvalue="1" message="Total number of (independent) import jobs"/>
+  </target>
+
+  <target name="import.get.my_import_number" unless="my_import_number">
+    <input addproperty="my_import_number" defaultvalue="1" message="This import's job number (1 &lt;= my_import_number &lt;= number_of_importers)"/>
+  </target>
+
+  <target name="import.get.web_xml" unless="web_xml">
+    <input addproperty="web_xml" defaultvalue="" message="Path to web.xml containing servlet optimisation options (leave empty for no DB conversion)"/>
+  </target>
+  
+  <target name="import-db" depends="build,import.get.data_sql,import.get.number_of_importers,import.get.my_import_number,import.get.web_xml,scalaris.properties">
+    <fail unless="data">You must specify the data property for 'ant import-db'.</fail>
+    <fail unless="number_of_importers">You must specify the number_of_importers property for 'ant import-db'.</fail>
+    <fail unless="my_import_number">You must specify the my_import_number property for 'ant import-db'.</fail>
+    <fail unless="web_xml">You must specify the web_xml property for 'ant import-db'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main" failonerror="true">
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+      <arg value="${data}"/>
+      <arg value="import-db"/>
+      <arg value="${number_of_importers}"/>
+      <arg value="${my_import_number}"/>
+      <arg value="${web_xml}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+  
+  <target name="prepare" depends="build,import.get.data_xml,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,import.get.prepare_db">
+    <fail unless="data">You must specify the data property for 'ant prepare'.</fail>
+    <fail unless="max_revisions">You must specify the max_revisions property for 'ant prepare'.</fail>
+    <fail unless="max_time">You must specify the max_time property for 'ant prepare'.</fail>
+    <fail unless="whitelist">You must specify the whitelist property for 'ant prepare'.</fail>
+    <fail unless="prepare_db">You must specify the prepare_db property for 'ant prepare'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main" failonerror="true">
+      <arg value="${data}"/>
+      <arg value="prepare"/>
+      <arg value="${max_revisions}"/>
+      <arg value="${min_time}"/>
+      <arg value="${max_time}"/>
+      <arg value="${whitelist}"/>
+      <arg value="${prepare_db}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+  
+  <target name="xml2db" depends="build,import.get.data_xml,import.get.max_revisions,import.get.min_time,import.get.max_time,import.get.whitelist,import.get.prepare_db">
+    <fail unless="data">You must specify the data property for 'ant xml2db'.</fail>
+    <fail unless="max_revisions">You must specify the max_revisions property for 'ant xml2db'.</fail>
+    <fail unless="max_time">You must specify the max_time property for 'ant xml2db'.</fail>
+    <fail unless="whitelist">You must specify the whitelist property for 'ant xml2db'.</fail>
+    <fail unless="prepare_db">You must specify the prepare_db property for 'ant xml2db'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main" failonerror="true">
+      <arg value="${data}"/>
+      <arg value="xml2db"/>
+      <arg value="${max_revisions}"/>
+      <arg value="${min_time}"/>
+      <arg value="${max_time}"/>
+      <arg value="${whitelist}"/>
+      <arg value="${prepare_db}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+  
+  <target name="dumpdb-addlinks" depends="build,import.get.data_sql">
+    <fail unless="data">You must specify the data property for 'ant dumpdb-addlinks'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main" failonerror="true">
+      <arg value="${data}"/>
+      <arg value="dumpdb-addlinks"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="dumpdb-filter" depends="build,import.get.data_sql,import.get.recursion_lvl,import.get.filtered_pagelist,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
+    <fail unless="data">You must specify the data property for 'ant dumpdb-filter'.</fail>
+    <fail unless="filtered_pagelist">You must specify the filtered_pagelist property for 'ant dumpdb-filter'.</fail>
+    <fail unless="allowed_pages">You must specify the allowed_pages property for 'ant dumpdb-filter'.</fail>
+    <fail unless="category1">You must specify the category1 property for 'ant dumpdb-filter'.</fail>
+    <fail unless="category2">You must specify the category2 property for 'ant dumpdb-filter'.</fail>
+    <fail unless="category3">You must specify the category3 property for 'ant dumpdb-filter'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main" failonerror="true">
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+      <arg value="${data}"/>
+      <arg value="dumpdb-filter"/>
+      <arg value="${recursion_lvl}"/>
+      <arg value="${filtered_pagelist}"/>
+      <arg value="${allowed_pages}"/>
+      <arg value="${category1}"/>
+      <arg value="${category2}"/>
+      <arg value="${category3}"/>
+      <arg value="${category4}"/>
+      <arg value="${category5}"/>
+      <arg value="${category6}"/>
+      <arg value="${category7}"/>
+      <arg value="${category8}"/>
+      <arg value="${category9}"/>
+      <arg value="${category10}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="filter" depends="build,import.get.data_xml,import.get.recursion_lvl,import.get.max_time,import.get.filtered_pagelist,import.get.allowed_pages,import.get.category1,import.get.category2,import.get.category3">
+    <fail unless="data">You must specify the data property for 'ant filter'.</fail>
+    <fail unless="max_time">You must specify the max_time property for 'ant filter'.</fail>
+    <fail unless="filtered_pagelist">You must specify the filtered_pagelist property for 'ant filter'.</fail>
+    <fail unless="allowed_pages">You must specify the allowed_pages property for 'ant filter'.</fail>
+    <fail unless="category1">You must specify the category1 property for 'ant filter'.</fail>
+    <fail unless="category2">You must specify the category2 property for 'ant filter'.</fail>
+    <fail unless="category3">You must specify the category3 property for 'ant filter'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main" failonerror="true">
+      <sysproperty key="scalaris.node" value="${scalaris.node}" />
+      <sysproperty key="scalaris.cookie" value="${scalaris.cookie}" />
+      <arg value="${data}"/>
+      <arg value="filter"/>
+      <arg value="${recursion_lvl}"/>
+      <arg value="${max_time}"/>
+      <arg value="${filtered_pagelist}"/>
+      <arg value="${allowed_pages}"/>
+      <arg value="${category1}"/>
+      <arg value="${category2}"/>
+      <arg value="${category3}"/>
+      <arg value="${category4}"/>
+      <arg value="${category5}"/>
+      <arg value="${category6}"/>
+      <arg value="${category7}"/>
+      <arg value="${category8}"/>
+      <arg value="${category9}"/>
+      <arg value="${category10}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="import.get.db_read" unless="db_read">
+    <input addproperty="db_read" defaultvalue="simplewiktionary-latest-pages-meta-history.xml-1.db" message="prepared SQLite dump file to read from"/>
+  </target>
+
+  <target name="import.get.db_write" unless="db_write" depends="import.get.db_read">
+    <input addproperty="db_write" defaultvalue="${db_read}-new.db" message="prepared SQLite dump file to write to"/>
+  </target>
+
+  <target name="import.get.db_write_options" unless="db_write_options">
+    <input addproperty="db_write_options" defaultvalue="ALL:APPEND_INCREMENT|PAGE_LIST:APPEND_INCREMENT_BUCKETS_WITH_HASH(10)" message="new optimisation scheme"/>
+  </target>
+  
+  <target name="convert" depends="build,import.get.db_read,import.get.db_write,import.get.db_write_options">
+    <fail unless="db_read">You must specify the data property for 'ant convert'.</fail>
+    <fail unless="db_write">You must specify the db_write property for 'ant convert'.</fail>
+    <fail unless="db_write_options">You must specify the db_write_options property for 'ant convert'.</fail>
+    <java classname="de.zib.scalaris.examples.wikipedia.data.xml.Main" failonerror="true">
+      <arg value="${db_read}"/>
+      <arg value="convert"/>
+      <arg value="${db_write}"/>
+      <arg value="${db_write_options}"/>
+      <classpath>
+        <pathelement location="scalaris-wiki/WEB-INF/classes"/>
+        <path refid="import.classpath"/>
+        <pathelement path="${java.class.path}"/>
+      </classpath>
+    </java>
+  </target>
+
+  <target name="dist" depends="build">
+    <jar jarfile="scalaris-wiki.war" update="false">
+      <fileset dir="scalaris-wiki" excludes="WEB-INF/dumps/**, **/.gitignore" />
+      <fileset dir="scalaris-wiki" includes="WEB-INF/dumps/empty-*.xml" />
+    </jar>
+  </target>
+
+  <target name="plugin-api" depends="build">
+    <jar jarfile="scalaris-wiki-plugin-api.jar" update="false">
+      <fileset dir="scalaris-wiki/WEB-INF/classes"
+        includes="de/zib/scalaris/examples/wikipedia/*.class,
+        de/zib/scalaris/examples/wikipedia/data/*.class,
+        de/zib/scalaris/examples/wikipedia/plugin/*.class"
+      excludes="de/zib/scalaris/examples/wikipedia/ScalarisDataHandler*.class,
+        de/zib/scalaris/examples/wikipedia/plugin/PluginClassLoader*.class"/>
+    </jar>
+  </target>
+</project>

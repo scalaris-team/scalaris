@@ -1,0 +1,14 @@
+etc/init.d/scalaris-contrail
+etc/init.d/vmcontext
+etc/scalaris/init-contrail.sh
+usr/lib/scalaris/contrib/opennebula/start-manager.sh
+usr/lib/scalaris/contrib/opennebula/manager.rb
+usr/lib/scalaris/contrib/opennebula/database.rb
+usr/lib/scalaris/contrib/opennebula/hadoophelper.rb
+usr/lib/scalaris/contrib/opennebula/jsonrpc.rb
+usr/lib/scalaris/contrib/opennebula/opennebulahelper.rb
+usr/lib/scalaris/contrib/opennebula/scalarishelper.rb
+usr/lib/scalaris/contrib/opennebula/*.erb
+usr/lib/scalaris/contrib/opennebula/sc_views/*
+usr/lib/scalaris/contrib/opennebula/ts_manager.rb
+usr/lib/scalaris/contrib/opennebula/ts_frontend.rb

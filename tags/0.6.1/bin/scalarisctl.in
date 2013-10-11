@@ -1,0 +1,802 @@
+#!/bin/bash
+# Copyright 2007-2013 Zuse Institute Berlin
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+datarootdir=@datarootdir@
+ERL=@ERL@
+EPMD=@EPMD@
+SCREEN=@SCREEN@
+
+# /bin
+BINDIR=@bindir@
+# /etc/scalaris/
+ETCDIR=@sysconfdir@/scalaris
+# /lib/scalaris/
+SCALARISDIR=@libdir@/scalaris
+# /lib/scalaris/ebin
+BEAMDIR=@libdir@/scalaris/ebin
+# /lib/scalaris/docroot
+DOCROOTDIR=$SCALARISDIR/docroot
+# /share/doc/scalaris
+DOCDIR=@docdir@
+# /share/java
+JAVADIR=@datarootdir@/java
+# /var/log/scalaris
+LOGDIR=@localstatedir@/log/scalaris
+# /usr/bin/scalaris
+SCALARISCLIENT_JAVA=${exec_prefix}/bin/scalaris
+SCALARISCLIENT_PYTHON=${exec_prefix}/bin/scalaris-python
+SCALARISCLIENT_PYTHON3=${exec_prefix}/bin/scalaris-python3
+SCALARISCLIENT_RUBY=${exec_prefix}/bin/scalaris-ruby
+
+TOKEFLAGS="@ERLANG_TOKE_FLAGS@"
+
+# for best performance, especially on Erlang > R14B04:
+ERL_SCHED_FLAGS_R15=${ERL_SCHED_FLAGS-"+sbt db +swt low +sbwt short"}
+ERL_SCHED_FLAGS_R14=${ERL_SCHED_FLAGS-"+sbt db +swt low"}
+
+# default values (commandline options change these parameters)
+NODE_NAME=node1
+ERLANG_HOSTNAME=${ERLANG_HOSTNAME-""}
+daemonize=0
+first=0
+first_quorum=0
+verbose=0
+port=""
+yaws_port=""
+join_at=""
+start_mgmt_server=0
+start_dht_node="" # "dht_node"
+DIST_ERL_PORT=""
+DAEMONIZE_SCREEN=0
+cmd=""
+NODES_PER_VM=""
+
+usage(){
+    echo "usage: scalarisctl [options] [services] <cmd>"
+    echo " options:"
+    echo "    -h          - print this help message"
+    echo "    -d          - daemonize"
+    echo "    --screen    - if daemonized, put an interactive session into screen"
+    echo "    -e <params> - pass additional parameters to erl"
+    echo "    -f          - first node (to start a new Scalaris instead of joining one)"
+    echo "                  (not with -q)"
+    echo "    -q          - elect first node from known hosts (not with -f)"
+    echo "    -n <name>   - Erlang process name (default 'node')"
+    echo "    -c <cookie> - Erlang cookie to use (for distributed Erlang)"
+    echo "                  (default '`get_cookie`')"
+    echo "    -p <port>   - TCP port for the Scalaris node"
+    echo "    -y <port>   - TCP port for the built-in webserver (YAWS)"
+    echo "    -k <key>    - join at the given key"
+    echo "    -v          - verbose"
+    echo "    --dist-erl-port <port>"
+    echo "                - (single) port distributed erlang listens on"
+    echo "    --nodes-per-vm <number>"
+    echo "                - number of Scalaris nodes to start inside the VM"
+    echo " services:"
+    echo "    -m          - global Scalaris management server"
+    echo "    -s          - Scalaris node (see also -f)"
+    echo " commands:"
+    echo "    checkinstallation"
+    echo "                - test installation"
+    echo "    start       - start services (see -m and -s)"
+    echo "    stop        - stop a scalaris process defined by its name (see -n)"
+    echo "    restart     - restart a scalaris process by its name (see -n)"
+    echo ""
+    echo "    list        - list locally running Erlang VMs"
+    echo "    debug       - connect to a running node via an Erlang shell"
+    echo ""
+    exit $1
+}
+
+fix_paths() {
+    ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+    DIRNAME=`dirname $ABSPATH`
+    # is this a svn checkout or an (rpm/deb/manual) installation?
+    if [ "$DIRNAME" != "$BINDIR" -a "$DIRNAME" != "/bin" ]; then
+        # scalaris
+        SCALARISDIR=`dirname $DIRNAME`
+        # /etc/scalaris/
+        ETCDIR=$SCALARISDIR/bin
+        # scalaris/ebin
+        BEAMDIR=$SCALARISDIR/ebin
+        # scalaris/docroot
+        DOCROOTDIR=$SCALARISDIR/docroot
+        # scalaris/log
+        LOGDIR=$SCALARISDIR/log
+        # /usr/bin/scalaris
+        SCALARISCLIENT_JAVA="$SCALARISDIR/java-api/scalaris --noconfig"
+        SCALARISCLIENT_PYTHON="$SCALARISDIR/python-api/scalaris_client.py"
+        SCALARISCLIENT_PYTHON3="$SCALARISDIR/python3-api/scalaris_client.py"
+        SCALARISCLIENT_RUBY="$SCALARISDIR/ruby-api/scalaris_client.rb"
+    fi
+}
+
+get_hostname() {
+    # Uses the OS hostname from "hostname -f" for the Erlang long node name.
+    if [ -z "$ERLANG_HOSTNAME" ] ; then
+        ERLANG_HOSTNAME="`get_sys_hostname`"
+    fi
+    # Alternative using the hostname that erlang chooses if set up to start with a long node
+    # name and falls back to "hostname -f" if this is not possible:
+    # NOTE: In this case, the Java-API (if used as a library) is not always able
+    #       to guess the host name that Erlang expects and connections may fail.
+    #       Therefore, the convenience node spec "<node>@localhost" may not be used.
+#     if [ -z "$ERLANG_HOSTNAME" ] ; then
+#         ERLANG_HOSTNAME="`get_erlang_hostname`"
+#         if [ -z "$ERLANG_HOSTNAME" ] ; then
+#             # could not start erlang with long node name (no FQDN?)
+#             ERLANG_HOSTNAME="`get_sys_hostname`"
+#         fi
+#     fi
+    echo "$ERLANG_HOSTNAME"
+}
+
+get_erlang_hostname() {
+    MY_HOSTNAME_ERL="`$ERL -name foo$$ -noinput -eval 'N=erlang:atom_to_list(node()),io:format("~s", [string:sub_string(N, string:chr(N, $@)+1)]), halt(0).' 2>/dev/null`"
+    if [ $? -ne 0 ] ; then
+        MY_HOSTNAME_ERL=
+    fi
+    echo "$MY_HOSTNAME_ERL"
+}
+
+get_sys_hostname() {
+    hostname -f
+}
+
+fix_node_name() {
+    # if the given node name includes an '@', leave untouched
+    if ! echo $NODE_NAME | grep "@" >/dev/null ; then
+        NODE_NAME="$NODE_NAME@`get_hostname`"
+    fi
+}
+
+# only get cookie from scalarisctl.conf if installed!
+get_cookie() {
+    ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+    DIRNAME=`dirname $ABSPATH`
+    if [ "$DIRNAME" = "$BINDIR" ]; then
+      # system config
+      . ${ETCDIR}/scalarisctl.conf
+
+      # load user scalaris configuration (overrides system config)
+      if [ -f "$HOME/.scalaris/scalarisctl.conf" ] ; then
+        . $HOME/.scalaris/scalarisctl.conf
+      fi
+    fi
+    echo -n ${cookie:-"chocolate chip cookie"}
+}
+
+checkinstallation() {
+    echo -n "Running basic tests..."
+    MSG_FAILED="\x1b[1;31mFAILED\x1b[0m" #red
+    MSG_ATTENTION="\x1b[1;34mATTENTION\x1b[0m" #blue
+    MSG_SUCCESS="\x1b[1;32mSUCCESS\x1b[0m" #green
+    MSG_NOTINSTALLED="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
+    MSG_DONE="DONE"
+    $ERL -noinput -eval 'halt(0).'
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_FAILED"
+        echo "ERROR: erl could not be run"
+        echo "We were trying to run: erl -noinput -eval 'halt(0).'"
+        exit 1
+    fi
+
+    if [ ! -s `which erl` ]; then
+        echo -e "$MSG_FAILED"
+        echo "ERROR: your erl executable is of size zero bytes: `which erl`"
+        echo "ls -l `which erl`"
+        exit 1
+    fi
+
+    $ERL -noinput -name "checkinstallation" -eval 'halt(0).' > /dev/null 2>&1
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_ATTENTION"
+        echo "ERROR: erl could not create a Erlang VM named 'checkinstallation'"
+        echo "Please check the configuration of your hostnames"
+        echo "Are you already running another checkinstallation?"
+        echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
+        echo "We were trying to run: erl -noinput -name \"checkinstallation\" -eval 'halt(0).'"
+        echo -n "Continuing basic tests..."
+    fi
+
+    $ERL -noinput -name "checkinstallation@`get_hostname`" -eval 'halt(0).' > /dev/null 2>&1
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_ATTENTION"
+        echo "ERROR: erl could not create a Erlang VM named 'checkinstallation@`get_hostname`'"
+        echo "Are you already running another checkinstallation?"
+        echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
+        echo "We were trying to run: erl -noinput -name \"checkinstallation@`get_hostname`\" -eval 'halt(0).'"
+        echo -n "Continuing basic tests..."
+    fi
+
+    $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.' > /dev/null 2>&1
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_FAILED"
+        echo "ERROR: erlang could not start the crypto module"
+        echo "We were trying to run: $ERL -noinput -eval 'case catch crypto:start() of ok -> halt(0); _ -> halt(1) end.'"
+        exit 1
+    fi
+
+    if [ -e $ETCDIR/scalaris.cfg ]; then
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.cfg\") of {error, _} -> halt(1); _ -> halt(0) end" > /dev/null 2>&1
+        FAILED=$?
+        if [ $FAILED -ne 0 ]; then
+            echo -e "$MSG_FAILED"
+            echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.cfg"
+            echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
+            exit 1
+        fi
+    else
+        echo -e "$MSG_FAILED"
+        echo "ERROR: there is no config file: $ETCDIR/scalaris.cfg"
+        exit 1
+    fi
+
+    if [ -e $ETCDIR/scalaris.local.cfg ]; then
+        $ERL -noinput -eval "case file:consult(\"$ETCDIR/scalaris.local.cfg\") of {error, _} -> halt(1); _ -> halt(0) end" > /dev/null 2>&1
+        FAILED=$?
+        if [ $FAILED -ne 0 ]; then
+            echo -e "$MSG_FAILED"
+            echo "ERROR: there is a syntax error in: $ETCDIR/scalaris.local.cfg"
+            echo "We were trying to run: $ERL -noinput -eval \"A = file:consult(\"$ETCDIR/scalaris.local.cfg\"), io:format(\"~p~n\", [A]), halt(0) end\""
+            exit 1
+        fi
+    fi
+
+    $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(mgmt_server), code:ensure_loaded(dht_node)} of {{module,mgmt_server},{module,dht_node}} -> halt(0); X -> halt(1) end.' > /dev/null 2>&1
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_FAILED"
+        echo "ERROR: could not find Scalaris' beam files"
+        echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval 'case {code:ensure_loaded(mgmt_server), code:ensure_loaded(dht_node)} of {{module,mgmt_server},{module,dht_node}} -> halt(0); X -> halt(1) end.'"
+        exit 1
+    fi
+
+    HOSTNAME_ERL=`get_erlang_hostname`
+    HOSTNAME_SYS=`get_sys_hostname`
+    if [ "$HOSTNAME_ERL" != "$HOSTNAME_SYS" ]; then
+        echo -e "$MSG_ATTENTION"
+        echo "WARNING: the hostnames reported by Erlang and the OS do not match."
+        echo "erlang (get_erlang_hostname): "
+        echo "     -> $HOSTNAME_ERL"
+        echo "system (get_sys_hostname):"
+        echo "     -> $HOSTNAME_SYS"
+        echo " If debugging does not work, try one of the following solutions:"
+        echo " - during start, specify a full node name using IPs with '-n node@<IP>'"
+        echo " - set environment variable ERLANG_HOSTNAME to your IP"
+        if [ -n "$HOSTNAME_ERL" ] ; then
+            echo " - during start, specify a full node name using the erlang hostname with '-n node@$HOSTNAME_ERL'"
+            echo " - set environment variable ERLANG_HOSTNAME to the erlang hostname"
+        fi
+        echo " - fix your hostname setup system-wide"
+        echo " Please refer to your system's manual to set your hostname, e.g. change the"
+        echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
+        echo " the DNS."
+        echo -n "Continuing basic tests..."
+    fi
+
+    $SCALARISCLIENT_JAVA -h > /dev/null 2>&1
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        HAS_JAVACLIENT=0
+        echo -e "$MSG_ATTENTION"
+        echo "INFO: could not find Scalaris' Java-API files."
+        echo "You won't be able to use the 'scalaris' command line script to access Scalaris."
+        echo "  'make java' will build the Java-API"
+        echo "We were trying to run: $SCALARISCLIENT_JAVA -h"
+        echo -n "Continuing basic tests..."
+    else
+        HAS_JAVACLIENT=1
+        HOSTNAME_CTL=`get_hostname`
+        HOSTNAME_JAVA=`$SCALARISCLIENT_JAVA -lh --noerl`
+        if [ "$HOSTNAME_CTL" != "$HOSTNAME_JAVA" ]; then
+            echo -e "$MSG_ATTENTION"
+            echo "WARNING: the hostnames reported by Erlang, OS and Java do not match."
+            echo " You may run into trouble with the automatic '<node>@localhost' to"
+            echo " '<node>@<hostname>' conversion done by the Java-API, e.g. if used through"
+            echo " scalaris.jar. Also, the java unit tests will probably not work."
+            echo " The java-api/scalaris script will work around this by using the same mechanism"
+            echo " that scalarisctl uses to start nodes."
+            echo " If you implement your own application either do not use \"@localhost\" in the"
+            echo " scalaris.properties file or set the scalaris.erlang.nodename system property"
+            echo " with the correct hostname (only the domain name part after the \"@\") or fix"
+            echo " your hostname setup system-wide."
+            echo " Please refer to your system's manual to set your hostname, e.g. change the"
+            echo " values in /etc/hosts or /etc/hostname, and check that it is consistent with"
+            echo " the DNS."
+            echo "scalarisctl: "
+            echo "     -> $HOSTNAME_CTL"
+            echo "java:   $SCALARISCLIENT_JAVA -lh"
+            echo "     -> $HOSTNAME_JAVA"
+            echo -n "Continuing basic tests..."
+        fi
+    fi
+
+    CHECKCONFIGMSG=`$ERL -noinput -pa $BEAMDIR \
+        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"], []), halt(0)." 2>&1`
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_FAILED"
+        echo "$CHECKCONFIGMSG"
+        echo "ERROR: some parameters in the config files are wrong or missing"
+        echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"], []), halt(0).\""
+        exit 1
+    fi
+
+
+    CHECKCONFIGMSG=`$ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).'`
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -e "$MSG_ATTENTION"
+        echo "$CHECKCONFIGMSG"
+        echo "WARNING: could not start erlang with the given $ERL_SCHED_FLAGS."
+        echo " Defaults will be used when running Scalaris."
+        echo " Use the ERL_SCHED_FLAGS environment variable to override the scheduler flags."
+        echo " You may need to include the +sct flag to set the CPU topology manually."
+        echo " Proposed values for optimal performance (will be used if not overridden):"
+        echo "  R15+: $ERL_SCHED_FLAGS_R15"
+        echo "  R14 : $ERL_SCHED_FLAGS_R14"
+        echo "We were trying to run: $ERL $ERL_SCHED_FLAGS -noinput -eval 'halt(0).'"
+        echo -n "Continuing basic tests..."
+    fi
+
+    echo -e "$MSG_DONE"
+
+    echo "Running Scalaris run-time tests..."
+    # test runtime
+    if [ -z "$yaws_port" ]; then
+        echo "  NOTE: yaws port not specified (you can specify it using -y <port> for $0)."
+        echo "        Python, Python3, Ruby API tests may fail if the port is different in"
+        echo "        one of the config files."
+    else
+        export SCALARIS_JSON_URL="http://localhost:$yaws_port" # for single operations
+        export SCALARIS_JSON_URLS="http://localhost:$yaws_port" # for benchmarks
+    fi
+    if [ -n "$port" ]; then
+        export SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$port,mgmt_server} -scalaris known_hosts [{{127,0,0,1},$port,service_per_vm}]"
+    fi
+    export SCALARIS_JAPI_NODE="$NODE_NAME"
+    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" start > /dev/null 2>&1
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"
+        echo "  we were trying to run: $0 -f -s -m -d start"
+        # try to stop anyway (it could have been a false alarm):
+        $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
+        exit 1
+    fi
+
+    # Check if Scalaris node has been started.
+    sleep 2s # let Scalaris settle
+    max_tries=58
+    try=0
+    while [ $try -lt $max_tries ] ; do
+      scalaris_nodes_count_actual="$(scalariscall "Res = rpc:call('$NODE_NAME', admin, number_of_nodes, []), io:format(\"~p~n\", [Res]), halt(0)." | head -n1)"
+
+      if [ "$scalaris_nodes_count_actual" -ge "1" ] ; then
+        break
+      fi
+
+      try=$((10#$try + 1))
+      sleep 1s
+
+      if [ $try -eq $max_tries ] ; then
+        echo -e "  Starting Scalaris \x1b[1;31mFAILED\x1b[0m"
+        echo "  we were trying to run: $0 -f -s -m -d start"
+        # try to stop anyway (it could have been a false alarm):
+        $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
+        exit 1
+      fi
+    done
+
+    # bench parameters:
+    BENCH_NR_OPS=10
+    BENCH_TPN=1 # threads per node
+    BENCH_TESTS=all
+
+    # testing Java:
+    echo -n "  Java-API ... "
+    if [ "$HAS_JAVACLIENT" -eq 1 ]; then
+        # simple read/write
+        KEY="checkinstallation-$RANDOM"
+        JAVA_OUTPUT=`echo -e "> $SCALARISCLIENT_JAVA -r ${KEY}"`
+        JAVAREAD1_OUTPUT=`$SCALARISCLIENT_JAVA -r ${KEY} 2>&1`
+        echo "$JAVAREAD1_OUTPUT" | grep "failed with not found" > /dev/null 2>&1
+        JAVAREAD1_FAILED=$?
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVAREAD1_OUTPUT"`
+
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n> $SCALARISCLIENT_JAVA -w ${KEY} 1"`
+        JAVAWRITE1_OUTPUT=`$SCALARISCLIENT_JAVA -w ${KEY} 1 2>&1`
+        JAVAWRITE1_FAILED=$?
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVAWRITE1_OUTPUT"`
+
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n> $SCALARISCLIENT_JAVA -r ${KEY}"`
+        JAVAREAD2_OUTPUT=`$SCALARISCLIENT_JAVA -r ${KEY} 2>&1`
+        JAVAREAD2_FAILED=$?
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVAREAD2_OUTPUT"`
+
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n> $SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
+        JAVABENCH_OUTPUT=`$SCALARISCLIENT_JAVA -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
+        JAVABENCH_FAILED=$?
+        echo "$JAVABENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && JAVABENCH_FAILED=1
+        JAVA_OUTPUT=`echo -e "$JAVA_OUTPUT\n$JAVABENCH_OUTPUT"`
+
+        if [ $JAVAREAD1_FAILED -ne 0 -o $JAVAWRITE1_FAILED -ne 0 -o $JAVAREAD2_FAILED -ne 0 -o $JAVABENCH_FAILED -ne 0 ]; then
+            JAVA_FAILED=1
+            JAVA_RESULT="$MSG_FAILED"
+        else
+            JAVA_FAILED=0
+            JAVA_RESULT="$MSG_SUCCESS"
+        fi
+    else
+        JAVA_FAILED=0
+        JAVA_RESULT="$MSG_NOTINSTALLED"
+    fi
+    echo -e "$JAVA_RESULT"
+    if [ "$verbose" -eq 1 -o "$JAVA_FAILED" -ne 0 ]; then
+        echo "$JAVA_OUTPUT"
+    fi
+
+    # testing Python:
+    echo -n "  Python-API ... "
+    if [ -f "$SCALARISCLIENT_PYTHON" ]; then
+        # simple read/write
+        KEY="checkinstallation-$RANDOM"
+        PYTHON_OUTPUT=`echo -e "> $SCALARISCLIENT_PYTHON -r ${KEY}"`
+        PYTHONREAD1_OUTPUT=`$SCALARISCLIENT_PYTHON -r ${KEY} 2>&1`
+        echo "$PYTHONREAD1_OUTPUT" | grep "failed with not_found" > /dev/null 2>&1
+        PYTHONREAD1_FAILED=$?
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONREAD1_OUTPUT"`
+
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n> $SCALARISCLIENT_PYTHON -w ${KEY} 1"`
+        PYTHONWRITE1_OUTPUT=`$SCALARISCLIENT_PYTHON -w ${KEY} 1 2>&1`
+        PYTHONWRITE1_FAILED=$?
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONWRITE1_OUTPUT"`
+
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n> $SCALARISCLIENT_PYTHON -r ${KEY}"`
+        PYTHONREAD2_OUTPUT=`$SCALARISCLIENT_PYTHON -r ${KEY} 2>&1`
+        PYTHONREAD2_FAILED=$?
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONREAD2_OUTPUT"`
+
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n> $SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
+        PYTHONBENCH_OUTPUT=`$SCALARISCLIENT_PYTHON -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
+        PYTHONBENCH_FAILED=$?
+        echo "$PYTHONBENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && PYTHONBENCH_FAILED=1
+        PYTHON_OUTPUT=`echo -e "$PYTHON_OUTPUT\n$PYTHONBENCH_OUTPUT"`
+
+        if [ $PYTHONREAD1_FAILED -ne 0 -o $PYTHONWRITE1_FAILED -ne 0 -o $PYTHONREAD2_FAILED -ne 0 -o $PYTHONBENCH_FAILED -ne 0 ]; then
+            PYTHON_FAILED=1
+            PYTHON_RESULT="$MSG_FAILED"
+        else
+            PYTHON_FAILED=0
+            PYTHON_RESULT="$MSG_SUCCESS"
+        fi
+    else
+        PYTHON_FAILED=0
+        PYTHON_RESULT="$MSG_NOTINSTALLED"
+    fi
+    echo -e "$PYTHON_RESULT"
+    if [ "$verbose" -eq 1 -o "$PYTHON_FAILED" -ne 0 ]; then
+        echo "$PYTHON_OUTPUT"
+    fi
+
+    # testing Python3:
+    echo -n "  Python3-API ... "
+    if [ -f "$SCALARISCLIENT_PYTHON3" ]; then
+        # simple read/write
+        KEY="checkinstallation-$RANDOM"
+        PYTHON3_OUTPUT=`echo -e "> $SCALARISCLIENT_PYTHON3 -r ${KEY}"`
+        PYTHON3READ1_OUTPUT=`$SCALARISCLIENT_PYTHON3 -r ${KEY} 2>&1`
+        echo "$PYTHON3READ1_OUTPUT" | grep "failed with not_found" > /dev/null 2>&1
+        PYTHON3READ1_FAILED=$?
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3READ1_OUTPUT"`
+
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n> $SCALARISCLIENT_PYTHON3 -w ${KEY} 1"`
+        PYTHON3WRITE1_OUTPUT=`$SCALARISCLIENT_PYTHON3 -w ${KEY} 1 2>&1`
+        PYTHON3WRITE1_FAILED=$?
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3WRITE1_OUTPUT"`
+
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n> $SCALARISCLIENT_PYTHON3 -r ${KEY}"`
+        PYTHON3READ2_OUTPUT=`$SCALARISCLIENT_PYTHON3 -r ${KEY} 2>&1`
+        PYTHON3READ2_FAILED=$?
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3READ2_OUTPUT"`
+
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n> $SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS}"`
+        PYTHON3BENCH_OUTPUT=`$SCALARISCLIENT_PYTHON3 -b ${BENCH_NR_OPS} ${BENCH_TPN} ${BENCH_TESTS} 2>&1`
+        PYTHON3BENCH_FAILED=$?
+        echo "$PYTHON3BENCH_OUTPUT" | grep "failed" > /dev/null 2>&1 && PYTHON3BENCH_FAILED=1
+        PYTHON3_OUTPUT=`echo -e "$PYTHON3_OUTPUT\n$PYTHON3BENCH_OUTPUT"`
+
+        if [ $PYTHON3READ1_FAILED -ne 0 -o $PYTHON3WRITE1_FAILED -ne 0 -o $PYTHON3READ2_FAILED -ne 0 -o $PYTHON3BENCH_FAILED -ne 0 ]; then
+            PYTHON3_FAILED=1
+            PYTHON3_RESULT="$MSG_FAILED"
+        else
+            PYTHON3_FAILED=0
+            PYTHON3_RESULT="$MSG_SUCCESS"
+        fi
+    else
+        PYTHON3_FAILED=0
+        PYTHON3_RESULT="$MSG_NOTINSTALLED"
+    fi
+    echo -e "$PYTHON3_RESULT"
+    if [ "$verbose" -eq 1 -o "$PYTHON3_FAILED" -ne 0 ]; then
+        echo "$PYTHON3_OUTPUT"
+    fi
+
+    # testing Ruby:
+    echo -n "  Ruby-API ... "
+    if [ -f "$SCALARISCLIENT_RUBY" ]; then
+        # simple read/write
+        KEY="checkinstallation-$RANDOM"
+        RUBY_OUTPUT=`echo -e "> $SCALARISCLIENT_RUBY -r ${KEY}"`
+        RUBYREAD1_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
+        echo "$RUBYREAD1_OUTPUT" | grep "Scalaris::NotFoundError" > /dev/null 2>&1
+        RUBYREAD1_FAILED=$?
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYREAD1_OUTPUT"`
+
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n> $SCALARISCLIENT_RUBY -w ${KEY},1"`
+        RUBYWRITE1_OUTPUT=`$SCALARISCLIENT_RUBY -w ${KEY},1 2>&1`
+        RUBYWRITE1_FAILED=$?
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYWRITE1_OUTPUT"`
+
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n> $SCALARISCLIENT_RUBY -r ${KEY}"`
+        RUBYREAD2_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
+        RUBYREAD2_FAILED=$?
+        RUBY_OUTPUT=`echo -e "$RUBY_OUTPUT\n$RUBYREAD2_OUTPUT"`
+
+        # note: we don't have a minibench for ruby...
+
+        if [ $RUBYREAD1_FAILED -ne 0 -o $RUBYWRITE1_FAILED -ne 0 -o $RUBYREAD2_FAILED -ne 0 ]; then
+            RUBY_FAILED=1
+            RUBY_RESULT="$MSG_FAILED"
+        else
+            RUBY_FAILED=0
+            RUBY_RESULT="$MSG_SUCCESS"
+        fi
+    else
+        RUBY_FAILED=0
+        RUBY_RESULT="$MSG_NOTINSTALLED"
+    fi
+    echo -e "$RUBY_RESULT"
+    if [ "$verbose" -eq 1 -o "$RUBY_FAILED" -ne 0 ]; then
+        echo "$RUBY_OUTPUT"
+    fi
+
+    $0 -c "$SCALARIS_COOKIE" -e "$erl_flags" -d -f -s -m -n "$NODE_NAME" -p "$port" -y "$yaws_port" stop > /dev/null 2>&1
+
+    if [ "$JAVA_FAILED" -ne 0 -o "$PYTHON_FAILED" -ne 0 \
+         -o "$PYTHON3_FAILED" -ne 0 -o "$RUBY_FAILED" -ne 0 ]; then
+        exit 1
+    fi
+
+    exit 0
+}
+
+scalarisstart(){
+    $ERL -noinput -name $NODE_NAME -eval 'halt(0).' 2>/dev/null > /dev/null
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo ""
+        echo "ERROR: erl could not create a Erlang VM named '$NODE_NAME'"
+        echo "Are you already running a Scalaris server with this name?"
+        echo "You can change the name by the -n option (see -h)."
+        echo "'scalarisctl list' gives you a list of currently registered Erlang VMs"
+        echo "We were trying to run: erl -noinput -name $NODE_NAME -eval 'halt(0).'"
+        exit 1
+    fi
+    $ERL $ERL_SCHED_FLAGS_R15 -noinput -eval 'halt(0).' 2>/dev/null > /dev/null
+    FAILED=$?
+    if [ $FAILED -eq 0 ]; then
+        erl_flags="$ERL_SCHED_FLAGS_R15 $erl_flags"
+    else
+        if [ "$ERL_SCHED_FLAGS_R15" != "$ERL_SCHED_FLAGS_R14" ]; then
+            $ERL $ERL_SCHED_FLAGS_R14 -noinput -eval 'halt(0).' 2>/dev/null > /dev/null
+            FAILED=$?
+            if [ $FAILED -eq 0 ]; then
+                erl_flags="$ERL_SCHED_FLAGS_R14 $erl_flags"
+            fi
+        fi
+    fi
+    if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -eq 0 ]; then
+        BACKGROUND="-detached"
+    fi
+    local tmp
+    tmp=""
+    if [ $first -eq 1 ]; then
+        tmp="$tmp -scalaris first true"
+    fi
+    if [ $first_quorum -eq 1 ]; then
+        tmp="$tmp -scalaris first_quorum true"
+    fi
+    if [ "$port" != "" ]; then
+        tmp="$tmp -scalaris port $port"
+    fi
+    if [ "$yaws_port" != "" ]; then
+        tmp="$tmp -scalaris yaws_port $yaws_port"
+    fi
+    if [ "$join_at" != "" ]; then
+        tmp="$tmp -scalaris join_at $join_at"
+    fi
+    if [ $start_mgmt_server -eq 1 ]; then
+        tmp="$tmp -scalaris start_mgmt_server true"
+    fi
+    if [ "$start_dht_node" != "" ]; then
+        tmp="$tmp -scalaris start_dht_node $start_dht_node"
+    fi
+    if [ "$verbose" -eq 1 ]; then
+        tmp="$tmp -scalaris verbose true"
+    fi
+    if [ -n "$DIST_ERL_PORT" ]; then
+        tmp="$tmp -kernel inet_dist_listen_min $DIST_ERL_PORT inet_dist_listen_max $DIST_ERL_PORT"
+    fi
+    if [ -n "$NODES_PER_VM" ]; then
+        tmp="$tmp -scalaris nodes_per_vm \"$NODES_PER_VM\""
+    fi
+    SCALARIS_ADDITIONAL_PARAMETERS="$SCALARIS_ADDITIONAL_PARAMETERS $tmp"
+    export YAWSHOME="$HOME/.scalaris/$NODE_NAME"
+    mkdir -p "$YAWSHOME"
+    mkdir -p "$LOGDIR/$NODE_NAME"
+    pushd $BEAMDIR > /dev/null
+    START_CMD="\"$ERL\" -setcookie \"$SCALARIS_COOKIE\"\
+ -pa $SCALARISDIR/contrib/yaws/ebin\
+ -pa $SCALARISDIR/contrib/log4erl/ebin\
+ -pa $BEAMDIR $TOKEFLAGS $BACKGROUND\
+ -yaws embedded true\
+ -scalaris log_path \"\\\"$LOGDIR/$NODE_NAME\\\"\"\
+ -scalaris docroot \"\\\"$DOCROOTDIR\\\"\"\
+ -scalaris config \"\\\"$ETCDIR/scalaris.cfg\\\"\"\
+ -scalaris local_config \"\\\"$ETCDIR/scalaris.local.cfg\\\"\"\
+ -connect_all false -hidden -name $NODE_NAME\
+ $SCALARIS_ADDITIONAL_PARAMETERS\
+ -s scalaris `echo $erl_flags`"
+    if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
+        $SCREEN -S "scalaris_$NODE_NAME" -d -m /bin/bash -x -c +B "$START_CMD; sleep 365d"
+    else
+        bash -x -f +B -c "$START_CMD"
+    fi
+    FAILED=$?
+    if [ $FAILED -ne 0 ]; then
+        echo "ERROR: could not start scalaris"
+        echo "  consider running scalarisctl checkinstallation"
+        exit 1
+    fi
+    popd > /dev/null
+}
+
+scalarisstop(){
+    pushd $BEAMDIR > /dev/null
+    $ERL -setcookie "$SCALARIS_COOKIE" \
+        -name "ctl_$RANDOM@`get_hostname`" \
+        -pa $BEAMDIR \
+        -noinput \
+        -s scalaris cli -extra $NODE_NAME stop
+    FAILED=$?
+    popd > /dev/null
+    return $FAILED
+}
+
+scalariscall(){
+    pushd $BEAMDIR > /dev/null
+    $ERL -setcookie "$SCALARIS_COOKIE" \
+        -name "ctl_$RANDOM@`get_hostname`" \
+        -pa $BEAMDIR \
+        -noinput \
+        -eval "$1"
+    FAILED=$?
+    popd > /dev/null
+    return $FAILED
+}
+
+scalarisgstop(){
+    scalariscall "Res = rpc:call('$NODE_NAME', api_vm, shutdown_vm, []), case Res of ok -> halt(0); _ -> io:format(\"~p~n\", [Res]), halt(1) end."
+    return $?
+}
+
+scalarisstatus(){
+    scalariscall "Res = rpc:call('$NODE_NAME', api_vm, number_of_nodes, []), case Res of N when is_integer(N) -> io:format(\"Number of nodes: ~p~n\", [Res]), halt(0); _ -> io:format(\"~p~n\", [Res]), halt(1) end."
+    return $?
+}
+
+list_erlang_processes(){
+    $EPMD -names || echo "could not run epmd"
+}
+
+debug(){
+    # look into epmd -list: boot or node
+    $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name "rem@`get_hostname`" -remsh $NODE_NAME `echo $erl_flags`
+}
+
+fix_paths
+SCALARIS_COOKIE="`get_cookie`"
+
+until [ -z "$1" ]; do
+  OPTIND=1
+  case $1 in
+    "--help")
+      shift
+      usage 0;;
+    "--dist-erl-port")
+      shift
+      DIST_ERL_PORT=$1
+      shift;;
+    "--screen")
+      shift
+      DAEMONIZE_SCREEN=1;;
+    "--nodes-per-vm")
+      shift
+      NODES_PER_VM=$1
+      shift;;
+    checkinstallation | start | stop | gstop | restart | list | debug | status)
+      cmd="$1"
+      shift;;
+    *)
+      if getopts "dhifqmsvn:p:y:k:e:c:" optionName; then
+        case "$optionName" in
+            c) SCALARIS_COOKIE=$OPTARG;;
+            e) erl_flags=$OPTARG;;
+            d) daemonize=1;;
+            f) first=1;;
+            q) first_quorum=1;;
+            h) usage 0;;
+            i) echo "WARN: interactive is now default";;
+            k) join_at=$OPTARG;;
+            n) NODE_NAME=$OPTARG;;
+            p) port=$OPTARG;;
+            y) yaws_port=$OPTARG;;
+            m) start_mgmt_server=1;;
+            s) start_dht_node="dht_node";;
+            v) echo setting verbose from cli
+               verbose=1;;
+          [?]) echo "Wrong parameter $1."
+               usage 1;;
+        esac
+        shift $(($OPTIND-1))
+      else
+        shift
+        usage 1
+      fi;;
+  esac
+done
+
+fix_node_name
+
+case $cmd in
+    checkinstallation)
+        checkinstallation;;
+    start)
+        scalarisstart;;
+    status)
+        scalarisstatus;;
+    stop)
+        scalarisstop;;
+    gstop)
+        scalarisgstop;;
+    restart)
+        scalarisstop
+        scalarisstart;;
+    list)
+        list_erlang_processes;;
+    debug)
+        debug;;
+    *)
+        echo "Unknown command: $cmd."
+        usage 1;;
+esac

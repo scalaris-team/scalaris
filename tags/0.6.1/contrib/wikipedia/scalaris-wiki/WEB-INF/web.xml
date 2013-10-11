@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+    <display-name>WikiOnScalaris</display-name>
+    <servlet>
+        <description>
+        </description>
+        <display-name>WikiServletScalaris</display-name>
+        <servlet-name>WikiServletScalaris</servlet-name>
+        <servlet-class>de.zib.scalaris.examples.wikipedia.bliki.WikiServletScalaris</servlet-class>
+        <load-on-startup>0</load-on-startup>
+        <init-param>
+            <param-name>SERVERNAME</param-name>
+            <param-value>localhost:8080</param-value>
+        </init-param>
+        <init-param>
+            <param-name>LOG_USER_REQS</param-name>
+            <!-- keep records of the last x minutes since the last request-->
+            <param-value>0</param-value>
+        </init-param>
+        <init-param>
+            <param-name>SCALARIS_NODE_DISCOVERY</param-name>
+            <!-- use the node discovery daemon to look for new Scalaris nodes (fixed delay between runs in seconds (0 to disable)-->
+            <param-value>60</param-value>
+        </init-param>
+        <init-param>
+            <param-name>SERVERPATH</param-name>
+            <param-value>/scalaris-wiki/wiki</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_USE_BACKLINKS</param-name>
+            <param-value>true</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_SAVEPAGE_RETRIES</param-name>
+            <param-value>3</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_SAVEPAGE_RETRY_DELAY</param-name>
+            <param-value>10</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_PAGES_CACHE_IMPL</param-name>
+            <!-- available implementations: BLOOM | FULL_SET -->
+            <param-value>FULL_SET</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_REBUILD_PAGES_CACHE</param-name>
+            <param-value>600</param-value>
+        </init-param>
+        <init-param>
+            <param-name>WIKI_STORE_CONTRIBUTIONS</param-name>
+            <param-value>OUTSIDE_TX</param-value>
+        </init-param>
+        <init-param>
+            <!-- IMPORTANT: When changing this file, leave both -name and -value on the same line.
+                            Otherwise 'sed' will fail to match it. -->
+            <param-name>WIKI_OPTIMISATIONS</param-name>
+<!--
+optimisations are executed in the same order as mentioned
+format: "|"-separated list of the following (no spaces!): 
+ <operation>:<optimisation>([<parameter>[,<parameter>[,<parameter>]...]])
+available operations:
+ to set all (except PAGE_COUNT and CATEGORY_PAGE_COUNT) to one optimisation, use:
+  ALL
+ otherwise use values from de.zib.scalaris.examples.wikipedia.ScalarisOpType:
+  PAGE_LIST,
+  PAGE_COUNT (if set to buckets, PAGE_LIST must also use buckets for now!),
+  CATEGORY_PAGE_LIST,
+  CATEGORY_PAGE_COUNT (if set to buckets, CATEGORY_PAGE_LIST must also use buckets for now!),
+  TEMPLATE_PAGE_LIST,
+  BACKLINK_PAGE_LIST,
+  SHORTREV_LIST,
+  ARTICLE_COUNT,
+  PAGE,
+  REVISION,
+  CONTRIBUTION,
+  EDIT_STAT
+available optimisations (parameter types depend on the implementation):
+ see implementations of de.zib.scalaris.examples.wikipedia.Options.ListOptimisation
+  TRADITIONAL
+  APPEND_INCREMENT
+  APPEND_INCREMENT_PARTIALREAD
+  APPEND_INCREMENT_BUCKETS_RANDOM(int buckets)
+  APPEND_INCREMENT_PARTIALREAD_BUCKETS_RANDOM(int buckets)
+  APPEND_INCREMENT_BUCKETS_WITH_HASH(int buckets)
+  APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_HASH(int buckets)
+  APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(int readBuckets, int writeBuckets)
+  APPEND_INCREMENT_PARTIALREAD_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM(int readBuckets, int writeBuckets)
+  APPEND_INCREMENT_BUCKETS_WITH_WCACHE_HASH(int readBuckets, int writeBuckets)
+
+example:
+ <param-value>ALL:APPEND_INCREMENT|PAGE_LIST:APPEND_INCREMENT_BUCKETS_WITH_HASH(10)</param-value>
+-->
+            <param-value>ALL:APPEND_INCREMENT</param-value>
+        </init-param>
+<!--
+        <init-param>
+            <param-name>4CaaSt.accounting</param-name>
+            <param-value>URL</param-value>
+        </init-param>
+-->
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>WikiServletScalaris</servlet-name>
+        <url-pattern>/wiki</url-pattern>
+    </servlet-mapping>
+    <welcome-file-list>
+        <welcome-file>index.jsp</welcome-file>
+    </welcome-file-list>
+    
+  <!-- A filter that sets character encoding that is used to decode -->
+  <!-- parameters in a POST request -->
+    <filter>
+        <filter-name>setCharacterEncodingFilter</filter-name>
+        <filter-class>de.zib.scalaris.examples.wikipedia.tomcat.SetCharacterEncodingFilter</filter-class>
+        <init-param>
+            <param-name>encoding</param-name>
+            <param-value>UTF-8</param-value>
+        </init-param>
+        <async-supported>true</async-supported>
+    </filter>
+
+  <!-- A filter that triggers request parameters parsing and rejects the    -->
+  <!-- request if some parameters were skipped because of parsing errors or -->
+  <!-- request size limitations.                                            -->
+    <filter>
+        <filter-name>failedRequestFilter</filter-name>
+        <filter-class>
+          de.zib.scalaris.examples.wikipedia.tomcat.FailedRequestFilter
+        </filter-class>
+        <async-supported>true</async-supported>
+    </filter>
+    
+  <!-- The mapping for the Set Character Encoding Filter -->
+    <filter-mapping>
+        <filter-name>setCharacterEncodingFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+    
+  <!-- The mapping for the Failed Request Filter -->
+    <filter-mapping>
+        <filter-name>failedRequestFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+</web-app>

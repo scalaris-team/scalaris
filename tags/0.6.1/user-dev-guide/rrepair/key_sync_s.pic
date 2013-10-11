@@ -1,0 +1,72 @@
+# Resolve Service Operations
+# by Maik Lange
+
+.PS
+copy "sequence.pic";
+
+# OBJEKTE
+actor(U,"");
+placeholder_object(Dummy1); # more space
+object(A,"A:RR");
+placeholder_object(AA);
+object(ADB,"A:DB");
+placeholder_object(Dummy2); # more space
+placeholder_object(BB);
+object(BDB,"B:DB");
+object(B,"B:RR");
+step();
+
+# Key_Upd_S
+async();
+message(U,A,"key_upd_s({K})"); active(A); 
+step();
+
+begin_frame(A,F,wid 1.2 "key_upd_s");
+sync();
+cmessage(A,AA,"A:RS"); active(AA);
+async();
+message(A,AA,"key_upd_s");
+inactive(A);
+step();
+
+message(AA,ADB,"{K}"); active(ADB);
+message(ADB,AA,"{KVV}"); inactive(ADB);
+message(AA,B,"key_upd\sbFB\eb({KVV})"); active(B);
+dmessage(AA,AA); inactive(AA);
+
+begin_frame(BB,F1,wid 1.0 "key_upd\sbFB\eb");
+sync();
+cmessage(B,BB,"B:RS"); active(BB); 
+async();
+message(B,BB,"key_upd\sbFB\eb({KVV})");
+inactive(B);
+step();
+message(BB,BDB,"{KVV}"); active(BDB);
+message(BDB,BB,"{KVV\sbFB\eb}"); inactive(BDB);
+message(BB,A,"key_upd({KVV\sbFB\eb})"); active(A);
+dmessage(BB,BB); inactive(BB);
+step();
+end_frame(B,F1);
+
+begin_frame(A,F2,wid 0.9 "key_upd");
+sync();
+cmessage(A,AA,"A:RS"); active(AA);
+async();
+message(A,AA,"key_upd"); inactive(A);
+message(AA,ADB,"{KVV\sbFB\eb}"); active(ADB);
+step();
+inactive(ADB);
+dmessage(AA,AA); inactive(AA);
+step();
+end_frame(ADB,F2);
+step();
+end_frame(B,F);
+
+# Complete the lifelines
+step();
+complete(U);
+complete(A);
+complete(ADB);
+complete(B);
+complete(BDB);
+.PE

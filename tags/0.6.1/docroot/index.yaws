@@ -1,0 +1,256 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+<erl>
+out(Arg) ->
+    {header, {cache_control, "no-cache"}}.
+</erl>
+    <title>Scalaris Management Interface</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  <!--[if lte IE 5.5999]>
+    <style type="text/css">@import url(ie55-.css);</style>
+  <![endif]-->
+  </head>
+  <body>
+
+    <div class="menubar">
+      <div class="nothighlighted">
+	    <h2>Scalaris</h2>
+	  </div>
+      <div class="highlighted">
+	    <a class="menua" href="index.yaws">Home</a>
+	  </div>
+      <div class="nothighlighted">
+        <a class="menua" href="ring.yaws">Ring</a>
+      </div>
+
+<erl>
+out(Arg) ->
+    case whereis(mgmt_server) of
+        undefined -> {html, ""};
+        _ ->
+            {html,
+"      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
+      </div>
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
+      </div>" ++ 
+    case config:read(dc_clustering_enable) of
+        true -> "
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"dc.yaws\">Datacenter Clusters Map</a>
+      </div>
+";
+        _ -> ""
+    end ++ "
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"bench.yaws\">Benchmarks</a>
+      </div>
+"}
+    end.
+</erl>
+
+      <div class="nothighlighted">
+        <a class="menua" href="gossip.yaws">Gossip values</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_client.yaws">Client Monitor</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_ring.yaws">Ring Monitor</a>
+      </div>
+	  <div class="nothighlighted">
+	    <a class="menua" href="documentation.yaws">Docu</a>
+	  </div>
+      <div class="nothighlighted">
+        <a class="menua" href="debug.yaws">Debug</a>
+      </div>
+	  <div class="nothighlightedlast">
+	    <a class="menua" href="logger.yaws">Message Stats</a>
+	  </div>
+    </div><div class="middle">
+      <div class="middleleft">
+      
+<erl>
+out(Arg) ->
+    case whereis(mgmt_server) of
+        undefined -> {html, "<h2>Scalaris Node Info Page</h2>"};
+        _ ->
+            mgmt_server:number_of_nodes(),
+            NrNodes =
+                receive {get_list_length_response, Res} -> integer_to_list(Res)
+                after 6000 -> "n/a"
+                end,
+            {html, io_lib:format("
+<h2>Scalaris Management Server Info Page</h2>
+<p>Number of nodes: ~s</p>", [NrNodes])}
+    end.
+</erl>
+
+<h3>Simple Storage </h3>
+<h4>Add Key Value</h4>
+
+<form method="post" action="/index.yaws">
+
+<table width="400">
+<tr>
+<td>Key</td><td><input name="key" size="42" /></td>
+</tr>
+<tr>
+<td>Value</td><td><input name="value" size="42" /></td>
+</tr>
+</table>
+
+<input type=hidden name="type" value="addkey">
+<p><input type="submit" value="Add"/> | <a href="/index.yaws">Reset</a></p>
+</form>
+
+<p>
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+               {ok, Type} = postvar(A,"type"),
+               if 
+                 Type =:= "addkey" -> 
+                    case {postvar(A, "key"),postvar(A, "value")} of
+		      {{ok, Key},{ok, Value}} ->
+                         {Time, Result} = webhelpers:set_key(Key, Value),
+		    	 {ehtml, {pre, [], io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+                      _ -> 
+                         {ehtml, {pre, [], "<div style='color: red;'>Missing required input: Need a Key and Value</div>"}}
+                    end;
+                 true ->
+                    {ehtml,{pre, [], ""}}
+               end;
+ 	true ->
+      		{ehtml,{pre, [], ""}}
+    end.
+</erl>
+</p>
+
+
+<h4>Search</h4>
+
+<form method="post" action="/index.yaws">
+
+<p>Key <input name="key" size="42" /></p>
+
+<input type=hidden name="type" value="querykey">
+
+<p><input type="submit" value="Lookup"/> | <a href="/index.yaws">Reset</a></p>
+</form>
+
+
+<p>
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    if
+      	IsPost ->
+              {ok, Type} = postvar(A,"type"),
+              if 
+                Type =:= "querykey" ->
+                  case postvar(A, "key") of
+                   {ok, Key} ->
+                      {Time, Result} = webhelpers:lookup(Key),
+		      {ehtml, {pre, [], io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+                    _ ->
+                      {ehtml, {pre, [], ""}}
+		  end;
+                true -> 
+                      {ehtml, {pre, [], ""}}
+              end;
+	true ->
+      		{ehtml, 
+       			{pre, [], 
+        		""}}
+    end.
+</erl>
+</p>
+
+<h4>Delete</h4>
+
+<form method="post" action="/index.yaws">
+<table width="400">
+<tr>
+<td colspan="2">WARNING: This can lead to inconsistent data (e.g. deleted items
+can re-appear). Also when re-creating an item the version before the
+delete can re-appear.</td>
+</tr>
+<tr>
+<td>Key</td><td><input name="key" size="42" /></td>
+</tr>
+<tr>
+<td>Timeout</td><td><input name="timeout" size="42" value=2000 /></td>
+</tr>
+</table>
+
+<input type=hidden name="type" value="deletekey">
+
+<p><input type="submit" value="Delete"/> | <a href="/index.yaws">Reset</a></p>
+</form>
+
+<p>
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    if
+      IsPost ->
+        {ok, Type} = postvar(A,"type"),
+        if 
+          Type =:= "deletekey" ->
+            case {postvar(A, "key"),postvar(A, "timeout")} of
+              {{ok, Key},{ok, TimeoutStr}} ->
+                Timeout = try list_to_integer(TimeoutStr)
+                          catch _:badarg -> 2000
+                          end,
+                {Time, Result} = webhelpers:delete_key(Key, Timeout),
+                {ehtml, {pre, [], io_lib:format('~w ms: ~p', [Time / 1000, Result])}};
+              _ ->
+                {ehtml, {pre, [], ""}}
+            end;
+          true -> 
+            {ehtml, {pre, [], ""}}
+        end;
+      true ->
+        {ehtml, {pre, [], ""}}
+    end.
+</erl>
+</p>
+
+<h3>Args</h3>
+<p>
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    case IsPost of
+      true ->
+        {ehtml, {pre, [], io_lib:format("GET:~p~nPOST:~p", [yaws_api:parse_query(A), yaws_api:parse_post(A)])}};
+      false ->
+        {ehtml, {pre, [], io_lib:format("GET:~p", [yaws_api:parse_query(A)])}}
+    end.
+</erl>
+</p>
+
+<hr />
+<p>Last update:
+<erl>
+ out(Arg) ->
+    {Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
+</erl></p>
+</div>
+<br class="br_class">&nbsp;
+</div>
+<div class="bottom">
+</div>
+</body>
+</html>
