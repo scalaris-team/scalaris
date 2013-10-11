@@ -4,6 +4,69 @@ scalaris (0.6.1+svn-1) unstable; urgency=low
 
  -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
 
+scalaris (0.6.1-1) stable; urgency=low
+
+  * Packaging:
+    - add ArchLinux ruby API packages
+  * API:
+    - Java-API: add Maven build support
+    - Java-API: add CircularByteArrayOutputStream#clear()
+    - Java-API: fix ConnectionPool#getConnection(timeout) throwing
+                IllegalMonitorStateException if a single ConnectionPool is used
+                by multiple threads and no more connections are available
+    - Java-API: add a "-monitor" command line parameter
+    - api_monitor: return the latency and stddev values of the micro-benchmark
+                   executed by monitor_perf for node and service performance
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
+    - separate list counters from their list partitions for a better data layout
+    - fix high memory use of the Scalaris import if the import is slow
+    - use tomcat 7.0.42
+  * Business Logic:
+    - rrepair: reduce overhead of ART reconciliation
+    - rrepair: allow resolving of multiple merkle node leaves with a single
+               resolve request
+    - rrepair: don't create resolve requests for empty intervals
+    - rrepair: reduce overhead of update_key_entry requests (use a single
+               request with all the data instead of one request for each item)
+    - rrepair: allow arbitrary intervals in interval_upd and interval_upd_send
+               resolve requests again
+    - rrepair: when hashing merkle_tree/ART children, also include the
+               represented interval (fixes indistinguishable empty leaf nodes
+               in ART)
+    - tx_tm_rtm: re-enable takeover by rtms on tm crash
+    - rt_chord: only re-build the RT if the pred or succ processes change or the
+                own new node ID is not between the new pred and succ any more
+  * Infrastructure:
+    - DB: improve performance of fold[lr] implementations by a factor of 2
+    - FD: get rid of annoying, wrongly raised log warnings
+    - RM: provide a more generic Reason for RM subscriptions
+    - RM: remove trigger infections
+    - RT: don't trigger an update when a slide finishes
+    - RT, FRT: reduce the number of messages sent on lookups
+    - log: don't exit with a badmatch if our error_logger is not the only one
+  * Tests:
+    - add protocol scheduler tests for slide, join and leave
+  * Documentation:
+    - user-dev-guide: add section on scalarisctl checkinstallation
+    - user-dev-guide: clarify the section about how to set up Scalaris
+  * Tools:
+    - proto scheduler: continue in case of send errors
+    - top: improve process messages output
+  * Bugs:
+    - node join: fix not being able to join a system with passive load balancer
+                 if the number of items in the DB is too high
+    - tx_tm_rtm: fix wrong asserts
+    - fix node resposibility check not always including message forward and
+      db_range intervals
+    - tx_tp: add missing snapshot number in tp_do_commit_abort message
+    - bulkowner: respect the nodes' DB ranges and forward requests for
+                 non-responsible ranges
+    - dn_cache: fix reporting wrong PIDs back as zombies after node reboots
+    - fix some more (less severe) bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 11 Oct 2013 15:00:00 +0200
+
 scalaris (0.6.0-1) stable; urgency=low
 
   * Packaging:
@@ -165,7 +228,7 @@ scalaris (0.6.0-1) stable; urgency=low
     - fix dc_clustering
     - fix numerous other bugs
 
- -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
+ -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 23:20:13 +0200
 
 scalaris (0.5.0-1) stable; urgency=low
 

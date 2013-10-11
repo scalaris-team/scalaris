@@ -4,6 +4,24 @@ scalaris-bindings (0.6.1+svn-1) unstable; urgency=low
 
  -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
 
+scalaris-bindings (0.6.1-1) stable; urgency=low
+
+  * Packaging:
+    - add ArchLinux ruby API packages
+  * API:
+    - Java-API: add Maven build support
+    - Java-API: add CircularByteArrayOutputStream#clear()
+    - Java-API: fix ConnectionPool#getConnection(timeout) throwing
+                IllegalMonitorStateException if a single ConnectionPool is used
+                by multiple threads and no more connections are available
+    - Java-API: add a "-monitor" command line parameter
+    - api_monitor: return the latency and stddev values of the micro-benchmark
+                   executed by monitor_perf for node and service performance
+  * Bugs:
+    - fix some more (less severe) bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 11 Oct 2013 15:00:00 +0200
+
 scalaris-bindings (0.6.0-1) stable; urgency=low
 
   * Packaging:
@@ -40,7 +58,7 @@ scalaris-bindings (0.6.0-1) stable; urgency=low
     - use /bin/bash instead of /bin/sh which may not result in a bash session
     - fix numerous other bugs
 
- -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
+ -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 23:20:13 +0200
 
 scalaris-bindings (0.5.0-1) stable; urgency=low
   * API:
