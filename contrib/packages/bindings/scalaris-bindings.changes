@@ -1,4 +1,22 @@
 -------------------------------------------------------------------
+Fri Oct 11 13:00:00 UTC 2013 - kruber@zib.de
+
+- Scalaris 0.6.1
+  * Packaging:
+    - add ArchLinux ruby API packages
+  * API:
+    - Java-API: add Maven build support
+    - Java-API: add CircularByteArrayOutputStream#clear()
+    - Java-API: fix ConnectionPool#getConnection(timeout) throwing
+                IllegalMonitorStateException if a single ConnectionPool is used
+                by multiple threads and no more connections are available
+    - Java-API: add a "-monitor" command line parameter
+    - api_monitor: return the latency and stddev values of the micro-benchmark
+                   executed by monitor_perf for node and service performance
+  * Bugs:
+    - fix some more (less severe) bugs
+
+-------------------------------------------------------------------
 Fri Aug 16 21:20:13 UTC 2013 - kruber@zib.de
 
 - Scalaris 0.6.0 (codename "Conus scalaris")
