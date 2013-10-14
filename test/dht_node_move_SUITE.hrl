@@ -75,13 +75,18 @@ groups() ->
          test_slide_adjacent,
          test_slide_conflict
         ],
+    SlideIllegally =
+        [
+         test_slide_illegally
+        ],
     [
       {send_to_pred, Config, SendToPredTestCases},
       {send_to_pred_incremental, ConfigInc, SendToPredTestCases},
       {send_to_succ, Config, SendToSuccTestCases},
       {send_to_succ_incremental, ConfigInc, SendToSuccTestCases},
       {send_to_both, Config, SendToBothTestCases},
-      {send_to_both_incremental, ConfigInc2, SendToBothTestCases}
+      {send_to_both_incremental, ConfigInc2, SendToBothTestCases},
+      {slide_illegally, Config, SlideIllegally}
     ]
       ++
 %%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
@@ -942,3 +947,33 @@ test_slide_conflict(_Config) ->
           end || DhtNode <- DhtNodes, Action <- Actions],
     erlang:exit(BenchPid, 'kill'),
     util:wait_for_process_to_die(BenchPid).
+
+%% @doc slide illegally, i.e. provide a target id impossible to slide to
+test_slide_illegally(_Config) ->
+    DhtNodes = pid_groups:find_all(dht_node),
+    %% Two slides that can't be performed
+    Slide1 = #slideconf{name = illegalslide1,
+                        node = node,
+                        slide_with = succ,
+                        targetid = gen_split_key_fun(predspred, {1, 2})},
+    Slide2 = #slideconf{name = illegalslide2,
+                        node = pred,
+                        slide_with = succ,
+                        targetid = gen_split_key_fun(node, {1, 2})},
+    %% Variations (different startup messages)
+    Slides = generate_slide_variation(Slide1) ++ generate_slide_variation(Slide2),
+    _ = [ begin
+              Nodes = get_predspred_pred_node_succ(DhtNode),
+              Node = select_from_nodes(Slide#slideconf.node, Nodes),
+              Direction = Slide#slideconf.slide_with,
+              TargetId = (Slide#slideconf.targetid)(Nodes),
+              Tag = Slide#slideconf.name,
+              ct:pal("Beginning ~p", [Tag]),
+              ?proto_sched(start),
+              comm:send(node:pidX(Node), {move, start_slide, Direction, TargetId, {slide, Direction, Tag}, self()}),
+              receive
+                  ?SCALARIS_RECV({move, result, {slide, Direction, Tag}, target_id_not_in_range}, ok);
+                  ?SCALARIS_RECV(X, ?ct_fail("Illegal Slide ~p", [X]))
+              end,
+              ?proto_sched(stop)
+          end || DhtNode <- DhtNodes, Slide <- Slides].

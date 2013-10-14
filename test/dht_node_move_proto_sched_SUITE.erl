@@ -53,7 +53,8 @@ all() ->
      {group, send_to_succ},
      {group, send_to_succ_incremental},
      {group, send_to_both},
-     {group, send_to_both_incremental}
+     {group, send_to_both_incremental},
+     {group, slide_illegally}
     ].
 
 suite() -> [ {timetrap, {seconds, 300}} ].
