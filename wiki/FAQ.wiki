@@ -96,6 +96,7 @@ Available packages are listed in the following table:
 || Ubuntu || 12.04 (Precise Pangolin) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_12.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_12.04/] ||
 || Ubuntu || 12.10 (Quantal Quetzal) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_12.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_12.10/] ||
 || Ubuntu || 13.04 (Raring Ringtail) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_13.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_13.04/] ||
+|| Ubuntu || 13.10 (Saucy Salamander) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_13.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_13.10/] ||
 
 For those distributions which provide a recent-enough Erlang version, we build the packages using their Erlang package and recommend using the same version that came with the distribution. In this case we do not provide Erlang packages in our repository.
 
