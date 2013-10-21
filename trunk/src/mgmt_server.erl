@@ -99,7 +99,7 @@ on({get_list_length, SourcePid}, Nodes) ->
 on({register, Node}, Nodes) ->
     NodePid = node:pidX(Node),
     fd:subscribe(NodePid),
-    gb_trees:insert(NodePid, Node, Nodes);
+    gb_trees:enter(NodePid, Node, Nodes);
 
 on({connect}, State) ->
     % ugly work around for finding the local ip by setting up a socket first
