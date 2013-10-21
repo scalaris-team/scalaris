@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2013 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -361,7 +361,7 @@ sup_get_all_children(Supervisor) ->
 %%      list of childs if the supervisor has been killed, e.g. by another
 %%      process.
 -spec sup_which_children(Supervisor::pid() | atom()) ->
-          [{Id::term(), Pid::pid | undefined, Type::worker | supervisor,
+          [{Id::term(), Pid::pid() | undefined, Type::worker | supervisor,
             Modules::[module()] | dynamic}].
 sup_which_children(Supervisor) ->
     try supervisor:which_children(Supervisor)
