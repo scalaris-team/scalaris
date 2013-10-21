@@ -279,7 +279,8 @@ on({qread_collect,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            {Done, NewEntry} = add_read_reply(Entry, MyRwithId, Val, AckRound),
+            {Done, NewEntry} =
+                add_read_reply(Entry, MyRwithId, Val, AckRound, Cons),
             case Done of
                 false ->
                     set_entry(NewEntry, tablename(State)),
@@ -390,7 +391,7 @@ on({qread_write_through_collect, ReqId,
         _ ->
             ?TRACE("rbrcseq:on qread_write_through_collect Client: ~p~n", [entry_client(Entry)]),
             %% log:pal("Collect reply ~p ~p~n", [ReqId, Round]),
-            {Done, NewEntry} = add_write_reply(Entry, Round),
+            {Done, NewEntry} = add_write_reply(Entry, Round, Cons),
             case Done of
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
@@ -415,7 +416,7 @@ on({qread_write_through_collect, ReqId,
         _ ->
             %% log:pal("Collect deny ~p ~p~n", [ReqId, NewerRound]),
             ?TRACE("rbrcseq:on qread_write_through_collect deny Client: ~p~n", [entry_client(Entry)]),
-            {Done, NewEntry} = add_write_deny(Entry, NewerRound),
+            {Done, NewEntry} = add_write_deny(Entry, NewerRound, Cons),
             %% log:pal("#Denies = ~p, ~p~n", [entry_num_denies(NewEntry), Done]),
             case Done of
                 false ->
@@ -578,7 +579,7 @@ on({qwrite_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            {Done, NewEntry} = add_write_reply(Entry, Round),
+            {Done, NewEntry} = add_write_reply(Entry, Round, Cons),
             case Done of
                 false -> set_entry(NewEntry, tablename(State));
                 true ->
@@ -603,7 +604,7 @@ on({qwrite_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            {Done, NewEntry} = add_write_deny(Entry, NewerRound),
+            {Done, NewEntry} = add_write_deny(Entry, NewerRound, Cons),
             case Done of
                 false -> set_entry(NewEntry, TableName),
                          State;
@@ -795,8 +796,18 @@ entry_inc_num_newest(Entry)        -> setelement(13, Entry, 1 + element(13, Entr
 -spec entry_num_newest(entry())    -> non_neg_integer().
 entry_num_newest(Entry)            -> element(13, Entry).
 
--spec add_read_reply(entry(), prbr:r_with_id(), client_value(), prbr:r_with_id()) -> {boolean() | write_through, entry()}.
-add_read_reply(Entry, AssignedRound, Val, AckRound) ->
+-spec add_read_reply(entry(), prbr:r_with_id(), client_value(),
+                     prbr:r_with_id(), Consistency::boolean())
+                    -> {boolean() | write_through, entry()}.
+add_read_reply(Entry, AssignedRound, Val, AckRound, Cons) ->
+    %% either decide on a majority of consistent replies, than we can
+    %% just take the newest consistent value and do not need a
+    %% write_through?
+
+    %% Otherwise we decide on a consistent quorum (a majority agrees
+    %% on the same version). We ensure this by write_through on odd
+    %% cases.
+    
     LatestSeen = entry_latest_seen(Entry),
     TmpEntry =
         if AckRound > LatestSeen ->
@@ -819,8 +830,9 @@ add_read_reply(Entry, AssignedRound, Val, AckRound) ->
      end,
      entry_inc_num_acks(E2)}.
 
--spec add_write_reply(entry(), prbr:r_with_id()) -> {boolean(), entry()}.
-add_write_reply(Entry, Round) ->
+-spec add_write_reply(entry(), prbr:r_with_id(), Consistency::boolean())
+                     -> {boolean(), entry()}.
+add_write_reply(Entry, Round, Cons) ->
     E1 =
         case Round > entry_latest_seen(Entry) of
             false -> Entry;
@@ -837,8 +849,9 @@ add_write_reply(Entry, Round) ->
     end,
     {3 =< (1+entry_num_acks(E1)), entry_inc_num_acks(E1)}.
 
--spec add_write_deny(entry(), prbr:r_with_id()) -> {boolean(), entry()}.
-add_write_deny(Entry, Round) ->
+-spec add_write_deny(entry(), prbr:r_with_id(), Consistency::boolean())
+                    -> {boolean(), entry()}.
+add_write_deny(Entry, Round, Cons) ->
     E1 =
         case Round > entry_latest_seen(Entry) of
             false -> Entry;
