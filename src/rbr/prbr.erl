@@ -68,9 +68,11 @@
 
 -type message() ::
         {prbr, read, DB :: dht_node_state:db_selector(),
+         WasConsistentLookup :: boolean(),
          Proposer :: comm:mypid(), ?RT:key(), InRound,
          read_filter()}
       | {prbr, write, DB :: dht_node_state:db_selector(),
+         WasConsistentLookup :: boolean(),
          Proposer :: comm:mypid(), ?RT:key(), InRound,
          Value :: term(), PassedToUpdate :: term(), write_filter()}.
 
