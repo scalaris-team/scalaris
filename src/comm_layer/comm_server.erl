@@ -200,7 +200,6 @@ tcp_options(Channel) ->
      {nodelay, true},
      {keepalive, true},
      {reuseaddr, true},
-     {delay_send, true},
      {send_timeout, TcpSendTimeout}].
 
 %% @doc Synchronous call to create (or get) a connection for the given Address+Port using Socket.
