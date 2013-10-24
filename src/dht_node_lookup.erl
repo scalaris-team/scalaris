@@ -72,7 +72,10 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
             comm:send_local(DHTNode,
                             {?lookup_fin, Key, Hops + 1, Msg});
         maybe ->
-            ok;
+            DHTNode = pid_groups:find_a(dht_node),
+            %log:log("aux -> fin: ~p ~p~n", [self(), DHTNode]),
+            comm:send_local(DHTNode,
+                            {?lookup_fin, Key, Hops + 1, Msg});
         false ->
             WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
             %log:log("lookup_aux_leases route ~p~n", [self()]),

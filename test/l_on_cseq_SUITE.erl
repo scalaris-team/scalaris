@@ -70,8 +70,8 @@ all() ->
      {group, tester_tests},
      {group, renew_tests},
      {group, split_tests},
-     {group, handover_tests}
-     %{group, takeover_tests}
+     {group, handover_tests},
+     {group, takeover_tests}
      %{group, gc_tests}
      ].
 
@@ -629,6 +629,8 @@ takeover_loop(L) ->
             ok;
         {takeover, failed, L2} ->
             ct:pal("retrying takeover ~p ~p", [L2, l_on_cseq:get_pretty_timeout(L2)]),
+            %% we repeat until the lease expired and then hopefully succeed
+            timer:sleep(500),
             takeover_loop(L2)
     end.
 
