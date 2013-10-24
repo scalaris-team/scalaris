@@ -104,7 +104,7 @@
 -type state_field() :: round |           %next round id
                        open_recon |      %number of open recon processes
                        open_resolve |    %number of open resolve processes
-                       open_sessions.    %number of current running sync sessions
+                       open_sessions.    %list of current running sync sessions
 
 -type message() ::
     % API
