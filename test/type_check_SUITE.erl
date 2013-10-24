@@ -548,7 +548,6 @@ tester_type_check_util(_Config) ->
              {dump3, 0}, %% type spec not valid
              {dumpX, 1}, {dumpX, 2}, %% type spec not valid?
              {extint2atom, 1}, %% type spec too wide
-             {first_matching, 2}, %% cannot create funs
              {for_to, 3}, %% cannot create funs
              {for_to_ex, 3}, %% cannot create funs
              {for_to_ex, 4}, %% cannot create funs
