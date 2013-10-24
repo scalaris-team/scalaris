@@ -358,11 +358,11 @@ send(Pid, Message, Options, State) ->
         -> state().
 send_internal(Pid, Message, Options, BinaryMessage, State) ->
     Socket = socket(State),
+    ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
     case gen_tcp:send(Socket, BinaryMessage) of
         ok ->
             ?TRACE("~.0p Sent message ~.0p~n",
                    [pid_groups:my_pidname(), Message]),
-            ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
             set_number_of_timeouts(State, 0);
         {error, closed} ->
             Address = dest_ip(State),
