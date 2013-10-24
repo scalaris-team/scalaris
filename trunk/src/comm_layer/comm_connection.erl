@@ -63,8 +63,7 @@
      MsgQueueLen          :: non_neg_integer(),
      DesiredBundleSize    :: non_neg_integer(),
      MsgsSinceBundleStart :: non_neg_integer(),
-     LastStatReport       :: stat_report(),
-     NumberOfTimeouts	  :: non_neg_integer()}.
+     LastStatReport       :: stat_report()}.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
     {tcp, Socket::inet:socket(), Data::binary()} |
@@ -349,35 +348,34 @@ send_or_bundle(DestPid, Message, Options, State) ->
 send(Pid, Message, Options, State) ->
     DeliverMsg = {?deliver, Pid, Message},
     BinaryMessage = ?COMM_COMPRESS_MSG(DeliverMsg, State),
-    send_internal(Pid, Message, Options, BinaryMessage, State).
+    send_internal(Pid, Message, Options, BinaryMessage, State, 0).
 
 -spec send_internal
-    (pid(), comm:message(), comm:send_options(), BinMsg::binary(), state())
+    (pid(), comm:message(), comm:send_options(), BinMsg::binary(), state(), Timeouts::non_neg_integer())
         -> state();
-    (?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], BinMsg::binary(), state())
+    (?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], BinMsg::binary(), state(), Timeouts::non_neg_integer())
         -> state().
-send_internal(Pid, Message, Options, BinaryMessage, State) ->
+send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts) ->
     Socket = socket(State),
     ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
     case gen_tcp:send(Socket, BinaryMessage) of
         ok ->
             ?TRACE("~.0p Sent message ~.0p~n",
                    [pid_groups:my_pidname(), Message]),
-            set_number_of_timeouts(State, 0);
+            State;
         {error, closed} ->
             Address = dest_ip(State),
             Port = dest_port(State),
             report_bundle_error(Options, {Address, Port, Pid}, Message,
                                 socket_closed),
             log:log(warn,"[ CC ~p (~p) ] sending closed connection", [self(), pid_groups:my_pidname()]),
-            close_connection(Socket, set_number_of_timeouts(State, 0));
+            close_connection(Socket, State);
         {error, timeout} ->
-            NumberOfTimeouts = number_of_timeouts(State),
             if  % retry 5 times
                 NumberOfTimeouts < 5 ->
                     log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). retrying.",
                             [self(), pid_groups:my_pidname(), timeout]),
-                    send_internal(Pid, Message, Options, BinaryMessage, set_number_of_timeouts(State, NumberOfTimeouts + 1));
+                    send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts + 1);
                 true ->
                     log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). retried 5 times, now closing the connection.",
                             [self(), pid_groups:my_pidname(), timeout]),
@@ -385,7 +383,7 @@ send_internal(Pid, Message, Options, BinaryMessage, State) ->
                     Port = dest_port(State),
                     report_bundle_error(Options, {Address, Port, Pid}, Message,
                                         socket_timeout),
-                    close_connection(Socket, set_number_of_timeouts(State, 0))
+                    close_connection(Socket, State)
             end;
         {error, Reason} ->
             Address = dest_ip(State),
@@ -394,7 +392,7 @@ send_internal(Pid, Message, Options, BinaryMessage, State) ->
                                 Reason),
             log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). closing connection",
                     [self(), pid_groups:my_pidname(), Reason]),
-            close_connection(Socket, set_number_of_timeouts(State, 0))
+            close_connection(Socket, State)
     end.
 
 -spec new_connection(inet:ip_address(), comm_server:tcp_port(),
@@ -485,8 +483,7 @@ state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
      _StartTime = os:timestamp(), _SentMsgCount = 0, _ReceivedMsgCount = 0,
      _MsgQueue = {[], []}, _Len = 0,
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0,
-     _LastStatReport = {0, 0, 0, 0},
-     _NumberOfTimeouts = 0}.
+     _LastStatReport = {0, 0, 0, 0}}.
 
 -spec dest_ip(state()) -> inet:ip_address().
 dest_ip(State)                 -> element(1, State).
@@ -547,11 +544,6 @@ set_msgs_since_bundle_start(State, Val) ->
 last_stat_report(State)          -> element(13, State).
 -spec set_last_stat_report(state(), stat_report()) -> state().
 set_last_stat_report(State, Val) -> setelement(13, State, Val).
-
--spec number_of_timeouts(state()) -> non_neg_integer().
-number_of_timeouts(State) -> element(14, State).
--spec set_number_of_timeouts(state(), non_neg_integer()) -> state().
-set_number_of_timeouts(State, N) -> setelement(14, State, N).
 
 -spec status(State::state()) -> notconnected | connected.
 status(State) ->
