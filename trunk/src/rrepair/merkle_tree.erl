@@ -150,12 +150,11 @@ lookup_(_I, {_, _, _, _NodeI, _ChildList = []}) ->
 lookup_(I, {_, _, _, _NodeI, ChildList = [_|_]}) ->
     ?ASSERT(1 >= length([C || C <- ChildList,
                               intervals:is_subset(I, get_interval(C))])),
-    case util:first_matching(ChildList,
-                             fun(X) ->
-                                     intervals:is_subset(I, get_interval(X))
-                             end) of
-        {ok, IChild} -> lookup_(I, IChild);
-        failed       -> not_found
+    case lists:dropwhile(fun(X) ->
+                                 not intervals:is_subset(I, get_interval(X))
+                         end, ChildList) of
+        [IChild | _] -> lookup_(I, IChild);
+        []           -> not_found
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

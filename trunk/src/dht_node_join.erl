@@ -503,11 +503,11 @@ process_join_state({?lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _Q
     State;
 process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, Hops, Msg}, _Reason}, FailedPids}, {join, JoinState, _QueuedMessages} = State) ->
     Connections = get_connections(JoinState),
-    case util:first_matching(Connections, fun({_, Pid}) -> not lists:member(Pid, FailedPids) end) of
-        failed ->
+    case lists:dropwhile(fun({_, Pid}) -> lists:member(Pid, FailedPids) end, Connections) of
+        [] ->
             _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
             ok;
-        {ok, {_, Pid}} ->
+        [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:
             Self = comm:reply_as(self(), 3, {join, send_failed, '_', [Target | FailedPids]}),
             comm:send(Pid, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
