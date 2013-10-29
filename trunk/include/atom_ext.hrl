@@ -72,6 +72,12 @@
 -define(paxos_id_atom, paxos_id).
 -define(paxos_id, ?int_or_atom(43, ?paxos_id_atom)).
 
+-define(proposer_initialize_atom, proposer_initialize).
+-define(proposer_initialize, ?int_or_atom(44, ?proposer_initialize_atom)).
+
+-define(proposer_deleteids_atom, proposer_deleteids).
+-define(proposer_deleteids, ?int_or_atom(45, ?proposer_deleteids_atom)).
+
 %% transactions
 -define(register_TP_atom, register_TP).
 -define(register_TP, ?int_or_atom(61, ?register_TP_atom)).
