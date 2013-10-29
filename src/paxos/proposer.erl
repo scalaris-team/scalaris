@@ -79,13 +79,13 @@ start_paxosid(Proposer, PaxosID, Acceptors, Proposal,
                     pos_integer(), pos_integer(), non_neg_integer()) -> ok.
 start_paxosid(Proposer, PaxosID, Acceptors, Proposal,
               Majority, MaxProposers, InitialRound) ->
-    Msg = {proposer_initialize, PaxosID, Acceptors, Proposal,
+    Msg = {?proposer_initialize, PaxosID, Acceptors, Proposal,
            Majority, MaxProposers, InitialRound},
     comm:send(Proposer, Msg).
 
 -spec stop_paxosids(comm:mypid(), any()) -> ok.
 stop_paxosids(Proposer, PaxosIds) ->
-    comm:send(Proposer, {proposer_deleteids, PaxosIds}).
+    comm:send(Proposer, {?proposer_deleteids, PaxosIds}).
 
 -spec trigger(comm:mypid(), any()) -> ok.
 trigger(Proposer, PaxosID) ->
@@ -110,15 +110,15 @@ init([]) ->
     _State = TableName.
 
 -spec on(comm:message(), state()) -> state().
-on({proposer_initialize, PaxosID, Acceptors, Proposal,
+on({?proposer_initialize, PaxosID, Acceptors, Proposal,
     Majority, MaxProposers, InitialRound},
    State) ->
-    on({proposer_initialize, PaxosID, Acceptors, Proposal,
+    on({?proposer_initialize, PaxosID, Acceptors, Proposal,
         Majority, MaxProposers, InitialRound,
         _ReplyTo = comm:this()},
        State);
 
-on({proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
+on({?proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
     MaxProposers, InitialRound, ReplyTo},
    ETSTableName = State) ->
     ?TRACE("proposer:initialize for paxos id: ~p round ~p~n", [PaxosID,InitialRound]),
@@ -212,7 +212,7 @@ on({acceptor_naccepted, PaxosID, Round}, _ETSTableName = State) ->
     start_new_higher_round(PaxosID, Round, State),
     State;
 
-on({proposer_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
+on({?proposer_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
     _ = [pdb:delete(Id, ETSTableName) || Id <- ListOfPaxosIDs],
     State;
 

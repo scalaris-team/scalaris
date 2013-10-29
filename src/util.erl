@@ -1356,6 +1356,8 @@ extint2atom(X) when is_integer(X) ->
         ?proposer_accept -> ?proposer_accept_atom;
         ?acceptor_accept -> ?acceptor_accept_atom;
         ?paxos_id -> ?paxos_id_atom;
+        ?proposer_initialize -> ?proposer_initialize_atom;
+        ?proposer_deleteids -> ?proposer_deleteids_atom;
         %% transactions
         ?register_TP -> ?register_TP_atom;
         ?tx_tm_rtm_init_RTM -> ?tx_tm_rtm_init_RTM_atom;

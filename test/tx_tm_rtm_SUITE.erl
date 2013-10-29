@@ -358,7 +358,7 @@ tp_crash(_) ->
     Proposer = hd(Proposers),
     %% ct:pal("Selected ~p~n", [pid_groups:group_and_name_of(Proposer)]),
     %% break one TP (minority) after proposer initialize:
-    gen_component:bp_set(Proposer, proposer_initialize, tp_crash),
+    gen_component:bp_set(Proposer, ?proposer_initialize, tp_crash),
     %% ct:pal("Breakpoints set~n"),
     gen_component:bp_barrier(Proposer),
     %% ct:pal("Barriers set~n"),
@@ -388,7 +388,7 @@ all_tp_crash(_) ->
     Proposers = [X || X <- AllProposers,
                       "basic_services" =/= pid_groups:group_of(X)],
     %% break all TPs (majority) after proposer initialize:
-    _ = [ gen_component:bp_set(Proposer, proposer_initialize, all_tp_crash)
+    _ = [ gen_component:bp_set(Proposer, ?proposer_initialize, all_tp_crash)
           || Proposer <- Proposers],
     %% ct:pal("Breakpoints set~n"),
     _ = [ gen_component:bp_barrier(Proposer) || Proposer <- Proposers ],

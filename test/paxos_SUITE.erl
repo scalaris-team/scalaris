@@ -242,7 +242,7 @@ prop_rnd_interleave(NumProposers, NumAcceptors, Seed) ->
     {Proposers, Acceptors, Learners} =
         make(NumProposers, NumAcceptors, 1, "rnd_interleave"),
     %% set bp on all processes
-    _ = [ gen_component:bp_set(comm:make_local(X), proposer_initialize, bp)
+    _ = [ gen_component:bp_set(comm:make_local(X), ?proposer_initialize, bp)
             ||  X <- Proposers],
     _ = [ gen_component:bp_set(comm:make_local(X), acceptor_initialize, bp)
             ||  X <- Acceptors ],
