@@ -563,7 +563,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
             Maj = config:read(quorum_factor),
             RTMs = tx_state_get_rtms(TxState),
             Role = state_get_role(State),
-            ValidAccs = [ X || {X} <- rtms_get_accpids(RTMs)],
+            ValidAccs = rtms_get_valid_accpids(RTMs),
             MaxProposers = length(ValidAccs) + 1,
             This = comm:this(),
             case comm:is_valid(This) of
@@ -811,8 +811,8 @@ init_TPs(TxState, ItemStates, LocalSnapNumber) ->
     %% be used
     Tid = tx_state_get_tid(TxState),
     RTMs = tx_state_get_rtms(TxState),
-    CleanRTMs = [ X || {X} <- rtms_get_rtmpids(RTMs) ],
-    Accs = [ X || {X} <- rtms_get_accpids(RTMs) ],
+    CleanRTMs = rtms_get_valid_rtmpids(RTMs),
+    Accs = rtms_get_valid_accpids(RTMs),
     TM = comm:this(),
     _ = [ begin
           %% ItemState = lists:keyfind(ItemId, 1, ItemStates),
@@ -1024,8 +1024,8 @@ rtms_of_same_dht_node(InRTMs) ->
     end.
 
 -compile({inline, [rtm_entry_new/4, get_rtmkey/1, set_rtmkey/2, get_rtmpid/1,
-                   get_nth/1, get_accpid/1,
-                   rtms_get_rtmpids/1, rtms_get_accpids/1]}).
+                   get_nth/1, %get_accpid/1,
+                   rtms_get_valid_rtmpids/1, rtms_get_valid_accpids/1]}).
 
 -spec rtm_entry_new(?RT:key(), {comm:mypid()} | unknown,
                     0..3, {comm:mypid()} | unknown) -> rtm().
@@ -1038,30 +1038,29 @@ set_rtmkey(RTMEntry, Val) -> setelement(1, RTMEntry, Val).
 get_rtmpid(RTMEntry) -> element(2, RTMEntry).
 -spec get_nth(rtm()) -> 0..3.
 get_nth(RTMEntry)    -> element(3, RTMEntry).
--spec get_accpid(rtm()) -> {comm:mypid()} | unknown.
-get_accpid(RTMEntry) -> element(4, RTMEntry).
+%% -spec get_accpid(rtm()) -> {comm:mypid()} | unknown.
+%% get_accpid(RTMEntry) -> element(4, RTMEntry).
 
--spec rtms_get_rtmpids(rtms()) -> [ {comm:mypid()} | unknown ].
-rtms_get_rtmpids(RTMs) -> [ get_rtmpid(X) || X <- RTMs ].
--spec rtms_get_accpids(rtms()) -> [ {comm:mypid()} | unknown ].
-rtms_get_accpids(RTMs) -> [ get_accpid(X) || X <- RTMs ].
+-spec rtms_get_valid_rtmpids(rtms()) -> [ {comm:mypid()} | unknown ].
+rtms_get_valid_rtmpids(RTMs) ->
+    [ RTMPid || {_Key, {RTMPid}, _Nth, _AccPid} <- RTMs ].
+-spec rtms_get_valid_accpids(rtms()) -> [comm:mypid()].
+rtms_get_valid_accpids(RTMs) ->
+    [ AccPid || {_Key, _RTMPid, _Nth, {AccPid}} <- RTMs ].
 
 -spec rtms_upd_entry(rtms(), ?RT:key(), comm:mypid(), comm:mypid()) -> rtms().
 rtms_upd_entry(RTMs, InKey, InPid, InAccPid) ->
-    [ case InKey =:= get_rtmkey(Entry) of
-          true ->
-              RTM = get_rtmpid(Entry),
-              case {InPid} =/= RTM of
-                  true -> case RTM of
-                              unknown -> ok;
-                              _ ->
-                                  fd:unsubscribe_refcount(element(1, RTM), tx_tm_rtm_fd_cookie)
-                          end,
-                          fd:subscribe_refcount(InPid, tx_tm_rtm_fd_cookie);
-                  false -> ok
+    [ case get_rtmkey(Entry) of
+          InKey ->
+              RTMPid = {InPid},
+              case get_rtmpid(Entry) of
+                  RTMPid  -> ok;
+                  unknown -> fd:subscribe_refcount(InPid, tx_tm_rtm_fd_cookie);
+                  {XPid}  -> fd:unsubscribe_refcount(XPid, tx_tm_rtm_fd_cookie),
+                             fd:subscribe_refcount(InPid, tx_tm_rtm_fd_cookie)
               end,
-              rtm_entry_new(InKey, {InPid}, get_nth(Entry), {InAccPid});
-          false -> Entry
+              rtm_entry_new(InKey, RTMPid, get_nth(Entry), {InAccPid});
+          _ -> Entry
       end || Entry <- RTMs ].
 
 -spec send_to_rtms(rtms(), fun((rtm()) -> comm:message())) -> ok.
@@ -1072,9 +1071,12 @@ send_to_rtms(RTMs, MsgGen) ->
           end || RTM <- RTMs ],
     ok.
 
--spec get_nth_rtm_name(0..3) -> atom(). %% pid_groups:pidname().
-get_nth_rtm_name(Nth) ->
-    list_to_existing_atom("tx_rtm" ++ integer_to_list(Nth)).
+%list_to_existing_atom("tx_rtm" ++ integer_to_list(Nth)).
+-spec get_nth_rtm_name(0..3) -> tx_rtm0 | tx_rtm1 | tx_rtm2 | tx_rtm3. %% atom(). %% pid_groups:pidname().
+get_nth_rtm_name(0) -> tx_rtm0;
+get_nth_rtm_name(1) -> tx_rtm1;
+get_nth_rtm_name(2) -> tx_rtm2;
+get_nth_rtm_name(3) -> tx_rtm3.
 
 -spec get_my(pid_groups:pidname(), atom()) -> pid() | failed.
 get_my(Role, PaxosRole) ->
