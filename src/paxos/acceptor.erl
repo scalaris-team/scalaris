@@ -40,6 +40,8 @@
 
 -include("acceptor_state.hrl").
 
+-compile({inline, [initialize/4, inform_learner/3]}).
+
 %% Messages to expect from this module
 -spec msg_ack(comm:mypid(), any(), non_neg_integer(), any(), non_neg_integer())
              -> ok.
@@ -110,18 +112,17 @@ init([]) ->
 -spec on(comm:message(), atom()) -> atom().
 on({acceptor_initialize, PaxosID, Learners}, ETSTableName = State) ->
     ?TRACE("acceptor:initialize for paxos id: Pid ~p Learners ~p~n", [PaxosID, Learners]),
-    StateForID = case pdb:get(PaxosID, ETSTableName) of
-                     undefined -> state_new(PaxosID);
-                     X -> X
-                 end,
-    case state_get_learners(StateForID) of
-        Learners -> log:log(error, "dupl. acceptor init for id ~p", [PaxosID]);
-        _ ->
-            NewState = state_set_learners(StateForID, Learners),
-            pdb:set(NewState, ETSTableName),
-            case state_accepted(NewState) of
-                true  -> inform_learners(PaxosID, NewState);
-                false -> ok
+    case pdb:get(PaxosID, ETSTableName) of
+        undefined when Learners =:= [] -> % just in case
+            log:log(error, "dupl. acceptor init for id ~p", [PaxosID]);
+        undefined ->
+            initialize(state_new(PaxosID), ETSTableName, PaxosID, Learners);
+        StateForID ->
+            case state_get_learners(StateForID) of
+                Learners ->
+                    log:log(error, "dupl. acceptor init for id ~p", [PaxosID]);
+                _ ->
+                    initialize(StateForID, ETSTableName, PaxosID, Learners)
             end
     end,
     State;
@@ -197,6 +198,16 @@ on({acceptor_add_learner, PaxosID, Learner}, ETSTableName = State) ->
     end,
     State.
 
+-spec initialize(StateForID::acceptor_state(), ETSTableName::atom(),
+                 PaxosID::any(), Learners::[comm:mypid()]) -> ok.
+initialize(StateForID, ETSTableName, PaxosID, Learners) ->
+    NewState = state_set_learners(StateForID, Learners),
+    pdb:set(NewState, ETSTableName),
+    case state_accepted(NewState) of
+        true  -> inform_learners(PaxosID, NewState);
+        false -> ok
+    end.
+
 -spec inform_learners(PaxosID::any(), acceptor_state()) -> ok.
 inform_learners(PaxosID, State) ->
     ?TRACE("acceptor:inform_learners: PaxosID ~p Learners ~p Decision ~p~n",
@@ -204,8 +215,6 @@ inform_learners(PaxosID, State) ->
     _ = [ inform_learner(X, PaxosID, State)
             || X <- state_get_learners(State) ],
     ok.
-
--compile({inline, [inform_learner/3]}).
 
 inform_learner(Learner, PaxosID, StateForID) ->
     msg_accepted(Learner, PaxosID,
