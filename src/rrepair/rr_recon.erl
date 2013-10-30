@@ -134,9 +134,9 @@
 -type message() ::
     % API
     request() |
-    % tree sync msgs
-    {check_nodes, InitiatorPid::comm:mypid(), [merkle_cmp_request()]} |
-    {check_nodes_response, [merkle_cmp_result()]} |
+    % merkle tree sync messages
+    {check_nodes, SenderPid::comm:mypid(), ToCheck::[merkle_cmp_request()]} |
+    {check_nodes_response, CmpResults::[merkle_cmp_result()]} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
     {create_struct2, DestI::intervals:interval(), {get_chunk_response, {intervals:interval(), db_chunk()}}} |
@@ -144,10 +144,7 @@
     % internal
     {shutdown, exit_reason()} | 
     {crash, DeadPid::comm:mypid()} |
-    {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()} |
-    % merkle tree sync messages
-    {check_nodes, SenderPid::comm:mypid(), ToCheck::[merkle_cmp_request()]} |
-    {check_nodes_response, CmpResults::[merkle_cmp_result()]}
+    {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}
     .
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
