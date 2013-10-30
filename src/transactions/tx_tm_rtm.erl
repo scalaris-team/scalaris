@@ -1041,7 +1041,7 @@ get_nth(RTMEntry)    -> element(3, RTMEntry).
 %% -spec get_accpid(rtm()) -> {comm:mypid()} | unknown.
 %% get_accpid(RTMEntry) -> element(4, RTMEntry).
 
--spec rtms_get_valid_rtmpids(rtms()) -> [ {comm:mypid()} | unknown ].
+-spec rtms_get_valid_rtmpids(rtms()) -> [comm:mypid()].
 rtms_get_valid_rtmpids(RTMs) ->
     [ RTMPid || {_Key, {RTMPid}, _Nth, _AccPid} <- RTMs ].
 -spec rtms_get_valid_accpids(rtms()) -> [comm:mypid()].
