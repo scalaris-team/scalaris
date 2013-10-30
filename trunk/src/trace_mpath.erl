@@ -58,6 +58,9 @@
 -export([log_recv/4]).
 -export([epidemic_reply_msg/4]).
 
+%% useful in e.g. filter funs
+-export([normalize_pidinfo/1]).
+
 %% gen_component behaviour
 -export([start_link/1, init/1]).
 -export([on/2]). %% internal message handler as gen_component
