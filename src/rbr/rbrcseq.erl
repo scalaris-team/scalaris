@@ -798,7 +798,7 @@ entry_num_newest(Entry)            -> element(13, Entry).
 
 -spec add_read_reply(entry(), prbr:r_with_id(), client_value(),
                      prbr:r_with_id(), Consistency::boolean())
-                    -> {boolean() | write_through, entry()}.
+                    -> {Done::boolean() | write_through, entry()}.
 add_read_reply(Entry, AssignedRound, Val, AckRound, Cons) ->
     %% either decide on a majority of consistent replies, than we can
     %% just take the newest consistent value and do not need a
@@ -820,18 +820,20 @@ add_read_reply(Entry, AssignedRound, Val, AckRound, Cons) ->
     end,
     MyRound = erlang:max(entry_my_round(TmpEntry), AssignedRound),
     E2 = entry_set_my_round(TmpEntry, MyRound),
-    {case 3 =< 1+entry_num_acks(E2) of
-         true ->
-             case entry_num_newest(E2) of
-                 1 -> write_through;
-                 _ -> true
-             end;
-         false -> false
-     end,
-     entry_inc_num_acks(E2)}.
+    E3 = entry_inc_num_acks(E2),
+    Done =
+        case 3 =< entry_num_acks(E3) of
+            true ->
+                case entry_num_newest(E3) of
+                    1 -> write_through;
+                    _ -> true
+                end;
+            false -> false
+        end,
+     {Done, E3}.
 
 -spec add_write_reply(entry(), prbr:r_with_id(), Consistency::boolean())
-                     -> {boolean(), entry()}.
+                     -> {Done::boolean(), entry()}.
 add_write_reply(Entry, Round, Cons) ->
     E1 =
         case Round > entry_latest_seen(Entry) of
@@ -846,11 +848,13 @@ add_write_reply(Entry, Round, Cons) ->
                 %% reset rack and store newer round
                 T1Entry = entry_set_latest_seen(Entry, Round),
                 _T2Entry = entry_set_num_acks(T1Entry, 0)
-    end,
-    {3 =< (1+entry_num_acks(E1)), entry_inc_num_acks(E1)}.
+        end,
+    E2 = entry_inc_num_acks(E1),
+    Done = (3 =< entry_num_acks(E2)),
+    {Done, E2}.
 
 -spec add_write_deny(entry(), prbr:r_with_id(), Consistency::boolean())
-                    -> {boolean(), entry()}.
+                    -> {Done::boolean(), entry()}.
 add_write_deny(Entry, Round, Cons) ->
     E1 =
         case Round > entry_latest_seen(Entry) of
@@ -862,8 +866,10 @@ add_write_deny(Entry, Round, Cons) ->
                 T2Entry = entry_set_num_acks(T1Entry, 0),
                 _T3Entry = entry_set_num_denies(
                              T2Entry, OldAcks + entry_num_denies(T2Entry))
-    end,
-    {2 =< (1+entry_num_denies(E1)), entry_inc_num_denies(E1)}.
+        end,
+    E2 = entry_inc_num_denies(E1),
+    Done = (2 =< entry_num_denies(E2)),
+    {Done, E2}.
 
 
 -spec inform_client(qread_done | qwrite_done, entry()) -> ok.
