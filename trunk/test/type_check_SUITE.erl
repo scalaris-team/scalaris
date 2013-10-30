@@ -262,6 +262,7 @@ tester_type_check_paxos(_Config) ->
            [ {msg_ack,5}, %% sends msgs
              {msg_nack,3}, %% sends msgs
              {msg_naccepted,3}, %% sends msgs
+             {initialize,4}, %% sends msgs
              {inform_learners,2}, %% sends msgs
              {inform_learner,3} %% sends msgs
            ]},
