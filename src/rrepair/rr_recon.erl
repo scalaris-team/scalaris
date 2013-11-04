@@ -79,15 +79,17 @@
         {
          interval = intervals:empty()                       :: intervals:interval(),
          reconPid = ?required(merkle_param, reconPid)       :: comm:mypid(),
+         signature_size = get_merkle_signature_size()       :: pos_integer(),
          branch_factor = get_merkle_branch_factor()         :: pos_integer(),
          bucket_size   = get_merkle_bucket_size()           :: pos_integer()
         }).
 
 -record(art_recon_struct,
         {
-         art           = ?required(art_recon_struct, art)           :: art:art(),
-         branch_factor = ?required(art_recon_struct, branch_factor) :: pos_integer(),
-         bucket_size   = ?required(art_recon_struct, bucket_size)   :: pos_integer()
+         art            = ?required(art_recon_struct, art)            :: art:art(),
+         signature_size = ?required(art_recon_struct, signature_size) :: pos_integer(),
+         branch_factor  = ?required(art_recon_struct, branch_factor)  :: pos_integer(),
+         bucket_size    = ?required(art_recon_struct, bucket_size)    :: pos_integer()
         }).
 
 -type sync_struct() :: #bloom_recon_struct{} |
@@ -292,7 +294,10 @@ on({check_nodes_response, CmpResults}, State =
                         ownerPid = OwnerL,
                         struct = Tree }) ->
     SID = rr_recon_stats:get(session_id, Stats),
-    {Req, Res, NStats, RTree} = process_tree_cmp_result(CmpResults, Tree, get_merkle_branch_factor(), Stats),
+    {Req, Res, NStats, RTree} = process_tree_cmp_result(
+                                  CmpResults, Tree,
+                                  get_merkle_branch_factor(), % this is how we build the tree!
+                                  Stats),
     Req =/= [] andalso
         send(DestReconPid, {check_nodes, comm:this(), Req}),
     {LeafNodes, Leafs} = merkle_get_sync_leaves(Res, [], 0),
@@ -626,16 +631,20 @@ build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, FinishR
     ?ASSERT(not intervals:is_empty(I)),
     case Params of
         {} ->
+            SignatureSize = get_merkle_signature_size(),
             BranchFactor = get_merkle_branch_factor(),
             BucketSize = get_merkle_bucket_size();
-        #merkle_params{branch_factor = BranchFactor,
+        #merkle_params{signature_size = SignatureSize,
+                       branch_factor = BranchFactor,
                        bucket_size = BucketSize} ->
             ok;
-        #art_recon_struct{branch_factor = BranchFactor,
+        #art_recon_struct{signature_size = SignatureSize,
+                          branch_factor = BranchFactor,
                           bucket_size = BucketSize} ->
             ok
     end,
-    merkle_tree:new(I, DBItems, [{branch_factor, BranchFactor},
+    merkle_tree:new(I, DBItems, [{signature_size, SignatureSize},
+                                 {branch_factor, BranchFactor},
                                  {bucket_size, BucketSize},
                                  {keep_bucket, not FinishRecon}]);
 build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params, FinishRecon) ->
@@ -651,15 +660,19 @@ build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params, FinishRecon
     end;
 build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}, FinishRecon) ->
     ?ASSERT(not intervals:is_empty(I)),
-    Branch = get_merkle_branch_factor(),
-    BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), Branch, 1),
-    Tree = merkle_tree:new(I, DBItems, [{branch_factor, Branch},
+    SignatureSize = get_merkle_signature_size(),
+    BranchFactor = get_merkle_branch_factor(),
+    BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), BranchFactor, 1),
+    Tree = merkle_tree:new(I, DBItems, [{signature_size, SignatureSize},
+                                        {branch_factor, BranchFactor},
                                         {bucket_size, BucketSize},
                                         {keep_bucket, not FinishRecon}]),
     if FinishRecon ->
            % no more DB items -> create art struct:
            #art_recon_struct{art = art:new(Tree, get_art_config()),
-                             branch_factor = Branch, bucket_size = BucketSize};
+                             signature_size = SignatureSize,
+                             branch_factor = BranchFactor,
+                             bucket_size = BucketSize};
        true ->
            % more DB items to come... stay with merkle tree
            Tree
@@ -673,6 +686,7 @@ build_recon_struct(art, OldSyncStruct, _I, DBItems, _Params = {}, FinishRecon) -
            % no more DB items -> finish tree, remove buckets, create art struct:
            NTree = merkle_tree:gen_hash(Tree1, true),
            #art_recon_struct{art = art:new(NTree, get_art_config()),
+                             signature_size = merkle_tree:get_signature_size(NTree),
                              branch_factor = merkle_tree:get_branch_factor(NTree),
                              bucket_size = merkle_tree:get_bucket_size(NTree)};
        true ->
@@ -955,6 +969,8 @@ check_config() ->
              true,
              config:cfg_is_integer(rr_max_items) andalso
                  config:cfg_is_greater_than(rr_max_items, 0)) andalso
+        config:cfg_is_integer(rr_merkle_signature_size) andalso
+        config:cfg_is_greater_than(rr_merkle_signature_size, 0) andalso
         config:cfg_is_integer(rr_merkle_branch_factor) andalso
         config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
         config:cfg_is_integer(rr_merkle_bucket_size) andalso
@@ -972,10 +988,17 @@ get_bloom_fpr() ->
 get_max_items() ->
     config:read(rr_max_items).
 
+%% @doc Merkle signature size in byte.
+-spec get_merkle_signature_size() -> pos_integer().
+get_merkle_signature_size() ->
+    config:read(rr_merkle_signature_size).
+
+%% @doc Merkle number of childs per inner node.
 -spec get_merkle_branch_factor() -> pos_integer().
 get_merkle_branch_factor() ->
     config:read(rr_merkle_branch_factor).
 
+%% @doc Merkle max items in a leaf node.
 -spec get_merkle_bucket_size() -> pos_integer().
 get_merkle_bucket_size() ->
     config:read(rr_merkle_bucket_size).
