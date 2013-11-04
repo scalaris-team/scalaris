@@ -96,10 +96,8 @@
                          {filter_fun, filter_fun()}].
 
 -ifdef(with_export_type_support).
--export_type([logger/0]).
--export_type([pidinfo/0]).
--export_type([passed_state/0]).
--export_type([trace_event/0]).
+-export_type([trace/0, trace_event/0]).
+-export_type([pidinfo/0, logger/0, passed_state/0]).
 -endif.
 
 -spec start() -> ok.
