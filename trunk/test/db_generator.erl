@@ -370,18 +370,15 @@ p_gen_kvv_feeder(EDist0, Keys0, _WrongKeyCount, FType, FDest, FCount) ->
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     {FKeys, GoodKeys} = select_random_keys(Keys, KeyCount, FCount, []),
-    GoodDB = lists:foldl(fun(Key, AccDb) -> 
-                                 lists:append(get_rep_group(Key), AccDb)
-                         end,
-                         [], GoodKeys),
-    {BadDB, O} = lists:foldl(fun(FKey, {AccBad, Out}) ->
-                                     {RList, NewOut} = get_failure_rep_group(FKey, FType, FDest),
-                                     {lists:append(RList, AccBad), Out + NewOut}
-                             end,
-                             {[], 0}, FKeys),
-    Insert = length(GoodDB) + length(BadDB),
+    GoodDB = lists:append([get_rep_group(Key) || Key <- GoodKeys]),
+    {DB, O} = lists:foldl(fun(FKey, {AccBad, Out}) ->
+                                  {RList, NewOut} = get_failure_rep_group(FKey, FType, FDest),
+                                  {lists:append(RList, AccBad), Out + NewOut}
+                          end,
+                          {GoodDB, 0}, FKeys),
+    Insert = length(DB),
     DBSize = KeyCount * ?ReplicationFactor,
-    {lists:append(GoodDB, BadDB), {DBSize, Insert, DBSize - Insert, O}};
+    {DB, {DBSize, Insert, DBSize - Insert, O}};
 p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
     ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     ?ASSERT(KeyCount =:= 1 orelse random_bias:numbers_left(RanGen) =< KeyCount),
