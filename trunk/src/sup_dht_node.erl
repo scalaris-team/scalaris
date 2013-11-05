@@ -57,11 +57,11 @@ supspec(_) ->
 -spec childs([{pid_groups:groupname(), Options::[tuple()]}]) ->
                     [ProcessDescr::supervisor:child_spec()].
 childs([{DHTNodeGroup, Options}]) ->
-	Autoscale =
-		case config:read(autoscale) of
-			true -> sup:worker_desc(autoscale, autoscale, start_link, [DHTNodeGroup]);
-			_ -> []
-		end,
+    Autoscale =
+        case config:read(autoscale) of
+            true -> sup:worker_desc(autoscale, autoscale, start_link, [DHTNodeGroup]);
+            _ -> []
+        end,
     Cyclon = sup:worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
     DBValCache =
         sup:worker_desc(dht_node_db_cache, dht_node_db_cache, start_link,
@@ -80,6 +80,9 @@ childs([{DHTNodeGroup, Options}]) ->
     Reregister =
         sup:worker_desc(dht_node_reregister, dht_node_reregister,
                              start_link, [DHTNodeGroup]),
+    RMLeases =
+        sup:worker_desc(rm_leases, rm_leases,
+                             start_link, [DHTNodeGroup]),
     RoutingTable =
         sup:worker_desc(routing_table, rt_loop, start_link,
                              [DHTNodeGroup]),
@@ -87,7 +90,7 @@ childs([{DHTNodeGroup, Options}]) ->
         sup:supervisor_desc(sup_dht_node_core, sup_dht_node_core,
                                  start_link, [DHTNodeGroup, Options]),
     %% SupMr = case config:read(mr_enable) of
-    %%     true -> 
+    %%     true ->
     %%         util:sup_supervisor_desc(sup_mr, sup_mr, start_link, [DHTNodeGroup]);
     %%     _ -> []
     %% end,
@@ -104,10 +107,10 @@ childs([{DHTNodeGroup, Options}]) ->
         end,
     SnapshotLeader =
         sup:worker_desc(snapshot_leader, snapshot_leader, start_link),
-    SupWPool = 
+    SupWPool =
         sup:supervisor_desc(sup_wpool, sup_wpool, start_link, [DHTNodeGroup]),
     WPool = sup:worker_desc(wpool, wpool, start_link, [DHTNodeGroup, Options]),
-	
+
     lists:flatten([ %% RepUpd may be [] and lists:flatten eliminates this
                     Monitor,
                     Delayer,
@@ -124,6 +127,7 @@ childs([{DHTNodeGroup, Options}]) ->
                     WPool,
                     MonitorPerf,
                     RepUpdate,
-					Autoscale,
-                    SnapshotLeader
+                    Autoscale,
+                    SnapshotLeader,
+                    RMLeases
            ]).

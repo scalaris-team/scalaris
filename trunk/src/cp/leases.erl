@@ -37,35 +37,40 @@
 
 -spec is_responsible(dht_node_state:state(), ?RT:key()) -> boolean() | maybe.
 is_responsible(State, Key) ->
-    {ActiveLeaseList, _} = dht_node_state:get(State, lease_list),
-    is_responsible_(ActiveLeaseList, Key).
-%    case lists:any(fun (Lease) ->
-%                           intervals:in(Key, l_on_cseq:get_range(Lease))
-%                               andalso l_on_cseq:is_valid(Lease)
-%                   end, ActiveLeaseList) of
-%        true -> true;
-%        false ->
-%            %log:log("is_responsible failed ~p ~p", [Key, ActiveLeaseList]),
-%            false
-%    end.
+    LeaseList = dht_node_state:get(State, lease_list),
+    is_responsible_(LeaseList, Key).
 
-is_responsible_([], _Key) ->
-    false;
-is_responsible_([Lease|List], Key) ->
-    RangeMatches = intervals:in(Key, l_on_cseq:get_range(Lease)),
-    IsAlive = l_on_cseq:is_valid(Lease),
-    if
-        IsAlive andalso RangeMatches ->
-            true;
-        RangeMatches ->
-            case is_responsible_(List, Key) of
-                true ->
+-spec is_responsible_(lease_list:lease_list(), ?RT:key()) -> boolean() | maybe.
+is_responsible_(LeaseList, Key) ->
+    ActiveLease = lease_list:get_active_lease(LeaseList),
+    %PassiveLease = lease_list:get_passive_leases(LeaseList),
+    case ActiveLease of
+        empty ->
+            PassiveLeases = lease_list:get_passive_leases(LeaseList),
+            is_responsible_passive_leases(PassiveLeases, Key);
+        _ ->
+            RangeMatches = intervals:in(Key, l_on_cseq:get_range(ActiveLease)),
+            IsAlive = l_on_cseq:is_valid(ActiveLease),
+            if
+                IsAlive andalso RangeMatches ->
                     true;
-                maybe ->
+                RangeMatches ->
+                    log:log("returned maybe"),
                     maybe;
-                false ->
-                    maybe
-            end;
+                true ->
+                    %log:log("returned false"),
+                    PassiveLeases = lease_list:get_passive_leases(LeaseList),
+                    is_responsible_passive_leases(PassiveLeases, Key)
+            end
+    end.
+
+-spec is_responsible_passive_leases(list(l_on_cseq:lease_t()), ?RT:key()) -> boolean() | maybe.
+is_responsible_passive_leases([], _Key) ->
+    false;
+is_responsible_passive_leases([Lease|Rest], Key) ->
+    case intervals:in(Key, l_on_cseq:get_range(Lease)) of
         true ->
-            is_responsible_(List, Key)
+            maybe;
+        false ->
+            is_responsible_passive_leases(Rest, Key)
     end.
