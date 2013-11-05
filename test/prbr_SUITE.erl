@@ -178,7 +178,7 @@ rbr_concurrency_leases(_Config) ->
                                               l_on_cseq:unittest_lease_update(
                                                 V,
                                                 l_on_cseq:set_version(
-                                                  V, l_on_cseq:get_version(V)+1)),
+                                                  V, l_on_cseq:get_version(V)+1), passive),
                                           case Update of
                                               ok -> ok;
                                               failed ->

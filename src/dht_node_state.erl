@@ -106,7 +106,7 @@
                 lease_db2 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db3 = ?required(state, prbr_state) :: prbr:state(),
                 lease_db4 = ?required(state, prbr_state) :: prbr:state(),
-                lease_list = ?required(state, lease_list) :: l_on_cseq:lease_list_state(),
+                lease_list = ?required(state, lease_list) :: lease_list:lease_list(),
                 snapshot_state   = null :: snapshot_state:snapshot_state() | null,
                 mr_state   = ?required(state, mr_state)  :: orddict:orddict()
                }).
@@ -131,8 +131,8 @@ new(RT, RMState, DB) ->
            lease_db2 = prbr:init(lease_db2),
            lease_db3 = prbr:init(lease_db3),
            lease_db4 = prbr:init(lease_db4),
-           lease_list = l_on_cseq:empty_lease_list(),
-		   snapshot_state = snapshot_state:new(),
+           lease_list = lease_list:empty(),
+           snapshot_state = snapshot_state:new(),
            mr_state = orddict:new()
           }.
 

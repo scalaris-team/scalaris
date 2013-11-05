@@ -96,7 +96,7 @@ update_rcv_data2(State, SlideOp, {continue}) ->
 prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
     % start to split own range
     log:log("prepare_send_delta1 ~p~n", [slide_op:get_type(OldSlideOp)]),
-    case find_lease(State, OldSlideOp) of
+    case find_lease(State, OldSlideOp, active) of
         {ok, Lease} ->
             Id = l_on_cseq:id(l_on_cseq:get_range(Lease)),
             % check slide direction
@@ -106,16 +106,17 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
                     {R1, R2} = case intervals:in(Id, Interval) of
                                    true ->
                                                 % ->
+                                       true = false, % TS: not tested
                                        {intervals:minus(l_on_cseq:get_range(Lease), Interval), Interval};
                                    false ->
                                                 % <-
                                        {Interval, intervals:minus(l_on_cseq:get_range(Lease), Interval)}
                                end,
                     NewOwner = node:pidX(slide_op:get_node(OldSlideOp)),
-                    l_on_cseq:lease_split_and_change_owner(Lease, R1, R2, NewOwner, ReplyPid),
+                    l_on_cseq:lease_split_and_change_owner(Lease, R1, R2, second, NewOwner, ReplyPid),
                     {ok, State, OldSlideOp};
                 true ->
-                    %log:log("only change owner instead of split and change owner", []),
+                    log:log("only change owner instead of split and change owner", []),
                     %% @todo
                     %log:log("Id ~p ~n", [Id]),
                     %log:log("Interval     ~p", [Interval]),
@@ -145,11 +146,11 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
 prepare_send_delta2(State, SlideOp, Msg) ->
     % check that split has been done
     case Msg of
-        {handover, success, NewLease} ->
+        {handover, success, _NewLease} ->
             % disable new lease
             log:log("prepare_send_delta2 ~p~n", [Msg]),
-            State1 = locally_disable_lease(State, NewLease),
-            {ok, State1, SlideOp};
+            %State1 = locally_disable_lease(State, NewLease),
+            {ok, State, SlideOp};
         {split, fail, _Lease} ->
             log:log("prepare_send_delta2: split failed~n", []),
             % @todo
@@ -196,13 +197,14 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
     % notify neighbor on successful handover
     log:log("finish_delta_ack2 ~p~n", [Msg]),
     % notify succ
-    case find_lease(State, SlideOp) of
+    case find_lease(State, SlideOp, passive) of
         {ok, Lease} ->
             Owner = l_on_cseq:get_owner(Lease),
             l_on_cseq:lease_send_lease_to_node(Owner, Lease),
-            State1 = l_on_cseq:remove_lease_from_dht_node_state(Lease, State),
+            State1 = lease_list:remove_lease_from_dht_node_state(Lease, State, passive),
             {ok, State1, SlideOp, NextOpMsg};
         error ->
+            log:log("error in finish_delta_ack2"),
             % @todo
             error
     end.
@@ -223,21 +225,31 @@ send_continue_msg(Pid) ->
 locally_disable_lease(State, Lease) ->
     l_on_cseq:disable_lease(State, Lease).
 
-find_lease(State, SlideOp) ->
-    {ActiveLeaseList, PassiveLeaseList} = dht_node_state:get(State, lease_list),
+find_lease(State, SlideOp, Mode) ->
+    LeaseList = dht_node_state:get(State, lease_list),
     Interval = slide_op:get_interval(SlideOp),
     Pred = fun (L) ->
                    intervals:is_subset(Interval, l_on_cseq:get_range(L))
-                       andalso intervals:is_continuous(intervals:intersection(Interval, l_on_cseq:get_range(L)))
+                       andalso intervals:is_continuous(
+                                   intervals:intersection(Interval,l_on_cseq:get_range(L)))
            end,
-    case lists:filter(Pred, ActiveLeaseList) of
-        [Lease] ->
-            {ok, Lease};
-        _ ->
-            case lists:filter(Pred, PassiveLeaseList) of
+    ActiveLease = lease_list:get_active_lease(LeaseList),
+    PassiveLeases = lease_list:get_passive_leases(LeaseList),
+    case Mode of
+        active ->
+            case Pred(ActiveLease) of
+                true ->
+                    {ok, ActiveLease};
+                false ->
+                    error
+            end;
+        passive ->
+            case lists:filter(Pred, PassiveLeases) of
                 [Lease] ->
                     {ok, Lease};
                 _ ->
+                    log:log("did not found requested lease in passive list: ~w ~w",
+                            [Interval, PassiveLeases]),
                     error
             end
     end.
