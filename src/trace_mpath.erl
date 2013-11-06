@@ -411,7 +411,7 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                         local -> "green!30!black";
                         global -> "red!50!black"
                     end,
-            MsgSizeBytes = erlang:external_size(SendMsg),
+            MsgSizeBytes = erlang:byte_size(erlang:term_to_binary(SendMsg, [{minor_version, 1}])),
             MsgSize =
                 case math:log(MsgSizeBytes)/math:log(2) of
                     L when L < 10.0 ->
