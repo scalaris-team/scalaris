@@ -282,10 +282,17 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({check_nodes, SenderPid, ToCheck}, State = #rr_recon_state{ struct = Tree }) ->
+on({check_nodes, SenderPid, ToCheck}, State = #rr_recon_state{struct = Tree}) ->
     {Result, RestTree} = check_node(ToCheck, Tree),
     send(SenderPid, {check_nodes_response, Result}),
-    State#rr_recon_state{ dest_recon_pid = SenderPid, struct = RestTree };
+    State#rr_recon_state{dest_recon_pid = SenderPid, struct = RestTree};
+
+on({check_nodes, ToCheck},
+   State = #rr_recon_state{struct = Tree, dest_recon_pid = SenderPid}) ->
+    ?ASSERT(comm:is_valid(SenderPid)),
+    {Result, RestTree} = check_node(ToCheck, Tree),
+    send(SenderPid, {check_nodes_response, Result}),
+    State#rr_recon_state{struct = RestTree};
 
 on({check_nodes_response, CmpResults}, State =
        #rr_recon_state{ dest_recon_pid = DestReconPid,
@@ -299,7 +306,7 @@ on({check_nodes_response, CmpResults}, State =
                                   get_merkle_branch_factor(), % this is how we build the tree!
                                   Stats),
     Req =/= [] andalso
-        send(DestReconPid, {check_nodes, comm:this(), Req}),
+        send(DestReconPid, {check_nodes, Req}),
     {LeafNodes, Leafs} = merkle_get_sync_leaves(Res, [], 0),
     Resolves = resolve_leaves(LeafNodes, SrcNode, SID, OwnerL),
     FStats = rr_recon_stats:inc([{tree_leafsSynced, Leafs},
