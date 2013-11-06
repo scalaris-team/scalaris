@@ -70,7 +70,7 @@
 
 % enable logging of message statistics at the granularity of erlang messages
 -define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), ok).
-%% -define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), comm_logger:log(SNDRCV, {CHANNEL, comm:get_msg_tag(MESSAGE)}, erlang:external_size(MESSAGE))).
+%% -define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), comm_logger:log(SNDRCV, {CHANNEL, comm:get_msg_tag(MESSAGE)}, erlang:byte_size(erlang:term_to_binary(MESSAGE, [{minor_version, 1}])))).
 
 
 % enable native register for all processes in gen_component or disable
@@ -107,7 +107,7 @@
        ).
 % do not compress big messages (assumes that those messages contain already-compressed values)
 %% -define(COMM_COMPRESS_MSG(DeliverMsg, State),
-%%         DeliverMsgSize = erlang:external_size(DeliverMsg, [{minor_version, 1}]),
+%%         DeliverMsgSize = erlang:byte_size(erlang:term_to_binary(DeliverMsg, [{minor_version, 1}])),
 %%         MsgQueueLen = erlang:max(1, msg_queue_len(State)),
 %%         CompressionLvl = if (DeliverMsgSize / MsgQueueLen) > 1024 -> 0;
 %%                             true -> 2

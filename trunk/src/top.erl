@@ -255,7 +255,7 @@ print_process_messages(Pid) ->
         lists:foldl(fun(MsgX, {I, TreeX}) ->
                             % note: don't use comm:get_msg_tag/1 - we want to keep the group_message tags
                             Tag = erlang:element(1, MsgX),
-                            Size = erlang:external_size(MsgX),
+                            Size = erlang:byte_size(erlang:term_to_binary(MsgX, [{minor_version, 1}])),
                             case gb_trees:lookup(Tag, TreeX) of
                                 none ->
                                     MsgX2 = prettyprint_msg(MsgX),
@@ -551,7 +551,7 @@ on({output_pid, Pid}, State) when pid =:= element(3, State) ->
     MemUsage = process_info_get(Infos, memory, 0),
     HeapSize = process_info_get(Infos, total_heap_size, 0),
     StackSize = process_info_get(Infos, stack_size, 0),
-    PDSize = erlang:external_size(PD),
+    PDSize = erlang:byte_size(erlang:term_to_binary(PD, [{minor_version, 1}])),
     WordSize = erlang:system_info(wordsize),
     io:format("Mem: ~s total, ~s heap, ~s stack, ~s dictionary (~p entries)~n",
               [readable_mem(MemUsage),
