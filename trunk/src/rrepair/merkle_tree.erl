@@ -57,12 +57,12 @@
 -export_type([mt_iter/0, mt_config_params/0]).
 -endif.
 
--type mt_node_key()     :: binary().
+-type mt_node_key()     :: non_neg_integer().
 -type mt_interval()     :: intervals:interval(). 
 -type mt_bucket()       :: [?RT:key() | rr_recon:db_entry_enc()].
 -type mt_size()         :: {InnerNodes::non_neg_integer(), Leafs::non_neg_integer()}.
--type hash_fun()        :: fun((binary()) -> mt_node_key()).
--type inner_hash_fun()  :: fun(([mt_node_key()]) -> mt_node_key()).
+-type hash_fun()        :: fun((binary()) -> binary()).
+-type inner_hash_fun()  :: fun(([mt_node_key(),...]) -> mt_node_key()).
 
 -record(mt_config,
         {
@@ -357,7 +357,7 @@ run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
     Size = erlang:byte_size(Hash),
     if Size > SigSize  ->
            Start = Size - SigSize,
-           <<_:Start/binary, SmallHash:SigSize/binary>> = Hash,
+           <<_:Start/binary, SmallHash:SigSize/integer-unsigned-unit:8>> = Hash,
            SmallHash;
        true -> Hash
     end.
@@ -541,7 +541,7 @@ keys_to_intervals(KList, IList) ->
 
 -spec get_XOR_fun() -> inner_hash_fun().
 get_XOR_fun() ->
-    fun([H|T]) -> lists:foldl(fun(X, Acc) -> util:bin_xor(X, Acc) end, H, T) end.
+    fun([H|T]) -> lists:foldl(fun(X, Acc) -> X bxor Acc end, H, T) end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

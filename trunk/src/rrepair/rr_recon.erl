@@ -121,7 +121,7 @@
 -define(ok_leaf,     2).
 -define(fail_leaf,   3).
 -define(fail_inner,  4).
--define(omit,        9).
+-define(omit,       -1). % NOTE: MUST NOT interfere with merkle_tree:mt_node_key()!
 
 -type merkle_cmp_result()  :: ?ok_inner | ?ok_leaf | ?fail_leaf | ?fail_inner.
 -type merkle_cmp_request() :: merkle_tree:mt_node_key() | ?omit.
