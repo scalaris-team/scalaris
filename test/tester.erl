@@ -342,8 +342,9 @@ type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
         _ ->
             ct:pal("Excluded all exported functions for module ~p?!~n",
                    [Module]),
-            ct:comment("Excluded all exported functions for module ~p?!~n",
-                   [Module])
+            catch ct:comment("Excluded all exported functions for module ~p?!~n",
+                             [Module]),
+            ok
     end,
 
     ok.
