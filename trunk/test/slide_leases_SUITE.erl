@@ -111,7 +111,6 @@ tester_type_check_slide_leases(_Config) ->
            ],
            [
             {send_continue_msg, 1},
-            {locally_disable_lease, 2},
             {find_lease, 3}
            ]}
         ],
@@ -323,7 +322,12 @@ check_local_leases(DHTNode) ->
     ActiveLease = lease_list:get_active_lease(LeaseList),
     PassiveLeases = lease_list:get_passive_leases(LeaseList),
     %log:log("active lease: ~w", [ActiveLease]),
-    ActiveInterval = l_on_cseq:get_range(ActiveLease),
+    ActiveInterval = case ActiveLease of
+                         empty ->
+                             interval:empty();
+                         _ ->
+                             l_on_cseq:get_range(ActiveLease)
+                     end,
     MyRange = get_dht_node_state(DHTNode, my_range),
     LocalCorrect = are_equal(MyRange, ActiveInterval),
     length(PassiveLeases) == 0 andalso LocalCorrect.
