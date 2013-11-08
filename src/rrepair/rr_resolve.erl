@@ -122,7 +122,7 @@ on({start, Operation, Options}, State) ->
                                                                session_id = SID },
                                        feedbackDestPid = FBDest,
                                        send_stats = StatsDest },
-    ?TRACE("RESOLVE - START~nOperation=~p - FeedbackTo=~p - FeedbackResponse=~p~n SessionId:~p",
+    ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p - FeedbackResponse=~p~n SessionId:~p",
            [element(1, Operation), FBDest, FBResp, SID], NewState),
     comm:send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
     NewState;
@@ -133,11 +133,10 @@ on({start, Operation, Options}, State) ->
 
 on({get_state_response, MyI}, State = 
        #rr_resolve_state{ operation = {key_upd, KvvList},
-                          dhtNodePid = DhtPid,
-                          stats = Stats                          
-                          }) ->
+                          dhtNodePid = DhtPid, stats = Stats }) ->
     ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
-    ?TRACE("GET INTERVAL - KEY UPD - KVVListLen=~p ; ToUpdate=~p", [length(KvvList), ToUpdate], State),
+    ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p~n KVVListLen=~p ; ToUpdate=~p",
+           [key_upd, Stats#resolve_stats.session_id, MyI, length(KvvList), ToUpdate], State),
     NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
     if ToUpdate =:= 0 ->
            shutdown(resolve_ok, NewState,
@@ -149,7 +148,9 @@ on({get_state_response, MyI}, State =
 
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd_send, _, KeyList},
-                          dhtNodePid = DhtPid }) ->
+                          dhtNodePid = DhtPid, stats = _Stats }) ->
+    ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p",
+           [key_upd_send, _Stats#resolve_stats.session_id, MyI], State),
     RepKeyInt = intervals:from_elements(
                     [K || X <- KeyList, K <- ?RT:get_replica_keys(X),
                           intervals:in(K, MyI)]),
@@ -158,7 +159,9 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {key_upd_send, Dest, _},
-                          feedbackDestPid = FBDest }) ->
+                          feedbackDestPid = FBDest, stats = _Stats }) ->
+    ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
+           [key_upd_send, _Stats#resolve_stats.session_id, length(EntryList)], State),
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
     shutdown(resolve_ok, State, Dest, KvvList, Options);
@@ -171,8 +174,6 @@ on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = Op, dhtNodePid = DhtPid, stats = _Stats })
   when element(1, Op) =:= interval_upd;
        element(1, Op) =:= interval_upd_send ->
-    ?TRACE("RESOLVE - START~nOperation=~p - SessionId:~p~n Interval=~p~n MyInterval=~p~n",
-           [element(1, Op), _Stats#resolve_stats.session_id, element(2, Op), MyI], State),
     OpSIs = intervals:get_simple_intervals(element(2, Op)),
     ISec = lists:foldl(
              fun(Q, AccJ) ->
@@ -187,6 +188,9 @@ on({get_state_response, MyI}, State =
                                end
                        end, AccJ, OpSIs)
              end, intervals:empty(), rr_recon:quadrant_intervals()),
+    ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n IntervalBounds=~p~n MyInterval=~p~n IntersecBounds=~p",
+           [element(1, Op), _Stats#resolve_stats.session_id, intervals:get_bounds(element(2, Op)),
+            MyI, intervals:get_bounds(ISec)], State),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
         false ->
@@ -204,6 +208,8 @@ on({get_entries_response, EntryList}, State =
                           feedbackDestPid = FBDest,
                           stats = Stats }) ->
     ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
+    ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p, KVVListLen=~p ; ToUpdate=~p",
+           [interval_upd, Stats#resolve_stats.session_id, length(EntryList), length(KvvList), ToUpdate], State),
     % Send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_set for faster access checks
     KSet = gb_sets:from_list([element(1, Z) || Z <- KvvList]),
@@ -221,6 +227,8 @@ on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {interval_upd_send, I, Dest},
                           feedbackDestPid = FBDest,
                           stats = Stats }) ->
+    ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
+           [interval_upd_send, Stats#resolve_stats.session_id, length(EntryList)], State),
     Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     SendList = make_unique_kvv(lists:keysort(1, KvvList), []),
@@ -235,9 +243,9 @@ on({get_entries_response, EntryList}, State =
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state_response, MyI} = _Msg,
-   State = #rr_resolve_state{operation = {interval_upd_my, I} = _Operation}) ->
-    ?TRACE("RESOLVE - START~nOperation=~.2p~nState=~.2p",
-           [_Operation, _Msg], State),
+   State = #rr_resolve_state{operation = {interval_upd_my, I}}) ->
+    ?TRACE("GET INTERVAL - Operation=~p~n IntervalBounds=~p~n MyInterval=~p",
+           [interval_upd_my, intervals:get_bounds(I), MyI], State),
     ?ASSERT(State#rr_resolve_state.feedbackDestPid =:= undefined),
     ISec = intervals:intersection(MyI, I),
     NewState = State#rr_resolve_state{ my_range = MyI },
@@ -276,6 +284,8 @@ on({update_key_entry_ack, NewEntryList}, State =
                         }) 
   when element(1, Op) =:= key_upd;
        element(1, Op) =:= interval_upd ->
+    ?TRACE("GET ENTRY_ACK - Operation=~p~n SessionId:~p - #NewItems: ~p",
+           [element(1, Op), Stats#resolve_stats.session_id, length(NewEntryList)], State),
     
     {NewUpdOk, NewUpdFail, NewRegenOk, NewRegenFail, NewFBItems} =
         integrate_update_key_entry_ack(
@@ -288,9 +298,7 @@ on({update_key_entry_ack, NewEntryList}, State =
                                    regen_fail_count = NewRegenFail + 1},
     NewState = State#rr_resolve_state{stats = NewStats, feedbackKvv = NewFBItems},
     ?ASSERT(_Diff =:= (NewRegenOk + NewUpdOk + NewUpdFail + NewRegenFail)),
-    ?TRACE("UPDATED = ~p - Regen=~p",
-           [Stats#resolve_stats.update_count,
-            Stats#resolve_stats.regen_count], State),
+    ?TRACE("UPDATED = ~p - Regen=~p", [NewUpdOk, NewRegenOk], State),
     shutdown(resolve_ok, NewState, FBDest, NewFBItems, [feedback_response]);
 
 on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
@@ -348,10 +356,11 @@ integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
 -spec shutdown(exit_reason(), state(), undefined | comm:mypid(), kvv_list(),
                options()) -> kill.
 shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
-                                    stats = Stats} = _State,
+                                    stats = Stats, operation = _Op} = _State,
          KUDest, KUItems, KUOptions) ->
-    ?TRACE("SHUTDOWN ~p - key_upd to ~p - items: ~.2p",
-           [_Reason, KUDest, KUItems], _State),
+    ?TRACE("SHUTDOWN ~p - Operation=~p~n SessionId:~p~n ~p items via key_upd to ~p~n Items: ~.2p",
+           [_Reason, element(1, _Op), Stats#resolve_stats.session_id,
+            length(KUItems), KUDest, KUItems], _State),
     send_key_upd(KUDest, KUItems, Stats#resolve_stats.session_id, KUOptions),
     send_stats(SendStats, Stats),
     comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
