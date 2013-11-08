@@ -27,14 +27,14 @@
 %% gen_component callbacks
 -export([start_link/1, init/1, on/2]).
 
--type state() :: op_t() | ok.
-
 -record(op, {
           missing_range = ?required(op, missing_range) :: intervals:interval(),
           found_leases  = ?required(op, found_leases) :: list(l_on_cseq:lease_t())
          }).
 
 -type op_t() :: #op{}.
+
+-type state() :: op_t() | ok.
 
 %% gen_component functions
 %% @doc Starts the failure detector server
