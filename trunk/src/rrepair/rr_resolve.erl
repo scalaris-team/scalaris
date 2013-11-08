@@ -73,9 +73,9 @@
 -type stats() :: #resolve_stats{}.
 
 -type operation() ::
-    {key_upd, SortedKvvListInQ1::kvv_list()} |
+    {key_upd, UniqueKvvListInAnyQ::kvv_list()} |
     {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
-    {interval_upd, intervals:interval(), SortedKvvListInQ1::kvv_list()} |
+    {interval_upd, intervals:interval(), UniqueKvvListInAnyQ::kvv_list()} |
     {interval_upd_send, intervals:interval(), DestPid::comm:mypid()} |
     {interval_upd_my, intervals:interval()}.
 
@@ -86,7 +86,7 @@
          operation      = undefined    									:: undefined | operation(),
          my_range       = undefined                                     :: undefined | intervals:interval(),
          feedbackDestPid= undefined                                     :: undefined | comm:mypid(),
-         feedbackKvv    = []                                            :: kvv_list(),
+         feedbackKvv    = {[], gb_trees:empty()}                        :: {MissingOnOther::kvv_list(), MyIKvTree::gb_tree()},
          send_stats     = undefined                                     :: undefined | comm:mypid(),
          stats          = #resolve_stats{}                              :: stats()
          }).
@@ -134,16 +134,26 @@ on({start, Operation, Options}, State) ->
 on({get_state_response, MyI}, State = 
        #rr_resolve_state{ operation = {key_upd, KvvList},
                           dhtNodePid = DhtPid, stats = Stats }) ->
-    ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
+    MyIKvvList = map_kvv_list(KvvList, MyI),
+    ToUpdate = start_update_key_entry(MyIKvvList, comm:this(), DhtPid),
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p~n KVVListLen=~p ; ToUpdate=~p",
            [key_upd, Stats#resolve_stats.session_id, MyI, length(KvvList), ToUpdate], State),
-    NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
+    
+    % Send entries in sender interval but not in sent KvvList
+    % convert keys KvvList to a gb_tree for faster access checks
+    MyIKvTree = lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
+                                    gb_trees:insert(KeyX, VersionX, TreeX)
+                            end, gb_trees:empty(), MyIKvvList),
+    
+    % allow the garbage collection to clean up the KvvList here:
+    NewState = State#rr_resolve_state{operation = {key_upd, []},
+                                      stats = Stats#resolve_stats{diff_size = ToUpdate}},
     if ToUpdate =:= 0 ->
            shutdown(resolve_ok, NewState,
                     State#rr_resolve_state.feedbackDestPid, [], []);
        true ->
            % note: shutdown and feedback handled by update_key_entry_ack
-           NewState
+           NewState#rr_resolve_state{feedbackKvv = {[], MyIKvTree}}
     end;
 
 on({get_state_response, MyI}, State =
@@ -217,25 +227,32 @@ on({get_state_response, MyI}, State =
     end;
 
 on({get_entries_response, EntryList}, State =
-       #rr_resolve_state{ operation = {interval_upd, _I, KvvList},
+       #rr_resolve_state{ operation = {interval_upd, I, KvvList},
                           my_range = MyI,
                           dhtNodePid = DhtPid,
                           feedbackDestPid = FBDest,
                           stats = Stats }) ->
-    ToUpdate = start_update_key_entry(KvvList, MyI, comm:this(), DhtPid),
+    MyIKvvList = map_kvv_list(KvvList, MyI),
+    ToUpdate = start_update_key_entry(MyIKvvList, comm:this(), DhtPid),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p, KVVListLen=~p ; ToUpdate=~p",
            [interval_upd, Stats#resolve_stats.session_id, length(EntryList), length(KvvList), ToUpdate], State),
+    
     % Send entries in sender interval but not in sent KvvList
-    % convert keys KvvList to a gb_set for faster access checks
-    KSet = gb_sets:from_list([element(1, Z) || Z <- KvvList]),
+    % convert keys KvvList to a gb_tree for faster access checks
+    MyIKvTree = lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
+                                    gb_trees:insert(KeyX, VersionX, TreeX)
+                            end, gb_trees:empty(), MyIKvvList),
     MissingOnOther = [MX || X <- EntryList,
-                            not gb_sets:is_element(element(1, (MX = entry_to_kvv(X))), KSet)],
-    NewState = State#rr_resolve_state{stats = Stats#resolve_stats{diff_size = ToUpdate}},
+                            not gb_trees:is_defined(element(1, (MX = entry_to_kvv(X))), MyIKvTree)],
+    
+    % allow the garbage collection to clean up the KvvList here:
+    NewState = State#rr_resolve_state{operation = {interval_upd, I, []},
+                                      stats = Stats#resolve_stats{diff_size = ToUpdate}},
     if ToUpdate =:= 0 ->
            shutdown(resolve_ok, NewState, FBDest, MissingOnOther, []);
        true ->
            % note: shutdown and feedback handled by update_key_entry_ack
-           NewState#rr_resolve_state{feedbackKvv = MissingOnOther}
+           NewState#rr_resolve_state{feedbackKvv = {MissingOnOther, MyIKvTree}}
     end;
 
 on({get_entries_response, EntryList}, State =
@@ -295,7 +312,7 @@ on({update_key_entry_ack, NewEntryList}, State =
                                                   regen_fail_count = RegenFail
                                                 } = Stats,
                           feedbackDestPid = FBDest,
-                          feedbackKvv = FBItems
+                          feedbackKvv = {MissingOnOther, MyIKvTree}
                         }) 
   when element(1, Op) =:= key_upd;
        element(1, Op) =:= interval_upd ->
@@ -304,14 +321,14 @@ on({update_key_entry_ack, NewEntryList}, State =
     
     {NewUpdOk, NewUpdFail, NewRegenOk, NewRegenFail, NewFBItems} =
         integrate_update_key_entry_ack(
-          NewEntryList, UpdOk, UpdFail, RegenOk, RegenFail, FBItems,
+          NewEntryList, UpdOk, UpdFail, RegenOk, RegenFail, MissingOnOther, MyIKvTree,
           FBDest =/= undefined),
     
     NewStats = Stats#resolve_stats{update_count     = NewUpdOk + 1,
                                    regen_count      = NewRegenOk +1,
                                    upd_fail_count   = NewUpdFail + 1,
                                    regen_fail_count = NewRegenFail + 1},
-    NewState = State#rr_resolve_state{stats = NewStats, feedbackKvv = NewFBItems},
+    NewState = State#rr_resolve_state{stats = NewStats, feedbackKvv = {NewFBItems, MyIKvTree}},
     ?ASSERT(_Diff =:= (NewRegenOk + NewUpdOk + NewUpdFail + NewRegenFail)),
     ?TRACE("UPDATED = ~p - Regen=~p", [NewUpdOk, NewRegenOk], State),
     shutdown(resolve_ok, NewState, FBDest, NewFBItems, [feedback_response]);
@@ -326,46 +343,58 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %%      PreCond: KvvList contains only unique keys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec start_update_key_entry(kvv_list(), intervals:interval(), comm:mypid(),
-                             comm:erl_local_pid()) -> non_neg_integer().
-start_update_key_entry(KvvList, MyI, MyPid, DhtPid) ->
+-spec map_kvv_list(kvv_list(), intervals:interval()) -> kvv_list().
+map_kvv_list(KvvList, MyI) ->
     ?ASSERT(length(KvvList) =:= length(lists:ukeysort(1, KvvList))),
-    ReplicatedKvvList =
-        [{RKey, Val, Vers} || {Key, Val, Vers} <- KvvList,
-                              RKey <- ?RT:get_replica_keys(Key),
-                              intervals:in(RKey, MyI)],
-    comm:send_local(DhtPid, {update_key_entry, MyPid, ReplicatedKvvList}),
-    length(ReplicatedKvvList).
+    [{RKey, Val, Vers} || {Key, Val, Vers} <- KvvList,
+                          RKey <- ?RT:get_replica_keys(Key),
+                          intervals:in(RKey, MyI)].
+
+-spec start_update_key_entry(MyIKvvList::kvv_list(), comm:mypid(),
+                             comm:erl_local_pid()) -> non_neg_integer().
+start_update_key_entry(MyIKvvList, MyPid, DhtPid) ->
+    comm:send_local(DhtPid, {update_key_entry, MyPid, MyIKvvList}),
+    length(MyIKvvList).
 
 -spec integrate_update_key_entry_ack(
         [{Entry::db_entry:entry(), Exists::boolean(), Done::boolean()}],
         UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
         RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
-        FBItems::kvv_list(), FBOn::boolean())
+        FBItems::kvv_list(), OtherKvTree::gb_tree(), FBOn::boolean())
         -> {UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
             RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
             FBItems::kvv_list()}.
 integrate_update_key_entry_ack([], UpdOk, UpdFail, RegenOk, RegenFail, FBItems,
-                               _FBOn) ->
+                               _OtherKvTree, _FBOn) ->
     {UpdOk, UpdFail, RegenOk, RegenFail, FBItems};
 integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
-                               RegenOk, RegenFail, FBItems, FBOn) ->
-    NewFBItems = if not Done andalso Exists andalso FBOn ->
-                        [entry_to_kvv(Entry) | FBItems];
-                    true -> FBItems
-                 end,
+                               RegenOk, RegenFail, FBItems, OtherKvTree, FBOn) ->
+    NewFBItems =
+        if not Done andalso Exists andalso FBOn ->
+               case gb_trees:lookup(db_entry:get_key(Entry), OtherKvTree) of
+                   none -> [entry_to_kvv(Entry) | FBItems];
+                   {value, OtherVersion} ->
+                       MyVersion = db_entry:get_version(Entry),
+                       if MyVersion > OtherVersion ->
+                              [entry_to_kvv(Entry) | FBItems];
+                          true ->
+                              FBItems
+                       end
+               end;
+           true -> FBItems
+        end,
     if Done andalso Exists ->
            integrate_update_key_entry_ack(
-             Rest, UpdOk + 1, UpdFail, RegenOk, RegenFail, NewFBItems, FBOn);
+             Rest, UpdOk + 1, UpdFail, RegenOk, RegenFail, NewFBItems, OtherKvTree, FBOn);
        Done andalso not Exists ->
            integrate_update_key_entry_ack(
-             Rest, UpdOk, UpdFail, RegenOk + 1, RegenFail, NewFBItems, FBOn);
+             Rest, UpdOk, UpdFail, RegenOk + 1, RegenFail, NewFBItems, OtherKvTree, FBOn);
        not Done and Exists ->
            integrate_update_key_entry_ack(
-             Rest, UpdOk, UpdFail + 1, RegenOk, RegenFail, NewFBItems, FBOn);
+             Rest, UpdOk, UpdFail + 1, RegenOk, RegenFail, NewFBItems, OtherKvTree, FBOn);
        not Done and not Exists ->
            integrate_update_key_entry_ack(
-             Rest, UpdOk, UpdFail, RegenOk, RegenFail + 1, NewFBItems, FBOn)
+             Rest, UpdOk, UpdFail, RegenOk, RegenFail + 1, NewFBItems, OtherKvTree, FBOn)
     end.
 
 -spec shutdown(exit_reason(), state(), undefined | comm:mypid(), kvv_list(),
@@ -427,6 +456,7 @@ merge_stats(#resolve_stats{ session_id = ASID,
 
 -spec entry_to_kvv(db_entry:entry()) -> {?RT:key(), db_dht:value(), db_dht:version()}.
 entry_to_kvv(Entry) ->
+    % map to any quadrant (here: 1) in order to be able to make replicated entries unique
     {rr_recon:map_key_to_quadrant(db_entry:get_key(Entry), 1),
      db_entry:get_value(Entry),
      db_entry:get_version(Entry)}.
