@@ -234,6 +234,8 @@ make_global(GlobalPid) -> GlobalPid.
 
 %% @doc Convert a global mypid() of the current node to a local erlang pid.
 -spec make_local(erl_local_pid() | mypid()) -> erl_local_pid().
+make_local({Pid, e, Nth, Cookie}) when is_pid(Pid) ->
+    {Pid, e, Nth, Cookie};
 make_local({Pid, e, Nth, Cookie}) ->
     {comm_server:make_local(Pid), e, Nth, Cookie};
 make_local(Pid) when is_pid(Pid) -> Pid;
