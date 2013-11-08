@@ -233,9 +233,10 @@ make_global(Pid) when is_atom(Pid) -> get(Pid, this());
 make_global(GlobalPid) -> GlobalPid.
 
 %% @doc Convert a global mypid() of the current node to a local erlang pid.
--spec make_local(mypid()) -> erl_local_pid().
+-spec make_local(erl_local_pid() | mypid()) -> erl_local_pid().
 make_local({Pid, e, Nth, Cookie}) ->
     {comm_server:make_local(Pid), e, Nth, Cookie};
+make_local(Pid) when is_pid(Pid) -> Pid;
 make_local(Pid) -> comm_server:make_local(Pid).
 
 %% @doc Returns the global pid of the current process.
