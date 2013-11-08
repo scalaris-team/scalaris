@@ -50,7 +50,7 @@
 %% trace analysis
 -export([send_histogram/1]).
 -export([time_delta/1]).
--export([to_texfile/2]).
+-export([to_texfile/2, to_texfile_no_time/2]).
 
 %% report tracing events from other modules
 -export([log_send/5]).
@@ -255,6 +255,11 @@ time_delta(Trace) ->
     [ setelement(2, X, timer:now_diff(element(2, X), StartTime))
       || X <- SortedTrace].
 
+-spec notime_delta(trace()) -> trace().
+notime_delta(Trace) ->
+    SortedTrace = lists:keysort(2, Trace),
+    util:map_with_nr(fun(X, I) -> setelement(2, X, I*10) end, SortedTrace, 0).
+
 %% sample call sequence to get a tx trace:
 %% tex traces have to be relatively short, so paste all at once to the
 %% erlang shell.
@@ -264,6 +269,16 @@ time_delta(Trace) ->
 
 -spec to_texfile(trace(), file:name()) -> ok | {error, file:posix() | badarg | terminated}.
 to_texfile(Trace, Filename) ->
+    to_texfile(Trace, Filename, fun time_delta/1, true).
+
+-spec to_texfile_no_time(trace(), file:name()) -> ok | {error, file:posix() | badarg | terminated}.
+to_texfile_no_time(Trace, Filename) ->
+    to_texfile(Trace, Filename, fun notime_delta/1, false).
+
+-spec to_texfile(trace(), file:name(), DeltaFun::fun((trace()) -> trace()),
+                 HaveRealTime::boolean())
+        -> ok | {error, file:posix() | badarg | terminated}.
+to_texfile(Trace, Filename, DeltaFun, HaveRealTime) ->
     ScaleX = 20, %% 1 cm is ScaleX microseconds in the plot
     TicsFreq = 20, %% draw x-tics every TicsFreq microseconds
 
@@ -301,7 +316,7 @@ to_texfile(Trace, Filename) ->
                end,
                [], Trace),
     Nodes = lists:reverse(NodesR),
-    DrawTrace = time_delta(Trace),
+    DrawTrace = DeltaFun(Trace),
 
     EndTime =  element(2, lists:last(DrawTrace)),
 
@@ -340,7 +355,7 @@ to_texfile(Trace, Filename) ->
       fun(I) ->
               io:format(File,
               "  \\draw[color=gray, very thin] (~pcm, 0.5)"
-              "  node[above] {~p$\\mu$s} --"
+              "  node[above] {~p" ++ ?IIF(HaveRealTime, "$\\mu$s", "") ++ "} --"
               " (~p, -~p);~n",
               [I*TicsFreq/ScaleX,
                I*TicsFreq,
@@ -353,7 +368,7 @@ to_texfile(Trace, Filename) ->
               "  \\draw[color=red!50!black,->] (-2cm, 0.5)"
               "  -- (-1.5cm, 0.5) node[anchor=west] {global send};~n", []),
 
-    draw_messages(File, Nodes, ScaleX, DrawTrace),
+    draw_messages(File, Nodes, ScaleX, HaveRealTime, DrawTrace),
 
     io:format(
       File,
@@ -380,8 +395,8 @@ quote_latex([Char | Tail], Acc) ->
         end,
     quote_latex(Tail, NewAcc).
 
-draw_messages(_File, _Nodes, _ScaleX, []) -> ok;
-draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
+draw_messages(_File, _Nodes, _ScaleX, _HaveRealTime, []) -> ok;
+draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
     RemainingTrace =
     case element(1, X) of
         log_send ->
@@ -494,13 +509,16 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
                         [] -> NewDrawTrace;
                         _ ->
                             DoneTime = element(2, hd(DoneEvents)),
-                            io:format(File,
-                                      "\\draw[semithick] (~pcm, -~p)"
-                                      " -- "
-                                      " (~pcm, -~p) node[inner sep=1pt, anchor=south] {\\tiny ~p};~n",
-                                      [RecvTime/ScaleX, DestNum/2,
-                                       DoneTime/ScaleX, DestNum/2,
-                                       DoneTime - RecvTime]),
+                            if HaveRealTime ->
+                                   io:format(File,
+                                             "\\draw[semithick] (~pcm, -~p)"
+                                                 " -- "
+                                                 " (~pcm, -~p) node[inner sep=1pt, anchor=south] {\\tiny ~p};~n",
+                                             [RecvTime/ScaleX, DestNum/2,
+                                              DoneTime/ScaleX, DestNum/2,
+                                              DoneTime - RecvTime]);
+                               true -> ok
+                            end,
                             lists:delete(hd(DoneEvents), NewDrawTrace)
                     end
             end;
@@ -521,7 +539,7 @@ draw_messages(File, Nodes, ScaleX, [X | DrawTrace]) ->
             %% not yet implemented
             DrawTrace
     end,
-    draw_messages(File, Nodes, ScaleX, RemainingTrace).
+    draw_messages(File, Nodes, ScaleX, HaveRealTime, RemainingTrace).
 
 %% Functions used to report tracing events from other modules
 -spec epidemic_reply_msg(passed_state(), anypid(), anypid(), comm:message()) ->
