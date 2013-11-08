@@ -220,11 +220,6 @@ send_continue_msg(Pid) ->
     ?TRACE_SEND(Pid, {continue}),
     comm:send_local(Pid, {continue}).
 
--spec locally_disable_lease(State::dht_node_state:state(),
-                            Lease::l_on_cseq:lease_t()) -> dht_node_state:state().
-locally_disable_lease(State, Lease) ->
-    l_on_cseq:disable_lease(State, Lease).
-
 find_lease(State, SlideOp, Mode) ->
     LeaseList = dht_node_state:get(State, lease_list),
     Interval = slide_op:get_interval(SlideOp),
