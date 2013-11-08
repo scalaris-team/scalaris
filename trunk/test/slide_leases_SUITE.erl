@@ -324,7 +324,7 @@ check_local_leases(DHTNode) ->
     %log:log("active lease: ~w", [ActiveLease]),
     ActiveInterval = case ActiveLease of
                          empty ->
-                             interval:empty();
+                             intervals:empty();
                          _ ->
                              l_on_cseq:get_range(ActiveLease)
                      end,
