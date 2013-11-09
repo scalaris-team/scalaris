@@ -350,7 +350,7 @@ gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
                   SigSize::pos_integer()) -> mt_node_key().
 run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
     BinBucket = case Bucket of
-                    [_|_] -> term_to_binary({Bucket, I});
+                    [_|_] -> term_to_binary(Bucket);
                     []    -> term_to_binary({0, I})
                 end,
     Hash = LeafHf(BinBucket),
