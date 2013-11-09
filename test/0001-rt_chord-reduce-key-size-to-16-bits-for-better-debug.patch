@@ -1,6 +1,6 @@
-From 6a4a28b903f7dd0abe43c21d8c19d536580d68a3 Mon Sep 17 00:00:00 2001
+From f79c8c8ce5ba28952d7f9406cbdf39e1aca5c197 Mon Sep 17 00:00:00 2001
 From: Nico Kruber <kruber@zib.de>
-Date: Tue, 29 Jan 2013 12:31:35 +0100
+Date: Sat, 9 Nov 2013 16:11:10 +0100
 Subject: [PATCH] rt_chord: reduce key size to 16 bits for better debugging
 
 ---
@@ -9,10 +9,10 @@ Subject: [PATCH] rt_chord: reduce key size to 16 bits for better debugging
  2 files changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/include/scalaris.hrl b/include/scalaris.hrl
-index a44022e..83b21a2 100644
+index 17fb0d2..ced216e 100644
 --- a/include/scalaris.hrl
 +++ b/include/scalaris.hrl
-@@ -35,8 +35,8 @@
+@@ -31,8 +31,8 @@
  -define(MINUS_INFINITY, 0).
  -define(MINUS_INFINITY_TYPE, 0).
  % first invalid key:
@@ -24,19 +24,19 @@ index a44022e..83b21a2 100644
  %%Simple routingtable
  %-define(RT, rt_simple).
 diff --git a/src/rt_chord.erl b/src/rt_chord.erl
-index 8804127..4aeabf5 100644
+index a3260df..cb32c19 100644
 --- a/src/rt_chord.erl
 +++ b/src/rt_chord.erl
-@@ -62,7 +62,7 @@ hash_key(Key) -> hash_key_(Key).
- %%      opaque key type).
- -spec hash_key_(client_key()) -> key_t().
+@@ -64,7 +64,7 @@ hash_key(Key) -> hash_key_(Key).
+ hash_key_(Key) when not is_binary(Key) ->
+     hash_key_(client_key_to_binary(Key));
  hash_key_(Key) ->
--    <<N:128>> = erlang:md5(client_key_to_binary(Key)),
-+    <<N:16,_:112>> = erlang:md5(client_key_to_binary(Key)),
+-    <<N:128>> = ?CRYPTO_MD5(Key),
++    <<N:16,_:112>> = ?CRYPTO_MD5(Key),
      N.
  
  %% @doc Generates a random node id, i.e. a random 128-bit number, based on the
-@@ -115,14 +115,14 @@ get_size(RT) ->
+@@ -117,14 +117,14 @@ get_size(RT) ->
  
  %% @doc Keep a key in the address space. See n/0.
  -spec normalize(non_neg_integer()) -> key_t().
@@ -54,7 +54,7 @@ index 8804127..4aeabf5 100644
  
  %% @doc Gets the number of keys in the interval (Begin, End]. In the special
  %%      case of Begin==End, the whole key range as specified by n/0 is returned.
-@@ -153,9 +153,9 @@ get_split_key(Begin, End, {Num, Denom}) ->
+@@ -179,9 +179,9 @@ get_random_in_interval2('[', L, R, ']') ->
  -spec get_replica_keys(key()) -> [key()].
  get_replica_keys(Key) ->
      [Key,
@@ -68,5 +68,5 @@ index 8804127..4aeabf5 100644
  
  -spec get_key_segment(key()) -> pos_integer().
 -- 
-1.8.1.1
+1.8.1.4
 
