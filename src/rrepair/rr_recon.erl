@@ -121,10 +121,14 @@
 -define(ok_leaf,     2).
 -define(fail_leaf,   3).
 -define(fail_inner,  4).
--define(omit,       -1). % NOTE: MUST NOT interfere with merkle_tree:mt_node_key()!
 
--type merkle_cmp_result()  :: ?ok_inner | ?ok_leaf | ?fail_leaf | ?fail_inner.
--type merkle_cmp_request() :: merkle_tree:mt_node_key() | ?omit.
+-type merkle_cmp_result()  :: ?ok_inner | 
+                              ?ok_leaf | 
+                              {?fail_leaf, merkle_tree:mt_node_key()} | 
+                              ?fail_inner.
+-type merkle_cmp_request() :: 
+          merkle_tree:mt_node_key() | 
+          {NodesToOmit::pos_integer(), LeafHash::merkle_tree:mt_node_key()}.
 
 -type request() :: 
     {start, method(), DestKey::recon_dest()} |
@@ -282,17 +286,28 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({check_nodes, SenderPid, ToCheck}, State = #rr_recon_state{struct = Tree}) ->
-    {Result, RestTree} = check_node(ToCheck, Tree),
-    send(SenderPid, {check_nodes_response, Result}),
-    State#rr_recon_state{dest_recon_pid = SenderPid, struct = RestTree};
+on({check_nodes, SenderPid, ToCheck}, State) ->
+    NewState = State#rr_recon_state{dest_recon_pid = SenderPid},
+    on({check_nodes, ToCheck}, NewState);
 
 on({check_nodes, ToCheck},
-   State = #rr_recon_state{struct = Tree, dest_recon_pid = SenderPid}) ->
+   State = #rr_recon_state{ struct = Tree, 
+                            dest_recon_pid = SenderPid,
+                            dest_rr_pid = DestNodePid,
+                            stats = Stats,
+                            ownerPid = OwnerL }) ->
     ?ASSERT(comm:is_valid(SenderPid)),
-    {Result, RestTree} = check_node(ToCheck, Tree),
+    {Result, RestTree, ToResolve} = check_node(ToCheck, Tree),
+    ToResolveLength = length(ToResolve),
+    NStats = if ToResolveLength > 0 ->           
+                    SID = rr_recon_stats:get(session_id, Stats),
+                    ResolveCount = resolve_leafs(ToResolve, DestNodePid, SID, OwnerL),
+                    rr_recon_stats:inc([{tree_leafsSynced, ToResolveLength},
+                                        {resolve_started, ResolveCount}], Stats);
+                true -> Stats
+             end,
     send(SenderPid, {check_nodes_response, Result}),
-    State#rr_recon_state{struct = RestTree};
+    State#rr_recon_state{ struct = RestTree, stats = NStats };
 
 on({check_nodes_response, CmpResults}, State =
        #rr_recon_state{ dest_recon_pid = DestReconPid,
@@ -307,9 +322,8 @@ on({check_nodes_response, CmpResults}, State =
                                   Stats),
     Req =/= [] andalso
         send(DestReconPid, {check_nodes, Req}),
-    {LeafNodes, Leafs} = merkle_get_sync_leaves(Res, [], 0),
-    Resolves = resolve_leaves(LeafNodes, SrcNode, SID, OwnerL),
-    FStats = rr_recon_stats:inc([{tree_leafsSynced, Leafs},
+    Resolves = resolve_leafs(Res, SrcNode, SID, OwnerL),
+    FStats = rr_recon_stats:inc([{tree_leafsSynced, length(Res)},
                                  {resolve_started, Resolves}], NStats),
     CompLeft = rr_recon_stats:get(tree_compareLeft, FStats),
     NewState = State#rr_recon_state{stats = FStats, struct = RTree},
@@ -430,34 +444,44 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec check_node([merkle_cmp_request()], merkle_tree:merkle_tree() | RestTree) 
-        -> {[merkle_cmp_result()], RestTree}
-    when is_subtype(RestTree, [merkle_tree:mt_node()]).
+-spec check_node([merkle_cmp_request()], merkle_tree:merkle_tree() | NodeList) 
+        -> {[merkle_cmp_result()], RestTree::NodeList, ResolveReq::NodeList}
+    when is_subtype(NodeList, [merkle_tree:mt_node()]).
 check_node(L, Tree) ->
     case merkle_tree:is_merkle_tree(Tree) of
-        false -> p_check_node(L, Tree, [], []);
-        true -> p_check_node(L, [merkle_tree:get_root(Tree)], [], [])
+        false -> p_check_node(L, Tree, [], [], []);
+        true -> p_check_node(L, [merkle_tree:get_root(Tree)], [], [], [])
     end.
 
 %% @doc Compares the given Hashes from the other node with my merkle_tree nodes.
 %%      Returns the comparison results and the rest nodes to check in a next
 %%      step.
--spec p_check_node(Hashes::[merkle_cmp_request()], MyNodes::[merkle_tree:mt_node()],
-                   [merkle_cmp_result()], RestTreeIn::[[merkle_tree:mt_node()]])
-        -> {[merkle_cmp_result()], RestTreeOut::[merkle_tree:mt_node()]}.
-p_check_node([], [], AccR, AccN) ->
-    {lists:reverse(AccR), lists:append(lists:reverse(AccN))};
-p_check_node([?omit | TK], [_Node | TN], AccR, AccN) ->
-    p_check_node(TK, TN, AccR, AccN);
-p_check_node([Hash | TK], [Node | TN], AccR, AccN) ->
+-spec p_check_node(Hashes::[merkle_cmp_request()], 
+                   MyNodes::NodeList,
+                   [merkle_cmp_result()], 
+                   RestTreeIn::[NodeList],
+                   AccResolve::NodeList)
+        -> {[merkle_cmp_result()], 
+            RestTreeOut::NodeList,
+            ResolveReq::NodeList}
+    when 
+      is_subtype(NodeList, [merkle_tree:mt_node()]).
+p_check_node([], [], AccR, AccN, AccRes) ->
+    {lists:reverse(AccR), lists:append(lists:reverse(AccN)), AccRes};
+p_check_node([{ToOmit, Hash} | TK], [Node | TN], AccR, AccN, AccRes) ->
+    OmitNodes = [Node | lists:sublist(TN, 1, ToOmit - 1)],
+    ToResolve = merkle_get_sync_leafs(OmitNodes, Hash, []),
+    p_check_node(TK, lists:nthtail(ToOmit - 1, TN), AccR, AccN, lists:append(ToResolve, AccRes));
+p_check_node([Hash | TK], [Node | TN], AccR, AccN, AccRes) ->
     IsLeaf = merkle_tree:is_leaf(Node),
-    case merkle_tree:get_hash(Node) =:= Hash of
-        true when IsLeaf -> p_check_node(TK, TN, [?ok_leaf | AccR], AccN);
-        true when not IsLeaf -> p_check_node(TK, TN, [?ok_inner | AccR], AccN);
-        false when IsLeaf -> p_check_node(TK, TN, [?fail_leaf | AccR], AccN);
+    NodeHash = merkle_tree:get_hash(Node),
+    case NodeHash =:= Hash of
+        true when IsLeaf -> p_check_node(TK, TN, [?ok_leaf | AccR], AccN, AccRes);
+        true when not IsLeaf -> p_check_node(TK, TN, [?ok_inner | AccR], AccN, AccRes);
+        false when IsLeaf -> p_check_node(TK, TN, [{?fail_leaf, NodeHash} | AccR], AccN, AccRes);
         false when not IsLeaf ->
             Childs = merkle_tree:get_childs(Node),
-            p_check_node(TK, TN, [?fail_inner | AccR], [Childs | AccN])
+            p_check_node(TK, TN, [?fail_inner | AccR], [Childs | AccN], AccRes)
     end.
 
 -spec process_tree_cmp_result([merkle_cmp_result()], merkle_tree:merkle_tree() | RestTree, pos_integer(), Stats) ->
@@ -492,8 +516,9 @@ p_process_tree_cmp_result([?ok_inner | TR], [Node | TN], BS, Stats, Req, Res, RT
 p_process_tree_cmp_result([?ok_leaf | TR], [_Node | TN], BS, Stats, Req, Res, RTree) ->
     NStats = rr_recon_stats:inc([{tree_compareSkipped, 1}], Stats),
     p_process_tree_cmp_result(TR, TN, BS, NStats, Req, Res, RTree);
-p_process_tree_cmp_result([?fail_leaf | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
-    p_process_tree_cmp_result(TR, TN, BS, Stats, Req, [Node | Res], RTree);
+p_process_tree_cmp_result([{?fail_leaf, Hash} | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
+    NewRes = lists:append(merkle_get_sync_leafs([Node], Hash, []), Res),
+    p_process_tree_cmp_result(TR, TN, BS, Stats, Req, NewRes, RTree);
 p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     case merkle_tree:is_leaf(Node) of
         false -> 
@@ -505,49 +530,50 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, 
                                       Res,
                                       lists:reverse(Childs, RTree));
         true -> 
-            NewReq = lists:duplicate(BS, ?omit),
-            p_process_tree_cmp_result(TR, TN, BS, Stats,
-                                      lists:append(NewReq, Req), [Node | Res], RTree)
+            NewReq = [{BS, merkle_tree:get_hash(Node)} | Req],
+            p_process_tree_cmp_result(TR, TN, BS, Stats, NewReq, [Node | Res], RTree)
     end.
 
-%% @doc Gets all leaves in the given merkle node list (recursively).
--spec merkle_get_sync_leaves(Nodes::NodeL, LeafAcc::NodeL,
-                             NLSyncAcc::non_neg_integer())
-        -> {ToSync::NodeL, NLSync::non_neg_integer()} when
-                  is_subtype(NodeL,  [merkle_tree:mt_node()]).
-merkle_get_sync_leaves([], ToSyncAcc, NLSyncAcc) ->
-    {ToSyncAcc, NLSyncAcc};
-merkle_get_sync_leaves([Node | Rest], ToSyncAcc, NLSyncAcc) ->
+%% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash. 
+-spec merkle_get_sync_leafs(Nodes::NodeL, Skip::Hash, LeafAcc::NodeL) -> ToSync::NodeL 
+    when 
+      is_subtype(Hash,  merkle_tree:mt_node_key()),
+      is_subtype(NodeL, [merkle_tree:mt_node()]).
+merkle_get_sync_leafs([], _Skip, ToSyncAcc) ->
+    ToSyncAcc;
+merkle_get_sync_leafs([Node | Rest], Skip, ToSyncAcc) ->
     case merkle_tree:is_leaf(Node) of
         true  ->
-            merkle_get_sync_leaves(Rest, [Node | ToSyncAcc], NLSyncAcc + 1);
+            case merkle_tree:get_hash(Node) =:= Skip of
+                true  -> merkle_get_sync_leafs(Rest, Skip, ToSyncAcc);
+                false -> merkle_get_sync_leafs(Rest, Skip, [Node | ToSyncAcc])
+            end;
         false ->
-            merkle_get_sync_leaves(
-              lists:append(merkle_tree:get_childs(Node), Rest),
-              ToSyncAcc, NLSyncAcc)
+            merkle_get_sync_leafs(
+              lists:append(merkle_tree:get_childs(Node), Rest), Skip, ToSyncAcc)
     end.
 
 %% @doc Starts a single resolve request for all given leave nodes by joining
 %%      their intervals.
 %%      Returns the number of resolve requests (requests with feedback count 2).
--spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
+-spec resolve_leafs([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid())
         -> 0..2.
-resolve_leaves([], _Dest, _SID, _OwnerL) -> 0;
-resolve_leaves(Nodes, Dest, SID, OwnerL) ->
-    resolve_leaves(Nodes, Dest, SID, OwnerL, intervals:empty(), 0).
+resolve_leafs([], _Dest, _SID, _OwnerL) -> 0;
+resolve_leafs(Nodes, Dest, SID, OwnerL) ->
+    resolve_leafs(Nodes, Dest, SID, OwnerL, intervals:empty(), 0).
 
 % @doc Returns number of caused resolve requests (requests with feedback count 2).
--spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
+-spec resolve_leafs([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid(),
                      Interval::intervals:interval(), Items::non_neg_integer())
         -> 0..2.
-resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
+resolve_leafs([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
     LeafInterval = merkle_tree:get_interval(Node),
     IntervalNew = intervals:union(Interval, LeafInterval),
     ItemsNew = Items + merkle_tree:get_item_count(Node),
-    resolve_leaves(Rest, Dest, SID, OwnerL, IntervalNew, ItemsNew);
-resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
+    resolve_leafs(Rest, Dest, SID, OwnerL, IntervalNew, ItemsNew);
+resolve_leafs([], Dest, SID, OwnerL, Interval, Items) ->
     Options = [{feedback_request, comm:make_global(OwnerL)}],
     case intervals:is_empty(Interval) of
         true -> 0;
@@ -581,9 +607,9 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
         case merkle_tree:get_interval(Tree) =:= art:get_interval(Art) of
             true ->
                 {ASyncLeafs, NComp, NSkip, NLSync} =
-                    art_get_sync_leaves([merkle_tree:get_root(Tree)], Art,
+                    art_get_sync_leafs([merkle_tree:get_root(Tree)], Art,
                                         [], 0, 0, 0),
-                ResolveCalled = resolve_leaves(ASyncLeafs, DestPid, SID, OwnerL),
+                ResolveCalled = resolve_leafs(ASyncLeafs, DestPid, SID, OwnerL),
                 rr_recon_stats:inc([{tree_nodesCompared, NComp},
                                     {tree_compareSkipped, NSkip},
                                     {tree_leafsSynced, NLSync},
@@ -594,27 +620,27 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
 
 %% @doc Gets all leaves in the merkle node list (recursively) which are not
 %%      present in the art structure.
--spec art_get_sync_leaves(Nodes::NodeL, art:art(), ToSyncAcc::NodeL,
+-spec art_get_sync_leafs(Nodes::NodeL, art:art(), ToSyncAcc::NodeL,
                           NCompAcc::non_neg_integer(), NSkipAcc::non_neg_integer(),
                           NLSyncAcc::non_neg_integer())
         -> {ToSync::NodeL, NComp::non_neg_integer(), NSkip::non_neg_integer(),
             NLSync::non_neg_integer()} when
     is_subtype(NodeL,  [merkle_tree:mt_node()]).
-art_get_sync_leaves([], _Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc) ->
+art_get_sync_leafs([], _Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc) ->
     {ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc};
-art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc) ->
+art_get_sync_leafs([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc) ->
     NComp = NCompAcc + 1,
     IsLeaf = merkle_tree:is_leaf(Node),
     case art:lookup(Node, Art) of
         true ->
             NSkip = NSkipAcc + ?IIF(IsLeaf, 0, merkle_tree:size(Node)),
-            art_get_sync_leaves(Rest, Art, ToSyncAcc, NComp, NSkip, NLSyncAcc);
+            art_get_sync_leafs(Rest, Art, ToSyncAcc, NComp, NSkip, NLSyncAcc);
         false ->
             if IsLeaf ->
-                   art_get_sync_leaves(Rest, Art, [Node | ToSyncAcc],
+                   art_get_sync_leafs(Rest, Art, [Node | ToSyncAcc],
                                        NComp, NSkipAcc, NLSyncAcc + 1);
                true ->
-                   art_get_sync_leaves(
+                   art_get_sync_leafs(
                      lists:append(merkle_tree:get_childs(Node), Rest), Art,
                      ToSyncAcc, NComp, NSkipAcc, NLSyncAcc)
             end
