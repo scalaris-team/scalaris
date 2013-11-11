@@ -318,17 +318,17 @@ on({check_nodes_response, CmpResults}, State =
                         ownerPid = OwnerL,
                         struct = Tree }) ->
     SID = rr_recon_stats:get(session_id, Stats),
-    {Req, Res, NStats, RTree} = process_tree_cmp_result(
-                                  CmpResults, Tree,
-                                  get_merkle_branch_factor(), % this is how we build the tree!
-                                  Stats),
+    {Req, ToResolve, NStats0, RTree} =
+        process_tree_cmp_result(CmpResults, Tree,
+                                get_merkle_branch_factor(), % this is how we build the tree!
+                                Stats),
     Req =/= [] andalso
         send(DestReconPid, {check_nodes, Req}),
-    Resolves = resolve_leaves(Res, SrcNode, SID, OwnerL),
-    FStats = rr_recon_stats:inc([{tree_leavesSynced, length(Res)},
-                                 {resolve_started, Resolves}], NStats),
-    CompLeft = rr_recon_stats:get(tree_compareLeft, FStats),
-    NewState = State#rr_recon_state{stats = FStats, struct = RTree},
+    ResolveCount = resolve_leaves(ToResolve, SrcNode, SID, OwnerL),
+    NStats = rr_recon_stats:inc([{tree_leavesSynced, length(ToResolve)},
+                                 {resolve_started, ResolveCount}], NStats0),
+    CompLeft = rr_recon_stats:get(tree_compareLeft, NStats),
+    NewState = State#rr_recon_state{stats = NStats, struct = RTree},
     if CompLeft =:= 0 ->
            send(DestReconPid, {shutdown, sync_finished_remote}),
            shutdown(sync_finished, NewState);
@@ -450,18 +450,20 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Compares the given Hashes from the other node with my merkle_tree nodes.
+%% @doc Compares the given Hashes from the other node with my merkle_tree nodes
+%%      (executed on non-initiator).
 %%      Returns the comparison results and the rest nodes to check in a next
 %%      step.
 -spec check_node(Hashes::[merkle_cmp_request()],
                  merkle_tree:merkle_tree() | NodeList)
         -> {[merkle_cmp_result()], RestTree::NodeList, ResolveReq::NodeList}
     when is_subtype(NodeList, [merkle_tree:mt_node()]).
-check_node(L, Tree) ->
-    case merkle_tree:is_merkle_tree(Tree) of
-        false -> p_check_node(L, Tree, [], [], []);
-        true -> p_check_node(L, [merkle_tree:get_root(Tree)], [], [], [])
-    end.
+check_node(Hashes, Tree) ->
+    TreeNodes = case merkle_tree:is_merkle_tree(Tree) of
+                    false -> Tree;
+                    true -> [merkle_tree:get_root(Tree)]
+                end,
+    p_check_node(Hashes, TreeNodes, [], [], []).
 
 %% @doc Helper for check_node/2.
 -spec p_check_node(Hashes::[merkle_cmp_request()], MyNodes::NodeList,
@@ -473,25 +475,24 @@ check_node(L, Tree) ->
 p_check_node([], [], AccR, AccN, AccRes) ->
     {lists:reverse(AccR), lists:append(lists:reverse(AccN)), AccRes};
 p_check_node([{ToOmit, Hash} | TK], [Node | TN], AccR, AccN, AccRes) ->
-    OmitNodes = [Node | lists:sublist(TN, 1, ToOmit - 1)],
-    ToResolve = merkle_get_sync_leaves(OmitNodes, Hash, []),
-    p_check_node(TK, lists:nthtail(ToOmit - 1, TN), AccR, AccN,
-                 lists:append(ToResolve, AccRes));
+    {OmitNodes0, RestNodes} = util:safe_split(ToOmit - 1, TN),
+    ToResolve = merkle_get_sync_leaves([Node | OmitNodes0], Hash, AccRes),
+    p_check_node(TK, RestNodes, AccR, AccN, ToResolve);
 p_check_node([Hash | TK], [Node | TN], AccR, AccN, AccRes) ->
     IsLeaf = merkle_tree:is_leaf(Node),
-    NodeHash = merkle_tree:get_hash(Node),
-    case NodeHash =:= Hash of
-        true when IsLeaf ->
+    case merkle_tree:get_hash(Node) of
+        Hash when IsLeaf ->
             p_check_node(TK, TN, [?ok_leaf | AccR], AccN, AccRes);
-        true when not IsLeaf ->
+        Hash when not IsLeaf ->
             p_check_node(TK, TN, [?ok_inner | AccR], AccN, AccRes);
-        false when IsLeaf ->
+        NodeHash when IsLeaf ->
             p_check_node(TK, TN, [{?fail_leaf, NodeHash} | AccR], AccN, AccRes);
-        false when not IsLeaf ->
+        _    when not IsLeaf ->
             Childs = merkle_tree:get_childs(Node),
             p_check_node(TK, TN, [?fail_inner | AccR], [Childs | AccN], AccRes)
     end.
 
+%% @doc Processes compare results from check_node/2 on the initiator.
 -spec process_tree_cmp_result([merkle_cmp_result()],
                               merkle_tree:merkle_tree() | RestTree,
                               BranchSize::pos_integer(), Stats)
@@ -511,6 +512,7 @@ process_tree_cmp_result(CmpResult, Tree, BranchSize, Stats) ->
                 end,
     p_process_tree_cmp_result(CmpResult, TreeNodes, BranchSize, NStats, [], [], []).
 
+%% @doc Helper for process_tree_cmp_result/4.
 -spec p_process_tree_cmp_result([merkle_cmp_result()], RestTree, BranchSize,
                                 Stats, Acc::Req, Acc::Res, AccRTree::Res)
         -> {Req, Res, Stats, RestTree::Res}
@@ -565,7 +567,7 @@ merkle_get_sync_leaves([Node | Rest], Skip, ToSyncAcc) ->
               lists:append(merkle_tree:get_childs(Node), Rest), Skip, ToSyncAcc)
     end.
 
-%% @doc Starts a single resolve request for all given leave nodes by joining
+%% @doc Starts a single resolve request for all given leaf nodes by joining
 %%      their intervals.
 %%      Returns the number of resolve requests (requests with feedback count 2).
 -spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
@@ -575,12 +577,13 @@ resolve_leaves([], _Dest, _SID, _OwnerL) -> 0;
 resolve_leaves(Nodes, Dest, SID, OwnerL) ->
     resolve_leaves(Nodes, Dest, SID, OwnerL, intervals:empty(), 0).
 
-% @doc Returns number of caused resolve requests (requests with feedback count 2).
+%% @doc Helper for resolve_leaves/4.
 -spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid(),
                      Interval::intervals:interval(), Items::non_neg_integer())
         -> 0..2.
 resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
+    ?ASSERT(merkle_tree:is_leaf(Node)),
     LeafInterval = merkle_tree:get_interval(Node),
     IntervalNew = intervals:union(Interval, LeafInterval),
     ItemsNew = Items + merkle_tree:get_item_count(Node),
