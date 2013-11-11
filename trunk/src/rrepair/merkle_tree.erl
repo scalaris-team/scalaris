@@ -294,7 +294,7 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
     Node = if Count > BucketSize ->
                   p_bulk_build({nil, 1, [], Interval, []}, Config, Bucket);
               KeepBucket ->
-                  % let gen_hash/1 hash the leafs
+                  % let gen_hash/1 hash the leaves
                   {nil, Count, Bucket, Interval, []};
               true ->
                   % need to hash here since we won't keep the bucket!
@@ -364,7 +364,7 @@ run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Returns the total number of nodes in a tree or node (inner nodes and leafs)
+% @doc Returns the total number of nodes in a tree or node (inner nodes and leaves)
 -spec size(merkle_tree() | mt_node()) -> non_neg_integer().
 size({merkle_tree, _, Root}) -> node_size(Root);
 size(Node) -> node_size(Node).

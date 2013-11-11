@@ -40,7 +40,7 @@
          tree_size          = {0, 0} :: merkle_tree:mt_size(),
          tree_nodesCompared = 0      :: non_neg_integer(),
          tree_compareSkipped= 0      :: non_neg_integer(),
-         tree_leafsSynced   = 0      :: non_neg_integer(),
+         tree_leavesSynced  = 0      :: non_neg_integer(),
          tree_compareLeft   = 0      :: non_neg_integer(),
          error_count        = 0      :: non_neg_integer(),
          build_time         = 0      :: non_neg_integer(),      %in us
@@ -54,7 +54,7 @@
           [{tree_size, merkle_tree:mt_size()} |
                {tree_nodesCompared, non_neg_integer()} |
                {tree_compareSkipped, non_neg_integer()} |
-               {tree_leafsSynced, non_neg_integer()} |
+               {tree_leavesSynced, non_neg_integer()} |
                {tree_compareLeft, non_neg_integer()} |
                {error_count, non_neg_integer()} |
                {build_time, non_neg_integer()} |
@@ -94,9 +94,9 @@ inc([{K, V} | L], Stats) ->
              tree_nodesCompared ->
                  X = V + Stats#rr_recon_stats.tree_nodesCompared,
                  Stats#rr_recon_stats {tree_nodesCompared = X};
-             tree_leafsSynced ->
-                 X = V + Stats#rr_recon_stats.tree_leafsSynced,
-                 Stats#rr_recon_stats{tree_leafsSynced = X};
+             tree_leavesSynced ->
+                 X = V + Stats#rr_recon_stats.tree_leavesSynced,
+                 Stats#rr_recon_stats{tree_leavesSynced = X};
              tree_compareSkipped ->
                  X = V + Stats#rr_recon_stats.tree_compareSkipped,
                  Stats#rr_recon_stats{tree_compareSkipped = X};
@@ -125,7 +125,7 @@ set([{K, V} | L], Stats) ->
              tree_size           -> Stats#rr_recon_stats{tree_size = V};
              tree_compareLeft    -> Stats#rr_recon_stats{tree_compareLeft = V};
              tree_nodesCompared  -> Stats#rr_recon_stats{tree_nodesCompared = V};
-             tree_leafsSynced    -> Stats#rr_recon_stats{tree_leafsSynced = V};
+             tree_leavesSynced   -> Stats#rr_recon_stats{tree_leavesSynced = V};
              tree_compareSkipped -> Stats#rr_recon_stats{tree_compareSkipped = V};
              error_count         -> Stats#rr_recon_stats{error_count = V};
              build_time          -> Stats#rr_recon_stats{build_time = V};
@@ -139,7 +139,7 @@ set([{K, V} | L], Stats) ->
          (tree_size, stats())          -> merkle_tree:mt_size();
          (tree_nodesCompared, stats()) -> non_neg_integer();
          (tree_compareSkipped, stats())-> non_neg_integer();
-         (tree_leafsSynced, stats())   -> non_neg_integer();
+         (tree_leavesSynced, stats())  -> non_neg_integer();
          (tree_compareLeft, stats())   -> non_neg_integer();
          (error_count, stats())        -> non_neg_integer();
          (build_time, stats())         -> non_neg_integer();
@@ -150,7 +150,7 @@ get(session_id         , #rr_recon_stats{session_id          = X}) -> X;
 get(tree_size          , #rr_recon_stats{tree_size           = X}) -> X;
 get(tree_compareLeft   , #rr_recon_stats{tree_compareLeft    = X}) -> X;
 get(tree_nodesCompared , #rr_recon_stats{tree_nodesCompared  = X}) -> X;
-get(tree_leafsSynced   , #rr_recon_stats{tree_leafsSynced    = X}) -> X;
+get(tree_leavesSynced  , #rr_recon_stats{tree_leavesSynced   = X}) -> X;
 get(tree_compareSkipped, #rr_recon_stats{tree_compareSkipped = X}) -> X;
 get(error_count        , #rr_recon_stats{error_count         = X}) -> X;
 get(build_time         , #rr_recon_stats{build_time          = X}) -> X;
@@ -162,7 +162,7 @@ get(status             , #rr_recon_stats{status              = X}) -> X.
 merge(A, #rr_recon_stats{ tree_size = TS,
                           tree_compareLeft = TCL,
                           tree_nodesCompared = TNC,
-                          tree_leafsSynced = TLS,
+                          tree_leavesSynced = TLS,
                           tree_compareSkipped = TCS,
                           error_count = EC,
                           build_time = BT,
@@ -171,7 +171,7 @@ merge(A, #rr_recon_stats{ tree_size = TS,
     inc([{tree_size, TS},
          {tree_compareLeft, TCL},
          {tree_nodesCompared, TNC},
-         {tree_leafsSynced, TLS},
+         {tree_leavesSynced, TLS},
          {tree_compareSkipped, TCS},
          {error_count, EC},
          {build_time, BT},
