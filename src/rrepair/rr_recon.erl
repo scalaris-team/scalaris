@@ -61,7 +61,7 @@
 -type stage()          :: req_shared_interval | build_struct | reconciliation.
 
 -type exit_reason()    :: empty_interval |          %interval intersection between initator and client is empty
-                          recon_node_crash |        %sync partner node crashed  
+                          recon_node_crash |        %sync partner node crashed
                           sync_finished |           %finish recon on local node
                           sync_finished_remote.     %client-side shutdown by merkle-tree recon initiator
 
@@ -122,15 +122,15 @@
 -define(fail_leaf,   3).
 -define(fail_inner,  4).
 
--type merkle_cmp_result()  :: ?ok_inner | 
-                              ?ok_leaf | 
-                              {?fail_leaf, merkle_tree:mt_node_key()} | 
+-type merkle_cmp_result()  :: ?ok_inner |
+                              ?ok_leaf |
+                              {?fail_leaf, merkle_tree:mt_node_key()} |
                               ?fail_inner.
--type merkle_cmp_request() :: 
-          merkle_tree:mt_node_key() | 
+-type merkle_cmp_request() ::
+          merkle_tree:mt_node_key() |
           {NodesToOmit::pos_integer(), LeafHash::merkle_tree:mt_node_key()}.
 
--type request() :: 
+-type request() ::
     {start, method(), DestKey::recon_dest()} |
     {create_struct, method(), SenderI::intervals:interval()} | % from initiator
     {start_recon, bloom, #bloom_recon_struct{}} | % to initiator
@@ -148,7 +148,7 @@
     {create_struct2, DestI::intervals:interval(), {get_chunk_response, {intervals:interval(), db_chunk()}}} |
     {reconcile, {get_chunk_response, {intervals:interval(), db_chunk()}}} |
     % internal
-    {shutdown, exit_reason()} | 
+    {shutdown, exit_reason()} |
     {crash, DeadPid::comm:mypid()} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}
     .
@@ -236,7 +236,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                _ -> [KeyX || {KeyX, VersionX} <- DBList0,
                              not bloom:is_element(BF, encodeBlob(KeyX, VersionX))]
            end,
-    %if rest interval is non empty start another sync    
+    %if rest interval is non empty start another sync
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
@@ -291,7 +291,7 @@ on({check_nodes, SenderPid, ToCheck}, State) ->
     on({check_nodes, ToCheck}, NewState);
 
 on({check_nodes, ToCheck},
-   State = #rr_recon_state{ struct = Tree, 
+   State = #rr_recon_state{ struct = Tree,
                             dest_recon_pid = SenderPid,
                             dest_rr_pid = DestNodePid,
                             stats = Stats,
@@ -299,7 +299,7 @@ on({check_nodes, ToCheck},
     ?ASSERT(comm:is_valid(SenderPid)),
     {Result, RestTree, ToResolve} = check_node(ToCheck, Tree),
     ToResolveLength = length(ToResolve),
-    NStats = if ToResolveLength > 0 ->           
+    NStats = if ToResolveLength > 0 ->
                     SID = rr_recon_stats:get(session_id, Stats),
                     ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
                     rr_recon_stats:inc([{tree_leavesSynced, ToResolveLength},
@@ -352,7 +352,7 @@ build_struct(DBList, DestI, RestI,
                     false ->
                         MySubSyncI = map_interval(RestI, DestI), % mapped to my range
                         Reconcile = Initiator andalso (Stage =:= reconciliation),
-                        if RMethod =:= bloom -> 
+                        if RMethod =:= bloom ->
                                ForkState = State#rr_recon_state{dest_interval = SubSyncI,
                                                                 params = Params},
                                {ok, Pid} = fork_recon(ForkState),
@@ -424,7 +424,7 @@ begin_sync(MySyncStruct, OtherSyncStruct,
             Stats1 = art_recon(MySyncStruct, OtherSyncStruct#art_recon_struct.art, State),
             shutdown(sync_finished, State#rr_recon_state{stats = Stats1});
         false ->
-            SID = rr_recon_stats:get(session_id, Stats), 
+            SID = rr_recon_stats:get(session_id, Stats),
             send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
                              {start_recon, art, MySyncStruct}}),
             shutdown(sync_finished, State)
@@ -444,7 +444,7 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec check_node([merkle_cmp_request()], merkle_tree:merkle_tree() | NodeList) 
+-spec check_node([merkle_cmp_request()], merkle_tree:merkle_tree() | NodeList)
         -> {[merkle_cmp_result()], RestTree::NodeList, ResolveReq::NodeList}
     when is_subtype(NodeList, [merkle_tree:mt_node()]).
 check_node(L, Tree) ->
@@ -456,15 +456,15 @@ check_node(L, Tree) ->
 %% @doc Compares the given Hashes from the other node with my merkle_tree nodes.
 %%      Returns the comparison results and the rest nodes to check in a next
 %%      step.
--spec p_check_node(Hashes::[merkle_cmp_request()], 
+-spec p_check_node(Hashes::[merkle_cmp_request()],
                    MyNodes::NodeList,
-                   [merkle_cmp_result()], 
+                   [merkle_cmp_result()],
                    RestTreeIn::[NodeList],
                    AccResolve::NodeList)
-        -> {[merkle_cmp_result()], 
+        -> {[merkle_cmp_result()],
             RestTreeOut::NodeList,
             ResolveReq::NodeList}
-    when 
+    when
       is_subtype(NodeList, [merkle_tree:mt_node()]).
 p_check_node([], [], AccR, AccN, AccRes) ->
     {lists:reverse(AccR), lists:append(lists:reverse(AccN)), AccRes};
@@ -500,8 +500,8 @@ process_tree_cmp_result(CmpResult, Tree, BranchSize, Stats) ->
         true -> p_process_tree_cmp_result(CmpResult, [merkle_tree:get_root(Tree)], BranchSize, NStats, [], [], [])
     end.
 
--spec p_process_tree_cmp_result([merkle_cmp_result()], RestTree, BranchSize, Stats, Acc::Req, Acc::Res, AccRTree::Res) 
-        -> {Req, Res, Stats, RestTree::Res}           
+-spec p_process_tree_cmp_result([merkle_cmp_result()], RestTree, BranchSize, Stats, Acc::Req, Acc::Res, AccRTree::Res)
+        -> {Req, Res, Stats, RestTree::Res}
     when
       is_subtype(BranchSize,pos_integer()),
       is_subtype(Stats,     rr_recon_stats:stats()),
@@ -521,7 +521,7 @@ p_process_tree_cmp_result([{?fail_leaf, Hash} | TR], [Node | TN], BS, Stats, Req
     p_process_tree_cmp_result(TR, TN, BS, Stats, Req, NewRes, RTree);
 p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     case merkle_tree:is_leaf(Node) of
-        false -> 
+        false ->
             Childs = merkle_tree:get_childs(Node),
             NewReq = [merkle_tree:get_hash(X) || X <- Childs],
             NStats = rr_recon_stats:inc([{tree_compareLeft, length(Childs)}], Stats),
@@ -529,14 +529,14 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, 
                                       lists:reverse(NewReq, Req),
                                       Res,
                                       lists:reverse(Childs, RTree));
-        true -> 
+        true ->
             NewReq = [{BS, merkle_tree:get_hash(Node)} | Req],
             p_process_tree_cmp_result(TR, TN, BS, Stats, NewReq, [Node | Res], RTree)
     end.
 
-%% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash. 
--spec merkle_get_sync_leaves(Nodes::NodeL, Skip::Hash, LeafAcc::NodeL) -> ToSync::NodeL 
-    when 
+%% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash.
+-spec merkle_get_sync_leaves(Nodes::NodeL, Skip::Hash, LeafAcc::NodeL) -> ToSync::NodeL
+    when
       is_subtype(Hash,  merkle_tree:mt_node_key()),
       is_subtype(NodeL, [merkle_tree:mt_node()]).
 merkle_get_sync_leaves([], _Skip, ToSyncAcc) ->
@@ -929,7 +929,7 @@ map_interval(A, B) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec encodeBlob(?RT:key(), db_dht:value() | db_dht:version()) -> db_entry_enc().
-encodeBlob(A, B) -> 
+encodeBlob(A, B) ->
     term_to_binary([A, "#", B]).
 
 -spec decodeBlob(term()) -> {?RT:key(), db_dht:value() | db_dht:version()} | fail.
@@ -1040,4 +1040,4 @@ get_merkle_bucket_size() ->
 get_art_config() ->
     [{correction_factor, config:read(rr_art_correction_factor)},
      {inner_bf_fpr, config:read(rr_art_inner_fpr)},
-     {leaf_bf_fpr, config:read(rr_art_leaf_fpr)}].    
+     {leaf_bf_fpr, config:read(rr_art_leaf_fpr)}].
