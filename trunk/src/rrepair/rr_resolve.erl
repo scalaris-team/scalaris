@@ -181,41 +181,26 @@ on({get_entries_response, EntryList}, State =
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {interval_upd, I, _KvvList},
-                          dhtNodePid = DhtPid, stats = _Stats}) ->
-    OpSIs = intervals:get_simple_intervals(I),
+       #rr_resolve_state{ operation = Op, dhtNodePid = DhtPid, stats = _Stats })
+  when element(1, Op) =:= interval_upd;
+       element(1, Op) =:= interval_upd_send ->
+    OpSIs = intervals:get_simple_intervals(element(2, Op)),
     ISec = lists:foldl(
              fun(Q, AccJ) ->
                      lists:foldl(
                        fun(OpSI, AccI) ->
                                OpI = intervals:simple_interval_to_interval(OpSI),
-                               IX = intervals:intersection(OpI, Q),
-                               case intervals:is_empty(IX) of
+                               I = intervals:intersection(OpI, Q),
+                               case intervals:is_empty(I) of
                                    true  -> AccI;
-                                   false -> MI = rr_recon:map_interval(MyI, IX),
+                                   false -> MI = rr_recon:map_interval(MyI, I),
                                             intervals:union(AccI, MI)
                                end
                        end, AccJ, OpSIs)
              end, intervals:empty(), rr_recon:quadrant_intervals()),
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n IntervalBounds=~p~n MyInterval=~p~n IntersecBounds=~p",
-           [interval_upd, _Stats#resolve_stats.session_id, intervals:get_bounds(I),
+           [element(1, Op), _Stats#resolve_stats.session_id, intervals:get_bounds(element(2, Op)),
             MyI, intervals:get_bounds(ISec)], State),
-    NewState = State#rr_resolve_state{ my_range = MyI },
-    case intervals:is_empty(ISec) of
-        false ->
-            comm:send_local(DhtPid, {get_entries, self(), ISec}),
-            NewState;
-        true ->
-            shutdown(resolve_abort, NewState,
-                     State#rr_resolve_state.feedbackDestPid, [], [])
-    end;
-
-on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {interval_upd_send, I, _Dest},
-                          dhtNodePid = DhtPid, stats = _Stats }) ->
-    ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n IntervalBounds=~p~n MyInterval=~p",
-           [interval_upd_send, _Stats#resolve_stats.session_id, intervals:get_bounds(I), MyI], State),
-    ISec = intervals:intersection(I, MyI),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
         false ->
