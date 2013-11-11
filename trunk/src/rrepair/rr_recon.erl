@@ -517,7 +517,7 @@ p_process_tree_cmp_result([?ok_leaf | TR], [_Node | TN], BS, Stats, Req, Res, RT
     NStats = rr_recon_stats:inc([{tree_compareSkipped, 1}], Stats),
     p_process_tree_cmp_result(TR, TN, BS, NStats, Req, Res, RTree);
 p_process_tree_cmp_result([{?fail_leaf, Hash} | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
-    NewRes = lists:append(merkle_get_sync_leaves([Node], Hash, []), Res),
+    NewRes = merkle_get_sync_leaves([Node], Hash, Res),
     p_process_tree_cmp_result(TR, TN, BS, Stats, Req, NewRes, RTree);
 p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     case merkle_tree:is_leaf(Node) of
@@ -544,9 +544,9 @@ merkle_get_sync_leaves([], _Skip, ToSyncAcc) ->
 merkle_get_sync_leaves([Node | Rest], Skip, ToSyncAcc) ->
     case merkle_tree:is_leaf(Node) of
         true  ->
-            case merkle_tree:get_hash(Node) =:= Skip of
-                true  -> merkle_get_sync_leaves(Rest, Skip, ToSyncAcc);
-                false -> merkle_get_sync_leaves(Rest, Skip, [Node | ToSyncAcc])
+            case merkle_tree:get_hash(Node) of
+                Skip -> merkle_get_sync_leaves(Rest, Skip, ToSyncAcc);
+                _    -> merkle_get_sync_leaves(Rest, Skip, [Node | ToSyncAcc])
             end;
         false ->
             merkle_get_sync_leaves(
