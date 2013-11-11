@@ -273,7 +273,15 @@ to_texfile(Trace, Filename) ->
 
 -spec to_texfile_no_time(trace(), file:name()) -> ok | {error, file:posix() | badarg | terminated}.
 to_texfile_no_time(Trace, Filename) ->
-    to_texfile(Trace, Filename, fun notime_delta/1, false).
+    %% we do not need the gc_on_done messages
+    F = fun(X) ->
+                case X of
+                    {log_info, _TimeStamp, _TraceId, _From, {gc_on_done, _MsgTag}} -> false;
+                    _ -> true
+                end
+        end,
+    FilteredTrace = [X || X <- Trace, F(X)],
+    to_texfile(FilteredTrace, Filename, fun notime_delta/1, false).
 
 -spec to_texfile(trace(), file:name(), DeltaFun::fun((trace()) -> trace()),
                  HaveRealTime::boolean())
