@@ -545,7 +545,7 @@ p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, 
                                       lists:reverse(Childs, RTree));
         true ->
             NewReq = [{BS, merkle_tree:get_hash(Node)} | Req],
-            p_process_tree_cmp_result(TR, TN, BS, Stats, NewReq, [Node | Res], RTree)
+            p_process_tree_cmp_result(TR, TN, BS, Stats, NewReq, Res, RTree)
     end.
 
 %% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash.
