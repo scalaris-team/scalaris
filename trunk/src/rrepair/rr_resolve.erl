@@ -242,8 +242,8 @@ on({get_entries_response, EntryList}, State =
     MyIKvTree = lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
                                     gb_trees:insert(KeyX, VersionX, TreeX)
                             end, gb_trees:empty(), MyIKvvList),
-    MissingOnOther = [MX || X <- EntryList,
-                            not gb_trees:is_defined(element(1, (MX = entry_to_kvv(X))), MyIKvTree)],
+    MissingOnOther = [entry_to_kvv(X) || X <- EntryList,
+                                         not gb_trees:is_defined(db_entry:get_key(X), MyIKvTree)],
     
     % allow the garbage collection to clean up the KvvList here:
     NewState = State#rr_resolve_state{operation = {interval_upd, I, []},
