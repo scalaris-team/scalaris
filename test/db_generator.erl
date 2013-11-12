@@ -392,9 +392,9 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     {FKeys, GoodKeys} = select_random_keys(Keys, KeyCount, FCount, []),
     GoodDB = lists:append([get_rep_group(Key) || Key <- GoodKeys]),
-    {DB, O} = lists:foldl(fun(FKey, {AccBad, Out}) ->
+    {DB, O} = lists:foldl(fun(FKey, {AccAll, Out}) ->
                                   {RList, NewOut} = get_failure_rep_group(FKey, FType, FDest),
-                                  {lists:append(RList, AccBad), Out + NewOut}
+                                  {lists:append(RList, AccAll), Out + NewOut}
                           end,
                           {GoodDB, 0}, FKeys),
     Insert = length(DB),
@@ -495,7 +495,7 @@ get_rep_group(Key) ->
           {[db_entry:entry()], Outdated::non_neg_integer()}.
 get_failure_rep_group(Key, FType, FDest) ->
     RepKeys = ?RT:get_replica_keys(Key),
-    EKey = get_error_key(Key, FDest),
+    EKey = get_error_key(Key, RepKeys, FDest),
     RGrp = [get_synthetic_entry(X, new) || X <- RepKeys, X =/= EKey],
     case get_failure_type(FType) of
         update -> {[get_synthetic_entry(EKey, old) | RGrp], 1};
@@ -512,10 +512,10 @@ get_failure_type(mixed) ->
 get_failure_type(Type) -> Type.
 
 % @doc Returns one key of KeyList which is in any quadrant out of DestList.
--spec get_error_key(?RT:key(), failure_dest()) -> ?RT:key(). 
-get_error_key(Key, Dest) ->
+-spec get_error_key(?RT:key(), [?RT:key(),...], failure_dest()) -> ?RT:key().
+get_error_key(Key, RepKeys, Dest) ->
     case Dest of
-        all -> util:randomelem(?RT:get_replica_keys(Key));
+        all -> util:randomelem(RepKeys);
         QList -> rr_recon:map_key_to_quadrant(Key, util:randomelem(QList))
     end.
 
