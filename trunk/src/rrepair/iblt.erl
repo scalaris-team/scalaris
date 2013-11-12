@@ -16,9 +16,9 @@
 %% @doc    Invertible Bloom Lookup Table
 %%         Operations: Insert, Delete, Get, ListEntries
 %% @end
-%% @reference 
+%% @reference
 %%          1) M.T. Goodrich, M. Mitzenmacher
-%%             <em>Invertible Bloom Lookup Tables</em> 
+%%             <em>Invertible Bloom Lookup Tables</em>
 %%             2011 ArXiv e-prints. 1101.2245
 %%          2) D. Eppstein, M.T. Goodrich, F. Uyeda, G. Varghese
 %%             <em>Whats the Difference? Efficient Set Reconciliation without Prior Context</em>
@@ -59,7 +59,7 @@
                item_count = 0                    :: non_neg_integer()  %number of inserted items
                }).
 
--type iblt() :: #iblt{}. 
+-type iblt() :: #iblt{}.
 
 -type option()         :: prime.
 -type options()        :: [] | [option()].
@@ -118,7 +118,7 @@ change_table(#iblt{ hfs = Hfs, table = T, item_count = ItemCount, col_size = Col
                                       encode_key(Key), Value, Operation),
                    [{ColNr, NCol} | NewT]
            end, [], T),
-    IBLT#iblt{ table = NT, item_count = ItemCount + operation_val(Operation)}.   
+    IBLT#iblt{ table = NT, item_count = ItemCount + operation_val(Operation)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -171,20 +171,20 @@ p_list_entries(#iblt{ table = T } = IBLT, Acc) ->
     case get_any_entry(T, []) of
         [] -> lists:flatten(Acc);
         [_|_] = L ->
-            NewIBLT = lists:foldl(fun({Key, Val}, NT) -> 
-                                          delete(NT, Key, Val) 
+            NewIBLT = lists:foldl(fun({Key, Val}, NT) ->
+                                          delete(NT, Key, Val)
                                   end, IBLT, L),
             p_list_entries(NewIBLT, [L, Acc])
     end.
 
-% tries to find any pure entry 
+% tries to find any pure entry
 -spec get_any_entry(table(), [{?RT:key(), value()}]) -> [{?RT:key(), value()}].
-get_any_entry([], Acc) -> 
+get_any_entry([], Acc) ->
     Acc;
 get_any_entry([{_, Col} | T], Acc) ->
     Result = [{decode_key(Key), Val} || {_, Key, _, Val, _} = Cell <- Col,
                                         is_pure(Cell)],
-    if 
+    if
         Result =:= [] -> get_any_entry(T, lists:append(Result, Acc));
         true -> Result
     end.
@@ -196,7 +196,7 @@ is_element(#iblt{ hfs = Hfs, table = T, col_size = ColSize }, Key) ->
     Found = lists:foldl(
               fun({ColNr, Col}, Count) ->
                       {C, _, _, _, _} = lists:nth((?REP_HFS:apply_val(Hfs, ColNr, Key) rem ColSize) + 1, Col),
-                      Count + if C > 0 -> 1; 
+                      Count + if C > 0 -> 1;
                                  true -> 0 end
                       end, 0, T),
     Found =:= ?REP_HFS:size(Hfs).

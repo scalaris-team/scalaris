@@ -75,12 +75,12 @@
          signature_size = 4                 :: pos_integer(),   %node signature size in byte
          leaf_hf        = fun(V) -> ?CRYPTO_SHA(V) end  :: hash_fun(),      %hash function for leaf signature creation
          inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation -
-         keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled          
+         keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled
          }).
 -type mt_config() :: #mt_config{}.
 -type mt_config_params() :: [{atom(), term()}] | [].    %only key value pairs of mt_config allowed
 
--type mt_node() :: { Hash        :: mt_node_key() | nil, %hash of childs/containing items 
+-type mt_node() :: { Hash        :: mt_node_key() | nil, %hash of childs/containing items
                      Count       :: non_neg_integer(),   %in inner nodes number of subnodes including itself, in leaf nodes number of items in the bucket
                      Bucket      :: mt_bucket(),         %item storage
                      Interval    :: mt_interval(),       %represented interval
@@ -101,8 +101,8 @@ get_bucket_size({merkle_tree, Config, _}) ->
     Config#mt_config.bucket_size.
 
 -spec get_branch_factor(merkle_tree()) -> pos_integer().
-get_branch_factor({merkle_tree, Config, _}) -> 
-    Config#mt_config.branch_factor.    
+get_branch_factor({merkle_tree, Config, _}) ->
+    Config#mt_config.branch_factor.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -325,7 +325,7 @@ gen_hash({merkle_tree, Config = #mt_config{inner_hf = InnerHf,
                     SigSize::pos_integer(), KeepBucket::boolean(),
                     CleanBuckets::boolean()) -> mt_node().
 gen_hash_node({_, Count, [], I, [_|_] = List}, InnerHf, LeafHf, SigSize,
-              OldKeepBucket, CleanBuckets) ->    
+              OldKeepBucket, CleanBuckets) ->
     NewChilds = [gen_hash_node(X, InnerHf, LeafHf, SigSize, OldKeepBucket,
                                CleanBuckets) || X <- List],
     Hash = InnerHf([get_hash(C) || C <- NewChilds]),
@@ -384,13 +384,13 @@ size_detail_node([{_, _, _, _, [_|_] = Childs} | R], Inner, Leafs) ->
     size_detail_node([Childs | R], Inner + 1, Leafs);
 size_detail_node([{_, _, _, _, []} | R], Inner, Leafs) ->
     size_detail_node(R, Inner, Leafs + 1);
-size_detail_node([], InnerNodes, Leafs) -> 
+size_detail_node([], InnerNodes, Leafs) ->
     {InnerNodes, Leafs};
 size_detail_node([[{_, _, _, _, [_|_] = Childs} | R1] | R2], Inner, Leafs) ->
     size_detail_node([Childs, R1 | R2], Inner + 1, Leafs);
 size_detail_node([[{_, _, _, _, []} | R1] | R2], Inner, Leafs) ->
     size_detail_node([R1 | R2], Inner, Leafs + 1);
-size_detail_node([[] | R2], Inner, Leafs) -> 
+size_detail_node([[] | R2], Inner, Leafs) ->
     size_detail_node(R2, Inner, Leafs).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -413,7 +413,7 @@ next([[Node | R1] | R2]) when is_tuple(Node) ->
     {Node, iterator_node(Node, [R1 | R2])};
 next([[] | R2]) ->
     next(R2);
-next([]) -> 
+next([]) ->
     none.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -422,7 +422,7 @@ next([]) ->
 -spec store_graph(merkle_tree(), string()) -> ok.
 store_graph(MerkleTree, FileName) ->
     erlang:spawn(fun() -> store_to_DOT_p(MerkleTree, FileName, true) end),
-    ok.    
+    ok.
 
 % @doc Stores the tree graph into a file in DOT language (for Graphviz or other visualization tools).
 -spec store_to_DOT(merkle_tree(), string()) -> ok.
@@ -442,7 +442,7 @@ store_to_DOT_p({merkle_tree, Conf, Root}, FileName, ToPng) ->
             _ = if ToPng ->
                        _ = os:cmd(io_lib:format("dot ../~s.dot -Tpng > ../~s.png", [FileName, FileName])),
                        os:cmd(io_lib:format("rm -f ../~s.dot", [FileName]));
-                   true -> ok 
+                   true -> ok
                 end,
             ok;
         {_, _} ->
@@ -459,12 +459,12 @@ store_node_to_DOT({H, C, _, I, []}, Fileid, MyId, NextFreeId, #mt_config{ bucket
     NextFreeId;
 store_node_to_DOT({H, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId, TConf) ->
     io:fwrite(Fileid, "    ~p -> { ~p", [MyId, NextFreeId]),
-    NNFreeId = lists:foldl(fun(_, Acc) -> 
+    NNFreeId = lists:foldl(fun(_, Acc) ->
                                     io:fwrite(Fileid, ";~p", [Acc]),
                                     Acc + 1
                            end, NextFreeId + 1, RChilds),
     io:fwrite(Fileid, " }~n", []),
-    {_, NNNFreeId} = lists:foldl(fun(Node, {NodeId, NextFree}) -> 
+    {_, NNNFreeId} = lists:foldl(fun(Node, {NodeId, NextFree}) ->
                                          {NodeId + 1 , store_node_to_DOT(Node, Fileid, NodeId, NextFree, TConf)}
                                  end, {NextFreeId, NNFreeId}, Childs),
     {LBr, _LKey, _RKey, RBr} = intervals:get_bounds(I),
@@ -484,7 +484,7 @@ get_opt_bucket_size(_N, 0, _S) -> 1;
 get_opt_bucket_size(0, _V, _S) -> 1;
 get_opt_bucket_size(N, V, S) ->
     Height = erlang:max(util:ceil(util:log(N, V)) - S, 1),
-    util:ceil(N / math:pow(V, Height)). 
+    util:ceil(N / math:pow(V, Height)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Local Functions

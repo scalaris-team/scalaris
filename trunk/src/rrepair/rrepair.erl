@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
-%% @doc    replica repair module 
+%% @doc    replica repair module
 %%         Replica sets will be synchronized in two steps.
 %%          I) reconciliation   - find set differences  (rr_recon.erl)
 %%         II) resolution       - resolve found differences (rr_resolve.erl)
@@ -76,7 +76,7 @@
 -type session_id()  :: {round(), comm:mypid()}.
 -type principal_id():: comm:mypid() | none.
 
-% @doc session contains only data of the sync request initiator thus rs_stats:regen_count represents only 
+% @doc session contains only data of the sync request initiator thus rs_stats:regen_count represents only
 %      number of regenerated db items on the initator
 -record(session,
         { id                = ?required(session, id)            :: session_id(),
@@ -97,7 +97,7 @@
          round          = {0, 0}                                    :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
          open_resolve   = 0                                         :: non_neg_integer(),
-         open_sessions  = []                                        :: [session()]   % List of running request_sync calls (only rounds initiated by this process) 
+         open_sessions  = []                                        :: [session()]   % List of running request_sync calls (only rounds initiated by this process)
          }).
 -type state() :: #rrepair_state{}.
 
@@ -150,7 +150,7 @@ on({request_resolve, Operation, Options}, State = #rrepair_state{open_resolve = 
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
 
 % request replica repair status
-on({get_state, Sender, Key}, State = 
+on({get_state, Sender, Key}, State =
        #rrepair_state{ open_recon = Recon,
                        open_resolve = Resolve,
                        round = Round,
@@ -172,7 +172,7 @@ on({?TRIGGER_NAME}, State) ->
     ?TRACE("RR: SYNC TRIGGER", []),
     Prob = get_start_prob(),
     Random = randoms:rand_uniform(1, 100),
-    if Random =< Prob ->           
+    if Random =< Prob ->
            comm:send_local(self(), {request_sync, get_recon_method(), random});
        true -> ok
     end,
@@ -184,7 +184,7 @@ on({?TRIGGER_NAME}, State) ->
 on ({?GC_TRIGGER}, State = #rrepair_state{ gc_trigger = GCState,
                                            open_sessions = Sessions }) ->
     Elapsed = get_gc_interval(),
-    NewSessions = [S#session{ ttl = S#session.ttl - Elapsed } 
+    NewSessions = [S#session{ ttl = S#session.ttl - Elapsed }
                             || S <- Sessions,
                                S#session.ttl - Elapsed > 0],
     State#rrepair_state{ gc_trigger = trigger:next(GCState),
@@ -265,7 +265,7 @@ on({recon_progress_report, Sender, _Initiator = false, DestRR, DestRC, Stats},
                                comm:this(), undefined, StatsToSend});
         _ -> ok
     end,
-    State#rrepair_state{ open_recon = OR - 1 };    
+    State#rrepair_state{ open_recon = OR - 1 };
 on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
    State = #rrepair_state{ open_recon = OR, open_sessions = OS }) ->
     ?TRACE_RECON("~nRECON OK - Sender=~p~nStats=~p~nOpenRecon=~p~nSessions=~p",
@@ -290,7 +290,7 @@ on({resolve_progress_report, _Sender, Stats},
    State = #rrepair_state{open_resolve = OR, open_sessions = OS}) ->
     NSessions = case extract_session(rr_resolve:get_stats_session_id(Stats), OS) of
                     not_found -> OS;
-                    {S, TSessions} -> 
+                    {S, TSessions} ->
                         SUpd = update_session_resolve(S, Stats),
                         case check_session_complete(SUpd) of
                             true -> TSessions;
@@ -327,7 +327,7 @@ on({web_debug_info, Requestor}, #rrepair_state{ round = Round,
 
 % - Requests database synchronization with DestPid (DestPid=DhtNodePid or random).
 %   Random leads to sync with a node which is associated with this (e.g. symmetric partner)
-% - Principal will eventually get an request_sync_complete message 
+% - Principal will eventually get an request_sync_complete message
 %   (no result message will be send if request receiver dies etc.).
 -spec request_sync(State::state(), Method::rr_recon:method(),
                    DestKey::random | ?RT:key(), Principal::principal_id()) -> state().
@@ -384,14 +384,14 @@ fork_session({{R, F}, Pid}) ->
 
 -spec extract_session(session_id(), [session()]) -> {session(), Remain::[session()]} | not_found.
 extract_session(Id, Sessions) ->
-    {Satis, NotSatis} = lists:partition(fun(#session{ id = I }) -> 
+    {Satis, NotSatis} = lists:partition(fun(#session{ id = I }) ->
                                                 session_id_equal(Id, I)
                                         end,
                                         Sessions),
     case Satis of
         [X] -> {X, NotSatis};
         [] -> not_found;
-        _ -> 
+        _ ->
             log:log(error, "[ ~p ] SESSION NOT UNIQUE! ~p - OpenSessions=~p", [?MODULE, Id, Sessions]),
             not_found
     end.
@@ -415,7 +415,7 @@ update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount } = S, New)
 %%      principal and returns 'true'. Otherwise 'false'.
 -spec check_session_complete(session()) -> boolean().
 check_session_complete(#session{rc_stats = RCStats, principal = PrincipalPid,
-                                rs_called = C, rs_finish = C} = S) 
+                                rs_called = C, rs_finish = C} = S)
   when RCStats =/= none->
     case rr_recon_stats:get(status, RCStats) of
         X when X =:= finish orelse X =:= abort ->
@@ -461,7 +461,7 @@ init([]) ->
 % USED CONFIG FIELDS
 %	* rr_trigger_interval: integer duration until next triggering (milliseconds) (0 = de-activate)
 %	* rr_recon_method: set reconciliation algorithm name
-%   * rr_trigger_probability: this is the probability of starting a synchronisation 
+%   * rr_trigger_probability: this is the probability of starting a synchronisation
 %                             with a random node if trigger has fired. ]0,100]
 %   * rr_session_ttl: time to live for sessions until they are garbage collected (milliseconds)
 %   * rr_gc_interval: garbage collector execution interval (milliseconds)
@@ -478,7 +478,7 @@ check_config() ->
         config:cfg_is_greater_than(rr_trigger_probability, 0) andalso
         config:cfg_is_less_than_equal(rr_trigger_probability, 100) andalso
         config:cfg_is_integer(rr_gc_interval) andalso
-        config:cfg_is_greater_than(rr_gc_interval, 0) andalso                
+        config:cfg_is_greater_than(rr_gc_interval, 0) andalso
         config:cfg_is_integer(rr_trigger_interval) andalso
         config:cfg_is_greater_than_equal(rr_trigger_interval, 0).
 

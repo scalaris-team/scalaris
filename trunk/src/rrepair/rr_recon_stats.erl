@@ -47,7 +47,7 @@
          recon_time         = 0      :: non_neg_integer(),      %in us
          resolve_started    = 0      :: non_neg_integer(),      %number of resolve requests send
          status             = wait   :: status()
-         }). 
+         }).
 -type stats() :: #rr_recon_stats{}.
 
 -type field_list1()  ::
@@ -79,7 +79,7 @@ new(KVList) ->
 
 % @doc increases the record field with name key by value
 -spec inc(field_list1(), Old::stats()) -> New::stats().
-inc([], Stats) -> 
+inc([], Stats) ->
     Stats;
 inc([{K, V} | L], Stats) ->
     NS = case K of

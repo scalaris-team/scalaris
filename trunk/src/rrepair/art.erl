@@ -68,7 +68,7 @@ default_config() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec new() -> art().
-new() -> 
+new() ->
     {art, default_config(), intervals:empty(), empty, empty}.
 
 -spec new(merkle_tree:merkle_tree()) -> art().
@@ -83,7 +83,7 @@ new(Tree, _Config) ->
     LeafBF = bloom:new(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),
     ?TRACE("INNER=~p~nLeaf=~p", [bloom:print(IBF), bloom:print(LBF)]),
-    {art, Config, merkle_tree:get_interval(Tree), IBF, LBF}.    
+    {art, Config, merkle_tree:get_interval(Tree), IBF, LBF}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -172,7 +172,7 @@ merkle_get_hashes(Iter, InnerHashes, LeafHashes) ->
     end.
 
 merge_prop_lists(DefList, ListB) ->
-    lists:foldl(fun({Key, Val}, Acc) ->                         
-                        [{Key, proplists:get_value(Key, ListB, Val)} | Acc] 
+    lists:foldl(fun({Key, Val}, Acc) ->
+                        [{Key, proplists:get_value(Key, ListB, Val)} | Acc]
                 end, [], DefList).
     

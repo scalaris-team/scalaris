@@ -53,7 +53,7 @@
 -endif.
 
 -type option()   :: feedback_response |
-                    {feedback_request, comm:mypid()} | 
+                    {feedback_request, comm:mypid()} |
                     {send_stats, comm:mypid()} | %send stats to pid after completion
                     {session_id, rrepair:session_id()}.
 -type options()  :: [option()].
@@ -81,22 +81,22 @@
 
 -record(rr_resolve_state,
         {
-         ownerPid       = ?required(rr_resolve_state, ownerPid)         :: comm:erl_local_pid(),
-         dhtNodePid     = ?required(rr_resolve_state, dhtNodePid)       :: comm:erl_local_pid(),
-         operation      = undefined    									:: undefined | operation(),
-         my_range       = undefined                                     :: undefined | intervals:interval(),
-         feedbackDestPid= undefined                                     :: undefined | comm:mypid(),
-         feedbackKvv    = {[], gb_trees:empty()}                        :: {MissingOnOther::kvv_list(), MyIKvTree::gb_tree()},
-         send_stats     = undefined                                     :: undefined | comm:mypid(),
-         stats          = #resolve_stats{}                              :: stats()
+         ownerPid       = ?required(rr_resolve_state, ownerPid)   :: comm:erl_local_pid(),
+         dhtNodePid     = ?required(rr_resolve_state, dhtNodePid) :: comm:erl_local_pid(),
+         operation      = undefined                               :: undefined | operation(),
+         my_range       = undefined                               :: undefined | intervals:interval(),
+         feedbackDestPid= undefined                               :: undefined | comm:mypid(),
+         feedbackKvv    = {[], gb_trees:empty()}                  :: {MissingOnOther::kvv_list(), MyIKvTree::gb_tree()},
+         send_stats     = undefined                               :: undefined | comm:mypid(),
+         stats          = #resolve_stats{}                        :: stats()
          }).
 -type state() :: #rr_resolve_state{}.
 
 -type message() ::
-	% API
-	{start, operation(), options()} |
+    % API
+    {start, operation(), options()} |
     % internal
-    {get_state_response, intervals:interval()} |    
+    {get_state_response, intervals:interval()} |
     {update_key_entry_ack, [{db_entry:entry(), Exists::boolean(), Done::boolean()}]} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
 
@@ -131,7 +131,7 @@ on({start, Operation, Options}, State) ->
 % MODE: key_upd
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({get_state_response, MyI}, State = 
+on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd, KvvList},
                           dhtNodePid = DhtPid, stats = Stats }) ->
     MyIKvvList = map_kvv_list(KvvList, MyI),
@@ -177,7 +177,7 @@ on({get_entries_response, EntryList}, State =
     shutdown(resolve_ok, State, Dest, KvvList, Options);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% MODE: interval_upd 
+% MODE: interval_upd
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state_response, MyI}, State =
@@ -297,7 +297,7 @@ on({update_key_entry_ack, NewEntryList}, State =
                                                 } = Stats,
                           feedbackDestPid = FBDest,
                           feedbackKvv = {MissingOnOther, MyIKvTree}
-                        }) 
+                        })
   when element(1, Op) =:= key_upd;
        element(1, Op) =:= interval_upd ->
     ?TRACE("GET ENTRY_ACK - Operation=~p~n SessionId:~p - #NewItems: ~p",
@@ -444,7 +444,7 @@ entry_to_kvv(Entry) ->
      db_entry:get_value(Entry),
      db_entry:get_version(Entry)}.
 
--spec send_key_upd(Dest::comm:mypid() | undefined, Items::kvv_list(), 
+-spec send_key_upd(Dest::comm:mypid() | undefined, Items::kvv_list(),
                    rrepair:session_id() | null, options()) -> ok.
 send_key_upd(undefined, _, _, _) ->
     ok;
@@ -456,7 +456,7 @@ send_key_upd(DestPid, Items, SID, Options) ->
     end.
 
 -spec send_stats(comm:mypid() | undefined, stats()) -> ok.
-send_stats(undefined, _) -> 
+send_stats(undefined, _) ->
     ok;
 send_stats(DestPid, Stats) ->
     comm:send(DestPid, {resolve_stats, Stats}).
@@ -482,4 +482,5 @@ start() ->
                                dhtNodePid = pid_groups:get_my(dht_node) },
     PidName = lists:flatten(io_lib:format("~s.~s", [?MODULE, randoms:getRandomString()])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, State,
-                             [{pid_groups_join_as, pid_groups:my_groupname(), {short_lived, PidName}}]).
+                             [{pid_groups_join_as, pid_groups:my_groupname(),
+                               {short_lived, PidName}}]).
