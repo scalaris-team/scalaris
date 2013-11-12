@@ -27,7 +27,7 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--export([read/1]).
+-export([read/1, read/2]).
 %%-export([write/2]).
 
 -export([on/2]).
@@ -861,20 +861,67 @@ is_valid_update(CurrentEpoch, CurrentVersion) ->
 -spec is_valid_takeover(non_neg_integer(), non_neg_integer()) ->
     fun ((any(), any(), any()) -> {boolean(), null}). %% content check
 is_valid_takeover(Epoch, Version) ->
-    fun (Current, _WriteFilter, Next) ->
-            log:log("is_valid_takeover~n~w~n~w~n", [Current, Next]),
-            Res = standard_check(Current, Next, Epoch, Version)
-            %% checks for debugging
-                andalso (Current#lease.epoch+1 == Next#lease.epoch)
-                andalso (Next#lease.owner == comm:make_global(pid_groups:get_my(dht_node)))
-                andalso (Current#lease.owner =/= Next#lease.owner)
-                andalso (Current#lease.range == Next#lease.range)
-                andalso (Current#lease.aux == Next#lease.aux)
-                andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout)
-                andalso not is_valid(Current), % Current has to be invalid!
-            {Res, null}
+    MyDHTNode = comm:make_global(pid_groups:get_my(dht_node)),
+    % standard_check: serialization
+    fun (#lease{epoch=Value}, _, _) when Value =/= Epoch ->
+            {false, epoch_or_version_mismatch};
+        (#lease{version=Value}, _, _) when Value =/= Version ->
+            {false, epoch_or_version_mismatch};
+    % standard_check: update epoch or version
+        (#lease{epoch=CurrentEpoch, version=CurrentVersion},
+         _,
+         #lease{epoch=NextEpoch, version=NextVersion})
+          when not (((CurrentEpoch + 1 =:= NextEpoch) andalso (NextVersion =:= 0)) orelse
+                    ((CurrentEpoch =:= NextEpoch) andalso (CurrentVersion+1 =:= NextVersion))) ->
+            {false, epoch_or_version_mismatch};
+    % check that epoch increases
+        (#lease{epoch=CurrentEpoch},
+         _,
+         #lease{epoch=NextEpoch}) when CurrentEpoch + 1 =/= NextEpoch ->
+            {false, epoch_or_version_mismatch};
+   % check that next owner is my dht_node
+        (_, _, #lease{owner=NextOwner}) when NextOwner =/= MyDHTNode ->
+            {false, unexpected_new_owner};
+   % check that the owner actually changed
+        (#lease{owner=CurrentOwner}, _, #lease{owner=NextOwner}) when CurrentOwner =:= NextOwner ->
+            {false, unexpected_new_owner};
+   % check that the range didn't change
+        (#lease{range=CurrentRange}, _, #lease{range=NextRange}) when CurrentRange =/= NextRange ->
+            {false, unexpected_new_range};
+   % check that aux didn't change
+        (#lease{aux=CurrentAux}, _, #lease{aux=NextAux}) when CurrentAux =/= NextAux ->
+            {false, unexpected_new_aux};
+   % check that aux timeout increased
+        (#lease{timeout=CurrentTimeout}, _, #lease{timeout=NextTimeout})
+          when CurrentTimeout >= NextTimeout ->
+            {false, unexpected_new_timeout};
+        (Current, _WriteFilter, #lease{timeout=NextTimeout}) ->
+            Timestamp = os:timestamp(),
+            IsValid = is_valid(Current),
+            if
+                Timestamp >= NextTimeout ->
+                    {false, unexpected_new_timeout};
+                IsValid ->
+                    {false, lease_is_still_valid};
+                true ->
+                    {true, null}
+            end
     end.
+%
+%    fun (Current, _WriteFilter, Next) ->
+%            log:log("is_valid_takeover~n~w~n~w~n", [Current, Next]),
+%            Res = standard_check(Current, Next, Epoch, Version)
+%            %% checks for debugging
+%                andalso (Current#lease.epoch+1 == Next#lease.epoch)
+%                andalso (Next#lease.owner == comm:make_global(pid_groups:get_my(dht_node)))
+%                andalso (Current#lease.owner =/= Next#lease.owner)
+%                andalso (Current#lease.range == Next#lease.range)
+%                andalso (Current#lease.aux == Next#lease.aux)
+%                andalso (Current#lease.timeout < Next#lease.timeout)
+%                andalso (os:timestamp() <  Next#lease.timeout)
+%                andalso not is_valid(Current), % Current has to be invalid!
+%            {Res, null}
+%    end.
 
 -spec is_valid_merge_step1(non_neg_integer(), non_neg_integer()) ->
     fun ((any(), any(), any()) -> {boolean(), null}). %% content check
