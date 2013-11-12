@@ -33,7 +33,6 @@
 
 basic_tests() ->
     [get_symmetric_keys_test,
-     tester_blob_coding,
      tester_quadrant_intervals,
      tester_map_key_to_interval,
      tester_map_key_to_quadrant,
@@ -340,20 +339,6 @@ get_symmetric_keys_test(Config) ->
     ?equals_w_note(ToTest, ToBe, 
                    io_lib:format("GenKeys=~w~nRTKeys=~w", [ToTest, ToBe])),
     ok.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec prop_blob_coding(?RT:key(), db_dht:value() | db_dht:version()) -> boolean().
-prop_blob_coding(A, B) ->
-    Coded = rr_recon:encodeBlob(A, B),
-    {DA, DB} = rr_recon:decodeBlob(Coded),
-    ?equals_w_note(A, DA, 
-                   io_lib:format("A=~p ; Coded=~p ; DecodedA=~p", [A, Coded, DA])) 
-        andalso ?equals_w_note(B, DB, 
-                               io_lib:format("B=~p ; Coded=~p ; DecodedB=~p", [B, Coded, DB])).
-
-tester_blob_coding(_) ->
-    tester:test(?MODULE, prop_blob_coding, 2, 100, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

@@ -61,7 +61,7 @@ comparison(_) ->
     DBSize = 10000,
     
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
-    DB = db_generator:get_db(I, DBSize, uniform),    
+    DB = db_generator:get_db(I, DBSize, uniform, [{output, list_keytpl}]),
     
     BBuildT = bloom_build_time(I, DB, DBSize, Iter, 0.1),
     MBuildT = merkle_build_time(I, DB, DBSize, Iter, []),
@@ -115,7 +115,7 @@ art(_) ->
     ExecTimes = 100,
     
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
-    DB = db_generator:get_db(I, ToAdd, uniform),
+    DB = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
 
     {TreeTime, Tree} = 
         util:tc(fun() -> merkle_tree:new(I, DB, []) end, []),
@@ -138,7 +138,7 @@ merkle_tree(_) ->
     ToAdd = 10000,
     
     I = intervals:new('[', rt_SUITE:number_to_key(1), rt_SUITE:number_to_key(100000000), ']'),
-    DB = db_generator:get_db(I, ToAdd, uniform),
+    DB = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
     
     TestTree = merkle_tree:new(I, DB, []),
     {Inner, Leafs} = merkle_tree:size_detail(TestTree),    

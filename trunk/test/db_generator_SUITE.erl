@@ -96,6 +96,10 @@ prop_get_db4_(Interval, ItemCount, Distribution, Options) ->
             ?equals([Key || Key <- Result,
                             not intervals:in(Key, Interval)],
                     []);
+        list_keytpl ->
+            ?equals([Key || {Key} <- Result,
+                            not intervals:in(Key, Interval)],
+                    []);
         list_key_val ->
             ?equals([Key || {Key, _Val} <- Result,
                             not intervals:in(Key, Interval)],

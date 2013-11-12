@@ -49,9 +49,10 @@
 -type db_distribution() :: uniform |
                            {non_uniform, random_bias:generator()}.
 -type result_k()  :: ?RT:key().
+-type result_ktpl():: {?RT:key()}.
 -type result_kv() :: {?RT:key(), db_dht:value()}.
--type result()    :: result_k() | result_kv().
--type option()    :: {output, list_key_val | list_key}.
+-type result()    :: result_k() | result_kv() | result_ktpl().
+-type option()    :: {output, list_key_val | list_key | list_keytpl}.
 
 -type failure_type()    :: update | regen | mixed.
 -type failure_quadrant():: 1..4.
@@ -77,7 +78,7 @@ get_db_feeder(I0, Count0, Distribution0) ->
 
 %% @doc This will generate a list of up to [ItemCount] keys with the requested
 %%      distribution in the given interval.
--spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution()) -> [result()].
+-spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution()) -> [result_k()].
 get_db(I, Count, Distribution) ->
     get_db(I, Count, Distribution, []).
 
@@ -105,6 +106,8 @@ get_db(Interval, ItemCount, Distribution, Options) ->
         ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
          Acc::[result_k()], OutputType::list_key) -> [result_k()];
         ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
+         Acc::[result_ktpl()], OutputType::list_keytpl) -> [result_ktpl()];
+        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
          Acc::[result_kv()], OutputType::list_key_val) -> [result_kv()].
 uniform_key_list([], Acc, _) -> Acc;
 uniform_key_list([{I, Add} | R] = Cmd, Acc, AccType) ->
@@ -125,6 +128,8 @@ uniform_key_list([{I, Add} | R] = Cmd, Acc, AccType) ->
         ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
          Acc::[result_k()], OutputType::list_key) -> [result_k()];
         ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
+         Acc::[result_ktpl()], OutputType::list_keytpl) -> [result_ktpl()];
+        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
          Acc::[result_kv()], OutputType::list_key_val) -> [result_kv()].
 uniform_key_list_no_split([{_I, 0} | R], Acc, AccType) ->
     uniform_key_list(R, Acc, AccType);
@@ -142,6 +147,8 @@ uniform_key_list_no_split([{I, Add} | R], Acc, AccType) ->
         case AccType of
             list_key ->
                 [Key || Key <- ToAddKeys, intervals:in(Key, I)];
+            list_keytpl ->
+                [{Key} || Key <- ToAddKeys, intervals:in(Key, I)];
             list_key_val ->
                 [{Key, gen_value()} || Key <- ToAddKeys, intervals:in(Key, I)]
         end,
@@ -158,6 +165,9 @@ gen_value() ->
          RanGen::random_bias:generator(), Acc::[result_k()],
          OutputType::list_key) -> [result_k()];
         (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
+         RanGen::random_bias:generator(), Acc::[result_ktpl()],
+         OutputType::list_keytpl) -> [result_ktpl()];
+        (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
          RanGen::random_bias:generator(), Acc::[result_kv()],
          OutputType::list_key_val) -> [result_kv()].
 non_uniform_key_list(_I, 0, _RanGen, Acc, _AccType) -> Acc;
@@ -170,6 +180,9 @@ non_uniform_key_list(I, ToAdd, RanGen, Acc, AccType) ->
         (SubIs::[intervals:continuous_interval(),...], ToAdd::non_neg_integer(),
          Fun::random_bias:generator(), Acc::[result_k()], AccLen::non_neg_integer(),
          OutputType::list_key, RoundingError::float()) -> [result_k()];
+        (SubIs::[intervals:continuous_interval(),...], ToAdd::non_neg_integer(),
+         Fun::random_bias:generator(), Acc::[result_ktpl()], AccLen::non_neg_integer(),
+         OutputType::list_keytpl, RoundingError::float()) -> [result_ktpl()];
         (SubIs::[intervals:continuous_interval(),...], ToAdd::non_neg_integer(),
          Fun::random_bias:generator(), Acc::[result_kv()], AccLen::non_neg_integer(),
          OutputType::list_key_val, RoundingError::float()) -> [result_kv()].
@@ -272,6 +285,8 @@ fill_wiki(_Params, DBFile) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Adds the given db entries to the DBs of the corresponding dht_node
+%%      processes.
 -spec insert_db(db_dht:db_as_list()) -> ok.
 insert_db(KVV) ->
     Nodes = get_node_list(),
@@ -297,6 +312,8 @@ insert_db(KVV) ->
           KVV, Nodes),
     ok.
 
+%% @doc Removes all DB entries with the given keys from the corresponding
+%%      dht_node processes.
 -spec remove_keys([?RT:key()]) -> ok.
 remove_keys(Keys) ->
     _ = [begin

@@ -60,7 +60,7 @@ eprof(_) ->
     
     I = intervals:new('[', L, R, ']'),
     ct:pal("L=~p ; R=~p ; ToAdd=~p", [L, R, ToAdd]),
-    Keys = db_generator:get_db(I, ToAdd, uniform),
+    Keys = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
     ct:pal("DB GEN OK"),
 
     _ = eprof:start(),
@@ -78,7 +78,7 @@ fprof(_) ->
     
     I = intervals:new('[', L, R, ']'),
     ct:pal("L=~p ; R=~p ; ToAdd=~p", [L, R, ToAdd]),
-    Keys = db_generator:get_db(I, ToAdd, uniform),
+    Keys = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
     ct:pal("DB GEN OK"),
 
     fprof:apply(merkle_tree, new, [I, Keys, []]),
@@ -179,7 +179,7 @@ tester_branch_bucket(_) ->
 -spec prop_tree_hash(intervals:key(), intervals:key(), 1..100) -> true.
 prop_tree_hash(L, R, ToAdd) ->
     I = unittest_helper:build_interval(L, R),
-    DB1 = db_generator:get_db(I, ToAdd, uniform),
+    DB1 = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
     DB1a = util:shuffle(DB1),
     
     DB1Tree1 = merkle_tree:new(I, DB1, []),
@@ -235,7 +235,7 @@ tester_tree_hash(_) ->
 -spec prop_insert_list(intervals:key(), intervals:key(), 1..2500) -> true.
 prop_insert_list(L, R, Count) ->
     I = unittest_helper:build_interval(L, R),
-    DB = db_generator:get_db(I, Count, uniform),
+    DB = db_generator:get_db(I, Count, uniform, [{output, list_keytpl}]),
     Tree = merkle_tree:insert_list(DB, merkle_tree:new(I, [{keep_bucket, true}])),
     ItemCount = iterate(merkle_tree:iterator(Tree), 
                         fun(N, Acc) -> Acc + case merkle_tree:is_leaf(N) of
@@ -256,7 +256,7 @@ tester_insert_list(_) ->
 -spec prop_bulk_insert(intervals:key(), intervals:key(), 1..50) -> true.
 prop_bulk_insert(L, R, BucketSize) ->
     I = unittest_helper:build_interval(L, R),
-    DB = db_generator:get_db(I, BucketSize, uniform),
+    DB = db_generator:get_db(I, BucketSize, uniform, [{output, list_keytpl}]),
     Tree1 = merkle_tree:new(I, DB, [{bucket_size, BucketSize}]),
     Tree2 = merkle_tree:new(I, DB, [{bucket_size, BucketSize}]),    
     Tree3 = build_tree(I, [{bucket_size, BucketSize}], BucketSize * 2 + 1, uniform),    
@@ -336,7 +336,7 @@ build_tree(Interval, ToAdd, Distribution) ->
     is_subtype(Distribution, db_generator:distribution()),
     is_subtype(Tree,         merkle_tree:merkle_tree()).
 build_tree(Interval, Config, ToAdd, Distribution) ->
-    Keys = db_generator:get_db(Interval, ToAdd, Distribution),
+    Keys = db_generator:get_db(Interval, ToAdd, Distribution, [{output, list_keytpl}]),
     merkle_tree:new(Interval, Keys, Config).
 
 -spec iterate(merkle_tree:mt_iter(), fun((merkle_tree:mt_node(), T) -> T), T) -> T. 
