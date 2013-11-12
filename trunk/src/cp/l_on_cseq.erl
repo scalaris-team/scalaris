@@ -420,9 +420,9 @@ on({l_on_cseq, takeover_reply, ReplyTo, {qwrite_done, _ReqId, _Round, Value}}, S
     comm:send_local(ReplyTo, {takeover, success, Value}),
     lease_list:update_lease_in_dht_node_state(Value, State, passive, takeover);
 
-on({l_on_cseq, takeover_reply, ReplyTo, {qwrite_deny, _ReqId, _Round, Value, _Reason}}, State) ->
-    log:log("takeover failed ~p ~p~n", [Value, _Reason]),
-    comm:send_local(ReplyTo, {takeover, failed, Value}),
+on({l_on_cseq, takeover_reply, ReplyTo, {qwrite_deny, _ReqId, _Round, Value, Reason}}, State) ->
+    log:log("takeover failed ~p ~p~n", [Value, Reason]),
+    comm:send_local(ReplyTo, {takeover, failed, Value, Reason}),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

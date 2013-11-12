@@ -618,13 +618,14 @@ test_takeover_helper(_Config, ModifyF, WaitF) ->
 takeover_loop(L) ->
     l_on_cseq:lease_takeover(L, self()),
     M = receive
-            {takeover, _ , _} = _M -> _M
+            {takeover, _ , _} = _M -> _M;
+            {takeover, _ , _, _} = _M -> _M
         end,
     case M of
         {takeover, success, L2} ->
             ct:pal("takeover succeed ~w", [L2]),
             ok;
-        {takeover, failed, L2} ->
+        {takeover, failed, L2, Result} ->
             ct:pal("retrying takeover ~p ~p", [L2, l_on_cseq:get_pretty_timeout(L2)]),
             %% we repeat until the lease expired and then hopefully succeed
             timer:sleep(500),
