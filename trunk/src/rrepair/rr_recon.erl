@@ -121,6 +121,7 @@
 
 -type merkle_cmp_result()  :: ?ok_inner |
                               ?ok_leaf |
+                              ?fail_leaf |
                               {?fail_leaf, merkle_tree:mt_node_key()} |
                               ?fail_inner.
 -type merkle_cmp_request() ::
@@ -290,12 +291,11 @@ on({check_nodes, SenderPid, ToCheck}, State) ->
     on({check_nodes, ToCheck}, NewState);
 
 on({check_nodes, ToCheck},
-   State = #rr_recon_state{ struct = Tree,
-                            dest_recon_pid = SenderPid,
-                            dest_rr_pid = DestNodePid,
-                            stats = Stats,
-                            ownerPid = OwnerL }) ->
-    ?ASSERT(comm:is_valid(SenderPid)),
+   State = #rr_recon_state{ stage = reconciliation,    initiator = false,
+                            struct = Tree,             ownerPid = OwnerL,
+                            dest_rr_pid = DestNodePid, stats = Stats,
+                            dest_recon_pid = DestReconPid }) ->
+    ?ASSERT(comm:is_valid(DestReconPid)),
     {Result, RestTree, ToResolve} = check_node(ToCheck, Tree),
     ToResolveLength = length(ToResolve),
     NStats = if ToResolveLength > 0 ->
@@ -305,15 +305,14 @@ on({check_nodes, ToCheck},
                                         {resolve_started, ResolveCount}], Stats);
                 true -> Stats
              end,
-    send(SenderPid, {check_nodes_response, Result}),
+    send(DestReconPid, {check_nodes_response, Result}),
     State#rr_recon_state{ struct = RestTree, stats = NStats };
 
 on({check_nodes_response, CmpResults}, State =
-       #rr_recon_state{ dest_recon_pid = DestReconPid,
-                        dest_rr_pid = SrcNode,
-                        stats = Stats,
-                        ownerPid = OwnerL,
-                        struct = Tree }) ->
+       #rr_recon_state{ stage = reconciliation,        initiator = true,
+                        struct = Tree,                 ownerPid = OwnerL,
+                        dest_rr_pid = DestNodePid,     stats = Stats,
+                        dest_recon_pid = DestReconPid }) ->
     SID = rr_recon_stats:get(session_id, Stats),
     {Req, ToResolve, NStats0, RTree} =
         process_tree_cmp_result(CmpResults, Tree,
@@ -321,7 +320,7 @@ on({check_nodes_response, CmpResults}, State =
                                 Stats),
     Req =/= [] andalso
         send(DestReconPid, {check_nodes, Req}),
-    ResolveCount = resolve_leaves(ToResolve, SrcNode, SID, OwnerL),
+    ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
     NStats = rr_recon_stats:inc([{tree_leavesSynced, length(ToResolve)},
                                  {resolve_started, ResolveCount}], NStats0),
     CompLeft = rr_recon_stats:get(tree_compareLeft, NStats),
@@ -477,14 +476,25 @@ p_check_node([{ToOmit, Hash} | TK], [Node | TN], AccR, AccN, AccRes) ->
     p_check_node(TK, RestNodes, AccR, AccN, ToResolve);
 p_check_node([Hash | TK], [Node | TN], AccR, AccN, AccRes) ->
     IsLeaf = merkle_tree:is_leaf(Node),
-    case merkle_tree:get_hash(Node) of
-        Hash when IsLeaf ->
+    case merkle_tree:is_hash_equal(Node, Hash) of
+        true when IsLeaf ->
             p_check_node(TK, TN, [?ok_leaf | AccR], AccN, AccRes);
-        Hash when not IsLeaf ->
+        true when not IsLeaf ->
             p_check_node(TK, TN, [?ok_inner | AccR], AccN, AccRes);
-        NodeHash when IsLeaf ->
-            p_check_node(TK, TN, [{?fail_leaf, NodeHash} | AccR], AccN, AccRes);
-        _    when not IsLeaf ->
+        false when IsLeaf ->
+            case merkle_tree:is_leaf_hash(Hash) of
+                true ->
+                    % note: we could alternatively start the resolve here
+                    %       instead of on the initiator, but we have to send
+                    %       the tag anyway and the initiator starts all the
+                    %       other resolves, so it is better to have this one
+                    %       there as well.
+                    p_check_node(TK, TN, [?fail_leaf | AccR], AccN, AccRes);
+                false ->
+                    NodeHash = merkle_tree:get_hash(Node),
+                    p_check_node(TK, TN, [{?fail_leaf, NodeHash} | AccR], AccN, AccRes)
+            end;
+        false when not IsLeaf ->
             Childs = merkle_tree:get_childs(Node),
             p_check_node(TK, TN, [?fail_inner | AccR], [Childs | AccN], AccRes)
     end.
@@ -527,6 +537,12 @@ p_process_tree_cmp_result([?ok_inner | TR], [Node | TN], BS, Stats, Req, Res, RT
 p_process_tree_cmp_result([?ok_leaf | TR], [_Node | TN], BS, Stats, Req, Res, RTree) ->
     NStats = rr_recon_stats:inc([{tree_compareSkipped, 1}], Stats),
     p_process_tree_cmp_result(TR, TN, BS, NStats, Req, Res, RTree);
+p_process_tree_cmp_result([?fail_leaf | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
+    ?ASSERT(merkle_tree:is_leaf(Node)),
+    % note: no leaf hash is equal to 0! (there should only be this one node anyway)
+    ?ASSERT(not merkle_tree:is_leaf_hash(0)),
+    NewRes = merkle_get_sync_leaves([Node], 0, Res),
+    p_process_tree_cmp_result(TR, TN, BS, Stats, Req, NewRes, RTree);
 p_process_tree_cmp_result([{?fail_leaf, Hash} | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     NewRes = merkle_get_sync_leaves([Node], Hash, Res),
     p_process_tree_cmp_result(TR, TN, BS, Stats, Req, NewRes, RTree);
@@ -555,9 +571,9 @@ merkle_get_sync_leaves([], _Skip, ToSyncAcc) ->
 merkle_get_sync_leaves([Node | Rest], Skip, ToSyncAcc) ->
     case merkle_tree:is_leaf(Node) of
         true  ->
-            case merkle_tree:get_hash(Node) of
-                Skip -> merkle_get_sync_leaves(Rest, Skip, ToSyncAcc);
-                _    -> merkle_get_sync_leaves(Rest, Skip, [Node | ToSyncAcc])
+            case merkle_tree:is_hash_equal(Node, Skip) of
+                true  -> merkle_get_sync_leaves(Rest, Skip, ToSyncAcc);
+                false -> merkle_get_sync_leaves(Rest, Skip, [Node | ToSyncAcc])
             end;
         false ->
             merkle_get_sync_leaves(
