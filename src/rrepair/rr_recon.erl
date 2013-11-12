@@ -705,7 +705,7 @@ build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params, FinishRecon
     end;
 build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}, FinishRecon) ->
     ?ASSERT(not intervals:is_empty(I)),
-    SignatureSize = get_merkle_signature_size(),
+    SignatureSize = get_art_signature_size(),
     BranchFactor = get_merkle_branch_factor(),
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), BranchFactor, 1),
     Tree = merkle_tree:new(I, DBItems, [{signature_size, SignatureSize},
@@ -1035,6 +1035,10 @@ get_merkle_branch_factor() ->
 -spec get_merkle_bucket_size() -> pos_integer().
 get_merkle_bucket_size() ->
     config:read(rr_merkle_bucket_size).
+
+%% @doc Merkle signature size in byte to use for ART.
+-spec get_art_signature_size() -> 20.
+get_art_signature_size() -> 20. % maximum for SHA1 (= 160 bits)
 
 -spec get_art_config() -> art:config().
 get_art_config() ->
