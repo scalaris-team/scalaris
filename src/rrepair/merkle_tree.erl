@@ -31,6 +31,7 @@
          lookup/2, size/1, size_detail/1, gen_hash/1, gen_hash/2,
          iterator/1, next/1,
          is_empty/1, is_leaf/1, is_merkle_tree/1,
+         is_hash_equal/2, is_leaf_hash/1,
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_item_count/1,
          get_signature_size/1, get_bucket_size/1, get_branch_factor/1,
@@ -41,7 +42,8 @@
 -export([bulk_build/3]).
 -export([tester_create_hash_fun/1, tester_create_inner_hash_fun/1]).
 
--compile({inline, [get_hash/1, get_interval/1, node_size/1, decode_key/1]}).
+-compile({inline, [get_hash/1, get_interval/1, node_size/1, decode_key/1,
+                   run_leaf_hf/4, run_inner_hf/2]}).
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
@@ -168,9 +170,22 @@ lookup_(I, {_, _, _, _NodeI, ChildList = [_|_]}) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Gets the node's hash value.
+%%      Note: leaf and inner node hashes are differently tagged and should
+%%            be compared with is_hash_equal/2.
 -spec get_hash(merkle_tree() | mt_node()) -> mt_node_key().
 get_hash({merkle_tree, _, Node}) -> get_hash(Node);
 get_hash({Hash, _, _, _, _}) -> Hash.
+
+%% @doc Merkle leaf/inner node hash comparison.
+-spec is_hash_equal(merkle_tree() | mt_node(), Hash::mt_node_key()) -> boolean().
+is_hash_equal({merkle_tree, _, Node}, Hash) -> is_hash_equal(Node, Hash);
+is_hash_equal({Hash2, _, _, _, _}, Hash1) ->
+    case (Hash1 bxor Hash2) of
+        0 -> true; % hashes from same types of nodes (leaf/inner)
+        1 -> true; % hashes from different types of nodes (leaf/inner)
+        _ -> false
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -194,10 +209,16 @@ get_item_count({_, _, _, _, _}) -> 0.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Checks whether the given merkle_tree or node is a leaf.
 -spec is_leaf(merkle_tree() | mt_node()) -> boolean().
 is_leaf({merkle_tree, _, Node}) -> is_leaf(Node);
 is_leaf({_, _, _, _, []}) -> true;
 is_leaf(_) -> false.
+
+%% @doc Checks whether the given hash is a leaf node hash.
+%%      See gen_hash_node/6.
+-spec is_leaf_hash(mt_node_key()) -> boolean().
+is_leaf_hash(Hash) -> (Hash rem 2) =:= 1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -310,7 +331,7 @@ build_childs([], _, Acc) ->
 gen_hash(Tree = {merkle_tree, #mt_config{keep_bucket = KeepBucket}, _Root}) ->
     gen_hash(Tree, not KeepBucket).
 
-%% @doc Assigns hash values to all nodes in the tree, remove the buckets
+%% @doc Assigns hash values to all nodes in the tree and removes the buckets
 %%      afterwards if CleanBuckets is set.
 -spec gen_hash(merkle_tree(), CleanBuckets::boolean()) -> merkle_tree().
 gen_hash({merkle_tree, Config = #mt_config{inner_hf = InnerHf,
@@ -321,25 +342,34 @@ gen_hash({merkle_tree, Config = #mt_config{inner_hf = InnerHf,
     RootNew = gen_hash_node(Root, InnerHf, LeafHf, SigSize, KeepBucket, CleanBuckets),
     {merkle_tree, Config#mt_config{keep_bucket = not CleanBuckets}, RootNew}.
 
+%% @doc Helper for gen_hash/2.
 -spec gen_hash_node(mt_node(), InnerHf::inner_hash_fun(), LeafHf::hash_fun(),
                     SigSize::pos_integer(), KeepBucket::boolean(),
                     CleanBuckets::boolean()) -> mt_node().
 gen_hash_node({_, Count, [], I, [_|_] = List}, InnerHf, LeafHf, SigSize,
               OldKeepBucket, CleanBuckets) ->
+    % inner node
     NewChilds = [gen_hash_node(X, InnerHf, LeafHf, SigSize, OldKeepBucket,
                                CleanBuckets) || X <- List],
-    Hash = InnerHf([get_hash(C) || C <- NewChilds]),
+    Hash = run_inner_hf(NewChilds, InnerHf),
     {Hash, Count, [], I, NewChilds};
 gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf, _LeafHf, _SigSize,
               false, _CleanBuckets) ->
-    % if keep_bucket was false, we already hashed the value in bulk_build and
-    % cannot insert any more values
+    % leaf node, no bucket contents, keep_bucket false
+    % -> we already hashed the value in bulk_build and cannot insert any more
+    %    values
     N;
 gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
               true, CleanBuckets) ->
+    % leaf node, no bucket contents, keep_bucket true
     Bucket1 = lists:ukeysort(1, Bucket),
     Hash = run_leaf_hf(Bucket1, I, LeafHf, SigSize),
     {Hash, Count, ?IIF(CleanBuckets, [], Bucket1), I, Childs}.
+
+%% @doc Hashes an inner node based on its childrens' hashes.
+-spec run_inner_hf([mt_node(),...], InnerHf::inner_hash_fun()) -> mt_node_key().
+run_inner_hf(Childs, InnerHf) ->
+    (InnerHf([get_hash(C) || C <- Childs]) bsr 1) bsl 1.
 
 %% @doc Hashes a leaf with the given (sorted!) bucket.
 -spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun(),
@@ -354,10 +384,10 @@ run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
     if Size > SigSize  ->
            Start = Size - SigSize,
            <<_:Start/binary, SmallHash:SigSize/integer-unsigned-unit:8>> = Hash,
-           SmallHash;
+           SmallHash bxor 1;
        true ->
            <<SmallHash:Size/integer-unit:8>> = Hash,
-           SmallHash
+           SmallHash bxor 1
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
