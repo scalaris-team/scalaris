@@ -74,7 +74,7 @@
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
          signature_size = 4                 :: pos_integer(),   %node signature size in byte
          leaf_hf        = fun(V) -> ?CRYPTO_SHA(V) end  :: hash_fun(),      %hash function for leaf signature creation
-         inner_hf       = get_XOR_fun()     :: inner_hash_fun(),%hash function for inner node signature creation -
+         inner_hf       = fun inner_hash_XOR/1 :: inner_hash_fun(),%hash function for inner node signature creation -
          keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled
          }).
 -type mt_config() :: #mt_config{}.
@@ -534,9 +534,9 @@ keys_to_intervals(KList, IList) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_XOR_fun() -> inner_hash_fun().
-get_XOR_fun() ->
-    fun([H|T]) -> lists:foldl(fun(X, Acc) -> X bxor Acc end, H, T) end.
+-spec inner_hash_XOR(ChildHashes::[mt_node_key(),...]) -> mt_node_key().
+inner_hash_XOR([H|T]) ->
+    lists:foldl(fun(X, Acc) -> X bxor Acc end, H, T).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -546,4 +546,4 @@ tester_create_hash_fun(1) -> fun(V) -> ?CRYPTO_SHA(V) end.
 
 % allow future versions to create more hash funs by having an integer parameter
 -spec tester_create_inner_hash_fun(I::1) -> inner_hash_fun().
-tester_create_inner_hash_fun(1) -> merkle_tree:get_XOR_fun().
+tester_create_inner_hash_fun(1) -> fun inner_hash_XOR/1.
