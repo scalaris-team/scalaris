@@ -49,7 +49,7 @@ repair_default() ->
      multi_round,    % run multiple sync rounds with sync probability 1
      multi_round2,   % run multiple sync rounds with sync probability 0.4
      parts           % get_chunk with limited items (leads to multiple get_chunk calls, in case of bloom also multiple bloom filters)
-	].
+    ].
 
 regen_special() ->
     [
@@ -155,7 +155,7 @@ get_rep_upd_config(Method) ->
      {rr_session_ttl, 100000},
      {rr_gc_interval, 60000},
      {rr_bloom_fpr, 0.1},
-	 {rr_trigger_probability, 100},
+     {rr_trigger_probability, 100},
      {rr_max_items, 10000},
      {rr_art_inner_fpr, 0.01},
      {rr_art_leaf_fpr, 0.1},
@@ -186,13 +186,13 @@ mpath_map(Msg, _Source, _Dest) ->
     {element(1, Msg)}.
 
 mpath(Config) ->
-	%parameter
+    %parameter
     NodeCount = 4,
     DataCount = 1000,
     Fpr = 0.1,
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
-	TraceName = erlang:list_to_atom(atom_to_list(Method)++atom_to_list(FType)),
+    TraceName = erlang:list_to_atom(atom_to_list(Method)++atom_to_list(FType)),
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
@@ -202,24 +202,24 @@ mpath(Config) ->
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
     %server starts sync
-	%trace_mpath:start(TraceName, fun mpath_map/3),
+    %trace_mpath:start(TraceName, fun mpath_map/3),
     trace_mpath:start(TraceName),
     api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair,
                                               {request_sync, Method, CKey}}),
     %waitForSyncRoundEnd(NodeKeys),
-	timer:sleep(3000),
-	trace_mpath:stop(),
-	%TRACE
-	A = trace_mpath:get_trace(TraceName),
+    timer:sleep(3000),
+    trace_mpath:stop(),
+    %TRACE
+    A = trace_mpath:get_trace(TraceName),
     trace_mpath:cleanup(TraceName),
-	B = [X || X = {log_send, _Time, _TraceID,
-				   {{_FIP,_FPort,_FPid}, _FName},
-				   {{_TIP,_TPort,_TPid}, _TName},
-				   _Msg, _LocalOrGlobal} <- A],
-	ok = file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])),
-	ok = file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(B)])),
+    B = [X || X = {log_send, _Time, _TraceID,
+                   {{_FIP,_FPort,_FPid}, _FName},
+                   {{_TIP,_TPort,_TPid}, _TName},
+                   _Msg, _LocalOrGlobal} <- A],
+    ok = file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])),
+    ok = file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(B)])),
     %ok = file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [rr_eval_admin:get_bandwidth(A)])),
-	ok.
+    ok.
 
 simple(Config) ->
     Method = proplists:get_value(ru_method, Config),
