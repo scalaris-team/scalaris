@@ -306,10 +306,12 @@ insert_db(KVV) ->
                                               intervals:in(db_entry:get_key(Entry), NRange)
                                       end, ActKVV),
                   comm:send(Node, {add_data, comm:this(), NKVV}),
-                  fun() -> receive ?SCALARIS_RECV({add_data_reply}, ok) end end(),
                   RestKVV
           end,
           KVV, Nodes),
+    _ = [begin
+             receive ?SCALARIS_RECV({add_data_reply}, ok) end
+         end || _Node <- Nodes],
     ok.
 
 %% @doc Removes all DB entries with the given keys from the corresponding
@@ -317,9 +319,11 @@ insert_db(KVV) ->
 -spec remove_keys([?RT:key()]) -> ok.
 remove_keys(Keys) ->
     _ = [begin
-             comm:send(Node, {delete_keys, comm:this(), Keys}),
-             receive ?SCALARIS_RECV({delete_keys_reply}, ok) end
+             comm:send(Node, {delete_keys, comm:this(), Keys})
          end || Node <- get_node_list()],
+    _ = [begin
+             receive ?SCALARIS_RECV({delete_keys_reply}, ok) end
+         end || _Node <- get_node_list()],
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
