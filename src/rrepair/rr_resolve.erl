@@ -73,9 +73,9 @@
 -type stats() :: #resolve_stats{}.
 
 -type operation() ::
-    {key_upd, UniqueKvvListInAnyQ::kvv_list()} |
+    {key_upd, KvvListInAnyQ::kvv_list()} |
     {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
-    {interval_upd, intervals:interval(), UniqueKvvListInAnyQ::kvv_list()} |
+    {interval_upd, intervals:interval(), KvvListInAnyQ::kvv_list()} |
     {interval_upd_send, intervals:interval(), DestPid::comm:mypid()} |
     {interval_upd_my, intervals:interval()}.
 
@@ -248,10 +248,9 @@ on({get_entries_response, EntryList}, State =
            [interval_upd_send, Stats#resolve_stats.session_id, length(EntryList)], State),
     Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
     KvvList = [entry_to_kvv(E) || E <- EntryList],
-    SendList = make_unique_kvv(lists:keysort(1, KvvList), []),
     case Stats#resolve_stats.session_id of
-        null -> comm:send(Dest, {request_resolve, {interval_upd, I, SendList}, Options});
-        SID -> comm:send(Dest, {request_resolve, SID, {interval_upd, I, SendList}, Options})
+        null -> comm:send(Dest, {request_resolve, {interval_upd, I, KvvList}, Options});
+        SID -> comm:send(Dest, {request_resolve, SID, {interval_upd, I, KvvList}, Options})
     end,
     shutdown(resolve_ok, State, undefined, [], []);
 
@@ -441,33 +440,19 @@ merge_stats(#resolve_stats{ session_id = ASID,
 
 -spec entry_to_kvv(db_entry:entry()) -> {?RT:key(), db_dht:value(), db_dht:version()}.
 entry_to_kvv(Entry) ->
-    % map to any quadrant (here: 1) in order to be able to make replicated entries unique
-    {rr_recon:map_key_to_quadrant(db_entry:get_key(Entry), 1),
+    {db_entry:get_key(Entry),
      db_entry:get_value(Entry),
      db_entry:get_version(Entry)}.
-
-make_unique_kvv([], Acc) -> Acc;
-make_unique_kvv([H | T], []) -> make_unique_kvv(T, [H]);
-make_unique_kvv([H | T], [AccH | AccT] = Acc) ->
-    case element(1, H) =:= element(1, AccH) of
-        true -> 
-            case element(3, H) > element(3, AccH) of
-                true -> make_unique_kvv(T, [H|AccT]);
-                false -> make_unique_kvv(T, Acc)
-            end;
-        false -> make_unique_kvv(T, [H|Acc])
-    end.
 
 -spec send_key_upd(Dest::comm:mypid() | undefined, Items::kvv_list(), 
                    rrepair:session_id() | null, options()) -> ok.
 send_key_upd(undefined, _, _, _) ->
     ok;
 send_key_upd(DestPid, Items, SID, Options) ->
-    SendList = make_unique_kvv(lists:keysort(1, Items), []),
     if SID =:= null ->
-           comm:send(DestPid, {request_resolve, {key_upd, SendList}, Options});
+           comm:send(DestPid, {request_resolve, {key_upd, Items}, Options});
        true ->
-           comm:send(DestPid, {request_resolve, SID, {key_upd, SendList}, Options})
+           comm:send(DestPid, {request_resolve, SID, {key_upd, Items}, Options})
     end.
 
 -spec send_stats(comm:mypid() | undefined, stats()) -> ok.
