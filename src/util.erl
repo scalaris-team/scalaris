@@ -503,12 +503,14 @@ sleep_for_ever() ->
 %% @doc Returns a random element from the given (non-empty!) list according to
 %%      a uniform distribution.
 -spec randomelem(List::[X,...]) -> X.
+randomelem([X]) -> X;
 randomelem(List) ->
     element(1, randomelem_and_length(List)).
 
 %% @doc Returns a random element from the given (non-empty!) list according to
 %%      a uniform distribution (also returns the list's length).
 -spec randomelem_and_length(List::[X,...]) -> {X, Length::pos_integer()}.
+randomelem_and_length([X]) -> {X, 1};
 randomelem_and_length(List) ->
     Length = length(List) + 1,
     RandomNum = randoms:rand_uniform(1, Length),
@@ -517,12 +519,17 @@ randomelem_and_length(List) ->
 %% @doc Removes a random element from the (non-empty!) list and returns the
 %%      resulting list and the removed element.
 -spec pop_randomelem(List::[X,...]) -> {NewList::[X], PoppedElement::X}.
+pop_randomelem([X]) -> {[], X};
 pop_randomelem(List) ->
     pop_randomelem(List, length(List)).
     
 %% @doc Removes a random element from the first Size elements of a (non-empty!)
-%%      list and returns the resulting list and the removed element. 
+%%      list and returns the resulting list and the removed element.
+%%      If Size is 0, the first element will be popped.
+%%      Size must not exceed the length of the list!
 -spec pop_randomelem(List::[X,...], Size::non_neg_integer()) -> {NewList::[X], PoppedElement::X}.
+pop_randomelem([X | TL], 0) -> {TL, X};
+pop_randomelem([X | TL], 1) -> {TL, X};
 pop_randomelem(List, Size) ->
     {Leading, [H | T]} = lists:split(randoms:rand_uniform(0, Size), List),
     {lists:append(Leading, T), H}.
@@ -532,12 +539,15 @@ pop_randomelem(List, Size) ->
 random_subset(0, _List) ->
     % having this special case here prevents unnecessary calls to erlang:length()
     [];
+random_subset(_Size, [X]) -> [X];
 random_subset(Size, List) ->
     ListSize = length(List),
     shuffle_helper(List, [], Size, ListSize).
 
 %% @doc Fisher-Yates shuffling for lists.
 -spec shuffle([T]) -> [T].
+shuffle([]) -> [];
+shuffle([X]) -> [X];
 shuffle(List) ->
     ListSize = length(List),
     shuffle_helper(List, [], ListSize, ListSize).
