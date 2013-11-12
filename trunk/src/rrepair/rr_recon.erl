@@ -142,6 +142,7 @@
     request() |
     % merkle tree sync messages
     {check_nodes, SenderPid::comm:mypid(), ToCheck::[merkle_cmp_request()]} |
+    {check_nodes, ToCheck::[merkle_cmp_request()]} |
     {check_nodes_response, CmpResults::[merkle_cmp_result()]} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
