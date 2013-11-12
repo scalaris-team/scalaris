@@ -124,7 +124,7 @@ init_per_group(Group, Config) ->
         _ -> []
     end ++ Config.
 
-end_per_group(Group, Config) ->  
+end_per_group(Group, Config) ->
     Method = proplists:get_value(ru_method, Config, undefined),
     FType = proplists:get_value(ftype, Config, undefined),
     case Method of
@@ -161,7 +161,7 @@ get_rep_upd_config(Method) ->
      {rr_art_leaf_fpr, 0.1},
      {rr_art_correction_factor, 2},
      {rr_merkle_branch_factor, 2},
-     {rr_merkle_bucket_size, 25}].    
+     {rr_merkle_bucket_size, 25}].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Replica Update tests
@@ -195,16 +195,16 @@ mpath(Config) ->
 	TraceName = erlang:list_to_atom(atom_to_list(Method)++atom_to_list(FType)),
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
-    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
-                                                   {fprob, 50}, 
+    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
+                                                   {fprob, 50},
                                                    {distribution, uniform}]),
-    %chose node pair    
+    %chose node pair
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
     %server starts sync
 	%trace_mpath:start(TraceName, fun mpath_map/3),
     trace_mpath:start(TraceName),
-    api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair, 
+    api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair,
                                               {request_sync, Method, CKey}}),
     %waitForSyncRoundEnd(NodeKeys),
 	timer:sleep(3000),
@@ -212,13 +212,13 @@ mpath(Config) ->
 	%TRACE
 	A = trace_mpath:get_trace(TraceName),
     trace_mpath:cleanup(TraceName),
-	B = [X || X = {log_send, _Time, _TraceID, 
-				   {{_FIP,_FPort,_FPid}, _FName}, 
-				   {{_TIP,_TPort,_TPid}, _TName}, 
+	B = [X || X = {log_send, _Time, _TraceID,
+				   {{_FIP,_FPort,_FPid}, _FName},
+				   {{_TIP,_TPort,_TPid}, _TName},
 				   _Msg, _LocalOrGlobal} <- A],
-	ok = file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])), 
+	ok = file:write_file("TRACE_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [B])),
 	ok = file:write_file("TRACE_HISTO_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [trace_mpath:send_histogram(B)])),
-    %ok = file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [eval_admin:get_bandwidth(A)])),  
+    %ok = file:write_file("TRACE_EVAL_" ++ atom_to_list(TraceName) ++ ".txt", io_lib:fwrite("~.0p\n", [rr_eval_admin:get_bandwidth(A)])),
 	ok.
 
 simple(Config) ->
@@ -250,10 +250,10 @@ dest(Config) ->
     FType = proplists:get_value(ftype, Config),
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
-    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
-                                                   {fprob, 50}, 
+    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
+                                                   {fprob, 50},
                                                    {distribution, uniform}]),
-    %chose node pair    
+    %chose node pair
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
     %measure initial sync degree
@@ -262,7 +262,7 @@ dest(Config) ->
     CO = count_outdated(CKey),
     CM = count_dbsize(CKey),
     %server starts sync
-    api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair, 
+    api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair,
                                               {request_sync, Method, CKey}}),
     %waitForSyncRoundEnd(NodeKeys),
     waitForSyncRoundEnd([SKey, CKey]),
@@ -273,8 +273,8 @@ dest(Config) ->
     CMNew = count_dbsize(CKey),
     ct:pal("SYNC RUN << ~p / ~p >>~nServerKey=~p~nClientKey=~p~n"
            "Server Outdated=[~p -> ~p] DBSize=[~p -> ~p] - Upd=~p ; Regen=~p~n"
-           "Client Outdated=[~p -> ~p] DBSize=[~p -> ~p] - Upd=~p ; Regen=~p", 
-           [Method, FType, SKey, CKey, 
+           "Client Outdated=[~p -> ~p] DBSize=[~p -> ~p] - Upd=~p ; Regen=~p",
+           [Method, FType, SKey, CKey,
             SO, SONew, SM, SMNew, SO - SONew, SMNew - SM,
             CO, CONew, CM, CMNew, CO - CONew, CMNew - CM]),
     %clean up
@@ -290,11 +290,11 @@ dest_empty_node(Config) ->
     Method = proplists:get_value(ru_method, Config),
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
-    _ = db_generator:fill_ring(random, DataCount, [{ftype, regen}, 
-                                                   {fprob, 100}, 
+    _ = db_generator:fill_ring(random, DataCount, [{ftype, regen},
+                                                   {fprob, 100},
                                                    {distribution, uniform},
                                                    {fdest, [1]}]),
-    %chose any node not in quadrant 1    
+    %chose any node not in quadrant 1
     KeyGrp = ?RT:get_replica_keys(?RT:get_random_node_id()),
     [Q1 | _] = rr_recon:quadrant_intervals(),
     IKey = util:randomelem([X || X <- KeyGrp, not intervals:in(X, Q1)]),
@@ -303,7 +303,7 @@ dest_empty_node(Config) ->
     IM = count_dbsize(IKey),
     CM = count_dbsize(CKey),
     %server starts sync
-    api_dht_raw:unreliable_lookup(IKey, {?send_to_group_member, rrepair, 
+    api_dht_raw:unreliable_lookup(IKey, {?send_to_group_member, rrepair,
                                               {request_sync, Method, CKey, comm:this()}}),
     wait_for_session_end(),
     %measure sync degree
@@ -311,8 +311,8 @@ dest_empty_node(Config) ->
     CMNew = count_dbsize(CKey),
     ct:pal("SYNC RUN << ~p >>~nServerKey=~p~nClientKey=~p~n"
            "Server DBSize=[~p -> ~p] - Regen=~p~n"
-           "Client DBSize=[~p -> ~p] - Regen=~p", 
-           [Method, IKey, CKey, 
+           "Client DBSize=[~p -> ~p] - Regen=~p",
+           [Method, IKey, CKey,
             IM, IMNew, IMNew - IM,
             CM, CMNew, CMNew - CM]),
     %clean up
@@ -323,7 +323,7 @@ parts(Config) ->
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     OldConf = get_rep_upd_config(Method),
-    Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),    
+    Conf = lists:keyreplace(rr_max_items, 1, OldConf, {rr_max_items, 500}),
     start_sync(Config, 4, 1000, [{fprob, 100}, {ftype, FType}],
                2, 0.2, Conf, fun erlang:'<'/2).
 
@@ -336,7 +336,7 @@ get_symmetric_keys_test(Config) ->
     ToTest = lists:sort(get_symmetric_keys(4)),
     ToBe = lists:sort(?RT:get_replica_keys(?MINUS_INFINITY)),
     unittest_helper:stop_minimal_procs(Conf2),
-    ?equals_w_note(ToTest, ToBe, 
+    ?equals_w_note(ToTest, ToBe,
                    io_lib:format("GenKeys=~w~nRTKeys=~w", [ToTest, ToBe])),
     ok.
 
@@ -351,7 +351,7 @@ wait_until_true(DestKey, Request, ConFun, MaxWait) ->
             erlang:yield(),
             timer:sleep(10),
             wait_until_true(DestKey, Request, ConFun, MaxWait - 10);
-        false when MaxWait =< 0 -> 
+        false when MaxWait =< 0 ->
             false
     end.
 
@@ -367,25 +367,25 @@ session_ttl(Config) ->
     RRConf = lists:keyreplace(rr_gc_interval, 1, _RRConf, {rr_gc_interval, erlang:round(TTL / 10)}),
     
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, RRConf),    
-    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType}, 
-                                                   {fprob, 90}, 
+    build_symmetric_ring(NodeCount, Config, RRConf),
+    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
+                                                   {fprob, 90},
                                                    {distribution, uniform}]),
     %chose node pair
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
     
-    api_dht_raw:unreliable_lookup(CKey, {get_pid_group, comm:this()}),    
+    api_dht_raw:unreliable_lookup(CKey, {get_pid_group, comm:this()}),
     CName = receive {get_pid_group_response, Key} -> Key end,
     
     %server starts sync
-    api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair, 
+    api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair,
                                               {request_sync, Method, CKey}}),
     Req = {?send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
     SessionOpened = wait_until_true(SKey, Req, fun(X) -> length(X) =/= 0 end, TTL),
 
     %check timeout
-    api_vm:kill_node(CName),    
+    api_vm:kill_node(CName),
     timer:sleep(TTL),
     api_dht_raw:unreliable_lookup(SKey, Req),
     SessionGarbageCollected = receive {get_state_response, R2} -> length(R2) =:= 0 end,
@@ -440,15 +440,15 @@ prop_map_key_to_interval(Key, I) ->
 %%                              ct:pal("~p -> ~p", [Z, MapZ]),
                              ?compare(fun erlang:'=/='/2, MapZ, Mapped)
                          end
-                         || Z <- NotIn], 
+                         || Z <- NotIn],
                     ?assert(intervals:in(Mapped, I))
             end;
         _ -> ?equals(InGrp, [])
     end.
 
 tester_map_key_to_interval(_) ->
-    [Q1, Q2, Q3 | _] = ?RT:get_replica_keys(?MINUS_INFINITY), 
-    prop_map_key_to_interval(Q1, intervals:new('[', Q1, Q2, ']')), 
+    [Q1, Q2, Q3 | _] = ?RT:get_replica_keys(?MINUS_INFINITY),
+    prop_map_key_to_interval(Q1, intervals:new('[', Q1, Q2, ']')),
     prop_map_key_to_interval(Q2, intervals:new('[', Q1, Q2, ']')),
     prop_map_key_to_interval(Q3, intervals:new('[', Q1, Q2, ']')),
     tester:test(?MODULE, prop_map_key_to_interval, 2, 1000, [{threads, 4}]).
@@ -463,7 +463,7 @@ tester_map_key_to_quadrant(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_map_interval(A::intervals:continuous_interval(), 
+-spec prop_map_interval(A::intervals:continuous_interval(),
                              B::intervals:continuous_interval()) -> boolean().
 prop_map_interval(A, B) ->
     Quadrants = rr_recon:quadrant_intervals(),
@@ -526,14 +526,14 @@ tester_find_sync_interval(_) ->
 
 -spec wait_for_session_end() -> ok.
 wait_for_session_end() ->
-    util:wait_for(fun() -> 
-                          receive 
+    util:wait_for(fun() ->
+                          receive
                               {request_sync_complete, _} -> true
                           end
                   end).
 
 % @doc
-%    runs the bloom filter synchronization [Rounds]-times 
+%    runs the bloom filter synchronization [Rounds]-times
 %    and records the sync degree after each round
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
@@ -562,10 +562,10 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig, CompFun) 
              end || NodePid <- pid_groups:find_all(dht_node)],
     ct:pal(">>Nodes: ~.2p", [Nodes]),
     erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
-    _ = db_generator:fill_ring(random, DBSize, DBParams),    
+    _ = db_generator:fill_ring(random, DBSize, DBParams),
     InitDBStat = get_db_status(),
     print_status(0, InitDBStat),
-    _ = util:for_to_ex(1, Rounds, 
+    _ = util:for_to_ex(1, Rounds,
                        fun(I) ->
                                ct:pal("Starting round ~p", [I]),
                                startSyncRound(NodeKeys),
@@ -594,12 +594,12 @@ count_outdated(Key) ->
 count_outdated() ->
     Req = {rr_stats, {count_old_replicas, comm:this(), intervals:all()}},
     lists:foldl(
-      fun(Node, Acc) -> 
+      fun(Node, Acc) ->
               comm:send(Node, {?send_to_group_member, rrepair, Req}),
               receive
                   {count_old_replicas_reply, Old} -> Acc + Old
               end
-      end, 
+      end,
       0, get_node_list()).
 
 -spec get_node_list() -> [comm:mypid()].
@@ -613,8 +613,8 @@ get_node_list() ->
 -spec count_dbsize(?RT:key()) -> non_neg_integer().
 count_dbsize(Key) ->
     RingData = unittest_helper:get_ring_data(),
-    N = lists:filter(fun({_Pid, {LBr, LK, RK, RBr}, _DB, _Pred, _Succ, ok}) -> 
-                             intervals:in(Key, intervals:new(LBr, LK, RK, RBr)) 
+    N = lists:filter(fun({_Pid, {LBr, LK, RK, RBr}, _DB, _Pred, _Succ, ok}) ->
+                             intervals:in(Key, intervals:new(LBr, LK, RK, RBr))
                      end, RingData),
     case N of
         [{_Pid, _I, DB, _Pred, _Succ, ok}] -> length(DB);
@@ -639,9 +639,9 @@ build_symmetric_ring(NodeCount, Config, RRConfig) ->
     %Build ring with NodeCount symmetric nodes
     unittest_helper:make_ring_with_ids(
       fun() ->  get_symmetric_keys(NodeCount) end,
-      [{config, lists:flatten([{log_path, PrivDir}, 
+      [{config, lists:flatten([{log_path, PrivDir},
                                RRConfig])}]),
-    % wait for all nodes to finish their join 
+    % wait for all nodes to finish their join
     unittest_helper:check_ring_size_fully_joined(NodeCount),
     % wait a bit for the rm-processes to settle
     timer:sleep(500),
@@ -653,16 +653,16 @@ build_symmetric_ring(NodeCount, Config, RRConfig) ->
 startSyncRound(NodeKeys) ->
     lists:foreach(fun(X) ->
                           api_dht_raw:unreliable_lookup(X, {?send_to_group_member, rrepair, {rr_trigger}})
-                  end, 
+                  end,
                   NodeKeys),
     ok.
 
 waitForSyncRoundEnd(NodeKeys) ->
     Req = {?send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
     lists:foreach(
-      fun(Key) -> 
+      fun(Key) ->
               util:wait_for(
-                fun() -> 
+                fun() ->
                         api_dht_raw:unreliable_lookup(Key, Req),
                         receive
                             {get_state_response, []} ->
@@ -672,7 +672,7 @@ waitForSyncRoundEnd(NodeKeys) ->
                                 false
                         end
                 end)
-      end, 
+      end,
       NodeKeys),
     ok.
 

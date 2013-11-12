@@ -57,12 +57,12 @@ prop_insert(CellCount, Key, Value) ->
     IBLT = iblt:new(get_hfs(), CellCount),
     IBLT2 = iblt:insert(IBLT, Key, Value),
     ?equals(iblt:get_prop(item_count, IBLT), 0),
-    ?equals(iblt:get_prop(item_count, IBLT2), 1),    
+    ?equals(iblt:get_prop(item_count, IBLT2), 1),
     ?equals(iblt:get(IBLT, Key), not_found),
     ?equals(iblt:get(IBLT2, Key), Value).
   
 tester_insert(_) ->
-    tester:test(?MODULE, prop_insert, 3, 1000, [{threads, 2}]).    
+    tester:test(?MODULE, prop_insert, 3, 1000, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -97,14 +97,14 @@ tester_prime_vs_noprime(_) ->
     tester:test(?MODULE, prop_prime, 2, Calls, [{threads, 1}]),
     pvp_iblt_test ! {reset, "Prime-ColSize - COLLISIONS:"},
     tester:test(?MODULE, prop_prime, 2, Calls, [{threads, 1}]),
-    pvp_iblt_test ! {reset, "Prime-ColSize - COLLISIONS:"},    
+    pvp_iblt_test ! {reset, "Prime-ColSize - COLLISIONS:"},
 
     tester:test(?MODULE, prop_noprime, 2, Calls, [{threads, 1}]),
     pvp_iblt_test ! {reset, "NON-Prime-ColSize - COLLISIONS:"},
     tester:test(?MODULE, prop_noprime, 2, Calls, [{threads, 1}]),
     pvp_iblt_test ! {reset, "NON-Prime-ColSize - COLLISIONS:"},
     tester:test(?MODULE, prop_noprime, 2, Calls, [{threads, 1}]),
-    pvp_iblt_test ! {reset, "NON-Prime-ColSize - COLLISIONS:"},    
+    pvp_iblt_test ! {reset, "NON-Prime-ColSize - COLLISIONS:"},
     true.
 
 -spec prop_prime(10..100, [{?RT:key(), db_dht:version()}]) -> true.
@@ -115,10 +115,10 @@ prop_noprime(Cells, Items) -> prop_get(Cells, Items, []).
 
 -spec prop_get(10..100, [{?RT:key(), db_dht:version()}], iblt:options()) -> true.
 prop_get(CellCount, Items, Options) ->
-    IBLT = lists:foldl(fun({Key, Ver}, _IBLT) -> 
-                               iblt:insert(_IBLT, Key, Ver) 
+    IBLT = lists:foldl(fun({Key, Ver}, _IBLT) ->
+                               iblt:insert(_IBLT, Key, Ver)
                        end,
-                       iblt:new(get_hfs(), erlang:round(1.5 * CellCount), Options), 
+                       iblt:new(get_hfs(), erlang:round(1.5 * CellCount), Options),
                        Items),
     ?equals(iblt:get_prop(item_count, IBLT), length(Items)),
     Found = lists:foldl(fun({Key, _}, Sum) ->
@@ -127,7 +127,7 @@ prop_get(CellCount, Items, Options) ->
                                     _ -> Sum + 1
                                 end
                         end, 0, Items),
-    _ = if 
+    _ = if
             Found =:= 0 andalso length(Items) > 0 -> pvp_iblt_test ! count_zero;
             Found > 0 andalso Found =:= length(Items) -> pvp_iblt_test ! count_all;
             length(Items) > 0 -> pvp_iblt_test ! {some, Found, length(Items)};
@@ -138,16 +138,16 @@ prop_get(CellCount, Items, Options) ->
     true.
 
 collector({ZeroFound, SomeFound, SomeAll, AllFound} = D, {FoundSum, ItemsSum} = A) ->
-    receive        
+    receive
         count_zero -> collector({ZeroFound + 1, SomeFound, SomeAll, AllFound}, A);
         count_all -> collector({ZeroFound, SomeFound, SomeAll, AllFound + 1}, A);
         {found_sum, FS} -> collector(D, {FoundSum + FS, ItemsSum});
         {items_sum, IS} -> collector(D, {FoundSum, ItemsSum + IS});
         {some, Found, All} -> collector({ZeroFound, SomeFound + Found, SomeAll + All, AllFound}, A);
-        {reset, Title} -> ct:pal("~s: SumFound=~p/~p (~f%) | DETAILS:  ZeroFound=~p ; AllFound=~p ; Some=~p/~p (~f%)", 
+        {reset, Title} -> ct:pal("~s: SumFound=~p/~p (~f%) | DETAILS:  ZeroFound=~p ; AllFound=~p ; Some=~p/~p (~f%)",
                                  [Title,
-                                  FoundSum, ItemsSum, 100*(FoundSum / ItemsSum), 
-                                  ZeroFound, AllFound, 
+                                  FoundSum, ItemsSum, 100*(FoundSum / ItemsSum),
+                                  ZeroFound, AllFound,
                                   SomeFound, SomeAll, 100*(SomeFound / SomeAll)]),
                           collector({0, 0, 0, 0}, {0, 0})
     end.
@@ -169,15 +169,15 @@ tester_prime_option(_) ->
 prop_list_entries(L, R, Count) ->
     I = intervals:new('[', L, R, ']'),
     DB = db_generator:get_db(I, Count, uniform, [{output, list_key_val}]),
-    IBLT = lists:foldl(fun({Key, Val}, Acc) -> iblt:insert(Acc, Key, Val) end, 
-                       iblt:new(get_hfs(), erlang:round(1.5 * Count)), 
+    IBLT = lists:foldl(fun({Key, Val}, Acc) -> iblt:insert(Acc, Key, Val) end,
+                       iblt:new(get_hfs(), erlang:round(1.5 * Count)),
                        DB),
     List = iblt:list_entries(IBLT),
     Found = length(List),
-     ct:pal("--IBLT--            
+     ct:pal("--IBLT--
              ItemsInserted=~p/~p
              ListEntrySize=~p/~p (~f%)
-             FPR=~p", 
+             FPR=~p",
             [iblt:get_prop(item_count, IBLT), Count,
              Found, Count, (Found / Count) * 100,
              iblt:get_fpr(IBLT)]),

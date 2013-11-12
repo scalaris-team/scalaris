@@ -15,9 +15,9 @@
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
 %% @doc    Bloom Filter implementation
 %% @end
-%% @reference A. Broder, M. Mitzenmacher 
-%%          <em>Network Applications of Bloom Filters: A Survey</em> 
-%%          2004 Internet Mathematics 1(4) 
+%% @reference A. Broder, M. Mitzenmacher
+%%          <em>Network Applications of Bloom Filters: A Survey</em>
+%%          2004 Internet Mathematics 1(4)
 %% @version $Id$
 -module(bloom).
 -author('malange@informatik.hu-berlin.de').
@@ -58,7 +58,7 @@
 -endif.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% API  
+%% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Creates new bloom filter with default hash function set
@@ -184,7 +184,7 @@ p_add_list_v2_([], AccPosBF, AccBF, BF, BFSize) ->
 -spec is_element(bloom_filter(), key()) -> boolean().
 is_element(#bloom{filter = <<>>}, _Item) ->
     false;
-is_element(#bloom{size = BFSize, hfs = Hfs, filter = Filter}, Item) -> 
+is_element(#bloom{size = BFSize, hfs = Hfs, filter = Filter}, Item) ->
     Positions = ?REP_HFS:apply_val_rem(Hfs, Item, BFSize),
     check_Bits(Filter, Positions).
 
@@ -297,7 +297,7 @@ set_bits(Filter, []) ->
 % @doc Checks if all bits are set on a given position list
 -spec check_Bits(binary(), [non_neg_integer()]) -> boolean().
 % V1
-%% check_Bits(Filter, [Pos | Positions]) -> 
+%% check_Bits(Filter, [Pos | Positions]) ->
 %%     PreBytes = Pos div 8,
 %%     <<_:PreBytes/binary, CheckByte:8, _/binary>> = Filter,
 %%     case 0 =/= CheckByte band (1 bsl (Pos rem 8)) of
@@ -313,7 +313,7 @@ check_Bits(Filter, [Pos | Positions]) ->
         0 -> false
     end;
 
-check_Bits(_, []) -> 
+check_Bits(_, []) ->
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -333,7 +333,7 @@ check_Bits(_, []) ->
 calc_HF_num(M, N) ->
     calc_HF_num(util:ceil(M / erlang:max(N, 1))).
 
-% @doc Calculates optimal number of hash functions for 
+% @doc Calculates optimal number of hash functions for
 %      a given compression rate of C.
 -spec calc_HF_num(pos_integer()) -> pos_integer().
 calc_HF_num(C) when C > 0 ->
@@ -362,12 +362,12 @@ calc_least_size(0, _) -> 1;
 calc_least_size(N, FPR) ->
     util:ceil((N * util:log2(math:exp(1)) * util:log2(1 / FPR))).
 
-% @doc  Calculates FPR for an M-bit large bloom_filter with K Hashfuntions 
+% @doc  Calculates FPR for an M-bit large bloom_filter with K Hashfuntions
 %       and a maximum of N elements.
 %       FPR = (1-e^(-kn/m))^k
 %       M = number of BF-Bits
 -spec calc_FPR(pos_integer(), pos_integer(), pos_integer()) -> float().
-calc_FPR(M, N, K) -> 
+calc_FPR(M, N, K) ->
     math:pow(1 - math:exp((-K * N) / M), K).
 
 -spec calc_FPR(pos_integer(), pos_integer()) -> float().

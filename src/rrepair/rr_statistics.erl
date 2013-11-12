@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Maik Lange <malange@informatik.hu-berlin.de>
-%% @doc    replica repair statistics module 
+%% @doc    replica repair statistics module
 %%         count outdated replicas
 %% @end
 %% @version $Id$
@@ -36,7 +36,7 @@
 -endif.
 
 
--type requests() :: 
+-type requests() ::
           {count_old_replicas, Requestor::comm:mypid(), Interval::intervals:interval()}.
 
 -record(state,
@@ -64,7 +64,7 @@ on({get_state_response, MyI},
                   dhtNodePid = DhtPid}) ->
     I = intervals:intersection(MyI, ReqI),
     case intervals:is_empty(I) of
-        true -> 
+        true ->
             comm:send(Req, {count_old_replicas_reply, 0}),
             kill;
         _ ->
@@ -73,7 +73,7 @@ on({get_state_response, MyI},
               {get_chunk, self(), I,
                fun(Item) -> db_entry:get_version(Item) =/= -1 end,
                fun(Item) -> {db_entry:get_key(Item), db_entry:get_version(Item)} end,
-               all})                    
+               all})
     end,
     State;
 

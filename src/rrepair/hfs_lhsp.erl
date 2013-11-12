@@ -16,14 +16,14 @@
 %% @doc    Less hashing, same performance hash function set container
 %% @end
 %% @reference
-%%         Implementation of a hash function set proposed in 
-%%         2006 by A. Kirsch, M. Mitzenmacher - 
-%%         "Less Hashing, Same Performance: Building a Better Bloom Filter 
+%%         Implementation of a hash function set proposed in
+%%         2006 by A. Kirsch, M. Mitzenmacher -
+%%         "Less Hashing, Same Performance: Building a Better Bloom Filter
 %%         Build k Hash functions of the form g_i(x) = h_1(X) + i * h_2(X)
-%%  
-%%         Used MD5 Hash-Function like in 
-%%         2000 - L.Fan, P. Cao., JA, ZB : 
-%%               "Summary Cache: A Scalable Wide-Area Web Cache Sharing Protocol" 
+%%
+%%         Used MD5 Hash-Function like in
+%%         2000 - L.Fan, P. Cao., JA, ZB :
+%%               "Summary Cache: A Scalable Wide-Area Web Cache Sharing Protocol"
 %%               (Counting Bloom Filters Paper)
 %% @version $Id$
 -module(hfs_lhsp).
@@ -55,7 +55,7 @@
 
 % @doc returns a new lhsp hfs with default functions
 -spec new(pos_integer()) -> hfs_t().
-new(HFCount) -> 
+new(HFCount) ->
     new([fun erlang:adler32/1, fun erlang:md5/1], HFCount).
 
 -spec new_feeder({hfs_fun(), hfs_fun()}, pos_integer())
@@ -75,7 +75,7 @@ apply_val({hfs_lhsp, K, H1, H2}, Val) ->
     HV2 = hash_value(ValBin, H2),
     util:for_to_ex(0, K - 1, fun(I) -> HV1 + I * HV2 end).
 
-% @doc Applies Val to all hash functions in container HC and returns only remainders 
+% @doc Applies Val to all hash functions in container HC and returns only remainders
 -spec apply_val_rem(hfs_t(), itemKey(), pos_integer()) -> [non_neg_integer(),...].
 apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) ->
     ValBin = erlang:term_to_binary(Val),
@@ -94,11 +94,11 @@ apply_val({hfs_lhsp, K, H1, H2}, I, Val) when I =< K ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
     HV2 = hash_value(ValBin, H2),
-    HV1 + (I - 1) * HV2.   
+    HV1 + (I - 1) * HV2.
 
 % @doc Returns number of hash functions in the container
 -spec size(hfs_t()) -> pos_integer().
-size({hfs_lhsp, K, _, _}) -> 
+size({hfs_lhsp, K, _, _}) ->
     K.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

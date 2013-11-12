@@ -28,7 +28,7 @@
 all() -> [
           %tester_branch_bucket,
           tester_size,
-          tester_store_to_dot,          
+          tester_store_to_dot,
           tester_tree_hash,
           tester_insert_list,
           tester_bulk_insert,
@@ -36,7 +36,7 @@ all() -> [
           tester_lookup,
           test_empty
           %eprof,
-          %fprof          
+          %fprof
          ].
 
 suite() ->
@@ -98,13 +98,13 @@ prop_lookup(L, R) ->
     SplitI = intervals:split(I, Branch),
     SplitI2 = intervals:split(I, Branch + 1),
     lists:foreach(
-      fun(SubI) -> 
+      fun(SubI) ->
               ?assert(merkle_tree:lookup(SubI, Tree) =/= not_found)
       end, SplitI),
     lists:foreach(
-      fun(SubI) -> 
+      fun(SubI) ->
               ?assert(merkle_tree:lookup(SubI, Tree) =:= not_found)
-      end, SplitI2),    
+      end, SplitI2),
     true.
 
 tester_lookup(_) ->
@@ -158,16 +158,16 @@ test_empty(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Tests branching and bucketing
--spec prop_branch_bucket(intervals:key(), intervals:key(), 
+-spec prop_branch_bucket(intervals:key(), intervals:key(),
                          BranchFactor::2..16, BucketSize::24..512) -> true.
 prop_branch_bucket(L, R, Branch, Bucket) ->
     I = unittest_helper:build_interval(L, R),
     Config = [{branch_factor, Branch}, {bucket_size, Bucket}],
     Tree1 = build_tree(I, Config, Bucket, uniform),
     Tree2 = build_tree(I, Config, Bucket + 1, uniform),
-    ct:pal("Branch=~p ; Bucket=~p ; Tree1Size=~p ; Tree2Size=~p", 
+    ct:pal("Branch=~p ; Bucket=~p ; Tree1Size=~p ; Tree2Size=~p",
            [Branch, Bucket, merkle_tree:size(Tree1), merkle_tree:size(Tree2)]),
-    ?equals(merkle_tree:size(Tree1), 1),    
+    ?equals(merkle_tree:size(Tree1), 1),
     ?equals(merkle_tree:size(Tree2), Branch + 1).
 
 tester_branch_bucket(_) ->
@@ -237,15 +237,15 @@ prop_insert_list(L, R, Count) ->
     I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, Count, uniform, [{output, list_keytpl}]),
     Tree = merkle_tree:insert_list(DB, merkle_tree:new(I, [{keep_bucket, true}])),
-    ItemCount = iterate(merkle_tree:iterator(Tree), 
+    ItemCount = iterate(merkle_tree:iterator(Tree),
                         fun(N, Acc) -> Acc + case merkle_tree:is_leaf(N) of
                                                  true -> merkle_tree:get_item_count(N);
                                                  false -> 0
                                              end
-                        end, 
+                        end,
                         0),
-    ?equals_w_note(Count, ItemCount, 
-                   io_lib:format("DB=~p~nTree=~p~nCount=~p; DBSize=~p; TreeCount=~p", 
+    ?equals_w_note(Count, ItemCount,
+                   io_lib:format("DB=~p~nTree=~p~nCount=~p; DBSize=~p; TreeCount=~p",
                                  [DB, Tree, Count, length(DB), ItemCount])).
 
 tester_insert_list(_) ->
@@ -258,8 +258,8 @@ prop_bulk_insert(L, R, BucketSize) ->
     I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, BucketSize, uniform, [{output, list_keytpl}]),
     Tree1 = merkle_tree:new(I, DB, [{bucket_size, BucketSize}]),
-    Tree2 = merkle_tree:new(I, DB, [{bucket_size, BucketSize}]),    
-    Tree3 = build_tree(I, [{bucket_size, BucketSize}], BucketSize * 2 + 1, uniform),    
+    Tree2 = merkle_tree:new(I, DB, [{bucket_size, BucketSize}]),
+    Tree3 = build_tree(I, [{bucket_size, BucketSize}], BucketSize * 2 + 1, uniform),
     Size1 = merkle_tree:size(Tree1),
     Size2 = merkle_tree:size(Tree2),
     Size3 = merkle_tree:size(Tree3),
@@ -277,7 +277,7 @@ prop_size(L, R, ToAdd) ->
     Tree = build_tree(I, ToAdd, uniform),
     Size = merkle_tree:size(Tree),
     {Inner, Leafs} = merkle_tree:size_detail(Tree),
-    ?equals_w_note(Size, Inner + Leafs, 
+    ?equals_w_note(Size, Inner + Leafs,
                    io_lib:format("TreeSize~nItemsAdded: ~p
                                   Simple: ~p Nodes
                                   InnerNodes: ~p   ;   Leafs: ~p",
@@ -292,10 +292,10 @@ tester_size(_) ->
 prop_iter(L, R, ToAdd) ->
     I = unittest_helper:build_interval(L, R),
     Tree = build_tree(I, ToAdd, uniform),
-    {Inner, Leafs} = merkle_tree:size_detail(Tree),    
+    {Inner, Leafs} = merkle_tree:size_detail(Tree),
     Count = iterate(merkle_tree:iterator(Tree), fun(_, Acc) -> Acc + 1 end, 0),
     ?equals_w_note(Count, Inner + Leafs,
-                   io_lib:format("Args: Interval=[~p, ~p] - ToAdd =~p~n", 
+                   io_lib:format("Args: Interval=[~p, ~p] - ToAdd =~p~n",
                                  [L, R, ToAdd])).
 
 tester_iter(_Config) ->
@@ -339,7 +339,7 @@ build_tree(Interval, Config, ToAdd, Distribution) ->
     Keys = db_generator:get_db(Interval, ToAdd, Distribution, [{output, list_keytpl}]),
     merkle_tree:new(Interval, Keys, Config).
 
--spec iterate(merkle_tree:mt_iter(), fun((merkle_tree:mt_node(), T) -> T), T) -> T. 
+-spec iterate(merkle_tree:mt_iter(), fun((merkle_tree:mt_node(), T) -> T), T) -> T.
 iterate(none, _, Acc) -> Acc;
 iterate(Iter, Fun, Acc) ->
     Next = merkle_tree:next(Iter),

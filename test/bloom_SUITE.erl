@@ -141,29 +141,29 @@ prop_fpr(ItemCount, ItemType) ->
     
     FPs = [{util:repeat(
               fun measure_fpr/3, [{Fpr, HFCount}, {InList, ItemCount}, ItemType],
-              ?Fpr_Test_NumTests, 
+              ?Fpr_Test_NumTests,
               [parallel, {accumulate, fun(X, Y) -> X + Y end, 0}])
-               / ?Fpr_Test_NumTests, 
-            Fpr} 
+               / ?Fpr_Test_NumTests,
+            Fpr}
            || Fpr <- DestFPRList],
-    FPs2 = [{D, M, (1 - D/M) * 100, 
-             if M-D =< 0 -> "ok"; true -> "fail" end } 
+    FPs2 = [{D, M, (1 - D/M) * 100,
+             if M-D =< 0 -> "ok"; true -> "fail" end }
            || {M, D} <- FPs],
     ct:pal("ItemCount=~p ; ItemType=~p ; Tests=~p ; Functions=~p ; CompressionRate=~.2f~n"
                "DestFpr, Measured, Diff in %, Status~n~p",
-               [ItemCount, ItemType, ?Fpr_Test_NumTests, HFCount, 
+               [ItemCount, ItemType, ?Fpr_Test_NumTests, HFCount,
                 ?BLOOM:calc_least_size(ItemCount, DestFpr) / ItemCount, FPs2]),
-    true.    
+    true.
 
 measure_fpr({DestFpr, HFCount}, {InList, ItemCount}, ListItemType) ->
-    Hfs = ?HFS:new(HFCount),    
-    InitBF = ?BLOOM:new(ItemCount, DestFpr, Hfs),    
+    Hfs = ?HFS:new(HFCount),
+    InitBF = ?BLOOM:new(ItemCount, DestFpr, Hfs),
     BF = ?BLOOM:add(InitBF, InList),
     
     Count = trunc(10 / ?BLOOM:get_property(BF, fpr)),
     _NotInList = random_list(ListItemType, Count),
-    NotInList = lists:filter(fun(I) -> not lists:member(I, InList) end, _NotInList),    
-    Found = lists:foldl(fun(I, Acc) -> 
+    NotInList = lists:filter(fun(I) -> not lists:member(I, InList) end, _NotInList),
+    Found = lists:foldl(fun(I, Acc) ->
                                 Acc + case ?BLOOM:is_element(BF, I) of
                                           true -> 1;
                                           false -> 0
@@ -179,7 +179,7 @@ tester_fpr(_) ->
 eprof(_) ->
     Count = 1000,
     BF = newBloom(Count, 0.1),
-    Items = [randoms:getRandomInt() || _ <- lists:seq(1, Count)], 
+    Items = [randoms:getRandomInt() || _ <- lists:seq(1, Count)],
         
     _ = eprof:start(),
     Fun = fun() -> ?BLOOM:add(BF, Items) end,
@@ -194,7 +194,7 @@ eprof(_) ->
 fprof(_) ->
     Count = 1000,
     BF = newBloom(Count, 0.1),
-    Items = [randoms:getRandomInt() || _ <- lists:seq(1, Count)], 
+    Items = [randoms:getRandomInt() || _ <- lists:seq(1, Count)],
         
     fprof:apply(?BLOOM, add, [BF, Items]),
     fprof:profile(),
