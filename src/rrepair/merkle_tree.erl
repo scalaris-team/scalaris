@@ -352,7 +352,9 @@ run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
            Start = Size - SigSize,
            <<_:Start/binary, SmallHash:SigSize/integer-unsigned-unit:8>> = Hash,
            SmallHash;
-       true -> Hash
+       true ->
+           <<SmallHash:Size/integer-unit:8>> = Hash,
+           SmallHash
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
