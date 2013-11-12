@@ -30,8 +30,7 @@
          quadrant_intervals/0]).
 
 %export for testing
--export([encodeBlob/2, decodeBlob/1,
-         find_sync_interval/2, quadrant_subints_/3]).
+-export([find_sync_interval/2, quadrant_subints_/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -53,7 +52,7 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([method/0, request/0, db_entry_enc/0]).
+-export_type([method/0, request/0]).
 -endif.
 
 -type quadrant()       :: 1..4. % 1..rep_factor()
@@ -65,8 +64,6 @@
                           sync_finished |       %finish recon on local node
                           sync_finished_remote. %client-side shutdown by merkle-tree recon initiator
 
--type db_entry_enc()   :: binary().
--type db_chunk_enc()   :: [db_entry_enc()].
 -type db_chunk()       :: [{?RT:key(), db_dht:version()}].
 
 -record(bloom_recon_struct,
@@ -192,8 +189,8 @@ on({create_struct2, DestI, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = build_struct,       initiator = false}) ->
     ?TRACE1(_Msg, State),
     % create recon structure based on all elements in sync interval
-    DBList = [encodeBlob(Key, VersionX) || {KeyX, VersionX} <- DBList0,
-                                           none =/= (Key = map_key_to_interval(KeyX, DestI))],
+    DBList = [{Key, VersionX} || {KeyX, VersionX} <- DBList0,
+                                 none =/= (Key = map_key_to_interval(KeyX, DestI))],
     build_struct(DBList, DestI, RestI, State);
 
 on({start_recon, RMethod, Params} = _Msg, State) ->
@@ -235,8 +232,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     % keys mapped to our interval
     Diff = case bloom:item_count(BF) of
                0 -> [KeyX || {KeyX, _VersionX} <- DBList0];
-               _ -> [KeyX || {KeyX, VersionX} <- DBList0,
-                             not bloom:is_element(BF, encodeBlob(KeyX, VersionX))]
+               _ -> [KeyX || {KeyX, _VersionX} = X <- DBList0,
+                             not bloom:is_element(BF, X)]
            end,
     %if rest interval is non empty start another sync
     SID = rr_recon_stats:get(session_id, Stats),
@@ -260,14 +257,13 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
        true         -> NewState
     end;
 
-on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
+on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = RMethod,           params = Params})
   when RMethod =:= merkle_tree orelse RMethod =:= art->
     ?TRACE1(_Msg, State),
     % no need to map keys since the other node's sync struct was created with
     % keys mapped to our interval
-    DBList = [encodeBlob(KeyX, VersionX) || {KeyX, VersionX} <- DBList0],
     MySyncI = case RMethod of
                   merkle_tree -> Params#merkle_params.interval;
                   art         -> art:get_interval(Params#art_recon_struct.art)
@@ -338,7 +334,7 @@ on({check_nodes_response, CmpResults}, State =
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_struct(DBList::db_chunk_enc(), DestI::intervals:non_empty_interval(),
+-spec build_struct(DBList::db_chunk(), DestI::intervals:non_empty_interval(),
                    RestI::intervals:interval(), state()) -> state() | kill.
 build_struct(DBList, DestI, RestI,
              State = #rr_recon_state{method = RMethod, params = Params,
@@ -665,7 +661,7 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
-                         DestI::intervals:non_empty_interval(), db_chunk_enc(),
+                         DestI::intervals:non_empty_interval(), db_chunk(),
                          Params::parameters() | {}, FinishRecon::boolean())
         -> sync_struct().
 build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
@@ -941,20 +937,6 @@ map_interval(A, B) ->
         [] -> intervals:empty();
         [_|_] -> util:randomelem(InterSecs)
     end.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec encodeBlob(?RT:key(), db_dht:value() | db_dht:version()) -> db_entry_enc().
-encodeBlob(A, B) ->
-    term_to_binary([A, "#", B]).
-
--spec decodeBlob(term()) -> {?RT:key(), db_dht:value() | db_dht:version()} | fail.
-decodeBlob(Blob) when is_binary(Blob) ->
-    case binary_to_term(Blob) of
-        [Key, "#", X] -> {Key, X};
-        _ -> fail
-    end;
-decodeBlob(_) -> fail.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % STARTUP

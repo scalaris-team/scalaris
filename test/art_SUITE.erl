@@ -50,7 +50,7 @@ end_per_suite(Config) ->
 -spec prop_new(intervals:key(), intervals:key()) -> boolean().
 prop_new(L, R) ->
     I = unittest_helper:build_interval(L, R),
-    DB = db_generator:get_db(I, 400, uniform),
+    DB = db_generator:get_db(I, 400, uniform, [{output, list_keytpl}]),
     Art1 = art:new(),
     Conf1 = art:get_config(Art1),
     Art2 = art:new(merkle_tree:new(I, DB, []), 
@@ -73,7 +73,7 @@ tester_new(_) ->
 -spec prop_lookup(intervals:key(), intervals:key()) -> boolean().    
 prop_lookup(L, R) ->    
     I = unittest_helper:build_interval(L, R),
-    DB = db_generator:get_db(I, 400, uniform),
+    DB = db_generator:get_db(I, 400, uniform, [{output, list_keytpl}]),
     Tree = merkle_tree:new(I, DB, []),
     Art = art:new(Tree),
     Found = nodes_in_art(merkle_tree:iterator(Tree), Art, 0),
@@ -99,7 +99,7 @@ eprof(_) ->
     ToAdd=1273,
     
     I = intervals:new('[', L, R, ']'),
-    Keys = db_generator:get_db(I, ToAdd, uniform),
+    Keys = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
     Merkle = merkle_tree:new(I, Keys, []),
         
     _ = eprof:start(),

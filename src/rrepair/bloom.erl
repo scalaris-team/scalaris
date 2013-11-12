@@ -51,7 +51,7 @@
                }).
 %-opaque bloom_filter() :: #bloom{}.
 -type bloom_filter() :: #bloom{}. %make opaque causes lots of dialyzer warnings
--type key() :: binary() | integer() | float() | boolean() | atom() | tuple() | ?RT:key().
+-type key() :: any().
 
 -ifdef(with_export_type_support).
 -export_type([bloom_filter/0, key/0]).

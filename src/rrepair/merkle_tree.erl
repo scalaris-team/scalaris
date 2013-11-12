@@ -41,7 +41,7 @@
 -export([bulk_build/3]).
 -export([tester_create_hash_fun/1, tester_create_inner_hash_fun/1]).
 
--compile({inline, [get_hash/1, get_interval/1, node_size/1]}).
+-compile({inline, [get_hash/1, get_interval/1, node_size/1, decode_key/1]}).
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
@@ -58,8 +58,9 @@
 -endif.
 
 -type mt_node_key()     :: non_neg_integer().
--type mt_interval()     :: intervals:interval(). 
--type mt_bucket()       :: [?RT:key() | rr_recon:db_entry_enc()].
+-type mt_interval()     :: intervals:interval().
+-type mt_bucket_entry() :: {?RT:key()} | {?RT:key(), any()} | {?RT:key(), any(), any()}. % add more, if needed
+-type mt_bucket()       :: [mt_bucket_entry()].
 -type mt_size()         :: {InnerNodes::non_neg_integer(), Leafs::non_neg_integer()}.
 -type hash_fun()        :: fun((binary()) -> binary()).
 -type inner_hash_fun()  :: fun(([mt_node_key(),...]) -> mt_node_key()).
@@ -217,7 +218,7 @@ insert_list(Terms, Tree) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec insert(Key::?RT:key() | rr_recon:db_entry_enc(), merkle_tree()) -> merkle_tree().
+-spec insert(Key::mt_bucket_entry(), merkle_tree()) -> merkle_tree().
 insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree) ->
     CheckKey = decode_key(Key),
     case intervals:in(CheckKey, get_interval(Root)) of
@@ -225,7 +226,7 @@ insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree)
         false -> Tree
     end.
 
--spec insert_to_node(Key::?RT:key() | rr_recon:db_entry_enc(), CheckKey::?RT:key(),
+-spec insert_to_node(Key::mt_bucket_entry(), CheckKey::?RT:key(),
                      Node::mt_node(), Config::mt_config())
         -> NewNode::mt_node().
 insert_to_node(Key, _CheckKey, {_Hash, Count, Bucket, Interval, []} = N, Config)
@@ -237,19 +238,11 @@ insert_to_node(Key, _CheckKey, {_Hash, Count, Bucket, Interval, []} = N, Config)
 
 insert_to_node(Key, CheckKey, {_, BucketSize, Bucket, Interval, []},
                #mt_config{ branch_factor = BranchFactor,
-                           bucket_size = BucketSize } = Config) ->    
+                           bucket_size = BucketSize } = Config) ->
+    % former leaf node which will become an inner node
     ChildI = intervals:split(Interval, BranchFactor),
-    NewLeafs = [begin 
-                    {NewBucket, BCount} = 
-                        lists:foldl(fun (K, {List, Sum} = Acc) -> 
-                                             case intervals:in(K, I) of 
-                                                 true -> {[K | List], Sum + 1}; 
-                                                 false -> Acc 
-                                             end 
-                                    end, {[], 0}, Bucket),
-                    {nil, BCount, NewBucket, I, []} 
-                end 
-                || I <- ChildI],
+    NewLeafs = [{nil, CX, BX, IX, []}
+               || {IX, CX, BX} <- keys_to_intervals(Bucket, ChildI)],
     insert_to_node(Key, CheckKey, {nil, 1 + BranchFactor, [], Interval, NewLeafs}, Config);
 
 insert_to_node(Key, CheckKey, {Hash, Count, [], Interval, Childs = [_|_]} = Node, Config) ->
@@ -298,7 +291,7 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
                   {nil, Count, Bucket, Interval, []};
               true ->
                   % need to hash here since we won't keep the bucket!
-                  Hash = run_leaf_hf(lists:usort(Bucket), Interval,
+                  Hash = run_leaf_hf(lists:ukeysort(1, Bucket), Interval,
                                      Config#mt_config.leaf_hf,
                                      Config#mt_config.signature_size),
                   {Hash, Count, [], Interval, []}
@@ -341,7 +334,7 @@ gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf, _LeafHf, _SigSize,
     N;
 gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
               true, CleanBuckets) ->
-    Bucket1 = lists:usort(Bucket),
+    Bucket1 = lists:ukeysort(1, Bucket),
     Hash = run_leaf_hf(Bucket1, I, LeafHf, SigSize),
     {Hash, Count, ?IIF(CleanBuckets, [], Bucket1), I, Childs}.
 
@@ -509,18 +502,14 @@ build_config(ParamList) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Decodes a key for use by the merkle_tree.
--spec decode_key(Key::rr_recon:db_entry_enc() | ?RT:key()) -> ?RT:key().
-decode_key(Key) ->
-    case rr_recon:decodeBlob(Key) of
-        {K, _} -> K;
-        fail -> Key
-    end.
+-spec decode_key(Key::mt_bucket_entry()) -> ?RT:key().
+decode_key(Key) -> element(1, Key).
 
-% @doc inserts key into its matching interval
-%      precondition: key fits into one of the given intervals
--spec p_key_in_I(Key, CheckKey::?RT:key(), ReverseLeft::[Bucket],
+%% @doc Inserts Key into its matching interval
+%%      PreCond: Key fits into one of the given intervals,
+%%               CheckKey is the decoded Key (see decode_key/1)
+-spec p_key_in_I(Key::mt_bucket_entry(), CheckKey::?RT:key(), ReverseLeft::[Bucket],
                  Right::[Bucket,...]) -> [Bucket,...] when
-    is_subtype(Key,    Key::?RT:key() | rr_recon:db_entry_enc()),
     is_subtype(Bucket, {I::intervals:continuous_interval(), Count::non_neg_integer(), mt_bucket()}).
 p_key_in_I(Key, CheckKey, ReverseLeft, [{Interval, C, L} = P | Right]) ->
     case intervals:in(CheckKey, Interval) of
@@ -528,9 +517,10 @@ p_key_in_I(Key, CheckKey, ReverseLeft, [{Interval, C, L} = P | Right]) ->
         false -> p_key_in_I(Key, CheckKey, [P | ReverseLeft], Right)
     end.
 
--spec keys_to_intervals(mt_bucket(), [I,...]) -> [{I, Count, mt_bucket()}] when
-    is_subtype(I,     intervals:continuous_interval()),
-    is_subtype(Count, non_neg_integer()).
+%% @doc Inserts the given keys into the given intervals.
+-spec keys_to_intervals(mt_bucket(), [I,...])
+        -> Buckets::[{I, Count::non_neg_integer(), mt_bucket()}] when
+    is_subtype(I, intervals:continuous_interval()).
 keys_to_intervals(KList, IList) ->
     IBucket = [{I, 0, []} || I <- IList],
     lists:foldr(fun(Key, Acc) ->
