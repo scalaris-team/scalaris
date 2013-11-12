@@ -206,7 +206,7 @@ new(RT, RMState, DB) ->
          (state(), lease_db2) -> prbr:state();
          (state(), lease_db3) -> prbr:state();
          (state(), lease_db4) -> prbr:state();
-         (state(), lease_list) -> l_on_cseq:lease_list_state();
+         (state(), lease_list) -> lease_list:lease_list();
          (state(), mr_state) -> orddict:orddict().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
@@ -300,7 +300,7 @@ set_prbr_state(State, WhichDB, Value) ->
         leases_4 -> State#state{lease_db4 = Value}
     end.
 
--spec set_lease_list(state(), l_on_cseq:lease_list_state()) -> state().
+-spec set_lease_list(state(), lease_list:lease_list()) -> state().
 set_lease_list(State, LeaseList) ->
     State#state{lease_list = LeaseList}.
 
