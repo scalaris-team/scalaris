@@ -141,9 +141,10 @@ tester_type_check_l_on_cseq(_Config) ->
              {unittest_lease_update, 3}, %% only for unittests
              {disable_lease, 2}, %% requires dht_node_state
              {on, 2}, %% cannot create dht_node_state (reference for bulkowner)
-             {get_pretty_timeout, 1} %% cannot create valid timestamps
+             {get_pretty_timeout, 1}, %% cannot create valid timestamps
+             {read, 2} %% cannot create pids
            ],
-           [ {read, 2}, %% cannot create pids
+           [
              {get_active_lease, 1}, %% cannot create reference (bulkowner uses one in dht_node_state
              {format_utc_timestamp, 1} %% cannot create valid timestamps
            ]},
@@ -814,12 +815,6 @@ wait_for_split_fail_msg() ->
         {split, fail, _} ->
             ok
     end.
-
-wait_for_ring_size(Size) ->
-    wait_for(fun () -> api_vm:number_of_nodes() == Size end).
-
-wait_for_correct_ring() ->
-    wait_for(fun () -> admin:check_ring_deep() == ok end).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
