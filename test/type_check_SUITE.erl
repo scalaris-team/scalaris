@@ -348,6 +348,7 @@ tester_type_check_rrepair(_Config) ->
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
              {p_check_node, 5}, %% needs same-length lists
+             {merkle_get_sync_leaves, 3}, %% needs merkle_tree with hashes
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
