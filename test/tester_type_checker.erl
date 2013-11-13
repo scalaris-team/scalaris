@@ -75,6 +75,9 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
         binary ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_binary/1, no_binary);
+        {builtin_type, bitstring} ->
+            check_basic_type(Value, Type, CheckStack, ParseState,
+                             fun erlang:is_bitstring/1, no_bitstring);
         bool ->
             check_basic_type(Value, Type, CheckStack, ParseState,
                              fun erlang:is_boolean/1, no_boolean);

@@ -65,6 +65,11 @@ create_value_(binary, Size, ParseState) ->
     create_val_50rand_50coll(
       ParseState, fun tester_parse_state:get_binaries/1,
       fun() -> list_to_binary(create_value({list, {range, {integer, 0}, {integer, 16#ff}}}, Size, ParseState)) end);
+create_value_({builtin_type, bitstring}, Size, ParseState) ->
+    Binary = create_value_(binary, Size, ParseState),
+    RandByte = crypto:rand_uniform(0, 256),
+    RandBits = crypto:rand_uniform(0, 8),
+    <<Binary/binary,RandByte:RandBits>>;
 create_value_(bool, _Size, _ParseState) ->
     case crypto:rand_uniform(0, 2) of
         0 -> false;
