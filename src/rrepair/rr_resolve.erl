@@ -55,7 +55,8 @@
 -type option()   :: feedback_response |
                     {feedback_request, comm:mypid()} |
                     {send_stats, comm:mypid()} | %send stats to pid after completion
-                    {session_id, rrepair:session_id()}.
+                    {session_id, rrepair:session_id()} |
+                    {report, 0 | 1}.
 -type options()  :: [option()].
 -type kvv_list() :: [{?RT:key(), db_dht:value(), db_dht:version()}].
 -type exit_reason() :: resolve_ok | resolve_abort.
@@ -88,7 +89,8 @@
          feedbackDestPid= undefined                               :: undefined | comm:mypid(),
          feedbackKvv    = {[], gb_trees:empty()}                  :: {MissingOnOther::kvv_list(), MyIKvTree::gb_tree()},
          send_stats     = undefined                               :: undefined | comm:mypid(),
-         stats          = #resolve_stats{}                        :: stats()
+         stats          = #resolve_stats{}                        :: stats(),
+         report         = 1                                       :: 0 | 1
          }).
 -type state() :: #rr_resolve_state{}.
 
@@ -115,13 +117,15 @@
 on({start, Operation, Options}, State) ->
     FBDest = proplists:get_value(feedback_request, Options, undefined),
     FBResp = proplists:get_value(feedback_response, Options, false),
+    Report = proplists:get_value(report, Options, 1),
     StatsDest = proplists:get_value(send_stats, Options, undefined),
     SID = proplists:get_value(session_id, Options, null),
     NewState = State#rr_resolve_state{ operation = Operation,
                                        stats = #resolve_stats{ feedback_response = FBResp,
                                                                session_id = SID },
                                        feedbackDestPid = FBDest,
-                                       send_stats = StatsDest },
+                                       send_stats = StatsDest,
+                                       report = Report },
     ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p - FeedbackResponse=~p~n SessionId:~p",
            [element(1, Operation), FBDest, FBResp, SID], NewState),
     comm:send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
@@ -245,10 +249,11 @@ on({get_entries_response, EntryList}, State =
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {interval_upd_send, I, Dest},
                           feedbackDestPid = FBDest,
-                          stats = Stats }) ->
+                          stats = Stats, report = Report }) ->
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
            [interval_upd_send, Stats#resolve_stats.session_id, length(EntryList)], State),
-    Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
+    Options0 = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
+    Options = [{report, Report bxor 1} | Options0],
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     case Stats#resolve_stats.session_id of
         null -> comm:send(Dest, {request_resolve, {interval_upd, I, KvvList}, Options});
@@ -386,14 +391,33 @@ integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
 -spec shutdown(exit_reason(), state(), undefined | comm:mypid(), kvv_list(),
                options()) -> kill.
 shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
-                                    stats = Stats, operation = _Op} = _State,
-         KUDest, KUItems, KUOptions) ->
+                                    stats = Stats, operation = _Op, report = Report} = _State,
+         KUDest, KUItems, KUOptions0) ->
     ?TRACE("SHUTDOWN ~p - Operation=~p~n SessionId:~p~n ~p items via key_upd to ~p~n Items: ~.2p",
            [_Reason, element(1, _Op), Stats#resolve_stats.session_id,
             length(KUItems), KUDest, KUItems], _State),
-    send_key_upd(KUDest, KUItems, Stats#resolve_stats.session_id, KUOptions),
+    case KUDest of
+        undefined -> ok;
+        _ ->
+            % note: do not propagate the SessionId unless we report to the node
+            %       the request came from (indicated by Report =:= 1),
+            %       otherwise the resolve_progress_report on the other node will
+            %       be counted for the session's rs_finish and it will not match
+            %       its rs_called any more!
+            NewReport = Report bxor 1,
+            KUOptions = [{report, NewReport} | KUOptions0],
+            case Stats#resolve_stats.session_id of
+                null ->
+                    comm:send(KUDest, {request_resolve, {key_upd, KUItems}, KUOptions});
+                SID ->
+                    comm:send(KUDest, {request_resolve, SID, {key_upd, KUItems}, KUOptions})
+            end
+    end,
     send_stats(SendStats, Stats),
-    comm:send_local(Owner, {resolve_progress_report, self(), Stats}),
+    if Report =:= 1 ->
+           comm:send_local(Owner, {resolve_progress_report, self(), Stats});
+       true -> ok
+    end,
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -445,17 +469,6 @@ entry_to_kvv(Entry) ->
     {db_entry:get_key(Entry),
      db_entry:get_value(Entry),
      db_entry:get_version(Entry)}.
-
--spec send_key_upd(Dest::comm:mypid() | undefined, Items::kvv_list(),
-                   rrepair:session_id() | null, options()) -> ok.
-send_key_upd(undefined, _, _, _) ->
-    ok;
-send_key_upd(DestPid, Items, SID, Options) ->
-    if SID =:= null ->
-           comm:send(DestPid, {request_resolve, {key_upd, Items}, Options});
-       true ->
-           comm:send(DestPid, {request_resolve, SID, {key_upd, Items}, Options})
-    end.
 
 -spec send_stats(comm:mypid() | undefined, stats()) -> ok.
 send_stats(undefined, _) ->

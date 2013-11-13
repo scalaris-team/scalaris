@@ -246,7 +246,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
         case Diff of
             [_|_] ->
                 send_local(OwnerL, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff},
-                                    [{feedback_request, comm:make_global(OwnerL)}]}),
+                                    [{feedback_request, comm:make_global(OwnerL)},
+                                     {report, 1}]}),
                 %feedback causes 2 resolve runs
                 rr_recon_stats:inc([{resolve_started, 2}], Stats);
             [] -> Stats
@@ -604,14 +605,14 @@ resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
             if Items > 0 ->
                    send_local(OwnerL, {request_resolve, SID,
                                        {interval_upd_send, Interval, Dest},
-                                       Options}),
+                                       [{report, 1} | Options]}),
                    2;
                true ->
                    % we know that we don't have data in this range, so we must
                    % regenerate it from the other node
                    % -> send him this request directly!
                    send(Dest, {request_resolve, SID, {interval_upd, Interval, []},
-                               [{session_id, SID} | Options]}),
+                               [{report, 0}, {session_id, SID} | Options]}),
                    1
             end
     end.
