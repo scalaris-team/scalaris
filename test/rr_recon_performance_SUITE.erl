@@ -190,7 +190,7 @@ bloom(_) ->
     Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(ToAdd, Fpr)),
     BaseBF = bloom:new(ToAdd, Fpr, Hfs),
     List = random_list(ToAdd),
-    TestBF = bloom:add(BaseBF, List),
+    TestBF = bloom:add_list(BaseBF, List),
 
     AddT = measure_util:time_avg(fun() -> for_to_ex(1, ToAdd,
                                                     fun(I) -> I end,
@@ -199,7 +199,7 @@ bloom(_) ->
                                  end,
                                  ExecTimes, []),
     
-    AddListT = measure_util:time_avg(fun() -> bloom:add(BaseBF, List) end,
+    AddListT = measure_util:time_avg(fun() -> bloom:add_list(BaseBF, List) end,
                                      ExecTimes, []),
 
     IsElemT = measure_util:time_avg(
@@ -252,7 +252,7 @@ bloom2(_) ->
                   1, ToAdd div ChunkSize,
                   fun(I) -> I end,
                   fun(_I, B) ->
-                          bloom:add(B, random_list(ChunkSize))
+                          bloom:add_list(B, random_list(ChunkSize))
                   end,
                   BaseBF)
         end,
@@ -333,6 +333,7 @@ bloom2(_) ->
 % UTILS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec random_list(Count::pos_integer()) -> [pos_integer(),...].
 random_list(Count) ->
     util:for_to_ex(1, Count, fun(_) -> randoms:getRandomInt() end).
 

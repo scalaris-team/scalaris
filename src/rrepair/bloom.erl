@@ -27,7 +27,7 @@
 
 -include("scalaris.hrl").
 
--export([new/2, new/3, new/4, add/2, is_element/2, item_count/1]).
+-export([new/2, new/3, new/4, add/2, add_list/2, is_element/2, item_count/1]).
 -export([equals/2, join/2, print/1]).
 
 -export([calc_HF_num/1, calc_HF_num/2, calc_HF_numEx/2,
@@ -93,13 +93,20 @@ new_(BitSize, MaxItems, Hfs) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Adds one or more items to the bloom filter.
--spec add(bloom_filter(), key() | [key()]) -> bloom_filter().
-add(#bloom{size = BFSize,
+%% @doc Adds one item to the bloom filter.
+-spec add(bloom_filter(), key()) -> bloom_filter().
+add(#bloom{size = BFSize, hfs = Hfs, items_count = FilledCount,
+           filter = Filter} = Bloom, Item) ->
+    Bloom#bloom{filter = p_add_list_v1(Hfs, BFSize, Filter, [Item]),
+                items_count = FilledCount + 1}.
+
+%% @doc Adds multiple items to the bloom filter.
+-spec add_list(bloom_filter(), [key()]) -> bloom_filter().
+add_list(#bloom{size = BFSize,
            hfs = Hfs,
            items_count = FilledCount,
            filter = Filter
-          } = Bloom, Items) when is_list(Items) ->
+          } = Bloom, Items) ->
     % choose version according to the number of elements to add:
     % when setting around 16*3 positions, V2 is faster
     MinLengthForV2 = erlang:max(1, (16 * 3) div ?REP_HFS:size(Hfs)),
@@ -109,14 +116,7 @@ add(#bloom{size = BFSize,
            true ->
                p_add_list_v1(Hfs, BFSize, Filter, Items)
         end,
-    Bloom#bloom{filter = F, items_count = FilledCount + ItemsL};
-add(#bloom{size = BFSize,
-           hfs = Hfs,
-           items_count = FilledCount,
-           filter = Filter
-          } = Bloom, Item) ->
-    Bloom#bloom{filter = p_add_list_v1(Hfs, BFSize, Filter, [Item]),
-                items_count = FilledCount + 1}.
+    Bloom#bloom{filter = F, items_count = FilledCount + ItemsL}.
 
 -compile({inline, [p_add_list_v1/4, p_add_list_v1_/4,
                    p_add_list_v2/4]}).

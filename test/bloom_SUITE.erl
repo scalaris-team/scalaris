@@ -55,16 +55,16 @@ end_per_suite(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_p_add_list(BF0Items::[bloom:key()], Items::[bloom:key()]) -> true.
+-spec prop_p_add_list(BF0Items::[?BLOOM:key()], Items::[?BLOOM:key()]) -> true.
 prop_p_add_list(BF0Items, Items) ->
     BF0 = newBloom(erlang:max(10, erlang:length(Items)), 0.1),
-    BF = bloom:add(BF0, BF0Items),
-    Hfs = bloom:get_property(BF, hfs),
-    BFSize = bloom:get_property(BF, size),
-    BFBin = bloom:get_property(BF, filter),
+    BF = ?BLOOM:add_list(BF0, BF0Items),
+    Hfs = ?BLOOM:get_property(BF, hfs),
+    BFSize = ?BLOOM:get_property(BF, size),
+    BFBin = ?BLOOM:get_property(BF, filter),
     
-    ?equals(bloom:p_add_list_v1(Hfs, BFSize, BFBin, Items),
-            bloom:p_add_list_v2(Hfs, BFSize, BFBin, Items)).
+    ?equals(?BLOOM:p_add_list_v1(Hfs, BFSize, BFBin, Items),
+            ?BLOOM:p_add_list_v2(Hfs, BFSize, BFBin, Items)).
 
 tester_p_add_list(_) ->
     prop_p_add_list([], [6,7,8]),
@@ -94,7 +94,7 @@ tester_add(_) ->
 -spec prop_add_list([?BLOOM:key(),...]) -> true.
 prop_add_list(Items) ->
     B1 = newBloom(erlang:length(Items), 0.1),
-    B2 = ?BLOOM:add(B1, Items),
+    B2 = ?BLOOM:add_list(B1, Items),
     lists:foreach(fun(X) -> ?assert(?BLOOM:is_element(B2, X)) end, Items),
     ?equals(?BLOOM:get_property(B2, items_count), length(Items)).
 
@@ -106,8 +106,8 @@ tester_add_list(_) ->
 -spec prop_join([?BLOOM:key(),...], [?BLOOM:key(),...]) -> true.
 prop_join(List1, List2) ->
     BSize = erlang:length(List1) + erlang:length(List2),
-    B1 = ?BLOOM:add(newBloom(BSize, 0.1), List1),
-    B2 = ?BLOOM:add(newBloom(BSize, 0.1), List2),
+    B1 = ?BLOOM:add_list(newBloom(BSize, 0.1), List1),
+    B2 = ?BLOOM:add_list(newBloom(BSize, 0.1), List2),
     B3 = ?BLOOM:join(B1, B2),
     lists:foreach(fun(X) -> ?assert(?BLOOM:is_element(B1, X) andalso
                                         ?BLOOM:is_element(B3, X)) end, List1),
@@ -122,8 +122,8 @@ tester_join(_) ->
 
 -spec prop_equals([?BLOOM:key(),...]) -> true.
 prop_equals(List) ->
-    B1 = ?BLOOM:add(newBloom(erlang:length(List), 0.1), List),
-    B2 = ?BLOOM:add(newBloom(erlang:length(List), 0.1), List),
+    B1 = ?BLOOM:add_list(newBloom(erlang:length(List), 0.1), List),
+    B2 = ?BLOOM:add_list(newBloom(erlang:length(List), 0.1), List),
     ?assert(?BLOOM:equals(B1, B2)).
 
 tester_equals(_) ->
@@ -158,7 +158,7 @@ prop_fpr(ItemCount, ItemType) ->
 measure_fpr({DestFpr, HFCount}, {InList, ItemCount}, ListItemType) ->
     Hfs = ?HFS:new(HFCount),
     InitBF = ?BLOOM:new(ItemCount, DestFpr, Hfs),
-    BF = ?BLOOM:add(InitBF, InList),
+    BF = ?BLOOM:add_list(InitBF, InList),
     
     Count = trunc(10 / ?BLOOM:get_property(BF, fpr)),
     _NotInList = random_list(ListItemType, Count),
@@ -182,7 +182,7 @@ eprof(_) ->
     Items = [randoms:getRandomInt() || _ <- lists:seq(1, Count)],
         
     _ = eprof:start(),
-    Fun = fun() -> ?BLOOM:add(BF, Items) end,
+    Fun = fun() -> ?BLOOM:add_list(BF, Items) end,
     eprof:profile([], Fun),
     eprof:stop_profiling(),
     eprof:analyze(procs, [{sort, time}]),
