@@ -142,7 +142,8 @@ on({get_state_response, MyI}, State =
     % Send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
     MyIKvTree = lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
-                                    gb_trees:insert(KeyX, VersionX, TreeX)
+                                    % assume, KVs at the same node are equal
+                                    gb_trees:enter(KeyX, VersionX, TreeX)
                             end, gb_trees:empty(), MyIKvvList),
     
     % allow the garbage collection to clean up the KvvList here:
@@ -225,7 +226,8 @@ on({get_entries_response, EntryList}, State =
     % Send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
     MyIKvTree = lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
-                                    gb_trees:insert(KeyX, VersionX, TreeX)
+                                    % assume, KVs at the same node are equal
+                                    gb_trees:enter(KeyX, VersionX, TreeX)
                             end, gb_trees:empty(), MyIKvvList),
     MissingOnOther = [entry_to_kvv(X) || X <- EntryList,
                                          not gb_trees:is_defined(db_entry:get_key(X), MyIKvTree)],
