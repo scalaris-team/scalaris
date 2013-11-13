@@ -114,16 +114,14 @@
          }).
 -type state() :: #rr_recon_state{}.
 
--define(ok_inner,    1).
--define(ok_leaf,     2).
--define(fail_leaf,   3).
--define(fail_inner,  4).
+-define(recon_ok,         1).
+-define(recon_fail_leaf,  2).
+-define(recon_fail_inner, 3).
 
--type merkle_cmp_result()  :: ?ok_inner |
-                              ?ok_leaf |
-                              ?fail_leaf |
-                              {?fail_leaf, merkle_tree:mt_node_key()} |
-                              ?fail_inner.
+-type merkle_cmp_result()  :: ?recon_ok |
+                              ?recon_fail_leaf |
+                              {?recon_fail_leaf, merkle_tree:mt_node_key()} |
+                              ?recon_fail_inner.
 -type merkle_cmp_request() ::
           merkle_tree:mt_node_key() |
           {NodesToOmit::pos_integer(), LeafHash::merkle_tree:mt_node_key()}.
@@ -475,28 +473,28 @@ p_check_node([{ToOmit, Hash} | TK], [Node | TN], AccR, AccN, AccRes) ->
     ToResolve = merkle_get_sync_leaves([Node | OmitNodes0], Hash, AccRes),
     p_check_node(TK, RestNodes, AccR, AccN, ToResolve);
 p_check_node([Hash | TK], [Node | TN], AccR, AccN, AccRes) ->
-    IsLeaf = merkle_tree:is_leaf(Node),
     case merkle_tree:is_hash_equal(Node, Hash) of
-        true when IsLeaf ->
-            p_check_node(TK, TN, [?ok_leaf | AccR], AccN, AccRes);
-        true when not IsLeaf ->
-            p_check_node(TK, TN, [?ok_inner | AccR], AccN, AccRes);
-        false when IsLeaf ->
-            case merkle_tree:is_leaf_hash(Hash) of
+        true ->
+            p_check_node(TK, TN, [?recon_ok | AccR], AccN, AccRes);
+        false ->
+            case merkle_tree:is_leaf(Node) of
                 true ->
-                    % note: we could alternatively start the resolve here
-                    %       instead of on the initiator, but we have to send
-                    %       the tag anyway and the initiator starts all the
-                    %       other resolves, so it is better to have this one
-                    %       there as well.
-                    p_check_node(TK, TN, [?fail_leaf | AccR], AccN, AccRes);
+                    case merkle_tree:is_leaf_hash(Hash) of
+                        true ->
+                            % note: we could alternatively start the resolve here
+                            %       instead of on the initiator, but we have to send
+                            %       the tag anyway and the initiator starts all the
+                            %       other resolves, so it is better to have this one
+                            %       there as well.
+                            p_check_node(TK, TN, [?recon_fail_leaf | AccR], AccN, AccRes);
+                        false ->
+                            NodeHash = merkle_tree:get_hash(Node),
+                            p_check_node(TK, TN, [{?recon_fail_leaf, NodeHash} | AccR], AccN, AccRes)
+                    end;
                 false ->
-                    NodeHash = merkle_tree:get_hash(Node),
-                    p_check_node(TK, TN, [{?fail_leaf, NodeHash} | AccR], AccN, AccRes)
-            end;
-        false when not IsLeaf ->
-            Childs = merkle_tree:get_childs(Node),
-            p_check_node(TK, TN, [?fail_inner | AccR], [Childs | AccN], AccRes)
+                    Childs = merkle_tree:get_childs(Node),
+                    p_check_node(TK, TN, [?recon_fail_inner | AccR], [Childs | AccN], AccRes)
+            end
     end.
 
 %% @doc Processes compare results from check_node/2 on the initiator.
@@ -531,22 +529,19 @@ process_tree_cmp_result(CmpResult, Tree, BranchSize, Stats) ->
       is_subtype(RestTree,  [merkle_tree:mt_node()]).
 p_process_tree_cmp_result([], [], _, Stats, Req, Res, RTree) ->
     {lists:reverse(Req), Res, Stats, lists:reverse(RTree)};
-p_process_tree_cmp_result([?ok_inner | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
+p_process_tree_cmp_result([?recon_ok | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     NStats = rr_recon_stats:inc([{tree_compareSkipped, merkle_tree:size(Node)}], Stats),
     p_process_tree_cmp_result(TR, TN, BS, NStats, Req, Res, RTree);
-p_process_tree_cmp_result([?ok_leaf | TR], [_Node | TN], BS, Stats, Req, Res, RTree) ->
-    NStats = rr_recon_stats:inc([{tree_compareSkipped, 1}], Stats),
-    p_process_tree_cmp_result(TR, TN, BS, NStats, Req, Res, RTree);
-p_process_tree_cmp_result([?fail_leaf | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
+p_process_tree_cmp_result([?recon_fail_leaf | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     ?ASSERT(merkle_tree:is_leaf(Node)),
     % note: no leaf hash is equal to 0! (there should only be this one node anyway)
     ?ASSERT(not merkle_tree:is_leaf_hash(0)),
     NewRes = merkle_get_sync_leaves([Node], 0, Res),
     p_process_tree_cmp_result(TR, TN, BS, Stats, Req, NewRes, RTree);
-p_process_tree_cmp_result([{?fail_leaf, Hash} | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
+p_process_tree_cmp_result([{?recon_fail_leaf, Hash} | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     NewRes = merkle_get_sync_leaves([Node], Hash, Res),
     p_process_tree_cmp_result(TR, TN, BS, Stats, Req, NewRes, RTree);
-p_process_tree_cmp_result([?fail_inner | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
+p_process_tree_cmp_result([?recon_fail_inner | TR], [Node | TN], BS, Stats, Req, Res, RTree) ->
     case merkle_tree:is_leaf(Node) of
         false ->
             Childs = merkle_tree:get_childs(Node),
