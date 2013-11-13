@@ -181,11 +181,7 @@ get_hash({Hash, _, _, _, _}) -> Hash.
 -spec is_hash_equal(merkle_tree() | mt_node(), Hash::mt_node_key()) -> boolean().
 is_hash_equal({merkle_tree, _, Node}, Hash) -> is_hash_equal(Node, Hash);
 is_hash_equal({Hash2, _, _, _, _}, Hash1) ->
-    case (Hash1 bxor Hash2) of
-        0 -> true; % hashes from same types of nodes (leaf/inner)
-        1 -> true; % hashes from different types of nodes (leaf/inner)
-        _ -> false
-    end.
+    (Hash1 bsr 1) =:= (Hash2 bsr 1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -369,7 +365,7 @@ gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
 %% @doc Hashes an inner node based on its childrens' hashes.
 -spec run_inner_hf([mt_node(),...], InnerHf::inner_hash_fun()) -> mt_node_key().
 run_inner_hf(Childs, InnerHf) ->
-    (InnerHf([get_hash(C) || C <- Childs]) bsr 1) bsl 1.
+    InnerHf([get_hash(C) || C <- Childs]) bsl 1.
 
 %% @doc Hashes a leaf with the given (sorted!) bucket.
 -spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun(),
@@ -384,10 +380,10 @@ run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
     if Size > SigSize  ->
            Start = Size - SigSize,
            <<_:Start/binary, SmallHash:SigSize/integer-unsigned-unit:8>> = Hash,
-           SmallHash bxor 1;
+           (SmallHash bsl 1) bor 1;
        true ->
            <<SmallHash:Size/integer-unit:8>> = Hash,
-           SmallHash bxor 1
+           (SmallHash bsl 1) bor 1
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
