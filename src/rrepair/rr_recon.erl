@@ -139,7 +139,7 @@
     % merkle tree sync messages
     {check_nodes, SenderPid::comm:mypid(), ToCheck::[merkle_cmp_request()]} |
     {check_nodes, ToCheck::[merkle_cmp_request()]} |
-    {check_nodes_response, Results::binary(), HashKeys::[merkle_tree:mt_node_key()]} |
+    {check_nodes_response, Results::bitstring(), HashKeys::[merkle_tree:mt_node_key()]} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
     {create_struct2, DestI::intervals:interval(),
@@ -449,9 +449,9 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 
 %% @doc Transforms merkle compare results into a compact representation for
 %%      transfer.
--spec merkle_compress_cmp_result(CmpRes, Bin, CmpRes) -> {Bin, [merkle_tree:mt_node_key()]}
-    when is_subtype(Bin, binary()),
-         is_subtype(CmpRes, [merkle_cmp_result()]).
+-spec merkle_compress_cmp_result([merkle_cmp_result()], Bin, Hashes) -> {Bin, Hashes}
+    when is_subtype(Bin, bitstring()),
+         is_subtype(Hashes, [merkle_tree:mt_node_key()]).
 merkle_compress_cmp_result([], Bin, Keys) ->
     {Bin, lists:reverse(Keys)};
 merkle_compress_cmp_result([H1 | TL], Bin, Keys) ->
@@ -466,7 +466,7 @@ merkle_compress_cmp_result([H1 | TL], Bin, Keys) ->
 
 %% @doc Transforms the compact representation of merkle compare results from
 %%      merkle_compress_cmp_result/3 back into the original form.
--spec merkle_decompress_cmp_result(binary(), [merkle_tree:mt_node_key()], CmpRes) -> CmpRes
+-spec merkle_decompress_cmp_result(bitstring(), [merkle_tree:mt_node_key()], CmpRes) -> CmpRes
     when is_subtype(CmpRes, [merkle_cmp_result()]).
 merkle_decompress_cmp_result(<<>>, [], CmpRes) ->
     lists:reverse(CmpRes);
