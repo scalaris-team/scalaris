@@ -34,9 +34,11 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
-import java.util.zip.GZIPInputStream;
 
+import java.util.zip.GZIPInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
+import de.zib.scalaris.examples.wikipedia.data.xml.util.SevenZInputStream;
+
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
@@ -628,10 +630,12 @@ public class Main {
             is = new GZIPInputStream(new FileInputStream(filename));
         } else if (filename.endsWith(".xml.bz2")) {
             is = new BZip2CompressorInputStream(new FileInputStream(filename));
+        } else if (filename.endsWith(".xml.7z")) {
+            is = new SevenZInputStream(new File(filename));
         } else if (filename.endsWith(".xml")) {
             is = new FileInputStream(filename);
         } else {
-            System.err.println("Unsupported file: " + filename + ". Supported: *.xml.gz, *.xml.bz2, *.xml");
+            System.err.println("Unsupported file: " + filename + ". Supported: *.xml.gz, *.xml.bz2, *.xml.7z, *.xml");
             System.exit(-1);
             return null; // will never be reached but is necessary to keep javac happy
         }
