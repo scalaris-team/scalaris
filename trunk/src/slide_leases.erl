@@ -131,10 +131,12 @@ prepare_send_delta1(State, OldSlideOp, ReplyPid) ->
             end;
         error ->
             % @todo
-            {ActiveLeaseList, PassiveLeaseList} = dht_node_state:get(State, lease_list),
+            LeaseList = dht_node_state:get(State, lease_list),
+            ActiveLease = lease_list:get_active_lease(LeaseList),
+            PassiveLeaseList = lease_list:get_passive_leases(LeaseList),
             Interval = slide_op:get_interval(OldSlideOp),
             log:log("unknown lease in prepare_send_delta1~n"),
-            log:log("~p:~p~n", [ActiveLeaseList, PassiveLeaseList]),
+            log:log("~p:~p~n", [ActiveLease, PassiveLeaseList]),
             log:log("~p~n", [Interval]),
             error
     end.
