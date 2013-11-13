@@ -163,8 +163,8 @@ test_quadruple_join_quadruple_leave(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 join_test(TargetSize) ->
-    wait_for_ring_size(1),
-    wait_for_correct_ring(),
+    lease_helper:wait_for_ring_size(1),
+    lease_helper:wait_for_correct_ring(),
     join_until(TargetSize),
     true.
 
@@ -180,11 +180,11 @@ joiner_helper(Current, Target) ->
 synchronous_join(TargetSize) ->
     api_vm:add_nodes(1),
     log:log("wait for ring size ~w", [TargetSize]),
-    wait_for_ring_size(TargetSize),
+    lease_helper:wait_for_ring_size(TargetSize),
     log:log("wait for correct ring"),
-    wait_for_correct_ring(),
+    lease_helper:wait_for_correct_ring(),
     log:log("wait for correct leases ~w", [TargetSize]),
-    wait_for_correct_leases(TargetSize).
+    lease_helper:wait_for_correct_leases(TargetSize).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -193,11 +193,11 @@ synchronous_join(TargetSize) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 join_leave_test(JoinTargetSize, LeaveTargetSize) ->
-    wait_for_ring_size(1),
-    wait_for_correct_ring(),
+    lease_helper:wait_for_ring_size(1),
+    lease_helper:wait_for_correct_ring(),
     join_until(JoinTargetSize),
-    print_all_active_leases(),
-    print_all_passive_leases(),
+    lease_helper:print_all_active_leases(),
+    lease_helper:print_all_passive_leases(),
     leave_until(JoinTargetSize, LeaveTargetSize),
     true.
 
@@ -208,151 +208,12 @@ leave_until(CurrentSize, TargetSize) ->
     Node = pid_groups:pid_of(Group, dht_node),
     ct:pal("shuting down node: ~w ~w", [Group, Node]),
     ok = api_vm:shutdown_node(Group),
-    wait_for_ring_size(CurrentSize - 1),
+    lease_helper:wait_for_ring_size(CurrentSize - 1),
     ct:pal("have correct ring size ~w", [Node]),
-    wait_for_correct_ring(),
+    lease_helper:wait_for_correct_ring(),
     ct:pal("have correct ring ~w", [Node]),
-    wait_for_correct_leases(CurrentSize - 1),
+    lease_helper:wait_for_correct_leases(CurrentSize - 1),
     ct:pal("shuting down node: success"),
     leave_until(CurrentSize - 1, TargetSize).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% wait helper
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-wait_for(F) ->
-    case F() of
-        true ->
-            ok;
-        false ->
-            wait_for(F);
-        X ->
-            ct:pal("error in wait_for ~p", [X]),
-            wait_for(F)
-    end.
 
-wait_for_ring_size(Size) ->
-    wait_for(fun () -> api_vm:number_of_nodes() == Size end).
-
-wait_for_correct_ring() ->
-    wait_for(fun () -> ct:pal("->admin:check_ring_deep()"),
-                       Res = admin:check_ring_deep(),
-                       ct:pal("<-admin:check_ring_deep()"),
-                       Res == ok
-             end).
-
-
-get_dht_node_state(Pid, What) ->
-    comm:send_local(Pid, {get_state, comm:this(), What}),
-    receive
-        {get_state_response, Data} ->
-            Data
-    end.
-
-get_all_leases() ->
-    [ get_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ].
-
-get_leases(Pid) ->
-    get_dht_node_state(Pid, lease_list).
-
-wait_for_correct_leases(TargetSize) ->
-    ct:pal("running lease_checker"),
-    wait_for(lease_checker(TargetSize)),
-    ct:pal("have correct lease_checker"),
-    wait_for(fun check_leases_per_node/0),
-    ct:pal("have correct leases_per_node").
-
-is_disjoint([]) ->
-    true;
-is_disjoint([H | T]) ->
-    is_disjoint(H, T) andalso
-        is_disjoint(T).
-
-is_disjoint(_I, []) ->
-    true;
-is_disjoint(I, [H|T]) ->
-    intervals:is_empty(intervals:intersection([I],[H]))
-        andalso is_disjoint(I, T).
-
-lease_checker(TargetSize) ->
-    fun () ->
-            LeaseLists = get_all_leases(),
-            ActiveLeases  = [lease_list:get_active_lease(LL)  || LL  <- LeaseLists],
-            PassiveLeases = lists:flatten([lease_list:get_passive_leases(LL) || LL <- LeaseLists]),
-            ActiveIntervals =   lists:flatten(
-                                  [ l_on_cseq:get_range(Lease) || Lease <- ActiveLeases, Lease =/= empty]),
-            NormalizedActiveIntervals = intervals:tester_create_interval(ActiveIntervals),
-            %log:log("Lease-Checker: ~w ~w ~w", [ActiveLeases, ActiveIntervals, PassiveLeases]),
-            %ct:pal("ActiveIntervals: ~p", [ActiveIntervals]),
-            %ct:pal("PassiveLeases: ~p", [PassiveLeases]),
-            IsAll = intervals:is_all(NormalizedActiveIntervals),
-            IsDisjoint = is_disjoint(ActiveIntervals),
-            HaveAllActiveLeases = length(ActiveLeases) == TargetSize,
-            HaveNoPassiveLeases = length(PassiveLeases) == 0,
-            %case IsAll of
-            %    false -> log:log("not IsAll~n");
-            %    true -> ok
-            %end,
-            %if
-            %    not IsDisjoint -> log:log("not IsDisjoint~n");
-            %    true -> ok
-            %end,
-            %if
-            %    not HaveAllActiveLeases ->
-            %        log:log("not HaveAllActiveLeases: ~w ~w~n", [length(ActiveLeases), TargetSize]),
-            %        log:log("~p", [ActiveLeases]);
-            %    true -> ok
-            %end,
-            %if
-            %    not HaveNoPassiveLeases -> log:log("not HaveNoPassiveLeases~n");
-            %    true -> ok
-            %end,
-            IsAll andalso
-                IsDisjoint andalso
-                HaveAllActiveLeases andalso % @todo enable after garbage collection is implemented
-                HaveNoPassiveLeases
-    end.
-
-check_leases_per_node() ->
-    lists:all(fun (B) -> B end, [ check_local_leases(DHTNode) || DHTNode <- pid_groups:find_all(dht_node) ]).
-
-check_local_leases(DHTNode) ->
-    LeaseList = get_dht_node_state(DHTNode, lease_list),
-    ActiveLease = lease_list:get_active_lease(LeaseList),
-    PassiveLeases = lease_list:get_passive_leases(LeaseList),
-    %log:log("active lease: ~w", [ActiveLease]),
-    ActiveInterval = case ActiveLease of
-                         empty ->
-                             intervals:empty();
-                         _ ->
-                             l_on_cseq:get_range(ActiveLease)
-                     end,
-    MyRange = get_dht_node_state(DHTNode, my_range),
-    LocalCorrect = are_equal(MyRange, ActiveInterval),
-    length(PassiveLeases) == 0 andalso LocalCorrect.
-
-
-%% @doc checks whether two interval lists cover the same range
--spec are_equal(intervals:interval(), list(intervals:interval())) -> boolean().
-are_equal(A, B) ->
-    %log:log("are equal: ~w ~w", [A, B]),
-    A =:= B.
-    %A =:= lists:foldl(fun intervals:union/2, intervals:empty(), B).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% utility functions
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-print_all_active_leases() ->
-    AllLeases = get_all_leases(),
-    ActiveLeases = [ lease_list:get_active_lease(LL) || LL <- AllLeases ],
-    log:log("active leases: ~w", [ActiveLeases]),
-    ok.
-
-print_all_passive_leases() ->
-    AllLeases = get_all_leases(),
-    PassiveLeases = [ lease_list:get_passive_leases(LL) || LL <- AllLeases ],
-    log:log("passive leases: ~w", [PassiveLeases]),
-    ok.
