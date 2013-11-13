@@ -153,7 +153,7 @@ prepend_merkle_childs(L, [Child | Rest], ChildCF) ->
       is_subtype(BF,        bloom:bloom_filter()).
 fill_bloom(Iter, IBF, LBF) ->
     {InnerHashes, LeafHashes} = merkle_get_hashes(Iter, [], []),
-    {bloom:add(IBF, InnerHashes), bloom:add(LBF, LeafHashes)}.
+    {bloom:add_list(IBF, InnerHashes), bloom:add_list(LBF, LeafHashes)}.
 
 -spec merkle_get_hashes(merkle_tree:mt_iter(), InnerHashes1::HashL, LeafHashes1::HashL)
         -> {InnerHashes2::HashL, LeafHashes2::HashL} when
