@@ -47,6 +47,7 @@
 -export([make_lease_list/2]).
 -export([get_active_lease/1]).
 -export([get_passive_leases/1]).
+-export([get_active_range/1]).
 
 -spec empty() -> lease_list().
 empty() ->
@@ -63,6 +64,15 @@ make_lease_list(Active, Passive) ->
 -spec get_active_lease(lease_list()) -> active_lease_t().
 get_active_lease(#lease_list_t{active=Active}) ->
     Active.
+
+-spec get_active_range(lease_list()) -> intervals:interval().
+get_active_range(#lease_list_t{active=Active}) ->
+    case Active of
+        empty ->
+            intervals:empty();
+        _ ->
+            l_on_cseq:get_range(Active)
+    end.
 
 -spec get_passive_leases(lease_list()) -> list(l_on_cseq:lease_t()).
 get_passive_leases(#lease_list_t{passive=Passive}) ->
