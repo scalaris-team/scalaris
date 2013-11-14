@@ -469,7 +469,7 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 %% @doc Transforms a list of merkle keys, i.e. hashes, into a compact binary
 %%      representation for transfer.
 -spec merkle_compress_hashlist(Hashes::[merkle_tree:mt_node_key()], Bin,
-                               SigSize::pos_integer()) -> Bin
+                               SigSize::1..161) -> Bin
     when is_subtype(Bin, bitstring()).
 merkle_compress_hashlist([], Bin, _SigSize) ->
     Bin;
@@ -478,7 +478,7 @@ merkle_compress_hashlist([H1 | TL], Bin, SigSize) ->
 
 %% @doc Transforms the compact binary representation of merkle hash lists from
 %%      merkle_compress_hashlist/2 back into the original form.
--spec merkle_decompress_hashlist(bitstring(), Hashes, SigSize::pos_integer()) -> Hashes
+-spec merkle_decompress_hashlist(bitstring(), Hashes, SigSize::1..161) -> Hashes
     when is_subtype(Hashes, [merkle_tree:mt_node_key()]).
 merkle_decompress_hashlist(<<>>, HashListR, _SigSize) ->
     lists:reverse(HashListR);
@@ -490,7 +490,7 @@ merkle_decompress_hashlist(Bin, HashListR, SigSize) ->
 %%      transfer.
 -spec merkle_compress_cmp_result(
         [merkle_cmp_result()], FlagsIN::Bin, HashesBinIN::Bin,
-        SigSize::pos_integer()) -> {FlagsOUT::Bin, HashesBinOUT::Bin}
+        SigSize::1..161) -> {FlagsOUT::Bin, HashesBinOUT::Bin}
     when is_subtype(Bin, bitstring()).
 merkle_compress_cmp_result([], Flags, HashesBin, _SigSize) ->
     {Flags, HashesBin};
@@ -508,7 +508,7 @@ merkle_compress_cmp_result([H1 | TL], Bin, HashesBin, SigSize) ->
 %% @doc Transforms the compact representation of merkle compare results from
 %%      merkle_compress_cmp_result/3 back into the original form.
 -spec merkle_decompress_cmp_result(Flags::Bin, HashesBin::Bin, CmpRes,
-                                   SigSize::pos_integer()) -> CmpRes
+                                   SigSize::1..161) -> CmpRes
     when is_subtype(Bin, bitstring()),
          is_subtype(CmpRes, [merkle_cmp_result()]).
 merkle_decompress_cmp_result(<<>>, <<>>, CmpRes, _SigSize) ->

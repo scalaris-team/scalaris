@@ -333,7 +333,10 @@ tester_type_check_rrepair(_Config) ->
              {on, 2}, %% tries to send messages, needs valid state with pid
              {init, 1}, %% needs a pid in the state
              {start, 2}, %% tries to spawn processes
-             {map_interval, 2} %% second interval must be in a single quadrant
+             {map_interval, 2}, %% second interval must be in a single quadrant
+
+             {merkle_decompress_hashlist, 3}, %% needs a special binary to correspond to a number of bits
+             {merkle_decompress_cmp_result, 4} %% needs a special binary to correspond to a list
            ],
            [
              % currently unsupported (bounded funs) by tester:
@@ -348,7 +351,6 @@ tester_type_check_rrepair(_Config) ->
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
              {p_check_node, 5}, %% needs same-length lists
-             {merkle_decompress_cmp_result, 3}, %% needs a special binary to correspond to a list
              {merkle_get_sync_leaves, 3}, %% needs merkle_tree with hashes
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
