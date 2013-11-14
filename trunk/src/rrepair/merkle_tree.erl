@@ -94,48 +94,61 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Gets the given merkle tree's signature size (in bits).
 -spec get_signature_size(merkle_tree()) -> pos_integer().
 get_signature_size({merkle_tree, Config, _}) ->
     Config#mt_config.signature_size.
 
+%% @doc Gets the given merkle tree's bucket size (number of elements in a leaf).
 -spec get_bucket_size(merkle_tree()) -> pos_integer().
 get_bucket_size({merkle_tree, Config, _}) ->
     Config#mt_config.bucket_size.
 
+%% @doc Gets the given merkle tree's branch factor (max number of children of
+%%      an inner node).
 -spec get_branch_factor(merkle_tree()) -> pos_integer().
 get_branch_factor({merkle_tree, Config, _}) ->
     Config#mt_config.branch_factor.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Gets the root node of a merkle tree.
 -spec get_root(merkle_tree()) -> mt_node() | undefined.
 get_root({merkle_tree, _, Root}) -> Root;
 get_root(_) -> undefined.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Checks whether the merkle tree has any children or elements.
 -spec is_empty(merkle_tree()) -> boolean().
 is_empty({merkle_tree, _, {_, 0, [], _I, []}}) -> true;
 is_empty(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Creates a new empty merkle tree with default params for the given
+%%      interval.
 -spec new(mt_interval()) -> merkle_tree().
 new(I) ->
     new(I, []).
 
-% @doc ConfParams = list of tuples defined by {config field name, value}
-%       e.g. [{branch_factor, 32}, {bucket_size, 16}]
+%% @doc Creates a new empty merkle tree with the given params and interval.
+%%      ConfParams = list of tuples defined by {config field name, value}
+%%      e.g. [{branch_factor, 32}, {bucket_size, 16}]
 -spec new(mt_interval(), mt_config_params()) -> merkle_tree().
 new(I, ConfParams) ->
     Config = build_config(ConfParams),
     [Root] = build_childs([{I, 0, []}], Config, []),
     gen_hash({merkle_tree, Config, Root}).
 
--spec new(mt_interval(), KeyList::mt_bucket(), mt_config_params())
+%% @doc Creates a new empty merkle tree with the given params and interval and
+%%      inserts entries from EntryList.
+%%      ConfParams = list of tuples defined by {config field name, value}
+%%      e.g. [{branch_factor, 32}, {bucket_size, 16}]
+-spec new(mt_interval(), EntryList::mt_bucket(), mt_config_params())
         -> merkle_tree().
-new(I, KeyList, ConfParams) ->
-    gen_hash(bulk_build(I, KeyList, ConfParams)).
+new(I, EntryList, ConfParams) ->
+    gen_hash(bulk_build(I, EntryList, ConfParams)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
