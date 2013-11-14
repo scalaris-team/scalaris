@@ -66,8 +66,7 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
-                                                    {leases, true},
-                                                    {leases_gc, true}]}]),
+                                                    {leases, true}]}]),
             Config
     end.
 
