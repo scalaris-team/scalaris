@@ -31,6 +31,8 @@
 
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3]).
+-export([merkle_compress_hashlist/3, merkle_decompress_hashlist/3,
+         merkle_compress_cmp_result/4, merkle_decompress_cmp_result/4]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -52,7 +54,7 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([method/0, request/0]).
+-export_type([method/0, request/0, merkle_cmp_result/0]).
 -endif.
 
 -type quadrant()       :: 1..4. % 1..rep_factor()
@@ -137,9 +139,9 @@
     % API
     request() |
     % merkle tree sync messages
-    {?check_nodes, SenderPid::comm:mypid(), ToCheck::[merkle_cmp_request()]} |
-    {?check_nodes, ToCheck::[merkle_cmp_request()]} |
-    {?check_nodes_response, Results::bitstring(), HashKeys::[merkle_tree:mt_node_key()]} |
+    {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring()} |
+    {?check_nodes, ToCheck::bitstring()} |
+    {?check_nodes_response, Results::bitstring(), HashKeys::bitstring()} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
     {create_struct2, DestI::intervals:interval(),
@@ -290,14 +292,17 @@ on({?check_nodes, SenderPid, ToCheck}, State) ->
     NewState = State#rr_recon_state{dest_recon_pid = SenderPid},
     on({?check_nodes, ToCheck}, NewState);
 
-on({?check_nodes, ToCheck},
+on({?check_nodes, ToCheck0},
    State = #rr_recon_state{ stage = reconciliation,    initiator = false,
                             struct = Tree,             ownerPid = OwnerL,
                             dest_rr_pid = DestNodePid, stats = Stats,
-                            dest_recon_pid = DestReconPid }) ->
+                            dest_recon_pid = DestReconPid, params = Params }) ->
     ?ASSERT(comm:is_valid(DestReconPid)),
+    ToCheck = merkle_decompress_hashlist(ToCheck0, [],
+                                         Params#merkle_params.signature_size + 1),
     {Result, RestTree, ToResolve} = check_node(ToCheck, Tree),
-    {Result1, HashKeys} = merkle_compress_cmp_result(Result, <<>>, []),
+    {Result1, HashKeys} = merkle_compress_cmp_result(
+                            Result, <<>>, <<>>, Params#merkle_params.signature_size + 1),
     ToResolveLength = length(ToResolve),
     NStats = if ToResolveLength > 0 ->
                     SID = rr_recon_stats:get(session_id, Stats),
@@ -314,13 +319,17 @@ on({?check_nodes_response, Result1, HashKeys}, State =
                         struct = Tree,                 ownerPid = OwnerL,
                         dest_rr_pid = DestNodePid,     stats = Stats,
                         dest_recon_pid = DestReconPid, params = Params }) ->
-    CmpResults = merkle_decompress_cmp_result(Result1, HashKeys, []),
+    MerkleS = Params#merkle_params.signature_size,
+    CmpResults = merkle_decompress_cmp_result(Result1, HashKeys, [], MerkleS + 1),
     SID = rr_recon_stats:get(session_id, Stats),
-    {Req, ToResolve, NStats0, RTree} =
-        process_tree_cmp_result(CmpResults, Tree,
-                                Params#merkle_params.branch_factor, Stats),
-    Req =/= [] andalso
-        send(DestReconPid, {?check_nodes, Req}),
+    case process_tree_cmp_result(CmpResults, Tree,
+                                 Params#merkle_params.branch_factor, Stats) of
+        {[], ToResolve, NStats0, RTree} ->
+            ok;
+        {[_|_] = Req0, ToResolve, NStats0, RTree} ->
+            Req = merkle_compress_hashlist(Req0, <<>>, MerkleS + 1),
+            send(DestReconPid, {?check_nodes, Req})
+    end,
     ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
     NStats = rr_recon_stats:inc([{tree_leavesSynced, length(ToResolve)},
                                  {resolve_started, ResolveCount}], NStats0),
@@ -400,14 +409,15 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                                    dest_rr_pid = DestRRPid,
                                    params = MySyncParams0}) ->
     ?TRACE("BEGIN SYNC", []),
+    MerkleS = merkle_tree:get_signature_size(MySyncStruct),
     case Initiator of
         true ->
             MySyncParams = MySyncParams0,
-            send(DestReconPid,
-                 {?check_nodes, comm:this(), [merkle_tree:get_hash(MySyncStruct)]});
+            Req = merkle_compress_hashlist([merkle_tree:get_hash(MySyncStruct)],
+                                           <<>>, MerkleS + 1),
+            send(DestReconPid, {?check_nodes, comm:this(), Req});
         false ->
             MerkleI = merkle_tree:get_interval(MySyncStruct),
-            MerkleS = merkle_tree:get_signature_size(MySyncStruct),
             MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
             MerkleB = merkle_tree:get_bucket_size(MySyncStruct),
             MySyncParams = #merkle_params{interval = MerkleI,
@@ -456,33 +466,59 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 % Merkle Tree specific
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Transforms a list of merkle keys, i.e. hashes, into a compact binary
+%%      representation for transfer.
+-spec merkle_compress_hashlist(Hashes::[merkle_tree:mt_node_key()], Bin,
+                               SigSize::pos_integer()) -> Bin
+    when is_subtype(Bin, bitstring()).
+merkle_compress_hashlist([], Bin, _SigSize) ->
+    Bin;
+merkle_compress_hashlist([H1 | TL], Bin, SigSize) ->
+    merkle_compress_hashlist(TL, <<Bin/bitstring, H1:SigSize>>, SigSize).
+
+%% @doc Transforms the compact binary representation of merkle hash lists from
+%%      merkle_compress_hashlist/2 back into the original form.
+-spec merkle_decompress_hashlist(bitstring(), Hashes, SigSize::pos_integer()) -> Hashes
+    when is_subtype(Hashes, [merkle_tree:mt_node_key()]).
+merkle_decompress_hashlist(<<>>, HashListR, _SigSize) ->
+    lists:reverse(HashListR);
+merkle_decompress_hashlist(Bin, HashListR, SigSize) ->
+    <<Hash:SigSize/integer-unit:1, T/bitstring>> = Bin,
+    merkle_decompress_hashlist(T, [Hash | HashListR], SigSize).
+
 %% @doc Transforms merkle compare results into a compact representation for
 %%      transfer.
--spec merkle_compress_cmp_result([merkle_cmp_result()], Bin, Hashes) -> {Bin, Hashes}
-    when is_subtype(Bin, bitstring()),
-         is_subtype(Hashes, [merkle_tree:mt_node_key()]).
-merkle_compress_cmp_result([], Bin, Keys) ->
-    {Bin, lists:reverse(Keys)};
-merkle_compress_cmp_result([H1 | TL], Bin, Keys) ->
+-spec merkle_compress_cmp_result(
+        [merkle_cmp_result()], FlagsIN::Bin, HashesBinIN::Bin,
+        SigSize::pos_integer()) -> {FlagsOUT::Bin, HashesBinOUT::Bin}
+    when is_subtype(Bin, bitstring()).
+merkle_compress_cmp_result([], Flags, HashesBin, _SigSize) ->
+    {Flags, HashesBin};
+merkle_compress_cmp_result([H1 | TL], Bin, HashesBin, SigSize) ->
     case H1 of
         {K} ->
+            % compress key similar to merkle_compress_hashlist/3
             merkle_compress_cmp_result(TL, <<Bin/bitstring, ?recon_fail_cont2:2>>,
-                                       [K | Keys]);
+                                       <<HashesBin/bitstring, K:SigSize>>, SigSize);
         _ ->
             ?ASSERT(is_integer(H1) andalso 0 =< H1 andalso H1 < 4),
-            merkle_compress_cmp_result(TL, <<Bin/bitstring, H1:2>>, Keys)
+            merkle_compress_cmp_result(TL, <<Bin/bitstring, H1:2>>, HashesBin, SigSize)
     end.
 
 %% @doc Transforms the compact representation of merkle compare results from
 %%      merkle_compress_cmp_result/3 back into the original form.
--spec merkle_decompress_cmp_result(bitstring(), [merkle_tree:mt_node_key()], CmpRes) -> CmpRes
-    when is_subtype(CmpRes, [merkle_cmp_result()]).
-merkle_decompress_cmp_result(<<>>, [], CmpRes) ->
+-spec merkle_decompress_cmp_result(Flags::Bin, HashesBin::Bin, CmpRes,
+                                   SigSize::pos_integer()) -> CmpRes
+    when is_subtype(Bin, bitstring()),
+         is_subtype(CmpRes, [merkle_cmp_result()]).
+merkle_decompress_cmp_result(<<>>, <<>>, CmpRes, _SigSize) ->
     lists:reverse(CmpRes);
-merkle_decompress_cmp_result(<<?recon_fail_cont2:2, T/bitstring>>, [K | Keys], CmpRes) ->
-    merkle_decompress_cmp_result(T, Keys, [{K} | CmpRes]);
-merkle_decompress_cmp_result(<<X:2, T/bitstring>>, Keys, CmpRes) ->
-    merkle_decompress_cmp_result(T, Keys, [X | CmpRes]).
+merkle_decompress_cmp_result(<<?recon_fail_cont2:2, T/bitstring>>, HashesBin, CmpRes, SigSize) ->
+    % similar to merkle_decompress_hashlist/3
+    <<K:SigSize/integer-unit:1, HashesBinRest/bitstring>> = HashesBin,
+    merkle_decompress_cmp_result(T, HashesBinRest, [{K} | CmpRes], SigSize);
+merkle_decompress_cmp_result(<<X:2, T/bitstring>>, HashesBin, CmpRes, SigSize) ->
+    merkle_decompress_cmp_result(T, HashesBin, [X | CmpRes], SigSize).
 
 %% @doc Compares the given Hashes from the other node with my merkle_tree nodes
 %%      (executed on non-initiator).
