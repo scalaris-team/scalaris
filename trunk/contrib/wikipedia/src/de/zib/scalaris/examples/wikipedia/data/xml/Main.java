@@ -444,14 +444,16 @@ public class Main {
      * @throws SAXException
      * @throws IOException
      */
-    private static void runXmlHandler(WikiDumpHandler handler, InputSource file)
+    private static void runXmlHandler(WikiDumpHandler handler, InputSource[] files)
             throws SAXException, IOException {
         XMLReader reader = XMLReaderFactory.createXMLReader();
         handler.setUp();
         ReportAtShutDown shutdownHook = handler.new ReportAtShutDown();
         Runtime.getRuntime().addShutdownHook(shutdownHook);
         reader.setContentHandler(handler);
-        reader.parse(file);
+        for (InputSource file : files) {
+            reader.parse(file);
+        }
         handler.tearDown();
         shutdownHook.reportAtEnd();
         Runtime.getRuntime().removeShutdownHook(shutdownHook);
@@ -614,32 +616,45 @@ public class Main {
     }
     
     /**
-     * Gets an appropriate file reader for the given file.
+     * Gets appropriate file reader(s) for the given file(s).
      * 
      * @param filename
-     *            the name of the file
+     *            the name of the file.
+     *            multiple files are separated using a pipe
      * 
-     * @return a file reader
+     * @return a file reader array
      * 
      * @throws FileNotFoundException
      * @throws IOException
      */
-    public static InputSource getFileReader(String filename) throws FileNotFoundException, IOException {
-        InputStream is;
-        if (filename.endsWith(".xml.gz")) {
-            is = new GZIPInputStream(new FileInputStream(filename));
-        } else if (filename.endsWith(".xml.bz2")) {
-            is = new BZip2CompressorInputStream(new FileInputStream(filename));
-        } else if (filename.endsWith(".xml.7z")) {
-            is = new SevenZInputStream(new File(filename));
-        } else if (filename.endsWith(".xml")) {
-            is = new FileInputStream(filename);
-        } else {
-            System.err.println("Unsupported file: " + filename + ". Supported: *.xml.gz, *.xml.bz2, *.xml.7z, *.xml");
-            System.exit(-1);
-            return null; // will never be reached but is necessary to keep javac happy
+    public static InputSource[] getFileReader(String filename) throws FileNotFoundException, IOException {
+        String[] files = filename.split("\\|");
+        InputSource[] sources = new InputSource[files.length];
+
+        for (int i = 0; i < files.length; i++) {
+
+            String file = files[i];
+            InputStream is;
+
+            if (file.endsWith(".xml.gz")) {
+                is = new GZIPInputStream(new FileInputStream(file));
+            } else if (file.endsWith(".xml.bz2")) {
+                is = new BZip2CompressorInputStream(new FileInputStream(file));
+            } else if (file.endsWith(".xml.7z")) {
+                is = new SevenZInputStream(new File(file));
+            } else if (file.endsWith(".xml")) {
+                is = new FileInputStream(file);
+            } else {
+                System.err.println("Unsupported file: " + file
+                        + ". Supported: *.xml.gz, *.xml.bz2, *.xml.7z, *.xml");
+                System.exit(-1);
+                return null; // will never be reached but is necessary to keep javac happy
+            }
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+            sources[i] = new InputSource(br);
         }
-        BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-        return new InputSource(br);
+
+        return sources;
     }
 }
