@@ -1395,7 +1395,10 @@ extint2atom(X) when is_integer(X) ->
         ?fail -> ?fail_atom;
         ?not_found -> ?not_found_atom;
         ?empty_list -> ?empty_list_atom;
-        ?not_a_list -> ?not_a_list_atom
+        ?not_a_list -> ?not_a_list_atom;
+        %% rrepair
+        ?check_nodes -> ?check_nodes_atom;
+        ?check_nodes_response -> ?check_nodes_response_atom
     end.
 -endif.
 

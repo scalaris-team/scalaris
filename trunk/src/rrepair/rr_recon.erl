@@ -137,9 +137,9 @@
     % API
     request() |
     % merkle tree sync messages
-    {check_nodes, SenderPid::comm:mypid(), ToCheck::[merkle_cmp_request()]} |
-    {check_nodes, ToCheck::[merkle_cmp_request()]} |
-    {check_nodes_response, Results::bitstring(), HashKeys::[merkle_tree:mt_node_key()]} |
+    {?check_nodes, SenderPid::comm:mypid(), ToCheck::[merkle_cmp_request()]} |
+    {?check_nodes, ToCheck::[merkle_cmp_request()]} |
+    {?check_nodes_response, Results::bitstring(), HashKeys::[merkle_tree:mt_node_key()]} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
     {create_struct2, DestI::intervals:interval(),
@@ -285,11 +285,11 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %% merkle tree sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({check_nodes, SenderPid, ToCheck}, State) ->
+on({?check_nodes, SenderPid, ToCheck}, State) ->
     NewState = State#rr_recon_state{dest_recon_pid = SenderPid},
-    on({check_nodes, ToCheck}, NewState);
+    on({?check_nodes, ToCheck}, NewState);
 
-on({check_nodes, ToCheck},
+on({?check_nodes, ToCheck},
    State = #rr_recon_state{ stage = reconciliation,    initiator = false,
                             struct = Tree,             ownerPid = OwnerL,
                             dest_rr_pid = DestNodePid, stats = Stats,
@@ -305,10 +305,10 @@ on({check_nodes, ToCheck},
                                         {resolve_started, ResolveCount}], Stats);
                 true -> Stats
              end,
-    send(DestReconPid, {check_nodes_response, Result1, HashKeys}),
+    send(DestReconPid, {?check_nodes_response, Result1, HashKeys}),
     State#rr_recon_state{ struct = RestTree, stats = NStats };
 
-on({check_nodes_response, Result1, HashKeys}, State =
+on({?check_nodes_response, Result1, HashKeys}, State =
        #rr_recon_state{ stage = reconciliation,        initiator = true,
                         struct = Tree,                 ownerPid = OwnerL,
                         dest_rr_pid = DestNodePid,     stats = Stats,
@@ -320,7 +320,7 @@ on({check_nodes_response, Result1, HashKeys}, State =
                                 get_merkle_branch_factor(), % this is how we build the tree!
                                 Stats),
     Req =/= [] andalso
-        send(DestReconPid, {check_nodes, Req}),
+        send(DestReconPid, {?check_nodes, Req}),
     ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
     NStats = rr_recon_stats:inc([{tree_leavesSynced, length(ToResolve)},
                                  {resolve_started, ResolveCount}], NStats0),
@@ -402,7 +402,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
     case Initiator of
         true ->
             send(DestReconPid,
-                 {check_nodes, comm:this(), [merkle_tree:get_hash(MySyncStruct)]});
+                 {?check_nodes, comm:this(), [merkle_tree:get_hash(MySyncStruct)]});
         false ->
             SID = rr_recon_stats:get(session_id, Stats),
             SyncParams = #merkle_params{interval = merkle_tree:get_interval(MySyncStruct),

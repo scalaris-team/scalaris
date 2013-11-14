@@ -162,3 +162,10 @@
 
 -define(not_a_list_atom, not_a_list).
 -define(not_a_list, ?int_or_atom(88, ?not_a_list_atom)).
+
+%% rrepair
+-define(check_nodes_atom, check_nodes).
+-define(check_nodes, ?int_or_atom(101, ?check_nodes_atom)).
+
+-define(check_nodes_response_atom, check_nodes_response).
+-define(check_nodes_response, ?int_or_atom(102, ?check_nodes_response_atom)).
