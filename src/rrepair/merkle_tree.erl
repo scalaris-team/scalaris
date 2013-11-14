@@ -74,7 +74,7 @@
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
-         signature_size = 32                :: pos_integer(),   %node signature size in bits
+         signature_size = 32                :: 1..160,          %node signature size in bits
          leaf_hf        = fun(V) -> ?CRYPTO_SHA(V) end  :: hash_fun(),      %hash function for leaf signature creation
          inner_hf       = fun inner_hash_XOR/1 :: inner_hash_fun(),%hash function for inner node signature creation -
          keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled
@@ -95,7 +95,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Gets the given merkle tree's signature size (in bits).
--spec get_signature_size(merkle_tree()) -> pos_integer().
+-spec get_signature_size(merkle_tree()) -> 1..160.
 get_signature_size({merkle_tree, Config, _}) ->
     Config#mt_config.signature_size.
 
@@ -353,7 +353,7 @@ gen_hash({merkle_tree, Config = #mt_config{inner_hf = InnerHf,
 
 %% @doc Helper for gen_hash/2.
 -spec gen_hash_node(mt_node(), InnerHf::inner_hash_fun(), LeafHf::hash_fun(),
-                    SigSize::pos_integer(), KeepBucket::boolean(),
+                    SigSize::1..160, KeepBucket::boolean(),
                     CleanBuckets::boolean()) -> mt_node().
 gen_hash_node({_, Count, [], I, [_|_] = List}, InnerHf, LeafHf, SigSize,
               OldKeepBucket, CleanBuckets) ->
@@ -382,7 +382,7 @@ run_inner_hf(Childs, InnerHf) ->
 
 %% @doc Hashes a leaf with the given (sorted!) bucket.
 -spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun(),
-                  SigSize::pos_integer()) -> mt_node_key().
+                  SigSize::1..160) -> mt_node_key().
 run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
     BinBucket = case Bucket of
                     [_|_] -> term_to_binary(Bucket);
