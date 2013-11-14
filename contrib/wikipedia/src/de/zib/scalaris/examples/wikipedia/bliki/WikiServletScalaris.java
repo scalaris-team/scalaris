@@ -401,7 +401,7 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
          */
         @Override
         public void run() {
-            InputSource is = null;
+            InputSource[] is = null;
             try {
                 handler.setUp();
                 if (handler instanceof WikiDumpHandler) {
@@ -409,7 +409,9 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                     XMLReader reader = XMLReaderFactory.createXMLReader();
                     reader.setContentHandler(xmlHandler);
                     is = de.zib.scalaris.examples.wikipedia.data.xml.Main.getFileReader(fileName);
-                    reader.parse(is);
+                    for (InputSource source : is) {
+                        reader.parse(source);
+                    }
                     xmlHandler.new ReportAtShutDown().reportAtEnd();
                     ps.println("import finished");
                 } else if (handler instanceof WikiDumpPreparedSQLiteToScalaris) {
@@ -428,7 +430,9 @@ public class WikiServletScalaris extends WikiServlet<Connection> {
                 handler.tearDown();
                 if (is != null) {
                     try {
-                        is.getCharacterStream().close();
+                        for (InputSource source : is) {
+                            source.getCharacterStream().close();
+                        }
                     } catch (IOException e) {
                         // don't care
                     }
