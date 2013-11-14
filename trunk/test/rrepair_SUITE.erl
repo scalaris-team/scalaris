@@ -37,7 +37,9 @@ basic_tests() ->
      tester_map_key_to_interval,
      tester_map_key_to_quadrant,
      tester_map_interval,
-     tester_find_sync_interval
+     tester_find_sync_interval,
+     tester_merkle_compress_hashlist,
+     tester_merkle_compress_cmp_result
     ].
 
 repair_default() ->
@@ -519,6 +521,37 @@ prop_find_sync_interval(A, B) ->
 
 tester_find_sync_interval(_) ->
     tester:test(?MODULE, prop_find_sync_interval, 2, 100, [{threads, 4}]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec prop_merkle_compress_hashlist(Hashes::[merkle_tree:mt_node_key()], SigSize::1..160) -> boolean().
+prop_merkle_compress_hashlist(Hashes, SigSize) ->
+    Bin = rr_recon:merkle_compress_hashlist(Hashes, <<>>, SigSize),
+    HashesRed = [begin
+                     <<H:SigSize/integer-unit:1>> = <<H0:SigSize>>,
+                     H
+                 end || H0 <- Hashes],
+    ?equals(rr_recon:merkle_decompress_hashlist(Bin, [], SigSize), HashesRed).
+
+tester_merkle_compress_hashlist(_) ->
+    tester:test(?MODULE, prop_merkle_compress_hashlist, 2, 1000, [{threads, 4}]).
+
+-spec prop_merkle_compress_cmp_result(CmpRes::[rr_recon:merkle_cmp_result()],
+                                      SigSize::1..160) -> boolean().
+prop_merkle_compress_cmp_result(CmpRes, SigSize) ->
+    {Flags, HashesBin} =
+        rr_recon:merkle_compress_cmp_result(CmpRes, <<>>, <<>>, SigSize),
+    CmpResRed = [case Cmp of
+                     {H0} ->
+                         <<H:SigSize/integer-unit:1>> = <<H0:SigSize>>,
+                         {H};
+                     X -> X
+                 end || Cmp <- CmpRes],
+    ?equals(rr_recon:merkle_decompress_cmp_result(Flags, HashesBin, [], SigSize),
+            CmpResRed).
+
+tester_merkle_compress_cmp_result(_) ->
+    tester:test(?MODULE, prop_merkle_compress_cmp_result, 2, 1000, [{threads, 4}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
