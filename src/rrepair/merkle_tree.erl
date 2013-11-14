@@ -378,7 +378,7 @@ gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
 %% @doc Hashes an inner node based on its childrens' hashes.
 -spec run_inner_hf([mt_node(),...], InnerHf::inner_hash_fun()) -> mt_node_key().
 run_inner_hf(Childs, InnerHf) ->
-    InnerHf([get_hash(C) || C <- Childs]) bsl 1.
+    (InnerHf([get_hash(C) || C <- Childs]) bsr 1) bsl 1.
 
 %% @doc Hashes a leaf with the given (sorted!) bucket.
 -spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun(),
