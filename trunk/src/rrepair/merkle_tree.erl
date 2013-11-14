@@ -74,7 +74,7 @@
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
-         signature_size = 4                 :: pos_integer(),   %node signature size in byte
+         signature_size = 32                :: pos_integer(),   %node signature size in bits
          leaf_hf        = fun(V) -> ?CRYPTO_SHA(V) end  :: hash_fun(),      %hash function for leaf signature creation
          inner_hf       = fun inner_hash_XOR/1 :: inner_hash_fun(),%hash function for inner node signature creation -
          keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled
@@ -389,13 +389,13 @@ run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
                     []    -> term_to_binary({0, I})
                 end,
     Hash = LeafHf(BinBucket),
-    Size = erlang:byte_size(Hash),
+    Size = erlang:bit_size(Hash),
     if Size > SigSize  ->
            Start = Size - SigSize,
-           <<_:Start/binary, SmallHash:SigSize/integer-unsigned-unit:8>> = Hash,
+           <<_:Start/bitstring, SmallHash:SigSize/integer-unsigned-unit:1>> = Hash,
            (SmallHash bsl 1) bor 1;
        true ->
-           <<SmallHash:Size/integer-unit:8>> = Hash,
+           <<SmallHash:Size/integer-unit:1>> = Hash,
            (SmallHash bsl 1) bor 1
     end.
 

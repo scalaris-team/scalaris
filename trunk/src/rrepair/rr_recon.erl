@@ -1050,7 +1050,7 @@ get_bloom_fpr() ->
 get_max_items() ->
     config:read(rr_max_items).
 
-%% @doc Merkle signature size in byte.
+%% @doc Merkle signature size in bits.
 -spec get_merkle_signature_size() -> pos_integer().
 get_merkle_signature_size() ->
     config:read(rr_merkle_signature_size).
@@ -1065,9 +1065,9 @@ get_merkle_branch_factor() ->
 get_merkle_bucket_size() ->
     config:read(rr_merkle_bucket_size).
 
-%% @doc Merkle signature size in byte to use for ART.
--spec get_art_signature_size() -> 20.
-get_art_signature_size() -> 20. % maximum for SHA1 (= 160 bits)
+%% @doc Merkle signature size in bits to use for ART.
+-spec get_art_signature_size() -> 160.
+get_art_signature_size() -> 160. % maximum for SHA1
 
 -spec get_art_config() -> art:config().
 get_art_config() ->
