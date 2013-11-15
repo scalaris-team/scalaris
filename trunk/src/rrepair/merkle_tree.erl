@@ -35,6 +35,7 @@
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_item_count/1,
          get_signature_size/1, get_bucket_size/1, get_branch_factor/1,
+         get_hash_size/1,
          get_opt_bucket_size/3,
          store_to_DOT/2, store_graph/2]).
 
@@ -98,6 +99,14 @@
 -spec get_signature_size(merkle_tree()) -> 1..160.
 get_signature_size({merkle_tree, Config, _}) ->
     Config#mt_config.signature_size.
+
+%% @doc Gets the actual hash size of a merkle tree or its signature size
+%%      (in bits) including bits needed for flagging hashes as leaf/inner nodes.
+-spec get_hash_size(SigSizeOrMT::1..160 | merkle_tree()) -> 1..161.
+get_hash_size({merkle_tree, Config, _}) ->
+    Config#mt_config.signature_size + 1;
+get_hash_size(SigSize) ->
+    SigSize + 1.
 
 %% @doc Gets the given merkle tree's bucket size (number of elements in a leaf).
 -spec get_bucket_size(merkle_tree()) -> pos_integer().

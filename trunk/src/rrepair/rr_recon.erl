@@ -298,36 +298,38 @@ on({?check_nodes, ToCheck0},
                             dest_rr_pid = DestNodePid, stats = Stats,
                             dest_recon_pid = DestReconPid, params = Params }) ->
     ?ASSERT(comm:is_valid(DestReconPid)),
-    ToCheck = merkle_decompress_hashlist(ToCheck0, [],
-                                         Params#merkle_params.signature_size + 1),
+    HashSize = merkle_tree:get_hash_size(Params#merkle_params.signature_size),
+    ToCheck = merkle_decompress_hashlist(ToCheck0, [], HashSize),
     {Result, RestTree, ToResolve} = check_node(ToCheck, Tree),
-    {Result1, HashKeys} = merkle_compress_cmp_result(
-                            Result, <<>>, <<>>, Params#merkle_params.signature_size + 1),
+    {Flags, HashKeys} =
+        merkle_compress_cmp_result(Result, <<>>, <<>>, HashSize),
     ToResolveLength = length(ToResolve),
-    NStats = if ToResolveLength > 0 ->
-                    SID = rr_recon_stats:get(session_id, Stats),
-                    ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
-                    rr_recon_stats:inc([{tree_leavesSynced, ToResolveLength},
-                                        {resolve_started, ResolveCount}], Stats);
-                true -> Stats
-             end,
-    send(DestReconPid, {?check_nodes_response, Result1, HashKeys}),
+    NStats =
+        if ToResolveLength > 0 ->
+               SID = rr_recon_stats:get(session_id, Stats),
+               ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
+               rr_recon_stats:inc([{tree_leavesSynced, ToResolveLength},
+                                   {resolve_started, ResolveCount}], Stats);
+           true -> Stats
+        end,
+    send(DestReconPid, {?check_nodes_response, Flags, HashKeys}),
     State#rr_recon_state{ struct = RestTree, stats = NStats };
 
-on({?check_nodes_response, Result1, HashKeys}, State =
+on({?check_nodes_response, Flags, HashKeys}, State =
        #rr_recon_state{ stage = reconciliation,        initiator = true,
                         struct = Tree,                 ownerPid = OwnerL,
                         dest_rr_pid = DestNodePid,     stats = Stats,
                         dest_recon_pid = DestReconPid, params = Params }) ->
     MerkleS = Params#merkle_params.signature_size,
-    CmpResults = merkle_decompress_cmp_result(Result1, HashKeys, [], MerkleS + 1),
+    MerkleHS = merkle_tree:get_hash_size(MerkleS),
+    CmpResults = merkle_decompress_cmp_result(Flags, HashKeys, [], MerkleHS),
     SID = rr_recon_stats:get(session_id, Stats),
     case process_tree_cmp_result(CmpResults, Tree,
                                  Params#merkle_params.branch_factor, Stats) of
         {[], ToResolve, NStats0, RTree} ->
             ok;
         {[_|_] = Req0, ToResolve, NStats0, RTree} ->
-            Req = merkle_compress_hashlist(Req0, <<>>, MerkleS + 1),
+            Req = merkle_compress_hashlist(Req0, <<>>, MerkleHS),
             send(DestReconPid, {?check_nodes, Req})
     end,
     ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
@@ -413,8 +415,9 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
     case Initiator of
         true ->
             MySyncParams = MySyncParams0,
+            MerkleHS = merkle_tree:get_hash_size(MerkleS),
             Req = merkle_compress_hashlist([merkle_tree:get_hash(MySyncStruct)],
-                                           <<>>, MerkleS + 1),
+                                           <<>>, MerkleHS),
             send(DestReconPid, {?check_nodes, comm:this(), Req});
         false ->
             MerkleI = merkle_tree:get_interval(MySyncStruct),
