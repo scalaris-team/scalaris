@@ -31,7 +31,7 @@
          lookup/2, size/1, size_detail/1, gen_hash/1, gen_hash/2,
          iterator/1, next/1,
          is_empty/1, is_leaf/1, is_merkle_tree/1,
-         is_hash_equal/2, is_leaf_hash/1,
+         is_leaf_hash/1,
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_item_count/1,
          get_signature_size/1, get_bucket_size/1, get_branch_factor/1,
@@ -193,17 +193,10 @@ lookup_(I, {_, _, _, _NodeI, ChildList = [_|_]}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Gets the node's hash value.
-%%      Note: leaf and inner node hashes are differently tagged and should
-%%            be compared with is_hash_equal/2.
+%%      Note: leaf and inner node hashes are differently tagged.
 -spec get_hash(merkle_tree() | mt_node()) -> mt_node_key().
 get_hash({merkle_tree, _, Node}) -> get_hash(Node);
 get_hash({Hash, _, _, _, _}) -> Hash.
-
-%% @doc Merkle leaf/inner node hash comparison.
--spec is_hash_equal(merkle_tree() | mt_node(), Hash::mt_node_key()) -> boolean().
-is_hash_equal({merkle_tree, _, Node}, Hash) -> is_hash_equal(Node, Hash);
-is_hash_equal({Hash2, _, _, _, _}, Hash1) ->
-    (Hash1 bsr 1) =:= (Hash2 bsr 1).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
