@@ -548,17 +548,16 @@ check_node(Hashes, Tree) ->
 p_check_node([], [], AccR, AccN, AccRes) ->
     {lists:reverse(AccR), lists:append(lists:reverse(AccN)), AccRes};
 p_check_node([Hash | TK], [Node | TN], AccR, AccN, AccRes) ->
-    case merkle_tree:is_hash_equal(Node, Hash) of
-        true ->
+    case merkle_tree:get_hash(Node) of
+        Hash ->
             p_check_node(TK, TN, [?recon_ok | AccR], AccN, AccRes);
-        false ->
+        NodeHash ->
             case merkle_tree:is_leaf(Node) of
                 true ->
                     case merkle_tree:is_leaf_hash(Hash) of
                         true ->
                             p_check_node(TK, TN, [?recon_fail_stop | AccR], AccN, [Node | AccRes]);
                         false ->
-                            NodeHash = merkle_tree:get_hash(Node),
                             p_check_node(TK, TN, [{NodeHash} | AccR], AccN, AccRes)
                     end;
                 false ->
@@ -632,9 +631,9 @@ merkle_get_sync_leaves([], _Skip, ToSyncAcc) ->
 merkle_get_sync_leaves([Node | Rest], Skip, ToSyncAcc) ->
     case merkle_tree:is_leaf(Node) of
         true  ->
-            case merkle_tree:is_hash_equal(Node, Skip) of
-                true  -> merkle_get_sync_leaves(Rest, Skip, ToSyncAcc);
-                false -> merkle_get_sync_leaves(Rest, Skip, [Node | ToSyncAcc])
+            case merkle_tree:get_hash(Node) of
+                Skip -> merkle_get_sync_leaves(Rest, Skip, ToSyncAcc);
+                _    -> merkle_get_sync_leaves(Rest, Skip, [Node | ToSyncAcc])
             end;
         false ->
             merkle_get_sync_leaves(
