@@ -85,7 +85,7 @@ comparison(_) ->
 -spec bloom_build_time(intervals:interval(), [any()], pos_integer(), pos_integer(), float()) -> measure_util:result().
 bloom_build_time(_, DB, DBSize, Iterations, Fpr) ->
     Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(DBSize, Fpr)),
-    BaseBF = bloom:new(DBSize, Fpr, Hfs),
+    BaseBF = bloom:new_fpr(DBSize, Fpr, Hfs),
     measure_util:time_avg(
       fun() ->
               lists:foldl(fun(I, Bloom) -> bloom:add(Bloom, I) end, BaseBF, DB)
@@ -188,7 +188,7 @@ bloom(_) ->
     Fpr = 0.1,
 
     Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(ToAdd, Fpr)),
-    BaseBF = bloom:new(ToAdd, Fpr, Hfs),
+    BaseBF = bloom:new_fpr(ToAdd, Fpr, Hfs),
     List = random_list(ToAdd),
     TestBF = bloom:add_list(BaseBF, List),
 
@@ -240,7 +240,7 @@ bloom2(_) ->
     Fpr = 0.1,
 
     Hfs = hfs_lhsp:new(bloom:calc_HF_numEx(ToAdd, Fpr)),
-    BaseBF = bloom:new(ToAdd, Fpr, Hfs),
+    BaseBF = bloom:new_fpr(ToAdd, Fpr, Hfs),
     
     Hfs = bloom:get_property(BaseBF, hfs),
     BFSize = bloom:get_property(BaseBF, size),
@@ -315,15 +315,15 @@ bloom2(_) ->
             PARAMETER: AddedItems=~p ; ExecTimes=~p
                        BFSize=~p ; #Hfs=~p
             --------------------------------------------------------------" ++ "
-            using bloom:add/2:" ++
+            using bloom:add_list/2 consecutively:" ++
                lists:append(lists:duplicate(length(AddTimesAdd), "
             Res: ~.2p")) ++ "
             --------------------------------------------------------------" ++ "
-            similar to bloom:new/* (V1 vs. V2):" ++
+            using bloom:add_list/2 (V1 vs. V2) on empty bloom filter:" ++
                lists:append(lists:duplicate(length(AddTimesNew), "
             Res: ~.2p")) ++ "
             --------------------------------------------------------------" ++ "
-            similar to bloom:add/* (V1 vs. V2):" ++
+            using bloom:add_list/2 (V1 vs. V2) consecutively:" ++
                lists:append(lists:duplicate(length(AddTimesFold), "
             Res: ~.2p")),
            [ToAdd, ExecTimes, BFSize, ?REP_HFS:size(Hfs)] ++ AddTimesAdd ++ AddTimesNew ++ AddTimesFold),

@@ -747,7 +747,8 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     Fpr = get_bloom_fpr(),
     ElementNum = length(DBItems),
     HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
-    BF = bloom:new(ElementNum, Fpr, ?REP_HFS:new(HFCount), DBItems),
+    BF0 = bloom:new_fpr(ElementNum, Fpr, ?REP_HFS:new(HFCount)),
+    BF = bloom:add_list(BF0, DBItems),
     #bloom_recon_struct{ interval = I, bloom = BF };
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, BeginSync) ->
     ?ASSERT(not intervals:is_empty(I)),

@@ -27,7 +27,7 @@
 
 -include("scalaris.hrl").
 
--export([new/2, new/3, new/4, add/2, add_list/2, is_element/2, item_count/1]).
+-export([new_fpr/2, new_fpr/3, new_bpi/3, add/2, add_list/2, is_element/2, item_count/1]).
 -export([equals/2, join/2, print/1]).
 
 -export([calc_HF_num/1, calc_HF_num/2, calc_HF_numEx/2,
@@ -61,27 +61,29 @@
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Creates new bloom filter with default hash function set
--spec new(non_neg_integer(), float()) -> bloom_filter().
-new(MaxItems, FPR) ->
+%% @doc Creates a new bloom filter with the default (optimal) hash function set
+%%      based on the given false positive rate.
+-spec new_fpr(non_neg_integer(), float()) -> bloom_filter().
+new_fpr(MaxItems, FPR) ->
     Hfs = ?REP_HFS:new(calc_HF_numEx(MaxItems, FPR)),
-    new(MaxItems, FPR, Hfs).
+    new_fpr(MaxItems, FPR, Hfs).
 
--spec new(non_neg_integer(), float() | integer(), ?REP_HFS:hfs()) -> bloom_filter().
-new(MaxItems, FPR, Hfs) when is_float(FPR) ->
+%% @doc Creates a new bloom filter with the given hash function set
+%%      based on the given false positive rate.
+-spec new_fpr(non_neg_integer(), float() | integer(), ?REP_HFS:hfs()) -> bloom_filter().
+new_fpr(MaxItems, FPR, Hfs) when is_float(FPR) ->
     Size = resize(calc_least_size(MaxItems, FPR), 8),
-    new_(Size, MaxItems, Hfs);
-new(MaxItems, BitPerItem, Hfs) ->
-    new_(resize(BitPerItem * MaxItems, 8), MaxItems, Hfs).
+    new_(Size, MaxItems, Hfs).
 
--spec new(non_neg_integer(), float(), ?REP_HFS:hfs(), [key()]) -> bloom_filter().
-new(MaxItems, FPR, Hfs, Items) ->
-    BF = new(MaxItems, FPR, Hfs),
-    add(BF, Items).
+%% @doc Creates a new bloom filter with the given hash function set and a fixed
+%%      number of bits per item.
+-spec new_bpi(non_neg_integer(), float(), ?REP_HFS:hfs()) -> bloom_filter().
+new_bpi(MaxItems, BitPerItem, Hfs) ->
+    new_(resize(util:ceil(BitPerItem * MaxItems), 8), MaxItems, Hfs).
 
-% @doc creates a new bloom filter
+%% @doc Creates a new bloom filter.
 -spec new_(non_neg_integer(), non_neg_integer(), ?REP_HFS:hfs()) -> bloom_filter().
-new_(BitSize, MaxItems, Hfs) when BitSize rem 8 =:= 0 ->
+new_(BitSize, MaxItems, Hfs) when (BitSize rem 8) =:= 0 ->
     #bloom{
            size = BitSize,
            max_items = MaxItems,
@@ -89,7 +91,7 @@ new_(BitSize, MaxItems, Hfs) when BitSize rem 8 =:= 0 ->
            items_count = 0
           };
 new_(BitSize, MaxItems, Hfs) ->
-    new(resize(BitSize, 8), MaxItems, Hfs).
+    new_(resize(BitSize, 8), MaxItems, Hfs).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
