@@ -208,7 +208,7 @@ on({start_recon, RMethod, Params} = _Msg, State) ->
             DestReconPid = undefined;
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
-            ?ASSERT(DestReconPid != undefined),
+            ?ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestReconPid);
         art ->
             MySyncI = art:get_interval(Params#art_recon_struct.art),
