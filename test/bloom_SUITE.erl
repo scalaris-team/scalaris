@@ -157,7 +157,7 @@ prop_fpr(ItemCount, ItemType) ->
 
 measure_fpr({DestFpr, HFCount}, {InList, ItemCount}, ListItemType) ->
     Hfs = ?HFS:new(HFCount),
-    InitBF = ?BLOOM:new(ItemCount, DestFpr, Hfs),
+    InitBF = ?BLOOM:new_fpr(ItemCount, DestFpr, Hfs),
     BF = ?BLOOM:add_list(InitBF, InList),
     
     Count = trunc(10 / ?BLOOM:get_property(BF, fpr)),
@@ -206,7 +206,7 @@ fprof(_) ->
 newBloom(ElementNum, Fpr) ->
     HFCount = ?BLOOM:calc_HF_numEx(ElementNum, Fpr),
     Hfs = ?HFS:new(HFCount),
-    ?BLOOM:new(ElementNum, Fpr, Hfs).
+    ?BLOOM:new_fpr(ElementNum, Fpr, Hfs).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

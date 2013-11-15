@@ -79,8 +79,8 @@ new(Tree) ->
 new(Tree, _Config) ->
     Config = merge_prop_lists(default_config(), _Config),
     {InnerCount, LeafCount} = merkle_tree:size_detail(Tree),
-    InnerBF = bloom:new(InnerCount, proplists:get_value(inner_bf_fpr, Config)),
-    LeafBF = bloom:new(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
+    InnerBF = bloom:new_fpr(InnerCount, proplists:get_value(inner_bf_fpr, Config)),
+    LeafBF = bloom:new_fpr(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),
     ?TRACE("INNER=~p~nLeaf=~p", [bloom:print(IBF), bloom:print(LBF)]),
     {art, Config, merkle_tree:get_interval(Tree), IBF, LBF}.
