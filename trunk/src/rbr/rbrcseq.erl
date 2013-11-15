@@ -808,18 +808,18 @@ add_read_reply(Entry, AssignedRound, Val, AckRound, Cons) ->
     %% on the same version). We ensure this by write_through on odd
     %% cases.
     
-    LatestSeen = entry_latest_seen(Entry),
-    TmpEntry =
-        if AckRound > LatestSeen ->
+    RLatestSeen = entry_latest_seen(Entry),
+    E1 =
+        if AckRound > RLatestSeen ->
                 T1 = entry_set_latest_seen(Entry, AckRound),
                 T2 = entry_set_num_newest(T1, 1),
                 entry_set_val(T2, Val);
-           AckRound =:= LatestSeen ->
+           AckRound =:= RLatestSeen ->
                 entry_inc_num_newest(Entry);
            true -> Entry
     end,
-    MyRound = erlang:max(entry_my_round(TmpEntry), AssignedRound),
-    E2 = entry_set_my_round(TmpEntry, MyRound),
+    MyRound = erlang:max(entry_my_round(E1), AssignedRound),
+    E2 = entry_set_my_round(E1, MyRound),
     E3 = entry_inc_num_acks(E2),
     Done =
         case 3 =< entry_num_acks(E3) of
@@ -839,15 +839,14 @@ add_write_reply(Entry, Round, Cons) ->
         case Round > entry_latest_seen(Entry) of
             false -> Entry;
             true ->
-                %% have to count the dropped acks as denies.
-                case entry_num_acks(Entry) > 0 of
-                    true ->
-                        log:pal("This should not happen a~n");
-                    false -> ok
-                end,
-                %% reset rack and store newer round
-                T1Entry = entry_set_latest_seen(Entry, Round),
-                _T2Entry = entry_set_num_acks(T1Entry, 0)
+                %% this is the first reply, all other positive replies
+                %% should have the same round number, as otherwise they
+                %% would be denies.
+                ?IIF(entry_num_acks(Entry) > 0,
+                     log:pal("This should not happen in real life~n"),
+                     ok),
+                %% set rack and store newer round
+                entry_set_latest_seen(Entry, Round)
         end,
     E2 = entry_inc_num_acks(E1),
     Done = (3 =< entry_num_acks(E2)),
