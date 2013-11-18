@@ -40,7 +40,7 @@
          get_neighbors/1, has_left/1, is_responsible/2,
          notify_new_pred/2, notify_new_succ/2,
          notify_slide_finished/1,
-         propose_new_neighbor/1,
+         propose_new_neighbors/1,
          % received at dht_node, (also) handled here:
          crashed_node/2, zombie_node/2,
          % node/neighborhood change subscriptions:
@@ -83,7 +83,7 @@
     {rm, notify_new_pred, NewPred::node:node_type()} |
     {rm, notify_new_succ, NewSucc::node:node_type()} |
     {rm, notify_slide_finished, SlideType::pred | succ} |
-    {rm, propose_new_neighbor, New::node:node_type()} |
+    {rm, propose_new_neighbors, NewNodes::[node:node_type(),...]} |
     {rm, leave} |
     {rm, pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {rm, succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
@@ -148,10 +148,10 @@ notify_slide_finished(SlideType) ->
 
 %% @doc Sends a message to the local node's dht_node process notifying
 %%      it of a potential new neighbor.
--spec propose_new_neighbor(NewNode::node:node_type()) -> ok.
-propose_new_neighbor(NewNode) ->
+-spec propose_new_neighbors(NewNodes::[node:node_type(),...]) -> ok.
+propose_new_neighbors(NewNodes) ->
     Pid = pid_groups:get_my(dht_node),
-    comm:send_local(Pid, {rm, propose_new_neighbor, NewNode}).
+    comm:send_local(Pid, {rm, propose_new_neighbors, NewNodes}).
 
 %% @doc Updates a dht node's id and sends the ring maintenance a message about
 %%      the change.
@@ -248,8 +248,8 @@ on({rm, notify_slide_finished, SlideType}, State = {RM_State, _HasLeft, SubscrTa
     call_subscribers(Neighborhood, Neighborhood, {slide_finished, SlideType}, SubscrTable),
     State;
 
-on({rm, propose_new_neighbor, NewNode}, State) ->
-    ?RM:contact_new_nodes([NewNode]),
+on({rm, propose_new_neighbors, NewNodes}, State) ->
+    ?RM:contact_new_nodes(NewNodes),
     State;
 
 on({rm, pred_left, OldPred, PredsPred}, State) ->
