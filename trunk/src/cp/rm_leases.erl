@@ -90,7 +90,7 @@ on({rm_change, OldRange, NewRange}, State) ->
     log:log("state: ~w", [State]),
     compare_and_fix_rm_with_leases(State);
 
-on({read_after_rm_change, MissingRange, Result}, State) ->
+on({read_after_rm_change, _MissingRange, Result}, State) ->
     log:log("read_after_rm_change ~w", [Result]),
     case Result of
         {qread_done, _ReqId, _Round, Lease} ->
@@ -101,7 +101,7 @@ on({read_after_rm_change, MissingRange, Result}, State) ->
             State
     end;
 
-on({takeover_after_rm_change, Lease, Result}, State) ->
+on({takeover_after_rm_change, _Lease, Result}, State) ->
     log:log("takeover_after_rm_change ~w", [Result]),
     case Result of
         {takeover, failed, L, Error} ->
@@ -134,11 +134,11 @@ on({takeover_after_rm_change, Lease, Result}, State) ->
             State
     end;
 
-on({merge_after_rm_change, L2, ActiveLease, Result}, State) ->
+on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
     log:log("merge after rm_change: ~w", [Result]),
     State;
 
-on({merge_after_leave, NewLease, OldLease, Result}, State) ->
+on({merge_after_leave, _NewLease, _OldLease, Result}, State) ->
     log:log("merge after finish done: ~w", [Result]),
     State.
 
@@ -152,20 +152,11 @@ compare_and_fix_rm_with_leases(State) ->
              end,
     log:log("lease list ~w", [LeaseList]),
     ActiveRange = lease_list:get_active_range(LeaseList),
-    EmptyInterval = intervals:empty(),
-    if
-        ActiveRange =:= EmptyInterval ->
-            MissingRange = MyRange,
-            log:log("missing range: ~w", [MissingRange]),
-            LeaseId = l_on_cseq:id(MissingRange),
-            Pid = comm:reply_as(self(), 3, {read_after_rm_change, MissingRange, '_'}),
-            l_on_cseq:read(LeaseId, Pid),
-            %#op{missing_range = MissingRange, found_leases = []};
-            State;
-        MyRange =:= ActiveRange ->
-            State;
+    MissingRange = intervals:minus(MyRange, ActiveRange),
+    case intervals:is_empty(MissingRange) of
         true ->
-            MissingRange = intervals:minus(MyRange, ActiveRange),
+            State;
+        false ->
             log:log("missing range: ~w", [MissingRange]),
             LeaseId = l_on_cseq:id(MissingRange),
             Pid = comm:reply_as(self(), 3, {read_after_rm_change, MissingRange, '_'}),
@@ -182,7 +173,7 @@ compare_and_fix_rm_with_leases(State) ->
 add_takeover(#state{takeovers=Takeovers} = State, Lease) ->
     Id = l_on_cseq:get_id(Lease),
     case gb_trees:lookup(Id, Takeovers) of
-        {value, Val} ->
+        {value, _Val} ->
             % @todo ?!?
             State;
         none ->
