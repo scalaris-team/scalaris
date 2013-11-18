@@ -152,10 +152,19 @@ compare_and_fix_rm_with_leases(State) ->
              end,
     log:log("lease list ~w", [LeaseList]),
     ActiveRange = lease_list:get_active_range(LeaseList),
-    case MyRange =:= ActiveRange of
-        true ->
+    EmptyInterval = intervals:empty(),
+    if
+        ActiveRange =:= EmptyInterval ->
+            MissingRange = MyRange,
+            log:log("missing range: ~w", [MissingRange]),
+            LeaseId = l_on_cseq:id(MissingRange),
+            Pid = comm:reply_as(self(), 3, {read_after_rm_change, MissingRange, '_'}),
+            l_on_cseq:read(LeaseId, Pid),
+            %#op{missing_range = MissingRange, found_leases = []};
             State;
-        false ->
+        MyRange =:= ActiveRange ->
+            State;
+        true ->
             MissingRange = intervals:minus(MyRange, ActiveRange),
             log:log("missing range: ~w", [MissingRange]),
             LeaseId = l_on_cseq:id(MissingRange),
