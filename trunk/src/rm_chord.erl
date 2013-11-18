@@ -137,18 +137,7 @@ handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
                       nodelist:succ_ord_node(A, B, nodelist:node(OldNeighborhood))
               end,
     {_, _, NewNodes} = util:ssplit_unique(OldView, NewView, ViewOrd),
-    
-    % TODO: add a local cache of contacted nodes in order not to contact them again
-    ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_', from_node}),
-    case comm:is_valid(ThisWithCookie) of
-        true ->
-            _ = [begin
-                     Msg = {get_node_details, ThisWithCookie, [node, is_leaving]},
-                     comm:send(node:pidX(Node), Msg, ?SEND_OPTIONS)
-                 end || Node <- NewNodes],
-            ok;
-        false -> ok
-    end,
+    contact_new_nodes(NewNodes),
     {{unknown}, State};
 
 handle_custom_message(_, _State) -> unknown_event.
@@ -189,6 +178,20 @@ update_node({OldNeighborhood, TriggerState}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
     % inform neighbors
     handle_custom_message({rm_trigger_action}, {NewNeighborhood, TriggerState}).
+
+-spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
+contact_new_nodes(NewNodes) ->
+    % TODO: add a local cache of contacted nodes in order not to contact them again
+    ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_', from_node}),
+    case comm:is_valid(ThisWithCookie) of
+        true ->
+            _ = [begin
+                     Msg = {get_node_details, ThisWithCookie, [node, is_leaving]},
+                     comm:send(node:pidX(Node), Msg, ?SEND_OPTIONS)
+                 end || Node <- NewNodes],
+            ok;
+        false -> ok
+    end.
 
 -spec leave(State::state()) -> ok.
 leave(_State) -> ok.

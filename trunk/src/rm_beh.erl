@@ -50,6 +50,7 @@
         -> {ChangeReason::rm_loop:reason(), state()}.
 -callback update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
+-callback contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 
 -callback get_web_debug_info(State::state()) -> [{string(), string()}].
 -callback check_config() -> boolean().
@@ -65,6 +66,7 @@ behaviour_info(callbacks) ->
      {new_pred, 2}, {new_succ, 2},
      {leave, 1},
      {remove_pred, 3}, {remove_succ, 3}, {update_node, 2},
+     {contact_new_nodes, 1},
      {get_web_debug_info, 1},
      {check_config, 0},
      {unittest_create_state, 1}

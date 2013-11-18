@@ -25,7 +25,7 @@
          zombie_node/2, crashed_node/2,
          new_pred/2, new_succ/2,
          leave/1, remove_pred/3, remove_succ/3,
-         update_node/2,
+         update_node/2, contact_new_nodes/1,
          get_neighbors/1,
          get_web_debug_info/1,
          check_config/0,

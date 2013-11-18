@@ -276,6 +276,19 @@ update_node({Neighborhood, RandViewSize, Interval, TriggerState, Cache, Churn}, 
     rm_trigger_action({NewNeighborhood, RandViewSize, Interval,
                        TriggerState, Cache, Churn}).
 
+-spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
+contact_new_nodes(NewNodes) ->
+    % TODO: add a local cache of contacted nodes in order not to contact them again
+    ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_'}),
+    case comm:is_valid(ThisWithCookie) of
+        true ->
+            _ = [begin
+                     Msg = {get_node_details, ThisWithCookie, [node, is_leaving]},
+                     comm:send(node:pidX(Node), Msg, ?SEND_OPTIONS)
+                 end || Node <- NewNodes],
+            ok;
+        false -> ok
+    end.
 
 -spec leave(State::state()) -> ok.
 leave(_State) -> ok.
@@ -383,20 +396,6 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
 
     contact_new_nodes(NewNodes),
     OldNeighborhood2.
-
--spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
-contact_new_nodes(NewNodes) ->
-    % TODO: add a local cache of contacted nodes in order not to contact them again
-    ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_'}),
-    case comm:is_valid(ThisWithCookie) of
-        true ->
-            _ = [begin
-                     Msg = {get_node_details, ThisWithCookie, [node, is_leaving]},
-                     comm:send(node:pidX(Node), Msg, ?SEND_OPTIONS)
-                 end || Node <- NewNodes],
-            ok;
-        false -> ok
-    end.
 
 %% @doc Adds and removes the given nodes from the rm_tman state.
 %%      Note: Sets the new RandViewSize to 0 if NodesToRemove is not empty and
