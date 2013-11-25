@@ -23,8 +23,11 @@
 -export([
          % instrument a module
          load_with_export_all/1,
-         load_without_export_all/1
-         ]).
+         load_without_export_all/1,
+         % helper
+         get_src_and_flags_for_module/1,
+         get_src_and_flags_for_module/2
+        ]).
 
 -include("tester.hrl").
 -include("unittest.hrl").
@@ -113,17 +116,18 @@ reload_with_options(Module, MyOptions) ->
 % misc. helper functions
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec get_src_and_flags_for_module(module()) -> {string(), list()}.
+-spec get_src_and_flags_for_module(module())
+        -> {FileName::string(), Flags::list()}.
 get_src_and_flags_for_module(Module) ->
     get_src_and_flags_for_module(Module, ["ebin", "test"]).
     
--spec get_src_and_flags_for_module(module(), Paths::[string(),...]) -> {string(), list()}.
+-spec get_src_and_flags_for_module(module(), RelativePaths::[string(),...])
+        -> {FileName::string(), Flags::list()}.
 get_src_and_flags_for_module(Module, [Path | PathL]) ->
-    % we have to be in $SCALARIS/ebin to find the beam file
-    {ok, CurCWD} = file:get_cwd(),
-    ok = fix_cwd(Path),
-    Res = beam_lib:chunks(Module, [compile_info]),
-    ok = file:set_cwd(CurCWD),
+    % assume we are in a sub-directory of $SCALARIS to find the beam file
+    Res = beam_lib:chunks(
+            lists:append(["../", Path, "/", erlang:atom_to_list(Module), ".beam"]),
+            [compile_info]),
     case Res of
         {ok, {Module, [{compile_info, Options}]}} ->
             {source, Source} = lists:keyfind(source, 1, Options),
@@ -136,18 +140,6 @@ get_src_and_flags_for_module(Module, [Path | PathL]) ->
             ct:pal("~p", [file:get_cwd()]),
             timer:sleep(1000),
             ct:fail(unknown_module)
-    end.
-
-% @doc set cwd to $SCALARIS/RelPath
--spec fix_cwd(RelPath::string()) -> ok | {error, Reason::file:posix()}.
-fix_cwd(RelPath) ->
-    case file:get_cwd() of
-        {ok, CurCWD} ->
-            case string:rstr(CurCWD, "/" ++ RelPath) =/= (length(CurCWD) - 4 + 1) of
-                true -> file:set_cwd("../" ++ RelPath);
-                _    -> ok
-            end;
-        Error -> Error
     end.
 
 % @doc set cwd to $SCALARIS

@@ -83,11 +83,10 @@ run_read_10_10000(_Config) ->
     write_result("result_read_10_10000.txt", Threads * Iterations / RunTime * 1000000.0),
     ok.
 
+-spec write_result(Filename::string(), Result::term()) -> ok.
 write_result(Filename, Result) ->
     % make_ring switched to the bin sub-dir...go to top-level:
-    _ = file:set_cwd(".."),
-    {ok, F} = file:open(Filename, [write]),
+    {ok, F} = file:open("../" ++ Filename, [write]),
     io:fwrite(F, "~p~n", [Result]),
     _ = file:close(F),
-    _ = file:set_cwd("bin"),
     ok.
