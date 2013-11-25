@@ -377,13 +377,13 @@ start_subprocess(StartFun, RunFun) ->
 -spec start_minimal_procs(CTConfig, ConfigOptions::[{atom(), term()}],
                           StartCommServer::boolean()) -> CTConfig when is_subtype(CTConfig, list()).
 start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
-    ok = unittest_helper:fix_cwd(),
+    ok = fix_cwd(),
     {Pid, _} =
         start_process(
           fun() ->
                   {ok, _GroupsPid} = pid_groups:start_link(),
                   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, CTConfig),
-                  ConfigOptions2 = unittest_helper:prepare_config(
+                  ConfigOptions2 = prepare_config(
                                      [{config, [{log_path, PrivDir} | ConfigOptions]}]),
                   {ok, _ConfigPid} = config:start_link(ConfigOptions2),
                   {ok, _LogPid} = log:start_link(),
@@ -392,7 +392,7 @@ start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
                           {ok, _CommPid} = sup:sup_start(
                                              {local, no_name},
                                              sup_comm_layer, []),
-                          Port = unittest_helper:get_scalaris_port(),
+                          Port = get_scalaris_port(),
                           comm_server:set_local_address({127,0,0,1}, Port);
                       false -> ok
                   end
@@ -408,7 +408,7 @@ stop_minimal_procs(CTConfig)  ->
             error_logger:tty(false),
             log:set_log_level(none),
             exit(Pid, kill),
-            unittest_helper:stop_pid_groups(),
+            stop_pid_groups(),
             error_logger:tty(true);
         false -> ok
     end.
@@ -528,7 +528,7 @@ end_per_suite(Config) ->
 -else.
 end_per_suite(Config) ->
     ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
-    unittest_helper:stop_ring(),
+    stop_ring(),
     % the following might still be running in case there was no ring:
     error_logger:tty(false),
     randoms:stop(),
@@ -683,7 +683,7 @@ check_ring_data() ->
 -spec check_ring_data(Timeout::pos_integer(), Retries::non_neg_integer()) -> boolean().
 check_ring_data(Timeout, Retries) ->
     Data = lists:append(
-             [Data || {_Pid, _Interval, Data, {pred, _PredPid}, {succc, _SuccPid}, _Result} <- unittest_helper:get_ring_data()]),
+             [Data || {_Pid, _Interval, Data, {pred, _PredPid}, {succc, _SuccPid}, _Result} <- get_ring_data()]),
     case Retries < 1 of
         true ->
             check_ring_data_all(Data, true);
