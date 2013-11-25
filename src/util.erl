@@ -839,11 +839,11 @@ is_unittest() ->
 make_filename(Name) ->
     re:replace(Name, "[^a-zA-Z0-9\-_@\.]", "_", [{return, list}, global]).
 
-%% @doc Get an application environment variable. If it is undefined, Default is
-%%      returned.
+%% @doc Get an application environment variable for the 'scalaris' application.
+%%      If the variable is undefined, Default is returned.
 -spec app_get_env(Var::atom(), Default::T) -> T.
 app_get_env(Var, Default) ->
-    case application:get_env(Var) of
+    case application:get_env(scalaris, Var) of
         {ok, Val} -> Val;
         _         -> app_check_known(),
                      Default
