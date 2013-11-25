@@ -23,8 +23,7 @@
 %%-define(TRACE_RING_DATA(), print_ring_data()).
 -define(TRACE_RING_DATA(), ok).
 
--export([fix_cwd/0,
-         get_scalaris_port/0, get_yaws_port/0,
+-export([get_scalaris_port/0, get_yaws_port/0,
          make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2,
          stop_ring/0, stop_ring/1,
          stop_pid_groups/0,
@@ -55,20 +54,14 @@
 
 -type kv_opts() :: [{Key::atom(), Value::term()}].
 
-%% @doc Sets the current working directory to "../bin" if it does not end with
-%%      "/bin" yet. Assumes that the current working directory is a sub-dir of
+%% @doc Sets the app environment to point to the correct config file paths
+%%      assuming that the current working directory is a sub-dir of
 %%      our top-level, e.g. "test". This is needed in order for the config
 %%      process to find its (default) config files.
--spec fix_cwd() -> ok | {error, Reason::file:posix()}.
-fix_cwd() ->
-    case file:get_cwd() of
-        {ok, CurCWD} ->
-            case string:rstr(CurCWD, "/bin") =/= (length(CurCWD) - 4 + 1) of
-                true -> file:set_cwd("../bin");
-                _    -> ok
-            end;
-        Error -> Error
-    end.
+-spec set_config_file_paths() -> ok.
+set_config_file_paths() ->
+    application:set_env(scalaris, config, "../bin/scalaris.cfg"),
+    application:set_env(scalaris, local_config, "../bin/scalaris.local.cfg").
 
 -spec get_port(EnvName::string(), Default::pos_integer()) -> pos_integer().
 get_port(EnvName, Default) ->
@@ -146,7 +139,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
     %       (it might use config or another process)
     % allow at most 10s for the whole ring to come up
     TimeTrap = test_server:timetrap(10000),
-    _ = fix_cwd(),
+    set_config_file_paths(),
     error_logger:tty(true),
     case ets:info(config_ets) of
         undefined -> ok;
@@ -197,7 +190,7 @@ make_ring(Size) ->
 make_ring(Size, Options) ->
     % allow at most 1s for each node to come up (+3s for init)
     TimeTrap = test_server:timetrap(3000 + Size * 1000),
-    _ = fix_cwd(),
+    set_config_file_paths(),
     error_logger:tty(true),
     case ets:info(config_ets) of
         undefined -> ok;
@@ -377,7 +370,7 @@ start_subprocess(StartFun, RunFun) ->
 -spec start_minimal_procs(CTConfig, ConfigOptions::[{atom(), term()}],
                           StartCommServer::boolean()) -> CTConfig when is_subtype(CTConfig, list()).
 start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
-    ok = fix_cwd(),
+    set_config_file_paths(),
     {Pid, _} =
         start_process(
           fun() ->
