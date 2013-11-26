@@ -52,6 +52,9 @@ start_link() ->
                                                  {config:read(log_level),
                                                   config:read(log_format)})
             end,
+            ErrorLoggerFile = filename:join(config:read(log_path),
+                                            config:read(log_file_name_log4erl)),
+            ok = filelib:ensure_dir(ErrorLoggerFile),
             log4erl:add_file_appender(file, {config:read(log_path),
                                              config:read(log_file_name_log4erl),
                                              {size, config:read(log_file_size)},
