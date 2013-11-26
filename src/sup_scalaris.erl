@@ -202,6 +202,7 @@ start_first_services(Options) ->
     _ = config:start_link(Options),
     ErrorLoggerFile = filename:join(config:read(log_path),
                                     config:read(log_file_name_errorlogger)),
+    ok = filelib:ensure_dir(ErrorLoggerFile),
     util:if_verbose("~p error logger file ~p.~n", [?MODULE, ErrorLoggerFile]),
     case error_logger:logfile({open, ErrorLoggerFile}) of
         ok -> ok;
