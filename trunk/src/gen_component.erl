@@ -327,7 +327,14 @@ bp_about_to_kill(Pid) ->
 % profile
 -spec start_link(module(), handler(), term(), list()) -> {ok, pid()}.
 start_link(Module, Handler, Args, Options) ->
-    Pid = spawn_link(?MODULE, start, [Module, Handler, Args, Options, self()]),
+    case lists:keytake(spawn_opts, 1, Options) of
+        {value, {spawn_opts, SpawnOpt}, Options1} -> ok;
+        false -> Options1 = Options,
+                 SpawnOpt = [],
+                 ok
+    end,
+    Pid = spawn_opt(?MODULE, start, [Module, Handler, Args, Options1, self()],
+                    [link | SpawnOpt]),
     receive {started, Pid} -> {ok, Pid} end.
 
 -spec start(module(), handler(), term(), list()) -> {ok, pid()}.
