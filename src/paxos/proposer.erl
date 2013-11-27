@@ -96,7 +96,9 @@ trigger(Proposer, PaxosID) ->
 start_link(DHTNodeGroup, PidName) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [],
-                             [{pid_groups_join_as, DHTNodeGroup, PidName}]).
+                             [{pid_groups_join_as, DHTNodeGroup, PidName},
+                              {spawn_opts, [{fullsweep_after, 0},
+                                            {min_heap_size, 16383}]}]).
 
 %% initialize: return initial state.
 -spec init([]) -> atom().

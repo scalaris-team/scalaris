@@ -150,7 +150,9 @@ start_link(CommLayerGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [],
                              [ {erlang_register, ?MODULE},
-                               {pid_groups_join_as, CommLayerGroup, ?MODULE}
+                               {pid_groups_join_as, CommLayerGroup, ?MODULE},
+                               {spawn_opts, [{fullsweep_after, 0},
+                                             {min_heap_size, 131071}]}
                              ]).
 
 %% @doc initialize: return initial state.
