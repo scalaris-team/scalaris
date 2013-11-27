@@ -743,10 +743,9 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     % note: for bloom, parameters don't need to match - use our own
     ?ASSERT(not intervals:is_empty(I)),
-    Fpr = get_bloom_fpr(),
+    P1E = get_p1e(),
     ElementNum = length(DBItems),
-    HFCount = bloom:calc_HF_numEx(ElementNum, Fpr),
-    BF0 = bloom:new_fpr(ElementNum, Fpr, ?REP_HFS:new(HFCount)),
+    BF0 = bloom:new_p1e(ElementNum, P1E),
     BF = bloom:add_list(BF0, DBItems),
     #bloom_recon_struct{ interval = I, bloom = BF };
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, BeginSync) ->
@@ -1050,7 +1049,8 @@ fork_recon(Conf) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config parameter handling
 %
-% rr_bloom_fpr              - bloom filter false positive rate (fpr)
+% rr_recon_p1e              - probability of a single false positive,
+%                             i.e. false positive absolute count
 % rr_max_items              - max. number of items to retrieve from the
 %                             dht_node at once
 %                             if syncing with bloom filters and node data count
@@ -1074,7 +1074,8 @@ check_percent(Atom) ->
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso
-        check_percent(rr_bloom_fpr) andalso
+        config:cfg_is_float(rr_recon_p1e) andalso
+        config:cfg_is_greater_than(rr_recon_p1e, 0) andalso
         ?IIF(config:read(rr_max_items) =:= all,
              true,
              config:cfg_is_integer(rr_max_items) andalso
@@ -1090,9 +1091,9 @@ check_config() ->
         config:cfg_is_integer(rr_art_correction_factor) andalso
         config:cfg_is_greater_than(rr_art_correction_factor, 0).
 
--spec get_bloom_fpr() -> float().
-get_bloom_fpr() ->
-    config:read(rr_bloom_fpr).
+-spec get_p1e() -> float().
+get_p1e() ->
+    config:read(rr_recon_p1e).
 
 -spec get_max_items() -> pos_integer() | all.
 get_max_items() ->
