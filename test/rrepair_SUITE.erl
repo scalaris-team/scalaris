@@ -156,7 +156,7 @@ get_rep_upd_config(Method) ->
      {rr_recon_method, Method},
      {rr_session_ttl, 100000},
      {rr_gc_interval, 60000},
-     {rr_bloom_fpr, 0.1},
+     {rr_recon_p1e, 0.1},
      {rr_trigger_probability, 100},
      {rr_max_items, 10000},
      {rr_art_inner_fpr, 0.01},
@@ -191,12 +191,12 @@ mpath(Config) ->
     %parameter
     NodeCount = 4,
     DataCount = 1000,
-    Fpr = 0.1,
+    P1E = 0.1,
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     TraceName = erlang:list_to_atom(atom_to_list(Method)++atom_to_list(FType)),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
+    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 50},
                                                    {distribution, uniform}]),
@@ -247,11 +247,11 @@ dest(Config) ->
     %parameter
     NodeCount = 7,
     DataCount = 1000,
-    Fpr = 0.1,
+    P1E = 0.1,
     Method = proplists:get_value(ru_method, Config),
     FType = proplists:get_value(ftype, Config),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
+    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 50},
                                                    {distribution, uniform}]),
@@ -288,10 +288,10 @@ dest_empty_node(Config) ->
     %parameter
     NodeCount = 4,
     DataCount = 1000,
-    Fpr = 0.1,
+    P1E = 0.1,
     Method = proplists:get_value(ru_method, Config),
     %build and fill ring
-    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_bloom_fpr, Fpr}]),
+    build_symmetric_ring(NodeCount, Config, [get_rep_upd_config(Method), {rr_recon_p1e, P1E}]),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, regen},
                                                    {fprob, 100},
                                                    {distribution, uniform},
@@ -571,15 +571,15 @@ wait_for_session_end() ->
 %    returns list of sync degrees per round, first value is initial sync degree
 % @end
 -spec start_sync(Config, Nodes::Int, DBSize::Int, DBParams,
-                 Rounds::Int, Fpr, RRConf::Config, CompFun) -> true when
+                 Rounds::Int, P1E, RRConf::Config, CompFun) -> true when
     is_subtype(Config,      [tuple()]),
     is_subtype(Int,         pos_integer()),
     is_subtype(DBParams,    [db_generator:db_parameter()]),
-    is_subtype(Fpr,         float()),
+    is_subtype(P1E,         float()),
     is_subtype(CompFun,     fun((T, T) -> boolean())).
-start_sync(Config, NodeCount, DBSize, DBParams, Rounds, Fpr, RRConfig, CompFun) ->
+start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) ->
     NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
-    build_symmetric_ring(NodeCount, Config, [RRConfig, {rr_bloom_fpr, Fpr}]),
+    build_symmetric_ring(NodeCount, Config, [RRConfig, {rr_recon_p1e, P1E}]),
     Nodes = [begin
                  comm:send_local(NodePid, {get_node_details, comm:this(), [node]}),
                  receive
