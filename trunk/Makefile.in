@@ -143,7 +143,7 @@ bench: compile
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "ebench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
-	sleep 5s ; \
+	./bin/scalarisctl -n "ebench_boot" dbg-check-ring 4 30 ; \
 	echo "running bench:increment(10, 500)..." ; \
 	$(ERL) -setcookie "chocolate chip cookie" -name bench_$(RANDOM) -pa ebin/ -noinput -eval "rpc:call('ebench_boot@`hostname -f`', bench, increment, [10, 500]), halt(0)."; \
 	echo "running bench:quorum_read(10, 5000)..." ; \
@@ -162,8 +162,8 @@ java-test: compile java
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
-	sleep 5s ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 ; \
 	ant -Dscalaris.node="$(SCALARIS_JTEST_NAME)" -buildfile java-api/build.xml test ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
@@ -171,7 +171,7 @@ java-test: compile java
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
+	  tail -n 50 "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -191,7 +191,7 @@ java-bench: compile java
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "jbench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
-	sleep 5s ; \
+	./bin/scalarisctl -n "jbench_boot" dbg-check-ring 4 30 ; \
 	SCALARIS_JAPI_NODE="jbench_boot jbench_node1 jbench_node2 jbench_node3" ./java-api/scalaris --noconfig -b $(SCALARIS_BENCHMARKS); \
 	./bin/scalarisctl -n "jbench_boot" stop ; \
 	./bin/scalarisctl -n "jbench_node1" stop ; \
@@ -218,8 +218,8 @@ python-test: compile python
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
-	sleep 5s ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" python-api/scalaris_test.py ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
@@ -227,7 +227,7 @@ python-test: compile python
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
+	  tail -n 50 "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -247,7 +247,7 @@ python-bench: compile python
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "pbench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
-	sleep 5s ; \
+	./bin/scalarisctl -n "pbench_boot" dbg-check-ring 4 30 ; \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" python-api/scalaris_bench.py $(SCALARIS_BENCHMARKS); \
 	./bin/scalarisctl -n "pbench_boot" stop ; \
 	./bin/scalarisctl -n "pbench_node1" stop ; \
@@ -296,8 +296,8 @@ python3-test: compile python3
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
-	sleep 5s ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" python3-api/scalaris_test.py ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
@@ -305,7 +305,7 @@ python3-test: compile python3
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
+	  tail -n 50 "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -325,7 +325,7 @@ python3-bench: compile python3
 	SCALARIS_ADDITIONAL_PARAMETERS="-scalaris mgmt_server {{127,0,0,1},$(SCALARIS_UNITTEST_PORT),mgmt_server} -scalaris known_hosts [{{127,0,0,1},$(SCALARIS_UNITTEST_PORT),service_per_vm}]" \
 	./bin/scalarisctl -d -k $(REPLICA_KEY_4) -n "p3bench_node3" \
 	-p $$(($(SCALARIS_UNITTEST_PORT)+3)) -y  $$(($(SCALARIS_UNITTEST_YAWS_PORT)+3)) -s start ; \
-	sleep 5s ; \
+	./bin/scalarisctl -n "p3bench_boot" dbg-check-ring 4 30 ; \
 	SCALARIS_JSON_URLS="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+1)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+2)) http://localhost:$$(($(SCALARIS_UNITTEST_YAWS_PORT)+3))" python3-api/scalaris_bench.py $(SCALARIS_BENCHMARKS); \
 	./bin/scalarisctl -n "p3bench_boot" stop ; \
 	./bin/scalarisctl -n "p3bench_node1" stop ; \
@@ -338,8 +338,8 @@ ruby-test: compile
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
-	sleep 5s ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" ruby-api/scalaris_test.rb ; \
 	FAILED=$$? ; \
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
@@ -347,7 +347,7 @@ ruby-test: compile
 	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
+	  tail -n 50 "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -359,8 +359,8 @@ interop-test: compile java java-scalaris.test.compile python
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
-	sleep 5s ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 ; \
 	java -cp "java-api/scalaris.jar:java-api/lib/jakarta-commons-cli-1.2.jar:java-api/lib/OtpErlang-$(OTP_ERLANG_VERSION).jar:java-api/classes" -Dscalaris.node="$(SCALARIS_JTEST_NAME)" de.zib.scalaris.InterOpTest -write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.java_write.log 2>&1; \
 	JAVA_WRITE_FAILED=$$? ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.log 2>&1 ; \
@@ -388,12 +388,12 @@ interop-test: compile java java-scalaris.test.compile python
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ $$JAVA_WRITE_FAILED -ne 0 -o $$PYTHON_JSON_WRITE_FAILED -ne 0 -o $$RUBY_JSON_WRITE_FAILED -ne 0 -o $$JAVA_READ_JAVA_FAILED -ne 0 -o $$JAVA_READ_PYTHON_JSON_FAILED -ne 0 -o $$JAVA_READ_RUBY_JSON_FAILED -ne 0 -o $$PYTHON_JSON_READ_JAVA_FAILED -ne 0 -o $$PYTHON_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$PYTHON_JSON_READ_RUBY_JSON_FAILED -ne 0 -o $$RUBY_JSON_READ_JAVA_FAILED -ne 0 -o $$RUBY_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$RUBY_JSON_READ_RUBY_JSON_FAILED -ne 0 ]; then \
 	  echo "####################" ; \
+	  cat "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"interop.*write*.log ; \
+	  cat "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"interop.*read*.log ; \
+	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  cat log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.*write*.log ; \
-	  cat log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.*read*.log ; \
-	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
+	  tail -n 50 "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \
@@ -407,8 +407,8 @@ interop3-test: interop-test python3
 	./bin/scalarisctl -d \
 	-y $(SCALARIS_UNITTEST_YAWS_PORT) \
 	-p $(SCALARIS_UNITTEST_PORT) \
-	-n $(SCALARIS_JTEST_NAME) -m -s -f start ; \
-	sleep 5s ; \
+	-n "$(SCALARIS_JTEST_NAME)" -m -s -f start ; \
+	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" dbg-check-ring 1 30 ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python-api/scalaris_interop_test.py write interop_test > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python_write.log 2>&1 ; \
 	PYTHON_JSON_WRITE_FAILED=$$? ; \
 	SCALARIS_JSON_URL="http://localhost:$(SCALARIS_UNITTEST_YAWS_PORT)" PYTHONIOENCODING="utf_8" python3-api/scalaris_interop_test.py write interop_test3 > log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.python3_write.log 2>&1 ; \
@@ -424,12 +424,12 @@ interop3-test: interop-test python3
 	./bin/scalarisctl -n "$(SCALARIS_JTEST_NAME)" stop ; \
 	if [ -o $$PYTHON_JSON_WRITE_FAILED -ne 0 -o $$PYTHON3_JSON_WRITE_FAILED -ne 0 -o $$PYTHON_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$PYTHON_JSON_READ_PYTHON3_JSON_FAILED -ne 0 -o $$PYTHON3_JSON_READ_PYTHON_JSON_FAILED -ne 0 -o $$PYTHON3_JSON_READ_PYTHON3_JSON_FAILED -ne 0 ]; then \
 	  echo "####################" ; \
+	  cat "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"interop.*write*.log ; \
+	  cat "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"interop.*read*.log ; \
+	  echo "####################" ; \
 	  echo "Erlang messages (last 50 per log file):" ; \
 	  echo "####################" ; \
-	  cat log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.*write*.log ; \
-	  cat log/$(SCALARIS_JTEST_NAME)@`hostname -f`/interop.*read*.log ; \
-	  echo "####################" ; \
-	  tail -n 50 log/$(SCALARIS_JTEST_NAME)@`hostname -f`/* ; \
+	  tail -n 50 "log/$(SCALARIS_JTEST_NAME)@`hostname -f`/"* ; \
 	  echo "####################" ; \
 	  false ; \
 	else \

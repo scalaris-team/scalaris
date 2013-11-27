@@ -98,6 +98,9 @@ usage(){
     echo ""
     echo "    list        - list locally running Erlang VMs"
     echo "    debug       - connect to a running node via an Erlang shell"
+    echo "    dbg-check-ring <ring-size> <timeout>"
+    echo "                - checks whether Scalaris has <ring-size> nodes and the"
+    echo "                  ring maintenance has settled (requires a mgmt_server)"
     echo ""
     exit $1
 }
@@ -737,6 +740,35 @@ debug(){
     $ERL -pa $BEAMDIR -setcookie "$SCALARIS_COOKIE" -name "rem@`get_hostname`" -remsh $NODE_NAME `echo $erl_flags`
 }
 
+# checks whether Scalaris has <ring-size> nodes and ring maintenance has settled
+# (requires a mgmt_server)
+dbg_check_ring(){
+  exp_nodes=$1
+  max_tries=$2
+  try=1
+  while [ $try -lt $max_tries ] ; do
+    scalaris_nodes_count_actual="$(scalariscall "Res = rpc:call('$NODE_NAME', admin, number_of_nodes, []), case Res of ${exp_nodes} -> halt(0); _ -> io:format(\"~p~n\", [Res]), halt(1) end.")"
+    if [ $? -eq 0 ] ; then
+      scalaris_check_ring="$(scalariscall "Res = rpc:call('$NODE_NAME', admin, check_ring_deep, []), case Res of ok -> halt(0); _ -> io:format(\"~p~n\", [Res]), halt(1) end.")"
+      if [ $? -eq 0 ] ; then
+        return 0
+      fi
+    fi
+
+    try=$((10#$try + 1))
+    sleep 1
+
+    if [ $try -eq $max_tries ] ; then
+      echo "ERROR: Failed to verify a total of ${exp_nodes} scalaris node(s) at node ${NODE_NAME}"
+      echo "       (result: ${scalaris_nodes_count_actual})."
+      if [ -n "$scalaris_check_ring" ] ; then
+        echo "ERROR: check_ring_deep: ${scalaris_check_ring}."
+      fi
+      exit 1
+    fi
+  done
+}
+
 fix_paths
 SCALARIS_COOKIE="`get_cookie`"
 
@@ -759,6 +791,13 @@ until [ -z "$1" ]; do
       shift;;
     checkinstallation | start | stop | gstop | restart | list | debug | status)
       cmd="$1"
+      shift;;
+    "dbg-check-ring")
+      cmd="$1"
+      shift
+      DBG_CHECK_RING_SIZE=$1
+      shift
+      DBG_CHECK_RING_TIMEOUT=$1
       shift;;
     *)
       if getopts "dhifqmsvn:p:y:k:e:c:" optionName; then
@@ -809,6 +848,12 @@ case $cmd in
         list_erlang_processes;;
     debug)
         debug;;
+    dbg-check-ring)
+        if [ -z "$DBG_CHECK_RING_SIZE" -o -z "$DBG_CHECK_RING_TIMEOUT" ] ; then
+          usage 1
+        else
+          dbg_check_ring "$DBG_CHECK_RING_SIZE" "$DBG_CHECK_RING_TIMEOUT"
+        fi;;
     *)
         echo "Unknown command: $cmd."
         usage 1;;
