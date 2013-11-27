@@ -109,7 +109,9 @@ rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors) ->
 start_link(DHTNodeGroup, Role) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [],
-                             [{pid_groups_join_as, DHTNodeGroup, Role}]).
+                             [{pid_groups_join_as, DHTNodeGroup, Role},
+                              {spawn_opts, [{fullsweep_after, 0},
+                                            {min_heap_size, 16383}]}]).
 
 %% initialize: return initial state.
 -spec init([]) -> state() | {'$gen_component', [{on_handler, gen_component:handler()},...],

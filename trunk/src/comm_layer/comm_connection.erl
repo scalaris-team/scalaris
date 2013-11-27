@@ -88,7 +88,9 @@ start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Chan
         ++ integer_to_list(IP4) ++ ":" ++ integer_to_list(DestPort),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              {DestIP, DestPort, LocalListenPort, Channel, Socket},
-                             [{pid_groups_join_as, CommLayerGroup, PidName}]).
+                             [{pid_groups_join_as, CommLayerGroup, PidName},
+                              {spawn_opts, [{fullsweep_after, 0},
+                                            {min_heap_size, 131071}]}]).
 
 %% @doc initialize: return initial state.
 -spec init({DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),

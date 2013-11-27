@@ -485,7 +485,10 @@ init(Options) ->
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, Options,
-                             [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
+                             [{pid_groups_join_as, DHTNodeGroup, dht_node},
+                              wait_for_init,
+                              {spawn_opts, [{fullsweep_after, 0},
+                                            {min_heap_size, 131071}]}]).
 %% userdevguide-end dht_node:start_link
 
 %% @doc Checks whether this VM is marked as first, e.g. in a unit test, and
