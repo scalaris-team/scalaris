@@ -31,11 +31,9 @@
          lookup/2, size/1, size_detail/1, gen_hash/1, gen_hash/2,
          iterator/1, next/1,
          is_empty/1, is_leaf/1, is_merkle_tree/1,
-         is_leaf_hash/1,
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
          get_item_count/1,
-         get_signature_size/1, get_bucket_size/1, get_branch_factor/1,
-         get_hash_size/1,
+         get_bucket_size/1, get_branch_factor/1,
          get_opt_bucket_size/3,
          store_to_DOT/2, store_graph/2]).
 
@@ -44,7 +42,7 @@
 -export([tester_create_hash_fun/1, tester_create_inner_hash_fun/1]).
 
 -compile({inline, [get_hash/1, get_interval/1, node_size/1, decode_key/1,
-                   run_leaf_hf/4, run_inner_hf/2]}).
+                   run_leaf_hf/3, run_inner_hf/2]}).
 
 %-define(TRACE(X,Y), io:format("~w: [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 -define(TRACE(X,Y), ok).
@@ -75,7 +73,6 @@
         {
          branch_factor  = 2                 :: pos_integer(),   %number of childs per inner node
          bucket_size    = 24                :: pos_integer(),   %max items in a leaf
-         signature_size = 32                :: 1..160,          %node signature size in bits
          leaf_hf        = fun(V) -> ?CRYPTO_SHA(V) end  :: hash_fun(),      %hash function for leaf signature creation
          inner_hf       = fun inner_hash_XOR/1 :: inner_hash_fun(),%hash function for inner node signature creation -
          keep_bucket    = false             :: boolean()        %false=bucket will be empty after bulk_build; true=bucket will be filled
@@ -94,19 +91,6 @@
 -type merkle_tree() :: {merkle_tree, mt_config(), Root::mt_node()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @doc Gets the given merkle tree's signature size (in bits).
--spec get_signature_size(merkle_tree()) -> 1..160.
-get_signature_size({merkle_tree, Config, _}) ->
-    Config#mt_config.signature_size.
-
-%% @doc Gets the actual hash size of a merkle tree or its signature size
-%%      (in bits) including bits needed for flagging hashes as leaf/inner nodes.
--spec get_hash_size(SigSizeOrMT::1..160 | merkle_tree()) -> 1..161.
-get_hash_size({merkle_tree, Config, _}) ->
-    Config#mt_config.signature_size + 1;
-get_hash_size(SigSize) ->
-    SigSize + 1.
 
 %% @doc Gets the given merkle tree's bucket size (number of elements in a leaf).
 -spec get_bucket_size(merkle_tree()) -> pos_integer().
@@ -193,7 +177,6 @@ lookup_(I, {_, _, _, _NodeI, ChildList = [_|_]}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Gets the node's hash value.
-%%      Note: leaf and inner node hashes are differently tagged.
 -spec get_hash(merkle_tree() | mt_node()) -> mt_node_key().
 get_hash({merkle_tree, _, Node}) -> get_hash(Node);
 get_hash({Hash, _, _, _, _}) -> Hash.
@@ -225,11 +208,6 @@ get_item_count({_, _, _, _, _}) -> 0.
 is_leaf({merkle_tree, _, Node}) -> is_leaf(Node);
 is_leaf({_, _, _, _, []}) -> true;
 is_leaf(_) -> false.
-
-%% @doc Checks whether the given hash is a leaf node hash.
-%%      See gen_hash_node/6.
--spec is_leaf_hash(mt_node_key()) -> boolean().
-is_leaf_hash(Hash) -> (Hash rem 2) =:= 1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -327,8 +305,7 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
               true ->
                   % need to hash here since we won't keep the bucket!
                   Hash = run_leaf_hf(lists:ukeysort(1, Bucket), Interval,
-                                     Config#mt_config.leaf_hf,
-                                     Config#mt_config.signature_size),
+                                     Config#mt_config.leaf_hf),
                   {Hash, Count, [], Interval, []}
            end,
     build_childs(T, Config, [Node | Acc]);
@@ -347,34 +324,33 @@ gen_hash(Tree = {merkle_tree, #mt_config{keep_bucket = KeepBucket}, _Root}) ->
 -spec gen_hash(merkle_tree(), CleanBuckets::boolean()) -> merkle_tree().
 gen_hash({merkle_tree, Config = #mt_config{inner_hf = InnerHf,
                                            leaf_hf = LeafHf,
-                                           signature_size = SigSize,
                                            keep_bucket = KeepBucket},
           Root}, CleanBuckets) ->
-    RootNew = gen_hash_node(Root, InnerHf, LeafHf, SigSize, KeepBucket, CleanBuckets),
+    RootNew = gen_hash_node(Root, InnerHf, LeafHf, KeepBucket, CleanBuckets),
     {merkle_tree, Config#mt_config{keep_bucket = not CleanBuckets}, RootNew}.
 
 %% @doc Helper for gen_hash/2.
 -spec gen_hash_node(mt_node(), InnerHf::inner_hash_fun(), LeafHf::hash_fun(),
-                    SigSize::1..160, KeepBucket::boolean(),
+                    KeepBucket::boolean(),
                     CleanBuckets::boolean()) -> mt_node().
-gen_hash_node({_, Count, [], I, [_|_] = List}, InnerHf, LeafHf, SigSize,
+gen_hash_node({_, Count, [], I, [_|_] = List}, InnerHf, LeafHf,
               OldKeepBucket, CleanBuckets) ->
     % inner node
-    NewChilds = [gen_hash_node(X, InnerHf, LeafHf, SigSize, OldKeepBucket,
+    NewChilds = [gen_hash_node(X, InnerHf, LeafHf, OldKeepBucket,
                                CleanBuckets) || X <- List],
     Hash = run_inner_hf(NewChilds, InnerHf),
     {Hash, Count, [], I, NewChilds};
-gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf, _LeafHf, _SigSize,
+gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf, _LeafHf,
               false, _CleanBuckets) ->
     % leaf node, no bucket contents, keep_bucket false
     % -> we already hashed the value in bulk_build and cannot insert any more
     %    values
     N;
-gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf, SigSize,
+gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf,
               true, CleanBuckets) ->
     % leaf node, no bucket contents, keep_bucket true
     Bucket1 = lists:ukeysort(1, Bucket),
-    Hash = run_leaf_hf(Bucket1, I, LeafHf, SigSize),
+    Hash = run_leaf_hf(Bucket1, I, LeafHf),
     {Hash, Count, ?IIF(CleanBuckets, [], Bucket1), I, Childs}.
 
 %% @doc Hashes an inner node based on its childrens' hashes.
@@ -383,23 +359,17 @@ run_inner_hf(Childs, InnerHf) ->
     (InnerHf([get_hash(C) || C <- Childs]) bsr 1) bsl 1.
 
 %% @doc Hashes a leaf with the given (sorted!) bucket.
--spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun(),
-                  SigSize::1..160) -> mt_node_key().
-run_leaf_hf(Bucket, I, LeafHf, SigSize) ->
+-spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun())
+        -> mt_node_key().
+run_leaf_hf(Bucket, I, LeafHf) ->
     BinBucket = case Bucket of
                     [_|_] -> term_to_binary(Bucket);
                     []    -> term_to_binary({0, I})
                 end,
     Hash = LeafHf(BinBucket),
     Size = erlang:bit_size(Hash),
-    if Size > SigSize  ->
-           Start = Size - SigSize,
-           <<_:Start/bitstring, SmallHash:SigSize/integer-unsigned-unit:1>> = Hash,
-           (SmallHash bsl 1) bor 1;
-       true ->
-           <<SmallHash:Size/integer-unit:1>> = Hash,
-           (SmallHash bsl 1) bor 1
-    end.
+    <<SmallHash:Size/integer-unit:1>> = Hash,
+    (SmallHash bsl 1) bor 1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -539,8 +509,7 @@ build_config(ParamList) ->
                   bucket_size    -> Conf#mt_config{ bucket_size = Val };
                   leaf_hf        -> Conf#mt_config{ leaf_hf = Val };
                   inner_hf       -> Conf#mt_config{ inner_hf = Val };
-                  keep_bucket    -> Conf#mt_config{ keep_bucket = Val};
-                  signature_size -> Conf#mt_config{ signature_size = Val}
+                  keep_bucket    -> Conf#mt_config{ keep_bucket = Val}
               end
       end,
       #mt_config{}, ParamList).
