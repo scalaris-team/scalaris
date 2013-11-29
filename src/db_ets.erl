@@ -37,7 +37,7 @@
 -export([foldl/3, foldl/4, foldl/5]).
 -export([foldr/3, foldr/4, foldr/5]).
 
--type db() :: tid() | atom().
+-type db() :: ets:tab().
 -type key() :: db_backend_beh:key(). %% '$end_of_table' is not allowed as key() or else iterations won't work!
 -type entry() :: db_backend_beh:entry().
 
@@ -48,6 +48,9 @@
 %% @doc Creates new DB handle named DBName.
 -spec new(DBName::nonempty_string()) -> db().
 new(DBName) ->
+    %% IMPORTANT: this module only works correctly when using ordered_set ets
+    %% tables. Other table types could throw bad_argument exceptions while
+    %% calling ets:next/2
     ets:new(list_to_atom(DBName), [ordered_set | ?DB_ETS_ADDITIONAL_OPS]).
 
 %% @doc Open a previously existing database. Not supported by ets.
@@ -118,7 +121,7 @@ foldl(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, '$end_of_table', _End, _}, _MaxNum) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, _Start, '$end_of_table', _}, _MaxNum) -> Acc;
 foldl(_DB, _Fun, Acc, {interval, _, Start, End, _}, _MaxNum) when Start > End -> Acc;
-foldl(DB, Fun, Acc, {element, El}, _MaxNum) -> 
+foldl(DB, Fun, Acc, {element, El}, _MaxNum) ->
     case ets:lookup(DB, El) of
         [] ->
             Acc;
@@ -128,9 +131,9 @@ foldl(DB, Fun, Acc, {element, El}, _MaxNum) ->
 foldl(DB, Fun, Acc, all, MaxNum) ->
     foldl(DB, Fun, Acc, {interval, '[', ets:first(DB), ets:last(DB), ']'},
           MaxNum);
-foldl(DB, Fun, Acc, {interval, '(', Start, End, RBr}, MaxNum) -> 
+foldl(DB, Fun, Acc, {interval, '(', Start, End, RBr}, MaxNum) ->
     foldl(DB, Fun, Acc, {interval, '[', ets:next(DB, Start), End, RBr}, MaxNum);
-foldl(DB, Fun, Acc, {interval, LBr, Start, End, ')'}, MaxNum) -> 
+foldl(DB, Fun, Acc, {interval, LBr, Start, End, ')'}, MaxNum) ->
     foldl(DB, Fun, Acc, {interval, LBr, Start, ets:prev(DB, End), ']'}, MaxNum);
 foldl(DB, Fun, Acc, {interval, '[', Start, End, ']'}, MaxNum) ->
     case ets:lookup(DB, Start) of
@@ -171,7 +174,7 @@ foldr(_DB, _Fun, Acc, _Interval, 0) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, _End, '$end_of_table', _}, _MaxNum) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, '$end_of_table', _Start, _}, _MaxNum) -> Acc;
 foldr(_DB, _Fun, Acc, {interval, _, End, Start, _}, _MaxNum) when Start < End -> Acc;
-foldr(DB, Fun, Acc, {element, El}, _MaxNum) -> 
+foldr(DB, Fun, Acc, {element, El}, _MaxNum) ->
     case ets:lookup(DB, El) of
         [] ->
             Acc;
@@ -181,9 +184,9 @@ foldr(DB, Fun, Acc, {element, El}, _MaxNum) ->
 foldr(DB, Fun, Acc, all, MaxNum) ->
     foldr(DB, Fun, Acc, {interval, '[', ets:first(DB), ets:last(DB), ']'},
           MaxNum);
-foldr(DB, Fun, Acc, {interval, '(', End, Start, RBr}, MaxNum) -> 
+foldr(DB, Fun, Acc, {interval, '(', End, Start, RBr}, MaxNum) ->
     foldr(DB, Fun, Acc, {interval, '[', ets:next(DB, End), Start, RBr}, MaxNum);
-foldr(DB, Fun, Acc, {interval, LBr, End, Start, ')'}, MaxNum) -> 
+foldr(DB, Fun, Acc, {interval, LBr, End, Start, ')'}, MaxNum) ->
     foldr(DB, Fun, Acc, {interval, LBr, End, ets:prev(DB, Start), ']'}, MaxNum);
 foldr(DB, Fun, Acc, {interval, '[', End, Start, ']'}, MaxNum) ->
     case ets:lookup(DB, Start) of
