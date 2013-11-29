@@ -130,6 +130,7 @@ tester_type_check_l_on_cseq(_Config) ->
              {lease_renew, 2}, %% sends messages
              {lease_handover, 3}, %% sends messages
              {lease_takeover, 2}, %% sends messages
+             {lease_takeover_after, 3}, %% sends messages
              {lease_split, 5}, %% sends messages
              {lease_merge, 3}, %% sends messages
              {lease_send_lease_to_node, 2}, %% sends messages

@@ -35,6 +35,7 @@
 -export([lease_renew/2]).
 -export([lease_handover/3]).
 -export([lease_takeover/2]).
+-export([lease_takeover_after/3]).
 -export([lease_split/5]).
 -export([lease_merge/3]).
 -export([lease_send_lease_to_node/2]).
@@ -52,7 +53,7 @@
 % lease accessors
 -export([get_version/1,set_version/2,
          get_epoch/1, set_epoch/2,
-         new_timeout/0, set_timeout/1, get_pretty_timeout/1,
+         new_timeout/0, set_timeout/1, get_timeout/1, get_pretty_timeout/1,
          get_id/1,
          get_owner/1, set_owner/2,
          get_aux/1, set_aux/2,
@@ -163,6 +164,13 @@ lease_takeover(Lease, ReplyTo) ->
     % @todo precondition: Lease has timeouted
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, takeover, Lease, ReplyTo}),
+    ok.
+
+-spec lease_takeover_after(non_neg_integer(), lease_t(), comm:erl_local_pid()) -> ok.
+lease_takeover_after(Delay, Lease, ReplyTo) ->
+    % @todo precondition: Lease has timeouted
+    msg_delay:send_local(Delay, pid_groups:get_my(dht_node),
+                         {l_on_cseq, takeover, Lease, ReplyTo}),
     ok.
 
 -spec lease_split(lease_t(), intervals:interval(),
@@ -710,7 +718,7 @@ on({l_on_cseq, split_reply_step3,
                    New),
     lease_list:update_lease_in_dht_node_state(L1, State, passive, split_reply_step3);
 
-on({l_on_cseq, split_reply_step4, L1, _R1, _R2, Keep, ReplyTo, _PostAux,
+on({l_on_cseq, split_reply_step4, L1, _R1, _R2, _Keep, ReplyTo, _PostAux,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
     log:pal("successful split~n", []),
     log:pal("successful split ~p~n", [ReplyTo]),
