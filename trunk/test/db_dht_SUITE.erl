@@ -240,15 +240,15 @@ update_entries(_Config) ->
 
 changed_keys(_Config) ->
     DB = db_dht:new(),
-    
+
     ?equals(db_dht:get_changes(DB), {[], []}),
-    
+
     DB2 = db_dht:stop_record_changes(DB),
     ?equals(db_dht:get_changes(DB2), {[], []}),
-    
+
     DB3 = db_dht:record_changes(DB2, intervals:empty()),
     ?equals(db_dht:get_changes(DB3), {[], []}),
-    
+
     db_dht:close(DB3).
 
 %% @doc Tests that previously failed with tester-generated values or otherwise
@@ -319,7 +319,7 @@ prop_update_entry(DBEntry1, Value2, WriteLock2, ReadLock2, Version2) ->
     case db_entry:is_null(DBEntry1) of
         true -> % update not possible
             DB3 = DB2,
-            ok; 
+            ok;
         false ->
             DB3 = db_dht:update_entry(DB2, DBEntry2),
             IsNullEntry = db_entry:is_null(DBEntry2),
@@ -424,7 +424,7 @@ prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
     DB = db_dht:new(),
     DBEntry = create_db_entry(Key, Value, WriteLock, ReadLock, Version),
     DB2 = db_dht:set_entry(DB, DBEntry),
-    
+
     % delete DBEntry:
     DB3 =
         case db_entry:is_locked(DBEntry) of
@@ -459,7 +459,7 @@ prop_delete(Key, Value, WriteLock, ReadLock, Version, Key2) ->
                 check_db(DBA2, {true, []}, 0, [], "check_db_delete_2b"),
                 DBA2
         end,
-    
+
     db_dht:close(DB3),
     true.
 
@@ -474,12 +474,12 @@ tester_delete(_Config) ->
 -spec prop_add_data(Data::db_dht:db_as_list()) -> true.
 prop_add_data(Data) ->
     DB = db_dht:new(),
-    
+
     UniqueCleanData = unittest_helper:scrub_data(Data),
-    
+
     DB2 = db_dht:add_data(DB, Data),
     check_db2(DB2, length(UniqueCleanData), UniqueCleanData, "check_db_add_data_1"),
-    
+
     db_dht:close(DB2),
     true.
 
@@ -503,14 +503,14 @@ prop_get_entries3_1(Data, Range) ->
                                      db_entry:get_key(A) =< db_entry:get_key(B)
                              end, lists:reverse(Data)),
     DB2 = db_dht:add_data(DB, UniqueData),
-    
+
     FilterFun = fun(A) -> (not db_entry:is_empty(A)) andalso
                               intervals:in(db_entry:get_key(A), Range)
                 end,
     ValueFun = fun(DBEntry) -> {db_entry:get_key(DBEntry),
                                 db_entry:get_value(DBEntry)}
                end,
-    
+
     ?equals_w_note(lists:sort(db_dht:get_entries(DB2, FilterFun, ValueFun)),
                    lists:sort([ValueFun(A) || A <- lists:filter(FilterFun, UniqueData)]),
                    "check_get_entries3_1_1"),
@@ -535,7 +535,7 @@ prop_get_entries3_2(Data, Range) ->
                                      db_entry:get_key(A) =< db_entry:get_key(B)
                              end, lists:reverse(Data)),
     DB2 = db_dht:add_data(DB, UniqueData),
-    
+
     FilterFun = fun(A) -> (not db_entry:is_empty(A)) andalso
                               db_entry:get_writelock(A) =:= false andalso
                               intervals:in(db_entry:get_key(A), Range)
@@ -544,7 +544,7 @@ prop_get_entries3_2(Data, Range) ->
                                 db_entry:get_value(DBEntry),
                                 db_entry:get_version(DBEntry)}
                end,
-    
+
     ?equals_w_note(lists:sort(db_dht:get_entries(DB2, FilterFun, ValueFun)),
                    lists:sort([ValueFun(A) || A <- lists:filter(FilterFun, UniqueData)]),
                    "check_get_entries3_2_1"),
@@ -569,11 +569,11 @@ prop_get_entries2(Data, Range) ->
                                      db_entry:get_key(A) =< db_entry:get_key(B)
                              end, lists:reverse(Data)),
     DB2 = db_dht:add_data(DB, UniqueData),
-    
+
     InRangeFun = fun(A) -> (not db_entry:is_empty(A)) andalso
                                intervals:in(db_entry:get_key(A), Range)
                  end,
-    
+
     ?equals_w_note(lists:sort(db_dht:get_entries(DB2, Range)),
                    lists:sort(lists:filter(InRangeFun, UniqueData)),
                    "check_get_entries2_1"),
@@ -595,10 +595,10 @@ prop_get_load2(Data, LoadInterval) ->
     UniqueCleanData = unittest_helper:scrub_data(Data),
 
     DB2 = db_dht:add_data(DB, Data),
-    
+
     FilterFun = fun(A) -> intervals:in(db_entry:get_key(A), LoadInterval) end,
     ValueFun = fun(_DBEntry) -> 1 end,
-    
+
     ?equals_w_note(db_dht:get_load(DB2, LoadInterval),
                    length(lists:filter(FilterFun, UniqueCleanData)),
                    "check_get_load2_1"),
@@ -627,7 +627,7 @@ prop_split_data(Data, Range) ->
                                   (not intervals:in(db_entry:get_key(A), Range))
                     end,
     InMyRangeFun = fun(A) -> intervals:in(db_entry:get_key(A), Range) end,
-    
+
     {DB3, HisList} = db_dht:split_data(DB2, Range),
     ?equals_w_note(lists:sort(HisList),
                    lists:sort(lists:filter(InHisRangeFun, UniqueCleanData)),
@@ -659,21 +659,21 @@ prop_update_entries(Data, ItemsToUpdate) ->
     end,
 
     ExpUpdatedData = UniqueUpdateData ++ UniqueOldData,
-    
+
     prop_update_entries_helper(UniqueCleanData, UniqueUpdateData, ExpUpdatedData).
 
 -spec prop_update_entries_helper(UniqueData::db_dht:db_as_list(), UniqueUpdateData::db_dht:db_as_list(), ExpUpdatedData::db_dht:db_as_list()) -> true.
 prop_update_entries_helper(UniqueData, UniqueUpdateData, ExpUpdatedData) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, UniqueData),
-    
+
     UpdatePred = fun(OldEntry, NewEntry) ->
                          db_entry:get_version(OldEntry) < db_entry:get_version(NewEntry)
                  end,
     UpdateVal = fun(_OldEntry, NewEntry) -> NewEntry end,
-    
+
     DB3 = db_dht:update_entries(DB2, UniqueUpdateData, UpdatePred, UpdateVal),
-    
+
     ?equals_w_note(lists:sort(db_dht:get_data(DB3)),
                    lists:sort(ExpUpdatedData),
                    "check_update_entries_1"),
@@ -694,14 +694,14 @@ prop_delete_entries1(Data, Range) ->
     % use a range to delete entries
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
-    
+
     DB3 = db_dht:delete_entries(DB2, Range),
-    
+
     UniqueCleanData = unittest_helper:scrub_data(Data),
     UniqueRemainingData = [DBEntry || DBEntry <- UniqueCleanData,
                                       not intervals:in(db_entry:get_key(DBEntry), Range)],
     check_db2(DB3, length(UniqueRemainingData), UniqueRemainingData, "check_db_delete_entries1_1"),
-    
+
     db_dht:close(DB3),
     true.
 
@@ -711,14 +711,14 @@ prop_delete_entries2(Data, Range) ->
     FilterFun = fun(DBEntry) -> not intervals:in(db_entry:get_key(DBEntry), Range) end,
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
-    
+
     DB3 = db_dht:delete_entries(DB2, FilterFun),
-    
+
     UniqueCleanData = unittest_helper:scrub_data(Data),
     UniqueRemainingData = [DBEntry || DBEntry <- UniqueCleanData,
                                       intervals:in(db_entry:get_key(DBEntry), Range)],
     check_db2(DB3, length(UniqueRemainingData), UniqueRemainingData, "check_db_delete_entries2_1"),
-    
+
     db_dht:close(DB3),
     true.
 
@@ -743,9 +743,9 @@ prop_changed_keys_get_entry(Data, ChangesInterval, Key) ->
 
     _ = db_dht:get_entry(DB3, Key),
     ?equals_w_note(db_dht:get_changes(DB3), {[], []}, "changed_keys_get_entry_1"),
-    
+
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_entry_2"),
-    
+
     db_dht:close(DB4),
     true.
 
@@ -757,11 +757,11 @@ prop_changed_keys_set_entry(Data, ChangesInterval, Entry) ->
     DB2 = db_dht:add_data(DB, Data),
     Old = db_dht:get_entry(DB2, db_entry:get_key(Entry)),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     DB4 = db_dht:set_entry(DB3, Entry),
     check_changes(DB4, ChangesInterval, "changed_keys_set_entry_1"),
     check_entry_in_changes(DB4, ChangesInterval, Entry, Old, "changed_keys_set_entry_2"),
-    
+
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "changed_keys_set_entry_3"),
 
     db_dht:close(DB5),
@@ -782,7 +782,7 @@ prop_changed_keys_update_entry(Data, ChangesInterval, UpdateVal) ->
     UpdateElement = util:randomelem(UniqueData),
     Old = db_dht:get_entry(DB2, db_entry:get_key(UpdateElement)),
     UpdatedElement = db_entry:set_value(UpdateElement, UpdateVal, db_entry:get_version(UpdateElement) + 1),
-    
+
     case element(1, Old) of
         false -> % element does not exist, i.e. was a null entry, -> cannot update
             DB5 = DB2;
@@ -791,7 +791,7 @@ prop_changed_keys_update_entry(Data, ChangesInterval, UpdateVal) ->
             DB4 = db_dht:update_entry(DB3, UpdatedElement),
             check_changes(DB4, ChangesInterval, "changed_update_entry_1"),
             check_entry_in_changes(DB4, ChangesInterval, UpdatedElement, Old, "changed_update_entry_2"),
-            
+
             DB5 = check_stop_record_changes(DB4, ChangesInterval, "changed_update_entry_3")
     end,
 
@@ -806,11 +806,11 @@ prop_changed_keys_delete_entry(Data, ChangesInterval, Entry) ->
     DB2 = db_dht:add_data(DB, Data),
     Old = db_dht:get_entry(DB2, db_entry:get_key(Entry)),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     DB4 = db_dht:delete_entry(DB3, Entry),
     check_changes(DB4, ChangesInterval, "delete_entry_1"),
     check_key_in_deleted_no_locks(DB4, ChangesInterval, db_entry:get_key(Entry), Old, "delete_entry_2"),
-    
+
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "delete_entry_3"),
 
     db_dht:close(DB5),
@@ -823,10 +823,10 @@ prop_changed_keys_read(Data, ChangesInterval, Key) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     _ = db_dht:read(DB3, Key),
     ?equals_w_note(db_dht:get_changes(DB3), {[], []}, "changed_keys_read_1"),
-    
+
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_read_2"),
 
     db_dht:close(DB4),
@@ -840,12 +840,12 @@ prop_changed_keys_write(Data, ChangesInterval, Key, Value, Version) ->
     DB2 = db_dht:add_data(DB, Data),
     Old = db_dht:get_entry(DB2, Key),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     DB4 = db_dht:write(DB3, Key, Value, Version),
     check_changes(DB4, ChangesInterval, "changed_keys_write_1"),
     ChangedEntry = db_dht:get_entry(DB4, Key),
     check_entry_in_changes(DB4, ChangesInterval, ChangedEntry, Old, "changed_keys_write_2"),
-    
+
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "changed_keys_write_3"),
 
     db_dht:close(DB5),
@@ -859,11 +859,11 @@ prop_changed_keys_delete(Data, ChangesInterval, Key) ->
     DB2 = db_dht:add_data(DB, Data),
     Old = db_dht:get_entry(DB2, Key),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     {DB4, Status} = db_dht:delete(DB3, Key),
     check_changes(DB4, ChangesInterval, "delete_1"),
     check_key_in_deleted_no_locks(DB4, ChangesInterval, Key, Old, "delete_2"),
-    
+
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "delete_3"),
 
     db_dht:close(DB5),
@@ -876,10 +876,10 @@ prop_changed_keys_get_entries2(Data, ChangesInterval, Interval) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     _ = db_dht:get_entries(DB3, Interval),
     ?equals_w_note(db_dht:get_changes(DB3), {[], []}, "changed_keys_get_entries2_1"),
-    
+
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_entries2_2"),
 
     db_dht:close(DB4),
@@ -892,15 +892,15 @@ prop_changed_keys_get_entries4(Data, ChangesInterval, Interval) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     FilterFun = fun(E) -> (not db_entry:is_empty(E)) andalso
                               (not intervals:in(db_entry:get_key(E), Interval))
                 end,
     ValueFun = fun(E) -> db_entry:get_key(E) end,
-    
+
     _ = db_dht:get_entries(DB3, FilterFun, ValueFun),
     ?equals_w_note(db_dht:get_changes(DB3), {[], []}, "changed_keys_get_entries4_1"),
-    
+
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_entries4_2"),
 
     db_dht:close(DB4),
@@ -980,7 +980,7 @@ prop_get_split_key5(Keys2, Begin, End, TargetLoad, ForwardBackward) ->
                     end,
     {_Next, Chunk} = db_dht:get_chunk(DB2, Begin, SplitInterval, all),
     db_dht:close(DB2),
-    
+
     ?compare(fun erlang:'=<'/2, TakenLoad, TargetLoad),
     ?compare(fun erlang:'=<'/2, length(Chunk), TargetLoad),
     ?equals(length(Chunk), TakenLoad),
@@ -995,7 +995,7 @@ prop_changed_keys_update_entries(Data, ChangesInterval, Entry1, Entry2) ->
     Old1 = db_dht:get_entry(DB2, db_entry:get_key(Entry1)),
     Old2 = db_dht:get_entry(DB2, db_entry:get_key(Entry2)),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     UpdatePred = fun(OldEntry, NewEntry) ->
                          db_entry:get_version(OldEntry) < db_entry:get_version(NewEntry)
                  end,
@@ -1009,7 +1009,7 @@ prop_changed_keys_update_entries(Data, ChangesInterval, Entry1, Entry2) ->
              check_entry_in_changes(DB4, ChangesInterval, NewEntry1, Old1, "update_entries_2")),
     ?implies(db_entry:get_version(Old2) < db_entry:get_version(Entry2),
              check_entry_in_changes(DB4, ChangesInterval, NewEntry2, Old2, "update_entries_3")),
-    
+
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "update_entries_4"),
 
     db_dht:close(DB5),
@@ -1023,16 +1023,16 @@ prop_changed_keys_delete_entries1(Data, ChangesInterval, Range) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     DB4 = db_dht:delete_entries(DB3, Range),
-    
+
     UniqueCleanData = unittest_helper:scrub_data(Data),
     DeletedKeys = [{db_entry:get_key(DBEntry), true}
                   || DBEntry <- UniqueCleanData,
                      intervals:in(db_entry:get_key(DBEntry), Range)],
     check_changes(DB4, ChangesInterval, "delete_entries1_1"),
     check_keys_in_deleted(DB4, ChangesInterval, DeletedKeys, "delete_entries1_2"),
-    
+
     db_dht:close(DB3),
     true.
 
@@ -1045,16 +1045,16 @@ prop_changed_keys_delete_entries2(Data, ChangesInterval, Range) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     DB4 = db_dht:delete_entries(DB3, FilterFun),
-    
+
     UniqueCleanData = unittest_helper:scrub_data(Data),
     DeletedKeys = [{db_entry:get_key(DBEntry), true}
                   || DBEntry <- UniqueCleanData,
                      not intervals:in(db_entry:get_key(DBEntry), Range)],
     check_changes(DB4, ChangesInterval, "delete_entries2_1"),
     check_keys_in_deleted(DB4, ChangesInterval, DeletedKeys, "delete_entries2_2"),
-    
+
     db_dht:close(DB3),
     true.
 
@@ -1064,10 +1064,10 @@ prop_changed_keys_get_load(Data, ChangesInterval) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     db_dht:get_load(DB3),
     ?equals_w_note(db_dht:get_changes(DB3), {[], []}, "changed_keys_get_load_1"),
-    
+
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_load_2"),
 
     db_dht:close(DB4),
@@ -1080,10 +1080,10 @@ prop_changed_keys_get_load2(Data, LoadInterval, ChangesInterval) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     db_dht:get_load(DB3, LoadInterval),
     ?equals_w_note(db_dht:get_changes(DB3), {[], []}, "changed_keys_get_load2_1"),
-    
+
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_load2_2"),
 
     db_dht:close(DB4),
@@ -1100,7 +1100,7 @@ prop_changed_keys_split_data1(Data, ChangesInterval, MyNewInterval) ->
 
     {DB4, _HisList} = db_dht:split_data(DB3, MyNewInterval),
     ?equals_w_note(db_dht:get_changes(DB4), {[], []}, "split_data1_1"),
-    
+
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "split_data1_2"),
 
     db_dht:close(DB5),
@@ -1118,9 +1118,9 @@ prop_changed_keys_split_data2(Data, ChangesInterval, MyNewInterval) ->
     DB3 = db_dht:add_data(DB2, CleanData),
 
     {DB4, _HisList} = db_dht:split_data(DB3, MyNewInterval),
-    
+
     check_changes(DB4, intervals:intersection(ChangesInterval, MyNewInterval), "split_data2_1"),
-    
+
     DB5 = check_stop_record_changes(DB4, ChangesInterval, "split_data2_2"),
 
     db_dht:close(DB5),
@@ -1132,12 +1132,12 @@ prop_changed_keys_get_data(Data, ChangesInterval) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     UniqueCleanData = unittest_helper:scrub_data(Data),
 
     ?equals(lists:sort(db_dht:get_data(DB3)), lists:sort(UniqueCleanData)),
     ?equals_w_note(db_dht:get_changes(DB3), {[], []}, "changed_keys_get_data_1"),
-    
+
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_get_data_2"),
 
     db_dht:close(DB4),
@@ -1149,7 +1149,7 @@ prop_changed_keys_get_data(Data, ChangesInterval) ->
 prop_changed_keys_add_data(Data, ChangesInterval) ->
     DB = db_dht:new(),
     DB2 = db_dht:record_changes(DB, ChangesInterval),
-    
+
     DB3 = db_dht:add_data(DB2, Data),
     check_changes(DB3, ChangesInterval, "add_data_1"),
 
@@ -1160,7 +1160,7 @@ prop_changed_keys_add_data(Data, ChangesInterval) ->
                              end, lists:reverse(Data)),
     _ = [check_entry_in_changes(DB3, ChangesInterval, E, {false, db_entry:new(db_entry:get_key(E))}, "add_data_2")
            || E <- UniqueData],
-    
+
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "add_data_3"),
 
     db_dht:close(DB4),
@@ -1172,10 +1172,10 @@ prop_changed_keys_check_db(Data, ChangesInterval) ->
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
-    
+
     _ = db_dht:check_db(DB3),
     ?equals_w_note(db_dht:get_changes(DB3), {[], []}, "changed_keys_check_db_1"),
-    
+
     DB4 = check_stop_record_changes(DB3, ChangesInterval, "changed_keys_check_db_2"),
 
     db_dht:close(DB4),
@@ -1193,31 +1193,31 @@ prop_changed_keys_mult_interval(Data, Entry1, Entry2, Entry3, Entry4) ->
     CI1_2 = intervals:union(CI1, CI2),
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
-    
+
     DB3 = db_dht:record_changes(DB2, CI1),
     Old1 = db_dht:get_entry(DB3, db_entry:get_key(Entry1)),
     DB4 = db_dht:set_entry(DB3, Entry1),
     check_changes(DB4, CI1, "changed_keys_mult_interval_1"),
     check_entry_in_changes(DB4, CI1, Entry1, Old1, "changed_keys_mult_interval_2"),
-    
+
     DB5 = db_dht:record_changes(DB4, CI2),
     Old2 = db_dht:get_entry(DB5, db_entry:get_key(Entry2)),
     DB6 = db_dht:set_entry(DB5, Entry2),
     check_changes(DB6, CI1_2, "changed_keys_mult_interval_3"),
     check_entry_in_changes(DB6, CI1_2, Entry2, Old2, "changed_keys_mult_interval_4"),
-    
+
     DB7 = db_dht:record_changes(DB6, CI2),
     Old3 = db_dht:get_entry(DB7, db_entry:get_key(Entry3)),
     DB8 = db_dht:set_entry(DB7, Entry3),
     check_changes(DB8, CI1_2, "changed_keys_mult_interval_5"),
     check_entry_in_changes(DB8, CI1_2, Entry3, Old3, "changed_keys_mult_interval_6"),
-    
+
     DB9 = db_dht:record_changes(DB8, CI2),
     Old4 = db_dht:get_entry(DB9, db_entry:get_key(Entry4)),
     DB10 = db_dht:set_entry(DB9, Entry4),
     check_changes(DB10, CI1_2, "changed_keys_mult_interval_7"),
     check_entry_in_changes(DB10, CI1_2, Entry4, Old4, "changed_keys_mult_interval_8"),
-    
+
     DB11 = check_stop_record_changes(DB10, CI1_2, "changed_keys_mult_interval_9"),
 
     db_dht:close(DB11),
@@ -1236,32 +1236,32 @@ prop_stop_record_changes(Data, Entry1, Entry2, Entry3, Entry4) ->
     CI1_wo2 = intervals:minus(CI1, CI2),
     DB = db_dht:new(),
     DB2 = db_dht:add_data(DB, Data),
-    
+
     DB3 = db_dht:record_changes(DB2, CI1_2),
     Old1 = db_dht:get_entry(DB3, db_entry:get_key(Entry1)),
     DB4 = db_dht:set_entry(DB3, Entry1),
     check_changes(DB4, CI1_2, "stop_record_changes_1"),
     check_entry_in_changes(DB4, CI1_2, Entry1, Old1, "stop_record_changes_2"),
-    
+
     Old3 = db_dht:get_entry(DB4, db_entry:get_key(Entry3)),
     DB5 = db_dht:set_entry(DB4, Entry3),
     check_changes(DB5, CI1_2, "stop_record_changes_3"),
     check_entry_in_changes(DB5, CI1_2, Entry3, Old3, "stop_record_changes_4"),
-    
+
     DB6 = db_dht:stop_record_changes(DB5, CI2),
     check_changes(DB6, CI1_wo2, "stop_record_changes_5"),
     check_entry_in_changes(DB6, CI1_wo2, Entry1, Old1, "stop_record_changes_6"),
-    
+
     Old2 = db_dht:get_entry(DB6, db_entry:get_key(Entry2)),
     DB7 = db_dht:set_entry(DB6, Entry2),
     check_changes(DB7, CI1_wo2, "stop_record_changes_7"),
     check_entry_in_changes(DB7, CI1_wo2, Entry2, Old2, "stop_record_changes_8"),
-    
+
     Old4 = db_dht:get_entry(DB7, db_entry:get_key(Entry4)),
     DB8 = db_dht:set_entry(DB7, Entry4),
     check_changes(DB8, CI1_wo2, "stop_record_changes_9"),
     check_entry_in_changes(DB8, CI1_wo2, Entry4, Old4, "stop_record_changes_10"),
-    
+
     DB9 = db_dht:stop_record_changes(DB8),
     ?equals_w_note(db_dht:get_changes(DB9), {[], []}, "stop_record_changes_11"),
 

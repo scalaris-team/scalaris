@@ -67,7 +67,7 @@ end_per_testcase(_TestCase, Config) ->
 -define(VALUE(Val), rdht_tx:encode_value(Val)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% snapshot-related DB API tests 
+% snapshot-related DB API tests
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec test_copy_value_to_snapshot_table(any()) -> ok.
@@ -146,7 +146,7 @@ test_get_snapshot_data(Data, Interval) ->
     All = db_dht:get_snapshot_data(LoadedDB),
     ?equals(length(All), length(CleanData)),
     ExpPart = lists:foldl(
-            fun(Entry, Acc) -> 
+            fun(Entry, Acc) ->
                     case intervals:in(db_entry:get_key(Entry), Interval) of
                         true ->
                             [Entry | Acc];
@@ -179,7 +179,7 @@ test_add_snapshot_data(Data) ->
 -spec make_even_db_entry_list(non_neg_integer()) -> [db_entry:entry()].
 make_even_db_entry_list(N) ->
     Step = (?PLUS_INFINITY - 1) / N,
-    [db_entry:new(K, ?VALUE(V), 1) || 
+    [db_entry:new(K, ?VALUE(V), 1) ||
     {K, V} <- lists:foldl(fun(X, Acc) -> [{erlang:round(Step / 2 + Step * X),
                                            "Foo"} | Acc] end,
                          [],
@@ -395,7 +395,7 @@ test_lock_counting_on_live_db(_) ->
     {_, _, {_, NewLiveLC, _}} = db_dht:set_entry(NewDB, EntryFoo),
     ?equals(NewLiveLC, 0),
     ok.
-    
+
 
 %%%%% integration tests
 
@@ -408,7 +408,7 @@ test_single_snapshot_call(_) ->
     ?equals_pattern(api_tx:get_system_snapshot(),
                     [{_, _, 0}, {_, _, 0}, {_, _, 0}, {_, _, 0}]),
     ok.
-    
+
 -spec test_basic_race_multiple_snapshots(any()) -> ok.
 test_basic_race_multiple_snapshots(_) ->
     unittest_helper:make_ring(4),
@@ -422,12 +422,12 @@ test_basic_race_multiple_snapshots(_) ->
 -spec test_spam_transactions_and_snapshots_on_fully_joined(any()) -> ok.
 test_spam_transactions_and_snapshots_on_fully_joined(_) ->
     unittest_helper:make_ring(4),
-    ct:pal("wating for fully joined ring...~n~p", 
+    ct:pal("wating for fully joined ring...~n~p",
            [unittest_helper:check_ring_size_fully_joined(4)]),
-    
+
     % apply a couple of transactions beforehand
     tester:test(?MODULE, do_transaction_a, 1, 10),
-    
+
     ct:pal("spaming transactions..."),
     SpamPid1 = erlang:spawn(fun() ->
                     [do_transaction_a(X) || X <- lists:seq(1, 500)]
@@ -435,15 +435,15 @@ test_spam_transactions_and_snapshots_on_fully_joined(_) ->
     SpamPid2 = erlang:spawn(fun() ->
                     [do_transaction_b(X) || X <- lists:seq(1, 500)]
           end),
-    
+
     ct:pal("spaming snapshots..."),
     % spam snapshots here
     tester:test(api_tx, get_system_snapshot, 0, 100),
-    
+
     ct:pal("waiting for transaction spam..."),
     util:wait_for_process_to_die(SpamPid1),
     util:wait_for_process_to_die(SpamPid2),
-    
+
     % get a final snapshot and print it
     Snap = api_tx:get_system_snapshot(),
     ?equals_pattern(Snap, [{_, _, _}, {_, _, _}]),
@@ -463,8 +463,8 @@ do_transaction_b(_I) ->
 -spec test_tx_snapshot_slide_interleave(any()) -> ok.
 test_tx_snapshot_slide_interleave(_) ->
     unittest_helper:make_ring(1),
-    ct:pal("writing a bit of data...~p", [api_tx:write("A", 1)]), 
-    ct:pal("wrote...~p", [api_tx:read("A")]), 
+    ct:pal("writing a bit of data...~p", [api_tx:write("A", 1)]),
+    ct:pal("wrote...~p", [api_tx:read("A")]),
     timer:sleep(1000),
     Pid = pid_groups:find_a(dht_node),
     ct:pal("setting breakpoint"),
@@ -491,7 +491,7 @@ test_tx_snapshot_slide_interleave(_) ->
     timer:sleep(100),
     ct:pal("adding node to provoke slide"),
     api_vm:add_nodes(1),
-    ct:pal("wating for fully joined ring...~n~p", 
+    ct:pal("wating for fully joined ring...~n~p",
            [unittest_helper:check_ring_size_fully_joined(2)]),
     ct:pal("removing breakpoint ~p", [gen_component:bp_del(Pid, snap_bp)]),
     util:wait_for_process_to_die(TxPid),
