@@ -110,8 +110,18 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
                     case is_current_takeover(State, L) of
                         true ->
                             log:log("retry ~s", [lists:flatten(l_on_cseq:get_pretty_timeout(L))]),
+                            LeaseTimeout = l_on_cseq:get_timeout(L),
                             Pid = comm:reply_as(self(), 3, {takeover_after_rm_change, L, '_'}),
-                            l_on_cseq:lease_takeover(L, Pid),
+                            WaitTime = timer:now_diff(LeaseTimeout, os:timestamp()),
+                            log:log("retry ~s ~w", [lists:flatten(l_on_cseq:get_pretty_timeout(L)), WaitTime]),
+                            case WaitTime < 500*1000 of
+                                true ->
+                                    l_on_cseq:lease_takeover(L, Pid);
+                                false ->
+                                    PostponeBy = trunc(0.5 + WaitTime / (1000*1000)),
+                                    log:log("delaying takeover by ~w", [PostponeBy]),
+                                    l_on_cseq:lease_takeover_after(PostponeBy, L, Pid)
+                            end,
                             State;
                         false ->
                             remove_takeover(State, L)
