@@ -98,6 +98,7 @@ on({read_after_rm_change, _MissingRange, Result}, State) ->
             l_on_cseq:lease_takeover(Lease, Pid),
             add_takeover(State, Lease);
         _ ->
+            log:log("not so well-formed qread-response"),
             State
     end;
 
@@ -108,26 +109,34 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
             case Error of
                 {content_check_failed,lease_is_still_valid} ->
                     case is_current_takeover(State, L) of
-                        true ->
-                            log:log("retry ~s", [lists:flatten(l_on_cseq:get_pretty_timeout(L))]),
-                            LeaseTimeout = l_on_cseq:get_timeout(L),
-                            Pid = comm:reply_as(self(), 3, {takeover_after_rm_change, L, '_'}),
-                            WaitTime = timer:now_diff(LeaseTimeout, os:timestamp()),
-                            log:log("retry ~s ~w", [lists:flatten(l_on_cseq:get_pretty_timeout(L)), WaitTime]),
-                            case WaitTime < 500*1000 of
+                        {value, L2} ->
+                            case l_on_cseq:get_timeout(L) =:= l_on_cseq:get_timeout(L2) of
                                 true ->
-                                    l_on_cseq:lease_takeover(L, Pid);
+                                    log:log("retry ~s", [lists:flatten(l_on_cseq:get_pretty_timeout(L))]),
+                                    LeaseTimeout = l_on_cseq:get_timeout(L),
+                                    Pid = comm:reply_as(self(), 3, {takeover_after_rm_change, L, '_'}),
+                                    WaitTime = timer:now_diff(LeaseTimeout, os:timestamp()),
+                                    log:log("retry ~s ~w", [lists:flatten(l_on_cseq:get_pretty_timeout(L)), WaitTime]),
+                                    case WaitTime < 500*1000 of
+                                        true ->
+                                            l_on_cseq:lease_takeover(L, Pid);
+                                        false ->
+                                            PostponeBy = trunc(0.5 + WaitTime / (1000*1000)),
+                                            log:log("delaying takeover by ~ws", [PostponeBy]),
+                                            l_on_cseq:lease_takeover_after(PostponeBy, L, Pid)
+                                    end,
+                                    State;
                                 false ->
-                                    PostponeBy = trunc(0.5 + WaitTime / (1000*1000)),
-                                    log:log("delaying takeover by ~w", [PostponeBy]),
-                                    l_on_cseq:lease_takeover_after(PostponeBy, L, Pid)
-                            end,
-                            State;
-                        false ->
+                                    propose_new_neighbors(l_on_cseq:get_owner(L)),
+                                    remove_takeover(State, L)
+                            end;
+                        none ->
+                            propose_new_neighbors(l_on_cseq:get_owner(L)),
                             remove_takeover(State, L)
                     end;
                 _ ->
-                    log:log("unknown error in takeover_after_rm_change ~w", [Error]),
+                    propose_new_neighbors(l_on_cseq:get_owner(L)),
+                    %log:log("unknown error in takeover_after_rm_change ~w", [Error]),
                     State
             end;
         {takeover, success, L2} ->
@@ -150,6 +159,10 @@ on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
 
 on({merge_after_leave, _NewLease, _OldLease, Result}, State) ->
     log:log("merge after finish done: ~w", [Result]),
+    State;
+
+on({get_node_for_new_neighbor, {get_state_response, Node}}, State) ->
+    rm_loop:propose_new_neighbors([Node]),
     State.
 
 -spec compare_and_fix_rm_with_leases(state()) -> state().
@@ -198,12 +211,26 @@ remove_takeover(#state{takeovers=Takeovers} = State, Lease) ->
     State#state{takeovers=NewTakeovers}.
 
 % @doc the given lease is the one we recorded earlier
--spec is_current_takeover(state(), l_on_cseq:lease_t()) -> boolean().
+-spec is_current_takeover(state(), l_on_cseq:lease_t()) -> {value, l_on_cseq:lease_t()} | none.
 is_current_takeover(#state{takeovers=Takeovers}, L) ->
     Id = l_on_cseq:get_id(L),
-    case gb_trees:lookup(Id, Takeovers) of
-        {value, L} -> true;
-        _ -> false
+    gb_trees:lookup(Id, Takeovers).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% utilities
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec propose_new_neighbors(comm:mypid() | nil) -> ok.
+propose_new_neighbors(PidOrNil) ->
+    log:log("somebody else updated this lease"),
+    case PidOrNil of
+        nil ->
+            ok;
+        Pid ->
+            ReplyPid = comm:reply_as(comm:this(), 2, {get_node_for_new_neighbor, '_'}),
+            comm:send(Pid, {get_state, ReplyPid, node}),
+            ok
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
