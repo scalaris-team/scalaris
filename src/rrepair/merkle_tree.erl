@@ -82,6 +82,7 @@
 
 -type mt_node() :: { Hash        :: mt_node_key() | nil, %hash of childs/containing items
                      Count       :: non_neg_integer(),   %in inner nodes number of subnodes including itself, in leaf nodes number of items in the bucket
+                     LeafCount   :: -1 | non_neg_integer(), % -1 if not hashed yet, otherwise the number of leafs below this node (if it is a leaf, LeafCount will be 0)
                      Bucket      :: mt_bucket(),         %item storage
                      Interval    :: mt_interval(),       %represented interval
                      Child_list  :: [mt_node()]
@@ -114,7 +115,7 @@ get_root(_) -> undefined.
 
 %% @doc Checks whether the merkle tree has any children or elements.
 -spec is_empty(merkle_tree()) -> boolean().
-is_empty({merkle_tree, _, {_, 0, [], _I, []}}) -> true;
+is_empty({merkle_tree, _, {_H, _Cnt = 0, _LCnt, _Bkt = [], _I, _CL = []}}) -> true;
 is_empty(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -149,9 +150,9 @@ new(I, EntryList, ConfParams) ->
 -spec lookup(mt_interval(), merkle_tree() | mt_node()) -> mt_node() | not_found.
 lookup(I, {merkle_tree, _, Root}) ->
     lookup(I, Root);
-lookup(I, {_, _, _, I, _ChildList} = Node) ->
+lookup(I, {_H, _Cnt, _LCnt, _Bkt, I, _CL} = Node) ->
     Node;
-lookup(I, {_, _, _, NodeI, _ChildList} = Node) ->
+lookup(I, {_H, _Cnt, _LCnt, _Bkt, NodeI, _CL} = Node) ->
     case intervals:is_subset(I, NodeI) of
         true  -> lookup_(I, Node);
         false -> not_found
@@ -160,11 +161,11 @@ lookup(I, {_, _, _, NodeI, _ChildList} = Node) ->
 %% @doc Helper for lookup/2. In contrast to lookup/2, assumes that I is a
 %%      subset of the current node's interval.
 -spec lookup_(mt_interval(), merkle_tree() | mt_node()) -> mt_node() | not_found.
-lookup_(I, {_, _, _, I, _ChildList} = Node) ->
+lookup_(I, {_H, _Cnt, _LCnt, _Bkt, I, _CL} = Node) ->
     Node;
-lookup_(_I, {_, _, _, _NodeI, _ChildList = []}) ->
+lookup_(_I, {_H, _Cnt, _LCnt, _Bkt, _NodeI, _CL = []}) ->
     not_found;
-lookup_(I, {_, _, _, _NodeI, ChildList = [_|_]}) ->
+lookup_(I, {_H, _Cnt, _LCnt, _Bkt, _NodeI, ChildList = [_|_]}) ->
     ?ASSERT(1 >= length([C || C <- ChildList,
                               intervals:is_subset(I, get_interval(C))])),
     case lists:dropwhile(fun(X) ->
@@ -178,49 +179,58 @@ lookup_(I, {_, _, _, _NodeI, ChildList = [_|_]}) ->
 
 %% @doc Gets the node's hash value.
 -spec get_hash(merkle_tree() | mt_node()) -> mt_node_key().
-get_hash({merkle_tree, _, Node}) -> get_hash(Node);
-get_hash({Hash, _, _, _, _}) -> Hash.
+get_hash({merkle_tree, _, Root}) -> get_hash(Root);
+get_hash({Hash, _Cnt, _LCnt, _Bkt, _I, _CL}) -> Hash.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec get_interval(merkle_tree() | mt_node()) -> intervals:interval().
-get_interval({merkle_tree, _, Node}) -> get_interval(Node);
-get_interval({_, _, _, I, _}) -> I.
+get_interval({merkle_tree, _, Root}) -> get_interval(Root);
+get_interval({_H, _Cnt, _LCnt, _Bkt, I, _CL}) -> I.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec get_childs(merkle_tree() | mt_node()) -> [mt_node()].
-get_childs({merkle_tree, _, Node}) -> get_childs(Node);
-get_childs({_, _, _, _, Childs}) -> Childs.
+get_childs({merkle_tree, _, Root}) -> get_childs(Root);
+get_childs({_H, _Cnt, _LCnt, _Bkt, _I, Childs}) -> Childs.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc returns number of items in a bucket / returns 0 if requested node is not a leaf node
 -spec get_item_count(merkle_tree() | mt_node()) -> non_neg_integer().
-get_item_count({merkle_tree, _, Node}) -> get_item_count(Node);
-get_item_count({_, C, _, _, []}) -> C;
-get_item_count({_, _, _, _, _}) -> 0.
+get_item_count({merkle_tree, _, Root}) -> get_item_count(Root);
+get_item_count({_H, Count, _LCnt, _Bkt, _I, _CL = []}) -> Count;
+get_item_count({_H, _Cnt, _LCnt, _Bkt, _I, _CL = [_|_]}) -> 0.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Returns the number of leafs under a bucket (0 if requested node is a
+%%      leaf node, -1 if not hashed yet)
+-spec get_leaf_count(merkle_tree() | mt_node()) -> -1 | non_neg_integer().
+get_leaf_count({merkle_tree, _, Root}) -> get_item_count(Root);
+get_leaf_count({_H, _Cnt, LeafCount, _Bkt, _I, _CL}) -> LeafCount.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether the given merkle_tree or node is a leaf.
 -spec is_leaf(merkle_tree() | mt_node()) -> boolean().
-is_leaf({merkle_tree, _, Node}) -> is_leaf(Node);
-is_leaf({_, _, _, _, []}) -> true;
+is_leaf({merkle_tree, _, Root}) -> is_leaf(Root);
+is_leaf({_H, _Cnt, _LCnt, _Bkt, _I, _CL = []}) -> true;
 is_leaf(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Returns true if given term is a merkle tree otherwise false.
 -spec is_merkle_tree(any()) -> boolean().
-is_merkle_tree({merkle_tree, _, _}) -> true;
+is_merkle_tree({merkle_tree, _, _Root}) -> true;
 is_merkle_tree(_) -> false.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec get_bucket(merkle_tree() | mt_node()) -> mt_bucket().
 get_bucket({merkle_tree, _, Root}) -> get_bucket(Root);
-get_bucket({_, C, Bucket, _, []}) when C > 0 -> Bucket;
+get_bucket({_H, Count, _LCnt, Bucket, _I, _CL = []})
+  when Count > 0 -> Bucket;
 get_bucket(_) -> [].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -242,24 +252,24 @@ insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree)
 -spec insert_to_node(Key::mt_bucket_entry(), CheckKey::?RT:key(),
                      Node::mt_node(), Config::mt_config())
         -> NewNode::mt_node().
-insert_to_node(Key, _CheckKey, {_Hash, Count, Bucket, Interval, []} = N, Config)
+insert_to_node(Key, _CheckKey, {_H, Count, LeafCount, Bucket, Interval, []} = N, Config)
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
     case lists:member(Key, Bucket) of
-        false -> {nil, Count + 1, [Key | Bucket], Interval, []};
+        false -> {nil, Count + 1, LeafCount, [Key | Bucket], Interval, []};
         _     -> N
     end;
 
-insert_to_node(Key, CheckKey, {_, BucketSize, Bucket, Interval, []},
+insert_to_node(Key, CheckKey, {_, BucketSize, LeafCount, Bucket, Interval, []},
                #mt_config{ branch_factor = BranchFactor,
                            bucket_size = BucketSize } = Config) ->
     % former leaf node which will become an inner node
     ChildI = intervals:split(Interval, BranchFactor),
-    NewLeafs = [{nil, CX, BX, IX, []}
+    NewLeafs = [{nil, CX, -1, BX, IX, []}
                || {IX, CX, BX} <- keys_to_intervals(Bucket, ChildI)],
-    insert_to_node(Key, CheckKey, {nil, 1 + BranchFactor, [], Interval, NewLeafs}, Config);
+    insert_to_node(Key, CheckKey, {nil, 1 + BranchFactor, LeafCount, [], Interval, NewLeafs}, Config);
 
-insert_to_node(Key, CheckKey, {Hash, Count, [], Interval, Childs = [_|_]} = Node, Config) ->
-    {Dest0, Rest} = lists:partition(fun({_, _, _, I, _}) ->
+insert_to_node(Key, CheckKey, {Hash, Count, LeafCount, [], Interval, Childs = [_|_]} = Node, Config) ->
+    {Dest0, Rest} = lists:partition(fun({_H, _Cnt, _LCnt, _Bkt, I, _CL}) ->
                                             intervals:in(CheckKey, I)
                                     end, Childs),
     case Dest0 of
@@ -267,7 +277,7 @@ insert_to_node(Key, CheckKey, {Hash, Count, [], Interval, Childs = [_|_]} = Node
         [Dest|_] ->
             OldSize = node_size(Dest),
             NewDest = insert_to_node(Key, CheckKey, Dest, Config),
-            {Hash, Count + (node_size(NewDest) - OldSize), [], Interval, [NewDest|Rest]}
+            {Hash, Count + (node_size(NewDest) - OldSize), LeafCount, [], Interval, [NewDest|Rest]}
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -285,12 +295,12 @@ bulk_build(I, KeyList, Params) ->
 %%      Config#mt_config.bucket_size.
 -spec p_bulk_build(CurNode::mt_node(), mt_config(), KeyList::mt_bucket())
         -> mt_node().
-p_bulk_build({_, C, _, I, _}, Config, KeyList) ->
-    ChildsI = intervals:split(I, Config#mt_config.branch_factor),
+p_bulk_build({_H, Count, LeafCount, _Bkt, Interval, _CL = []}, Config, KeyList) ->
+    ChildsI = intervals:split(Interval, Config#mt_config.branch_factor),
     IKList = keys_to_intervals(KeyList, ChildsI),
     ChildNodes = build_childs(IKList, Config, []),
     NCount = lists:foldl(fun(N, Acc) -> Acc + node_size(N) end, 0, ChildNodes),
-    {nil, C + NCount, [], I, ChildNodes}.
+    {nil, Count + NCount, LeafCount, [], Interval, ChildNodes}.
 
 -spec build_childs([{I::intervals:continuous_interval(), Count::non_neg_integer(),
                      mt_bucket()}], mt_config(), Acc::[mt_node()]) -> [mt_node()].
@@ -298,15 +308,15 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
     BucketSize = Config#mt_config.bucket_size,
     KeepBucket = Config#mt_config.keep_bucket,
     Node = if Count > BucketSize ->
-                  p_bulk_build({nil, 1, [], Interval, []}, Config, Bucket);
+                  p_bulk_build({nil, 1, -1, [], Interval, []}, Config, Bucket);
               KeepBucket ->
                   % let gen_hash/1 hash the leaves
-                  {nil, Count, Bucket, Interval, []};
+                  {nil, Count, -1, Bucket, Interval, []};
               true ->
                   % need to hash here since we won't keep the bucket!
                   Hash = run_leaf_hf(lists:ukeysort(1, Bucket), Interval,
                                      Config#mt_config.leaf_hf),
-                  {Hash, Count, [], Interval, []}
+                  {Hash, Count, 0, [], Interval, []}
            end,
     build_childs(T, Config, [Node | Acc]);
 build_childs([], _, Acc) ->
@@ -333,25 +343,28 @@ gen_hash({merkle_tree, Config = #mt_config{inner_hf = InnerHf,
 -spec gen_hash_node(mt_node(), InnerHf::inner_hash_fun(), LeafHf::hash_fun(),
                     KeepBucket::boolean(),
                     CleanBuckets::boolean()) -> mt_node().
-gen_hash_node({_, Count, [], I, [_|_] = List}, InnerHf, LeafHf,
-              OldKeepBucket, CleanBuckets) ->
+gen_hash_node({_H, Count, _LCnt, _Bkt = [], Interval, ChildList = [_|_]},
+              InnerHf, LeafHf, OldKeepBucket, CleanBuckets) ->
     % inner node
     NewChilds = [gen_hash_node(X, InnerHf, LeafHf, OldKeepBucket,
-                               CleanBuckets) || X <- List],
+                               CleanBuckets) || X <- ChildList],
+    LeafCount = lists:foldl(fun(N, LeafCountX) ->
+                                    LeafCountX + get_leaf_count(N)
+                            end, 0, ChildList),
     Hash = run_inner_hf(NewChilds, InnerHf),
-    {Hash, Count, [], I, NewChilds};
-gen_hash_node({_, _Count, _Bucket, _I, []} = N, _InnerHf, _LeafHf,
-              false, _CleanBuckets) ->
+    {Hash, Count, LeafCount, [], Interval, NewChilds};
+gen_hash_node({Hash, _Cnt, _LCnt = 0, _Bkt, _I, []} = N, _InnerHf,
+              _LeafHf, false, _CleanBuckets) when Hash =/= nil ->
     % leaf node, no bucket contents, keep_bucket false
     % -> we already hashed the value in bulk_build and cannot insert any more
     %    values
     N;
-gen_hash_node({_, Count, Bucket, I, [] = Childs}, _InnerHf, LeafHf,
-              true, CleanBuckets) ->
+gen_hash_node({_OldHash, Count, _LCnt, Bucket, Interval, [] = Childs},
+              _InnerHf, LeafHf, true, CleanBuckets) ->
     % leaf node, no bucket contents, keep_bucket true
     Bucket1 = lists:ukeysort(1, Bucket),
-    Hash = run_leaf_hf(Bucket1, I, LeafHf),
-    {Hash, Count, ?IIF(CleanBuckets, [], Bucket1), I, Childs}.
+    Hash = run_leaf_hf(Bucket1, Interval, LeafHf),
+    {Hash, Count, 0, ?IIF(CleanBuckets, [], Bucket1), Interval, Childs}.
 
 %% @doc Hashes an inner node based on its childrens' hashes.
 -spec run_inner_hf([mt_node(),...], InnerHf::inner_hash_fun()) -> mt_node_key().
@@ -379,27 +392,29 @@ size({merkle_tree, _, Root}) -> node_size(Root);
 size(Node) -> node_size(Node).
 
 -spec node_size(mt_node()) -> non_neg_integer().
-node_size({_, _, _, _, []}) -> 1;
-node_size({_, C, _, _, [_|_]}) -> C.
+node_size({_H, _Cnt, _LCnt, _Bkt, _I, _CL = []}) -> 1;
+node_size({_H, Count, _LCnt, _Bkt, _I, _CL = [_|_]}) -> Count.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc Returns a tuple with number of inner nodes and leaf nodes.
 -spec size_detail(merkle_tree()) -> mt_size().
 size_detail({merkle_tree, _, Root}) ->
-    size_detail_node([Root], 0, 0).
+    Result = {_Inner, _Leafs} = size_detail_node([Root], 0, 0),
+    ?ASSERT(_Leafs = get_leaf_count(Root)),
+    Result.
 
 -spec size_detail_node([mt_node() | [mt_node()]], InnerNodes::non_neg_integer(),
                        Leafs::non_neg_integer()) -> mt_size().
-size_detail_node([{_, _, _, _, [_|_] = Childs} | R], Inner, Leafs) ->
+size_detail_node([{_H, _Cnt, _LCnt, _Bkt, _I, Childs = [_|_]} | R], Inner, Leafs) ->
     size_detail_node([Childs | R], Inner + 1, Leafs);
-size_detail_node([{_, _, _, _, []} | R], Inner, Leafs) ->
+size_detail_node([{_H, _Cnt, _LCnt, _Bkt, _I, _Childs = []} | R], Inner, Leafs) ->
     size_detail_node(R, Inner, Leafs + 1);
 size_detail_node([], InnerNodes, Leafs) ->
     {InnerNodes, Leafs};
-size_detail_node([[{_, _, _, _, [_|_] = Childs} | R1] | R2], Inner, Leafs) ->
+size_detail_node([[{_H, _Cnt, _LCnt, _Bkt, _I, Childs = [_|_]} | R1] | R2], Inner, Leafs) ->
     size_detail_node([Childs, R1 | R2], Inner + 1, Leafs);
-size_detail_node([[{_, _, _, _, []} | R1] | R2], Inner, Leafs) ->
+size_detail_node([[{_H, _Cnt, _LCnt, _Bkt, _I, _Childs = []} | R1] | R2], Inner, Leafs) ->
     size_detail_node([R1 | R2], Inner, Leafs + 1);
 size_detail_node([[] | R2], Inner, Leafs) ->
     size_detail_node(R2, Inner, Leafs).
@@ -412,9 +427,9 @@ size_detail_node([[] | R2], Inner, Leafs) ->
 iterator({merkle_tree, _, Root}) -> [Root].
 
 -spec iterator_node(Node::mt_node(), mt_iter()) -> mt_iter().
-iterator_node({_, _, _, _, [_|_] = Childs}, Iter1) ->
+iterator_node({_H, _Cnt, _LCnt, _Bkt, _I, Childs = [_|_]}, Iter1) ->
     [Childs | Iter1];
-iterator_node({_, _, _, _, []}, Iter1) ->
+iterator_node({_H, _Cnt, _LCnt, _Bkt, _I, _CL = []}, Iter1) ->
     Iter1.
 
 -spec next(mt_iter()) -> none | {Node::mt_node(), mt_iter()}.
@@ -461,14 +476,16 @@ store_to_DOT_p({merkle_tree, Conf, Root}, FileName, ToPng) ->
     end.
 
 -spec store_node_to_DOT(mt_node(), pid(), pos_integer(), pos_integer(), mt_config()) -> pos_integer().
-store_node_to_DOT({H, C, _, I, []}, Fileid, MyId, NextFreeId, #mt_config{ bucket_size = BuckSize }) ->
+store_node_to_DOT({H, C, _LCnt, _Bkt, I, _CL = []}, Fileid, MyId,
+                  NextFreeId, #mt_config{ bucket_size = BuckSize }) ->
     {LBr, _LKey, _RKey, RBr} = intervals:get_bounds(I),
     io:fwrite(Fileid, "    ~p [label=\"~p\\n~s~p,~p~s ; ~p/~p\", shape=box]~n",
               [MyId, ?DOT_SHORTNAME_HASH(H), erlang:atom_to_list(LBr),
                ?DOT_SHORTNAME_KEY(_LKey), ?DOT_SHORTNAME_KEY(_RKey),
                erlang:atom_to_list(RBr), C, BuckSize]),
     NextFreeId;
-store_node_to_DOT({H, _, _ , I, [_|RChilds] = Childs}, Fileid, MyId, NextFreeId, TConf) ->
+store_node_to_DOT({H, _Cnt, _LCnt, _Bkt, I, Childs = [_|RChilds]}, Fileid, MyId,
+                  NextFreeId, TConf) ->
     io:fwrite(Fileid, "    ~p -> { ~p", [MyId, NextFreeId]),
     NNFreeId = lists:foldl(fun(_, Acc) ->
                                     io:fwrite(Fileid, ";~p", [Acc]),
