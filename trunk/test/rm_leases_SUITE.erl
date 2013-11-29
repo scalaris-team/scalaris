@@ -32,13 +32,17 @@ groups() ->
                               ]},
      {kill_tests, [sequence], [
                                test_single_kill
-                               ]}
+                               ]},
+     {rm_loop_tests, [sequence], [
+                                  propose_new_neighbor
+                                 ]}
     ].
 
 all() ->
     [
      {group, tester_tests},
-     {group, kill_tests}
+     {group, kill_tests},
+     {group, rm_loop_tests}
      ].
 
 suite() -> [ {timetrap, {seconds, 400}} ].
@@ -85,7 +89,8 @@ tester_type_check_rm_leases(_Config) ->
             {on, 2}
            ],
            [
-            {compare_and_fix_rm_with_leases, 1} %% cannot create dht_node_state (reference for bulkowner)
+            {compare_and_fix_rm_with_leases, 1}, %% cannot create dht_node_state (reference for bulkowner)
+            {propose_new_neighbors, 1} %% sends messages
            ]}
         ],
     %% join a dht_node group to be able to call lease trigger functions
@@ -109,6 +114,38 @@ test_single_kill(_Config) ->
     timer:sleep(5000),
     ok.
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% rm_loop unit tests
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+propose_new_neighbor(_Config) ->
+    lease_helper:wait_for_ring_size(4),
+    lease_helper:wait_for_correct_ring(),
+    MainNode = pid_groups:group_with(dht_node),
+    % main node
+    RMLeasesPid = pid_groups:pid_of(MainNode, rm_leases),
+    DHTNodePid = pid_groups:pid_of(MainNode, dht_node),
+
+    % fake death
+    comm:send_local(DHTNodePid, {get_state, comm:this(), neighbors}),
+    Neighbors = receive
+        {get_state_response, Neighbors2} -> Neighbors2
+    end,
+    % @todo could add fake node??!
+    PredNode = nodelist:pred(Neighbors),
+    PredPid = node:pidX(PredNode),
+    comm:send(PredPid, {get_state, comm:this(), my_range}),
+    PredRange = receive
+        {get_state_response, PredRange2} -> PredRange2
+    end,
+    LeaseId = l_on_cseq:id(PredRange),
+    {ok, Lease} = l_on_cseq:read(LeaseId),
+    Result = {qread_done, fake_reqid, fake_round, Lease},
+    Msg = {read_after_rm_change, PredRange, Result},
+    comm:send_local(RMLeasesPid, Msg),
+    timer:sleep(15000),
+    ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
