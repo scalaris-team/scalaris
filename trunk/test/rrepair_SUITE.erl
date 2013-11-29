@@ -524,13 +524,23 @@ tester_find_sync_interval(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_merkle_compress_hashlist(Hashes::[merkle_tree:mt_node_key()], SigSize::1..160) -> boolean().
-prop_merkle_compress_hashlist(Hashes, SigSize) ->
-    Bin = rr_recon:merkle_compress_hashlist(Hashes, <<>>, SigSize),
+-spec prop_merkle_compress_hashlist(Nodes::[merkle_tree:mt_node()], SigSize::1..160) -> boolean().
+prop_merkle_compress_hashlist(Nodes0, SigSize) ->
+    % fix node list which may contain nil hashes:
+    % let it crash if the format of a merkle tree node changes
+    Nodes = [begin
+                 case N of
+                     {nil, Count, Bucket, Interval, Child_list} ->
+                         {randoms:getRandomInt(), Count, Bucket, Interval, Child_list};
+                     _ -> N
+                 end
+             end || N <- Nodes0],
+    Bin = rr_recon:merkle_compress_hashlist(Nodes, <<>>, SigSize),
     HashesRed = [begin
+                     H0 = merkle_tree:get_hash(N),
                      <<H:SigSize/integer-unit:1>> = <<H0:SigSize>>,
-                     H
-                 end || H0 <- Hashes],
+                     {H, merkle_tree:is_leaf(N)}
+                 end || N <- Nodes],
     ?equals(rr_recon:merkle_decompress_hashlist(Bin, [], SigSize), HashesRed).
 
 tester_merkle_compress_hashlist(_) ->
