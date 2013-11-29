@@ -23,6 +23,7 @@ call "%~dp0"\bin\find_erlang.bat
 ::  {d, have_ctline_support}
 ::  {d, have_cthooks_support}
 ::  {d, have_callback_support}
+::  {d, with_crypto_hash}
 :: For older erlang versions that do not have the httpc module but use the (older)
 :: http module, the following line needs to be added to Emakefile:
 :: ["{\"contrib/compat/httpc.erl\",[debug_info, nowarn_unused_function, nowarn_obsolete_guard, nowarn_unused_vars,{outdir, \"ebin\"}]}."]
