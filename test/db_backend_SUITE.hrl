@@ -184,7 +184,6 @@ check_db(DB, ExpData, Note) ->
     ?equals_w_note(lists:sort(InDb), lists:sort(ExpData), Note),
     ?equals_w_note(?TEST_DB:get_load(DB), length(ExpData), Note).
 
-
 is_in({element, Key}, OtherKey) -> Key ?EQ OtherKey;
 is_in(all, _Key) -> true;
 is_in({interval, '(', L, R, ')'}, Key) -> Key > L andalso Key < R;
