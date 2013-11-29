@@ -325,7 +325,21 @@ bp_about_to_kill(Pid) ->
 %% generic framework
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % profile
--spec start_link(module(), handler(), term(), list()) -> {ok, pid()}.
+
+-type spawn_option() ::
+            link | monitor
+          | {priority, Level::low | normal | high | max}
+          | {fullsweep_after, Number::non_neg_integer()}
+          | {min_heap_size, Size::non_neg_integer()}
+          | {min_bin_vheap_size, VSize::non_neg_integer()}.
+-type option() ::
+            {pid_groups_join_as, pid_groups:groupname(), pid_groups:pidname()}
+          | {pid_groups_join_as, pid_groups:groupname(), {short_lived, pid_groups:pidname()}}
+          | {erlang_register, Name::atom()}
+          | {spawn_opts, [spawn_option()]}
+          | wait_for_init.
+
+-spec start_link(module(), handler(), term(), [option()]) -> {ok, pid()}.
 start_link(Module, Handler, Args, Options) ->
     case lists:keytake(spawn_opts, 1, Options) of
         {value, {spawn_opts, SpawnOpt}, Options1} -> ok;
@@ -337,12 +351,12 @@ start_link(Module, Handler, Args, Options) ->
                     [link | SpawnOpt]),
     receive {started, Pid} -> {ok, Pid} end.
 
--spec start(module(), handler(), term(), list()) -> {ok, pid()}.
+-spec start(module(), handler(), term(), [option()]) -> {ok, pid()}.
 start(Module, Handler, Args, Options) ->
     Pid = spawn(?MODULE, start, [Module, Handler, Args, Options, self()]),
     receive {started, Pid} -> {ok, Pid} end.
 
--spec start(module(), handler(), term(), list(), pid()) -> no_return() | ok.
+-spec start(module(), handler(), term(), [option()], pid()) -> no_return() | ok.
 start(Module, DefaultHandler, Args, Options, Supervisor) ->
     %?SPAWNED(Module),
     case lists:keyfind(pid_groups_join_as, 1, Options) of
