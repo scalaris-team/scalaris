@@ -401,7 +401,7 @@ node_size({_H, Count, _LCnt, _Bkt, _I, _CL = [_|_]}) -> Count.
 -spec size_detail(merkle_tree()) -> mt_size().
 size_detail({merkle_tree, _, Root}) ->
     Result = {_Inner, _Leafs} = size_detail_node([Root], 0, 0),
-    ?ASSERT(_Leafs = get_leaf_count(Root)),
+    ?ASSERT(get_leaf_count(Root) =:= -1 orelse _Leafs =:= get_leaf_count(Root)),
     Result.
 
 -spec size_detail_node([mt_node() | [mt_node()]], InnerNodes::non_neg_integer(),
