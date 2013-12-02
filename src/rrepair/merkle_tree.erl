@@ -82,7 +82,7 @@
 
 -type mt_node() :: { Hash        :: mt_node_key() | nil, %hash of childs/containing items
                      Count       :: non_neg_integer(),   %in inner nodes number of subnodes including itself, in leaf nodes number of items in the bucket
-                     LeafCount   :: -1 | non_neg_integer(), % -1 if not hashed yet, otherwise the number of leafs below this node (if it is a leaf, LeafCount will be 0)
+                     LeafCount   :: -1 | pos_integer(), % -1 if not hashed yet, otherwise the number of leafs below this node (if it is a leaf, LeafCount will be 0)
                      Bucket      :: mt_bucket(),         %item storage
                      Interval    :: mt_interval(),       %represented interval
                      Child_list  :: [mt_node()]
@@ -316,7 +316,7 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
                   % need to hash here since we won't keep the bucket!
                   Hash = run_leaf_hf(lists:ukeysort(1, Bucket), Interval,
                                      Config#mt_config.leaf_hf),
-                  {Hash, Count, 0, [], Interval, []}
+                  {Hash, Count, 1, [], Interval, []}
            end,
     build_childs(T, Config, [Node | Acc]);
 build_childs([], _, Acc) ->
@@ -353,7 +353,7 @@ gen_hash_node({_H, Count, _LCnt, _Bkt = [], Interval, ChildList = [_|_]},
                             end, 0, ChildList),
     Hash = run_inner_hf(NewChilds, InnerHf),
     {Hash, Count, LeafCount, [], Interval, NewChilds};
-gen_hash_node({Hash, _Cnt, _LCnt = 0, _Bkt, _I, []} = N, _InnerHf,
+gen_hash_node({Hash, _Cnt, _LCnt = 1, _Bkt, _I, []} = N, _InnerHf,
               _LeafHf, false, _CleanBuckets) when Hash =/= nil ->
     % leaf node, no bucket contents, keep_bucket false
     % -> we already hashed the value in bulk_build and cannot insert any more
@@ -364,7 +364,7 @@ gen_hash_node({_OldHash, Count, _LCnt, Bucket, Interval, [] = Childs},
     % leaf node, no bucket contents, keep_bucket true
     Bucket1 = lists:ukeysort(1, Bucket),
     Hash = run_leaf_hf(Bucket1, Interval, LeafHf),
-    {Hash, Count, 0, ?IIF(CleanBuckets, [], Bucket1), Interval, Childs}.
+    {Hash, Count, 1, ?IIF(CleanBuckets, [], Bucket1), Interval, Childs}.
 
 %% @doc Hashes an inner node based on its childrens' hashes.
 -spec run_inner_hf([mt_node(),...], InnerHf::inner_hash_fun()) -> mt_node_key().
