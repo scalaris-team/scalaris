@@ -350,7 +350,7 @@ gen_hash_node({_H, Count, _LCnt, _Bkt = [], Interval, ChildList = [_|_]},
                                CleanBuckets) || X <- ChildList],
     LeafCount = lists:foldl(fun(N, LeafCountX) ->
                                     LeafCountX + get_leaf_count(N)
-                            end, 0, ChildList),
+                            end, 0, NewChilds),
     Hash = run_inner_hf(NewChilds, InnerHf),
     {Hash, Count, LeafCount, [], Interval, NewChilds};
 gen_hash_node({Hash, _Cnt, _LCnt = 1, _Bkt, _I, []} = N, _InnerHf,
