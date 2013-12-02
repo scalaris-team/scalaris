@@ -32,7 +32,7 @@
          iterator/1, next/1,
          is_empty/1, is_leaf/1, is_merkle_tree/1,
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
-         get_item_count/1,
+         get_item_count/1, get_leaf_count/1,
          get_bucket_size/1, get_branch_factor/1,
          get_opt_bucket_size/3,
          store_to_DOT/2, store_graph/2]).
