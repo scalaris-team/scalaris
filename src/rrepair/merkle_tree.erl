@@ -204,10 +204,10 @@ get_item_count({_H, _Cnt, _LCnt, _Bkt, _I, _CL = [_|_]}) -> 0.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Returns the number of leafs under a bucket (0 if requested node is a
-%%      leaf node, -1 if not hashed yet)
--spec get_leaf_count(merkle_tree() | mt_node()) -> -1 | non_neg_integer().
-get_leaf_count({merkle_tree, _, Root}) -> get_item_count(Root);
+%% @doc Returns the number of leafs under a bucket (1 if the requested node is
+%%      a leaf node, -1 if not hashed yet).
+-spec get_leaf_count(merkle_tree() | mt_node()) -> -1 | pos_integer().
+get_leaf_count({merkle_tree, _, Root}) -> get_leaf_count(Root);
 get_leaf_count({_H, _Cnt, LeafCount, _Bkt, _I, _CL}) -> LeafCount.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
