@@ -68,6 +68,8 @@
 
 -type db_chunk()       :: [{?RT:key(), db_dht:version()}].
 
+-type signature_size() :: 1..160. % upper bound of 160 (SHA-1) to also limit testing
+
 -record(bloom_recon_struct,
         {
          interval = intervals:empty()                       :: intervals:interval(),
@@ -78,7 +80,7 @@
         {
          interval       = ?required(merkle_param, interval)       :: intervals:interval(),
          reconPid       = undefined                               :: comm:mypid() | undefined,
-         signature_size = ?required(merkle_param, signature_size) :: pos_integer(),
+         signature_size = ?required(merkle_param, signature_size) :: signature_size(),
          branch_factor  = ?required(merkle_param, branch_factor)  :: pos_integer(),
          bucket_size    = ?required(merkle_param, bucket_size)    :: pos_integer()
         }).
@@ -471,7 +473,7 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 %% @doc Transforms a list of merkle keys, i.e. hashes, into a compact binary
 %%      representation for transfer.
 -spec merkle_compress_hashlist(Nodes::[merkle_tree:mt_node()], Bin,
-                               SigSize::pos_integer()) -> Bin
+                               SigSize::signature_size()) -> Bin
     when is_subtype(Bin, bitstring()).
 merkle_compress_hashlist([], Bin, _SigSize) ->
     Bin;
@@ -482,7 +484,7 @@ merkle_compress_hashlist([N1 | TL], Bin, SigSize) ->
 
 %% @doc Transforms the compact binary representation of merkle hash lists from
 %%      merkle_compress_hashlist/2 back into the original form.
--spec merkle_decompress_hashlist(bitstring(), Hashes, SigSize::pos_integer()) -> Hashes
+-spec merkle_decompress_hashlist(bitstring(), Hashes, SigSize::signature_size()) -> Hashes
     when is_subtype(Hashes, [merkle_cmp_request()]).
 merkle_decompress_hashlist(<<>>, HashListR, _SigSize) ->
     lists:reverse(HashListR);
@@ -497,7 +499,7 @@ merkle_decompress_hashlist(Bin, HashListR, SigSize) ->
 %%      transfer.
 -spec merkle_compress_cmp_result(
         [merkle_cmp_result()], FlagsIN::Bin, HashesBinIN::Bin,
-        SigSize::pos_integer()) -> {FlagsOUT::Bin, HashesBinOUT::Bin}
+        SigSize::signature_size()) -> {FlagsOUT::Bin, HashesBinOUT::Bin}
     when is_subtype(Bin, bitstring()).
 merkle_compress_cmp_result([], Flags, HashesBin, _SigSize) ->
     {Flags, HashesBin};
@@ -515,7 +517,7 @@ merkle_compress_cmp_result([H1 | TL], Bin, HashesBin, SigSize) ->
 %% @doc Transforms the compact representation of merkle compare results from
 %%      merkle_compress_cmp_result/3 back into the original form.
 -spec merkle_decompress_cmp_result(Flags::Bin, HashesBin::Bin, CmpRes,
-                                   SigSize::pos_integer()) -> CmpRes
+                                   SigSize::signature_size()) -> CmpRes
     when is_subtype(Bin, bitstring()),
          is_subtype(CmpRes, [merkle_cmp_result()]).
 merkle_decompress_cmp_result(<<>>, <<>>, CmpRes, _SigSize) ->
@@ -532,7 +534,7 @@ merkle_decompress_cmp_result(<<X:2, T/bitstring>>, HashesBin, CmpRes, SigSize) -
 %%      Returns the comparison results and the rest nodes to check in a next
 %%      step.
 -spec check_node(Hashes::[merkle_cmp_request()],
-                 merkle_tree:merkle_tree() | NodeList, SigSize::pos_integer())
+                 merkle_tree:merkle_tree() | NodeList, SigSize::signature_size())
         -> {[merkle_cmp_result()], RestTree::NodeList, ResolveReq::NodeList}
     when is_subtype(NodeList, [merkle_tree:mt_node()]).
 check_node(Hashes, Tree, SigSize) ->
@@ -544,7 +546,7 @@ check_node(Hashes, Tree, SigSize) ->
 
 %% @doc Helper for check_node/2.
 -spec p_check_node(Hashes::[merkle_cmp_request()], MyNodes::NodeList,
-                   SigSize::pos_integer(),
+                   SigSize::signature_size(),
                    Result::[merkle_cmp_result()], RestTreeIn::[NodeList],
                    AccResolve::NodeList)
         -> {[merkle_cmp_result()], RestTreeOut::NodeList, ResolveReq::NodeList}
@@ -570,10 +572,10 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSize, AccR, AccN, AccRes
            p_check_node(TK, TN, SigSize, [?recon_fail_cont | AccR], [Childs | AccN], AccRes)
     end.
 
-%% @doc Processes compare results from check_node/2 on the initiator.
+%% @doc Processes compare results from check_node/3 on the initiator.
 -spec process_tree_cmp_result([merkle_cmp_result()],
                               merkle_tree:merkle_tree() | RestTree,
-                              BranchSize::pos_integer(), SigSize::pos_integer(),
+                              BranchSize::pos_integer(), SigSize::signature_size(),
                               Stats)
         -> {Requests::[merkle_tree:mt_node()], Resolve, New::Stats, New::RestTree}
     when
@@ -592,7 +594,7 @@ process_tree_cmp_result(CmpResult, Tree, BranchSize, SigSize, Stats) ->
 
 %% @doc Helper for process_tree_cmp_result/4.
 -spec p_process_tree_cmp_result([merkle_cmp_result()], RestTree, BranchSize,
-                                SigSize::pos_integer(), Stats, Acc::Req, Acc::Res, AccRTree::Res)
+                                SigSize::signature_size(), Stats, Acc::Req, Acc::Res, AccRTree::Res)
         -> {Req, Res, Stats, RestTree::Res}
     when
       is_subtype(BranchSize,pos_integer()),
@@ -619,7 +621,7 @@ p_process_tree_cmp_result([?recon_fail_cont | TR], [Node | TN], BS, SS, Stats, R
                               Res, lists:reverse(Childs, RTree)).
 
 %% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash.
--spec merkle_get_sync_leaves(Nodes::NodeL, Skip::Hash, SigSize::pos_integer(),
+-spec merkle_get_sync_leaves(Nodes::NodeL, Skip::Hash, SigSize::signature_size(),
                              LeafAcc::NodeL) -> ToSync::NodeL
     when
       is_subtype(Hash,  merkle_tree:mt_node_key()),

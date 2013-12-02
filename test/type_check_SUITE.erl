@@ -335,26 +335,25 @@ tester_type_check_rrepair(_Config) ->
              {start, 2}, %% tries to spawn processes
              {map_interval, 2}, %% second interval must be in a single quadrant
 
+             {merkle_compress_hashlist, 3}, %% needs merkle nodes with hashes
              {merkle_decompress_hashlist, 3}, %% needs a special binary to correspond to a number of bits
              {merkle_decompress_cmp_result, 4} %% needs a special binary to correspond to a list
            ],
            [
-             % currently unsupported (bounded funs) by tester:
-             {check_node, 2},
-             {process_tree_cmp_result, 4},
-             {p_process_tree_cmp_result, 7},
-             {art_get_sync_leaves, 6},
-
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
              {build_struct, 4}, %% tries to send messages, needs valid state with pid
              {build_recon_struct, 6}, %% DB items must be in interval
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
-             {p_check_node, 5}, %% needs same-length lists
-             {merkle_get_sync_leaves, 3}, %% needs merkle_tree with hashes
+             {check_node, 3}, %% needs merkle_tree/nodes with hashes
+             {p_check_node, 6}, %% needs merkle_tree/nodes with hashes
+             {process_tree_cmp_result, 5}, %% needs matching result and merkle nodes
+             {p_process_tree_cmp_result, 8}, %% needs matching result and merkle nodes
+             {merkle_get_sync_leaves, 4}, %% needs merkle_tree with hashes
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
+             {art_get_sync_leaves, 6}, %% needs non-empty bloom filters
              {send, 2}, %% tries to send messages
              {send_local, 2}, %% tries to send messages
              {send_chunk_req, 6}, %% tries to send messages
