@@ -80,7 +80,6 @@
         {
          interval       = ?required(merkle_param, interval)       :: intervals:interval(),
          reconPid       = undefined                               :: comm:mypid() | undefined,
-         signature_size = undefined                               :: signature_size() | undefined,
          branch_factor  = ?required(merkle_param, branch_factor)  :: pos_integer(),
          bucket_size    = ?required(merkle_param, bucket_size)    :: pos_integer()
         }).
@@ -113,6 +112,7 @@
          struct             = {}                                     :: sync_struct() | {}, % my recon structure
          stage              = req_shared_interval                    :: stage(),
          initiator          = false                                  :: boolean(),
+         misc               = []                                     :: [{atom(), term()}], % any optional parameters an algorithm wants to keep
          stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats()
          }).
 -type state() :: #rr_recon_state{}.
@@ -320,32 +320,31 @@ on({?check_nodes_response, Flags, HashKeys, OtherMaxLeafCount}, State =
        #rr_recon_state{ stage = reconciliation,        initiator = true,
                         struct = Tree,                 ownerPid = OwnerL,
                         dest_rr_pid = DestNodePid,     stats = Stats,
-                        dest_recon_pid = DestReconPid, params = Params }) ->
-    SigSize = Params#merkle_params.signature_size,
+                        dest_recon_pid = DestReconPid, params = Params,
+                        misc = [{signature_size, SigSize}] }) ->
     CmpResults = merkle_decompress_cmp_result(Flags, HashKeys, [], SigSize),
     SID = rr_recon_stats:get(session_id, Stats),
-    Params1 =
-        case process_tree_cmp_result(CmpResults, Tree,
-                                     Params#merkle_params.branch_factor,
-                                     SigSize, Stats) of
-            {[], ToResolve, NStats0, RTree, _MyMaxLeafCount} ->
-                Params;
-            {[_|_] = Req0, ToResolve, NStats0, RTree, MyMaxLeafCount} ->
-                NextSigSize = calc_signature_size(
-                                erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
-                                get_p1e() / length(Req0)),
-%%                 log:pal("MyMLC: ~p~n    OtherMLC: ~p~n     SigSize: ~p",
-%%                         [MyMaxLeafCount, OtherMaxLeafCount, NextSigSize]),
-                Req = merkle_compress_hashlist(Req0, <<>>, NextSigSize),
-                send(DestReconPid, {?check_nodes, Req, NextSigSize}),
-                Params#merkle_params{signature_size = NextSigSize}
-        end,
+    case process_tree_cmp_result(CmpResults, Tree,
+                                 Params#merkle_params.branch_factor,
+                                 SigSize, Stats) of
+        {[], ToResolve, NStats0, RTree, _MyMaxLeafCount} ->
+            NextSigSize = SigSize,
+            ok;
+        {[_|_] = Req0, ToResolve, NStats0, RTree, MyMaxLeafCount} ->
+            NextSigSize = calc_signature_size(
+                            erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
+                            get_p1e() / length(Req0)),
+%%             log:pal("MyMLC: ~p~n    OtherMLC: ~p~n     SigSize: ~p",
+%%                     [MyMaxLeafCount, OtherMaxLeafCount, NextSigSize]),
+            Req = merkle_compress_hashlist(Req0, <<>>, NextSigSize),
+            send(DestReconPid, {?check_nodes, Req, NextSigSize})
+    end,
     ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
     NStats = rr_recon_stats:inc([{tree_leavesSynced, length(ToResolve)},
                                  {resolve_started, ResolveCount}], NStats0),
     CompLeft = rr_recon_stats:get(tree_compareLeft, NStats),
     NewState = State#rr_recon_state{stats = NStats, struct = RTree,
-                                    params = Params1},
+                                    misc = [{signature_size, NextSigSize}]},
     if CompLeft =:= 0 ->
            send(DestReconPid, {shutdown, sync_finished_remote}),
            shutdown(sync_finished, NewState);
@@ -417,16 +416,20 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
            State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_recon_pid = DestReconPid,
-                                   dest_rr_pid = DestRRPid,
-                                   params = MySyncParams0}) ->
+                                   dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
+    Stats1 =
+        rr_recon_stats:set(
+          [{tree_compareLeft, ?IIF(Initiator, 1, 0)},
+           {tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
     case Initiator of
         true ->
             SigSize = 160,
-            MySyncParams = MySyncParams0#merkle_params{signature_size = SigSize},
             Req = merkle_compress_hashlist([merkle_tree:get_root(MySyncStruct)],
                                            <<>>, SigSize),
-            send(DestReconPid, {?check_nodes, comm:this(), Req, SigSize});
+            send(DestReconPid, {?check_nodes, comm:this(), Req, SigSize}),
+            State#rr_recon_state{stats = Stats1,
+                                 misc = [{signature_size, SigSize}]};
         false ->
             MerkleI = merkle_tree:get_interval(MySyncStruct),
             MerkleV = merkle_tree:get_branch_factor(MySyncStruct),
@@ -437,13 +440,9 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
             SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
             SID = rr_recon_stats:get(session_id, Stats),
             send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
-                             {start_recon, merkle_tree, SyncParams}})
-    end,
-    Stats1 =
-        rr_recon_stats:set(
-          [{tree_compareLeft, ?IIF(Initiator, 1, 0)},
-           {tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
-    State#rr_recon_state{stats = Stats1, params = MySyncParams};
+                             {start_recon, merkle_tree, SyncParams}}),
+            State#rr_recon_state{stats = Stats1, params = MySyncParams}
+    end;
 begin_sync(MySyncStruct, OtherSyncStruct,
            State = #rr_recon_state{method = art, initiator = Initiator,
                                    ownerPid = OwnerL, stats = Stats,
