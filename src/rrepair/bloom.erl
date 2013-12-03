@@ -47,7 +47,6 @@
                 size          = ?required(bloom, size):: pos_integer(),%bit-length of the bloom filter - requirement: size rem 8 = 0
                 filter        = <<>>                  :: binary(),         %length = size div 8
                 hfs           = ?required(bloom, hfs) :: ?REP_HFS:hfs(),   %HashFunctionSet
-                max_items     = undefined             :: non_neg_integer() | undefined, %expected number of items
                 items_count   = 0                     :: non_neg_integer() %number of inserted items
                }).
 %-opaque bloom_filter() :: #bloom{}.
@@ -75,15 +74,15 @@ new_fpr(MaxItems, FPR) ->
         -> bloom_filter().
 new_fpr(MaxItems, FPR, Hfs) ->
     Size = resize(calc_least_size(MaxItems, FPR), 8),
-    new_(Size, MaxItems, Hfs).
+    new_(Size, Hfs).
 
 %% @doc Creates a new bloom filter with the default (optimal) hash function set
 %%      based on the given probability of a single false positive (P1E, i.e.
 %%      false positive absolute count).
 -spec new_p1e(MaxItems::non_neg_integer(), P1E::float()) -> bloom_filter().
-new_p1e(MaxItems = 0, _P1E) ->
+new_p1e(_MaxItems = 0, _P1E) ->
     Hfs = ?REP_HFS:new(1),
-    new_(8, MaxItems, Hfs);
+    new_(8, Hfs);
 new_p1e(MaxItems, P1E) ->
     new_fpr(MaxItems, _FPR = P1E / MaxItems).
 
@@ -92,8 +91,8 @@ new_p1e(MaxItems, P1E) ->
 %%      false positive absolute count
 -spec new_p1e(MaxItems::non_neg_integer(), P1E::float(), ?REP_HFS:hfs())
         -> bloom_filter().
-new_p1e(MaxItems = 0, _P1E, Hfs) ->
-    new_(8, MaxItems, Hfs);
+new_p1e(_MaxItems = 0, _P1E, Hfs) ->
+    new_(8, Hfs);
 new_p1e(MaxItems, P1E, Hfs) ->
     new_fpr(MaxItems, _FPR = P1E / MaxItems, Hfs).
 
@@ -102,19 +101,14 @@ new_p1e(MaxItems, P1E, Hfs) ->
 -spec new_bpi(MaxItems::non_neg_integer(), BitsPerItem::float(), ?REP_HFS:hfs())
         -> bloom_filter().
 new_bpi(MaxItems, BitPerItem, Hfs) ->
-    new_(resize(util:ceil(BitPerItem * MaxItems), 8), MaxItems, Hfs).
+    new_(resize(util:ceil(BitPerItem * MaxItems), 8), Hfs).
 
 %% @doc Creates a new bloom filter.
--spec new_(BitSize::pos_integer(), MaxItems::non_neg_integer(), ?REP_HFS:hfs()) -> bloom_filter().
-new_(BitSize, MaxItems, Hfs) when (BitSize rem 8) =:= 0 ->
-    #bloom{
-           size = BitSize,
-           max_items = MaxItems,
-           hfs = Hfs,
-           items_count = 0
-          };
-new_(BitSize, MaxItems, Hfs) ->
-    new_(resize(BitSize, 8), MaxItems, Hfs).
+-spec new_(BitSize::pos_integer(), ?REP_HFS:hfs()) -> bloom_filter().
+new_(BitSize, Hfs) when (BitSize rem 8) =:= 0 ->
+    #bloom{size = BitSize, hfs = Hfs, items_count = 0};
+new_(BitSize, Hfs) ->
+    new_(resize(BitSize, 8), Hfs).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -223,31 +217,24 @@ item_count(#bloom{items_count = ItemsCount}) -> ItemsCount.
 
 %% @doc joins two bloom filter, returned bloom filter represents their union
 -spec join(bloom_filter(), bloom_filter()) -> bloom_filter().
-join(#bloom{size = Size, max_items = ExpItem1, items_count = Items1,
+join(#bloom{size = Size, items_count = Items1,
             filter = <<>>, hfs = Hfs},
-     #bloom{size = Size, max_items = ExpItem2, items_count = Items2,
+     #bloom{size = Size, items_count = Items2,
             filter = F2}) ->
     #bloom{size = Size, filter = F2, hfs = Hfs,
-           max_items = erlang:max(ExpItem1, ExpItem2),
            items_count = Items1 + Items2 %approximation
            };
-join(#bloom{size = Size, max_items = ExpItem1, items_count = Items1,
-            filter = F1, hfs = Hfs},
-     #bloom{size = Size, max_items = ExpItem2, items_count = Items2,
-            filter = <<>>}) ->
+join(#bloom{size = Size, items_count = Items1, filter = F1, hfs = Hfs},
+     #bloom{size = Size, items_count = Items2, filter = <<>>}) ->
     #bloom{size = Size, filter = F1, hfs = Hfs,
-           max_items = erlang:max(ExpItem1, ExpItem2),
            items_count = Items1 + Items2 %approximation
            };
-join(#bloom{size = Size, max_items = ExpItem1, items_count = Items1,
-            filter = F1, hfs = Hfs},
-     #bloom{size = Size, max_items = ExpItem2, items_count = Items2,
-            filter = F2}) ->
+join(#bloom{size = Size, items_count = Items1, filter = F1, hfs = Hfs},
+     #bloom{size = Size, items_count = Items2, filter = F2}) ->
     <<F1Val : Size>> = F1,
     <<F2Val : Size>> = F2,
     NewFVal = F1Val bor F2Val,
     #bloom{size = Size, filter = <<NewFVal:Size>>, hfs = Hfs,
-           max_items = erlang:max(ExpItem1, ExpItem2),
            items_count = Items1 + Items2 %approximation
            }.
 
@@ -265,16 +252,14 @@ equals(#bloom{ size = Size1, items_count = Items1, filter = Filter1 },
 
 %% @doc Return bloom filter debug information.
 -spec print(bloom_filter()) -> [{atom(), any()}].
-print(#bloom{max_items = MaxItems, size = Size, hfs = Hfs,
-             items_count = NumItems} = Bloom) ->
+print(#bloom{size = Size, hfs = Hfs, items_count = NumItems} = Bloom) ->
     HCount = ?REP_HFS:size(Hfs),
     [{filter_bit_size, Size},
      {struct_byte_size, byte_size(term_to_binary(Bloom))},
      {hash_fun_num, HCount},
-     {max_items, MaxItems},
      {items_inserted, NumItems},
      {act_fpr, get_property(Bloom, fpr)},
-     {compression_rate, ?IIF(MaxItems =:= 0, 0.0, Size / MaxItems)}].
+     {compression_rate, ?IIF(NumItems =:= 0, 0.0, Size / NumItems)}].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -282,14 +267,12 @@ print(#bloom{max_items = MaxItems, size = Size, hfs = Hfs,
                   (bloom_filter(), size) -> non_neg_integer();
                   (bloom_filter(), filter) -> binary();
                   (bloom_filter(), hfs) -> ?REP_HFS:hfs();
-                  (bloom_filter(), max_items) -> non_neg_integer() | undefined;
                   (bloom_filter(), items_count) -> non_neg_integer().
 get_property(#bloom{size = Size, hfs = Hfs, items_count = NumItems}, fpr) ->
     calc_FPR(Size, NumItems, ?REP_HFS:size(Hfs));
 get_property(#bloom{size = X}       , size)        -> X;
 get_property(#bloom{filter = X}     , filter)      -> X;
 get_property(#bloom{hfs = X}        , hfs)         -> X;
-get_property(#bloom{max_items = X}  , max_items)   -> X;
 get_property(#bloom{items_count = X}, items_count) -> X.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
