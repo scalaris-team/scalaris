@@ -79,7 +79,9 @@
 
 -type channel() :: main | prio.
 
--type msg_tag() :: atom().
+-type msg_tag() :: atom() | byte(). %% byte() in case of compact external atoms. See include/atom_ext.hrl
+
+
 %% there is no variable length-tuple definition for types -> declare
 %% messages with up to 10 parameters here:
 -type message() ::
