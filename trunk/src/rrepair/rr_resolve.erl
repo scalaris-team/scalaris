@@ -74,7 +74,7 @@
 -type stats() :: #resolve_stats{}.
 
 -type operation() ::
-    {key_upd, KvvListInAnyQ::kvv_list()} |
+    {key_upd, KvvListInAnyQ::kvv_list(), ReqKeys::[?RT:key()]} |
     {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
     {interval_upd, intervals:interval(), KvvListInAnyQ::kvv_list()} |
     {interval_upd_send, intervals:interval(), DestPid::comm:mypid()} |
@@ -136,39 +136,59 @@ on({start, Operation, Options}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {key_upd, KvvList},
+       #rr_resolve_state{ operation = {key_upd, KvvList, ReqKeys},
+                          feedbackDestPid = FBDest,
                           dhtNodePid = DhtPid, stats = Stats }) ->
     MyIKvvList = map_kvv_list(KvvList, MyI),
     ToUpdate = start_update_key_entry(MyIKvvList, comm:this(), DhtPid),
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p~n KVVListLen=~p ; ToUpdate=~p",
            [key_upd, Stats#resolve_stats.session_id, MyI, length(KvvList), ToUpdate], State),
     
-    % Send entries in sender interval but not in sent KvvList
+    % send requested entries (similar to key_upd_send handling)
+    RepKeyInt = intervals:from_elements(map_key_list(ReqKeys, MyI)),
+    comm:send_local(DhtPid, {get_entries, self(), RepKeyInt}),
+    
+    % send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
     MyIKvTree = lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
                                     % assume, KVs at the same node are equal
                                     gb_trees:enter(KeyX, VersionX, TreeX)
                             end, gb_trees:empty(), MyIKvvList),
     
-    % allow the garbage collection to clean up the KvvList here:
-    NewState = State#rr_resolve_state{operation = {key_upd, []},
+    % allow the garbage collection to clean up the KvvList and ReqKeys here:
+    NewState = State#rr_resolve_state{operation = {key_upd, [], []},
                                       stats = Stats#resolve_stats{diff_size = ToUpdate}},
-    if ToUpdate =:= 0 ->
-           shutdown(resolve_ok, NewState,
-                    State#rr_resolve_state.feedbackDestPid, [], []);
+    if ToUpdate =:= 0 andalso MyIKvvList =:= [] ->
+           shutdown(resolve_ok, NewState, FBDest, [], []);
        true ->
-           % note: shutdown and feedback handled by update_key_entry_ack
+           % note: shutdown and feedback handled by update_key_entry_ack or
+           %       get_entries_response
            NewState#rr_resolve_state{feedbackKvv = {[], MyIKvTree}}
     end;
 
+on({get_entries_response, EntryList}, State =
+       #rr_resolve_state{ operation = {key_upd, [], []},
+                          feedbackDestPid = FBDest,
+                          feedbackKvv = {FbKVV, MyIKvTree},
+                          stats = #resolve_stats{diff_size = ToUpdate}}) ->
+    ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
+           [key_upd, _Stats#resolve_stats.session_id, length(EntryList)], State),
+    KvvList = [entry_to_kvv(E) || E <- EntryList],
+    if ToUpdate =:= 0 ->
+           % use the same options as above in get_state_response:
+           shutdown(resolve_ok, State, FBDest, KvvList, []);
+       true ->
+           % note: shutdown and feedback handled by update_key_entry_ack
+           State#rr_resolve_state{feedbackKvv =
+                                      {lists:append(FbKVV, KvvList), MyIKvTree}}
+    end;
+
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {key_upd_send, _, KeyList},
+       #rr_resolve_state{ operation = {key_upd_send, _Dest, KeyList},
                           dhtNodePid = DhtPid, stats = _Stats }) ->
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p",
            [key_upd_send, _Stats#resolve_stats.session_id, MyI], State),
-    RepKeyInt = intervals:from_elements(
-                    [K || X <- KeyList, K <- ?RT:get_replica_keys(X),
-                          intervals:in(K, MyI)]),
+    RepKeyInt = intervals:from_elements(map_key_list(KeyList, MyI)),
     comm:send_local(DhtPid, {get_entries, self(), RepKeyInt}),
     State;
 
@@ -344,6 +364,13 @@ map_kvv_list(TplList, MyI) ->
                                RKey <- ?RT:get_replica_keys(element(1, E)),
                                intervals:in(RKey, MyI)].
 
+-spec map_key_list([?RT:key()], intervals:interval()) -> [?RT:key()].
+map_key_list(KeyList, MyI) ->
+    ?ASSERT(length(KeyList) =:= length(lists:sort(KeyList))),
+    [RKey || Key <- KeyList,
+             RKey <- ?RT:get_replica_keys(Key),
+             intervals:in(RKey, MyI)].
+
 -spec start_update_key_entry(MyIKvvList::kvv_list(), comm:mypid(),
                              comm:erl_local_pid()) -> non_neg_integer().
 start_update_key_entry(MyIKvvList, MyPid, DhtPid) ->
@@ -411,9 +438,9 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
             KUOptions = [{from_my_node, FromMyNode bxor 1} | KUOptions0],
             case Stats#resolve_stats.session_id of
                 null ->
-                    comm:send(KUDest, {request_resolve, {key_upd, KUItems}, KUOptions});
+                    comm:send(KUDest, {request_resolve, {key_upd, KUItems, []}, KUOptions});
                 SID ->
-                    comm:send(KUDest, {request_resolve, SID, {key_upd, KUItems}, KUOptions})
+                    comm:send(KUDest, {request_resolve, SID, {key_upd, KUItems, []}, KUOptions})
             end
     end,
     send_stats(SendStats, Stats),
