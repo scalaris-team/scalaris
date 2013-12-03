@@ -169,3 +169,9 @@
 
 -define(check_nodes_response_atom, check_nodes_response).
 -define(check_nodes_response, ?int_or_atom(102, ?check_nodes_response_atom)).
+
+-define(key_upd_atom, key_upd).
+-define(key_upd, ?int_or_atom(103, ?key_upd_atom)).
+
+-define(interval_upd_atom, interval_upd).
+-define(interval_upd, ?int_or_atom(104, ?interval_upd_atom)).

@@ -74,9 +74,9 @@
 -type stats() :: #resolve_stats{}.
 
 -type operation() ::
-    {key_upd, KvvListInAnyQ::kvv_list(), ReqKeys::[?RT:key()]} |
+    {?key_upd, KvvListInAnyQ::kvv_list(), ReqKeys::[?RT:key()]} |
     {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
-    {interval_upd, intervals:interval(), KvvListInAnyQ::kvv_list()} |
+    {?interval_upd, intervals:interval(), KvvListInAnyQ::kvv_list()} |
     {interval_upd_send, intervals:interval(), DestPid::comm:mypid()} |
     {interval_upd_my, intervals:interval()}.
 
@@ -136,7 +136,7 @@ on({start, Operation, Options}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {key_upd, KvvList, ReqKeys},
+       #rr_resolve_state{ operation = {?key_upd, KvvList, ReqKeys},
                           feedbackDestPid = FBDest,
                           dhtNodePid = DhtPid, stats = Stats }) ->
     MyIKvvList = map_kvv_list(KvvList, MyI),
@@ -156,7 +156,7 @@ on({get_state_response, MyI}, State =
                             end, gb_trees:empty(), MyIKvvList),
     
     % allow the garbage collection to clean up the KvvList and ReqKeys here:
-    NewState = State#rr_resolve_state{operation = {key_upd, [], []},
+    NewState = State#rr_resolve_state{operation = {?key_upd, [], []},
                                       stats = Stats#resolve_stats{diff_size = ToUpdate}},
     if ToUpdate =:= 0 andalso MyIKvvList =:= [] ->
            shutdown(resolve_ok, NewState, FBDest, [], []);
@@ -167,7 +167,7 @@ on({get_state_response, MyI}, State =
     end;
 
 on({get_entries_response, EntryList}, State =
-       #rr_resolve_state{ operation = {key_upd, [], []},
+       #rr_resolve_state{ operation = {?key_upd, [], []},
                           feedbackDestPid = FBDest,
                           feedbackKvv = {FbKVV, MyIKvTree},
                           stats = #resolve_stats{diff_size = ToUpdate}}) ->
@@ -207,7 +207,7 @@ on({get_entries_response, EntryList}, State =
 
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = Op, dhtNodePid = DhtPid, stats = _Stats })
-  when element(1, Op) =:= interval_upd;
+  when element(1, Op) =:= ?interval_upd;
        element(1, Op) =:= interval_upd_send ->
     OpSIs = intervals:get_simple_intervals(element(2, Op)),
     ISec = lists:foldl(
@@ -237,7 +237,7 @@ on({get_state_response, MyI}, State =
     end;
 
 on({get_entries_response, EntryList}, State =
-       #rr_resolve_state{ operation = {interval_upd, I, KvvList},
+       #rr_resolve_state{ operation = {?interval_upd, I, KvvList},
                           my_range = MyI,
                           dhtNodePid = DhtPid,
                           feedbackDestPid = FBDest,
@@ -257,7 +257,7 @@ on({get_entries_response, EntryList}, State =
                                          not gb_trees:is_defined(db_entry:get_key(X), MyIKvTree)],
     
     % allow the garbage collection to clean up the KvvList here:
-    NewState = State#rr_resolve_state{operation = {interval_upd, I, []},
+    NewState = State#rr_resolve_state{operation = {?interval_upd, I, []},
                                       stats = Stats#resolve_stats{diff_size = ToUpdate}},
     if ToUpdate =:= 0 ->
            shutdown(resolve_ok, NewState, FBDest, MissingOnOther, []);
@@ -276,8 +276,8 @@ on({get_entries_response, EntryList}, State =
     Options = [{from_my_node, FromMyNode bxor 1} | Options0],
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     case Stats#resolve_stats.session_id of
-        null -> comm:send(Dest, {request_resolve, {interval_upd, I, KvvList}, Options});
-        SID -> comm:send(Dest, {request_resolve, SID, {interval_upd, I, KvvList}, Options})
+        null -> comm:send(Dest, {request_resolve, {?interval_upd, I, KvvList}, Options});
+        SID -> comm:send(Dest, {request_resolve, SID, {?interval_upd, I, KvvList}, Options})
     end,
     shutdown(resolve_ok, State, undefined, [], []);
 
@@ -325,8 +325,8 @@ on({update_key_entry_ack, NewEntryList}, State =
                           feedbackDestPid = FBDest,
                           feedbackKvv = {MissingOnOther, MyIKvTree}
                         })
-  when element(1, Op) =:= key_upd;
-       element(1, Op) =:= interval_upd ->
+  when element(1, Op) =:= ?key_upd;
+       element(1, Op) =:= ?interval_upd ->
     ?TRACE("GET ENTRY_ACK - Operation=~p~n SessionId:~p - #NewItems: ~p",
            [element(1, Op), Stats#resolve_stats.session_id, length(NewEntryList)], State),
     
@@ -438,9 +438,9 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
             KUOptions = [{from_my_node, FromMyNode bxor 1} | KUOptions0],
             case Stats#resolve_stats.session_id of
                 null ->
-                    comm:send(KUDest, {request_resolve, {key_upd, KUItems, []}, KUOptions});
+                    comm:send(KUDest, {request_resolve, {?key_upd, KUItems, []}, KUOptions});
                 SID ->
-                    comm:send(KUDest, {request_resolve, SID, {key_upd, KUItems, []}, KUOptions})
+                    comm:send(KUDest, {request_resolve, SID, {?key_upd, KUItems, []}, KUOptions})
             end
     end,
     send_stats(SendStats, Stats),

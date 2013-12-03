@@ -706,7 +706,7 @@ resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
                    % we know that we don't have data in this range, so we must
                    % regenerate it from the other node
                    % -> send him this request directly!
-                   send(Dest, {request_resolve, SID, {interval_upd, Interval, []},
+                   send(Dest, {request_resolve, SID, {?interval_upd, Interval, []},
                                [{from_my_node, 0}, {session_id, SID} | Options]}),
                    1
             end
