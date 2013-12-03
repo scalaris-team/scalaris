@@ -21,7 +21,7 @@
 %%         Examples:
 %%            1) remote node should get a single kvv-pair (Key, Value, Version)
 %%               with Key mapped into first quadrant
-%%               >>comm:send(RemoteRRepairPid, {request_resolve, {key_upd, [{Key, Value, Version}]}, []}).
+%%               >>comm:send(RemoteRRepairPid, {request_resolve, {key_upd, [{Key, Value, Version}], []}, []}).
 %%
 %% @end
 %% @version $Id$
