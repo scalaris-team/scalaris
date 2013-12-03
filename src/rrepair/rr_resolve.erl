@@ -334,12 +334,15 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %%      PreCond: KvvList contains only unique keys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec map_kvv_list(kvv_list(), intervals:interval()) -> kvv_list().
-map_kvv_list(KvvList, MyI) ->
-    ?ASSERT(length(KvvList) =:= length(lists:ukeysort(1, KvvList))),
-    [{RKey, Val, Vers} || {Key, Val, Vers} <- KvvList,
-                          RKey <- ?RT:get_replica_keys(Key),
-                          intervals:in(RKey, MyI)].
+-spec map_kvv_list([Tpl], intervals:interval()) -> [Tpl]
+        when is_subtype(Tpl, {?RT:key()} |
+                             {?RT:key(), term()} |
+                             {?RT:key(), term(), term()}).
+map_kvv_list(TplList, MyI) ->
+    ?ASSERT(length(TplList) =:= length(lists:ukeysort(1, TplList))),
+    [setelement(1, E, RKey) || E <- TplList,
+                               RKey <- ?RT:get_replica_keys(element(1, E)),
+                               intervals:in(RKey, MyI)].
 
 -spec start_update_key_entry(MyIKvvList::kvv_list(), comm:mypid(),
                              comm:erl_local_pid()) -> non_neg_integer().
