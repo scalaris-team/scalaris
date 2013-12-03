@@ -112,8 +112,8 @@ tc1(_Config) ->
               intervals:union(intervals:new(Key1), intervals:new(Key3)),
               intervals:new('[', Key1, Key3, ']'))),
 
-    ?equals(intervals:union([{interval,'(', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}],
-                            [{interval,'[', ?MINUS_INFINITY, ?RT:hash_key("4"), ']'}]),
+    ?equals(intervals:union([{'(', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}],
+                            [{'[', ?MINUS_INFINITY, ?RT:hash_key("4"), ']'}]),
             intervals:all()),
 
     ok.
@@ -121,16 +121,16 @@ tc1(_Config) ->
 normalize(_Config) ->
     % some tests that have once failed:
     % attention: manually defined intervals may have to be adapted to changes in the intervals module!
-    ?equals(intervals:tester_create_interval([{interval,'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}, {element,?MINUS_INFINITY}, {interval,'[', ?PLUS_INFINITY,4,']'}, {interval,'(', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'}]),
+    ?equals(intervals:tester_create_interval([{'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}, {?MINUS_INFINITY}, {'[', ?PLUS_INFINITY,4,']'}, {'(', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'}]),
             intervals:all()),
     
-    ?equals(intervals:tester_create_interval([{interval,'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}, {element,?MINUS_INFINITY}, {interval,'[', ?PLUS_INFINITY,4,']'}]),
+    ?equals(intervals:tester_create_interval([{'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}, {?MINUS_INFINITY}, {'[', ?PLUS_INFINITY,4,']'}]),
             intervals:all()),
     
-    ?equals(intervals:tester_create_interval([{interval,'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}, {interval,'[', ?PLUS_INFINITY, 4, ']'}]),
+    ?equals(intervals:tester_create_interval([{'[', ?MINUS_INFINITY, ?PLUS_INFINITY,')'}, {'[', ?PLUS_INFINITY, 4, ']'}]),
             intervals:all()),
 
-    ?equals(intervals:tester_create_interval([{interval,'[',3,2,']'}, {interval,'[',?PLUS_INFINITY,3,')'}, {interval,'(',3,?PLUS_INFINITY,')'}]),
+    ?equals(intervals:tester_create_interval([{'[',3,2,']'}, {'[',?PLUS_INFINITY,3,')'}, {'(',3,?PLUS_INFINITY,')'}]),
             intervals:all()).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -542,8 +542,8 @@ tester_is_left_right_of(_Config) ->
 
 is_left_right_of(_Config) ->
     MiddleKey = ?RT:hash_key("17"),
-    X = [{interval,'[', MiddleKey, ?PLUS_INFINITY, ')'}],
-    Y = [{interval,'[', ?MINUS_INFINITY, MiddleKey, ')'}],
+    X = [{'[', MiddleKey, ?PLUS_INFINITY, ')'}],
+    Y = [{'[', ?MINUS_INFINITY, MiddleKey, ')'}],
     ?equals(intervals:is_adjacent(X, Y), true), % @17
     ?equals(intervals:is_left_of(X, Y), true),
     ?equals(intervals:is_left_of(Y, X), true),

@@ -25,7 +25,7 @@
 -type entry() :: tuple().
 -type left_bracket() :: '(' | '['.
 -type right_bracket() :: ')' | ']'.
--type interval() :: {element, key()} | all | {interval, left_bracket(), key(), key(), right_bracket()}.
+-type interval() :: {key()} | all | {left_bracket(), key(), key(), right_bracket()}.
 
 -ifdef(with_export_type_support).
 -export_type([db/0, key/0, entry/0, interval/0]).

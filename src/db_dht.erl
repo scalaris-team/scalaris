@@ -307,24 +307,24 @@ get_chunk({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSiz
     %% rotate and split intervals so that StartId is the first element looked at
     {Before, After} = lists:splitwith(
             fun(all) -> false;
-               ({element, Key}) ->
+               ({Key}) ->
                     StartId > Key;
-               ({interval, _LBr, _L, R, _RBr}) ->
+               ({_LBr, _L, R, _RBr}) ->
                 StartId > R
             end, intervals:get_simple_intervals(Interval)),
     RotatedInterval = case After of
         [] -> Before;
         [all] ->
-            [{interval, '[', StartId, ?PLUS_INFINITY, ')'},
-             {interval, '[', ?MINUS_INFINITY, StartId, ')'}];
-        [{element, _K} | _Rest] ->
+            [{'[', StartId, ?PLUS_INFINITY, ')'},
+             {'[', ?MINUS_INFINITY, StartId, ')'}];
+        [{_K} | _Rest] ->
             After ++ Before;
-        [{interval, LBr, L, R, RBr} | Tail] ->
+        [{LBr, L, R, RBr} | Tail] ->
             case intervals:in(StartId, intervals:new(LBr, L, R, RBr)) of
                 true ->
-                    lists:append([[{interval, '[', StartId, R, RBr}],
+                    lists:append([[{'[', StartId, R, RBr}],
                                   Tail, Before,
-                                  [{interval, LBr, L, StartId, ')'}]]);
+                                  [{LBr, L, StartId, ')'}]]);
                 _ ->
                     After ++ Before
             end
@@ -371,19 +371,19 @@ get_split_key({DB, _Subscr, _Snap}, Begin, End, TargetLoad, forward)
     {Key, Taken1} = ?DB:foldl(DB,
               fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {End, 0},
-              {interval, '(', Begin, ?PLUS_INFINITY, ')'},
+              {'(', Begin, ?PLUS_INFINITY, ')'},
               TargetLoad),
     Split = ?DB:foldl(DB,
               fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {Key, Taken1},
-              {interval, '[', ?MINUS_INFINITY, End, ']'},
+              {'[', ?MINUS_INFINITY, End, ']'},
               TargetLoad - Taken1),
     normalize_split_key(Split, TargetLoad, End);
 get_split_key({DB, _Subscr, _Snap}, Begin, End, TargetLoad, forward) ->
     Split = ?DB:foldl(DB,
               fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {End, 0},
-              {interval, '(', Begin, End, ']'},
+              {'(', Begin, End, ']'},
               TargetLoad),
     normalize_split_key(Split, TargetLoad, End);
 
@@ -393,21 +393,21 @@ get_split_key({DB, _Subscr, _Snap}, Begin, End, TargetLoad, backward)
     {Key, Taken1} = ?DB:foldr(DB,
               fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {End, 0},
-              {interval, '[', ?MINUS_INFINITY, Begin, ']'},
+              {'[', ?MINUS_INFINITY, Begin, ']'},
               TargetLoad + 1),
     ?TRACE("first fold done~nnew target:~p~nstart: ~p~nend: ~p~nacc: ~p",
            [TargetLoad - Taken1, ?PLUS_INFINITY, End, {Key, Taken1}]),
     Split = ?DB:foldr(DB,
               fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {Key, Taken1},
-              {interval, '(', End, ?PLUS_INFINITY, ')'},
+              {'(', End, ?PLUS_INFINITY, ')'},
               TargetLoad - Taken1 + 1),
     normalize_split_key_b(Split, TargetLoad, End);
 get_split_key({DB, _Subscr, _Snap}, Begin, End, TargetLoad, backward) ->
     Split = ?DB:foldr(DB,
               fun(E, {_El, Taken}) -> {E, Taken + 1} end,
               {End, 0},
-              {interval, '(', End, Begin, ']'},
+              {'(', End, Begin, ']'},
               TargetLoad + 1),
     normalize_split_key_b(Split, TargetLoad, End).
 
