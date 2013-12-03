@@ -229,8 +229,7 @@ is_merkle_tree(_) -> false.
 
 -spec get_bucket(merkle_tree() | mt_node()) -> mt_bucket().
 get_bucket({merkle_tree, _, Root}) -> get_bucket(Root);
-get_bucket({_H, Count, _LCnt, Bucket, _I, _CL = []})
-  when Count > 0 -> Bucket;
+get_bucket({_H, _Cnt, _LCnt, Bucket, _I, _CL = []}) -> Bucket;
 get_bucket(_) -> [].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
