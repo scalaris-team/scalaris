@@ -97,8 +97,8 @@
                        [merkle_tree:mt_node()] |
                        #art_recon_struct{}.
 -type parameters() :: #bloom_recon_struct{} |
-                      #art_recon_struct{} |
-                      #merkle_params{}.
+                      #merkle_params{} |
+                      #art_recon_struct{}.
 -type recon_dest() :: ?RT:key() | random.
 
 -record(rr_recon_state,
@@ -773,7 +773,8 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
                          Params::parameters() | {}, BeginSync::boolean())
         -> sync_struct().
 build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
-    % note: for bloom, parameters don't need to match - use our own
+    % note: for bloom, parameters don't need to match (only one bloom filter at
+    %       the non-initiator is created!) - use our own parameters
     ?ASSERT(not intervals:is_empty(I)),
     P1E = get_p1e(),
     ElementNum = length(DBItems),
