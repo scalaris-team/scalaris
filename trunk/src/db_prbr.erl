@@ -195,24 +195,24 @@ get_chunk({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSiz
     %% rotate and split intervals so that StartId is the first element looked at
     {Before, After} = lists:splitwith(
             fun(all) -> false;
-               ({element, Key}) ->
+               ({Key}) ->
                     StartId > Key;
-               ({interval, _LBr, _L, R, _RBr}) ->
+               ({_LBr, _L, R, _RBr}) ->
                 StartId > R
             end, intervals:get_simple_intervals(Interval)),
     RotatedInterval = case After of
         [] -> Before;
         [all] ->
-            [{interval, '[', StartId, ?PLUS_INFINITY, ')'},
-             {interval, '[', ?MINUS_INFINITY, StartId, ')'}];
-        [{element, _K} | _Rest] ->
+            [{'[', StartId, ?PLUS_INFINITY, ')'},
+             {'[', ?MINUS_INFINITY, StartId, ')'}];
+        [{_K} | _Rest] ->
             After ++ Before;
-        [{interval, LBr, L, R, RBr} | Tail] ->
+        [{LBr, L, R, RBr} | Tail] ->
             case intervals:in(StartId, intervals:new(LBr, L, R, RBr)) of
                 true ->
-                    lists:append([[{interval, '[', StartId, R, RBr}],
+                    lists:append([[{'[', StartId, R, RBr}],
                                   Tail, Before,
-                                  [{interval, LBr, L, StartId, ')'}]]);
+                                  [{LBr, L, StartId, ')'}]]);
                 _ ->
                     After ++ Before
             end
