@@ -290,7 +290,7 @@ get_port(Pid) ->
 
 %% @doc Gets the tag of a message (the first element of its tuple - should be an
 %%      atom).
--spec get_msg_tag(message() | group_message()) -> atom().
+-spec get_msg_tag(message() | group_message()) -> msg_tag().
 get_msg_tag({Msg, _Cookie})
   when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
     get_msg_tag(Msg);
