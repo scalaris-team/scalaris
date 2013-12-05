@@ -778,7 +778,11 @@ on({l_on_cseq, renew_leases}, State) ->
     ActiveLease = lease_list:get_active_lease(LeaseList),
     PassiveLeaseList = lease_list:get_passive_leases(LeaseList),
     %io:format("renewing all local leases: ~p~n", [length(LeaseList)]),
-    lease_renew(ActiveLease, active),
+    case ActiveLease of
+        empty -> ok;
+        _ ->
+            lease_renew(ActiveLease, active)
+    end,
     _ = [lease_renew(L, passive) || L <- PassiveLeaseList, get_aux(L) =/= {invalid, merge, stopped}],
     msg_delay:send_local(delta() div 2, self(), {l_on_cseq, renew_leases}),
     State.
