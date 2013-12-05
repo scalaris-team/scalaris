@@ -292,7 +292,8 @@ on({l_on_cseq, renew_reply,
                 {invalid, merge, stopped} ->
                     lease_list:remove_lease_from_dht_node_state(Value, State, Mode);
                 {valid, split, _, _}   -> lease_renew(Value, Mode), State;
-                {valid, merge, _, _}   -> lease_renew(Value, Mode), State
+                {valid, merge, _, _}   -> lease_renew(Value, Mode), State;
+                {change_owner, _Pid}  ->  lease_renew(Value, Mode), State
             end;
         unexpected_range   -> lease_renew(Value, Mode), State;
         unexpected_timeout -> lease_renew(Value, Mode), State;
