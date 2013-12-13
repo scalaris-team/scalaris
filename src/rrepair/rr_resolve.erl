@@ -41,7 +41,7 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start/0]).
--export([get_stats_session_id/1, get_stats_feedback/1, merge_stats/2]).
+-export([get_stats_session_id/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -52,8 +52,7 @@
 -export_type([stats/0]).
 -endif.
 
--type option()   :: feedback_response |
-                    {feedback_request, comm:mypid()} |
+-type option()   :: {feedback_request, comm:mypid()} |
                     {send_stats, comm:mypid()} | %send stats to pid after completion
                     {session_id, rrepair:session_id()} |
                     {from_my_node, 0 | 1}.
@@ -68,8 +67,7 @@
          regen_count      = 0      :: non_neg_integer(),
          update_count     = 0      :: non_neg_integer(),
          upd_fail_count   = 0      :: non_neg_integer(),
-         regen_fail_count = 0      :: non_neg_integer(),
-         feedback_response= false  :: boolean() %true if this is a feedback response
+         regen_fail_count = 0      :: non_neg_integer()
          }).
 -type stats() :: #resolve_stats{}.
 
@@ -116,18 +114,16 @@
 
 on({start, Operation, Options}, State) ->
     FBDest = proplists:get_value(feedback_request, Options, undefined),
-    FBResp = proplists:get_value(feedback_response, Options, false),
     FromMyNode = proplists:get_value(from_my_node, Options, 1),
     StatsDest = proplists:get_value(send_stats, Options, undefined),
     SID = proplists:get_value(session_id, Options, null),
     NewState = State#rr_resolve_state{ operation = Operation,
-                                       stats = #resolve_stats{ feedback_response = FBResp,
-                                                               session_id = SID },
+                                       stats = #resolve_stats{session_id = SID},
                                        feedbackDestPid = FBDest,
                                        send_stats = StatsDest,
                                        from_my_node = FromMyNode },
-    ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p - FeedbackResponse=~p~n SessionId:~p",
-           [util:extint2atom(element(1, Operation)), FBDest, FBResp, SID], NewState),
+    ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p~n SessionId:~p",
+           [util:extint2atom(element(1, Operation)), FBDest, SID], NewState),
     comm:send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
     NewState;
 
@@ -342,7 +338,7 @@ on({update_key_entry_ack, NewEntryList}, State =
     NewState = State#rr_resolve_state{stats = NewStats, feedbackKvv = {NewFBItems, MyIKvTree}},
     ?ASSERT(_Diff =:= (NewRegenOk + NewUpdOk + NewUpdFail + NewRegenFail)),
     ?TRACE("UPDATED = ~p - Regen=~p", [NewUpdOk, NewRegenOk], State),
-    shutdown(resolve_ok, NewState, FBDest, NewFBItems, [feedback_response]);
+    shutdown(resolve_ok, NewState, FBDest, NewFBItems, []);
 
 on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
@@ -460,21 +456,16 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
 -spec get_stats_session_id(stats()) -> rrepair:session_id() | null.
 get_stats_session_id(Stats) -> Stats#resolve_stats.session_id.
 
--spec get_stats_feedback(stats()) -> boolean().
-get_stats_feedback(Stats) -> Stats#resolve_stats.feedback_response.
-
 %% @doc merges two stats records with identical session_id, otherwise error will be raised
 -spec merge_stats(stats(), stats()) -> stats() | error.
 merge_stats(#resolve_stats{ session_id = ASID,
                             diff_size = ADiff,
-                            feedback_response = AFB,
                             regen_count = ARC,
                             regen_fail_count = AFC,
                             upd_fail_count = AUFC,
                             update_count = AUC },
             #resolve_stats{ session_id = BSID,
                             diff_size = BDiff,
-                            feedback_response = BFB,
                             regen_count = BRC,
                             regen_fail_count = BFC,
                             upd_fail_count = BUFC,
@@ -483,7 +474,6 @@ merge_stats(#resolve_stats{ session_id = ASID,
         true ->
             #resolve_stats{ session_id = ASID,
                             diff_size = ADiff + BDiff,
-                            feedback_response = AFB orelse BFB,
                             regen_count = ARC + BRC,
                             regen_fail_count = AFC + BFC,
                             upd_fail_count = AUFC + BUFC,
