@@ -373,6 +373,7 @@ map_key_list(KeyList, MyI) ->
 
 -spec start_update_key_entry(MyIKvvList::kvv_list(), comm:mypid(),
                              comm:erl_local_pid()) -> non_neg_integer().
+start_update_key_entry([], _MyPid, _DhtPid) -> 0;
 start_update_key_entry(MyIKvvList, MyPid, DhtPid) ->
     comm:send_local(DhtPid, {update_key_entry, MyPid, MyIKvvList}),
     length(MyIKvvList).
