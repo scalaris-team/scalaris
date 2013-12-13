@@ -398,7 +398,8 @@ session_id_equal(_, _) -> false.
 fork_session({{R, F}, Pid}) ->
     {{R, F + 1}, Pid}.
 
--spec extract_session(session_id(), [session()]) -> {session(), Remain::[session()]} | not_found.
+-spec extract_session(session_id() | null, [session()]) -> {session(), Remain::[session()]} | not_found.
+extract_session(null, _Sessions) -> not_found;
 extract_session(Id, Sessions) ->
     {Satis, NotSatis} = lists:partition(fun(#session{ id = I }) ->
                                                 session_id_equal(Id, I)
