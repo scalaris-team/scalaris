@@ -694,6 +694,7 @@ build_symmetric_ring(NodeCount, Config, RRConfig) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Analysis
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec startSyncRound(NodeKeys::[?RT:key()]) -> ok.
 startSyncRound(NodeKeys) ->
     lists:foreach(fun(X) ->
                           api_dht_raw:unreliable_lookup(X, {?send_to_group_member, rrepair, {rr_trigger}})
@@ -701,32 +702,34 @@ startSyncRound(NodeKeys) ->
                   NodeKeys),
     ok.
 
+-spec waitForSyncRoundEnd(NodeKeys::[?RT:key()]) -> ok.
 waitForSyncRoundEnd(NodeKeys) ->
     Req = {?send_to_group_member, rrepair,
            {get_state, comm:this(), [open_sessions, open_recon, open_resolve]}},
-    lists:foreach(
-      fun(Key) ->
-              util:wait_for(
-                fun() ->
-                        api_dht_raw:unreliable_lookup(Key, Req),
-                        receive
-                            ?SCALARIS_RECV(
-                            {get_state_response, [Sessions, ORC, ORS]}, % ->
-                            begin
-                                if (ORC =:= 0 andalso ORS =:= 0 andalso
-                                            Sessions =:= []) ->
-                                       true;
-                                   true ->
-%%                                        log:pal("Node: ~.2p~nOS : ~.2p~nORC: ~p, ORS: ~p~n",
-%%                                                [Node, Sessions, ORC, ORS]),
-                                       false
-                                end
-                            end)
-                        end
-                end)
-      end,
-      NodeKeys),
-    ok.
+    util:wait_for(fun() -> wait_for_sync_round_end2(Req, NodeKeys) end, 100).
+
+-spec wait_for_sync_round_end2(Req::comm:message(), [?RT:key()]) -> ok.
+wait_for_sync_round_end2(_Req, []) -> true;
+wait_for_sync_round_end2(Req, [Key | Keys]) ->
+    api_dht_raw:unreliable_lookup(Key, Req),
+    KeyResult = 
+        receive
+            ?SCALARIS_RECV(
+            {get_state_response, [Sessions, ORC, ORS]}, % ->
+            begin
+                if (ORC =:= 0 andalso ORS =:= 0 andalso
+                        Sessions =:= []) ->
+                       true;
+                   true ->
+%%                        log:pal("Key: ~.2p~nOS : ~.2p~nORC: ~p, ORS: ~p~n",
+%%                                [Key, Sessions, ORC, ORS]),
+                       false
+                end
+            end)
+        end,
+    if KeyResult -> wait_for_sync_round_end2(Req, Keys);
+       true -> false
+    end.
 
 -spec sync_degree(db_generator:db_status()) -> float().
 sync_degree({Count, _Ex, M, O}) ->
