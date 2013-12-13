@@ -409,7 +409,8 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                                    dest_rr_pid = DestRRPid}) ->
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
-    send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
+    send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
+                     comm:make_global(OwnerL), SID,
                      {start_recon, bloom, MySyncStruct}}),
     shutdown(sync_finished, State);
 begin_sync(MySyncStruct, _OtherSyncStruct,
@@ -439,7 +440,8 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
                                           bucket_size = MerkleB},
             SyncParams = MySyncParams#merkle_params{reconPid = comm:this()},
             SID = rr_recon_stats:get(session_id, Stats),
-            send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
+            send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
+                             comm:make_global(OwnerL), SID,
                              {start_recon, merkle_tree, SyncParams}}),
             State#rr_recon_state{stats = Stats1, params = MySyncParams}
     end;
@@ -454,7 +456,8 @@ begin_sync(MySyncStruct, OtherSyncStruct,
             shutdown(sync_finished, State#rr_recon_state{stats = Stats1});
         false ->
             SID = rr_recon_stats:get(session_id, Stats),
-            send(DestRRPid, {continue_recon, comm:make_global(OwnerL), SID,
+            send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
+                             comm:make_global(OwnerL), SID,
                              {start_recon, art, MySyncStruct}}),
             shutdown(sync_finished, State)
     end.
