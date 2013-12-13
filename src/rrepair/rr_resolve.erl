@@ -137,12 +137,10 @@ on({start, Operation, Options}, State) ->
 
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {?key_upd, KvvList, ReqKeys},
-                          feedbackDestPid = FBDest,
-                          dhtNodePid = DhtPid, stats = Stats }) ->
+                          dhtNodePid = DhtPid, stats = _Stats }) ->
     MyIKvvList = map_kvv_list(KvvList, MyI),
-    ToUpdate = start_update_key_entry(MyIKvvList, comm:this(), DhtPid),
-    ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p~n KVVListLen=~p ; ToUpdate=~p",
-           [key_upd, Stats#resolve_stats.session_id, MyI, length(KvvList), ToUpdate], State),
+    ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p~n KVVListLen=~p",
+           [key_upd, _Stats#resolve_stats.session_id, MyI, length(KvvList)], State),
     
     % send requested entries (similar to key_upd_send handling)
     RepKeyInt = intervals:from_elements(map_key_list(ReqKeys, MyI)),
@@ -155,31 +153,31 @@ on({get_state_response, MyI}, State =
                                     gb_trees:enter(KeyX, VersionX, TreeX)
                             end, gb_trees:empty(), MyIKvvList),
     
-    % allow the garbage collection to clean up the KvvList and ReqKeys here:
-    NewState = State#rr_resolve_state{operation = {?key_upd, [], []},
-                                      stats = Stats#resolve_stats{diff_size = ToUpdate}},
-    if ToUpdate =:= 0 andalso MyIKvvList =:= [] ->
-           shutdown(resolve_ok, NewState, FBDest, [], []);
-       true ->
-           % note: shutdown and feedback handled by update_key_entry_ack or
-           %       get_entries_response
-           NewState#rr_resolve_state{feedbackKvv = {[], MyIKvTree}}
-    end;
+    % allow the garbage collection to clean up the ReqKeys here:
+    % also update the KvvList
+    State#rr_resolve_state{operation = {?key_upd, MyIKvvList, []},
+                           feedbackKvv = {[], MyIKvTree}};
 
 on({get_entries_response, EntryList}, State =
-       #rr_resolve_state{ operation = {?key_upd, [], []},
-                          feedbackDestPid = FBDest,
+       #rr_resolve_state{ operation = {?key_upd, MyIKvvList, []},
+                          feedbackDestPid = FBDest, dhtNodePid = DhtPid,
                           feedbackKvv = {FbKVV, MyIKvTree},
-                          stats = #resolve_stats{diff_size = ToUpdate} = _Stats}) ->
-    ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
-           [key_upd, _Stats#resolve_stats.session_id, length(EntryList)], State),
+                          stats = Stats}) ->
     KvvList = [entry_to_kvv(E) || E <- EntryList],
+    ToUpdate = start_update_key_entry(MyIKvvList, comm:this(), DhtPid),
+    ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p ; ToUpdate=~p - #Items: ~p",
+           [key_upd, Stats#resolve_stats.session_id, ToUpdate, length(EntryList)], State),
+    
+    % allow the garbage collection to clean up the KvvList here:
+    NewState = State#rr_resolve_state{operation = {?key_upd, [], []},
+                                      stats = Stats#resolve_stats{diff_size = ToUpdate}},
+    
     if ToUpdate =:= 0 ->
            % use the same options as above in get_state_response:
-           shutdown(resolve_ok, State, FBDest, KvvList, []);
+           shutdown(resolve_ok, NewState, FBDest, KvvList, []);
        true ->
            % note: shutdown and feedback handled by update_key_entry_ack
-           State#rr_resolve_state{feedbackKvv =
+           NewState#rr_resolve_state{feedbackKvv =
                                       {lists:append(FbKVV, KvvList), MyIKvTree}}
     end;
 
