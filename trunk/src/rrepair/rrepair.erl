@@ -433,20 +433,28 @@ extract_session(Id, Sessions) ->
     end.
 
 -spec update_session_recon(session(), rr_recon_stats:stats()) -> session().
-update_session_recon(Session, New) ->
+update_session_recon(Session = #session{rs_called = RSCalled}, New) ->
     case rr_recon_stats:get(status, New) of
         wait -> Session;
-        _ -> Session#session{ rc_stats  = New,
-                              rs_called = rr_recon_stats:get(resolve_started, New) }
+        _ -> NewRS = rr_recon_stats:get(resolve_started, New),
+             Session#session{ rc_stats  = New,
+                              rs_called = RSCalled + NewRS }
     end.
 
-%% @doc Increases the rs_finish field and merges the new stats.
+%% @doc Increases the rs_finish field and merges the new stats. If the resolve
+%%      is expecting a feedback reply, rs_called is also increased.
 -spec update_session_resolve(session(), rr_resolve:stats()) -> session().
-update_session_resolve(#session{ rs_stats = none, rs_finish = RSCount } = S, Stats) ->
-    S#session{ rs_stats = Stats, rs_finish = RSCount + 1 };
-update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount } = S, New) ->
+update_session_resolve(#session{ rs_stats = none, rs_finish = RSCount,
+                                 rs_called = RSCalled } = S, Stats) ->
+    NewRS = rr_resolve:get_stats_resolve_started(Stats),
+    S#session{ rs_stats = Stats, rs_finish = RSCount + 1,
+               rs_called = RSCalled + NewRS };
+update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount,
+                                 rs_called = RSCalled } = S, New) ->
+    NewRS = rr_resolve:get_stats_resolve_started(New),
     Merge = rr_resolve:merge_stats(Old, New),
-    S#session{ rs_stats = Merge, rs_finish = RSCount + 1 }.
+    S#session{ rs_stats = Merge, rs_finish = RSCount + 1,
+               rs_called = RSCalled + NewRS }.
 
 %% @doc Checks if the session is complete (rs_called =:= rs_finish, stats
 %%      available) and in this case informs the principal and returns 'true'.
