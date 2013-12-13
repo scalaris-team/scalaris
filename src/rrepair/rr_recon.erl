@@ -252,8 +252,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                 send_local(OwnerL, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff},
                                     [{feedback_request, comm:make_global(OwnerL)},
                                      {from_my_node, 1}]}),
-                %feedback causes 2 resolve runs
-                rr_recon_stats:inc([{resolve_started, 2}], Stats);
+                rr_recon_stats:inc([{resolve_started, 1}], Stats);
             [] -> Stats
         end,
     NewState = State#rr_recon_state{stats = NewStats},
@@ -679,7 +678,7 @@ merkle_get_sync_leaves([Node | Rest], Skip, SigSize, ToSyncAcc) ->
 %%      Returns the number of resolve requests (requests with feedback count 2).
 -spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid())
-        -> 0..2.
+        -> 0..1.
 resolve_leaves([], _Dest, _SID, _OwnerL) -> 0;
 resolve_leaves(Nodes, Dest, SID, OwnerL) ->
     resolve_leaves(Nodes, Dest, SID, OwnerL, intervals:empty(), 0).
@@ -688,7 +687,7 @@ resolve_leaves(Nodes, Dest, SID, OwnerL) ->
 -spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid(),
                      Interval::intervals:interval(), Items::non_neg_integer())
-        -> 0..2.
+        -> 0..1.
 resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
     ?ASSERT(merkle_tree:is_leaf(Node)),
     LeafInterval = merkle_tree:get_interval(Node),
@@ -704,7 +703,7 @@ resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
                    send_local(OwnerL, {request_resolve, SID,
                                        {interval_upd_send, Interval, Dest},
                                        [{from_my_node, 1} | Options]}),
-                   2;
+                   1;
                true ->
                    % we know that we don't have data in this range, so we must
                    % regenerate it from the other node
