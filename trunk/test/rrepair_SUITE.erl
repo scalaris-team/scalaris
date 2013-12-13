@@ -158,7 +158,6 @@ get_rep_upd_config(Method) ->
      {rr_gc_interval, 60000},
      {rr_recon_p1e, 0.1},
      {rr_trigger_probability, 100},
-     {rr_max_items, 10000},
      {rr_art_inner_fpr, 0.01},
      {rr_art_leaf_fpr, 0.1},
      {rr_art_correction_factor, 2},
