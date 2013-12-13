@@ -702,18 +702,26 @@ startSyncRound(NodeKeys) ->
     ok.
 
 waitForSyncRoundEnd(NodeKeys) ->
-    Req = {?send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
+    Req = {?send_to_group_member, rrepair,
+           {get_state, comm:this(), [open_sessions, open_recon, open_resolve]}},
     lists:foreach(
       fun(Key) ->
               util:wait_for(
                 fun() ->
                         api_dht_raw:unreliable_lookup(Key, Req),
                         receive
-                            {get_state_response, []} ->
-                                true;
-                            {get_state_response, [_|_] = _Val} ->
-                                % ct:pal("open sessions at ~p:~n  ~.4p", [Key, _Val]),
-                                false
+                            ?SCALARIS_RECV(
+                            {get_state_response, [Sessions, ORC, ORS]}, % ->
+                            begin
+                                if (ORC =:= 0 andalso ORS =:= 0 andalso
+                                            Sessions =:= []) ->
+                                       true;
+                                   true ->
+%%                                        log:pal("Node: ~.2p~nOS : ~.2p~nORC: ~p, ORS: ~p~n",
+%%                                                [Node, Sessions, ORC, ORS]),
+                                       false
+                                end
+                            end)
                         end
                 end)
       end,
