@@ -182,7 +182,13 @@ one_node(Config) ->
     start_sync(Config, 1, 1, [{fprob, 50}, {ftype, FType}],
                1, 0.2, get_rep_upd_config(Method), fun erlang:'=:='/2).
 
+mpath_map({request_resolve, {?key_upd, KVV, ReqKeys}, _}, _Source, _Dest) ->
+    {?key_upd, length(KVV), length(ReqKeys)};
+mpath_map({continue_resolve, {?key_upd, KVV, ReqKeys}, _}, _Source, _Dest) ->
+    {?key_upd, length(KVV), length(ReqKeys)};
 mpath_map({request_resolve, _, {?key_upd, KVV, ReqKeys}, _}, _Source, _Dest) ->
+    {?key_upd, length(KVV), length(ReqKeys)};
+mpath_map({continue_resolve, _, {?key_upd, KVV, ReqKeys}, _}, _Source, _Dest) ->
     {?key_upd, length(KVV), length(ReqKeys)};
 mpath_map(Msg, _Source, _Dest) ->
     {element(1, Msg)}.
