@@ -118,7 +118,8 @@
     {?GC_TRIGGER} |
     {start_sync, get_range, session_id(), rr_recon:method(), DestKey::random | ?RT:key(), {get_state_response, MyI::intervals:interval()}} |
 	{start_recon | continue_recon, SenderRRPid::comm:mypid(), session_id() | null, ReqMsg::rr_recon:request()} |
-    {request_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
+    {request_resolve | continue_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
+    {continue_resolve, rr_resolve:operation(), rr_resolve:options()} |
     {recon_forked} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
@@ -144,6 +145,7 @@ on({request_sync, Method, DestKey}, State) ->
 on({request_sync, Method, DestKey, Principal}, State) ->
     request_sync(State, Method, DestKey, Principal);
 
+% initial resolve request
 on({request_resolve, Operation, Options}, State = #rrepair_state{open_resolve = OpenResolve}) ->
     {ok, Pid} = rr_resolve:start(),
     comm:send_local(Pid, {start, Operation, Options}),
@@ -241,10 +243,28 @@ on({continue_recon, Sender, SessionID, Msg}, State) ->
     %       counted by request_sync)
     State;
 
-on({request_resolve, SessionID, Operation, Options}, State = #rrepair_state{ open_resolve = OpenResolve }) ->
+% initial resolve request
+on({request_resolve, SessionID, Operation, Options},
+   State = #rrepair_state{open_resolve = OpenResolve}) ->
     {ok, Pid} = rr_resolve:start(),
     comm:send_local(Pid, {start, Operation, [{session_id, SessionID} | Options]}),
     State#rrepair_state{ open_resolve = OpenResolve + 1 };
+
+% feedback response from a previous resolve request (without session ID)
+on({continue_resolve, Operation, Options}, State) ->
+    % do not increase the open_resolve member - we did this during the
+    % resolve_progress_report of the original request
+    {ok, Pid} = rr_resolve:start(),
+    comm:send_local(Pid, {start, Operation, Options}),
+    State;
+
+% feedback response from a previous resolve request (with session ID)
+on({continue_resolve, SessionID, Operation, Options}, State) ->
+    % do not increase the open_resolve member - we did this during the
+    % resolve_progress_report of the original request
+    {ok, Pid} = rr_resolve:start(),
+    comm:send_local(Pid, {start, Operation, [{session_id, SessionID} | Options]}),
+    State;
 
 on({recon_forked}, State) ->
     ?TRACE_RECON("RECON FORKED", []),
@@ -304,7 +324,8 @@ on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
 
 on({resolve_progress_report, _Sender, Stats},
    State = #rrepair_state{open_resolve = OR, open_sessions = OS}) ->
-    NSessions = case extract_session(rr_resolve:get_stats_session_id(Stats), OS) of
+    SID = rr_resolve:get_stats_session_id(Stats),
+    NSessions = case extract_session(SID, OS) of
                     not_found -> OS;
                     {S, TSessions} ->
                         SUpd = update_session_resolve(S, Stats),
@@ -313,10 +334,12 @@ on({resolve_progress_report, _Sender, Stats},
                             _    -> [SUpd | TSessions]
                         end
                 end,
+    NewRS = rr_resolve:get_stats_resolve_started(Stats),
     ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p~nOldSessions=~p~nNewSessions=~p",
                    [_Sender, rr_resolve:print_resolve_stats(Stats),
                     State#rrepair_state.open_recon, OR - 1, OS, NSessions]),
-    State#rrepair_state{open_resolve = OR - 1, open_sessions = NSessions};
+    State#rrepair_state{open_resolve = OR - 1 + NewRS,
+                        open_sessions = NSessions};
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % misc info messages

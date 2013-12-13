@@ -41,7 +41,7 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start/0]).
--export([get_stats_session_id/1, merge_stats/2]).
+-export([get_stats_session_id/1, get_stats_resolve_started/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -67,7 +67,8 @@
          regen_count      = 0      :: non_neg_integer(),
          update_count     = 0      :: non_neg_integer(),
          upd_fail_count   = 0      :: non_neg_integer(),
-         regen_fail_count = 0      :: non_neg_integer()
+         regen_fail_count = 0      :: non_neg_integer(),
+         resolve_started  = 0      :: non_neg_integer()
          }).
 -type stats() :: #resolve_stats{}.
 
@@ -156,8 +157,7 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {?key_upd, MyIKvvList, []},
-                          feedbackDestPid = FBDest, dhtNodePid = DhtPid,
-                          feedbackKvv = {FbKVV, MyIKvTree},
+                          dhtNodePid = DhtPid, feedbackKvv = {FbKVV, MyIKvTree},
                           stats = Stats}) ->
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     ToUpdate = start_update_key_entry(MyIKvvList, comm:this(), DhtPid),
@@ -166,11 +166,13 @@ on({get_entries_response, EntryList}, State =
     
     % allow the garbage collection to clean up the KvvList here:
     NewState = State#rr_resolve_state{operation = {?key_upd, [], []},
-                                      stats = Stats#resolve_stats{diff_size = ToUpdate}},
+                                      stats = Stats#resolve_stats{diff_size = ToUpdate},
+                                      feedbackKvv = {lists:append(FbKVV, KvvList),
+                                                     MyIKvTree}},
     
     if ToUpdate =:= 0 ->
            % use the same options as above in get_state_response:
-           shutdown(resolve_ok, NewState, FBDest, KvvList, []);
+           shutdown(resolve_ok, NewState);
        true ->
            % note: shutdown and feedback handled by update_key_entry_ack
            NewState#rr_resolve_state{feedbackKvv =
@@ -188,12 +190,19 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {key_upd_send, Dest, _},
-                          feedbackDestPid = FBDest, stats = _Stats }) ->
+                          feedbackDestPid = FBDest, from_my_node = FromMyNode,
+                          stats = Stats }) ->
+    SID = Stats#resolve_stats.session_id,
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
-           [key_upd_send, _Stats#resolve_stats.session_id, length(EntryList)], State),
+           [key_upd_send, SID, length(EntryList)], State),
     KvvList = [entry_to_kvv(E) || E <- EntryList],
-    Options = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
-    shutdown(resolve_ok, State, Dest, KvvList, Options);
+    ResStarted = send_request_resolve(Dest, {?key_upd, KvvList, []}, SID,
+                                      FromMyNode, FBDest, [], false),
+
+    NewState =
+        State#rr_resolve_state{stats = Stats#resolve_stats{resolve_started = ResStarted},
+                               feedbackDestPid = undefined},
+    shutdown(resolve_ok, NewState);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MODE: interval_upd
@@ -227,15 +236,13 @@ on({get_state_response, MyI}, State =
             comm:send_local(DhtPid, {get_entries, self(), ISec}),
             NewState;
         true ->
-            shutdown(resolve_abort, NewState,
-                     State#rr_resolve_state.feedbackDestPid, [], [])
+            shutdown(resolve_abort, NewState)
     end;
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {?interval_upd, I, KvvList},
                           my_range = MyI,
                           dhtNodePid = DhtPid,
-                          feedbackDestPid = FBDest,
                           stats = Stats }) ->
     MyIKvvList = map_kvv_list(KvvList, MyI),
     ToUpdate = start_update_key_entry(MyIKvvList, comm:this(), DhtPid),
@@ -253,28 +260,31 @@ on({get_entries_response, EntryList}, State =
     
     % allow the garbage collection to clean up the KvvList here:
     NewState = State#rr_resolve_state{operation = {?interval_upd, I, []},
-                                      stats = Stats#resolve_stats{diff_size = ToUpdate}},
+                                      stats = Stats#resolve_stats{diff_size = ToUpdate},
+                                      feedbackKvv = {MissingOnOther, MyIKvTree}},
     if ToUpdate =:= 0 ->
-           shutdown(resolve_ok, NewState, FBDest, MissingOnOther, []);
+           shutdown(resolve_ok, NewState);
        true ->
            % note: shutdown and feedback handled by update_key_entry_ack
-           NewState#rr_resolve_state{feedbackKvv = {MissingOnOther, MyIKvTree}}
+           NewState
     end;
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {interval_upd_send, I, Dest},
-                          feedbackDestPid = FBDest,
-                          stats = Stats, from_my_node = FromMyNode }) ->
+                          feedbackDestPid = FBDest, from_my_node = FromMyNode,
+                          stats = Stats }) ->
+    SID = Stats#resolve_stats.session_id,
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
-           [interval_upd_send, Stats#resolve_stats.session_id, length(EntryList)], State),
-    Options0 = ?IIF(FBDest =/= undefined, [{feedback_request, FBDest}], []),
-    Options = [{from_my_node, FromMyNode bxor 1} | Options0],
+           [interval_upd_send, SID, length(EntryList)], State),
+
     KvvList = [entry_to_kvv(E) || E <- EntryList],
-    case Stats#resolve_stats.session_id of
-        null -> comm:send(Dest, {request_resolve, {?interval_upd, I, KvvList}, Options});
-        SID -> comm:send(Dest, {request_resolve, SID, {?interval_upd, I, KvvList}, Options})
-    end,
-    shutdown(resolve_ok, State, undefined, [], []);
+    ResStarted = send_request_resolve(Dest, {?interval_upd, I, KvvList}, SID,
+                                      FromMyNode, FBDest, [], false),
+
+    NewState =
+        State#rr_resolve_state{stats = Stats#resolve_stats{resolve_started = ResStarted},
+                               feedbackDestPid = undefined},
+    shutdown(resolve_ok, NewState);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MODE: interval_upd_my
@@ -290,7 +300,7 @@ on({get_state_response, MyI} = _Msg,
     case intervals:is_empty(ISec) of
         false -> case rrepair:select_sync_node(ISec, true) of
                      not_found ->
-                         shutdown(resolve_abort, NewState, undefined, [], []);
+                         shutdown(resolve_abort, NewState);
                      DKey ->
                          % TODO: keep trying to resolve the whole intersection
                          %       e.g. by removing each sync interval and
@@ -302,9 +312,9 @@ on({get_state_response, MyI} = _Msg,
                          %       own range -> choose merkle_tree instead
                          comm:send_local(pid_groups:get_my(rrepair),
                                          {request_sync, merkle_tree, DKey}),
-                         shutdown(resolve_ok, NewState, undefined, [], [])
+                         shutdown(resolve_ok, NewState)
                  end;
-        true  -> shutdown(resolve_abort, NewState, undefined, [], [])
+        true  -> shutdown(resolve_abort, NewState)
     end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -338,7 +348,7 @@ on({update_key_entry_ack, NewEntryList}, State =
     NewState = State#rr_resolve_state{stats = NewStats, feedbackKvv = {NewFBItems, MyIKvTree}},
     ?ASSERT(_Diff =:= (NewRegenOk + NewUpdOk + NewUpdFail + NewRegenFail)),
     ?TRACE("UPDATED = ~p - Regen=~p", [NewUpdOk, NewRegenOk], State),
-    shutdown(resolve_ok, NewState, FBDest, NewFBItems, []);
+    shutdown(resolve_ok, NewState);
 
 on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
@@ -415,50 +425,58 @@ integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
              Rest, UpdOk, UpdFail, RegenOk, RegenFail + 1, NewFBItems, OtherKvTree, FBOn)
     end.
 
--spec shutdown(exit_reason(), state(), undefined | comm:mypid(), kvv_list(),
-               options()) -> kill.
+-spec shutdown(exit_reason(), state()) -> kill.
 shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
-                                    stats = Stats, operation = _Op,
-                                    from_my_node = FromMyNode} = _State,
-         KUDest, KUItems, KUOptions0) ->
+                                    stats = #resolve_stats{resolve_started = ResStarted0} = Stats,
+                                    operation = _Op, feedbackDestPid = FBDest,
+                                    feedbackKvv = {FbKVV, _MyIKvTree},
+                                    from_my_node = FromMyNode} = _State) ->
     ?TRACE("SHUTDOWN ~p - Operation=~p~n SessionId:~p~n ~p items via key_upd to ~p~n Items: ~.2p",
            [_Reason, util:extint2atom(element(1, _Op)), Stats#resolve_stats.session_id,
-            length(KUItems), KUDest, KUItems], _State),
-    case KUDest of
-        undefined -> ok;
-        _ -> send_request_resolve(KUDest, {?key_upd, KUItems, []},
-                                  Stats#resolve_stats.session_id, FromMyNode,
-                                  undefined, KUOptions0)
-    end,
-    send_stats(SendStats, Stats),
+            length(FbKVV), FBDest, FbKVV], _State),
+    ResStarted =
+        case FBDest of
+            undefined -> 0;
+            _ -> send_request_resolve(FBDest, {?key_upd, FbKVV, []},
+                                      Stats#resolve_stats.session_id,
+                                      FromMyNode, undefined, [], true)
+        end,
+    Stats1 = Stats#resolve_stats{resolve_started = ResStarted0 + ResStarted},
+    send_stats(SendStats, Stats1),
     % note: do not propagate the SessionId unless we report to the node
     %       the request came from (indicated by FromMyNode =:= 1),
     %       otherwise the resolve_progress_report on the other node will
     %       be counted for the session's rs_finish and it will not match
     %       its rs_called any more!
     if FromMyNode =:= 1 ->
-           comm:send_local(Owner, {resolve_progress_report, self(), Stats});
+           comm:send_local(Owner, {resolve_progress_report, self(), Stats1});
        true ->
            comm:send_local(Owner, {resolve_progress_report, self(),
-                                   Stats#resolve_stats{session_id = null}})
+                                   Stats1#resolve_stats{session_id = null}})
     end,
     kill.
 
 -spec send_request_resolve(Dest::comm:mypid(), Op::operation(),
                            SID::rrepair:session_id() | null,
-                           FromMyNode::boolean(),
-                           FBDest::comm:mypid() | undefined, Options::options())
-        -> ok.
-send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options) ->
+                           FromMyNode::0 | 1, FBDest::comm:mypid() | undefined,
+                           Options::options(), IsFeedback::boolean())
+        -> ResolveStarted::non_neg_integer().
+send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options, IsFeedback) ->
     case FBDest of
-        undefined -> Options1 = Options;
-        _         -> Options1 = [{feedback_request, FBDest} | Options]
+        undefined -> Options1 = Options,
+                     ResStarted = 0;
+        _         -> Options1 = [{feedback_request, FBDest} | Options],
+                     ResStarted = 1
     end,
     Options2 = [{from_my_node, FromMyNode bxor 1} | Options1],
+    Tag = if IsFeedback -> continue_resolve;
+             true       -> request_resolve
+          end,
     case SID of
-        null -> comm:send(Dest, {request_resolve, Op, Options2});
-        SID -> comm:send(Dest, {request_resolve, SID, Op, Options2})
-    end.
+        null -> comm:send(Dest, {Tag, Op, Options2});
+        SID -> comm:send(Dest, {Tag, SID, Op, Options2})
+    end,
+    ResStarted.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % resolve stats operations
@@ -466,6 +484,9 @@ send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options) ->
 
 -spec get_stats_session_id(stats()) -> rrepair:session_id() | null.
 get_stats_session_id(Stats) -> Stats#resolve_stats.session_id.
+
+-spec get_stats_resolve_started(stats()) -> non_neg_integer().
+get_stats_resolve_started(Stats) -> Stats#resolve_stats.resolve_started.
 
 %% @doc merges two stats records with identical session_id, otherwise error will be raised
 -spec merge_stats(stats(), stats()) -> stats() | error.
