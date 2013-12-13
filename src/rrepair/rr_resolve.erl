@@ -426,21 +426,16 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
             length(KUItems), KUDest, KUItems], _State),
     case KUDest of
         undefined -> ok;
-        _ ->
-            % note: do not propagate the SessionId unless we report to the node
-            %       the request came from (indicated by FromMyNode =:= 1),
-            %       otherwise the resolve_progress_report on the other node will
-            %       be counted for the session's rs_finish and it will not match
-            %       its rs_called any more!
-            KUOptions = [{from_my_node, FromMyNode bxor 1} | KUOptions0],
-            case Stats#resolve_stats.session_id of
-                null ->
-                    comm:send(KUDest, {request_resolve, {?key_upd, KUItems, []}, KUOptions});
-                SID ->
-                    comm:send(KUDest, {request_resolve, SID, {?key_upd, KUItems, []}, KUOptions})
-            end
+        _ -> send_request_resolve(KUDest, {?key_upd, KUItems, []},
+                                  Stats#resolve_stats.session_id, FromMyNode,
+                                  undefined, KUOptions0)
     end,
     send_stats(SendStats, Stats),
+    % note: do not propagate the SessionId unless we report to the node
+    %       the request came from (indicated by FromMyNode =:= 1),
+    %       otherwise the resolve_progress_report on the other node will
+    %       be counted for the session's rs_finish and it will not match
+    %       its rs_called any more!
     if FromMyNode =:= 1 ->
            comm:send_local(Owner, {resolve_progress_report, self(), Stats});
        true ->
@@ -448,6 +443,22 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
                                    Stats#resolve_stats{session_id = null}})
     end,
     kill.
+
+-spec send_request_resolve(Dest::comm:mypid(), Op::operation(),
+                           SID::rrepair:session_id() | null,
+                           FromMyNode::boolean(),
+                           FBDest::comm:mypid() | undefined, Options::options())
+        -> ok.
+send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options) ->
+    case FBDest of
+        undefined -> Options1 = Options;
+        _         -> Options1 = [{feedback_request, FBDest} | Options]
+    end,
+    Options2 = [{from_my_node, FromMyNode bxor 1} | Options1],
+    case SID of
+        null -> comm:send(Dest, {request_resolve, Op, Options2});
+        SID -> comm:send(Dest, {request_resolve, SID, Op, Options2})
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % resolve stats operations
