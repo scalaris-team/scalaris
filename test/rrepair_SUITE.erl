@@ -213,9 +213,8 @@ mpath(Config) ->
     %trace_mpath:start(TraceName, fun mpath_map/3),
     trace_mpath:start(TraceName),
     api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair,
-                                              {request_sync, Method, CKey}}),
-    %waitForSyncRoundEnd(NodeKeys),
-    timer:sleep(3000),
+                                              {request_sync, Method, CKey, comm:this()}}),
+    waitForSyncRoundEnd([SKey, CKey], true),
     trace_mpath:stop(),
     %TRACE
     A = trace_mpath:get_trace(TraceName),
@@ -271,9 +270,8 @@ dest(Config) ->
     CM = count_dbsize(CKey),
     %server starts sync
     api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair,
-                                              {request_sync, Method, CKey}}),
-    %waitForSyncRoundEnd(NodeKeys),
-    waitForSyncRoundEnd([SKey, CKey]),
+                                              {request_sync, Method, CKey, comm:this()}}),
+    waitForSyncRoundEnd([SKey, CKey], true),
     %measure sync degree
     SONew = count_outdated(SKey),
     SMNew = count_dbsize(SKey),
@@ -313,7 +311,7 @@ dest_empty_node(Config) ->
     %server starts sync
     api_dht_raw:unreliable_lookup(IKey, {?send_to_group_member, rrepair,
                                               {request_sync, Method, CKey, comm:this()}}),
-    wait_for_session_end(),
+    waitForSyncRoundEnd([IKey, CKey], true),
     %measure sync degree
     IMNew = count_dbsize(IKey),
     CMNew = count_dbsize(CKey),
@@ -350,17 +348,19 @@ get_symmetric_keys_test(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec wait_until_true(DestKey::?RT:key(), Request::comm:message(),
+                      ConFun::fun((StateResponse::term()) -> boolean()),
+                      MaxWait::integer()) -> boolean().
 wait_until_true(DestKey, Request, ConFun, MaxWait) ->
     api_dht_raw:unreliable_lookup(DestKey, Request),
     Result = receive {get_state_response, R} -> ConFun(R) end,
-    case Result of
-        true -> true;
-        false when MaxWait > 0 ->
-            erlang:yield(),
-            timer:sleep(10),
-            wait_until_true(DestKey, Request, ConFun, MaxWait - 10);
-        false when MaxWait =< 0 ->
-            false
+    if Result -> true;
+       not Result andalso MaxWait > 0 ->
+           erlang:yield(),
+           timer:sleep(10),
+           wait_until_true(DestKey, Request, ConFun, MaxWait - 10);
+       not Result andalso MaxWait =< 0 ->
+           false
     end.
 
 session_ttl(Config) ->
@@ -574,14 +574,6 @@ tester_merkle_compress_cmp_result(_) ->
 % Helper Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec wait_for_session_end() -> ok.
-wait_for_session_end() ->
-    util:wait_for(fun() ->
-                          receive
-                              {request_sync_complete, _} -> true
-                          end
-                  end).
-
 % @doc
 %    runs the bloom filter synchronization [Rounds]-times
 %    and records the sync degree after each round
@@ -619,7 +611,7 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) 
                        fun(I) ->
                                ct:pal("Starting round ~p", [I]),
                                startSyncRound(NodeKeys),
-                               waitForSyncRoundEnd(NodeKeys),
+                               waitForSyncRoundEnd(NodeKeys, false),
                                print_status(I, get_db_status())
                        end),
     EndStat = get_db_status(),
@@ -702,14 +694,20 @@ build_symmetric_ring(NodeCount, Config, RRConfig) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec startSyncRound(NodeKeys::[?RT:key()]) -> ok.
 startSyncRound(NodeKeys) ->
-    lists:foreach(fun(X) ->
-                          api_dht_raw:unreliable_lookup(X, {?send_to_group_member, rrepair, {rr_trigger}})
-                  end,
-                  NodeKeys),
+    lists:foreach(
+      fun(X) ->
+              Req = {?send_to_group_member, rrepair, {rr_trigger}},
+              api_dht_raw:unreliable_lookup(X, Req)
+      end,
+      NodeKeys),
     ok.
 
--spec waitForSyncRoundEnd(NodeKeys::[?RT:key()]) -> ok.
-waitForSyncRoundEnd(NodeKeys) ->
+-spec waitForSyncRoundEnd(NodeKeys::[?RT:key()], RcvReqCompleteMsg::boolean()) -> ok.
+waitForSyncRoundEnd(NodeKeys, RcvReqCompleteMsg) ->
+    RcvReqCompleteMsg andalso
+        receive
+            {request_sync_complete, _} -> true
+        end,
     Req = {?send_to_group_member, rrepair,
            {get_state, comm:this(), [open_sessions, open_recon, open_resolve]}},
     util:wait_for(fun() -> wait_for_sync_round_end2(Req, NodeKeys) end, 100).
