@@ -170,7 +170,7 @@ on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {?key_upd, [], []},
                           feedbackDestPid = FBDest,
                           feedbackKvv = {FbKVV, MyIKvTree},
-                          stats = #resolve_stats{diff_size = ToUpdate}}) ->
+                          stats = #resolve_stats{diff_size = ToUpdate} = _Stats}) ->
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
            [key_upd, _Stats#resolve_stats.session_id, length(EntryList)], State),
     KvvList = [entry_to_kvv(E) || E <- EntryList],
