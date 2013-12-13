@@ -61,7 +61,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -export([start_link/1, init/1, on/2, check_config/0,
-         fork_session/1, session_id_equal/2,
+         session_id_equal/2,
          select_sync_node/2]).
 
 -ifdef(with_export_type_support).
@@ -72,7 +72,7 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type round()       :: {non_neg_integer(), non_neg_integer()}.
+-type round()       :: non_neg_integer().
 -type session_id()  :: {round(), comm:mypid()}.
 -type principal_id():: comm:mypid() | none.
 
@@ -94,7 +94,7 @@
         {
          trigger_state  = ?required(rrepair_state, trigger_state)   :: trigger:state() | null,
          gc_trigger     = ?required(rrepair_state, gc_trigger)      :: trigger:state(),     %garbage collector trigger to remove dead sessions
-         round          = {0, 0}                                    :: round(),
+         round          = 0                                         :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
          open_resolve   = 0                                         :: non_neg_integer(),
          open_sessions  = []                                        :: [session()]   % List of running request_sync calls (only rounds initiated by this process)
@@ -384,19 +384,15 @@ select_sync_node(Interval, ExcludeInterval) ->
     end.
 
 -spec next_round(round()) -> round().
-next_round({R, _Fork}) -> {R + 1, 0}.
+next_round(R) -> R + 1.
 
 -spec new_session(round(), comm:mypid(), rr_recon:method(), principal_id()) -> session().
 new_session(Round, Pid, RCMethod, Principal) ->
     #session{ id = {Round, Pid}, rc_method = RCMethod, ttl = get_session_ttl(), principal = Principal }.
 
 -spec session_id_equal(session_id(), session_id()) -> boolean().
-session_id_equal({{R, _}, Pid}, {{R, _}, Pid}) -> true;
+session_id_equal({R, Pid}, {R, Pid}) -> true;
 session_id_equal(_, _) -> false.
-
--spec fork_session(session_id()) -> session_id().
-fork_session({{R, F}, Pid}) ->
-    {{R, F + 1}, Pid}.
 
 -spec extract_session(session_id() | null, [session()]) -> {session(), Remain::[session()]} | not_found.
 extract_session(null, _Sessions) -> not_found;
