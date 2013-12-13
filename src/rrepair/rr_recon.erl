@@ -113,6 +113,7 @@
          stage              = req_shared_interval                    :: stage(),
          initiator          = false                                  :: boolean(),
          misc               = []                                     :: [{atom(), term()}], % any optional parameters an algorithm wants to keep
+         kv_list            = []                                     :: db_chunk(),
          stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats()
          }).
 -type state() :: #rr_recon_state{}.
@@ -358,7 +359,8 @@ build_struct(DBList, DestI, RestI,
              State = #rr_recon_state{method = RMethod, params = Params,
                                      struct = OldSyncStruct,
                                      initiator = Initiator, stats = Stats,
-                                     dhtNodePid = DhtNodePid, stage = Stage}) ->
+                                     dhtNodePid = DhtNodePid, stage = Stage,
+                                     kv_list = KVList}) ->
     ?ASSERT(not intervals:is_empty(DestI)),
     % bloom may fork more recon processes if un-synced elements remain
     BeginSync =
@@ -369,35 +371,29 @@ build_struct(DBList, DestI, RestI,
                     false ->
                         MySubSyncI = map_interval(RestI, DestI), % mapped to my range
                         Reconcile = Initiator andalso (Stage =:= reconciliation),
-                        if RMethod =:= bloom ->
-                               ForkState = State#rr_recon_state{dest_interval = SubSyncI,
-                                                                params = Params},
-                               {ok, Pid} = fork_recon(ForkState),
-                               send_chunk_req(DhtNodePid, Pid, MySubSyncI, SubSyncI,
-                                              get_max_items(), Reconcile),
-                               true;
-                           true ->
-                               send_chunk_req(DhtNodePid, self(), MySubSyncI, SubSyncI,
-                                              get_max_items(), Reconcile),
-                               false
-                        end;
+                        send_chunk_req(DhtNodePid, self(), MySubSyncI, SubSyncI,
+                                       get_max_items(), Reconcile),
+                        false;
                     true -> true
                 end;
             true -> true
         end,
-    ToBuild = if Initiator andalso RMethod =:= art -> merkle_tree;
-                 true -> RMethod
-              end,
-    {BuildTime, SyncStruct} =
-        util:tc(fun() -> build_recon_struct(ToBuild, OldSyncStruct, DestI,
-                                            DBList, Params, BeginSync)
-                end),
-    Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
-    NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1},
+    NewKVList = lists:append(KVList, DBList),
     if BeginSync ->
+           ToBuild = if Initiator andalso RMethod =:= art -> merkle_tree;
+                        true -> RMethod
+                     end,
+           {BuildTime, SyncStruct} =
+               util:tc(fun() -> build_recon_struct(ToBuild, OldSyncStruct, DestI,
+                                                   NewKVList, Params, BeginSync)
+                       end),
+           Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
+           NewState = State#rr_recon_state{struct = SyncStruct, stats = Stats1,
+                                           kv_list = []},
            begin_sync(SyncStruct, Params, NewState#rr_recon_state{stage = reconciliation});
        true ->
-           NewState % keep stage (at initiator: reconciliation, at other: build_struct)
+           % keep stage (at initiator: reconciliation, at other: build_struct)
+           State#rr_recon_state{kv_list = NewKVList}
     end.
 
 -spec begin_sync(MySyncStruct::sync_struct(), OtherSyncStruct::parameters(),
@@ -1062,26 +1058,11 @@ start(SessionId, SenderRRPid) ->
                              [{pid_groups_join_as, pid_groups:my_groupname(),
                                {short_lived, PidName}}]).
 
--spec fork_recon(state()) -> {ok, pid()}.
-fork_recon(Conf) ->
-    NStats = rr_recon_stats:set([{session_id, null}], Conf#rr_recon_state.stats),
-    State = Conf#rr_recon_state{ stats = NStats },
-    send_local(Conf#rr_recon_state.ownerPid, {recon_forked}),
-    PidName = lists:flatten(io_lib:format("~s_~p.~s", [?MODULE, null, randoms:getRandomString()])),
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, State,
-                             [{pid_groups_join_as, pid_groups:my_groupname(),
-                               {short_lived, PidName}}]).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config parameter handling
 %
 % rr_recon_p1e              - probability of a single false positive,
 %                             i.e. false positive absolute count
-% rr_max_items              - max. number of items to retrieve from the
-%                             dht_node at once
-%                             if syncing with bloom filters and node data count
-%                             exceeds rr_max_items, new rr_recon processes will
-%                             be spawned (each creating a new bloom filter)
 % rr_art_inner_fpr          - 
 % rr_art_leaf_fpr           -  
 % rr_art_correction_factor  - 
@@ -1102,10 +1083,6 @@ check_config() ->
     config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso
         config:cfg_is_float(rr_recon_p1e) andalso
         config:cfg_is_greater_than(rr_recon_p1e, 0) andalso
-        ?IIF(config:read(rr_max_items) =:= all,
-             true,
-             config:cfg_is_integer(rr_max_items) andalso
-                 config:cfg_is_greater_than(rr_max_items, 0)) andalso
         config:cfg_is_integer(rr_merkle_branch_factor) andalso
         config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
         config:cfg_is_integer(rr_merkle_bucket_size) andalso
@@ -1119,9 +1096,14 @@ check_config() ->
 get_p1e() ->
     config:read(rr_recon_p1e).
 
+%% @doc Sepcifies how many items to retrieve from the DB at once. 
+%%      Tries to reduce the load of a single request in the dht_node process.
 -spec get_max_items() -> pos_integer() | all.
 get_max_items() ->
-    config:read(rr_max_items).
+    case config:read(rr_max_items) of
+        failed -> 100000;
+        CfgX   -> CfgX
+    end.
 
 %% @doc Merkle number of childs per inner node.
 -spec get_merkle_branch_factor() -> pos_integer().

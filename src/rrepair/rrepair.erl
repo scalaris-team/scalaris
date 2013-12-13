@@ -120,7 +120,6 @@
 	{start_recon | continue_recon, SenderRRPid::comm:mypid(), session_id() | null, ReqMsg::rr_recon:request()} |
     {request_resolve | continue_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
     {continue_resolve, rr_resolve:operation(), rr_resolve:options()} |
-    {recon_forked} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     % rr statistics
@@ -265,10 +264,6 @@ on({continue_resolve, SessionID, Operation, Options}, State) ->
     {ok, Pid} = rr_resolve:start(),
     comm:send_local(Pid, {start, Operation, [{session_id, SessionID} | Options]}),
     State;
-
-on({recon_forked}, State) ->
-    ?TRACE_RECON("RECON FORKED", []),
-    State#rrepair_state{ open_recon = State#rrepair_state.open_recon + 1 };
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
