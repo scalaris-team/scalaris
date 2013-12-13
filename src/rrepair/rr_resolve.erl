@@ -127,7 +127,7 @@ on({start, Operation, Options}, State) ->
                                        send_stats = StatsDest,
                                        from_my_node = FromMyNode },
     ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p - FeedbackResponse=~p~n SessionId:~p",
-           [element(1, Operation), FBDest, FBResp, SID], NewState),
+           [util:extint2atom(element(1, Operation)), FBDest, FBResp, SID], NewState),
     comm:send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
     NewState;
 
@@ -224,7 +224,8 @@ on({get_state_response, MyI}, State =
                        end, AccJ, OpSIs)
              end, intervals:empty(), rr_recon:quadrant_intervals()),
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n IntervalBounds=~p~n MyInterval=~p~n IntersecBounds=~p",
-           [element(1, Op), _Stats#resolve_stats.session_id, intervals:get_bounds(element(2, Op)),
+           [util:extint2atom(element(1, Op)), _Stats#resolve_stats.session_id,
+            intervals:get_bounds(element(2, Op)),
             MyI, intervals:get_bounds(ISec)], State),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
@@ -328,7 +329,8 @@ on({update_key_entry_ack, NewEntryList}, State =
   when element(1, Op) =:= ?key_upd;
        element(1, Op) =:= ?interval_upd ->
     ?TRACE("GET ENTRY_ACK - Operation=~p~n SessionId:~p - #NewItems: ~p",
-           [element(1, Op), Stats#resolve_stats.session_id, length(NewEntryList)], State),
+           [util:extint2atom(element(1, Op)), Stats#resolve_stats.session_id,
+            length(NewEntryList)], State),
     
     {NewUpdOk, NewUpdFail, NewRegenOk, NewRegenFail, NewFBItems} =
         integrate_update_key_entry_ack(
@@ -425,7 +427,7 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
                                     from_my_node = FromMyNode} = _State,
          KUDest, KUItems, KUOptions0) ->
     ?TRACE("SHUTDOWN ~p - Operation=~p~n SessionId:~p~n ~p items via key_upd to ~p~n Items: ~.2p",
-           [_Reason, element(1, _Op), Stats#resolve_stats.session_id,
+           [_Reason, util:extint2atom(element(1, _Op)), Stats#resolve_stats.session_id,
             length(KUItems), KUDest, KUItems], _State),
     case KUDest of
         undefined -> ok;
