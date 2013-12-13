@@ -446,7 +446,9 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
     send_stats(SendStats, Stats),
     if FromMyNode =:= 1 ->
            comm:send_local(Owner, {resolve_progress_report, self(), Stats});
-       true -> ok
+       true ->
+           comm:send_local(Owner, {resolve_progress_report, self(),
+                                   Stats#resolve_stats{session_id = null}})
     end,
     kill.
 
