@@ -710,7 +710,7 @@ resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
                    % regenerate it from the other node
                    % -> send him this request directly!
                    send(Dest, {request_resolve, SID, {?interval_upd, Interval, []},
-                               [{from_my_node, 0}, {session_id, SID} | Options]}),
+                               [{from_my_node, 0} | Options]}),
                    1
             end
     end.
