@@ -420,6 +420,7 @@ update_session_recon(Session, New) ->
                               rs_called = rr_recon_stats:get(resolve_started, New) }
     end.
 
+%% @doc Increases the rs_finish field and merges the new stats.
 -spec update_session_resolve(session(), rr_resolve:stats()) -> session().
 update_session_resolve(#session{ rs_stats = none, rs_finish = RSCount } = S, Stats) ->
     S#session{ rs_stats = Stats, rs_finish = RSCount + 1 };
@@ -427,8 +428,9 @@ update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount } = S, New)
     Merge = rr_resolve:merge_stats(Old, New),
     S#session{ rs_stats = Merge, rs_finish = RSCount + 1 }.
 
-%% @doc Checks if the session is complete and in this case, informs the
-%%      principal and returns 'true'. Otherwise 'false'.
+%% @doc Checks if the session is complete (rs_called =:= rs_finish, stats
+%%      available) and in this case informs the principal and returns 'true'.
+%%      Otherwise 'false'.
 -spec check_session_complete(session()) -> boolean().
 check_session_complete(#session{rc_stats = RCStats, principal = PrincipalPid,
                                 rs_called = C, rs_finish = C} = S)
