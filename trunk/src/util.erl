@@ -157,11 +157,8 @@ max(?PLUS_INFINITY, _) -> ?PLUS_INFINITY;
 max(_, ?PLUS_INFINITY) -> ?PLUS_INFINITY;
 max(?MINUS_INFINITY, X) -> X;
 max(X, ?MINUS_INFINITY) -> X;
-max(A, B) ->
-    case A > B of
-        true -> A;
-        false -> B
-    end.
+max(A, B) when A > B -> A;
+max(_A, B) -> B.
 
 %% @doc Variant of erlang:min/2 also taking ?PLUS_INFINITY_TYPE and
 %%      ?MINUS_INFINITY_TYPE into account, e.g. for comparing keys.
@@ -174,11 +171,8 @@ min(?MINUS_INFINITY, _) -> ?MINUS_INFINITY;
 min(_, ?MINUS_INFINITY) -> ?MINUS_INFINITY;
 min(?PLUS_INFINITY, X) -> X;
 min(X, ?PLUS_INFINITY) -> X;
-min(A, B) ->
-    case A < B of
-        true -> A;
-        false -> B
-    end.
+min(A, B) when A < B -> A;
+min(_A, B) -> B.
 
 -spec pow(integer(), non_neg_integer()) -> integer();
          (float(), non_neg_integer()) -> number().
@@ -190,15 +184,12 @@ pow(X, 2) ->
     X * X;
 pow(X, 3) ->
     X * X * X;
+pow(X, Y) when (Y rem 2) =:= 0 ->
+    Half = pow(X, Y div 2),
+    Half * Half;
 pow(X, Y) ->
-    case Y rem 2 of
-        0 ->
-            Half = pow(X, Y div 2),
-            Half * Half;
-        1 ->
-            Half = pow(X, Y div 2),
-            Half * Half * X
-    end.
+    Half = pow(X, Y div 2),
+    Half * Half * X.
 
 %% @doc Logarithm of X to the base of Base.
 -spec log(X::number(), Base::number()) -> float().
@@ -574,20 +565,20 @@ gb_trees_largest_smaller_than(MyKey, {_Size, InnerTree}) ->
     gb_trees_largest_smaller_than_iter(MyKey, InnerTree, true).
 
 -spec gb_trees_largest_smaller_than_iter(Key, {Key, Value, Smaller::term(), Bigger::term()}, RightTree::boolean()) -> {value, Key, Value} | nil.
-gb_trees_largest_smaller_than_iter(SearchKey, {Key, Value, Smaller, Bigger}, RightTree) ->
-    case Key < SearchKey of
-        true when RightTree andalso Bigger =:= nil ->
-            % we reached the right end of the whole tree
-            % -> there is no larger item than the current item
-            {value, Key, Value};
-        true ->
-            case gb_trees_largest_smaller_than_iter(SearchKey, Bigger, RightTree) of
-                {value, _, _} = AValue -> AValue;
-                nil -> {value, Key, Value}
-            end;
-        _ ->
-            gb_trees_largest_smaller_than_iter(SearchKey, Smaller, false)
+gb_trees_largest_smaller_than_iter(SearchKey, {Key, Value, _Smaller, nil},
+                                   true) when Key < SearchKey ->
+    % we reached the right end of the whole tree
+    % -> there is no larger item than the current item
+    {value, Key, Value};
+gb_trees_largest_smaller_than_iter(SearchKey, {Key, Value, _Smaller, Bigger},
+                                   RightTree) when Key < SearchKey ->
+    case gb_trees_largest_smaller_than_iter(SearchKey, Bigger, RightTree) of
+        {value, _, _} = AValue -> AValue;
+        nil -> {value, Key, Value}
     end;
+gb_trees_largest_smaller_than_iter(SearchKey, {_Key, _Value, Smaller, _Bigger},
+                                   _RightTree) ->
+  gb_trees_largest_smaller_than_iter(SearchKey, Smaller, false);
 gb_trees_largest_smaller_than_iter(_SearchKey, nil, _RightTree) ->
     nil.
 
