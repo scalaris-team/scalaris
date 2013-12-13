@@ -234,9 +234,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
     Diff = case bloom:item_count(BF) of
-               0 -> [KeyX || {KeyX, _VersionX} <- DBList0];
-               _ -> [KeyX || {KeyX, _VersionX} = X <- DBList0,
-                             not bloom:is_element(BF, X)]
+               0 -> DBList0;
+               _ -> [X || X <- DBList0, not bloom:is_element(BF, X)]
            end,
     %if rest interval is non empty start another sync
     SID = rr_recon_stats:get(session_id, Stats),
@@ -249,9 +248,10 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     NewStats =
         case Diff of
             [_|_] ->
-                send_local(OwnerL, {request_resolve, SID, {key_upd_send, DestRU_Pid, Diff},
-                                    [{feedback_request, comm:make_global(OwnerL)},
-                                     {from_my_node, 1}]}),
+                send(DestRU_Pid, {request_resolve, SID,
+                                  {?key_upd2, Diff, comm:make_global(OwnerL)},
+                                    [{from_my_node, 0}]}),
+                % we will get one reply from a subsequent ?key_upd resolve
                 rr_recon_stats:inc([{resolve_started, 1}], Stats);
             [] -> Stats
         end,

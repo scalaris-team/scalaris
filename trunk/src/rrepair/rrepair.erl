@@ -337,7 +337,7 @@ on({resolve_progress_report, _Sender, Stats},
     NewRS = rr_resolve:get_stats_resolve_started(Stats),
     ?TRACE_RESOLVE("~nRESOLVE OK - Sender=~p ~nStats=~p~nOpenRecon=~p ; OpenResolve=~p~nOldSessions=~p~nNewSessions=~p",
                    [_Sender, rr_resolve:print_resolve_stats(Stats),
-                    State#rrepair_state.open_recon, OR - 1, OS, NSessions]),
+                    State#rrepair_state.open_recon, OR - 1 + NewRS, OS, NSessions]),
     State#rrepair_state{open_resolve = OR - 1 + NewRS,
                         open_sessions = NSessions};
 
