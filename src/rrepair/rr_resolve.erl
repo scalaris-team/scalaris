@@ -457,7 +457,7 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
 % resolve stats operations
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_stats_session_id(stats()) -> rrepair:session_id().
+-spec get_stats_session_id(stats()) -> rrepair:session_id() | null.
 get_stats_session_id(Stats) -> Stats#resolve_stats.session_id.
 
 -spec get_stats_feedback(stats()) -> boolean().
