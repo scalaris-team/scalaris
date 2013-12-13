@@ -112,7 +112,7 @@
     {request_sync, Method::rr_recon:method(), DestKey::random | ?RT:key()} |
     {request_sync, Method::rr_recon:method(), DestKey::random | ?RT:key(), Principal::principal_id()} |
     {request_resolve, rr_resolve:operation(), rr_resolve:options()} |
-    {get_state, Sender::comm:mypid(), Key::state_field()} |
+    {get_state, Sender::comm:mypid(), Keys::state_field() | [state_field(),...]} |
     % internal
     {?TRIGGER_NAME} |
     {?GC_TRIGGER} |
@@ -151,15 +151,19 @@ on({request_resolve, Operation, Options}, State = #rrepair_state{open_resolve = 
 
 % request replica repair status
 on({get_state, Sender, Key}, State =
-       #rrepair_state{ open_recon = Recon,
-                       open_resolve = Resolve,
-                       round = Round,
-                       open_sessions = Sessions }) ->
-    Value = case Key of
-                open_recon -> Recon;
-                open_resolve -> Resolve;
-                round -> Round;
-                open_sessions -> Sessions
+       #rrepair_state{ open_recon = Recon, open_resolve = Resolve,
+                       round = Round, open_sessions = Sessions }) ->
+    Keys = if is_list(Key) -> Key;
+              is_atom(Key) -> [Key]
+           end,
+    Values0 = [case KeyX of
+                   open_recon -> Recon;
+                   open_resolve -> Resolve;
+                   round -> Round;
+                   open_sessions -> Sessions
+               end || KeyX <- Keys],
+    Value = if is_list(Key) -> Values0;
+               is_atom(Key) -> hd(Values0)
             end,
     comm:send(Sender, {get_state_response, Value}),
     State;
