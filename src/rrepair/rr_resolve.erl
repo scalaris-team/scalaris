@@ -216,7 +216,9 @@ on({get_chunk_response, {_RestI, KvvList}}, State =
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
            [key_upd2, SID, length(KvvList)], State),
     
-    {FBItems, ReqItems} = get_diff(KvvList, MyIOtherKvTree, [], []),
+    {FBItems, ReqItems0, MyIOtherKvTree1} =
+        get_diff(KvvList, MyIOtherKvTree, [], []),
+    ReqItems = lists:append(gb_trees:keys(MyIOtherKvTree1), ReqItems0),
     FBDest = comm:make_global(pid_groups:get_my(rrepair)),
     ResStarted = send_request_resolve(Dest, {?key_upd, FBItems, ReqItems}, SID,
                                       FromMyNode, FBDest, [], false),
@@ -472,22 +474,22 @@ integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
              Rest, UpdOk, UpdFail, RegenOk, RegenFail + 1, NewFBItems, OtherKvTree, FBOn)
     end.
 
--spec get_diff(MyEntries::rr_recon:db_chunk_kvv(), OtherKvTree::gb_tree(),
+-spec get_diff(MyEntries::rr_recon:db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
                AccFBItems::kvv_list(), AccReqItems::[?RT:key()])
-        -> {FBItems::kvv_list(), ReqItems::[?RT:key()]}.
-get_diff([], OtherKvTree, FBItems, ReqItems) ->
-    {FBItems, lists:append(gb_trees:keys(OtherKvTree), ReqItems)};
-get_diff([{Key, Version, Value} | Rest], OtherKvTree, FBItems, ReqItems) ->
-    case gb_trees:lookup(Key, OtherKvTree) of
+        -> {FBItems::kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+get_diff([], MyIOtherKvTree, FBItems, ReqItems) ->
+    {FBItems, ReqItems, MyIOtherKvTree};
+get_diff([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems) ->
+    case gb_trees:lookup(Key, MyIOtherKvTree) of
         none ->
-            get_diff(Rest, OtherKvTree, [{Key, Value, Version} | FBItems],
+            get_diff(Rest, MyIOtherKvTree, [{Key, Value, Version} | FBItems],
                      ReqItems);
         {value, OtherVersion} ->
             if Version > OtherVersion ->
-                   get_diff(Rest, gb_trees:delete(Key, OtherKvTree),
+                   get_diff(Rest, gb_trees:delete(Key, MyIOtherKvTree),
                             [{Key, Value, Version} | FBItems], ReqItems);
                true ->
-                   get_diff(Rest, gb_trees:delete(Key, OtherKvTree),
+                   get_diff(Rest, gb_trees:delete(Key, MyIOtherKvTree),
                             FBItems, [Key | ReqItems])
             end
     end.
