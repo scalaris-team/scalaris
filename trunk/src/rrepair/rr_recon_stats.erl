@@ -46,6 +46,7 @@
          build_time         = 0      :: non_neg_integer(),      %in us
          recon_time         = 0      :: non_neg_integer(),      %in us
          resolve_started    = 0      :: non_neg_integer(),      %number of resolve requests send
+         await_rs_fb        = 0      :: non_neg_integer(),      %awaiting feedback response from a RS process not initiated by rr_resolve 
          status             = wait   :: status()
          }).
 -type stats() :: #rr_recon_stats{}.
@@ -59,7 +60,8 @@
                {error_count, non_neg_integer()} |
                {build_time, non_neg_integer()} |
                {recon_time, non_neg_integer()} |
-               {resolve_started, non_neg_integer()}].
+               {resolve_started, non_neg_integer()} |
+               {await_rs_fb, non_neg_integer()}].
 
 -type field_list2()  ::
           [{session_id, rrepair:session_id() | null} |
@@ -111,7 +113,10 @@ inc([{K, V} | L], Stats) ->
                  Stats#rr_recon_stats{recon_time = X};
              resolve_started ->
                  X = V + Stats#rr_recon_stats.resolve_started,
-                 Stats#rr_recon_stats{resolve_started = X}
+                 Stats#rr_recon_stats{resolve_started = X};
+             await_rs_fb ->
+                 X = V + Stats#rr_recon_stats.await_rs_fb,
+                 Stats#rr_recon_stats{await_rs_fb = X}
          end,
     inc(L, NS).
 
@@ -131,6 +136,7 @@ set([{K, V} | L], Stats) ->
              build_time          -> Stats#rr_recon_stats{build_time = V};
              recon_time          -> Stats#rr_recon_stats{recon_time = V};
              resolve_started     -> Stats#rr_recon_stats{resolve_started = V};
+             await_rs_fb         -> Stats#rr_recon_stats{await_rs_fb = V};
              status              -> Stats#rr_recon_stats{status = V}
          end,
     set(L, NS).
@@ -145,6 +151,7 @@ set([{K, V} | L], Stats) ->
          (build_time, stats())         -> non_neg_integer();
          (recon_time, stats())         -> non_neg_integer();
          (resolve_started, stats())    -> non_neg_integer();
+         (await_rs_fb, stats())        -> non_neg_integer();
          (status, stats())             -> status().
 get(session_id         , #rr_recon_stats{session_id          = X}) -> X;
 get(tree_size          , #rr_recon_stats{tree_size           = X}) -> X;
@@ -156,6 +163,7 @@ get(error_count        , #rr_recon_stats{error_count         = X}) -> X;
 get(build_time         , #rr_recon_stats{build_time          = X}) -> X;
 get(recon_time         , #rr_recon_stats{recon_time          = X}) -> X;
 get(resolve_started    , #rr_recon_stats{resolve_started     = X}) -> X;
+get(await_rs_fb        , #rr_recon_stats{await_rs_fb         = X}) -> X;
 get(status             , #rr_recon_stats{status              = X}) -> X.
 
 -spec merge(stats(), stats()) -> stats().
@@ -167,7 +175,8 @@ merge(A, #rr_recon_stats{ tree_size = TS,
                           error_count = EC,
                           build_time = BT,
                           recon_time = RC,
-                          resolve_started = RS }) ->
+                          resolve_started = RS,
+                          await_rs_fb = RsFb }) ->
     inc([{tree_size, TS},
          {tree_compareLeft, TCL},
          {tree_nodesCompared, TNC},
@@ -176,7 +185,8 @@ merge(A, #rr_recon_stats{ tree_size = TS,
          {error_count, EC},
          {build_time, BT},
          {recon_time, RC},
-         {resolve_started, RS}], A).
+         {resolve_started, RS},
+         {await_rs_fb, RsFb}], A).
 
 -spec print(stats()) -> [any()].
 print(Stats) ->

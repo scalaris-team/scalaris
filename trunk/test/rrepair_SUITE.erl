@@ -66,12 +66,15 @@ all() ->
 
 groups() ->
     [{basic,  [parallel], basic_tests()},
-     {repair, [sequence], [{upd_bloom,    [sequence], repair_default()}, %{repeat_until_any_fail, 1000}
+     {repair, [sequence], [{upd_trivial,  [sequence], repair_default()},
+                           {upd_bloom,    [sequence], repair_default()}, %{repeat_until_any_fail, 1000}
                            {upd_merkle,   [sequence], repair_default()},
                            {upd_art,      [sequence], repair_default()},
+                           {regen_trivial,[sequence], repair_default() ++ regen_special()},
                            {regen_bloom,  [sequence], repair_default() ++ regen_special()},
                            {regen_merkle, [sequence], repair_default() ++ regen_special()},
                            {regen_art,    [sequence], repair_default() ++ regen_special()},
+                           {mixed_trivial,[sequence], repair_default()},
                            {mixed_bloom,  [sequence], repair_default()},
                            {mixed_merkle, [sequence], repair_default()},
                            {mixed_art,    [sequence], repair_default()}
@@ -114,12 +117,15 @@ end_per_suite(Config) ->
 init_per_group(Group, Config) ->
     ct:comment(io_lib:format("BEGIN ~p", [Group])),
     case Group of
+        upd_trivial -> [{ru_method, trivial}, {ftype, update}];
         upd_bloom -> [{ru_method, bloom}, {ftype, update}];
         upd_merkle -> [{ru_method, merkle_tree}, {ftype, update}];
         upd_art -> [{ru_method, art}, {ftype, update}];
+        regen_trivial -> [{ru_method, trivial}, {ftype, regen}];
         regen_bloom -> [{ru_method, bloom}, {ftype, regen}];
         regen_merkle -> [{ru_method, merkle_tree}, {ftype, regen}];
         regen_art -> [{ru_method, art}, {ftype, regen}];
+        mixed_trivial -> [{ru_method, trivial}, {ftype, mixed}];
         mixed_bloom -> [{ru_method, bloom}, {ftype, mixed}];
         mixed_merkle -> [{ru_method, merkle_tree}, {ftype, mixed}];
         mixed_art -> [{ru_method, art}, {ftype, mixed}];
