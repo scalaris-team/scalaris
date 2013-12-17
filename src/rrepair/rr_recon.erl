@@ -567,6 +567,8 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 -spec calc_signature_size_1_to_n(N::non_neg_integer(), P1E::float(),
                                  MaxSize::signature_size())
         -> SigSize::signature_size().
+calc_signature_size_1_to_n(0, P1E, _MaxSize) when P1E > 0 ->
+    1;
 calc_signature_size_1_to_n(N, P1E, MaxSize) when P1E > 0 ->
     erlang:min(MaxSize, erlang:max(1, util:ceil(util:log2(N / P1E)))).
 
