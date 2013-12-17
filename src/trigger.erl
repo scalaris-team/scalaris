@@ -37,7 +37,10 @@
 
 -include("scalaris.hrl").
 
--export([init/2, init/3, init/4, init/5, now/1, next/2, next/1, stop/1]).
+-export([init/2, init/3, init/4, init/5,
+         now/1, now/2,
+         next/1, next/2, next/3,
+         stop/1]).
 
 -ifdef(with_export_type_support).
 -export_type([interval/0, interval_time/0, state/0]).
@@ -77,25 +80,37 @@ init(Trigger, BaseInterval, MinInterval, MaxInterval, MsgTag)
            is_integer(MaxInterval) ->
     {Trigger, Trigger:init(BaseInterval, MinInterval, MaxInterval, MsgTag)}.
 
-%% @doc Sets the trigger to send its message immediately, for example after
-%%      its initialization. Any previous trigger will be canceled!
+%% @doc Sets the trigger to send its message immediately to self(), for example
+%%      after its initialization. Any previous trigger will be canceled!
 -spec now(state()) -> state().
-now({Trigger, TriggerState}) ->
-    ?ASSERT(erlang:get(trace_mpath) =:= undefined),
-    {Trigger, Trigger:now(TriggerState)}.
+now(State) ->
+    now(State, self()).
 
-%% @doc Sets the trigger to send its message after BaseInterval
+%% @doc Sets the trigger to send its message immediately to the given Pid, for
+%%      example after its initialization. Any previous trigger will be canceled!
+-spec now(state(), ReplyTo::comm:erl_local_pid()) -> state().
+now({Trigger, TriggerState}, ReplyTo) ->
+    ?ASSERT(erlang:get(trace_mpath) =:= undefined),
+    {Trigger, Trigger:now(TriggerState, ReplyTo)}.
+
+%% @doc Sets the trigger to send its message to self() after BaseInterval
 %%      milliseconds. Any previous trigger will be canceled!
 -spec next(state()) -> state().
 next(State) ->
     next(State, base_interval).
 
-%% @doc Sets the trigger to send its message after the given interval's number
-%%      of milliseconds. Any previous trigger will be canceled!
+%% @doc Sets the trigger to send its message to self() after the given
+%%      interval's number of milliseconds. Any previous trigger will be canceled!
 -spec next(state(), IntervalTag::interval()) -> state().
-next({Trigger, TriggerState}, IntervalTag) ->
+next(State, IntervalTag) ->
+    next(State, IntervalTag, self()).
+
+%% @doc Sets the trigger to send its message to the given Pid after the given
+%%      interval's number of milliseconds. Any previous trigger will be canceled!
+-spec next(state(), IntervalTag::interval(), ReplyTo::comm:erl_local_pid()) -> state().
+next({Trigger, TriggerState}, IntervalTag, ReplyTo) ->
     ?ASSERT(erlang:get(trace_mpath) =:= undefined),
-    {Trigger, Trigger:next(TriggerState, IntervalTag)}.
+    {Trigger, Trigger:next(TriggerState, IntervalTag, ReplyTo)}.
 
 %% @doc Stops the trigger until next or now are called again.
 -spec stop(state()) -> state().

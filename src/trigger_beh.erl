@@ -29,8 +29,8 @@
 
 -callback init(BaseInterval::trigger:interval_time(), MinInterval::trigger:interval_time(),
                MaxInterval::trigger:interval_time(), comm:msg_tag()) -> state().
--callback now(state()) -> state().
--callback next(state(), IntervalTag::trigger:interval()) -> state().
+-callback now(state(), ReplyTo::comm:erl_local_pid()) -> state().
+-callback next(state(), IntervalTag::trigger:interval(), ReplyTo::comm:erl_local_pid()) -> state().
 -callback stop(state()) -> state().
 
 -else.
@@ -38,8 +38,8 @@
 behaviour_info(callbacks) ->
     [
      {init, 4},
-     {now, 1},
-     {next, 2},
+     {now, 2},
+     {next, 3},
      {stop, 1}
     ];
 behaviour_info(_Other) ->

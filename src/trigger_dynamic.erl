@@ -33,7 +33,7 @@
 
 -include("scalaris.hrl").
 
--export([init/4, now/1, next/2, stop/1]).
+-export([init/4, now/2, next/3, stop/1]).
 
 -type state() :: {BaseInterval::trigger:interval_time(),
                   MinInterval::trigger:interval_time(),
@@ -49,45 +49,45 @@ init(BaseInterval, MinInterval, MaxInterval, MsgTag) when is_integer(BaseInterva
 
 %% @doc Sets the trigger to send its message immediately, for example after
 %%      its initialization. Any previous trigger will be canceled!
--spec now(state()) -> state().
-now({BaseInterval, MinInterval, MaxInterval, MsgTag, ok}) ->
-    TimerRef = comm:send_local(self(), {MsgTag}),
+-spec now(state(), ReplyTo::comm:erl_local_pid()) -> state().
+now({BaseInterval, MinInterval, MaxInterval, MsgTag, ok}, ReplyTo) ->
+    TimerRef = comm:send_local(ReplyTo, {MsgTag}),
     {BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef};
-now({BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef}) ->
+now({BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef}, ReplyTo) ->
     % timer still running
     _ = erlang:cancel_timer(TimerRef),
-    NewTimerRef = comm:send_local(self(), {MsgTag}),
+    NewTimerRef = comm:send_local(ReplyTo, {MsgTag}),
     {BaseInterval, MinInterval, MaxInterval, MsgTag, NewTimerRef}.
 
 %% @doc Sets the trigger to send its message after some delay. The given
 %%      IntervalTag will determine which of the three interval functions will
 %%      be evaluated in order to get the number of milliseconds of this delay.
 %%      Any previous trigger will be canceled!
--spec next(state(), IntervalTag::trigger:interval()) -> state().
-next({BaseInterval, MinInterval, MaxInterval, MsgTag, ok}, IntervalTag) ->
-    NewTimerRef = send_message(IntervalTag, BaseInterval, MinInterval, MaxInterval, MsgTag),
+-spec next(state(), IntervalTag::trigger:interval(), ReplyTo::comm:erl_local_pid()) -> state().
+next({BaseInterval, MinInterval, MaxInterval, MsgTag, ok}, IntervalTag, ReplyTo) ->
+    NewTimerRef = send_message(IntervalTag, BaseInterval, MinInterval, MaxInterval, MsgTag, ReplyTo),
     {BaseInterval, MinInterval, MaxInterval, MsgTag, NewTimerRef};
-next({BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef}, IntervalTag) ->
+next({BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef}, IntervalTag, ReplyTo) ->
     % timer still running?
     _ = erlang:cancel_timer(TimerRef),
-    NewTimerRef = send_message(IntervalTag, BaseInterval, MinInterval, MaxInterval, MsgTag),
+    NewTimerRef = send_message(IntervalTag, BaseInterval, MinInterval, MaxInterval, MsgTag, ReplyTo),
     {BaseInterval, MinInterval, MaxInterval, MsgTag, NewTimerRef}.
 
 -spec send_message(IntervalTag::trigger:interval(),
                    BaseInterval::trigger:interval_time(),
                    MinInterval::trigger:interval_time(),
                    MaxInterval::trigger:interval_time(),
-                   MsgTag::comm:msg_tag()) -> reference().
-send_message(IntervalTag, BaseInterval, MinInterval, MaxInterval, MsgTag) ->
+                   MsgTag::comm:msg_tag(), ReplyTo::comm:erl_local_pid()) -> reference().
+send_message(IntervalTag, BaseInterval, MinInterval, MaxInterval, MsgTag, ReplyTo) ->
     case IntervalTag of
         max_interval ->
-            comm:send_local_after(MaxInterval, self(), {MsgTag});
+            comm:send_local_after(MaxInterval, ReplyTo, {MsgTag});
         base_interval ->
-            comm:send_local_after(BaseInterval, self(), {MsgTag});
+            comm:send_local_after(BaseInterval, ReplyTo, {MsgTag});
         min_interval ->
-            comm:send_local_after(MinInterval, self(), {MsgTag});
+            comm:send_local_after(MinInterval, ReplyTo, {MsgTag});
         _ ->
-            comm:send_local_after(BaseInterval, self(), {MsgTag})
+            comm:send_local_after(BaseInterval, ReplyTo, {MsgTag})
      end.
 
 %% @doc Stops the trigger until next or now are called again.
