@@ -66,7 +66,8 @@
                           sync_finished |       %finish recon on local node
                           sync_finished_remote. %client-side shutdown by merkle-tree recon initiator
 
--type db_chunk()       :: [{?RT:key(), db_dht:version()}].
+-type db_chunk_kv()    :: [{?RT:key(), db_dht:version()}].
+-type db_chunk_kvv()   :: [{?RT:key(), db_dht:version(), db_dht:value()}].
 
 -type signature_size() :: 1..160. % upper bound of 160 (SHA-1) to also limit testing
 
@@ -113,7 +114,7 @@
          stage              = req_shared_interval                    :: stage(),
          initiator          = false                                  :: boolean(),
          misc               = []                                     :: [{atom(), term()}], % any optional parameters an algorithm wants to keep
-         kv_list            = []                                     :: db_chunk(),
+         kv_list            = []                                     :: db_chunk_kv(),
          stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats()
          }).
 -type state() :: #rr_recon_state{}.
@@ -147,8 +148,8 @@
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
     {create_struct2, DestI::intervals:interval(),
-     {get_chunk_response, {intervals:interval(), db_chunk()}}} |
-    {reconcile, {get_chunk_response, {intervals:interval(), db_chunk()}}} |
+     {get_chunk_response, {intervals:interval(), db_chunk_kv()}}} |
+    {reconcile, {get_chunk_response, {intervals:interval(), db_chunk_kv()}}} |
     % internal
     {shutdown, exit_reason()} |
     {crash, DeadPid::comm:mypid()} |
@@ -353,7 +354,7 @@ on({?check_nodes_response, Flags, HashKeys, OtherMaxLeafCount}, State =
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_struct(DBList::db_chunk(), DestI::intervals:non_empty_interval(),
+-spec build_struct(DBList::db_chunk_kv(), DestI::intervals:non_empty_interval(),
                    RestI::intervals:interval(), state()) -> state() | kill.
 build_struct(DBList, DestI, RestI,
              State = #rr_recon_state{method = RMethod, params = Params,
@@ -399,9 +400,9 @@ build_struct(DBList, DestI, RestI,
            State#rr_recon_state{kv_list = NewKVList}
     end.
 
--spec begin_sync(MySyncStruct::sync_struct(), OtherSyncStruct::parameters(),
+-spec begin_sync(MySyncStruct::sync_struct(), OtherSyncStruct::parameters() | {},
                  state()) -> state() | kill.
-begin_sync(MySyncStruct, _OtherSyncStruct,
+begin_sync(MySyncStruct, _OtherSyncStruct = {},
            State = #rr_recon_state{method = bloom, initiator = false,
                                    ownerPid = OwnerL, stats = Stats,
                                    dest_rr_pid = DestRRPid}) ->
@@ -769,7 +770,7 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
-                         DestI::intervals:non_empty_interval(), db_chunk(),
+                         DestI::intervals:non_empty_interval(), db_chunk_kv(),
                          Params::parameters() | {}, BeginSync::boolean())
         -> sync_struct().
 build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
@@ -866,17 +867,19 @@ send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, reconcile) ->
     SrcPidReply = comm:reply_as(SrcPid, 2, {reconcile, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
-                fun get_chunk_value/1, MaxItems});
+                fun get_chunk_kv/1, MaxItems});
 send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems, create_struct) ->
     SrcPidReply = comm:reply_as(SrcPid, 3, {create_struct2, DestI, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
-                fun get_chunk_value/1, MaxItems}).
+                fun get_chunk_kv/1, MaxItems}).
 
 -spec get_chunk_filter(db_entry:entry()) -> boolean().
 get_chunk_filter(DBEntry) -> db_entry:get_version(DBEntry) =/= -1.
--spec get_chunk_value(db_entry:entry()) -> {?RT:key(), db_dht:version() | -1}.
-get_chunk_value(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBEntry)}.
+-spec get_chunk_kv(db_entry:entry()) -> {?RT:key(), db_dht:version() | -1}.
+get_chunk_kv(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBEntry)}.
+-spec get_chunk_kvv(db_entry:entry()) -> {?RT:key(), db_dht:version() | -1, db_dht:value()}.
+get_chunk_kvv(DBEntry) -> {db_entry:get_key(DBEntry), db_entry:get_version(DBEntry), db_entry:get_value(DBEntry)}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
