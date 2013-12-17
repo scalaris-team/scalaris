@@ -414,7 +414,9 @@ on({?check_nodes_response, Flags, HashKeys, OtherMaxLeafCount}, State =
             NextSigSize = SigSize,
             ok;
         {[_|_] = Req0, ToResolve, NStats0, RTree, MyMaxLeafCount} ->
-            NextSigSize = calc_signature_size(
+            % note: we want an accumulated probability of P1E and thus need to
+            %       divide by the number of requests!
+            NextSigSize = calc_signature_size_1_to_n(
                             erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
                             get_p1e() / length(Req0), 160),
 %%             log:pal("MyMLC: ~p~n    OtherMLC: ~p~n     SigSize: ~p",
@@ -562,9 +564,10 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 
 %% @doc Calculates the minimum number of bits needed to have a hash collision
 %%      probability of P1E, given we compare one hash with N other hashes.
--spec calc_signature_size(N::non_neg_integer(), P1E::float(), MaxSize::signature_size())
+-spec calc_signature_size_1_to_n(N::non_neg_integer(), P1E::float(),
+                                 MaxSize::signature_size())
         -> SigSize::signature_size().
-calc_signature_size(N, P1E, MaxSize) when P1E > 0 ->
+calc_signature_size_1_to_n(N, P1E, MaxSize) when P1E > 0 ->
     erlang:min(MaxSize, erlang:max(1, util:ceil(util:log2(N / P1E)))).
 
 %% @doc Transforms a list of merkle keys, i.e. hashes, into a compact binary
