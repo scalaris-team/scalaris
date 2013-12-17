@@ -28,6 +28,7 @@
 -export([init/1, on/2, start/2, check_config/0]).
 -export([map_key_to_interval/2, map_key_to_quadrant/2, map_interval/2,
          quadrant_intervals/0]).
+-export([get_chunk_kv/1, get_chunk_kvv/1, get_chunk_filter/1]).
 
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3]).
@@ -54,7 +55,8 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([method/0, request/0, merkle_cmp_result/0]).
+-export_type([method/0, request/0, merkle_cmp_result/0,
+              db_chunk_kv/0, db_chunk_kvv/0]).
 -endif.
 
 -type quadrant()       :: 1..4. % 1..rep_factor()
