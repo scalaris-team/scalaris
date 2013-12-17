@@ -98,6 +98,8 @@
     % API
     {start, operation(), options()} |
     % internal
+    {get_entries_response, db_dht:db_as_list()} |
+    {get_chunk_response, {intervals:interval(), rr_recon:db_chunk_kvv()}} |
     {get_state_response, intervals:interval()} |
     {update_key_entry_ack, [{db_entry:entry(), Exists::boolean(), Done::boolean()}]} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
@@ -189,7 +191,9 @@ on({get_state_response, MyI}, State =
     
     % get local entries for comparison
     RepKeyInt = intervals:from_elements([KeyX || {KeyX, _VerX} <- MyIKvList]),
-    comm:send_local(DhtPid, {get_entries, self(), RepKeyInt}),
+    comm:send_local(DhtPid,
+               {get_chunk, self(), RepKeyInt, fun rr_recon:get_chunk_filter/1,
+                fun rr_recon:get_chunk_kvv/1, all}),
     
     % convert keys KvvList to a gb_tree for faster access checks
     MyIKvTree = lists:foldl(fun({KeyX, VersionX}, TreeX) ->
@@ -202,16 +206,17 @@ on({get_state_response, MyI}, State =
                            stats = Stats#resolve_stats{diff_size = gb_trees:size(MyIKvTree)},
                            feedbackKvv = {[], MyIKvTree}};
 
-on({get_entries_response, EntryList}, State =
+on({get_chunk_response, {_RestI, KvvList}}, State =
        #rr_resolve_state{ operation = {?key_upd2, [], Dest},
                           feedbackKvv = {[], MyIKvTree},
                           from_my_node = FromMyNode, stats = Stats}) ->
     ?ASSERT(State#rr_resolve_state.feedbackDestPid =:= undefined),
+    ?ASSERT(intervals:is_empty(_RestI)),
     SID = Stats#resolve_stats.session_id,
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
-           [key_upd2, SID, length(EntryList)], State),
+           [key_upd2, SID, length(KvvList)], State),
     
-    {FBItems, ReqItems} = get_diff(EntryList, MyIKvTree, [], []),
+    {FBItems, ReqItems} = get_diff(KvvList, MyIKvTree, [], []),
     FBDest = comm:make_global(pid_groups:get_my(rrepair)),
     ResStarted = send_request_resolve(Dest, {?key_upd, FBItems, ReqItems}, SID,
                                       FromMyNode, FBDest, [], false),
@@ -467,22 +472,20 @@ integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
              Rest, UpdOk, UpdFail, RegenOk, RegenFail + 1, NewFBItems, OtherKvTree, FBOn)
     end.
 
--spec get_diff(MyEntries::[db_entry:entry()], OtherKvTree::gb_tree(),
+-spec get_diff(MyEntries::rr_recon:db_chunk_kvv(), OtherKvTree::gb_tree(),
                AccFBItems::kvv_list(), AccReqItems::[?RT:key()])
         -> {FBItems::kvv_list(), ReqItems::[?RT:key()]}.
 get_diff([], OtherKvTree, FBItems, ReqItems) ->
     {FBItems, lists:append(gb_trees:keys(OtherKvTree), ReqItems)};
-get_diff([Entry | Rest], OtherKvTree, FBItems, ReqItems) ->
-    Key = db_entry:get_key(Entry),
+get_diff([{Key, Version, Value} | Rest], OtherKvTree, FBItems, ReqItems) ->
     case gb_trees:lookup(Key, OtherKvTree) of
         none ->
-            get_diff(Rest, OtherKvTree, [entry_to_kvv(Entry) | FBItems],
+            get_diff(Rest, OtherKvTree, [{Key, Value, Version} | FBItems],
                      ReqItems);
         {value, OtherVersion} ->
-            MyVersion = db_entry:get_version(Entry),
-            if MyVersion > OtherVersion ->
+            if Version > OtherVersion ->
                    get_diff(Rest, gb_trees:delete(Key, OtherKvTree),
-                            [entry_to_kvv(Entry) | FBItems], ReqItems);
+                            [{Key, Value, Version} | FBItems], ReqItems);
                true ->
                    get_diff(Rest, gb_trees:delete(Key, OtherKvTree),
                             FBItems, [Key | ReqItems])
