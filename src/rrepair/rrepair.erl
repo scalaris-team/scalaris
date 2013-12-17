@@ -298,13 +298,14 @@ on({recon_progress_report, Sender, _Initiator = false, DestRR, DestRC, Stats},
     end,
     State#rrepair_state{ open_recon = OR - 1 };
 on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
-   State = #rrepair_state{ open_recon = OR, open_sessions = OS }) ->
+   State = #rrepair_state{open_recon = ORC, open_resolve = ORS,
+                          open_sessions = OS}) ->
     ?TRACE_RECON("~nRECON OK - Sender=~p~nStats=~p~nOpenRecon=~p~nSessions=~p",
-                 [_Sender, rr_recon_stats:print(Stats), OR - 1, OS]),
+                 [_Sender, rr_recon_stats:print(Stats), ORC - 1, OS]),
     NewOS = case extract_session(rr_recon_stats:get(session_id, Stats), OS) of
                     {S, TSessions} ->
                         ?TRACE_RECON("~nRECON OK2 - Sender=~p,~n~.2p~nOpenRecon=~p~nSessions=~p,~n~p",
-                                     [_Sender, S, OR - 1, OS, rr_recon_stats:print(Stats)]),
+                                     [_Sender, S, ORC - 1, OS, rr_recon_stats:print(Stats)]),
                         SUpd = update_session_recon(S, Stats),
                         case check_session_complete(SUpd) of
                             true -> TSessions;
@@ -315,7 +316,9 @@ on({recon_progress_report, _Sender, _Initiator = true, _DestRR, _DestRC, Stats},
                         %log:log(error, "[ ~p ] SESSION NOT FOUND BY INITIATOR ~p", [?MODULE, rr_recon_stats:get(session_id, Stats)]),
                         OS
                 end,
-    State#rrepair_state{open_recon = OR - 1, open_sessions = NewOS};
+    NewRS = rr_recon_stats:get(await_rs_fb, Stats),
+    State#rrepair_state{open_resolve = ORS + NewRS,
+                        open_recon = ORC - 1, open_sessions = NewOS};
 
 on({resolve_progress_report, _Sender, Stats},
    State = #rrepair_state{open_resolve = OR, open_sessions = OS}) ->
@@ -457,7 +460,7 @@ update_session_resolve(#session{ rs_stats = Old, rs_finish = RSCount,
 -spec check_session_complete(session()) -> boolean().
 check_session_complete(#session{rc_stats = RCStats, principal = PrincipalPid,
                                 rs_called = C, rs_finish = C} = S)
-  when RCStats =/= none->
+  when RCStats =/= none ->
     case rr_recon_stats:get(status, RCStats) of
         X when X =:= finish orelse X =:= abort ->
             ?TRACE_COMPLETE("--SESSION COMPLETE--~n~p", [S]),

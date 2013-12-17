@@ -60,8 +60,8 @@
 -endif.
 
 -type quadrant()       :: 1..4. % 1..rep_factor()
--type method()         :: bloom | merkle_tree | art.% | iblt.
--type stage()          :: req_shared_interval | build_struct | reconciliation.
+-type method()         :: trivial | bloom | merkle_tree | art.% | iblt.
+-type stage()          :: req_shared_interval | build_struct | reconciliation | resolve.
 
 -type exit_reason()    :: empty_interval |      %interval intersection between initator and client is empty
                           recon_node_crash |    %sync partner node crashed
@@ -72,6 +72,12 @@
 -type db_chunk_kvv()   :: [{?RT:key(), db_dht:version(), db_dht:value()}].
 
 -type signature_size() :: 1..160. % upper bound of 160 (SHA-1) to also limit testing
+
+-record(trivial_recon_struct,
+        {
+         interval = intervals:empty()                         :: intervals:interval(),
+         db_chunk = ?required(trivial_recon_struct, db_chunk) :: db_chunk_kv() | gb_tree()
+        }).
 
 -record(bloom_recon_struct,
         {
@@ -94,11 +100,13 @@
          bucket_size    = ?required(art_recon_struct, bucket_size)    :: pos_integer()
         }).
 
--type sync_struct() :: #bloom_recon_struct{} |
+-type sync_struct() :: #trivial_recon_struct{} |
+                       #bloom_recon_struct{} |
                        merkle_tree:merkle_tree() |
                        [merkle_tree:mt_node()] |
                        #art_recon_struct{}.
--type parameters() :: #bloom_recon_struct{} |
+-type parameters() :: #trivial_recon_struct{} |
+                      #bloom_recon_struct{} |
                       #merkle_params{} |
                       #art_recon_struct{}.
 -type recon_dest() :: ?RT:key() | random.
@@ -117,7 +125,8 @@
          initiator          = false                                  :: boolean(),
          misc               = []                                     :: [{atom(), term()}], % any optional parameters an algorithm wants to keep
          kv_list            = []                                     :: db_chunk_kv(),
-         stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats()
+         stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats(),
+         to_resolve         = {[], []}                               :: {ToSend::rr_resolve:kvv_list(), ToReq::[?RT:key()]}
          }).
 -type state() :: #rr_recon_state{}.
 
@@ -152,6 +161,7 @@
     {create_struct2, DestI::intervals:interval(),
      {get_chunk_response, {intervals:interval(), db_chunk_kv()}}} |
     {reconcile, {get_chunk_response, {intervals:interval(), db_chunk_kv()}}} |
+    {resolve, {get_chunk_response, {intervals:interval(), db_chunk_kvv()}}} |
     % internal
     {shutdown, exit_reason()} |
     {crash, DeadPid::comm:mypid()} |
@@ -208,31 +218,99 @@ on({start_recon, RMethod, Params} = _Msg, State) ->
     %       -> pay attention when saving values to DB!
     %       (it could be outdated then even if we retrieved the current range now!)
     case RMethod of
+        trivial ->
+            MySyncI = Params#trivial_recon_struct.interval,
+            DestReconPid = undefined,
+            % convert db_chunk to a gb_tree for faster access checks
+            DBChunkTree =
+                lists:foldl(
+                  fun({KeyX, VersionX}, TreeX) ->
+                          % assume, KVs at the same node are equal
+                          gb_trees:enter(KeyX, VersionX, TreeX)
+                  end, gb_trees:empty(), Params#trivial_recon_struct.db_chunk),
+            Params1 = Params#trivial_recon_struct{db_chunk = DBChunkTree},
+            Reconcile = resolve,
+            Stage = resolve;
         bloom ->
             MySyncI = Params#bloom_recon_struct.interval,
-            DestReconPid = undefined;
+            DestReconPid = undefined,
+            Params1 = Params,
+            Reconcile = reconcile,
+            Stage = reconciliation;
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
             ?ASSERT(DestReconPid =/= undefined),
-            fd:subscribe(DestReconPid);
+            fd:subscribe(DestReconPid),
+            Params1 = Params,
+            Reconcile = reconcile,
+            Stage = reconciliation;
         art ->
             MySyncI = art:get_interval(Params#art_recon_struct.art),
-            DestReconPid = undefined
+            DestReconPid = undefined,
+            Params1 = Params,
+            Reconcile = reconcile,
+            Stage = reconciliation
     end,
     % client only sends non-empty sync intervals or exits
     ?ASSERT(not intervals:is_empty(MySyncI)),
     
     DhtNodePid = State#rr_recon_state.dhtNodePid,
-    send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), reconcile),
-    State#rr_recon_state{stage = reconciliation, params = Params,
+    send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), Reconcile),
+    State#rr_recon_state{stage = Stage, params = Params1,
                          method = RMethod, initiator = true,
                          dest_recon_pid = DestReconPid};
+
+on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
+   State = #rr_recon_state{stage = resolve,            initiator = true,
+                           method = trivial,           dhtNodePid = DhtNodePid,
+                           params = #trivial_recon_struct{db_chunk = OtherDBChunk} = Params,
+                           dest_rr_pid = DestRR_Pid,   stats = Stats,
+                           ownerPid = OwnerL, to_resolve = {ToSend, ToReq}}) ->
+    ?TRACE1(_Msg, State),
+
+    {ToSend1, ToReq1, OtherDBChunk1} =
+        rr_resolve:get_diff(DBList, OtherDBChunk, ToSend, ToReq),
+
+    %if rest interval is non empty start another sync
+    SID = rr_recon_stats:get(session_id, Stats),
+    SyncFinished = intervals:is_empty(RestI),
+    if not SyncFinished ->
+           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve);
+       true -> ok
+    end,
+    ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p ; ToReq=~p",
+           [SID, length(ToSend1), length(ToReq1)]),
+    NewStats =
+        if ToSend1 =/= [] orelse ToReq1 =/= [] orelse SyncFinished ->
+               ToReq2 = if SyncFinished ->
+                               OtherDBChunk2 = gb_trees:empty(),
+                               lists:append(gb_trees:keys(OtherDBChunk1), ToReq1);
+                           true ->
+                               OtherDBChunk2 = OtherDBChunk1,
+                               ToReq1
+                        end,
+               send(DestRR_Pid, {request_resolve, SID,
+                                 {?key_upd, ToSend1, ToReq2},
+                                 [{from_my_node, 0},
+                                  {feedback_request, comm:make_global(OwnerL)}]}),
+               % we will get one reply from a subsequent feedback response
+               rr_recon_stats:inc([{resolve_started, 1},
+                                   {await_rs_fb, 1}], Stats);
+           true ->
+               OtherDBChunk2 = OtherDBChunk1,
+               Stats
+        end,
+    NewState = State#rr_recon_state{stats = NewStats, to_resolve = {[], []},
+                                    params = Params#trivial_recon_struct{db_chunk = OtherDBChunk2}},
+    if SyncFinished -> shutdown(sync_finished, NewState);
+       true         -> NewState
+    end;
 
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = bloom,             dhtNodePid = DhtNodePid,
                            params = #bloom_recon_struct{bloom = BF},
-                           dest_rr_pid = DestRU_Pid,   stats = Stats,
+                           dest_rr_pid = DestRR_Pid,   stats = Stats,
                            ownerPid = OwnerL}) ->
     ?TRACE1(_Msg, State),
     % no need to map keys since the other node's bloom filter was created with
@@ -252,7 +330,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     NewStats =
         case Diff of
             [_|_] ->
-                send(DestRU_Pid, {request_resolve, SID,
+                send(DestRR_Pid, {request_resolve, SID,
                                   {?key_upd2, Diff, comm:make_global(OwnerL)},
                                     [{from_my_node, 0}]}),
                 % we will get one reply from a subsequent ?key_upd resolve
@@ -405,14 +483,15 @@ build_struct(DBList, DestI, RestI,
 -spec begin_sync(MySyncStruct::sync_struct(), OtherSyncStruct::parameters() | {},
                  state()) -> state() | kill.
 begin_sync(MySyncStruct, _OtherSyncStruct = {},
-           State = #rr_recon_state{method = bloom, initiator = false,
+           State = #rr_recon_state{method = RMethod, initiator = false,
                                    ownerPid = OwnerL, stats = Stats,
-                                   dest_rr_pid = DestRRPid}) ->
+                                   dest_rr_pid = DestRRPid})
+  when RMethod =:= bloom orelse RMethod =:= trivial ->
     ?TRACE("BEGIN SYNC", []),
     SID = rr_recon_stats:get(session_id, Stats),
     send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
                      comm:make_global(OwnerL), SID,
-                     {start_recon, bloom, MySyncStruct}}),
+                     {start_recon, RMethod, MySyncStruct}}),
     shutdown(sync_finished, State);
 begin_sync(MySyncStruct, _OtherSyncStruct,
            State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
@@ -775,6 +854,9 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
                          DestI::intervals:non_empty_interval(), db_chunk_kv(),
                          Params::parameters() | {}, BeginSync::boolean())
         -> sync_struct().
+build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
+    ?ASSERT(not intervals:is_empty(I)),
+    #trivial_recon_struct{ interval = I, db_chunk = DBItems };
 build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
@@ -858,10 +940,11 @@ send_local(Pid, Msg) ->
     comm:send_local(Pid, Msg).
 
 %% @doc Sends a get_chunk request to the local DHT_node process.
-%%      Request responds with a list of {Key, Value} tuples.
+%%      Request responds with a list of {Key, Version, Value} tuples (if set
+%%      for resolve) or {Key, Version} tuples (anything else).
 %%      The mapping to DestI is not done here!
 -spec send_chunk_req(DhtPid::LPid, AnswerPid::LPid, ChunkI::I, DestI::I,
-                     MaxItems::pos_integer() | all, create_struct | reconcile) -> ok when
+                     MaxItems::pos_integer() | all, create_struct | reconcile | resolve) -> ok when
     is_subtype(LPid,        comm:erl_local_pid()),
     is_subtype(I,           intervals:interval()).
 send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, reconcile) ->
@@ -874,7 +957,13 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems, create_struct) ->
     SrcPidReply = comm:reply_as(SrcPid, 3, {create_struct2, DestI, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
-                fun get_chunk_kv/1, MaxItems}).
+                fun get_chunk_kv/1, MaxItems});
+send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, resolve) ->
+    ?ASSERT(I =:= _DestI),
+    SrcPidReply = comm:reply_as(SrcPid, 2, {resolve, '_'}),
+    send_local(DhtPid,
+               {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
+                fun get_chunk_kvv/1, MaxItems}).
 
 -spec get_chunk_filter(db_entry:entry()) -> boolean().
 get_chunk_filter(DBEntry) -> db_entry:get_version(DBEntry) =/= -1.

@@ -41,6 +41,7 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start/0]).
+-export([get_diff/4]).
 -export([get_stats_session_id/1, get_stats_resolve_started/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
@@ -48,7 +49,7 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([operation/0, options/0]).
+-export_type([operation/0, options/0, kvv_list/0]).
 -export_type([stats/0]).
 -endif.
 
@@ -195,7 +196,7 @@ on({get_state_response, MyI}, State =
                {get_chunk, self(), RepKeyInt, fun rr_recon:get_chunk_filter/1,
                 fun rr_recon:get_chunk_kvv/1, all}),
     
-    % convert keys KvvList to a gb_tree for faster access checks
+    % convert keys KvList to a gb_tree for faster access checks
     MyIOtherKvTree = lists:foldl(fun({KeyX, VersionX}, TreeX) ->
                                          % assume, KVs at the same node are equal
                                          gb_trees:enter(KeyX, VersionX, TreeX)
@@ -488,6 +489,9 @@ get_diff([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems) ->
             if Version > OtherVersion ->
                    get_diff(Rest, gb_trees:delete(Key, MyIOtherKvTree),
                             [{Key, Value, Version} | FBItems], ReqItems);
+               Version =:= OtherVersion ->
+                   get_diff(Rest, gb_trees:delete(Key, MyIOtherKvTree),
+                            FBItems, ReqItems);
                true ->
                    get_diff(Rest, gb_trees:delete(Key, MyIOtherKvTree),
                             FBItems, [Key | ReqItems])
