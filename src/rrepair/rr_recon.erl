@@ -182,7 +182,7 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
             RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
             % reduce SenderI to the sub-interval matching SyncI, i.e. a mapped SyncI
             SenderSyncI = map_interval(SenderI, SyncI),
-            send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(), false),
+            send_chunk_req(DhtPid, self(), SyncI, SenderSyncI, get_max_items(), create_struct),
             NewState;
         true ->
             shutdown(empty_interval, NewState)
@@ -220,7 +220,7 @@ on({start_recon, RMethod, Params} = _Msg, State) ->
     ?ASSERT(not intervals:is_empty(MySyncI)),
     
     DhtNodePid = State#rr_recon_state.dhtNodePid,
-    send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), true),
+    send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), reconcile),
     State#rr_recon_state{stage = reconciliation, params = Params,
                          method = RMethod, initiator = true,
                          dest_recon_pid = DestReconPid};
@@ -242,7 +242,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
     SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
-           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), true);
+           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), reconcile);
        true -> ok
     end,
     ?TRACE("Reconcile Bloom Session=~p ; Diff=~p", [SID, length(Diff)]),
@@ -370,7 +370,10 @@ build_struct(DBList, DestI, RestI,
                 case intervals:is_empty(SubSyncI) of
                     false ->
                         MySubSyncI = map_interval(RestI, DestI), % mapped to my range
-                        Reconcile = Initiator andalso (Stage =:= reconciliation),
+                        Reconcile =
+                            if Initiator andalso (Stage =:= reconciliation) -> reconcile;
+                               true -> create_struct
+                            end,
                         send_chunk_req(DhtNodePid, self(), MySubSyncI, SubSyncI,
                                        get_max_items(), Reconcile),
                         false;
@@ -855,16 +858,16 @@ send_local(Pid, Msg) ->
 %%      Request responds with a list of {Key, Value} tuples.
 %%      The mapping to DestI is not done here!
 -spec send_chunk_req(DhtPid::LPid, AnswerPid::LPid, ChunkI::I, DestI::I,
-                     MaxItems::pos_integer() | all, Reconcile::boolean()) -> ok when
+                     MaxItems::pos_integer() | all, create_struct | reconcile) -> ok when
     is_subtype(LPid,        comm:erl_local_pid()),
     is_subtype(I,           intervals:interval()).
-send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, true) ->
+send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, reconcile) ->
     ?ASSERT(I =:= _DestI),
     SrcPidReply = comm:reply_as(SrcPid, 2, {reconcile, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
                 fun get_chunk_value/1, MaxItems});
-send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems, false) ->
+send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems, create_struct) ->
     SrcPidReply = comm:reply_as(SrcPid, 3, {create_struct2, DestI, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
