@@ -358,8 +358,7 @@ tester_type_check_rrepair(_Config) ->
              {send, 2}, %% tries to send messages
              {send_local, 2}, %% tries to send messages
              {send_chunk_req, 6}, %% tries to send messages
-             {replicated_intervals, 1}, %% interval must be in a single quadrant
-             {fork_recon, 1} %% tries to spawn processes
+             {replicated_intervals, 1} %% interval must be in a single quadrant
            ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
