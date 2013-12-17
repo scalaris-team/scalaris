@@ -119,6 +119,7 @@
          dest_recon_pid     = undefined                              :: comm:mypid() | undefined, %dest recon process pid
          method             = undefined                              :: method() | undefined,
          dest_interval      = intervals:empty()                      :: intervals:interval(),
+         my_sync_interval   = intervals:empty()                      :: intervals:interval(),
          params             = {}                                     :: parameters() | {}, % parameters from the other node
          struct             = {}                                     :: sync_struct() | {}, % my recon structure
          stage              = req_shared_interval                    :: stage(),
@@ -189,7 +190,8 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
     % dest_interval contains the interval of the initiator
     % -> client creates recon structure based on common interval, sends it to initiator
     SyncI = find_sync_interval(MyI, SenderI),
-    NewState = State#rr_recon_state{stage = build_struct},
+    NewState = State#rr_recon_state{stage = build_struct,
+                                    my_sync_interval = SyncI},
     case intervals:is_empty(SyncI) of
         false ->
             RMethod =:= merkle_tree andalso fd:subscribe(DestRRPid),
