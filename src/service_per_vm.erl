@@ -132,6 +132,10 @@ on({delete_node, SupPid, SupId}, State) ->
     _ = supervisor:delete_child(main_sup, SupId),
     State;
 
+on({add_node, Options}, State) ->
+    _ = admin:add_node(Options),
+    State;
+
 % message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
 on({hi}, State) ->
     State.

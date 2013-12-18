@@ -77,6 +77,11 @@ childs([{DHTNodeGroup, Options}]) ->
                              [DHTNodeGroup]),
     Gossip =
         sup:worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
+    LBActive =
+        case config:read(lb_active) of
+            true -> sup:worker_desc(lb_active, lb_active_karger, start_link, [DHTNodeGroup]);
+            _ -> []
+        end,
     Reregister =
         sup:worker_desc(dht_node_reregister, dht_node_reregister,
                              start_link, [DHTNodeGroup]),
@@ -129,5 +134,6 @@ childs([{DHTNodeGroup, Options}]) ->
                     RepUpdate,
                     Autoscale,
                     SnapshotLeader,
-                    RMLeases
+                    RMLeases,
+                    LBActive
            ]).
