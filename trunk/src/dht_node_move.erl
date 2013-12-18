@@ -417,8 +417,18 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
                                     true ->
                                         prepare_send_data1(State0, SlideOp);
                                     false ->
+                                        TargetIdReal = 
+                                            %% in case of a jump, the target id is always
+                                            %% the pred id which is set as target id for the
+                                            %% slide later on.
+                                            case slide_op:is_jump(SlideOp0, 'send') of
+                                                true ->
+                                                    slide_op:get_jump_target_id(SlideOp0);
+                                                _    ->
+                                                    TargetId
+                                            end,
                                         recreate_existing_slide(
-                                          SlideOp0, State0, TargetId,
+                                          SlideOp0, State0, TargetIdReal,
                                           MaxTransportEntries, MsgTag, NextOp)
                                 end
                         end,
@@ -481,8 +491,8 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
                                             dht_node_state:get(State, slide_succ),
                                         SlidePred =
                                             dht_node_state:get(State, slide_pred),
-                                        case SlideSucc =/= null andalso
-                                                 SlidePred =/= null of
+                                        case SlideSucc =:= null andalso
+                                                 SlidePred =:= null of
                                             true -> {ok, {jump, 'send'}};
                                             _    -> {abort, ongoing_slide, Type}
                                         end
@@ -595,12 +605,18 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                 {abort, Reason, State1, SlideOp3} ->
                     abort_slide(State1, SlideOp3, Reason, true)
             end;
-        {ok, {jump, 'send'}} -> % similar to {ok, {slide, succ, 'send'}}
+        {ok, {jump, 'send'} = NewType} -> % similar to {ok, {slide, succ, 'send'}}
             fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
-            % TODO: activate incremental jump:
-%%             IncTargetKey = find_incremental_target_id(Neighbors, State, TargetId, NewType, OtherMTE),
-%%             SlideOp = slide_op:new_sending_slide_jump(MoveFullId, IncTargetKey, TargetId, Tag, Neighbors),
-            SlideOp = slide_op:new_sending_slide_jump(MoveFullId, TargetId, Tag, Neighbors),
+            UseIncrSlides = use_incremental_slides(),            
+            LeaveTargetId = node:id(nodelist:pred(Neighbors)),
+            CurTargetId =
+                if UseIncrSlides orelse OtherMTE =/= unknown->
+                       find_incremental_target_id(
+                         Neighbors, State, LeaveTargetId, NewType, OtherMTE);
+                   true -> LeaveTargetId
+                end, 
+            SlideOp = slide_op:new_sending_slide_jump(
+                        MoveFullId, CurTargetId, TargetId, SourcePid, Tag, Neighbors),
             case MsgTag of
                 nomsg ->
                     notify_other(SlideOp, State);
@@ -731,7 +747,7 @@ prepare_send_data2(State, SlideOp, EmbeddedMsg) ->
             % last part of a leave? -> transfer all DB entries!
             % since in this case there is no other slide, we can safely use intervals:all()
             MovingInterval =
-                case slide_op:is_leave(SlideOp1) andalso not slide_op:is_jump(SlideOp1)
+                case slide_op:is_leave(SlideOp1)
                          andalso slide_op:get_next_op(SlideOp1) =:= {none} of
                     true  -> intervals:all();
                     false -> slide_op:get_interval(SlideOp1)
@@ -893,10 +909,6 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
                                                                 Type =:= {join, 'rcv'} ->
                             Type1 = {slide, PredOrSucc, 'rcv'}, % converts join
                             finish_delta2B(State1, SlideOp1, Type1, NewTargetId);
-                        {jump, continue, _NewTargetId} ->
-                            % TODO
-                            send_delta_ack(SlideOp1, {none}),
-                            finish_slide(State1, SlideOp1);
                         {leave, continue} ->
                             % this is not the correct target ID, but the leaving node will set it itself
                             NewTargetId = dht_node_state:get(State, pred_id),
@@ -987,7 +999,6 @@ finish_slide_and_continue_with_next_op(State0, OldSlideOp) ->
         {none} -> State;
         % ignore incremental slide ops
         {slide, continue, _Id} -> State;
-        {jump, continue, _Id} -> State;
         {leave, continue} -> State;
         {slide, PredOrSucc, NewTargetId, NewTag, NewSourcePid} ->
             % continue operation with the same node previously sliding with or
@@ -1025,12 +1036,16 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg) ->
     SlideMod = get_slide_mod(),
     case SlideMod:finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg) of
         {ok, State1, SlideOp1, NextOpMsg1} ->
+            IsJump = slide_op:is_jump(SlideOp1),
             NextOpMsg2 =
                 case slide_op:is_leave(SlideOp1)
-                         andalso not slide_op:is_jump(SlideOp1)
                          andalso NextOpMsg1 =:= {none} of
-                    true  -> {finish_leave};
-                    false -> NextOpMsg1
+                    true when not IsJump -> 
+                        {finish_leave};
+                    true when IsJump ->
+                        {finish_jump};
+                    false -> 
+                        NextOpMsg1
                 end,
             finish_delta_ack2B(State1, SlideOp1, NextOpMsg2);
         {abort, Reason, State1, SlideOp1} ->
@@ -1056,6 +1071,23 @@ finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     % note: we will be killed soon but need to be removed from the supervisor first
     % -> do not kill this process
     State1;
+finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
+    NewId = slide_op:get_jump_target_id(SlideOp),    
+    fd:report_graceful_leave(),
+    State1 = finish_slide(State, SlideOp),
+    SupDhtNodeId = erlang:get(my_sup_dht_node_id),
+    SupDhtNode = pid_groups:get_my(sup_dht_node),
+    ServicePerVM = pid_groups:find_a(service_per_vm),
+    comm:send_local(ServicePerVM,
+                    {delete_node, SupDhtNode, SupDhtNodeId}),
+    Options =
+    case config:read(lb_active_and_psv) of
+        true -> [{{dht_node, id}, NewId}];
+        _    -> [{{dht_node, id}, NewId}, {skip_psv_lb}]
+    end,
+    comm:send_local(ServicePerVM,
+                    {add_node, Options}),
+    State;
 finish_delta_ack2B(State, SlideOp, {none}) ->
     finish_slide_and_continue_with_next_op(State, SlideOp);
 finish_delta_ack2B(State, SlideOp, {abort, NewSlideId, Reason}) ->
@@ -1082,11 +1114,14 @@ finish_delta_ack2B(State, SlideOp, {continue, NewSlideId}) ->
             finish_delta_ack2B(
               State, SlideOp, {Type1, NewSlideId, MyNode,
                                TargetNode, NewTargetId, Tag, SourcePid});
-        {jump, continue, _NewTargetId} ->
-            % TODO
-            finish_delta_ack2B(State, SlideOp, {none});
         {leave, continue} when Type =:= {leave, 'send'} ->
             NewTargetId = dht_node_state:get(State, pred_id),
+            finish_delta_ack2B(
+              State, SlideOp, {Type, NewSlideId, MyNode,
+                               TargetNode, NewTargetId, Tag, SourcePid});
+        {leave, continue} when Type =:= {jump, 'send'} ->
+            %% keep the old jump target id
+            NewTargetId = slide_op:get_jump_target_id(SlideOp),
             finish_delta_ack2B(
               State, SlideOp, {Type, NewSlideId, MyNode,
                                TargetNode, NewTargetId, Tag, SourcePid});
@@ -1110,7 +1145,6 @@ finish_delta_ack2B(State, SlideOp, {MyNextOpType, NewSlideId, MyNode,
             case MyNextOp of
                 {none} -> ok;
                 {slide, continue, TargetId} -> ok;
-                {jump, continue, TargetId} -> ok;
                 {leave, continue} -> ok;
                 _ ->
                     log:log(info, "[ dht_node_move ~.0p ] removing "

@@ -24,12 +24,12 @@
          new_receiving_slide_join/4,
          new_sending_slide_join/4, new_sending_slide_join_i/5,
          new_sending_slide_leave/5,
-         new_sending_slide_jump/4, new_sending_slide_jump/5,
+         new_sending_slide_jump/6,
          update_target_id/4,
          other_type_to_my_type/1,
          is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1, is_jump/2,
          is_incremental/1,
-         get_id/1, get_node/1, get_interval/1, get_target_id/1,
+         get_id/1, get_node/1, get_interval/1, get_target_id/1, get_jump_target_id/1,
          get_source_pid/1, get_tag/1, get_sendORreceive/1, get_type/1,
          get_predORsucc/1,
          get_timer/1, set_timer/3, cancel_timer/1,
@@ -80,6 +80,7 @@
          node              = ?required(slide_op, node)      :: node:node_type(), % the node, data is sent to/received from
          interval          = ?required(slide_op, interval)  :: intervals:interval(), % send/receive data in this range
          target_id         = ?required(slide_op, target_id) :: ?RT:key(), % ID to move the predecessor of the two participating nodes to
+         jump_target_id    = null                           :: ?RT:key() | null, % ID to jump to in case of a jump operation which is preceeded by a slide to leave
          tag               = ?required(slide_op, tag)       :: any(),
          source_pid        = null              :: comm:mypid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
          timer             = {null, nomsg, 0}  :: {reference(), comm:message(), non_neg_integer()} | {null, nomsg, non_neg_integer()}, % timeout timer, msg, number of timeouts
@@ -240,35 +241,29 @@ new_sending_slide_leave(MoveId, CurTargetId, Tag, SourcePid, Neighbors) ->
               next_op = NextOp}.
 
 %% @doc Sets up a new slide operation for a node which is about to leave its
-%%      position in the ring, transfer its data to its successor and afterwards
-%%      join somewhere else.
--spec new_sending_slide_jump(MoveId::id(), TargetId::?RT:key(), Tag::any(),
-        Neighbors::nodelist:neighborhood()) -> slide_op().
-new_sending_slide_jump(MoveId, TargetId, Tag, Neighbors) ->
-    TargetId = node:id(nodelist:pred(Neighbors)),
-    new_sending_slide_jump(MoveId, TargetId, TargetId, Tag, Neighbors).
-
-%% @doc Sets up a new slide operation for a node which is about to leave its
 %%      position in the ring, transfer its data to its successor
 %%      incrementally (current step is to move to CurTargetId) and afterwards
 %%      join somewhere else.
 -spec new_sending_slide_jump(MoveId::id(), CurTargetId::?RT:key(),
-        FinalTargetId::?RT:key(), Tag::any(), Neighbors::nodelist:neighborhood())
+        JumpTargetId::?RT:key(), SourcePid::comm:erl_local_pid(),
+                              Tag::any(), Neighbors::nodelist:neighborhood())
         -> slide_op().
-new_sending_slide_jump(MoveId, CurTargetId, FinalTargetId, Tag, Neighbors) ->
+new_sending_slide_jump(MoveId, CurTargetId, JumpTargetId, SourcePid, Tag, Neighbors) ->
     {Interval, TargetNode} =
         get_interval_tnode('succ', 'send', CurTargetId, Neighbors),
-    NextOp = case FinalTargetId of
-                 CurTargetId -> {none};
-                 _           -> {jump, continue, FinalTargetId}
-             end,
+    NextOp =
+         case node:id(nodelist:pred(Neighbors)) of
+             CurTargetId -> {none};
+             _           -> {leave, continue}
+         end,
     #slide_op{type = {jump, 'send'},
               id = MoveId,
               node = TargetNode,
               interval = Interval,
               target_id = CurTargetId,
+              jump_target_id = JumpTargetId,
               tag = Tag,
-              source_pid = null,
+              source_pid = SourcePid,
               next_op = NextOp}.
 
 %% @doc Updates the slide op with a new TargetId and NextOp adapting message
@@ -328,6 +323,9 @@ get_interval(#slide_op{interval=Interval}) -> Interval.
 %%      slide operation moves to (note: this may be the other node).
 -spec get_target_id(SlideOp::slide_op()) -> ?RT:key().
 get_target_id(#slide_op{target_id=TargetId}) -> TargetId.
+
+-spec get_jump_target_id(SlideOp::slide_op()) -> ?RT:key().
+get_jump_target_id(#slide_op{jump_target_id=TargetId}) -> TargetId.
 
 %% @doc Gets the pid of the (local) process that requested the move or null if
 %%      no local process initiated it.
