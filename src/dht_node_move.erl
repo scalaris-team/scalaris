@@ -83,8 +83,8 @@
     {abort, NewSlideId::slide_op:id(), abort_reason()}.
 
 -type move_message1() ::
-    {move, start_slide, pred | succ, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
-    {move, start_jump, TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
+    {move, start_slide, pred | succ, TargetId::?RT:key(), Tag::any(), SourcePid::comm:mypid() | null} |
+    {move, start_jump, TargetId::?RT:key(), Tag::any(), SourcePid::comm:mypid() | null} |
     {move, slide, OtherType::slide_op:type(), MoveFullId::slide_op:id(),
      InitNode::node:node_type(), TargetNode::node:node_type(), TargetId::?RT:key(),
      Tag::any(), NextOp::slide_op:next_op(), MaxTransportEntries::unknown | pos_integer()} |
@@ -390,7 +390,7 @@ notify_other(SlideOp, State) ->
                   MoveFullId::slide_op:id(), MyNode::node:node_type(),
                   TargetNode::node:node_type(), TargetId::?RT:key(),
                   Tag::any(), MaxTransportEntries::unknown | pos_integer(),
-                  SourcePid::comm:erl_local_pid() | null,
+                  SourcePid::comm:mypid() | null,
                   MsgTag::nomsg | slide,
                   NextOp::slide_op:next_op())
         -> dht_node_state:state().
@@ -521,7 +521,7 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
         State::dht_node_state:state(), MoveFullId::slide_op:id(),
         TargetNode::node:node_type(), TargetId::?RT:key(), Tag::any(),
         OtherMaxTransportEntries::unknown | pos_integer(),
-        SourcePid::comm:erl_local_pid() | null,
+        SourcePid::comm:mypid() | null,
         MsgTag::nomsg | slide | delta_ack,
         NextOp::slide_op:next_op()) -> dht_node_state:state().
 exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
@@ -1044,7 +1044,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg) ->
           {finish_leave} |
           {NextOpType::slide_op:type(), NewSlideId::slide_op:id(),
           InitNode::node:node_type(), TargetNode::node:node_type(),
-          TargetId::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null})
+          TargetId::?RT:key(), Tag::any(), SourcePid::comm:mypid() | null})
         -> dht_node_state:state().
 finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     fd:report_graceful_leave(),
@@ -1251,12 +1251,12 @@ can_slide_pred(State, TargetId, _Type) ->
         ).
 
 %% @doc Sends the source pid the given message if it is not 'null'.
--spec notify_source_pid(SourcePid::comm:erl_local_pid() | null, Message::result_message()) -> ok.
+-spec notify_source_pid(SourcePid::comm:mypid() | null, Message::result_message()) -> ok.
 notify_source_pid(SourcePid, Message) ->
     case SourcePid of
         null -> ok;
         _ -> ?TRACE_SEND(SourcePid, Message),
-             comm:send_local(SourcePid, Message)
+             comm:send(comm:make_global(SourcePid), Message)
     end.
 
 %% @doc Updates TargetId and NextOp after receiving it along with a data message.
@@ -1380,7 +1380,7 @@ abort_slide(State, SlideOp, Reason, NotifyNode) ->
 %%      available as this also resets all its timers!
 -spec abort_slide(State::dht_node_state:state(), Node::node:node_type(),
                   SlideOpId::slide_op:id(), Phase::slide_op:phase(),
-                  SourcePid::comm:erl_local_pid() | null,
+                  SourcePid::comm:mypid() | null,
                   Tag::any(), Type::slide_op:type(), Reason::abort_reason(),
                   NotifyNode::boolean()) -> dht_node_state:state().
 abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, NotifyNode) ->
@@ -1422,7 +1422,7 @@ crashed_node(MyState, _DeadPid, {move, MoveFullId} = _Cookie) ->
 %%      the other node will change its ID to TargetId. SourcePid will be
 %%      notified about the result.
 -spec make_slide(State::dht_node_state:state(), pred | succ, TargetId::?RT:key(),
-        Tag::any(), SourcePid::comm:erl_local_pid() | null) -> dht_node_state:state().
+        Tag::any(), SourcePid::comm:mypid() | null) -> dht_node_state:state().
 make_slide(State, PredOrSucc, TargetId, Tag, SourcePid) ->
     % slide with PredOrSucc possible? if so, receive or send data?
     Neighbors = dht_node_state:get(State, neighbors),
@@ -1449,7 +1449,7 @@ make_slide(State, PredOrSucc, TargetId, Tag, SourcePid) ->
 %% @doc Creates a slide with the node's predecessor. The predecessor will
 %%      change its ID to TargetId, SourcePid will be notified about the result.
 -spec make_jump(State::dht_node_state:state(), TargetId::?RT:key(),
-                Tag::any(), SourcePid::comm:erl_local_pid() | null)
+                Tag::any(), SourcePid::comm:mypid() | null)
     -> dht_node_state:state().
 make_jump(State, TargetId, Tag, SourcePid) ->
     MoveFullId = uid:get_global_uid(),
@@ -1464,7 +1464,7 @@ make_jump(State, TargetId, Tag, SourcePid) ->
 %% @doc Creates a slide that will move all data to the successor and leave the
 %%      ring. Note: Will re-try (forever) to successfully start a leaving slide
 %%      if anything causes an abort!
--spec make_slide_leave(State::dht_node_state:state(), SourcePid::comm:erl_local_pid() | null)
+-spec make_slide_leave(State::dht_node_state:state(), SourcePid::comm:mypid() | null)
         -> dht_node_state:state().
 make_slide_leave(State, SourcePid) ->
     MoveFullId = uid:get_global_uid(),
