@@ -1087,7 +1087,7 @@ finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
     end,
     comm:send_local(ServicePerVM,
                     {add_node, Options}),
-    State;
+    State1;
 finish_delta_ack2B(State, SlideOp, {none}) ->
     finish_slide_and_continue_with_next_op(State, SlideOp);
 finish_delta_ack2B(State, SlideOp, {abort, NewSlideId, Reason}) ->
