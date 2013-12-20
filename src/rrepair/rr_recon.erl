@@ -414,11 +414,13 @@ on({?check_nodes_response, Flags, HashKeys, OtherMaxLeafCount}, State =
             NextSigSize = SigSize,
             ok;
         {[_|_] = Req0, ToResolve, NStats0, RTree, MyMaxLeafCount} ->
-            % note: we want an accumulated probability of P1E and thus need to
-            %       divide by the number of requests!
+            % note: we have m one-to-n comparisons, assuming the probability of
+            %       a failure in a single one-to-n comparison is p, the overall
+            %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
+            P = 1 - math:pow(1 - get_p1e(), 1 / erlang:max(1, length(Req0))),
             NextSigSize = calc_signature_size_1_to_n(
                             erlang:max(MyMaxLeafCount, OtherMaxLeafCount),
-                            get_p1e() / length(Req0), 160),
+                            P, 160),
 %%             log:pal("MyMLC: ~p~n    OtherMLC: ~p~n     SigSize: ~p",
 %%                     [MyMaxLeafCount, OtherMaxLeafCount, NextSigSize]),
             Req = merkle_compress_hashlist(Req0, <<>>, NextSigSize),
