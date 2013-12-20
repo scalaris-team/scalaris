@@ -321,8 +321,8 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                   true -> NewStats
                end,
 
-           ?TRACE("resolve_req Trivial Session=~p ; ToReq=~p",
-                  [SID, Req2Count]),
+           ?TRACE("resolve_req Trivial Session=~p ; ToReq=~p (~p bits)",
+                  [SID, Req2Count, erlang:bit_size(ToReq2)]),
            comm:send(DestReconPid, {resolve_req, ToReq2, SigSize}),
            
            Params2 = Params1#trivial_recon_struct{db_chunk = gb_trees:empty()},
@@ -1060,6 +1060,12 @@ build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
     SigSize = FullKVSize - VSize, 
     DBChunkBin = compress_kv_list(DBItems, <<>>, SigSize, VSize),
+    % debug compressed and uncompressed sizes:
+    ?TRACE("SigSize: ~p, VSize: ~p, ChunkSize: ~p / ~p bits",
+            [SigSize, VSize, erlang:bit_size(DBChunkBin),
+             erlang:bit_size(
+                 erlang:term_to_binary(DBChunkBin,
+                                       [{minor_version, 1}, {compressed, 2}]))]),
     #trivial_recon_struct{interval = I, reconPid = comm:this(),
                           db_chunk = DBChunkBin,
                           sig_size = SigSize, ver_size = VSize};
