@@ -1386,6 +1386,7 @@ check_config() ->
     config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso
         config:cfg_is_float(rr_recon_p1e) andalso
         config:cfg_is_greater_than(rr_recon_p1e, 0) andalso
+        config:cfg_is_less_than_equal(rr_recon_p1e, 1) andalso
         config:cfg_is_integer(rr_merkle_branch_factor) andalso
         config:cfg_is_greater_than(rr_merkle_branch_factor, 1) andalso
         config:cfg_is_integer(rr_merkle_bucket_size) andalso
