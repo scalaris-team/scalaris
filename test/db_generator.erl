@@ -34,6 +34,9 @@
 -export([feeder_fix_rangen/2]).
 
 -define(ReplicationFactor, 4).
+-define(VersionMin, 1).
+-define(VersionMax, 1048576). % 1024*1024
+-define(VersionDiffMax, 512).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TYPES
@@ -481,24 +484,33 @@ get_non_uniform_probs(RanGen, Acc) ->
         {last, V, exit}  -> lists:reverse([V | Acc])
     end.
 
--spec get_synthetic_entry(?RT:key(), old | new) -> db_entry:entry().
-get_synthetic_entry(Key, new) ->
-    db_entry:new(Key, val, 2);
-get_synthetic_entry(Key, old) ->
-    db_entry:new(Key, old, 1).
+%% TODO: we need to create random values (prefixed them with old/new for better
+%%       debugging) if we want to measure bytes to transfer
+-spec get_synthetic_value(old | new) -> term().
+get_synthetic_value(new) ->
+    val;
+get_synthetic_value(old) ->
+    old.
 
 -spec get_rep_group(?RT:key()) -> [db_entry:entry()].
 get_rep_group(Key) ->
-    [get_synthetic_entry(X, new) || X <- ?RT:get_replica_keys(Key)].
+    Version = randoms:rand_uniform(?VersionMin, ?VersionMax),
+    Value = get_synthetic_value(new),
+    [db_entry:new(K, Value, Version) || K <- ?RT:get_replica_keys(Key)].
 
 -spec get_failure_rep_group(?RT:key(), failure_type(), failure_dest()) -> 
           {[db_entry:entry()], Outdated::non_neg_integer()}.
 get_failure_rep_group(Key, FType, FDest) ->
     RepKeys = ?RT:get_replica_keys(Key),
     EKey = get_error_key(Key, RepKeys, FDest),
-    RGrp = [get_synthetic_entry(X, new) || X <- RepKeys, X =/= EKey],
+    VersionNew = randoms:rand_uniform(?VersionMin, ?VersionMax),
+    ValueNew = get_synthetic_value(new),
+    RGrp = [db_entry:new(K, ValueNew, VersionNew) || K <- RepKeys, K =/= EKey],
     case get_failure_type(FType) of
-        update -> {[get_synthetic_entry(EKey, old) | RGrp], 1};
+        update ->
+            VersionOld = erlang:max(0, VersionNew - randoms:rand_uniform(1, ?VersionDiffMax)),
+            ValueOld = get_synthetic_value(old),
+            {[db_entry:new(EKey, ValueOld, VersionOld) | RGrp], 1};
         regen -> {RGrp, 0}
     end.
 
