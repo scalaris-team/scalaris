@@ -149,10 +149,11 @@ on({get_state_response, MyI}, State =
     
     % send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
-    MyIOtherKvTree = lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
-                                         % assume, KVs at the same node are equal
-                                         gb_trees:enter(KeyX, VersionX, TreeX)
-                                 end, gb_trees:empty(), MyIOtherKvvList),
+    MyIOtherKvTree =
+        lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
+                            % assume, KVs at the same node have the same version
+                            gb_trees:enter(KeyX, VersionX, TreeX)
+                    end, gb_trees:empty(), MyIOtherKvvList),
     
     % allow the garbage collection to clean up the ReqKeys here:
     % also update the KvvList
@@ -197,10 +198,11 @@ on({get_state_response, MyI}, State =
                 fun rr_recon:get_chunk_kvv/1, all}),
     
     % convert keys KvList to a gb_tree for faster access checks
-    MyIOtherKvTree = lists:foldl(fun({KeyX, VersionX}, TreeX) ->
-                                         % assume, KVs at the same node are equal
-                                         gb_trees:enter(KeyX, VersionX, TreeX)
-                                 end, gb_trees:empty(), MyIOtherKvList),
+    MyIOtherKvTree =
+        lists:foldl(fun({KeyX, VersionX}, TreeX) ->
+                            % assume, KVs at the same node have the same version
+                            gb_trees:enter(KeyX, VersionX, TreeX)
+                    end, gb_trees:empty(), MyIOtherKvList),
     
     % allow the garbage collection to clean up the KvvList and ReqKeys here:
     State#rr_resolve_state{operation = {?key_upd2, [], DestPid},
@@ -301,10 +303,11 @@ on({get_entries_response, EntryList}, State =
     
     % Send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
-    MyIOtherKvTree = lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
-                                         % assume, KVs at the same node are equal
-                                         gb_trees:enter(KeyX, VersionX, TreeX)
-                                 end, gb_trees:empty(), MyIOtherKvvList),
+    MyIOtherKvTree =
+        lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
+                            % assume, KVs at the same node have the same version
+                            gb_trees:enter(KeyX, VersionX, TreeX)
+                    end, gb_trees:empty(), MyIOtherKvvList),
     MissingOnOther = [entry_to_kvv(X) || X <- EntryList,
                                          not gb_trees:is_defined(db_entry:get_key(X), MyIOtherKvTree)],
     
