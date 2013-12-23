@@ -832,8 +832,13 @@ compress_kv_pair_(Key, Version, SigSize, VMod) ->
 compress_key(Key, SigSize) ->
     KBin = erlang:term_to_binary(Key),
     RestSize = erlang:bit_size(KBin) - SigSize,
-    <<_:RestSize/bitstring, KBinCompressed:SigSize/bitstring>> = KBin,
-    KBinCompressed.
+    if RestSize >= 0  ->
+           <<_:RestSize/bitstring, KBinCompressed:SigSize/bitstring>> = KBin,
+           KBinCompressed;
+       true ->
+           FillSize = erlang:abs(RestSize),
+           <<0:FillSize, KBin/binary>>
+    end.
 
 %% @doc De-compresses a bitstring with hashes of SigSize number of bits
 %%      into a gb_set with a binary key representation.
