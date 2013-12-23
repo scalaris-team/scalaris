@@ -41,7 +41,6 @@
 -include("scalaris.hrl").
 
 -export([init/1, on/2, start/0]).
--export([get_diff/4]).
 -export([get_stats_session_id/1, get_stats_resolve_started/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
@@ -434,29 +433,6 @@ integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
        not Done and not Exists ->
            integrate_update_key_entry_ack(
              Rest, UpdOk, UpdFail, RegenOk, RegenFail + 1, NewFBItems, OtherKvTree, FBOn)
-    end.
-
--spec get_diff(MyEntries::rr_recon:db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
-               AccFBItems::kvv_list(), AccReqItems::[?RT:key()])
-        -> {FBItems::kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
-get_diff([], MyIOtherKvTree, FBItems, ReqItems) ->
-    {FBItems, ReqItems, MyIOtherKvTree};
-get_diff([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems) ->
-    case gb_trees:lookup(Key, MyIOtherKvTree) of
-        none ->
-            get_diff(Rest, MyIOtherKvTree, [{Key, Value, Version} | FBItems],
-                     ReqItems);
-        {value, OtherVersion} ->
-            if Version > OtherVersion ->
-                   get_diff(Rest, gb_trees:delete(Key, MyIOtherKvTree),
-                            [{Key, Value, Version} | FBItems], ReqItems);
-               Version =:= OtherVersion ->
-                   get_diff(Rest, gb_trees:delete(Key, MyIOtherKvTree),
-                            FBItems, ReqItems);
-               true ->
-                   get_diff(Rest, gb_trees:delete(Key, MyIOtherKvTree),
-                            FBItems, [Key | ReqItems])
-            end
     end.
 
 -spec shutdown(exit_reason(), state()) -> kill.
