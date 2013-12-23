@@ -718,23 +718,14 @@ calc_signature_size_n_pair(N, P1E, MaxSize) when P1E > 0 ->
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
--spec compress_kv_list(KVList::[{?RT:key(), db_dht:version()}], Bin,
+-spec compress_kv_list(KVList::db_chunk_kv(), Bin,
                        SigSize::signature_size(), VSize::signature_size())
         -> Bin when is_subtype(Bin, bitstring()).
-compress_kv_list(KVList, Bin, SigSize, VSize) ->
-    compress_kv_list_(KVList, Bin, SigSize, VSize, util:pow(2, VSize)).
-
-%% @doc Helper for compress_kv_list/4.
--spec compress_kv_list_(KVList::[{?RT:key(), db_dht:version()}], Bin,
-                       SigSize::signature_size(), VSize::signature_size(),
-                       VMod::pos_integer())
-        -> Bin when is_subtype(Bin, bitstring()).
-compress_kv_list_([], Bin, _SigSize, _VSize, _VMod) ->
+compress_kv_list([], Bin, _SigSize, _VSize) ->
     Bin;
-compress_kv_list_([{K0, V0} | TL], Bin, SigSize, VSize, VMod) ->
+compress_kv_list([{K0, V} | TL], Bin, SigSize, VSize) ->
     KBin = compress_key(K0, SigSize),
-    V = V0 rem VMod,
-    compress_kv_list_(TL, <<Bin/bitstring, KBin/bitstring, V:VSize>>, SigSize, VSize, VMod).
+    compress_kv_list(TL, <<Bin/bitstring, KBin/bitstring, V:VSize>>, SigSize, VSize).
 
 %% @doc De-compresses the binary from compress_kv_list/4 into a gb_tree with a
 %%      binary key representation and the integer of the (shortened) version.
@@ -756,27 +747,35 @@ decompress_kv_list(Bin, Tree, SigSize, VSize) ->
                     AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
                     SigSize::signature_size(), VSize::signature_size())
 -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
-get_full_diff([], MyIOtherKvTree, FBItems, ReqItems, _SigSize, _VSize) ->
+get_full_diff(MyEntries, MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
+    get_full_diff_(MyEntries, MyIOtherKvTree, FBItems, ReqItems, SigSize,
+                  util:pow(2, VSize)).
+    
+-spec get_full_diff_(MyEntries::db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
+                     AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
+                     SigSize::signature_size(), VMod::pos_integer())
+-> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+get_full_diff_([], MyIOtherKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
     {FBItems, ReqItems, MyIOtherKvTree};
-get_full_diff([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
-    {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VSize),
+get_full_diff_([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSize, VMod) ->
+    {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
     case gb_trees:lookup(KeyBin, MyIOtherKvTree) of
         none ->
-            get_full_diff(Rest, MyIOtherKvTree,
+            get_full_diff_(Rest, MyIOtherKvTree,
                           [{Key, Value, Version} | FBItems], ReqItems,
-                          SigSize, VSize);
+                          SigSize, VMod);
         {value, OtherVersionShort} ->
             MyIOtherKvTree2 = gb_trees:delete(KeyBin, MyIOtherKvTree),
             if VersionShort > OtherVersionShort ->
-                   get_full_diff(Rest, MyIOtherKvTree2,
+                   get_full_diff_(Rest, MyIOtherKvTree2,
                                  [{Key, Value, Version} | FBItems], ReqItems,
-                                 SigSize, VSize);
+                                 SigSize, VMod);
                VersionShort =:= OtherVersionShort ->
-                   get_full_diff(Rest, MyIOtherKvTree2, FBItems, ReqItems,
-                                 SigSize, VSize);
+                   get_full_diff_(Rest, MyIOtherKvTree2, FBItems, ReqItems,
+                                 SigSize, VMod);
                true ->
-                   get_full_diff(Rest, MyIOtherKvTree2, FBItems, [Key | ReqItems],
-                                 SigSize, VSize)
+                   get_full_diff_(Rest, MyIOtherKvTree2, FBItems, [Key | ReqItems],
+                                 SigSize, VMod)
             end
     end.
 
@@ -788,25 +787,34 @@ get_full_diff([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems,
                     AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
                     SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
-get_part_diff([], MyIOtherKvTree, FBItems, ReqItems, _SigSize, _VSize) ->
+get_part_diff(MyEntries, MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
+    get_part_diff_(MyEntries, MyIOtherKvTree, FBItems, ReqItems, SigSize,
+                   util:pow(2, VSize)).
+
+%% @doc Helper for get_part_diff/6.
+-spec get_part_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::gb_tree(),
+                     AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
+                     SigSize::signature_size(), VMod::pos_integer())
+        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+get_part_diff_([], MyIOtherKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
     {FBItems, ReqItems, MyIOtherKvTree};
-get_part_diff([{Key, Version} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
-    {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VSize),
+get_part_diff_([{Key, Version} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSize, VMod) ->
+    {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
     case gb_trees:lookup(KeyBin, MyIOtherKvTree) of
         none ->
-            get_part_diff(Rest, MyIOtherKvTree, FBItems, ReqItems,
-                          SigSize, VSize);
+            get_part_diff_(Rest, MyIOtherKvTree, FBItems, ReqItems,
+                           SigSize, VMod);
         {value, OtherVersionShort} ->
             MyIOtherKvTree2 = gb_trees:delete(KeyBin, MyIOtherKvTree),
             if VersionShort > OtherVersionShort ->
-                   get_part_diff(Rest, MyIOtherKvTree2, [Key | FBItems], ReqItems,
-                                 SigSize, VSize);
+                   get_part_diff_(Rest, MyIOtherKvTree2, [Key | FBItems], ReqItems,
+                                  SigSize, VMod);
                VersionShort =:= OtherVersionShort ->
-                   get_part_diff(Rest, MyIOtherKvTree2, FBItems, ReqItems,
-                                 SigSize, VSize);
+                   get_part_diff_(Rest, MyIOtherKvTree2, FBItems, ReqItems,
+                                  SigSize, VMod);
                true ->
-                   get_part_diff(Rest, MyIOtherKvTree2, FBItems, [Key | ReqItems],
-                                 SigSize, VSize)
+                   get_part_diff_(Rest, MyIOtherKvTree2, FBItems, [Key | ReqItems],
+                                  SigSize, VMod)
             end
     end.
 
@@ -814,16 +822,9 @@ get_part_diff([{Key, Version} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSiz
 %%      representation.
 %%      Similar to compress_kv_list/4.
 -spec compress_kv_pair(Key::?RT:key(), Version::db_dht:version(),
-                       SigSize::signature_size(), VSize::signature_size())
-        -> {BinKey::bitstring(), VersionShort::integer()}.
-compress_kv_pair(Key, Version, SigSize, VSize) ->
-    compress_kv_pair_(Key, Version, SigSize, util:pow(2, VSize)).
-
-%% @doc Helper for compress_kv_pair/4.
--spec compress_kv_pair_(Key::?RT:key(), Version::db_dht:version(),
                         SigSize::signature_size(), VMod::pos_integer())
         -> {BinKey::bitstring(), VersionShort::integer()}.
-compress_kv_pair_(Key, Version, SigSize, VMod) ->
+compress_kv_pair(Key, Version, SigSize, VMod) ->
     KeyBin = compress_key(Key, SigSize),
     VersionShort = Version rem VMod,
     {<<KeyBin/bitstring>>, VersionShort}.
