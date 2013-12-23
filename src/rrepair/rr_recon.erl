@@ -307,9 +307,12 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                                  {?key_upd, ToSend1, ToReq1},
                                  [{from_my_node, 0},
                                   {feedback_request, comm:make_global(OwnerL)}]}),
-               % we will get one reply from a subsequent feedback response
+               % we will get one or two replies from a subsequent feedback response
+               FBCount = if ToReq1 =/= [] -> 2;
+                            true -> 1
+                         end,
                rr_recon_stats:inc([{resolve_started, 1},
-                                   {await_rs_fb, 1}], Stats);
+                                   {await_rs_fb, FBCount}], Stats);
            true ->
                Stats
         end,
