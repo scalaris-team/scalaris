@@ -91,8 +91,19 @@ create_value_({builtin_type, gb_tree}, Size, ParseState) ->
         [] -> T;
         _ -> lists:foldl(
                fun(X, Acc) ->
-                       try gb_trees:insert(element(1, X), element(2,X), Acc) of
-                           Y -> Y
+                       try gb_trees:insert(element(1, X), element(2,X), Acc)
+                       catch _:_ -> Acc
+                       end
+               end, T, L)
+    end;
+create_value_({builtin_type, gb_set}, Size, ParseState) ->
+    L = create_value({list, {typedef, tester, test_any}}, Size, ParseState),
+    T = gb_sets:empty(),
+    case L of
+        [] -> T;
+        _ -> lists:foldl(
+               fun(X, Acc) ->
+                       try gb_sets:insert(X, Acc)
                        catch _:_ -> Acc
                        end
                end, T, L)
