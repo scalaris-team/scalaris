@@ -180,8 +180,7 @@ on({get_entries_response, EntryList}, State =
            shutdown(resolve_ok, NewState);
        true ->
            % note: shutdown and feedback handled by update_key_entry_ack
-           NewState#rr_resolve_state{feedbackKvv =
-                                      {lists:append(FbKVV, KvvList), MyIOtherKvTree}}
+           NewState
     end;
 
 on({get_state_response, MyI}, State =
