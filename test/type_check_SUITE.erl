@@ -347,6 +347,7 @@ tester_type_check_rrepair(_Config) ->
              {shutdown, 2}, %% tries to send messages
              {calc_signature_size_1_to_n, 3}, %% needs float > 0
              {calc_signature_size_n_pair, 3}, %% needs float > 0
+             {compress_kv_list_p1e, 3}, %% needs float > 0, =< 1
              {check_node, 3}, %% needs merkle_tree/nodes with hashes
              {p_check_node, 7}, %% needs merkle_tree/nodes with hashes
              {process_tree_cmp_result, 5}, %% needs matching result and merkle nodes

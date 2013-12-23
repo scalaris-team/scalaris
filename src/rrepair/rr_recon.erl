@@ -86,6 +86,7 @@
 -record(bloom_recon_struct,
         {
          interval = intervals:empty()                       :: intervals:interval(),
+         reconPid = undefined                               :: comm:mypid() | undefined,
          bloom    = ?required(bloom_recon_struct, bloom)    :: bloom:bloom_filter()
         }).
 
@@ -159,6 +160,8 @@
     request() |
     % trivial sync messages
     {resolve_req, BinKeys::bitstring(), SigSize::signature_size()} |
+    {resolve_req, DBChunk::bitstring(), SigSize::signature_size(),
+     VSize::signature_size(), SenderPid::comm:mypid()} |
     % merkle tree sync messages
     {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), SigSize::signature_size()} |
     {?check_nodes, ToCheck::bitstring(), SigSize::signature_size()} |
@@ -202,6 +205,7 @@ on({create_struct2, {get_state_response, MyI}} = _Msg,
         false ->
             case RMethod of
                 trivial -> fd:subscribe(DestRRPid);
+                bloom   -> fd:subscribe(DestRRPid);
                 merkle_tree -> fd:subscribe(DestRRPid);
                 _ -> ok
             end,
@@ -243,8 +247,10 @@ on({start_recon, RMethod, Params} = _Msg, State) ->
             Reconcile = resolve,
             Stage = resolve;
         bloom ->
-            MySyncI = Params#bloom_recon_struct.interval,
-            DestReconPid = undefined,
+            #bloom_recon_struct{interval = MySyncI,
+                                reconPid = DestReconPid} = Params,
+            ?ASSERT(DestReconPid =/= undefined),
+            fd:subscribe(DestReconPid),
             Params1 = Params,
             Reconcile = reconcile,
             Stage = reconciliation;
@@ -269,6 +275,7 @@ on({start_recon, RMethod, Params} = _Msg, State) ->
     send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), Reconcile),
     State#rr_recon_state{stage = Stage, params = Params1,
                          method = RMethod, initiator = true,
+                         my_sync_interval = MySyncI,
                          dest_recon_pid = DestReconPid};
 
 on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
@@ -283,7 +290,7 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
     ?TRACE1(_Msg, State),
 
     {ToSend1, ToReq1, OtherDBChunk1} =
-        get_diff(DBList, OtherDBChunk, ToSend, ToReq, SigSize, VSize),
+        get_full_diff(DBList, OtherDBChunk, ToSend, ToReq, SigSize, VSize),
 
     %if rest interval is non empty start another sync
     SID = rr_recon_stats:get(session_id, Stats),
@@ -336,8 +343,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
    State = #rr_recon_state{stage = reconciliation,     initiator = true,
                            method = bloom,             dhtNodePid = DhtNodePid,
                            params = #bloom_recon_struct{bloom = BF},
-                           dest_rr_pid = DestRR_Pid,   stats = Stats,
-                           ownerPid = OwnerL}) ->
+                           stats = Stats,              kv_list = KVList,
+                           dest_recon_pid = DestReconPid}) ->
     ?TRACE1(_Msg, State),
     % no need to map keys since the other node's bloom filter was created with
     % keys mapped to our interval
@@ -345,27 +352,40 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                0 -> DBList0;
                _ -> [X || X <- DBList0, not bloom:is_element(BF, X)]
            end,
+    NewKVList = lists:append(KVList, Diff),
+
     %if rest interval is non empty start another sync
-    SID = rr_recon_stats:get(session_id, Stats),
     SyncFinished = intervals:is_empty(RestI),
     if not SyncFinished ->
-           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), reconcile);
-       true -> ok
-    end,
-    ?TRACE("Reconcile Bloom Session=~p ; Diff=~p", [SID, length(Diff)]),
-    NewStats =
-        case Diff of
-            [_|_] ->
-                send(DestRR_Pid, {request_resolve, SID,
-                                  {?key_upd2, Diff, comm:make_global(OwnerL)},
-                                    [{from_my_node, 0}]}),
-                % we will get one reply from a subsequent ?key_upd resolve
-                rr_recon_stats:inc([{resolve_started, 1}], Stats);
-            [] -> Stats
-        end,
-    NewState = State#rr_recon_state{stats = NewStats},
-    if SyncFinished -> shutdown(sync_finished, NewState);
-       true         -> NewState
+           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), reconcile),
+           State#rr_recon_state{kv_list = NewKVList};
+       true ->
+           ?TRACE("Reconcile Bloom Session=~p ; Diff=~p",
+                  [rr_recon_stats:get(session_id, Stats), length(NewKVList)]),
+           case NewKVList of
+               [_|_] ->
+                   % start resolve similar to a trivial recon but using the full diff!
+                   % (as if non-initiator in trivial recon)
+                   {BuildTime, {DBChunk, SigSize, VSize}} =
+                       util:tc(fun() ->
+                                       compress_kv_list_p1e(NewKVList,
+                                                            bloom:item_count(BF),
+                                                            get_p1e())
+                               end),
+                    
+                    send(DestReconPid, {resolve_req, DBChunk, SigSize, VSize,
+                                        comm:this()}),
+                    % we will get one reply from a subsequent ?key_upd resolve
+                    NewStats = rr_recon_stats:inc([{resolve_started, 1},
+                                                   {build_time, BuildTime}], Stats),
+                    State#rr_recon_state{stats = NewStats, stage = resolve,
+                                         kv_list = NewKVList};
+               [] ->
+                   % must send resolve_req message for the non-initiator to shut down
+                    send(DestReconPid, {resolve_req, <<>>, 1, 1, comm:this()}),
+                   % note: kv_list has not changed, we can thus use the old State here:
+                   shutdown(sync_finished, State)
+           end
     end;
 
 on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
@@ -393,13 +413,16 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     kill;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% trivial reconciliation sync messages
+%% trivial/bloom reconciliation sync messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({resolve_req, BinKeys, SigSize} = _Msg,
-   State = #rr_recon_state{stage = resolve,           initiator = false,
+   State = #rr_recon_state{stage = resolve,           initiator = Initiator,
+                           method = RMethod,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
-                           kv_list = KVList,          stats = Stats}) ->
+                           kv_list = KVList,          stats = Stats})
+  when (RMethod =:= trivial andalso not Initiator) orelse
+           (RMethod =:= bloom andalso Initiator) ->
     ?TRACE1(_Msg, State),
     ReqSet = decompress_k_list(BinKeys, gb_sets:empty(), SigSize),
     NewStats =
@@ -411,16 +434,64 @@ on({resolve_req, BinKeys, SigSize} = _Msg,
                                                     ReqSet)],
                 
                 SID = rr_recon_stats:get(session_id, Stats),
-                % note: the resolve request was counted at the initiator and
-                %       thus from_my_node must be 0 on this node!
+                % note: the resolve request is counted at the initiator and
+                %       thus from_my_node must be set accordingly on this node!
                 send_local(OwnerL, {request_resolve, SID,
                                     {key_upd_send, DestRRPid, ReqKeys, []},
                                     [{feedback_request, comm:make_global(OwnerL)},
-                                     {from_my_node, 0}]}),
+                                     {from_my_node, ?IIF(Initiator, 1, 0)}]}),
                 % we will get one reply from a subsequent ?key_upd resolve
                 rr_recon_stats:inc([{resolve_started, 1}], Stats)
         end,
     shutdown(sync_finished, State#rr_recon_state{stats = NewStats});
+
+on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = false,
+                           method = bloom,
+                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
+                           kv_list = KVList,          stats = Stats}) ->
+    ?TRACE1(_Msg, State),
+    
+    DBChunkTree =
+        decompress_kv_list(DBChunk, gb_trees:empty(), SigSize, VSize),
+
+    NewStats2 =
+        case gb_sets:is_empty(DBChunkTree) of
+            true ->
+                % nothing to do if the chunk is empty:
+                Stats;
+            _ ->
+                SID = rr_recon_stats:get(session_id, Stats),
+                {ToSendKeys1, ToReq1, DBChunkTree1} =
+                    get_part_diff(KVList, DBChunkTree, [], [], SigSize, VSize),
+                ?TRACE("Resolve Bloom Session=~p ; ToSend=~p ; ToReq=~p",
+                       [SID, length(ToSendKeys1), length(ToReq1)]),
+                
+                % note: the resolve request was counted at the initiator and
+                %       thus from_my_node must be 0 on this node!
+                send_local(OwnerL, {request_resolve, SID,
+                                    {key_upd_send, DestRRPid, ToSendKeys1, ToReq1},
+                                    [{from_my_node, 0},
+                                     {feedback_request, comm:make_global(OwnerL)}]}),
+                % we will get one reply from a subsequent feedback response
+                NewStats1 = rr_recon_stats:inc([{resolve_started, 1}], Stats),
+                
+                % let the initiator's rr_recon process identify the remaining keys
+                Req2Count = gb_trees:size(DBChunkTree1),
+                ToReq2 = util:gb_trees_foldl(
+                           fun(KeyBin, _VersionShort, Acc) ->
+                                   <<Acc/bitstring, KeyBin/bitstring>>
+                           end, <<>>, DBChunkTree1),
+                ?TRACE("resolve_req Bloom Session=~p ; ToReq=~p (~p bits)",
+                       [SID, Req2Count, erlang:bit_size(ToReq2)]),
+                comm:send(DestReconPid, {resolve_req, ToReq2, SigSize}),
+                if Req2Count > 0 ->
+                       rr_recon_stats:inc([{resolve_started, 1}], NewStats1);
+                   true -> NewStats1
+                end
+        end,
+
+    shutdown(sync_finished, State#rr_recon_state{stats = NewStats2});
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% merkle tree sync messages
@@ -561,7 +632,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct = {},
     send(DestRRPid, {?IIF(SID =:= null, start_recon, continue_recon),
                      comm:make_global(OwnerL), SID,
                      {start_recon, bloom, MySyncStruct}}),
-    shutdown(sync_finished, State#rr_recon_state{kv_list = []});
+    State#rr_recon_state{struct = {}, stage = resolve};
 begin_sync(MySyncStruct, _OtherSyncStruct,
            State = #rr_recon_state{method = merkle_tree, initiator = Initiator,
                                    ownerPid = OwnerL, stats = Stats,
@@ -674,30 +745,65 @@ decompress_kv_list(Bin, Tree, SigSize, VSize) ->
     Tree1 = gb_trees:enter(KeyBin, Version, Tree),
     decompress_kv_list(T, Tree1, SigSize, VSize).
 
--spec get_diff(MyEntries::db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
-               AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
-               SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
-get_diff([], MyIOtherKvTree, FBItems, ReqItems, _SigSize, _VSize) ->
+%% @doc Gets all entries from MyEntries which are not encoded in MyIOtherKvTree
+%%      or the entry in MyEntries has a newer version than the one in the tree
+%%      and returns them as FBItems. ReqItems contains items in the tree but
+%%      where the version in MyEntries is older than the one in the tree.
+-spec get_full_diff(MyEntries::db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
+                    AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
+                    SigSize::signature_size(), VSize::signature_size())
+-> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+get_full_diff([], MyIOtherKvTree, FBItems, ReqItems, _SigSize, _VSize) ->
     {FBItems, ReqItems, MyIOtherKvTree};
-get_diff([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
+get_full_diff([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
     {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VSize),
     case gb_trees:lookup(KeyBin, MyIOtherKvTree) of
         none ->
-            get_diff(Rest, MyIOtherKvTree, [{Key, Value, Version} | FBItems],
-                     ReqItems, SigSize, VSize);
+            get_full_diff(Rest, MyIOtherKvTree,
+                          [{Key, Value, Version} | FBItems], ReqItems,
+                          SigSize, VSize);
         {value, OtherVersionShort} ->
             MyIOtherKvTree2 = gb_trees:delete(KeyBin, MyIOtherKvTree),
             if VersionShort > OtherVersionShort ->
-                   get_diff(Rest, MyIOtherKvTree2,
-                            [{Key, Value, Version} | FBItems], ReqItems,
-                            SigSize, VSize);
+                   get_full_diff(Rest, MyIOtherKvTree2,
+                                 [{Key, Value, Version} | FBItems], ReqItems,
+                                 SigSize, VSize);
                VersionShort =:= OtherVersionShort ->
-                   get_diff(Rest, MyIOtherKvTree2, FBItems, ReqItems,
-                            SigSize, VSize);
+                   get_full_diff(Rest, MyIOtherKvTree2, FBItems, ReqItems,
+                                 SigSize, VSize);
                true ->
-                   get_diff(Rest, MyIOtherKvTree2, FBItems, [Key | ReqItems],
-                            SigSize, VSize)
+                   get_full_diff(Rest, MyIOtherKvTree2, FBItems, [Key | ReqItems],
+                                 SigSize, VSize)
+            end
+    end.
+
+%% @doc Gets all entries from MyEntries which are in MyIOtherKvTree
+%%      and the entry in MyEntries has a newer version than the one in the tree
+%%      and returns them as FBItems. ReqItems contains items in the tree but
+%%      where the version in MyEntries is older than the one in the tree.
+-spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::gb_tree(),
+                    AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
+                    SigSize::signature_size(), VSize::signature_size())
+        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+get_part_diff([], MyIOtherKvTree, FBItems, ReqItems, _SigSize, _VSize) ->
+    {FBItems, ReqItems, MyIOtherKvTree};
+get_part_diff([{Key, Version} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
+    {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VSize),
+    case gb_trees:lookup(KeyBin, MyIOtherKvTree) of
+        none ->
+            get_part_diff(Rest, MyIOtherKvTree, FBItems, ReqItems,
+                          SigSize, VSize);
+        {value, OtherVersionShort} ->
+            MyIOtherKvTree2 = gb_trees:delete(KeyBin, MyIOtherKvTree),
+            if VersionShort > OtherVersionShort ->
+                   get_part_diff(Rest, MyIOtherKvTree2, [Key | FBItems], ReqItems,
+                                 SigSize, VSize);
+               VersionShort =:= OtherVersionShort ->
+                   get_part_diff(Rest, MyIOtherKvTree2, FBItems, ReqItems,
+                                 SigSize, VSize);
+               true ->
+                   get_part_diff(Rest, MyIOtherKvTree2, FBItems, [Key | ReqItems],
+                                 SigSize, VSize)
             end
     end.
 
@@ -1040,20 +1146,15 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
-                         DestI::intervals:non_empty_interval(), db_chunk_kv(),
-                         Params::parameters() | {}, BeginSync::boolean())
-        -> sync_struct().
-build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
-    ?ASSERT(not intervals:is_empty(I)),
-    P1E = get_p1e(),
-    ElementNum = length(DBItems),
+-spec compress_kv_list_p1e(Items::db_chunk_kv(), ItemCount::non_neg_integer(), P1E::float())
+        -> {DBChunk::bitstring(), SigSize::signature_size(), VSize::signature_size()}.
+compress_kv_list_p1e(DBItems, ItemCount, P1E) ->
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize0 = calc_signature_size_n_pair(ElementNum, P1E, 128),
+    SigSize0 = calc_signature_size_n_pair(ItemCount, P1E, 128),
     % note: we have n one-to-one comparisons, assuming the probability of a
     %       failure in a single one-to-one comparison is p, the overall
     %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
-    VP = 1 - math:pow(1 - P1E, 1 / erlang:max(1, ElementNum)),
+    VP = 1 - math:pow(1 - P1E, 1 / erlang:max(1, ItemCount)),
     VSize0 = calc_signature_size_1_to_n(1, VP, 128),
     % note: we can reach the best compression if values and versions align to
     %       byte-boundaries
@@ -1068,6 +1169,16 @@ build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
              erlang:bit_size(
                  erlang:term_to_binary(DBChunkBin,
                                        [{minor_version, 1}, {compressed, 2}]))]),
+    {DBChunkBin, SigSize, VSize}.
+
+-spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
+                         DestI::intervals:non_empty_interval(), db_chunk_kv(),
+                         Params::parameters() | {}, BeginSync::boolean())
+        -> sync_struct().
+build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
+    ?ASSERT(not intervals:is_empty(I)),
+    {DBChunkBin, SigSize, VSize} =
+        compress_kv_list_p1e(DBItems, length(DBItems), get_p1e()),
     #trivial_recon_struct{interval = I, reconPid = comm:this(),
                           db_chunk = DBChunkBin,
                           sig_size = SigSize, ver_size = VSize};
@@ -1079,7 +1190,7 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     ElementNum = length(DBItems),
     BF0 = bloom:new_p1e(ElementNum, P1E),
     BF = bloom:add_list(BF0, DBItems),
-    #bloom_recon_struct{ interval = I, bloom = BF };
+    #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, BeginSync) ->
     ?ASSERT(not intervals:is_empty(I)),
     case Params of
