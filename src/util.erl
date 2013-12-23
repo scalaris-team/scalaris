@@ -1391,8 +1391,7 @@ extint2atom(X) when is_integer(X) ->
         ?check_nodes -> ?check_nodes_atom;
         ?check_nodes_response -> ?check_nodes_response_atom;
         ?key_upd -> ?key_upd_atom;
-        ?interval_upd -> ?interval_upd_atom;
-        ?key_upd2 -> ?key_upd2_atom
+        ?interval_upd -> ?interval_upd_atom
     end.
 -endif.
 

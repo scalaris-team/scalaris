@@ -175,6 +175,3 @@
 
 -define(interval_upd_atom, interval_upd).
 -define(interval_upd, ?int_or_atom(104, ?interval_upd_atom)).
-
--define(key_upd2_atom, key_upd2).
--define(key_upd2, ?int_or_atom(105, ?key_upd2_atom)).

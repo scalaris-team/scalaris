@@ -75,7 +75,6 @@
 
 -type operation() ::
     {?key_upd, KvvListInAnyQ::kvv_list(), ReqKeys::[?RT:key()]} |
-    {?key_upd2, KvListInAnyQ::[{?RT:key(), db_dht:version()}], DestPid::comm:mypid()} |
     {key_upd_send, DestPid::comm:mypid(), SendKeys::[?RT:key()], ReqKeys::[?RT:key()]} |
     {?interval_upd, intervals:interval(), KvvListInAnyQ::kvv_list()} |
     {interval_upd_send, intervals:interval(), DestPid::comm:mypid()} |
@@ -182,53 +181,6 @@ on({get_entries_response, EntryList}, State =
            % note: shutdown and feedback handled by update_key_entry_ack
            NewState
     end;
-
-on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {?key_upd2, KvList, DestPid},
-                          dhtNodePid = DhtPid, stats = Stats }) ->
-    MyIOtherKvList = map_kvv_list(KvList, MyI),
-    ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p~n KVListLen=~p",
-           [key_upd2, Stats#resolve_stats.session_id, MyI, length(KvList)], State),
-    
-    % get local entries for comparison
-    RepKeyInt = intervals:from_elements([KeyX || {KeyX, _VerX} <- MyIOtherKvList]),
-    comm:send_local(DhtPid,
-               {get_chunk, self(), RepKeyInt, fun rr_recon:get_chunk_filter/1,
-                fun rr_recon:get_chunk_kvv/1, all}),
-    
-    % convert keys KvList to a gb_tree for faster access checks
-    MyIOtherKvTree =
-        lists:foldl(fun({KeyX, VersionX}, TreeX) ->
-                            % assume, KVs at the same node have the same version
-                            gb_trees:enter(KeyX, VersionX, TreeX)
-                    end, gb_trees:empty(), MyIOtherKvList),
-    
-    % allow the garbage collection to clean up the KvvList and ReqKeys here:
-    State#rr_resolve_state{operation = {?key_upd2, [], DestPid},
-                           stats = Stats#resolve_stats{diff_size = gb_trees:size(MyIOtherKvTree)},
-                           feedbackKvv = {[], MyIOtherKvTree}};
-
-on({get_chunk_response, {_RestI, KvvList}}, State =
-       #rr_resolve_state{ operation = {?key_upd2, [], Dest},
-                          feedbackKvv = {[], MyIOtherKvTree},
-                          from_my_node = FromMyNode, stats = Stats}) ->
-    ?ASSERT(State#rr_resolve_state.feedbackDestPid =:= undefined),
-    ?ASSERT(intervals:is_empty(_RestI)),
-    SID = Stats#resolve_stats.session_id,
-    ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
-           [key_upd2, SID, length(KvvList)], State),
-    
-    {FBItems, ReqItems0, MyIOtherKvTree1} =
-        get_diff(KvvList, MyIOtherKvTree, [], []),
-    ReqItems = lists:append(gb_trees:keys(MyIOtherKvTree1), ReqItems0),
-    FBDest = comm:make_global(pid_groups:get_my(rrepair)),
-    ResStarted = send_request_resolve(Dest, {?key_upd, FBItems, ReqItems}, SID,
-                                      FromMyNode, FBDest, [], false),
-
-    NewState =
-        State#rr_resolve_state{stats = Stats#resolve_stats{resolve_started = ResStarted},
-                               feedbackDestPid = undefined},
-    shutdown(resolve_ok, NewState);
 
 on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd_send, _Dest, SendKeys, ReqKeys},
