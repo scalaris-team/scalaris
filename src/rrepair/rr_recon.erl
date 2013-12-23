@@ -225,7 +225,8 @@ on({create_struct2, DestI, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                                  none =/= (Key = map_key_to_interval(KeyX, DestI))],
     build_struct(DBList, DestI, RestI, State);
 
-on({start_recon, RMethod, Params} = _Msg, State) ->
+on({start_recon, RMethod, Params} = _Msg,
+   State = #rr_recon_state{dest_rr_pid = DestRRPid}) ->
     ?TRACE1(_Msg, State),
     % initiator got other node's sync struct or parameters over sync interval
     % (mapped to the initiator's range)
@@ -239,7 +240,7 @@ on({start_recon, RMethod, Params} = _Msg, State) ->
                                   db_chunk = DBChunk,
                                   sig_size = SigSize, ver_size = VSize} = Params,
             ?ASSERT(DestReconPid =/= undefined),
-            fd:subscribe(DestReconPid),
+            fd:subscribe(DestRRPid),
             % convert db_chunk to a gb_tree for faster access checks
             DBChunkTree =
                 decompress_kv_list(DBChunk, gb_trees:empty(), SigSize, VSize),
@@ -250,14 +251,14 @@ on({start_recon, RMethod, Params} = _Msg, State) ->
             #bloom_recon_struct{interval = MySyncI,
                                 reconPid = DestReconPid} = Params,
             ?ASSERT(DestReconPid =/= undefined),
-            fd:subscribe(DestReconPid),
+            fd:subscribe(DestRRPid),
             Params1 = Params,
             Reconcile = reconcile,
             Stage = reconciliation;
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
             ?ASSERT(DestReconPid =/= undefined),
-            fd:subscribe(DestReconPid),
+            fd:subscribe(DestRRPid),
             Params1 = Params,
             Reconcile = reconcile,
             Stage = reconciliation;
