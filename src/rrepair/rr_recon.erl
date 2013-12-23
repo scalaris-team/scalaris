@@ -1180,7 +1180,8 @@ compress_kv_list_p1e(DBItems, ItemCount, VCompareCount, P1E) ->
     %       failure in a single one-to-one comparison is p, the overall
     %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
     VP = 1 - math:pow(1 - P1E, 1 / erlang:max(1, VCompareCount)),
-    VSize0 = calc_signature_size_1_to_n(1, VP, 128),
+    VSize0 = erlang:max(get_min_version_bits(),
+                        calc_signature_size_1_to_n(1, VP, 128)),
     % note: we can reach the best compression if values and versions align to
     %       byte-boundaries
     FullKVSize0 = SigSize0 + VSize0,
@@ -1545,7 +1546,11 @@ check_config() ->
 get_p1e() ->
     config:read(rr_recon_p1e).
 
-%% @doc Sepcifies how many items to retrieve from the DB at once. 
+%% @doc Use at least these many bits for compressed version numbers.
+-spec get_min_version_bits() -> 16.
+get_min_version_bits() -> 16.
+
+%% @doc Specifies how many items to retrieve from the DB at once.
 %%      Tries to reduce the load of a single request in the dht_node process.
 -spec get_max_items() -> pos_integer() | all.
 get_max_items() ->
