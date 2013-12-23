@@ -88,6 +88,7 @@
          my_range       = undefined                               :: undefined | intervals:interval(),
          fb_dest_pid    = undefined                               :: undefined | comm:mypid(),
          fb_send_kvv    = []                                      :: OutdatedOnOther::kvv_list(),
+         fb_send_kvv_req= []                                      :: RequestedByOther::kvv_list(),
          other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_tree(),
          send_stats     = undefined                               :: undefined | comm:mypid(),
          stats          = #resolve_stats{}                        :: stats(),
@@ -162,7 +163,7 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {?key_upd, MyIOtherKvvList, []},
-                          dhtNodePid = DhtPid, fb_send_kvv = FbKVV,
+                          dhtNodePid = DhtPid, fb_send_kvv_req = FbReqKVV,
                           stats = Stats}) ->
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     ToUpdate = start_update_key_entry(MyIOtherKvvList, comm:this(), DhtPid),
@@ -170,9 +171,10 @@ on({get_entries_response, EntryList}, State =
            [key_upd, Stats#resolve_stats.session_id, ToUpdate, length(EntryList)], State),
     
     % allow the garbage collection to clean up the KvvList here:
-    NewState = State#rr_resolve_state{operation = {?key_upd, [], []},
-                                      stats = Stats#resolve_stats{diff_size = ToUpdate},
-                                      fb_send_kvv = lists:append(FbKVV, KvvList)},
+    NewState =
+        State#rr_resolve_state{operation = {?key_upd, [], []},
+                               stats = Stats#resolve_stats{diff_size = ToUpdate},
+                               fb_send_kvv_req = lists:append(FbReqKVV, KvvList)},
     
     if ToUpdate =:= 0 ->
            % use the same options as above in get_state_response:
@@ -199,8 +201,12 @@ on({get_entries_response, EntryList}, State =
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
            [key_upd_send, SID, length(EntryList)], State),
     KvvList = [entry_to_kvv(E) || E <- EntryList],
+    % note: if ReqKeys contains any entries, we will get 2 replies per resolve!
+    FBCount = if ReqKeys =/= [] -> 2;
+                 true -> 1
+              end,
     ResStarted = send_request_resolve(Dest, {?key_upd, KvvList, ReqKeys}, SID,
-                                      FromMyNode, FBDest, [], false),
+                                      FromMyNode, FBDest, [], false) * FBCount,
 
     NewState =
         State#rr_resolve_state{stats = Stats#resolve_stats{resolve_started = ResStarted},
@@ -458,16 +464,27 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
                                     stats = #resolve_stats{resolve_started = ResStarted0} = Stats,
                                     operation = _Op, fb_dest_pid = FBDest,
                                     fb_send_kvv = FbKVV,
+                                    fb_send_kvv_req = FbReqKVV,
                                     from_my_node = FromMyNode} = _State) ->
     ?TRACE("SHUTDOWN ~p - Operation=~p~n SessionId:~p~n ~p items via key_upd to ~p~n Items: ~.2p",
            [_Reason, util:extint2atom(element(1, _Op)), Stats#resolve_stats.session_id,
             length(FbKVV), FBDest, FbKVV], _State),
     ResStarted =
         case FBDest of
-            undefined -> 0;
-            _ -> send_request_resolve(FBDest, {?key_upd, FbKVV, []},
-                                      Stats#resolve_stats.session_id,
-                                      FromMyNode, undefined, [], true)
+            undefined ->
+                0;
+            _ when FbReqKVV =:= [] ->
+                send_request_resolve(FBDest, {?key_upd, FbKVV, []},
+                                     Stats#resolve_stats.session_id,
+                                     FromMyNode, undefined, [], true);
+            _ ->
+                send_request_resolve(FBDest, {?key_upd, FbKVV, []},
+                                     Stats#resolve_stats.session_id,
+                                     FromMyNode, undefined, [], true) +
+                    send_request_resolve(FBDest, {?key_upd, FbReqKVV, []},
+                                         Stats#resolve_stats.session_id,
+                                         FromMyNode, comm:make_global(Owner),
+                                         [], true)
         end,
     Stats1 = Stats#resolve_stats{resolve_started = ResStarted0 + ResStarted},
     send_stats(SendStats, Stats1),
