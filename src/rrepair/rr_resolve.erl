@@ -87,6 +87,7 @@
          my_range       = undefined                               :: undefined | intervals:interval(),
          fb_dest_pid    = undefined                               :: undefined | comm:mypid(),
          fb_send_kvv    = []                                      :: OutdatedOnOther::kvv_list(),
+         fb_had_kvv_req = false                                   :: NonEmptyReqList::boolean(),
          fb_send_kvv_req= []                                      :: RequestedByOther::kvv_list(),
          other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_tree(),
          send_stats     = undefined                               :: undefined | comm:mypid(),
@@ -158,7 +159,8 @@ on({get_state_response, MyI}, State =
     % allow the garbage collection to clean up the ReqKeys here:
     % also update the KvvList
     State#rr_resolve_state{operation = {?key_upd, MyIOtherKvvList, []},
-                           other_kv_tree = MyIOtherKvTree};
+                           other_kv_tree = MyIOtherKvTree,
+                           fb_had_kvv_req = ReqKeys =/= []};
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {?key_upd, MyIOtherKvvList, []},
@@ -440,6 +442,7 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
                                     stats = #resolve_stats{resolve_started = ResStarted0} = Stats,
                                     operation = _Op, fb_dest_pid = FBDest,
                                     fb_send_kvv = FbKVV,
+                                    fb_had_kvv_req = SendReqKeyReply,
                                     fb_send_kvv_req = FbReqKVV,
                                     from_my_node = FromMyNode} = _State) ->
     ?TRACE("SHUTDOWN ~p - Operation=~p~n SessionId:~p~n ~p items via key_upd to ~p~n Items: ~.2p",
@@ -449,7 +452,7 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
         case FBDest of
             undefined ->
                 0;
-            _ when FbReqKVV =:= [] ->
+            _ when not SendReqKeyReply ->
                 send_request_resolve(FBDest, {?key_upd, FbKVV, []},
                                      Stats#resolve_stats.session_id,
                                      FromMyNode, undefined, [], true);
