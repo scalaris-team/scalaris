@@ -460,7 +460,7 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
         decompress_kv_list(DBChunk, gb_trees:empty(), SigSize, VSize),
 
     NewStats2 =
-        case gb_sets:is_empty(DBChunkTree) of
+        case gb_trees:is_empty(DBChunkTree) of
             true ->
                 % nothing to do if the chunk is empty:
                 Stats;
