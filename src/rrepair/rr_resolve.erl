@@ -76,7 +76,7 @@
 -type operation() ::
     {?key_upd, KvvListInAnyQ::kvv_list(), ReqKeys::[?RT:key()]} |
     {?key_upd2, KvListInAnyQ::[{?RT:key(), db_dht:version()}], DestPid::comm:mypid()} |
-    {key_upd_send, DestPid::comm:mypid(), [?RT:key()]} |
+    {key_upd_send, DestPid::comm:mypid(), SendKeys::[?RT:key()], ReqKeys::[?RT:key()]} |
     {?interval_upd, intervals:interval(), KvvListInAnyQ::kvv_list()} |
     {interval_upd_send, intervals:interval(), DestPid::comm:mypid()} |
     {interval_upd_my, intervals:interval()}.
@@ -232,23 +232,23 @@ on({get_chunk_response, {_RestI, KvvList}}, State =
     shutdown(resolve_ok, NewState);
 
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {key_upd_send, _Dest, KeyList},
+       #rr_resolve_state{ operation = {key_upd_send, _Dest, SendKeys, ReqKeys},
                           dhtNodePid = DhtPid, stats = _Stats }) ->
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p",
            [key_upd_send, _Stats#resolve_stats.session_id, MyI], State),
-    RepKeyInt = intervals:from_elements(map_key_list(KeyList, MyI)),
-    comm:send_local(DhtPid, {get_entries, self(), RepKeyInt}),
+    SendKeysMappedInterval = intervals:from_elements(map_key_list(SendKeys, MyI)),
+    comm:send_local(DhtPid, {get_entries, self(), SendKeysMappedInterval}),
     State;
 
 on({get_entries_response, EntryList}, State =
-       #rr_resolve_state{ operation = {key_upd_send, Dest, _},
+       #rr_resolve_state{ operation = {key_upd_send, Dest, _, ReqKeys},
                           feedbackDestPid = FBDest, from_my_node = FromMyNode,
                           stats = Stats }) ->
     SID = Stats#resolve_stats.session_id,
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
            [key_upd_send, SID, length(EntryList)], State),
     KvvList = [entry_to_kvv(E) || E <- EntryList],
-    ResStarted = send_request_resolve(Dest, {?key_upd, KvvList, []}, SID,
+    ResStarted = send_request_resolve(Dest, {?key_upd, KvvList, ReqKeys}, SID,
                                       FromMyNode, FBDest, [], false),
 
     NewState =

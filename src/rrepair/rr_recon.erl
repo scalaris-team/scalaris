@@ -414,7 +414,7 @@ on({resolve_req, BinKeys, SigSize} = _Msg,
                 % note: the resolve request was counted at the initiator and
                 %       thus from_my_node must be 0 on this node!
                 send_local(OwnerL, {request_resolve, SID,
-                                    {key_upd_send, DestRRPid, ReqKeys},
+                                    {key_upd_send, DestRRPid, ReqKeys, []},
                                     [{feedback_request, comm:make_global(OwnerL)},
                                      {from_my_node, 0}]}),
                 % we will get one reply from a subsequent ?key_upd resolve
