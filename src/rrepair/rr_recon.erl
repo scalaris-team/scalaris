@@ -364,31 +364,31 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
            send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), reconcile),
            State#rr_recon_state{kv_list = NewKVList};
        true ->
+           FullDiffSize = length(NewKVList),
            ?TRACE("Reconcile Bloom Session=~p ; Diff=~p",
-                  [rr_recon_stats:get(session_id, Stats), length(NewKVList)]),
-           case NewKVList of
-               [_|_] ->
-                   % start resolve similar to a trivial recon but using the full diff!
-                   % (as if non-initiator in trivial recon)
-                   {BuildTime, {DBChunk, SigSize, VSize}} =
-                       util:tc(fun() ->
-                                       compress_kv_list_p1e(NewKVList,
-                                                            bloom:item_count(BF),
-                                                            get_p1e())
-                               end),
-                    
-                    send(DestReconPid, {resolve_req, DBChunk, SigSize, VSize,
-                                        comm:this()}),
-                    % we will get one reply from a subsequent ?key_upd resolve
-                    NewStats = rr_recon_stats:inc([{resolve_started, 1},
-                                                   {build_time, BuildTime}], Stats),
-                    State#rr_recon_state{stats = NewStats, stage = resolve,
-                                         kv_list = NewKVList};
-               [] ->
-                   % must send resolve_req message for the non-initiator to shut down
-                    send(DestReconPid, {resolve_req, <<>>, 1, 1, comm:this()}),
-                   % note: kv_list has not changed, we can thus use the old State here:
-                   shutdown(sync_finished, State)
+                  [rr_recon_stats:get(session_id, Stats), FullDiffSize]),
+           if FullDiffSize > 0 ->
+                  % start resolve similar to a trivial recon but using the full diff!
+                  % (as if non-initiator in trivial recon)
+                  {BuildTime, {DBChunk, SigSize, VSize}} =
+                      util:tc(fun() ->
+                                      compress_kv_list_p1e(
+                                        NewKVList, bloom:item_count(BF),
+                                        FullDiffSize, get_p1e())
+                              end),
+                  
+                  send(DestReconPid,
+                       {resolve_req, DBChunk, SigSize, VSize, comm:this()}),
+                  % we will get one reply from a subsequent ?key_upd resolve
+                  NewStats = rr_recon_stats:inc([{resolve_started, 1},
+                                                 {build_time, BuildTime}], Stats),
+                  State#rr_recon_state{stats = NewStats, stage = resolve,
+                                       kv_list = NewKVList};
+              true ->
+                  % must send resolve_req message for the non-initiator to shut down
+                  send(DestReconPid, {resolve_req, <<>>, 1, 1, comm:this()}),
+                  % note: kv_list has not changed, we can thus use the old State here:
+                  shutdown(sync_finished, State)
            end
     end;
 
@@ -1170,15 +1170,16 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec compress_kv_list_p1e(Items::db_chunk_kv(), ItemCount::non_neg_integer(), P1E::float())
+-spec compress_kv_list_p1e(Items::db_chunk_kv(), ItemCount::non_neg_integer(),
+                           VCompareCount::non_neg_integer(), P1E::float())
         -> {DBChunk::bitstring(), SigSize::signature_size(), VSize::signature_size()}.
-compress_kv_list_p1e(DBItems, ItemCount, P1E) ->
+compress_kv_list_p1e(DBItems, ItemCount, VCompareCount, P1E) ->
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
     SigSize0 = calc_signature_size_n_pair(ItemCount, P1E, 128),
     % note: we have n one-to-one comparisons, assuming the probability of a
     %       failure in a single one-to-one comparison is p, the overall
     %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
-    VP = 1 - math:pow(1 - P1E, 1 / erlang:max(1, ItemCount)),
+    VP = 1 - math:pow(1 - P1E, 1 / erlang:max(1, VCompareCount)),
     VSize0 = calc_signature_size_1_to_n(1, VP, 128),
     % note: we can reach the best compression if values and versions align to
     %       byte-boundaries
@@ -1201,8 +1202,9 @@ compress_kv_list_p1e(DBItems, ItemCount, P1E) ->
         -> sync_struct().
 build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     ?ASSERT(not intervals:is_empty(I)),
+    ItemCount = length(DBItems),
     {DBChunkBin, SigSize, VSize} =
-        compress_kv_list_p1e(DBItems, length(DBItems), get_p1e()),
+        compress_kv_list_p1e(DBItems, ItemCount, ItemCount, get_p1e()),
     #trivial_recon_struct{interval = I, reconPid = comm:this(),
                           db_chunk = DBChunkBin,
                           sig_size = SigSize, ver_size = VSize};
