@@ -86,8 +86,9 @@
          dhtNodePid     = ?required(rr_resolve_state, dhtNodePid) :: comm:erl_local_pid(),
          operation      = undefined                               :: undefined | operation(),
          my_range       = undefined                               :: undefined | intervals:interval(),
-         feedbackDestPid= undefined                               :: undefined | comm:mypid(),
-         feedbackKvv    = {[], gb_trees:empty()}                  :: {MissingOnOther::kvv_list(), MyIOtherKvTree::gb_tree()},
+         fb_dest_pid    = undefined                               :: undefined | comm:mypid(),
+         fb_send_kvv    = []                                      :: OutdatedOnOther::kvv_list(),
+         other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_tree(),
          send_stats     = undefined                               :: undefined | comm:mypid(),
          stats          = #resolve_stats{}                        :: stats(),
          from_my_node   = 1                                       :: 0 | 1
@@ -123,7 +124,7 @@ on({start, Operation, Options}, State) ->
     SID = proplists:get_value(session_id, Options, null),
     NewState = State#rr_resolve_state{ operation = Operation,
                                        stats = #resolve_stats{session_id = SID},
-                                       feedbackDestPid = FBDest,
+                                       fb_dest_pid = FBDest,
                                        send_stats = StatsDest,
                                        from_my_node = FromMyNode },
     ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p~n SessionId:~p",
@@ -157,11 +158,11 @@ on({get_state_response, MyI}, State =
     % allow the garbage collection to clean up the ReqKeys here:
     % also update the KvvList
     State#rr_resolve_state{operation = {?key_upd, MyIOtherKvvList, []},
-                           feedbackKvv = {[], MyIOtherKvTree}};
+                           other_kv_tree = MyIOtherKvTree};
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {?key_upd, MyIOtherKvvList, []},
-                          dhtNodePid = DhtPid, feedbackKvv = {FbKVV, MyIOtherKvTree},
+                          dhtNodePid = DhtPid, fb_send_kvv = FbKVV,
                           stats = Stats}) ->
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     ToUpdate = start_update_key_entry(MyIOtherKvvList, comm:this(), DhtPid),
@@ -171,8 +172,7 @@ on({get_entries_response, EntryList}, State =
     % allow the garbage collection to clean up the KvvList here:
     NewState = State#rr_resolve_state{operation = {?key_upd, [], []},
                                       stats = Stats#resolve_stats{diff_size = ToUpdate},
-                                      feedbackKvv = {lists:append(FbKVV, KvvList),
-                                                     MyIOtherKvTree}},
+                                      fb_send_kvv = lists:append(FbKVV, KvvList)},
     
     if ToUpdate =:= 0 ->
            % use the same options as above in get_state_response:
@@ -193,7 +193,7 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {key_upd_send, Dest, _, ReqKeys},
-                          feedbackDestPid = FBDest, from_my_node = FromMyNode,
+                          fb_dest_pid = FBDest, from_my_node = FromMyNode,
                           stats = Stats }) ->
     SID = Stats#resolve_stats.session_id,
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
@@ -204,7 +204,7 @@ on({get_entries_response, EntryList}, State =
 
     NewState =
         State#rr_resolve_state{stats = Stats#resolve_stats{resolve_started = ResStarted},
-                               feedbackDestPid = undefined},
+                               fb_dest_pid = undefined},
     shutdown(resolve_ok, NewState);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -265,7 +265,8 @@ on({get_entries_response, EntryList}, State =
     % allow the garbage collection to clean up the KvvList here:
     NewState = State#rr_resolve_state{operation = {?interval_upd, I, []},
                                       stats = Stats#resolve_stats{diff_size = ToUpdate},
-                                      feedbackKvv = {MissingOnOther, MyIOtherKvTree}},
+                                      fb_send_kvv = MissingOnOther,
+                                      other_kv_tree = MyIOtherKvTree},
     if ToUpdate =:= 0 ->
            shutdown(resolve_ok, NewState);
        true ->
@@ -275,7 +276,7 @@ on({get_entries_response, EntryList}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {interval_upd_send, I, Dest},
-                          feedbackDestPid = FBDest, from_my_node = FromMyNode,
+                          fb_dest_pid = FBDest, from_my_node = FromMyNode,
                           stats = Stats }) ->
     SID = Stats#resolve_stats.session_id,
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
@@ -287,7 +288,7 @@ on({get_entries_response, EntryList}, State =
 
     NewState =
         State#rr_resolve_state{stats = Stats#resolve_stats{resolve_started = ResStarted},
-                               feedbackDestPid = undefined},
+                               fb_dest_pid = undefined},
     shutdown(resolve_ok, NewState);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -298,7 +299,7 @@ on({get_state_response, MyI} = _Msg,
    State = #rr_resolve_state{operation = {interval_upd_my, I}}) ->
     ?TRACE("GET INTERVAL - Operation=~p~n IntervalBounds=~p~n MyInterval=~p",
            [interval_upd_my, intervals:get_bounds(I), MyI], State),
-    ?ASSERT(State#rr_resolve_state.feedbackDestPid =:= undefined),
+    ?ASSERT(State#rr_resolve_state.fb_dest_pid =:= undefined),
     ISec = intervals:intersection(MyI, I),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
@@ -331,8 +332,8 @@ on({update_key_entry_ack, NewEntryList}, State =
                                                   upd_fail_count = UpdFail,
                                                   regen_fail_count = RegenFail
                                                 } = Stats,
-                          feedbackDestPid = FBDest,
-                          feedbackKvv = {MissingOnOther, MyIOtherKvTree}
+                          fb_dest_pid = FBDest, fb_send_kvv = MissingOnOther,
+                          other_kv_tree = MyIOtherKvTree
                         })
   when element(1, Op) =:= ?key_upd;
        element(1, Op) =:= ?interval_upd ->
@@ -349,7 +350,7 @@ on({update_key_entry_ack, NewEntryList}, State =
                                    regen_count      = NewRegenOk +1,
                                    upd_fail_count   = NewUpdFail + 1,
                                    regen_fail_count = NewRegenFail + 1},
-    NewState = State#rr_resolve_state{stats = NewStats, feedbackKvv = {NewFBItems, MyIOtherKvTree}},
+    NewState = State#rr_resolve_state{stats = NewStats, fb_send_kvv = NewFBItems},
     ?ASSERT(_Diff =:= (NewRegenOk + NewUpdOk + NewUpdFail + NewRegenFail)),
     ?TRACE("UPDATED = ~p - Regen=~p", [NewUpdOk, NewRegenOk], State),
     shutdown(resolve_ok, NewState);
@@ -455,8 +456,8 @@ get_diff([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems) ->
 -spec shutdown(exit_reason(), state()) -> kill.
 shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
                                     stats = #resolve_stats{resolve_started = ResStarted0} = Stats,
-                                    operation = _Op, feedbackDestPid = FBDest,
-                                    feedbackKvv = {FbKVV, _MyIOtherKvTree},
+                                    operation = _Op, fb_dest_pid = FBDest,
+                                    fb_send_kvv = FbKVV,
                                     from_my_node = FromMyNode} = _State) ->
     ?TRACE("SHUTDOWN ~p - Operation=~p~n SessionId:~p~n ~p items via key_upd to ~p~n Items: ~.2p",
            [_Reason, util:extint2atom(element(1, _Op)), Stats#resolve_stats.session_id,
