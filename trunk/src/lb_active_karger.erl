@@ -65,7 +65,7 @@
            %% Result from slide or jump
            dht_node_move:result_message() |
            %% Send errors
-           {send_error, comm:plain_pid(), comm:message(), atom()}).
+           {send_error, comm:mypid(), comm:message(), atom()}).
      
 -type(dht_message() ::
 	  	   %% phase1
@@ -241,7 +241,7 @@ balance_adjacent(HeavyNodeDetails, LightNodeDetails) ->
 	end.
 
 %% Convert node details to lb_info
--spec serialize(node_details:node_details_record()) -> lb_info().
+-spec serialize(node_details:node_details()) -> lb_info().
 serialize(NodeDetails) ->
     #lb_info{node = node_details:get(NodeDetails, node),
              load = node_details:get(NodeDetails, load),

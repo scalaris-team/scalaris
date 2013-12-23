@@ -53,7 +53,8 @@
          use_incremental_slides/0, get_max_transport_entries/0]).
 
 -ifdef(with_export_type_support).
--export_type([move_message/0, next_op_msg/0, abort_reason/0]).
+-export_type([move_message/0, next_op_msg/0, abort_reason/0,
+              result_message/0]).
 -endif.
 
 -type abort_reason() ::
