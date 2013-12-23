@@ -185,7 +185,7 @@ on({get_entries_response, EntryList}, State =
     end;
 
 on({get_state_response, MyI}, State =
-       #rr_resolve_state{ operation = {key_upd_send, _Dest, SendKeys, ReqKeys},
+       #rr_resolve_state{ operation = {key_upd_send, _Dest, SendKeys, _ReqKeys},
                           dhtNodePid = DhtPid, stats = _Stats }) ->
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p",
            [key_upd_send, _Stats#resolve_stats.session_id, MyI], State),
