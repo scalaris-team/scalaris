@@ -431,7 +431,7 @@ checkinstallation() {
     echo -n "  Java-API ... "
     if [ "$HAS_JAVACLIENT" -eq 1 ]; then
         # simple read/write
-        KEY="checkinstallation-$RANDOM"
+        KEY="checkinstallation-java-$RANDOM"
         JAVA_OUTPUT=`echo -e "> $SCALARISCLIENT_JAVA -r ${KEY}"`
         JAVAREAD1_OUTPUT=`$SCALARISCLIENT_JAVA -r ${KEY} 2>&1`
         echo "$JAVAREAD1_OUTPUT" | grep "failed with not found" > /dev/null 2>&1
@@ -474,7 +474,7 @@ checkinstallation() {
     echo -n "  Python-API ... "
     if [ -f "$SCALARISCLIENT_PYTHON" ]; then
         # simple read/write
-        KEY="checkinstallation-$RANDOM"
+        KEY="checkinstallation-python-$RANDOM"
         PYTHON_OUTPUT=`echo -e "> $SCALARISCLIENT_PYTHON -r ${KEY}"`
         PYTHONREAD1_OUTPUT=`$SCALARISCLIENT_PYTHON -r ${KEY} 2>&1`
         echo "$PYTHONREAD1_OUTPUT" | grep "failed with not_found" > /dev/null 2>&1
@@ -517,7 +517,7 @@ checkinstallation() {
     echo -n "  Python3-API ... "
     if [ -f "$SCALARISCLIENT_PYTHON3" ]; then
         # simple read/write
-        KEY="checkinstallation-$RANDOM"
+        KEY="checkinstallation-python3-$RANDOM"
         PYTHON3_OUTPUT=`echo -e "> $SCALARISCLIENT_PYTHON3 -r ${KEY}"`
         PYTHON3READ1_OUTPUT=`$SCALARISCLIENT_PYTHON3 -r ${KEY} 2>&1`
         echo "$PYTHON3READ1_OUTPUT" | grep "failed with not_found" > /dev/null 2>&1
@@ -560,7 +560,7 @@ checkinstallation() {
     echo -n "  Ruby-API ... "
     if [ -f "$SCALARISCLIENT_RUBY" ]; then
         # simple read/write
-        KEY="checkinstallation-$RANDOM"
+        KEY="checkinstallation-ruby-$RANDOM"
         RUBY_OUTPUT=`echo -e "> $SCALARISCLIENT_RUBY -r ${KEY}"`
         RUBYREAD1_OUTPUT=`$SCALARISCLIENT_RUBY -r ${KEY} 2>&1`
         echo "$RUBYREAD1_OUTPUT" | grep "Scalaris::NotFoundError" > /dev/null 2>&1
