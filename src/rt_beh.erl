@@ -103,6 +103,8 @@ behaviour_info(callbacks) ->
      % address space size, range and split key
      % (may all throw 'throw:not_supported' if unsupported by the RT)
      {n, 0}, {get_range, 2}, {get_split_key, 3},
+     % get a random key wihtin the requested interval
+     {get_random_in_interval, 1},
      % for debugging and web interface
      {dump, 1},
      % for bulkowner
