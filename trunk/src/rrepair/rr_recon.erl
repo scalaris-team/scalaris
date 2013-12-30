@@ -312,7 +312,7 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                FBCount = if ToReq1 =/= [] -> 2;
                             true -> 1
                          end,
-               rr_recon_stats:inc([{resolve_started, 1},
+               rr_recon_stats:inc([{resolve_started, FBCount},
                                    {await_rs_fb, FBCount}], Stats);
            true ->
                Stats
