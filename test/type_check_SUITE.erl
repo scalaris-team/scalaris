@@ -352,8 +352,8 @@ tester_type_check_rrepair(_Config) ->
              {decompress_k_list, 3}, %% needs a special binary to correspond to a number of bits
              {check_node, 3}, %% needs merkle_tree/nodes with hashes
              {p_check_node, 7}, %% needs merkle_tree/nodes with hashes
-             {process_tree_cmp_result, 5}, %% needs matching result and merkle nodes
-             {p_process_tree_cmp_result, 9}, %% needs matching result and merkle nodes
+             {process_tree_cmp_result, 4}, %% needs matching result and merkle nodes
+             {p_process_tree_cmp_result, 8}, %% needs matching result and merkle nodes
              {merkle_get_sync_leaves, 4}, %% needs merkle_tree with hashes
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
