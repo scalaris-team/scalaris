@@ -532,13 +532,11 @@ on({?check_nodes_response, Flags, HashKeys, OtherMaxLeafCount}, State =
        #rr_recon_state{ stage = reconciliation,        initiator = true,
                         struct = Tree,                 ownerPid = OwnerL,
                         dest_rr_pid = DestNodePid,     stats = Stats,
-                        dest_recon_pid = DestReconPid, params = Params,
+                        dest_recon_pid = DestReconPid,
                         misc = [{signature_size, SigSize}] }) ->
     CmpResults = merkle_decompress_cmp_result(Flags, HashKeys, [], SigSize),
     SID = rr_recon_stats:get(session_id, Stats),
-    case process_tree_cmp_result(CmpResults, Tree,
-                                 Params#merkle_params.branch_factor,
-                                 SigSize, Stats) of
+    case process_tree_cmp_result(CmpResults, Tree, SigSize, Stats) of
         {[], ToResolve, NStats0, RTree, _MyMaxLeafCount} ->
             NextSigSize = SigSize,
             ok;
@@ -999,14 +997,13 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSize, AccR, AccN,
 %% @doc Processes compare results from check_node/3 on the initiator.
 -spec process_tree_cmp_result([merkle_cmp_result()],
                               merkle_tree:merkle_tree() | NodeList,
-                              BranchSize::pos_integer(), SigSize::signature_size(),
-                              Stats)
+                              SigSize::signature_size(), Stats)
         -> {Requests::NodeList, Resolve::NodeList, New::Stats, New::NodeList,
             MaxLeafCount::non_neg_integer()}
     when
       is_subtype(NodeList,     [merkle_tree:mt_node()]),
       is_subtype(Stats,        rr_recon_stats:stats()).
-process_tree_cmp_result(CmpResult, Tree, BranchSize, SigSize, Stats) ->
+process_tree_cmp_result(CmpResult, Tree, SigSize, Stats) ->
     Compared = length(CmpResult),
     NStats = rr_recon_stats:inc([{tree_compareLeft, -Compared},
                                  {tree_nodesCompared, Compared}], Stats),
@@ -1014,41 +1011,40 @@ process_tree_cmp_result(CmpResult, Tree, BranchSize, SigSize, Stats) ->
                     false -> Tree;
                     true -> [merkle_tree:get_root(Tree)]
                 end,
-    p_process_tree_cmp_result(CmpResult, TreeNodes, BranchSize, SigSize, NStats,
+    p_process_tree_cmp_result(CmpResult, TreeNodes, SigSize, NStats,
                               [], [], [], 0).
 
 %% @doc Helper for process_tree_cmp_result/4.
 -spec p_process_tree_cmp_result([merkle_cmp_result()], RestTree::NodeList,
-                                BranchSize, SigSize::signature_size(), Stats,
+                                SigSize::signature_size(), Stats,
                                 AccReq::NodeList, AccRes::NodeList,
                                 AccRTree::NodeList, AccMLC::MaxLeafCount)
         -> {Req::NodeList, Res::NodeList, Stats, NodeList, MaxLeafCount}
     when
-      is_subtype(BranchSize,   pos_integer()),
       is_subtype(NodeList,     [merkle_tree:mt_node()]),
       is_subtype(Stats,        rr_recon_stats:stats()),
       is_subtype(MaxLeafCount, non_neg_integer()).
-p_process_tree_cmp_result([], [], _BS, _SS, Stats, Req, Res, RTree, AccMLC) ->
+p_process_tree_cmp_result([], [], _SS, Stats, Req, Res, RTree, AccMLC) ->
     {lists:reverse(Req), Res, Stats, lists:reverse(RTree), AccMLC};
-p_process_tree_cmp_result([?recon_ok | TR], [Node | TN], BS, SS, Stats,
+p_process_tree_cmp_result([?recon_ok | TR], [Node | TN], SS, Stats,
                           Req, Res, RTree, AccMLC) ->
     NStats = rr_recon_stats:inc([{tree_compareSkipped, merkle_tree:size(Node)}], Stats),
-    p_process_tree_cmp_result(TR, TN, BS, SS, NStats, Req, Res, RTree, AccMLC);
-p_process_tree_cmp_result([?recon_fail_stop | TR], [_Node | TN], BS, SS, Stats,
+    p_process_tree_cmp_result(TR, TN, SS, NStats, Req, Res, RTree, AccMLC);
+p_process_tree_cmp_result([?recon_fail_stop | TR], [_Node | TN], SS, Stats,
                           Req, Res, RTree, AccMLC) ->
     ?ASSERT(merkle_tree:is_leaf(_Node)),
-    p_process_tree_cmp_result(TR, TN, BS, SS, Stats, Req, Res, RTree, AccMLC);
-p_process_tree_cmp_result([{Hash} | TR], [Node | TN], BS, SS, Stats,
+    p_process_tree_cmp_result(TR, TN, SS, Stats, Req, Res, RTree, AccMLC);
+p_process_tree_cmp_result([{Hash} | TR], [Node | TN], SS, Stats,
                           Req, Res, RTree, AccMLC) ->
     NewRes = merkle_get_sync_leaves([Node], Hash, SS, Res),
-    p_process_tree_cmp_result(TR, TN, BS, SS, Stats, Req, NewRes, RTree, AccMLC);
-p_process_tree_cmp_result([?recon_fail_cont | TR], [Node | TN], BS, SS, Stats,
+    p_process_tree_cmp_result(TR, TN, SS, Stats, Req, NewRes, RTree, AccMLC);
+p_process_tree_cmp_result([?recon_fail_cont | TR], [Node | TN], SS, Stats,
                           Req, Res, RTree, AccMLC) ->
     ?ASSERT(not merkle_tree:is_leaf(Node)),
     NewAccMLC = erlang:max(AccMLC, merkle_tree:get_leaf_count(Node)),
     Childs = merkle_tree:get_childs(Node),
     NStats = rr_recon_stats:inc([{tree_compareLeft, length(Childs)}], Stats),
-    p_process_tree_cmp_result(TR, TN, BS, SS, NStats, lists:reverse(Childs, Req),
+    p_process_tree_cmp_result(TR, TN, SS, NStats, lists:reverse(Childs, Req),
                               Res, lists:reverse(Childs, RTree), NewAccMLC).
 
 %% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash.
