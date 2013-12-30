@@ -49,8 +49,7 @@
 -type distribution()    :: random |
                            uniform |
                            {non_uniform, random_bias:generator()}.
--type db_distribution() :: uniform |
-                           {non_uniform, random_bias:generator()}.
+-type db_distribution() :: distribution().
 -type result_k()  :: ?RT:key().
 -type result_ktpl():: {?RT:key()}.
 -type result_kv() :: {?RT:key(), db_dht:value()}.
@@ -87,6 +86,8 @@ get_db(I, Count, Distribution) ->
 
 -spec get_db_feeder(intervals:continuous_interval(), 0..1000, db_distribution(), [option()])
         -> {intervals:continuous_interval(), non_neg_integer(), db_distribution(), [option()]}.
+get_db_feeder(I, Count, Distribution = random, Options) ->
+    {I, Count, Distribution, Options};
 get_db_feeder(I, Count, Distribution = uniform, Options) ->
     {I, Count, Distribution, Options};
 get_db_feeder(I, Count0, Distribution0 = {non_uniform, RanGen}, Options) ->
@@ -99,9 +100,81 @@ get_db(Interval, ItemCount, Distribution, Options) ->
     ?ASSERT(Distribution =:= feeder_fix_rangen(Distribution, ItemCount)),
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
+        random -> gen_random([{Interval, ItemCount}], [], OutputType);
         uniform -> uniform_key_list([{Interval, ItemCount}], [], OutputType);
         {non_uniform, RanGen} -> non_uniform_key_list(Interval, ItemCount, RanGen, [], OutputType)
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec gen_random
+        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
+         Acc::[result_k()], OutputType::list_key) -> [result_k()];
+        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
+         Acc::[result_ktpl()], OutputType::list_keytpl) -> [result_ktpl()];
+        ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
+         Acc::[result_kv()], OutputType::list_key_val) -> [result_kv()].
+gen_random([], Acc, _) -> Acc;
+gen_random([{I, Add} | R], Acc, OutputType) ->    
+    ToAdd = gen_random_gbTree(I, Add, OutputType, {gb_trees:empty(), 0}),
+    gen_random(R, lists:append(ToAdd, Acc), OutputType).
+
+-spec gen_random_gbTree
+        (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
+         OutputType::list_key, Acc::{gb_tree(), non_neg_integer()}) -> [result_k()];
+        (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
+         OutputType::list_key, Acc::{gb_tree(), non_neg_integer()}) -> [result_ktpl()];
+        (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
+         OutputType::list_key, Acc::{gb_tree(), non_neg_integer()}) -> [result_kv()].
+gen_random_gbTree(_I, ToAdd, OutputType, {Tree, Retry}) 
+  when ToAdd =:= 0 orelse Retry =:= 3 -> 
+    % abort after 3 random keys already in Tree / probably no more free keys in I
+    [case OutputType of
+         list_key -> Key;
+         list_keytpl -> {Key};
+         list_key_val -> {Key, gen_value()}
+     end 
+    || {Key, _Val} <- gb_trees:to_list(Tree)];
+gen_random_gbTree(I, ToAdd, OutputType, {Tree, Retry}) ->
+    NewKey = ?RT:get_random_in_interval(intervals:get_bounds(I)),
+    case gb_trees:is_defined(NewKey, Tree) of
+        true ->
+            gen_random_gbTree(I, ToAdd, OutputType, {Tree, Retry + 1});
+        false ->
+            NewTree = gb_trees:insert(NewKey, 0, Tree),
+            gen_random_gbTree(I, ToAdd - 1, OutputType, {NewTree, 0})
+    end.
+
+%% bloom filter version is 6 times slower than gb_tree
+%% -spec gen_random_bloom
+%%     (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(), 
+%%      OutputType::list_key) -> [result_k()];
+%%     (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(), 
+%%      OutputType::list_keytpl) -> [result_ktpl()];
+%%     (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(), 
+%%      OutputType::list_key_val) -> [result_kv()].
+%% gen_random_bloom(I, Number, OutputType) ->
+%%     Bloom = bloom:new_p1e(Number, 0.1),
+%%     gen_random_bloom2(I, Number, OutputType, {[], Bloom, 0}).
+%% 
+%% gen_random_bloom2(_I, 0, _OutputType, {AccList, _AccBloom, _AccRetry}) -> AccList;
+%% gen_random_bloom2(_I, _Number, _OutputType, {AccList, _AccBloom, 3}) ->
+%%     % abort after 3 random keys / probably no more free keys in I
+%%     AccList;
+%% gen_random_bloom2(I, Number, OutputType, {AccList, AccBloom, AccRetry}) ->
+%%     NewKey = ?RT:get_random_in_interval(intervals:get_bounds(I)),
+%%     case bloom:is_element(AccBloom, NewKey) of
+%%         true ->
+%%             gen_random_bloom2(I, Number, OutputType, {AccList, AccBloom, AccRetry + 1});
+%%         false ->
+%%             NewItem = case OutputType of
+%%                           list_key -> NewKey;
+%%                           list_keytpl -> {NewKey};
+%%                           list_key_val -> {NewKey, gen_value()}
+%%                       end,
+%%             NewBloom = bloom:add(AccBloom, NewKey),
+%%             gen_random_bloom2(I, Number - 1, OutputType, {[NewItem | AccList], NewBloom, 0})
+%%     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
