@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc Unit tests for src/db_generator.erl.
+%% @doc Unit tests for test/db_generator.erl.
 %% @end
 %% @version $Id$
 -module(db_generator_SUITE).
@@ -26,12 +26,14 @@
 -include("scalaris.hrl").
 
 all() ->
-    [tester_get_db3, tester_get_db4
+    [
+     tester_get_db3,
+     tester_get_db4
      ].
 
 suite() ->
     [
-     {timetrap, {seconds, 90}}
+     {timetrap, {seconds, 60}}
     ].
 
 init_per_suite(Config) ->
@@ -55,17 +57,17 @@ end_per_suite(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% db_generator:get_db/3 and db_generator:get_db/3
+% db_generator:get_db/3 and db_generator:get_db/4
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_get_db3(I::intervals:continuous_interval(), ItemCount::1..1000,
                    db_generator:db_distribution()) -> true.
-prop_get_db3(Interval, ItemCount, Distribution = uniform) ->
-    prop_get_db3_(Interval, ItemCount, Distribution);
 prop_get_db3(Interval, ItemCount0, Distribution0 = {non_uniform, RanGen}) ->
     ItemCount = erlang:min(ItemCount0, random_bias:numbers_left(RanGen)),
-    prop_get_db3_(Interval, ItemCount, db_generator:feeder_fix_rangen(Distribution0, ItemCount)).
+    prop_get_db3_(Interval, ItemCount, db_generator:feeder_fix_rangen(Distribution0, ItemCount));
+prop_get_db3(Interval, ItemCount, Distribution) ->
+    prop_get_db3_(Interval, ItemCount, Distribution).
 
 -spec prop_get_db3_(I::intervals:continuous_interval(), ItemCount::1..1000,
                     db_generator:db_distribution()) -> true.
@@ -81,11 +83,12 @@ prop_get_db3_(Interval, ItemCount, Distribution) ->
 
 -spec prop_get_db4(I::intervals:continuous_interval(), ItemCount::1..1000,
                    db_generator:db_distribution(), Options::[db_generator:option()]) -> boolean().
-prop_get_db4(Interval, ItemCount, Distribution = uniform, Options) ->
-    prop_get_db4_(Interval, ItemCount, Distribution, Options);
 prop_get_db4(Interval, ItemCount0, Distribution0 = {non_uniform, RanGen}, Options) ->
     ItemCount = erlang:min(ItemCount0, random_bias:numbers_left(RanGen)),
-    prop_get_db4_(Interval, ItemCount, db_generator:feeder_fix_rangen(Distribution0, ItemCount), Options).
+    prop_get_db4_(Interval, ItemCount, db_generator:feeder_fix_rangen(Distribution0, ItemCount), Options);
+prop_get_db4(Interval, ItemCount, Distribution, Options) ->
+    prop_get_db4_(Interval, ItemCount, Distribution, Options).
+
 
 -spec prop_get_db4_(I::intervals:continuous_interval(), ItemCount::1..1000,
                     db_generator:db_distribution(), Options::[db_generator:option()]) -> boolean().
@@ -111,7 +114,7 @@ prop_get_db4_(Interval, ItemCount, Distribution, Options) ->
              ?equals(length(Result), ItemCount)).
 
 tester_get_db3(_Config) ->
-    tester:test(?MODULE, prop_get_db3, 3, 500, [{threads, 4}]).
+    tester:test(?MODULE, prop_get_db3, 3, 10, [{threads, 1}]).
 
 tester_get_db4(_Config) ->
     prop_get_db4(intervals:new(?MINUS_INFINITY), 1,
