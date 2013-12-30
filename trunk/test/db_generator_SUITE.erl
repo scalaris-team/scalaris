@@ -114,7 +114,7 @@ prop_get_db4_(Interval, ItemCount, Distribution, Options) ->
              ?equals(length(Result), ItemCount)).
 
 tester_get_db3(_Config) ->
-    tester:test(?MODULE, prop_get_db3, 3, 500, [{threads, 5}]).
+    tester:test(?MODULE, prop_get_db3, 3, 500, [{threads, 4}]).
 
 tester_get_db4(_Config) ->
     prop_get_db4(intervals:new(?MINUS_INFINITY), 1,
