@@ -41,7 +41,6 @@
          tree_nodesCompared = 0      :: non_neg_integer(),
          tree_compareSkipped= 0      :: non_neg_integer(),
          tree_leavesSynced  = 0      :: non_neg_integer(),
-         tree_compareLeft   = 0      :: non_neg_integer(),
          error_count        = 0      :: non_neg_integer(),
          build_time         = 0      :: non_neg_integer(),      %in us
          recon_time         = 0      :: non_neg_integer(),      %in us
@@ -56,7 +55,6 @@
                {tree_nodesCompared, non_neg_integer()} |
                {tree_compareSkipped, non_neg_integer()} |
                {tree_leavesSynced, non_neg_integer()} |
-               {tree_compareLeft, non_neg_integer()} |
                {error_count, non_neg_integer()} |
                {build_time, non_neg_integer()} |
                {recon_time, non_neg_integer()} |
@@ -90,9 +88,6 @@ inc([{K, V} | L], Stats) ->
                  {IncI, IncF} = V,
                  X = {OldI + IncI, OldF + IncF},
                  Stats#rr_recon_stats{tree_size = X};
-             tree_compareLeft ->
-                 X = V + Stats#rr_recon_stats.tree_compareLeft,
-                 Stats#rr_recon_stats{tree_compareLeft = X};
              tree_nodesCompared ->
                  X = V + Stats#rr_recon_stats.tree_nodesCompared,
                  Stats#rr_recon_stats {tree_nodesCompared = X};
@@ -128,7 +123,6 @@ set([{K, V} | L], Stats) ->
     NS = case K of
              session_id          -> Stats#rr_recon_stats{session_id = V};
              tree_size           -> Stats#rr_recon_stats{tree_size = V};
-             tree_compareLeft    -> Stats#rr_recon_stats{tree_compareLeft = V};
              tree_nodesCompared  -> Stats#rr_recon_stats{tree_nodesCompared = V};
              tree_leavesSynced   -> Stats#rr_recon_stats{tree_leavesSynced = V};
              tree_compareSkipped -> Stats#rr_recon_stats{tree_compareSkipped = V};
@@ -146,7 +140,6 @@ set([{K, V} | L], Stats) ->
          (tree_nodesCompared, stats()) -> non_neg_integer();
          (tree_compareSkipped, stats())-> non_neg_integer();
          (tree_leavesSynced, stats())  -> non_neg_integer();
-         (tree_compareLeft, stats())   -> non_neg_integer();
          (error_count, stats())        -> non_neg_integer();
          (build_time, stats())         -> non_neg_integer();
          (recon_time, stats())         -> non_neg_integer();
@@ -155,7 +148,6 @@ set([{K, V} | L], Stats) ->
          (status, stats())             -> status().
 get(session_id         , #rr_recon_stats{session_id          = X}) -> X;
 get(tree_size          , #rr_recon_stats{tree_size           = X}) -> X;
-get(tree_compareLeft   , #rr_recon_stats{tree_compareLeft    = X}) -> X;
 get(tree_nodesCompared , #rr_recon_stats{tree_nodesCompared  = X}) -> X;
 get(tree_leavesSynced  , #rr_recon_stats{tree_leavesSynced   = X}) -> X;
 get(tree_compareSkipped, #rr_recon_stats{tree_compareSkipped = X}) -> X;
@@ -168,7 +160,6 @@ get(status             , #rr_recon_stats{status              = X}) -> X.
 
 -spec merge(stats(), stats()) -> stats().
 merge(A, #rr_recon_stats{ tree_size = TS,
-                          tree_compareLeft = TCL,
                           tree_nodesCompared = TNC,
                           tree_leavesSynced = TLS,
                           tree_compareSkipped = TCS,
@@ -178,7 +169,6 @@ merge(A, #rr_recon_stats{ tree_size = TS,
                           resolve_started = RS,
                           await_rs_fb = RsFb }) ->
     inc([{tree_size, TS},
-         {tree_compareLeft, TCL},
          {tree_nodesCompared, TNC},
          {tree_leavesSynced, TLS},
          {tree_compareSkipped, TCS},
