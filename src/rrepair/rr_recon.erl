@@ -556,10 +556,9 @@ on({?check_nodes_response, Flags, HashKeys, OtherMaxLeafCount}, State =
     ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
     NStats = rr_recon_stats:inc([{tree_leavesSynced, length(ToResolve)},
                                  {resolve_started, ResolveCount}], NStats0),
-    CompLeft = rr_recon_stats:get(tree_compareLeft, NStats),
     NewState = State#rr_recon_state{stats = NStats, struct = RTree,
                                     misc = [{signature_size, NextSigSize}]},
-    if CompLeft =:= 0 ->
+    if RTree =:= [] ->
            send(DestReconPid, {shutdown, sync_finished_remote}),
            shutdown(sync_finished, NewState);
        true -> NewState
@@ -643,8 +642,7 @@ begin_sync(MySyncStruct, _OtherSyncStruct,
     ?TRACE("BEGIN SYNC", []),
     Stats1 =
         rr_recon_stats:set(
-          [{tree_compareLeft, ?IIF(Initiator, 1, 0)},
-           {tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
+          [{tree_size, merkle_tree:size_detail(MySyncStruct)}], Stats),
     case Initiator of
         true ->
             SigSize = 160,
@@ -1005,8 +1003,7 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSize, AccR, AccN,
       is_subtype(Stats,        rr_recon_stats:stats()).
 process_tree_cmp_result(CmpResult, Tree, SigSize, Stats) ->
     Compared = length(CmpResult),
-    NStats = rr_recon_stats:inc([{tree_compareLeft, -Compared},
-                                 {tree_nodesCompared, Compared}], Stats),
+    NStats = rr_recon_stats:inc([{tree_nodesCompared, Compared}], Stats),
     TreeNodes = case merkle_tree:is_merkle_tree(Tree) of
                     false -> Tree;
                     true -> [merkle_tree:get_root(Tree)]
@@ -1043,8 +1040,7 @@ p_process_tree_cmp_result([?recon_fail_cont | TR], [Node | TN], SS, Stats,
     ?ASSERT(not merkle_tree:is_leaf(Node)),
     NewAccMLC = erlang:max(AccMLC, merkle_tree:get_leaf_count(Node)),
     Childs = merkle_tree:get_childs(Node),
-    NStats = rr_recon_stats:inc([{tree_compareLeft, length(Childs)}], Stats),
-    p_process_tree_cmp_result(TR, TN, SS, NStats, lists:reverse(Childs, Req),
+    p_process_tree_cmp_result(TR, TN, SS, Stats, lists:reverse(Childs, Req),
                               Res, lists:reverse(Childs, RTree), NewAccMLC).
 
 %% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash.
