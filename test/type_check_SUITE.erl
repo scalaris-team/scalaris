@@ -318,6 +318,8 @@ tester_type_check_rrepair(_Config) ->
              {p_gen_kvv, 6}, %% tested via feeder
              {select_random_keys, 4}, %% tested via feeder
 
+             {gen_random, 3}, %% needs feeder
+             {gen_random_gbTree, 4}, %% needs feeder
              {uniform_key_list, 3}, %% needs feeder
              {uniform_key_list_no_split, 3}, %% needs feeder
              {non_uniform_key_list, 5}, %% needs feeder
