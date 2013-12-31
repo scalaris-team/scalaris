@@ -117,23 +117,23 @@ get_db(Interval, ItemCount, Distribution, Options) ->
 gen_random([], Acc, _) -> Acc;
 gen_random([{I, Add} | R], Acc, OutputType) ->    
     ToAdd = gen_random_gb_sets(intervals:get_bounds(I), Add, OutputType,
-                               {gb_sets:empty(), 0}),
+                               gb_sets:empty(), 0),
     gen_random(R, lists:append(ToAdd, Acc), OutputType).
 
 -spec gen_random_gb_sets
         (Interval, ToAdd::non_neg_integer(), OutputType::list_key,
-         Acc::{gb_set(), Retries::non_neg_integer()}) -> [result_k()]
+         Set::gb_set(), Retries::non_neg_integer()) -> [result_k()]
     when is_subtype(Interval, {intervals:left_bracket(), ?RT:key(), ?RT:key(), intervals:right_bracket()} |
                               {intervals:left_bracket(), ?RT:key(), ?PLUS_INFINITY_TYPE, ')'});
         (Interval, ToAdd::non_neg_integer(), OutputType::list_keytpl,
-         Acc::{gb_set(), Retries::non_neg_integer()}) -> [result_ktpl()]
+         Set::gb_set(), Retries::non_neg_integer()) -> [result_ktpl()]
     when is_subtype(Interval, {intervals:left_bracket(), ?RT:key(), ?RT:key(), intervals:right_bracket()} |
                               {intervals:left_bracket(), ?RT:key(), ?PLUS_INFINITY_TYPE, ')'});
         (Interval, ToAdd::non_neg_integer(), OutputType::list_key_val,
-         Acc::{gb_set(), Retries::non_neg_integer()}) -> [result_kv()]
+         Set::gb_set(), Retries::non_neg_integer()) -> [result_kv()]
     when is_subtype(Interval, {intervals:left_bracket(), ?RT:key(), ?RT:key(), intervals:right_bracket()} |
                               {intervals:left_bracket(), ?RT:key(), ?PLUS_INFINITY_TYPE, ')'}).
-gen_random_gb_sets(_I, ToAdd, OutputType, {Set, Retry})
+gen_random_gb_sets(_I, ToAdd, OutputType, Set, Retry)
   when ToAdd =:= 0 orelse Retry =:= 3 -> 
     % abort after 3 random keys already in Tree / probably no more free keys in I
     [case OutputType of
@@ -141,14 +141,14 @@ gen_random_gb_sets(_I, ToAdd, OutputType, {Set, Retry})
          list_keytpl -> {Key};
          list_key_val -> {Key, gen_value()}
      end || Key <- gb_sets:to_list(Set)];
-gen_random_gb_sets(I, ToAdd, OutputType, {Set, Retry}) ->
+gen_random_gb_sets(I, ToAdd, OutputType, Set, Retry) ->
     NewKey = ?RT:get_random_in_interval(I),
     case gb_sets:is_member(NewKey, Set) of
         true ->
-            gen_random_gb_sets(I, ToAdd, OutputType, {Set, Retry + 1});
+            gen_random_gb_sets(I, ToAdd, OutputType, Set, Retry + 1);
         false ->
             NewSet = gb_sets:add(NewKey, Set),
-            gen_random_gb_sets(I, ToAdd - 1, OutputType, {NewSet, 0})
+            gen_random_gb_sets(I, ToAdd - 1, OutputType, NewSet, 0)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
