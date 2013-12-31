@@ -65,13 +65,15 @@
 -export_type([interval/0, key/0, left_bracket/0, right_bracket/0,
               continuous_interval/0, non_empty_interval/0]).
 % for tester:
--export_type([invalid_interval/0, invalid_simple_interval/0, simple_interval/0]).
+-export_type([invalid_interval/0, invalid_simple_interval/0, simple_interval/0,
+              simple_interval2/0]).
 -endif.
 
 -type left_bracket() :: '(' | '['.
 -type right_bracket() :: ')' | ']'.
 -type key() :: ?RT:key() | ?MINUS_INFINITY_TYPE. % ?MINUS_INFINITY_TYPE unnecessary (should be included in ?RT:key()) but needed for fewer dialyzer warnings
--type simple_interval2() :: {left_bracket(), key(), key(), right_bracket()} | {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'}.
+-type simple_interval2() :: {left_bracket(), key(), key(), right_bracket()} |
+                            {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'}.
 -type simple_interval() :: {key()} | all | simple_interval2().
 -type invalid_simple_interval() :: {key()} | all | simple_interval2().
 -opaque interval() :: [simple_interval()].
@@ -82,7 +84,7 @@
 % @type interval() = [simple_interval()].
 % [] -> empty interval
 % [simple_interval(),...] -> union of the simple intervals
-% @type simple_interval() = {key()} | {left_bracket(), key(), key(), right_bracket()} | all.
+% @type simple_interval() = {key()} | {left_bracket(), key(), key(), right_bracket()} | {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'} | all.
 % {term()} -> one element interval
 % {'[', A::term(), B::term(), ']'} -> closed interval [A, B]
 % {'(', A::term(), B::term(), ']'} -> half-open interval (A, B], aka ]A, B]
@@ -507,8 +509,7 @@ is_continuous(_) -> false.
 %%      Note: the bounds of non-continuous intervals are not optimal!
 %%      Note: this method will only work on non-empty intervals
 %%      and will throw an exception otherwise!
--spec get_bounds(interval()) -> {left_bracket(), key(), key(), right_bracket()} |
-                                {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'}.
+-spec get_bounds(interval()) -> simple_interval2().
 get_bounds([{LBr, L, R, RBr}]) -> {LBr, L, R, RBr};
 get_bounds([{'[', ?MINUS_INFINITY, B1, B1Br},
             {A0Br, A0, ?PLUS_INFINITY, ')'}]) -> {A0Br, A0, B1, B1Br};

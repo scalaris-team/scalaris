@@ -121,18 +121,15 @@ gen_random([{I, Add} | R], Acc, OutputType) ->
     gen_random(R, lists:append(ToAdd, Acc), OutputType).
 
 -spec gen_random_gb_sets
-        (Interval, ToAdd::non_neg_integer(), OutputType::list_key,
-         Set::gb_set(), Retries::non_neg_integer()) -> [result_k()]
-    when is_subtype(Interval, {intervals:left_bracket(), ?RT:key(), ?RT:key(), intervals:right_bracket()} |
-                              {intervals:left_bracket(), ?RT:key(), ?PLUS_INFINITY_TYPE, ')'});
-        (Interval, ToAdd::non_neg_integer(), OutputType::list_keytpl,
-         Set::gb_set(), Retries::non_neg_integer()) -> [result_ktpl()]
-    when is_subtype(Interval, {intervals:left_bracket(), ?RT:key(), ?RT:key(), intervals:right_bracket()} |
-                              {intervals:left_bracket(), ?RT:key(), ?PLUS_INFINITY_TYPE, ')'});
-        (Interval, ToAdd::non_neg_integer(), OutputType::list_key_val,
-         Set::gb_set(), Retries::non_neg_integer()) -> [result_kv()]
-    when is_subtype(Interval, {intervals:left_bracket(), ?RT:key(), ?RT:key(), intervals:right_bracket()} |
-                              {intervals:left_bracket(), ?RT:key(), ?PLUS_INFINITY_TYPE, ')'}).
+        (Interval::intervals:simple_interval2(), ToAdd::non_neg_integer(),
+         OutputType::list_key, Set::gb_set(), Retries::non_neg_integer())
+        -> [result_k()];
+        (Interval::intervals:simple_interval2(), ToAdd::non_neg_integer(),
+         OutputType::list_keytpl, Set::gb_set(), Retries::non_neg_integer())
+        -> [result_ktpl()];
+        (Interval::intervals:simple_interval2(), ToAdd::non_neg_integer(),
+         OutputType::list_key_val, Set::gb_set(), Retries::non_neg_integer())
+        -> [result_kv()].
 gen_random_gb_sets(_I, ToAdd, OutputType, Set, Retry)
   when ToAdd =:= 0 orelse Retry =:= 3 -> 
     % abort after 3 random keys already in Tree / probably no more free keys in I

@@ -154,9 +154,7 @@ get_split_key(Begin, End, {Num, Denom}) ->
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and
 %%      calculates a random key in this range. Fails with an exception if there
 %%      is no key.
--spec get_random_in_interval(
-        {intervals:left_bracket(), key(), key(), intervals:right_bracket()} |
-        {intervals:left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'}) -> key().
+-spec get_random_in_interval(intervals:simple_interval2()) -> key().
 get_random_in_interval({LBr, L, R, RBr}) ->
     case intervals:wraps_around(LBr, L, R, RBr) of
         false -> normalize(get_random_in_interval2(LBr, L, R, RBr));
