@@ -116,33 +116,32 @@ get_db(Interval, ItemCount, Distribution, Options) ->
          Acc::[result_kv()], OutputType::list_key_val) -> [result_kv()].
 gen_random([], Acc, _) -> Acc;
 gen_random([{I, Add} | R], Acc, OutputType) ->    
-    ToAdd = gen_random_gbTree(I, Add, OutputType, {gb_trees:empty(), 0}),
+    ToAdd = gen_random_gb_sets(I, Add, OutputType, {gb_sets:empty(), 0}),
     gen_random(R, lists:append(ToAdd, Acc), OutputType).
 
--spec gen_random_gbTree
+-spec gen_random_gb_sets
         (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
-         OutputType::list_key, Acc::{gb_tree(), non_neg_integer()}) -> [result_k()];
+         OutputType::list_key, Acc::{gb_set(), non_neg_integer()}) -> [result_k()];
         (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
-         OutputType::list_keytpl, Acc::{gb_tree(), non_neg_integer()}) -> [result_ktpl()];
+         OutputType::list_keytpl, Acc::{gb_set(), non_neg_integer()}) -> [result_ktpl()];
         (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
-         OutputType::list_key_val, Acc::{gb_tree(), non_neg_integer()}) -> [result_kv()].
-gen_random_gbTree(_I, ToAdd, OutputType, {Tree, Retry}) 
+         OutputType::list_key_val, Acc::{gb_set(), non_neg_integer()}) -> [result_kv()].
+gen_random_gb_sets(_I, ToAdd, OutputType, {Set, Retry})
   when ToAdd =:= 0 orelse Retry =:= 3 -> 
     % abort after 3 random keys already in Tree / probably no more free keys in I
     [case OutputType of
          list_key -> Key;
          list_keytpl -> {Key};
          list_key_val -> {Key, gen_value()}
-     end 
-    || {Key, _Val} <- gb_trees:to_list(Tree)];
-gen_random_gbTree(I, ToAdd, OutputType, {Tree, Retry}) ->
+     end || Key <- gb_sets:to_list(Set)];
+gen_random_gb_sets(I, ToAdd, OutputType, {Set, Retry}) ->
     NewKey = ?RT:get_random_in_interval(intervals:get_bounds(I)),
-    case gb_trees:is_defined(NewKey, Tree) of
+    case gb_sets:is_member(NewKey, Set) of
         true ->
-            gen_random_gbTree(I, ToAdd, OutputType, {Tree, Retry + 1});
+            gen_random_gb_sets(I, ToAdd, OutputType, {Set, Retry + 1});
         false ->
-            NewTree = gb_trees:insert(NewKey, 0, Tree),
-            gen_random_gbTree(I, ToAdd - 1, OutputType, {NewTree, 0})
+            NewSet = gb_sets:add(NewKey, Set),
+            gen_random_gb_sets(I, ToAdd - 1, OutputType, {NewSet, 0})
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
