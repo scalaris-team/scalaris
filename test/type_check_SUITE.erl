@@ -339,7 +339,7 @@ tester_type_check_rrepair(_Config) ->
 
              {merkle_compress_hashlist, 3}, %% needs merkle nodes with hashes
              {merkle_decompress_hashlist, 3}, %% needs a special binary to correspond to a number of bits
-             {merkle_decompress_cmp_result, 4} %% needs a special binary to correspond to a list
+             {merkle_decompress_flags, 2} %% needs a special binary to correspond to a number of bits
            ],
            [
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
@@ -352,11 +352,15 @@ tester_type_check_rrepair(_Config) ->
              {compress_kv_list_p1e, 4}, %% needs float > 0, =< 1
              {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
              {decompress_k_list, 3}, %% needs a special binary to correspond to a number of bits
-             {check_node, 3}, %% needs merkle_tree/nodes with hashes
-             {p_check_node, 7}, %% needs merkle_tree/nodes with hashes
-             {process_tree_cmp_result, 4}, %% needs matching result and merkle nodes
-             {p_process_tree_cmp_result, 7}, %% needs matching result and merkle nodes
+             {check_node, 4}, %% needs merkle_tree/nodes with hashes
+             {p_check_node, 8}, %% needs merkle_tree/nodes with hashes
+             {process_tree_cmp_result, 5}, %% needs matching result and merkle nodes
+             {p_process_tree_cmp_result, 9}, %% needs matching result and merkle nodes
              {merkle_get_sync_leaves, 4}, %% needs merkle_tree with hashes
+             {merkle_resolve_leaves_noninit, 4}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_noninit, 8}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_init, 5}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_init, 8}, % needs only leaf nodes in node list
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
