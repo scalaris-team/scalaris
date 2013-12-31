@@ -123,9 +123,9 @@ gen_random([{I, Add} | R], Acc, OutputType) ->
         (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
          OutputType::list_key, Acc::{gb_tree(), non_neg_integer()}) -> [result_k()];
         (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
-         OutputType::list_key, Acc::{gb_tree(), non_neg_integer()}) -> [result_ktpl()];
+         OutputType::list_keytpl, Acc::{gb_tree(), non_neg_integer()}) -> [result_ktpl()];
         (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(),
-         OutputType::list_key, Acc::{gb_tree(), non_neg_integer()}) -> [result_kv()].
+         OutputType::list_key_val, Acc::{gb_tree(), non_neg_integer()}) -> [result_kv()].
 gen_random_gbTree(_I, ToAdd, OutputType, {Tree, Retry}) 
   when ToAdd =:= 0 orelse Retry =:= 3 -> 
     % abort after 3 random keys already in Tree / probably no more free keys in I
