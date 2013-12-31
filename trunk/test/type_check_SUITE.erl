@@ -338,8 +338,7 @@ tester_type_check_rrepair(_Config) ->
              {map_interval, 2}, %% second interval must be in a single quadrant
 
              {merkle_compress_hashlist, 3}, %% needs merkle nodes with hashes
-             {merkle_decompress_hashlist, 3}, %% needs a special binary to correspond to a number of bits
-             {merkle_decompress_flags, 2} %% needs a special binary to correspond to a number of bits
+             {merkle_decompress_hashlist, 3} %% needs a special binary to correspond to a number of bits
            ],
            [
              {check_percent, 1}, %% checks arbitrary config -> too many unnecessary error messages
