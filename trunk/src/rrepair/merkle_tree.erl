@@ -32,7 +32,7 @@
          iterator/1, next/1,
          is_empty/1, is_leaf/1, is_merkle_tree/1,
          get_bucket/1, get_hash/1, get_interval/1, get_childs/1, get_root/1,
-         get_item_count/1, get_leaf_count/1,
+         get_item_count/1, get_leaf_count/1, get_leaves/1,
          get_bucket_size/1, get_branch_factor/1,
          get_opt_bucket_size/3,
          store_to_DOT/2, store_graph/2]).
@@ -440,6 +440,22 @@ next([[] | R2]) ->
     next(R2);
 next([]) ->
     none.
+
+%% @doc Gets all leaves in the given merkle tree or node list.
+-spec get_leaves(Tree::merkle_tree() | [mt_node()]) -> Leaves::[mt_node()].
+get_leaves({merkle_tree, _, Root})    -> get_leaves([Root], []);
+get_leaves(Nodes) when is_list(Nodes) -> get_leaves(Nodes, []).
+
+%% @doc Helper for get_leaves/1.
+-spec get_leaves(RestNodes::[mt_node()], LeafAcc::[mt_node()])
+        -> Leaves::[mt_node()].
+get_leaves([], LeafAcc) ->
+    lists:reverse(LeafAcc);
+get_leaves([Node | Rest], LeafAcc) ->
+    case is_leaf(Node) of
+        true  -> get_leaves(Rest, [Node | LeafAcc]);
+        false -> get_leaves(lists:append(get_childs(Node), Rest), LeafAcc)
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
