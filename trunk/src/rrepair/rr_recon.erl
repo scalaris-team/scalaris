@@ -34,7 +34,7 @@
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3]).
 -export([merkle_compress_hashlist/3, merkle_decompress_hashlist/3,
-         merkle_compress_cmp_result/4, merkle_decompress_cmp_result/4]).
+         merkle_decompress_flags/2]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -56,7 +56,7 @@
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([method/0, request/0, merkle_cmp_result/0,
+-export_type([method/0, request/0,
               db_chunk_kv/0, db_chunk_kvv/0]).
 -endif.
 
@@ -116,6 +116,11 @@
                       #art_recon_struct{}.
 -type recon_dest() :: ?RT:key() | random.
 
+-type merkle_sync() ::
+          {My::inner, Other::leaf,  SigSize::signature_size(), LeafNodes::[merkle_tree:mt_node(),...]} |
+          {My::leaf,  Other::leaf,  SigSize::signature_size(), LeafNode::merkle_tree:mt_node()} |
+          {My::leaf,  Other::inner, SigSize::signature_size(), LeafNode::merkle_tree:mt_node()}.
+
 -record(rr_recon_state,
         {
          ownerPid           = ?required(rr_recon_state, ownerPid)    :: comm:erl_local_pid(),
@@ -129,6 +134,7 @@
          struct             = {}                                     :: sync_struct() | {}, % my recon structure
          stage              = req_shared_interval                    :: stage(),
          initiator          = false                                  :: boolean(),
+         merkle_sync        = []                                     :: [merkle_sync()],
          misc               = []                                     :: [{atom(), term()}], % any optional parameters an algorithm wants to keep
          kv_list            = []                                     :: db_chunk_kv(),
          stats              = rr_recon_stats:new()                   :: rr_recon_stats:stats(),
@@ -137,15 +143,13 @@
 -type state() :: #rr_recon_state{}.
 
 % keep in sync with check_node/2
--define(recon_ok,         1).
--define(recon_fail_stop,  2).
--define(recon_fail_cont,  3).
--define(recon_fail_cont2, 0). % failed leaf with included hash
+-define(recon_ok,              1). % match
+-define(recon_fail_stop_leaf,  2). % mismatch, sending node has leaf node
+-define(recon_fail_stop_inner, 3). % mismatch, sending node has inner node
+-define(recon_fail_cont_inner, 0). % mismatch, both inner nodes (continue!)
 
--type merkle_cmp_result()  :: ?recon_ok |
-                              ?recon_fail_stop |
-                              {merkle_tree:mt_node_key()} |
-                              ?recon_fail_cont.
+-type merkle_flag()  :: ?recon_ok | ?recon_fail_stop_leaf | ?recon_fail_stop_inner | ?recon_fail_cont_inner.
+
 -type merkle_cmp_request() :: {Hash::merkle_tree:mt_node_key(), IsLeaf::boolean()}.
 
 -type request() ::
@@ -166,6 +170,7 @@
     {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), SigSize::signature_size()} |
     {?check_nodes, ToCheck::bitstring(), SigSize::signature_size()} |
     {?check_nodes_response, Results::bitstring(), HashKeys::bitstring(), MaxLeafCount::non_neg_integer()} |
+    {resolve_req, Hashes::bitstring()} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
     {create_struct2, DestI::intervals:interval(),
@@ -506,41 +511,52 @@ on({?check_nodes, SenderPid, ToCheck, SigSize}, State) ->
     on({?check_nodes, ToCheck, SigSize}, NewState);
 
 on({?check_nodes, ToCheck0, SigSize},
-   State = #rr_recon_state{ stage = reconciliation,    initiator = false,
-                            struct = Tree,             ownerPid = OwnerL,
-                            dest_rr_pid = DestNodePid, stats = Stats,
-                            dest_recon_pid = DestReconPid }) ->
+   State = #rr_recon_state{stage = reconciliation,    initiator = false,
+                           method = merkle_tree,      merkle_sync = MerkleSync,
+                           struct = Tree,             ownerPid = OwnerL,
+                           dest_rr_pid = DestNodePid, stats = Stats,
+                           dest_recon_pid = DestReconPid}) ->
     ?ASSERT(comm:is_valid(DestReconPid)),
     ToCheck = merkle_decompress_hashlist(ToCheck0, [], SigSize),
-    {Result, RestTree, ToResolve, MaxLeafCount} =
-        check_node(ToCheck, Tree, SigSize),
-    {Flags, HashKeys} =
-        merkle_compress_cmp_result(Result, <<>>, <<>>, SigSize),
-    ToResolveLength = length(ToResolve),
-    NStats =
-        if ToResolveLength > 0 ->
-               SID = rr_recon_stats:get(session_id, Stats),
-               ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
-               rr_recon_stats:inc([{tree_leavesSynced, ToResolveLength},
-                                   {resolve_started, ResolveCount}], Stats);
-           true -> Stats
-        end,
-    send(DestReconPid, {?check_nodes_response, Flags, HashKeys, MaxLeafCount}),
-    State#rr_recon_state{ struct = RestTree, stats = NStats };
+    {FlagsBin, RTree, MerkleSyncNew, MaxLeafCount} =
+        check_node(ToCheck, Tree, SigSize, MerkleSync),
+    send(DestReconPid, {?check_nodes_response, FlagsBin, MaxLeafCount}),
+    NewState = State#rr_recon_state{struct = RTree, merkle_sync = MerkleSyncNew},
+    if RTree =:= [] andalso MerkleSyncNew =:= [] ->
+           shutdown(sync_finished, NewState);
+       RTree =:= [] ->
+            ?TRACE("Sync (NI): ~.2p", [MerkleSyncNew]),
+            SID = rr_recon_stats:get(session_id, Stats),
+            {Hashes, ResolveReqCount, LeafNodesCount} =
+                merkle_resolve_leaves_noninit(MerkleSyncNew, DestNodePid, SID, OwnerL),
+            NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafNodesCount},
+                                         {resolve_started, ResolveReqCount}], Stats),
+            send(DestReconPid, {resolve_req, Hashes}),
+            NewState2 = NewState#rr_recon_state{stage = resolve, stats = NStats},
+            shutdown(sync_finished, NewState2);
+       true -> NewState
+    end;
 
-on({?check_nodes_response, Flags, HashKeys, OtherMaxLeafCount}, State =
-       #rr_recon_state{ stage = reconciliation,        initiator = true,
-                        struct = Tree,                 ownerPid = OwnerL,
-                        dest_rr_pid = DestNodePid,     stats = Stats,
-                        dest_recon_pid = DestReconPid,
-                        misc = [{signature_size, SigSize}] }) ->
-    CmpResults = merkle_decompress_cmp_result(Flags, HashKeys, [], SigSize),
-    SID = rr_recon_stats:get(session_id, Stats),
-    case process_tree_cmp_result(CmpResults, Tree, SigSize, Stats) of
-        {[] = RTree, ToResolve, NStats0, _MyMaxLeafCount} ->
+on({?check_nodes_response, FlagsBin, OtherMaxLeafCount},
+   State = #rr_recon_state{stage = reconciliation,        initiator = true,
+                           method = merkle_tree,          merkle_sync = MerkleSync,
+                           struct = Tree,                 stats = Stats,
+                           dest_recon_pid = DestReconPid,
+                           misc = [{signature_size, SigSize}]}) ->
+    FlagsList = merkle_decompress_flags(FlagsBin, []),
+    case process_tree_cmp_result(FlagsList, Tree, SigSize, MerkleSync, Stats) of
+        {[] = RTree, [] = MerkleSyncNew, NStats, _MyMaxLeafCount} ->
+            NStage = reconciliation,
             NextSigSize = SigSize,
             ok;
-        {[_|_] = RTree, ToResolve, NStats0, MyMaxLeafCount} ->
+        {[] = RTree, [_|_] = MerkleSyncNew, NStats, _MyMaxLeafCount} ->
+            NStage = resolve,
+            NextSigSize = SigSize,
+            % note: we will get a resolve_req message from the other node
+            ?TRACE("Sync (I): ~.2p", [MerkleSyncNew]),
+            ok;
+        {[_|_] = RTree, MerkleSyncNew, NStats, MyMaxLeafCount} ->
+            NStage = reconciliation,
             % note: we have m one-to-n comparisons, assuming the probability of
             %       a failure in a single one-to-n comparison is p, the overall
             %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
@@ -553,16 +569,28 @@ on({?check_nodes_response, Flags, HashKeys, OtherMaxLeafCount}, State =
             Req = merkle_compress_hashlist(RTree, <<>>, NextSigSize),
             send(DestReconPid, {?check_nodes, Req, NextSigSize})
     end,
-    ResolveCount = resolve_leaves(ToResolve, DestNodePid, SID, OwnerL),
-    NStats = rr_recon_stats:inc([{tree_leavesSynced, length(ToResolve)},
-                                 {resolve_started, ResolveCount}], NStats0),
     NewState = State#rr_recon_state{stats = NStats, struct = RTree,
-                                    misc = [{signature_size, NextSigSize}]},
-    if RTree =:= [] ->
-           send(DestReconPid, {shutdown, sync_finished_remote}),
+                                    misc = [{signature_size, NextSigSize}],
+                                    merkle_sync = MerkleSyncNew, stage = NStage},
+    if RTree =:= [] andalso MerkleSyncNew =:= [] ->
+           %send(DestReconPid, {shutdown, sync_finished_remote}),
            shutdown(sync_finished, NewState);
        true -> NewState
-    end.
+    end;
+
+on({resolve_req, Hashes} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = true,
+                           method = merkle_tree,      merkle_sync = MerkleSync,
+                           dest_rr_pid = DestNodePid, ownerPid = OwnerL,
+                           stats = Stats}) ->
+    SID = rr_recon_stats:get(session_id, Stats),
+    {ResolveReqCount, LeafNodesCount} =
+        merkle_resolve_leaves_init(MerkleSync, Hashes, DestNodePid, SID, OwnerL),
+    NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafNodesCount},
+                                 {resolve_started, ResolveReqCount}], Stats),
+    NewState = State#rr_recon_state{stats = NStats},
+    %send(DestReconPid, {shutdown, sync_finished_remote}),
+    shutdown(sync_finished, NewState).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -905,143 +933,142 @@ merkle_decompress_hashlist(Bin, HashListR, SigSize) ->
              end,
     merkle_decompress_hashlist(T, [{Hash, IsLeaf} | HashListR], SigSize).
 
-%% @doc Transforms merkle compare results into a compact representation for
-%%      transfer.
--spec merkle_compress_cmp_result(
-        [merkle_cmp_result()], FlagsIN::Bin, HashesBinIN::Bin,
-        SigSize::signature_size()) -> {FlagsOUT::Bin, HashesBinOUT::Bin}
-    when is_subtype(Bin, bitstring()).
-merkle_compress_cmp_result([], Flags, HashesBin, _SigSize) ->
-    {Flags, HashesBin};
-merkle_compress_cmp_result([H1 | TL], Bin, HashesBin, SigSize) ->
-    case H1 of
-        {K} ->
-            % compress key similar to merkle_compress_hashlist/3
-            merkle_compress_cmp_result(TL, <<Bin/bitstring, ?recon_fail_cont2:2>>,
-                                       <<HashesBin/bitstring, K:SigSize>>, SigSize);
-        _ ->
-            ?ASSERT(is_integer(H1) andalso 0 =< H1 andalso H1 < 4),
-            merkle_compress_cmp_result(TL, <<Bin/bitstring, H1:2>>, HashesBin, SigSize)
-    end.
-
-%% @doc Transforms the compact representation of merkle compare results from
-%%      merkle_compress_cmp_result/3 back into the original form.
--spec merkle_decompress_cmp_result(Flags::Bin, HashesBin::Bin, CmpRes,
-                                   SigSize::signature_size()) -> CmpRes
-    when is_subtype(Bin, bitstring()),
-         is_subtype(CmpRes, [merkle_cmp_result()]).
-merkle_decompress_cmp_result(<<>>, <<>>, CmpRes, _SigSize) ->
-    lists:reverse(CmpRes);
-merkle_decompress_cmp_result(<<?recon_fail_cont2:2, T/bitstring>>, HashesBin, CmpRes, SigSize) ->
-    % similar to merkle_decompress_hashlist/3
-    <<K:SigSize/integer-unit:1, HashesBinRest/bitstring>> = HashesBin,
-    merkle_decompress_cmp_result(T, HashesBinRest, [{K} | CmpRes], SigSize);
-merkle_decompress_cmp_result(<<X:2, T/bitstring>>, HashesBin, CmpRes, SigSize) ->
-    merkle_decompress_cmp_result(T, HashesBin, [X | CmpRes], SigSize).
-
 %% @doc Compares the given Hashes from the other node with my merkle_tree nodes
 %%      (executed on non-initiator).
 %%      Returns the comparison results and the rest nodes to check in a next
 %%      step.
 -spec check_node(Hashes::[merkle_cmp_request()],
-                 merkle_tree:merkle_tree() | NodeList, SigSize::signature_size())
-        -> {[merkle_cmp_result()], RestTree::NodeList, ResolveReq::NodeList,
-            MaxLeafCount::non_neg_integer()}
+                 merkle_tree:merkle_tree() | NodeList, SigSize::signature_size(),
+                 MerkleSyncIn::[merkle_sync()])
+        -> {Flags::bitstring(), RestTree::NodeList,
+            MerkleSyncOut::[merkle_sync()], MaxLeafCount::non_neg_integer()}
     when is_subtype(NodeList, [merkle_tree:mt_node()]).
-check_node(Hashes, Tree, SigSize) ->
+check_node(Hashes, Tree, SigSize, MerkleSyncIn) ->
     TreeNodes = case merkle_tree:is_merkle_tree(Tree) of
                     false -> Tree;
                     true -> [merkle_tree:get_root(Tree)]
                 end,
-    p_check_node(Hashes, TreeNodes, SigSize, [], [], [], 0).
+    p_check_node(Hashes, TreeNodes, SigSize, <<>>, [], [], MerkleSyncIn, 0).
 
 %% @doc Helper for check_node/2.
 -spec p_check_node(Hashes::[merkle_cmp_request()], MyNodes::NodeList,
-                   SigSize::signature_size(),
-                   Result::[merkle_cmp_result()], RestTreeIn::[NodeList],
-                   AccResolve::NodeList, AccMLC::MaxLeafCount)
-        -> {[merkle_cmp_result()], RestTreeOut::NodeList, ResolveReq::NodeList,
-            MaxLeafCount}
+                   SigSize::signature_size(), FlagsAcc::bitstring(),
+                   RestTreeAcc::[NodeList], MerkleSyncAcc::[merkle_sync()],
+                   MerkleSyncIn::[merkle_sync()], AccMLC::MaxLeafCount)
+        -> {FlagsOUT::bitstring(), RestTreeOut::NodeList,
+            MerkleSyncOUT::[merkle_sync()], MaxLeafCount}
     when
       is_subtype(NodeList, [merkle_tree:mt_node()]),
       is_subtype(MaxLeafCount, non_neg_integer()).
-p_check_node([], [], _SigSize, AccR, AccN, AccRes, AccMLC) ->
-    {lists:reverse(AccR), lists:append(lists:reverse(AccN)), AccRes, AccMLC};
-p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSize, AccR, AccN,
-             AccRes, AccMLC) ->
+p_check_node([], [], _SigSize, FlagsAcc, AccN, MerkleSyncAcc, MerkleSyncIn, AccMLC) ->
+    {FlagsAcc, lists:append(lists:reverse(AccN)),
+     lists:reverse(MerkleSyncAcc, MerkleSyncIn), AccMLC};
+p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSize, FlagsAcc, AccN,
+             MerkleSynAcc, MerkleSyncIN, AccMLC) ->
     IsLeafNode = merkle_tree:is_leaf(Node),
     NodeHash0 = merkle_tree:get_hash(Node),
     <<NodeHash:SigSize/integer-unit:1>> = <<NodeHash0:SigSize>>,
     if Hash =:= NodeHash andalso IsLeafHash =:= IsLeafNode ->
-           p_check_node(TK, TN, SigSize, [?recon_ok | AccR], AccN,
-                        AccRes, AccMLC);
-       IsLeafNode andalso IsLeafHash ->
-           p_check_node(TK, TN, SigSize, [?recon_fail_stop | AccR], AccN,
-                        [Node | AccRes], AccMLC);
-       IsLeafNode andalso (not IsLeafHash) ->
-           p_check_node(TK, TN, SigSize, [{NodeHash} | AccR], AccN,
-                        AccRes, AccMLC);
-       (not IsLeafNode) andalso IsLeafHash ->
-           ToResolve = merkle_get_sync_leaves([Node], Hash, SigSize, AccRes),
-           p_check_node(TK, TN, SigSize, [?recon_fail_stop | AccR], AccN,
-                        ToResolve, AccMLC);
+           p_check_node(TK, TN, SigSize, <<FlagsAcc/bitstring, ?recon_ok:2>>,
+                        AccN, MerkleSynAcc,
+                        MerkleSyncIN, AccMLC);
        (not IsLeafNode) andalso (not IsLeafHash) ->
            NewAccMLC = erlang:max(AccMLC, merkle_tree:get_leaf_count(Node)),
            Childs = merkle_tree:get_childs(Node),
-           p_check_node(TK, TN, SigSize, [?recon_fail_cont | AccR], [Childs | AccN],
-                        AccRes, NewAccMLC)
+           p_check_node(TK, TN, SigSize, <<FlagsAcc/bitstring, ?recon_fail_cont_inner:2>>,
+                        [Childs | AccN], MerkleSynAcc,
+                        MerkleSyncIN, NewAccMLC);
+       (not IsLeafNode) andalso IsLeafHash ->
+           LeafNodes = merkle_get_sync_leaves([Node], Hash, SigSize, []),
+           p_check_node(TK, TN, SigSize, <<FlagsAcc/bitstring, ?recon_fail_stop_inner:2>>,
+                        AccN, [{inner, leaf, SigSize, LeafNodes} | MerkleSynAcc],
+                        MerkleSyncIN, AccMLC);
+       IsLeafNode andalso IsLeafHash ->
+           p_check_node(TK, TN, SigSize, <<FlagsAcc/bitstring, ?recon_fail_stop_leaf:2>>,
+                        AccN, [{leaf, leaf, SigSize, Node} | MerkleSynAcc],
+                        MerkleSyncIN, AccMLC);
+       IsLeafNode andalso (not IsLeafHash) ->
+           p_check_node(TK, TN, SigSize, <<FlagsAcc/bitstring, ?recon_fail_stop_leaf:2>>,
+                        AccN, [{leaf, inner, SigSize, Node} | MerkleSynAcc],
+                        MerkleSyncIN, AccMLC)
     end.
 
+%% @doc Transforms the compact representation of merkle flags from
+%%      p_check_node/8 back into their original form.
+-spec merkle_decompress_flags(Flags::Bin, Acc::CmpRes) -> CmpRes
+    when is_subtype(Bin, bitstring()),
+         is_subtype(CmpRes, [merkle_flag()]).
+merkle_decompress_flags(<<>>, CmpRes) ->
+    lists:reverse(CmpRes);
+merkle_decompress_flags(<<X:2, T/bitstring>>, CmpRes) ->
+    merkle_decompress_flags(T, [X | CmpRes]).
+
 %% @doc Processes compare results from check_node/3 on the initiator.
--spec process_tree_cmp_result([merkle_cmp_result()],
-                              merkle_tree:merkle_tree() | NodeList,
-                              SigSize::signature_size(), Stats)
-        -> {RTree::NodeList, Resolve::NodeList, New::Stats,
+-spec process_tree_cmp_result(
+        [merkle_flag()], merkle_tree:merkle_tree() | NodeList,
+        SigSize::signature_size(), MerkleSyncIn::[merkle_sync()], Stats)
+        -> {RestTree::NodeList, MerkleSyncOut::[merkle_sync()], NewStats::Stats,
             MaxLeafCount::non_neg_integer()}
     when
       is_subtype(NodeList,     [merkle_tree:mt_node()]),
       is_subtype(Stats,        rr_recon_stats:stats()).
-process_tree_cmp_result(CmpResult, Tree, SigSize, Stats) ->
-    Compared = length(CmpResult),
-    NStats = rr_recon_stats:inc([{tree_nodesCompared, Compared}], Stats),
+process_tree_cmp_result(CmpResult, Tree, SigSize, MerkleSyncIn, Stats) ->
     TreeNodes = case merkle_tree:is_merkle_tree(Tree) of
                     false -> Tree;
                     true -> [merkle_tree:get_root(Tree)]
                 end,
-    p_process_tree_cmp_result(CmpResult, TreeNodes, SigSize, NStats,
-                              [], [], 0).
+    p_process_tree_cmp_result(CmpResult, TreeNodes, SigSize, MerkleSyncIn,
+                              Stats, [], [], 0, 0).
 
 %% @doc Helper for process_tree_cmp_result/4.
--spec p_process_tree_cmp_result([merkle_cmp_result()], RestTree::NodeList,
-                                SigSize::signature_size(), Stats,
-                                AccRTree::NodeList, AccResolve::NodeList,
-                                AccMLC::MaxLeafCount)
-        -> {RTree::NodeList, Resolve::NodeList, Stats, MaxLeafCount}
+-spec p_process_tree_cmp_result(
+        [merkle_flag()], RestTree::NodeList, SigSize::signature_size(),
+        MerkleSyncIn::[merkle_sync()], Stats, RestTreeAcc::NodeList,
+        MerkleSyncAcc::[merkle_sync()], AccMLC::Count, AccCmp::Count)
+        -> {RestTreeOut::NodeList, MerkleSyncOut::[merkle_sync()],
+            NewStats::Stats, MaxLeafCount::Count}
     when
-      is_subtype(NodeList,     [merkle_tree:mt_node()]),
-      is_subtype(Stats,        rr_recon_stats:stats()),
-      is_subtype(MaxLeafCount, non_neg_integer()).
-p_process_tree_cmp_result([], [], _SS, Stats, RTree, Res, AccMLC) ->
-    {lists:reverse(RTree), Res, Stats, AccMLC};
-p_process_tree_cmp_result([?recon_ok | TR], [Node | TN], SS, Stats,
-                          RTree, Res, AccMLC) ->
-    NStats = rr_recon_stats:inc([{tree_compareSkipped, merkle_tree:size(Node)}], Stats),
-    p_process_tree_cmp_result(TR, TN, SS, NStats, RTree, Res, AccMLC);
-p_process_tree_cmp_result([?recon_fail_stop | TR], [_Node | TN], SS, Stats,
-                          RTree, Res, AccMLC) ->
-    ?ASSERT(merkle_tree:is_leaf(_Node)),
-    p_process_tree_cmp_result(TR, TN, SS, Stats, RTree, Res, AccMLC);
-p_process_tree_cmp_result([{Hash} | TR], [Node | TN], SS, Stats,
-                          RTree, Res, AccMLC) ->
-    NewRes = merkle_get_sync_leaves([Node], Hash, SS, Res),
-    p_process_tree_cmp_result(TR, TN, SS, Stats, RTree, NewRes, AccMLC);
-p_process_tree_cmp_result([?recon_fail_cont | TR], [Node | TN], SS, Stats,
-                          RTree, Res, AccMLC) ->
+      is_subtype(NodeList, [merkle_tree:mt_node()]),
+      is_subtype(Stats,    rr_recon_stats:stats()),
+      is_subtype(Count,    non_neg_integer()).
+p_process_tree_cmp_result([], [], _SigSize, MerkleSyncIn, Stats, RestTreeAcc,
+                          MerkleSyncAcc, AccMLC, AccCmp) ->
+    NStats = rr_recon_stats:inc([{tree_nodesCompared, AccCmp}], Stats),
+     {lists:reverse(RestTreeAcc), lists:reverse(MerkleSyncAcc, MerkleSyncIn),
+      NStats, AccMLC};
+p_process_tree_cmp_result([?recon_ok | TR], [Node | TN], SigSize, MerkleSyncIn,
+                          Stats, RestTreeAcc, MerkleSyncAcc,
+                          AccMLC, AccCmp) ->
+    Skipped = merkle_tree:size(Node),
+    NStats = rr_recon_stats:inc([{tree_compareSkipped, Skipped}], Stats),
+    p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, NStats,
+                              RestTreeAcc, MerkleSyncAcc, AccMLC, AccCmp + 1);
+p_process_tree_cmp_result([?recon_fail_stop_leaf | TR], [Node | TN], SigSize,
+                          MerkleSyncIn, Stats, RestTreeAcc,
+                          MerkleSyncAcc, AccMLC, AccCmp) ->
+    Sync = case merkle_tree:is_leaf(Node) of
+               true  -> {leaf, leaf, SigSize, Node};
+               false -> LeafNodes = merkle_tree:get_leaves([Node]),
+                        {inner, leaf, SigSize, LeafNodes}
+           end,
+    p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, Stats, RestTreeAcc,
+                              [Sync | MerkleSyncAcc], AccMLC, AccCmp + 1);
+p_process_tree_cmp_result([?recon_fail_stop_inner | TR], [Node | TN], SigSize,
+                          MerkleSyncIn, Stats, RestTreeAcc,
+                          MerkleSyncAcc, AccMLC, AccCmp) ->
+    ?ASSERT(merkle_tree:is_leaf(Node)),
+    p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, Stats, RestTreeAcc,
+                              [{leaf, inner, SigSize, Node} | MerkleSyncAcc],
+                              AccMLC, AccCmp + 1);
+p_process_tree_cmp_result([?recon_fail_cont_inner | TR], [Node | TN], SigSize,
+                          MerkleSyncIn, Stats, RestTreeAcc,
+                          MerkleSyncAcc, AccMLC, AccCmp) ->
     ?ASSERT(not merkle_tree:is_leaf(Node)),
     NewAccMLC = erlang:max(AccMLC, merkle_tree:get_leaf_count(Node)),
     Childs = merkle_tree:get_childs(Node),
-    p_process_tree_cmp_result(TR, TN, SS, Stats, lists:reverse(Childs, RTree),
-                              Res, NewAccMLC).
+    p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, Stats,
+                              lists:reverse(Childs, RestTreeAcc), MerkleSyncAcc,
+                              NewAccMLC, AccCmp + 1).
 
 %% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash.
 -spec merkle_get_sync_leaves(Nodes::NodeL, Skip::Hash, SigSize::signature_size(),
@@ -1065,6 +1092,97 @@ merkle_get_sync_leaves([Node | Rest], Skip, SigSize, ToSyncAcc) ->
             merkle_get_sync_leaves(
               lists:append(merkle_tree:get_childs(Node), Rest), Skip, SigSize, ToSyncAcc)
     end.
+
+%% @doc Gets a compact binary merkle hash list from all leaf-inner node
+%%      comparisons so that the other node can filter its leaf nodes and
+%%      resolves all other leaf nodes (called on non-initiator).
+-spec merkle_resolve_leaves_noninit(
+        Sync::[merkle_sync()], Dest::comm:mypid(), SID::rrepair:session_id(),
+        OwnerL::comm:erl_local_pid())
+        -> {Hashes::bitstring(), ResolveRequests::0..1,
+            LeafNodes::non_neg_integer()}.
+merkle_resolve_leaves_noninit(Sync, Dest, SID, OwnerL) ->
+    merkle_resolve_leaves_noninit(Sync, <<>>, Dest, SID, OwnerL,
+                                  intervals:empty(), 0, 0).
+
+%% @doc Helper for merkle_resolve_leaves_noninit/4.
+-spec merkle_resolve_leaves_noninit(
+        Sync::[merkle_sync()], HashesAcc::bitstring(), Dest::comm:mypid(),
+        SID::rrepair:session_id(), OwnerL::comm:erl_local_pid(),
+        Interval::intervals:interval(), Items::non_neg_integer(),
+        LeafNodesAcc::non_neg_integer())
+        -> {Hashes::bitstring(), ResolveRequests::0..1,
+            LeafNodes::non_neg_integer()}.
+merkle_resolve_leaves_noninit([{leaf, inner, SigSize, LeafNode} | TL], Bin,
+                              Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
+    H1 = merkle_tree:get_hash(LeafNode),
+    ?ASSERT(merkle_tree:is_leaf(LeafNode)),
+    merkle_resolve_leaves_noninit(TL, <<Bin/bitstring, H1:SigSize>>,
+                                  Dest, SID, OwnerL, Interval, Items, LeafNAcc + 1);
+merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes} | TL], Bin,
+                              Dest, SID, OwnerL, Interval, Items, LeafNAcc)
+  when is_list(LeafNodes) ->
+    {NInterval, NItems, NLeafNAcc} =
+        lists:foldl(fun(N, {AccI, AccItems, LeafNAccX}) ->
+                            ?ASSERT(merkle_tree:is_leaf(N)),
+                            {intervals:union(AccI, merkle_tree:get_interval(N)),
+                             AccItems + merkle_tree:get_item_count(N),
+                             LeafNAccX + 1}
+                    end, {Interval, Items, LeafNAcc}, LeafNodes),
+    merkle_resolve_leaves_noninit(TL, Bin, Dest, SID, OwnerL, NInterval, NItems,
+                                  NLeafNAcc);
+merkle_resolve_leaves_noninit([{leaf, leaf, _SigSize, LeafNode} | TL], Bin,
+                              Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
+    ?ASSERT(merkle_tree:is_leaf(LeafNode)),
+    NInterval = intervals:union(Interval, merkle_tree:get_interval(LeafNode)),
+    NItems = Items + merkle_tree:get_item_count(LeafNode),
+    merkle_resolve_leaves_noninit(TL, Bin, Dest, SID, OwnerL, NInterval, NItems,
+                                  LeafNAcc + 1);
+merkle_resolve_leaves_noninit([], Bin, Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
+    ResolveRequests = resolve_leaves([], Dest, SID, OwnerL, Interval, Items),
+    {Bin, ResolveRequests, LeafNAcc}.
+
+%% @doc Filters leaf nodes of inner-leaf comparisons by the compact binary
+%%      representation of a merkle hash list from merkle_sync_compress_hashes/2
+%%      and resolves them (called on initiator).
+%%      All other comparisons have already been resolved by the non-initiator!
+-spec merkle_resolve_leaves_init(
+        Sync::[merkle_sync()], Hashes::bitstring(), Dest::comm:mypid(),
+        SID::rrepair:session_id(), OwnerL::comm:erl_local_pid())
+        -> {ResolveRequests::0..1, LeafNodes::non_neg_integer()}.
+merkle_resolve_leaves_init(Sync, Hashes, Dest, SID, OwnerL) ->
+    merkle_resolve_leaves_init(Sync, Hashes, Dest, SID, OwnerL,
+                               intervals:empty(), 0, 0).
+
+%% @doc Helper for merkle_resolve_leaves_init/5.
+-spec merkle_resolve_leaves_init(
+        Sync::[merkle_sync()], Hashes::bitstring(), Dest::comm:mypid(),
+        SID::rrepair:session_id(), OwnerL::comm:erl_local_pid(),
+        Interval::intervals:interval(), Items::non_neg_integer(),
+        LeafNodesAcc::non_neg_integer())
+        -> {ResolveRequests::0..1, LeafNodes::non_neg_integer()}.
+merkle_resolve_leaves_init([{inner, leaf, SigSize, LeafNodes0} | TL], Hashes,
+                           Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
+    <<X:SigSize, HashesT/bitstring>> = Hashes,
+    LeafNodes = merkle_get_sync_leaves(LeafNodes0, X, SigSize, []),
+    {NInterval, NItems, NLeafNAcc} =
+        lists:foldl(fun(N, {AccI, AccItems, LeafNAccX}) ->
+                            ?ASSERT(merkle_tree:is_leaf(N)),
+                            {intervals:union(AccI, merkle_tree:get_interval(N)),
+                             AccItems + merkle_tree:get_item_count(N),
+                             LeafNAccX + 1}
+                    end, {Interval, Items, LeafNAcc}, LeafNodes),
+    merkle_resolve_leaves_init(TL, HashesT, Dest, SID, OwnerL, NInterval,
+                               NItems, NLeafNAcc);
+merkle_resolve_leaves_init([{leaf, X, _SigSize, _LeafNode} | TL], Hashes,
+                           Dest, SID, OwnerL, Interval, Items, LeafNAcc)
+  when X =:= leaf orelse X =:= inner->
+    ?ASSERT(merkle_tree:is_leaf(_LeafNode)),
+    merkle_resolve_leaves_init(TL, Hashes, Dest, SID, OwnerL, Interval, Items,
+                               LeafNAcc + 1);
+merkle_resolve_leaves_init([], _Hashes, Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
+    ResolveRequests = resolve_leaves([], Dest, SID, OwnerL, Interval, Items),
+    {ResolveRequests, LeafNAcc}.
 
 %% @doc Starts a single resolve request for all given leaf nodes by joining
 %%      their intervals.
