@@ -33,8 +33,7 @@
 
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3]).
--export([merkle_compress_hashlist/3, merkle_decompress_hashlist/3,
-         merkle_decompress_flags/2]).
+-export([merkle_compress_hashlist/3, merkle_decompress_hashlist/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
@@ -147,8 +146,6 @@
 -define(recon_fail_stop_leaf,  2). % mismatch, sending node has leaf node
 -define(recon_fail_stop_inner, 3). % mismatch, sending node has inner node
 -define(recon_fail_cont_inner, 0). % mismatch, both inner nodes (continue!)
-
--type merkle_flag()  :: ?recon_ok | ?recon_fail_stop_leaf | ?recon_fail_stop_inner | ?recon_fail_cont_inner.
 
 -type merkle_cmp_request() :: {Hash::merkle_tree:mt_node_key(), IsLeaf::boolean()}.
 
@@ -543,8 +540,7 @@ on({?check_nodes_response, FlagsBin, OtherMaxLeafCount},
                            struct = Tree,                 stats = Stats,
                            dest_recon_pid = DestReconPid,
                            misc = [{signature_size, SigSize}]}) ->
-    FlagsList = merkle_decompress_flags(FlagsBin, []),
-    case process_tree_cmp_result(FlagsList, Tree, SigSize, MerkleSync, Stats) of
+    case process_tree_cmp_result(FlagsBin, Tree, SigSize, MerkleSync, Stats) of
         {[] = RTree, [] = MerkleSyncNew, NStats, _MyMaxLeafCount} ->
             NStage = reconciliation,
             NextSigSize = SigSize,
@@ -993,19 +989,9 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSize, FlagsAcc, AccN,
                         MerkleSyncIN, AccMLC)
     end.
 
-%% @doc Transforms the compact representation of merkle flags from
-%%      p_check_node/8 back into their original form.
--spec merkle_decompress_flags(Flags::Bin, Acc::CmpRes) -> CmpRes
-    when is_subtype(Bin, bitstring()),
-         is_subtype(CmpRes, [merkle_flag()]).
-merkle_decompress_flags(<<>>, CmpRes) ->
-    lists:reverse(CmpRes);
-merkle_decompress_flags(<<X:2, T/bitstring>>, CmpRes) ->
-    merkle_decompress_flags(T, [X | CmpRes]).
-
 %% @doc Processes compare results from check_node/3 on the initiator.
 -spec process_tree_cmp_result(
-        [merkle_flag()], merkle_tree:merkle_tree() | NodeList,
+        bitstring(), merkle_tree:merkle_tree() | NodeList,
         SigSize::signature_size(), MerkleSyncIn::[merkle_sync()], Stats)
         -> {RestTree::NodeList, MerkleSyncOut::[merkle_sync()], NewStats::Stats,
             MaxLeafCount::non_neg_integer()}
@@ -1022,7 +1008,7 @@ process_tree_cmp_result(CmpResult, Tree, SigSize, MerkleSyncIn, Stats) ->
 
 %% @doc Helper for process_tree_cmp_result/4.
 -spec p_process_tree_cmp_result(
-        [merkle_flag()], RestTree::NodeList, SigSize::signature_size(),
+        bitstring(), RestTree::NodeList, SigSize::signature_size(),
         MerkleSyncIn::[merkle_sync()], Stats, RestTreeAcc::NodeList,
         MerkleSyncAcc::[merkle_sync()], AccMLC::Count, AccCmp::Count)
         -> {RestTreeOut::NodeList, MerkleSyncOut::[merkle_sync()],
@@ -1031,19 +1017,19 @@ process_tree_cmp_result(CmpResult, Tree, SigSize, MerkleSyncIn, Stats) ->
       is_subtype(NodeList, [merkle_tree:mt_node()]),
       is_subtype(Stats,    rr_recon_stats:stats()),
       is_subtype(Count,    non_neg_integer()).
-p_process_tree_cmp_result([], [], _SigSize, MerkleSyncIn, Stats, RestTreeAcc,
+p_process_tree_cmp_result(<<>>, [], _SigSize, MerkleSyncIn, Stats, RestTreeAcc,
                           MerkleSyncAcc, AccMLC, AccCmp) ->
     NStats = rr_recon_stats:inc([{tree_nodesCompared, AccCmp}], Stats),
      {lists:reverse(RestTreeAcc), lists:reverse(MerkleSyncAcc, MerkleSyncIn),
       NStats, AccMLC};
-p_process_tree_cmp_result([?recon_ok | TR], [Node | TN], SigSize, MerkleSyncIn,
+p_process_tree_cmp_result(<<?recon_ok:2, TR/bitstring>>, [Node | TN], SigSize, MerkleSyncIn,
                           Stats, RestTreeAcc, MerkleSyncAcc,
                           AccMLC, AccCmp) ->
     Skipped = merkle_tree:size(Node),
     NStats = rr_recon_stats:inc([{tree_compareSkipped, Skipped}], Stats),
     p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, NStats,
                               RestTreeAcc, MerkleSyncAcc, AccMLC, AccCmp + 1);
-p_process_tree_cmp_result([?recon_fail_stop_leaf | TR], [Node | TN], SigSize,
+p_process_tree_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN], SigSize,
                           MerkleSyncIn, Stats, RestTreeAcc,
                           MerkleSyncAcc, AccMLC, AccCmp) ->
     Sync = case merkle_tree:is_leaf(Node) of
@@ -1053,14 +1039,14 @@ p_process_tree_cmp_result([?recon_fail_stop_leaf | TR], [Node | TN], SigSize,
            end,
     p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, Stats, RestTreeAcc,
                               [Sync | MerkleSyncAcc], AccMLC, AccCmp + 1);
-p_process_tree_cmp_result([?recon_fail_stop_inner | TR], [Node | TN], SigSize,
+p_process_tree_cmp_result(<<?recon_fail_stop_inner:2, TR/bitstring>>, [Node | TN], SigSize,
                           MerkleSyncIn, Stats, RestTreeAcc,
                           MerkleSyncAcc, AccMLC, AccCmp) ->
     ?ASSERT(merkle_tree:is_leaf(Node)),
     p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, Stats, RestTreeAcc,
                               [{leaf, inner, SigSize, Node} | MerkleSyncAcc],
                               AccMLC, AccCmp + 1);
-p_process_tree_cmp_result([?recon_fail_cont_inner | TR], [Node | TN], SigSize,
+p_process_tree_cmp_result(<<?recon_fail_cont_inner:2, TR/bitstring>>, [Node | TN], SigSize,
                           MerkleSyncIn, Stats, RestTreeAcc,
                           MerkleSyncAcc, AccMLC, AccCmp) ->
     ?ASSERT(not merkle_tree:is_leaf(Node)),
