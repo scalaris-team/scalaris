@@ -145,37 +145,6 @@ gen_random_gbTree(I, ToAdd, OutputType, {Tree, Retry}) ->
             gen_random_gbTree(I, ToAdd - 1, OutputType, {NewTree, 0})
     end.
 
-%% bloom filter version is 6 times slower than gb_tree
-%% -spec gen_random_bloom
-%%     (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(), 
-%%      OutputType::list_key) -> [result_k()];
-%%     (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(), 
-%%      OutputType::list_keytpl) -> [result_ktpl()];
-%%     (Interval::intervals:continuous_interval(), ToAdd::non_neg_integer(), 
-%%      OutputType::list_key_val) -> [result_kv()].
-%% gen_random_bloom(I, Number, OutputType) ->
-%%     Bloom = bloom:new_p1e(Number, 0.1),
-%%     gen_random_bloom2(I, Number, OutputType, {[], Bloom, 0}).
-%% 
-%% gen_random_bloom2(_I, 0, _OutputType, {AccList, _AccBloom, _AccRetry}) -> AccList;
-%% gen_random_bloom2(_I, _Number, _OutputType, {AccList, _AccBloom, 3}) ->
-%%     % abort after 3 random keys / probably no more free keys in I
-%%     AccList;
-%% gen_random_bloom2(I, Number, OutputType, {AccList, AccBloom, AccRetry}) ->
-%%     NewKey = ?RT:get_random_in_interval(intervals:get_bounds(I)),
-%%     case bloom:is_element(AccBloom, NewKey) of
-%%         true ->
-%%             gen_random_bloom2(I, Number, OutputType, {AccList, AccBloom, AccRetry + 1});
-%%         false ->
-%%             NewItem = case OutputType of
-%%                           list_key -> NewKey;
-%%                           list_keytpl -> {NewKey};
-%%                           list_key_val -> {NewKey, gen_value()}
-%%                       end,
-%%             NewBloom = bloom:add(AccBloom, NewKey),
-%%             gen_random_bloom2(I, Number - 1, OutputType, {[NewItem | AccList], NewBloom, 0})
-%%     end.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec uniform_key_list
