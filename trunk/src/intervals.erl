@@ -84,7 +84,7 @@
 % @type interval() = [simple_interval()].
 % [] -> empty interval
 % [simple_interval(),...] -> union of the simple intervals
-% @type simple_interval() = {key()} | {left_bracket(), key(), key(), right_bracket()} | {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')'} | all.
+% @type simple_interval() = {key()} | {left_bracket(), key(), key(), right_bracket()} | {left_bracket(), key(), PLUS_INFINITY, ')'} | all.
 % {term()} -> one element interval
 % {'[', A::term(), B::term(), ']'} -> closed interval [A, B]
 % {'(', A::term(), B::term(), ']'} -> half-open interval (A, B], aka ]A, B]
