@@ -136,11 +136,12 @@ gen_random([{I, Add} | R], Acc, OutputType) ->
 gen_random_gb_sets(_I, ToAdd, OutputType, Set, Retry)
   when ToAdd =:= 0 orelse Retry =:= 3 -> 
     % abort after 3 random keys already in Tree / probably no more free keys in I
-    [case OutputType of
-         list_key -> Key;
-         list_keytpl -> {Key};
-         list_key_val -> {Key, gen_value()}
-     end || Key <- gb_sets:to_list(Set)];
+    KeyList = gb_sets:to_list(Set),
+    case OutputType of
+        list_key     -> [Key || Key <- KeyList];
+        list_keytpl  -> [{Key} || Key <- KeyList];
+        list_key_val -> [{Key, gen_value()} || Key <- KeyList]
+    end;
 gen_random_gb_sets(I, ToAdd, OutputType, Set, Retry) ->
     NewKey = ?RT:get_random_in_interval(I),
     case gb_sets:is_member(NewKey, Set) of
