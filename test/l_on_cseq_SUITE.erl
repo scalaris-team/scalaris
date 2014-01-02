@@ -82,7 +82,9 @@ group(split_tests) ->
 group(takeover_tests) ->
     [{timetrap, {seconds, 30}}];
 group(handover_tests) ->
-    [{timetrap, {seconds, 10}}].
+    [{timetrap, {seconds, 10}}];
+group(_) ->
+    suite().
 
 
 init_per_suite(Config) ->

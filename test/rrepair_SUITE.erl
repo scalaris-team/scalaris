@@ -81,13 +81,12 @@ groups() ->
                           ]}
     ].
 
-suite() ->
-    [
-     {timetrap, {seconds, 20}}
-    ].
+suite() -> [{timetrap, {seconds, 20}}].
 
 group(tester_type_check) ->
-    [{timetrap, {seconds, 60}}].
+    [{timetrap, {seconds, 60}}];
+group(_) ->
+    suite().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

@@ -46,7 +46,9 @@ suite() -> [ {timetrap, {seconds, 120}} ].
 %group(tester_tests) ->
 %    [{timetrap, {seconds, 400}}];
 group(rbr_tests) ->
-    [{timetrap, {seconds, 200}}].
+    [{timetrap, {seconds, 200}}];
+group(_) ->
+    suite().
 
 
 init_per_suite(Config) ->
