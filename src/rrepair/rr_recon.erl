@@ -168,6 +168,7 @@
     {?check_nodes, ToCheck::bitstring(), SigSize::signature_size()} |
     {?check_nodes_response, Results::bitstring(), HashKeys::bitstring(), MaxLeafCount::non_neg_integer()} |
     {resolve_req, Hashes::bitstring()} |
+    {resolve_req, BinKeyList::[[bitstring()]]} |
     % dht node response
     {create_struct2, {get_state_response, MyI::intervals:interval()}} |
     {create_struct2, DestI::intervals:interval(),
@@ -328,6 +329,8 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                       fun(KeyBin, _VersionShort, Acc) ->
                               <<Acc/bitstring, KeyBin/bitstring>>
                       end, <<>>, OtherDBChunk1),
+           % the non-initiator will use key_upd_send and we must thus increase
+           % the number of resolve processes here!
            NewStats2 =
                if Req2Count > 0 ->
                       rr_recon_stats:inc([{resolve_started, 1}], NewStats);
@@ -529,8 +532,7 @@ on({?check_nodes, ToCheck0, SigSize},
             NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafNodesCount},
                                          {resolve_started, ResolveReqCount}], Stats),
             send(DestReconPid, {resolve_req, Hashes}),
-            NewState2 = NewState#rr_recon_state{stage = resolve, stats = NStats},
-            shutdown(sync_finished, NewState2);
+            NewState#rr_recon_state{stage = resolve, stats = NStats};
        true -> NewState
     end;
 
@@ -577,16 +579,30 @@ on({?check_nodes_response, FlagsBin, OtherMaxLeafCount},
 on({resolve_req, Hashes} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = true,
                            method = merkle_tree,      merkle_sync = MerkleSync,
-                           dest_rr_pid = DestNodePid, ownerPid = OwnerL,
-                           stats = Stats}) ->
-    SID = rr_recon_stats:get(session_id, Stats),
-    {ResolveReqCount, LeafNodesCount} =
-        merkle_resolve_leaves_init(MerkleSync, Hashes, DestNodePid, SID, OwnerL),
-    NStats = rr_recon_stats:inc([{tree_leavesSynced, LeafNodesCount},
-                                 {resolve_started, ResolveReqCount}], Stats),
+                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
+                           dest_recon_pid = DestRCPid,
+                           stats = Stats}) when is_bitstring(Hashes) ->
+    NStats =
+        merkle_resolve_leaves_init(MerkleSync, Hashes, DestRRPid, DestRCPid, Stats, OwnerL),
     NewState = State#rr_recon_state{stats = NStats},
     %send(DestReconPid, {shutdown, sync_finished_remote}),
-    shutdown(sync_finished, NewState).
+    shutdown(sync_finished, NewState);
+
+on({resolve_req, []} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = false,
+                           method = merkle_tree}) ->
+    ?TRACE1(_Msg, State),
+    shutdown(sync_finished, State);
+
+on({resolve_req, [_|_] = BinKeyList} = _Msg,
+   State = #rr_recon_state{stage = resolve,           initiator = false,
+                           method = merkle_tree,      merkle_sync = MerkleSync,
+                           dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
+                           stats = Stats}) ->
+    ?TRACE1(_Msg, State),
+    NStats = merkle_resolve_req_keys_noninit(MerkleSync, BinKeyList, DestRRPid,
+                                             Stats, OwnerL, []),
+    shutdown(sync_finished, State#rr_recon_state{stats = NStats}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1131,12 +1147,17 @@ merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes} | TL], Bin,
                     end, {Interval, Items, LeafNAcc}, LeafNodes),
     merkle_resolve_leaves_noninit(TL, Bin, Dest, SID, OwnerL, NInterval, NItems,
                                   NLeafNAcc);
-merkle_resolve_leaves_noninit([{leaf, leaf, _SigSize, LeafNode} | TL], Bin,
+merkle_resolve_leaves_noninit([{leaf, leaf, SigSize, LeafNode} | TL], Bin,
                               Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
     ?ASSERT(merkle_tree:is_leaf(LeafNode)),
-    NInterval = intervals:union(Interval, merkle_tree:get_interval(LeafNode)),
-    NItems = Items + merkle_tree:get_item_count(LeafNode),
-    merkle_resolve_leaves_noninit(TL, Bin, Dest, SID, OwnerL, NInterval, NItems,
+    % TODO: make extra version binary for better compression (?)
+    % TODO: use formulae of compress_kv_list_p1e/4 for the version size (?) - have to have the same info on the other node!
+    Bucket = merkle_tree:get_bucket(LeafNode),
+    BucketSize = length(Bucket),
+    ?ASSERT(BucketSize < 255),
+    Bin1 = <<Bin/bitstring, BucketSize:8>>,
+    NBin = compress_kv_list(Bucket, Bin1, SigSize, get_min_version_bits()),
+    merkle_resolve_leaves_noninit(TL, NBin, Dest, SID, OwnerL, Interval, Items,
                                   LeafNAcc + 1);
 merkle_resolve_leaves_noninit([], Bin, Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
     ResolveRequests = resolve_leaves([], Dest, SID, OwnerL, Interval, Items),
@@ -1147,42 +1168,139 @@ merkle_resolve_leaves_noninit([], Bin, Dest, SID, OwnerL, Interval, Items, LeafN
 %%      and resolves them (called on initiator).
 %%      All other comparisons have already been resolved by the non-initiator!
 -spec merkle_resolve_leaves_init(
-        Sync::[merkle_sync()], Hashes::bitstring(), Dest::comm:mypid(),
-        SID::rrepair:session_id(), OwnerL::comm:erl_local_pid())
-        -> {ResolveRequests::0..1, LeafNodes::non_neg_integer()}.
-merkle_resolve_leaves_init(Sync, Hashes, Dest, SID, OwnerL) ->
-    merkle_resolve_leaves_init(Sync, Hashes, Dest, SID, OwnerL,
-                               intervals:empty(), 0, 0).
+        Sync::[merkle_sync()], Hashes::bitstring(), DestRRPid::comm:mypid(),
+        DestRCPid::comm:mypid(), Stats, OwnerL::comm:erl_local_pid())
+        -> NewStats::Stats
+    when is_subtype(Stats, rr_recon_stats:stats()).
+merkle_resolve_leaves_init(Sync, Hashes, DestRRPid, DestRCPid, SID, OwnerL) ->
+    merkle_resolve_leaves_init(Sync, Hashes, DestRRPid, DestRCPid, SID, OwnerL,
+                               intervals:empty(), [], [], [], false, 0, 0).
 
 %% @doc Helper for merkle_resolve_leaves_init/5.
 -spec merkle_resolve_leaves_init(
-        Sync::[merkle_sync()], Hashes::bitstring(), Dest::comm:mypid(),
-        SID::rrepair:session_id(), OwnerL::comm:erl_local_pid(),
-        Interval::intervals:interval(), Items::non_neg_integer(),
-        LeafNodesAcc::non_neg_integer())
-        -> {ResolveRequests::0..1, LeafNodes::non_neg_integer()}.
+        Sync::[merkle_sync()], Hashes::bitstring(), DestRRPid::comm:mypid(),
+        DestRCPid::comm:mypid(), Stats, OwnerL::comm:erl_local_pid(),
+        Interval::intervals:interval(), % TODO: remove interval, resolve single keys!
+        ToSend::[?RT:key()], ToReq::[?RT:key()], ToResolve::[[bitstring()]],
+        ResolveNonEmpty::boolean(),
+        SyncItemCount::non_neg_integer(), LeafNodesAcc::non_neg_integer())
+        -> NewStats::Stats
+    when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_init([{inner, leaf, SigSize, LeafNodes0} | TL], Hashes,
-                           Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
+                           DestRRPid, DestRCPid, Stats, OwnerL, Interval,
+                           ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
     <<X:SigSize, HashesT/bitstring>> = Hashes,
     LeafNodes = merkle_get_sync_leaves(LeafNodes0, X, SigSize, []),
-    {NInterval, NItems, NLeafNAcc} =
+    {NInterval, NSyncItemCount, NLeafNAcc} =
         lists:foldl(fun(N, {AccI, AccItems, LeafNAccX}) ->
                             ?ASSERT(merkle_tree:is_leaf(N)),
                             {intervals:union(AccI, merkle_tree:get_interval(N)),
                              AccItems + merkle_tree:get_item_count(N),
                              LeafNAccX + 1}
-                    end, {Interval, Items, LeafNAcc}, LeafNodes),
-    merkle_resolve_leaves_init(TL, HashesT, Dest, SID, OwnerL, NInterval,
-                               NItems, NLeafNAcc);
-merkle_resolve_leaves_init([{leaf, X, _SigSize, _LeafNode} | TL], Hashes,
-                           Dest, SID, OwnerL, Interval, Items, LeafNAcc)
-  when X =:= leaf orelse X =:= inner->
+                    end, {Interval, SyncItemCount, LeafNAcc}, LeafNodes),
+    merkle_resolve_leaves_init(TL, HashesT, DestRRPid, DestRCPid, Stats, OwnerL,
+                               NInterval, ToSend, ToReq, ToResolve, ResolveNonEmpty,
+                               NSyncItemCount, NLeafNAcc);
+merkle_resolve_leaves_init([{leaf, leaf, SigSize, LeafNode} | TL],
+                           <<BSize:8/integer-unit:1, HashesT/bitstring>>,
+                           DestRRPid, DestRCPid, Stats, OwnerL, Interval,
+                           ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
     ?ASSERT(merkle_tree:is_leaf(_LeafNode)),
-    merkle_resolve_leaves_init(TL, Hashes, Dest, SID, OwnerL, Interval, Items,
-                               LeafNAcc + 1);
-merkle_resolve_leaves_init([], _Hashes, Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
-    ResolveRequests = resolve_leaves([], Dest, SID, OwnerL, Interval, Items),
-    {ResolveRequests, LeafNAcc}.
+    VSize = get_min_version_bits(),
+    OBucketBinSize = BSize * (SigSize + VSize),
+    <<OBucketBin:OBucketBinSize/bitstring, NHashes/bitstring>> = HashesT,
+    OBucketTree = decompress_kv_list(OBucketBin, gb_trees:empty(), SigSize, VSize),
+    {ToSend1, ToReq1, OBucketTree1} =
+        get_full_diff(merkle_tree:get_bucket(LeafNode), OBucketTree,
+                      ToSend, ToReq, SigSize, VSize),
+    ToResolve1 = [gb_trees:keys(OBucketTree1) | ToResolve],
+    ResolveNonEmpty1 = ?IIF(gb_trees:size(OBucketTree1) =/= 0, true, ResolveNonEmpty),
+
+    merkle_resolve_leaves_init(TL, NHashes, DestRRPid, DestRCPid, Stats, OwnerL,
+                               Interval, ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1,
+                               SyncItemCount, LeafNAcc + 1);
+merkle_resolve_leaves_init([{leaf, inner, _SigSize, _LeafNode} | TL], Hashes,
+                           DestRRPid, DestRCPid, Stats, OwnerL, Interval,
+                           ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
+    ?ASSERT(merkle_tree:is_leaf(_LeafNode)),
+    merkle_resolve_leaves_init(TL, Hashes, DestRRPid, DestRCPid, Stats, OwnerL,
+                               Interval, ToSend, ToReq, ToResolve, ResolveNonEmpty,
+                               SyncItemCount, LeafNAcc + 1);
+merkle_resolve_leaves_init([], _Hashes, DestRRPid, DestRCPid, Stats, OwnerL, Interval,
+                           ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
+    SID = rr_recon_stats:get(session_id, Stats),
+    IntervalUpdResReqs =
+        resolve_leaves([], DestRRPid, SID, OwnerL, Interval, SyncItemCount),
+
+    % resolve the leaf-leaf comparison's items as key_upd:
+    KeyUpdResReqs =
+        if ToSend =/= [] orelse ToReq =/= [] ->
+               send_local(OwnerL, {request_resolve, SID,
+                                   {key_upd_send, DestRRPid, ToSend, ToReq},
+                                   [{from_my_node, 1},
+                                    {feedback_request, comm:make_global(OwnerL)}]}),
+               1;
+           true ->
+               0
+        end,
+
+    % let the non-initiator's rr_recon process identify the remaining keys;
+    % the non-initiator will use key_upd_send and we must thus increase
+    % the number of resolve processes here!
+    if ResolveNonEmpty -> 
+           ToResolve1 = lists:reverse(ToResolve),
+           MerkleResReqs = 1;
+       true ->
+           ToResolve1 = [],
+           MerkleResReqs = 0
+    end,
+    
+    comm:send(DestRCPid, {resolve_req, ToResolve1}),
+    
+    ?TRACE("resolve_req Merkle Session=~p ; interval_upd=~p ; key_upd_send=~p ; merkle_resolve=~p",
+           [SID, IntervalUpdResReqs, KeyUpdResReqs, MerkleResReqs]),
+    rr_recon_stats:inc([{tree_leavesSynced, LeafNAcc},
+                        {resolve_started,
+                         IntervalUpdResReqs + KeyUpdResReqs + MerkleResReqs}],
+                       Stats).
+
+%% @doc For each leaf-leaf comparison, gets the requested keys and resolves them
+%%      (if non-empty) with a key_upd_send (called on non-initiator).
+-spec merkle_resolve_req_keys_noninit(
+        Sync::[merkle_sync()], BinKeyList::[[bitstring()]], DestRRPid::comm:mypid(),
+        Stats, OwnerL::comm:erl_local_pid(), SendKeysAcc::[?RT:key()])
+        -> NewStats::Stats
+    when is_subtype(Stats, rr_recon_stats:stats()).
+merkle_resolve_req_keys_noninit([{leaf, leaf, _SigSize, _LeafNode} | TL],
+                        [[] | BinKeyList],
+                        DestRRPid, Stats, OwnerL, SendKeys) ->
+    merkle_resolve_req_keys_noninit(TL, BinKeyList, DestRRPid, Stats, OwnerL,
+                                    SendKeys);
+merkle_resolve_req_keys_noninit([{leaf, leaf, SigSize, LeafNode} | TL],
+                        [[_|_] = ReqKeys | BinKeyList],
+                        DestRRPid, Stats, OwnerL, SendKeys) ->
+    ReqSet = gb_sets:from_list(ReqKeys),
+    SendKeys1 = [Key || {Key, _Version} <- merkle_tree:get_bucket(LeafNode),
+                        gb_sets:is_member(compress_key(Key, SigSize),
+                                          ReqSet)] ++ SendKeys,
+    merkle_resolve_req_keys_noninit(TL, BinKeyList, DestRRPid, Stats, OwnerL,
+                                    SendKeys1);
+merkle_resolve_req_keys_noninit([_ | TL], BinKeyList, DestRRPid, Stats, OwnerL,
+                                SendKeys) ->
+    merkle_resolve_req_keys_noninit(TL, BinKeyList, DestRRPid, Stats, OwnerL,
+                                    SendKeys);
+merkle_resolve_req_keys_noninit([], [], DestRRPid, Stats, OwnerL, [_|_] = SendKeys) ->
+    SID = rr_recon_stats:get(session_id, Stats),
+    % note: the resolve request is counted at the initiator and
+    %       thus from_my_node must be set accordingly on this node!
+    send_local(OwnerL, {request_resolve, SID,
+                        {key_upd_send, DestRRPid, SendKeys, []},
+                        [{feedback_request, comm:make_global(OwnerL)},
+                         {from_my_node, 0}]}),
+    % we will get one reply from a subsequent ?key_upd resolve
+    rr_recon_stats:inc([{resolve_started, 1}], Stats);
+merkle_resolve_req_keys_noninit([], [], _DestRRPid, Stats, _OwnerL, []) ->
+    Stats.
 
 %% @doc Starts a single resolve request for all given leaf nodes by joining
 %%      their intervals.
@@ -1328,7 +1446,7 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     BF0 = bloom:new_p1e(ElementNum, P1E),
     BF = bloom:add_list(BF0, DBItems),
     #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
-build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, BeginSync) ->
+build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginSync) ->
     ?ASSERT(not intervals:is_empty(I)),
     case Params of
         {} ->
@@ -1343,13 +1461,13 @@ build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, BeginSy
     end,
     merkle_tree:new(I, DBItems, [{branch_factor, BranchFactor},
                                  {bucket_size, BucketSize},
-                                 {keep_bucket, not BeginSync}]);
+                                 {keep_bucket, true}]);
 build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params, BeginSync) ->
     ?ASSERT(not intervals:is_empty(_I)),
     ?ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
     NTree = merkle_tree:insert_list(DBItems, OldSyncStruct),
     if BeginSync ->
-           % no more DB items -> finish tree, remove buckets
+           % no more DB items -> finish tree
            merkle_tree:gen_hash(NTree, true);
        true ->
            % don't hash now - there will be new items
@@ -1361,7 +1479,7 @@ build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}, BeginSync
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), BranchFactor, 1),
     Tree = merkle_tree:new(I, DBItems, [{branch_factor, BranchFactor},
                                         {bucket_size, BucketSize},
-                                        {keep_bucket, not BeginSync}]),
+                                        {keep_bucket, true}]),
     if BeginSync ->
            % no more DB items -> create art struct:
            #art_recon_struct{art = art:new(Tree, get_art_config()),

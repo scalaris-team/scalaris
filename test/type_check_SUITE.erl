@@ -358,8 +358,9 @@ tester_type_check_rrepair(_Config) ->
              {merkle_get_sync_leaves, 4}, %% needs merkle_tree with hashes
              {merkle_resolve_leaves_noninit, 4}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_noninit, 8}, % needs only leaf nodes in node list
-             {merkle_resolve_leaves_init, 5}, % needs only leaf nodes in node list
-             {merkle_resolve_leaves_init, 8}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_init, 6}, % needs only leaf nodes in node list
+             {merkle_resolve_leaves_init, 13}, % needs only leaf nodes in node list
+             {merkle_resolve_req_keys_noninit, 6}, % needs only leaf nodes in node list, same-length lists
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
