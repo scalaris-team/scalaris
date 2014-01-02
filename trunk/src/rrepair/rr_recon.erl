@@ -1147,7 +1147,7 @@ merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes} | TL], Bin,
                     end, {Interval, Items, LeafNAcc}, LeafNodes),
     merkle_resolve_leaves_noninit(TL, Bin, Dest, SID, OwnerL, NInterval, NItems,
                                   NLeafNAcc);
-merkle_resolve_leaves_noninit([{leaf, leaf, SigSize, LeafNode} | TL], Bin,
+merkle_resolve_leaves_noninit([{leaf, leaf, SigSize0, LeafNode} | TL], Bin,
                               Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
     ?ASSERT(merkle_tree:is_leaf(LeafNode)),
     % TODO: make extra version binary for better compression (?)
@@ -1156,7 +1156,12 @@ merkle_resolve_leaves_noninit([{leaf, leaf, SigSize, LeafNode} | TL], Bin,
     BucketSize = length(Bucket),
     ?ASSERT(BucketSize < 255),
     Bin1 = <<Bin/bitstring, BucketSize:8>>,
-    NBin = compress_kv_list(Bucket, Bin1, SigSize, get_min_version_bits()),
+
+    % note: we can reach the best compression if values and versions align to
+    %       byte-boundaries
+    {SigSize, VSize} = align_bitsize(SigSize0, get_min_version_bits()),
+
+    NBin = compress_kv_list(Bucket, Bin1, SigSize, VSize),
     merkle_resolve_leaves_noninit(TL, NBin, Dest, SID, OwnerL, Interval, Items,
                                   LeafNAcc + 1);
 merkle_resolve_leaves_noninit([], Bin, Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
@@ -1201,12 +1206,12 @@ merkle_resolve_leaves_init([{inner, leaf, SigSize, LeafNodes0} | TL], Hashes,
     merkle_resolve_leaves_init(TL, HashesT, DestRRPid, DestRCPid, Stats, OwnerL,
                                NInterval, ToSend, ToReq, ToResolve, ResolveNonEmpty,
                                NSyncItemCount, NLeafNAcc);
-merkle_resolve_leaves_init([{leaf, leaf, SigSize, LeafNode} | TL],
+merkle_resolve_leaves_init([{leaf, leaf, SigSize0, LeafNode} | TL],
                            <<BSize:8/integer-unit:1, HashesT/bitstring>>,
                            DestRRPid, DestRCPid, Stats, OwnerL, Interval,
                            ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
     ?ASSERT(merkle_tree:is_leaf(_LeafNode)),
-    VSize = get_min_version_bits(),
+    {SigSize, VSize} = align_bitsize(SigSize0, get_min_version_bits()),
     OBucketBinSize = BSize * (SigSize + VSize),
     <<OBucketBin:OBucketBinSize/bitstring, NHashes/bitstring>> = HashesT,
     OBucketTree = decompress_kv_list(OBucketBin, gb_trees:empty(), SigSize, VSize),
@@ -1276,10 +1281,11 @@ merkle_resolve_req_keys_noninit([{leaf, leaf, _SigSize, _LeafNode} | TL],
                         DestRRPid, Stats, OwnerL, SendKeys) ->
     merkle_resolve_req_keys_noninit(TL, BinKeyList, DestRRPid, Stats, OwnerL,
                                     SendKeys);
-merkle_resolve_req_keys_noninit([{leaf, leaf, SigSize, LeafNode} | TL],
+merkle_resolve_req_keys_noninit([{leaf, leaf, SigSize0, LeafNode} | TL],
                         [[_|_] = ReqKeys | BinKeyList],
                         DestRRPid, Stats, OwnerL, SendKeys) ->
     ReqSet = gb_sets:from_list(ReqKeys),
+    {SigSize, _VSize} = align_bitsize(SigSize0, get_min_version_bits()),
     SendKeys1 = [Key || {Key, _Version} <- merkle_tree:get_bucket(LeafNode),
                         gb_sets:is_member(compress_key(Key, SigSize),
                                           ReqSet)] ++ SendKeys,
@@ -1412,10 +1418,7 @@ compress_kv_list_p1e(DBItems, ItemCount, VCompareCount, P1E) ->
                         calc_signature_size_1_to_n(1, VP, 128)),
     % note: we can reach the best compression if values and versions align to
     %       byte-boundaries
-    FullKVSize0 = SigSize0 + VSize0,
-    FullKVSize = bloom:resize(FullKVSize0, 8),
-    VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
-    SigSize = FullKVSize - VSize, 
+    {SigSize, VSize} = align_bitsize(SigSize0, VSize0),
     DBChunkBin = compress_kv_list(DBItems, <<>>, SigSize, VSize),
     % debug compressed and uncompressed sizes:
     ?TRACE("SigSize: ~p, VSize: ~p, ChunkSize: ~p / ~p bits",
@@ -1424,6 +1427,18 @@ compress_kv_list_p1e(DBItems, ItemCount, VCompareCount, P1E) ->
                  erlang:term_to_binary(DBChunkBin,
                                        [{minor_version, 1}, {compressed, 2}]))]),
     {DBChunkBin, SigSize, VSize}.
+
+%% @doc Aligns the two sizes so that their sum is a multiple of 8 in order to
+%%      achieve a better compression in binaries.
+-spec align_bitsize(SigSize, VSize) -> {SigSize, VSize}
+    when is_subtype(SigSize, pos_integer()),
+         is_subtype(VSize, pos_integer()).
+align_bitsize(SigSize0, VSize0) ->
+    FullKVSize0 = SigSize0 + VSize0,
+    FullKVSize = bloom:resize(FullKVSize0, 8),
+    VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
+    SigSize = FullKVSize - VSize,
+    {SigSize, VSize}.
 
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
                          DestI::intervals:non_empty_interval(), db_chunk_kv(),
