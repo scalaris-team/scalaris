@@ -778,39 +778,53 @@ decompress_kv_list(Bin, Tree, SigSize, VSize) ->
 %%      or the entry in MyEntries has a newer version than the one in the tree
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
--spec get_full_diff(MyEntries::db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
-                    AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
-                    SigSize::signature_size(), VSize::signature_size())
--> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
-get_full_diff(MyEntries, MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
-    get_full_diff_(MyEntries, MyIOtherKvTree, FBItems, ReqItems, SigSize,
+-spec get_full_diff
+        (MyEntries::db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
+         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VSize::signature_size())
+        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()};
+        (MyEntries::db_chunk_kv(), MyIOtherKvTree::gb_tree(),
+         AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VSize::signature_size())
+        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
+    get_full_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
                   util:pow(2, VSize)).
     
 -spec get_full_diff_(MyEntries::db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
                      AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
                      SigSize::signature_size(), VMod::pos_integer())
 -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
-get_full_diff_([], MyIOtherKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
-    {FBItems, ReqItems, MyIOtherKvTree};
-get_full_diff_([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSize, VMod) ->
+get_full_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
+    {FBItems, ReqItems, MyIOtKvTree};
+get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
+    Key = element(1, Tpl),
+    Version = element(2, Tpl),
+    TplSize = size(Tpl),
     {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
-    case gb_trees:lookup(KeyBin, MyIOtherKvTree) of
-        none ->
-            get_full_diff_(Rest, MyIOtherKvTree,
-                          [{Key, Value, Version} | FBItems], ReqItems,
-                          SigSize, VMod);
+    case gb_trees:lookup(KeyBin, MyIOtKvTree) of
+        none when TplSize =:= 3 ->
+            Value = element(3, Tpl),
+            get_full_diff_(Rest, MyIOtKvTree, [{Key, Value, Version} | FBItems],
+                           ReqItems, SigSize, VMod);
+        none when TplSize =:= 2 ->
+            get_full_diff_(Rest, MyIOtKvTree, [Key | FBItems],
+                           ReqItems, SigSize, VMod);
         {value, OtherVersionShort} ->
-            MyIOtherKvTree2 = gb_trees:delete(KeyBin, MyIOtherKvTree),
-            if VersionShort > OtherVersionShort ->
-                   get_full_diff_(Rest, MyIOtherKvTree2,
-                                 [{Key, Value, Version} | FBItems], ReqItems,
-                                 SigSize, VMod);
+            MyIOtKvTree2 = gb_trees:delete(KeyBin, MyIOtKvTree),
+            if VersionShort > OtherVersionShort andalso TplSize =:= 3 ->
+                   Value = element(3, Tpl),
+                   get_full_diff_(Rest, MyIOtKvTree2, [{Key, Value, Version} | FBItems],
+                                  ReqItems, SigSize, VMod);
+               VersionShort > OtherVersionShort andalso TplSize =:= 2 ->
+                   get_full_diff_(Rest, MyIOtKvTree2, [Key | FBItems],
+                                  ReqItems, SigSize, VMod);
                VersionShort =:= OtherVersionShort ->
-                   get_full_diff_(Rest, MyIOtherKvTree2, FBItems, ReqItems,
-                                 SigSize, VMod);
+                   get_full_diff_(Rest, MyIOtKvTree2, FBItems,
+                                  ReqItems, SigSize, VMod);
                true ->
-                   get_full_diff_(Rest, MyIOtherKvTree2, FBItems, [Key | ReqItems],
-                                 SigSize, VMod)
+                   get_full_diff_(Rest, MyIOtKvTree2, FBItems,
+                                  [Key | ReqItems], SigSize, VMod)
             end
     end.
 
@@ -822,8 +836,8 @@ get_full_diff_([{Key, Version, Value} | Rest], MyIOtherKvTree, FBItems, ReqItems
                     AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
                     SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
-get_part_diff(MyEntries, MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
-    get_part_diff_(MyEntries, MyIOtherKvTree, FBItems, ReqItems, SigSize,
+get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
+    get_part_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
                    util:pow(2, VSize)).
 
 %% @doc Helper for get_part_diff/6.
@@ -831,24 +845,24 @@ get_part_diff(MyEntries, MyIOtherKvTree, FBItems, ReqItems, SigSize, VSize) ->
                      AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
                      SigSize::signature_size(), VMod::pos_integer())
         -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
-get_part_diff_([], MyIOtherKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
-    {FBItems, ReqItems, MyIOtherKvTree};
-get_part_diff_([{Key, Version} | Rest], MyIOtherKvTree, FBItems, ReqItems, SigSize, VMod) ->
+get_part_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
+    {FBItems, ReqItems, MyIOtKvTree};
+get_part_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
     {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
-    case gb_trees:lookup(KeyBin, MyIOtherKvTree) of
+    case gb_trees:lookup(KeyBin, MyIOtKvTree) of
         none ->
-            get_part_diff_(Rest, MyIOtherKvTree, FBItems, ReqItems,
+            get_part_diff_(Rest, MyIOtKvTree, FBItems, ReqItems,
                            SigSize, VMod);
         {value, OtherVersionShort} ->
-            MyIOtherKvTree2 = gb_trees:delete(KeyBin, MyIOtherKvTree),
+            MyIOtKvTree2 = gb_trees:delete(KeyBin, MyIOtKvTree),
             if VersionShort > OtherVersionShort ->
-                   get_part_diff_(Rest, MyIOtherKvTree2, [Key | FBItems], ReqItems,
+                   get_part_diff_(Rest, MyIOtKvTree2, [Key | FBItems], ReqItems,
                                   SigSize, VMod);
                VersionShort =:= OtherVersionShort ->
-                   get_part_diff_(Rest, MyIOtherKvTree2, FBItems, ReqItems,
+                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, ReqItems,
                                   SigSize, VMod);
                true ->
-                   get_part_diff_(Rest, MyIOtherKvTree2, FBItems, [Key | ReqItems],
+                   get_part_diff_(Rest, MyIOtKvTree2, FBItems, [Key | ReqItems],
                                   SigSize, VMod)
             end
     end.
