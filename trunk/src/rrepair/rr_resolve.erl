@@ -484,7 +484,7 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
                            SID::rrepair:session_id() | null,
                            FromMyNode::0 | 1, FBDest::comm:mypid() | undefined,
                            Options::options(), IsFeedback::boolean())
-        -> ResolveStarted::non_neg_integer().
+        -> ResolveStarted::0 | 1.
 send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options, IsFeedback) ->
     case FBDest of
         undefined -> Options1 = Options,
