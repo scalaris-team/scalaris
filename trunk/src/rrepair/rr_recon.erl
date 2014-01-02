@@ -166,7 +166,7 @@
     % merkle tree sync messages
     {?check_nodes, SenderPid::comm:mypid(), ToCheck::bitstring(), SigSize::signature_size()} |
     {?check_nodes, ToCheck::bitstring(), SigSize::signature_size()} |
-    {?check_nodes_response, Results::bitstring(), HashKeys::bitstring(), MaxLeafCount::non_neg_integer()} |
+    {?check_nodes_response, FlagsBin::bitstring(), MaxLeafCount::non_neg_integer()} |
     {resolve_req, Hashes::bitstring()} |
     {resolve_req, BinKeyList::[[bitstring()]]} |
     % dht node response
