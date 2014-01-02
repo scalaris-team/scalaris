@@ -40,7 +40,9 @@ all() ->
 suite() -> [ {timetrap, {seconds, 120}} ].
 
 group(send_tests) ->
-    [{timetrap, {seconds, 400}}].
+    [{timetrap, {seconds, 400}}];
+group(_) ->
+    suite().
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).

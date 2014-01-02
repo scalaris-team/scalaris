@@ -58,7 +58,9 @@ group(tester_tests) ->
 group(join_tests) ->
     [{timetrap, {seconds, 10}}];
 group(join_and_leave_tests) ->
-    [{timetrap, {seconds, 30}}].
+    [{timetrap, {seconds, 30}}];
+group(_) ->
+    suite().
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
