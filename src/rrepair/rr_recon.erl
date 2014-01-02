@@ -1220,17 +1220,19 @@ merkle_resolve_leaves_init([{leaf, leaf, SigSize0, LeafNode} | TL],
                       ToSend, ToReq, SigSize, VSize),
     ToResolve1 = [gb_trees:keys(OBucketTree1) | ToResolve],
     ResolveNonEmpty1 = ?IIF(gb_trees:size(OBucketTree1) =/= 0, true, ResolveNonEmpty),
+    NSyncItemCount = SyncItemCount + merkle_tree:get_item_count(LeafNode),
 
     merkle_resolve_leaves_init(TL, NHashes, DestRRPid, DestRCPid, Stats, OwnerL,
                                Interval, ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1,
-                               SyncItemCount, LeafNAcc + 1);
-merkle_resolve_leaves_init([{leaf, inner, _SigSize, _LeafNode} | TL], Hashes,
+                               NSyncItemCount, LeafNAcc + 1);
+merkle_resolve_leaves_init([{leaf, inner, _SigSize, LeafNode} | TL], Hashes,
                            DestRRPid, DestRCPid, Stats, OwnerL, Interval,
                            ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
-    ?ASSERT(merkle_tree:is_leaf(_LeafNode)),
+    ?ASSERT(merkle_tree:is_leaf(LeafNode)),
+    NSyncItemCount = SyncItemCount + merkle_tree:get_item_count(LeafNode),
     merkle_resolve_leaves_init(TL, Hashes, DestRRPid, DestRCPid, Stats, OwnerL,
                                Interval, ToSend, ToReq, ToResolve, ResolveNonEmpty,
-                               SyncItemCount, LeafNAcc + 1);
+                               NSyncItemCount, LeafNAcc + 1);
 merkle_resolve_leaves_init([], _Hashes, DestRRPid, DestRCPid, Stats, OwnerL, Interval,
                            ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
     SID = rr_recon_stats:get(session_id, Stats),
