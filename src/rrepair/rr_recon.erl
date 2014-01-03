@@ -1124,30 +1124,44 @@ merkle_get_sync_leaves([Node | Rest], Skip, SigSize, ToSyncAcc, FoundSkipHash) -
             LeafNodes::non_neg_integer()}.
 merkle_resolve_leaves_noninit(Sync, Dest, SID, OwnerL) ->
     merkle_resolve_leaves_noninit(Sync, <<>>, Dest, SID, OwnerL,
-                                  intervals:empty(), 0, 0).
+                                  intervals:empty(), [], 0, 0).
 
 %% @doc Helper for merkle_resolve_leaves_noninit/4.
 -spec merkle_resolve_leaves_noninit(
-        Sync::[merkle_sync()], HashesAcc::bitstring(), Dest::comm:mypid(),
+        Sync::[merkle_sync()], HashesAcc::bitstring(), DestRRPid::comm:mypid(),
         SID::rrepair:session_id(), OwnerL::comm:erl_local_pid(),
-        Interval::intervals:interval(), Items::non_neg_integer(),
+        Interval::intervals:interval(), % TODO: remove interval, resolve single keys!
+        ToSend::[?RT:key()], SyncItemCount::non_neg_integer(),
         LeafNodesAcc::non_neg_integer())
         -> {Hashes::bitstring(), ResolveRequests::0..1,
             LeafNodes::non_neg_integer()}.
-merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes, FoundHash} | TL], Bin,
-                              Dest, SID, OwnerL, Interval, Items, LeafNAcc)
+merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes, true} | TL], Bin,
+                              DestRRPid, SID, OwnerL, Interval, ToSend, SyncItemCount, LeafNAcc)
   when is_list(LeafNodes) ->
-    {NInterval, NItems, NLeafNAcc} =
+    {ToSend1, NSyncItemCount, NLeafNAcc} =
+        lists:foldl(fun(N, {AccToSend, AccItems, LeafNAccX}) ->
+                            ?ASSERT(merkle_tree:is_leaf(N)),
+                            {lists:append([Key || {Key, _Version} <- merkle_tree:get_bucket(N)],
+                                          AccToSend),
+                             AccItems + merkle_tree:get_item_count(N),
+                             LeafNAccX + 1}
+                    end, {ToSend, SyncItemCount, LeafNAcc}, LeafNodes),
+    merkle_resolve_leaves_noninit(TL, Bin, DestRRPid, SID, OwnerL, Interval, ToSend1, NSyncItemCount,
+                                  NLeafNAcc);
+merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes, false} | TL], Bin,
+                              DestRRPid, SID, OwnerL, Interval, ToSend, SyncItemCount, LeafNAcc)
+  when is_list(LeafNodes) ->
+    {NInterval, NSyncItemCount, NLeafNAcc} =
         lists:foldl(fun(N, {AccI, AccItems, LeafNAccX}) ->
                             ?ASSERT(merkle_tree:is_leaf(N)),
                             {intervals:union(AccI, merkle_tree:get_interval(N)),
                              AccItems + merkle_tree:get_item_count(N),
                              LeafNAccX + 1}
-                    end, {Interval, Items, LeafNAcc}, LeafNodes),
-    merkle_resolve_leaves_noninit(TL, Bin, Dest, SID, OwnerL, NInterval, NItems,
+                    end, {Interval, SyncItemCount, LeafNAcc}, LeafNodes),
+    merkle_resolve_leaves_noninit(TL, Bin, DestRRPid, SID, OwnerL, NInterval, ToSend, NSyncItemCount,
                                   NLeafNAcc);
 merkle_resolve_leaves_noninit([{leaf, X, SigSize0, LeafNode} | TL], Bin,
-                              Dest, SID, OwnerL, Interval, Items, LeafNAcc)
+                              DestRRPid, SID, OwnerL, Interval, ToSend, SyncItemCount, LeafNAcc)
   when X =:= leaf orelse X =:= inner ->
     ?ASSERT(merkle_tree:is_leaf(LeafNode)),
     % TODO: make extra version binary for better compression (?)
@@ -1162,11 +1176,25 @@ merkle_resolve_leaves_noninit([{leaf, X, SigSize0, LeafNode} | TL], Bin,
     {SigSize, VSize} = align_bitsize(SigSize0, get_min_version_bits()),
 
     NBin = compress_kv_list(Bucket, Bin1, SigSize, VSize),
-    merkle_resolve_leaves_noninit(TL, NBin, Dest, SID, OwnerL, Interval, Items,
+    merkle_resolve_leaves_noninit(TL, NBin, DestRRPid, SID, OwnerL, Interval, ToSend, SyncItemCount,
                                   LeafNAcc + 1);
-merkle_resolve_leaves_noninit([], Bin, Dest, SID, OwnerL, Interval, Items, LeafNAcc) ->
-    ResolveRequests = resolve_leaves([], Dest, SID, OwnerL, Interval, Items),
-    {Bin, ResolveRequests, LeafNAcc}.
+merkle_resolve_leaves_noninit([], Bin, DestRRPid, SID, OwnerL, Interval, ToSend, SyncItemCount, LeafNAcc) ->
+    IntervalUpdResReqs =
+        resolve_leaves([], DestRRPid, SID, OwnerL, Interval, SyncItemCount),
+    
+    % resolve the leaf-leaf comparison's items as key_upd:
+    KeyUpdResReqs =
+        if ToSend =/= [] ->
+               send_local(OwnerL, {request_resolve, SID,
+                                   {key_upd_send, DestRRPid, ToSend, []},
+                                   [{from_my_node, 1},
+                                    {feedback_request, comm:make_global(OwnerL)}]}),
+               1;
+           true ->
+               0
+        end,
+
+    {Bin, IntervalUpdResReqs + KeyUpdResReqs, LeafNAcc}.
 
 %% @doc Filters leaf nodes of inner-leaf comparisons by the compact binary
 %%      representation of a merkle hash list from merkle_sync_compress_hashes/2
