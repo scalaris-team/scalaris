@@ -355,7 +355,7 @@ tester_type_check_rrepair(_Config) ->
              {p_check_node, 8}, %% needs merkle_tree/nodes with hashes
              {process_tree_cmp_result, 5}, %% needs matching result and merkle nodes
              {p_process_tree_cmp_result, 9}, %% needs matching result and merkle nodes
-             {merkle_get_sync_leaves, 4}, %% needs merkle_tree with hashes
+             {merkle_get_sync_leaves, 5}, %% needs merkle_tree with hashes
              {merkle_resolve_leaves_noninit, 4}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_noninit, 8}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_init, 6}, % needs only leaf nodes in node list

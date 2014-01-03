@@ -116,7 +116,8 @@
 -type recon_dest() :: ?RT:key() | random.
 
 -type merkle_sync() ::
-          {My::inner, Other::leaf,  SigSize::signature_size(), LeafNodes::[merkle_tree:mt_node(),...]} |
+          {My::inner, Other::leaf,  SigSize::signature_size(), LeafNodes::[merkle_tree:mt_node()],
+           FoundHash::boolean()} |
           {My::leaf,  Other::leaf,  SigSize::signature_size(), LeafNode::merkle_tree:mt_node()} |
           {My::leaf,  Other::inner, SigSize::signature_size(), LeafNode::merkle_tree:mt_node()}.
 
@@ -1005,9 +1006,10 @@ p_check_node([{Hash, IsLeafHash} | TK], [Node | TN], SigSize, FlagsAcc, AccN,
                         [Childs | AccN], MerkleSynAcc,
                         MerkleSyncIN, NewAccMLC);
        (not IsLeafNode) andalso IsLeafHash ->
-           LeafNodes = merkle_get_sync_leaves([Node], Hash, SigSize, []),
+           {LeafNodes, FoundHash} =
+               merkle_get_sync_leaves([Node], Hash, SigSize, [], false),
            p_check_node(TK, TN, SigSize, <<FlagsAcc/bitstring, ?recon_fail_stop_inner:2>>,
-                        AccN, [{inner, leaf, SigSize, LeafNodes} | MerkleSynAcc],
+                        AccN, [{inner, leaf, SigSize, LeafNodes, FoundHash} | MerkleSynAcc],
                         MerkleSyncIN, AccMLC);
        IsLeafNode andalso IsLeafHash ->
            p_check_node(TK, TN, SigSize, <<FlagsAcc/bitstring, ?recon_fail_stop_leaf:2>>,
@@ -1065,7 +1067,7 @@ p_process_tree_cmp_result(<<?recon_fail_stop_leaf:2, TR/bitstring>>, [Node | TN]
     Sync = case merkle_tree:is_leaf(Node) of
                true  -> {leaf, leaf, SigSize, Node};
                false -> LeafNodes = merkle_tree:get_leaves([Node]),
-                        {inner, leaf, SigSize, LeafNodes}
+                        {inner, leaf, SigSize, LeafNodes, false}
            end,
     p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, Stats, RestTreeAcc,
                               [Sync | MerkleSyncAcc], AccMLC, AccCmp + 1);
@@ -1088,25 +1090,28 @@ p_process_tree_cmp_result(<<?recon_fail_cont_inner:2, TR/bitstring>>, [Node | TN
 
 %% @doc Gets all leaves in the given merkle node list whose hash =/= skipHash.
 -spec merkle_get_sync_leaves(Nodes::NodeL, Skip::Hash, SigSize::signature_size(),
-                             LeafAcc::NodeL) -> ToSync::NodeL
+                             LeafAcc::NodeL, FoundSkipHash::boolean())
+        -> {ToSync::NodeL, FoundSkipHash::boolean()}
     when
       is_subtype(Hash,  merkle_tree:mt_node_key()),
       is_subtype(NodeL, [merkle_tree:mt_node()]).
-merkle_get_sync_leaves([], _Skip, _SigSize, ToSyncAcc) ->
-    ToSyncAcc;
-merkle_get_sync_leaves([Node | Rest], Skip, SigSize, ToSyncAcc) ->
+merkle_get_sync_leaves([], _Skip, _SigSize, ToSyncAcc, FoundSkipHash) ->
+    {ToSyncAcc, FoundSkipHash};
+merkle_get_sync_leaves([Node | Rest], Skip, SigSize, ToSyncAcc, FoundSkipHash) ->
     case merkle_tree:is_leaf(Node) of
         true  ->
             NodeHash0 = merkle_tree:get_hash(Node),
             <<NodeHash:SigSize/integer-unit:1>> = <<NodeHash0:SigSize>>,
             if NodeHash =:= Skip ->
-                   merkle_get_sync_leaves(Rest, Skip, SigSize, ToSyncAcc);
+                   merkle_get_sync_leaves(Rest, Skip, SigSize, ToSyncAcc, true);
                true ->
-                   merkle_get_sync_leaves(Rest, Skip, SigSize, [Node | ToSyncAcc])
+                   merkle_get_sync_leaves(Rest, Skip, SigSize, [Node | ToSyncAcc],
+                                          FoundSkipHash)
             end;
         false ->
             merkle_get_sync_leaves(
-              lists:append(merkle_tree:get_childs(Node), Rest), Skip, SigSize, ToSyncAcc)
+              lists:append(merkle_tree:get_childs(Node), Rest), Skip, SigSize,
+              ToSyncAcc, FoundSkipHash)
     end.
 
 %% @doc Gets a compact binary merkle hash list from all leaf-inner node
@@ -1129,7 +1134,7 @@ merkle_resolve_leaves_noninit(Sync, Dest, SID, OwnerL) ->
         LeafNodesAcc::non_neg_integer())
         -> {Hashes::bitstring(), ResolveRequests::0..1,
             LeafNodes::non_neg_integer()}.
-merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes} | TL], Bin,
+merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes, FoundHash} | TL], Bin,
                               Dest, SID, OwnerL, Interval, Items, LeafNAcc)
   when is_list(LeafNodes) ->
     {NInterval, NItems, NLeafNAcc} =
@@ -1189,10 +1194,10 @@ merkle_resolve_leaves_init([{leaf, leaf, SigSize, LeafNode} | TL], Hashes,
                            ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc) ->
     % same handling as below -> simply convert:
     merkle_resolve_leaves_init(
-      [{inner, leaf, SigSize, [LeafNode]} | TL], Hashes,
+      [{inner, leaf, SigSize, [LeafNode], false} | TL], Hashes,
       DestRRPid, DestRCPid, Stats, OwnerL,
       ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc);
-merkle_resolve_leaves_init([{inner, leaf, SigSize0, LeafNodes} | TL],
+merkle_resolve_leaves_init([{inner, leaf, SigSize0, LeafNodes, _FoundHash} | TL],
                            <<BSize:8/integer-unit:1, HashesT/bitstring>>,
                            DestRRPid, DestRCPid, Stats, OwnerL,
                            ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc) ->
