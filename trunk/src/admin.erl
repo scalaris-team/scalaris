@@ -113,15 +113,27 @@ del_nodes(Count, Graceful, Prev) ->
 del_nodes_by_name(Names, Graceful) ->
     % note: specs selected now may not be available anymore when trying to
     % delete them during concurrent executions
-    Specs = [Spec || {_Id, Pid, _Type, _} = Spec <- get_dht_node_specs(),
-                     lists:member(pid_groups:group_of(Pid), Names)],
+    Specs = [{Spec, pid_groups:group_of(Pid)}
+             || {_Id, Pid, _Type, _} = Spec <- get_dht_node_specs(),
+                lists:member(pid_groups:group_of(Pid), Names)],
     case Specs of
         [] -> {[], []};
-        [_|_] ->
+        [_|_] when Graceful ->
             lists:foldr(
-              fun(Spec = {_Id, Pid, _Type, _}, {Ok, NotFound}) ->
-                      Name = pid_groups:group_of(Pid),
+              fun({Spec, Name}, {Ok, NotFound}) ->
                       case del_node(Spec, Graceful) of
+                          ok -> {[Name | Ok], NotFound};
+                          {error, not_found} -> {Ok, [Name | NotFound]};
+                          {error, no_partner_found} -> {Ok, NotFound}
+                      end
+              end, {[], []}, Specs);
+        [_|_] when not Graceful ->
+            Pids = [Pid || {{_Id, Pid, _Type, _}, _Name} <- Specs],
+            sup:sup_terminate_childs(Pids),
+            lists:foldr(
+              fun({{Id, _Pid, _Type, _}, Name}, {Ok, NotFound}) ->
+                      _ = supervisor:terminate_child(main_sup, Id),
+                      case supervisor:delete_child(main_sup, Id) of
                           ok -> {[Name | Ok], NotFound};
                           {error, not_found} -> {Ok, [Name | NotFound]};
                           {error, no_partner_found} -> {Ok, NotFound}
