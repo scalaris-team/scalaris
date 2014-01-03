@@ -588,20 +588,15 @@ on({resolve_req, Hashes} = _Msg,
     %send(DestReconPid, {shutdown, sync_finished_remote}),
     shutdown(sync_finished, NewState);
 
-on({resolve_req, []} = _Msg,
-   State = #rr_recon_state{stage = resolve,           initiator = false,
-                           method = merkle_tree}) ->
-    ?TRACE1(_Msg, State),
-    shutdown(sync_finished, State);
-
-on({resolve_req, [_|_] = BinKeyList} = _Msg,
+on({resolve_req, BinKeyList} = _Msg,
    State = #rr_recon_state{stage = resolve,           initiator = false,
                            method = merkle_tree,      merkle_sync = MerkleSync,
                            dest_rr_pid = DestRRPid,   ownerPid = OwnerL,
                            stats = Stats}) ->
     ?TRACE1(_Msg, State),
-    NStats = merkle_resolve_req_keys_noninit(MerkleSync, BinKeyList, DestRRPid,
-                                             Stats, OwnerL, []),
+    NStats = merkle_resolve_req_keys_noninit(
+               MerkleSync, BinKeyList, DestRRPid, Stats, OwnerL, [],
+               BinKeyList =/= []),
     shutdown(sync_finished, State#rr_recon_state{stats = NStats}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1295,18 +1290,24 @@ merkle_resolve_leaves_init([], _Hashes, DestRRPid, Stats, OwnerL,
 %%      (if non-empty) with a key_upd_send (called on non-initiator).
 -spec merkle_resolve_req_keys_noninit(
         Sync::[merkle_sync()], BinKeyList::[[bitstring()]], DestRRPid::comm:mypid(),
-        Stats, OwnerL::comm:erl_local_pid(), SendKeysAcc::[?RT:key()])
+        Stats, OwnerL::comm:erl_local_pid(), SendKeysAcc::[?RT:key()],
+        ResolveNonEmpty::boolean())
         -> NewStats::Stats
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_req_keys_noninit([{leaf, X, _SigSize, _LeafNode} | TL],
-                        [[] | BinKeyList],
-                        DestRRPid, Stats, OwnerL, SendKeys)
+                                [], DestRRPid, Stats, OwnerL, SendKeys, false)
+  when X =:= leaf orelse X =:= inner ->
+    merkle_resolve_req_keys_noninit(TL, [], DestRRPid, Stats, OwnerL,
+                                    SendKeys, false);
+merkle_resolve_req_keys_noninit([{leaf, X, _SigSize, _LeafNode} | TL],
+                                [[] | BinKeyList],
+                                DestRRPid, Stats, OwnerL, SendKeys, true)
   when X =:= leaf orelse X =:= inner ->
     merkle_resolve_req_keys_noninit(TL, BinKeyList, DestRRPid, Stats, OwnerL,
-                                    SendKeys);
+                                    SendKeys, true);
 merkle_resolve_req_keys_noninit([{leaf, X, SigSize0, LeafNode} | TL],
-                        [[_|_] = ReqKeys | BinKeyList],
-                        DestRRPid, Stats, OwnerL, SendKeys)
+                                [[_|_] = ReqKeys | BinKeyList],
+                                DestRRPid, Stats, OwnerL, SendKeys, true)
   when X =:= leaf orelse X =:= inner ->
     ReqSet = gb_sets:from_list(ReqKeys),
     {SigSize, _VSize} = align_bitsize(SigSize0, get_min_version_bits()),
@@ -1314,12 +1315,13 @@ merkle_resolve_req_keys_noninit([{leaf, X, SigSize0, LeafNode} | TL],
                         gb_sets:is_member(compress_key(Key, SigSize),
                                           ReqSet)] ++ SendKeys,
     merkle_resolve_req_keys_noninit(TL, BinKeyList, DestRRPid, Stats, OwnerL,
-                                    SendKeys1);
+                                    SendKeys1, true);
 merkle_resolve_req_keys_noninit([_ | TL], BinKeyList, DestRRPid, Stats, OwnerL,
-                                SendKeys) ->
+                                SendKeys, ResolveNonEmpty) ->
     merkle_resolve_req_keys_noninit(TL, BinKeyList, DestRRPid, Stats, OwnerL,
-                                    SendKeys);
-merkle_resolve_req_keys_noninit([], [], DestRRPid, Stats, OwnerL, [_|_] = SendKeys) ->
+                                    SendKeys, ResolveNonEmpty);
+merkle_resolve_req_keys_noninit([], [], DestRRPid, Stats, OwnerL, [_|_] = SendKeys,
+                                _ResolveNonEmpty) ->
     SID = rr_recon_stats:get(session_id, Stats),
     % note: the resolve request is counted at the initiator and
     %       thus from_my_node must be set accordingly on this node!
@@ -1329,7 +1331,8 @@ merkle_resolve_req_keys_noninit([], [], DestRRPid, Stats, OwnerL, [_|_] = SendKe
                          {from_my_node, 0}]}),
     % we will get one reply from a subsequent ?key_upd resolve
     rr_recon_stats:inc([{resolve_started, 1}], Stats);
-merkle_resolve_req_keys_noninit([], [], _DestRRPid, Stats, _OwnerL, []) ->
+merkle_resolve_req_keys_noninit([], [], _DestRRPid, Stats, _OwnerL, [],
+                                _ResolveNonEmpty) ->
     Stats.
 
 %% @doc Starts a single resolve request for all given leaf nodes by joining
