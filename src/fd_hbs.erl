@@ -134,7 +134,7 @@ on({check_delayed_del_watching_of, WatchedPid, Time} = _Msg, State) ->
         false ->
             %% WatchedPid may be crashed and therefore the entry was
             %% already removed in on({crashed, ...}, ...).
-            log:log(warn, "req. to delete non watched/crashed pid ~p.~n",
+            log:log(info, "req. to delete non watched/crashed pid ~p.~n",
                     [WatchedPid]),
             State;
         Entry ->
