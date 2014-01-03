@@ -125,6 +125,10 @@ on({del_subscriber, Subscriber, WatchedPid, Cookie} = _Msg, State) ->
         unchanged -> S1
     end;
 
+on({del_all_subscriptions, Subscribers} = _Msg, State) ->
+    ?TRACE("fd_hbs del_all_subscriptions ~.0p~n", [_Msg]),
+    state_del_all_subscriptions(State, Subscribers);
+
 on({check_delayed_del_watching_of, WatchedPid, Time} = _Msg, State) ->
     ?TRACE("fd_hbs check_delayed_del_watching_of ~.0p~n", [_Msg]),
     %% initiate demonitoring and delete local entry if
@@ -464,6 +468,26 @@ state_get_subscriptions(State, SearchedPid) ->
                %% assignment exception.
                SearchedPid =:= WatchedPid],
     lists:flatten(Res).
+
+-spec state_del_all_subscriptions(state(), [pid()]) -> state().
+state_del_all_subscriptions(State, SubscriberPids) ->
+    Table = state_get_table(State),
+    Set = gb_sets:from_list(SubscriberPids),
+    Entries = pdb:tab2list(Table),
+    lists:foldl(
+      fun({Key = {Subscriber, WatchedPid}, _Cookies, _Num}, StateX) ->
+              case gb_sets:is_member(Subscriber, Set) of
+                  true ->
+                      %% unregister subscriber locally
+                      pdb:delete(Key, Table),
+                      %% delete watched pid remotely, if no longer needed
+                      state_del_watched_pid(StateX, WatchedPid, Subscriber);
+                  false ->
+                      StateX
+              end;
+         (_, StateX) ->
+              StateX
+      end, State, Entries).
 
 -spec state_add_watched_pid(state(), comm:mypid()) -> state().
 state_add_watched_pid(State, WatchedPid) ->
