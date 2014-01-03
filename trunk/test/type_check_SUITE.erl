@@ -360,7 +360,7 @@ tester_type_check_rrepair(_Config) ->
              {merkle_resolve_leaves_noninit, 9}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_init, 5}, % needs only leaf nodes in node list
              {merkle_resolve_leaves_init, 10}, % needs only leaf nodes in node list
-             {merkle_resolve_req_keys_noninit, 6}, % needs only leaf nodes in node list, same-length lists
+             {merkle_resolve_req_keys_noninit, 7}, % needs only leaf nodes in node list, same-length lists
              {resolve_leaves, 4}, %% tries to send messages
              {resolve_leaves, 6}, %% tries to send messages
              {art_recon, 3}, %% tries to send messages
