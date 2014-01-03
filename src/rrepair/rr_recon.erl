@@ -1174,64 +1174,57 @@ merkle_resolve_leaves_noninit([], Bin, Dest, SID, OwnerL, Interval, Items, LeafN
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_init(Sync, Hashes, DestRRPid, DestRCPid, SID, OwnerL) ->
     merkle_resolve_leaves_init(Sync, Hashes, DestRRPid, DestRCPid, SID, OwnerL,
-                               intervals:empty(), [], [], [], false, 0, 0).
+                               [], [], [], false, 0).
 
-%% @doc Helper for merkle_resolve_leaves_init/5.
+%% @doc Helper for merkle_resolve_leaves_init/6.
 -spec merkle_resolve_leaves_init(
         Sync::[merkle_sync()], Hashes::bitstring(), DestRRPid::comm:mypid(),
         DestRCPid::comm:mypid(), Stats, OwnerL::comm:erl_local_pid(),
-        Interval::intervals:interval(), % TODO: remove interval, resolve single keys!
         ToSend::[?RT:key()], ToReq::[?RT:key()], ToResolve::[[bitstring()]],
-        ResolveNonEmpty::boolean(),
-        SyncItemCount::non_neg_integer(), LeafNodesAcc::non_neg_integer())
+        ResolveNonEmpty::boolean(), LeafNodesAcc::non_neg_integer())
         -> NewStats::Stats
     when is_subtype(Stats, rr_recon_stats:stats()).
 merkle_resolve_leaves_init([{leaf, leaf, SigSize, LeafNode} | TL], Hashes,
-                           DestRRPid, DestRCPid, Stats, OwnerL, Interval,
-                           ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
+                           DestRRPid, DestRCPid, Stats, OwnerL,
+                           ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc) ->
     % same handling as below -> simply convert:
     merkle_resolve_leaves_init(
       [{inner, leaf, SigSize, [LeafNode]} | TL], Hashes,
-      DestRRPid, DestRCPid, Stats, OwnerL, Interval,
-      ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc);
+      DestRRPid, DestRCPid, Stats, OwnerL,
+      ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc);
 merkle_resolve_leaves_init([{inner, leaf, SigSize0, LeafNodes} | TL],
                            <<BSize:8/integer-unit:1, HashesT/bitstring>>,
-                           DestRRPid, DestRCPid, Stats, OwnerL, Interval,
-                           ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
+                           DestRRPid, DestRCPid, Stats, OwnerL,
+                           ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc) ->
     {SigSize, VSize} = align_bitsize(SigSize0, get_min_version_bits()),
     OBucketBinSize = BSize * (SigSize + VSize),
     <<OBucketBin:OBucketBinSize/bitstring, NHashes/bitstring>> = HashesT,
     OBucketTree = decompress_kv_list(OBucketBin, gb_trees:empty(), SigSize, VSize),
 
-    {MyBuckets, NSyncItemCount, NLeafNAcc} =
-        lists:foldl(fun(N, {AccBuckets, AccItems, LeafNAccX}) ->
+    {MyBuckets, NLeafNAcc} =
+        lists:foldl(fun(N, {AccBuckets, LeafNAccX}) ->
                             ?ASSERT(merkle_tree:is_leaf(N)),
                             {lists:append(merkle_tree:get_bucket(N), AccBuckets),
-                             AccItems + merkle_tree:get_item_count(N),
                              LeafNAccX + 1}
-                    end, {[], SyncItemCount, LeafNAcc}, LeafNodes),
+                    end, {[], LeafNAcc}, LeafNodes),
     {ToSend1, ToReq1, OBucketTree1} =
         get_full_diff(MyBuckets, OBucketTree, ToSend, ToReq, SigSize, VSize),
     ToResolve1 = [gb_trees:keys(OBucketTree1) | ToResolve],
     ResolveNonEmpty1 = ?IIF(gb_trees:size(OBucketTree1) =/= 0, true, ResolveNonEmpty),
 
     merkle_resolve_leaves_init(TL, NHashes, DestRRPid, DestRCPid, Stats, OwnerL,
-                               Interval, ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1,
-                               NSyncItemCount, NLeafNAcc);
-merkle_resolve_leaves_init([{leaf, inner, _SigSize, LeafNode} | TL], Hashes,
-                           DestRRPid, DestRCPid, Stats, OwnerL, Interval,
-                           ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
-    ?ASSERT(merkle_tree:is_leaf(LeafNode)),
-    NSyncItemCount = SyncItemCount + merkle_tree:get_item_count(LeafNode),
+                               ToSend1, ToReq1, ToResolve1, ResolveNonEmpty1,
+                               NLeafNAcc);
+merkle_resolve_leaves_init([{leaf, inner, _SigSize, _LeafNode} | TL], Hashes,
+                           DestRRPid, DestRCPid, Stats, OwnerL,
+                           ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc) ->
+    ?ASSERT(merkle_tree:is_leaf(_LeafNode)),
     merkle_resolve_leaves_init(TL, Hashes, DestRRPid, DestRCPid, Stats, OwnerL,
-                               Interval, ToSend, ToReq, ToResolve, ResolveNonEmpty,
-                               NSyncItemCount, LeafNAcc + 1);
-merkle_resolve_leaves_init([], _Hashes, DestRRPid, DestRCPid, Stats, OwnerL, Interval,
-                           ToSend, ToReq, ToResolve, ResolveNonEmpty, SyncItemCount, LeafNAcc) ->
+                               ToSend, ToReq, ToResolve, ResolveNonEmpty,
+                               LeafNAcc + 1);
+merkle_resolve_leaves_init([], _Hashes, DestRRPid, DestRCPid, Stats, OwnerL,
+                           ToSend, ToReq, ToResolve, ResolveNonEmpty, LeafNAcc) ->
     SID = rr_recon_stats:get(session_id, Stats),
-    IntervalUpdResReqs =
-        resolve_leaves([], DestRRPid, SID, OwnerL, Interval, SyncItemCount),
-
     % resolve the leaf-leaf comparison's items as key_upd:
     KeyUpdResReqs =
         if ToSend =/= [] orelse ToReq =/= [] ->
@@ -1257,11 +1250,10 @@ merkle_resolve_leaves_init([], _Hashes, DestRRPid, DestRCPid, Stats, OwnerL, Int
     
     comm:send(DestRCPid, {resolve_req, ToResolve1}),
     
-    ?TRACE("resolve_req Merkle Session=~p ; interval_upd=~p ; key_upd_send=~p ; merkle_resolve=~p",
-           [SID, IntervalUpdResReqs, KeyUpdResReqs, MerkleResReqs]),
+    ?TRACE("resolve_req Merkle Session=~p ; key_upd_send=~p ; merkle_resolve=~p",
+           [SID, KeyUpdResReqs, MerkleResReqs]),
     rr_recon_stats:inc([{tree_leavesSynced, LeafNAcc},
-                        {resolve_started,
-                         IntervalUpdResReqs + KeyUpdResReqs + MerkleResReqs}],
+                        {resolve_started, KeyUpdResReqs + MerkleResReqs}],
                        Stats).
 
 %% @doc For each leaf-leaf comparison, gets the requested keys and resolves them
