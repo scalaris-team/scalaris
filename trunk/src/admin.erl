@@ -129,6 +129,12 @@ del_nodes_by_name(Names, Graceful) ->
               end, {[], []}, Specs);
         [_|_] when not Graceful ->
             Pids = [Pid || {{_Id, Pid, _Type, _}, _Name} <- Specs],
+            AllChildren = lists:append([sup:sup_get_all_children(Pid) || Pid <- Pids]),
+            _ = [comm:send_local(Pid, {del_all_subscriptions, AllChildren})
+                     || Pid <- pid_groups:members("basic_services"),
+                        gen_component:is_gen_component(Pid),
+                        (X = gen_component:get_component_state(Pid, 500)) =/= failed,
+                        element(1, X) =:= fd_hbs],
             sup:sup_terminate_childs(Pids),
             lists:foldr(
               fun({{Id, _Pid, _Type, _}, Name}, {Ok, NotFound}) ->
