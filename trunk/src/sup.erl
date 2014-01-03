@@ -293,13 +293,17 @@ sup_terminate(SupPid) ->
     util:wait_for_process_to_die(SupPid),
     ok.
 
-%% @doc Terminates all children of the given supervisor gracefully, i.e. first
+%% @doc Terminates all children of the given supervisor(s) gracefully, i.e. first
 %%      stops all gen_component processes and then terminates all children
 %%      recursively.
--spec sup_terminate_childs(Supervisor::pid() | atom()) -> ok.
-sup_terminate_childs(SupPid) ->
-    sup_pause_childs(SupPid),
-    sup_kill_childs(SupPid),
+%%      Note: the children beneath the given supervisor pids MUST NOT overlap!
+-spec sup_terminate_childs(Supervisor::Proc | [Proc]) -> ok
+    when is_subtype(Proc, pid() | atom()).
+sup_terminate_childs(SupPid) when is_pid(SupPid) orelse is_atom(SupPid) ->
+    sup_terminate_childs([SupPid]);
+sup_terminate_childs(SupPids) when is_list(SupPids) ->
+    _ = [sup_pause_childs(SupPid) || SupPid <- SupPids],
+    _ = [sup_kill_childs(SupPid) || SupPid <- SupPids],
     ok.
 
 %% @doc Pauses all children of the given supervisor (recursively) by setting
