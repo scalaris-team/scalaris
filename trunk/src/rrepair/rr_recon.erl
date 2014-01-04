@@ -307,26 +307,26 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
            send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve);
        true -> ok
     end,
-    ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p ; ToReq=~p~n DBEntries=~p ; RestI=~p",
-           [SID, length(ToSend1), length(ToReq1), length(DBList), RestI]),
-    NewStats =
-        if ToSend1 =/= [] orelse ToReq1 =/= [] orelse SyncFinished ->
-               send(DestRR_Pid, {request_resolve, SID,
-                                 {?key_upd, ToSend1, ToReq1},
-                                 [{from_my_node, 0},
-                                  {feedback_request, comm:make_global(OwnerL)}]}),
-               % we will get one or two replies from a subsequent feedback response
-               FBCount = if ToReq1 =/= [] -> 2;
-                            true -> 1
-                         end,
-               rr_recon_stats:inc([{resolve_started, FBCount},
-                                   {await_rs_fb, FBCount}], Stats);
-           true ->
-               Stats
-        end,
     Params1 = Params#trivial_recon_struct{db_chunk = OtherDBChunk1},
-    NewState = State#rr_recon_state{to_resolve = {[], []}},
     if SyncFinished ->
+           ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p ; ToReq=~p",
+                  [SID, length(ToSend1), length(ToReq1)]),
+           NewStats =
+               if ToSend1 =/= [] orelse ToReq1 =/= [] ->
+                      send(DestRR_Pid, {request_resolve, SID,
+                                        {?key_upd, ToSend1, ToReq1},
+                                        [{from_my_node, 0},
+                                         {feedback_request, comm:make_global(OwnerL)}]}),
+                      % we will get one or two replies from a subsequent feedback response
+                      FBCount = if ToReq1 =/= [] -> 2;
+                                   true -> 1
+                                end,
+                      rr_recon_stats:inc([{resolve_started, FBCount},
+                                          {await_rs_fb, FBCount}], Stats);
+                  true ->
+                      Stats
+               end,
+
            % let the non-initiator's rr_recon process identify the remaining keys
            Req2Count = gb_trees:size(OtherDBChunk1),
            ToReq2 = util:gb_trees_foldl(
@@ -347,9 +347,11 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
            
            Params2 = Params1#trivial_recon_struct{db_chunk = gb_trees:empty()},
            shutdown(sync_finished,
-                    NewState#rr_recon_state{stats = NewStats2, params = Params2});
+                    State#rr_recon_state{stats = NewStats2, params = Params2,
+                                         to_resolve = {[], []}});
        true ->
-           NewState#rr_recon_state{stats = NewStats, params = Params1}
+           State#rr_recon_state{params = Params1,
+                                to_resolve = {ToSend1, ToReq1}}
     end;
 
 on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
