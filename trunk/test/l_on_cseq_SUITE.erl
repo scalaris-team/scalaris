@@ -71,7 +71,7 @@ all() ->
      {group, takeover_tests}
      ].
 
-suite() -> [ {timetrap, {seconds, 60}} ].
+suite() -> [ {timetrap, {seconds, 90}} ].
 
 group(tester_tests) ->
     [{timetrap, {seconds, 400}}];
