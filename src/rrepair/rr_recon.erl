@@ -307,8 +307,8 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
            send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve);
        true -> ok
     end,
-    ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p ; ToReq=~p",
-           [SID, length(ToSend1), length(ToReq1)]),
+    ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p ; ToReq=~p~n DBEntries=~p ; RestI=~p",
+           [SID, length(ToSend1), length(ToReq1), length(DBList), RestI]),
     NewStats =
         if ToSend1 =/= [] orelse ToReq1 =/= [] orelse SyncFinished ->
                send(DestRR_Pid, {request_resolve, SID,
@@ -447,6 +447,8 @@ on({resolve_req, BinKeys, SigSize} = _Msg,
                                                     ReqSet)],
                 
                 SID = rr_recon_stats:get(session_id, Stats),
+                ?TRACE("Resolve Trivial Session=~p ; ToSend=~p",
+                       [SID, length(ReqKeys)]),
                 % note: the resolve request is counted at the initiator and
                 %       thus from_my_node must be set accordingly on this node!
                 send_local(OwnerL, {request_resolve, SID,
@@ -632,30 +634,24 @@ on({resolve_req, BinKeyList} = _Msg,
 
 -spec build_struct(DBList::db_chunk_kv(), DestI::intervals:non_empty_interval(),
                    RestI::intervals:interval(), state()) -> state() | kill.
-build_struct(DBList, DestI, RestI,
+build_struct(DBList, SyncI, RestI,
              State = #rr_recon_state{method = RMethod, params = Params,
                                      struct = OldSyncStruct,
                                      initiator = Initiator, stats = Stats,
                                      dhtNodePid = DhtNodePid, stage = Stage,
                                      kv_list = KVList}) ->
-    ?ASSERT(not intervals:is_empty(DestI)),
-    % bloom may fork more recon processes if un-synced elements remain
+    ?ASSERT(not intervals:is_empty(SyncI)),
+    % note: RestI already is a sub-interval of the sync interval
     BeginSync =
         case intervals:is_empty(RestI) of
             false ->
-                SubSyncI = map_interval(DestI, RestI),
-                case intervals:is_empty(SubSyncI) of
-                    false ->
-                        MySubSyncI = map_interval(RestI, DestI), % mapped to my range
-                        Reconcile =
-                            if Initiator andalso (Stage =:= reconciliation) -> reconcile;
-                               true -> create_struct
-                            end,
-                        send_chunk_req(DhtNodePid, self(), MySubSyncI, SubSyncI,
-                                       get_max_items(), Reconcile),
-                        false;
-                    true -> true
-                end;
+                Reconcile =
+                    if Initiator andalso (Stage =:= reconciliation) -> reconcile;
+                       true -> create_struct
+                    end,
+                send_chunk_req(DhtNodePid, self(), RestI, SyncI,
+                               get_max_items(), Reconcile),
+                false;
             true -> true
         end,
     NewKVList = lists:append(KVList, DBList),
@@ -664,7 +660,7 @@ build_struct(DBList, DestI, RestI,
                         true -> RMethod
                      end,
            {BuildTime, SyncStruct} =
-               util:tc(fun() -> build_recon_struct(ToBuild, OldSyncStruct, DestI,
+               util:tc(fun() -> build_recon_struct(ToBuild, OldSyncStruct, SyncI,
                                                    NewKVList, Params, BeginSync)
                        end),
            Stats1 = rr_recon_stats:inc([{build_time, BuildTime}], Stats),
@@ -1713,7 +1709,7 @@ send_local(Pid, Msg) ->
     is_subtype(LPid,        comm:erl_local_pid()),
     is_subtype(I,           intervals:interval()).
 send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, reconcile) ->
-    ?ASSERT(I =:= _DestI),
+    ?ASSERT(intervals:is_subset(I, _DestI)),
     SrcPidReply = comm:reply_as(SrcPid, 2, {reconcile, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
