@@ -186,7 +186,7 @@ getDCClustersAndNodes() ->
             comm:send_local(ClusteringProcess, {query_clustering, This}),
             comm:send_local(ClusteringProcess, {query_my, local_epoch, This}),
             comm:send_local(ClusteringProcess, {query_my, radius, This}),
-            
+
             % note: receive wrapped in anonymous functions to allow
             %       ?SCALARIS_RECV in multiple receive statements
             Centroids = fun() -> receive
@@ -209,9 +209,9 @@ getDCClustersAndNodes() ->
                     log:log(error,"[ WH ] Timeout getting radius from dc_clustering"),
                     throw('dc_clustering_timeout')
             end end(),
-            
+
             Nodes = getVivaldiMap(),
-            
+
             {Nodes, Centroids, Epoch, Radius};
         _ -> disabled
     end.
@@ -480,7 +480,7 @@ renderRing({ok, Details}) ->
     end,
     NodePort = comm:get_port(NodePid),
     YawsPort = node:yawsPort(Node),
-    {tr, [], 
+    {tr, [],
       [
        {td, [], [get_flag(Hostname),
                  io_lib:format("<a href=\"http://~B.~B.~B.~B:~B/ring.yaws\">~p (~B.~B.~B.~B:~B)</a>",
@@ -494,7 +494,7 @@ renderRing({ok, Details}) ->
        {td, [], io_lib:format("~p", [Load])}
       ]};
 renderRing({failed, Pid}) ->
-    {tr, [], 
+    {tr, [],
       [
        {td, [], "-"},
        {td, [], "-"},
@@ -581,7 +581,7 @@ renderIndexedRing({ok, Details}) ->
     end,
     NodePort = comm:get_port(NodePid),
     YawsPort = node:yawsPort(Node),
-    {tr, [], 
+    {tr, [],
       [
        {td, [], [get_flag(Hostname),
                  io_lib:format("<a href=\"http://~B.~B.~B.~B:~B/ring.yaws\">~p (~B.~B.~B.~B:~B)</a>",
@@ -623,8 +623,10 @@ renderIndexedRing({failed, Pid}) ->
 -spec getGossip() -> [gossip_pv()].
 getGossip() ->
     GossipPids = pid_groups:find_all(gossip),
+    %% GossipPids = pid_groups:find_all(gossip2),
     [begin
          comm:send_local(Pid, {get_values_best, self()}),
+         %% comm:send_local(Pid, {get_values_best, gossip_load, self()}),
          receive
              ?SCALARIS_RECV(
                  {gossip_get_values_best_response, BestValues}, %% ->
@@ -735,6 +737,7 @@ renderGossipData({_P1, V1}, {P2Exists, PV2}, {P3Exists, PV3}, Name, Key, Fun) ->
                           fun((term()) -> string())) -> string().
 format_gossip_value(Value, Key, Fun) ->
     case gossip_state:get(Value, Key) of
+    %% case gossip_load:load_info_get(Key, Value) of
         unknown -> "n/a";
         X       -> Fun(X)
     end.
@@ -753,7 +756,7 @@ getMonitorClientData() ->
     AvgMinMaxMsD = lists:zipwith3(fun([Time, Avg], [Time, Min], [Time, Max]) ->
                                           [Time, Avg, Avg - Min, Max - Avg]
                                   end, AvgMsD, MinMsD, MaxMsD),
-    
+
     MemMonKeys = [{monitor_perf, X} || X <- [mem_total, mem_processes, mem_system,
                                              mem_atom, mem_binary, mem_ets]],
     case statistics:getGaugeMonitorStats(ClientMonitor, MemMonKeys, list, 1024.0 * 1024.0) of
@@ -765,12 +768,12 @@ getMonitorClientData() ->
          {monitor_perf, mem_binary, MemBinD},
          {monitor_perf, mem_ets, MemEtsD}] -> ok
     end,
-    
-    IOMonKeys = [{monitor_perf, X} || X <- [%rcv_count, 
-                                            rcv_bytes, %send_count, 
+
+    IOMonKeys = [{monitor_perf, X} || X <- [%rcv_count,
+                                            rcv_bytes, %send_count,
                                             send_bytes]],
     case statistics:getGaugeMonitorStats(ClientMonitor, IOMonKeys, list, 1) of
-        [] -> %RcvCntD0 = SendCntD0 = 
+        [] -> %RcvCntD0 = SendCntD0 =
             RcvBytesD0 = SendBytesD0 = [];
         [%{monitor_perf, rcv_count, RcvCntD0},
          {monitor_perf, rcv_bytes, RcvBytesD0},
@@ -781,7 +784,7 @@ getMonitorClientData() ->
     RcvBytesD = get_diff_data(lists:reverse(RcvBytesD0)),
 %%     SendCntD = get_diff_data(lists:reverse(SendCntD0)),
     SendBytesD = get_diff_data(lists:reverse(SendBytesD0)),
-    
+
     DataStr =
         lists:flatten(
           ["\n",
