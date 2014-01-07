@@ -140,7 +140,7 @@ join_as_other(Id, IdVersion, Options) ->
 % 2. Find known hosts
 % no matter which phase, if there are no contact nodes (yet), try to get some
 process_join_state({join, known_hosts_timeout, JoinUUId} = _Msg,
-                   {join, JoinState, _QueuedMessages} = State) 
+                   {join, JoinState, _QueuedMessages} = State)
   when element(2, JoinState) =:= JoinUUId ->
     ?TRACE_JOIN1(_Msg, JoinState),
     case get_connections(JoinState) of
@@ -305,7 +305,7 @@ process_join_state({join, join_request_timeout, Timeouts, CandId, JoinUUId} = _M
             case lb_op:get(BestCand, id) =:= CandId of
                 false -> State; % unrelated/old message
                 _ ->
-                    NewJoinState = 
+                    NewJoinState =
                         case Timeouts < get_join_request_timeouts() of
                             true ->
                                 send_join_request(JoinState, Timeouts + 1);
@@ -432,7 +432,7 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId, TargetId, N
                                     [self(), Pred, Succ]),
                             rm_loop:notify_new_succ(node:pidX(Pred), Me),
                             rm_loop:notify_new_pred(node:pidX(Succ), Me),
-                            
+
                             finish_join_and_slide(Me, Pred, Succ, db_dht:new(),
                                                   QueuedMessages, MoveId, NextOp)
                     end
@@ -513,7 +513,7 @@ process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, H
             comm:send(Pid, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
-    
+
 % Catch all other messages until the join procedure is complete
 process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
     ?TRACE_JOIN1(Msg, JoinState),
@@ -630,7 +630,7 @@ get_known_nodes(JoinUUId) ->
          end || Host <- KnownHosts],
     % also try to get some nodes from the current erlang VM:
     OwnServicePerVm = pid_groups:find_a(service_per_vm),
-    ?TRACE_SEND(OwnServicePerVm, {get_dht_nodes, comm:this()}), 
+    ?TRACE_SEND(OwnServicePerVm, {get_dht_nodes, comm:this()}),
     comm:send_local(OwnServicePerVm, {get_dht_nodes, comm:this()}),
     % timeout just in case
     msg_delay:send_local(get_known_hosts_timeout() div 1000, self(),
@@ -694,7 +694,7 @@ lookup_new_ids2(TotalCount, JoinState) ->
     CurCount = length(OldIds) + length(get_candidates(JoinState2)),
     NewIdsCount = erlang:max(TotalCount - CurCount, 0),
     case NewIdsCount of
-        0 -> 
+        0 ->
             % if there are no join IDs left, then there will be no candidate response
             % -> contact best candidate
             case get_join_ids(JoinState2) of
@@ -784,7 +784,7 @@ lookup(JoinState, JoinIds = [_|_]) ->
                      msg_delay:send_local(
                        get_lookup_timeout() div 1000, self(),
                        {join, lookup_timeout, NewConn, Id, get_join_uuid(JoinState2)}),
-                     NewConn                     
+                     NewConn
                  end
                  || Id <- JoinIds],
             JoinState3 = add_connections(NewConns, JoinState2, back),
@@ -920,6 +920,7 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     vivaldi:activate(),
     dc_clustering:activate(),
     gossip:activate(nodelist:node_range(Neighbors)),
+    %% gossip2:activate(nodelist:node_range(Neighbors)),
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
     NewRT_ext = ?RT:empty_ext(Neighbors),
