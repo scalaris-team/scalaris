@@ -77,6 +77,8 @@ childs([{DHTNodeGroup, Options}]) ->
                              [DHTNodeGroup]),
     Gossip =
         sup:worker_desc(gossip, gossip, start_link, [DHTNodeGroup]),
+    %% Gossip2 =
+    %%     sup:worker_desc(gossip2, gossip2, start_link, [DHTNodeGroup]),
     LBActive =
         case config:read(lb_active) of
             true -> sup:worker_desc(lb_active, lb_active_karger, start_link, [DHTNodeGroup]);
@@ -127,6 +129,7 @@ childs([{DHTNodeGroup, Options}]) ->
                     Vivaldi,
                     DC_Clustering,
                     Gossip,
+                    %% Gossip2,
                     SupDHTNodeCore_AND,
                     SupWPool,
                     WPool,
