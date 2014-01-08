@@ -1,4 +1,4 @@
-%% @copyright 2007-2012 Zuse Institute Berlin
+%% @copyright 2007-2012, 2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -201,7 +201,7 @@ on({check_idle}, State) ->
     case socket(State) =:= notconnected of
         true -> State;
         _    ->
-            case timer:now_diff(erlang:now(), LastMsgSent) div 1000 of
+            case timer:now_diff(os:timestamp(), LastMsgSent) div 1000 of
                 N when N > Timeout ->
                     %% we timed out
                     ?TRACE("Closing idle connection: ~p~n", [State]),
@@ -214,7 +214,7 @@ on({check_idle}, State) ->
     end;
 
 on({web_debug_info, Requestor}, State) ->
-    Now = erlang:now(),
+    Now = os:timestamp(),
     LastMsgSent = last_msg_sent(State),
     SecondsAgo =
         case LastMsgSent of
@@ -583,7 +583,7 @@ set_last_stat_report(State, Val) -> setelement(13, State, Val).
 -spec last_msg_sent(state()) -> erlang:timestamp().
 last_msg_sent(State) -> element(14, State).
 -spec set_last_msg_sent(state()) -> state().
-set_last_msg_sent(State) -> setelement(14, State, erlang:now()).
+set_last_msg_sent(State) -> setelement(14, State, os:timestamp()).
 
 -spec start_idle_check() -> ok.
 start_idle_check() ->
