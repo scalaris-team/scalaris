@@ -587,7 +587,7 @@ set_last_msg_sent(State) -> setelement(14, State, erlang:now()).
 
 -spec start_idle_check() -> ok.
 start_idle_check() ->
-    msg_delay:send_local(10000, self(), {check_idle}).
+    msg_delay:send_local(10, self(), {check_idle}).
 
 -spec status(State::state()) -> notconnected | connected.
 status(State) ->
