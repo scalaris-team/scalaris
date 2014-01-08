@@ -50,6 +50,8 @@
                       OQueue::[comm:send_options()]}.
 -type stat_report() :: {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
                         SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}.
+-type last_msg_sent() :: erlang:timestamp().
+
 -type state() ::
     {DestIP               :: inet:ip_address(),
      DestPort             :: comm_server:tcp_port(),
@@ -63,7 +65,8 @@
      MsgQueueLen          :: non_neg_integer(),
      DesiredBundleSize    :: non_neg_integer(),
      MsgsSinceBundleStart :: non_neg_integer(),
-     LastStatReport       :: stat_report()}.
+     LastStatReport       :: stat_report(),
+     LastMsgSent          :: last_msg_sent()}.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
     {tcp, Socket::inet:socket(), Data::binary()} |
@@ -98,6 +101,7 @@ start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Chan
             Socket::inet:socket() | notconnected}) -> state().
 init({DestIP, DestPort, LocalListenPort, Channel, Socket}) ->
     msg_delay:send_local(10, self(), {report_stats}),
+    start_idle_check(),
     state_new(DestIP, DestPort, LocalListenPort, Channel, Socket).
 
 %% @doc Forwards a message to the given PID or named process.
@@ -190,8 +194,33 @@ on({report_stats}, State) ->
     NewState = report_stats(State),
     send_bundle_if_ready(NewState);
 
+%% checks if the connection hasn't been used recently
+on({check_idle}, State) ->
+    Timeout = config:read(tcp_idle_timeout),
+    LastMsgSent = last_msg_sent(State),
+    case socket(State) =:= notconnected of
+        true -> State;
+        _    ->
+            case timer:now_diff(erlang:now(), LastMsgSent) div 1000 of
+                N when N > Timeout ->
+                    %% we timed out
+                    io:format("Closing idle connection: ~p~n", [State]),
+                    close_connection(socket(State), State);
+                _ ->
+                    io:format("Connection not idle~n", []),
+                    start_idle_check(),
+                    State
+            end
+    end;
+
 on({web_debug_info, Requestor}, State) ->
     Now = erlang:now(),
+    LastMsgSent = last_msg_sent(State),
+    SecondsAgo =
+        case LastMsgSent of
+            {0,0,0} -> infinity;
+            _ ->  timer:now_diff(Now, last_msg_sent(State)) div 1000000
+        end,
     Runtime = timer:now_diff(Now, started(State)) / 1000000,
     {SentPerS, ReceivedPerS} =
         if Runtime =< 0 -> {"n/a", "n/a"};
@@ -258,7 +287,9 @@ on({web_debug_info, Requestor}, State) ->
          {"~ recv avg packet size",
           webhelpers:safe_html_string("~p", [RcvAgv])},
          {"recv total bytes",
-          webhelpers:safe_html_string("~p", [RcvBytes])}
+          webhelpers:safe_html_string("~p", [RcvBytes])},
+         {"last message sent",
+          webhelpers:safe_html_string("~p sec ago", [SecondsAgo])}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     send_bundle_if_ready(State);
@@ -364,7 +395,7 @@ send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts) ->
         ok ->
             ?TRACE("~.0p Sent message ~.0p~n",
                    [pid_groups:my_pidname(), Message]),
-            State;
+            set_last_msg_sent(State);
         {error, closed} ->
             Address = dest_ip(State),
             Port = dest_port(State),
@@ -409,6 +440,7 @@ new_connection(Address, Port, MyPort, Channel) ->
             % in order to have only a single connection to me)
             case inet:sockname(Socket) of
                 {ok, {MyAddress, _SocketPort}} ->
+                    start_idle_check(),
                     case comm_server:get_local_address_port() of
                         {undefined,_} ->
                             comm_server:set_local_address(MyAddress, MyPort);
@@ -485,7 +517,8 @@ state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
      _StartTime = os:timestamp(), _SentMsgCount = 0, _ReceivedMsgCount = 0,
      _MsgQueue = {[], []}, _Len = 0,
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0,
-     _LastStatReport = {0, 0, 0, 0}}.
+     _LastStatReport = {0, 0, 0, 0},
+     _LastMsgSent = {0, 0, 0}}.
 
 -spec dest_ip(state()) -> inet:ip_address().
 dest_ip(State)                 -> element(1, State).
@@ -546,6 +579,15 @@ set_msgs_since_bundle_start(State, Val) ->
 last_stat_report(State)          -> element(13, State).
 -spec set_last_stat_report(state(), stat_report()) -> state().
 set_last_stat_report(State, Val) -> setelement(13, State, Val).
+
+-spec last_msg_sent(state()) -> erlang:timestamp().
+last_msg_sent(State) -> element(14, State).
+-spec set_last_msg_sent(state()) -> state().
+set_last_msg_sent(State) -> setelement(14, State, erlang:now()).
+
+-spec start_idle_check() -> ok.
+start_idle_check() ->
+    msg_delay:send_local(10000, self(), {check_idle}).
 
 -spec status(State::state()) -> notconnected | connected.
 status(State) ->
