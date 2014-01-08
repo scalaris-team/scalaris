@@ -204,10 +204,10 @@ on({check_idle}, State) ->
             case timer:now_diff(erlang:now(), LastMsgSent) div 1000 of
                 N when N > Timeout ->
                     %% we timed out
-                    io:format("Closing idle connection: ~p~n", [State]),
+                    ?TRACE("Closing idle connection: ~p~n", [State]),
                     close_connection(socket(State), State);
                 _ ->
-                    io:format("Connection not idle~n", []),
+                    ?TRACE("Connection not idle~n", []),
                     start_idle_check(),
                     State
             end
