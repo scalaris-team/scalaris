@@ -20,6 +20,8 @@
 -author('jensvfischer@gmail.com').
 -vsn('$Id$').
 
+-export_type([exch_data/0, round_status/0]).
+
 % for behaviour
 -ifndef(have_callback_support).
 -export([behaviour_info/1]).
@@ -33,6 +35,7 @@
 -type new_leader_msg() :: {is_leader|no_leader, NewRange::intervals:interval()}.
 -type round() :: non_neg_integer().
 -type round_status() :: 'current_round' | 'old_round'.
+-type notify_keyword() :: new_round | leader | exch_failure.
 
 % Erlang version >= R15B
 -ifdef(have_callback_support).
@@ -75,19 +78,17 @@
 -callback round_has_converged(State::cb_state()) ->
     {true|false, cb_state()}.
 
--callback notify_change(new_round|leader|exch_failure, _|new_leader_msg(), State::cb_state()) ->
+-callback notify_change(notify_keyword(), _|new_leader_msg(), State::cb_state()) ->
     cb_return().
 
 % Result extraction
 
--callback get_values_best(State::cb_state())
-            -> BestValues::aggregates().
+-callback get_values_best(State::cb_state()) -> BestValues::aggregates().
 
--callback get_values_all(State::cb_state())
-            -> AllValues::aggregates().
+-callback get_values_all(State::cb_state()) -> AllValues::aggregates().
 
--callback web_debug_info(State::cb_state())
-            -> KeyValueList::[{Key::any(), Value::any()},...].
+-callback web_debug_info(State::cb_state()) ->
+    {KeyValueList::[{Key::any(), Value::any()},...], cb_state()}.
 
 % Erlang version < R15B
 -else.
