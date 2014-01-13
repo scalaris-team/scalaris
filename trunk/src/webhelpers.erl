@@ -618,6 +618,7 @@ renderIndexedRing({failed, Pid}) ->
 %%%-----------------------------Gossip----------------------------------
 
 -type gossip_pv() :: {PidName::string(), gossip_state:values()}.
+%% -type gossip_pv() :: {PidName::string(), gossip_load:load_info()}.
 -type gossip_key() :: avgLoad | stddev | size_ldr | size_kr | minLoad | maxLoad.
 
 -spec getGossip() -> [gossip_pv()].
@@ -735,6 +736,8 @@ renderGossipData({_P1, V1}, {P2Exists, PV2}, {P3Exists, PV3}, Name, Key, Fun) ->
 
 -spec format_gossip_value(gossip_state:values(), Key::gossip_key(),
                           fun((term()) -> string())) -> string().
+%% -spec format_gossip_value(gossip_load:load_info(), Key::gossip_key(),
+%%                           fun((term()) -> string())) -> string().
 format_gossip_value(Value, Key, Fun) ->
     case gossip_state:get(Value, Key) of
     %% case gossip_load:load_info_get(Key, Value) of
