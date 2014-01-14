@@ -67,10 +67,11 @@
     {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
--define(SEND_OPTIONS, [{channel, prio}]).
+-define(SEND_OPTIONS, [{channel, prio}, {no_keep_alive}]).
 % prevent warnings in the log
 % (the entry for a failed node will age and will be removed when it is old enough)
--define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, {?quiet}, {channel, prio}])).
+-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process},
+                                                                      {?quiet}, {channel, prio}, {no_keep_alive}])).
 
 %% @doc Activates the cyclon process. If not activated, the cyclon process will
 %%      queue most messages without processing them.
