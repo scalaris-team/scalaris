@@ -53,20 +53,23 @@
 -type last_msg_sent() :: erlang:timestamp().
 
 -type state() ::
-    {DestIP               :: inet:ip_address(),
-     DestPort             :: comm_server:tcp_port(),
-     LocalListenPort      :: comm_server:tcp_port(),
-     Channel              :: comm:channel(),
-     Socket               :: inet:socket() | notconnected,
-     StartTime            :: erlang_timestamp(),
-     SentMsgCount         :: non_neg_integer(),
-     ReceivedMsgCount     :: non_neg_integer(),
-     MsgQueue             :: msg_queue(),
-     MsgQueueLen          :: non_neg_integer(),
-     DesiredBundleSize    :: non_neg_integer(),
-     MsgsSinceBundleStart :: non_neg_integer(),
-     LastStatReport       :: stat_report(),
-     LastMsgSent          :: last_msg_sent()}.
+    {DestIP                  :: inet:ip_address(),
+     DestPort                :: comm_server:tcp_port(),
+     LocalListenPort         :: comm_server:tcp_port(),
+     Channel                 :: comm:channel(),
+     Socket                  :: inet:socket() | notconnected,
+     StartTime               :: erlang_timestamp(),
+     SentMsgCount            :: non_neg_integer(),
+     ReceivedMsgCount        :: non_neg_integer(),
+     MsgQueue                :: msg_queue(),
+     MsgQueueLen             :: non_neg_integer(),
+     DesiredBundleSize       :: non_neg_integer(),
+     MsgsSinceBundleStart    :: non_neg_integer(),
+     LastStatReport          :: stat_report(),
+     LastMsgSent             :: last_msg_sent(),
+     SentMsgCountSession     :: non_neg_integer(),
+     ReceivedMsgCountSession :: non_neg_integer()
+    }.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
     {tcp, Socket::inet:socket(), Data::binary()} |
@@ -289,7 +292,11 @@ on({web_debug_info, Requestor}, State) ->
          {"recv total bytes",
           webhelpers:safe_html_string("~p", [RcvBytes])},
          {"last message sent",
-          webhelpers:safe_html_string("~p sec ago", [SecondsAgo])}
+          webhelpers:safe_html_string("~p sec ago", [SecondsAgo])},
+         {"sent_tcp_messages (session)",
+          webhelpers:safe_html_string("~p", [s_msg_count_session(State)])},
+         {"recv_tcp_messages (session)",
+          webhelpers:safe_html_string("~p", [r_msg_count_session(State)])}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     send_bundle_if_ready(State);
@@ -395,7 +402,14 @@ send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts) ->
         ok ->
             ?TRACE("~.0p Sent message ~.0p~n",
                    [pid_groups:my_pidname(), Message]),
-            set_last_msg_sent(State);
+            StateNew = set_last_msg_sent(State),
+            %% only close in case of no_keep_alive if the
+            %% connection was solely initiated for this send
+            case lists:member({no_keep_alive}, Options)
+                     andalso s_msg_count_session(StateNew) =< 1 of
+                true -> close_connection(Socket, StateNew);
+                _    -> StateNew
+            end;
         {error, closed} ->
             Address = dest_ip(State),
             Port = dest_port(State),
@@ -470,8 +484,9 @@ close_connection(Socket, State) ->
         Socket ->
             % report stats out of the original schedule
             % (these would otherwise be lost)
-            set_socket(report_stats(State), notconnected);
-        _      -> State
+            StateNew = report_stats(State),
+            set_socket(reset_msg_counters(StateNew), notconnected);
+        _ -> State
     end.
 
 -spec send_bundle_if_ready(state()) -> state().
@@ -518,7 +533,8 @@ state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
      _MsgQueue = {[], []}, _Len = 0,
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0,
      _LastStatReport = {0, 0, 0, 0},
-     _LastMsgSent = {0, 0, 0}}.
+     _LastMsgSent = {0, 0, 0},
+     _SentMsgCountSession = 0, _ReceivedMsgCountSession = 0}.
 
 -spec dest_ip(state()) -> inet:ip_address().
 dest_ip(State)                 -> element(1, State).
@@ -544,12 +560,14 @@ started(State)                 -> element(6, State).
 -spec s_msg_count(state()) -> non_neg_integer().
 s_msg_count(State)             -> element(7, State).
 -spec inc_s_msg_count(state()) -> state().
-inc_s_msg_count(State)         -> setelement(7, State, s_msg_count(State) + 1).
+inc_s_msg_count(State)         -> State2 = setelement(7, State, s_msg_count(State) + 1),
+                                  inc_s_msg_count_session(State2).
 
 -spec r_msg_count(state()) -> non_neg_integer().
 r_msg_count(State)             -> element(8, State).
 -spec inc_r_msg_count(state()) -> state().
-inc_r_msg_count(State)         -> setelement(8, State, r_msg_count(State) + 1).
+inc_r_msg_count(State)         -> State2 = setelement(8, State, r_msg_count(State) + 1),
+                                  inc_r_msg_count_session(State2).
 
 -spec msg_queue(state()) -> msg_queue().
 msg_queue(State)               -> element(9, State).
@@ -584,6 +602,20 @@ set_last_stat_report(State, Val) -> setelement(13, State, Val).
 last_msg_sent(State) -> element(14, State).
 -spec set_last_msg_sent(state()) -> state().
 set_last_msg_sent(State) -> setelement(14, State, os:timestamp()).
+
+-spec s_msg_count_session(state()) -> non_neg_integer().
+s_msg_count_session(State)             -> element(15, State).
+-spec inc_s_msg_count_session(state()) -> state().
+inc_s_msg_count_session(State)         -> setelement(15, State, s_msg_count_session(State) + 1).
+
+-spec r_msg_count_session(state()) -> non_neg_integer().
+r_msg_count_session(State)             -> element(16, State).
+-spec inc_r_msg_count_session(state()) -> state().
+inc_r_msg_count_session(State)         -> setelement(16, State, r_msg_count_session(State) + 1).
+
+-spec reset_msg_counters(state()) -> state().
+reset_msg_counters(State) -> StateNew = setelement(15, State, 0),
+                             setelement(16, StateNew, 0).
 
 -spec start_idle_check() -> ok.
 start_idle_check() ->
