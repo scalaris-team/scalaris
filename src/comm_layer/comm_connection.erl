@@ -68,7 +68,8 @@
      LastStatReport          :: stat_report(),
      LastMsgSent             :: last_msg_sent(),
      SentMsgCountSession     :: non_neg_integer(),
-     ReceivedMsgCountSession :: non_neg_integer()
+     ReceivedMsgCountSession :: non_neg_integer(),
+     SessionCount            :: non_neg_integer()
     }.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
@@ -293,9 +294,12 @@ on({web_debug_info, Requestor}, State) ->
           webhelpers:safe_html_string("~p", [RcvBytes])},
          {"last message sent",
           webhelpers:safe_html_string("~p sec ago", [SecondsAgo])},
-         {"sent_tcp_messages (session)",
+         {"session variables:", ""},
+         {"num sessions",
+          webhelpers:safe_html_string("~p", [session_count(State)])},
+         {"sent_tcp_messages",
           webhelpers:safe_html_string("~p", [s_msg_count_session(State)])},
-         {"recv_tcp_messages (session)",
+         {"recv_tcp_messages",
           webhelpers:safe_html_string("~p", [r_msg_count_session(State)])}
         ],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
@@ -534,7 +538,8 @@ state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0,
      _LastStatReport = {0, 0, 0, 0},
      _LastMsgSent = {0, 0, 0},
-     _SentMsgCountSession = 0, _ReceivedMsgCountSession = 0}.
+     _SentMsgCountSession = 0, _ReceivedMsgCountSession = 0,
+     _SessionCount = 0}.
 
 -spec dest_ip(state()) -> inet:ip_address().
 dest_ip(State)                 -> element(1, State).
@@ -614,8 +619,14 @@ r_msg_count_session(State)             -> element(16, State).
 inc_r_msg_count_session(State)         -> setelement(16, State, r_msg_count_session(State) + 1).
 
 -spec reset_msg_counters(state()) -> state().
-reset_msg_counters(State) -> StateNew = setelement(15, State, 0),
-                             setelement(16, StateNew, 0).
+reset_msg_counters(State) -> State1 = setelement(15, State, 0),
+                             State2 = setelement(16, State1, 0),
+                             inc_session_count(State2).
+
+-spec session_count(state()) -> state().
+session_count(State) -> element(17, State).
+-spec inc_session_count(state()) -> state().
+inc_session_count(State) -> setelement(17, State, session_count(State) + 1).
 
 -spec start_idle_check() -> ok.
 start_idle_check() ->
