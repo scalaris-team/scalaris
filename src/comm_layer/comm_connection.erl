@@ -50,7 +50,7 @@
                       OQueue::[comm:send_options()]}.
 -type stat_report() :: {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
                         SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}.
--type last_msg_sent() :: erlang:timestamp().
+-type time_last_msg_sent() :: erlang:timestamp().
 
 -type state() ::
     {DestIP                  :: inet:ip_address(),
@@ -66,10 +66,12 @@
      DesiredBundleSize       :: non_neg_integer(),
      MsgsSinceBundleStart    :: non_neg_integer(),
      LastStatReport          :: stat_report(),
-     LastMsgSent             :: last_msg_sent(),
+     TimeLastMsgSent         :: time_last_msg_sent(),
      SentMsgCountSession     :: non_neg_integer(),
      ReceivedMsgCountSession :: non_neg_integer(),
-     SessionCount            :: non_neg_integer()
+     SessionCount            :: non_neg_integer(),
+     LastMsgSent             :: comm:message() | none,
+     LastMsgReceived         :: comm:message() | none
     }.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
@@ -162,14 +164,14 @@ on({tcp, Socket, Data}, State) ->
                             ok, Message),
                 %% may fail, when tcp just closed
                 _ = inet:setopts(Socket, [{active, once}]),
-                inc_r_msg_count(State);
+                state_after_receiving(State, lists:nth(1, Message));
             {?deliver, Process, Message} ->
                 ?TRACE("Received message ~.0p", [Message]),
                 ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
                 forward_msg(Process, Message, State),
                 %% may fail, when tcp just closed
                 _ = inet:setopts(Socket, [{active, once}]),
-                inc_r_msg_count(State);
+                state_after_receiving(State, Message);
             {user_close} ->
                 log:log(warn,"[ CC ~p (~p) ] tcp user_close request", [self(), pid_groups:my_pidname()]),
                 close_connection(Socket, State);
@@ -201,11 +203,11 @@ on({report_stats}, State) ->
 %% checks if the connection hasn't been used recently
 on({check_idle}, State) ->
     Timeout = config:read(tcp_idle_timeout),
-    LastMsgSent = last_msg_sent(State),
+    TimeLastMsgSent = time_last_msg_sent(State),
     case socket(State) =:= notconnected of
         true -> State;
         _    ->
-            case timer:now_diff(os:timestamp(), LastMsgSent) div 1000 of
+            case timer:now_diff(os:timestamp(), TimeLastMsgSent) div 1000 of
                 N when N > Timeout ->
                     %% we timed out
                     ?TRACE("Closing idle connection: ~p~n", [State]),
@@ -219,11 +221,11 @@ on({check_idle}, State) ->
 
 on({web_debug_info, Requestor}, State) ->
     Now = os:timestamp(),
-    LastMsgSent = last_msg_sent(State),
+    TimeLastMsgSent = time_last_msg_sent(State),
     SecondsAgo =
-        case LastMsgSent of
+        case TimeLastMsgSent of
             {0,0,0} -> infinity;
-            _ ->  timer:now_diff(Now, last_msg_sent(State)) div 1000000
+            _ ->  timer:now_diff(Now, TimeLastMsgSent) div 1000000
         end,
     Runtime = timer:now_diff(Now, started(State)) / 1000000,
     {SentPerS, ReceivedPerS} =
@@ -292,8 +294,12 @@ on({web_debug_info, Requestor}, State) ->
           webhelpers:safe_html_string("~p", [RcvAgv])},
          {"recv total bytes",
           webhelpers:safe_html_string("~p", [RcvBytes])},
-         {"last message sent",
+         {"time last message sent",
           webhelpers:safe_html_string("~p sec ago", [SecondsAgo])},
+         {"last message sent:",
+          webhelpers:html_pre("~50p", [last_msg_sent(State)])},
+         {"last message received",
+          webhelpers:html_pre("~50p", [last_msg_received(State)])},
          {"session variables:", ""},
          {"num sessions",
           webhelpers:safe_html_string("~p", [session_count(State)])},
@@ -364,8 +370,7 @@ send_or_bundle(DestPid, Message, Options, State) ->
                    % -> to process this 1 msg + MQL messages (see below)
                    set_desired_bundle_size(T2, erlang:min(MQL, MaxBundle));
                true ->
-                   NewState = send(DestPid, Message, Options, State),
-                   inc_s_msg_count(NewState)
+                   send(DestPid, Message, Options, State)
             end;
         QL ->
             {MsgQueue0, OptionQueue0} = msg_queue(State),
@@ -406,13 +411,13 @@ send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts) ->
         ok ->
             ?TRACE("~.0p Sent message ~.0p~n",
                    [pid_groups:my_pidname(), Message]),
-            StateNew = set_last_msg_sent(State),
+            State2 = state_after_sending(State, Message),
             %% only close in case of no_keep_alive if the
             %% connection was solely initiated for this send
             case lists:member({no_keep_alive}, Options)
-                     andalso s_msg_count_session(StateNew) =< 1 of
-                true -> close_connection(Socket, StateNew);
-                _    -> StateNew
+                     andalso s_msg_count_session(State2) =< 1 of
+                true -> close_connection(Socket, State2);
+                _    -> State2
             end;
         {error, closed} ->
             Address = dest_ip(State),
@@ -522,10 +527,9 @@ send_msg_bundle(State, MQueue, OQueue, QL) ->
             set_msg_queue_len(T1, QL);
         _ ->
             T1State = send(?unpack_msg_bundle, MQueue, OQueue, State),
-            T2State = inc_s_msg_count(T1State),
-            T3State = set_msg_queue(T2State, {[], []}),
-            T4State = set_msg_queue_len(T3State, 0),
-            _T5State = set_msgs_since_bundle_start(T4State,0)
+            T2State = set_msg_queue(T1State, {[], []}),
+            T3State = set_msg_queue_len(T2State, 0),
+            _T4State = set_msgs_since_bundle_start(T3State,0)
     end.
 
 -spec state_new(DestIP::inet:ip_address(), DestPort::comm_server:tcp_port(),
@@ -537,9 +541,11 @@ state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
      _MsgQueue = {[], []}, _Len = 0,
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0,
      _LastStatReport = {0, 0, 0, 0},
-     _LastMsgSent = {0, 0, 0},
+     _TimeLastMsgSent = {0, 0, 0},
      _SentMsgCountSession = 0, _ReceivedMsgCountSession = 0,
-     _SessionCount = 0}.
+     _SessionCount = 0,
+     _LastMsgSent = none, _LastMsgReceived = none
+    }.
 
 -spec dest_ip(state()) -> inet:ip_address().
 dest_ip(State)                 -> element(1, State).
@@ -565,14 +571,18 @@ started(State)                 -> element(6, State).
 -spec s_msg_count(state()) -> non_neg_integer().
 s_msg_count(State)             -> element(7, State).
 -spec inc_s_msg_count(state()) -> state().
-inc_s_msg_count(State)         -> State2 = setelement(7, State, s_msg_count(State) + 1),
-                                  inc_s_msg_count_session(State2).
+inc_s_msg_count(State) -> inc_s_msg_count(State, 1).
+-spec inc_s_msg_count(state(), pos_integer()) -> state().
+inc_s_msg_count(State, N)      -> State2 = setelement(7, State, s_msg_count(State) + N),
+                                  inc_s_msg_count_session(State2, N).
 
 -spec r_msg_count(state()) -> non_neg_integer().
 r_msg_count(State)             -> element(8, State).
 -spec inc_r_msg_count(state()) -> state().
-inc_r_msg_count(State)         -> State2 = setelement(8, State, r_msg_count(State) + 1),
-                                  inc_r_msg_count_session(State2).
+inc_r_msg_count(State)         -> inc_r_msg_count(State, 1).
+-spec inc_r_msg_count(state(), pos_integer()) -> state().
+inc_r_msg_count(State, N)      -> State2 = setelement(8, State, r_msg_count(State) + N),
+                                  inc_r_msg_count_session(State2, N).
 
 -spec msg_queue(state()) -> msg_queue().
 msg_queue(State)               -> element(9, State).
@@ -603,20 +613,20 @@ last_stat_report(State)          -> element(13, State).
 -spec set_last_stat_report(state(), stat_report()) -> state().
 set_last_stat_report(State, Val) -> setelement(13, State, Val).
 
--spec last_msg_sent(state()) -> erlang:timestamp().
-last_msg_sent(State) -> element(14, State).
--spec set_last_msg_sent(state()) -> state().
-set_last_msg_sent(State) -> setelement(14, State, os:timestamp()).
+-spec time_last_msg_sent(state()) -> erlang:timestamp().
+time_last_msg_sent(State) -> element(14, State).
+-spec set_time_last_msg_sent(state()) -> state().
+set_time_last_msg_sent(State) -> setelement(14, State, os:timestamp()).
 
 -spec s_msg_count_session(state()) -> non_neg_integer().
-s_msg_count_session(State)             -> element(15, State).
--spec inc_s_msg_count_session(state()) -> state().
-inc_s_msg_count_session(State)         -> setelement(15, State, s_msg_count_session(State) + 1).
+s_msg_count_session(State)         -> element(15, State).
+-spec inc_s_msg_count_session(state(), pos_integer()) -> state().
+inc_s_msg_count_session(State, N)  -> setelement(15, State, s_msg_count_session(State) + N).
 
 -spec r_msg_count_session(state()) -> non_neg_integer().
-r_msg_count_session(State)             -> element(16, State).
--spec inc_r_msg_count_session(state()) -> state().
-inc_r_msg_count_session(State)         -> setelement(16, State, r_msg_count_session(State) + 1).
+r_msg_count_session(State)         -> element(16, State).
+-spec inc_r_msg_count_session(state(), pos_integer()) -> state().
+inc_r_msg_count_session(State, N)  -> setelement(16, State, r_msg_count_session(State) + N).
 
 -spec reset_msg_counters(state()) -> state().
 reset_msg_counters(State) -> State1 = setelement(15, State, 0),
@@ -627,6 +637,32 @@ reset_msg_counters(State) -> State1 = setelement(15, State, 0),
 session_count(State) -> element(17, State).
 -spec inc_session_count(state()) -> state().
 inc_session_count(State) -> setelement(17, State, session_count(State) + 1).
+
+-spec last_msg_sent(state()) -> comm:message().
+last_msg_sent(State) -> element(18, State).
+-spec set_last_msg_sent(state(), comm:message()) -> state().
+set_last_msg_sent(State, Msg) -> setelement(18, State, Msg).
+
+-spec last_msg_received(state()) -> comm:message().
+last_msg_received(State) -> element(19, State).
+-spec set_last_msg_received(state(), comm:message()) -> state().
+set_last_msg_received(State, Msg) -> setelement(19, State, Msg).
+
+-spec state_after_sending(state(), comm:message() | [{pid(), comm:message()}]) -> state().
+state_after_sending(State, Msg) ->
+    State2 = set_time_last_msg_sent(State),
+    case Msg of % bundle or plain message
+        [{_, M}|_T] ->
+            StateTemp = inc_s_msg_count(State2, length(Msg)),
+            set_last_msg_sent(StateTemp, M);
+        Msg ->
+            StateTemp = inc_s_msg_count(State2),
+            set_last_msg_sent(StateTemp, Msg)
+    end.
+-spec state_after_receiving(state(), comm:message()) -> state().
+state_after_receiving(State, Msg) ->
+    State2 = set_last_msg_received(State, Msg),
+    inc_r_msg_count(State2).
 
 -spec start_idle_check() -> ok.
 start_idle_check() ->
