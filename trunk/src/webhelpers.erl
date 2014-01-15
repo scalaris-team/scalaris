@@ -29,9 +29,9 @@
          getGossipRendered/0, getVivaldiMap/0,
          getMonitorClientData/0, getMonitorRingData/0,
          lookup/1, set_key/2, delete_key/2, isPost/1,
-         safe_html_string/1, safe_html_string/2,
-         pid_to_integer/1, color/1, format_coordinate/1
-         , format_nodes/1, format_centroids/1
+         safe_html_string/1, safe_html_string/2, html_pre/2,
+         pid_to_integer/1, color/1, format_coordinate/1,
+         format_nodes/1, format_centroids/1
      ]).
 
 -type attribute_type() :: {atom(), string()}.
@@ -922,3 +922,7 @@ safe_html_string(String) ->
                        $> -> "&gt;";
                        _ -> C
                    end || C <- lists:flatten(String)]).
+
+%% @doc Pre-formats a string (useful for reading erlang terms)
+html_pre(Format, String) ->
+    "<pre>" ++ lists:flatten(io_lib:format(Format, String)) ++ "</pre>".
