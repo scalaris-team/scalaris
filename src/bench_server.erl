@@ -22,7 +22,7 @@
 
 -behaviour(gen_component).
 
--export([start_link/0, init/1, on/2]).
+-export([start_link/1, init/1, on/2]).
 
 -include("scalaris.hrl").
 
@@ -113,9 +113,10 @@ init([]) ->
     #state{load_pid=ok}.
 
 %% @doc spawns a bench_server
--spec start_link() -> {ok, pid()}.
-start_link() ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [], [{erlang_register, bench_server}]).
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(ServiceGroup) ->
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [], [{pid_groups_join_as, ServiceGroup, ?MODULE}, 
+                                                             {erlang_register, ?MODULE}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

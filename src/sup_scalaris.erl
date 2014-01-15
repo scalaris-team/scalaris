@@ -94,7 +94,7 @@ childs(Options) ->
                       end,
 
     AdminServer = sup:worker_desc(admin_server, admin, start_link),
-    BenchServer = sup:worker_desc(bench_server, bench_server, start_link),
+    BenchServer = sup:worker_desc(bench_server, bench_server, start_link, [ServiceGroup]),
     MgmtServer = sup:worker_desc(mgmt_server, mgmt_server, start_link,
                                       [ServiceGroup, []]),
     MgmtServerDNCache =
