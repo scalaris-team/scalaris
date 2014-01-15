@@ -1,5 +1,4 @@
-% @copyright 2009-2013 Zuse Institute Berlin,
-%            2009 onScale solutions GmbH
+% @copyright 2009-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,7 +12,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%% @author Florian Schintke <schintke@onscale.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc Part of a generic implementation of transactions using Paxos Commit -
 %%      the roles of the (replicated) transaction manager TM and RTM.
 %% @end
@@ -572,7 +571,13 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                 false ->
                     log:log(warn, "Cannot discover my comm:this().~n");
                 true ->
-                    {_, _, ThisRTMsNumber, _} = lists:keyfind({This}, 2, RTMs),
+                    ThisRTMsNumber =
+                        case Role of
+                            tx_rtm0 -> 1;
+                            tx_rtm1 -> 2;
+                            tx_rtm2 -> 3;
+                            tx_rtm3 -> 4
+                        end,
 
             %% add ourselves as learner and
             %% trigger paxos proposers for new round with own proposal 'abort'
@@ -593,7 +598,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
                                       || X <- ValidAccs],
                                 proposer:start_paxosid(
                                   Proposer, PaxId, _Acceptors = ValidAccs, ?abort,
-                                  Maj, MaxProposers, ThisRTMsNumber),
+                                  Maj, MaxProposers, _InitialRound = ThisRTMsNumber),
                                 ok
                             end
                             || {PaxId, _RTLog, _TP}
