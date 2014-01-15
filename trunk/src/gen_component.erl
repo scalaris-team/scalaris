@@ -651,7 +651,7 @@ on_unknown_event({web_debug_info, Requestor}, UState, GCState) ->
                                 [{"generic info from gen_component:", ""},
                                  {"module", webhelpers:safe_html_string("~.0p", [gc_mod(GCState)])},
                                  {"handler", webhelpers:safe_html_string("~.0p", [gc_hand(GCState)])},
-                                 {"state", webhelpers:safe_html_string("~.0p", [UState])}]});
+                                 {"state", "<pre>" ++ webhelpers:safe_html_string("~50p", [UState]) ++ "</pre>"}]});
 on_unknown_event(UnknownMessage, UState, GCState) ->
     DbgMsg = "~n** Unknown message:~n ~.0p~n"
                "** Module:~n ~.0p~n"
