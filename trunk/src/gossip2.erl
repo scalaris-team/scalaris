@@ -354,7 +354,10 @@ on_active({get_values_all, CBModule, SourcePid}=Msg, State) ->
 
 
 on_active({web_debug_info, Requestor}=Msg, State) ->
-    KeyValueList = cb_call(web_debug_info, [], Msg, gossip_load, State),
+    CBModules = get_cbmodules(State),
+    Fun = fun (CBModule, Acc) -> Acc ++ [{"",""}] ++
+            cb_call(web_debug_info, [], Msg, CBModule, State) end,
+    KeyValueList = lists:foldl(Fun, [], CBModules),
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
