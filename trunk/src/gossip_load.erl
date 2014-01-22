@@ -405,6 +405,7 @@ get_values_all(State) ->
 web_debug_info(State) ->
     PreviousState = state_get(prev_state, State),
     PreviousData = prev_state_get(load_data, State),
+    io:format("PreviousData: ~w", [PreviousData]),
     CurrentData = state_get(load_data, State),
     BestState = previous_or_current(State),
     Best = if BestState =:= State -> current_data;
@@ -974,7 +975,9 @@ calc_initial_avg_kr(MyRange) ->
 
 
 %% @doc Extracts and calculates the standard deviation from the load_data record
--spec calc_stddev(load_data()) -> unknown | float().
+-spec calc_stddev(unknown | load_data()) -> unknown | float().
+calc_stddev(unknown) -> unknown;
+
 calc_stddev(Data) when is_record(Data, load_data) ->
     Avg = get_current_estimate(avg, Data),
     Avg2 = get_current_estimate(avg2, Data),
@@ -990,7 +993,9 @@ calc_stddev(Data) when is_record(Data, load_data) ->
 
 
 %% @doc Extracts and calculates the size_kr field from the load_data record
--spec calc_size_kr(load_data()) -> unknown | float().
+-spec calc_size_kr(unknown | load_data()) -> unknown | float().
+calc_size_kr(unknown) -> unknown;
+
 calc_size_kr(Data) when is_record(Data, load_data) ->
     AvgKR = get_current_estimate(avg_kr, Data),
     try
