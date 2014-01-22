@@ -176,7 +176,7 @@ select_data(State) ->
     end,
     {ok, State}.
 
--spec select_reply_data(PData::load_data(), Ref::reference(),
+-spec select_reply_data(PData::load_data(), Ref::pos_integer(),
     RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
 select_reply_data(PData, Ref, RoundStatus, Round, State) ->
@@ -434,7 +434,7 @@ web_debug_info(State) ->
          {"cur_stddev",          calc_stddev(CurrentData)},
          {"cur_size_ldr",        get_current_estimate(size_inv, CurrentData)},
          {"cur_size_kr",         calc_size_kr(CurrentData)},
-         {"cur_histo",          to_string(load_data_get(histo, PreviousData))}],
+         {"cur_histo",           to_string(load_data_get(histo, PreviousData))}],
     {KeyValueList, State}.
 
 
@@ -974,9 +974,7 @@ calc_initial_avg_kr(MyRange) ->
 
 
 %% @doc Extracts and calculates the standard deviation from the load_data record
--spec calc_stddev(Data::unknown | load_data()) -> unknown | float().
-calc_stddev(unknown) -> unknown;
-
+-spec calc_stddev(load_data()) -> unknown | float().
 calc_stddev(Data) when is_record(Data, load_data) ->
     Avg = get_current_estimate(avg, Data),
     Avg2 = get_current_estimate(avg2, Data),
@@ -992,9 +990,7 @@ calc_stddev(Data) when is_record(Data, load_data) ->
 
 
 %% @doc Extracts and calculates the size_kr field from the load_data record
--spec calc_size_kr(unknown | load_data()) -> float() | unknown.
-calc_size_kr(unknown) -> unknown;
-
+-spec calc_size_kr(load_data()) -> unknown | float().
 calc_size_kr(Data) when is_record(Data, load_data) ->
     AvgKR = get_current_estimate(avg_kr, Data),
     try

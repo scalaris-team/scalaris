@@ -161,21 +161,45 @@ tester_type_check_gossip2(_Config) ->
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    tester:register_type_checker({typedef, gossip2, state}, gossip2, is_state),
     tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram),
     tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state),
+    tester:register_value_creator({typedef, gossip2, state}, gossip2, tester_create_state, 10),
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
     tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 7),
     Modules =
-        [ {gossip_load,
+        [ {gossip2,
+            % excluded (exported functions)
+            [   {start_link,1}, % type of pid_groups:groupname() seems not restrictive enough
+                {init,1}, % does not return fully filled state
+                {on_inactive,2}, % sends messages
+                {on_active,2}, % sends messages
+                {activate,1} % uses pid_group:get_my()
+            ],
+            % excluded (private functions)
+            [   {start_p2p_exchange,4}, % needs node as peer
+                {init_gossip_task,2}, % tested via feeder
+                {cb_call,5}, % spec to wide
+                {select_reply_data,7}, % would need valid callback state
+                {request_random_node,1}, % needs pid_group:get_my()
+                {request_random_node_delayed,2}, % needs pid_group:get_my()
+                {check_round,3}, % would need valid callback state
+                {is_end_of_round,2}, % would need valid callback state
+                {state_get,2}, % tested via feeder
+                {state_take,2}, % tested via feeder
+                {state_update,4} % tester can not create a value of type fun()
+            ]},
+          {gossip_load,
+            % excluded (exported functions)
             [   {select_data,1}, % needs pid_groups:get_my()
                 {select_reply_data,5}, % needs pid_groups:get_my / references
                 {integrate_data,4}, % needs pid_groups:get_my()
                 {handle_msg,2}, % needs pid_groups:get_my()
                 {notify_change,3} % needs state
             ],
-            [
-               {integrate_data_init,3}, % needs pid_groups:get_my()
-               {request_local_info,0}, % sends message, produces a *lot* of warnings!
+            % excluded (private functions)
+            [  {integrate_data_init,3}, % needs pid_groups:get_my()
+               {request_local_info,0}, % sends message
                {state_update,3}, % cannot create funs
                {init_histo,1}, % needs DHTNodeState state
                {get_load_for_interval,3}, % needs dht db
@@ -191,9 +215,11 @@ tester_type_check_gossip2(_Config) ->
     tester:unregister_value_creator({typedef, intervals, interval}),
     tester:unregister_value_creator({typedef, intervals, simple_interval}),
     tester:unregister_type_checker({typedef, is_histogram, gossip_load}),
+    tester:unregister_type_checker({typedef, gossip2, state}),
     tester:unregister_type_checker({typedef, gossip_load, state}),
-    tester:unregister_value_creator({typedef, gossip_load, histogram}),
+    tester:unregister_value_creator({typedef, gossip2, state}),
     tester:unregister_value_creator({typedef, gossip_load, state}),
+    tester:unregister_value_creator({typedef, gossip_load, histogram}),
     true.
 
 

@@ -53,7 +53,7 @@
     % has to initiate {selected_data, CBModule::module(), PData::exch_data()}
     cb_return().
 
--callback select_reply_data(PData::exch_data(), reference(),
+-callback select_reply_data(PData::exch_data(), Ref::pos_integer(),
     RoundStatus::round_status(), Round::round(), State::cb_state()) ->
     % has to initiate {selected_reply_data, CBModule::module(), QData::exch_data()}
     cb_return().
