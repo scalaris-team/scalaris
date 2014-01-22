@@ -29,17 +29,17 @@
 -include("client_types.hrl").
 
 all()   -> [
-            tester_type_check_api,
-            tester_type_check_config,
+            %% tester_type_check_api,
+            %% tester_type_check_config,
 %%            tester_type_check_dht_node,
-            tester_type_check_gossip,
-            tester_type_check_math,
-            tester_type_check_node,
-            tester_type_check_paxos,
-            tester_type_check_rrepair,
-            tester_type_check_tx,
-            tester_type_check_rdht_tx,
-            tester_type_check_util
+            tester_type_check_gossip
+            %% tester_type_check_math,
+            %% tester_type_check_node,
+            %% tester_type_check_paxos,
+            %% tester_type_check_rrepair,
+            %% tester_type_check_tx,
+            %% tester_type_check_rdht_tx,
+            %% tester_type_check_util
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
 
