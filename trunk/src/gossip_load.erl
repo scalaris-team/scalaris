@@ -29,8 +29,7 @@
         min_cycles_per_round/0, max_cycles_per_round/0, round_has_converged/1,
         get_values_best/1, get_values_all/1, web_debug_info/1]).
 
--define(PDB, pdb_ets).
--define(PDB_OPTIONS, [set, protected]).
+
 -define(SHOW, config:read(log_level)).
 
 
@@ -426,7 +425,7 @@ request_local_info() ->
 %% @doc Create a new state table with some initial values.
 -spec state_new() -> state().
 state_new() ->
-    NewState = ?PDB:new(cbstate, ?PDB_OPTIONS),
+    NewState = ets:new(cbstate, [set, protected]),
     state_set(status, uninit, NewState),
     state_set(load_data, load_data_new(), NewState),
     Fun = fun (Key) -> state_set(Key, 0, NewState) end,
@@ -460,25 +459,26 @@ state_get(_Key, unknown) ->
     unknown;
 
 state_get(Key, State) ->
-    case ?PDB:get(Key, State) of
-        {Key, Value} -> Value;
-        undefined ->
+    case ets:lookup(State, Key) of
+        [] ->
             log:log(error, "[ ~w ] Lookup of ~w in ~w failed~n", [?MODULE, Key, State]),
-            error(lookup_failed, [Key, State])
+            error(lookup_failed, [Key, State]);
+        [{Key, Value}] -> Value
     end.
 
 
--spec state_set(Key::state_key(), Value::any(), State::state()) -> ok.
+-spec state_set(Key::state_key(), Value::any(), State::state()) -> true.
 state_set(Key, Value, State) ->
-    ?PDB:set({Key, Value}, State).
+    ets:insert(State, {Key, Value}).
 
-
+-spec state_update(Key::state_key(), Fun::fun(), State::state()) -> true.
 state_update(Key, Fun, State) ->
     Value = state_get(Key, State),
     NewValue = apply(Fun, [Value]),
     state_set(Key, NewValue, State).
 
 
+-spec prev_state_get(Key::state_key(), State::state()) -> any().
 prev_state_get(Key, State) ->
     PrevState = state_get(prev_state, State),
     state_get(Key, PrevState).
@@ -489,7 +489,7 @@ prev_state_get(Key, State) ->
 %%     state_set(Key, Value, PrevState).
 
 
--spec update_convergence_count(OldData::load_data(), NewData::load_data(), State::state()) -> ok.
+-spec update_convergence_count(OldData::load_data(), NewData::load_data(), State::state()) -> true.
 update_convergence_count(OldData, NewData, State) ->
 
     % check whether all average based values changed less than epsilon percent
