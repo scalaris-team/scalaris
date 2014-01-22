@@ -29,17 +29,18 @@
 -include("client_types.hrl").
 
 all()   -> [
-            %% tester_type_check_api,
-            %% tester_type_check_config,
+            tester_type_check_api,
+            tester_type_check_config,
 %%            tester_type_check_dht_node,
-            tester_type_check_gossip
-            %% tester_type_check_math,
-            %% tester_type_check_node,
-            %% tester_type_check_paxos,
-            %% tester_type_check_rrepair,
-            %% tester_type_check_tx,
-            %% tester_type_check_rdht_tx,
-            %% tester_type_check_util
+            tester_type_check_gossip,
+            tester_type_check_math,
+            tester_type_check_node,
+            tester_type_check_paxos,
+            tester_type_check_rrepair,
+            tester_type_check_tx,
+            tester_type_check_rdht_tx,
+            tester_type_check_util,
+            tester_type_check_gossip2
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
 
@@ -150,6 +151,51 @@ tester_type_check_gossip(_Config) ->
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
     true.
+
+tester_type_check_gossip2(_Config) ->
+    Count = 500,
+    config:write(no_print_ring_data, true),
+    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
+    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
+    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram),
+    tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state),
+    tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
+    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 7),
+    Modules =
+        [ {gossip_load,
+            [   {select_data,1}, % needs pid_groups:get_my()
+                {select_reply_data,5}, % needs pid_groups:get_my / references
+                {integrate_data,4}, % needs pid_groups:get_my()
+                {handle_msg,2}, % needs pid_groups:get_my()
+                {notify_change,3} % needs state
+            ],
+            [
+               {integrate_data_init,3}, % needs pid_groups:get_my()
+               {request_local_info,0}, % sends message, produces a *lot* of warnings!
+               {state_update,3}, % cannot create funs
+               {init_histo,1}, % needs DHTNodeState state
+               {get_load_for_interval,3}, % needs dht db
+               {merge_histo,2}, % tested via feeder
+               {merge_bucket,2} % tested via feeder
+            ]}
+        ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_type_checker({typedef, intervals, interval}),
+    tester:unregister_type_checker({typedef, intervals, simple_interval}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
+    tester:unregister_value_creator({typedef, intervals, interval}),
+    tester:unregister_value_creator({typedef, intervals, simple_interval}),
+    tester:unregister_type_checker({typedef, is_histogram, gossip_load}),
+    tester:unregister_type_checker({typedef, gossip_load, state}),
+    tester:unregister_value_creator({typedef, gossip_load, histogram}),
+    tester:unregister_value_creator({typedef, gossip_load, state}),
+    true.
+
 
 tester_type_check_math(_Config) ->
     Count = 500,

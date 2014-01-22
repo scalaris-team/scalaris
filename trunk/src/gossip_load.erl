@@ -29,6 +29,9 @@
         min_cycles_per_round/0, max_cycles_per_round/0, round_has_converged/1,
         get_values_best/1, get_values_all/1, web_debug_info/1]).
 
+%% for testing
+-export([tester_create_histogram/1, is_histogram/1, tester_create_state/7, is_state/1]).
+
 -export_type([load_info/0]).
 
 %% -define(SHOW, config:read(log_level)).
@@ -44,37 +47,39 @@
 -type state() :: ets:tab().
 -type state_key() :: convergence_count | leader | load_data | merged |
     prev_state | range | round | status.
--type avg() :: {Value::float(), Weight::float()} | unknown.
--type size() :: float() | unknown.
--type avg_kr() :: {number(), float()} | unknown.
--type min() :: non_neg_integer() | unknown.
--type max() :: non_neg_integer() | unknown.
+-type avg() :: {Value::float(), Weight::float()}.
+-type avg_kr() :: {number(), float()}.
+-type min() :: non_neg_integer().
+-type max() :: non_neg_integer().
 -type merged() :: non_neg_integer().
--type bucket() :: {Interval::intervals:interval(), Avg::avg()}.
--type histogram() :: [bucket()] | unknown.
+-type bucket() :: {Interval::intervals:interval(), Avg::avg()|unknown}.
+-type histogram() :: [bucket()].
 
 
 % record of load data values for gossiping
 -record(load_data, {
-            avg       = unknown :: avg(), % average load
-            avg2      = unknown :: avg(), % average of load^2
-            size_inv  = unknown :: avg(), % 1 / size
-            avg_kr    = unknown :: avg_kr(), % average key range (distance between nodes in the address space)
-            min       = unknown :: min(),
-            max       = unknown :: max(),
-            histo     = unknown :: histogram()
+            avg       = unknown :: unknown | avg(), % average load
+            avg2      = unknown :: unknown | avg(), % average of load^2
+            size_inv  = unknown :: unknown | avg(), % 1 / size
+            avg_kr    = unknown :: unknown | avg_kr(), % average key range (distance between nodes in the address space)
+            min       = unknown :: unknown | min(),
+            max       = unknown :: unknown | max(),
+            histo     = unknown :: unknown | histogram()
     }).
--type(load_data() :: #load_data{}).
+-type load_data_uninit() :: #load_data{}.
+-type load_data() :: {load_data, Avg::avg(), Avg2::avg(), SizeInv::avg(),
+            AvgKr::avg_kr(), Min::non_neg_integer(), Max::non_neg_integer(),
+            Histogram::histogram()}.
 
 % record of load data values for use by other modules
 -record(load_info, {
-            avg       = unknown :: avg(),  % average load
-            stddev    = unknown :: float(), % standard deviation of the load
-            size_ldr  = unknown :: size(), % estimated ring size: 1/(average of leader=1, others=0)
-            size_kr   = unknown :: size(), % estimated ring size based on average key ranges
-            min       = unknown :: min(), % minimum load
-            max       = unknown :: max(), % maximum load
-            merged    = 0 :: merged() % how often the data was merged since the node entered/created the round
+            avg       = unknown :: unknown | float(),  % average load
+            stddev    = unknown :: unknown | float(), % standard deviation of the load
+            size_ldr  = unknown :: unknown | float(), % estimated ring size: 1/(average of leader=1, others=0)
+            size_kr   = unknown :: unknown | float(), % estimated ring size based on average key ranges
+            min       = unknown :: unknown | min(), % minimum load
+            max       = unknown :: unknown | max(), % maximum load
+            merged    = unknown :: unknown | merged() % how often the data was merged since the node entered/created the round
     }).
 -type(load_info() :: #load_info{}). %% @todo: mark as opaque (dialyzer currently crashes if set)
 
@@ -259,8 +264,8 @@ integrate_data_init(QData, RoundStatus, State) ->
                     % not cause mass loss.
                     do_nothing;
                 false ->
-                    log:log(?SHOW, "[ ~w ] integrate_data in old_round", [?MODULE]),
-                    merge_load_data(prev_round, QData, State)
+                    _ = merge_load_data(prev_round, QData, State),
+                    log:log(?SHOW, "[ ~w ] integrate_data in old_round", [?MODULE])
             end
     end,
     Pid = pid_groups:get_my(gossip2),
@@ -272,7 +277,7 @@ integrate_data_init(QData, RoundStatus, State) ->
     State::state()) -> {ok, state()}.
 handle_msg({get_state_response, DHTNodeState}, State) ->
     Load = dht_node_state:get(DHTNodeState, load),
-    log:log(warn, "[ ~w ] Load: ~w", [?MODULE, Load]),
+    log:log(?SHOW, "[ ~w ] Load: ~w", [?MODULE, Load]),
 
     Data = state_get(load_data, State),
     Data1 = load_data_set(avg, {float(Load), 1.0}, Data),
@@ -429,7 +434,7 @@ web_debug_info(State) ->
          {"cur_stddev",          calc_stddev(CurrentData)},
          {"cur_size_ldr",        get_current_estimate(size_inv, CurrentData)},
          {"cur_size_kr",         calc_size_kr(CurrentData)},
-         {"prev_histo",          to_string(load_data_get(histo, PreviousData))}],
+         {"cur_histo",          to_string(load_data_get(histo, PreviousData))}],
     {KeyValueList, State}.
 
 
@@ -444,6 +449,7 @@ request_local_info() ->
     % get state of dht node
     DHT_Node = pid_groups:get_my(dht_node),
     EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, ?MODULE, '_'}),
+    % send_local doesn't work
     comm:send(comm:make_global(DHT_Node), {get_state, EnvPid}).
 
 
@@ -458,6 +464,9 @@ state_new() ->
     NewState = ets:new(cbstate, [set, protected]),
     state_set(status, uninit, NewState),
     state_set(load_data, load_data_new(), NewState),
+    state_set(leader, unknown, NewState),
+    state_set(range, unknown, NewState),
+    state_set(prev_state, unknown, NewState),
     Fun = fun (Key) -> state_set(Key, 0, NewState) end,
     lists:foreach(Fun, [round, merged, reqs_send, reqs_recv, replies_recv, convergence_count]),
     NewState.
@@ -478,7 +487,7 @@ state_new(PrevState) ->
 
 
 -spec state_delete(State::unknown | state()) -> true.
-state_delete(unknown) -> do_nothing;
+state_delete(unknown) -> true;
 
 state_delete(Name) ->
     ets:delete(Name).
@@ -586,7 +595,7 @@ is_valid_round(RoundStatus, RoundFromMessage, State) ->
 
 
 %% @doc creates a new load_data (for internal use by gossip_load.erl)
--spec load_data_new() -> load_data().
+-spec load_data_new() -> load_data_uninit().
 load_data_new() ->
     #load_data{}.
 
@@ -699,6 +708,14 @@ prepare_load_data(State) ->
 -spec divide2(AvgType:: avg | avg2 | size_inv | avg_kr, MyData::load_data()) ->
     load_data().
 divide2(AvgType, MyData) ->
+    %% NewAvg = case load_data_get(AvgType, MyData) of
+    %%     {Value, Weight} ->
+    %%         NewValue = Value/2,
+    %%         NewWeight = Weight/2,
+    %%         {NewValue, NewWeight};
+    %%     unknown -> unknown
+    %% end,
+    %% load_data_set(AvgType, NewAvg, MyData).
     {Avg, Weight} = load_data_get(AvgType, MyData),
     NewAvg = Avg/2,
     NewWeight = Weight/2,
@@ -816,7 +833,7 @@ get_load_for_interval(BucketInterval, MyRange, DB) ->
         [] -> unknown;
         _NonEmptyIntersection ->
             Load = db_dht:get_load(DB, BucketInterval),
-            {Load, 1}
+            {float(Load), 1.0}
     end.
 
 
@@ -844,6 +861,13 @@ merge_histo(MyData, OtherData) when is_record(MyData, load_data)
     OtherHisto = load_data_get(histo, OtherData),
     MergedHisto = lists:zipwith(fun merge_bucket/2, MyHisto, OtherHisto),
     load_data_set(histo, MergedHisto, MyData).
+
+%%% @doc For testing: ensure, that only buckets with identical keys are feeded to
+%%%      merge_bucket().
+-spec merge_bucket_feeder(Bucket1::bucket(), Bucket2::bucket()) -> {bucket(), bucket()}.
+merge_bucket_feeder({Key1, Val1}, {_Key2, Val2}) ->
+    {{Key1, Val1}, {Key1, Val2}}.
+
 
 %%% @doc Merge two buckets of a histogram.
 -spec merge_bucket(Bucket1::bucket(), Bucket2::bucket()) -> bucket().
@@ -879,13 +903,13 @@ get_load_info(State) ->
 
 
 %% @doc Gets the value to the given key from the given load_info record.
--spec load_info_get(Key::avgLoad, LoadInfoRecord::load_info()) -> avg();
-                   (Key::stddev, LoadInfoRecord::load_info()) -> float();
-                   (Key::size_ldr, LoadInfoRecord::load_info()) -> size();
-                   (Key::size_kr, LoadInfoRecord::load_info()) -> size();
-                   (Key::minLoad, LoadInfoRecord::load_info()) -> min();
-                   (Key::maxLoad, LoadInfoRecord::load_info()) -> max();
-                   (Key::merged, LoadInfoRecord::load_info()) -> merged().
+-spec load_info_get(Key::avgLoad, LoadInfoRecord::load_info()) -> unknown | float();
+                   (Key::stddev, LoadInfoRecord::load_info()) -> unknown | float();
+                   (Key::size_ldr, LoadInfoRecord::load_info()) -> unknown | float();
+                   (Key::size_kr, LoadInfoRecord::load_info()) -> unknown | float();
+                   (Key::minLoad, LoadInfoRecord::load_info()) -> unknown | min();
+                   (Key::maxLoad, LoadInfoRecord::load_info()) -> unknown | max();
+                   (Key::merged, LoadInfoRecord::load_info()) -> unknown | merged().
 load_info_get(Key, #load_info{avg=Avg, stddev=Stddev, size_ldr=SizeLdr,
         size_kr=SizeKr, min=Min, max=Max, merged=Merged}) ->
     case Key of
@@ -937,17 +961,20 @@ calc_change(OldValue, NewValue) ->
 %%      Pre: MyRange is continuous
 -spec calc_initial_avg_kr(MyRange::intervals:interval()) -> avg_kr() | unknown.
 calc_initial_avg_kr(MyRange) ->
-    {_, PredKey, MyKey, _} = intervals:get_bounds(MyRange),
-    % we don't know whether we can subtract keys of type ?RT:key()
-    % -> try it and if it fails, return unknown
-    try {?RT:get_range(PredKey, MyKey), 1}
+    try
+        % get_bounds([]) throws 'no bounds in empty interval'
+        {_, PredKey, MyKey, _} = intervals:get_bounds(MyRange),
+        % we don't know whether we can subtract keys of type ?RT:key()
+        % -> try it and if it fails, return unknown
+        {?RT:get_range(PredKey, MyKey), 1.0}
     catch
-        throw:not_supported -> unknown
+        throw:not_supported -> unknown;
+        throw:'no bounds in empty interval' -> unknown
     end.
 
 
 %% @doc Extracts and calculates the standard deviation from the load_data record
--spec calc_stddev(Data::unknown | load_data()) -> float().
+-spec calc_stddev(Data::unknown | load_data()) -> unknown | float().
 calc_stddev(unknown) -> unknown;
 
 calc_stddev(Data) when is_record(Data, load_data) ->
@@ -965,7 +992,7 @@ calc_stddev(Data) when is_record(Data, load_data) ->
 
 
 %% @doc Extracts and calculates the size_kr field from the load_data record
--spec calc_size_kr(unknown | load_data()) -> size().
+-spec calc_size_kr(unknown | load_data()) -> float() | unknown.
 calc_size_kr(unknown) -> unknown;
 
 calc_size_kr(Data) when is_record(Data, load_data) ->
@@ -1014,5 +1041,88 @@ to_string(Histogram) when is_list(Histogram) ->
               (Value, AccIn) ->  AccIn ++ io_lib:format(" ~10.2. f", [Value]) end,
     HistoString = lists:foldl(Fun, "[ ", Values) ++ " ]",
     lists:flatten(HistoString).
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% For Testing
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%% @doc Creates a random state() table within the given type specifications.
+%%%      Used as value_creator in tester.erl (property testing).
+-spec tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status) -> state() when
+    ConvCount :: non_neg_integer(),
+    Leader :: boolean(),
+    LoadData::load_data(),
+    Merged :: non_neg_integer(),
+    Range :: intervals:non_empty_interval(),
+    Round :: non_neg_integer(),
+    Status :: init|uninit.
+tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status) ->
+    NewState = ets:new(cbstate, [set, protected]),
+    state_set(convergence_count, ConvCount, NewState),
+    state_set(leader, Leader, NewState),
+    state_set(load_data, LoadData, NewState),
+    state_set(merged, Merged, NewState),
+    state_set(prev_state, NewState, NewState),
+    state_set(range, Range, NewState),
+    state_set(round, Round, NewState),
+    state_set(status, Status, NewState),
+    NewState.
+
+
+%%% @doc Checks if a given ets table is a valid state.
+%%%      Used as type_checker in tester.erl (property testing).
+-spec is_state(State::ets:tab()) -> boolean().
+is_state(State) ->
+    Keys = [convergence_count, leader, load_data, merged, prev_state, range, round, status],
+    try lists:foreach(fun (Key) -> state_get(Key, State) end, Keys) of
+        _Success -> true
+    catch _:_ -> false
+    end.
+
+
+%%% @doc Creates a histogram() within the specifications of this modules, i.e.
+%%%      in particular that all histograms need to have the same keys
+%%%      (keyrange/no_of_buckets).
+-spec tester_create_histogram(ListOfAvgs::[avg() | unknown]) -> histogram().
+tester_create_histogram([]) ->
+    tester_create_histogram([unknown]);
+tester_create_histogram(ListOfAvgs) ->
+    Buckets = intervals:split(intervals:all(), no_of_buckets()),
+    Histo1 = [ {BucketInterval, {}} || BucketInterval <- Buckets],
+    Fun = fun ({BucketInterval, {}}) -> {BucketInterval,
+                lists:nth(random:uniform(length(ListOfAvgs)), ListOfAvgs)} end,
+    lists:map(Fun, Histo1).
+
+
+%%% @doc Checks if a given list is a valid histogram.
+%%%      Used as type_checker in tester.erl (property testing).
+-spec is_histogram([{intervals:interval(), avg()}]) -> boolean().
+is_histogram([]) ->
+    false;
+
+is_histogram(Histogram) ->
+    Buckets = intervals:split(intervals:all(), no_of_buckets()),
+    EmptyHisto = [ {BucketInterval, {}} || BucketInterval <- Buckets],
+    compare(Histogram, EmptyHisto).
+
+
+%% @doc Compares to histograms for identical keys, helper function for
+%%      is_histogram().
+-spec compare(histogram(), histogram()) -> boolean().
+compare([], []) -> true;
+
+compare([], _List) -> false;
+
+compare(_List, []) -> false;
+
+compare([H1|List1], [H2|List2]) when is_tuple(H1) andalso is_tuple(H2) ->
+        {BucketInterval1, _Avg1} = H1,
+        {BucketInterval2, _Avg2} = H2,
+        case BucketInterval1 =:= BucketInterval2 of
+            true -> compare(List1, List2);
+            false -> false
+        end.
 
 
