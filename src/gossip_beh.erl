@@ -31,7 +31,8 @@
 -type cb_state() :: any().
 -type exch_data() :: any().
 -type aggregates() :: any().
--type cb_return() :: {ok, cb_state()} | {retry, cb_state()} | {any()| cb_state()}.
+-type cb_return() :: {KeyValueList::list({list(), list()}) | discard_msg |
+    false | ok | retry | send_back | true, cb_state()}.
 -type new_leader_msg() :: {is_leader|no_leader, NewRange::intervals:interval()}.
 -type round() :: non_neg_integer().
 -type round_status() :: 'current_round' | 'old_round'.
