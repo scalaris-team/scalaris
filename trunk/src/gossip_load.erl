@@ -29,6 +29,7 @@
         min_cycles_per_round/0, max_cycles_per_round/0, round_has_converged/1,
         get_values_best/1, get_values_all/1, web_debug_info/1]).
 
+-export_type([load_info/0]).
 
 -define(SHOW, config:read(log_level)).
 
@@ -164,7 +165,7 @@ select_data(State) ->
 
 -spec select_reply_data(PData::load_data(), Ref::reference(),
     RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(), State::state()) ->
-    {'retry'|'ok', state()}.
+    {discard_msg | ok | retry | send_back, state()}.
 select_reply_data(PData, Ref, RoundStatus, Round, State) ->
 
     IsValidRound = is_valid_round(RoundStatus, Round, State),
@@ -175,7 +176,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
             {retry,State};
         init when not IsValidRound ->
             log:log(warn, "[ ~w ] Discarded Data. PData: ~w", [?MODULE, PData]),
-            {ok, State};
+            {send_back, State};
         init when RoundStatus =:= current_round ->
             Data1 = prepare_load_data(State),
             Pid = pid_groups:get_my(gossip2),
@@ -205,7 +206,8 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
     end.
 
 -spec integrate_data(QData::load_data(), RoundStatus::gossip_beh:round_status(),
-    Round::non_neg_integer(), State::state()) -> {retry|ok, state()}.
+    Round::non_neg_integer(), State::state()) ->
+    {discard_msg | ok | retry | send_back, state()}.
 integrate_data(QData, RoundStatus, Round, State) ->
     log:log(debug, "[ ~w ] Reply-Data: ~w~n", [?MODULE, QData]),
 
@@ -214,7 +216,7 @@ integrate_data(QData, RoundStatus, Round, State) ->
     case state_get(status, State) of
         _ when not IsValidRound ->
             log:log(warn, "[ ~w ] Discarded Data. QData: ~w", [?MODULE, QData]),
-            {ok, State};
+            {send_back, State};
         uninit ->
             log:log(?SHOW, "[ ~w ] integrate_data in uninit", [?MODULE]),
             {retry,State};
@@ -342,10 +344,20 @@ notify_change(leader, {MsgTag, NewRange}, State) when MsgTag =:= no_leader ->
     {ok, State};
 
 
-notify_change(exch_failure, {_MsgTag, Data, _Round}, State) ->
+notify_change(exch_failure, {_MsgTag, Data, Round}, State) ->
+    RoundFromState = state_get(round, State),
+    RoundStatus = if Round =:= RoundFromState -> current_round;
+        Round =/= RoundFromState -> old_round
+    end,
+    IsValidRound = is_valid_round(RoundStatus, Round, State),
     _ = case Data of
+        _ when not IsValidRound ->
+            log:log(?SHOW, " [ ~w ] exch_failure in invalid round", [?MODULE]),
+            do_nothing;
         undefined -> do_nothing;
-        Data -> merge_failed_exch_data(Data, State)
+        Data ->
+            log:log(debug, " [ ~w ] exch_failure in valid round", [?MODULE]),
+            merge_failed_exch_data(Data, State)
     end,
     {ok, State}.
 

@@ -359,7 +359,7 @@ on_active({web_debug_info, Requestor}=Msg, State) ->
     State;
 
 
-% received from shepherd or from on_inactive
+% received from shepherd, from on_inactive on from rejected messages
 on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
     % unpack msg if necessary
     MsgUnpacked = case Msg of
@@ -475,7 +475,7 @@ init_gossip_task(CBModule, State) ->
 
 -spec cb_call(CBFunctionName::cb_fun_name(), Arguments::list(), Msg::message(),
     CBModule::module(), State::state()) ->
-    ok | discard_msg | boolean() | {any(), any(), any()}.
+    ok | discard_msg | send_back | boolean() | {any(), any(), any()} | list({list(), list()}).
 cb_call(Fun, Args, Msg, CBModule, State) ->
     CBState = get_cbstate(CBModule, State),
     Args1 = Args ++ [CBState],
@@ -488,6 +488,14 @@ cb_call(Fun, Args, Msg, CBModule, State) ->
             msg_queue_add(Msg, State),
             set_cbstate(ReturnedCBState, CBModule, State),
             discard_msg;
+        {discard_msg, ReturnedCBState} ->
+            set_cbstate(ReturnedCBState, CBModule, State),
+            discard_msg;
+        {send_back, ReturnedCBState} ->
+            SourcePid = get_source_pid(Msg),
+            comm:send(SourcePid, {send_error, comm:this(), Msg, message_rejected}),
+            set_cbstate(ReturnedCBState, CBModule, State),
+            send_back;
         {ReturnValue, ReturnedCBState} ->
             log:log(debug, "[ Gossip ] cb_call: ReturnTuple: ~w, ReturnValue: ~w ReturendCBState: ~w", [ReturnTuple, ReturnValue, ReturnedCBState]),
             set_cbstate(ReturnedCBState, CBModule, State),
@@ -502,8 +510,9 @@ select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
     case cb_call(select_reply_data, [PData, Ref, RoundStatus, Round], Msg, CBModule, State) of
         ok -> ok;
         discard_msg ->
-            take_reply_peer(Ref, State),
-            ok
+            take_reply_peer(Ref, State), ok;
+        send_back ->
+            take_reply_peer(Ref, State), ok
     end.
 
 
@@ -788,3 +797,15 @@ table_take(Key, TableId) ->
 
 table_set(Key, Value, TableId) ->
     ?PDB:set({Key, Value}, TableId).
+
+
+-spec get_source_pid({p2p_exch, CBModule::module(), SourcePid::comm:mypid(),
+        PData::gossip_beh:exch_data(), OtherRound::non_neg_integer()} |
+    {p2p_exch_reply, CBModule::module(), SourcePid::comm:mypid(),
+        QData::gossip_beh:exch_data(), OtherRound::non_neg_integer()}) -> comm:mypid().
+get_source_pid({p2p_exch, _CBModule, SourcePid, _PData, _OtherRound}) ->
+    SourcePid;
+
+get_source_pid({p2p_exch_reply, _CBModule, SourcePid, _QData, _OtherRound}) ->
+    SourcePid.
+
