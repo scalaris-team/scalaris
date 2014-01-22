@@ -32,6 +32,7 @@
 -export_type([load_info/0]).
 
 -define(SHOW, config:read(log_level)).
+%% -define(SHOW, info).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -43,12 +44,15 @@
 -type state() :: ets:tab().
 -type state_key() :: convergence_count | leader | load_data | merged |
     prev_state | range | round | status.
--type avg() :: {float(), float()} | unknown.
+-type avg() :: {Value::float(), Weight::float()} | unknown.
 -type size() :: float() | unknown.
 -type avg_kr() :: {number(), float()} | unknown.
 -type min() :: non_neg_integer() | unknown.
 -type max() :: non_neg_integer() | unknown.
 -type merged() :: non_neg_integer().
+-type bucket() :: {Interval::intervals:interval(), Avg::avg()}.
+-type histogram() :: [bucket()] | unknown.
+
 
 % record of load data values for gossiping
 -record(load_data, {
@@ -57,7 +61,8 @@
             size_inv  = unknown :: avg(), % 1 / size
             avg_kr    = unknown :: avg_kr(), % average key range (distance between nodes in the address space)
             min       = unknown :: min(),
-            max       = unknown :: max()
+            max       = unknown :: max(),
+            histo     = unknown :: histogram()
     }).
 -type(load_data() :: #load_data{}).
 
@@ -131,6 +136,9 @@ convergence_epsilon() ->
 -spec discard_old_rounds() -> boolean().
 discard_old_rounds() ->
     false.
+
+-spec no_of_buckets() -> pos_integer().
+no_of_buckets() -> 10.
 
 
 
@@ -239,7 +247,9 @@ integrate_data_init(QData, RoundStatus, State) ->
             %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [?MODULE, _ValuesAll]),
             %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [?MODULE, _PrevLoadInfo]),
             _LoadInfo = get_load_info(State),
-            log:log(?SHOW, "[ ~w ] Data at end of cycle: ~w~n", [?MODULE, _LoadInfo]);
+            log:log(?SHOW, "[ ~w ] Data at end of cycle: ~w", [?MODULE, _LoadInfo]),
+            _Histo = load_data_get(histo, _NewData),
+            log:log(?SHOW, "[ ~w ] Histo: ~s", [?MODULE, to_string(_Histo)]);
         old_round ->
              case discard_old_rounds() of
                 true ->
@@ -258,11 +268,11 @@ integrate_data_init(QData, RoundStatus, State) ->
     {ok, State}.
 
 
--spec handle_msg(Message::{get_node_details_response, NodeDetails::node_details:node_details()},
+-spec handle_msg(Message::{get_state_response, DHTNodeState::dht_node_state:state()},
     State::state()) -> {ok, state()}.
-handle_msg({get_node_details_response, NodeDetails}, State) ->
-    Load = node_details:get(NodeDetails, load),
-    log:log(?SHOW, "[ ~w ] Load: ~w", [?MODULE, Load]),
+handle_msg({get_state_response, DHTNodeState}, State) ->
+    Load = dht_node_state:get(DHTNodeState, load),
+    log:log(warn, "[ ~w ] Load: ~w", [?MODULE, Load]),
 
     Data = state_get(load_data, State),
     Data1 = load_data_set(avg, {float(Load), 1.0}, Data),
@@ -277,10 +287,14 @@ handle_msg({get_node_details_response, NodeDetails}, State) ->
     end,
     AvgKr = calc_initial_avg_kr(state_get(range, State)),
     Data6 = load_data_set(avg_kr, AvgKr, Data5),
-    state_set(load_data, Data6, State),
 
+    % histogram
+    Histo = init_histo(DHTNodeState),
+    log:log(?SHOW,"[ ~w ] Histo: ~s", [?MODULE, to_string(Histo)]),
+    Data7 = load_data_set(histo, Histo, Data6),
+
+    state_set(load_data, Data7, State),
     NewData = prepare_load_data(State),
-
     state_set(status, init, State),
 
     % send PData to BHModule
@@ -307,6 +321,8 @@ has_converged(TargetConvergenceCount, State) ->
             _Round::non_neg_integer()}, State::state()) -> {ok, state()}.
 notify_change(new_round, NewRound, State) ->
     log:log(debug, "[ ~w ] new_round notification. NewRound: ~w", [?MODULE, NewRound]),
+    _Histo = load_data_get(histo, state_get(load_data, State)),
+    log:log(debug, "[ ~w ] Histo: ~s", [?MODULE, to_string(_Histo)]),
 
     % only replace prev round with current round if current has converged
     % cases in which current round has not converged: e.g. late joining, sleeped/paused
@@ -402,6 +418,7 @@ web_debug_info(State) ->
          {"prev_stddev",         calc_stddev(PreviousData)},
          {"prev_size_ldr",       get_current_estimate(size_inv, PreviousData)},
          {"prev_size_kr",        calc_size_kr(PreviousData)},
+         {"prev_histo",          to_string(load_data_get(histo, PreviousData))},
 
          {"cur_round",           state_get(round, State)},
          {"cur_merged",          state_get(merged, State)},
@@ -411,7 +428,8 @@ web_debug_info(State) ->
          {"cur_max",             load_data_get(max, CurrentData)},
          {"cur_stddev",          calc_stddev(CurrentData)},
          {"cur_size_ldr",        get_current_estimate(size_inv, CurrentData)},
-         {"cur_size_kr",         calc_size_kr(CurrentData)}],
+         {"cur_size_kr",         calc_size_kr(CurrentData)},
+         {"prev_histo",          to_string(load_data_get(histo, PreviousData))}],
     {KeyValueList, State}.
 
 
@@ -423,10 +441,10 @@ web_debug_info(State) ->
 
 -spec request_local_info() -> ok.
 request_local_info() ->
-    % ask for local load:
+    % get state of dht node
     DHT_Node = pid_groups:get_my(dht_node),
     EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, ?MODULE, '_'}),
-    comm:send(comm:make_global(DHT_Node), {get_node_details, EnvPid, [load]}).
+    comm:send(comm:make_global(DHT_Node), {get_state, EnvPid}).
 
 
 
@@ -516,8 +534,26 @@ update_convergence_count(OldData, NewData, State) ->
             HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon,
             Acc andalso HasConverged
     end,
-    HaveConverged = lists:foldl(Fun, true, [avg, avg2, size_inv, avg_kr]),
+    HaveConverged1 = lists:foldl(Fun, true, [avg, avg2, size_inv, avg_kr]),
+    log:log(debug, "Averages have converged: ~w", [HaveConverged1]),
 
+    % Combine the avg values of the buckets of two histograms into one tuple list
+    Combine = fun ( {Interval, AvgOld}, {Interval, AvgNew} )
+        -> {AvgOld, AvgNew} end,
+    CompList = lists:zipwith(Combine,
+        load_data_get(histo, OldData), load_data_get(histo, NewData)),
+
+    % check that all the buckets of histogram have changed less than epsilon percent
+    Fun1 = fun({OldAvg, NewAvg}, AccIn) ->
+            OldEstimate = calc_current_estimate(OldAvg),
+            NewEstimate = calc_current_estimate(NewAvg),
+            HasConverged = calc_change(OldEstimate, NewEstimate) < AvgChangeEpsilon,
+            AccIn andalso HasConverged
+    end,
+    HaveConverged2 = lists:foldl(Fun1, true, CompList),
+    log:log(debug, "Histogram has converged: ~w", [HaveConverged2]),
+
+    HaveConverged = HaveConverged1 andalso HaveConverged2,
     case HaveConverged of
         true ->
             state_update(convergence_count, fun inc/1, State);
@@ -571,18 +607,20 @@ load_data_new() ->
          (size_inv, load_data()) -> avg();
          (avg_kr, load_data()) -> avg_kr();
          (min, load_data()) -> min();
-         (max, load_data()) -> max().
+         (max, load_data()) -> max();
+         (histo, load_data()) -> histogram().
 load_data_get(_Key, unknown) -> unknown;
 
 load_data_get(Key, #load_data{avg=Avg, avg2=Avg2, size_inv=Size_inv, avg_kr=AvgKR,
-        min=Min, max=Max}) ->
+        min=Min, max=Max, histo=Histo}) ->
     case Key of
         avg -> Avg;
         avg2 -> Avg2;
         size_inv -> Size_inv;
         avg_kr -> AvgKR;
         min -> Min;
-        max -> Max
+        max -> Max;
+        histo -> Histo
     end.
 
 
@@ -598,6 +636,7 @@ get_current_estimate(Key, #load_data{avg=Avg, avg2=Avg2, size_inv=Size_inv,
         avg_kr ->  calc_current_estimate(AvgKR)
     end.
 
+
 %% get_size(Data) ->
 %%     Size_kr = calc_size_kr(Data),
 %%     Size_ldr = load_data_get(size_inv, Data),
@@ -606,6 +645,7 @@ get_current_estimate(Key, #load_data{avg=Avg, avg2=Avg2, size_inv=Size_inv,
 %%         unknown -> Size_ldr;
 %%         _       -> Size_kr
 %%     end.
+
 
 %% @doc Sets information in a load_data record.
 %%      Allowed keys are:
@@ -623,7 +663,7 @@ get_current_estimate(Key, #load_data{avg=Avg, avg2=Avg2, size_inv=Size_inv,
          (avg2, avg(), load_data()) -> load_data();
          (size_inv, avg(), load_data()) -> load_data();
          (avg_kr, avg_kr(), load_data()) -> load_data();
-         (round, current_round|prev_round, load_data()) -> load_data().
+         (histo, histogram(), load_data()) -> load_data().
 load_data_set(Key, Value, LoadData) when is_record(LoadData, load_data) ->
     case Key of
         avg -> LoadData#load_data{avg = Value};
@@ -631,7 +671,8 @@ load_data_set(Key, Value, LoadData) when is_record(LoadData, load_data) ->
         size_inv -> LoadData#load_data{size_inv = Value};
         avg_kr -> LoadData#load_data{avg_kr = Value};
         min -> LoadData#load_data{min = Value};
-        max -> LoadData#load_data{max = Value}
+        max -> LoadData#load_data{max = Value};
+        histo -> LoadData#load_data{histo = Value}
     end.
 
 
@@ -641,20 +682,23 @@ load_data_set(Key, Value, LoadData) when is_record(LoadData, load_data) ->
 prepare_load_data(State) ->
     % Averages
     Data1 = state_get(load_data, State),
-    Fun = fun (AvgType, MyData) -> prepare_avg(AvgType, MyData) end,
-    NewData = lists:foldl(Fun, Data1, [avg, avg2, size_inv, avg_kr]),
+    Fun = fun (AvgType, MyData) -> divide2(AvgType, MyData) end,
+    Data2 = lists:foldl(Fun, Data1, [avg, avg2, size_inv, avg_kr]),
 
     % Min and Max
     do_nothing,
 
-    state_set(load_data, NewData, State),
-    NewData.
+    % Histogram
+    Data3 = divide2(Data2),
+
+    state_set(load_data, Data3, State),
+    Data3.
 
 
 %% @doc Cut the average values and associated weights in half.
--spec prepare_avg(AvgType:: avg | avg2 | size_inv | avg_kr, MyData::load_data()) ->
+-spec divide2(AvgType:: avg | avg2 | size_inv | avg_kr, MyData::load_data()) ->
     load_data().
-prepare_avg(AvgType, MyData) ->
+divide2(AvgType, MyData) ->
     {Avg, Weight} = load_data_get(AvgType, MyData),
     NewAvg = Avg/2,
     NewWeight = Weight/2,
@@ -708,7 +752,10 @@ merge_load_data1(Update, OtherData, State) ->
             MyMax > OtherMax -> load_data_set(max, OtherMax, MyData3)
         end,
 
-    NewData = MyData4,
+    % Histogram
+    MyData5 = merge_histo(MyData4, OtherData),
+
+    NewData = MyData5,
     case Update of
         update ->
             state_update(merged, fun inc/1, State),
@@ -729,7 +776,6 @@ merge_avg(AvgType, Data1, Data2) ->
     NewAvg = {AvgLoad1+AvgLoad2, AvgWeight1+AvgWeight2},
     load_data_set(AvgType, NewAvg, Data1).
 
-
 %% @doc Returns the previous load data if the current load data has not
 %%      sufficiently converged, otherwise returns the current load data.
 %%      In round 0 (when no previous load data exists) always the current load
@@ -749,6 +795,73 @@ previous_or_current(State) when is_atom(State) orelse is_integer(State) ->
             false -> State
         end.
 
+
+
+%%%------------------------------- Histogram --------------------------------%%%
+
+
+-spec init_histo(DHTNodeState::dht_node_state:state()) -> histogram().
+init_histo(DHTNodeState) ->
+    DB = dht_node_state:get(DHTNodeState, db),
+    MyRange = dht_node_state:get(DHTNodeState, my_range),
+    Buckets = intervals:split(intervals:all(), no_of_buckets()),
+    [ {BucketInterval, get_load_for_interval(BucketInterval, MyRange, DB)}
+        || BucketInterval <- Buckets ].
+
+
+-spec get_load_for_interval(BucketInterval::intervals:interval(),
+    MyRange::intervals:interval(), DB::db_dht:db()) -> avg().
+get_load_for_interval(BucketInterval, MyRange, DB) ->
+    case intervals:intersection(BucketInterval, MyRange) of
+        [] -> unknown;
+        _NonEmptyIntersection ->
+            Load = db_dht:get_load(DB, BucketInterval),
+            {Load, 1}
+    end.
+
+
+-spec divide2(LoadData::load_data()) -> NewLoadData::load_data();
+             (Bucket::bucket()) -> NewBucket::bucket().
+% divide the histogram in the given load_data
+divide2(LoadData) when is_record(LoadData, load_data) ->
+    Histogram = load_data_get(histo, LoadData),
+    Histogram1 = lists:map(fun divide2/1, Histogram),
+    load_data_set(histo, Histogram1, LoadData);
+
+% divide a single bucket of a histogram
+divide2({Interval, unknown}) ->
+    {Interval, unknown};
+
+% divide a single bucket of a histogram
+divide2({Interval, {Value, Weight}}) ->
+    {Interval, {Value/2, Weight/2}}.
+
+
+-spec merge_histo(MyData::load_data(), OtherData::load_data()) -> load_data().
+merge_histo(MyData, OtherData) when is_record(MyData, load_data)
+        andalso is_record(OtherData, load_data)->
+    MyHisto = load_data_get(histo, MyData),
+    OtherHisto = load_data_get(histo, OtherData),
+    MergedHisto = lists:zipwith(fun merge_bucket/2, MyHisto, OtherHisto),
+    load_data_set(histo, MergedHisto, MyData).
+
+%%% @doc Merge two buckets of a histogram.
+-spec merge_bucket(Bucket1::bucket(), Bucket2::bucket()) -> bucket().
+merge_bucket({Key, unknown}, {Key, unknown}) ->
+    {Key, unknown};
+
+merge_bucket({Key, unknown}, {Key, Avg2}) ->
+    {Key, Avg2};
+
+merge_bucket({Key, Avg1}, {Key, unknown}) ->
+    {Key, Avg1};
+
+merge_bucket({Key, {Value1, Weight1}}, {Key, {Value2, Weight2}}) ->
+    {Key, {Value1+Value2, Weight1+Weight2}}.
+
+
+
+%%%------------------------------- Load Info --------------------------------%%%
 
 %% @doc Builds a load_info record from the given state (current or previous state)
 -spec get_load_info(State::state()) -> load_info().
@@ -877,3 +990,17 @@ calc_size_kr(Data) when is_record(Data, load_data) ->
 -spec inc(Value::integer()) -> integer().
 inc(Value) ->
     Value+1.
+
+
+-spec to_string(unknown) -> unknown;
+               (Histogram::histogram()) -> string().
+to_string(unknown) -> unknown;
+
+to_string(Histogram) when is_list(Histogram) ->
+    Values = [ calc_current_estimate(VWTuple) || { _, VWTuple } <- Histogram ],
+    Fun = fun (unknown, AccIn) -> AccIn ++ "    unknown";
+              (Value, AccIn) ->  AccIn ++ io_lib:format(" ~10.2. f", [Value]) end,
+    HistoString = lists:foldl(Fun, "[ ", Values) ++ " ]",
+    lists:flatten(HistoString).
+
+
