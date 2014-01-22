@@ -446,7 +446,7 @@ init_gossip_task(CBModule, State) ->
     state_set(cb_state, CBState, CBModule, State),
 
     % set cb_status to init
-    state_set(cb_status, unstarted, CBModule, State),
+    state_set(cb_status, started, CBModule, State),
 
     % notify cb module about leader state
     MyRange = state_get(range, State),
