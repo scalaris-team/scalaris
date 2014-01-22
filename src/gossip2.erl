@@ -42,8 +42,8 @@
 % (node availability is not that important to gossip)
 -define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, {shepherd, self()}])).
 
--define(SHOW, config:read(log_level)).
-%% -define(SHOW, info).
+%% -define(SHOW, config:read(log_level)).
+-define(SHOW, debug).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Type Definitions

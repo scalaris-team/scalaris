@@ -31,8 +31,8 @@
 
 -export_type([load_info/0]).
 
--define(SHOW, config:read(log_level)).
-%% -define(SHOW, info).
+%% -define(SHOW, config:read(log_level)).
+-define(SHOW, debug).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -247,9 +247,9 @@ integrate_data_init(QData, RoundStatus, State) ->
             %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [?MODULE, _ValuesAll]),
             %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [?MODULE, _PrevLoadInfo]),
             _LoadInfo = get_load_info(State),
-            log:log(?SHOW, "[ ~w ] Data at end of cycle: ~w", [?MODULE, _LoadInfo]),
             _Histo = load_data_get(histo, _NewData),
-            log:log(?SHOW, "[ ~w ] Histo: ~s", [?MODULE, to_string(_Histo)]);
+            log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
+                [?MODULE, to_string(_LoadInfo), to_string(_Histo)]);
         old_round ->
              case discard_old_rounds() of
                 true ->
@@ -740,16 +740,16 @@ merge_load_data1(Update, OtherData, State) ->
     MyMin = load_data_get(min, MyData2),
     OtherMin = load_data_get(min, OtherData),
     MyData3 =
-        if  MyMin =< OtherMin -> load_data_set(min, OtherMin, MyData2);
-            MyMin > OtherMin -> load_data_set(min, MyMin, MyData2)
+        if  MyMin =< OtherMin -> load_data_set(min, MyMin, MyData2);
+            MyMin > OtherMin -> load_data_set(min, OtherMin, MyData2)
         end,
 
     % Max
     MyMax = load_data_get(max, MyData3),
     OtherMax = load_data_get(max, OtherData),
     MyData4 =
-        if  MyMax =< OtherMax -> load_data_set(max, MyMax, MyData3);
-            MyMax > OtherMax -> load_data_set(max, OtherMax, MyData3)
+        if  MyMax =< OtherMax -> load_data_set(max, OtherMax, MyData3);
+            MyMax > OtherMax -> load_data_set(max, MyMax, MyData3)
         end,
 
     % Histogram
@@ -995,6 +995,18 @@ inc(Value) ->
 -spec to_string(unknown) -> unknown;
                (Histogram::histogram()) -> string().
 to_string(unknown) -> unknown;
+
+to_string(LoadInfo=#load_info{avg=Avg, stddev=Stddev, size_ldr=SizeLdr, size_kr=SizeKr,
+        min=Min, max=Max, merged=Merged}) when is_record(LoadInfo, load_info) ->
+    Labels1 = ["avg", "stddev", "size_ldr", "size_kr"],
+    Values1 = [Avg, Stddev, SizeLdr, SizeKr],
+    LVZib = lists:zip(Labels1, Values1),
+    Fun = fun({Label, unknown}, AccIn) -> AccIn ++ Label ++ ": unknown, ";
+             ({Label, Value}, AccIn) ->
+                AccIn ++ io_lib:format("~s: ~.2f, ", [Label, Value]) end,
+    L1 = lists:foldl(Fun, "", LVZib),
+    L2 = io_lib:format("min: ~w, max: ~w, merged: ~w", [Min, Max, Merged]),
+    lists:flatten(L1++L2);
 
 to_string(Histogram) when is_list(Histogram) ->
     Values = [ calc_current_estimate(VWTuple) || { _, VWTuple } <- Histogram ],
