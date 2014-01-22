@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2011, 2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -580,7 +580,7 @@ is_leader(MyRange) ->
 %%      itself or its pred changed.
 -spec rm_my_range_changed(OldNeighbors::nodelist:neighborhood(),
                           NewNeighbors::nodelist:neighborhood(),
-                          IsSlide::rm_loop:slide()) -> boolean().
+                          IsSlide::rm_loop:reason()) -> boolean().
 rm_my_range_changed(OldNeighbors, NewNeighbors, _IsSlide) ->
     nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors) orelse
         nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors).
