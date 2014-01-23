@@ -460,6 +460,13 @@ send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts) ->
                      comm_server:tcp_port(), Channel::comm:channel() | unknown)
         -> inet:socket() | fail.
 new_connection(Address, Port, MyPort, Channel) ->
+    new_connection(Address, Port, MyPort, Channel, 0).
+
+-spec new_connection(inet:ip_address(), comm_server:tcp_port(),
+                     comm_server:tcp_port(), Channel::comm:channel() | unknown,
+                     non_neg_integer())
+        -> inet:socket() | fail.
+new_connection(Address, Port, MyPort, Channel, Retries) ->
     case gen_tcp:connect(Address, Port, [binary, {packet, 4}]
                          ++ comm_server:tcp_options(Channel),
                          config:read(tcp_connect_timeout)) of
@@ -483,12 +490,16 @@ new_connection(Address, Port, MyPort, Channel) ->
                     log:log(error,"[ CC ~p (~p) ] reconnect because socket is ~.0p",
                             [self(), pid_groups:my_pidname(), Reason]),
                     gen_tcp:close(Socket),
-                    new_connection(Address, Port, MyPort, Channel)
+                    new_connection(Address, Port, MyPort, Channel, Retries + 1)
             end;
         {error, Reason} ->
             log:log(info,"[ CC ~p (~p) ] couldn't connect (~.0p)",
                     [self(), pid_groups:my_pidname(), Reason]),
-            fail
+            case Retries >= 3 of
+                true -> fail;
+                _    -> timer:sleep(config:read(tcp_connect_timeout) * (Retries + 1)),
+                        new_connection(Address, Port, MyPort, Channel, Retries + 1)
+            end
     end.
 
 -spec close_connection(Socket::inet:socket(), State::state()) -> state().
