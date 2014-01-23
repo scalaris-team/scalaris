@@ -30,6 +30,9 @@
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).
 
+-define(NUM_KEEP_MSGS, 10).
+-define(KEEP_MSG_OR_TAG, tag).
+
 -compile({inline, [dest_ip/1, dest_port/1, local_listen_port/1, channel/1,
                    socket/1, set_socket/2,
                    started/1,
@@ -50,7 +53,8 @@
                       OQueue::[comm:send_options()]}.
 -type stat_report() :: {RcvCnt::non_neg_integer(), RcvBytes::non_neg_integer(),
                         SendCnt::non_neg_integer(), SendBytes::non_neg_integer()}.
--type time_last_msg_sent() :: erlang:timestamp().
+-type time_last_msg() :: erlang:timestamp().
+-type msg_or_tag() :: comm:message() | comm:msg_tag().
 
 -type state() ::
     {DestIP                  :: inet:ip_address(),
@@ -66,12 +70,13 @@
      DesiredBundleSize       :: non_neg_integer(),
      MsgsSinceBundleStart    :: non_neg_integer(),
      LastStatReport          :: stat_report(),
-     TimeLastMsgSent         :: time_last_msg_sent(),
+     TimeLastMsgSent         :: time_last_msg(),
+     TimeLastMsgReceived     :: time_last_msg(),
      SentMsgCountSession     :: non_neg_integer(),
      ReceivedMsgCountSession :: non_neg_integer(),
      SessionCount            :: non_neg_integer(),
-     LastMsgSent             :: comm:message() | none,
-     LastMsgReceived         :: comm:message() | none
+     LastMsgSent             :: [msg_or_tag()],
+     LastMsgReceived         :: [msg_or_tag()]
     }.
 -type message() ::
     {send, DestPid::pid(), Message::comm:message(), Options::comm:send_options()} |
@@ -164,14 +169,14 @@ on({tcp, Socket, Data}, State) ->
                             ok, Message),
                 %% may fail, when tcp just closed
                 _ = inet:setopts(Socket, [{active, once}]),
-                state_after_receiving(State, lists:nth(1, Message));
+                save_n_msgs(Message, fun set_last_msg_received/2, State);
             {?deliver, Process, Message} ->
                 ?TRACE("Received message ~.0p", [Message]),
                 ?LOG_MESSAGE_SOCK('rcv', Data, byte_size(Data), channel(State)),
                 forward_msg(Process, Message, State),
                 %% may fail, when tcp just closed
                 _ = inet:setopts(Socket, [{active, once}]),
-                state_after_receiving(State, Message);
+                save_n_msgs(Message, fun set_last_msg_received/2, State);
             {user_close} ->
                 log:log(warn,"[ CC ~p (~p) ] tcp user_close request", [self(), pid_groups:my_pidname()]),
                 close_connection(Socket, State);
@@ -222,11 +227,9 @@ on({check_idle}, State) ->
 on({web_debug_info, Requestor}, State) ->
     Now = os:timestamp(),
     TimeLastMsgSent = time_last_msg_sent(State),
-    SecondsAgo =
-        case TimeLastMsgSent of
-            {0,0,0} -> infinity;
-            _ ->  timer:now_diff(Now, TimeLastMsgSent) div 1000000
-        end,
+    TimeLastMsgReceived = time_last_msg_received(State),
+    SecondsAgoSent = seconds_ago(Now, TimeLastMsgSent),
+    SecondsAgoReceived = seconds_ago(Now, TimeLastMsgReceived),
     Runtime = timer:now_diff(Now, started(State)) / 1000000,
     {SentPerS, ReceivedPerS} =
         if Runtime =< 0 -> {"n/a", "n/a"};
@@ -295,11 +298,13 @@ on({web_debug_info, Requestor}, State) ->
          {"recv total bytes",
           webhelpers:safe_html_string("~p", [RcvBytes])},
          {"time last message sent",
-          webhelpers:safe_html_string("~p sec ago", [SecondsAgo])},
+          webhelpers:safe_html_string("~p sec ago", [SecondsAgoSent])},
+         {"time last message received",
+          webhelpers:safe_html_string("~p sec ago", [SecondsAgoReceived])},
          {"last message sent:",
-          webhelpers:html_pre("~50p", [last_msg_sent(State)])},
+          webhelpers:html_pre("~0p", [last_msg_sent(State)])},
          {"last message received",
-          webhelpers:html_pre("~50p", [last_msg_received(State)])},
+          webhelpers:html_pre("~0p", [last_msg_received(State)])},
          {"session variables:", ""},
          {"num sessions",
           webhelpers:safe_html_string("~p", [session_count(State)])},
@@ -411,7 +416,7 @@ send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts) ->
         ok ->
             ?TRACE("~.0p Sent message ~.0p~n",
                    [pid_groups:my_pidname(), Message]),
-            State2 = state_after_sending(State, Message),
+            State2 = save_n_msgs(Message, fun set_last_msg_sent/2, State),
             %% only close in case of no_keep_alive if the
             %% connection was solely initiated for this send
             case lists:member({no_keep_alive}, Options)
@@ -542,9 +547,10 @@ state_new(DestIP, DestPort, LocalListenPort, Channel, Socket) ->
      _DesiredBundleSize = 0, _MsgsSinceBundleStart = 0,
      _LastStatReport = {0, 0, 0, 0},
      _TimeLastMsgSent = {0, 0, 0},
+     _TimeLastMsgReceived = {0, 0, 0},
      _SentMsgCountSession = 0, _ReceivedMsgCountSession = 0,
      _SessionCount = 0,
-     _LastMsgSent = none, _LastMsgReceived = none
+     _LastMsgsSent = [], _LastMsgsReceived = []
     }.
 
 -spec dest_ip(state()) -> inet:ip_address().
@@ -618,51 +624,74 @@ time_last_msg_sent(State) -> element(14, State).
 -spec set_time_last_msg_sent(state()) -> state().
 set_time_last_msg_sent(State) -> setelement(14, State, os:timestamp()).
 
+-spec time_last_msg_received(state()) -> erlang:timestamp().
+time_last_msg_received(State) -> element(15, State).
+-spec set_time_last_msg_received(state()) -> state().
+set_time_last_msg_received(State) -> setelement(15, State, os:timestamp()).
+
 -spec s_msg_count_session(state()) -> non_neg_integer().
-s_msg_count_session(State)         -> element(15, State).
+s_msg_count_session(State)         -> element(16, State).
 -spec inc_s_msg_count_session(state(), pos_integer()) -> state().
-inc_s_msg_count_session(State, N)  -> setelement(15, State, s_msg_count_session(State) + N).
+inc_s_msg_count_session(State, N)  -> setelement(16, State, s_msg_count_session(State) + N).
 
 -spec r_msg_count_session(state()) -> non_neg_integer().
-r_msg_count_session(State)         -> element(16, State).
+r_msg_count_session(State)         -> element(17, State).
 -spec inc_r_msg_count_session(state(), pos_integer()) -> state().
-inc_r_msg_count_session(State, N)  -> setelement(16, State, r_msg_count_session(State) + N).
+inc_r_msg_count_session(State, N)  -> setelement(17, State, r_msg_count_session(State) + N).
 
 -spec reset_msg_counters(state()) -> state().
-reset_msg_counters(State) -> State1 = setelement(15, State, 0),
-                             State2 = setelement(16, State1, 0),
+reset_msg_counters(State) -> State1 = setelement(16, State, 0),
+                             State2 = setelement(17, State1, 0),
                              inc_session_count(State2).
 
 -spec session_count(state()) -> state().
-session_count(State) -> element(17, State).
+session_count(State) -> element(18, State).
 -spec inc_session_count(state()) -> state().
-inc_session_count(State) -> setelement(17, State, session_count(State) + 1).
+inc_session_count(State) -> setelement(18, State, session_count(State) + 1).
 
--spec last_msg_sent(state()) -> comm:message().
-last_msg_sent(State) -> element(18, State).
--spec set_last_msg_sent(state(), comm:message()) -> state().
-set_last_msg_sent(State, Msg) -> setelement(18, State, Msg).
-
--spec last_msg_received(state()) -> comm:message().
-last_msg_received(State) -> element(19, State).
--spec set_last_msg_received(state(), comm:message()) -> state().
-set_last_msg_received(State, Msg) -> setelement(19, State, Msg).
-
--spec state_after_sending(state(), comm:message() | [{pid(), comm:message()}]) -> state().
-state_after_sending(State, Msg) ->
+-spec last_msg_sent(state()) -> [comm:message()].
+last_msg_sent(State) -> element(19, State).
+-spec set_last_msg_sent(state(), [comm:message()]) -> state().
+set_last_msg_sent(State, Msg) ->
+    OldList = last_msg_sent(State),
+    NumToKeep = erlang:max(?NUM_KEEP_MSGS - length(Msg), 0),
+    NewList = Msg ++ lists:sublist(OldList, NumToKeep),
     State2 = set_time_last_msg_sent(State),
-    case Msg of % bundle or plain message
-        [{_, M}|_T] ->
-            StateTemp = inc_s_msg_count(State2, length(Msg)),
-            set_last_msg_sent(StateTemp, M);
-        Msg ->
-            StateTemp = inc_s_msg_count(State2),
-            set_last_msg_sent(StateTemp, Msg)
+    State3 = inc_s_msg_count(State2, length(Msg)),
+    setelement(19, State3, NewList).
+
+-spec last_msg_received(state()) -> [comm:message()].
+last_msg_received(State) -> element(20, State).
+-spec set_last_msg_received(state(), [comm:message()]) -> state().
+set_last_msg_received(State, Msg) ->
+    OldList = last_msg_received(State),
+    NumToKeep = erlang:max(?NUM_KEEP_MSGS - length(Msg), 0),
+    NewList = Msg ++ lists:sublist(OldList, NumToKeep),
+    State2 = set_time_last_msg_received(State),
+    State3 = inc_r_msg_count(State2, length(Msg)),
+    setelement(20, State3, NewList).
+
+-spec save_n_msgs([msg_or_tag()], fun((state(), [msg_or_tag()]) -> state()), state()) -> state().
+save_n_msgs(Msg, SaveFun, State) when is_tuple(Msg) ->
+    save_n_msgs([{single, Msg}], SaveFun, State);
+save_n_msgs(Msgs, SaveFun, State) when is_list(Msgs) ->
+    NumElements = erlang:min(?NUM_KEEP_MSGS, length(Msgs)),
+    List = [get_msg_tag(M) || M <- lists:sublist(Msgs, NumElements)],
+    SaveFun(State, List).
+
+-spec get_msg_tag(msg_or_tag()) -> comm:msg_tag() | comm:message().
+get_msg_tag(Msg) ->
+    {_Pid, ActualMessage} = Msg,
+    ?IIF(?KEEP_MSG_OR_TAG =:= tag,
+         util:extint2atom(comm:get_msg_tag(ActualMessage)),
+         setelement(1, ActualMessage, util:extint2atom(element(1, ActualMessage)))).
+
+-spec seconds_ago(time_last_msg(), time_last_msg()) -> non_neg_integer().
+seconds_ago(Now, Time) ->
+    case Time of
+        {0,0,0} -> infinity;
+        _ -> timer:now_diff(Now, Time) div 1000000
     end.
--spec state_after_receiving(state(), comm:message()) -> state().
-state_after_receiving(State, Msg) ->
-    State2 = set_last_msg_received(State, Msg),
-    inc_r_msg_count(State2).
 
 -spec start_idle_check() -> ok.
 start_idle_check() ->
