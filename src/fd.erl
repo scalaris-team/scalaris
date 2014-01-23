@@ -1,4 +1,4 @@
-% @copyright 2007-2013 Zuse Institute Berlin
+% @copyright 2007-2014 Zuse Institute Berlin
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
 %  you may not use this file except in compliance with the License.
@@ -35,6 +35,9 @@
 -export([report_graceful_leave/0]).
 %% gen_server & gen_component callbacks
 -export([start_link/1, init/1, on/2]).
+
+%% debug purposes
+-export([subscriptions/0]).
 
 -type cookie() :: {pid(), '$fd_nil'} | any().
 -type state() :: ok.
@@ -291,3 +294,28 @@ forward_to_hbs(Pid, Msg) ->
                  Entry -> element(2, Entry)
              end,
     comm:send_local(HBSPid, Msg).
+
+%%@doc show subscriptions
+-spec subscriptions() -> ok.
+subscriptions() ->
+    FD = my_fd_pid(),
+    case FD of
+        failed -> [];
+        FD ->
+            {dictionary, Dictionary} = process_info(FD, dictionary),
+            All_HBS = [ X || {{_,_,fd},{{_,_,fd},X}} <- Dictionary ],
+            io:format("Remote nodes watched: ~p~n", [length(All_HBS)]),
+            [ begin
+                  io:format("fd_hbs: ~p~n", [pid_groups:group_and_name_of(X)]),
+                  {dictionary, FD_HBS_Dict} = process_info(X, dictionary),
+                  [ begin
+                        io:format("  ~p ~p ~p~n",
+                                  [pid_groups:group_and_name_of(LSub),
+                                   Cookies, Count])
+                    end
+                    || {{LSub,{_,_,_}},
+                        {{LSub,{_,_,_}}, Cookies, Count}}
+                           <- FD_HBS_Dict ]
+              end || X <- All_HBS ]
+    end,
+    ok.
