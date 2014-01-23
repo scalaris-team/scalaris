@@ -402,14 +402,14 @@ send_or_bundle(DestPid, Message, Options, State) ->
 send(Pid, Message, Options, State) ->
     DeliverMsg = {?deliver, Pid, Message},
     BinaryMessage = ?COMM_COMPRESS_MSG(DeliverMsg, State),
-    send_internal(Pid, Message, Options, BinaryMessage, State, 0).
+    send_internal(Pid, Message, Options, BinaryMessage, State, 0, 0).
 
 -spec send_internal
-    (pid(), comm:message(), comm:send_options(), BinMsg::binary(), state(), Timeouts::non_neg_integer())
+    (pid(), comm:message(), comm:send_options(), BinMsg::binary(), state(), Timeouts::non_neg_integer(), Errors::non_neg_integer())
         -> state();
-    (?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], BinMsg::binary(), state(), Timeouts::non_neg_integer())
+    (?unpack_msg_bundle, [{pid(), comm:message()}], [comm:send_options()], BinMsg::binary(), state(), Timeouts::non_neg_integer(), Errors::non_neg_integer())
         -> state().
-send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts) ->
+send_internal(Pid, Message, Options, BinaryMessage, State, Timeouts, Errors) ->
     Socket = socket(State),
     ?LOG_MESSAGE_SOCK('send', Message, byte_size(BinaryMessage), channel(State)),
     case gen_tcp:send(Socket, BinaryMessage) of
@@ -420,23 +420,30 @@ send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts) ->
             %% only close in case of no_keep_alive if the
             %% connection was solely initiated for this send
             case lists:member({no_keep_alive}, Options)
-                     andalso s_msg_count_session(State2) =< 1 of
+                     andalso s_msg_count_session(State) =< 1 of
                 true -> close_connection(Socket, State2);
                 _    -> State2
             end;
         {error, closed} ->
-            Address = dest_ip(State),
-            Port = dest_port(State),
-            report_bundle_error(Options, {Address, Port, Pid}, Message,
-                                socket_closed),
-            log:log(warn,"[ CC ~p (~p) ] sending closed connection", [self(), pid_groups:my_pidname()]),
-            close_connection(Socket, State);
+            case Errors < 1 of
+                true ->
+                    State2 = close_connection(Socket, State),
+                    State3 = set_socket(State2, reconnect(State2)),
+                    send_internal(Pid, Message, Options, BinaryMessage, State3, Timeouts, Errors + 1);
+                _    ->
+                    Address = dest_ip(State),
+                    Port = dest_port(State),
+                    report_bundle_error(Options, {Address, Port, Pid}, Message,
+                                        socket_closed),
+                    log:log(warn,"[ CC ~p (~p) ] sending closed connection", [self(), pid_groups:my_pidname()]),
+                    close_connection(Socket, State)
+            end;
         {error, timeout} ->
             if  % retry 5 times
-                NumberOfTimeouts < 5 ->
+                Timeouts < 5 ->
                     log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). retrying.",
                             [self(), pid_groups:my_pidname(), timeout]),
-                    send_internal(Pid, Message, Options, BinaryMessage, State, NumberOfTimeouts + 1);
+                    send_internal(Pid, Message, Options, BinaryMessage, State, Timeouts + 1, Errors);
                 true ->
                     log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). retried 5 times, now closing the connection.",
                             [self(), pid_groups:my_pidname(), timeout]),
@@ -501,6 +508,14 @@ new_connection(Address, Port, MyPort, Channel, Retries) ->
                         new_connection(Address, Port, MyPort, Channel, Retries + 1)
             end
     end.
+
+-spec reconnect(state()) -> inet:socket() | fail.
+reconnect(State) ->
+    Address = dest_ip(State),
+    Port = dest_port(State),
+    MyPort = local_listen_port(State),
+    Channel = channel(State),
+    new_connection(Address, Port, MyPort, Channel, 0).
 
 -spec close_connection(Socket::inet:socket(), State::state()) -> state().
 close_connection(Socket, State) ->
