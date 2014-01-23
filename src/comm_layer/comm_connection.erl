@@ -454,13 +454,20 @@ send_internal(Pid, Message, Options, BinaryMessage, State, Timeouts, Errors) ->
                     close_connection(Socket, State)
             end;
         {error, Reason} ->
-            Address = dest_ip(State),
-            Port = dest_port(State),
-            report_bundle_error(Options, {Address, Port, Pid}, Message,
-                                Reason),
-            log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). closing connection",
-                    [self(), pid_groups:my_pidname(), Reason]),
-            close_connection(Socket, State)
+            case Errors < 1 of
+                true ->
+                    State2 = close_connection(Socket, State),
+                    State3 = set_socket(State2, reconnect(State2)),
+                    send_internal(Pid, Message, Options, BinaryMessage, State3, Timeouts, Errors + 1);
+                _    ->
+                    Address = dest_ip(State),
+                    Port = dest_port(State),
+                    report_bundle_error(Options, {Address, Port, Pid}, Message,
+                                        Reason),
+                    log:log(error,"[ CC ~p (~p) ] couldn't send message (~.0p). closing connection",
+                            [self(), pid_groups:my_pidname(), Reason]),
+                    close_connection(Socket, State)
+            end
     end.
 
 -spec new_connection(inet:ip_address(), comm_server:tcp_port(),
