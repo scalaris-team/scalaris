@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,7 +13,8 @@
 %   limitations under the License.
 
 %% @author Thorsten Schuett <schuett@zib.de>
-%% @doc Handling all scalaris nodes inside an erlang VM.
+%% @doc Handling all Scalaris nodes inside an Erlang VM and Erlang VM wide
+%%      maintenance tasks.
 %% @version $Id$
 -module(service_per_vm).
 -author('schuett@zib.de').
@@ -35,6 +36,7 @@
     {deregister_dht_node, PidToRemove :: comm:mypid()} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()} |
     {delete_node, SupPid::pid() | atom(), SupId::pid() | term()} |
+    {trigger_gc} | %% only internally inside the process
     {hi}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -90,6 +92,7 @@ start_link(ServiceGroup) ->
 
 -spec init(any()) -> state().
 init(_Arg) ->
+    msg_delay:send_local(10, self(), {trigger_gc}),
     [].
 
 -spec on(Message :: message(), State :: state()) -> state().
@@ -136,7 +139,21 @@ on({add_node, Options}, State) ->
     _ = admin:add_node(Options),
     State;
 
-% message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
+on({trigger_gc}, State) ->
+    %% Periodically garbage collect all processes of the VM.  This
+    %% helps especially when running several VMs on the same machine.
+    %% Otherwise the Erlang VM will not release allocated memory and
+    %% the operating system may start swapping virtual memory,
+    %% although the Erlang VM could easily reduce its memory footprint
+    %% and swapping would not be necessary.  With periodic garbage
+    %% collection, Erlang becomes much more cooperative with other
+    %% processes running on the same machine.
+    msg_delay:send_local(10, self(), {trigger_gc}),
+    %% io:format("Garbage collect all processes~n"),
+    [garbage_collect(X) || X <- processes()],
+    State;
+
+%% message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
 on({hi}, State) ->
     State.
 
