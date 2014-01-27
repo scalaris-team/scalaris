@@ -36,8 +36,8 @@
 -compile({inline, [dest_ip/1, dest_port/1, local_listen_port/1, channel/1,
                    socket/1, set_socket/2,
                    started/1,
-                   s_msg_count/1, inc_s_msg_count/1,
-                   r_msg_count/1, inc_r_msg_count/1,
+                   s_msg_count/1, inc_s_msg_count/2,
+                   r_msg_count/1, inc_r_msg_count/2,
                    msg_queue/1, set_msg_queue/2,
                    msg_queue_len/1, set_msg_queue_len/2,
                    desired_bundle_size/1, set_desired_bundle_size/2,
@@ -609,16 +609,12 @@ started(State)                 -> element(6, State).
 
 -spec s_msg_count(state()) -> non_neg_integer().
 s_msg_count(State)             -> element(7, State).
--spec inc_s_msg_count(state()) -> state().
-inc_s_msg_count(State) -> inc_s_msg_count(State, 1).
 -spec inc_s_msg_count(state(), pos_integer()) -> state().
 inc_s_msg_count(State, N)      -> State2 = setelement(7, State, s_msg_count(State) + N),
                                   inc_s_msg_count_session(State2, N).
 
 -spec r_msg_count(state()) -> non_neg_integer().
 r_msg_count(State)             -> element(8, State).
--spec inc_r_msg_count(state()) -> state().
-inc_r_msg_count(State)         -> inc_r_msg_count(State, 1).
 -spec inc_r_msg_count(state(), pos_integer()) -> state().
 inc_r_msg_count(State, N)      -> State2 = setelement(8, State, r_msg_count(State) + N),
                                   inc_r_msg_count_session(State2, N).
@@ -677,7 +673,7 @@ reset_msg_counters(State) -> State1 = setelement(16, State, 0),
                              State2 = setelement(17, State1, 0),
                              inc_session_count(State2).
 
--spec session_count(state()) -> state().
+-spec session_count(state()) -> non_neg_integer().
 session_count(State) -> element(18, State).
 -spec inc_session_count(state()) -> state().
 inc_session_count(State) -> setelement(18, State, session_count(State) + 1).
@@ -704,7 +700,7 @@ set_last_msg_received(State, Msg) ->
     State3 = inc_r_msg_count(State2, length(Msg)),
     setelement(20, State3, NewList).
 
--spec save_n_msgs([msg_or_tag()], fun((state(), [msg_or_tag()]) -> state()), state()) -> state().
+-spec save_n_msgs([msg_or_tag()] | msg_or_tag(), fun((state(), [msg_or_tag()]) -> state()), state()) -> state().
 save_n_msgs(Msg, SaveFun, State) when is_tuple(Msg) ->
     save_n_msgs([{single, Msg}], SaveFun, State);
 save_n_msgs(Msgs, SaveFun, State) when is_list(Msgs) ->
@@ -715,7 +711,7 @@ save_n_msgs(Msgs, SaveFun, State) when is_list(Msgs) ->
 -spec get_msg_tag(msg_or_tag()) -> comm:msg_tag() | comm:message().
 get_msg_tag(Msg) ->
     {_Pid, ActualMessage} = Msg,
-    ?IIF(?KEEP_MSG_OR_TAG =:= tag,
+    ?IIF(?KEEP_MSG_OR_TAG =/= tag,
          util:extint2atom(comm:get_msg_tag(ActualMessage)),
          setelement(1, ActualMessage, util:extint2atom(element(1, ActualMessage)))).
 
