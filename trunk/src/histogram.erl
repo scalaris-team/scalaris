@@ -54,9 +54,10 @@ add(Value, Histogram) ->
 -spec add(Value::float(), Count::pos_integer(), Histogram::histogram()) -> histogram().
 add(_Value, _Count, Histogram = #histogram{size = 0}) ->
     Histogram;
-add(Value, Count, Histogram = #histogram{data = OldData, data_size = OldDataSize}) ->
-    resize(Histogram#histogram{data = insert({Value, Count}, OldData),
-                               data_size = OldDataSize + 1}).
+add(Value, Count, Histogram = #histogram{data = OldData, data_size = _OldDataSize}) ->
+    DataNew = insert({Value, Count}, OldData),
+    resize(Histogram#histogram{data = DataNew,
+                               data_size = length(DataNew)}).
 
 -spec get_data(Histogram::histogram()) -> data_list().
 get_data(Histogram) ->
@@ -88,6 +89,8 @@ resize(Histogram = #histogram{data = Data, size = ExpectedSize, data_size = Actu
     end.
 
 -spec insert(Value::data_item(), Data::data_list()) -> data_list().
+insert({Value, _}, [{Value2, Count} | Rest]) when Value =:= Value2 ->
+    [{Value, Count + 1} | Rest];
 insert({Value, _} = DataItem, [{Value2, _} | _] = Data) when Value < Value2 ->
     [DataItem | Data];
 insert(DataItem, [DataItem2 | Rest]) ->
