@@ -286,7 +286,7 @@ get_last_n(Table, Key, N) ->
 web_debug_info_dump_fun(DB, From_us, To_us, Value) ->
     From = calendar:now_to_universal_time(util:us2timestamp(From_us)),
     To = calendar:now_to_universal_time(util:us2timestamp(To_us)),
-    Diff_in_s = (To_us - From_us) div 1000,
+    Diff_in_s = (To_us - From_us) div 1000000,
     ValueStr =
         case rrd:get_type(DB) of
             {Type, Unit} when Type =:= timing orelse Type =:= timing_with_hist ->
