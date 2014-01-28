@@ -1,4 +1,4 @@
-% @copyright 2008-2013 Zuse Institute Berlin
+% @copyright 2008-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -300,7 +300,7 @@ get_dump() ->
 -spec get_dump_bw() -> {Received::[{atom(), float(), float()}], Sent::[{atom(), float(), float()}]}.
 get_dump_bw() ->
     {Received, Sent, StartTime} = get_dump(),
-    RunTime = timer:now_diff(erlang:now(), StartTime),
+    RunTime = timer:now_diff(os:timestamp(), StartTime),
     AggFun =
         fun(Map) ->
                 [{Tag, Size / RunTime, Count / RunTime} || {Tag, {Size, Count}} <- gb_trees:to_list(Map)]

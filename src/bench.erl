@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -143,7 +143,7 @@ manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
     Print = lists:member(print, Options),
     ServerList = util:get_proc_in_vms(bench_server),
     %% io:format("~p~n", [ServerList]),
-    Before = erlang:now(),
+    Before = os:timestamp(),
     _ = [comm:send(Server, Message) || Server <- ServerList],
     fd:subscribe(ServerList),
     ?IIF(Print, io:format("Collecting results... ~n"), ok),
@@ -156,7 +156,7 @@ manage_run_internal(ThreadsPerVM, Iterations, Options, Message) ->
                                         Mean + Iterations / element(3, Stats) * 1000000.0 * ThreadsPerVM,
                                         Max + Iterations / element(2, Stats) * 1000000.0 * ThreadsPerVM}
                      end, {0.0, 0.0, 0.0}, Statistics),
-    After = erlang:now(),
+    After = os:timestamp(),
     RunTime = timer:now_diff(After, Before),
     NrServers = length(ServerList),
     WallClockTime = RunTime / 1000000.0,

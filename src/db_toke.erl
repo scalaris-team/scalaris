@@ -1,4 +1,4 @@
-% @copyright 2013 Zuse Institute Berlin,
+% @copyright 2013-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 %% @doc    DB back-end using tokyo cabinet via toke.
 %%         Two keys K and L are considered equal if they match, i.e. K =:= L
 %%
-%%         To use this backend you have to install 
-%%         Tokyo Cabinet [http://fallabs.com/tokyocabinet] and 
+%%         To use this backend you have to install
+%%         Tokyo Cabinet [http://fallabs.com/tokyocabinet] and
 %%         Toke [http://hg.opensource.lshift.net/toke/] (a simple Erlang
 %%         wrapper for Tokyo Cabinets hash API tchdb*).
-%%         For development Tokyo Cabinet V1.4.48-1 and the at-the-time 
+%%         For development Tokyo Cabinet V1.4.48-1 and the at-the-time
 %%         latest commit to the toke-repository (f178e55bb6b5) was used.
 %%
 %%         After building and installing Tokyo Cabinet and toke
@@ -77,7 +77,7 @@ new(_DBName) ->
         {error, eexist} -> ok;
         {error, Error} -> erlang:exit({db_toke, 'cannot create dir', FullDir, Error})
     end,
-    {_Now_Ms, _Now_s, Now_us} = Now = erlang:now(),
+    {_Now_Ms, _Now_s, Now_us} = Now = os:timestamp(),
     {{Year, Month, Day}, {Hour, Minute, Second}} =
         calendar:now_to_local_time(Now),
     FileBaseName = util:make_filename(

@@ -1,4 +1,4 @@
-% @copyright 2008-2013 Zuse Institute Berlin
+% @copyright 2008-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ dump() ->
 %%--------------------------------------------------------------------
 -spec init(list()) -> {ok, #state{}}.
 init([]) ->
-    {ok, #state{start=erlang:now(), received=gb_trees:empty(), sent=gb_trees:empty()}}.
+    {ok, #state{start=os:timestamp(), received=gb_trees:empty(), sent=gb_trees:empty()}}.
 
 %%--------------------------------------------------------------------
 %% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |

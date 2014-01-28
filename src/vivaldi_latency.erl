@@ -1,4 +1,4 @@
-%  @copyright 2009-2012 Zuse Institute Berlin
+%  @copyright 2009-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@
 on({ping_reply, {pong, vivaldi}, Count},
    {Owner, RemotePid, Token, Start, Count, Latencies})
   when Start =/= unknown ->
-    Stop = erlang:now(),
+    Stop = os:timestamp(),
     NewLatencies = [timer:now_diff(Stop, Start) | Latencies],
     case Count =:= config:read(vivaldi_count_measurements) of
         true ->
@@ -75,7 +75,7 @@ on({start_ping}, {Owner, RemotePid, Token, _, Count, Latencies}) ->
     NewCount = Count + 1,
     SPid = comm:reply_as(comm:this(), 2, {ping_reply, '_', NewCount}),
     comm:send(RemotePid, {ping, SPid}, ?SEND_OPTIONS),
-    {Owner, RemotePid, Token, erlang:now(), NewCount, Latencies};
+    {Owner, RemotePid, Token, os:timestamp(), NewCount, Latencies};
 
 on({shutdown}, _State) ->
     log:log(info, "shutdown vivaldi_latency due to timeout", []),
