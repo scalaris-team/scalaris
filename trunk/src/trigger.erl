@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Nico Kruber <kruber@zib.de>
-%% @doc    Generic trigger for (parameterized) modules.
+%% @doc    Generic trigger for modules.
 %%
 %% Can be used by a module in order to get a configurable
 %% message (by default <code>{trigger}</code>) in intervals defined by a given
