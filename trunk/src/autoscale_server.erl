@@ -20,7 +20,7 @@
 %%      server runs in the same VM as mgmt_server (needs to be set in config).
 %%
 %%      {autoscale_server_plot_path, PATH} needs to be set in order to write
-%%      the collected data to the file system (see on({write_to_file})). 
+%%      the collected data to the file system (see on({write_to_file})).
 %% @end
 %% @version $Id$
 -module(autoscale_server).
@@ -74,7 +74,7 @@ on({write_to_file}, {PlotData}) ->
                     lists:foreach(
                         fun({Timestamp, Value}) ->
                             io:format(File, "~p ~p~n", [Timestamp, Value])
-                        end, Data),          
+                        end, Data),
                     file:close(File)
                 end, dict:to_list(PlotData))
     end,
@@ -88,10 +88,10 @@ log(Key, Value) ->
 
 -spec log(KeyValueList :: [{Key :: atom(), Value :: term()}]) -> ok.
 log(KeyValueList) when erlang:is_list(KeyValueList)  ->
-    {Ms, S, _Us} = erlang:now(),
+    {Ms, S, _Us} = os:timestamp(),
     NowMs = Ms*1000000+S,
     MgmtServer = config:read(mgmt_server),
-    
+
     lists:foreach(
       fun({Key, Value}) ->
               comm:send(MgmtServer, {collect, Key, NowMs, Value},

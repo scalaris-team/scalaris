@@ -159,9 +159,9 @@ on({hi}, State) ->
 
 -spec get_round_trip(GPid::comm:mypid(), Iterations::pos_integer()) -> float().
 get_round_trip(GPid, Iterations) ->
-    Start = erlang:now(),
+    Start = os:timestamp(),
     get_round_trip_helper(GPid, Iterations),
-    End = erlang:now(),
+    End = os:timestamp(),
     timer:now_diff(End, Start) / Iterations.
 
 -spec get_round_trip_helper(GPid::comm:mypid(), Iterations::pos_integer()) -> ok.

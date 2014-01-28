@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ on({bench, Op, Threads, Iterations, Owner, Param}, State) ->
                 read_read ->
                     bench_fun:read_read(Iterations)
             end,
-    BenchStart = erlang:now(),
+    BenchStart = os:timestamp(),
     run_threads(Threads, Bench),
     State#state{bench_start = BenchStart,
                 bench_owner = Owner,
@@ -89,7 +89,7 @@ on({done, Time, Aborts},
                  AggAborts + Aborts}
         end,
     if BenchThreads =:= 1 ->
-           RepTime = timer:now_diff(erlang:now(), BenchStart),
+           RepTime = timer:now_diff(os:timestamp(), BenchStart),
            {NewN, RepMeanTime, NewM2, RepMinTime, RepMaxTime, RepAborts} = NewBenchData,
            RepVariance = if NewN =:= 1 -> 0.0;
                             true       -> NewM2 / (NewN - 1)

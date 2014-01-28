@@ -1,4 +1,4 @@
-% @copyright 2012 Zuse Institute Berlin
+% @copyright 2012-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -54,7 +54,7 @@ start_link(CommLayerGroup) ->
 %% @doc initialize: return initial state.
 -spec init([]) -> state().
 init([]) ->
-    {erlang:now(), 0, 0, 0, 0}.
+    { os:timestamp(), 0, 0, 0, 0}.
 
 %% @doc message handler
 -spec on(message(), State::state()) -> state().
@@ -72,7 +72,7 @@ on({get_stats, Pid},
     State;
 
 on({web_debug_info, Requestor}, State = {StartTime, RcvCnt, RcvBytes, SendCnt, SendBytes}) ->
-    Now = erlang:now(),
+    Now = os:timestamp(),
     Runtime = timer:now_diff(Now, StartTime) / 1000000,
     {SendCntPerS, SendBytesPerS, RcvCntPerS, RcvBytesPerS} =
         if Runtime =< 0 -> {"n/a", "n/a", "n/a", "n/a"};
