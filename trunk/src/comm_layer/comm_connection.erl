@@ -30,8 +30,10 @@
 -define(TRACE(X,Y), ok).
 -behaviour(gen_component).
 
--define(NUM_KEEP_MSGS, 10).
--define(KEEP_MSG_OR_TAG, tag).
+%% number of tags or messages to keep (for debugging)
+-define(NUM_KEEP, 10).
+%% keep only tag (uncomment to keep msg)
+-define(KEEP_TAG, true).
 
 -compile({inline, [dest_ip/1, dest_port/1, local_listen_port/1, channel/1,
                    socket/1, set_socket/2,
@@ -683,7 +685,7 @@ last_msg_sent(State) -> element(19, State).
 -spec set_last_msg_sent(state(), [comm:message()]) -> state().
 set_last_msg_sent(State, Msg) ->
     OldList = last_msg_sent(State),
-    NumToKeep = erlang:max(?NUM_KEEP_MSGS - length(Msg), 0),
+    NumToKeep = erlang:max(?NUM_KEEP - length(Msg), 0),
     NewList = Msg ++ lists:sublist(OldList, NumToKeep),
     State2 = set_time_last_msg_sent(State),
     State3 = inc_s_msg_count(State2, length(Msg)),
@@ -694,7 +696,7 @@ last_msg_received(State) -> element(20, State).
 -spec set_last_msg_received(state(), [comm:message()]) -> state().
 set_last_msg_received(State, Msg) ->
     OldList = last_msg_received(State),
-    NumToKeep = erlang:max(?NUM_KEEP_MSGS - length(Msg), 0),
+    NumToKeep = erlang:max(?NUM_KEEP - length(Msg), 0),
     NewList = Msg ++ lists:sublist(OldList, NumToKeep),
     State2 = set_time_last_msg_received(State),
     State3 = inc_r_msg_count(State2, length(Msg)),
@@ -704,16 +706,20 @@ set_last_msg_received(State, Msg) ->
 save_n_msgs(Msg, SaveFun, State) when is_tuple(Msg) ->
     save_n_msgs([{single, Msg}], SaveFun, State);
 save_n_msgs(Msgs, SaveFun, State) when is_list(Msgs) ->
-    NumElements = erlang:min(?NUM_KEEP_MSGS, length(Msgs)),
+    NumElements = erlang:min(?NUM_KEEP, length(Msgs)),
     List = [get_msg_tag(M) || M <- lists:sublist(Msgs, NumElements)],
     SaveFun(State, List).
+
+-ifdef(KEEP_TAG).
+    -define(GET_MSG_OR_TAG(Msg), util:extint2atom(comm:get_msg_tag(Msg))).
+-else.
+    -define(GET_MSG_OR_TAG(Msg), setelement(1, Msg, util:extint2atom(element(1, Msg)))).
+-endif.
 
 -spec get_msg_tag(msg_or_tag()) -> comm:msg_tag() | comm:message().
 get_msg_tag(Msg) ->
     {_Pid, ActualMessage} = Msg,
-    ?IIF(?KEEP_MSG_OR_TAG =/= tag,
-         util:extint2atom(comm:get_msg_tag(ActualMessage)),
-         setelement(1, ActualMessage, util:extint2atom(element(1, ActualMessage)))).
+    ?GET_MSG_OR_TAG(ActualMessage).
 
 -spec seconds_ago(time_last_msg(), time_last_msg()) -> non_neg_integer().
 seconds_ago(Now, Time) ->
