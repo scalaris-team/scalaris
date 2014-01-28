@@ -13,11 +13,13 @@
 %   limitations under the License.
 
 %% @author Jens V. Fischer <jensvfischer@gmail.com>
-%% @doc    Behaviour modul for gossip_beh.erl. Implements the generic code of the
-%%         gossiping framework.
+%% @doc    Behaviour modul for gossip_beh.erl. Implements the generic code
+%%         of the gossiping framework.
 %%         Used abbreviations:
 %%         <ul>
-%%            <li> cb: callback module </li>
+%%            <li> cb: callback module (a module implementing the
+%%                     gossip_beh.erl behaviour)
+%%            </li>
 %%         </ul>
 %%
 %% @version $Id$
@@ -43,7 +45,8 @@
 
 % prevent warnings in the log
 % (node availability is not that important to gossip)
--define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process}, {shepherd, self()}])).
+-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg),
+        comm:send(Pid, Msg, [{group_member, Process}, {shepherd, self()}])).
 
 %% -define(SHOW, config:read(log_level)).
 -define(SHOW, debug).
@@ -51,14 +54,17 @@
 -define(CBMODULES, [gossip_load]).
 -define(CBMODULES_TYPE, gossip_load).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Type Definitions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Type Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type state() :: ets:tab().
--type state_key() :: cb_modules | msg_queue | range | status | {reply_peer, pos_integer()} |
-    {trigger_group, pos_integer()} | {state_key_cb(), cb_module()} .
--type state_key_cb() :: cb_state | cb_status | cycles | trigger_lock | exch_data | round .
+-type state_key() :: cb_modules | msg_queue | range | status |
+                     {reply_peer, pos_integer()} |
+                     {trigger_group, pos_integer()} |
+                     {state_key_cb(), cb_module()} .
+-type state_key_cb() :: cb_state | cb_status | cycles | trigger_lock |
+                        exch_data | round.
 -type cb_fun_name() :: get_values_all | get_values_best | handle_msg |
     integrate_data | notify_change | round_has_converged | select_data |
     select_node | select_reply_data | web_debug_info.
@@ -88,11 +94,9 @@
     {send_error, _Pid::comm:mypid(), Msg::message(), Reason::atom()}
 ).
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Startup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec activate(Range::intervals:interval()) -> ok.
 activate(MyRange) ->
@@ -101,7 +105,8 @@ activate(MyRange) ->
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [], [{pid_groups_join_as, DHTNodeGroup, gossip2}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
+                             [{pid_groups_join_as, DHTNodeGroup, gossip2}]).
 
 -spec init([]) -> state().
 init([]) ->
@@ -111,9 +116,9 @@ init([]) ->
     TabName.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Main Message Loop
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Main Message Loop
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on_inactive(Msg::message(), State::state()) -> state().
 on_inactive({activate_gossip, MyRange}=Msg, State) ->
@@ -396,10 +401,9 @@ on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
     State.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Msg Exchange with Peer
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Msg Exchange with Peer
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % called by either on({selected_data,...}) or on({selected_peer, ...}),
 % depending on which finished first
@@ -423,9 +427,9 @@ start_p2p_exchange(Peer, PData, CBModule, State)  ->
     ok.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Interacting with the Callback Modules
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec init_gossip_tasks(State::state()) -> ok.
 init_gossip_tasks(State) ->
@@ -541,9 +545,9 @@ select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Requesting Peers
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Requesting Peers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Sends the local node's cyclon process an enveloped request for a random node.
 %%      on_active({selected_peer, CBModule, {cy_cache, Cache}}, State) will handle the response
@@ -562,9 +566,9 @@ request_random_node_delayed(Delay, CBModule) ->
     comm:send_local_after(Delay, CyclonPid, {get_subset_rand, 1, EnvPid}).
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Round Handling
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Round Handling
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec check_round(OtherRound::non_neg_integer(), CBModule::cb_module(), State::state())
     -> ok | start_new_round | enter_new_round | propagate_new_round.
@@ -599,9 +603,9 @@ is_end_of_round(CBModule, State) ->
         ( cb_call(round_has_converged, [], no_msg, CBModule, State) ) ) .
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Range/Leader Handling
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Range/Leader Handling
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Checks whether the node is the current leader.
 -spec is_leader(MyRange::intervals:interval()) -> boolean().
@@ -630,12 +634,9 @@ rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors) ->
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Getters and Setters
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Gets the given key from the given state.
 %%      Allowed keys:
@@ -737,9 +738,9 @@ msg_queue_send(State) ->
 
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % For Testing
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec tester_create_state(Status, Range, Interval, TriggerState,
     CBState, CBStatus, ExchData, Round, TriggerLock, Cycles) -> state()
