@@ -1,4 +1,4 @@
-%  @copyright 2009-2012 Zuse Institute Berlin
+%  @copyright 2009-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 %% <code>MinInterval</code> or
 %% <code>MaxInterval</code>
 %% milliseconds depending on a user-provided interval tag specified with next/2.
-%% 
+%%
 %% Use this module through the interface provided by the trigger module,
 %% initializing it with trigger_dynamic!
 %% @version $Id$
@@ -51,13 +51,13 @@ init(BaseInterval, MinInterval, MaxInterval, MsgTag) when is_integer(BaseInterva
 %%      its initialization. Any previous trigger will be canceled!
 -spec now(state(), ReplyTo::comm:erl_local_pid()) -> state().
 now({BaseInterval, MinInterval, MaxInterval, MsgTag, ok}, ReplyTo) ->
-    TimerRef = comm:send_local(ReplyTo, {MsgTag}),
-    {BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef};
+    ok = comm:send_local(ReplyTo, {MsgTag}),
+    {BaseInterval, MinInterval, MaxInterval, MsgTag, ok};
 now({BaseInterval, MinInterval, MaxInterval, MsgTag, TimerRef}, ReplyTo) ->
     % timer still running
     _ = erlang:cancel_timer(TimerRef),
-    NewTimerRef = comm:send_local(ReplyTo, {MsgTag}),
-    {BaseInterval, MinInterval, MaxInterval, MsgTag, NewTimerRef}.
+    ok = comm:send_local(ReplyTo, {MsgTag}),
+    {BaseInterval, MinInterval, MaxInterval, MsgTag, ok}.
 
 %% @doc Sets the trigger to send its message after some delay. The given
 %%      IntervalTag will determine which of the three interval functions will

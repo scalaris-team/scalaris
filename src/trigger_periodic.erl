@@ -1,4 +1,4 @@
-%  @copyright 2009-2012 Zuse Institute Berlin
+%  @copyright 2009-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -45,23 +45,25 @@ init(BaseInterval, _MinInterval, _MaxInterval, MsgTag) when is_integer(BaseInter
 %%      example after its initialization. Any previous trigger will be canceled!
 -spec now(state(), ReplyTo::comm:erl_local_pid()) -> state().
 now({BaseInterval, MsgTag, ok}, ReplyTo) ->
-    TimerRef = comm:send_local(ReplyTo, {MsgTag}),
-    {BaseInterval, MsgTag, TimerRef};
+    ok = comm:send_local(ReplyTo, {MsgTag}),
+    {BaseInterval, MsgTag, ok};
 now({BaseInterval, MsgTag, TimerRef}, ReplyTo) ->
     % timer still running
     _ = erlang:cancel_timer(TimerRef),
-    NewTimerRef = comm:send_local(ReplyTo, {MsgTag}),
-    {BaseInterval, MsgTag, NewTimerRef}.
+    ok = comm:send_local(ReplyTo, {MsgTag}),
+    {BaseInterval, MsgTag, ok}.
 
 %% @doc Sets the trigger to send its message after BaseInterval
 %%      milliseconds. Any previous trigger will be canceled!
 -spec next(state(), IntervalTag::trigger:interval(), ReplyTo::comm:erl_local_pid()) -> state().
 next({BaseInterval, MsgTag, ok}, _IntervalTag, ReplyTo) ->
+%    io:format("new timer~n"),
     NewTimerRef = comm:send_local_after(BaseInterval, ReplyTo, {MsgTag}),
     {BaseInterval, MsgTag, NewTimerRef};
 next({BaseInterval, MsgTag, TimerRef}, _IntervalTag, ReplyTo) ->
     % timer still running
     _ = erlang:cancel_timer(TimerRef),
+%    io:format("new timer 2~n"),
     NewTimerRef = comm:send_local_after(BaseInterval, ReplyTo, {MsgTag}),
     {BaseInterval, MsgTag, NewTimerRef}.
 
