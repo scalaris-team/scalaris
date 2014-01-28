@@ -1,4 +1,4 @@
-%  @copyright 2011, 2012 Zuse Institute Berlin
+%  @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -148,12 +148,12 @@ on({bench} = Msg, {AllNodes, Leader, BenchPid, _IgnBenchT} = _State) ->
     ?TRACE1(Msg, _State),
     case get_bench_interval() of
         0 -> ok;
-        I -> msg_delay:send_local(I, self(), {bench})
+        I -> msg_delay:send_local(I, self(), {bench}),
+             comm:send_local(BenchPid, Msg),
+             %% send a timeout so that a hanging bench service gets re-started
+             msg_delay:send_local(get_bench_timeout_interval(), self(),
+                                  {bench_timeout, os:timestamp(), BenchPid})
     end,
-    comm:send_local(BenchPid, Msg),
-    % send a timeout so that a haning bench service gets re-started
-    msg_delay:send_local(get_bench_timeout_interval(), self(),
-                         {bench_timeout, os:timestamp(), BenchPid}),
     {AllNodes, Leader, BenchPid, false};
 
 on({bench_result, Time, TimeInMs} = _Msg,
@@ -314,7 +314,7 @@ on({get_rrds, KeyList, SourcePid},
 
 on({web_debug_info, Requestor} = _Msg,
    {AllNodes, Leader, _BenchPid, _IgnBenchT} = State) ->
-    ?TRACE1(_Msg, _State),
+    ?TRACE1(_Msg, State),
     [KVAllNodes, KVLeader] =
         [begin
              PerfRR5 = rrd:reduce_timeslots(5, Data#state.perf_rr),
@@ -348,11 +348,11 @@ init(null) ->
         0 -> ok;
         I -> FirstDelay = randoms:rand_uniform(1, I + 1),
              msg_delay:send_local(FirstDelay, Self, {bench}),
-             msg_delay:send_local(get_gather_interval(), Self, {propagate})
+             msg_delay:send_local(get_gather_interval(), Self, {propagate}),
+             msg_delay:send_local(10, Self, {collect_system_stats})
     end,
     init_bench(),
     init_system_stats(),
-    msg_delay:send_local(10, Self, {collect_system_stats}),
     Now = os:timestamp(),
     BenchPid = erlang:spawn(fun() -> bench_service(Self) end),
     State = #state{id = uid:get_global_uid(),
