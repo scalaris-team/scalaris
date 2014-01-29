@@ -336,13 +336,7 @@ on_active({bulkowner, deliver, _Id, _Range, Msg, _Parents}, State) ->
 
 
 on_active({remove_all_tombstones}, State) ->
-    StateList = ?PDB:tab2list(State),
-    Fun = fun ({{cb_status, CBModule}, Status}, Acc) ->
-                if Status =:= tombstone -> [{cb_status, CBModule}|Acc];
-                   Status =/= tombstone -> Acc
-                end;
-              (_Entry, Acc) -> Acc end,
-    TombstoneKeys = lists:foldl(Fun, [], StateList),
+    TombstoneKeys = get_tombstones(State),
     lists:foreach(fun (Key) -> ?PDB:delete(Key, State) end, TombstoneKeys),
     State;
 
@@ -354,7 +348,6 @@ on_active({deactivate_gossip2}, State) ->
     % stop all gossip tasks
     lists:foreach(fun (CBModule) -> handle_msg({stop_gossip_task, CBModule}, State) end,
         state_get(cb_modules, State)),
-    %% remove_all_tombstones(),
 
     % cleanup state
     state_set(status, uninit, State),
@@ -917,6 +910,16 @@ msg_queue_send(State) ->
     end,
     state_set(msg_queue, NewMsgQueue, State).
 
+-spec get_tombstones(State::state()) -> list({cb_status, cb_module()}).
+get_tombstones(State) ->
+    StateList = ?PDB:tab2list(State),
+    Fun = fun ({{cb_status, CBModule}, Status}, Acc) ->
+            if Status =:= tombstone -> [{cb_status, CBModule}|Acc];
+               Status =/= tombstone -> Acc
+            end;
+        (_Entry, Acc) -> Acc end,
+    lists:foldl(Fun, [], StateList).
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Misc
@@ -924,9 +927,15 @@ msg_queue_send(State) ->
 
 -spec web_debug_info(State::state()) -> [{_,_}, ...].
 web_debug_info(State) ->
+    CBModules = state_get(cb_modules, State),
+    Tombstones = lists:map(fun ({cb_status, CBModule}) -> CBModule end, get_tombstones(State)),
     _KeyValueList =
-        [{"behaviour module",    ""},
-         {"msg_queue_len",       length(state_get(msg_queue, State))}].
+        [{"behaviour module",   ""},
+         {"msg_queue_len",      length(state_get(msg_queue, State))},
+         {"status",             state_get(status, State)},
+         {"registered modules", to_string(CBModules)},
+         {"tombstones",         to_string(Tombstones)}
+     ].
 
 
 -spec contains(Element::any(), List::list()) -> boolean().
@@ -936,6 +945,10 @@ contains(Element, [H|List]) ->
     if H =:= Element -> true;
        H =/= Element -> contains(Element, List)
     end.
+
+-spec to_string(list()) -> string().
+to_string(List) when is_list(List) ->
+    lists:flatten(io_lib:format("~w", [List])).
 
 
 
