@@ -185,7 +185,6 @@ tester_type_check_gossip2(_Config) ->
                 {init_gossip_task, 3}, % test via feeder
                 {cb_call, 3}, % unbounded_fun?
                 {cb_call, 5}, % spec to wide
-                {handle_cb_return, 4}, % spec to wide
                 {select_reply_data, 7}, % would need to valid load_data
                 {request_random_node, 1}, % needs pid_group:get_my()
                 {request_random_node_delayed, 2}, % needs pid_group:get_my()

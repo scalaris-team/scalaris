@@ -35,7 +35,7 @@
 -export([init/1, on_inactive/2, on_active/2]).
 
 %API
--export([start_link/1, activate/1, start_gossip_task/2, stop_gossip_task/1, remove_all_tombstones/0]).
+-export([start_link/1, activate/1, deactivate/0, start_gossip_task/2, stop_gossip_task/1, remove_all_tombstones/0]).
 
 % interaction with the ring maintenance:
 -export([rm_my_range_changed/3, rm_send_new_range/4]).
@@ -54,8 +54,9 @@
 %% -define(SHOW, config:read(log_level)).
 -define(SHOW, debug).
 
--define(CBMODULES, [{gossip_load, default}]).
--define(CBMODULES_TYPE, {gossip_load, default}).
+-define(CBMODULES, [{gossip_load, default}]). % callback modules as list
+-define(CBMODULES_TYPE, {gossip_load, default}). % callback modules as union of atoms
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Type Definitions
@@ -134,13 +135,19 @@ activate(MyRange) ->
     comm:send_local(Pid, {activate_gossip, MyRange}).
 
 
+%% @doc Deactivates all gossip processes.
+-spec deactivate() -> ok.
+deactivate() ->
+    Msg = {?send_to_group_member, gossip2, {deactivate_gossip2}},
+    bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
+
+
 -spec start_gossip_task(CBModule, Args) -> ok when
     CBModule :: atom() | cb_module(),
     Args :: list().
-start_gossip_task(CBModule, Args) when is_atom(CBModule) ->
+start_gossip_task(ModuleName, Args) when is_atom(ModuleName) ->
     Id = uid:get_global_uid(),
-    Msg = {?send_to_group_member, gossip2, {start_gossip_task, {CBModule, Id}, Args}},
-    bulkowner:issue_bulk_owner(Id, intervals:all(), Msg);
+    start_gossip_task({ModuleName, Id}, Args);
 
 start_gossip_task({ModuleName, Id}, Args) when is_atom(ModuleName) ->
     Msg = {?send_to_group_member, gossip2,
@@ -338,6 +345,24 @@ on_active({remove_all_tombstones}, State) ->
     TombstoneKeys = lists:foldl(Fun, [], StateList),
     lists:foreach(fun (Key) -> ?PDB:delete(Key, State) end, TombstoneKeys),
     State;
+
+
+on_active({deactivate_gossip2}, State) ->
+    log:log(warn, "[ Gossip ] deactivating gossip framwork"),
+    rm_loop:unsubscribe(self(), ?MODULE),
+
+    % stop all gossip tasks
+    lists:foreach(fun (CBModule) -> handle_msg({stop_gossip_task, CBModule}, State) end,
+        state_get(cb_modules, State)),
+    %% remove_all_tombstones(),
+
+    % cleanup state
+    state_set(status, uninit, State),
+    state_set(cb_modules, [], State),
+    lists:foreach(fun (Key) -> ?PDB:delete(Key, State) end,
+        [msg_queue, range]),
+
+    gen_component:change_handler(State, fun ?MODULE:on_inactive/2);
 
 
 % messages expected reaching this on_active clause have the form:
@@ -647,17 +672,6 @@ cb_call(FunName, Args, Msg, CBModule, State) ->
     CBState = state_get(cb_state, CBModule, State),
     Args1 = Args ++ [CBState],
     ReturnTuple = apply(ModuleName, FunName, Args1),
-    handle_cb_return(ReturnTuple, Msg, CBModule, State).
-
-
--spec handle_cb_return(ReturnTuple, Msg, CBModule, State) -> Return when
-    ReturnTuple :: gossip_beh:cb_return(),
-    Msg :: message(),
-    CBModule :: cb_module(),
-    State :: state(),
-    Return :: ok | discard_msg
-        | send_back | boolean() | {any(), any(), any()} | list({list(), list()}).
-handle_cb_return(ReturnTuple, Msg, CBModule, State) ->
     case ReturnTuple of
         {ok, ReturnedCBState} ->
             log:log(debug, "[ Gossip ] cb_call: ReturnTuple: ~w, ReturendCBState ~w", [ReturnTuple, ReturnedCBState]),
