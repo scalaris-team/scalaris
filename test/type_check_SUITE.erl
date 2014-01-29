@@ -208,6 +208,7 @@ tester_type_check_gossip2(_Config) ->
             [  {integrate_data_init, 3}, % needs pid_groups:get_my()
                {request_local_info, 1}, % sends message
                {finish_request, 1}, % produces a lot of warnings in gossip2
+               {state_new, 2}, % too many db tables
                {state_update, 3}, % cannot create funs
                {init_histo, 2}, % needs DHTNodeState state
                {get_load_for_interval, 3}, % needs dht db

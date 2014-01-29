@@ -452,8 +452,8 @@ web_debug_info(State) ->
 
 -spec shutdown(State::state()) -> {ok, state_deleted}.
 shutdown(State) ->
-    state_delete(state_get(prev_state, State)),
-    state_delete(State),
+    delete_state(state_get(prev_state, State)),
+    delete_state(State),
     {ok, state_deleted}.
 
 
@@ -483,24 +483,14 @@ new_round(NewRound, State) ->
         true ->
             % make the current state the previous state and delete the old prev state
             OldPrevState = state_get(prev_state, State),
-            state_delete(OldPrevState),
-            state_new(State);
+            delete_state(OldPrevState),
+            state_new(State, State);
         false ->
             % make the old previous state the new previous state and discard the current state
             log:log(warn(), "[ ~w ] Entering new round, but old round has not converged", [?MODULE]),
             PrevState = state_get(prev_state, State),
-            NewState1 = state_new(PrevState),
-            state_set(leader, state_get(leader, State), NewState1),
-            state_set(range, state_get(range, State), NewState1),
-            state_set(no_of_buckets, state_get(no_of_buckets, State), NewState1),
-            state_set(request, state_get(request, State), NewState1),
-            case state_get(request, NewState1) of
-                true ->
-                    state_set(requestor, state_get(requestor, State), NewState1);
-                false -> do_nothing
-            end,
-            state_set(instance, state_get(instance, State), NewState1),
-            state_delete(State),
+            NewState1 = state_new(State, PrevState),
+            delete_state(State),
             NewState1
     end,
     state_set(round, NewRound, NewState),
@@ -536,37 +526,35 @@ state_new() ->
     state_set(range, unknown, NewState),
     state_set(prev_state, unknown, NewState),
     state_set(request, false, NewState),
+    state_set(requestor, none, NewState),
     Fun = fun (Key) -> state_set(Key, 0, NewState) end,
     lists:foreach(Fun, [round, merged, reqs_send, reqs_recv, replies_recv, convergence_count]),
     NewState.
 
 
-%% @doc Create a new state table with information from another state table.
+%% @doc Create a new state table with information from other state tables.
 %%      This is used to build a new state from the current state when a new round
 %%      is entered. Some values (mainly counters) are resetted, others are taken
-%%      from the given state. The given state is set as prev_state of the new
-%%      state.
--spec state_new(PrevState::state()) -> state().
-state_new(PrevState) ->
-    NewState = state_new(),
+%%      from the Parent state. The given PrevState is set as prev_state of the new
+%%      state. The PrevState can (but does not have to) be the same as Parent.
+-spec state_new(Parent::state(), PrevState::state()) -> state().
+state_new(Parent, PrevState) ->
+    NewState = state_new(), % new state with default values
     state_set(prev_state, PrevState, NewState),
-    state_set(leader, state_get(leader, PrevState), NewState),
-    state_set(range, state_get(range, PrevState), NewState),
-    state_set(no_of_buckets, state_get(no_of_buckets, PrevState), NewState),
-    state_set(request, state_get(request, PrevState), NewState),
-    case state_get(request, NewState) of
-        true ->
-            state_set(requestor, state_get(requestor, PrevState), NewState);
-        false -> do_nothing
-    end,
-    state_set(instance, state_get(instance, PrevState), NewState),
+    state_set(leader, state_get(leader, Parent), NewState),
+    state_set(range, state_get(range, Parent), NewState),
+    state_set(no_of_buckets, state_get(no_of_buckets, Parent), NewState),
+    state_set(request, state_get(request, Parent), NewState),
+    state_set(requestor, state_get(requestor, Parent), NewState),
+    state_set(instance, state_get(instance, Parent), NewState),
     NewState.
 
 
--spec state_delete(State::unknown | state()) -> true.
-state_delete(unknown) -> true;
 
-state_delete(Name) ->
+-spec delete_state(State::unknown | state()) -> true.
+delete_state(unknown) -> true;
+
+delete_state(Name) ->
     ets:delete(Name).
 
 
@@ -1156,10 +1144,9 @@ tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
     state_set(requestor, comm:this(), NewState),
     state_set(instance, Instance, NewState),
     % make the createt state the prev state of a new state
-    NewState2 = state_new(NewState),
+    NewState2 = state_new(NewState, NewState),
     % state_new only creates load_data_uninit, so we reuse the given LoadData
     state_set(load_data, LoadData, NewState2),
-    state_set(requestor, comm:this(), NewState2),
     NewState2.
 
 
