@@ -25,16 +25,15 @@
 % API
 -export([request_histogram/2, load_info_get/2]).
 
--export([init/1, init_delay/0, trigger_interval/0, select_node/2, select_data/2,
-        select_reply_data/6, integrate_data/5, handle_msg/3, notify_change/4,
+-export([init/1, init/2, init/3, init_delay/0, trigger_interval/0, select_node/1, select_data/1,
+        select_reply_data/5, integrate_data/4, handle_msg/2, notify_change/3,
         min_cycles_per_round/0, max_cycles_per_round/0, round_has_converged/1,
-        get_values_best/1, get_values_all/1, web_debug_info/2, shutdown/2]).
+        get_values_best/1, get_values_all/1, web_debug_info/1, shutdown/1]).
 
 %% for testing
--export([tester_create_histogram/1, is_histogram/1, tester_create_state/9, is_state/1,
-    init_feeder/1]).
--export_type([state/0]).
+-export([tester_create_histogram/1, is_histogram/1, tester_create_state/10, is_state/1]).
 
+-export_type([state/0]).
 -export_type([load_info/0]).
 
 %% -define(SHOW, config:read(log_level)).
@@ -48,7 +47,7 @@
 
 %% Gossip types
 -type state() :: ets:tab().
--type state_key() :: convergence_count | leader | load_data | merged |
+-type state_key() :: convergence_count | instance | leader | load_data | merged |
     no_of_buckets | prev_state | range | request | requestor | round | status.
 -type avg() :: {Value::float(), Weight::float()}.
 -type avg_kr() :: {number(), float()}.
@@ -57,6 +56,7 @@
 -type merged() :: non_neg_integer().
 -type bucket() :: {Interval::intervals:interval(), Avg::avg()|unknown}.
 -type histogram() :: [bucket()].
+-type instance() :: {Module :: gossip_load, Id :: atom() | uid:global_uid()}.
 
 
 % record of load data values for gossiping
@@ -153,15 +153,6 @@ no_of_buckets() -> 10.
 no_of_buckets(State) ->
     state_get(no_of_buckets, State).
 
-% hack to be able to suppress warnings when testing
--spec warn() -> log:log_level().
-warn() ->
-    case config:read(gossip_load_debug_level_warn) of
-        failed -> warn;
-        Level -> Level
-    end.
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % API
@@ -172,55 +163,55 @@ request_histogram(Size, SourcePid) ->
     gossip2:start_gossip_task(?MODULE, [Size, SourcePid]).
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Callback Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec init(Args::[pos_integer()]) -> {ok, state()}.
-init([]) ->
-    init([no_of_buckets()]);
+-spec init(Instance::instance()) -> {ok, state()}.
+init(Instance) ->
+    init(Instance, no_of_buckets(), none).
 
-init(Args=[NoOfBuckets]) when length(Args) =:= 1 andalso is_integer(NoOfBuckets) ->
-    log:log(debug, "[ ~w ] CBModule initiated", [?MODULE]),
+-spec init(Instance::instance(), NoOfBuckets::non_neg_integer()) -> {ok, state()}.
+init(Instance, NoOfBuckets) ->
+    init(Instance, NoOfBuckets, none).
+
+-spec init(Instance::instance(), NoOfBuckets::non_neg_integer(),
+                Requestor::comm:mypid()|none) -> {ok, state()}.
+init(Instance, NoOfBuckets, Requestor) ->
+    log:log(debug, "[ ~w ] CBModule initiated. NoOfBuckets: ~w, Requestor: ~w",
+        [Instance, NoOfBuckets, Requestor]),
     State = state_new(),
     state_set(prev_state, unknown, State),
     state_set(no_of_buckets, NoOfBuckets, State),
-    {ok, State};
-
-init(Args=[NoOfBuckets, RequestorPid]) when length(Args) =:= 2
-        andalso is_integer(NoOfBuckets) ->
-    log:log(debug, "[ ~w ] CBModule initiated", [?MODULE]),
-    State = state_new(),
-    state_set(prev_state, unknown, State),
-    state_set(no_of_buckets, NoOfBuckets, State),
-    state_set(request, true, State),
-    state_set(requestor, RequestorPid, State),
+    if Requestor =/= none -> state_set(request, true, State);
+       Requestor =:= none -> state_set(request, false, State)
+    end,
+    state_set(requestor, Requestor, State),
+    state_set(instance, Instance, State),
     {ok, State}.
 
 
-
--spec select_node(Instance::gossip_beh:instance_id(), State::state()) -> {boolean(), state()}.
-select_node(_Instance, State) ->
+-spec select_node(State::state()) -> {boolean(), state()}.
+select_node(State) ->
     {false, State}.
 
--spec select_data(Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()}.
-select_data(Instance, State) ->
+-spec select_data(State::state()) -> {ok, state()}.
+select_data(State) ->
     log:log(debug, "[ ~w ] select_data: State: ~w", [?MODULE, State]),
     case state_get(status, State) of
         uninit ->
-            request_local_info(Instance);
+            request_local_info(State);
         init ->
             LoadData = prepare_load_data(State),
             Pid = pid_groups:get_my(gossip2),
-            comm:send_local(Pid, {selected_data, {?MODULE, Instance}, LoadData})
+            comm:send_local(Pid, {selected_data, state_get(instance, State), LoadData})
     end,
     {ok, State}.
 
 -spec select_reply_data(PData::load_data(), Ref::pos_integer(),
-    RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(), Instance::gossip_beh:instance_id(),
+    RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(),
     State::state()) -> {discard_msg | ok | retry | send_back, state()}.
-select_reply_data(PData, Ref, RoundStatus, Round, Instance, State) ->
+select_reply_data(PData, Ref, RoundStatus, Round, State) ->
 
     IsValidRound = is_valid_round(RoundStatus, Round, State),
 
@@ -234,7 +225,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, Instance, State) ->
         init when RoundStatus =:= current_round ->
             Data1 = prepare_load_data(State),
             Pid = pid_groups:get_my(gossip2),
-            comm:send_local(Pid, {selected_reply_data, {?MODULE, Instance}, Data1, Ref, Round}),
+            comm:send_local(Pid, {selected_reply_data, state_get(instance, State), Data1, Ref, Round}),
 
             _ = merge_load_data(current_round, PData, State),
 
@@ -253,16 +244,16 @@ select_reply_data(PData, Ref, RoundStatus, Round, Instance, State) ->
                     PrevState = state_get(prev_state, State),
                     Data1 = prepare_load_data(PrevState),
                     Pid = pid_groups:get_my(gossip2),
-                    comm:send_local(Pid, {selected_reply_data, {?MODULE, Instance}, Data1, Ref, Round}),
+                    comm:send_local(Pid, {selected_reply_data, state_get(instance, State), Data1, Ref, Round}),
                     _ = merge_load_data(prev_round, PData, State),
                     {ok, State}
             end
     end.
 
 -spec integrate_data(QData::load_data(), RoundStatus::gossip_beh:round_status(),
-    Round::non_neg_integer(), Instance::gossip_beh:instance_id(), State::state()) ->
+    Round::non_neg_integer(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
-integrate_data(QData, RoundStatus, Round, Instance, State) ->
+integrate_data(QData, RoundStatus, Round, State) ->
     log:log(debug, "[ ~w ] Reply-Data: ~w~n", [?MODULE, QData]),
 
     IsValidRound = is_valid_round(RoundStatus, Round, State),
@@ -275,13 +266,13 @@ integrate_data(QData, RoundStatus, Round, Instance, State) ->
             log:log(?SHOW, "[ ~w ] integrate_data in uninit", [?MODULE]),
             {retry,State};
         init ->
-            integrate_data_init(QData, RoundStatus, Instance, State)
+            integrate_data_init(QData, RoundStatus, State)
     end.
 
 
 -spec integrate_data_init(QData::load_data(), RoundStatus::gossip_beh:round_status(),
-    Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()}.
-integrate_data_init(QData, RoundStatus, Instance, State) ->
+    State::state()) -> {ok, state()}.
+integrate_data_init(QData, RoundStatus, State) ->
     case RoundStatus of
         current_round ->
             _NewData = merge_load_data(current_round, QData, State),
@@ -310,13 +301,13 @@ integrate_data_init(QData, RoundStatus, Instance, State) ->
             end
     end,
     Pid = pid_groups:get_my(gossip2),
-    comm:send_local(Pid, {integrated_data, {?MODULE, Instance}, RoundStatus}),
+    comm:send_local(Pid, {integrated_data, state_get(instance, State), RoundStatus}),
     {ok, State}.
 
 
 -spec handle_msg(Message::{get_state_response, DHTNodeState::dht_node_state:state()},
-    Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()}.
-handle_msg({get_state_response, DHTNodeState}, Instance, State) ->
+    State::state()) -> {ok, state()}.
+handle_msg({get_state_response, DHTNodeState}, State) ->
     Load = dht_node_state:get(DHTNodeState, load),
     log:log(?SHOW, "[ ~w ] Load: ~w", [?MODULE, Load]),
 
@@ -345,7 +336,7 @@ handle_msg({get_state_response, DHTNodeState}, Instance, State) ->
 
     % send PData to BHModule
     Pid = pid_groups:get_my(gossip2),
-    comm:send_local(Pid, {selected_data, {?MODULE, Instance}, NewData}),
+    comm:send_local(Pid, {selected_data, state_get(instance, State), NewData}),
     {ok, State}.
 
 -spec round_has_converged(State::state()) -> {boolean(), state()}.
@@ -359,35 +350,34 @@ has_converged(TargetConvergenceCount, State) ->
     CurrentConvergenceCount >= TargetConvergenceCount.
 
 
--spec notify_change(Keyword::new_round, NewRound::non_neg_integer(), Instance::gossip_beh:instance_id(),
-            State::state()) -> {ok, state()};
+-spec notify_change(Keyword::new_round, NewRound::non_neg_integer(), State::state()) -> {ok, state()};
     (Keyword::leader, {MsgTag::is_leader | no_leader, NewRange::intervals:interval()},
-            Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()};
+            State::state()) -> {ok, state()};
     (Keyword::exch_failure, {_MsgTag::atom(), Data::load_data(), _Round::non_neg_integer()},
-             Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()}.
-notify_change(new_round, NewRound, Instance, State) ->
+             State::state()) -> {ok, state()}.
+notify_change(new_round, NewRound, State) ->
     log:log(debug, "[ ~w ] new_round notification. NewRound: ~w", [?MODULE, NewRound]),
     case state_get(request, State) of
         true ->
-            finish_request(Instance, State);
+            finish_request(State);
         false ->
             new_round(NewRound, State)
     end;
 
-notify_change(leader, {MsgTag, NewRange}, _Instance, State) when MsgTag =:= is_leader ->
+notify_change(leader, {MsgTag, NewRange}, State) when MsgTag =:= is_leader ->
     log:log(?SHOW, "[ ~w ] I'm the leader", [?MODULE]),
     state_set(leader, true, State),
     state_set(range, NewRange, State),
     {ok, State};
 
-notify_change(leader, {MsgTag, NewRange}, _Instance, State) when MsgTag =:= no_leader ->
+notify_change(leader, {MsgTag, NewRange}, State) when MsgTag =:= no_leader ->
     log:log(?SHOW, "[ ~w ] I'm no leader", [?MODULE]),
     state_set(leader, false, State),
     state_set(range, NewRange, State),
     {ok, State};
 
 
-notify_change(exch_failure, {_MsgTag, Data, Round}, _Instance, State) ->
+notify_change(exch_failure, {_MsgTag, Data, Round}, State) ->
     RoundFromState = state_get(round, State),
     RoundStatus = if Round =:= RoundFromState -> current_round;
         Round =/= RoundFromState -> old_round
@@ -422,9 +412,9 @@ get_values_all(State) ->
     {list_to_tuple(InfosAll), State}.
 
 
--spec web_debug_info(Instance::gossip_beh:instance_id(), state()) ->
+-spec web_debug_info(state()) ->
     {KeyValueList::[{Key::any(),Value::any()},...], NewState::state()}.
-web_debug_info(Instance, State) ->
+web_debug_info(State) ->
     PreviousState = state_get(prev_state, State),
     PreviousData = prev_state_get(load_data, State),
     CurrentData = state_get(load_data, State),
@@ -433,7 +423,7 @@ web_debug_info(Instance, State) ->
               BestState =:= PreviousState -> previous_data
         end,
     KeyValueList =
-        [{to_string(?MODULE) ++ ":" ++ to_string(Instance), ""},
+        [{to_string(state_get(instance, State)), ""},
          {"best",                Best},
          {"leader",              state_get(leader, State)},
          {"prev_round",          state_get(round, PreviousState)},
@@ -460,8 +450,8 @@ web_debug_info(Instance, State) ->
     {KeyValueList, State}.
 
 
--spec shutdown(Instance::gossip_beh:instance_id(), State::state()) -> {ok, state_deleted}.
-shutdown(_Instance, State) ->
+-spec shutdown(State::state()) -> {ok, state_deleted}.
+shutdown(State) ->
     state_delete(state_get(prev_state, State)),
     state_delete(State),
     {ok, state_deleted}.
@@ -472,11 +462,11 @@ shutdown(_Instance, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
--spec request_local_info(Instance::gossip_beh:instance_id()) -> ok.
-request_local_info(Instance) ->
+-spec request_local_info(State::state()) -> ok.
+request_local_info(State) ->
     % get state of dht node
     DHT_Node = pid_groups:get_my(dht_node),
-    EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, {?MODULE, Instance}, '_'}),
+    EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, state_get(instance, State), '_'}),
     % send_local doesn't work
     comm:send(comm:make_global(DHT_Node), {get_state, EnvPid}).
 
@@ -509,6 +499,7 @@ new_round(NewRound, State) ->
                     state_set(requestor, state_get(requestor, State), NewState1);
                 false -> do_nothing
             end,
+            state_set(instance, state_get(instance, State), NewState1),
             state_delete(State),
             NewState1
     end,
@@ -516,16 +507,15 @@ new_round(NewRound, State) ->
     {ok, NewState}.
 
 
--spec finish_request(Instance, State) -> {ok, State} when
-    Instance :: gossip_beh:instance_id(),
+-spec finish_request(State) -> {ok, State} when
     State :: state().
-finish_request(Instance, State) ->
+finish_request(State) ->
     Histo = load_data_get(histo, state_get(load_data, State)),
     case state_get(leader, State) of
         true ->
             Requestor = state_get(requestor, State),
             comm:send(Requestor, {histogram, Histo}),
-            gossip2:stop_gossip_task({?MODULE, Instance});
+            gossip2:stop_gossip_task(state_get(instance, State));
         false -> do_nothing
     end,
     {ok, State}.
@@ -569,6 +559,7 @@ state_new(PrevState) ->
             state_set(requestor, state_get(requestor, PrevState), NewState);
         false -> do_nothing
     end,
+    state_set(instance, state_get(instance, PrevState), NewState),
     NewState.
 
 
@@ -1102,7 +1093,10 @@ inc(Value) ->
 
 
 -spec to_string(unknown) -> unknown;
-               (Histogram::histogram()) -> string().
+               (Histogram::histogram()) -> string();
+               (LoadInfo::load_info()) -> string();
+               (Histogram::histogram()) -> string();
+               (Instance::instance()) -> string().
 to_string(unknown) -> unknown;
 
 to_string(LoadInfo=#load_info{avg=Avg, stddev=Stddev, size_ldr=SizeLdr, size_kr=SizeKr,
@@ -1124,14 +1118,9 @@ to_string(Histogram) when is_list(Histogram) ->
     HistoString = lists:foldl(Fun, "[ ", Values) ++ " ]",
     lists:flatten(HistoString);
 
-%% to_string(ModuleName, Instance) when is_atom(Instance) ->
-%%     io_lib:format("{ ~s, ~s }", [ModuleName, atom_to_list(Instance)]);
+to_string({ModuleName, Id}) ->
+    lists:flatten(io_lib:format("~w:~w", [ModuleName, Id])).
 
-to_string(Atom) when is_atom(Atom) ->
-    lists:flatten(io_lib:format("~s", [Atom]));
-
-to_string(_GlobalUid={Uid, Pid}) when is_integer(Uid) andalso is_pid(Pid) ->
-    lists:flatten(io_lib:format("{~w, ~w}", [Uid, Pid])).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % For Testing
@@ -1140,7 +1129,7 @@ to_string(_GlobalUid={Uid, Pid}) when is_integer(Uid) andalso is_pid(Pid) ->
 %%% @doc Creates a random state() table within the given type specifications.
 %%%      Used as value_creator in tester.erl (property testing).
 -spec tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
-        NoOfBuckets, Request) -> state() when
+        NoOfBuckets, Request, Instance) -> state() when
     ConvCount :: non_neg_integer(),
     Leader :: boolean(),
     LoadData::load_data(),
@@ -1149,9 +1138,10 @@ to_string(_GlobalUid={Uid, Pid}) when is_integer(Uid) andalso is_pid(Pid) ->
     Round :: non_neg_integer(),
     Status :: init|uninit,
     NoOfBuckets :: 1..50,
-    Request :: boolean().
+    Request :: boolean(),
+    Instance :: instance().
 tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
-        NoOfBuckets, Request) ->
+        NoOfBuckets, Request, Instance) ->
     NewState = ets:new(cbstate, [set, protected]),
     state_set(convergence_count, ConvCount, NewState),
     state_set(leader, Leader, NewState),
@@ -1164,6 +1154,7 @@ tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
     state_set(no_of_buckets, NoOfBuckets, NewState),
     state_set(request, Request, NewState),
     state_set(requestor, comm:this(), NewState),
+    state_set(instance, Instance, NewState),
     % make the createt state the prev state of a new state
     NewState2 = state_new(NewState),
     % state_new only creates load_data_uninit, so we reuse the given LoadData
@@ -1234,9 +1225,12 @@ compare([H1|List1], [H2|List2]) when is_tuple(H1) andalso is_tuple(H2) ->
 merge_bucket_feeder({Key1, Val1}, {_Key2, Val2}) ->
     {{Key1, Val1}, {Key1, Val2}}.
 
--spec init_feeder([pos_integer()]) -> {[pos_integer()]}.
-init_feeder(List) ->
-    if length(List)>1 -> {[hd(List)]};
-        true -> {List}
+% hack to be able to suppress warnings when testing
+-spec warn() -> log:log_level().
+warn() ->
+    case config:read(gossip_load_debug_level_warn) of
+        failed -> warn;
+        Level -> Level
     end.
+
 

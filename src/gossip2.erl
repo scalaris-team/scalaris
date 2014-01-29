@@ -183,7 +183,7 @@ on_inactive({activate_gossip, MyRange}=Msg, State) ->
         false -> {no_leader, MyRange}
     end,
     List = [leader, Msg1],
-    Fun = fun (CBModule) -> cb_call_instance(notify_change, List, Msg, CBModule, State) end,
+    Fun = fun (CBModule) -> cb_call(notify_change, List, Msg, CBModule, State) end,
     CBModules = state_get(cb_modules, State),
     lists:foreach(Fun, CBModules),
 
@@ -232,7 +232,7 @@ on_active({start_gossip_task, CBModule, Args}, State) ->
         true ->
             log:log(warn, "[ Gossip ] Trying to start an already existing Module: ~w ."
                 ++ "Request will be ignored.", [CBModule]);
-        false -> start_gossip_task(CBModule, Args, State)
+        false -> init_gossip_task(CBModule, Args, State)
     end,
     State;
 
@@ -256,13 +256,13 @@ on_active({gossip2_trigger, TriggerInterval, {gossip2_trigger}}=Msg, State) ->
                         state_set(exch_data, {undefined, undefined}, CBModule, State),
 
                         % request node (by the cb module or the bh module)
-                        case cb_call_instance(select_node, [], Msg, CBModule, State) of
+                        case cb_call(select_node, [], Msg, CBModule, State) of
                             true -> ok;
                             false -> request_random_node(CBModule)
                         end,
 
                         % request data
-                        cb_call_instance(select_data, [], Msg, CBModule, State);
+                        cb_call(select_data, [], Msg, CBModule, State);
                     locked -> do_nothing % ignore trigger when within prepare-request phase
                 end
         end || CBModule <- CBModules
@@ -281,7 +281,7 @@ on_active({update_range, NewRange}=FullMsg, State) ->
         true -> {is_leader, NewRange};
         false -> {no_leader, NewRange}
     end,
-    Fun = fun (CBModule) -> cb_call_instance(notify_change, [leader, Msg], FullMsg, CBModule, State) end,
+    Fun = fun (CBModule) -> cb_call(notify_change, [leader, Msg], FullMsg, CBModule, State) end,
     CBModules = state_get(cb_modules, State),
     lists:foreach(Fun, CBModules),
     State;
@@ -290,7 +290,7 @@ on_active({update_range, NewRange}=FullMsg, State) ->
 on_active({web_debug_info, Requestor}=Msg, State) ->
     CBModules = lists:reverse(state_get(cb_modules, State)),
     Fun = fun (CBModule, Acc) -> Acc ++ [{"",""}] ++
-            cb_call_instance(web_debug_info, [], Msg, CBModule, State) end,
+            cb_call(web_debug_info, [], Msg, CBModule, State) end,
     KeyValueList = [{"",""}] ++ web_debug_info(State) ++ lists:foldl(Fun, [], CBModules),
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
@@ -312,10 +312,10 @@ on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
                 [element(1, ErrorMsg), element(2, MsgUnpacked)]);
         {p2p_exch, CBModule, _SourcePid, PData, Round} ->
             log:log(?SHOW, "[ Gossip ] p2p_exch failed because of ~w", [Reason]),
-            _ = cb_call_instance(notify_change, [exch_failure, {p2p_exch, PData, Round}], ErrorMsg, CBModule, State);
+            _ = cb_call(notify_change, [exch_failure, {p2p_exch, PData, Round}], ErrorMsg, CBModule, State);
         {p2p_exch_reply, CBModule, QData, Round} ->
             log:log(?SHOW, "[ Gossip ] p2p_exch_reply failed because of ~w", [Reason]),
-            _ = cb_call_instance(notify_change, [exch_failure, {p2p_exch_reply, QData, Round}], ErrorMsg, CBModule, State);
+            _ = cb_call(notify_change, [exch_failure, {p2p_exch_reply, QData, Round}], ErrorMsg, CBModule, State);
         _ ->
             log:log(?SHOW, "[ Gossip ] Failed to deliever the Msg ~w because ~w", [Msg, Reason])
     end,
@@ -356,7 +356,7 @@ on_active(Msg, State) ->
         started ->
             handle_msg(Msg, State)
     catch
-        _:_ -> log:log(warn, "[ Gossip ] Unknown msg: ~w", [Msg])
+        _:_ -> log:log(warn(), "[ Gossip ] Unknown msg: ~w", [Msg])
     end,
     State.
 
@@ -399,12 +399,12 @@ handle_msg({p2p_exch, CBModule, SourcePid, PData, OtherRound}=Msg, State) ->
             select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State);
         start_new_round -> % self is leader
             log:log(?SHOW, "[ Gossip ] Starting a new round in p2p_exch"),
-            _ = cb_call_instance(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
+            _ = cb_call(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
             select_reply_data(PData, Ref, old_round, OtherRound, Msg, CBModule, State),
             comm:send(SourcePid, {new_round, CBModule, state_get(round, CBModule, State)});
         enter_new_round ->
             log:log(?SHOW, "[ Gossip ] Entering a new round in p2p_exch"),
-            _ = cb_call_instance(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
+            _ = cb_call(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
             select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State);
         propagate_new_round -> % i.e. MyRound > OtherRound
             log:log(debug, "[ Gossip ] propagate round in p2p_exch"),
@@ -426,20 +426,20 @@ handle_msg({p2p_exch_reply, CBModule, SourcePid, QData, OtherRound}=Msg, State) 
     log:log(debug, "[ Gossip ] p2p_exch_reply, CBModule: ~w, QData ~w", [CBModule, QData]),
     _ = case check_round(OtherRound, CBModule, State) of
         ok ->
-            _ = cb_call_instance(integrate_data, [QData, current_round, OtherRound], Msg, CBModule, State);
+            _ = cb_call(integrate_data, [QData, current_round, OtherRound], Msg, CBModule, State);
         start_new_round -> % self is leader
             log:log(?SHOW, "[ Gossip ] Starting a new round p2p_exch_reply"),
-            _ = cb_call_instance(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
-            _ = cb_call_instance(integrate_data, [QData, old_round, OtherRound], Msg, CBModule, State),
+            _ = cb_call(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
+            _ = cb_call(integrate_data, [QData, old_round, OtherRound], Msg, CBModule, State),
             comm:send(SourcePid, {new_round, CBModule, state_get(round, CBModule, State)});
         enter_new_round ->
             log:log(?SHOW, "[ Gossip ] Entering a new round p2p_exch_reply"),
-            _ = cb_call_instance(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
-            _ = cb_call_instance(integrate_data, [QData, current_round, OtherRound], Msg, CBModule, State);
+            _ = cb_call(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
+            _ = cb_call(integrate_data, [QData, current_round, OtherRound], Msg, CBModule, State);
         propagate_new_round -> % i.e. MyRound > OtherRound
             log:log(debug, "[ Gossip ] propagate round in p2p_exch_reply"),
             comm:send(SourcePid, {new_round, CBModule, state_get(round, CBModule, State)}),
-            _ = cb_call_instance(integrate_data, [QData, old_round, OtherRound], Msg, CBModule, State)
+            _ = cb_call(integrate_data, [QData, old_round, OtherRound], Msg, CBModule, State)
     end,
     State;
 
@@ -455,7 +455,7 @@ handle_msg({integrated_data, _CBModule, old_round}, State) ->
 
 
 handle_msg({cb_reply, CBModule, Msg}=FullMsg, State) ->
-    _ = cb_call_instance(handle_msg, [Msg], FullMsg, CBModule, State),
+    _ = cb_call(handle_msg, [Msg], FullMsg, CBModule, State),
     State;
 
 % round propagation message
@@ -464,7 +464,7 @@ handle_msg({new_round, CBModule, NewRound}=Msg, State) ->
     if
         MyRound < NewRound ->
             log:log(?SHOW, "[ Gossip ] Entering new round via round propagation message"),
-            _ = cb_call_instance(notify_change, [new_round, NewRound], Msg, CBModule, State),
+            _ = cb_call(notify_change, [new_round, NewRound], Msg, CBModule, State),
             state_set(round, NewRound, CBModule, State),
             state_set(cycles, 0, CBModule, State);
         MyRound =:= NewRound -> % i.e. the round propagation msg was already received
@@ -492,7 +492,7 @@ handle_msg({get_values_all, CBModule, SourcePid}=Msg, State) ->
 handle_msg({stop_gossip_task, CBModule}=Msg, State) ->
     log:log(warn, "Stopping ~w", [CBModule]),
     % shutdown callback module
-    _ = cb_call_instance(shutdown, [], Msg, CBModule, State),
+    _ = cb_call(shutdown, [], Msg, CBModule, State),
 
     % delete callback module dependet entries from state
     Fun = fun (Key) -> ?PDB:delete({Key, CBModule}, State) end,
@@ -559,11 +559,11 @@ init_gossip_tasks(State) ->
     lists:foreach(Fun, ?CBMODULES).
 
 
--spec start_gossip_task(CBModule::cb_module(), Args::list(), State::state()) -> ok.
-start_gossip_task(CBModule, Args, State) ->
+-spec init_gossip_task(CBModule::cb_module(), Args::list(), State::state()) -> ok.
+init_gossip_task(CBModule, Args, State) ->
 
     % initialize CBModule
-    {ok, CBState} = cb_call(init, [Args], CBModule),
+    {ok, CBState} = cb_call(init, [CBModule|Args], CBModule),
 
     % add state ob CBModule to state
     state_set(cb_state, CBState, CBModule, State),
@@ -578,7 +578,7 @@ start_gossip_task(CBModule, Args, State) ->
         false -> {no_leader, MyRange}
     end,
     % todo no_msg is no solution
-    _ = cb_call_instance(notify_change, [leader, LeaderMsg], no_msg, CBModule, State),
+    _ = cb_call(notify_change, [leader, LeaderMsg], no_msg, CBModule, State),
 
     % configure and add trigger
     TriggerInterval = cb_call(trigger_interval, CBModule),
@@ -624,26 +624,14 @@ cb_call(FunName, CBModule) ->
 %%     Args :: list(),
 %%     CBModule :: cb_module(),
 %%     Return :: non_neg_integer() | pos_integer() | ok.
--spec cb_call (FunName, Args::list(), CBModule::cb_module()) -> non_neg_integer() when
+-spec cb_call(FunName, Args::list(), CBModule::cb_module()) -> non_neg_integer() when
                     FunName :: init_delay | min_cycles_per_round;
-              (FunName, Args::list(), CBModule::cb_module()) -> pos_integer() when
+             (FunName, Args::list(), CBModule::cb_module()) -> pos_integer() when
                     FunName :: trigger_interval | max_cycles_per_round;
-              (FunName::init_delay, Args::list(), CBModule::cb_module()) -> ok.
+             (FunName::init_delay, Args::list(), CBModule::cb_module()) -> ok.
 cb_call(FunName, Args, CBModule) ->
     {CBModuleName, _Id} = CBModule,
     apply(CBModuleName, FunName, Args).
-
--spec cb_call_instance(FunName, Arguments, Msg, CBModule, State) -> Return when
-    FunName :: cb_fun_name(),
-    Arguments :: list(),
-    Msg :: message(),
-    CBModule :: cb_module(),
-    State :: state(),
-    Return :: ok | discard_msg
-        | send_back | boolean() | {any(), any(), any()} | list({list(), list()}).
-cb_call_instance(FunName, Args, Msg, CBModule, State) ->
-    {_ModuleName, InstanceId} = CBModule,
-    cb_call(FunName, Args++[InstanceId], Msg, CBModule, State).
 
 
 -spec cb_call(FunName, Arguments, Msg, CBModule, State) -> Return when
@@ -703,7 +691,7 @@ handle_cb_return(ReturnTuple, Msg, CBModule, State) ->
     RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(),
     Msg::message(), CBModule::cb_module(), State::state()) -> ok.
 select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
-    case cb_call_instance(select_reply_data, [PData, Ref, RoundStatus, Round], Msg, CBModule, State) of
+    case cb_call(select_reply_data, [PData, Ref, RoundStatus, Round], Msg, CBModule, State) of
         ok -> ok;
         discard_msg ->
             state_take({reply_peer, Ref}, State), ok;
@@ -820,7 +808,7 @@ state_get(Key, State) ->
     case ?PDB:get(Key, State) of
         {Key, Value} -> Value;
         undefined ->
-            log:log(error, "[ gossip2 ] Lookup of ~w in ~w failed", [Key, State]),
+            log:log(error(), "[ gossip2 ] Lookup of ~w in ~w failed", [Key, State]),
             error(lookup_failed, [Key, State])
     end.
 
@@ -1009,8 +997,8 @@ tuplekeyfind(Key, [H|List]) ->
         _ -> tuplekeyfind(Key, List)
     end.
 
--spec start_gossip_task_feeder(cb_module(), [1..50], state()) -> {cb_module(), list(), state()}.
-start_gossip_task_feeder(CBModule, Args, State) ->
+-spec init_gossip_task_feeder(cb_module(), [1..50], state()) -> {cb_module(), list(), state()}.
+init_gossip_task_feeder(CBModule, Args, State) ->
     Args1 = if length(Args)>1 -> [hd(Args)];
                true -> Args
             end,
@@ -1038,5 +1026,18 @@ state_feeder_helper(Key, State) ->
         _ -> {Key, State}
     end.
 
+% hack to be able to suppress warnings when testing via config:write()
+-spec warn() -> log:log_level().
+warn() ->
+    case config:read(gossip_load_debug_level_warn) of
+        failed -> warn;
+        Level -> Level
+    end.
 
-
+% hack to be able to suppress warnings when testing via config:write()
+-spec error() -> log:log_level().
+error() ->
+    case config:read(gossip_load_debug_level_warn) of
+        failed -> warn;
+        Level -> Level
+    end.
