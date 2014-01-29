@@ -167,7 +167,7 @@ tester_type_check_gossip2(_Config) ->
     tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state),
     tester:register_value_creator({typedef, gossip2, state}, gossip2, tester_create_state, 10),
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
-    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 8),
+    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 9),
     Modules =
         [ {gossip2,
             % excluded (exported functions)
@@ -200,14 +200,19 @@ tester_type_check_gossip2(_Config) ->
           {gossip_load,
             % excluded (exported functions)
             [   {init, 1}, % tested via feeder
+                {request_histogram, 2}, % starts gossip_load at all nodes, this produces to many ets tables
                 {select_data, 2}, % needs pid_groups:get_my()
                 {select_reply_data, 6}, % needs pid_groups:get_my / references
                 {integrate_data, 5}, % needs pid_groups:get_my()
+                {notify_change, 4}, % seems not to get values from the value creator. Bug?
                 {handle_msg, 3} % needs pid_groups:get_my()
             ],
             % excluded (private functions)
             [  {integrate_data_init, 4}, % needs pid_groups:get_my()
                {request_local_info, 1}, % sends message
+               {new_round, 2}, % seems not to get values from the value creator. Bug?
+               {finish_request, 2}, % produces a lot of warnings in gossip2
+               {state_delete, 1}, % seems not to get values from the value creator. Bug?
                {state_update, 3}, % cannot create funs
                {init_histo, 2}, % needs DHTNodeState state
                {get_load_for_interval, 3}, % needs dht db

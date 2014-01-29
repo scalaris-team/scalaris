@@ -183,7 +183,7 @@ on_inactive({activate_gossip, MyRange}=Msg, State) ->
         false -> {no_leader, MyRange}
     end,
     List = [leader, Msg1],
-    Fun = fun (CBModule) -> cb_call(notify_change, List, Msg, CBModule, State) end,
+    Fun = fun (CBModule) -> cb_call_instance(notify_change, List, Msg, CBModule, State) end,
     CBModules = state_get(cb_modules, State),
     lists:foreach(Fun, CBModules),
 
@@ -281,7 +281,7 @@ on_active({update_range, NewRange}=FullMsg, State) ->
         true -> {is_leader, NewRange};
         false -> {no_leader, NewRange}
     end,
-    Fun = fun (CBModule) -> cb_call(notify_change, [leader, Msg], FullMsg, CBModule, State) end,
+    Fun = fun (CBModule) -> cb_call_instance(notify_change, [leader, Msg], FullMsg, CBModule, State) end,
     CBModules = state_get(cb_modules, State),
     lists:foreach(Fun, CBModules),
     State;
@@ -305,13 +305,17 @@ on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
         % other send_error msgs, e.g. from on_inactive
         _Msg -> _Msg
     end,
+    CBStatus = state_get(cb_status, element(2, MsgUnpacked), State),
     case MsgUnpacked of
+        _ when CBStatus =:= tombstone ->
+            log:log(warn, "[ Gossip ] Got ~w msg for tombstoned module ~w",
+                [element(1, ErrorMsg), element(2, MsgUnpacked)]);
         {p2p_exch, CBModule, _SourcePid, PData, Round} ->
             log:log(?SHOW, "[ Gossip ] p2p_exch failed because of ~w", [Reason]),
-            _ = cb_call(notify_change, [exch_failure, {p2p_exch, PData, Round}], ErrorMsg, CBModule, State);
+            _ = cb_call_instance(notify_change, [exch_failure, {p2p_exch, PData, Round}], ErrorMsg, CBModule, State);
         {p2p_exch_reply, CBModule, QData, Round} ->
             log:log(?SHOW, "[ Gossip ] p2p_exch_reply failed because of ~w", [Reason]),
-            _ = cb_call(notify_change, [exch_failure, {p2p_exch_reply, QData, Round}], ErrorMsg, CBModule, State);
+            _ = cb_call_instance(notify_change, [exch_failure, {p2p_exch_reply, QData, Round}], ErrorMsg, CBModule, State);
         _ ->
             log:log(?SHOW, "[ Gossip ] Failed to deliever the Msg ~w because ~w", [Msg, Reason])
     end,
@@ -395,12 +399,12 @@ handle_msg({p2p_exch, CBModule, SourcePid, PData, OtherRound}=Msg, State) ->
             select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State);
         start_new_round -> % self is leader
             log:log(?SHOW, "[ Gossip ] Starting a new round in p2p_exch"),
-            _ = cb_call(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
+            _ = cb_call_instance(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
             select_reply_data(PData, Ref, old_round, OtherRound, Msg, CBModule, State),
             comm:send(SourcePid, {new_round, CBModule, state_get(round, CBModule, State)});
         enter_new_round ->
             log:log(?SHOW, "[ Gossip ] Entering a new round in p2p_exch"),
-            _ = cb_call(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
+            _ = cb_call_instance(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
             select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State);
         propagate_new_round -> % i.e. MyRound > OtherRound
             log:log(debug, "[ Gossip ] propagate round in p2p_exch"),
@@ -425,12 +429,12 @@ handle_msg({p2p_exch_reply, CBModule, SourcePid, QData, OtherRound}=Msg, State) 
             _ = cb_call_instance(integrate_data, [QData, current_round, OtherRound], Msg, CBModule, State);
         start_new_round -> % self is leader
             log:log(?SHOW, "[ Gossip ] Starting a new round p2p_exch_reply"),
-            _ = cb_call(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
+            _ = cb_call_instance(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
             _ = cb_call_instance(integrate_data, [QData, old_round, OtherRound], Msg, CBModule, State),
             comm:send(SourcePid, {new_round, CBModule, state_get(round, CBModule, State)});
         enter_new_round ->
             log:log(?SHOW, "[ Gossip ] Entering a new round p2p_exch_reply"),
-            _ = cb_call(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
+            _ = cb_call_instance(notify_change, [new_round, state_get(round, CBModule, State)], Msg, CBModule, State),
             _ = cb_call_instance(integrate_data, [QData, current_round, OtherRound], Msg, CBModule, State);
         propagate_new_round -> % i.e. MyRound > OtherRound
             log:log(debug, "[ Gossip ] propagate round in p2p_exch_reply"),
@@ -460,7 +464,7 @@ handle_msg({new_round, CBModule, NewRound}=Msg, State) ->
     if
         MyRound < NewRound ->
             log:log(?SHOW, "[ Gossip ] Entering new round via round propagation message"),
-            _ = cb_call(notify_change, [new_round, NewRound], Msg, CBModule, State),
+            _ = cb_call_instance(notify_change, [new_round, NewRound], Msg, CBModule, State),
             state_set(round, NewRound, CBModule, State),
             state_set(cycles, 0, CBModule, State);
         MyRound =:= NewRound -> % i.e. the round propagation msg was already received
@@ -574,7 +578,7 @@ start_gossip_task(CBModule, Args, State) ->
         false -> {no_leader, MyRange}
     end,
     % todo no_msg is no solution
-    _ = cb_call(notify_change, [leader, LeaderMsg], no_msg, CBModule, State),
+    _ = cb_call_instance(notify_change, [leader, LeaderMsg], no_msg, CBModule, State),
 
     % configure and add trigger
     TriggerInterval = cb_call(trigger_interval, CBModule),
