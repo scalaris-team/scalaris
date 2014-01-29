@@ -109,7 +109,7 @@
 -type message() :: bh_message() | cb_message().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Startup
+%% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % called by sup_dht_node
@@ -172,6 +172,8 @@ remove_all_tombstones() ->
 %% Main Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%%-------------------------- on_inactive ---------------------------%%
+
 -spec on_inactive(Msg::message(), State::state()) -> state().
 on_inactive({activate_gossip, MyRange}=Msg, State) ->
     ?PDB:set({status, init}, State),
@@ -231,6 +233,8 @@ on_inactive({remove_all_tombstones}=Msg, State) ->
 on_inactive(_Msg, State) ->
     State.
 
+
+%%--------------------------- on_active ----------------------------%%
 
 -spec on_active(Msg::message(), State::state()) -> state().
 on_active({start_gossip_task, CBModule, Args}, State) ->
@@ -637,16 +641,11 @@ init_gossip_task(CBModule, Args, State) ->
 cb_call(FunName, CBModule) ->
     cb_call(FunName, [], CBModule).
 
-%% -spec cb_call(FunName, Args, CBModule) -> Return when
-%%     FunName :: init | init_delay | min_cycles_per_round | max_cycles_per_round | trigger_interval,
-%%     Args :: list(),
-%%     CBModule :: cb_module(),
-%%     Return :: non_neg_integer() | pos_integer() | ok.
--spec cb_call(FunName, Args::list(), CBModule::cb_module()) -> non_neg_integer() when
-                    FunName :: init_delay | min_cycles_per_round;
-             (FunName, Args::list(), CBModule::cb_module()) -> pos_integer() when
-                    FunName :: trigger_interval | max_cycles_per_round;
-             (FunName::init_delay, Args::list(), CBModule::cb_module()) -> ok.
+-spec cb_call(FunName, Args, CBModule) -> Return when
+    FunName :: init | init_delay | min_cycles_per_round | max_cycles_per_round | trigger_interval,
+    Args :: list(),
+    CBModule :: cb_module(),
+    Return :: non_neg_integer() | pos_integer() | {ok, any()}.
 cb_call(FunName, Args, CBModule) ->
     {CBModuleName, _Id} = CBModule,
     apply(CBModuleName, FunName, Args).
@@ -688,7 +687,8 @@ cb_call(FunName, Args, Msg, CBModule, State) ->
             state_set(cb_state, ReturnedCBState, CBModule, State),
             send_back;
         {ReturnValue, ReturnedCBState} ->
-            log:log(debug, "[ Gossip ] cb_call: ReturnTuple: ~w, ReturnValue: ~w ReturendCBState: ~w", [ReturnTuple, ReturnValue, ReturnedCBState]),
+            log:log(debug, "[ Gossip ] cb_call: ReturnTuple: ~w, ReturnValue: ~w ReturendCBState: ~w",
+                [ReturnTuple, ReturnValue, ReturnedCBState]),
             state_set(cb_state, ReturnedCBState, CBModule, State),
             ReturnValue
     end.
@@ -705,7 +705,6 @@ select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
         send_back ->
             state_take({reply_peer, Ref}, State), ok
     end.
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -796,9 +795,8 @@ rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors) ->
     comm:send_local(Pid, {update_range, NewRange}).
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Getters and Setters
+%% State: Getters and Setters
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Gets the given key from the given state.
@@ -846,6 +844,7 @@ state_update(Key, Fun, State) ->
     NewValue = apply(Fun, [state_get(Key, State)]),
     state_set(Key, NewValue, State).
 
+%%---------------- Callback Module Specific State ------------------%%
 
 %% @doc Gets the given key from the given state.
 %%      Allowed keys:
@@ -888,7 +887,7 @@ state_update(Key, Fun, CBModule, State) ->
     state_set(Key, Value, CBModule, State).
 
 
-%% Message Queue %%
+%%------------------------- Message Queue --------------------------%%
 
 -spec msg_queue_add(Msg::message(), State::state()) -> ok.
 msg_queue_add(Msg, State) ->
