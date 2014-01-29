@@ -24,13 +24,15 @@
 
 -export([load_info_get/2]).
 
--export([init/0, init_delay/0, trigger_interval/0, select_node/1, select_data/1,
-        select_reply_data/5, integrate_data/4, handle_msg/2, notify_change/3,
+-export([init/1, init_delay/0, trigger_interval/0, select_node/2, select_data/2,
+        select_reply_data/6, integrate_data/5, handle_msg/3, notify_change/3,
         min_cycles_per_round/0, max_cycles_per_round/0, round_has_converged/1,
-        get_values_best/1, get_values_all/1, web_debug_info/1]).
+        get_values_best/1, get_values_all/1, web_debug_info/2, shutdown/2]).
 
 %% for testing
--export([tester_create_histogram/1, is_histogram/1, tester_create_state/7, is_state/1]).
+-export([tester_create_histogram/1, is_histogram/1, tester_create_state/8, is_state/1,
+    init_feeder/1]).
+-export_type([state/0]).
 
 -export_type([load_info/0]).
 
@@ -46,7 +48,7 @@
 %% Gossip types
 -type state() :: ets:tab().
 -type state_key() :: convergence_count | leader | load_data | merged |
-    prev_state | range | round | status.
+    no_of_buckets | prev_state | range | round | status.
 -type avg() :: {Value::float(), Weight::float()}.
 -type avg_kr() :: {number(), float()}.
 -type min() :: non_neg_integer().
@@ -82,6 +84,7 @@
             merged    = unknown :: unknown | merged() % how often the data was merged since the node entered/created the round
     }).
 -type(load_info() :: #load_info{}). %% @todo: mark as opaque (dialyzer currently crashes if set)
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -145,41 +148,57 @@ discard_old_rounds() ->
 -spec no_of_buckets() -> pos_integer().
 no_of_buckets() -> 10.
 
+-spec no_of_buckets(State::state()) -> pos_integer().
+no_of_buckets(State) ->
+    state_get(no_of_buckets, State).
+
+% hack to be able to suppress warnings when testing
+-spec warn() -> log:log_level().
+warn() ->
+    case config:read(gossip_load_debug_level_warn) of
+        failed -> warn;
+        Level -> Level
+    end.
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Callback Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec init() -> {ok, state()}.
-init() ->
+-spec init(Args::[pos_integer()]) -> {ok, state()}.
+init([]) ->
+    init([no_of_buckets()]);
+
+init(Args=[NoOfBuckets]) when length(Args) =:= 1 andalso is_integer(NoOfBuckets) ->
     log:log(debug, "[ ~w ] CBModule initiated", [?MODULE]),
     State = state_new(),
     state_set(prev_state, unknown, State),
+    state_set(no_of_buckets, NoOfBuckets, State),
     {ok, State}.
 
 
--spec select_node(State::state()) -> {boolean(), state()}.
-select_node(State) ->
+-spec select_node(Instance::gossip_beh:instance_id(), State::state()) -> {boolean(), state()}.
+select_node(_Instance, State) ->
     {false, State}.
 
--spec select_data(State::state()) -> {ok, state()}.
-select_data(State) ->
+-spec select_data(Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()}.
+select_data(Instance, State) ->
     log:log(debug, "[ ~w ] select_data: State: ~w", [?MODULE, State]),
     case state_get(status, State) of
         uninit ->
-            request_local_info();
+            request_local_info(Instance);
         init ->
             LoadData = prepare_load_data(State),
             Pid = pid_groups:get_my(gossip2),
-            comm:send_local(Pid, {selected_data, ?MODULE, LoadData})
+            comm:send_local(Pid, {selected_data, {?MODULE, Instance}, LoadData})
     end,
     {ok, State}.
 
 -spec select_reply_data(PData::load_data(), Ref::pos_integer(),
-    RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(), State::state()) ->
-    {discard_msg | ok | retry | send_back, state()}.
-select_reply_data(PData, Ref, RoundStatus, Round, State) ->
+    RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(), Instance::gossip_beh:instance_id(),
+    State::state()) -> {discard_msg | ok | retry | send_back, state()}.
+select_reply_data(PData, Ref, RoundStatus, Round, Instance, State) ->
 
     IsValidRound = is_valid_round(RoundStatus, Round, State),
 
@@ -193,7 +212,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
         init when RoundStatus =:= current_round ->
             Data1 = prepare_load_data(State),
             Pid = pid_groups:get_my(gossip2),
-            comm:send_local(Pid, {selected_reply_data, ?MODULE, Data1, Ref, Round}),
+            comm:send_local(Pid, {selected_reply_data, {?MODULE, Instance}, Data1, Ref, Round}),
 
             _ = merge_load_data(current_round, PData, State),
 
@@ -212,16 +231,16 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
                     PrevState = state_get(prev_state, State),
                     Data1 = prepare_load_data(PrevState),
                     Pid = pid_groups:get_my(gossip2),
-                    comm:send_local(Pid, {selected_reply_data, ?MODULE, Data1, Ref, Round}),
+                    comm:send_local(Pid, {selected_reply_data, {?MODULE, Instance}, Data1, Ref, Round}),
                     _ = merge_load_data(prev_round, PData, State),
                     {ok, State}
             end
     end.
 
 -spec integrate_data(QData::load_data(), RoundStatus::gossip_beh:round_status(),
-    Round::non_neg_integer(), State::state()) ->
+    Round::non_neg_integer(), Instance::gossip_beh:instance_id(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
-integrate_data(QData, RoundStatus, Round, State) ->
+integrate_data(QData, RoundStatus, Round, Instance, State) ->
     log:log(debug, "[ ~w ] Reply-Data: ~w~n", [?MODULE, QData]),
 
     IsValidRound = is_valid_round(RoundStatus, Round, State),
@@ -234,13 +253,13 @@ integrate_data(QData, RoundStatus, Round, State) ->
             log:log(?SHOW, "[ ~w ] integrate_data in uninit", [?MODULE]),
             {retry,State};
         init ->
-            integrate_data_init(QData, RoundStatus, State)
+            integrate_data_init(QData, RoundStatus, Instance, State)
     end.
 
 
 -spec integrate_data_init(QData::load_data(), RoundStatus::gossip_beh:round_status(),
-    State::state()) -> {ok, state()}.
-integrate_data_init(QData, RoundStatus, State) ->
+    Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()}.
+integrate_data_init(QData, RoundStatus, Instance, State) ->
     case RoundStatus of
         current_round ->
             _NewData = merge_load_data(current_round, QData, State),
@@ -269,13 +288,13 @@ integrate_data_init(QData, RoundStatus, State) ->
             end
     end,
     Pid = pid_groups:get_my(gossip2),
-    comm:send_local(Pid, {integrated_data, ?MODULE, RoundStatus}),
+    comm:send_local(Pid, {integrated_data, {?MODULE, Instance}, RoundStatus}),
     {ok, State}.
 
 
 -spec handle_msg(Message::{get_state_response, DHTNodeState::dht_node_state:state()},
-    State::state()) -> {ok, state()}.
-handle_msg({get_state_response, DHTNodeState}, State) ->
+    Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()}.
+handle_msg({get_state_response, DHTNodeState}, Instance, State) ->
     Load = dht_node_state:get(DHTNodeState, load),
     log:log(?SHOW, "[ ~w ] Load: ~w", [?MODULE, Load]),
 
@@ -294,7 +313,7 @@ handle_msg({get_state_response, DHTNodeState}, State) ->
     Data6 = load_data_set(avg_kr, AvgKr, Data5),
 
     % histogram
-    Histo = init_histo(DHTNodeState),
+    Histo = init_histo(DHTNodeState, State),
     log:log(?SHOW,"[ ~w ] Histo: ~s", [?MODULE, to_string(Histo)]),
     Data7 = load_data_set(histo, Histo, Data6),
 
@@ -304,7 +323,7 @@ handle_msg({get_state_response, DHTNodeState}, State) ->
 
     % send PData to BHModule
     Pid = pid_groups:get_my(gossip2),
-    comm:send_local(Pid, {selected_data, ?MODULE, NewData}),
+    comm:send_local(Pid, {selected_data, {?MODULE, Instance}, NewData}),
     {ok, State}.
 
 -spec round_has_converged(State::state()) -> {boolean(), state()}.
@@ -341,11 +360,12 @@ notify_change(new_round, NewRound, State) ->
             state_new(State);
         false ->
             % make the old previous state the new previous state and discard the current state
-            log:log(warn, "[ ~w ] Entering new round, but old round has not converged", [?MODULE]),
+            log:log(warn(), "[ ~w ] Entering new round, but old round has not converged", [?MODULE]),
             PrevState = state_get(prev_state, State),
             NewState1 = state_new(PrevState),
             state_set(leader, state_get(leader, State), NewState1),
             state_set(range, state_get(range, State), NewState1),
+            state_set(no_of_buckets, state_get(no_of_buckets, State), NewState1),
             state_delete(State),
             NewState1
     end,
@@ -400,24 +420,23 @@ get_values_all(State) ->
     {list_to_tuple(InfosAll), State}.
 
 
--spec web_debug_info(state()) ->
+-spec web_debug_info(Instance::gossip_beh:instance_id(), state()) ->
     {KeyValueList::[{Key::any(),Value::any()},...], NewState::state()}.
-web_debug_info(State) ->
+web_debug_info(Instance, State) ->
     PreviousState = state_get(prev_state, State),
     PreviousData = prev_state_get(load_data, State),
-    io:format("PreviousData: ~w", [PreviousData]),
     CurrentData = state_get(load_data, State),
     BestState = previous_or_current(State),
     Best = if BestState =:= State -> current_data;
               BestState =:= PreviousState -> previous_data
         end,
     KeyValueList =
-        [{"gossip_load", ""},
-         {"best", Best},
-         {"leader", state_get(leader, State)},
+        [{to_string(?MODULE) ++ ":" ++ to_string(Instance), ""},
+         {"best",                Best},
+         {"leader",              state_get(leader, State)},
          {"prev_round",          state_get(round, PreviousState)},
          {"prev_merged",         state_get(merged, PreviousState)},
-         {"prev_conv_avg_count",  state_get(convergence_count, PreviousState)},
+         {"prev_conv_avg_count", state_get(convergence_count, PreviousState)},
          {"prev_avg",            get_current_estimate(avg, PreviousData)},
          {"prev_min",            load_data_get(min, PreviousData)},
          {"prev_max",            load_data_get(max, PreviousData)},
@@ -435,9 +454,14 @@ web_debug_info(State) ->
          {"cur_stddev",          calc_stddev(CurrentData)},
          {"cur_size_ldr",        get_current_estimate(size_inv, CurrentData)},
          {"cur_size_kr",         calc_size_kr(CurrentData)},
-         {"cur_histo",           to_string(load_data_get(histo, PreviousData))}],
+         {"cur_histo",           to_string(load_data_get(histo, CurrentData))}],
     {KeyValueList, State}.
 
+-spec shutdown(Instance::gossip_beh:instance_id(), State::state()) -> {ok, state_deleted}.
+shutdown(_Instance, State) ->
+    state_delete(state_get(prev_state, State)),
+    state_delete(State),
+    {ok, state_deleted}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -445,11 +469,11 @@ web_debug_info(State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
--spec request_local_info() -> ok.
-request_local_info() ->
+-spec request_local_info(Instance::gossip_beh:instance_id()) -> ok.
+request_local_info(Instance) ->
     % get state of dht node
     DHT_Node = pid_groups:get_my(dht_node),
-    EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, ?MODULE, '_'}),
+    EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, {?MODULE, Instance}, '_'}),
     % send_local doesn't work
     comm:send(comm:make_global(DHT_Node), {get_state, EnvPid}).
 
@@ -484,6 +508,7 @@ state_new(PrevState) ->
     state_set(prev_state, PrevState, NewState),
     state_set(leader, state_get(leader, PrevState), NewState),
     state_set(range, state_get(range, PrevState), NewState),
+    state_set(no_of_buckets, state_get(no_of_buckets, PrevState), NewState),
     NewState.
 
 
@@ -818,11 +843,11 @@ previous_or_current(State) when is_atom(State) orelse is_integer(State) ->
 %%%------------------------------- Histogram --------------------------------%%%
 
 
--spec init_histo(DHTNodeState::dht_node_state:state()) -> histogram().
-init_histo(DHTNodeState) ->
+-spec init_histo(DHTNodeState::dht_node_state:state(), State::state()) -> histogram().
+init_histo(DHTNodeState, State) ->
     DB = dht_node_state:get(DHTNodeState, db),
     MyRange = dht_node_state:get(DHTNodeState, my_range),
-    Buckets = intervals:split(intervals:all(), no_of_buckets()),
+    Buckets = intervals:split(intervals:all(), no_of_buckets(State)),
     [ {BucketInterval, get_load_for_interval(BucketInterval, MyRange, DB)}
         || BucketInterval <- Buckets ].
 
@@ -863,11 +888,7 @@ merge_histo(MyData, OtherData) when is_record(MyData, load_data)
     MergedHisto = lists:zipwith(fun merge_bucket/2, MyHisto, OtherHisto),
     load_data_set(histo, MergedHisto, MyData).
 
-%%% @doc For testing: ensure, that only buckets with identical keys are feeded to
-%%%      merge_bucket().
--spec merge_bucket_feeder(Bucket1::bucket(), Bucket2::bucket()) -> {bucket(), bucket()}.
-merge_bucket_feeder({Key1, Val1}, {_Key2, Val2}) ->
-    {{Key1, Val1}, {Key1, Val2}}.
+
 
 
 %%% @doc Merge two buckets of a histogram.
@@ -1041,9 +1062,16 @@ to_string(Histogram) when is_list(Histogram) ->
     Fun = fun (unknown, AccIn) -> AccIn ++ "    unknown";
               (Value, AccIn) ->  AccIn ++ io_lib:format(" ~10.2. f", [Value]) end,
     HistoString = lists:foldl(Fun, "[ ", Values) ++ " ]",
-    lists:flatten(HistoString).
+    lists:flatten(HistoString);
 
+%% to_string(ModuleName, Instance) when is_atom(Instance) ->
+%%     io_lib:format("{ ~s, ~s }", [ModuleName, atom_to_list(Instance)]);
 
+to_string(Atom) when is_atom(Atom) ->
+    lists:flatten(io_lib:format("~s", [Atom]));
+
+to_string(_GlobalUid={Uid, Pid}) when is_integer(Uid) andalso is_pid(Pid) ->
+    lists:flatten(io_lib:format("{~w, ~w}", [Uid, Pid])).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % For Testing
@@ -1051,15 +1079,16 @@ to_string(Histogram) when is_list(Histogram) ->
 
 %%% @doc Creates a random state() table within the given type specifications.
 %%%      Used as value_creator in tester.erl (property testing).
--spec tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status) -> state() when
+-spec tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status, NoOfBuckets) -> state() when
     ConvCount :: non_neg_integer(),
     Leader :: boolean(),
     LoadData::load_data(),
     Merged :: non_neg_integer(),
     Range :: intervals:non_empty_interval(),
     Round :: non_neg_integer(),
-    Status :: init|uninit.
-tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status) ->
+    Status :: init|uninit,
+    NoOfBuckets :: 1..50.
+tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status, NoOfBuckets) ->
     NewState = ets:new(cbstate, [set, protected]),
     state_set(convergence_count, ConvCount, NewState),
     state_set(leader, Leader, NewState),
@@ -1069,7 +1098,12 @@ tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status) -
     state_set(range, Range, NewState),
     state_set(round, Round, NewState),
     state_set(status, Status, NewState),
-    NewState.
+    state_set(no_of_buckets, NoOfBuckets, NewState),
+    % make the createt state the prev state of a new state
+    NewState2 = state_new(NewState),
+    % state_new only creates load_data_uninit, so we reuse the given LoadData
+    state_set(load_data, LoadData, NewState2),
+    NewState2.
 
 
 %%% @doc Checks if a given ets table is a valid state.
@@ -1079,7 +1113,9 @@ is_state(State) ->
     Keys = [convergence_count, leader, load_data, merged, prev_state, range, round, status],
     try lists:foreach(fun (Key) -> state_get(Key, State) end, Keys) of
         _Success -> true
-    catch _:_ -> false
+    catch _Kind:_Reason ->
+        %% log:log(warn, "is_state error: Kind: ~w, Reason ~w", [_Kind, _Reason]),
+        false
     end.
 
 
@@ -1126,4 +1162,15 @@ compare([H1|List1], [H2|List2]) when is_tuple(H1) andalso is_tuple(H2) ->
             false -> false
         end.
 
+%%% @doc For testing: ensure, that only buckets with identical keys are feeded to
+%%%      merge_bucket().
+-spec merge_bucket_feeder(Bucket1::bucket(), Bucket2::bucket()) -> {bucket(), bucket()}.
+merge_bucket_feeder({Key1, Val1}, {_Key2, Val2}) ->
+    {{Key1, Val1}, {Key1, Val2}}.
+
+-spec init_feeder([pos_integer()]) -> {[pos_integer()]}.
+init_feeder(List) ->
+    if length(List)>1 -> {[hd(List)]};
+        true -> {List}
+    end.
 

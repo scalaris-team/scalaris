@@ -627,7 +627,7 @@ getGossip() ->
     %% GossipPids = pid_groups:find_all(gossip2),
     [begin
          comm:send_local(Pid, {get_values_best, self()}),
-         %% comm:send_local(Pid, {get_values_best, gossip_load, self()}),
+         %% comm:send_local(Pid, {get_values_best, {gossip_load, default}, self()}),
          receive
              ?SCALARIS_RECV(
                  {gossip_get_values_best_response, BestValues}, %% ->
