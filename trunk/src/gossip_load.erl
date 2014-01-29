@@ -1,3 +1,4 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %  @copyright 2008-2011 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +26,7 @@
 % API
 -export([request_histogram/2, load_info_get/2]).
 
+% gossip_beh
 -export([init/1, init/2, init/3, init_delay/0, trigger_interval/0, select_node/1, select_data/1,
         select_reply_data/5, integrate_data/4, handle_msg/2, notify_change/3,
         min_cycles_per_round/0, max_cycles_per_round/0, round_has_converged/1,
@@ -40,12 +42,10 @@
 -define(SHOW, debug).
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Types
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Type Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-%% Gossip types
 -type state() :: ets:tab().
 -type state_key() :: convergence_count | instance | leader | load_data | merged |
     no_of_buckets | prev_state | range | request | requestor | round | status.
@@ -87,12 +87,11 @@
 -type(load_info() :: #load_info{}). %% @todo: mark as opaque (dialyzer currently crashes if set)
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Config Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Config Functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% External config function (called by bh module) %%
+%%--------- External config function (called by bh module) ---------%%
 
 %% @doc Defines how many ms the initialization of gossip_load is delayed in
 %%      relation to the bh module (non-blocking).
@@ -123,7 +122,8 @@ min_cycles_per_round() ->
 max_cycles_per_round() ->
     1000.
 
-%% Private config functions %%
+
+%%------------------- Private config functions ---------------------%%
 
 -spec convergence_count_best_values() -> pos_integer().
 convergence_count_best_values() ->
@@ -154,18 +154,18 @@ no_of_buckets(State) ->
     state_get(no_of_buckets, State).
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% API
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% API
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec request_histogram(Size::pos_integer(), SourceId::comm:mypid()) -> ok.
 request_histogram(Size, SourcePid) ->
     gossip2:start_gossip_task(?MODULE, [Size, SourcePid]).
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Callback Functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Callback Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec init(Instance::instance()) -> {ok, state()}.
 init(Instance) ->
@@ -207,6 +207,7 @@ select_data(State) ->
             comm:send_local(Pid, {selected_data, state_get(instance, State), LoadData})
     end,
     {ok, State}.
+
 
 -spec select_reply_data(PData::load_data(), Ref::pos_integer(),
     RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(),
@@ -250,6 +251,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
             end
     end.
 
+
 -spec integrate_data(QData::load_data(), RoundStatus::gossip_beh:round_status(),
     Round::non_neg_integer(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
@@ -268,41 +270,6 @@ integrate_data(QData, RoundStatus, Round, State) ->
         init ->
             integrate_data_init(QData, RoundStatus, State)
     end.
-
-
--spec integrate_data_init(QData::load_data(), RoundStatus::gossip_beh:round_status(),
-    State::state()) -> {ok, state()}.
-integrate_data_init(QData, RoundStatus, State) ->
-    case RoundStatus of
-        current_round ->
-            _NewData = merge_load_data(current_round, QData, State),
-            %% _PrevState = state_get(prev_state, State),
-            %% _PrevLoadInfo = get_load_info(_PrevState),
-            %% _ValuesBest = get_values_best(State),
-            %% _ValuesAll = get_values_all(State),
-            %% log:log(debug, "[ ~w ] Values best: ~n\t~w", [?MODULE, _ValuesBest]),
-            %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [?MODULE, _ValuesAll]),
-            %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [?MODULE, _PrevLoadInfo]),
-            _LoadInfo = get_load_info(State),
-            _Histo = load_data_get(histo, _NewData),
-            log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
-                [?MODULE, to_string(_LoadInfo), to_string(_Histo)]);
-        old_round ->
-             case discard_old_rounds() of
-                true ->
-                    log:log(debug, "[ ~w ] integrate_data in old_round", [?MODULE]),
-                    % This only happens when entering a new round, i.e. the values have
-                    % already converged. Consequently, discarding messages does
-                    % not cause mass loss.
-                    do_nothing;
-                false ->
-                    _ = merge_load_data(prev_round, QData, State),
-                    log:log(?SHOW, "[ ~w ] integrate_data in old_round", [?MODULE])
-            end
-    end,
-    Pid = pid_groups:get_my(gossip2),
-    comm:send_local(Pid, {integrated_data, state_get(instance, State), RoundStatus}),
-    {ok, State}.
 
 
 -spec handle_msg(Message::{get_state_response, DHTNodeState::dht_node_state:state()},
@@ -339,15 +306,11 @@ handle_msg({get_state_response, DHTNodeState}, State) ->
     comm:send_local(Pid, {selected_data, state_get(instance, State), NewData}),
     {ok, State}.
 
+
 -spec round_has_converged(State::state()) -> {boolean(), state()}.
 round_has_converged(State) ->
     ConvergenceCount = convergence_count_new_round(),
     {has_converged(ConvergenceCount, State), State}.
-
--spec has_converged(TargetConvergenceCount::pos_integer(), State::state()) -> boolean().
-has_converged(TargetConvergenceCount, State) ->
-    CurrentConvergenceCount = state_get(convergence_count, State),
-    CurrentConvergenceCount >= TargetConvergenceCount.
 
 
 -spec notify_change(Keyword::new_round, NewRound::non_neg_integer(), State::state()) -> {ok, state()};
@@ -457,10 +420,7 @@ shutdown(State) ->
     {ok, state_deleted}.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Helpers / Private Methods
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%%------------------- Callback Functions: Helpers ------------------%%
 
 -spec request_local_info(State::state()) -> ok.
 request_local_info(State) ->
@@ -469,6 +429,58 @@ request_local_info(State) ->
     EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, state_get(instance, State), '_'}),
     % send_local doesn't work
     comm:send(comm:make_global(DHT_Node), {get_state, EnvPid}).
+
+
+-spec is_valid_round(RoundStatus::gossip_beh:round_status(),
+    RoundFromMessage::non_neg_integer(), State::state()) -> boolean().
+is_valid_round(RoundStatus, RoundFromMessage, State) ->
+    RoundFromState = case RoundStatus of
+        current_round -> state_get(round, State);
+        old_round -> prev_state_get(round, State)
+    end,
+
+    case RoundFromState =:= RoundFromMessage of
+        true -> true;
+        false ->
+            log:log(debug, "[ ~w ] Invalid ~w. RoundFromState: ~w, RoundFromMessage: ~w",
+                [?MODULE, RoundStatus, RoundFromState, RoundFromMessage]),
+            false
+    end.
+
+
+-spec integrate_data_init(QData::load_data(), RoundStatus::gossip_beh:round_status(),
+    State::state()) -> {ok, state()}.
+integrate_data_init(QData, RoundStatus, State) ->
+    case RoundStatus of
+        current_round ->
+            _NewData = merge_load_data(current_round, QData, State),
+            %% _PrevState = state_get(prev_state, State),
+            %% _PrevLoadInfo = get_load_info(_PrevState),
+            %% _ValuesBest = get_values_best(State),
+            %% _ValuesAll = get_values_all(State),
+            %% log:log(debug, "[ ~w ] Values best: ~n\t~w", [?MODULE, _ValuesBest]),
+            %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [?MODULE, _ValuesAll]),
+            %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [?MODULE, _PrevLoadInfo]),
+            _LoadInfo = get_load_info(State),
+            _Histo = load_data_get(histo, _NewData),
+            log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
+                [?MODULE, to_string(_LoadInfo), to_string(_Histo)]);
+        old_round ->
+             case discard_old_rounds() of
+                true ->
+                    log:log(debug, "[ ~w ] integrate_data in old_round", [?MODULE]),
+                    % This only happens when entering a new round, i.e. the values have
+                    % already converged. Consequently, discarding messages does
+                    % not cause mass loss.
+                    do_nothing;
+                false ->
+                    _ = merge_load_data(prev_round, QData, State),
+                    log:log(?SHOW, "[ ~w ] integrate_data in old_round", [?MODULE])
+            end
+    end,
+    Pid = pid_groups:get_my(gossip2),
+    comm:send_local(Pid, {integrated_data, state_get(instance, State), RoundStatus}),
+    {ok, State}.
 
 
 -spec new_round(NewRound, State) -> {ok, State} when
@@ -497,6 +509,12 @@ new_round(NewRound, State) ->
     {ok, NewState}.
 
 
+-spec has_converged(TargetConvergenceCount::pos_integer(), State::state()) -> boolean().
+has_converged(TargetConvergenceCount, State) ->
+    CurrentConvergenceCount = state_get(convergence_count, State),
+    CurrentConvergenceCount >= TargetConvergenceCount.
+
+
 -spec finish_request(State) -> {ok, State} when
     State :: state().
 finish_request(State) ->
@@ -511,10 +529,52 @@ finish_request(State) ->
     {ok, State}.
 
 
+-spec update_convergence_count(OldData::load_data(), NewData::load_data(), State::state()) -> true.
+update_convergence_count(OldData, NewData, State) ->
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% State of gossip_load: Getters, Setters and Helpers
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % check whether all average based values changed less than epsilon percent
+    AvgChangeEpsilon = convergence_epsilon(),
+    Fun = fun(AvgType, Acc) ->
+            {OldAvg, OldWeight} = load_data_get(AvgType, OldData),
+            {NewAvg, NewWeight} = load_data_get(AvgType, NewData),
+            OldValue = calc_current_estimate(OldAvg, OldWeight),
+            NewValue = calc_current_estimate(NewAvg, NewWeight),
+            log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
+                [?MODULE, AvgType, OldValue, NewValue]),
+            HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon,
+            Acc andalso HasConverged
+    end,
+    HaveConverged1 = lists:foldl(Fun, true, [avg, avg2, size_inv, avg_kr]),
+    log:log(debug, "Averages have converged: ~w", [HaveConverged1]),
+
+    % Combine the avg values of the buckets of two histograms into one tuple list
+    Combine = fun ( {Interval, AvgOld}, {Interval, AvgNew} )
+        -> {AvgOld, AvgNew} end,
+    CompList = lists:zipwith(Combine,
+        load_data_get(histo, OldData), load_data_get(histo, NewData)),
+
+    % check that all the buckets of histogram have changed less than epsilon percent
+    Fun1 = fun({OldAvg, NewAvg}, AccIn) ->
+            OldEstimate = calc_current_estimate(OldAvg),
+            NewEstimate = calc_current_estimate(NewAvg),
+            HasConverged = calc_change(OldEstimate, NewEstimate) < AvgChangeEpsilon,
+            AccIn andalso HasConverged
+    end,
+    HaveConverged2 = lists:foldl(Fun1, true, CompList),
+    log:log(debug, "Histogram has converged: ~w", [HaveConverged2]),
+
+    HaveConverged = HaveConverged1 andalso HaveConverged2,
+    case HaveConverged of
+        true ->
+            state_update(convergence_count, fun inc/1, State);
+        false ->
+            state_set(convergence_count, 0, State)
+    end.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% State of gossip_load: Getters, Setters and Helpers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Create a new state table with some initial values.
 -spec state_new() -> state().
@@ -593,71 +653,9 @@ prev_state_get(Key, State) ->
 %%     state_set(Key, Value, PrevState).
 
 
--spec update_convergence_count(OldData::load_data(), NewData::load_data(), State::state()) -> true.
-update_convergence_count(OldData, NewData, State) ->
-
-    % check whether all average based values changed less than epsilon percent
-    AvgChangeEpsilon = convergence_epsilon(),
-    Fun = fun(AvgType, Acc) ->
-            {OldAvg, OldWeight} = load_data_get(AvgType, OldData),
-            {NewAvg, NewWeight} = load_data_get(AvgType, NewData),
-            OldValue = calc_current_estimate(OldAvg, OldWeight),
-            NewValue = calc_current_estimate(NewAvg, NewWeight),
-            log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
-                [?MODULE, AvgType, OldValue, NewValue]),
-            HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon,
-            Acc andalso HasConverged
-    end,
-    HaveConverged1 = lists:foldl(Fun, true, [avg, avg2, size_inv, avg_kr]),
-    log:log(debug, "Averages have converged: ~w", [HaveConverged1]),
-
-    % Combine the avg values of the buckets of two histograms into one tuple list
-    Combine = fun ( {Interval, AvgOld}, {Interval, AvgNew} )
-        -> {AvgOld, AvgNew} end,
-    CompList = lists:zipwith(Combine,
-        load_data_get(histo, OldData), load_data_get(histo, NewData)),
-
-    % check that all the buckets of histogram have changed less than epsilon percent
-    Fun1 = fun({OldAvg, NewAvg}, AccIn) ->
-            OldEstimate = calc_current_estimate(OldAvg),
-            NewEstimate = calc_current_estimate(NewAvg),
-            HasConverged = calc_change(OldEstimate, NewEstimate) < AvgChangeEpsilon,
-            AccIn andalso HasConverged
-    end,
-    HaveConverged2 = lists:foldl(Fun1, true, CompList),
-    log:log(debug, "Histogram has converged: ~w", [HaveConverged2]),
-
-    HaveConverged = HaveConverged1 andalso HaveConverged2,
-    case HaveConverged of
-        true ->
-            state_update(convergence_count, fun inc/1, State);
-        false ->
-            state_set(convergence_count, 0, State)
-    end.
-
-
--spec is_valid_round(RoundStatus::gossip_beh:round_status(),
-    RoundFromMessage::non_neg_integer(), State::state()) -> boolean().
-is_valid_round(RoundStatus, RoundFromMessage, State) ->
-    RoundFromState = case RoundStatus of
-        current_round -> state_get(round, State);
-        old_round -> prev_state_get(round, State)
-    end,
-
-    case RoundFromState =:= RoundFromMessage of
-        true -> true;
-        false ->
-            log:log(debug, "[ ~w ] Invalid ~w. RoundFromState: ~w, RoundFromMessage: ~w",
-                [?MODULE, RoundStatus, RoundFromState, RoundFromMessage]),
-            false
-    end.
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Load Data
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Load Data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc creates a new load_data (for internal use by gossip_load.erl)
 -spec load_data_new() -> load_data_uninit().
@@ -773,14 +771,6 @@ prepare_load_data(State) ->
 -spec divide2(AvgType:: avg | avg2 | size_inv | avg_kr, MyData::load_data()) ->
     load_data().
 divide2(AvgType, MyData) ->
-    %% NewAvg = case load_data_get(AvgType, MyData) of
-    %%     {Value, Weight} ->
-    %%         NewValue = Value/2,
-    %%         NewWeight = Weight/2,
-    %%         {NewValue, NewWeight};
-    %%     unknown -> unknown
-    %% end,
-    %% load_data_set(AvgType, NewAvg, MyData).
     {Avg, Weight} = load_data_get(AvgType, MyData),
     NewAvg = Avg/2,
     NewWeight = Weight/2,
@@ -879,7 +869,7 @@ previous_or_current(State) when is_atom(State) orelse is_integer(State) ->
 
 
 
-%%%------------------------------- Histogram --------------------------------%%%
+%%---------------------------- Histogram ---------------------------%%
 
 
 -spec init_histo(DHTNodeState::dht_node_state:state(), State::state()) -> histogram().
@@ -930,7 +920,7 @@ merge_histo(MyData, OtherData) when is_record(MyData, load_data)
 
 
 
-%%% @doc Merge two buckets of a histogram.
+%% @doc Merge two buckets of a histogram.
 -spec merge_bucket(Bucket1::bucket(), Bucket2::bucket()) -> bucket().
 merge_bucket({Key, unknown}, {Key, unknown}) ->
     {Key, unknown};
@@ -946,7 +936,7 @@ merge_bucket({Key, {Value1, Weight1}}, {Key, {Value2, Weight2}}) ->
 
 
 
-%%%------------------------------- Load Info --------------------------------%%%
+%%---------------------------- Load Info ---------------------------%%
 
 %% @doc Builds a load_info record from the given state (current or previous state)
 -spec get_load_info(State::state()) -> load_info().
@@ -984,9 +974,9 @@ load_info_get(Key, #load_info{avg=Avg, stddev=Stddev, size_ldr=SizeLdr,
     end.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Calculations on Load Data Values
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Calculations on Load Data Values
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Calculate the current estimate from a given {Value, Weight} tuple.
 -spec calc_current_estimate(unknown | avg()) -> float() | unknown.
@@ -1069,10 +1059,9 @@ calc_size_kr(Data) when is_record(Data, load_data) ->
     end.
 
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Misc
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Misc
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Increments given value with one.
 -spec inc(Value::integer()) -> integer().
@@ -1111,11 +1100,11 @@ to_string({ModuleName, Id}) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% For Testing
+%% For Testing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%% @doc Creates a random state() table within the given type specifications.
-%%%      Used as value_creator in tester.erl (property testing).
+%% @doc Creates a random state() table within the given type specifications.
+%%      Used as value_creator in tester.erl (property testing).
 -spec tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
         NoOfBuckets, Request, Instance) -> state() when
     ConvCount :: non_neg_integer(),
@@ -1150,8 +1139,8 @@ tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
     NewState2.
 
 
-%%% @doc Checks if a given ets table is a valid state.
-%%%      Used as type_checker in tester.erl (property testing).
+%% @doc Checks if a given ets table is a valid state.
+%%      Used as type_checker in tester.erl (property testing).
 -spec is_state(State::ets:tab()) -> boolean().
 is_state(State) ->
     Keys = [convergence_count, leader, load_data, merged, prev_state, range, round, status],
@@ -1163,9 +1152,9 @@ is_state(State) ->
     end.
 
 
-%%% @doc Creates a histogram() within the specifications of this modules, i.e.
-%%%      in particular that all histograms need to have the same keys
-%%%      (keyrange/no_of_buckets).
+%% @doc Creates a histogram() within the specifications of this modules, i.e.
+%%      in particular that all histograms need to have the same keys
+%%      (keyrange/no_of_buckets).
 -spec tester_create_histogram(ListOfAvgs::[avg() | unknown]) -> histogram().
 tester_create_histogram([]) ->
     tester_create_histogram([unknown]);
@@ -1177,8 +1166,8 @@ tester_create_histogram(ListOfAvgs) ->
     lists:map(Fun, Histo1).
 
 
-%%% @doc Checks if a given list is a valid histogram.
-%%%      Used as type_checker in tester.erl (property testing).
+%% @doc Checks if a given list is a valid histogram.
+%%      Used as type_checker in tester.erl (property testing).
 -spec is_histogram([{intervals:interval(), avg()}]) -> boolean().
 is_histogram([]) ->
     false;
@@ -1206,8 +1195,8 @@ compare([H1|List1], [H2|List2]) when is_tuple(H1) andalso is_tuple(H2) ->
             false -> false
         end.
 
-%%% @doc For testing: ensure, that only buckets with identical keys are feeded to
-%%%      merge_bucket().
+%% @doc For testing: ensure, that only buckets with identical keys are feeded to
+%%      merge_bucket().
 -spec merge_bucket_feeder(Bucket1::bucket(), Bucket2::bucket()) -> {bucket(), bucket()}.
 merge_bucket_feeder({Key1, Val1}, {_Key2, Val2}) ->
     {{Key1, Val1}, {Key1, Val2}}.
