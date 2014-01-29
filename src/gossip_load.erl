@@ -22,15 +22,16 @@
 
 -include("scalaris.hrl").
 
--export([load_info_get/2]).
+% API
+-export([request_histogram/2, load_info_get/2]).
 
 -export([init/1, init_delay/0, trigger_interval/0, select_node/2, select_data/2,
-        select_reply_data/6, integrate_data/5, handle_msg/3, notify_change/3,
+        select_reply_data/6, integrate_data/5, handle_msg/3, notify_change/4,
         min_cycles_per_round/0, max_cycles_per_round/0, round_has_converged/1,
         get_values_best/1, get_values_all/1, web_debug_info/2, shutdown/2]).
 
 %% for testing
--export([tester_create_histogram/1, is_histogram/1, tester_create_state/8, is_state/1,
+-export([tester_create_histogram/1, is_histogram/1, tester_create_state/9, is_state/1,
     init_feeder/1]).
 -export_type([state/0]).
 
@@ -48,7 +49,7 @@
 %% Gossip types
 -type state() :: ets:tab().
 -type state_key() :: convergence_count | leader | load_data | merged |
-    no_of_buckets | prev_state | range | round | status.
+    no_of_buckets | prev_state | range | request | requestor | round | status.
 -type avg() :: {Value::float(), Weight::float()}.
 -type avg_kr() :: {number(), float()}.
 -type min() :: non_neg_integer().
@@ -163,6 +164,16 @@ warn() ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% API
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec request_histogram(Size::pos_integer(), SourceId::comm:mypid()) -> ok.
+request_histogram(Size, SourcePid) ->
+    gossip2:start_gossip_task(?MODULE, [Size, SourcePid]).
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Callback Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -175,7 +186,18 @@ init(Args=[NoOfBuckets]) when length(Args) =:= 1 andalso is_integer(NoOfBuckets)
     State = state_new(),
     state_set(prev_state, unknown, State),
     state_set(no_of_buckets, NoOfBuckets, State),
+    {ok, State};
+
+init(Args=[NoOfBuckets, RequestorPid]) when length(Args) =:= 2
+        andalso is_integer(NoOfBuckets) ->
+    log:log(debug, "[ ~w ] CBModule initiated", [?MODULE]),
+    State = state_new(),
+    state_set(prev_state, unknown, State),
+    state_set(no_of_buckets, NoOfBuckets, State),
+    state_set(request, true, State),
+    state_set(requestor, RequestorPid, State),
     {ok, State}.
+
 
 
 -spec select_node(Instance::gossip_beh:instance_id(), State::state()) -> {boolean(), state()}.
@@ -207,7 +229,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, Instance, State) ->
             log:log(?SHOW, "[ ~w ] select_reply_data in uninit", [?MODULE]),
             {retry,State};
         init when not IsValidRound ->
-            log:log(warn, "[ ~w ] Discarded Data. PData: ~w", [?MODULE, PData]),
+            log:log(warn, "[ ~w ] Discarded data in select_reply_data. Reason: invalid round.", [?MODULE]),
             {send_back, State};
         init when RoundStatus =:= current_round ->
             Data1 = prepare_load_data(State),
@@ -247,7 +269,7 @@ integrate_data(QData, RoundStatus, Round, Instance, State) ->
 
     case state_get(status, State) of
         _ when not IsValidRound ->
-            log:log(warn, "[ ~w ] Discarded Data. QData: ~w", [?MODULE, QData]),
+            log:log(warn, "[ ~w ] Discarded data in integrate_data. Reason: invalid round. ", [?MODULE]),
             {send_back, State};
         uninit ->
             log:log(?SHOW, "[ ~w ] integrate_data in uninit", [?MODULE]),
@@ -337,55 +359,35 @@ has_converged(TargetConvergenceCount, State) ->
     CurrentConvergenceCount >= TargetConvergenceCount.
 
 
--spec notify_change(Keyword::new_round, NewRound::non_neg_integer(),
+-spec notify_change(Keyword::new_round, NewRound::non_neg_integer(), Instance::gossip_beh:instance_id(),
             State::state()) -> {ok, state()};
-    (Keyword::leader, {MsgTag::is_leader | no_leader,
-            NewRange::intervals:interval()}, State::state()) -> {ok, state()};
-    (Keyword::exch_failure, {_MsgTag::atom(), Data::load_data(),
-            _Round::non_neg_integer()}, State::state()) -> {ok, state()}.
-notify_change(new_round, NewRound, State) ->
+    (Keyword::leader, {MsgTag::is_leader | no_leader, NewRange::intervals:interval()},
+            Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()};
+    (Keyword::exch_failure, {_MsgTag::atom(), Data::load_data(), _Round::non_neg_integer()},
+             Instance::gossip_beh:instance_id(), State::state()) -> {ok, state()}.
+notify_change(new_round, NewRound, Instance, State) ->
     log:log(debug, "[ ~w ] new_round notification. NewRound: ~w", [?MODULE, NewRound]),
-    _Histo = load_data_get(histo, state_get(load_data, State)),
-    log:log(debug, "[ ~w ] Histo: ~s", [?MODULE, to_string(_Histo)]),
-
-    % only replace prev round with current round if current has converged
-    % cases in which current round has not converged: e.g. late joining, sleeped/paused
-    % ConvergenceTarget should be less than covergence_count_new_round,
-    % otherwise non leader groups seldom replace prev_load_data
-    NewState = case has_converged(convergence_count_best_values(), State) of
+    case state_get(request, State) of
         true ->
-            % make the current state the previous state and delete the old prev state
-            OldPrevState = state_get(prev_state, State),
-            state_delete(OldPrevState),
-            state_new(State);
+            finish_request(Instance, State);
         false ->
-            % make the old previous state the new previous state and discard the current state
-            log:log(warn(), "[ ~w ] Entering new round, but old round has not converged", [?MODULE]),
-            PrevState = state_get(prev_state, State),
-            NewState1 = state_new(PrevState),
-            state_set(leader, state_get(leader, State), NewState1),
-            state_set(range, state_get(range, State), NewState1),
-            state_set(no_of_buckets, state_get(no_of_buckets, State), NewState1),
-            state_delete(State),
-            NewState1
-    end,
-    state_set(round, NewRound, NewState),
-    {ok, NewState};
+            new_round(NewRound, State)
+    end;
 
-notify_change(leader, {MsgTag, NewRange}, State) when MsgTag =:= is_leader ->
+notify_change(leader, {MsgTag, NewRange}, _Instance, State) when MsgTag =:= is_leader ->
     log:log(?SHOW, "[ ~w ] I'm the leader", [?MODULE]),
     state_set(leader, true, State),
     state_set(range, NewRange, State),
     {ok, State};
 
-notify_change(leader, {MsgTag, NewRange}, State) when MsgTag =:= no_leader ->
+notify_change(leader, {MsgTag, NewRange}, _Instance, State) when MsgTag =:= no_leader ->
     log:log(?SHOW, "[ ~w ] I'm no leader", [?MODULE]),
     state_set(leader, false, State),
     state_set(range, NewRange, State),
     {ok, State};
 
 
-notify_change(exch_failure, {_MsgTag, Data, Round}, State) ->
+notify_change(exch_failure, {_MsgTag, Data, Round}, _Instance, State) ->
     RoundFromState = state_get(round, State),
     RoundStatus = if Round =:= RoundFromState -> current_round;
         Round =/= RoundFromState -> old_round
@@ -403,7 +405,7 @@ notify_change(exch_failure, {_MsgTag, Data, Round}, State) ->
     {ok, State}.
 
 
-%% @doc atm, returns unknown if no previous exists (todo change??)
+%% @doc
 -spec get_values_best(state()) -> {load_info(), state()}.
 get_values_best(State) ->
     BestState = previous_or_current(State),
@@ -457,6 +459,7 @@ web_debug_info(Instance, State) ->
          {"cur_histo",           to_string(load_data_get(histo, CurrentData))}],
     {KeyValueList, State}.
 
+
 -spec shutdown(Instance::gossip_beh:instance_id(), State::state()) -> {ok, state_deleted}.
 shutdown(_Instance, State) ->
     state_delete(state_get(prev_state, State)),
@@ -478,6 +481,56 @@ request_local_info(Instance) ->
     comm:send(comm:make_global(DHT_Node), {get_state, EnvPid}).
 
 
+-spec new_round(NewRound, State) -> {ok, State} when
+    NewRound :: non_neg_integer(),
+    State :: state().
+new_round(NewRound, State) ->
+    % Only replace prev round with current round if current has converged.
+    % Cases in which current round has not converged: e.g. late joining, sleeped/paused.
+    % ConvergenceTarget should be less than covergence_count_new_round,
+    % otherwise non leader groups seldom replace prev_load_data
+    NewState = case has_converged(convergence_count_best_values(), State) of
+        true ->
+            % make the current state the previous state and delete the old prev state
+            OldPrevState = state_get(prev_state, State),
+            state_delete(OldPrevState),
+            state_new(State);
+        false ->
+            % make the old previous state the new previous state and discard the current state
+            log:log(warn(), "[ ~w ] Entering new round, but old round has not converged", [?MODULE]),
+            PrevState = state_get(prev_state, State),
+            NewState1 = state_new(PrevState),
+            state_set(leader, state_get(leader, State), NewState1),
+            state_set(range, state_get(range, State), NewState1),
+            state_set(no_of_buckets, state_get(no_of_buckets, State), NewState1),
+            state_set(request, state_get(request, State), NewState1),
+            case state_get(request, NewState1) of
+                true ->
+                    state_set(requestor, state_get(requestor, State), NewState1);
+                false -> do_nothing
+            end,
+            state_delete(State),
+            NewState1
+    end,
+    state_set(round, NewRound, NewState),
+    {ok, NewState}.
+
+
+-spec finish_request(Instance, State) -> {ok, State} when
+    Instance :: gossip_beh:instance_id(),
+    State :: state().
+finish_request(Instance, State) ->
+    Histo = load_data_get(histo, state_get(load_data, State)),
+    case state_get(leader, State) of
+        true ->
+            Requestor = state_get(requestor, State),
+            comm:send(Requestor, {histogram, Histo}),
+            gossip2:stop_gossip_task({?MODULE, Instance});
+        false -> do_nothing
+    end,
+    {ok, State}.
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % State of gossip_load: Getters, Setters and Helpers
@@ -492,6 +545,7 @@ state_new() ->
     state_set(leader, unknown, NewState),
     state_set(range, unknown, NewState),
     state_set(prev_state, unknown, NewState),
+    state_set(request, false, NewState),
     Fun = fun (Key) -> state_set(Key, 0, NewState) end,
     lists:foreach(Fun, [round, merged, reqs_send, reqs_recv, replies_recv, convergence_count]),
     NewState.
@@ -509,6 +563,12 @@ state_new(PrevState) ->
     state_set(leader, state_get(leader, PrevState), NewState),
     state_set(range, state_get(range, PrevState), NewState),
     state_set(no_of_buckets, state_get(no_of_buckets, PrevState), NewState),
+    state_set(request, state_get(request, PrevState), NewState),
+    case state_get(request, NewState) of
+        true ->
+            state_set(requestor, state_get(requestor, PrevState), NewState);
+        false -> do_nothing
+    end,
     NewState.
 
 
@@ -1079,7 +1139,8 @@ to_string(_GlobalUid={Uid, Pid}) when is_integer(Uid) andalso is_pid(Pid) ->
 
 %%% @doc Creates a random state() table within the given type specifications.
 %%%      Used as value_creator in tester.erl (property testing).
--spec tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status, NoOfBuckets) -> state() when
+-spec tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
+        NoOfBuckets, Request) -> state() when
     ConvCount :: non_neg_integer(),
     Leader :: boolean(),
     LoadData::load_data(),
@@ -1087,8 +1148,10 @@ to_string(_GlobalUid={Uid, Pid}) when is_integer(Uid) andalso is_pid(Pid) ->
     Range :: intervals:non_empty_interval(),
     Round :: non_neg_integer(),
     Status :: init|uninit,
-    NoOfBuckets :: 1..50.
-tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status, NoOfBuckets) ->
+    NoOfBuckets :: 1..50,
+    Request :: boolean().
+tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
+        NoOfBuckets, Request) ->
     NewState = ets:new(cbstate, [set, protected]),
     state_set(convergence_count, ConvCount, NewState),
     state_set(leader, Leader, NewState),
@@ -1099,10 +1162,13 @@ tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status, N
     state_set(round, Round, NewState),
     state_set(status, Status, NewState),
     state_set(no_of_buckets, NoOfBuckets, NewState),
+    state_set(request, Request, NewState),
+    state_set(requestor, comm:this(), NewState),
     % make the createt state the prev state of a new state
     NewState2 = state_new(NewState),
     % state_new only creates load_data_uninit, so we reuse the given LoadData
     state_set(load_data, LoadData, NewState2),
+    state_set(requestor, comm:this(), NewState2),
     NewState2.
 
 

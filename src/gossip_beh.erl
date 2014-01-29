@@ -80,8 +80,8 @@
 -callback round_has_converged(State::cb_state()) ->
     {true|false, cb_state()}.
 
--callback notify_change(notify_keyword(), _|new_leader_msg(), State::cb_state()) ->
-    cb_return().
+-callback notify_change(notify_keyword(), _|new_leader_msg(), Instance::instance_id(),
+    State::cb_state()) -> cb_return().
 
 % Result extraction
 
@@ -107,7 +107,7 @@ behaviour_info(callbacks) ->
     {min_cycles_per_round, 0},
     {max_cycles_per_round, 0},
     {round_has_converged, 1},
-    {notify_change, 3},
+    {notify_change, 4},
     {get_values_best, 1},
     {get_values_all, 1},
     {web_debug_info,2}
