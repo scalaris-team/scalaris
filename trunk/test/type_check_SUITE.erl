@@ -155,6 +155,7 @@ tester_type_check_gossip(_Config) ->
 tester_type_check_gossip2(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
+    config:write(gossip_load_debug_level_warn, debug),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
@@ -166,45 +167,52 @@ tester_type_check_gossip2(_Config) ->
     tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state),
     tester:register_value_creator({typedef, gossip2, state}, gossip2, tester_create_state, 10),
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
-    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 7),
+    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 8),
     Modules =
         [ {gossip2,
             % excluded (exported functions)
-            [   {start_link,1}, % type of pid_groups:groupname() seems not restrictive enough
-                {init,1}, % does not return fully filled state
-                {on_inactive,2}, % sends messages
-                {on_active,2}, % sends messages
-                {activate,1} % uses pid_group:get_my()
+            [   {start_link, 1}, % type of pid_groups:groupname() seems not restrictive enough
+                {init, 1}, % does not return fully filled state
+                {start_gossip_task, 2}, % send messages
+                {stop_gossip_task, 1}, % send messages
+                {on_inactive, 2}, % sends messages
+                {on_active, 2}, % sends messages
+                {activate, 1} % uses pid_group:get_my()
             ],
             % excluded (private functions)
-            [   {start_p2p_exchange,4}, % needs node as peer
-                {init_gossip_task,2}, % tested via feeder
-                {cb_call,5}, % spec to wide
-                {select_reply_data,7}, % would need valid callback state
-                {request_random_node,1}, % needs pid_group:get_my()
-                {request_random_node_delayed,2}, % needs pid_group:get_my()
-                {check_round,3}, % would need valid callback state
-                {is_end_of_round,2}, % would need valid callback state
-                {state_get,2}, % tested via feeder
-                {state_take,2}, % tested via feeder
-                {state_update,4} % tester can not create a value of type fun()
+            [   {handle_msg, 2}, % sends messages
+                {start_p2p_exchange, 4}, % needs node as peer
+                {start_gossip_task, 3}, % test via feeder
+                {cb_call, 3}, % unbounded_fun?
+                {cb_call, 5}, % spec to wide
+                {cb_call_instance, 5}, % spec to wide
+                {handle_cb_return, 4}, % spec to wide
+                {select_reply_data, 7}, % would need to valid load_data
+                {request_random_node, 1}, % needs pid_group:get_my()
+                {request_random_node_delayed, 2}, % needs pid_group:get_my()
+                {check_round, 3}, % would need valid callback state
+                {is_end_of_round, 2}, % would need valid callback state
+                {state_get, 2}, % tested via feeder
+                {state_take, 2}, % tested via feeder
+                {state_update, 3}, % tester can not create a value of type fun()
+                {state_update, 4} % tester can not create a value of type fun()
             ]},
           {gossip_load,
             % excluded (exported functions)
-            [   {select_data,1}, % needs pid_groups:get_my()
-                {select_reply_data,5}, % needs pid_groups:get_my / references
-                {integrate_data,4}, % needs pid_groups:get_my()
-                {handle_msg,2}, % needs pid_groups:get_my()
-                {notify_change,3} % needs state
+            [   {init, 1}, % tested via feeder
+                {select_data, 2}, % needs pid_groups:get_my()
+                {select_reply_data, 6}, % needs pid_groups:get_my / references
+                {integrate_data, 5}, % needs pid_groups:get_my()
+                {handle_msg, 3} % needs pid_groups:get_my()
             ],
             % excluded (private functions)
-            [  {integrate_data_init,3}, % needs pid_groups:get_my()
-               {request_local_info,0}, % sends message
-               {state_update,3}, % cannot create funs
-               {init_histo,1}, % needs DHTNodeState state
-               {get_load_for_interval,3}, % needs dht db
-               {merge_histo,2}, % tested via feeder
-               {merge_bucket,2} % tested via feeder
+            [  {integrate_data_init, 4}, % needs pid_groups:get_my()
+               {request_local_info, 1}, % sends message
+               {state_update, 3}, % cannot create funs
+               {init_histo, 2}, % needs DHTNodeState state
+               {get_load_for_interval, 3}, % needs dht db
+               {merge_histo, 2}, % tested via feeder
+               {merge_bucket, 2} % tested via feeder
             ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
