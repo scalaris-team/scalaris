@@ -211,19 +211,16 @@ on({report_stats}, State) ->
 on({check_idle}, State) ->
     Timeout = config:read(tcp_idle_timeout),
     TimeLastMsgSent = time_last_msg_sent(State),
-    case socket(State) =:= notconnected of
-        true -> State;
+    start_idle_check(),
+    case socket(State) =/= notconnected andalso
+             timer:now_diff(os:timestamp(), TimeLastMsgSent) div 1000 > Timeout of
+        true ->
+            %% we timed out
+            ?TRACE("Closing idle connection: ~p~n", [State]),
+            close_connection(socket(State), State);
         _    ->
-            case timer:now_diff(os:timestamp(), TimeLastMsgSent) div 1000 of
-                N when N > Timeout ->
-                    %% we timed out
-                    ?TRACE("Closing idle connection: ~p~n", [State]),
-                    close_connection(socket(State), State);
-                _ ->
-                    ?TRACE("Connection not idle~n", []),
-                    start_idle_check(),
-                    State
-            end
+            ?TRACE("Connection not idle~n", []),
+            State
     end;
 
 on({web_debug_info, Requestor}, State) ->
@@ -491,7 +488,6 @@ new_connection(Address, Port, MyPort, Channel, Retries) ->
             % in order to have only a single connection to me)
             case inet:sockname(Socket) of
                 {ok, {MyAddress, _SocketPort}} ->
-                    start_idle_check(),
                     case comm_server:get_local_address_port() of
                         {undefined,_} ->
                             comm_server:set_local_address(MyAddress, MyPort);
