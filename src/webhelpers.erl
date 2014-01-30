@@ -617,17 +617,17 @@ renderIndexedRing({failed, Pid}) ->
 
 %%%-----------------------------Gossip----------------------------------
 
-%% -type gossip_pv() :: {PidName::string(), gossip_state:values()}.
--type gossip_pv() :: {PidName::string(), gossip_load:load_info()}.
+-type gossip_pv() :: {PidName::string(), gossip_state:values()}.
+%% -type gossip_pv() :: {PidName::string(), gossip_load:load_info()}.
 -type gossip_key() :: avgLoad | stddev | size_ldr | size_kr | minLoad | maxLoad.
 
 -spec getGossip() -> [gossip_pv()].
 getGossip() ->
-    %% GossipPids = pid_groups:find_all(gossip),
-    GossipPids = pid_groups:find_all(gossip2),
+    GossipPids = pid_groups:find_all(gossip),
+    %% GossipPids = pid_groups:find_all(gossip2),
     [begin
-         %% comm:send_local(Pid, {get_values_best, self()}),
-         comm:send_local(Pid, {get_values_best, {gossip_load, default}, self()}),
+         comm:send_local(Pid, {get_values_best, self()}),
+         %% comm:send_local(Pid, {get_values_best, {gossip_load, default}, self()}),
          receive
              ?SCALARIS_RECV(
                  {gossip_get_values_best_response, BestValues}, %% ->
@@ -734,13 +734,13 @@ renderGossipData({_P1, V1}, {P2Exists, PV2}, {P3Exists, PV3}, Name, Key, Fun) ->
       TD_V3_1, TD_V3_2
      ]}.
 
-%% -spec format_gossip_value(gossip_state:values(), Key::gossip_key(),
-%%                           fun((term()) -> string())) -> string().
--spec format_gossip_value(gossip_load:load_info(), Key::gossip_key(),
+-spec format_gossip_value(gossip_state:values(), Key::gossip_key(),
                           fun((term()) -> string())) -> string().
+%% -spec format_gossip_value(gossip_load:load_info(), Key::gossip_key(),
+%%                           fun((term()) -> string())) -> string().
 format_gossip_value(Value, Key, Fun) ->
-    %% case gossip_state:get(Value, Key) of
-    case gossip_load:load_info_get(Key, Value) of
+    case gossip_state:get(Value, Key) of
+    %% case gossip_load:load_info_get(Key, Value) of
         unknown -> "n/a";
         X       -> Fun(X)
     end.
