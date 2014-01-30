@@ -110,7 +110,7 @@ on({zombie, Node}, Nodes) ->
     on({register, Node}, Nodes);
 
 on({web_debug_info, Requestor}, Nodes) ->
-    RegisteredPids = gb_trees:to_list(Nodes),
+    RegisteredPids = gb_trees:keys(Nodes),
     % resolve (local and remote) pids to names:
     PidNames = pid_groups:pids_to_names(RegisteredPids, 1000),
     KeyValueList =
