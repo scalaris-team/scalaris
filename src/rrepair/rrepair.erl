@@ -1,4 +1,4 @@
-% @copyright 2011, 2012 Zuse Institute Berlin
+% @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -51,12 +51,6 @@
 %-define(TRACE_COMPLETE(X,Y), log:pal("~w [~p] " ++ X ++ "~n", [?MODULE, self()] ++ Y)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% constants
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--define(TRIGGER_NAME,   rr_trigger).
--define(GC_TRIGGER,     rr_gc_trigger).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % export
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -92,8 +86,6 @@
 
 -record(rrepair_state,
         {
-         trigger_state  = ?required(rrepair_state, trigger_state)   :: trigger:state() | null,
-         gc_trigger     = ?required(rrepair_state, gc_trigger)      :: trigger:state(),     %garbage collector trigger to remove dead sessions
          round          = 0                                         :: round(),
          open_recon     = 0                                         :: non_neg_integer(),
          open_resolve   = 0                                         :: non_neg_integer(),
@@ -114,8 +106,8 @@
     {request_resolve, rr_resolve:operation(), rr_resolve:options()} |
     {get_state, Sender::comm:mypid(), Keys::state_field() | [state_field(),...]} |
     % internal
-    {?TRIGGER_NAME} |
-    {?GC_TRIGGER} |
+    {rr_trigger} |
+    {rr_gc_trigger} |
     {start_sync, get_range, session_id(), rr_recon:method(), DestKey::random | ?RT:key(), {get_state_response, MyI::intervals:interval()}} |
 	{start_recon | continue_recon, SenderRRPid::comm:mypid(), session_id() | null, ReqMsg::rr_recon:request()} |
     {request_resolve | continue_resolve, session_id() | null, rr_resolve:operation(), rr_resolve:options()} |
@@ -173,7 +165,7 @@ on({get_state, Sender, Key}, State =
 % internal messages
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({?TRIGGER_NAME}, State) ->
+on({rr_trigger} = Msg, State) ->
     ?TRACE("RR: SYNC TRIGGER", []),
     Prob = get_start_prob(),
     Random = randoms:rand_uniform(1, 100),
@@ -181,19 +173,16 @@ on({?TRIGGER_NAME}, State) ->
            comm:send_local(self(), {request_sync, get_recon_method(), random});
        true -> ok
     end,
-    NewTriggerState =
-        ?IIF(State#rrepair_state.trigger_state =:= null, null,
-             trigger:next(State#rrepair_state.trigger_state)),
-    State#rrepair_state{ trigger_state = NewTriggerState };
+    msg_delay:send_trigger(get_trigger_interval(), Msg),
+    State;
 
-on ({?GC_TRIGGER}, State = #rrepair_state{ gc_trigger = GCState,
-                                           open_sessions = Sessions }) ->
-    Elapsed = get_gc_interval(),
+on({rr_gc_trigger} = Msg, State = #rrepair_state{ open_sessions = Sessions }) ->
+    Elapsed = get_gc_interval() * 1000,
     NewSessions = [S#session{ ttl = S#session.ttl - Elapsed }
                             || S <- Sessions,
                                S#session.ttl - Elapsed > 0],
-    State#rrepair_state{ gc_trigger = trigger:next(GCState),
-                         open_sessions = NewSessions };
+    msg_delay:send_trigger(Elapsed div 1000, Msg),
+    State#rrepair_state{ open_sessions = NewSessions };
 
 on({start_sync, get_range, SessionId, Method, DestKey, {get_state_response, MyI}}, State) ->
     Msg = {?send_to_group_member, rrepair,
@@ -490,14 +479,12 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module and starts the trigger
 -spec init([]) -> state().
 init([]) ->
-    TriggerState = case get_update_interval() of
-                       0 -> null;
-                       X -> trigger:next(
-                              trigger:init(trigger_periodic, X, ?TRIGGER_NAME))
-                   end,
-    GCTrigger = trigger:next(
-                  trigger:init(trigger_periodic, get_gc_interval(), ?GC_TRIGGER)),
-    #rrepair_state{trigger_state = TriggerState, gc_trigger = GCTrigger}.
+    case get_trigger_interval() of
+        0 -> null;
+        X -> msg_delay:send_trigger(X, {rr_trigger})
+    end,
+    msg_delay:send_trigger(get_gc_interval(), {rr_gc_trigger}),
+    #rrepair_state{}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Config handling
@@ -529,8 +516,10 @@ check_config() ->
 -spec get_recon_method() -> rr_recon:method().
 get_recon_method() ->  config:read(rr_recon_method).
 
--spec get_update_interval() -> non_neg_integer().
-get_update_interval() -> config:read(rr_trigger_interval).
+-spec get_trigger_interval() -> non_neg_integer().
+get_trigger_interval() ->
+    %% deactivated when 0,so ceil when larger than 0
+    util:ceil(config:read(rr_trigger_interval) / 1000).
 
 -spec get_start_prob() -> pos_integer().
 get_start_prob() -> config:read(rr_trigger_probability).
@@ -539,4 +528,4 @@ get_start_prob() -> config:read(rr_trigger_probability).
 get_session_ttl() -> config:read(rr_session_ttl).
 
 -spec get_gc_interval() -> pos_integer().
-get_gc_interval() -> config:read(rr_gc_interval).
+get_gc_interval() -> config:read(rr_gc_interval) div 1000.

@@ -1,4 +1,4 @@
-% @copyright 2008-2012 Zuse Institute Berlin
+% @copyright 2008-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -24,8 +24,7 @@
 
 -behavior(rm_beh).
 
--type(state() :: {Neighbors    :: nodelist:neighborhood(),
-                  TriggerState :: trigger:state()}).
+-type(state() :: {Neighbors :: nodelist:neighborhood()}).
 
 % accepted messages of an initialized rm_chord process in addition to rm_loop
 -type(custom_message() ::
@@ -41,7 +40,7 @@
 -include("rm_beh.hrl").
 
 -spec get_neighbors(state()) -> nodelist:neighborhood().
-get_neighbors({Neighbors, _TriggerState}) ->
+get_neighbors({Neighbors}) ->
     Neighbors.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -52,18 +51,15 @@ get_neighbors({Neighbors, _TriggerState}) ->
 -spec init(Me::node:node_type(), Pred::node:node_type(),
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
-    Trigger = config:read(ringmaintenance_trigger),
-    TriggerState = trigger:init(Trigger, stabilizationInterval(), rm_trigger),
-    NewTriggerState = trigger:now(TriggerState),
+    msg_delay:send_trigger(stabilizationInterval(), {rm_trigger}),
+    comm:send_local(self(), {rm_trigger_action}),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     get_successorlist(node:pidX(Succ)),
-    {Neighborhood, NewTriggerState}.
+    {Neighborhood}.
 
 -spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
 unittest_create_state(Neighbors) ->
-    Trigger = config:read(ringmaintenance_trigger),
-    TriggerState = trigger:init(Trigger, stabilizationInterval(), rm_trigger),
-    {Neighbors, TriggerState}.
+    {Neighbors}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -72,11 +68,11 @@ unittest_create_state(Neighbors) ->
 %% @doc Message handler when the module is fully initialized.
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
-handle_custom_message({rm_trigger}, {Neighborhood, TriggerState}) ->
-    NewTriggerState = trigger:next(TriggerState),
-    handle_custom_message({rm_trigger_action}, {Neighborhood, NewTriggerState});
+handle_custom_message({rm_trigger}, {Neighborhood}) ->
+    msg_delay:send_trigger(stabilizationInterval(), {rm_trigger}),
+    handle_custom_message({rm_trigger_action}, {Neighborhood});
 
-handle_custom_message({rm_trigger_action}, {Neighborhood, _TriggerState} = State) ->
+handle_custom_message({rm_trigger_action}, {Neighborhood} = State) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
         true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
@@ -87,7 +83,7 @@ handle_custom_message({rm_trigger_action}, {Neighborhood, _TriggerState} = State
     end,
     {{unknown}, State};
 
-handle_custom_message({rm, get_succlist, Source_Pid}, {Neighborhood, _TriggerState} = State) ->
+handle_custom_message({rm, get_succlist, Source_Pid}, {Neighborhood} = State) ->
     comm:send(Source_Pid, {rm, get_succlist_response,
                            nodelist:node(Neighborhood),
                            nodelist:succs(Neighborhood)},
@@ -106,7 +102,7 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_succ},
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
 handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_node},
-   {OldNeighborhood, TriggerState} = State)  ->
+   {OldNeighborhood} = State)  ->
     case node_details:get(NodeDetails, is_leaving) of
         false ->
             Node = node_details:get(NodeDetails, node),
@@ -122,13 +118,13 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_node},
                                             nodelist:node(NewNeighborhood));
                 false -> ok
             end,
-            {{node_discovery}, {NewNeighborhood, TriggerState}};
+            {{node_discovery}, {NewNeighborhood}};
         true  -> {{unknown}, State}
     end;
 
 handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
-   {OldNeighborhood, _TriggerState} = State) ->
-    
+   {OldNeighborhood} = State) ->
+
     NewNeighborhood = nodelist:add_nodes(OldNeighborhood, [Succ | SuccsSuccList],
                                          predListLength(), succListLength()),
     OldView = nodelist:to_list(OldNeighborhood),
@@ -144,40 +140,40 @@ handle_custom_message(_, _State) -> unknown_event.
 
 -spec new_pred(State::state(), NewPred::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
-new_pred({OldNeighborhood, TriggerState}, NewPred) ->
+new_pred({OldNeighborhood}, NewPred) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewPred,
                                         predListLength(), succListLength()),
-    {{unknown}, {NewNeighborhood, TriggerState}}.
+    {{unknown}, {NewNeighborhood}}.
 
 -spec new_succ(State::state(), NewSucc::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
-new_succ({OldNeighborhood, TriggerState}, NewSucc) ->
+new_succ({OldNeighborhood}, NewSucc) ->
     NewNeighborhood = nodelist:add_node(OldNeighborhood, NewSucc,
                                         predListLength(), succListLength()),
-    {{unknown}, {NewNeighborhood, TriggerState}}.
+    {{unknown}, {NewNeighborhood}}.
 
 -spec remove_pred(State::state(), OldPred::node:node_type(),
                   PredsPred::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
-remove_pred({OldNeighborhood, TriggerState}, OldPred, PredsPred) ->
+remove_pred({OldNeighborhood}, OldPred, PredsPred) ->
     NewNbh1 = nodelist:remove(OldPred, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, PredsPred, predListLength(), succListLength()),
-    {{unknown}, {NewNbh2, TriggerState}}.
+    {{unknown}, {NewNbh2}}.
 
 -spec remove_succ(State::state(), OldSucc::node:node_type(),
                   SuccsSucc::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
-remove_succ({OldNeighborhood, TriggerState}, OldSucc, SuccsSucc) ->
+remove_succ({OldNeighborhood}, OldSucc, SuccsSucc) ->
     NewNbh1 = nodelist:remove(OldSucc, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, predListLength(), succListLength()),
-    {{unknown}, {NewNbh2, TriggerState}}.
+    {{unknown}, {NewNbh2}}.
 
 -spec update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
-update_node({OldNeighborhood, TriggerState}, NewMe) ->
+update_node({OldNeighborhood}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
     % inform neighbors
-    handle_custom_message({rm_trigger_action}, {NewNeighborhood, TriggerState}).
+    handle_custom_message({rm_trigger_action}, {NewNeighborhood}).
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes(NewNodes) ->
@@ -199,18 +195,18 @@ leave(_State) -> ok.
 % failure detector reported dead node
 -spec crashed_node(State::state(), DeadPid::comm:mypid())
         -> {ChangeReason::rm_loop:reason(), state()}.
-crashed_node({OldNeighborhood, TriggerState}, DeadPid) ->
+crashed_node({OldNeighborhood}, DeadPid) ->
     NewNeighborhood = nodelist:remove(DeadPid, OldNeighborhood),
-    {{node_crashed, DeadPid}, {NewNeighborhood, TriggerState}}.
+    {{node_crashed, DeadPid}, {NewNeighborhood}}.
 
 % dead-node-cache reported dead node to be alive again
 -spec zombie_node(State::state(), Node::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
-zombie_node({OldNeighborhood, TriggerState}, Node) ->
+zombie_node({OldNeighborhood}, Node) ->
     % this node could potentially be useful as it has been in our state before
     NewNeighborhood = nodelist:add_node(OldNeighborhood, Node,
                                         predListLength(), succListLength()),
-    {{node_discovery}, {NewNeighborhood, TriggerState}}.
+    {{node_discovery}, {NewNeighborhood}}.
 
 -spec get_web_debug_info(State::state()) -> [{string(), string()}].
 get_web_debug_info(_State) -> [].
@@ -219,11 +215,9 @@ get_web_debug_info(_State) -> [].
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_module(ringmaintenance_trigger) and
-    
-    config:cfg_is_integer(stabilization_interval_max) and
-    config:cfg_is_greater_than(stabilization_interval_max, 0) and
-    
+    config:cfg_is_integer(stabilization_interval_base) and
+    config:cfg_is_greater_than(stabilization_interval_base, 0) and
+
     config:cfg_is_integer(succ_list_length) and
     config:cfg_is_greater_than(succ_list_length, 0).
 
@@ -247,6 +241,6 @@ predListLength() -> 1.
 -spec succListLength() -> pos_integer().
 succListLength() -> config:read(succ_list_length).
 
-%% @doc the interval between two stabilization runs Max
+%% @doc the interval between two stabilization runs
 -spec stabilizationInterval() -> pos_integer().
-stabilizationInterval() -> config:read(stabilization_interval_max).
+stabilizationInterval() -> config:read(stabilization_interval_base) div 1000.

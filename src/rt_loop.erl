@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -39,17 +39,16 @@
 % state of the routing table loop
 %% userdevguide-begin rt_loop:state
 -opaque(state_active() :: {Neighbors    :: nodelist:neighborhood(),
-                           RTState      :: ?RT:rt(),
-                           TriggerState :: trigger:state()}).
+                           RTState      :: ?RT:rt()}).
 -type(state_inactive() :: {inactive,
-                           MessageQueue::msg_queue:msg_queue(),
-                           TriggerState::trigger:state()}).
+                           MessageQueue::msg_queue:msg_queue()}).
 %% -type(state() :: state_active() | state_inactive()).
 %% userdevguide-end rt_loop:state
 
 % accepted messages of rt_loop processes
 -type(message() ::
-    {trigger_rt} |
+    {trigger_rt} | %% just for periodic wake up
+    {periodic_rt_rebuild} | %% actually initiate a rt rebuild
     {update_rt, OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()} |
     {crash, DeadPid::comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
@@ -84,8 +83,9 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init([]) -> state_inactive().
 init([]) ->
-    TriggerState = trigger:init(trigger_periodic, get_base_interval(), trigger_rt),
-    {inactive, msg_queue:new(), TriggerState}.
+    %% generate trigger msg only once and then keep it repeating
+    msg_delay:send_trigger(get_base_interval(), {trigger_rt}),
+    {inactive, msg_queue:new()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
@@ -96,17 +96,23 @@ init([]) ->
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
                  ({activate_rt, Neighbors::nodelist:neighborhood()}, state_inactive())
                     -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
-on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages, TriggerState}) ->
+on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages}) ->
     log:log(info, "[ RT ~.0p ] activating...~n", [comm:this()]),
-    TriggerState2 = trigger:now(TriggerState),
+    comm:send_local(self(), {periodic_rt_rebuild}),
     rm_loop:subscribe(self(), ?MODULE,
                       fun rm_loop:subscribe_dneighbor_change_filter/3,
                       fun ?MODULE:rm_send_update/4, inf),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
-      {Neighbors, ?RT:init(Neighbors), TriggerState2}, fun ?MODULE:on_active/2);
+      {Neighbors, ?RT:init(Neighbors)}, fun ?MODULE:on_active/2);
 
-on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages, _TriggerState} = State) ->
+on_inactive({trigger_rt}, State) ->
+    %% keep trigger active to avoid generating new triggers when
+    %% frequently jumping between inactive and active state.
+    msg_delay:send_trigger(get_base_interval(), {trigger_rt}),
+    State;
+
+on_inactive({web_debug_info, Requestor}, {inactive, QueuedMessages} = State) ->
     % get a list of up to 50 queued messages to display:
     MessageListTmp = [{"", webhelpers:safe_html_string("~p", [Message])}
                   || Message <- lists:sublist(QueuedMessages, 50)],
@@ -125,63 +131,62 @@ on_inactive(_Msg, State) ->
 -spec on_active(message(), state_active()) -> state_active() | unknown_event;
                ({deactivate_rt}, state_active())
                   -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_inactive()}.
-on_active({deactivate_rt}, {Neighbors, _OldRT, TriggerState})  ->
+on_active({deactivate_rt}, {Neighbors, _OldRT})  ->
     log:log(info, "[ RT ~.0p ] deactivating...~n", [comm:this()]),
     rm_loop:unsubscribe(self(), ?MODULE),
     % send new empty RT to the dht_node so that all routing messages
-    % must be passed to the successor: 
+    % must be passed to the successor:
     comm:send_local(pid_groups:get_my(dht_node),
                     {rt_update, ?RT:empty_ext(Neighbors)}),
-    gen_component:change_handler({inactive, msg_queue:new(), TriggerState},
+    gen_component:change_handler({inactive, msg_queue:new()},
                                  fun ?MODULE:on_inactive/2);
 
 %% userdevguide-begin rt_loop:update_rt
 % update routing table with changed ID, pred and/or succ
-on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT, TriggerState}) ->
+on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT}) ->
     case ?RT:update(OldRT, OldNeighbors, NewNeighbors) of
         {trigger_rebuild, NewRT} ->
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
             % trigger immediate rebuild
-            gen_component:post_op(new_state(NewNeighbors, NewRT, TriggerState), {periodic_rt_rebuild})
+            gen_component:post_op(new_state(NewNeighbors, NewRT), {periodic_rt_rebuild})
         ;
         {ok, NewRT} ->
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
-            new_state(NewNeighbors, NewRT, TriggerState)
+            new_state(NewNeighbors, NewRT)
     end;
 %% userdevguide-end rt_loop:update_rt
 
 %% userdevguide-begin rt_loop:trigger
 % Message handler to manage the trigger
-on_active({trigger_rt}, {Neighbors, OldRT, TriggerState}) ->
-    % trigger next stabilization    
-    NewTriggerState = trigger:next(TriggerState),
-    gen_component:post_op(new_state(Neighbors, OldRT, NewTriggerState), {periodic_rt_rebuild});
+on_active({trigger_rt}, State) ->
+    msg_delay:send_trigger(get_base_interval(), {trigger_rt}),
+    gen_component:post_op(State, {periodic_rt_rebuild});
 
 % Actual periodic rebuilding of the RT
-on_active({periodic_rt_rebuild}, {Neighbors, OldRT, TriggerState}) ->
+on_active({periodic_rt_rebuild}, {Neighbors, OldRT}) ->
     % start periodic stabilization
     % log:log(debug, "[ RT ] stabilize"),
     NewRT = ?RT:init_stabilize(Neighbors, OldRT),
     ?RT:check(OldRT, NewRT, Neighbors, true),
-    new_state(Neighbors, NewRT, TriggerState);
+    new_state(Neighbors, NewRT);
 %% userdevguide-end rt_loop:trigger
 
 % failure detector reported dead node
-on_active({crash, DeadPid}, {Neighbors, OldRT, TriggerState}) ->
+on_active({crash, DeadPid}, {Neighbors, OldRT}) ->
     NewRT = ?RT:filter_dead_node(OldRT, DeadPid),
     ?RT:check(OldRT, NewRT, Neighbors, false),
-    new_state(Neighbors, NewRT, TriggerState);
+    new_state(Neighbors, NewRT);
 
 % debug_info for web interface
 on_active({web_debug_info, Requestor},
-   {_Neighbors, RTState, _TriggerState} = State) ->
+   {_Neighbors, RTState} = State) ->
     KeyValueList =
         [{"rt_size", ?RT:get_size(RTState)},
          {"rt (index, node):", ""} | ?RT:dump(RTState)],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-on_active({dump, Pid}, {_Neighbors, RTState, _TriggerState} = State) ->
+on_active({dump, Pid}, {_Neighbors, RTState} = State) ->
     comm:send_local(Pid, {dump_response, RTState}),
     State;
 
@@ -196,21 +201,21 @@ on_active(Message, State) ->
 % handling rt_loop's (opaque) state - these handlers should at least be used
 % outside this module:
 
--spec new_state(Neighbors::nodelist:neighborhood(), RTState::?RT:rt(),
-                TriggerState::trigger:state()) -> state_active().
-new_state(Neighbors, RT, TriggerState) ->
-    {Neighbors, RT, TriggerState}.
+-spec new_state(Neighbors::nodelist:neighborhood(), RTState::?RT:rt())
+               -> state_active().
+new_state(Neighbors, RT) ->
+    {Neighbors, RT}.
 
 -spec get_neighb(State::state_active()) -> nodelist:neighborhood().
-get_neighb({Neighbors, _RT, _TriggerState}) ->
+get_neighb({Neighbors, _RT}) ->
     Neighbors.
 
 -spec get_rt(State::state_active()) -> ?RT:rt().
-get_rt({_Neighbors, RT, _TriggerState}) -> RT.
+get_rt({_Neighbors, RT}) -> RT.
 
 -spec set_rt(State::state_active(), RT::?RT:rt()) -> NewState::state_active().
-set_rt({Neighbors, _OldRT, TriggerState}, NewRT) ->
-    {Neighbors, NewRT, TriggerState}.
+set_rt({Neighbors, _OldRT}, NewRT) ->
+    {Neighbors, NewRT}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Misc.
@@ -226,7 +231,7 @@ rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors) ->
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
-    config:read(pointer_base_stabilization_interval).
+    config:read(pointer_base_stabilization_interval) div 1000.
 
 %% @doc Checks whether config parameters of the rt_loop process exist and are
 %%      valid.

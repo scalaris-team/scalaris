@@ -1,4 +1,4 @@
-% @copyright 2009-2012 Zuse Institute Berlin,
+% @copyright 2009-2014 Zuse Institute Berlin,
 %            2009 onScale solutions GmbH
 % @end
 
@@ -14,7 +14,7 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
-%% @author Florian Schintke <schintke@onscale.de>
+%% @author Florian Schintke <schintke@zib.de>
 %% @doc Cheap message delay.
 %%      Instead of using send_after, which is slow in Erlang, as it
 %%      performs a system call, this module allows for a weaker
@@ -26,8 +26,10 @@
 %% @end
 %% @version $Id$
 -module(msg_delay).
--author('schintke@onscale.de').
+-author('schintke@zib.de').
 -vsn('$Id$').
+
+-include("scalaris.hrl").
 
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(_X,_Y), ok).
@@ -36,6 +38,9 @@
 %% public interface for delayed messages
 -export([send_local/3,
          send_local_as_client/3]).
+
+%% public interface for self trigger messages using msg_delay
+-export([send_trigger/2]).
 
 %% functions for gen_component module and supervisor callbacks
 -export([start_link/1, on/2, init/1]).
@@ -66,6 +71,16 @@ start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [], % parameters passed to init
                              [{pid_groups_join_as, DHTNodeGroup, msg_delay}]).
+
+-spec send_trigger(Seconds::non_neg_integer(), Msg::comm:message()) -> ok.
+send_trigger(Seconds, Msg) ->
+    %% (1) Triggers are typically periodic messages. We do not want to
+    %%     infect a system forever, so we forbid trace_mpath here.
+    %% (2) We do not need a reply_as for self() in this case, as one can
+    %%     easily put all infos in the message itself, when inside the
+    %%     same process.
+    ?ASSERT(erlang:get(trace_mpath) =:= undefined),
+    send_local(Seconds, self(), Msg).
 
 %% userdevguide-begin gen_component:sample
 %% initialize: return initial state.

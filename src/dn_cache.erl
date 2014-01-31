@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@
     {send_error, Target::comm:mypid(), {ping, ThisWithCookie::comm:mypid()}, Reason::atom()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
--type(state() :: {fix_queue:fix_queue(), Subscribers::gb_set(), trigger:state()}).
+-type(state() :: {fix_queue:fix_queue(), Subscribers::gb_set()}).
 
 -define(SEND_OPTIONS, [{channel, prio}]).
 
@@ -58,9 +58,9 @@ subscribe() ->
 unsubscribe() ->
     comm:send_local(get_pid(), {unsubscribe, self()}).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Starts a Dead Node Cache process, registers it with the process
 %%      dictionary and returns its pid for use by a supervisor.
@@ -72,18 +72,17 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init([]) -> state().
 init([]) ->
-    TriggerState = trigger:init(trigger_periodic, get_base_interval()),
-    TriggerState2 = trigger:now(TriggerState),
-    {fix_queue:new(config:read(zombieDetectorSize)), gb_sets:new(), TriggerState2}.
-      
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Message Loop
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    msg_delay:send_trigger(0, {trigger}),
+    {fix_queue:new(config:read(zombieDetectorSize)), gb_sets:new()}.
 
-% @doc the Token takes care, that there is only one timermessage for stabilize 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Message Loop
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% @doc the Token takes care, that there is only one timermessage for stabilize
 
 -spec on(message(), state()) -> state().
-on({trigger}, {Queue, Subscribers, TriggerState}) ->
+on({trigger}, {Queue, Subscribers}) ->
     _ = fix_queue:map(
           fun(X) ->
                   Pid = case node:is_valid(X) of
@@ -94,11 +93,11 @@ on({trigger}, {Queue, Subscribers, TriggerState}) ->
                   comm:send(Pid, {ping, SPid},
                             ?SEND_OPTIONS ++ [{shepherd, self()}])
           end, Queue),
-    NewTriggerState = trigger:next(TriggerState),
-    {fix_queue:new(config:read(zombieDetectorSize)), Subscribers, NewTriggerState};
+    msg_delay:send_trigger(get_base_interval(), {trigger}),
+    {fix_queue:new(config:read(zombieDetectorSize)), Subscribers};
 
 on({trigger_reply, {pong, dht_node}, Zombie},
-   {_Queue, Subscribers, _TriggerState} = State) ->
+   {_Queue, Subscribers} = State) ->
     log:log(warn,"[ dn_cache ~p ] found zombie ~.0p", [comm:this(), Zombie]),
     report_zombie(Subscribers, Zombie),
     State;
@@ -108,20 +107,20 @@ on({trigger_reply, {pong, PidName}, Zombie}, State) ->
             [comm:this(), Zombie, PidName]),
     State;
 
-on({add_zombie_candidate, Node}, {Queue, Subscribers, TriggerState}) ->
-    {add_to_queue(Queue, Node), Subscribers, TriggerState};
+on({add_zombie_candidate, Node}, {Queue, Subscribers}) ->
+    {add_to_queue(Queue, Node), Subscribers};
 
-on({subscribe, Node}, {Queue, Subscribers, TriggerState}) ->
-    {Queue, gb_sets:insert(Node, Subscribers), TriggerState};
+on({subscribe, Node}, {Queue, Subscribers}) ->
+    {Queue, gb_sets:insert(Node, Subscribers)};
 
-on({unsubscribe, Node}, {Queue, Subscribers, TriggerState}) ->
-    {Queue, gb_sets:del_element(Node, Subscribers), TriggerState};
+on({unsubscribe, Node}, {Queue, Subscribers}) ->
+    {Queue, gb_sets:del_element(Node, Subscribers)};
 
-on({send_error, _Target, {ping, ThisWithCookie}, _Reason}, {Queue, Subscribers, TriggerState}) ->
+on({send_error, _Target, {ping, ThisWithCookie}, _Reason}, {Queue, Subscribers}) ->
     {_This, {trigger_reply, {null}, Node}} = comm:unpack_cookie(ThisWithCookie, {null}),
-    {add_to_queue(Queue, Node), Subscribers, TriggerState};
+    {add_to_queue(Queue, Node), Subscribers};
 
-on({web_debug_info, Requestor}, {Queue, Subscribers, _TriggerState} = State) ->
+on({web_debug_info, Requestor}, {Queue, Subscribers} = State) ->
     KeyValueList =
         lists:flatten(
           [{"max_length", fix_queue:max_length(Queue)},
@@ -152,7 +151,7 @@ report_zombie(Subscribers, Zombie) ->
     ok.
 
 %% @doc Gets the pid of the dn_cache process in the same group as the calling
-%%      process. 
+%%      process.
 -spec get_pid() -> pid() | failed.
 get_pid() ->
     pid_groups:get_my(dn_cache).
