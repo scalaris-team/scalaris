@@ -236,7 +236,7 @@ $B$ contains a special message, which is usually handled by the
 \erlmodule{gen\_component} module itself (like
 \code{send\_to\_group\_member}, \code{kill}, \code{sleep}), the direct call
 to the message handler would not achieve the expected result. By calling
-\erlfun{gen\_component}{post\_op}{NewState, B} to return the new state after
+\erlfun{gen\_component}{post\_op}{B, NewState} to return the new state after
 handling message \code{A}, message \code{B} will be handled directly after
 the current message \code{A}.
 

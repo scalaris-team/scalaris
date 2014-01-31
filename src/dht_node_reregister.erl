@@ -98,7 +98,7 @@ on_active({deactivate_reregister}, _State)  ->
 
 on_active({register_trigger}, State) ->
     msg_delay:send_trigger(get_base_interval(), {register}),
-    gen_component:post_op(State, {register});
+    gen_component:post_op({register}, State);
 
 on_active({register}, State) ->
     comm:send_local(pid_groups:get_my(dht_node),

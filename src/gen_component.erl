@@ -1,4 +1,4 @@
-%% @copyright 2007-2013 Zuse Institute Berlin
+%% @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -226,9 +226,9 @@ change_handler(UState, Handler) when is_function(Handler, 2) ->
     {'$gen_component', [{on_handler, Handler}], UState}.
 
 %% @doc perform a post op, i.e. handle a message directly after another
--spec post_op(user_state(), comm:message())
+-spec post_op(comm:message(), user_state())
         -> {'$gen_component', [{post_op, comm:message()}], user_state()}.
-post_op(UState, Msg) ->
+post_op(Msg, UState) ->
     {'$gen_component', [{post_op, Msg}], UState}.
 
 %% requests regarding breakpoint processing

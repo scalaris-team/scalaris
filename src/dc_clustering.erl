@@ -193,7 +193,7 @@ on_active({activate_clustering}, State) ->
 
 on_active({dc_trigger}, State) ->
     msg_delay:send_trigger(get_clustering_interval(), {dc_trigger}),
-    gen_component:post_op(State, {start_clustering_shuffle});
+    gen_component:post_op({start_clustering_shuffle}, State);
 
 on_active({start_clustering_shuffle}, State) ->
     % start new clustering shuffle -> gossip communication
@@ -202,7 +202,7 @@ on_active({start_clustering_shuffle}, State) ->
 
 on_active({dc_reset_trigger}, State) ->
     msg_delay:send_trigger(get_clustering_reset_interval(), {dc_reset_trigger}),
-    gen_component:post_op(State, {reset_clustering});
+    gen_component:post_op({reset_clustering}, State);
 
 % ask vivaldi for network coordinate
 on_active({reset_clustering}, State) ->

@@ -96,7 +96,7 @@ init([]) ->
 -spec on(my_message(), state()) -> state().
 on({lb_trigger}, State) ->
     msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
-    gen_component:post_op(State, {trigger_periodic});
+    gen_component:post_op({trigger_periodic}, State);
 
 on({trigger_periodic}, State) ->
     %% Request N random nodes from cyclon

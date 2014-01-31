@@ -1,4 +1,4 @@
-% @copyright 2012, 2013 Zuse Institute Berlin,
+% @copyright 2012-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -333,7 +333,7 @@ on({tx_tm_txid_stored, TxId, {qwrite_done, _ReqId, NextWriteRound, WrittenVal}},
     NewTxState = tx_state_set_txid_written_value(T1TxState, WrittenVal),
     set_entry(NewTxState, State),
     %% progress to the next step in the protocol
-    gen_component:post_op(State, {tx_tm_acquire_locks, TxId});
+    gen_component:post_op({tx_tm_acquire_locks, TxId}, State);
 
 %% step 2: acquire locks for tlog entries (this cannot be done
 %% overlapping with step 1 because when locks were acquired without
@@ -374,7 +374,7 @@ on({tx_tm_lock_get_done, TxId, Key, {qwrite_done, _ReqId, NextRound, WrittenVal}
                     OldVal = tx_state_txid_written_value(NewTxState),
 %%                    io:format("decide commit~n"),
                     gen_component:post_op(
-                      State, {tx_tm_write_decision, TxId, commit, Round, OldVal});
+                      {tx_tm_write_decision, TxId, commit, Round, OldVal}, State);
                 _ -> State
             end
     end;
@@ -401,7 +401,7 @@ on({tx_tm_lock_get_done, TxId, Key, {qwrite_deny, _ReqId, NextRound, WrittenVal,
                     OldVal = tx_state_txid_written_value(NewTxState),
 %%                    io:format("decide abort~n"),
                     gen_component:post_op(
-                      State, {tx_tm_write_decision, TxId, abort, Round, OldVal});
+                      {tx_tm_write_decision, TxId, abort, Round, OldVal}, State);
                 _ -> State
             end
     end;
@@ -418,7 +418,7 @@ on({tx_tm_write_decision, TxId, Decision, WriteRound, OldVal}, State) ->
     State;
 
 on({tx_tm_decision_stored, TxId, {qwrite_done, _ReqId, _Round, Decision}}, State) ->
-    gen_component:post_op(State, {tx_tm_execute_decision, TxId, Decision});
+    gen_component:post_op({tx_tm_execute_decision, TxId, Decision}, State);
 
 on({tx_tm_execute_decision, TxId, Decision}, State) ->
     TxState = get_entry(TxId, State),
@@ -468,7 +468,7 @@ on({tx_tm_executed_decision, TxId, Key, Decision, {qwrite_done, _ReqId, _Round, 
                     end,
                     %% proceed to next step
                     
-                    gen_component:post_op(State, {tx_tm_delete_txid, TxId});
+                    gen_component:post_op({tx_tm_delete_txid, TxId}, State);
                 _ ->
                     NewTxState = tx_state_set_open_commits(TxState, NewOpenCommits),
                     set_entry(NewTxState, State),

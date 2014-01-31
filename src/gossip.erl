@@ -239,7 +239,7 @@ on_active({activate_gossip, NewRange},
 
 on_active({gossip_trigger}, State) ->
     msg_delay:send_trigger(get_base_interval(), {gossip_trigger}),
-    gen_component:post_op(State, {gossip_periodic});
+    gen_component:post_op({gossip_periodic}, State);
 
 on_active({gossip_periodic},
           {PreviousState, State, QueuedMessages, MyRange}) ->

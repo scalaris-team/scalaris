@@ -1,5 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin,
-%            2010 onScale solutions GmbH
+% @copyright 2009-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -133,7 +132,7 @@ on({?proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
             log:log(error, "Duplicate proposer:initialize for paxos id ~p"
                            "Just triggering instead~n", [PaxosID])
     end,
-    gen_component:post_op(State, {proposer_trigger, PaxosID, InitialRound});
+    gen_component:post_op({proposer_trigger, PaxosID, InitialRound}, State);
 
 % trigger new proposer round
 on({proposer_trigger, PaxosID}, ETSTableName = State) ->
@@ -144,9 +143,9 @@ on({proposer_trigger, PaxosID}, ETSTableName = State) ->
             TmpState = state_reset_state(StateForID),
             NewState = state_inc_round(TmpState),
             pdb:set(NewState, ETSTableName),
-            gen_component:post_op(State,
-                                  {proposer_trigger, PaxosID,
-                                   state_get_round(NewState)})
+            gen_component:post_op({proposer_trigger, PaxosID,
+                                   state_get_round(NewState)},
+                                  State)
     end;
 
 %% trigger for given round is needed for initial round without auto-increment

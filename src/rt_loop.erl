@@ -148,7 +148,7 @@ on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT}) ->
         {trigger_rebuild, NewRT} ->
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
             % trigger immediate rebuild
-            gen_component:post_op(new_state(NewNeighbors, NewRT), {periodic_rt_rebuild})
+            gen_component:post_op({periodic_rt_rebuild}, new_state(NewNeighbors, NewRT))
         ;
         {ok, NewRT} ->
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
@@ -160,7 +160,7 @@ on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT}) ->
 % Message handler to manage the trigger
 on_active({trigger_rt}, State) ->
     msg_delay:send_trigger(get_base_interval(), {trigger_rt}),
-    gen_component:post_op(State, {periodic_rt_rebuild});
+    gen_component:post_op({periodic_rt_rebuild}, State);
 
 % Actual periodic rebuilding of the RT
 on_active({periodic_rt_rebuild}, {Neighbors, OldRT}) ->
