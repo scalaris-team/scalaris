@@ -1,4 +1,4 @@
-% @copyright 2007-2013 Zuse Institute Berlin
+% @copyright 2007-2014 Zuse Institute Berlin
 
 %  Licensed under the Apache License, Version 2.0 (the "License");
 %  you may not use this file except in compliance with the License.
@@ -26,6 +26,9 @@
 
 %% gen_component callbacks
 -export([start_link/1, init/1, on/2]).
+
+%% rm subscriptions
+-export([rm_filter/3, rm_exec/4]).
 
 -record(state, {
           takeovers     = ?required(state, takeovers) :: gb_tree()
@@ -74,14 +77,38 @@ init([]) ->
                                 false
                         end
                 end,
-    ExecFun = fun (Pid, _Tag, Old, New) ->
-                      comm:send_local(Pid, {rm_change, nodelist:node_range(Old),
-                                            nodelist:node_range(New)})
-              end,
-    rm_loop:subscribe(self(), ?MODULE, FilterFun, ExecFun, inf),
+    rm_loop:subscribe(self(), ?MODULE,
+                      fun ?MODULE:rm_filter/3,
+                      fun ?MODULE:rm_exec/4, inf),
     #state{
        takeovers=gb_trees:empty()
       }.
+
+-spec rm_filter(OldNeighbors::nodelist:neighborhood(),
+                NewNeighbors::nodelist:neighborhood(),
+                IsSlide::rm_loop:reason()) -> boolean().
+rm_filter(Old, New, Reason) ->
+    OldRange = nodelist:node_range(Old),
+    NewRange = nodelist:node_range(New),
+    case Reason of
+        {slide_finished, _} ->
+            false;
+        {add_subscriber} ->
+            false;
+        {node_crashed, _} ->
+            OldRange =/= NewRange;
+        {node_discovery} ->
+            OldRange =/= NewRange;
+        {unknown} -> % @todo ?
+            false
+    end.
+
+-spec rm_exec(pid(), Tag::?MODULE,
+              OldNeighbors::nodelist:neighborhood(),
+              NewNeighbors::nodelist:neighborhood()) -> ok.
+rm_exec(Pid, _Tag, Old, New) ->
+  comm:send_local(Pid, {rm_change, nodelist:node_range(Old),
+                        nodelist:node_range(New)}).
 
 %% @private
 -spec on(comm:message(), state()) -> state().
