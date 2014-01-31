@@ -1,4 +1,4 @@
-% @copyright 2013 Zuse Institute Berlin
+% @copyright 2013-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -70,8 +70,11 @@
 -export([start_link/1, init/1, on/2]).
 %% rm_loop interaction
 -export([send_my_range_req/4]).
-%% misc (check_config for api_autoscale) 
+%% misc (check_config for api_autoscale)
 -export([check_config/0]).
+
+%% rm subscription
+-export([rm_exec/4]).
 
 -define(TRACE1(X), ?TRACE(X, [])).
 %% -define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
@@ -210,7 +213,7 @@ on({check_alarm, Name}, {IsLeader, Alarms, ScaleReq, Triggers})
 
     % log current number of vms
     log_vms(),
-    
+
     % call alarm handler
     NewReq =
         case Alarm#alarm.state of
@@ -362,7 +365,7 @@ on({update_alarm, Name, NewOptions, Pid},
             {error, unknown_alarm} ->
                 comm:send(Pid, {update_alarm_resp, {error, unknown_alarm}}),
                 Alarms;
-            {ok, Alarm} -> 
+            {ok, Alarm} ->
                 UpdatedOptions = lists:foldl(
                                    fun(Option = {Key, _Value}, Acc) ->
                                            lists:keystore(Key, 1, Acc, Option)
@@ -465,7 +468,7 @@ send_my_range_req(Pid, ?MODULE, _OldN, _NewN) ->
 %%      alarms in ToRem are removed. Usually, ToAdd should contain the new
 %%      version of the alarm and ToRem the old version (which could possibly
 %%      have been written to the dht before).
-%%       
+%%
 %%      When a node becomes leader, she merges her local alarms with alarms from
 %%      the ring (alarms on ring overwrite local alarms). See tx_merge_alarms/2.
 -spec tx_update_alarms(ToAdd::alarms(), ToRem::alarms()) -> ok | fail;
@@ -513,12 +516,7 @@ init([]) ->
     % check my_range at direct neighborhood changes
     rm_loop:subscribe(
       self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_filter/3,
-      fun (Pid, ?MODULE, _OldN, _NewN) ->
-               DhtNodeOfPid = pid_groups:pid_of(pid_groups:group_of(Pid),
-                                                dht_node),
-               comm:send_local(DhtNodeOfPid,
-                               {get_state, comm:make_global(Pid), my_range})
-      end, inf),
+      fun ?MODULE:rm_exec/4, inf),
 
     % intial state
     {_IsLeader = false,
@@ -539,7 +537,7 @@ init([]) ->
 get_alarms() ->
     case check_config() of
         true  ->
-            % @todo add convenience for cfg 
+            % @todo add convenience for cfg
             config:read(autoscale_alarms);
         false ->
             []
@@ -559,6 +557,15 @@ get_lock_timeout() ->
 check_config() ->
     config:cfg_is_list(autoscale_alarms) andalso
     config:cfg_exists(autoscale_cloud_module) andalso
-    config:cfg_is_list(autoscale_alarms, 
+    config:cfg_is_list(autoscale_alarms,
                        fun(X) -> erlang:is_record(X, alarm) end,
                        "alarm record tuple").
+
+-spec rm_exec(pid(), Tag::?MODULE,
+              OldNeighbors::nodelist:neighborhood(),
+              NewNeighbors::nodelist:neighborhood()) -> ok.
+rm_exec(Pid, ?MODULE, _OldN, _NewN) ->
+    DhtNodeOfPid = pid_groups:pid_of(pid_groups:group_of(Pid),
+                                     dht_node),
+    comm:send_local(DhtNodeOfPid,
+                    {get_state, comm:make_global(Pid), my_range}).
