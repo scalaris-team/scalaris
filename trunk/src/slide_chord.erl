@@ -1,4 +1,4 @@
-%% @copyright 2010-2013 Zuse Institute Berlin
+%% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@
          finish_delta1/3, finish_delta2/3,
          finish_delta_ack1/3, finish_delta_ack2/4]).
 
+-export([rm_exec/4]).
+
 -spec prepare_join_send(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_join_send(State, SlideOp) ->
@@ -63,7 +65,7 @@ prepare_rcv_data(State, SlideOp) ->
                    _ -> SlideOp
                end,
     {ok, State, SlideOp1}.
-    
+
 %% @doc Change the local node's ID to the given TargetId by calling the ring
 %%      maintenance and sending a continue message when the node is up-to-date.
 -spec change_my_id(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
@@ -103,9 +105,8 @@ change_my_id(State, SlideOp, ReplyPid) ->
                       nodelist:nodeid(NewN) =:= TargetId
               % note: no need to check the id version
               end,
-              fun(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
-                      send_continue_msg(Pid)
-              end, 1),
+              fun ?MODULE:rm_exec/4,
+              1),
             rm_loop:update_id(TargetId),
             {ok, State1, SlideOp2}
     end.
@@ -183,9 +184,8 @@ send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid) ->
                           node:id(RMNewPred) =:= ExpPredId orelse
                           RMNewPred =/= OldPred
               end,
-              fun(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
-                      send_continue_msg(Pid)
-              end, 1)
+              fun ?MODULE:rm_exec/4,
+              1)
     end.
 
 %% @doc Accepts data_ack received during the given (existing!) slide operation
@@ -267,3 +267,9 @@ finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
 finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
     {ok, State, SlideOp, NextOpMsg}.
+
+-spec rm_exec(pid(), term(),
+              OldNeighbors::nodelist:neighborhood(),
+              NewNeighbors::nodelist:neighborhood()) -> ok.
+rm_exec(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
+    send_continue_msg(Pid).
