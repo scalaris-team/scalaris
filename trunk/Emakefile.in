@@ -8,7 +8,6 @@
   "src/rrepair/hfs_beh.erl",
   "src/rt_beh.erl",
   "src/slide_beh.erl",
-  "src/trigger_beh.erl",
   "src/transactions/tx_op_beh.erl"],
  [debug_info,
   inline_list_funcs,

@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -371,11 +371,11 @@ session_ttl(Config) ->
     DataCount = 1000,
     Method = merkle_tree,
     FType = mixed,
-    TTL = 2500,
-    
-    _RRConf = lists:keyreplace(rr_session_ttl, 1, get_rep_upd_config(Method), {rr_session_ttl, TTL / 2}),
-    RRConf = lists:keyreplace(rr_gc_interval, 1, _RRConf, {rr_gc_interval, erlang:round(TTL / 10)}),
-    
+    TTL = 2000,
+
+    RRConf1 = lists:keyreplace(rr_session_ttl, 1, get_rep_upd_config(Method), {rr_session_ttl, TTL / 2}),
+    RRConf = lists:keyreplace(rr_gc_interval, 1, RRConf1, {rr_gc_interval, erlang:round(TTL / 2)}),
+
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, RRConf),
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
@@ -384,10 +384,10 @@ session_ttl(Config) ->
     %chose node pair
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
-    
+
     api_dht_raw:unreliable_lookup(CKey, {get_pid_group, comm:this()}),
     CName = receive {get_pid_group_response, Key} -> Key end,
-    
+
     %server starts sync
     api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair,
                                               {request_sync, Method, CKey}}),
@@ -481,16 +481,16 @@ prop_map_interval(A, B) ->
     % deterministic behaviour:
     BQ = hd(rr_recon:quadrant_subints_(B, rr_recon:quadrant_intervals(), [])),
     SA = rr_recon:map_interval(A, BQ),
-    
+
     % SA must be a sub-interval of A
     ?compare(fun intervals:is_subset/2, SA, A),
-    
+
     % SA must be in a single quadrant
     ?equals([I || Q <- Quadrants,
                   not intervals:is_empty(
                     I = intervals:intersection(SA, Q))],
             ?IIF(intervals:is_empty(SA), [], [SA])),
-    
+
     % if mapped back, must at least be a subset of BQ:
     case intervals:is_empty(SA) of
         true -> true;
@@ -568,7 +568,7 @@ tester_merkle_compress_hashlist(_) ->
 %%                  end || Cmp <- CmpRes],
 %%     ?equals(rr_recon:merkle_decompress_cmp_result(Flags, HashesBin, [], SigSize),
 %%             CmpResRed).
-%% 
+%%
 %% tester_merkle_compress_cmp_result(_) ->
 %%     tester:test(?MODULE, prop_merkle_compress_cmp_result, 2, 1000, [{threads, 4}]).
 
@@ -718,7 +718,7 @@ waitForSyncRoundEnd(NodeKeys, RcvReqCompleteMsg) ->
 wait_for_sync_round_end2(_Req, []) -> true;
 wait_for_sync_round_end2(Req, [Key | Keys]) ->
     api_dht_raw:unreliable_lookup(Key, Req),
-    KeyResult = 
+    KeyResult =
         receive
             ?SCALARIS_RECV(
             {get_state_response, [Sessions, ORC, ORS]}, % ->

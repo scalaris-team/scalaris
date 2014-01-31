@@ -1,4 +1,4 @@
-%  @copyright 2013 Zuse Institute Berlin
+%  @copyright 2013-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
 
 %% @author Maximilian Michels <michels@zib.de>
 %% @doc Implementation of Karger and Ruhl's item balancing load balancing algorithm.
-%% @reference D. R. Karger and M. Ruhl, 
-%%            "Simple efficient load balancing algorithms for peer-to-peer systems," 
-%%            in Proceedings of the sixteenth annual ACM symposium on Parallelism in algorithms and architectures, 
+%% @reference D. R. Karger and M. Ruhl,
+%%            "Simple efficient load balancing algorithms for peer-to-peer systems,"
+%%            in Proceedings of the sixteenth annual ACM symposium on Parallelism in algorithms and architectures,
 %%            2004, pp. 36-43.
 %% @version $Id$
 -module(lb_active_karger).
@@ -46,14 +46,13 @@
 
 -type(lb_info() :: #lb_info{}).
 
--record(state, {trigger          = ?required(state, trigger) :: trigger:state(),
-                epsilon          = ?required(state, epsilon) :: float(),
+-record(state, {epsilon          = ?required(state, epsilon) :: float(),
                 rnd_node         = nil                       :: node:node_type() | nil
                }).
 
 -type(state() :: #state{}).
 
--type(my_message() :: 
+-type(my_message() ::
            %% trigger messages
            {lb_trigger} |
            %% actions for trigger
@@ -86,10 +85,9 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialization of process called by gen_component.
 -spec init([]) -> state().
 init([]) ->
-    TriggerNew = trigger:init(trigger_periodic, get_base_interval(), lb_trigger),
-    TriggerNext = trigger:next(TriggerNew),
+    msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
     Epsilon = config:read(lb_active_karger_epsilon),
-    #state{trigger = TriggerNext, epsilon = Epsilon}.
+    #state{epsilon = Epsilon}.
 
 %%%%%%%%%%%%%%%
 %%  Trigger   %
@@ -97,10 +95,8 @@ init([]) ->
 
 -spec on(my_message(), state()) -> state().
 on({lb_trigger}, State) ->
-    Trigger = State#state.trigger,
-    TriggerNext = trigger:next(Trigger),
-    StateNew = State#state{trigger=TriggerNext},
-    gen_component:post_op(StateNew, {trigger_periodic});
+    msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
+    gen_component:post_op(State, {trigger_periodic});
 
 on({trigger_periodic}, State) ->
     %% Request N random nodes from cyclon
@@ -250,7 +246,7 @@ get_target_load(jump, HeavyNode, _LightNode) ->
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
-    config:read(lb_active_interval).
+    config:read(lb_active_interval) div 1000.
 
 -spec check_config() -> boolean().
 check_config() ->
@@ -259,4 +255,3 @@ check_config() ->
     config:cfg_is_float(lb_active_karger_epsilon) andalso
     config:cfg_is_greater_than(lb_active_karger_epsilon, 0.0),
     config:cfg_is_less_than(lb_active_karger_epsilon, 0.25).
-    

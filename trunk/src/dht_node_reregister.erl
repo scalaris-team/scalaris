@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -30,11 +30,12 @@
          activate/0, deactivate/0]).
 
 -type(message() ::
+    {register_trigger} |
     {register} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
--type state_active() :: trigger:state().
--type state_inactive() :: {inactive, trigger:state()} .
+-type state_active() :: ok.
+-type state_inactive() :: inactive.
 
 %% @doc Activates the re-register process. If not activated, it will
 %%      queue most messages without processing them.
@@ -49,9 +50,9 @@ deactivate() ->
     Pid = pid_groups:get_my(dht_node_reregister),
     comm:send_local(Pid, {deactivate_reregister}).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Startup
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Starts a re-register process, registers it with the process
 %%      dictionary and returns its pid for use by a supervisor.
@@ -63,40 +64,48 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an uninitialized state.
 -spec init([]) -> state_inactive().
 init([]) ->
-    TriggerState = trigger:init(trigger_periodic, get_base_interval(), register),
-    {inactive, TriggerState}.
-      
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    msg_delay:send_trigger(get_base_interval(), {register_trigger}),
+    inactive.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
                  ({activate_reregister}, state_inactive()) -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
-on_inactive({activate_reregister}, {inactive, TriggerState}) ->
+on_inactive({activate_reregister}, _State) ->
     log:log(info, "[ Reregister ~.0p ] activating...~n", [comm:this()]),
-    NewTriggerState = trigger:now(TriggerState),
-    gen_component:change_handler(NewTriggerState, fun ?MODULE:on_active/2);
+    comm:send_local(self(), {register}),
+    gen_component:change_handler(ok, fun ?MODULE:on_active/2);
 
 on_inactive({web_debug_info, Requestor}, State) ->
     KeyValueList = [{"", ""}, {"inactive re-register process", ""}],
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-on_inactive(_Msg, {inactive, _TriggerState} = State) ->
+on_inactive({register_trigger}, State) ->
+    msg_delay:send_trigger(get_base_interval(), {register}),
+    State;
+
+on_inactive(_Msg, State) ->
     State.
 
 -spec on_active(message(), state_active()) -> state_active();
          ({deactivate_reregister}, state_active()) -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_inactive()}.
-on_active({deactivate_reregister}, TriggerState)  ->
+on_active({deactivate_reregister}, _State)  ->
     log:log(info, "[ Reregister ~.0p ] deactivating...~n", [comm:this()]),
-    gen_component:change_handler({inactive, TriggerState}, fun ?MODULE:on_inactive/2);
+    gen_component:change_handler(inactive, fun ?MODULE:on_inactive/2);
 
-on_active({register}, TriggerState) ->
+on_active({register_trigger}, State) ->
+    msg_delay:send_trigger(get_base_interval(), {register}),
+    gen_component:post_op(State, {register});
+
+on_active({register}, State) ->
     comm:send_local(pid_groups:get_my(dht_node),
                     {get_node_details, comm:this(), [node]}),
-    trigger:next(TriggerState);
+    State;
 
-on_active({get_node_details_response, NodeDetails}, TriggerState) ->
+on_active({get_node_details_response, NodeDetails}, State) ->
     RegisterMessage = {register, node_details:get(NodeDetails, node)},
     _ = case config:read(register_hosts) of
             failed -> MgmtServer = mgmtServer(),
@@ -106,9 +115,9 @@ on_active({get_node_details_response, NodeDetails}, TriggerState) ->
                       end;
             Hosts  -> [comm:send(Host, RegisterMessage) || Host <- Hosts]
         end,
-    TriggerState;
+    State;
 
-on_active({web_debug_info, Requestor}, TriggerState) ->
+on_active({web_debug_info, Requestor}, State) ->
     KeyValueList =
         case config:read(register_hosts) of
             failed -> [{"Hosts (mgmt_server):", webhelpers:safe_html_string("~.0p", [mgmtServer()])}];
@@ -116,7 +125,7 @@ on_active({web_debug_info, Requestor}, TriggerState) ->
                            [{"", webhelpers:safe_html_string("~.0p", [Host])} || Host <- Hosts]]
         end,
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
-    TriggerState.
+    State.
 
 %% @doc Gets the interval to trigger re-registering the node set in scalaris.cfg.
 -spec get_base_interval() -> pos_integer().

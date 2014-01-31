@@ -36,7 +36,6 @@
                              Load :: non_neg_integer()}.
 
 -type state() :: {LastUpdated :: non_neg_integer(),
-                  Trigger :: trigger:state(),
                   LoadAggregation :: load_aggregation()}.
 
 -type message() :: {ganglia_trigger} |
@@ -52,14 +51,15 @@ start_link(ServiceGroup) ->
 
 -spec init([]) -> state().
 init([]) ->
-    UpdateInterval = config:read(ganglia_interval),
-    Trigger = trigger:init(trigger_periodic, UpdateInterval, ganglia_trigger),
-    {_LastActive = 0, trigger:next(Trigger), {0, 0, 0}}.
+    UpdateInterval = config:read(ganglia_interval) div 1000,
+    msg_delay:send_trigger(UpdateInterval, {ganglia_trigger}),
+    {_LastActive = 0, {0, 0, 0}}.
 
 -spec on(message(), state()) -> state().
 on({ganglia_trigger}, State) ->
-    Trigger = trigger:next(get_trigger(State)),
-    StateNew = inc_agg_id(set_trigger(Trigger, State)),
+    UpdateInterval = config:read(ganglia_interval) div 1000,
+    msg_delay:send_trigger(UpdateInterval, {ganglia_trigger}),
+    StateNew = inc_agg_id(State),
     gen_component:post_op(StateNew, _Msg = {ganglia_periodic});
 
 on({ganglia_periodic}, State) ->
@@ -242,14 +242,6 @@ agg_check_pending(State) ->
 set_last_active(State) ->
     {_Megasecs, Secs, _MicroSecs} = os:timestamp(),
     setelement(1, State, Secs).
-
--spec get_trigger(state()) -> trigger:state().
-get_trigger(State) ->
-    element(2, State).
-
--spec set_trigger(trigger:state(), state()) -> state().
-set_trigger(Trigger, State) ->
-    setelement(2, State, Trigger).
 
 -spec get_agg_id(state()) -> non_neg_integer().
 get_agg_id(State) ->

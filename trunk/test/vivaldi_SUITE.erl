@@ -1,4 +1,4 @@
-% @copyright 2010-2012 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -59,15 +59,16 @@ test_init(Config) ->
     EmptyMsgQueue = msg_queue:new(),
     InitialState1 = vivaldi:init([]),
     ?equals_pattern(InitialState1,
-                    {inactive, EmptyMsgQueue, {'trigger_periodic', _TriggerState}}),
+                    {inactive, EmptyMsgQueue}),
     ?expect_no_message(),
-    
+
     FullState2 = vivaldi:on_inactive({activate_vivaldi}, InitialState1),
     OnActiveHandler = fun vivaldi:on_active/2,
     ?equals_pattern(FullState2,
                     {'$gen_component', [{on_handler, OnActiveHandler}],
-                     {[_X, _Y], 1.0, {'trigger_periodic', _TriggerState}}}),
+                     {[_X, _Y], 1.0}}),
     ?expect_message({vivaldi_trigger}),
+    ?expect_message({trigger_once}),
     ?expect_no_message(),
     Config.
 
@@ -75,19 +76,14 @@ test_on_trigger(Config) ->
     pid_groups:join_as(atom_to_list(?MODULE), cyclon),
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
-    Trigger1 = get_ptrigger_nodelay(),
-    InitialState = {Coordinate, Confidence, Trigger1},
-    {NewCoordinate, NewConfidence, NewTriggerState} =
-        vivaldi:on_active({vivaldi_trigger}, InitialState),
+    InitialState = {Coordinate, Confidence},
+    {NewCoordinate, NewConfidence} =
+        vivaldi:on_active({trigger_once}, InitialState),
 
     Self = self(),
     ?equals(Coordinate, NewCoordinate),
     ?equals(Confidence, NewConfidence),
-    % note: cannot compare with an opaque trigger state from trigger:next/1
-    % since the timer ref will be different
-    ?equals_pattern(NewTriggerState, {'trigger_periodic', _}),
     ?expect_message({get_subset_rand, 1, Self}),
-    ?expect_message({vivaldi_trigger}),
     ?expect_no_message(),
     Config.
 
@@ -96,7 +92,7 @@ test_on_vivaldi_shuffle(Config) ->
     config:write(vivaldi_measurements_delay, 0),
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
-    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    InitialState = {Coordinate, Confidence},
     _NewState = vivaldi:on_active({vivaldi_shuffle, comm:this(), [0.0, 0.0], 1.0},
                                  InitialState),
     receive
@@ -111,7 +107,7 @@ test_on_vivaldi_shuffle(Config) ->
 test_on_cy_cache1(Config) ->
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
-    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    InitialState = {Coordinate, Confidence},
     % empty node cache
     Cache = [],
     NewState =
@@ -127,7 +123,7 @@ test_on_cy_cache2(Config) ->
 
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
-    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    InitialState = {Coordinate, Confidence},
     % non-empty node cache
     Cache = [node:new(comm:make_global(self()), ?RT:hash_key("10"), 0)],
     NewState =
@@ -145,7 +141,7 @@ test_on_cy_cache3(Config) ->
 
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
-    InitialState = {Coordinate, Confidence, get_ptrigger_nodelay()},
+    InitialState = {Coordinate, Confidence},
     % non-empty node cache
     Cache = [node:new(comm:make_global(self()), ?RT:hash_key("10"), 0)],
     NewState =
@@ -158,7 +154,7 @@ test_on_cy_cache3(Config) ->
                      {vivaldi_shuffle, This, Coordinate, Confidence}}),
     % no further messages
     ?expect_no_message(),
-    
+
     exit(DHT_Node, kill),
     Config.
 
@@ -168,12 +164,6 @@ reset_config() ->
     config:write(vivaldi_count_measurements, 10),
     config:write(vivaldi_measurements_delay, 1000),
     config:write(vivaldi_latency_timeout, 60000).
-
-get_ptrigger_nodelay() ->
-    get_ptrigger_delay(0).
-
-get_ptrigger_delay(Delay) ->
-    trigger:init('trigger_periodic', Delay, 'vivaldi_trigger').
 
 fake_dht_node() ->
     element(1, unittest_helper:start_subprocess(
