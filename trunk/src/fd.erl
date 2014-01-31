@@ -299,23 +299,23 @@ forward_to_hbs(Pid, Msg) ->
 -spec subscriptions() -> ok.
 subscriptions() ->
     FD = my_fd_pid(),
-    case FD of
-        failed -> [];
-        FD ->
-            {dictionary, Dictionary} = process_info(FD, dictionary),
-            All_HBS = [ X || {{_,_,fd},{{_,_,fd},X}} <- Dictionary ],
-            io:format("Remote nodes watched: ~p~n", [length(All_HBS)]),
-            [ begin
-                  io:format("fd_hbs: ~p~n", [pid_groups:group_and_name_of(X)]),
-                  {dictionary, FD_HBS_Dict} = process_info(X, dictionary),
-                  [ begin
-                        io:format("  ~p ~p ~p~n",
-                                  [pid_groups:group_and_name_of(LSub),
-                                   Cookies, Count])
-                    end
-                    || {{LSub,{_,_,_}},
-                        {{LSub,{_,_,_}}, Cookies, Count}}
-                           <- FD_HBS_Dict ]
-              end || X <- All_HBS ]
-    end,
+    _ = case FD of
+            failed -> [];
+            FD ->
+                {dictionary, Dictionary} = process_info(FD, dictionary),
+                All_HBS = [ X || {{_,_,fd},{{_,_,fd},X}} <- Dictionary ],
+                io:format("Remote nodes watched: ~p~n", [length(All_HBS)]),
+                [ begin
+                      io:format("fd_hbs: ~p~n", [pid_groups:group_and_name_of(X)]),
+                      {dictionary, FD_HBS_Dict} = process_info(X, dictionary),
+                      [ begin
+                            io:format("  ~p ~p ~p~n",
+                                      [pid_groups:group_and_name_of(LSub),
+                                       Cookies, Count])
+                        end
+                        || {{LSub,{_,_,_}},
+                            {{LSub,{_,_,_}}, Cookies, Count}}
+                               <- FD_HBS_Dict ]
+                  end || X <- All_HBS ]
+        end,
     ok.

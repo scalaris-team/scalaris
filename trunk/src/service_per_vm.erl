@@ -150,7 +150,7 @@ on({trigger_gc}, State) ->
     %% processes running on the same machine.
     msg_delay:send_local(10, self(), {trigger_gc}),
     %% io:format("Garbage collect all processes~n"),
-    [garbage_collect(X) || X <- processes()],
+    _ = [garbage_collect(X) || X <- processes()],
     State;
 
 %% message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
