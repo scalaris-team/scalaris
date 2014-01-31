@@ -1,4 +1,4 @@
-% @copyright 2012-2013 Zuse Institute Berlin,
+% @copyright 2012-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -240,8 +240,8 @@ unittest_lease_update(Old, New, Mode) ->
 on({l_on_cseq, split_and_change_owner, _Lease, NewOwner, ReplyPid, SplitResult}, State) ->
     case SplitResult of
         {split, success, L2, _L1} ->
-            gen_component:post_op(State,
-                                  {l_on_cseq, handover, L2, NewOwner, ReplyPid});
+            gen_component:post_op({l_on_cseq, handover, L2, NewOwner, ReplyPid},
+                                  State);
         {split, fail, L1} ->
             comm:send_local(ReplyPid, {split, fail, L1}),
             State
@@ -621,24 +621,28 @@ on({l_on_cseq, split_reply_step2, L1, R1, R2, Keep, ReplyTo, PostAux,
         unexpected_aux       -> comm:send_local(ReplyTo, {split, fail, L2}), State; %@todo
         unexpected_timeout ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step1, L2, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L1}});
+            gen_component:post_op({l_on_cseq, split_reply_step1, L2, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                  State);
         timeout_is_not_newer_than_current_lease ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step1, L2, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L1}});
+            gen_component:post_op({l_on_cseq, split_reply_step1, L2, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                  State);
         unexpected_epoch ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step1, L2, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L1}});
+            gen_component:post_op({l_on_cseq, split_reply_step1, L2, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                  State);
         unexpected_version ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step1, L2, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L1}})
+            gen_component:post_op({l_on_cseq, split_reply_step1, L2, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                  State)
     end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -677,24 +681,28 @@ on({l_on_cseq, split_reply_step3, L2, R1, R2, Keep, ReplyTo, PostAux,
         unexpected_aux       -> comm:send_local(ReplyTo, {split, fail, L1}), State; %@todo
         unexpected_timeout ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L1, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L2}});
+            gen_component:post_op({l_on_cseq, split_reply_step2, L1, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L2}},
+                                  State);
         timeout_is_not_newer_than_current_lease ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L1, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L2}});
+            gen_component:post_op({l_on_cseq, split_reply_step2, L1, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L2}},
+                                  State);
         unexpected_epoch ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L1, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L2}});
+            gen_component:post_op({l_on_cseq, split_reply_step2, L1, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L2}},
+                                  State);
         unexpected_version ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step2, L1, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L2}})
+            gen_component:post_op({l_on_cseq, split_reply_step2, L1, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L2}},
+                                  State)
     end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -740,24 +748,28 @@ on({l_on_cseq, split_reply_step4, L1, R1, R2, Keep, ReplyTo, PostAux,
         unexpected_aux       -> comm:send_local(ReplyTo, {split, fail, L2}), State;
         unexpected_timeout ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L2, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L1}});
+            gen_component:post_op({l_on_cseq, split_reply_step3, L2, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                  State);
         timeout_is_not_newer_than_current_lease ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L2, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L1}});
+            gen_component:post_op({l_on_cseq, split_reply_step3, L2, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                  State);
         unexpected_epoch ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L2, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L1}});
+            gen_component:post_op({l_on_cseq, split_reply_step3, L2, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                  State);
         unexpected_version ->
             % retry
-            gen_component:post_op(State, {l_on_cseq, split_reply_step3, L2, R1, R2,
-                                          Keep, ReplyTo, PostAux,
-                                          {qwrite_done, fake_reqid, fake_round, L1}})
+            gen_component:post_op({l_on_cseq, split_reply_step3, L2, R1, R2,
+                                   Keep, ReplyTo, PostAux,
+                                   {qwrite_done, fake_reqid, fake_round, L1}},
+                                  State)
     end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

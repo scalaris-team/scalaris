@@ -1,4 +1,4 @@
-%  @copyright 2011 Zuse Institute Berlin
+%  @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -227,7 +227,7 @@ on({report_single, Process, Key, NewValue_or_UpdateFun}, State) ->
 on({trigger_check_timeslots}, State) ->
     _ = comm:send_local_after(get_check_timeslots_interval(), self(),
                               {trigger_check_timeslots}),
-    gen_component:post_op(State, {check_timeslots});
+    gen_component:post_op({check_timeslots}, State);
 
 on({check_timeslots}, {_Table, OldApiTxReqList} = State) ->
     proc_check_all_timeslot(),

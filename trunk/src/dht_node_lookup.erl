@@ -1,4 +1,4 @@
-%  @copyright 2007-2013 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -107,7 +107,7 @@ lookup_fin_chord(State, Key, Hops, Msg) ->
                     %comm:send_local(dht_node_state:get(State, monitor_proc),
                     %                {lookup_hops, Hops}),
                     %Unwrap = ?RT:unwrap_message(Msg, State),
-                    %gen_component:post_op(State, Unwrap);
+                    %gen_component:post_op(Unwrap, State);
                     deliver(State, Msg, false, Hops);
                 false ->
                     % it is possible that we received the message due to a
@@ -183,8 +183,7 @@ deliver(State, Msg, Consistency, Hops) ->
     Unwrap = ?RT:unwrap_message(Msg, State),
     case Unwrap of
         {Nth, f, InnerMsg} ->
-            gen_component:post_op(State,
-                                  erlang:setelement(Nth, InnerMsg, Consistency));
+            gen_component:post_op(erlang:setelement(Nth, InnerMsg, Consistency), State);
         _ ->
-            gen_component:post_op(State, Unwrap)
+            gen_component:post_op(Unwrap, State)
     end.

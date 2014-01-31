@@ -60,7 +60,7 @@ on({ganglia_trigger}, State) ->
     UpdateInterval = config:read(ganglia_interval) div 1000,
     msg_delay:send_trigger(UpdateInterval, {ganglia_trigger}),
     StateNew = inc_agg_id(State),
-    gen_component:post_op(StateNew, _Msg = {ganglia_periodic});
+    gen_component:post_op(_Msg = {ganglia_periodic}, StateNew);
 
 on({ganglia_periodic}, State) ->
     NewState = send_dht_node_metrics(State),

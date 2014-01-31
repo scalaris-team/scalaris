@@ -176,7 +176,7 @@ on_active({activate_vivaldi}, State) ->
 
 on_active({vivaldi_trigger}, State) ->
     msg_delay:send_trigger(get_vivaldi_interval(), {vivaldi_trigger}),
-    gen_component:post_op(State, {trigger_once});
+    gen_component:post_op({trigger_once}, State);
 
 on_active({trigger_once}, State) ->
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),

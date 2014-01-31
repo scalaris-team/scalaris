@@ -215,7 +215,7 @@ on_active({deactivate_cyclon}, {_Cache, _Node, _Cycles})  ->
 
 on_active({cy_trigger}, State) ->
     msg_delay:send_trigger(get_cyclon_interval(), {cy_trigger}),
-    gen_component:post_op(State, {cy_shuffle});
+    gen_component:post_op({cy_shuffle}, State);
 
 on_active({cy_shuffle}, {Cache, Node, Cycles} = State)  ->
     NewCache =

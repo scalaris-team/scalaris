@@ -1,4 +1,4 @@
-% @copyright 2013 Zuse Institute Berlin
+% @copyright 2013-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -289,7 +289,7 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
         start_delivery ->
             NewEntry = TmpEntry#state{status = running},
             NewState = lists:keystore(TraceId, 1, State, {TraceId, NewEntry}),
-            gen_component:post_op(NewState, {deliver, TraceId});
+            gen_component:post_op({deliver, TraceId}, NewState);
         _ ->
             lists:keystore(TraceId, 1, State, {TraceId, TmpEntry})
     end;
@@ -306,7 +306,7 @@ on({start_deliver, TraceId}, State) ->
         {TraceId, OldTrace} ->
             NewEntry = {TraceId, OldTrace#state{status = running}},
             NewState = lists:keystore(TraceId, 1, State, NewEntry),
-            gen_component:post_op(NewState, {deliver, TraceId})
+            gen_component:post_op({deliver, TraceId}, NewState)
     end;
 
 on({deliver, TraceId}, State) ->
@@ -351,13 +351,13 @@ on({deliver, TraceId}, State) ->
 
 on({on_handler_done, TraceId}, State) ->
     ?TRACE("on handler execution done~n", []),
-    gen_component:post_op(State, {deliver, TraceId});
+    gen_component:post_op({deliver, TraceId}, State);
 
 on({send_error, _Pid, Msg, _Reason} = _ShepherdMsg, State) ->
     %% call on_handler_done and continue with message delivery
     TraceId = get_trace_id(get_passed_state(Msg)),
     ?TRACE("send error for trace id ~p: ~p calling on_handler_done~n", [TraceId, _ShepherdMsg]),
-    gen_component:post_op(State, {on_handler_done, TraceId});
+    gen_component:post_op({on_handler_done, TraceId}, State);
 
 on({register_callback, CallbackFun, TraceId, Client}, State) ->
     case lists:keyfind(TraceId, 1, State) of

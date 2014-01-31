@@ -1,4 +1,4 @@
-% @copyright 2012-2013 Zuse Institute Berlin,
+% @copyright 2012-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -297,8 +297,8 @@ on({qread_collect,
                     %% are not considered
                     ?PDB:delete(ReqId, tablename(State)),
 
-                    gen_component:post_op(State,
-                      {qread_initiate_write_through, NewEntry})
+                    gen_component:post_op({qread_initiate_write_through, NewEntry},
+                      State)
             end
         end;
 
@@ -373,10 +373,10 @@ on({qread_initiate_write_through, ReadEntry}, State) ->
                      self(), 4,
                      {qread_write_through_done, ReadEntry, apply_filter, '_'}),
 
-            gen_component:post_op(State,
-              {qread, This, entry_key(ReadEntry),
+            gen_component:post_op({qread, This, entry_key(ReadEntry),
                fun prbr:noop_read_filter/1,
-               entry_retrigger(ReadEntry) - entry_period(ReadEntry)})
+               entry_retrigger(ReadEntry) - entry_period(ReadEntry)},
+              State)
     end;
 
 on({qread_write_through_collect, ReqId,
@@ -463,9 +463,9 @@ on({qread_write_through_collect, ReqId,
                                 {UnpackedClient,
                                  entry_filters(UnpackedEntry)}
                         end,
-                    gen_component:post_op(State,
-                      {qread, Client, Key, Filter,
-                       entry_retrigger(Entry) - entry_period(Entry)})
+                    gen_component:post_op({qread, Client, Key, Filter,
+                       entry_retrigger(Entry) - entry_period(Entry)},
+                      State)
             end
     end;
 
@@ -510,14 +510,14 @@ on({qwrite, Client, Key, Filters, Value, RetriggerAfter}, State) ->
 
     This = comm:reply_as(self(), 3, {qwrite_read_done, ReqId, '_'}),
     set_entry(Entry, tablename(State)),
-    gen_component:post_op(State, {qread, This, Key, element(1, Filters), 1});
+    gen_component:post_op({qread, This, Key, element(1, Filters), 1}, State);
 
 %% qwrite step 2: qread is done, we trigger a quorum write in the given Round
 on({qwrite_read_done, ReqId,
     {qread_done, _ReadId, Round, ReadValue}},
    State) ->
     ?TRACE("rbrcseq:on qwrite_read_done qread_done~n", []),
-    gen_component:post_op(State, {do_qwrite_fast, ReqId, Round, ReadValue});
+    gen_component:post_op({do_qwrite_fast, ReqId, Round, ReadValue}, State);
 
 on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
     WriteValue, RetriggerAfter, Round, ReadFilterResultValue}, State) ->
@@ -533,8 +533,8 @@ on({qwrite_fast, Client, Key, Filters = {_RF, _CC, _WF},
                             Filters, WriteValue, RetriggerAfter),
 
     set_entry(Entry, tablename(State)),
-    gen_component:post_op(State, {do_qwrite_fast, ReqId, Round,
-                                  ReadFilterResultValue});
+    gen_component:post_op({do_qwrite_fast, ReqId, Round,
+                                  ReadFilterResultValue}, State);
 
 on({do_qwrite_fast, ReqId, Round, OldRFResultValue}, State) ->
     Entry = setelement(2, get_entry(ReqId, tablename(State)), do_qwrite_fast),
@@ -641,7 +641,7 @@ on({qwrite_collect, ReqId,
                         3 ->
                             NewReq = req_for_retrigger(NewEntry, noincdelay),
                             ?PDB:delete(element(1, NewEntry), TableName),
-                            gen_component:post_op(State, NewReq)
+                            gen_component:post_op(NewReq, State)
                     end
             end
     end
