@@ -155,7 +155,8 @@ tester_type_check_gossip(_Config) ->
 tester_type_check_gossip2(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
-    config:write(gossip_load_debug_level_warn, debug),
+    config:write(gossip2_debug_level_warn, debug),
+    config:write(gossip2_debug_level_error, debug),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),

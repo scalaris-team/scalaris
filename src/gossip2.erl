@@ -1054,7 +1054,7 @@ state_feeder_helper(Key, State) ->
 % hack to be able to suppress warnings when testing via config:write()
 -spec warn() -> log:log_level().
 warn() ->
-    case config:read(gossip_load_debug_level_warn) of
+    case config:read(gossip2_level_warn) of
         failed -> warn;
         Level -> Level
     end.
@@ -1062,7 +1062,7 @@ warn() ->
 % hack to be able to suppress warnings when testing via config:write()
 -spec error() -> log:log_level().
 error() ->
-    case config:read(gossip_load_debug_level_warn) of
+    case config:read(gossip2_debug_level_error) of
         failed -> warn;
         Level -> Level
     end.
