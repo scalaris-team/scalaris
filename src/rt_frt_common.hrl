@@ -57,8 +57,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
--type external_rt_t() :: {unknown | gossip_state:size(),
-                          gb_tree()}.
+-type external_rt_t() :: {unknown | gossip_state:size(), gb_tree()}.
+%% -type external_rt_t() :: {Size :: unknown | float(), gb_tree()}.
 
 % define the possible types of nodes in the routing table:
 %  - normal nodes are nodes which have been added by entry learning
@@ -86,6 +86,7 @@
         , num_active_learning_lookups = 0 :: non_neg_integer()
         , nodes = gb_trees:empty() :: gb_tree()
         , nodes_in_ring = unknown :: unknown | gossip_state:size()
+        %% , nodes_in_ring = unknown :: Size :: unknown | float()
     }).
 
 -type(rt_t() :: #rt_t{}).
@@ -123,6 +124,7 @@ init(Neighbors) ->
 
     % request approximated ring size
     comm:send_local(pid_groups:get_my(gossip), {get_values_best, self()}),
+    %% comm:send_local(pid_groups:get_my(gossip2), {get_values_best, {gossip_load, default}, self()}),
 
     update_entries(Neighbors, add_source_entry(nodelist:node(Neighbors), #rt_t{})).
 
@@ -162,7 +164,7 @@ get_random_node_id() ->
 %%  that something changed (async and optimistic -> if they don't care, we don't care)
 %% - if pred/succ changed, update sticky entries
 -spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
-init_stabilize(Neighbors, RT) -> 
+init_stabilize(Neighbors, RT) ->
     case node:id(nodelist:node(Neighbors)) =:= entry_nodeid(get_source_node(RT)) of
         true -> update_entries(Neighbors, RT) ;
         false -> % source node changed, replace the complete table
@@ -234,7 +236,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 %% @doc Removes dead nodes from the routing table (rely on periodic
 %%      stabilization here).
 -spec filter_dead_node(rt(), comm:mypid()) -> rt().
-filter_dead_node(RT, DeadPid) -> 
+filter_dead_node(RT, DeadPid) ->
     % find the node id of DeadPid and delete it from the RT
     case [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid] of
         [Node] -> entry_delete(node:id(Node), RT);
@@ -488,7 +490,9 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
 handle_custom_message({gossip_get_values_best_response, Vals}, State) ->
     RT = rt_loop:get_rt(State),
     NewRT = rt_set_ring_size(RT, gossip_state:get(Vals, size_kr)),
+    %% NewRT = rt_set_ring_size(RT, gossip_load:load_info_get(size_kr, Vals)),
     msg_delay:send_local(config:read(rt_frt_gossip_interval), pid_groups:get_my(gossip),{get_values_best, self()}),
+    %% msg_delay:send_local(config:read(rt_frt_gossip_interval), pid_groups:get_my(gossip2),{get_values_best, {gossip_load, default}, self()}),
     RTExt = export_rt_to_dht_node(NewRT, rt_loop:get_neighb(State)),
     comm:send_local(pid_groups:get_my(dht_node), {rt_update, RTExt}),
     rt_loop:set_rt(State, NewRT);
@@ -513,7 +517,7 @@ check(OldRT, NewRT, Neighbors, ReportToFD) ->
 check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
     % if the routing tables haven't changed and the successor/predecessor haven't changed
     % as well, do nothing
-    case OldRT =:= NewRT andalso 
+    case OldRT =:= NewRT andalso
          nodelist:succ(OldNeighbors) =:= nodelist:succ(NewNeighbors) andalso
          nodelist:pred(OldNeighbors) =:= nodelist:pred(NewNeighbors) of
         true -> ok;
@@ -783,7 +787,7 @@ get_adjacent_fingers_from(Pred, Node, Type, RT) ->
 % @doc Add a new entry to the routing table. A source node is only allowed to be added
 % once.
 -spec entry_learning(Entry :: node:node_type(), Type :: entry_type(), RT :: rt()) -> RefinedRT :: rt().
-entry_learning(Entry, Type, RT) -> 
+entry_learning(Entry, Type, RT) ->
     % only add the entry if it doesn't exist yet or if it is a sticky node. If its a
     % stickynode, RM told us about a new neighbour -> if the neighbour was already added
     % as a normal node, convert it to a sticky node now.
@@ -989,10 +993,12 @@ rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 
 % @doc Set the size estimate of the ring
 -spec rt_set_ring_size(RT :: rt_t(), Size :: unknown | gossip_state:size()) -> rt_t().
+%% -spec rt_set_ring_size(RT :: rt_t(), Size :: unknown | float()) -> rt_t().
 rt_set_ring_size(RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
 
 % @doc Get the ring size estimate from the external routing table
 -spec external_rt_get_ring_size(RT :: external_rt()) -> gossip_state:size() | unknown.
+%% -spec external_rt_get_ring_size(RT :: external_rt()) -> Size :: float() | unknown.
 external_rt_get_ring_size(RT) when element(1, RT) >= 0 orelse
                                    element(1, RT) == unknown ->
     element(1, RT).
@@ -1157,7 +1163,7 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
 
     learn_on_forward(Issuer),
     Msg;
-    
+
 wrap_message(_Key, {'$wrapped', Issuer, _} = Msg, _State, _) ->
     learn_on_forward(Issuer),
     Msg.
