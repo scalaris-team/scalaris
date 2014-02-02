@@ -255,7 +255,7 @@ on_active({start_gossip_task, CBModule, Args}, State) ->
 on_active({gossip2_trigger, TriggerInterval}=Msg, State) ->
     msg_queue_send(State),
     log:log(debug, "[ Gossip ] Triggered: ~w", [Msg]),
-    case state_get({trigger_group, TriggerInterval}, State) of
+    case state_get_raw({trigger_group, TriggerInterval}, State) of
         undefined ->
             ok; %% trigger group does no longer exist, forget about this trigger
         {CBModules} ->
@@ -532,7 +532,7 @@ handle_msg({stop_gossip_task, CBModule}=Msg, State) ->
     state_update(cb_modules, Fun1, State),
 
     % remove from trigger group
-    Interval = cb_call(trigger_interval, CBModule),
+    Interval = cb_call(trigger_interval, CBModule) div 1000,
     {CBModules} = state_get({trigger_group, Interval}, State),
     NewCBModules = lists:delete(CBModule, CBModules),
     case NewCBModules of
