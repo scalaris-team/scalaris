@@ -197,7 +197,7 @@ select_node(State) ->
 
 -spec select_data(State::state()) -> {ok, state()}.
 select_data(State) ->
-    log:log(debug, "[ ~w ] select_data: State: ~w", [?MODULE, State]),
+    log:log(debug, "[ ~w ] select_data: State: ~w", [state_get(instance, State), State]),
     case state_get(status, State) of
         uninit ->
             request_local_info(State);
@@ -221,7 +221,8 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
             log:log(?SHOW, "[ ~w ] select_reply_data in uninit", [?MODULE]),
             {retry,State};
         init when not IsValidRound ->
-            log:log(warn, "[ ~w ] Discarded data in select_reply_data. Reason: invalid round.", [?MODULE]),
+            log:log(warn, "[ ~w ] Discarded data in select_reply_data. Reason: invalid round.",
+                [state_get(instance, State)]),
             {send_back, State};
         init when RoundStatus =:= current_round ->
             Data1 = prepare_load_data(State),
@@ -230,7 +231,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
 
             _ = merge_load_data(current_round, PData, State),
 
-            log:log(debug, "[ ~w ] Data after select_reply_data: ~w", [?MODULE, get_load_info(State)]),
+            log:log(debug, "[ ~w ] Data after select_reply_data: ~w", [state_get(instance, State), get_load_info(State)]),
             {ok, State};
         init when RoundStatus =:= old_round ->
             case discard_old_rounds() of
@@ -256,7 +257,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
     Round::non_neg_integer(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
 integrate_data(QData, RoundStatus, Round, State) ->
-    log:log(debug, "[ ~w ] Reply-Data: ~w~n", [?MODULE, QData]),
+    log:log(debug, "[ ~w ] Reply-Data: ~w~n", [state_get(instance, State), QData]),
 
     IsValidRound = is_valid_round(RoundStatus, Round, State),
 
@@ -276,7 +277,7 @@ integrate_data(QData, RoundStatus, Round, State) ->
     State::state()) -> {ok, state()}.
 handle_msg({get_state_response, DHTNodeState}, State) ->
     Load = dht_node_state:get(DHTNodeState, load),
-    log:log(?SHOW, "[ ~w ] Load: ~w", [?MODULE, Load]),
+    log:log(?SHOW, "[ ~w ] Load: ~w", [state_get(instance, State), Load]),
 
     Data = state_get(load_data, State),
     Data1 = load_data_set(avg, {float(Load), 1.0}, Data),
@@ -294,7 +295,7 @@ handle_msg({get_state_response, DHTNodeState}, State) ->
 
     % histogram
     Histo = init_histo(DHTNodeState, State),
-    log:log(?SHOW,"[ ~w ] Histo: ~s", [?MODULE, to_string(Histo)]),
+    log:log(?SHOW,"[ ~w ] Histo: ~s", [state_get(instance, State), to_string(Histo)]),
     Data7 = load_data_set(histo, Histo, Data6),
 
     state_set(load_data, Data7, State),
@@ -319,7 +320,7 @@ round_has_converged(State) ->
     (Keyword::exch_failure, {_MsgTag::atom(), Data::load_data(), _Round::non_neg_integer()},
              State::state()) -> {ok, state()}.
 notify_change(new_round, NewRound, State) ->
-    log:log(debug, "[ ~w ] new_round notification. NewRound: ~w", [?MODULE, NewRound]),
+    log:log(debug, "[ ~w ] new_round notification. NewRound: ~w", [state_get(instance, State), NewRound]),
     case state_get(request, State) of
         true ->
             finish_request(State);
@@ -443,7 +444,7 @@ is_valid_round(RoundStatus, RoundFromMessage, State) ->
         true -> true;
         false ->
             log:log(debug, "[ ~w ] Invalid ~w. RoundFromState: ~w, RoundFromMessage: ~w",
-                [?MODULE, RoundStatus, RoundFromState, RoundFromMessage]),
+                [state_get(instance, State), RoundStatus, RoundFromState, RoundFromMessage]),
             false
     end.
 
@@ -458,13 +459,13 @@ integrate_data_init(QData, RoundStatus, State) ->
             %% _PrevLoadInfo = get_load_info(_PrevState),
             %% _ValuesBest = get_values_best(State),
             %% _ValuesAll = get_values_all(State),
-            %% log:log(debug, "[ ~w ] Values best: ~n\t~w", [?MODULE, _ValuesBest]),
-            %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [?MODULE, _ValuesAll]),
-            %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [?MODULE, _PrevLoadInfo]),
+            %% log:log(debug, "[ ~w ] Values best: ~n\t~w", [state_get(instance, State), _ValuesBest]),
+            %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [state_get(instance, State), _ValuesAll]),
+            %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [state_get(instance, State), _PrevLoadInfo]),
             _LoadInfo = get_load_info(State),
             _Histo = load_data_get(histo, _NewData),
             log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
-                [?MODULE, to_string(_LoadInfo), to_string(_Histo)]);
+                [state_get(instance, State), to_string(_LoadInfo), to_string(_Histo)]);
         old_round ->
              case discard_old_rounds() of
                 true ->
@@ -540,7 +541,7 @@ update_convergence_count(OldData, NewData, State) ->
             OldValue = calc_current_estimate(OldAvg, OldWeight),
             NewValue = calc_current_estimate(NewAvg, NewWeight),
             log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
-                [?MODULE, AvgType, OldValue, NewValue]),
+                [state_get(instance, State), AvgType, OldValue, NewValue]),
             HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon,
             Acc andalso HasConverged
     end,
@@ -625,7 +626,7 @@ state_get(_Key, unknown) ->
 state_get(Key, State) ->
     case ets:lookup(State, Key) of
         [] ->
-            log:log(error, "[ ~w ] Lookup of ~w in ~w failed~n", [?MODULE, Key, State]),
+            log:log(error, "[ ~w ] Lookup of ~w in ~w failed~n", [state_get(instance, State), Key, State]),
             error(lookup_failed, [Key, State]);
         [{Key, Value}] -> Value
     end.
