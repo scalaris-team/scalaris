@@ -159,6 +159,9 @@ no_of_buckets(State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec request_histogram(Size::pos_integer(), SourceId::comm:mypid()) -> ok.
+request_histogram(Size, SourcePid) when Size < 1 ->
+    error(badarg, [Size, SourcePid]);
+
 request_histogram(Size, SourcePid) ->
     gossip2:start_gossip_task(?MODULE, [Size, SourcePid]).
 
@@ -1212,7 +1215,7 @@ merge_bucket_feeder({Key1, Val1}, {_Key2, Val2}) ->
 % hack to be able to suppress warnings when testing
 -spec warn() -> log:log_level().
 warn() ->
-    case config:read(gossip2_debug_level_warn) of
+    case config:read(gossip2_log_level_warn) of
         failed -> warn;
         Level -> Level
     end.
