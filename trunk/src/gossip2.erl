@@ -226,6 +226,10 @@ on_inactive({stop_gossip_task, _CBModule}=Msg, State) ->
     msg_queue_add(Msg, State), State;
 
 
+on_inactive({start_gossip_task, _CBModule}=Msg, State) ->
+    msg_queue_add(Msg, State), State;
+
+
 on_inactive({remove_all_tombstones}=Msg, State) ->
     msg_queue_add(Msg, State), State;
 
@@ -322,13 +326,13 @@ on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
     CBStatus = state_get(cb_status, element(2, MsgUnpacked), State),
     case MsgUnpacked of
         _ when CBStatus =:= tombstone ->
-            log:log(warn, "[ Gossip ] Got ~w msg for tombstoned module ~w",
-                [element(1, ErrorMsg), element(2, MsgUnpacked)]);
+            log:log(warn(), "[ Gossip ] Got ~w msg for tombstoned module ~w. Reason: ~w. Original Msg: ~w",
+                [element(1, ErrorMsg), element(2, MsgUnpacked), Reason, element(1, Msg)]);
         {p2p_exch, CBModule, _SourcePid, PData, Round} ->
-            log:log(?SHOW, "[ Gossip ] p2p_exch failed because of ~w", [Reason]),
+            log:log(warn(), "[ Gossip ] p2p_exch failed because of ~w", [Reason]),
             _ = cb_call(notify_change, [exch_failure, {p2p_exch, PData, Round}], ErrorMsg, CBModule, State);
         {p2p_exch_reply, CBModule, QData, Round} ->
-            log:log(?SHOW, "[ Gossip ] p2p_exch_reply failed because of ~w", [Reason]),
+            log:log(warn(), "[ Gossip ] p2p_exch_reply failed because of ~w", [Reason]),
             _ = cb_call(notify_change, [exch_failure, {p2p_exch_reply, QData, Round}], ErrorMsg, CBModule, State);
         _ ->
             log:log(?SHOW, "[ Gossip ] Failed to deliever the Msg ~w because ~w", [Msg, Reason])
@@ -372,10 +376,10 @@ on_active({deactivate_gossip2}, State) ->
 on_active(Msg, State) ->
     try state_get(cb_status, element(2, Msg), State) of
         tombstone ->
-            log:log(warn, "[ Gossip ] Got ~w msg for tombstoned module ~w",
+            log:log(warn(), "[ Gossip ] Got ~w msg for tombstoned module ~w",
                 [element(1, Msg), element(2, Msg)]);
         unstarted ->
-            log:log(warn, "[ Gossip ] Got ~w msg in cbstatus 'unstarted' for ~w",
+            log:log(?SHOW, "[ Gossip ] Got ~w msg in cbstatus 'unstarted' for ~w",
                 [element(1, Msg), element(2, Msg)]),
             msg_queue_add(Msg, State);
         started ->
@@ -515,7 +519,7 @@ handle_msg({get_values_all, CBModule, SourcePid}=Msg, State) ->
 
 
 handle_msg({stop_gossip_task, CBModule}=Msg, State) ->
-    log:log(warn, "Stopping ~w", [CBModule]),
+    log:log(?SHOW, "[ Gossip ] Stopping ~w", [CBModule]),
     % shutdown callback module
     _ = cb_call(shutdown, [], Msg, CBModule, State),
 
@@ -1054,7 +1058,7 @@ state_feeder_helper(Key, State) ->
 % hack to be able to suppress warnings when testing via config:write()
 -spec warn() -> log:log_level().
 warn() ->
-    case config:read(gossip2_level_warn) of
+    case config:read(gossip2_log_level_warn) of
         failed -> warn;
         Level -> Level
     end.
@@ -1062,7 +1066,7 @@ warn() ->
 % hack to be able to suppress warnings when testing via config:write()
 -spec error() -> log:log_level().
 error() ->
-    case config:read(gossip2_debug_level_error) of
+    case config:read(gossip2_log_level_error) of
         failed -> warn;
         Level -> Level
     end.

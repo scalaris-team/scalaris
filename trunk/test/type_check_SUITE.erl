@@ -155,8 +155,8 @@ tester_type_check_gossip(_Config) ->
 tester_type_check_gossip2(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
-    config:write(gossip2_debug_level_warn, debug),
-    config:write(gossip2_debug_level_error, debug),
+    config:write(gossip2_log_level_warn, debug),
+    config:write(gossip2_log_level_error, debug),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
@@ -164,21 +164,15 @@ tester_type_check_gossip2(_Config) ->
     tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
     tester:register_type_checker({typedef, gossip2, state}, gossip2, is_state),
-    tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram),
-    tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state),
-    tester:register_value_creator({typedef, gossip2, state}, gossip2, tester_create_state, 10),
-    tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
-    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 10),
-    Modules =
-        [ {gossip2,
-            % excluded (exported functions)
+    tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram), tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state), tester:register_value_creator({typedef, gossip2, state}, gossip2, tester_create_state, 9), tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1), tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 10), Modules = [ {gossip2, % excluded (exported functions)
             [   {start_link, 1}, % type of pid_groups:groupname() seems not restrictive enough
                 {init, 1}, % does not return fully filled state
                 {start_gossip_task, 2}, % send messages
                 {stop_gossip_task, 1}, % send messages
                 {on_inactive, 2}, % sends messages
                 {on_active, 2}, % sends messages
-                {activate, 1} % uses pid_group:get_my()
+                {activate, 1}, % uses pid_group:get_my()
+                {is_state, 1}
             ],
             % excluded (private functions)
             [   {handle_msg, 2}, % sends messages
