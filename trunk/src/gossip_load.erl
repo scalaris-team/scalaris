@@ -35,7 +35,7 @@
 %% for testing
 -export([tester_create_histogram/1, is_histogram/1, tester_create_state/10, is_state/1]).
 
--export_type([state/0]).
+%% -export_type([state/0]).
 -export_type([load_info/0]).
 
 %% -define(SHOW, config:read(log_level)).
@@ -1205,7 +1205,7 @@ merge_bucket_feeder({Key1, Val1}, {_Key2, Val2}) ->
 % hack to be able to suppress warnings when testing
 -spec warn() -> log:log_level().
 warn() ->
-    case config:read(gossip_load_debug_level_warn) of
+    case config:read(gossip2_debug_level_warn) of
         failed -> warn;
         Level -> Level
     end.
