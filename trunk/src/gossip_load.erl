@@ -959,6 +959,7 @@ get_load_info(State) ->
                    (Key::stddev, LoadInfoRecord::load_info()) -> unknown | float();
                    (Key::size_ldr, LoadInfoRecord::load_info()) -> unknown | float();
                    (Key::size_kr, LoadInfoRecord::load_info()) -> unknown | float();
+                   (Key::size, LoadInfoRecord::load_info()) -> unknown | float();
                    (Key::minLoad, LoadInfoRecord::load_info()) -> unknown | min();
                    (Key::maxLoad, LoadInfoRecord::load_info()) -> unknown | max();
                    (Key::merged, LoadInfoRecord::load_info()) -> unknown | merged().
@@ -969,6 +970,12 @@ load_info_get(Key, #load_info{avg=Avg, stddev=Stddev, size_ldr=SizeLdr,
         stddev -> Stddev;
         size_ldr -> SizeLdr;
         size_kr -> SizeKr;
+        size ->
+            % favor key range based calculations over leader-based
+            case SizeKr of
+                unknown -> SizeLdr;
+                _       -> SizeKr
+            end;
         minLoad -> Min;
         maxLoad -> Max;
         merged -> Merged
