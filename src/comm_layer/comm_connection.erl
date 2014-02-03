@@ -187,8 +187,9 @@ on({tcp, Socket, Data}, State) ->
                 %% may fail, when tcp just closed
                 _ = inet:setopts(Socket, [{active, once}]),
                 State
-    end,
-    send_bundle_if_ready(NewState);
+        end,
+    New2State = set_time_last_msg_seen(NewState),
+    send_bundle_if_ready(New2State);
 
 on({tcp_closed, Socket}, State) ->
     log:log(warn,"[ CC ~p (~p) ] tcp closed", [self(), pid_groups:my_pidname()]),
@@ -209,23 +210,32 @@ on({report_stats}, State) ->
 
 %% checks if the connection hasn't been used recently
 on({check_idle}, State) ->
-    Timeout = config:read(tcp_idle_timeout),
-    TimeLastMsgSent = time_last_msg_sent(State),
     start_idle_check(),
-    case socket(State) =/= notconnected andalso
-             timer:now_diff(os:timestamp(), TimeLastMsgSent) div 1000 > Timeout of
+    NewState = send_bundle_if_ready(State),
+
+    Timeout = config:read(tcp_idle_timeout),
+    TimeLastMsgSent = time_last_msg_seen(NewState),
+    case (notconnected =/= socket(NewState)) andalso
+        timer:now_diff(os:timestamp(), TimeLastMsgSent) div 1000 > Timeout of
         true ->
             %% we timed out
-            ?TRACE("Closing idle connection: ~p~n", [State]),
-            close_connection(socket(State), State);
-        _    ->
+            ?TRACE("Closing idle connection: ~p~n", [NewState]),
+            %% TODO: check whether data was received on this socket?
+            %% (maybe a part of a huge message that takes longer
+            %% than the tcp_idle_timeout to receive?)
+            close_connection(socket(NewState), NewState);
+        _ ->
             ?TRACE("Connection not idle~n", []),
-            State
+            NewState
+            %% send_bundle_if_ready() is called in the
+            %% beginning of this on handler to make the
+            %% decision on tcp_idle_timeout on the newest
+            %% possible state NewState
     end;
 
 on({web_debug_info, Requestor}, State) ->
     Now = os:timestamp(),
-    TimeLastMsgSent = time_last_msg_sent(State),
+    TimeLastMsgSent = time_last_msg_seen(State),
     TimeLastMsgReceived = time_last_msg_received(State),
     SecondsAgoSent = seconds_ago(Now, TimeLastMsgSent),
     SecondsAgoReceived = seconds_ago(Now, TimeLastMsgReceived),
@@ -646,10 +656,10 @@ last_stat_report(State)          -> element(13, State).
 -spec set_last_stat_report(state(), stat_report()) -> state().
 set_last_stat_report(State, Val) -> setelement(13, State, Val).
 
--spec time_last_msg_sent(state()) -> erlang:timestamp().
-time_last_msg_sent(State) -> element(14, State).
--spec set_time_last_msg_sent(state()) -> state().
-set_time_last_msg_sent(State) -> setelement(14, State, os:timestamp()).
+-spec time_last_msg_seen(state()) -> erlang:timestamp().
+time_last_msg_seen(State) -> element(14, State).
+-spec set_time_last_msg_seen(state()) -> state().
+set_time_last_msg_seen(State) -> setelement(14, State, os:timestamp()).
 
 -spec time_last_msg_received(state()) -> erlang:timestamp().
 time_last_msg_received(State) -> element(15, State).
@@ -683,7 +693,7 @@ set_last_msg_sent(State, Msg) ->
     OldList = last_msg_sent(State),
     NumToKeep = erlang:max(?NUM_KEEP - length(Msg), 0),
     NewList = Msg ++ lists:sublist(OldList, NumToKeep),
-    State2 = set_time_last_msg_sent(State),
+    State2 = set_time_last_msg_seen(State),
     State3 = inc_s_msg_count(State2, length(Msg)),
     setelement(19, State3, NewList).
 
