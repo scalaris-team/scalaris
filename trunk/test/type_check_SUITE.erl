@@ -153,6 +153,9 @@ tester_type_check_gossip(_Config) ->
     true.
 
 tester_type_check_gossip2(_Config) ->
+    unittest_helper:wait_for_stable_ring_deep(),
+    Group = pid_groups:group_with(gossip2),
+    pid_groups:join_as(Group, gossip2),
     Count = 500,
     config:write(no_print_ring_data, true),
     config:write(gossip2_log_level_warn, debug),
@@ -169,25 +172,25 @@ tester_type_check_gossip2(_Config) ->
     tester:register_value_creator({typedef, gossip2, state}, gossip2, tester_create_state, 9),
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
     tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 10),
-    Modules = [ {gossip2, % excluded (exported functions)
-            [   {start_link, 1}, % type of pid_groups:groupname() seems not restrictive enough
-                {init, 1}, % does not return fully filled state
-                {start_gossip_task, 2}, % send messages
-                {stop_gossip_task, 1}, % send messages
-                {on_inactive, 2}, % sends messages
-                {on_active, 2}, % sends messages
-                {activate, 1}, % uses pid_group:get_my()
+    Modules = [ {gossip2,
+            % excluded (exported functions)
+            [   {start_link, 1}, % would start a lot of processes
+                {init, 1}, % does not return fully filled state (as checked by type checker)
+                {start_gossip_task, 2}, % spec to wide
+                {stop_gossip_task, 1}, % would prohibit subsequent tests
+                {deactivate, 0}, % would prohibit subsequent tests
+                {on_inactive, 2}, % too much interaction / spec to wide
+                {on_active, 2}, % too much interaction / spec to wide
                 {is_state, 1}
             ],
             % excluded (private functions)
-            [   {handle_msg, 2}, % sends messages
-                {start_p2p_exchange, 4}, % needs node as peer
+            [   {handle_msg, 2}, % spec to wide
+                {start_p2p_exchange, 4}, % would need valid peer
                 {init_gossip_task, 3}, % test via feeder
                 {cb_call, 3}, % unbounded_fun?
                 {cb_call, 5}, % spec to wide
                 {select_reply_data, 7}, % would need to valid load_data
-                {request_random_node, 1}, % needs pid_group:get_my()
-                {request_random_node_delayed, 2}, % needs pid_group:get_my()
+                {request_random_node_delayed, 2}, % testes via feeder
                 {check_round, 3}, % would need valid callback state
                 {is_end_of_round, 2}, % would need valid callback state
                 {state_get, 2}, % tested via feeder
@@ -198,16 +201,11 @@ tester_type_check_gossip2(_Config) ->
           {gossip_load,
             % excluded (exported functions)
             [   {request_histogram, 2}, % starts gossip_load at all nodes, this produces to many ets tables
-                {select_data, 1}, % needs pid_groups:get_my()
-                {select_reply_data, 5}, % needs pid_groups:get_my()
-                {integrate_data, 4}, % needs pid_groups:get_my()
-                {handle_msg, 2} % needs pid_groups:get_my()
+                {handle_msg, 2}, % would need valid dht_node_state / pid_groups:get_my()
+                {is_state, 1}
             ],
             % excluded (private functions)
-            [  {integrate_data_init, 3}, % needs pid_groups:get_my()
-               {request_local_info, 1}, % sends message
-               {finish_request, 1}, % produces a lot of warnings in gossip2
-               {state_new, 2}, % too many db tables
+            [  {state_new, 2}, % too many db tables
                {state_update, 3}, % cannot create funs
                {init_histo, 2}, % needs DHTNodeState state
                {get_load_for_interval, 3}, % needs dht db

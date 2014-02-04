@@ -1026,12 +1026,20 @@ tuplekeyfind(Key, [H|List]) ->
         _ -> tuplekeyfind(Key, List)
     end.
 
+
 -spec init_gossip_task_feeder(cb_module(), [1..50], state()) -> {cb_module(), list(), state()}.
 init_gossip_task_feeder(CBModule, Args, State) ->
     Args1 = if length(Args)>1 -> [hd(Args)];
                true -> Args
             end,
     {CBModule, Args1, State}.
+
+
+-spec request_random_node_delayed_feeder(Delay::0..1000, CBModule::cb_module()) ->
+    {non_neg_integer(), cb_module()}.
+request_random_node_delayed_feeder(Delay, CBModule) ->
+    {Delay, CBModule}.
+
 
 -spec state_get_feeder(Key::state_key(), State::state()) -> {state_key(), state()}.
 state_get_feeder(Key, State) ->

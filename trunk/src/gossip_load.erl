@@ -224,7 +224,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
             log:log(?SHOW, "[ ~w ] select_reply_data in uninit", [?MODULE]),
             {retry,State};
         init when not IsValidRound ->
-            log:log(warn, "[ ~w ] Discarded data in select_reply_data. Reason: invalid round.",
+            log:log(warn(), "[ ~w ] Discarded data in select_reply_data. Reason: invalid round.",
                 [state_get(instance, State)]),
             {send_back, State};
         init when RoundStatus =:= current_round ->
@@ -266,7 +266,7 @@ integrate_data(QData, RoundStatus, Round, State) ->
 
     case state_get(status, State) of
         _ when not IsValidRound ->
-            log:log(warn, "[ ~w ] Discarded data in integrate_data. Reason: invalid round. ", [?MODULE]),
+            log:log(warn(), "[ ~w ] Discarded data in integrate_data. Reason: invalid round. ", [?MODULE]),
             {send_back, State};
         uninit ->
             log:log(?SHOW, "[ ~w ] integrate_data in uninit", [?MODULE]),
