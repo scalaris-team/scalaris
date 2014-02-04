@@ -1,4 +1,4 @@
-% @copyright 2011 Zuse Institute Berlin
+% @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -79,7 +79,8 @@ merge(Hist1 = #histogram{data = Hist1Data, data_size = Hist1DataSize},
 -spec resize(Histogram::histogram()) -> histogram().
 resize(Histogram = #histogram{data = Data, size = ExpectedSize, data_size = ActualSize}) ->
     if
-        ActualSize > ExpectedSize ->
+        (ActualSize > ExpectedSize) andalso (1 < ExpectedSize) ->
+            %% we need at least two items to do the following:
             MinSecondValue = find_smallest_interval(Data),
             NewHistogram = Histogram#histogram{data = merge_interval(MinSecondValue, Data),
                                                data_size = ActualSize - 1},
