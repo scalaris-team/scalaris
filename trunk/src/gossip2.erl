@@ -51,8 +51,8 @@
 -define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg),
         comm:send(Pid, Msg, [{group_member, Process}, {shepherd, self()}])).
 
--define(SHOW, config:read(log_level)).
-%% -define(SHOW, debug).
+%% -define(SHOW, config:read(log_level)).
+-define(SHOW, debug).
 
 -define(CBMODULES, [{gossip_load, default}]). % callback modules as list
 -define(CBMODULES_TYPE, {gossip_load, default}). % callback modules as union of atoms
@@ -125,6 +125,7 @@ init([]) ->
     TabName = ?PDB:new(state, ?PDB_OPTIONS),
     state_set(status, uninit, TabName),
     state_set(cb_modules, [], TabName),
+    state_set(msg_queue, msg_queue:new(), TabName),
     TabName.
 
 
