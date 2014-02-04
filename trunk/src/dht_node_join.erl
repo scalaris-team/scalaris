@@ -1,4 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -920,7 +920,7 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
     vivaldi:activate(),
     dc_clustering:activate(),
     gossip:activate(nodelist:node_range(Neighbors)),
-    %% gossip2:activate(nodelist:node_range(Neighbors)),
+    gossip2:activate(nodelist:node_range(Neighbors)),
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
     NewRT_ext = ?RT:empty_ext(Neighbors),
