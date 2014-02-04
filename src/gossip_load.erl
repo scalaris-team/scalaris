@@ -132,11 +132,19 @@ convergence_count_best_values() ->
 %       once every cycle).
 % 2) When receiving a request (select_reply_data()) (this happens randomly,
 %       but *on average* once per round).
-    10.
+    case config:read(gossip2_convergence_count_best_values) of
+        failed -> 10;
+        Count -> Count
+    end.
+
 
 -spec convergence_count_new_round() -> pos_integer().
 convergence_count_new_round() ->
-    20.
+    case config:read(gossip2_convergence_count_new_round) of
+        failed -> 20;
+        Count -> Count
+    end.
+
 
 -spec convergence_epsilon() -> float().
 convergence_epsilon() ->

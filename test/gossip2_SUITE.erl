@@ -31,7 +31,7 @@
 all() ->
     [
         test_no_load,
-        %% test_load, % throws error in perf monitor in 60% of the tries
+        test_load,
         test_request_histogram1,
         test_request_histogram2
     ].
@@ -49,11 +49,12 @@ end_per_suite(Config) ->
     ok.
 
 init_per_testcase(_TestCase, Config) ->
-    unittest_helper:make_ring(?NO_OF_NODES),
+    unittest_helper:make_ring(?NO_OF_NODES,  [{config, [{monitor_perf_interval, 0}]}]), % deactivate monitor_perf
     config:write(gossip2_log_level_warn, warn),
     config:write(gossip2_log_level_error, error),
+    config:write(gossip2_convergence_count_new_round, 5),
+    config:write(gossip2_convergence_count_best_values, 1),
     unittest_helper:wait_for_stable_ring_deep(),
-    timer:sleep(1000),
     Config.
 
 end_per_testcase(_TestCase, Config) ->
@@ -68,7 +69,7 @@ end_per_testcase(_TestCase, Config) ->
 test_no_load(_Config) ->
 
     % get values from gossiping (after round finishes)
-    wait_n_rounds(2),
+    wait_n_rounds(1),
     send2gossip2({get_values_best, {gossip_load,default}, self()}, 0),
 
     %                 {load_info, avg, stddev, size_ldr, size_kr, minLoad, maxLoad, merged}
@@ -93,7 +94,7 @@ test_load(_Config) ->
     LoadInfoExpected = {load_info, Avg, Stddev, Size,     Size,    Min,     Max,      dc},
 
     % get values from gossiping (after round finishes)
-    wait_n_rounds(2),
+    wait_n_rounds(1),
     send2gossip2({get_values_best, {gossip_load,default}, self()}, 0),
     receive {gossip_get_values_best_response, LoadInfo} ->
             ?compare(fun compare/2, LoadInfo, LoadInfoExpected)
@@ -173,7 +174,10 @@ wait_for_round(TargetRound) ->
 get_current_round() ->
     send2gossip2({web_debug_info, self()}, 1000),
     receive {web_debug_info_reply, KeyValueList} ->
-        {"cur_round", Round} = lists:keyfind("cur_round", 1, KeyValueList), Round
+        case lists:keyfind("cur_round", 1, KeyValueList) of
+            {"cur_round", Round} -> Round;
+            false -> get_current_round() % happens if cb module not yet initiated
+        end
     end.
 
 
