@@ -38,7 +38,7 @@
 -export([start_link/1, activate/1, deactivate/0, start_gossip_task/2, stop_gossip_task/1, remove_all_tombstones/0]).
 
 % interaction with the ring maintenance:
--export([rm_my_range_changed/3, rm_send_new_range/4]).
+-export([rm_filter_slide_msg/3, rm_send_activation_msg/4, rm_my_range_changed/3, rm_send_new_range/4]).
 
 % testing
 -export([tester_create_state/9, is_state/1]).
@@ -51,8 +51,8 @@
 -define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg),
         comm:send(Pid, Msg, [{group_member, Process}, {shepherd, self()}])).
 
-%% -define(SHOW, config:read(log_level)).
--define(SHOW, debug).
+-define(SHOW, config:read(log_level)).
+%% -define(SHOW, debug).
 
 -define(CBMODULES, [{gossip_load, default}]). % callback modules as list
 -define(CBMODULES_TYPE, {gossip_load, default}). % callback modules as union of atoms
@@ -130,9 +130,11 @@ init([]) ->
 
 % called by dht_node_join, results in on_active
 -spec activate(Range::intervals:interval()) -> ok.
-activate(MyRange) ->
-    Pid = pid_groups:get_my(gossip2),
-    comm:send_local(Pid, {activate_gossip, MyRange}).
+activate(_MyRange) ->
+    % subscribe to ring maintenance (rm) for {slide_finished, succ} or {slide_finished, pred}
+    rm_loop:subscribe(self(), ?MODULE,
+                      fun gossip2:rm_filter_slide_msg/3,
+                      fun gossip2:rm_send_activation_msg/4, 1).
 
 
 %% @doc Deactivates all gossip processes.
@@ -166,6 +168,26 @@ remove_all_tombstones() ->
     Msg = {?send_to_group_member, gossip2, {remove_all_tombstones}},
     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
 
+
+%% @doc Checks whether the received notification is a {slide_finished, succ} or
+%%      {slide_finished, pred} msg. Used as filter function for the ring maintanance.
+-spec rm_filter_slide_msg(Neighbors, Neighbors, Reason) -> boolean() when
+                          Neighbors :: nodelist:neighborhood(),
+                          Reason :: rm_loop:reason().
+rm_filter_slide_msg(_OldNeighbors, _NewNeighbors, Reason) ->
+        Reason =:= {slide_finished, pred} orelse Reason =:= {slide_finished, succ}.
+
+%% @doc Sends the activation message to the behaviour module (this module)
+%%      Used to subscribe to the ring maintenance for {slide_finished, succ} or
+%%      {slide_finished, pred} msg.
+-spec rm_send_activation_msg(Subscriber, ?MODULE, Neighbours, Neighbours) -> ok when
+                             Subscriber :: pid(),
+                             Neighbours::nodelist:neighborhood().
+rm_send_activation_msg(_Pid, ?MODULE, _OldNeighbours, NewNeighbours) ->
+    %% io:format("Pid: ~w. Self: ~w. PidGossip: ~w~n", [Pid, self(), Pid2]),
+    MyRange = nodelist:node_range(NewNeighbours),
+    Pid = pid_groups:get_my(gossip2),
+    comm:send_local(Pid, {activate_gossip, MyRange}).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
