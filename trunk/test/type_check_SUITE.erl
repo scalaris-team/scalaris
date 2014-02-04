@@ -1,4 +1,4 @@
-%% @copyright 2012-2013 Zuse Institute Berlin
+%% @copyright 2012-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -164,7 +164,12 @@ tester_type_check_gossip2(_Config) ->
     tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
     tester:register_type_checker({typedef, gossip2, state}, gossip2, is_state),
-    tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram), tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state), tester:register_value_creator({typedef, gossip2, state}, gossip2, tester_create_state, 9), tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1), tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 10), Modules = [ {gossip2, % excluded (exported functions)
+    tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram),
+    tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state),
+    tester:register_value_creator({typedef, gossip2, state}, gossip2, tester_create_state, 9),
+    tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
+    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 10),
+    Modules = [ {gossip2, % excluded (exported functions)
             [   {start_link, 1}, % type of pid_groups:groupname() seems not restrictive enough
                 {init, 1}, % does not return fully filled state
                 {start_gossip_task, 2}, % send messages
@@ -217,12 +222,13 @@ tester_type_check_gossip2(_Config) ->
     tester:unregister_type_checker({typedef, intervals, continuous_interval}),
     tester:unregister_value_creator({typedef, intervals, interval}),
     tester:unregister_value_creator({typedef, intervals, simple_interval}),
-    tester:unregister_type_checker({typedef, is_histogram, gossip_load}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
     tester:unregister_type_checker({typedef, gossip2, state}),
     tester:unregister_type_checker({typedef, gossip_load, state}),
     tester:unregister_value_creator({typedef, gossip2, state}),
     tester:unregister_value_creator({typedef, gossip_load, state}),
     tester:unregister_value_creator({typedef, gossip_load, histogram}),
+    tester:unregister_type_checker({typedef, gossip_load, histogram}),
     true.
 
 
@@ -287,6 +293,7 @@ tester_type_check_math(_Config) ->
     tester:unregister_value_creator({typedef, intervals, simple_interval}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
     tester:unregister_value_creator({typedef, prime, prime_list}),
+    tester:unregister_value_creator({typedef, prime, rev_prime_list}),
     true.
 
 tester_type_check_node(_Config) ->
@@ -462,6 +469,7 @@ tester_type_check_rrepair(_Config) ->
     tester:unregister_type_checker({typedef, intervals, interval}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval}),
     tester:unregister_type_checker({typedef, intervals, non_empty_interval}),
+    tester:unregister_value_creator({typedef, hfs_lhsp, hfs_fun}),
     true.
 
 tester_type_check_tx(_Config) ->
