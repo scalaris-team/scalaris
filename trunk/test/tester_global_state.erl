@@ -1,4 +1,4 @@
-%  @copyright 2010-2013 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -98,7 +98,15 @@ insert(Key, Value) ->
 -spec delete(Key::term()) -> true | ok.
 delete(Key) ->
     case check_whether_table_exists(false) of
-        true -> ets:delete(?MODULE, Key);
+        true ->
+            case ets:member(?MODULE, Key) of
+                true ->
+                    ets:delete(?MODULE, Key);
+                _ ->
+                    %% unregister non registered object
+                    ct:pal("Stacktrace: ~p", [util:get_stacktrace()]),
+                    throw({tester_global_state_delete_unregisterd_object, Key})
+            end;
         false -> ok
     end.
 
