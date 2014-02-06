@@ -180,8 +180,7 @@ tester_type_check_gossip2(_Config) ->
                 {stop_gossip_task, 1}, % would prohibit subsequent tests
                 {deactivate, 0}, % would prohibit subsequent tests
                 {on_inactive, 2}, % too much interaction / spec to wide
-                {on_active, 2}, % too much interaction / spec to wide
-                {is_state, 1}
+                {on_active, 2} % too much interaction / spec to wide
             ],
             % excluded (private functions)
             [   {handle_msg, 2}, % spec to wide
@@ -201,8 +200,7 @@ tester_type_check_gossip2(_Config) ->
           {gossip_load,
             % excluded (exported functions)
             [   {request_histogram, 2}, % starts gossip_load at all nodes, this produces to many ets tables
-                {handle_msg, 2}, % would need valid dht_node_state / pid_groups:get_my()
-                {is_state, 1}
+                {handle_msg, 2} % would need valid dht_node_state / pid_groups:get_my()
             ],
             % excluded (private functions)
             [  {state_new, 2}, % too many db tables
