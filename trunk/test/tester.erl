@@ -1,4 +1,4 @@
-%  @copyright 2010-2013 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -319,7 +319,7 @@ type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
     ErrList = [ case lists:member(X, ExpFuncs) of
                     true -> true;
                     false ->
-                        ct:pal("Excluded non exported function ~p:~p~n", [Module,X]),
+                        ct:pal("Excluded non exported function ~p:~p", [Module,X]),
                         false
                 end ||
                   X <- ExcludeList ],
@@ -340,9 +340,9 @@ type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
                   lists:flatten(ResList)) of
         true -> ok;
         _ ->
-            ct:pal("Excluded all exported functions for module ~p?!~n",
+            ct:pal("Excluded all exported functions for module ~p?!",
                    [Module]),
-            catch ct:comment("Excluded all exported functions for module ~p?!~n",
+            catch ct:comment("Excluded all exported functions for module ~p?!",
                              [Module]),
             ok
     end,
@@ -362,7 +362,7 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
           %% Silently drop it for modules that export it.
           Res1 = case lists:member(FA, FunsToTestNormally) of
                      true ->
-                         ct:pal("Testing ~p:~p/~p~n", [Module, Fun, Arity]),
+                         ct:pal("Testing ~p:~p/~p", [Module, Fun, Arity]),
                          test(Module, Fun, Arity, Count, [{threads, 1}]);
                      false -> skipped
                  end,
@@ -378,7 +378,7 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
                   case lists:member({TestedFun, Arity}, FunList) of
                       true -> ok;
                       false ->
-                          ct:pal("Found feeder, but no target fun ~p:~p/~p~n",
+                          ct:pal("Found feeder, but no target fun ~p:~p/~p",
                                  [Module, TestedFun, Arity]),
                           throw(error)
                   end;
@@ -392,7 +392,7 @@ type_check_module_funs(Module, FunList, ExcludeList, Count) ->
           FeederFun = list_to_atom(FunString ++ "_feeder"),
           case lists:member({FeederFun, Arity}, FunList) of
               true ->
-                  ct:pal("Testing with feeder ~p:~p/~p~n",
+                  ct:pal("Testing with feeder ~p:~p/~p",
                          [Module, Fun, Arity]),
                   [Res1 , test(Module, Fun, Arity, Count, [{threads, 1}, with_feeder])];
               false -> Res1
@@ -409,7 +409,7 @@ type_check_private_funs(Module, ExcludePrivate, Count) ->
 
     PrivateFuns = [ X || X <- AllFuns, not lists:member(X, ExportedFuns)],
 
-    ct:pal("*** Private funs of ~p:~n~.0p~n", [Module, PrivateFuns]),
+    ct:pal("*** Private funs of ~p:~n~.0p", [Module, PrivateFuns]),
 
     %% only excluded existing functions?
     ErrList = [ case lists:member(X, PrivateFuns) of
