@@ -1,5 +1,5 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%  @copyright 2008-2011 Zuse Institute Berlin
+%  @copyright 2008-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -1151,7 +1151,7 @@ tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
     state_set(request, Request, NewState),
     state_set(requestor, comm:this(), NewState),
     state_set(instance, Instance, NewState),
-    % make the createt state the prev state of a new state
+    % make the created state the prev state of a new state
     NewState2 = state_new(NewState, NewState),
     % state_new only creates load_data_uninit, so we reuse the given LoadData
     state_set(load_data, LoadData, NewState2),
@@ -1162,12 +1162,23 @@ tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
 %%      Used as type_checker in tester.erl (property testing).
 -spec is_state(State::ets:tab()) -> boolean().
 is_state(State) ->
-    Keys = [convergence_count, leader, load_data, merged, prev_state, range, round, status],
-    try lists:foreach(fun (Key) -> state_get(Key, State) end, Keys) of
-        _Success -> true
-    catch _Kind:_Reason ->
-        %% log:log(warn, "is_state error: Kind: ~w, Reason ~w", [_Kind, _Reason]),
-        false
+    case lists:member(State, ets:all()) of
+        false ->
+            %% check shortly after: this is a bug in ets that we reported
+            %% and that will be fixed in Erlang 17.0
+            %% see: http://erlang.org/pipermail/erlang-bugs/2014-February/004054.html
+            timer:sleep(15),
+            case lists:member(State, ets:all()) of
+                false -> false;
+                true ->
+                    Keys = [convergence_count, leader, load_data, merged,
+                            prev_state, range, round, status],
+                    lists:all(fun(Key) -> ets:member(State, Key) end, Keys)
+            end;
+        true ->
+            Keys = [convergence_count, leader, load_data, merged,
+                    prev_state, range, round, status],
+            lists:all(fun(Key) -> ets:member(State, Key) end, Keys)
     end.
 
 
