@@ -113,8 +113,8 @@ start_link(CommLayerGroup, {IP1, IP2, IP3, IP4} = DestIP, DestPort, Socket, Chan
             LocalListenPort::comm_server:tcp_port(), Channel::comm:channel(),
             Socket::inet:socket() | notconnected}) -> state().
 init({DestIP, DestPort, LocalListenPort, Channel, Socket}) ->
-    msg_delay:send_local(10, self(), {report_stats}),
-    start_idle_check(),
+    msg_delay:send_trigger(10, {report_stats}),
+    msg_delay:send_trigger(10, {check_idle}),
     state_new(DestIP, DestPort, LocalListenPort, Channel, Socket).
 
 %% @doc Forwards a message to the given PID or named process.
@@ -204,13 +204,13 @@ on({tcp_error, Socket, Reason}, State) ->
 
 on({report_stats}, State) ->
     %% re-trigger
-    msg_delay:send_local(10, self(), {report_stats}),
+    msg_delay:send_trigger(10, {report_stats}),
     NewState = report_stats(State),
     send_bundle_if_ready(NewState);
 
 %% checks if the connection hasn't been used recently
 on({check_idle}, State) ->
-    start_idle_check(),
+    msg_delay:send_trigger(10, {check_idle}),
     NewState = send_bundle_if_ready(State),
 
     Timeout = config:read(tcp_idle_timeout),
@@ -734,9 +734,6 @@ seconds_ago(Now, Time) ->
         _ -> timer:now_diff(Now, Time) div 1000000
     end.
 
--spec start_idle_check() -> ok.
-start_idle_check() ->
-    msg_delay:send_local(10, self(), {check_idle}).
 
 -spec status(State::state()) -> notconnected | connected.
 status(State) ->

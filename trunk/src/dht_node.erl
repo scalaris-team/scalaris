@@ -1,4 +1,4 @@
-%  @copyright 2007-2013 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -455,7 +455,7 @@ init(Options) ->
 
     Id = case {is_first(Options), config:read(leases)} of
              {true, true} ->
-                 msg_delay:send_local(1, self(), {l_on_cseq, renew_leases}),
+                 msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
                  l_on_cseq:id(intervals:all());
              {true, _} ->
                  % get my ID (if set, otherwise chose a random ID):
@@ -464,7 +464,7 @@ init(Options) ->
                      _ -> ?RT:get_random_node_id()
                  end;
              {false, true} ->
-                 msg_delay:send_local(1, self(), {l_on_cseq, renew_leases}),
+                 msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
                  % get my ID (if set, otherwise chose a random ID):
                  case lists:keyfind({dht_node, id}, 1, Options) of
                      {{dht_node, id}, IdX} -> IdX;

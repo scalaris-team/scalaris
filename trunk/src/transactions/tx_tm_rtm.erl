@@ -792,8 +792,8 @@ rtm_update(RTMs, Delay, TriggerMsg) ->
               api_dht_raw:unreliable_lookup(Key, {get_rtm, This, Key, Name})
           end
           || RTM <- RTMs],
-    msg_delay:send_local(Delay, %config:read(tx_rtm_update_interval) div 1000,
-                          self(), TriggerMsg),
+    msg_delay:send_trigger(Delay, %config:read(tx_rtm_update_interval) div 1000,
+                           TriggerMsg),
     ok.
 
 %% functions for tx processing

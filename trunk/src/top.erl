@@ -1,4 +1,4 @@
-% @copyright 2012-2013 Zuse Institute Berlin,
+% @copyright 2012-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -492,7 +492,7 @@ on({output_all}, State) when all =:= element(3, State) ->
       end
       || {Pid, Status, MQLen, CPUUsage, MemUsage, StackSize} <- lists:reverse(PlotThese)],
     usage(),
-    msg_delay:send_local(2, self(), {output_all}),
+    msg_delay:send_trigger(2, {output_all}),
     S1 = set_counter(State, 1),
     set_timestamp(S1, os:timestamp());
 

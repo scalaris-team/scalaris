@@ -92,7 +92,7 @@ start_link(ServiceGroup) ->
 
 -spec init(any()) -> state().
 init(_Arg) ->
-    msg_delay:send_local(10, self(), {trigger_gc}),
+    msg_delay:send_trigger(10, {trigger_gc}),
     [].
 
 -spec on(Message :: message(), State :: state()) -> state().
@@ -148,7 +148,7 @@ on({trigger_gc}, State) ->
     %% and swapping would not be necessary.  With periodic garbage
     %% collection, Erlang becomes much more cooperative with other
     %% processes running on the same machine.
-    msg_delay:send_local(10, self(), {trigger_gc}),
+    msg_delay:send_trigger(10, {trigger_gc}),
     %% io:format("Garbage collect all processes~n"),
     _ = [garbage_collect(X) || X <- processes()],
     State;

@@ -208,7 +208,7 @@ start_link(DHTNodeGroup, Name, DBSelector) ->
 
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->
-    msg_delay:send_local(1, self(), {next_period, 1}),
+    msg_delay:send_trigger(1, {next_period, 1}),
     {?PDB:new(?MODULE, [set, protected]), DBSelector, 0}.
 
 -spec on(comm:message(), state()) -> state().
@@ -690,7 +690,7 @@ on({next_period, NewPeriod}, State) ->
              13 =:= erlang:size(X), NewPeriod > element(4, X) ],
 
     %% re-trigger next next_period
-    msg_delay:send_local(1, self(), {next_period, NewPeriod + 1}),
+    msg_delay:send_trigger(1, {next_period, NewPeriod + 1}),
     set_period(State, NewPeriod).
 
 -spec req_for_retrigger(entry(), incdelay|noincdelay) ->
@@ -799,7 +799,7 @@ entry_num_newest(Entry)            -> element(13, Entry).
 -spec add_read_reply(entry(), prbr:r_with_id(), client_value(),
                      prbr:r_with_id(), Consistency::boolean())
                     -> {Done::boolean() | write_through, entry()}.
-add_read_reply(Entry, AssignedRound, Val, AckRound, Cons) ->
+add_read_reply(Entry, AssignedRound, Val, AckRound, _Cons) ->
     %% either decide on a majority of consistent replies, than we can
     %% just take the newest consistent value and do not need a
     %% write_through?
@@ -834,7 +834,7 @@ add_read_reply(Entry, AssignedRound, Val, AckRound, Cons) ->
 
 -spec add_write_reply(entry(), prbr:r_with_id(), Consistency::boolean())
                      -> {Done::boolean(), entry()}.
-add_write_reply(Entry, Round, Cons) ->
+add_write_reply(Entry, Round, _Cons) ->
     E1 =
         case Round > entry_latest_seen(Entry) of
             false -> Entry;
@@ -854,7 +854,7 @@ add_write_reply(Entry, Round, Cons) ->
 
 -spec add_write_deny(entry(), prbr:r_with_id(), Consistency::boolean())
                     -> {Done::boolean(), entry()}.
-add_write_deny(Entry, Round, Cons) ->
+add_write_deny(Entry, Round, _Cons) ->
     E1 =
         case Round > entry_latest_seen(Entry) of
             false -> Entry;

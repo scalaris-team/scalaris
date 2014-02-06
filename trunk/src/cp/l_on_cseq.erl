@@ -797,7 +797,7 @@ on({l_on_cseq, renew_leases}, State) ->
             lease_renew(ActiveLease, active)
     end,
     _ = [lease_renew(L, passive) || L <- PassiveLeaseList, get_aux(L) =/= {invalid, merge, stopped}],
-    msg_delay:send_local(delta() div 2, self(), {l_on_cseq, renew_leases}),
+    msg_delay:send_trigger(delta() div 2, {l_on_cseq, renew_leases}),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
