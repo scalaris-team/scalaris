@@ -1,4 +1,4 @@
-% @copyright 2013 Zuse Institute Berlin
+% @copyright 2013-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -114,7 +114,7 @@ maximum_entries() -> config:read(rt_frt_max_entries).
 init(Neighbors) ->
     % trigger a random lookup after initializing the table
     case config:read(rt_frt_al) of
-        true -> comm:send_local(self(), {trigger_random_lookup});
+        true -> msg_delay:send_trigger(0, {trigger_random_lookup});
         false -> ok
     end,
 
@@ -463,7 +463,7 @@ handle_custom_message({trigger_random_lookup}, State) ->
 
     % schedule the next random lookup
     Interval = config:read(rt_frt_al_interval),
-    msg_delay:send_local(Interval, self(), {trigger_random_lookup}),
+    msg_delay:send_trigger(Interval, {trigger_random_lookup}),
 
     api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, routing_table,
                                         {rt_get_node, comm:this()}}),

@@ -148,11 +148,10 @@ on({bench} = Msg, {AllNodes, Leader, BenchPid, _IgnBenchT} = _State) ->
     ?TRACE1(Msg, _State),
     case get_bench_interval() of
         0 -> ok;
-        I -> msg_delay:send_local(I, self(), {bench}),
+        I -> msg_delay:send_trigger(I, {bench}),
              comm:send_local(BenchPid, Msg),
              %% send a timeout so that a hanging bench service gets re-started
-             msg_delay:send_local(get_bench_timeout_interval(), self(),
-                                  {bench_timeout, os:timestamp(), BenchPid})
+             msg_delay:send_trigger(get_bench_timeout_interval(), {bench_timeout, os:timestamp(), BenchPid})
     end,
     {AllNodes, Leader, BenchPid, false};
 
@@ -184,13 +183,13 @@ on({bench_timeout, _Time, _BenchPid} = _Msg, State) ->
 
 on({collect_system_stats} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    msg_delay:send_local(10, self(), {collect_system_stats}),
+    msg_delay:send_trigger(10, {collect_system_stats}),
     collect_system_stats(),
     State;
 
 on({propagate} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    msg_delay:send_local(get_gather_interval(), self(), {propagate}),
+    msg_delay:send_trigger(get_gather_interval(), {propagate}),
     DHT_Node = pid_groups:get_my(dht_node),
     comm:send_local(DHT_Node, {get_node_details, comm:this(), [my_range]}),
     State;
@@ -343,18 +342,17 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(null) -> state().
 init(null) ->
-    Self = self(),
     case get_bench_interval() of
         0 -> ok;
         I -> FirstDelay = randoms:rand_uniform(1, I + 1),
-             msg_delay:send_local(FirstDelay, Self, {bench}),
-             msg_delay:send_local(get_gather_interval(), Self, {propagate}),
-             msg_delay:send_local(10, Self, {collect_system_stats})
+             msg_delay:send_trigger(FirstDelay, {bench}),
+             msg_delay:send_trigger(get_gather_interval(), {propagate}),
+             msg_delay:send_trigger(10, {collect_system_stats})
     end,
     init_bench(),
     init_system_stats(),
     Now = os:timestamp(),
-    BenchPid = erlang:spawn(fun() -> bench_service(Self) end),
+    BenchPid = erlang:spawn(fun() -> bench_service(self()) end),
     State = #state{id = uid:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
                    perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now),

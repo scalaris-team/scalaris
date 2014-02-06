@@ -225,8 +225,7 @@ on({report_single, Process, Key, NewValue_or_UpdateFun}, State) ->
     State;
 
 on({trigger_check_timeslots}, State) ->
-    _ = comm:send_local_after(get_check_timeslots_interval(), self(),
-                              {trigger_check_timeslots}),
+    _ = msg_delay:send_trigger(get_check_timeslots_interval(), {trigger_check_timeslots}),
     gen_component:post_op({check_timeslots}, State);
 
 on({check_timeslots}, {_Table, OldApiTxReqList} = State) ->
@@ -332,8 +331,7 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(null) -> state().
 init(null) ->
-    _ = comm:send_local_after(get_check_timeslots_interval(), self(),
-                              {check_timeslots}),
+    _ = msg_delay:send_trigger(get_check_timeslots_interval(), {trigger_check_timeslots}),
     TableName = pid_groups:my_groupname() ++ ":monitor",
     {ets:new(list_to_atom(TableName), [ordered_set, protected]),
      init_apitx_reqlist_rrd(os:timestamp())}.
@@ -356,7 +354,7 @@ get_timeslots_to_keep() ->
 
 -spec get_check_timeslots_interval() -> 10000.
 get_check_timeslots_interval() ->
-    10 * 1000. % every 10s
+    10. % every 10s
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Convenience API

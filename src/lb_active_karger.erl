@@ -56,7 +56,7 @@
            %% trigger messages
            {lb_trigger} |
            %% actions for trigger
-           {trigger_periodic} |
+           {trigger_action} |
            %% random node from cyclon
            {cy_cache, [node:node_type()]} |
            %% load response from dht node
@@ -96,9 +96,9 @@ init([]) ->
 -spec on(my_message(), state()) -> state().
 on({lb_trigger}, State) ->
     msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
-    gen_component:post_op({trigger_periodic}, State);
+    gen_component:post_op({trigger_action}, State);
 
-on({trigger_periodic}, State) ->
+on({trigger_action}, State) ->
     %% Request N random nodes from cyclon
     cyclon:get_subset_rand(1),
     State;
