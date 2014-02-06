@@ -68,7 +68,10 @@ set_last_call(Thread, Module, Function, Args) ->
 
 -spec reset_last_call(Thread::pos_integer()) -> true | ok.
 reset_last_call(Thread) ->
-    delete({last_call, Thread}).
+    case ets:member(?MODULE, {last_call, Thread}) of
+        true ->  delete({last_call, Thread});
+        false -> ok
+    end.
 
 -spec get_last_call(Thread::pos_integer()) -> failed | {module(), Fun::atom(), Args::list()}.
 get_last_call(Thread) ->
