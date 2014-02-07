@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -196,6 +196,7 @@ factorial_feeder(N) -> {N}.
 -spec factorial(non_neg_integer()) -> pos_integer().
 factorial(N) -> factorial(N, 1).
 
+-compile({nowarn_unused_function, {factorial_feeder, 2}}).
 -spec factorial_feeder(0..20, pos_integer()) -> {0..20, pos_integer()}.
 factorial_feeder(N, Acc) -> {N, Acc}.
 

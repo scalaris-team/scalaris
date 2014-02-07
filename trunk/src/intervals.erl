@@ -1,5 +1,4 @@
-%  @copyright 2007-2012 Zuse Institute Berlin
-%             2008 onScale solutions GmbH
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -704,6 +703,7 @@ split(I, Parts) ->
         end,
     lists:reverse(split2(LBr, LKey, RKey, RBr, Parts, InnerLBr, InnerRBr, [])).
 
+-compile({nowarn_unused_function, {split2_feeder, 8}}).
 -spec split2_feeder
         (left_bracket(), key(), key(), right_bracket(), Parts::1..255,
          InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()])

@@ -1049,7 +1049,7 @@ tuplekeyfind(Key, [H|List]) ->
         _ -> tuplekeyfind(Key, List)
     end.
 
-
+-compile({nowarn_unused_function, {init_gossip_task_feeder, 3}}).
 -spec init_gossip_task_feeder(cb_module(), [1..50], state()) -> {cb_module(), list(), state()}.
 init_gossip_task_feeder(CBModule, Args, State) ->
     Args1 = if length(Args)>1 -> [hd(Args)];
@@ -1057,23 +1057,23 @@ init_gossip_task_feeder(CBModule, Args, State) ->
             end,
     {CBModule, Args1, State}.
 
-
+-compile({nowarn_unused_function, {request_random_node_delayed_feeder, 2}}).
 -spec request_random_node_delayed_feeder(Delay::0..1000, CBModule::cb_module()) ->
     {non_neg_integer(), cb_module()}.
 request_random_node_delayed_feeder(Delay, CBModule) ->
     {Delay, CBModule}.
 
-
+-compile({nowarn_unused_function, {state_get_feeder, 2}}).
 -spec state_get_feeder(Key::state_key(), State::state()) -> {state_key(), state()}.
 state_get_feeder(Key, State) ->
     state_feeder_helper(Key, State).
 
-
+-compile({nowarn_unused_function, {state_take_feeder, 2}}).
 -spec state_take_feeder(Key::state_key(), State::state()) -> {state_key(), state()}.
 state_take_feeder(Key, State) ->
     state_feeder_helper(Key, State).
 
-
+-compile({nowarn_unused_function, {state_feeder_helper, 2}}).
 -spec state_feeder_helper(state_key(), state()) -> {state_key(), state()}.
 state_feeder_helper(Key, State) ->
     case Key of

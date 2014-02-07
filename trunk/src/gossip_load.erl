@@ -1227,6 +1227,7 @@ compare([H1|List1], [H2|List2]) when is_tuple(H1) andalso is_tuple(H2) ->
 
 %% @doc For testing: ensure, that only buckets with identical keys are feeded to
 %%      merge_bucket().
+-compile({nowarn_unused_function, {merge_bucket_feeder, 2}}).
 -spec merge_bucket_feeder(Bucket1::bucket(), Bucket2::bucket()) -> {bucket(), bucket()}.
 merge_bucket_feeder({Key1, Val1}, {_Key2, Val2}) ->
     {{Key1, Val1}, {Key1, Val2}}.

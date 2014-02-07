@@ -1,4 +1,4 @@
-%% @copyright 2009-2013 Zuse Institute Berlin
+%% @copyright 2009-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -523,6 +523,7 @@ set_and_inform_client(Client, Entry, Reps, Table, ValType) ->
     Entry2 = state_set_client_informed(Entry),
     set_or_delete_if_all_replied(Entry2, Reps, Table).
 
+-compile({nowarn_unused_function, {make_tlog_entry_feeder, 2}}).
 -spec make_tlog_entry_feeder(
         read_state_decided(), {ValType::?value | ?partial_value | ?not_found | ?value_dropped, ?RT:key()})
         -> {read_state_decided(), ?value | ?partial_value | ?not_found | ?value_dropped}.
