@@ -18,8 +18,9 @@
 %% @version $Id$
 -module(ganglia).
 -author('hoffmann@zib.de').
-
 -vsn('$Id$').
+
+-compile({nowarn_unused_function, {send_general_metrics,0}}).
 
 -behavior(gen_component).
 
@@ -130,6 +131,7 @@ on({ganglia_vivaldi_confidence, DHTName, Msg}, State) ->
     _ = gmetric(both, lists:flatten(io_lib:format("vivaldi_confidence_~s", [DHTName])), "float", Confidence, "Confidence"),
     State.
 
+-spec send_general_metrics() -> ok.
 send_general_metrics() ->
     % general erlang status information
     _ = gmetric(both, "Erlang Processes", "int32", erlang:system_info(process_count), "Total Number"),
@@ -243,34 +245,42 @@ set_last_active(State) ->
     {_Megasecs, Secs, _MicroSecs} = os:timestamp(),
     setelement(1, State, Secs).
 
+-spec get_load_agg(state()) -> load_aggregation().
+get_load_agg(State) ->
+    element(2, State).
+
+-spec set_load_agg(state(), load_aggregation()) -> state().
+set_load_agg(State, LoadAgg) ->
+    setelement(2, State, LoadAgg).
+
 -spec get_agg_id(state()) -> non_neg_integer().
 get_agg_id(State) ->
-    element(1, element(3, State)).
+    element(1, get_load_agg(State)).
 
 -spec get_agg_load(state()) -> non_neg_integer().
 get_agg_load(State) ->
-    {_AggId, _Pending, Load} = element(3, State),
+    {_AggId, _Pending, Load} = get_load_agg(State),
     Load.
 
 -spec set_agg_load(non_neg_integer(), state()) -> state().
 set_agg_load(Load, State) ->
-    {AggId, Pending, OldLoad} = element(3, State),
-    setelement(3, State, {AggId, Pending - 1, OldLoad + Load}).
+    {AggId, Pending, OldLoad} = get_load_agg(State),
+    set_load_agg(State, {AggId, Pending - 1, OldLoad + Load}).
 
 -spec get_agg_pending(state()) -> non_neg_integer().
 get_agg_pending(State) ->
-    {_AggId, Pending, _Load} = element(3, State),
+    {_AggId, Pending, _Load} = get_load_agg(State),
     Pending.
 
 -spec set_agg_pending(non_neg_integer(), state()) -> state().
 set_agg_pending(NumPending, State) ->
-    {AggId, _Pending, Load} = element(3, State),
-    setelement(3, State, {AggId, NumPending, Load}).
+    {AggId, _Pending, Load} = get_load_agg(State),
+    set_load_agg(State, {AggId, NumPending, Load}).
 
 -spec inc_agg_id(state()) -> state().
 inc_agg_id(State) ->
-    {AggId, _Pending, _Load} = element(3,State),
-    setelement(3, State, {AggId + 1, 0, 0}).
+    {AggId, _Pending, _Load} = get_load_agg(State),
+    set_load_agg(State, {AggId + 1, 0, 0}).
 
 %% @doc Checks whether config parameters of the ganglia process exist and are
 %%      valid.
