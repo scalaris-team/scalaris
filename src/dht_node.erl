@@ -332,10 +332,10 @@ on(Msg, State) when mr =:= element(1, Msg) ->
     mr:on(Msg, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% active load balancing messages (see lb_active_karger.erl)
+% active load balancing messages (see lb_active_*.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on(Msg, State) when balance_load =:= element(1, Msg) ->
-    lb_active_karger:process_lb_msg(Msg, State);
+on(Msg, State) when lb_active =:= element(1, Msg) ->
+    lb_active:process_lb_msg(Msg, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handling of failed sends

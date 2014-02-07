@@ -66,11 +66,11 @@
 
 -type(dht_message() ::
 		   %% phase1
-		   {balance_load, phase1, Epsilon :: float(), NodeX :: lb_info()} |
+		   {lb_active, {phase1, Epsilon :: float(), NodeX :: lb_info()}} |
 		   %% phase2
-		   {balance_load, phase2, HeavyNode :: lb_info(), LightNode :: lb_info()} |
+		   {lb_active, {phase2, HeavyNode :: lb_info(), LightNode :: lb_info()}} |
 		   %% final phase
-		   {balance_load, jump | slide, LightNode :: lb_info()}).
+		   {lb_active, {jump | slide, LightNode :: lb_info()}}).
 
 %%%%%%%%%%%%%%%
 %%  Startup   %
@@ -124,7 +124,7 @@ on({my_dht_response, {get_node_details_response, NodeDetails}}, State) ->
 	?TRACE1("Received node details for own node~n"),
 	RndNode = State#state.rnd_node,
 	Epsilon = State#state.epsilon,
-	comm:send(node:pidX(RndNode), {balance_load, phase1, Epsilon, serialize(NodeDetails)}, [{?quiet}]),
+	comm:send(node:pidX(RndNode), {lb_active, {phase1, Epsilon, serialize(NodeDetails)}}, [{?quiet}]),
 	State#state{rnd_node = nil};
 
 on({move, result, {tag, _JumpOrSlide}, _Status}, State) ->
@@ -140,7 +140,7 @@ on({move, result, {tag, _JumpOrSlide}, _Status}, State) ->
 %% load balancing is necessary. If so, we'll try to balance
 %% assuming the two nodes are neighbors. If not we'll contact
 %% the light node's successor for more load information.
-process_lb_msg({balance_load, phase1, Epsilon, NodeX}, DhtState) ->
+process_lb_msg({lb_active, {phase1, Epsilon, NodeX}}, DhtState) ->
 	MyLBInfo = serialize(dht_node_state:details(DhtState)),
 	MyLoad = get_load(MyLBInfo),
 	LoadX = get_load(NodeX),
@@ -166,7 +166,7 @@ process_lb_msg({balance_load, phase1, Epsilon, NodeX}, DhtState) ->
 %% more load than the HeavyNode. If so, we'll slide with the
 %% LightNode. Otherwise we instruct the HeavyNode to set up
 %% a jump operation with the Lightnode.
-process_lb_msg({balance_load, phase2, HeavyNode, LightNode}, DhtState) ->
+process_lb_msg({lb_active, {phase2, HeavyNode, LightNode}}, DhtState) ->
 	?TRACE1("In phase 2~n"),
 	MyLBInfo = serialize(dht_node_state:details(DhtState)),
 	MyLoad = get_load(MyLBInfo),
@@ -176,14 +176,14 @@ process_lb_msg({balance_load, phase2, HeavyNode, LightNode}, DhtState) ->
 			balance_adjacent(MyLBInfo, LightNode);
 		_ ->
 			Node = get_node(HeavyNode),
-			comm:send(node:pidX(Node), {balance_load, jump, LightNode})
+			comm:send(node:pidX(Node), {lb_active, {jump, LightNode}})
 	end,
 	DhtState;
 
 %% We received a jump or slide operation from a LightNode.
 %% In either case, we'll compute the target id and send out
 %% the jump or slide message to the LightNode.
-process_lb_msg({balance_load, JumpOrSlide, LightNode}, DhtState) ->
+process_lb_msg({lb_active, {JumpOrSlide, LightNode}}, DhtState) ->
 	?TRACE2("Before ~p Heavy: ~p Light: ~p~n",
             [JumpOrSlide, dht_node_state:get(DhtState, node_id), node:id(get_node(LightNode))]),
 	MyNode = serialize(dht_node_state:details(DhtState)),
@@ -219,11 +219,11 @@ balance_adjacent(HeavyNodeDetails, LightNodeDetails) ->
 			% neighbors, thus sliding
 			?TRACE1("We're neighbors~n"),
             %% slide in phase1 or phase2
-			comm:send(node:pidX(HeavyNode), {balance_load, slide, LightNodeDetails});
+			comm:send(node:pidX(HeavyNode), {lb_active, {slide, LightNodeDetails}});
 		_ ->
 			% ask the successor of the light node how much load he carries
 			?TRACE1("Nodes not adjacent, requesting information about neighbors~n"),
-			comm:send(node:pidX(LightNodeSucc), {balance_load, phase2, HeavyNodeDetails, LightNodeDetails})
+			comm:send(node:pidX(LightNodeSucc), {lb_active, {phase2, HeavyNodeDetails, LightNodeDetails}})
 	end.
 
 %% Convert node details to lb_info
@@ -253,5 +253,5 @@ check_config() ->
     config:cfg_is_integer(lb_active_interval) andalso
     config:cfg_is_greater_than(lb_active_interval, 0) andalso
     config:cfg_is_float(lb_active_karger_epsilon) andalso
-    config:cfg_is_greater_than(lb_active_karger_epsilon, 0.0),
+    config:cfg_is_greater_than(lb_active_karger_epsilon, 0.0) andalso
     config:cfg_is_less_than(lb_active_karger_epsilon, 0.25).

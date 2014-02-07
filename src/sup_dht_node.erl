@@ -81,7 +81,7 @@ childs([{DHTNodeGroup, Options}]) ->
         sup:worker_desc(gossip2, gossip2, start_link, [DHTNodeGroup]),
     LBActive =
         case config:read(lb_active) of
-            true -> sup:worker_desc(lb_active, lb_active_karger, start_link, [DHTNodeGroup]);
+            true -> sup:worker_desc(lb_active, lb_active, start_link, [DHTNodeGroup]);
             _ -> []
         end,
     Reregister =

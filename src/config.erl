@@ -261,7 +261,7 @@ check_config() ->
                          fun autoscale_server:check_config/0,
                          fun cloud_local:check_config/0,
                          fun cloud_ssh:check_config/0,
-                         fun lb_active_karger:check_config/0
+                         fun lb_active:check_config/0
                        ]],
     lists:foldl(fun(A,B) -> A and B end, true, Checks).
 
