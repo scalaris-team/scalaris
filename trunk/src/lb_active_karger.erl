@@ -28,9 +28,8 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--define(TRACE2(X,Y), ok).
-%%-define(TRACE2(X,Y), io:format(X,Y)).
--define(TRACE1(X), ?TRACE2(X, [])).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X,Y)).
 
 -export([start_link/1, init/1]).
 -export([on/2, process_lb_msg/2]).
@@ -109,26 +108,26 @@ on({trigger_action}, State) ->
 
 %% No random nodes available via cyclon
 on({cy_cache, []}, State) ->
-    ?TRACE1("Cyclon returned no random node~n"),
+    ?TRACE("Cyclon returned no random node~n", []),
     State;
 
 %% Got a random node via cyclon
 on({cy_cache, [RandomNode]}, State) ->
-    ?TRACE1("Got random node~n"),
+    ?TRACE("Got random node~n", []),
     Envelope = comm:reply_as(comm:this(), 2, {my_dht_response, '_'}),
     comm:send(comm:this(), {get_node_details, Envelope}, [{group_member, dht_node}]),
     State#state{rnd_node = RandomNode};
 
 %% Got load from my node
 on({my_dht_response, {get_node_details_response, NodeDetails}}, State) ->
-	?TRACE1("Received node details for own node~n"),
+	?TRACE("Received node details for own node~n", []),
 	RndNode = State#state.rnd_node,
 	Epsilon = State#state.epsilon,
 	comm:send(node:pidX(RndNode), {lb_active, {phase1, Epsilon, serialize(NodeDetails)}}, [{?quiet}]),
 	State#state{rnd_node = nil};
 
 on({move, result, {tag, _JumpOrSlide}, _Status}, State) ->
-	?TRACE2("~p status: ~p~n", [_JumpOrSlide, _Status]),
+	?TRACE("~p status: ~p~n", [_JumpOrSlide, _Status]),
 	State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -149,14 +148,14 @@ process_lb_msg({lb_active, {phase1, Epsilon, NodeX}}, DhtState) ->
 			if
     % first check if load balancing is necessary
 				MyLoad =< Epsilon * LoadX ->
-					?TRACE1("My node is light~n"),
+					?TRACE("My node is light~n", []),
 					balance_adjacent(NodeX, MyLBInfo);
 				LoadX =< Epsilon * MyLoad ->
-					?TRACE1("My node is heavy~n"),
+					?TRACE("My node is heavy~n", []),
 					balance_adjacent(MyLBInfo, NodeX);
 				true ->
 					%% no balancing
-					?TRACE1("Won't balance~n")
+					?TRACE("Won't balance~n", [])
 			end;
 		_ -> ok
 	end,
@@ -167,7 +166,7 @@ process_lb_msg({lb_active, {phase1, Epsilon, NodeX}}, DhtState) ->
 %% LightNode. Otherwise we instruct the HeavyNode to set up
 %% a jump operation with the Lightnode.
 process_lb_msg({lb_active, {phase2, HeavyNode, LightNode}}, DhtState) ->
-	?TRACE1("In phase 2~n"),
+	?TRACE("In phase 2~n", []),
 	MyLBInfo = serialize(dht_node_state:details(DhtState)),
 	MyLoad = get_load(MyLBInfo),
 	LoadHeavyNode = get_load(HeavyNode),
@@ -184,14 +183,14 @@ process_lb_msg({lb_active, {phase2, HeavyNode, LightNode}}, DhtState) ->
 %% In either case, we'll compute the target id and send out
 %% the jump or slide message to the LightNode.
 process_lb_msg({lb_active, {JumpOrSlide, LightNode}}, DhtState) ->
-	?TRACE2("Before ~p Heavy: ~p Light: ~p~n",
-            [JumpOrSlide, dht_node_state:get(DhtState, node_id), node:id(get_node(LightNode))]),
+	?TRACE("Before ~p Heavy: ~p Light: ~p~n",
+           [JumpOrSlide, dht_node_state:get(DhtState, node_id), node:id(get_node(LightNode))]),
 	MyNode = serialize(dht_node_state:details(DhtState)),
 	TargetLoad = get_target_load(JumpOrSlide, MyNode, LightNode),
     From = dht_node_state:get(DhtState, pred_id),
 	To = dht_node_state:get(DhtState, node_id),
 	{SplitKey, _TakenLoad} = dht_node_state:get_split_key(DhtState, From, To, TargetLoad, forward),
-	?TRACE2("TargetLoad: ~p TakenLoad: ~p~n",
+	?TRACE("TargetLoad: ~p TakenLoad: ~p~n",
             [TargetLoad, _TakenLoad]),
 	LbModule = comm:make_global(pid_groups:get_my(?MODULE)),
 	case JumpOrSlide of
@@ -217,12 +216,12 @@ balance_adjacent(HeavyNodeDetails, LightNodeDetails) ->
 		 %orelse node_details:get(HeavyNode, node) =:= node_details:get(LightNode, pred) of
 		true ->
 			% neighbors, thus sliding
-			?TRACE1("We're neighbors~n"),
+			?TRACE("We're neighbors~n", []),
             %% slide in phase1 or phase2
 			comm:send(node:pidX(HeavyNode), {lb_active, {slide, LightNodeDetails}});
 		_ ->
 			% ask the successor of the light node how much load he carries
-			?TRACE1("Nodes not adjacent, requesting information about neighbors~n"),
+			?TRACE("Nodes not adjacent, requesting information about neighbors~n", []),
 			comm:send(node:pidX(LightNodeSucc), {lb_active, {phase2, HeavyNodeDetails, LightNodeDetails}})
 	end.
 
