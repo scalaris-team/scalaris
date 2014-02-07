@@ -192,7 +192,7 @@ on({tcp, Socket, Data}, State) ->
     send_bundle_if_ready(New2State);
 
 on({tcp_closed, Socket}, State) ->
-    log:log(warn,"[ CC ~p (~p) ] tcp closed", [self(), pid_groups:my_pidname()]),
+    log:log(info,"[ CC ~p (~p) ] tcp closed", [self(), pid_groups:my_pidname()]),
     close_connection(Socket, State);
 
 on({tcp_error, Socket, Reason}, State) ->
