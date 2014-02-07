@@ -20,8 +20,6 @@
 -author('hoffmann@zib.de').
 -vsn('$Id$').
 
--compile({nowarn_unused_function, {send_general_metrics,0}}).
-
 -behavior(gen_component).
 
 -include("scalaris.hrl").
