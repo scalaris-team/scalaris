@@ -1,4 +1,4 @@
-% @copyright 2012 Zuse Institute Berlin
+% @copyright 2012-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 %% @end
 %% @reference 2009 - Melissa E. O'Neill
 %%          <em> The Genuine Sieve of Eratosthenes </em>
-%%          Journal of Functional Programming 19(1) pp: 95-106 
+%%          Journal of Functional Programming 19(1) pp: 95-106
 %%          Implemented Method: Trial Division
 %% @version $Id$
 -module(prime).
@@ -88,7 +88,7 @@ is_prime_p(V, Primes) ->
 
 -spec get_feeder(1..?TESTER_MAX_PRIME) -> {1..?TESTER_MAX_PRIME}.
 get_feeder(N) -> {N}.
-    
+
 % @doc returns all primes less than or equal to N
 -spec get(pos_integer()) -> prime_list().
 get(N) when N =< ?PrimeCache ->
@@ -96,6 +96,7 @@ get(N) when N =< ?PrimeCache ->
 get(N) ->
     find_primes(?PrimeCache, N, lists:reverse(prime_cache())).
 
+-compile({nowarn_unused_function, {find_primes_feeder, 3}}).
 -spec find_primes_feeder(0 | 2, 1..?TESTER_MAX_PRIME, rev_prime_list())
         -> {pos_integer(), 1..?TESTER_MAX_PRIME, rev_prime_list()}.
 find_primes_feeder(_Add, N, [] = Primes) ->
@@ -125,7 +126,7 @@ is_prime(I, []) -> I > 1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc list of all primes less than 5003 from 
+% @doc list of all primes less than 5003 from
 %      http://primes.utm.edu/lists/small/10000.txt
 -spec prime_cache() -> prime_list().
 prime_cache() ->

@@ -1,4 +1,4 @@
-% @copyright 2007-2013 Zuse Institute Berlin
+% @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -1065,6 +1065,7 @@ lists_partition3_feeder(will_fill_pred, List) ->
 lists_partition3(Pred, L) ->
     lists_partition3(Pred, L, [], [], []).
 
+-compile({nowarn_unused_function, {lists_partition3_feeder, 5}}).
 -spec lists_partition3_feeder(will_fill_pred, [integer()],
                               [integer()], [integer()], [integer()])
         -> {fun((integer()) -> 1..3), [integer()], [integer()], [integer()], [integer()]}.
@@ -1128,6 +1129,7 @@ sublist(List, Start, Length) ->
                end,
     sublist_(List, ListLen, NewStart, Length).
 
+-compile({nowarn_unused_function, {sublist__feeder, 4}}).
 -spec sublist__feeder(List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer())
         -> {List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer()}.
 sublist__feeder(List, _, Start, Length) ->
