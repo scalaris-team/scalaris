@@ -31,7 +31,8 @@
 -export([create/1, add/2, add/3, get_data/1, merge/2]).
 
 % private API for unit tests:
--export([find_smallest_interval/1, merge_interval/2]).
+-export([find_smallest_interval/1, merge_interval/2,
+         tester_create_histogram/2, tester_is_valid_histogram/1]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -76,6 +77,8 @@ merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
 % private
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Resizes the given histogram to fit its maximum size (reduces the data).
+%%      PRE: histogram maximum size > 0 (from create/1)
 -spec resize(Histogram::histogram()) -> histogram().
 resize(Histogram = #histogram{data = Data, size = ExpectedSize, data_size = ActualSize}) ->
     ?ASSERT(ExpectedSize > 0),
@@ -128,3 +131,23 @@ merge_interval(Value2, [{Value, Count}, {Value2, Count2} | Rest]) ->
     [{(Value * Count + Value2 * Count2) / (Count + Count2), Count + Count2} | Rest];
 merge_interval(MinSecondValue, [DataItem | Rest]) ->
     [DataItem | merge_interval(MinSecondValue, Rest)].
+
+-spec tester_create_histogram(Size::non_neg_integer(), Data::data_list()) -> histogram().
+tester_create_histogram(Size = 0, _Data) ->
+    #histogram{size = Size, data = [], data_size = 0};
+tester_create_histogram(Size, Data) ->
+    DataSize = length(Data),
+    if DataSize > Size ->
+           #histogram{size = DataSize, data = Data, data_size = DataSize};
+       true ->
+           #histogram{size = Size, data = Data, data_size = DataSize}
+    end.
+
+-spec tester_is_valid_histogram(X::term()) -> boolean().
+tester_is_valid_histogram(#histogram{size = 0, data = [], data_size = 0}) ->
+    true;
+tester_is_valid_histogram(#histogram{size = Size, data = Data, data_size = DataSize})
+  when Size > 0->
+    Size >= DataSize andalso length(Data) =:= DataSize;
+tester_is_valid_histogram(_) ->
+    false.
