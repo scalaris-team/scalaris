@@ -1,4 +1,4 @@
-%  @copyright 2010-2013 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -56,7 +56,11 @@ inner_check(Value, Type, CheckStack, ParseState) ->
                         true ->
                             true;
                         false ->
-                            {false, [{Value, registered_type_checker_failed, {Module, Function}}|CheckStack]}
+                            {false,
+                             [{Value,
+                               structural_test_ok_your_registered_type_checker_failed,
+                               {Module, Function}}
+                              | CheckStack]}
                     end;
                 X ->
                     X
