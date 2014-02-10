@@ -33,6 +33,7 @@
 % private API for unit tests:
 -export([find_smallest_interval/1, merge_interval/2]).
 
+-include("scalaris.hrl").
 -include("record_helpers.hrl").
 
 -type data_item() :: {float(), pos_integer()}.
@@ -65,6 +66,7 @@ get_data(Histogram) ->
 %% @doc Merges the given two histograms by adding every data point of Hist2
 %%      to Hist1.
 -spec merge(Hist1::histogram(), Hist2::histogram()) -> histogram().
+merge(Hist1 = #histogram{size = 0}, _Hist2) -> Hist1;
 merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
     NewData = lists:foldl(fun insert/2, Hist1Data, Hist2Data),
     resize(Hist1#histogram{data = NewData, data_size = length(NewData)}).
@@ -76,8 +78,9 @@ merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec resize(Histogram::histogram()) -> histogram().
 resize(Histogram = #histogram{data = Data, size = ExpectedSize, data_size = ActualSize}) ->
+    ?ASSERT(ExpectedSize > 0),
     if
-        (ActualSize > ExpectedSize) andalso (1 < ExpectedSize) ->
+        (ActualSize > ExpectedSize) andalso (1 < ActualSize) ->
             %% we need at least two items to do the following:
             MinSecondValue = find_smallest_interval(Data),
             NewHistogram = Histogram#histogram{data = merge_interval(MinSecondValue, Data),
