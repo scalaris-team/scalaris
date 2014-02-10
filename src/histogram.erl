@@ -30,8 +30,8 @@
 % external API
 -export([create/1, add/2, add/3, get_data/1, merge/2]).
 
-% private API
--export([resize/1, insert/2, find_smallest_interval/1, merge_interval/2]).
+% private API for unit tests:
+-export([find_smallest_interval/1, merge_interval/2]).
 
 -include("record_helpers.hrl").
 
