@@ -352,7 +352,7 @@ check_config() ->
 get_timeslots_to_keep() ->
     config:read(monitor_timeslots_to_keep).
 
--spec get_check_timeslots_interval() -> 10000.
+-spec get_check_timeslots_interval() -> 10.
 get_check_timeslots_interval() ->
     10. % every 10s
 
@@ -361,7 +361,7 @@ get_check_timeslots_interval() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Get the available RRD keys
--spec get_rrd_keys() -> [table_index()].
+-spec get_rrd_keys() -> [table_index()] | timeout.
 get_rrd_keys() ->
     Monitor = case pid_groups:get_my(monitor) of
         failed -> pid_groups:find_a(monitor);
@@ -369,12 +369,11 @@ get_rrd_keys() ->
     end,
     get_rrd_keys(Monitor).
 
--spec get_rrd_keys(comm:erl_local_pid()) -> [table_index()].
+-spec get_rrd_keys(comm:erl_local_pid()) -> [table_index()] | timeout.
 get_rrd_keys(MonitorPid) ->
     comm:send_local(MonitorPid, {get_rrd_keys, self()}),
     receive
         ?SCALARIS_RECV({get_rrd_keys, Keys}, Keys)
     after 2000 ->
             timeout
-    end
-    .
+    end.
