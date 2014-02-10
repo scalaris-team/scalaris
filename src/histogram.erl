@@ -54,10 +54,9 @@ add(Value, Histogram) ->
 -spec add(Value::float(), Count::pos_integer(), Histogram::histogram()) -> histogram().
 add(_Value, _Count, Histogram = #histogram{size = 0}) ->
     Histogram;
-add(Value, Count, Histogram = #histogram{data = OldData, data_size = _OldDataSize}) ->
+add(Value, Count, Histogram = #histogram{data = OldData}) ->
     DataNew = insert({Value, Count}, OldData),
-    resize(Histogram#histogram{data = DataNew,
-                               data_size = length(DataNew)}).
+    resize(Histogram#histogram{data = DataNew, data_size = length(DataNew)}).
 
 -spec get_data(Histogram::histogram()) -> data_list().
 get_data(Histogram) ->
@@ -66,10 +65,9 @@ get_data(Histogram) ->
 %% @doc Merges the given two histograms by adding every data point of Hist2
 %%      to Hist1.
 -spec merge(Hist1::histogram(), Hist2::histogram()) -> histogram().
-merge(Hist1 = #histogram{data = Hist1Data, data_size = Hist1DataSize},
-      Hist2 = #histogram{data_size = Hist2DataSize}) ->
-    NewData = lists:foldl(fun insert/2, Hist1Data, get_data(Hist2)),
-    resize(Hist1#histogram{data = NewData, data_size = Hist1DataSize + Hist2DataSize}).
+merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
+    NewData = lists:foldl(fun insert/2, Hist1Data, Hist2Data),
+    resize(Hist1#histogram{data = NewData, data_size = length(NewData)}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
