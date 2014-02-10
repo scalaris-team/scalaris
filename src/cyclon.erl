@@ -35,6 +35,7 @@
 % functions gen_component and the config module use
 -export([init/1, on_inactive/2, on_active/2,
          activate/0, deactivate/0,
+         rm_check/3,
          rm_send_changes/4,
          check_config/0]).
 
@@ -164,7 +165,7 @@ init([]) ->
 on_inactive({activate_cyclon}, {inactive, QueuedMessages}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
     rm_loop:subscribe(self(), cyclon,
-                      fun(OldN, NewN, _Reason) -> OldN =/= NewN end,
+                      fun cyclon:rm_check/3,
                       fun cyclon:rm_send_changes/4, inf),
     request_node_details([node, pred, succ]),
     comm:send_local(self(), {cy_shuffle}),
@@ -364,6 +365,12 @@ check_state({Cache, Node, _Cycles} = _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec rm_check(Neighbors, Neighbors, Reason) -> boolean() when
+      Neighbors :: nodelist:neighborhood(),
+      Reason :: rm_loop:reason().
+rm_check(OldN, NewN, _Reason) ->
+    OldN =/= NewN.
 
 %% @doc Sends changes to a subscribed cyclon process when the neighborhood
 %%      changes.
