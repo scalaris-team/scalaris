@@ -29,18 +29,18 @@
 -include("client_types.hrl").
 
 all()   -> [
-            tester_type_check_api,
-            tester_type_check_config,
-%%            tester_type_check_dht_node,
-            tester_type_check_gossip,
-            tester_type_check_math,
-            tester_type_check_node,
-            tester_type_check_paxos,
-            tester_type_check_rrepair,
-            tester_type_check_tx,
-            tester_type_check_rdht_tx,
-            tester_type_check_util,
-            tester_type_check_gossip2
+%%            tester_type_check_api,
+%%            tester_type_check_config,
+%%%%            tester_type_check_dht_node,
+%%            tester_type_check_gossip,
+%%            tester_type_check_math,
+%%            tester_type_check_node,
+%%            tester_type_check_paxos,
+%%            tester_type_check_rrepair,
+%%            tester_type_check_tx,
+%%            tester_type_check_rdht_tx,
+            tester_type_check_util
+%%            tester_type_check_gossip2
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
 
@@ -594,7 +594,7 @@ tester_type_check_util(_Config) ->
            ], []},
           %% {fix_queue, [], []}, %% queue as builtin type not supported yet
 
-          %% {histogram, [], []}, %% error in add?
+          {histogram, [], []},
           {msg_queue, [], []},
           {pdb, [], []},
           {pid_groups,
