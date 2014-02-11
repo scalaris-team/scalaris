@@ -22,6 +22,7 @@
 -module(slide_chord).
 -author('kruber@zib.de').
 -vsn('$Id$').
+-behaviour(slide_beh).
 
 -include("scalaris.hrl").
 
