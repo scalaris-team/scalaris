@@ -257,6 +257,8 @@ parse_type_({type, _Line, module, []}, _Module, ParseState) ->
     {{builtin_type, module}, ParseState};
 parse_type_({type, _Line, iodata, []}, _Module, ParseState) ->
     {{builtin_type, iodata}, ParseState};
+parse_type_({type, _Line, map, any}, _Module, ParseState) -> % Erlang R17
+    {{builtin_type, map}, ParseState};
 parse_type_({type, _Line, mfa, []}, _Module, ParseState) ->
     {{tuple, [atom, atom, {range, {integer, 0}, {integer, 255}}]}, ParseState};
 parse_type_({remote_type, _Line, [{atom, _Line2, TypeModule},
