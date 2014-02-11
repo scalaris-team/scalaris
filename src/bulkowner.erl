@@ -21,10 +21,13 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+-define(TRACE(X, Y), io:format(X, Y)).
+
 -include("scalaris.hrl").
 
 % public API:
--export([issue_bulk_owner/3, issue_send_reply/4, issue_bulk_distribute/5,
+-export([issue_bulk_owner/3, issue_send_reply/4,
+         issue_bulk_distribute/5, issue_bulk_distribute/6,
          send_reply/5, send_reply_failed/6]).
 
 % only use inside the dht_node process:
@@ -66,10 +69,18 @@ issue_send_reply(Id, Target, Msg, Parents) ->
     comm:send_local(DHTNode, {bulkowner, reply, Id, Target, Msg, Parents}).
 
 -spec issue_bulk_distribute(ID::uid:global_uid(), atom(), pos_integer(),
-                           comm:message(), [tuple()]) -> ok.
+                           comm:message(), [{string(), term()}] | {ets, ets:tab()}) -> ok.
 issue_bulk_distribute(Id, Proc, Pos, Msg, Data) ->
+    issue_bulk_distribute(Id, Proc, Pos, Msg, Data, intervals:all()).
+
+-spec issue_bulk_distribute(ID::uid:global_uid(), atom(), pos_integer(),
+                           comm:message(), [{string(), term()}] | {ets, ets:tab()},
+                           intervals:interval()) -> ok.
+issue_bulk_distribute(Id, Proc, Pos, Msg, Data, Interval) ->
+    ?TRACE("~p ~p: bulk_distribute initiated to ~p", [self(), ?MODULE,
+                                                      Interval]),
     DHTNode = pid_groups:find_a(dht_node),
-    comm:send_local(DHTNode, {bulkowner, start, Id, intervals:all(), {bulk_distribute, Proc,
+    comm:send_local(DHTNode, {bulkowner, start, Id, Interval, {bulk_distribute, Proc,
                                                         Pos, Msg, Data}}).
 
 -spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(),
@@ -103,11 +114,13 @@ bulk_owner(State, Id, I, Msg, Parents) ->
         false ->
             case Msg of
                 {bulk_distribute, Proc, N, Env, Data} ->
-                    {SuccData, _Rest} = lists:partition(
-                            fun(Entry) ->
-                                intervals:in(?RT:hash_key(element(1, Entry)),
-                                            SuccIntI)
-                            end, Data),
+                    SuccData = get_range_data(Data, SuccIntI),
+                    ?TRACE("~p bulk_distribute: sending to succ ~p on interval ~p
+                           I: ~p
+                           Msg: ~p",
+                           [self(), node:pidX(nodelist:succ(Neighbors)),
+                            SuccIntI, I, {bulkowner, deliver, Id, SuccIntI,
+                              {bulk_distribute, Proc, N, Env, SuccData}, Parents}]),
                     comm:send(node:pidX(nodelist:succ(Neighbors)),
                               {bulkowner, deliver, Id, SuccIntI,
                               {bulk_distribute, Proc, N, Env, SuccData}, Parents});
@@ -151,11 +164,11 @@ bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
             false ->
                 case Msg of
                     {bulk_distribute, Proc, N, Env, Data} ->
-                        {RangeData, _Rest} = lists:partition(
-                                fun(Entry) ->
-                                    intervals:in(?RT:hash_key(element(1, Entry)),
-                                                Range)
-                                end, Data),
+                        RangeData = get_range_data(Data, Range),
+                        ?TRACE("~p bulk_distribute: sending to node ~p on interval ~p
+                               Msg: ~p",
+                               [self(), node:pidX(Head), Range, {bulkowner, Id, Range,
+                              {bulk_distribute, Proc, N, Env, RangeData}, Parents}]),
                         comm:send(node:pidX(Head),
                               {bulkowner, Id, Range,
                               {bulk_distribute, Proc, N, Env, RangeData}, Parents});
@@ -190,10 +203,15 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                             %% FwdInt part of the data. otherwise we get duplicate
                             %% data
                             {bulk_distribute, Proc, N, Msg1, Data} ->
-                                RangeData =
-                                    [Entry || Entry <- Data,
-                                              intervals:in(?RT:hash_key(element(1, Entry)),
-                                                           FwdRange)],
+                                RangeData = get_range_data(Data, FwdRange),
+                        ?TRACE("~p bulkowner: forwarding {~p, ~p,
+                               ~p} to ~p in ~p~n",
+                               [self(),
+                                element(1, Msg1),
+                                element(2, Msg1),
+                                RangeData,
+                                FwdPid,
+                                FwdRange]),
                                 comm:send(FwdPid,
                                       {bulkowner, deliver, Id, FwdRange,
                                       {bulk_distribute, Proc, N, Msg1, RangeData},
@@ -214,33 +232,60 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
     MyDBRange = intervals:union(dht_node_state:get(State, my_range), DBRange),
     MyRange0 = lists:foldl(F, Range, MsgFwd),
     MyRange = intervals:intersection(MyRange0, MyDBRange),
+    %% ?TRACE("~p ranges on delivery:
+    %%                 DBRange:    ~p
+    %%                 MyDBRange:  ~p
+    %%                 MyRange0:   ~p
+    %%                 MyRange:    ~p",
+    %%        [self(), DBRange, MyDBRange, MyRange0, MyRange]),
     case intervals:is_empty(MyRange) of
         true -> ok;
         _ ->
-            case Msg of
-                {bulk_read_entry, Issuer} ->
-                    Data = db_dht:get_entries(dht_node_state:get(State, db), MyRange),
-                    ReplyMsg = {bulk_read_entry_response, MyRange, Data},
-                    % for aggregation using a tree, activate this instead:
-                    % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
-                    comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
-                {bulk_distribute, Proc, N, Msg1, Data} ->
-                    RangeData =
-                        [Entry || Entry <- Data,
-                                  intervals:in(?RT:hash_key(element(1, Entry)),
-                                               MyRange)],
-                    %% only deliver data in MyRange as data outside of it was
-                    %% forwarded
-                    comm:send_local(pid_groups:get_my(Proc),
-                                    {bulk_distribute, Id, MyRange, 
-                                     setelement(N, Msg1, RangeData), Parents});
-                {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
-                    comm:send_local(pid_groups:get_my(Proc),
-                                    {bulkowner, deliver, Id, MyRange, Msg1, Parents});
-                {do_snapshot, _SnapNo, _Leader} ->
-                    comm:send_local(pid_groups:get_my(dht_node), Msg);
-                MrMsg when mr =:= element(1, MrMsg) ->
-                    comm:send_local(pid_groups:get_my(dht_node), Msg)
+            %% check if node has left the ring via a slide
+            %% if rm_loop:has_left/1 is true this message arrived through a
+            %% msg_fwd and needs to be passed back into the system
+            case rm_loop:has_left(dht_node_state:get(State, rm_state)) of
+                false ->
+                    case Msg of
+                        {bulk_read_entry, Issuer} ->
+                            Data = db_dht:get_entries(dht_node_state:get(State, db), MyRange),
+                            ReplyMsg = {bulk_read_entry_response, MyRange, Data},
+                            % for aggregation using a tree, activate this instead:
+                            % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
+                            comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
+                        {bulk_distribute, Proc, N, Msg1, Data} ->
+                            ?TRACE("~p bulkowner: delivering {~p, ~p} locally to ~p
+                           MyDbRange: ~p
+                           FwdRange: ~p",
+                                   [self(),
+                                    element(1, Msg1),
+                                    element(2, Msg1),
+                                    MyRange,
+                                    MyDBRange,
+                                    MyRange0]),
+                            RangeData = get_range_data(Data, MyRange),
+                            %% only deliver data in MyRange as data outside of it was
+                            %% forwarded
+                            comm:send_local(pid_groups:get_my(Proc),
+                                            {bulk_distribute, Id, MyRange,
+                                             setelement(N, Msg1, RangeData), Parents});
+                        {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
+                            comm:send_local(pid_groups:get_my(Proc),
+                                            {bulkowner, deliver, Id, MyRange, Msg1, Parents});
+                        {do_snapshot, _SnapNo, _Leader} ->
+                            comm:send_local(pid_groups:get_my(dht_node), Msg);
+                        MrMsg when mr =:= element(1, MrMsg) ->
+                            comm:send_local(pid_groups:get_my(dht_node),
+                                            erlang:append_element(Msg, MyRange))
+                    end;
+                true ->
+                    ?TRACE("~p bulkowner: delivering to leaving node...
+                            forwarding msg ~p to succ ~p~n",
+                           [self(), Msg, nodelist:succ(dht_node_state:get(State,
+                                                                          neighbors))]),
+                    Neighbors = dht_node_state:get(State, neighbors),
+                    comm:send(node:pidX(nodelist:succ(Neighbors)),
+                              {bulkowner, Id, Range, Msg, Parents})
             end
     end,
     RestRange = intervals:minus(MyRange0, MyRange),
@@ -289,3 +334,19 @@ on({bulkowner, gather, Id, Target, [H = {bulk_read_entry_response, _HRange, _HDa
 on({send_error, FailedTarget, {bulkowner, reply, Id, Target, Msg, Parents}, _Reason}, State) ->
     bulkowner:send_reply_failed(Id, Target, Msg, Parents, self(), FailedTarget),
     State.
+
+-spec get_range_data({ets, db_ets:db()} | [{nonempty_string(), term()},...],
+                     intervals:interval()) -> [{nonempty_string(), term()}].
+get_range_data({ets, ETS}, Range) ->
+    lists:foldl(fun(Interval, Acc1) ->
+                    db_ets:foldl(ETS,
+                                 fun(E, Acc) -> [db_ets:get(ETS,E) | Acc] end,
+                                 Acc1, Interval)
+                end,
+                [], intervals:get_simple_intervals(Range));
+get_range_data(Data, Range) ->
+    lists:filter(
+      fun(Entry) ->
+              intervals:in(element(1, Entry),
+                           Range)
+      end, Data).
