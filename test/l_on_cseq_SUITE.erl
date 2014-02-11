@@ -626,7 +626,7 @@ takeover_loop(L) ->
         {takeover, success, L2} ->
             ct:pal("takeover succeed ~w", [L2]),
             ok;
-        {takeover, failed, L2, Result} ->
+        {takeover, failed, L2, _Result} ->
             ct:pal("retrying takeover ~p ~p", [L2, l_on_cseq:get_pretty_timeout(L2)]),
             %% we repeat until the lease expired and then hopefully succeed
             timer:sleep(500),
@@ -685,8 +685,8 @@ test_split_prepare(DHTNode) ->
     l_on_cseq:lease_split(L, R1, R2, second, self()),            % trigger step
     ct:pal("intercepting msg"),
     StartMsg = receive                                           % intercept msg
-                   M = {l_on_cseq, split, _Lease, _R1, _R2, _Keep,
-                        _ReplyTo, _PostAux} ->
+                   M = {l_on_cseq, split, _Lease, __R1, __R2, __Keep,
+                        __ReplyTo, __PostAux} ->
                        M
                end,
     ct:pal("intercepted msg"),
@@ -875,7 +875,7 @@ wait_for_lease_owner(Id, NewOwner) ->
 
 wait_for_lease_helper(Id, F) ->
     wait_for(fun () ->
-                     DHTNode = pid_groups:find_a(dht_node),
+                     %DHTNode = pid_groups:find_a(dht_node),
                      %comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
                      %{A, P} = receive
                      %        {get_state_response, {ActiveList, PassiveList}} ->
