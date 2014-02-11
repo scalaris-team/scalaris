@@ -1,4 +1,4 @@
-%% @copyright 2010-2013 Zuse Institute Berlin
+%% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@
 -module(slide_leases).
 -author('schuett@zib.de').
 -vsn('$Id$').
+
+-behaviour(slide_beh).
 
 -include("scalaris.hrl").
 
