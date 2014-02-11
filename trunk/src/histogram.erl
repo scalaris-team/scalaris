@@ -37,7 +37,7 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--type data_item() :: {float(), pos_integer()}.
+-type data_item() :: {float() | integer(), pos_integer()}.
 -type data_list() :: list(data_item()).
 -record(histogram, {size = ?required(histogram, size):: non_neg_integer(),
                     data = [] :: data_list(),
@@ -127,8 +127,10 @@ find_smallest_interval_loop(_MinInterval, MinSecondValue, _LastValue, []) ->
 %%      Stops after the first match.
 %%      PRE: length(Data) >= 2, two consecutive values with the given difference
 -spec merge_interval(MinSecondValue::float(), Data::data_list()) -> data_list().
-merge_interval(Value2, [{Value, Count}, {Value2, Count2} | Rest]) ->
+merge_interval(Value2, [{Value, Count}, {Value2, Count2} | Rest]) when is_float(Value) orelse is_float(Value2) ->
     [{(Value * Count + Value2 * Count2) / (Count + Count2), Count + Count2} | Rest];
+merge_interval(Value2, [{Value, Count}, {Value2, Count2} | Rest]) ->
+    [{(Value * Count + Value2 * Count2) div (Count + Count2), Count + Count2} | Rest];
 merge_interval(MinSecondValue, [DataItem | Rest]) ->
     [DataItem | merge_interval(MinSecondValue, Rest)].
 
