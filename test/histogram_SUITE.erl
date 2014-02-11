@@ -31,7 +31,8 @@ all()   -> [
             insert,
             find_smallest_interval,
             merge_interval,
-            perf_add
+            perf_add,
+            find_largest_window
            ].
 
 suite() -> [ {timetrap, {seconds, 40}} ].
@@ -98,4 +99,29 @@ perf_add(_Config) ->
     AddIntFun = fun(I, AccH) -> histogram:add(float(I), AccH) end,
     Hist2 = performance_SUITE:iter2_foldl(performance_SUITE:count(), AddIntFun, Hist, "histogram:add (1)"),
     _Hist3 = performance_SUITE:iter2_foldl(performance_SUITE:count(), AddIntFun, Hist2, "histogram:add (2)"),
+    ok.
+
+find_largest_window(_Config) ->
+    H1 = histogram:create(10),
+    Values = [1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5],
+    H2 = lists:foldl(fun histogram:add/2, H1, Values),
+    {MaxPos, MaxVal} = histogram:find_largest_window(2, H2),
+    ?equals(MaxVal, 6),
+    ?equals(MaxPos, 4),
+    Values2 = [3, 3],
+    H3 = lists:foldl(fun histogram:add/2, H2, Values2),
+    {MaxPos2, MaxVal2} = histogram:find_largest_window(2, H3),
+    ?equals(MaxVal2, 7),
+    ?equals(MaxPos2, 3),
+    F = fun(N, WindowSize, Result) ->
+                ct:pal("Histogram size: ~p, Adding ~p, SlidingWindow ~p~n", [N, N, WindowSize]),
+                H4 = histogram:create(N),
+                Values3 = lists:seq(1, N),
+                H5 = lists:foldl(fun histogram:add/2, H4, Values3),
+                {Time, Result} = util:tc(fun() -> histogram:find_largest_window(WindowSize, H5) end),
+                ct:pal("Time: ~p~n", [Time])
+        end,
+    F(100, 20, {1, 20}),
+    F(1000, 100, {1, 100}),
+    F(10000, 300, {1, 300}),
     ok.

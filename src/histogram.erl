@@ -34,6 +34,8 @@
 -export([find_smallest_interval/1, merge_interval/2,
          tester_create_histogram/2, tester_is_valid_histogram/1]).
 
+-export([find_largest_window/2]).
+
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
@@ -72,11 +74,33 @@ merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
     NewData = lists:foldl(fun insert/2, Hist1Data, Hist2Data),
     resize(Hist1#histogram{data = NewData, data_size = length(NewData)}).
 
+%% @doc Determines the maximum number of occurances under a sliding window
+-spec find_largest_window(WindowSize::pos_integer(), Histogram::histogram()) -> {Pos::pos_integer(), Sum::pos_integer()}.
+find_largest_window(WindowSize, #histogram{data = HistData, data_size = Len})  when Len >= WindowSize ->
+    Data = lists:map(fun({_, Count}) -> Count end, HistData),
+    sliding_window_max(WindowSize, 0, 0, Data, 1, queue:new(), 0).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % private
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% @doc Helper function for find_largest_window/2
+-spec sliding_window_max(WindowSize::pos_integer(), MaxPos::pos_integer(), MaxSum::non_neg_integer(),
+                         Data::list(), Pos::pos_integer(), OldVals::queue(), Sum::non_neg_integer())
+                      -> Max::{Pos::pos_integer(), Sum::pos_integer()}.
+sliding_window_max(0, MaxPos, MaxSum, [], _Pos, _OldVals, _Sum) ->
+    {MaxPos, MaxSum};
+sliding_window_max(0, MaxPos, MaxSum, List, Pos, OldVals, Sum) ->
+    {{value, OldVal}, NewOldVals} = queue:out(OldVals),
+    sliding_window_max(1, MaxPos, MaxSum, List, Pos + 1, NewOldVals, Sum - OldVal);
+sliding_window_max(WindowSize, MaxPos, MaxSum, [H|T], Pos, OldVals, LastSum) ->
+    Sum = LastSum + H,
+    case Sum > MaxSum of
+        true -> sliding_window_max(WindowSize - 1, Pos   , Sum   , T, Pos, queue:in(H, OldVals), Sum);
+        _    -> sliding_window_max(WindowSize - 1, MaxPos, MaxSum, T, Pos, queue:in(H, OldVals), Sum)
+    end.
+
 %% @doc Resizes the given histogram to fit its maximum size (reduces the data).
 %%      PRE: histogram maximum size > 0 (from create/1)
 -spec resize(Histogram::histogram()) -> histogram().
