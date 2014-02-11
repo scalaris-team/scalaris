@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -115,7 +115,7 @@ get_db(Interval, ItemCount, Distribution, Options) ->
         ([{Interval::intervals:continuous_interval(), ToAdd::non_neg_integer()}],
          Acc::[result_kv()], OutputType::list_key_val) -> [result_kv()].
 gen_random([], Acc, _) -> Acc;
-gen_random([{I, Add} | R], Acc, OutputType) ->    
+gen_random([{I, Add} | R], Acc, OutputType) ->
     ToAdd = gen_random_gb_sets(intervals:get_bounds(I), Add, OutputType,
                                gb_sets:empty(), 0),
     gen_random(R, lists:append(ToAdd, Acc), OutputType).
@@ -131,7 +131,7 @@ gen_random([{I, Add} | R], Acc, OutputType) ->
          OutputType::list_key_val, Set::gb_set(), Retries::non_neg_integer())
         -> [result_kv()].
 gen_random_gb_sets(_I, ToAdd, OutputType, Set, Retry)
-  when ToAdd =:= 0 orelse Retry =:= 3 -> 
+  when ToAdd =:= 0 orelse Retry =:= 3 ->
     % abort after 3 random keys already in Tree / probably no more free keys in I
     KeyList = gb_sets:to_list(Set),
     case OutputType of
@@ -304,6 +304,7 @@ fill_ring(Type, DBSize, Params) ->
         wiki -> fill_wiki(Params, "barwiki-latest-pages-meta-current.db")
     end.
 
+-compile({nowarn_unused_function, {fill_random_feeder, 2}}).
 -spec fill_random_feeder({1..1000, 1..1000}, [db_parameter()])
         -> {pos_integer(), [db_parameter()]}.
 fill_random_feeder(Sizes0, Params0) ->
@@ -311,7 +312,7 @@ fill_random_feeder(Sizes0, Params0) ->
     {DBSize, Params}.
 
 -spec fill_random(DBSize::pos_integer(), [db_parameter()]) -> db_status().
-fill_random(DBSize, Params) ->    
+fill_random(DBSize, Params) ->
     Distr = proplists:get_value(distribution, Params, uniform),
     I = hd(intervals:split(intervals:all(), ?ReplicationFactor)),
     {_LBr, LKey, RKey, _RBr} = intervals:get_bounds(I),
@@ -388,6 +389,7 @@ feeder_fix_rangen({non_uniform, {{binom, _N, P, X, Approx}, CalcFun, NewStateFun
 feeder_fix_rangen(RanGen, _MaxN) ->
     RanGen.
 
+-compile({nowarn_unused_function, {gen_kvv_feeder, 3}}).
 -spec gen_kvv_feeder(ErrorDist::distribution(), [?RT:key()], [db_parameter()])
         -> {ErrorDist::distribution(), [?RT:key()], [db_parameter()]}.
 gen_kvv_feeder(EDist0, Keys0, Params) ->
@@ -418,6 +420,7 @@ gen_kvv(EDist, Keys, Params) ->
             p_gen_kvv(EDist, Keys, KeyCount, FType, FDest, FCount)
     end.
 
+-compile({nowarn_unused_function, {p_gen_kvv_feeder, 6}}).
 -spec p_gen_kvv_feeder(ErrorDist::distribution(), [?RT:key(),...], KeyCount::0,
                        failure_type(), failure_dest(), FailCount::non_neg_integer())
         -> {ErrorDist::distribution(), [?RT:key(),...], KeyCount::pos_integer(),
@@ -459,7 +462,7 @@ p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
                    FProbL -> erlang:round(KeyCount / FProbL)
                end,
     FCells = lists:reverse(lists:keysort(1, build_failure_cells(FProbList, Keys, CellLength, []))),
-    {DB, _, Out} = 
+    {DB, _, Out} =
         lists:foldl(fun({_P, Cell}, {DB, RestF, ROut}) ->
                             {NewEntry, NewOut, NewF} = add_failures_to_cell(Cell, RestF, FType, FDest, {[], ROut}),
                             {lists:append(NewEntry, DB), NewF, NewOut}
@@ -474,7 +477,7 @@ p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
                 0 -> KeyCount + 1;
                 _ -> erlang:max(1, erlang:trunc(KeyCount / FCount))
             end,
-    {DB, O, _, _} = 
+    {DB, O, _, _} =
         lists:foldl(
           fun(Key, {AccDb, Out, Count, FCRest}) ->
                   {{RList, AddOut}, FCNew} =
@@ -544,7 +547,7 @@ get_rep_group(Key) ->
     Value = get_synthetic_value(new),
     [db_entry:new(K, Value, Version) || K <- ?RT:get_replica_keys(Key)].
 
--spec get_failure_rep_group(?RT:key(), failure_type(), failure_dest()) -> 
+-spec get_failure_rep_group(?RT:key(), failure_type(), failure_dest()) ->
           {[db_entry:entry()], Outdated::non_neg_integer()}.
 get_failure_rep_group(Key, FType, FDest) ->
     RepKeys = ?RT:get_replica_keys(Key),
@@ -577,6 +580,7 @@ get_error_key(Key, RepKeys, Dest) ->
         QList -> rr_recon:map_key_to_quadrant(Key, util:randomelem(QList))
     end.
 
+-compile({nowarn_unused_function, {select_random_keys_feeder, 4}}).
 -spec select_random_keys_feeder([Keys::?RT:key()], KeysLen::non_neg_integer(),
                                 FailureCount::non_neg_integer(), FailAcc::[?RT:key()])
         -> {[Keys::?RT:key()], KeysLen::non_neg_integer(),

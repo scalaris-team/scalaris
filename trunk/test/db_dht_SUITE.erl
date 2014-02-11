@@ -1,4 +1,4 @@
-% @copyright 2010-2011 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -860,7 +860,7 @@ prop_changed_keys_delete(Data, ChangesInterval, Key) ->
     Old = db_dht:get_entry(DB2, Key),
     DB3 = db_dht:record_changes(DB2, ChangesInterval),
 
-    {DB4, Status} = db_dht:delete(DB3, Key),
+    {DB4, _Status} = db_dht:delete(DB3, Key),
     check_changes(DB4, ChangesInterval, "delete_1"),
     check_key_in_deleted_no_locks(DB4, ChangesInterval, Key, Old, "delete_2"),
 
@@ -1379,7 +1379,7 @@ tester_stop_record_changes(_Config) ->
 -spec check_entry(DB::db_dht:db(), Key::?RT:key(), ExpDBEntry::db_entry:entry(),
                   ExpRead::{ok, Value::db_dht:value(), Version::db_dht:version()} | {ok, empty_val, -1},
                   ExpExists::boolean(), Note::string()) -> true.
-check_entry(DB, Key, ExpDBEntry, ExpRead, ExpExists, Note) ->
+check_entry(DB, Key, ExpDBEntry, ExpRead, _ExpExists, Note) ->
     ?equals_w_note(db_dht:get_entry(DB, Key), ExpDBEntry, Note),
     ?equals_w_note(db_dht:read(DB, Key), ExpRead, Note).
 

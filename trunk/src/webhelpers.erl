@@ -1,5 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin,
-%            2008 onScale solutions
+% @copyright 2007-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -924,5 +923,6 @@ safe_html_string(String) ->
                    end || C <- lists:flatten(String)]).
 
 %% @doc Pre-formats a string (useful for reading erlang terms)
+-spec html_pre(io:format(), io_lib:chars()) -> string().
 html_pre(Format, String) ->
     "<pre>" ++ lists:flatten(io_lib:format(Format, String)) ++ "</pre>".
