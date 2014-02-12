@@ -141,8 +141,7 @@ del_nodes_by_name(Names, Graceful) ->
                       _ = supervisor:terminate_child(main_sup, Id),
                       case supervisor:delete_child(main_sup, Id) of
                           ok -> {[Name | Ok], NotFound};
-                          {error, not_found} -> {Ok, [Name | NotFound]};
-                          {error, no_partner_found} -> {Ok, NotFound}
+                          {error, not_found} -> {Ok, [Name | NotFound]}
                       end
               end, {[], []}, Specs)
     end.
