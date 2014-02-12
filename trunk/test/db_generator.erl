@@ -42,7 +42,7 @@
 %% TYPES
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -ifdef(with_export_type_support).
--export_type([distribution/0, db_distribution/0,
+-export_type([distribution/0, db_distribution/0, option/0,
               db_type/0, db_parameter/0, db_status/0, failure_type/0]).
 -endif.
 
