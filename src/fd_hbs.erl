@@ -1,4 +1,4 @@
-% @copyright 2010-2013 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ start_link(ServiceGroup, RemotePid) ->
     RemoteFDPid = comm:get(fd, RemotePid),
     Name = lists:flatten(io_lib:format("fd <-> ~p", [RemoteFDPid])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [RemotePid],
-                             [wait_for_init,
+                             [{wait_for_init},
                               {pid_groups_join_as, ServiceGroup, Name}]).
 
 -spec init([pid() | comm:mypid()]) -> state().

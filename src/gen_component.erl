@@ -337,7 +337,7 @@ bp_about_to_kill(Pid) ->
           | {pid_groups_join_as, pid_groups:groupname(), {short_lived, pid_groups:pidname()}}
           | {erlang_register, Name::atom()}
           | {spawn_opts, [spawn_option()]}
-          | wait_for_init.
+          | {wait_for_init}.
 
 -spec start_link(module(), handler(), term(), [option()]) -> {ok, pid()}.
 start_link(Module, Handler, Args, Options) ->
@@ -400,7 +400,7 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
                                              ++ randoms:getRandomString()), self()),
                 ok
         end,
-    WaitForInit = lists:member(wait_for_init, Options),
+    WaitForInit = lists:member({wait_for_init}, Options),
     _ = case WaitForInit of
             true -> ok;
             false -> Supervisor ! {started, self()}
