@@ -34,12 +34,13 @@
 -export([find_smallest_interval/1, merge_interval/2,
          tester_create_histogram/2, tester_is_valid_histogram/1]).
 
--export([find_largest_window/2]).
+-export([find_largest_window/2, find_largest_window_feeder/2]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--type data_item() :: {float() | integer(), pos_integer()}.
+-type value() :: float() | integer().
+-type data_item() :: {value(), pos_integer()}.
 -type data_list() :: list(data_item()).
 -record(histogram, {size = ?required(histogram, size):: non_neg_integer(),
                     data = [] :: data_list(),
@@ -51,11 +52,11 @@
 create(Size) ->
     #histogram{size = Size}.
 
--spec add(Value::float(), Histogram::histogram()) -> histogram().
+-spec add(Value::value(), Histogram::histogram()) -> histogram().
 add(Value, Histogram) ->
     add(Value, 1, Histogram).
 
--spec add(Value::float(), Count::pos_integer(), Histogram::histogram()) -> histogram().
+-spec add(Value::value(), Count::pos_integer(), Histogram::histogram()) -> histogram().
 add(_Value, _Count, Histogram = #histogram{size = 0}) ->
     Histogram;
 add(Value, Count, Histogram = #histogram{data = OldData}) ->
@@ -78,7 +79,21 @@ merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
 -spec find_largest_window(WindowSize::pos_integer(), Histogram::histogram()) -> {Pos::pos_integer(), Sum::pos_integer()}.
 find_largest_window(WindowSize, #histogram{data = HistData, data_size = Len})  when Len >= WindowSize ->
     Data = lists:map(fun({_, Count}) -> Count end, HistData),
-    sliding_window_max(WindowSize, 0, 0, Data, 1, queue:new(), 0).
+    sliding_window_max(WindowSize, 1, 0, Data, 1, queue:new(), 0).
+
+%% @doc Feeder function to create valid window sizes for the tester
+%%      In case of empty or zero sized histograms a default histogram is used
+-spec find_largest_window_feeder(WindowSize::pos_integer(), Hist::histogram()) -> {WindowSize::pos_integer(), Histogram::histogram()}.
+find_largest_window_feeder(WindowSize, #histogram{size = Size, data_size = DataSize} = Hist) ->
+    case DataSize =:= 0 orelse Size =:= 0 of
+        true ->
+            Hist2 = histogram:create(100),
+            Elements = lists:seq(1, 100),
+            Hist3 = lists:foldl(fun histogram:add/2, Hist2, Elements),
+            {20, Hist3};
+        _ ->
+            {erlang:min(WindowSize, DataSize), Hist}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -130,11 +145,11 @@ insert(DataItem, []) ->
 %% @doc Finds the smallest interval between two consecutive values and returns
 %%      the second value (in the list's order).
 %%      PRE: length(Data) >= 2
--spec find_smallest_interval(Data::data_list()) -> MinSecondValue::float().
+-spec find_smallest_interval(Data::data_list()) -> MinSecondValue::value().
 find_smallest_interval([{Value, _}, {Value2, _} | Rest]) ->
     find_smallest_interval_loop(Value2 - Value, Value2, Value2, Rest).
 
--spec find_smallest_interval_loop(MinInterval::float(), MinSecondValue::float(), LastValue::float(), Data::data_list()) -> MinSecondValue::float().
+-spec find_smallest_interval_loop(MinInterval::value(), MinSecondValue::value(), LastValue::value(), Data::data_list()) -> MinSecondValue::value().
 find_smallest_interval_loop(MinInterval, MinSecondValue, LastValue, [{Value, _} | Rest]) ->
     Diff = Value - LastValue,
     case MinInterval =< Diff of
@@ -150,7 +165,7 @@ find_smallest_interval_loop(_MinInterval, MinSecondValue, _LastValue, []) ->
 %% @doc Merges two consecutive values if the second of them is MinSecondValue.
 %%      Stops after the first match.
 %%      PRE: length(Data) >= 2, two consecutive values with the given difference
--spec merge_interval(MinSecondValue::float(), Data::data_list()) -> data_list().
+-spec merge_interval(MinSecondValue::value(), Data::data_list()) -> data_list().
 merge_interval(Value2, [{Value, Count}, {Value2, Count2} | Rest]) when is_float(Value) orelse is_float(Value2) ->
     [{(Value * Count + Value2 * Count2) / (Count + Count2), Count + Count2} | Rest];
 merge_interval(Value2, [{Value, Count}, {Value2, Count2} | Rest]) ->
