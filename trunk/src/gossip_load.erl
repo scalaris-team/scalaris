@@ -894,11 +894,12 @@ init_histo(DHTNodeState, State) ->
 
 
 -spec get_load_for_interval(BucketInterval::intervals:interval(),
-    MyRange::intervals:interval(), DB::db_dht:db()) -> avg().
+    MyRange::intervals:interval(), DB::db_dht:db()) -> avg() | unknown.
 get_load_for_interval(BucketInterval, MyRange, DB) ->
-    case intervals:intersection(BucketInterval, MyRange) of
-        [] -> unknown;
-        _NonEmptyIntersection ->
+    Intersection = intervals:intersection(BucketInterval, MyRange),
+    case intervals:is_empty(Intersection) of
+        true -> unknown;
+        false ->
             Load = db_dht:get_load(DB, BucketInterval),
             {float(Load), 1.0}
     end.
@@ -1091,7 +1092,6 @@ inc(Value) ->
 -spec to_string(unknown) -> unknown;
                (Histogram::histogram()) -> string();
                (LoadInfo::load_info()) -> string();
-               (Histogram::histogram()) -> string();
                (Instance::instance()) -> string().
 to_string(unknown) -> unknown;
 
