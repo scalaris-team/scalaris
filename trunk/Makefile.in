@@ -439,19 +439,20 @@ interop3-test: interop-test python3
 
 clean:
 	-rm -f .make-doc
-	-rm -rf bin/*.beam
-	-rm -rf ebin/*.beam
-	-rm -rf src/*.beam
-	-rm -rf src/comm_layer/*.beam
-	-rm -rf contrib/yaws/ebin/*.beam
-	-rm -rf contrib/log4erl/ebin/*.beam
+	-rm -f bin/*.beam
+	-rm -f ebin/*.beam
+	-rm -f src/*.beam
+	-rm -f src/comm_layer/*.beam
+	-rm -f contrib/yaws/ebin/*.beam
+	-rm -f contrib/log4erl/ebin/*.beam
 	-rm -f contrib/log4erl/src/log4erl_lex.erl
 	-rm -f contrib/log4erl/src/log4erl_parser.erl
-	-rm -rf test/*.beam
-	-rm -rf doc/*.html
-	-rm -rf doc/*.css
+	-rm -f test/*.beam
+	-rm -f doc/*.html
+	-rm -f doc/*.css
 	-rm -rf doc/edoc-info
-	-rm -rf docroot/graphs/*.png
+	-rm -f docroot/graphs/*.png
+	-rm -f TAGS TAGS.root TAGS.contrib TAGS.stdlib
 
 tags: TAGS.root TAGS.contrib TAGS.stdlib
 	@$(ERL) -noinput -noshell -eval 'tags:subdirs(["src", "include", "test"]), halt(0).' ; true
