@@ -27,25 +27,25 @@
          new_neighborhood/1, new_neighborhood/2, new_neighborhood/3,
          mk_neighborhood/2, mk_neighborhood/4,
          mk_nodelist/2,
-         
+
          % getters:
          node/1, nodeid/1, pred/1, preds/1, succ/1, succs/1,
          node_range/1, succ_range/1,
          has_real_pred/1, has_real_succ/1,
-         
+
          % modifiers:
          trunc/3, trunc_preds/2, trunc_succs/2,
          remove/2, remove/3, filter/2, filter/3,
          lremove/2, lremove/3,lfilter/2, lfilter/3,
          lfilter_min_length/3, filter_min_length/4,
          merge/4, add_node/4, add_nodes/4,
-         
+
          update_node/2, % update base node
          update_ids/2, % update node ids
-         
+
          % converters:
          to_list/1,
-         
+
          % miscellaneous:
          succ_ord_node/2, succ_ord_id/2,
          succ_ord_node/3, succ_ord_id/3,
@@ -160,15 +160,13 @@ trunc({Preds, Node, Succs, NodeIntv, SuccIntv}, PredsLength, SuccsLength) when (
 
 %% @doc Truncates the given neighborhood's predecessor list to the given size.
 -spec trunc_preds(neighborhood(), PredsLength::pos_integer()) -> neighborhood().
-trunc_preds(Neighborhood, PredsLength) when (PredsLength > 0) ->
-    Preds = preds(Neighborhood),
-    setelement(1, Neighborhood, lists:sublist(Preds, PredsLength)).
+trunc_preds({Preds, Node, Succs, NodeIntv, SuccIntv}, PredsLength) when (PredsLength > 0) ->
+    {lists:sublist(Preds, PredsLength), Node, Succs, NodeIntv, SuccIntv}.
 
 %% @doc Truncates the given neighborhood's successor list to the given size.
 -spec trunc_succs(neighborhood(), SuccsLength::pos_integer()) -> neighborhood().
-trunc_succs(Neighborhood, SuccsLength) when (SuccsLength > 0) ->
-    Succs = succs(Neighborhood),
-    setelement(3, Neighborhood, lists:sublist(Succs, SuccsLength)).
+trunc_succs({Preds, Node, Succs, NodeIntv, SuccIntv}, SuccsLength) when (SuccsLength > 0) ->
+    {Preds, Node, lists:sublist(Succs, SuccsLength), NodeIntv, SuccIntv}.
 
 %% @doc Returns the neighborhood's node.
 -spec node(neighborhood()) -> node:node_type().
@@ -384,11 +382,11 @@ lfilter_min_length(NodeList, FilterFun, MinLength) ->
                                           end
                                   end,
                                   0, NodeList),
-    % then collect matching nodes and as many unmatching nodes as needed to 
+    % then collect matching nodes and as many unmatching nodes as needed to
     % have a result of at least MinLength elements
     % -> beware not to destroy the order of the list!
     UnsatisfyingNodesToAdd = MinLength - SatisfyingCount,
-    NewNodeList = 
+    NewNodeList =
         case UnsatisfyingNodesToAdd =< 0 of
             true -> [Node || Node <- NodeList, FilterFun(Node)];
             false ->
@@ -525,7 +523,7 @@ lmerge_helper(Node1View, Node2View, BaseNode, PredsLength, SuccsLength) ->
     ensure_lists_not_empty(Preds, BaseNode, Succs).
 
 %% @doc Merges nodes of Neighbors2 into Neighbors1 and truncates the predecessor
-%%      and successor lists to the given sizes. 
+%%      and successor lists to the given sizes.
 -spec merge(Neighbors1::neighborhood(), Neighbors2::neighborhood(), PredsLength::pos_integer(),
             SuccsLength::pos_integer()) -> neighborhood().
 merge(Neighbors1, Neighbors2, PredsLength, SuccsLength) ->
@@ -561,7 +559,7 @@ add_node({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, NodeToAdd, PredsLength,
             SuccOrd = fun(N1, N2) -> succ_ord_node(N1, N2, BaseNode) end,
             SuccsUpdSorted = lists:usort(SuccOrd, ViewUpd),
             PredsUpdSorted = lists:reverse(SuccsUpdSorted),
-            
+
             trunc(new(PredsUpdSorted, BaseNode, SuccsUpdSorted), PredsLength, SuccsLength);
         true ->
             throw_if_newer(NodeToAdd, BaseNode),
@@ -638,7 +636,7 @@ succ_ord_id(K1, K2, BaseKey) ->
 %%     (K1 < BaseKey andalso K2 < BaseKey andalso K1 =< K2) orelse
 %%     (K1 > BaseKey andalso K2 < BaseKey) orelse
 %%     (K1 =:= BaseKey).
-    % (slightly) faster version: 
+    % (slightly) faster version:
     (K1 =:= BaseKey) orelse
     (K1 > BaseKey andalso K2 < BaseKey) orelse
     (K1 =< K2 andalso (not (K1 < BaseKey andalso K2 > BaseKey))).
@@ -718,7 +716,7 @@ lupdate_ids(L1, L2) ->
     EtsInsertNewerNodeFun = fun(N) -> ets_insert_newer_node(L1L2Tab, N) end,
     _ = lists:map(EtsInsertNewerNodeFun, L1),
     _ = lists:map(EtsInsertNewerNodeFun, L2),
-    
+
     GetNewNode = fun(Node) -> ets:lookup_element(L1L2Tab, node:pidX(Node), 2) end,
     L1Upd = lists:map(GetNewNode, L1),
     L2Upd = lists:map(GetNewNode, L2),
