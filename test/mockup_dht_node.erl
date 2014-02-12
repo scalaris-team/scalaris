@@ -1,4 +1,4 @@
-%  @copyright 2011 Zuse Institute Berlin
+%  @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ on(Msg, State = {Module, Handler, ModuleState, MsgDropSpecs}) ->
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, Options,
-                             [{pid_groups_join_as, DHTNodeGroup, dht_node}, wait_for_init]).
+                             [{pid_groups_join_as, DHTNodeGroup, dht_node}, {wait_for_init}]).
 
 -spec init(Options::[tuple()]) -> state().
 init(Options) ->
