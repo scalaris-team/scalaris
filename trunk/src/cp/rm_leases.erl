@@ -45,7 +45,7 @@ start_link(ServiceGroup) ->
     case config:read(leases) of
         true ->
             gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
-                                     [wait_for_init, {erlang_register, ?MODULE},
+                                     [{wait_for_init}, {erlang_register, ?MODULE},
                                       {pid_groups_join_as, ServiceGroup, ?MODULE}]);
         _ ->
             ignore
