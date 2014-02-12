@@ -68,6 +68,7 @@
 
 -ifdef(with_export_type_support).
 -export_type([handler/0]).
+-export_type([bp_name/0]). %% for unittests
 -endif.
 
 -type bp_name() :: atom().

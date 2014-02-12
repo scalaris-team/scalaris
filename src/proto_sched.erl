@@ -129,6 +129,7 @@
 -ifdef(with_export_type_support).
 -export_type([logger/0]).
 -export_type([passed_state/0]).
+-export_type([callback_on_deliver/0]).
 -endif.
 
 -type queue_key()        :: {Src :: comm:mypid(), Dest :: comm:mypid()}.
