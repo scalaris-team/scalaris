@@ -97,7 +97,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
     ?TRACE("mr_~s on ~p: received phase results: ~p...~ndistributing...~n",
            [JobId, self(), ets:tab2list(Data)]),
     MRState = dht_node_state:get_mr_state(State, JobId),
-    NewMRState = case mr_state:is_last_phase(MRState) of
+    NewMRState = case mr_state:is_last_phase(MRState, Round) of
         false ->
             Ref = uid:get_global_uid(),
             bulkowner:issue_bulk_distribute(Ref, dht_node,
@@ -157,10 +157,8 @@ on({mr, next_phase_data_ack, AckInterval, JobId, DeliveryInterval}, State) ->
 on({mr, next_phase, JobId, Round, _DeliveryInterval}, State) ->
     ?TRACE("master initiated phase ~p in ~p ~p~n",
               [Round, JobId, self()]),
-    MrState = mr_state:next_phase(dht_node_state:get_mr_state(State, JobId),
-                                  Round),
-    work_on_phase(JobId, MrState),
-    dht_node_state:set_mr_state(State, JobId, MrState);
+    work_on_phase(JobId, State, Round),
+    State;
 
 on({mr, terminate_job, JobId, _DeliveryInterval}, State) ->
     MRState = dht_node_state:get_mr_state(State, JobId),
@@ -171,16 +169,17 @@ on(Msg, State) ->
     ?TRACE("~p mr: unknown message ~p~n", [comm:this(), Msg]),
     State.
 
--spec work_on_phase(mr_state:jobid(), mr_state:state()) -> ok.
-work_on_phase(JobId, MRState) ->
-    {Round, MoR, FunTerm, ETS, Interval} = mr_state:get_phase(MRState),
+-spec work_on_phase(mr_state:jobid(), dht_node_state:state(), pos_integer()) -> ok.
+work_on_phase(JobId, State, Round) ->
+    MRState = dht_node_state:get_mr_state(State, JobId),
+    {Round, MoR, FunTerm, ETS, Interval} = mr_state:get_phase(MRState, Round),
     TmpETS = mr_state:get(MRState, phase_res),
     ets:delete_all_objects(TmpETS),
     case ets:info(ETS, size) of
         0 ->
             ?TRACE("mr_~s on ~p: no data for this phase...phase complete ~p~n",
                    [JobId, self(), Round]),
-            case mr_state:is_last_phase(MRState) of
+            case mr_state:is_last_phase(MRState, Round) of
                 false ->
                     %% io:format("no data for phase...done...~p informs master~n", [self()]),
                     Master = mr_state:get(MRState, master),
