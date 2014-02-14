@@ -118,6 +118,8 @@ on({'DOWN', exc_subs, wpool_worker, Pid, Reason}, {Avail, Working, Waiting}) ->
     worker_finished({Avail, NewWorking, Waiting}, Pid);
 
 %% worker sends results; forward to source
+%% TODO hsould be better if worker sends directly to source and just informs
+%% wpool that it is available for new work
 on({data, Pid, Data}, {Avail, Working, Waiting}) ->
     ?TRACE("wpool: received data from ~p:~n~p...~n",
             [Pid, Data]),
