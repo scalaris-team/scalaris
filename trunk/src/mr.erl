@@ -70,11 +70,12 @@ on({mr, init, Client, JobId, Job}, State) ->
         ok ->
             JobDesc = {"mr_master_" ++ JobId,
                        {mr_master, start_link,
-                        [pid_groups:my_groupname(), {JobId, Client, Job}]},
+                        [pid_groups:my_groupname(), {JobId}]},
                        temporary, brutal_kill, worker, []},
             SupDHT = pid_groups:get_my(sup_dht_node),
             %% TODO handle failed starts
-            _Res = supervisor:start_child(SupDHT, JobDesc);
+            {ok, Pid} = supervisor:start_child(SupDHT, JobDesc),
+            comm:send_local(Pid, {start_job, Client, Job});
         {error, Reason} ->
             comm:send(Client, {mr_results, {error, Reason}, intervals:all(), JobId})
     end,

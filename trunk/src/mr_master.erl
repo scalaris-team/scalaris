@@ -43,14 +43,7 @@
                    {mr, job_completed, intervals:interval()}).
 
 -spec init({nonempty_string(), comm:mypid(), mr:job_description()}) -> state().
-init({JobId, Client, Job}) ->
-    Data = filter_data(api_tx:get_system_snapshot(),
-                          element(2, Job)),
-    ?TRACE("mr_master: job ~p started~n", [JobId]),
-    bulkowner:issue_bulk_distribute(uid:get_global_uid(),
-                                    dht_node, 7, {mr, job, JobId, comm:this(),
-                                                  Client, Job, '_'},
-                                    Data),
+init({JobId}) ->
     {JobId, []}.
 
 -spec start_link(pid_groups:groupname(), tuple()) -> {ok, pid()}.
@@ -61,7 +54,15 @@ start_link(DHTNodeGroup, Options) ->
                               element(1, Options)}]).
 
 -spec on(message(), state()) -> state().
-
+on({start_job, Client, Job}, {JobId, _Acks} = State) ->
+    Data = filter_data(api_tx:get_system_snapshot(),
+                          element(2, Job)),
+    ?TRACE("mr_master: job ~p started~n", [JobId]),
+    bulkowner:issue_bulk_distribute(uid:get_global_uid(),
+                                    dht_node, 7, {mr, job, JobId, comm:this(),
+                                                  Client, Job, '_'},
+                                    Data),
+    State;
 on({mr, phase_completed, Range}, {JobId, I}) ->
     NewInterval = intervals:union(I, Range),
     case intervals:is_all(NewInterval) of
