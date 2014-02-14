@@ -105,7 +105,8 @@
           boolean(),          %% bp active?
           [bp_msg()],         %% queued bp messages
           boolean(),          %% bp stepped?
-          pid() | unknown     %% bp stepper
+          pid() | unknown,    %% bp stepper
+          [comm:mypid()]      %% exception subscribers
         }.
 
 %% define macros for the tuple positions to use them also in guards.
@@ -118,6 +119,7 @@
 -define(BP_QUEUE,    5).
 -define(BP_STEPPED,  6).
 -define(BP_STEPPER,  7).
+-define(EXC_SUBS,    8).
 
 %% userdevguide-begin gen_component:behaviour
 -ifdef(have_callback_support).
@@ -417,7 +419,13 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
                           UState ->
                               DefaultHandler
                       end,
-            {UState, gc_set_hand(T1State, Handler)}
+            T2State = case lists:keyfind(exception_subscription, 1, Options) of
+                          {exception_subscription, Subs} ->
+                              gc_set_exc_subs(T1State, Subs);
+                          _ ->
+                              T1State
+                      end,
+            {UState, gc_set_hand(T2State, Handler)}
         catch
             % If init throws up, send 'started' to the supervisor but exit.
             % The supervisor will try to restart the process as it is watching
@@ -675,15 +683,23 @@ on_exception(Msg, Level, Reason, Stacktrace, UState, GCState) ->
                "** Source linetrace (enable in scalaris.hrl):~n ~.0p~n"
                "** State:~n ~.0p~n"
                "** Stacktrace:~n ~.0p~n",
+    Mod = gc_mod(GCState),
     DbgVal = [Level, Reason,
               Msg,
-              gc_mod(GCState),
+              Mod,
               gc_hand(GCState),
               self(), catch pid_groups:group_and_name_of(self()),
               erlang:get(test_server_loc),
               {UState, GCState},
               Stacktrace],
+    inform_exc_subs(gc_exc_subs(GCState), self(), Mod, {Level, Reason, Msg}),
     log_or_fail(DbgMsg, DbgVal, exception_throw).
+
+-spec inform_exc_subs([comm:mypid()], pid(), atom(), term()) -> ok.
+inform_exc_subs([], _Source, _Mod, _DbgMsg) -> ok;
+inform_exc_subs([Pid | Tail], Source, Mod, DbgMsg) ->
+    comm:send(Pid, {'DOWN', exc_subs, Mod, Source, DbgMsg}),
+    inform_exc_subs(Tail, Source, Mod, DbgMsg).
 
 -spec log_or_fail(DbgMsg::string(), DbgVal::[term()],
                   Reason::unknown_message | exception_throw) -> ok.
@@ -968,11 +984,14 @@ gc_new(Module, Handler) ->
 %     Options, _Slowest = 0.0,
      _BPs = [], _BPActive = false,
      _BPHoldbackQueue = [], _BPStepped = false,
-     _BPStepperPid = unknown
+     _BPStepperPid = unknown,
+     _ExcSubs = []
     }.
 gc_mod(State) ->                element(?MOD, State).
 gc_hand(State) ->               element(?HAND, State).
 gc_set_hand(State, Handler) ->  setelement(?HAND, State, Handler).
+gc_exc_subs(State) ->           element(?EXC_SUBS, State).
+gc_set_exc_subs(State, Subs) -> setelement(?EXC_SUBS, State, Subs).
 %% opts
 %% slowest
 -spec gc_bps(gc_state()) -> [bp()].
