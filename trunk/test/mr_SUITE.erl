@@ -28,7 +28,68 @@
 -include("mr_SUITE.hrl").
 
 all() ->
-    tests_avail().
+    tests_avail() ++ [test_join, test_leave].
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
+test_join(_Config) ->
+    Pids = pid_groups:find_all(dht_node),
+    ct:pal("setting breakpoint before starting reduce phase"),
+    NextPhase = fun(Msg, _State) ->
+            case Msg of
+                {mr, next_phase, _JobId, 1, _Interval} ->
+                    comm:send_local(self(), Msg),
+                    drop_single;
+                _ ->
+                    false
+            end
+    end,
+    [gen_component:bp_set_cond(Pid, NextPhase, mr_bp) || Pid <- Pids],
+    ct:pal("starting job that triggers breakpoint"),
+    MrPid = spawn_link(fun() ->
+                    ct:pal("starting mr job"),
+                    Res = api_mr:start_job(get_wc_job_erl()),
+                    ct:pal("mr job finished"),
+                    check_results(Res)
+            end),
+    timer:sleep(1000),
+    ct:pal("adding node to provoke slide"),
+    _ = api_vm:add_nodes(2),
+    unittest_helper:wait_for_stable_ring(),
+    unittest_helper:check_ring_size_fully_joined(4),
+    ct:pal("ring fully joined (4)"),
+    ct:pal("removing breakpoints"),
+    [gen_component:bp_del(Pid, mr_bp) || Pid <- Pids],
+    util:wait_for_process_to_die(MrPid),
+    ok.
+
+test_leave(_Config) ->
+    api_vm:shutdown_nodes(1),
+    {[AddedNode], _} = api_vm:add_nodes(1),
+    unittest_helper:wait_for_stable_ring(),
+    unittest_helper:check_ring_size_fully_joined(2),
+    Pids = pid_groups:find_all(dht_node),
+    ct:pal("setting breakpoint before starting reduce phase on ~p", [Pids]),
+    NextPhase = fun(Msg, _State) ->
+            case Msg of
+                {mr, next_phase, _JobId, 1, _Interval} ->
+                    comm:send_local(self(), Msg),
+                    drop_single;
+                _ ->
+                    false
+            end
+    end,
+    [gen_component:bp_set_cond(Pid, NextPhase, mr_bp) || Pid <- Pids],
+    ct:pal("starting job that triggers breakpoint"),
+    MrPid = spawn_link(fun() ->
+                    ct:pal("starting mr job"),
+                    Res = api_mr:start_job(get_wc_job_erl()),
+                    ct:pal("mr job finished"),
+                    check_results(Res)
+            end),
+    timer:sleep(1000),
+    ct:pal("shutting down node to provoke slide"),
+    ok = api_vm:shutdown_node(AddedNode),
+    [ct:pal("removing breakpoints on ~p...~p", [Pid, gen_component:bp_del_async(Pid, mr_bp)]) || Pid <- Pids],
+    util:wait_for_process_to_die(MrPid),
+    ok.
