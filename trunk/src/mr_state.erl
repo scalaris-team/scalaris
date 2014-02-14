@@ -252,7 +252,10 @@ add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
                                    _ = ets:insert(ETS, List),
                                   {Round, MoR, Fun, ETS}
                           end, Phases),
-    State#state{phases = ETSPhases}.
+    TmpETS = ets:new(
+               list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
+               , [public]),
+    State#state{phases = ETSPhases, phase_res = TmpETS}.
 
 
 -spec get_slide_delta(state(), intervals:interval()) ->
