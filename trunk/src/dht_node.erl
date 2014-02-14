@@ -321,7 +321,7 @@ on({send_error, _FailedTarget, FailedMsg, _Reason} = Msg, State)
   when bulkowner =:= element(1, FailedMsg) ->
     bulkowner:on(Msg, State);
 
-on({bulk_distribute, _Id, _Range, InnerMsg, _Parents} = Msg, State) 
+on({bulk_distribute, _Id, _Range, InnerMsg, _Parents} = Msg, State)
   when mr =:= element(1, InnerMsg) ->
     mr:on(Msg, State);
 

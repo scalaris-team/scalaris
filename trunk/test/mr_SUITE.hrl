@@ -23,9 +23,9 @@
 -include("unittest.hrl").
 
 tests_avail() ->
-    [test_sane_result].
-    %% [test_sane_result,
-    %%  test_join,
+    %% [test_sane_result].
+    [test_sane_result,
+     test_join].
     %%  test_leave].
 
 init_per_suite(Config) ->
@@ -66,15 +66,9 @@ test_join(_Config) ->
     ct:pal("setting breakpoint before starting reduce phase"),
     NextPhase = fun(Msg, State) ->
             case Msg of
-                {mr, next_phase, JobId} ->
-                    case mr_state:get(
-                           dht_node_state:get_mr_state(State, JobId),
-                           current) of
-                        1 ->
-                            comm:send_local(self(), Msg),
-                            drop_single;
-                        _ -> false
-                    end;
+                {mr, next_phase, JobId, 1} ->
+                    comm:send_local(self(), Msg),
+                    drop_single;
                 _ ->
                     false
             end
