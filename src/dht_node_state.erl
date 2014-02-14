@@ -374,9 +374,10 @@ set_slide(State, succ, SlideSucc) -> State#state{slide_succ=SlideSucc}.
 -spec set_snapshot_state(State::state(),NewInfo::snapshot_state:snapshot_state()) -> state().
 set_snapshot_state(State,NewInfo) -> State#state{snapshot_state=NewInfo}.
 
--spec get_mr_state(State::state(), mr_state:jobid()) -> mr_state:state().
+-spec get_mr_state(State::state(), mr_state:jobid()) ->
+    {value, mr_state:state()} | error.
 get_mr_state(#state{mr_state = MRStates}, JobId) ->
-    orddict:fetch(JobId, MRStates).
+    orddict:find(JobId, MRStates).
 
 -spec set_mr_state(State::state(), nonempty_string(), mr_state:state()) -> state().
 set_mr_state(#state{mr_state = MRStates} = State, JobId, MRState) ->
@@ -711,16 +712,25 @@ mr_add_delta(State = #state{mr_state = MRStates,
              {MRDeltaStates, MasterDelta}) ->
     NewMRState = orddict:map(
      fun(K, MRState) ->
-             mr_state:add_slide_delta(MRState,
-                                      orddict:fetch(K, MRDeltaStates))
+             case orddict:find(K, MRDeltaStates) of
+                 error ->
+                     log:log(warn, "~p Slide with empty mr delta...should not
+                             happen~n~p  ~p", [self(), K, MRState]),
+                     MRState;
+                 {ok, Delta} ->
+                     mr_state:add_slide_delta(MRState, Delta)
+             end
      end,
      MRStates),
     NewMasterStates =
-    orddict:foldl(
+    orddict:fold(
      fun(K, NewState, Acc) ->
              case mr_master_state:get(outstanding, NewState) of
                  snapshot ->
-                     mr_master_state:dispatch_snapshot(K);
+                     ?TRACE_MR_SLIDE(
+                        "master state moved while snapshoting...dispatching again",
+                        []),
+                     mr_master:dispatch_snapshot(K);
                  false ->
                      %% nothing to do
                      ok
