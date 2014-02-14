@@ -22,7 +22,7 @@
 %%      scalaris.[local.]config.
 %%      when the maximum number of jobs is reached new jobs are queued and run
 %%      as soon as a running job finishes.
-%%         
+%%
 %% @end
 %% @version $Id$
 -module(wpool).
@@ -222,7 +222,7 @@ work(DHTNodeGroup, {_Round, reduce, {jsanon, FunBin}, Data}) ->
 apply_erl(Fun, Data) ->
     Fun(Data).
 
--spec aggregate_reduce([{string(), term()}, ...]) 
+-spec aggregate_reduce([{string(), term()}, ...])
           -> [{string(), [term()]}, ...].
 aggregate_reduce([{_K, _V} | _T] = Data) ->
     Fun = fun({K, V}, AccIn) ->
@@ -245,7 +245,7 @@ apply_js(FunBin, Data, VM) ->
 
 %% @doc create a self calling JS function.
 %%      takes a anonymous JS function (as a binary string) and a list of
-%%      arguments and returns a self calling JS (`function(arg) {...}(args)') 
+%%      arguments and returns a self calling JS (`function(arg) {...}(args)')
 %%      function as a binary string.
 -spec define_auto_js(Fun::binary(), [term()]) -> binary().
 define_auto_js(FunBin, Args) ->

@@ -218,7 +218,7 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                     %% only deliver data in MyRange as data outside of it was
                     %% forwarded
                     comm:send_local(pid_groups:get_my(Proc),
-                                    {bulk_distribute, Id, MyRange, 
+                                    {bulk_distribute, Id, MyRange,
                                      setelement(N, Msg1, RangeData), Parents});
                 {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
                     comm:send_local(pid_groups:get_my(Proc),
