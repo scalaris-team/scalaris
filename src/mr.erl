@@ -66,13 +66,18 @@ on({mr, init, Client, JobId, Job}, State) ->
     %% which in turn starts the worker supervisor on all nodes.
     ?TRACE("mr: ~p~n received init message from ~p~n starting job ~p~n",
            [comm:this(), Client, Job]),
-    JobDesc = {"mr_master_" ++ JobId,
-               {mr_master, start_link,
-                [pid_groups:my_groupname(), {JobId, Client, Job}]},
-               temporary, brutal_kill, worker, []},
-    SupDHT = pid_groups:get_my(sup_dht_node),
-    %% TODO handle failed starts
-    _Res = supervisor:start_child(SupDHT, JobDesc),
+    case validate_job(Job) of
+        ok ->
+            JobDesc = {"mr_master_" ++ JobId,
+                       {mr_master, start_link,
+                        [pid_groups:my_groupname(), {JobId, Client, Job}]},
+                       temporary, brutal_kill, worker, []},
+            SupDHT = pid_groups:get_my(sup_dht_node),
+            %% TODO handle failed starts
+            _Res = supervisor:start_child(SupDHT, JobDesc);
+        {error, Reason} ->
+            comm:send(Client, {mr_results, {error, Reason}, intervals:all(), JobId})
+    end,
     State;
 
 on({bulk_distribute, _Id, _Interval,
@@ -188,4 +193,45 @@ work_on_phase(JobId, MRState, MyRange) ->
                                                    MyRange}),
             comm:send_local(pid_groups:get_my(wpool),
                             {do_work, Reply, {Round, MoR, FunTerm, ETS, TmpETS}})
+    end.
+
+-spec validate_job(job_description) -> ok | {error, term()}.
+validate_job({Phases, _Options}) ->
+    validate_phases(Phases).
+
+-spec validate_phases([phase_desc()]) -> ok | {error, term()}.
+validate_phases([]) -> ok;
+validate_phases([H | T]) ->
+    case validate_phase(H) of
+        ok ->
+            validate_phases(T);
+        Error ->
+            Error
+    end.
+
+-spec validate_phase(phase_desc()) -> ok | {error, term()}.
+validate_phase(Phase) ->
+    El1 = element(1, Phase), {FunTag, Fun} = element(2, Phase),
+    case El1 == map orelse El1 == reduce of
+        true ->
+            case FunTag of
+                erlanon ->
+                    case is_function(Fun) of
+                        true ->
+                            ok;
+                        false ->
+                            {error ,{badfun, "Fun should be a fun"}}
+                    end;
+                jsanon ->
+                    case is_binary(Fun) of
+                        true ->
+                            ok;
+                        false ->
+                            {error ,{badfun, "Fun should be a binary"}}
+                    end;
+                Tag ->
+                    {error, {bad_tag, {Tag, Fun}}}
+            end;
+        false ->
+            {error, {bad_phase, "phase must be either map or reduce"}}
     end.
