@@ -41,6 +41,7 @@
         , clean_up/1
         , split_slide_state/2
         , add_slide_state/3
+        , init_slide_phase/1
         , get_slide_delta/2
         , add_slide_delta/2]).
 
@@ -280,12 +281,23 @@ split_slide_state(#state{phases = Phases} = State, _Interval) ->
       end,
       [],
       Phases),
-    ?TRACE_SLIDE("mr_ on ~p: sliding phases: ~p~n", [self(), SlidePhases]),
     State#state{phases = SlidePhases}.
 
 add_slide_state(_K, State1, _State2) ->
-    ?TRACE_SLIDE("mr_ on ~p: adding state: ~p~n", [self(), State1]),
     State1.
+
+init_slide_phase(State = #state{phases = Phases, jobid = JobId}) ->
+    PhasesETS = lists:foldl(
+                  fun({Nr, MoR, Fun, false, Open, Working}, AccIn) ->
+                          ETS = db_ets:new(
+                                  lists:flatten(io_lib:format("mr_~s_~p",
+                                                              [JobId, Nr]))
+                                  , [ordered_set]),
+                          [{Nr, MoR, Fun, ETS, Open, Working} | AccIn];
+                     (Phase, AccIn) ->
+                          [Phase | AccIn]
+                  end, [], Phases),
+    State#state{phases = PhasesETS}.
 
 -spec get_slide_delta(state(), intervals:intervals()) -> {state(), [phase()]}.
 get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
@@ -328,17 +340,6 @@ add_slide_delta(State = #state{jobid = JobId,
     trigger_work(MergedPhases, JobId),
     State#state{phases = MergedPhases}.
 
-merge_phase_delta({Round, MoR, Fun, false, Open, Working},
-                  {Round, MoR, Fun, Delta, DOpen, _DWorking},
-                  JobId) ->
-    ETS = db_ets:new(
-            lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round]))
-            , [ordered_set]),
-    %% side effect
-    %% also should be db_ets, but ets can add lists
-    ets:insert(ETS, Delta),
-    {Round, MoR, Fun, ETS, intervals:union(Open, DOpen),
-     Working};
 merge_phase_delta({Round, MoR, Fun, ETS, Open, Working},
                   {Round, MoR, Fun, Delta, DOpen, _DWorking},
                   _JobId) ->

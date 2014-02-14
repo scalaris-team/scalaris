@@ -666,8 +666,16 @@ merge_mr_states(State = #state{mr_state = MRStates1}, MRStates2) ->
     NewMRStates = orddict:merge(fun mr_state:add_slide_state/3,
                               MRStates1,
                               MRStates2),
-    %% ?TRACE_MR_SLIDE("merged slide states are ~p~n", [NewMRStates]),
-    State#state{mr_state = NewMRStates}.
+    %% make sure the phases ets tables are initialized since it can happen, that
+    %% a mr_state is slided before the jobs init message arrives. this would
+    %% cause a db_ets:put(false, SomeData)
+    NewMRStatesETS = orddict:map(fun(_JobId, MRState) ->
+                                         mr_state:init_slide_phase(MRState)
+                                 end,
+                                 NewMRStates
+                                ),
+    ?TRACE_MR_SLIDE("~p merged slide states are ~p~n", [self(), NewMRStatesETS]),
+    State#state{mr_state = NewMRStatesETS}.
 
 -spec mr_get_delta_states(state(), intervals:interval()) -> {state(),
                                                              orddict:orddict()}.
