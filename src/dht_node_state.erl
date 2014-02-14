@@ -77,7 +77,8 @@
                        MovingMRState::orddict:orddict()}.
 -type slide_delta() :: {{ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()]},
                         [{db_selector(), {Changed::db_prbr:db_as_list(),
-                                          Deleted::[?RT:key()]}}]}.
+                                          Deleted::[?RT:key()]}}],
+                        MRDelta::orddict:orddict()}.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
@@ -482,22 +483,14 @@ slide_get_data_start_record(State, MovingInterval) ->
          ),
 
     %% map reduce state
-    MovingMRState =
-        orddict:fold(
-          fun(K, MRState, MovingAcc) ->
-                  Moving = mr_state:split_slide_state(MRState, MovingInterval),
-                   orddict:store(K, Moving, MovingAcc)
-
-          end,
-          orddict:new(),
-          get(T1State, mr_state)),
+    {T2State, MovingMRState} = get_mr_slide_states(T1State, MovingInterval),
 
     %% snapshot state and db
-    OldDB = get(T1State, db),
+    OldDB = get(T2State, db),
     MovingSnapData =
         case db_dht:snapshot_is_running(OldDB) of
             true ->
-                {get(T1State, snapshot_state),
+                {get(T2State, snapshot_state),
                  db_dht:get_snapshot_data(OldDB, MovingInterval)};
             false ->
                 {false}
@@ -510,7 +503,7 @@ slide_get_data_start_record(State, MovingInterval) ->
            interval ~p~n~p~n~p",
            [?MODULE, comm:this(), MovingData, MovingSnapData,
             MovingInterval, OldDB, NewDB]),
-    NewState = set_db(T1State, NewDB),
+    NewState = set_db(T2State, NewDB),
     {NewState, {{MovingData, MovingSnapData}, MoveRBRData, MovingMRState}}.
 
 
@@ -531,11 +524,7 @@ slide_add_data(State, {{Data, SnapData}, PRBRData, MRStates}) ->
                 set_snapshot_state(T1State, SnapState)
         end,
 
-    %% mr state...change data lists to ets tables
-    AddedMRStates = orddict:map(fun(_K, MRState) ->
-                                   mr_state:add_slide_data(MRState)
-                           end, MRStates),
-    T3State = T2State#state{mr_state = AddedMRStates},
+    T3State = merge_mr_states(T2State, MRStates),
 
     %% all prbr dbs
     lists:foldl(
@@ -570,19 +559,23 @@ slide_take_delta_stop_record(State, MovingInterval) ->
     OldDB = get(State, db),
     ChangedData = db_dht:get_changes(OldDB, MovingInterval),
 
-    NewState = slide_stop_record(State, MovingInterval, true),
+    {T1State, MRDelta} = mr_get_delta_states(State, MovingInterval),
+
+    NewState = slide_stop_record(T1State, MovingInterval, true),
     ?TRACE("~p:slide_take_delta_stop_record: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), ChangedData, get(NewState, db)]),
-    {NewState, {ChangedData, DeltaRBR}}.
+    {NewState, {ChangedData, DeltaRBR, MRDelta}}.
 
 %% @doc Adds delta infos from slide_take_delta_stop_record/2 to the local DB.
 -spec slide_add_delta(state(), slide_delta()) -> state().
-slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta}) ->
+slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta, MRDelta}) ->
     NewDB1 = db_dht:add_data(get(State, db), ChangedData),
     NewDB2 = db_dht:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
     ?TRACE("~p:slide_add_delta: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), {ChangedData, DeletedKeys}, NewDB2]),
     T1State = set_db(State, NewDB2),
+
+    T2State = mr_add_delta(T1State, MRDelta),
 
     %% all prbr dbs
     lists:foldl(
@@ -594,7 +587,7 @@ slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta}) ->
                         intervals:from_elements(DelKeys)),
               set_prbr_state(AccState, X, NewDB)
       end,
-      T1State,
+      T2State,
       PRBRDelta).
 
 %% @doc Stops recording changes in the given interval.
@@ -633,3 +626,33 @@ slide_stop_record(State, MovingInterval, Remove) ->
         -> {?RT:key(), TakenLoad::pos_integer()}.
 get_split_key(State, Begin, End, TargetLoad, Direction) ->
     db_dht:get_split_key(get(State, db), Begin, End, TargetLoad, Direction).
+
+-spec get_mr_slide_states(state(), intervals:interval()) -> orddict:orddict().
+get_mr_slide_states(State, MovInterval) ->
+    {State, orddict:new()}.
+    %% SlideStates = orddict:fold(
+    %%   fun(K, MRState, MovingAcc) ->
+    %%           Moving = mr_state:split_slide_state(MRState, MovInterval),
+    %%           orddict:store(K, Moving, MovingAcc)
+
+    %%   end,
+    %%   orddict:new(),
+    %%   get(State, mr_state)),
+    %% {State, SlideStates}.
+
+-spec merge_mr_states(state(), orddict:orddict()) -> state().
+merge_mr_states(State, MRStates) ->
+    State.
+    %% mr state...change data lists to ets tables
+    %% AddedMRStates = orddict:map(fun(_K, MRState) ->
+    %%                                mr_state:add_slide_data(MRState)
+    %%                             end, MRStates).
+    %%and merge states!.
+
+-spec mr_get_delta_states(state(), intervals:interval()) -> state().
+mr_get_delta_states(State, Interval) ->
+    {State, orddict:new()}.
+
+-spec mr_add_delta(state(), orddict:orddict()) -> state().
+mr_add_delta(State, MRStates) ->
+    State.

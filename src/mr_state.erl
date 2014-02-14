@@ -28,12 +28,11 @@
 
 -export([new/6
         , get/2
-        , get_phase/1
+        , get_phase/2
         , is_acked_complete/1
         , set_acked/2
         , reset_acked/1
-        , next_phase/2
-        , is_last_phase/1
+        , is_last_phase/2
         , add_data_to_phase/4
         , accumulate_data/2
         , clean_up/1
@@ -66,7 +65,6 @@
                 , master    = null :: comm:mypid() | null
                 , phases    = ?required(state, phases) :: [phase(),...]
                 , options   = ?required(state, options) :: [mr:option()]
-                , current   = 0 :: non_neg_integer()
                 , acked     = intervals:empty() :: intervals:interval()
                 , phase_res = ?required(state, phase_res) :: data()
                }).
@@ -77,14 +75,12 @@
          (state(), jobid)           -> nonempty_string();
          (state(), phases)          -> [phase()];
          (state(), options)         -> [mr:option()];
-         (state(), phase_res)         -> db_ets:db();
-         (state(), current)         -> non_neg_integer().
+         (state(), phase_res)         -> db_ets:db().
 get(#state{client     = Client
            , master   = Master
            , jobid    = JobId
            , phases   = Phases
            , options  = Options
-           , current  = Cur
            , phase_res  = PhaseRes
           }, Key) ->
     case Key of
@@ -92,7 +88,6 @@ get(#state{client     = Client
         master   -> Master;
         phases   -> Phases;
         options  -> Options;
-        current  -> Cur;
         phase_res  -> PhaseRes;
         jobid    -> JobId
     end.
@@ -134,17 +129,13 @@ new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
           },
     NewState.
 
--spec next_phase(state(), pos_integer()) -> state().
-next_phase(State, Round) ->
-    State#state{current = Round}.
+-spec is_last_phase(state(), pos_integer()) -> boolean().
+is_last_phase(#state{phases = Phases}, Round) ->
+    Round =:= length(Phases).
 
--spec is_last_phase(state()) -> boolean().
-is_last_phase(#state{current = Cur, phases = Phases}) ->
-    Cur =:= length(Phases).
-
--spec get_phase(state()) -> phase() | false.
-get_phase(#state{phases = Phases, current = Cur}) ->
-    lists:keyfind(Cur, 1, Phases).
+-spec get_phase(state(), pos_integer()) -> phase() | false.
+get_phase(#state{phases = Phases}, Round) ->
+    lists:keyfind(Round, 1, Phases).
 
 -spec is_acked_complete(state()) -> boolean().
 is_acked_complete(#state{acked = Interval}) ->

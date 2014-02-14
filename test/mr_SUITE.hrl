@@ -66,7 +66,7 @@ test_join(_Config) ->
     ct:pal("setting breakpoint before starting reduce phase"),
     NextPhase = fun(Msg, State) ->
             case Msg of
-                {mr, next_phase, JobId, 1} ->
+                {mr, next_phase, JobId, 1, _Interval} ->
                     comm:send_local(self(), Msg),
                     drop_single;
                 _ ->
