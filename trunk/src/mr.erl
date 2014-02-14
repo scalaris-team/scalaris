@@ -22,8 +22,8 @@
 -author('fajerski@informatik.hu-berlin.de').
 -vsn('$Id$ ').
 
--define(TRACE(X, Y), io:format(X, Y)).
-%% -define(TRACE(X, Y), ok).
+%% -define(TRACE(X, Y), io:format(X, Y)).
+-define(TRACE(X, Y), ok).
 
 -export([
         on/2
@@ -83,13 +83,11 @@ on({bulk_distribute, _Id, _Interval,
     %% this message starts the worker supervisor and adds a job specific state
     %% to the dht node
     JobState = mr_state:new(JobId, Client, Master, InitalData, Job),
-    %% send acc to master
-    %% comm:send(Master, {mr, ack_init, Range}),
-    %% start worker thread for first phase
     Range = lists:foldl(fun({I, _SlideOp}, AccIn) -> intervals:union(I, AccIn) end,
                         dht_node_state:get(State, my_range),
                         dht_node_state:get(State, db_range)),
-    work_on_phase(JobId, JobState, Range),
+    %% send acc to master
+    comm:send(Master, {mr, phase_completed, Range}),
     dht_node_state:set_mr_state(State, JobId, JobState);
 
 on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->

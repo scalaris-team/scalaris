@@ -59,25 +59,18 @@
                 , master    = null :: comm:mypid() | null
                 , phases    = ?required(state, phases) :: [phase(),...]
                 , options   = ?required(state, options) :: [mr:option()]
-                , current   = 1 :: pos_integer()
+                , current   = 0 :: non_neg_integer()
                 , acked     = {null, intervals:empty()} :: {null | uid:global_uid(),
                                                             intervals:interval()}
                }).
 
 -type(state() :: #state{}).
 
--type(pub_props() :: client  |
-                     master  |
-                     jobid   |
-                     phases  |
-                     options |
-                     current).
-
 -spec get(state(), client | master) -> comm:mypid() | null;
          (state(), jobid)           -> nonempty_string();
          (state(), phases)          -> [phase()];
          (state(), options)         -> [mr:option()];
-         (state(), current)         -> pos_integer().
+         (state(), current)         -> non_neg_integer().
 get(#state{client     = Client
            , master   = Master
            , jobid    = JobId
