@@ -40,7 +40,8 @@ all()   -> [
             tester_type_check_tx,
             tester_type_check_rdht_tx,
             tester_type_check_util,
-            tester_type_check_gossip2
+            tester_type_check_gossip2,
+            tester_type_check_mr
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
 
@@ -718,4 +719,15 @@ tester_type_check_util(_Config) ->
 %%    ct:pal("testing with export all"),
 %%    tester:test(util, escape_quotes_, 2, 25),
 %%    tester_helper:load_without_export_all(util),
+    true.
+
+tester_type_check_mr(_Config) ->
+    Count = 500,
+    config:write(no_print_ring_data, true),
+    Modules =
+        [ {mr_state, [], []}
+          %% , {mr_master, [{on, 2}, {init, 1}, {start_link, 2}], []}
+        ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
     true.

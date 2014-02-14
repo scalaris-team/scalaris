@@ -29,6 +29,7 @@
         , get_phase/1
         , is_acked_complete/1
         , set_acked/2
+        , reset_acked/2
         , next_phase/1
         , is_last_phase/1
         , add_data_to_next_phase/2
@@ -56,7 +57,7 @@
 -record(state, {jobid       = ?required(state, jobid) :: jobid()
                 , client    = null :: comm:mypid() | null
                 , master    = null :: comm:mypid() | null
-                , phases    = ?required(state, phases) :: [phase()]
+                , phases    = ?required(state, phases) :: [phase(),...]
                 , options   = ?required(state, options) :: [mr:option()]
                 , current   = 1 :: pos_integer()
                 , acked     = {null, intervals:empty()} :: {null | uid:global_uid(),
@@ -72,7 +73,11 @@
                      options |
                      current).
 
--spec get(state(), pub_props())          -> comm:mypid().
+-spec get(state(), client | master) -> comm:mypid() | null;
+         (state(), jobid)           -> nonempty_string();
+         (state(), phases)          -> [phase()];
+         (state(), options)         -> [mr:option()];
+         (state(), current)         -> pos_integer().
 get(#state{client     = Client
            , master   = Master
            , jobid    = JobId
@@ -121,7 +126,7 @@ next_phase(State = #state{current = Cur}) ->
 is_last_phase(#state{current = Cur, phases = Phases}) ->
     Cur =:= length(Phases).
 
--spec get_phase(state()) -> phase().
+-spec get_phase(state()) -> phase() | false.
 get_phase(#state{phases = Phases, current = Cur}) ->
     lists:keyfind(Cur, 1, Phases).
 
@@ -129,18 +134,28 @@ get_phase(#state{phases = Phases, current = Cur}) ->
 is_acked_complete(#state{acked = {_Ref, Interval}}) ->
     intervals:is_all(Interval).
 
--spec set_acked(state(), {uid:global_uid(), intervals:interval()}) -> state().
-%% TODO find a robust way to check for the same ref but only when not resetting
-set_acked(State = #state{acked = {_OldRef, _Interval}}, {NewRef, []}) ->
-    State#state{acked = {NewRef, intervals:empty()}};
-set_acked(State = #state{acked = {Ref, Interval}}, {Ref, NewInterval}) ->
-    State#state{acked = {Ref, intervals:union(Interval, NewInterval)}}.
+-spec reset_acked(state(), uid:global_uid()) -> state().
+reset_acked(State, NewRef) ->
+    State#state{acked = {NewRef, intervals:empty()}}.
 
--spec add_data_to_next_phase(state(), [any()]) -> state().
+-spec set_acked(state(), {uid:global_uid(), intervals:interval()}) -> state().
+set_acked(State = #state{acked = {Ref, Interval}}, {Ref, NewInterval}) ->
+    State#state{acked = {Ref, intervals:union(Interval, NewInterval)}};
+set_acked(State, _OldAck) ->
+    State.
+
+-spec add_data_to_next_phase(state(), data()) -> state().
 add_data_to_next_phase(State = #state{phases = Phases, current = Cur}, NewData) ->
-    {Round, MoR, Fun, Data} = lists:keyfind(Cur + 1, 1, Phases),
-    State#state{phases = lists:keyreplace(Cur + 1, 1, Phases, {Round, MoR, Fun,
-                                                            NewData ++ Data})}.
+     case lists:keyfind(Cur + 1, 1, Phases) of
+        {Round, MoR, Fun, Data} ->
+            State#state{phases = lists:keyreplace(Cur + 1, 1,
+                                                  Phases,
+                                                  {Round, MoR, Fun,
+                                                   NewData ++ Data})};
+         false ->
+             %% someone tries to add data to nonexisting phase...do nothing
+             State
+     end.
 
 -spec merge_with_default_options(UserOptions::[mr:option()],
                                  DefaultOptions::[mr:option()]) ->
@@ -173,15 +188,15 @@ split_slide_state(#state{phases = Phases} = State, Interval) ->
 get_slide_delta(#state{phases = Phases, current = Cur} = State, Interval) ->
     case lists:keyfind(Cur + 1, 1, Phases) of
         false ->
-            {State, []};
+            {State, {Cur + 1, []}};
         {Nr, MoR, Fun, Data} ->
             {Staying, Moving} = lists:partition(
                                   fun({K, _V}) ->
                                           intervals:in(K, Interval)
                                   end, Data),
-        {State#state{phases = lists:keyreplace(Nr, 1, Phases,
+            {State#state{phases = lists:keyreplace(Nr, 1, Phases,
                                                {Nr, MoR, Fun, Staying})},
-         {Nr, Moving}}
+             {Nr, Moving}}
     end.
 
 -spec add_slide_delta(state(), Data::{Round::pos_integer(), [{string(),

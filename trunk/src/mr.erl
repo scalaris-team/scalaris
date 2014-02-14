@@ -37,9 +37,9 @@
 -type(phase_desc() :: {map | reduce,
                      {erlanon | jsanon, binary()}}).
 
--type(option() :: {atom(), term()}).
+-type(option() :: {tag, atom()}).
 
--type(job_description() :: {[phase_desc()], [option()]}).
+-type(job_description() :: {[phase_desc(),...], [option()]}).
 
 -type(bulk_message() :: {mr, job, mr_state:jobid(), comm:mypid(), comm:mypid(),
                          job_description(), mr_state:data()} |
@@ -95,8 +95,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
     ?TRACE("mr_~s on ~p: received phase results: ~p...~ndistributing...~n",
            [JobId, self(), hd(Data)]),
     Ref = uid:get_global_uid(),
-    NewMRState = mr_state:set_acked(dht_node_state:get_mr_state(State, JobId),
-                                    {Ref, intervals:empty()}),
+    NewMRState = mr_state:reset_acked(dht_node_state:get_mr_state(State, JobId), Ref),
     case mr_state:is_last_phase(NewMRState) of
         false ->
             Reply = comm:reply_as(comm:this(), 4, {mr, next_phase_data_ack,

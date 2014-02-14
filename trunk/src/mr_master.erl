@@ -93,12 +93,15 @@ on(Msg, State) ->
            [comm:this(), Msg]),
     State.
 
--spec filter_data(mr_state:data() | [{atom(), string(), term()}], [mr:option()]) ->
+-spec filter_data([{?RT:key(),
+                   {{string(), term()} | {atom(), string(), term()}},
+                   db_dht:version()}],
+                  [mr:option()]) ->
     mr_state:data().
 filter_data(Data, Options) ->
     case lists:keyfind(tag, 1, Options) of
         {tag, FilterTag} ->
-            ?TRACE("Filtering! tag is ~p~n", [FilterTag]),
+            ?TRACE("Filtering! tag is ~p~ndata: ~p~n", [FilterTag, Data]),
             [{K, V} || {_HashedKey, {Tag, K, V}, _Version} <- Data, Tag =:= FilterTag];
         false ->
             [{K, V} || {_HashedKey, {K, V}, _Version} <- Data]
