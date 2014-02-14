@@ -22,6 +22,12 @@
 -include("scalaris.hrl").
 -include("unittest.hrl").
 
+-define(DATA, [{"1", "MapReduce allows for distributed processing of the map and reduction operations"}
+                , {"3", "Provided each mapping operation can run independently all maps may be performed in parallel"}
+                , {"5", "This example data set contains one single word only once"}
+                , {"7", "Now I am too lazy to construct another sentence that actually makes sense"}
+           ]).
+
 tests_avail() ->
     %% [test_sane_result].
     [test_sane_result,
@@ -64,7 +70,7 @@ test_join(_Config) ->
     ?proto_sched(start),
     Pids = pid_groups:find_all(dht_node),
     ct:pal("setting breakpoint before starting reduce phase"),
-    NextPhase = fun(Msg, State) ->
+    NextPhase = fun(Msg, _State) ->
             case Msg of
                 {mr, next_phase, JobId, 1, _Interval} ->
                     comm:send_local(self(), Msg),
@@ -100,7 +106,7 @@ test_leave(_Config) ->
     unittest_helper:check_ring_size_fully_joined(2),
     Pids = pid_groups:find_all(dht_node),
     ct:pal("setting breakpoint before starting reduce phase on ~p", [Pids]),
-    NextPhase = fun(Msg, State) ->
+    NextPhase = fun(Msg, _State) ->
             case Msg of
                 {mr, next_phase, JobId, 1, _Interval} ->
                     comm:send_local(self(), Msg),
@@ -139,16 +145,24 @@ get_wc_job_erl() ->
      []}.
 
 add_data() ->
-    Data = [{"1", "MapReduce allows for distributed processing of the map and reduction operations."}
-            , {"3", "Provided each mapping operation can run independently, all maps may be performed in parallel."}
-            , {"5", "This example data set contains one single word only once."}
-            , {"7", "Now I am too lazy to construct another sentence that actually makes sense."}
-           ],
-    [api_tx:write(Key, {Key, Value}) || {Key, Value} <- Data],
+    [api_tx:write(Key, {Key, Value}) || {Key, Value} <- ?DATA],
     ok.
 
 check_results(Results) ->
-    ?equals(length(Results),
-            lists:foldl(fun({_Word, Count}, AccIn) ->
-                                AccIn + Count
-                        end, 0, Results)).
+    Mapped = lists:foldl(fun({_K, V}, Acc) ->
+                                   T = string:tokens(string:to_lower(V), " "),
+                                   [{W, 1} || W <- T] ++ Acc
+                           end, [], ?DATA),
+    Expected = lists:foldl(fun({K, V}, Acc) ->
+                                   case lists:keyfind(K, 1, Acc) of
+                                       false ->
+                                           [{K, V} | Acc];
+                                       {T, C} ->
+                                           lists:keyreplace(T, 1, Acc, {T, C + V})
+                                   end
+                           end, [], Mapped),
+    ?equals(length(Expected),
+            length(Results)),
+    Zipped = lists:zip(lists:sort(Expected),
+                       lists:sort(Results)),
+    [?equals(X, Y) || {X, Y} <- Zipped].

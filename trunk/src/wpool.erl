@@ -29,8 +29,8 @@
 -author('fajerski@zib.de').
 -vsn('$Id$ ').
 
--define(TRACE(X, Y), ok).
-%% -define(TRACE(X, Y), io:format(X, Y)).
+%% -define(TRACE(X, Y), ok).
+-define(TRACE(X, Y), io:format(X, Y)).
 
 -behaviour(gen_component).
 
@@ -121,7 +121,7 @@ on({'DOWN', exc_subs, wpool_worker, Pid, Reason}, {Avail, Working, Waiting}) ->
 %% TODO hsould be better if worker sends directly to source and just informs
 %% wpool that it is available for new work
 on({data, Pid, Data}, {Avail, Working, Waiting}) ->
-    ?TRACE("wpool: received data from ~p:~n~p...~n",
+    ?TRACE("wpool: received data from ~p:~n~p~n",
             [Pid, Data]),
     %% send results to source
     {value, {_Pid, Source}, NewWorking} = lists:keytake(Pid, 1, Working),
