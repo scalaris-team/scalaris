@@ -79,20 +79,28 @@ on({bulk_distribute, _Id, Interval,
     {mr, job, JobId, MasterId, Client, Job, InitalData}, _Parents}, State) ->
     %% this message starts the worker supervisor and adds a job specific state
     %% to the dht node
-    ?TRACE("mr_~s on ~p: received job with initial data: ~p...~n",
-           [JobId, self(), InitalData]),
-    JobState = mr_state:new(JobId, Client, MasterId, InitalData, Job, Interval),
+    MRState = case dht_node_state:get_mr_state(State, JobId) of
+        error ->
+            ?TRACE("~p mr_~s: received job init for ~p~n~p~n",
+                   [self(), JobId, Interval, InitalData]),
+            mr_state:new(JobId, Client, MasterId, InitalData, Job,
+                       Interval);
+        {ok, ExState} ->
+            ?TRACE("~p mr_~s: second init for ~p~n~p~n",
+                   [self(), JobId, Interval, InitalData]),
+            mr_state:add_data_to_phase(ExState, InitalData, Interval, 1)
+    end,
     %% send acc to master
     api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, phase_completed,
                                              0, Interval}),
-    dht_node_state:set_mr_state(State, JobId, JobState);
+    dht_node_state:set_mr_state(State, JobId, MRState);
 
 on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
     %% processing of phase results from worker.
     %% distribute data and start sync phase
-    ?TRACE("mr_~s on ~p: received phase results (round ~p) for interval ~p:~n~p...~ndistributing...~n",
-           [JobId, self(), Round, Range, Data]),
-    MRState = dht_node_state:get_mr_state(State, JobId),
+    %% ?TRACE("~p mr_~s: received phase results (round ~p) for interval ~p:~n~p...~ndistributing...~n",
+    %%        [self(), JobId, Round, Range, Data]),
+    {ok, MRState} = dht_node_state:get_mr_state(State, JobId),
     NewMRState = mr_state:interval_processed(MRState, Range, Round),
     case mr_state:is_last_phase(MRState, Round) of
         false ->
@@ -117,7 +125,7 @@ on({mr, phase_result, JobId, {worker_died, Reason}, Range, Round}, State) ->
     %% processing of a failed worker result.
     %% for now abort the job
     ?TRACE("runtime error in phase ~p...terminating job~n", [Round]),
-    MRState = dht_node_state:get_mr_state(State, JobId),
+    {ok, MRState} = dht_node_state:get_mr_state(State, JobId),
     MasterId = mr_state:get(MRState, master_id),
     api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, job_error, Range}),
     Client = mr_state:get(MRState, client),
@@ -128,11 +136,10 @@ on({bulk_distribute, _Id, Interval,
    {mr, next_phase_data, JobId, AckRange, Data, Round}, _Parents}, State) ->
     %% processing of data for next phase.
     %% save data and send ack
-    ?TRACE("mr_~s on ~p: received next phase data (round ~p) interval ~p: ~p~n",
-           [JobId, self(), Round, Interval, Data]),
-    NewMRState = mr_state:add_data_to_phase(dht_node_state:get_mr_state(State,
-                                                                            JobId),
-                                                 Data, Interval, Round + 1),
+    ?TRACE("~p mr_~s: received next phase data (round ~p) interval ~p: ~p~n",
+           [self(), JobId, Round, Interval, Data]),
+    {ok, MRState} = dht_node_state:get_mr_state(State, JobId),
+    NewMRState = mr_state:add_data_to_phase(MRState, Data, Interval, Round + 1),
     %% send ack with delivery interval
     bulkowner:issue_bulk_owner(uid:get_global_uid(), AckRange, {mr,
                                                                 next_phase_data_ack,
@@ -144,7 +151,8 @@ on({mr, next_phase_data_ack, AckInterval, JobId, Round, DeliveryInterval}, State
     %% ack from other mr nodes.
     %% check if the whole interval waas acked. If so inform master, wait
     %% otherwise.
-    NewMRState = mr_state:set_acked(dht_node_state:get_mr_state(State, JobId),
+    {ok, MRState} = dht_node_state:get_mr_state(State, JobId),
+    NewMRState = mr_state:set_acked(MRState,
                                     AckInterval),
     NewMRState2 = case mr_state:is_acked_complete(NewMRState) of
         true ->
@@ -169,7 +177,7 @@ on({mr, next_phase, JobId, Round, _DeliveryInterval}, State) ->
 
 on({mr, terminate_job, JobId, _DeliveryInterval}, State) ->
     %% master wants to terminate job.
-    MRState = dht_node_state:get_mr_state(State, JobId),
+    {ok, MRState} = dht_node_state:get_mr_state(State, JobId),
     _ = mr_state:clean_up(MRState),
     dht_node_state:delete_mr_state(State, JobId);
 
@@ -180,7 +188,7 @@ on(Msg, State) ->
 -spec work_on_phase(mr_state:jobid(), dht_node_state:state(), pos_integer()) ->
     dht_node_state:state().
 work_on_phase(JobId, State, Round) ->
-    MRState = dht_node_state:get_mr_state(State, JobId),
+    {ok, MRState} = dht_node_state:get_mr_state(State, JobId),
     case mr_state:get_phase(MRState, Round) of
         {_Round, _MoR, _FunTerm, _ETS, [], _Working} ->
             %% nothing to do
