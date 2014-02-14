@@ -67,24 +67,14 @@ work(Source, {_Round, map, {erlanon, FunBin}, Data, ResTable}) ->
     Results =
     ets:foldl(fun(E, Acc) ->
                       Res = apply_erl(Fun, E),
-                      lists:foldl(fun({K, V}, ETSAcc) ->
-                                          case ets:lookup(ETSAcc, K) of
-                                              [] ->
-                                                  ets:insert(ETSAcc, {K, [V]});
-                                              [{K, ExV}] ->
-                                                  ets:insert(ETSAcc, {K, [V | ExV]})
-                                          end,
-                                          ETSAcc
-                                  end,
-                                  Acc,
-                                  Res),
-                      Acc
+                      mr_state:accumulate_data(Res, Acc)
               end,
               ResTable, Data),
     return(Source, Results);
 work(Source, {_Round, reduce, {erlanon, FunBin}, Data, Acc}) ->
     Fun = erlang:binary_to_term(FunBin, [safe]),
     Res = apply_erl(Fun, ets:tab2list(Data)),
+    %% TODO insert can handle lists
     Results = lists:foldl(fun({K, V}, ETSAcc) ->
                         ets:insert(ETSAcc, {K, V}),
                         ETSAcc
