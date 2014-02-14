@@ -75,7 +75,12 @@ start_job(Job) ->
 wait_for_results(Data, Interval, Id) ->
     {NewData, NewInterval} = receive
         ?SCALARIS_RECV({mr_results, PartData, PartInterval, Id},
-                       {[PartData | Data], intervals:union(PartInterval, Interval)})
+                       case PartData of
+                            {error, Reason} ->
+                                {[{error, Reason}], intervals:all()};
+                            PartData ->
+                               {[PartData | Data], intervals:union(PartInterval, Interval)}
+                        end)
     end,
     ?TRACE("mr_api: received data for job ~p: ~p~n", [Id, hd(NewData)]),
     case intervals:is_all(NewInterval) of
