@@ -49,6 +49,7 @@ init_job(State, JobId, Job, Client) ->
     dispatch_snapshot(JobId),
     dht_node_state:set_mr_master_state(State, JobId, MasterState).
 
+-spec dispatch_snapshot(mr_state:jobid()) -> ok.
 dispatch_snapshot(JobId) ->
     Reply = comm:reply_as(comm:this(), 4, {mr_master, JobId, snapshot, '_'}),
     comm:send_local(pid_groups:get_my(wpool),
