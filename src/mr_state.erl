@@ -109,14 +109,14 @@ new(JobId, Client, Master, InitalData, {Phases, Options}) ->
     TmpETS = ets:new(
                list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
                , [public]),
-    ExtraData = [{1, InitalETS} | 
+    ExtraData = [{1, InitalETS} |
                  [{I, ets:new(
                         list_to_atom(lists:flatten(io_lib:format("mr_~s_~p",
                                                                  [JobId, I])))
                         , [])}
                   || I <- lists:seq(2, length(Phases))]],
     PhasesWithData = lists:zipwith(
-            fun({MoR, Fun}, {Round, Data}) -> 
+            fun({MoR, Fun}, {Round, Data}) ->
                     {Round, MoR, Fun, Data}
             end, Phases, ExtraData),
     JobOptions = merge_with_default_options(Options, ?DEF_OPTIONS),
@@ -181,9 +181,9 @@ add_data_to_next_phase(State = #state{phases = Phases, current = Cur}, NewData) 
                                  DefaultOptions::[mr:option()]) ->
     JobOptions::[mr:option()].
 merge_with_default_options(UserOptions, DefaultOptions) ->
-    %% TODO merge by hand and skip everything that is not in DefaultOptions 
-    lists:keymerge(1, 
-                   lists:keysort(1, UserOptions), 
+    %% TODO merge by hand and skip everything that is not in DefaultOptions
+    lists:keymerge(1,
+                   lists:keysort(1, UserOptions),
                    lists:keysort(1, DefaultOptions)).
 
 %% TODO fix types data as ets or list
@@ -198,7 +198,7 @@ clean_up(#state{phases = Phases, phase_res = Tmp}) ->
 -spec split_slide_state(state(), intervals:interval()) -> {OldState::state(),
                                                            SlideState::state()}.
 split_slide_state(#state{phases = Phases} = State, Interval) ->
-    SildePhases = 
+    SildePhases =
     lists:foldl(
       fun({Nr, MoR, Fun, ETS}, Slide) ->
               New = ets:foldl(fun({K, _V} = Entry, SlideAcc) ->

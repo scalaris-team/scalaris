@@ -67,7 +67,7 @@
 -spec start_job(mr:job_description()) -> [any()].
 start_job(Job) ->
     Id = randoms:getRandomString(),
-    comm:send_local(pid_groups:find_a(dht_node), 
+    comm:send_local(pid_groups:find_a(dht_node),
                     {mr, init, comm:this(), Id, Job}),
     wait_for_results([], intervals:empty(), Id).
 
@@ -75,12 +75,12 @@ start_job(Job) ->
 wait_for_results(Data, Interval, Id) ->
     {NewData, NewInterval} = receive
         ?SCALARIS_RECV({mr_results, PartData, PartInterval, Id},
-                       {PartData ++ Data, intervals:union(PartInterval, Interval)})
+                       {[PartData | Data], intervals:union(PartInterval, Interval)})
     end,
     ?TRACE("mr_api: received data for job ~p: ~p~n", [Id, hd(NewData)]),
     case intervals:is_all(NewInterval) of
         true ->
-            lists:sort(NewData);
+            lists:append(NewData);
         _ ->
             wait_for_results(NewData, NewInterval, Id)
     end.

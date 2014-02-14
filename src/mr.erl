@@ -15,7 +15,7 @@
 %% @author Jan Fajerski <fajerski@informatik.hu-berlin.de>
 %% @doc Map Reduce functions
 %%      this is part of the dht node
-%%         
+%%
 %% @end
 %% @version $Id$
 -module(mr).
@@ -66,9 +66,9 @@ on({mr, init, Client, JobId, Job}, State) ->
     %% which in turn starts the worker supervisor on all nodes.
     ?TRACE("mr: ~p~n received init message from ~p~n starting job ~p~n",
            [comm:this(), Client, Job]),
-    JobDesc = {"mr_master_" ++ JobId, 
-               {mr_master, start_link, 
-                [pid_groups:my_groupname(), {JobId, Client, Job}]}, 
+    JobDesc = {"mr_master_" ++ JobId,
+               {mr_master, start_link,
+                [pid_groups:my_groupname(), {JobId, Client, Job}]},
                transient, brutal_kill, worker, []},
     SupDHT = pid_groups:get_my(sup_dht_node),
     %% TODO handle failed starts
@@ -105,7 +105,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
         _ ->
             ?TRACE("jobs last phase done...sending to client~n", []),
             Master = mr_state:get(NewMRState, master),
-            comm:send(Master, {mr, job_completed, Range}), 
+            comm:send(Master, {mr, job_completed, Range}),
             Client = mr_state:get(NewMRState, client),
             comm:send(Client, {mr_results, ets:tab2list(Data), Range, JobId})
     end,
@@ -114,7 +114,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
 on({bulk_distribute, _Id, Interval,
    {mr, next_phase_data, JobId, Source, Data}, _Parents}, State) ->
     NewMRState = mr_state:add_data_to_next_phase(dht_node_state:get_mr_state(State,
-                                                                            JobId), 
+                                                                            JobId),
                                                  Data),
     %% send ack with delivery interval
     comm:send(Source, Interval),
@@ -167,7 +167,7 @@ work_on_phase(JobId, MRState, MyRange) ->
                 _ ->
                     %% io:format("last phase and no data ~p~n", [Round]),
                     Master = mr_state:get(MRState, master),
-                    comm:send(Master, {mr, job_completed, MyRange}), 
+                    comm:send(Master, {mr, job_completed, MyRange}),
                     Client = mr_state:get(MRState, client),
                     comm:send(Client, {mr_results, [], MyRange, JobId})
             end;
@@ -175,6 +175,6 @@ work_on_phase(JobId, MRState, MyRange) ->
             ?TRACE("starting to work on phase ~p~n", [Round]),
             Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
                                                    MyRange}),
-            comm:send_local(pid_groups:get_my(wpool), 
+            comm:send_local(pid_groups:get_my(wpool),
                             {do_work, Reply, {Round, MoR, FunTerm, ETS, TmpETS}})
     end.
