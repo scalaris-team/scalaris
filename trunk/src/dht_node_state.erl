@@ -520,8 +520,8 @@ slide_get_data_start_record(State, MovingInterval) ->
 -spec slide_add_data(state(),slide_data()) -> state().
 slide_add_data(State, {{Data, SnapData}, PRBRData, MRStates}) ->
     T1DB = db_dht:add_data(get(State, db), Data),
-    ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~p~n~p",
-           [?MODULE, comm:this(), Data, SnapData, NewDB]),
+    ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~pPRBR: ~n~pMR: ~n~p",
+           [?MODULE, comm:this(), Data, SnapData, PRBRData, MRStates]),
     T2State =
         case SnapData of
             {false} ->
@@ -570,12 +570,11 @@ slide_take_delta_stop_record(State, MovingInterval) ->
 
     %% mr delta
     MRDelta = orddict:fold(
-                fun(K, MRState, {StateAcc, DeltaAcc}) ->
-                        {Staying, Delta} =
+                fun(K, MRState, DeltaAcc) ->
+                        Delta =
                         mr_state:get_slide_delta(MRState,
                                                  MovingInterval),
-                        {orddict:store(K, Staying, StateAcc),
-                         [{K, Delta} | DeltaAcc]}
+                         [{K, Delta} | DeltaAcc]
                 end,
                 [],
                 get(State, mr_state)),
