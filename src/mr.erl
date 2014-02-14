@@ -22,8 +22,8 @@
 -author('fajerski@informatik.hu-berlin.de').
 -vsn('$Id$ ').
 
-%% -define(TRACE(X, Y), io:format(X, Y)).
--define(TRACE(X, Y), ok).
+-define(TRACE(X, Y), io:format(X, Y)).
+%% -define(TRACE(X, Y), ok).
 
 -export([
         on/2
@@ -185,6 +185,8 @@ work_on_phase(JobId, MRState, MyRange) ->
     ets:delete_all_objects(TmpETS),
     case ets:info(ETS, size) of
         0 ->
+            ?TRACE("mr_~p on ~p: no data for this phase...phase complete ~p~n",
+                   [JobId, self(), Round]),
             case mr_state:is_last_phase(MRState) of
                 false ->
                     %% io:format("no data for phase...done...~p informs master~n", [self()]),
@@ -198,7 +200,8 @@ work_on_phase(JobId, MRState, MyRange) ->
                     comm:send(Client, {mr_results, [], MyRange, JobId})
             end;
         _Load ->
-            ?TRACE("starting to work on phase ~p~n", [Round]),
+            ?TRACE("mr_~p on ~p: starting to work on phase ~p~n", [JobId,
+                                                                   self(), Round]),
             Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
                                                    MyRange}),
             comm:send_local(pid_groups:get_my(wpool),

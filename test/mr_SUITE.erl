@@ -20,17 +20,15 @@
 -author('fajerski@zib.de').
 -vsn('$Id$').
 
+-compile([export_all]).
+
 %% no proto scheduler for this suite
 -define(proto_sched(_Action), ok).
 
 -include("mr_SUITE.hrl").
 
 all() ->
-    [
-     test_sane_result
-     , test_join
-     , test_leave
-    ].
+    tests_avail().
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
