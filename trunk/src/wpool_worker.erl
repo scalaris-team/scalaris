@@ -21,8 +21,8 @@
 -author('fajerski@zib.de').
 -vsn('$Id$ ').
 
-%% -define(TRACE(X, Y), ok).
--define(TRACE(X, Y), io:format(X, Y)).
+-define(TRACE(X, Y), ok).
+%% -define(TRACE(X, Y), io:format(X, Y)).
 
 -behaviour(gen_component).
 
@@ -52,7 +52,7 @@ on({work, Source, Workload}, State) ->
     work(Source, Workload),
     State;
 
-on(Msg, State) ->
+on(_Msg, State) ->
     ?TRACE("~200p~nwpool_worker: unknown message~n", [Msg]),
     State.
 
@@ -60,7 +60,7 @@ on(Msg, State) ->
 %% @doc do the actual work.
 %%      executes Job and returns results to the local wpool. wpool associates
 %%      the worker pid to the jobs client and knows where the results go.
--spec work(comm:mypid (), wpool:job()) -> ok.
+-spec work(comm:mypid(), wpool:job()) -> ok.
 work(Source, {_Round, map, {erlanon, Fun}, Data, Interval}) ->
     ?TRACE("worker: should apply map ~p to ~p in ~p~n", [Fun, Data, Interval]),
     Results =
@@ -195,7 +195,7 @@ decode(BinString) when is_binary(BinString) ->
 decode(X) -> X.
 
 %% send results back to wpool
--spec return(comm:mypid(), any()) -> ok.
+-spec return(comm:mypid(), [term()]) -> ok.
 return(Source, Data) ->
     comm:send_local(Source, {data, self(), Data}).
 

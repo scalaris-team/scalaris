@@ -29,8 +29,8 @@
 -author('fajerski@zib.de').
 -vsn('$Id$ ').
 
-%% -define(TRACE(X, Y), ok).
--define(TRACE(X, Y), io:format(X, Y)).
+-define(TRACE(X, Y), ok).
+%% -define(TRACE(X, Y), io:format(X, Y)).
 
 -behaviour(gen_component).
 
@@ -46,16 +46,16 @@
 -export_type([job/0]).
 -endif.
 
--type(ets() :: ets:tid() | atom()).
-
 -type(mr_job() :: {Round::pos_integer(),
                    map | reduce,
                    mr_state:fun_term(),
-                   Data::ets(), Interval::intervals:interval(), Results::ets()}).
+                   Data::[term()], Interval::intervals:interval()}).
 
--type(generic_job() :: {erlanon | jsanon, binary(), [tuple()]}).
+-type(snapshot_job() :: {snapshot}).
 
--type(job() :: mr_job() | generic_job()).
+%% -type(generic_job() :: {erlanon | jsanon, binary(), [tuple()]}).
+
+-type(job() :: mr_job() | snapshot_job()).
 
 -type(message() :: {do_work, Source::comm:mypid(), job()} |
                    %% TODO find better spec for Info

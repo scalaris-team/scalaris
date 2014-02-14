@@ -21,8 +21,8 @@
 
 -define(TRACE(X, Y), ok).
 %% -define(TRACE(X, Y), io:format(X, Y)).
-%% -define(TRACE_SLIDE(X, Y), ok).
--define(TRACE_SLIDE(X, Y), io:format(X, Y)).
+-define(TRACE_SLIDE(X, Y), ok).
+%% -define(TRACE_SLIDE(X, Y), io:format(X, Y)).
 
 -define(DEF_OPTIONS, []).
 
@@ -106,8 +106,8 @@ new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
                                                                  Options}}]),
     InitalETS = db_ets:new(
                     lists:append(["mr_", JobId, "_1"]), [ordered_set]),
-    db_ets:put(InitalETS, InitalData),
-    ExtraData = [{1, InitalETS, Interval, intervals:empty()} |
+    DB = db_ets:put(InitalETS, InitalData),
+    ExtraData = [{1, DB, Interval, intervals:empty()} |
                  [{I, db_ets:new(
                         lists:flatten(io_lib:format("mr_~s_~p", [JobId, I]))
                         , [ordered_set]), intervals:empty(), intervals:empty()}
@@ -142,7 +142,7 @@ is_acked_complete(#state{acked = Interval}) ->
 reset_acked(State) ->
     State#state{acked = intervals:empty()}.
 
--spec set_acked(state(), {uid:global_uid(), intervals:interval()}) -> state().
+-spec set_acked(state(), intervals:interval()) -> state().
 set_acked(State = #state{acked = Interval}, NewInterval) ->
     State#state{acked = intervals:union(Interval, NewInterval)}.
 
@@ -154,7 +154,7 @@ interval_processing(State = #state{phases = Phases}, Interval, Round) ->
                                  {Round, MoR, Fun, ETS,
                                   intervals:minus(Open, Interval),
                                   intervals:union(Working, Interval)}),
-    io:format("start working on ~p new open is ~p~n", [Interval,
+    ?TRACE("start working on ~p new open is ~p~n", [Interval,
                                                        intervals:minus(Open,
                                                                        Interval)]),
     State#state{phases = NewPhases}.
@@ -196,7 +196,7 @@ add_data_to_phase(State = #state{phases = Phases}, NewData,
             State
     end.
 
--spec accumulate_data({?RT:client_key(), term()}, data()) -> data().
+-spec accumulate_data([{?RT:client_key(), term()}], data()) -> data().
 accumulate_data(Data, List) when is_list(List) ->
     lists:foldl(fun({K, V}, Acc) ->
                         HK = ?RT:hash_key(K),
@@ -252,8 +252,7 @@ acc_add_element(ETS, {HK, K, V}) ->
                 _ ->
                     db_ets:put(ETS, {HK, K, [V | ExV]})
             end
-    end,
-    ETS.
+    end.
 
 -spec merge_with_default_options(UserOptions::[mr:option()],
                                  DefaultOptions::[mr:option()]) ->
@@ -301,7 +300,7 @@ init_slide_phase(State = #state{phases = Phases, jobid = JobId}) ->
                   end, [], Phases),
     State#state{phases = PhasesETS}.
 
--spec get_slide_delta(state(), intervals:intervals()) -> {state(), [phase()]}.
+-spec get_slide_delta(state(), intervals:interval()) -> {state(), [phase()]}.
 get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
     {NewPhases, SlidePhases} =
     lists:foldl(
@@ -311,7 +310,7 @@ get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
                                     db_ets:foldl(ETS,
                                                  fun(K, Acc) ->
                                                          Entry = db_ets:get(ETS, K),
-                                                         db_ets:delete(ETS, K),
+                                                         _NewDB = db_ets:delete(ETS, K),
                                                          [Entry | Acc]
                                                  end,
                                                  AccI,

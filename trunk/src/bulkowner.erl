@@ -21,6 +21,9 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
+-define(TRACE(X, Y), ok).
+%% -define(TRACE(X, Y), io:format(X, Y)).
+
 -include("scalaris.hrl").
 
 % public API:
@@ -147,6 +150,7 @@ bulk_owner(State, Id, I, Msg, Parents) ->
                       Limit::?RT:key(), Parents::[comm:mypid(),...]) -> ok.
 bulk_owner_iter([], _Id, _I, _Msg, _Limit, _Parents) ->
     ok;
+%% TODO dont match [] for empty interval...opaque term
 bulk_owner_iter(_Neighbors, _Id, [], _Msg, _Limit, _Parents) ->
     ok;
 bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
