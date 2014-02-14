@@ -38,7 +38,9 @@
         , accumulate_data/2
         , clean_up/1
         , split_slide_state/2
-        , add_slide_data/1]).
+        , add_slide_state/3
+        , get_slide_delta/2
+        , add_slide_delta/2]).
 
 -include("scalaris.hrl").
 %% for ?required macro
@@ -239,16 +241,58 @@ split_slide_state(#state{phases = Phases} = State, _Interval) ->
     ?TRACE_SLIDE("mr_ on ~p: sliding phases: ~p~n", [self(), SlidePhases]),
     State#state{phases = SlidePhases, phase_res = false}.
 
--spec add_slide_data(state()) -> state().
-add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
-    ETSPhases = lists:map(fun({Round, MoR, Fun, false, Open, Done}) ->
+add_slide_state(_K, State1, _State2) ->
+    ?TRACE_SLIDE("mr_ on ~p: adding state: ~p~n", [self(), State1]),
+    State1.
+
+-spec get_slide_delta(state(), intervals:intervals()) -> {state(), [phase()]}.
+get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
+    {NewPhases, SlidePhases} =
+    lists:foldl(
+      fun({Nr, MoR, Fun, ETS, Open, Done}, {PhaseAcc, SlideAcc}) ->
+              SlideData = lists:foldl(
+                            fun(SimpleInterval, AccI) ->
+                                    db_ets:foldl(ETS,
+                                                 fun(K, Acc) ->
+                                                         Entry = db_ets:get(ETS, K),
+                                                         db_ets:delete(ETS, K),
+                                                         [Entry | Acc]
+                                                 end,
+                                                 AccI,
+                                                 SimpleInterval)
+                            end, [],
+                            intervals:get_simple_intervals(SlideInterval)),
+              NewOpen = intervals:minus(Open, SlideInterval),
+              SlideOpen = intervals:intersection(Open, SlideInterval),
+              NewDone = intervals:minus(Done, SlideInterval),
+              SlideDone = intervals:intersection(Done, SlideInterval),
+              {[{Nr, MoR, Fun, ETS, NewOpen, NewDone} | PhaseAcc],
+               [{Nr, MoR, Fun, SlideData, SlideOpen, SlideDone} | SlideAcc]}
+      end,
+      {[], []},
+      Phases),
+    {State#state{phases = NewPhases}, SlidePhases}.
+
+-spec add_slide_delta(state(), [phase()]) -> state().
+add_slide_delta(State = #state{jobid = JobId}, DeltaPhases) ->
+    ETSPhases = lists:map(fun({Round, MoR, Fun, Data, Open, Done}) ->
                                  ETS = db_ets:new(
                                      lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round]))
                                    , [ordered_set]),
+                                 lists:map(fun(E) -> db_ets:put(ETS, E) end,
+                                           Data),
+                                 case intervals:is_empty(Open) of
+                                     false ->
+                                         comm:send_local(self(), {mr, next_phase,
+                                                               JobId, Round,
+                                                               intervals:empty()});
+                                     _ ->
+                                         ok
+                                 end,
                                   {Round, MoR, Fun, ETS, Open, Done}
-                          end, Phases),
+                          end, DeltaPhases),
     TmpETS = db_ets:new(
                lists:append(["mr_", JobId, "_tmp"])
                , [ordered_set, public]),
-    ?TRACE_SLIDE("mr_~p on ~p: received State: ~p~n", [JobId, self(), State]),
+    ?TRACE_SLIDE("mr_~p on ~p: received delta: ~p~n", [JobId, self(), DeltaPhases]),
     State#state{phases = ETSPhases, phase_res = TmpETS}.
