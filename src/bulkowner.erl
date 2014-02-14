@@ -213,28 +213,51 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
     case intervals:is_empty(MyRange) of
         true -> ok;
         _ ->
-            case Msg of
-                {bulk_read_entry, Issuer} ->
-                    Data = db_dht:get_entries(dht_node_state:get(State, db), MyRange),
-                    ReplyMsg = {bulk_read_entry_response, MyRange, Data},
-                    % for aggregation using a tree, activate this instead:
-                    % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
-                    comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
-                {bulk_distribute, Proc, N, Msg1, Data} ->
-                    RangeData = get_range_data(Data, MyRange),
-                    %% only deliver data in MyRange as data outside of it was
-                    %% forwarded
-                    comm:send_local(pid_groups:get_my(Proc),
-                                    {bulk_distribute, Id, MyRange,
-                                     setelement(N, Msg1, RangeData), Parents});
-                {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
-                    comm:send_local(pid_groups:get_my(Proc),
-                                    {bulkowner, deliver, Id, MyRange, Msg1, Parents});
-                {do_snapshot, _SnapNo, _Leader} ->
-                    comm:send_local(pid_groups:get_my(dht_node), Msg);
-                MrMsg when mr =:= element(1, MrMsg) ->
-                    comm:send_local(pid_groups:get_my(dht_node),
-                                    erlang:append_element(Msg, MyRange))
+            %% check if node has left the ring via a slide
+            %% if rm_loop:has_left/1 is true this message arrived through a
+            %% msg_fwd and needs to be passed back into the system
+            case rm_loop:has_left(dht_node_state:get(State, rm_state)) of
+                false ->
+                    case Msg of
+                        {bulk_read_entry, Issuer} ->
+                            Data = db_dht:get_entries(dht_node_state:get(State, db), MyRange),
+                            ReplyMsg = {bulk_read_entry_response, MyRange, Data},
+                            % for aggregation using a tree, activate this instead:
+                            % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
+                            comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
+                        {bulk_distribute, Proc, N, Msg1, Data} ->
+                            ?TRACE("~p bulkowner: delivering {~p, ~p} locally to ~p
+                           MyDbRange: ~p
+                           FwdRange: ~p",
+                                   [self(),
+                                    element(1, Msg1),
+                                    element(2, Msg1),
+                                    MyRange,
+                                    MyDBRange,
+                                    MyRange0]),
+                            RangeData = get_range_data(Data, MyRange),
+                            %% only deliver data in MyRange as data outside of it was
+                            %% forwarded
+                            comm:send_local(pid_groups:get_my(Proc),
+                                            {bulk_distribute, Id, MyRange,
+                                             setelement(N, Msg1, RangeData), Parents});
+                        {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
+                            comm:send_local(pid_groups:get_my(Proc),
+                                            {bulkowner, deliver, Id, MyRange, Msg1, Parents});
+                        {do_snapshot, _SnapNo, _Leader} ->
+                            comm:send_local(pid_groups:get_my(dht_node), Msg);
+                        MrMsg when mr =:= element(1, MrMsg) ->
+                            comm:send_local(pid_groups:get_my(dht_node),
+                                            erlang:append_element(Msg, MyRange))
+                    end;
+                true ->
+                    ?TRACE("~p bulkowner: delivering to leaving node...
+                            forwarding msg ~p to succ ~p~n",
+                           [self(), Msg, nodelist:succ(dht_node_state:get(State,
+                                                                          neighbors))]),
+                    Neighbors = dht_node_state:get(State, neighbors),
+                    comm:send(node:pidX(nodelist:succ(Neighbors)),
+                              {bulkowner, Id, Range, Msg, Parents})
             end
     end,
     RestRange = intervals:minus(MyRange0, MyRange),
