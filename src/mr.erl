@@ -146,18 +146,20 @@ on({mr, next_phase_data_ack, AckInterval, JobId, Round, DeliveryInterval}, State
     %% otherwise.
     NewMRState = mr_state:set_acked(dht_node_state:get_mr_state(State, JobId),
                                     AckInterval),
-    case mr_state:is_acked_complete(NewMRState) of
+    NewMRState2 = case mr_state:is_acked_complete(NewMRState) of
         true ->
             MasterId = mr_state:get(NewMRState, master_id),
             api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId,
                                                      phase_completed, Round, DeliveryInterval}),
             ?TRACE("Phase ~p complete...~p informing master at ~p~n", [Round, self(),
-                                                                    MasterId]);
+                                                                    MasterId]),
+            mr_state:reset_acked(NewMRState);
         false ->
             ?TRACE("~p is still waiting for phase ~p to complete~n", [self(),
-                                                                      Round])
+                                                                      Round]),
+            NewMRState
     end,
-    dht_node_state:set_mr_state(State, JobId, NewMRState);
+    dht_node_state:set_mr_state(State, JobId, NewMRState2);
 
 on({mr, next_phase, JobId, Round, _DeliveryInterval}, State) ->
     %% master started next round.
@@ -178,43 +180,48 @@ on(Msg, State) ->
 -spec work_on_phase(mr_state:jobid(), dht_node_state:state(), pos_integer()) ->
     dht_node_state:state().
 work_on_phase(JobId, State, Round) ->
-    MRState = mr_state:reset_acked(dht_node_state:get_mr_state(State, JobId)),
-    {Round, MoR, FunTerm, ETS, Open, _Working} = mr_state:get_phase(MRState, Round),
-    NewMrState = case db_ets:get_load(ETS) of
-        0 ->
-            ?TRACE("mr_~s on ~p: no data for this phase...phase complete ~p~n",
-                   [JobId, self(), Round]),
-            case mr_state:is_last_phase(MRState, Round) of
-                false ->
-                    %% io:format("no data for phase...done...~p informs master~n", [self()]),
-                    MasterId = mr_state:get(MRState, master_id),
-                    api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId,
-                                                             phase_completed,
-                                                             Round,
-                                                             Open}),
-                    mr_state:interval_empty(MRState, Open, Round);
-                _ ->
-                    %% io:format("last phase and no data ~p~n", [Round]),
-                    MasterId = mr_state:get(MRState, master_id),
-                    api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId,
-                                                             job_completed, Open}),
-                    Client = mr_state:get(MRState, client),
-                    comm:send(Client, {mr_results, [], Open, JobId}),
-                    mr_state:interval_empty(MRState, Open, Round)
-            end;
-        _Load ->
-            ?TRACE("mr_~s on ~p: starting to work on phase ~p
-                    sending work (~p) to ~p~n", [JobId, self(), Round, Open,
-                                                 pid_groups:get_my(wpool)]),
-            Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
-                                                   Open, Round}),
-            comm:send_local(pid_groups:get_my(wpool),
-                            {do_work, Reply, {Round, MoR, FunTerm, ETS, Open}}),
-            mr_state:interval_processing(MRState, Open, Round)
+    MRState = dht_node_state:get_mr_state(State, JobId),
+    case mr_state:get_phase(MRState, Round) of
+        {_Round, _MoR, _FunTerm, _ETS, [], _Working} ->
+            %% nothing to do
+            State;
+        {Round, MoR, FunTerm, ETS, Open, _Working} ->
+            NewMrState = case db_ets:get_load(ETS) of
+                             0 ->
+                                 ?TRACE("mr_~s on ~p: no data for this phase...phase complete ~p~n",
+                                        [JobId, self(), Round]),
+                                 case mr_state:is_last_phase(MRState, Round) of
+                                     false ->
+                                         %% io:format("no data for phase...done...~p informs master~n", [self()]),
+                                         MasterId = mr_state:get(MRState, master_id),
+                                         api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId,
+                                                                                  phase_completed,
+                                                                                  Round,
+                                                                                  Open}),
+                                         mr_state:interval_empty(MRState, Open, Round);
+                                     _ ->
+                                         %% io:format("last phase and no data ~p~n", [Round]),
+                                         MasterId = mr_state:get(MRState, master_id),
+                                         api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId,
+                                                                                  job_completed, Open}),
+                                         Client = mr_state:get(MRState, client),
+                                         comm:send(Client, {mr_results, [], Open, JobId}),
+                                         mr_state:interval_empty(MRState, Open, Round)
+                                 end;
+                             _Load ->
+                                 ?TRACE("mr_~s on ~p: starting to work on phase ~p
+                            sending work (~p) to ~p~n", [JobId, self(), Round, Open,
+                                                         pid_groups:get_my(wpool)]),
+                                 Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
+                                                                        Open, Round}),
+                                 comm:send_local(pid_groups:get_my(wpool),
+                                                 {do_work, Reply, {Round, MoR, FunTerm, ETS, Open}}),
+                                 mr_state:interval_processing(MRState, Open, Round)
 
-    end,
-    ?TRACE("mr_~p: work is dispatched for ~p~n", [JobId, Open]),
-    dht_node_state:set_mr_state(State, JobId, NewMrState).
+                         end,
+            ?TRACE("mr_~p: work is dispatched for ~p~n", [JobId, Open]),
+            dht_node_state:set_mr_state(State, JobId, NewMrState)
+    end.
 
 -spec validate_job(job_description) -> ok | {error, term()}.
 validate_job({Phases, _Options}) ->
