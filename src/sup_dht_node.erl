@@ -130,13 +130,13 @@ childs([{DHTNodeGroup, Options}]) ->
                     DC_Clustering,
                     Gossip,
                     Gossip2,
+                    SnapshotLeader,
                     SupWPool,
                     WPool,
                     SupDHTNodeCore_AND,
                     MonitorPerf,
                     RepUpdate,
                     Autoscale,
-                    SnapshotLeader,
                     RMLeases,
                     LBActive
            ]).
