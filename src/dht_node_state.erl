@@ -24,7 +24,7 @@
 
 %-define(TRACE(X,Y), log:pal(X,Y)).
 -define(TRACE(X,Y), ok).
--define(TRACE_MR_SLIDE(X,Y), io:format(X, Y)).
+-define(TRACE_MR_SLIDE(X,Y), ?TRACE(X, Y)).
 
 -export([new/3,
          get/2,
@@ -387,11 +387,11 @@ set_mr_state(#state{mr_state = MRStates} = State, JobId, MRState) ->
 delete_mr_state(#state{mr_state = MRStateList} = State, JobId) ->
     State#state{mr_state = orddict:erase(JobId, MRStateList)}.
 
--spec get_mr_master_state(State::state(), mr_state:jobid()) -> mr_master:state().
+-spec get_mr_master_state(State::state(), mr_state:jobid()) -> mr_master_state:state().
 get_mr_master_state(#state{mr_master_state = MRMStates}, JobId) ->
     orddict:fetch(JobId, MRMStates).
 
--spec set_mr_master_state(State::state(), nonempty_string(), mr_master:state()) -> state().
+-spec set_mr_master_state(State::state(), nonempty_string(), mr_master_state:state()) -> state().
 set_mr_master_state(#state{mr_master_state = MRMStates} = State, JobId, MRMState) ->
     State#state{mr_master_state = orddict:store(JobId, MRMState, MRMStates)}.
 
@@ -678,7 +678,8 @@ merge_mr_states(State = #state{mr_state = MRStates1}, MRStates2) ->
     State#state{mr_state = NewMRStatesETS}.
 
 -spec mr_get_delta_states(state(), intervals:interval()) -> {state(),
-                                                             orddict:orddict()}.
+                                                             {orddict:orddict(),
+                                                              orddict:orddict()}}.
 mr_get_delta_states(State = #state{mr_state = MRStates,
                                    mr_master_state = MasterStates},
                     Interval) ->

@@ -23,8 +23,8 @@
 -author('fajerski@zib.de').
 -vsn('$Id$ ').
 
--define(TRACE(X, Y), io:format(X, Y)).
-%% -define(TRACE(X, Y), ok).
+%% -define(TRACE(X, Y), io:format(X, Y)).
+-define(TRACE(X, Y), ok).
 
 -export([
          init_job/4,
@@ -52,7 +52,7 @@ init_job(State, JobId, Job, Client) ->
 -spec dispatch_snapshot(mr_state:jobid()) -> ok.
 dispatch_snapshot(JobId) ->
     Reply = comm:reply_as(comm:this(), 4, {mr_master, JobId, snapshot, '_'}),
-    comm:send_local(pid_groups:get_my(wpool),
+    ok = comm:send_local(pid_groups:get_my(wpool),
                     {do_work, Reply, {snapshot}}).
 
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state().
@@ -123,7 +123,7 @@ on({mr_master, JobId, job_error, _Range}, State) ->
                                {mr, terminate_job, JobId}),
     dht_node_state:delete_mr_master_state(State, JobId);
 
-on(Msg, State) ->
+on(_Msg, State) ->
     ?TRACE("~p mr_master: revceived ~p~n",
            [comm:this(), Msg]),
     State.
