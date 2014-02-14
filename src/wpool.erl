@@ -43,10 +43,12 @@
 
 -include("scalaris.hrl").
 
+-type(ets() :: ets:tid() | atom()).
+
 -type(mr_job() :: {Round::pos_integer(),
                    map | reduce,
                    {erlanon | jsanon, binary()},
-                   Data::[tuple()]}).
+                   Data::ets(), Results::ets()}).
 
 -type(generic_job() :: {erlanon | jsanon, binary(), [tuple()]}).
 
@@ -103,7 +105,7 @@ on({do_work, Source, Workload}, State) ->
 
 %% worker terminated; clear it from the working list and do error reporting if
 %% necessarry
-on({'DOWN', _Ref, process, Pid, _Reason}, State) ->
+on({'DOWN', _Ref, process, Pid, Reason}, State) ->
     ?TRACE("worker finished with reason ~p~n", [Reason]),
     %% TODO in case of error send some report back
     cleanup_worker(Pid, State);
@@ -111,13 +113,13 @@ on({'DOWN', _Ref, process, Pid, _Reason}, State) ->
 %% worker sends results; forward to source
 on({data, Pid, Data}, {_Max, Working, _Waiting} = State) ->
     ?TRACE("wpool: received data from ~p:~n~p...~n",
-            [Pid, hd(Data)]),
+            [Pid, Data]),
     %% send results to source
     {_Pid, Source} = lists:keyfind(Pid, 1, Working),
     comm:send(Source, {work_done, Data}),
     State;
 
-on(_Msg, State) ->
+on(Msg, State) ->
     ?TRACE("~200p~nwpool: unknown message~n", [Msg]),
     State.
 
@@ -139,7 +141,7 @@ start_worker(Source, Workload, State) ->
             monitor_worker(Pid, Source, State);
         {ok, Pid, _Info} ->
             monitor_worker(Pid, Source, State);
-        _X ->
+        X ->
             ?TRACE("start child failed ~p~n", [X]),
             %% handle failures
             State
@@ -175,13 +177,37 @@ init_worker(DHTNodeGroup, Workload) ->
 %%      executes Job and returns results to the local wpool. wpool associates
 %%      the worker pid to the jobs client and knows where the results go.
 -spec work(pid_groups:groupname(), job()) -> ok.
-work(DHTNodeGroup, {_Round, map, {erlanon, FunBin}, Data}) ->
-    %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
+work(DHTNodeGroup, {_Round, map, {erlanon, FunBin}, Data, ResTable}) ->
+    ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     Fun = erlang:binary_to_term(FunBin, [safe]),
-    return(DHTNodeGroup, lists:flatten([apply_erl(Fun, X) || X <- Data]));
-work(DHTNodeGroup, {_Round, reduce, {erlanon, FunBin}, Data}) ->
+    Results =
+    ets:foldl(fun(E, Acc) ->
+                      Res = apply_erl(Fun, E),
+                      lists:foldl(fun({K, V}, ETSAcc) ->
+                                          case ets:lookup(ETSAcc, K) of
+                                              [] ->
+                                                  ets:insert(ETSAcc, {K, [V]});
+                                              [{K, ExV}] ->
+                                                  ets:insert(ETSAcc, {K, [V | ExV]})
+                                          end,
+                                          ETSAcc
+                                  end,
+                                  Acc,
+                                  Res),
+                      Acc
+              end,
+              ResTable, Data),
+    return(DHTNodeGroup, Results);
+work(DHTNodeGroup, {_Round, reduce, {erlanon, FunBin}, Data, Acc}) ->
     Fun = erlang:binary_to_term(FunBin, [safe]),
-    return(DHTNodeGroup, apply_erl(Fun, aggregate_reduce(Data)));
+    Res = apply_erl(Fun, ets:tab2list(Data)),
+    Results = lists:foldl(fun({K, V}, ETSAcc) ->
+                        ets:insert(ETSAcc, {K, V}),
+                        ETSAcc
+                end,
+                Acc,
+                Res),
+    return(DHTNodeGroup, Results);
 
 work(DHTNodeGroup, {_Round, map, {jsanon, FunBin}, Data}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
@@ -215,7 +241,6 @@ aggregate_reduce([{_K, _V} | _T] = Data) ->
 apply_js(FunBin, Data, VM) ->
     AutoJS = define_auto_js(FunBin, Data),
     {ok, Result} = js:eval(VM, AutoJS),
-    io:format("js:eval returned ~p~n", [Result]),
     decode(Result).
 
 %% @doc create a self calling JS function.

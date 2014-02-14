@@ -66,6 +66,8 @@ on({mr, phase_completed, Range}, {JobId, I}) ->
     NewInterval = intervals:union(I, Range),
     case intervals:is_all(NewInterval) of
         false ->
+            %% ?TRACE("mr_master_~s: phase completed...~p~n",
+            %%          [JobId, Range]),
             {JobId, NewInterval};
         _ ->
             ?TRACE("mr_master_~s: phase completed...initiating next phase~n",

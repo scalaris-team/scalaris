@@ -33,7 +33,9 @@
         , next_phase/1
         , is_last_phase/1
         , add_data_to_next_phase/2
+        , clean_up/1
         , split_slide_state/2
+        , add_slide_data/1
         , get_slide_delta/2
         , add_slide_delta/2]).
 
@@ -47,7 +49,7 @@
 
 -type(fun_term() :: {erlanon, binary()} | {jsanon, binary()}).
 
--type(data() :: [{string(), term()}]).
+-type(data() :: ets:tid() | atom()).
 
 -type(phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(),
                      Input::data()}).
@@ -62,6 +64,7 @@
                 , current   = 0 :: non_neg_integer()
                 , acked     = {null, intervals:empty()} :: {null | uid:global_uid(),
                                                             intervals:interval()}
+                , phase_res = ?required(state, phase_res) :: data()
                }).
 
 -type(state() :: #state{}).
@@ -70,6 +73,7 @@
          (state(), jobid)           -> nonempty_string();
          (state(), phases)          -> [phase()];
          (state(), options)         -> [mr:option()];
+         (state(), phase_res)         -> db_ets:db();
          (state(), current)         -> non_neg_integer().
 get(#state{client     = Client
            , master   = Master
@@ -77,6 +81,7 @@ get(#state{client     = Client
            , phases   = Phases
            , options  = Options
            , current  = Cur
+           , phase_res  = PhaseRes
           }, Key) ->
     case Key of
         client   -> Client;
@@ -84,6 +89,7 @@ get(#state{client     = Client
         phases   -> Phases;
         options  -> Options;
         current  -> Cur;
+        phase_res  -> PhaseRes;
         jobid    -> JobId
     end.
 
@@ -96,11 +102,23 @@ new(JobId, Client, Master, InitalData, {Phases, Options}) ->
                                                                 InitalData,
                                                                 {Phases,
                                                                  Options}}]),
+    InitalETS = ets:new(
+                  list_to_atom(
+                    lists:append(["mr_", JobId, "_1"])), []),
+    ets:insert(InitalETS, InitalData),
+    TmpETS = ets:new(
+               list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
+               , [public]),
+    ExtraData = [{1, InitalETS} | 
+                 [{I, ets:new(
+                        list_to_atom(lists:flatten(io_lib:format("mr_~s_~p",
+                                                                 [JobId, I])))
+                        , [])}
+                  || I <- lists:seq(2, length(Phases))]],
     PhasesWithData = lists:zipwith(
             fun({MoR, Fun}, {Round, Data}) -> 
                     {Round, MoR, Fun, Data}
-            end, Phases, [{1, InitalData} | [{I, []} || I <- lists:seq(2,
-                                                             length(Phases))]]),
+            end, Phases, ExtraData),
     JobOptions = merge_with_default_options(Options, ?DEF_OPTIONS),
     NewState = #state{
                   jobid      = JobId
@@ -108,6 +126,7 @@ new(JobId, Client, Master, InitalData, {Phases, Options}) ->
                   , master   = Master
                   , phases   = PhasesWithData
                   , options  = JobOptions
+                  , phase_res = TmpETS
           },
     NewState.
 
@@ -139,42 +158,80 @@ set_acked(State, _OldAck) ->
 
 -spec add_data_to_next_phase(state(), data()) -> state().
 add_data_to_next_phase(State = #state{phases = Phases, current = Cur}, NewData) ->
-     case lists:keyfind(Cur + 1, 1, Phases) of
-        {Round, MoR, Fun, Data} ->
-            State#state{phases = lists:keyreplace(Cur + 1, 1,
-                                                  Phases,
-                                                  {Round, MoR, Fun,
-                                                   NewData ++ Data})};
-         false ->
-             %% someone tries to add data to nonexisting phase...do nothing
-             State
-     end.
+    case lists:keyfind(Cur + 1, 1, Phases) of
+        {_Round, _MoR, _Fun, ETS} ->
+            lists:foldl(fun({K, V}, ETSAcc) ->
+                                case ets:lookup(ETSAcc, K) of
+                                    [] ->
+                                        ets:insert(ETSAcc, {K, [V]});
+                                    [{K, ExV}] ->
+                                        ets:insert(ETSAcc, {K, [V | ExV]})
+                                end,
+                                ETSAcc
+                        end,
+                        ETS,
+                        NewData),
+            State;
+        false ->
+            %% someone tries to add data to nonexisting phase...do nothing
+            State
+    end.
 
 -spec merge_with_default_options(UserOptions::[mr:option()],
                                  DefaultOptions::[mr:option()]) ->
-      JobOptions::[mr:option()].
+    JobOptions::[mr:option()].
 merge_with_default_options(UserOptions, DefaultOptions) ->
     %% TODO merge by hand and skip everything that is not in DefaultOptions 
     lists:keymerge(1, 
                    lists:keysort(1, UserOptions), 
                    lists:keysort(1, DefaultOptions)).
 
+%% TODO fix types data as ets or list
+
+-spec clean_up(state()) -> true.
+clean_up(#state{phases = Phases, phase_res = Tmp}) ->
+    ets:delete(Tmp),
+    lists:map(fun({_R, _MoR, _Fun, ETS}) ->
+                      ets:delete(ETS)
+              end, Phases).
+
 -spec split_slide_state(state(), intervals:interval()) -> {OldState::state(),
-                                                         SlideState::state()}.
+                                                           SlideState::state()}.
 split_slide_state(#state{phases = Phases} = State, Interval) ->
-    {StayingPhases, SildePhases} = lists:foldl(
-                    fun({Nr, MoR, Fun, Data}, {Staying, Slide}) ->
-                            {New, Old} = lists:partition(
-                                           fun({K, _V}) ->
-                                                   intervals:in(?RT:hash_key(K),
-                                                                Interval)
-                                           end, Data),
-                            {[{Nr, MoR, Fun, Old} | Staying],
-                             [{Nr, MoR, Fun, New} | Slide]}
-                    end,
-                    {[],[]},
-                    Phases),
-    {State#state{phases = StayingPhases}, State#state{phases = SildePhases}}.
+    SildePhases = 
+    lists:foldl(
+      fun({Nr, MoR, Fun, ETS}, Slide) ->
+              New = ets:foldl(fun({K, _V} = Entry, SlideAcc) ->
+                                         case intervals:in(?RT:hash_key(K),
+                                                           Interval) of
+                                             true ->
+                                                 %% this creates a side effect...works
+                                                 %% only with ets as data store
+                                                 db_ets:delete(ETS, K),
+                                                 [Entry | SlideAcc];
+                                             false ->
+                                                 SlideAcc
+                                         end
+                                 end,
+                                 [], ETS),
+              [{Nr, MoR, Fun, New} | Slide]
+      end,
+      [],
+      Phases),
+    State#state{phases = SildePhases}.
+
+-spec add_slide_data(state()) -> state().
+add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
+    ETSPhases = lists:map(fun({Round, MoR, Fun, List}) ->
+                                 ETS = ets:new(
+                                   list_to_atom(
+                                     io_lib:format("mr_~s_~p", [JobId, Round]))
+                                   , []),
+                                   ets:insert(ETS, List),
+                                  {Round, MoR, Fun, ETS}
+                          end, Phases),
+    State#state{phases = ETSPhases}.
+
 
 -spec get_slide_delta(state(), intervals:interval()) ->
     {RemaingState::state(), SlideData::{Round::pos_integer(), data()}}.
@@ -182,14 +239,21 @@ get_slide_delta(#state{phases = Phases, current = Cur} = State, Interval) ->
     case lists:keyfind(Cur + 1, 1, Phases) of
         false ->
             {State, {Cur + 1, []}};
-        {Nr, MoR, Fun, Data} ->
-            {Staying, Moving} = lists:partition(
-                                  fun({K, _V}) ->
-                                          intervals:in(K, Interval)
-                                  end, Data),
-            {State#state{phases = lists:keyreplace(Nr, 1, Phases,
-                                               {Nr, MoR, Fun, Staying})},
-             {Nr, Moving}}
+        {Nr, _MoR, _Fun, ETS} ->
+            Moving = ets:foldl(fun({K, _V} = New, DeltaAcc) ->
+                                          case intervals:in(?RT:hash_key(K),
+                                                            Interval) of
+                                              true ->
+                                                  %% this creates a side effect...works
+                                                  %% only with ets as data store
+                                                  db_ets:delete(ETS, K),
+                                                  [New | DeltaAcc];
+                                              false ->
+                                                  DeltaAcc
+                                          end
+                                  end,
+                                  [], ETS),
+            {Nr, Moving}
     end.
 
 -spec add_slide_delta(state(), Data::{Round::pos_integer(), [{string(),
@@ -200,8 +264,7 @@ add_slide_delta(#state{phases = Phases} = State, {Round, SlideData}) ->
         false ->
             %% no further rounds; slide data should be empty in this case
             State;
-        {Round, MoR, Fun, Data} ->
-            State#state{phases = lists:keyreplace(Round, 1, Phases,
-                                                  {Round, MoR, Fun, SlideData ++
-                                                  Data})}
+        {_Round, _MoR, _Fun, ETS} ->
+            ets:insert(ETS, SlideData),
+            State
     end.
