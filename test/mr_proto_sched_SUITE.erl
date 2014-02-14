@@ -42,7 +42,45 @@
 -include("mr_SUITE.hrl").
 
 all() ->
-    tests_avail().
+    tests_avail() ++ [test_join, test_leave].
 
 suite() -> [ {timetrap, {seconds, 90}} ].
+
+test_join(_Config) ->
+    ?proto_sched(start),
+    ct:pal("starting job that triggers breakpoint"),
+    MrPid = spawn_link(fun() ->
+                    ct:pal("starting mr job"),
+                    Res = api_mr:start_job(get_wc_job_erl()),
+                    ct:pal("mr job finished"),
+                    check_results(Res)
+            end),
+    ct:pal("adding node to provoke slide"),
+    _AddPid = spawn_link(fun() ->
+                                api_vm:add_nodes(2)
+                        end),
+    unittest_helper:wait_for_stable_ring(),
+    unittest_helper:check_ring_size_fully_joined(4),
+    ct:pal("ring fully joined (4)"),
+    util:wait_for_process_to_die(MrPid),
+    ok.
+
+test_leave(_Config) ->
+    api_vm:shutdown_nodes(1),
+    {[AddedNode], _} = api_vm:add_nodes(1),
+    unittest_helper:wait_for_stable_ring(),
+    unittest_helper:check_ring_size_fully_joined(2),
+    ?proto_sched(start),
+    MrPid = spawn_link(fun() ->
+                    ct:pal("starting mr job"),
+                    Res = api_mr:start_job(get_wc_job_erl()),
+                    ct:pal("mr job finished"),
+                    check_results(Res)
+            end),
+    ct:pal("shutting down node ~p to provoke slide", [AddedNode]),
+    _VMPid = spawn_link(fun() ->
+                               api_vm:shutdown_node(AddedNode)
+                       end),
+    util:wait_for_process_to_die(MrPid),
+    ok.
 
