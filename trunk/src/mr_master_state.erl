@@ -50,6 +50,7 @@ new(Id, Job, Client) ->
            job         = Job,
            client      = Client}.
 
+%% TODO check if this is better vs dht_node_state
 -spec get(id, state()) -> ?RT:key();
          (acked, state()) -> intervals:interval();
          (round, state()) -> non_neg_integer();
@@ -69,6 +70,11 @@ get(job, #state{job = X}) ->
 get(client, #state{client = X}) ->
     X.
 
+-spec set(state(), [{id, ?RT:key()}]) -> state();
+         (state(), [{acked, intervals:interval()}]) -> state();
+         (state(), [{round, non_neg_integer()}]) -> state();
+         (state(), [{outstanding, outstanding()}]) -> state();
+         (state(), [{client, comm:mypid()}]) -> state().
 set(State, []) ->
     State;
 set(State, [{id, Id} | T]) ->
@@ -82,15 +88,6 @@ set(State, [{outstanding, Out} | T]) ->
 set(State, [{client, Client} | T]) ->
     set(State#state{client = Client}, T).
 
+-spec get_slide_delta(state(), intervals:interval()) -> {boolean(), state()}.
 get_slide_delta(State, Interval) ->
-    case intervals:in(get(id, State), Interval) of
-        true ->
-            %% master needs to slide
-            %% ?TRACE_MR_SLIDE("~p is moving because ~p~n", [MasterState,
-            %%                                               Interval]),
-            {false, State};
-        _false ->
-            %% ?TRACE_MR_SLIDE("~p is staying because ~p~n", [MasterState,
-            %%                                                Interval]),
-            {State, false}
-    end.
+    {intervals:in(get(id, State), Interval), State}.

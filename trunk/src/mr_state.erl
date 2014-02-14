@@ -283,9 +283,11 @@ split_slide_state(#state{phases = Phases} = State, _Interval) ->
       Phases),
     State#state{phases = SlidePhases}.
 
+-spec add_slide_state(mr_state:jobid(), state(), state()) -> state().
 add_slide_state(_K, State1, _State2) ->
     State1.
 
+-spec init_slide_phase(state()) -> state().
 init_slide_phase(State = #state{phases = Phases, jobid = JobId}) ->
     PhasesETS = lists:foldl(
                   fun({Nr, MoR, Fun, false, Open, Working}, AccIn) ->
@@ -333,22 +335,22 @@ add_slide_delta(State = #state{jobid = JobId,
                           merge_phase_delta(lists:keyfind(element(1, DeltaPhase),
                                                           1,
                                                           Phases),
-                                            DeltaPhase,
-                                            JobId)
+                                            DeltaPhase)
                           end, DeltaPhases),
     ?TRACE_SLIDE("mr_~p on ~p: received delta: ~p~n", [JobId, self(), DeltaPhases]),
     trigger_work(MergedPhases, JobId),
     State#state{phases = MergedPhases}.
 
+-spec merge_phase_delta(phase(), phase()) -> phase().
 merge_phase_delta({Round, MoR, Fun, ETS, Open, Working},
-                  {Round, MoR, Fun, Delta, DOpen, _DWorking},
-                  _JobId) ->
+                  {Round, MoR, Fun, Delta, DOpen, _DWorking}) ->
     %% side effect
     %% also should be db_ets, but ets can add lists
     ets:insert(ETS, Delta),
     {Round, MoR, Fun, ETS, intervals:union(Open, DOpen),
      Working}.
 
+-spec trigger_work([phase()], jobid()) -> ok.
 trigger_work(Phases, JobId) ->
     SmallestOpenPhase = lists:foldl(
                          fun({Round, _, _, _, Open, _}, Acc) ->

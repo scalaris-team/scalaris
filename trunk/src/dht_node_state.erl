@@ -695,11 +695,11 @@ mr_get_delta_states(State = #state{mr_state = MRStates,
     orddict:fold(
      fun(K, MasterState, {StateAcc, DeltaAcc}) ->
              case mr_master_state:get_slide_delta(MasterState, Interval) of
-                 {false, Delta} ->
+                 {true, Delta} ->
                      %% slide
                      {StateAcc,
                       orddict:store(K, Delta, DeltaAcc)};
-                 {NewState, false} ->
+                 {false, NewState} ->
                      %% no slide
                      {orddict:store(K, NewState, StateAcc),
                       DeltaAcc}
