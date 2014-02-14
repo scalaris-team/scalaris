@@ -256,7 +256,7 @@ add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
 
 
 -spec get_slide_delta(state(), intervals:interval()) ->
-    {RemaingState::state(), SlideData::{Round::pos_integer(), data()}}.
+    SlideData::{Round::pos_integer(), data()}.
 get_slide_delta(#state{phases = Phases, current = Cur} = State, Interval) ->
     case lists:keyfind(Cur + 1, 1, Phases) of
         false ->
