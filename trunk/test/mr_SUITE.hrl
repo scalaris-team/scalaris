@@ -25,8 +25,8 @@
 tests_avail() ->
     %% [test_sane_result].
     [test_sane_result,
-     test_join].
-    %%  test_leave].
+     test_join,
+     test_leave].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -93,15 +93,35 @@ test_join(_Config) ->
     ok.
 
 test_leave(_Config) ->
-    _ = api_vm:add_nodes(2),
-    unittest_helper:wait_for_stable_ring(),
-    unittest_helper:check_ring_size_fully_joined(4),
     ?proto_sched(start),
-    Res = api_mr:start_job(get_wc_job_erl()),
-    _ = api_vm:kill_nodes(2),
+    api_vm:shutdown_nodes(1),
+    {[AddedNode], _} = api_vm:add_nodes(1),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size_fully_joined(2),
-    check_results(Res),
+    Pids = pid_groups:find_all(dht_node),
+    ct:pal("setting breakpoint before starting reduce phase on ~p", [Pids]),
+    NextPhase = fun(Msg, State) ->
+            case Msg of
+                {mr, next_phase, JobId, 1, _Interval} ->
+                    comm:send_local(self(), Msg),
+                    drop_single;
+                _ ->
+                    false
+            end
+    end,
+    [gen_component:bp_set_cond(Pid, NextPhase, mr_bp) || Pid <- Pids],
+    ct:pal("starting job that triggers breakpoint"),
+    MrPid = spawn_link(fun() ->
+                    ct:pal("starting mr job"),
+                    Res = api_mr:start_job(get_wc_job_erl()),
+                    ct:pal("mr job finished"),
+                    check_results(Res)
+            end),
+    timer:sleep(1000),
+    ct:pal("shutting down node to provoke slide"),
+    ok = api_vm:shutdown_node(AddedNode),
+    [ct:pal("removing breakpoints on ~p...~p", [Pid, gen_component:bp_del_async(Pid, mr_bp)]) || Pid <- Pids],
+    util:wait_for_process_to_die(MrPid),
     ok.
 
 get_wc_job_erl() ->
@@ -120,9 +140,9 @@ get_wc_job_erl() ->
 
 add_data() ->
     Data = [{"1", "MapReduce allows for distributed processing of the map and reduction operations."}
-            , {"2", "Provided each mapping operation can run independently, all maps may be performed in parallel."}
-            , {"3", "This example data set contains one single word only once."}
-            , {"4", "Now I am too lazy to construct another sentence that actually makes sense."}
+            , {"3", "Provided each mapping operation can run independently, all maps may be performed in parallel."}
+            , {"5", "This example data set contains one single word only once."}
+            , {"7", "Now I am too lazy to construct another sentence that actually makes sense."}
            ],
     [api_tx:write(Key, {Key, Value}) || {Key, Value} <- Data],
     ok.
