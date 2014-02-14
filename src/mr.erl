@@ -175,7 +175,7 @@ work_on_phase(JobId, State, Round) ->
     {Round, MoR, FunTerm, ETS, Interval} = mr_state:get_phase(MRState, Round),
     TmpETS = mr_state:get(MRState, phase_res),
     ets:delete_all_objects(TmpETS),
-    case ets:info(ETS, size) of
+    case db_ets:get_load(ETS) of
         0 ->
             ?TRACE("mr_~s on ~p: no data for this phase...phase complete ~p~n",
                    [JobId, self(), Round]),

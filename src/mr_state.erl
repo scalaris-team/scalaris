@@ -51,7 +51,7 @@
 
 -type(data_list() :: [{?RT:key(), string(), term()}]).
 %% data in ets table has the same format
--type(data_ets() :: ets:tab()).
+-type(data_ets() :: db_ets:db()).
 
 -type(data() :: data_list() | data_ets()).
 
@@ -101,17 +101,15 @@ new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
                                                                 InitalData,
                                                                 {Phases,
                                                                  Options}}]),
-    InitalETS = ets:new(
-                  list_to_atom(
-                    lists:append(["mr_", JobId, "_1"])), [ordered_set]),
-    ets:insert(InitalETS, InitalData),
-    TmpETS = ets:new(
-               list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
+    InitalETS = db_ets:new(
+                    lists:append(["mr_", JobId, "_1"]), [ordered_set]),
+    db_ets:put(InitalETS, InitalData),
+    TmpETS = db_ets:new(
+               lists:append(["mr_", JobId, "_tmp"])
                , [ordered_set, public]),
     ExtraData = [{1, InitalETS, Interval} |
-                 [{I, ets:new(
-                        list_to_atom(lists:flatten(io_lib:format("mr_~s_~p",
-                                                                 [JobId, I])))
+                 [{I, db_ets:new(
+                        lists:flatten(io_lib:format("mr_~s_~p", [JobId, I]))
                         , [ordered_set]), intervals:empty()}
                   || I <- lists:seq(2, length(Phases))]],
     PhasesWithData = lists:zipwith(
@@ -183,20 +181,20 @@ accumulate_data(Data, ETS) ->
                                  {?RT:client_key(), term()}) ->
     ets:tab().
 acc_add_element(ETS, {HK, K, V}) ->
-    case ets:lookup(ETS, HK) of
-        [] ->
+    case db_ets:get(ETS, HK) of
+        {} ->
             case is_list(V) of
                 true ->
-                    ets:insert(ETS, {HK, K, V});
+                    db_ets:put(ETS, {HK, K, V});
                 _ ->
-                    ets:insert(ETS, {HK, K, [V]})
+                    db_ets:put(ETS, {HK, K, [V]})
             end;
-        [{HK, K, ExV}] ->
+        {HK, K, ExV} ->
             case is_list(V) of
                 true ->
-                    ets:insert(ETS, {HK, K, V ++ ExV});
+                    db_ets:put(ETS, {HK, K, V ++ ExV});
                 _ ->
-                    ets:insert(ETS, {HK, K, [V | ExV]})
+                    db_ets:put(ETS, {HK, K, [V | ExV]})
             end
     end,
     ETS.
@@ -214,9 +212,9 @@ merge_with_default_options(UserOptions, DefaultOptions) ->
 
 -spec clean_up(state()) -> [true].
 clean_up(#state{phases = Phases, phase_res = Tmp}) ->
-    ets:delete(Tmp),
+    db_ets:close(Tmp),
     lists:map(fun({_R, _MoR, _Fun, ETS, _Interval}) ->
-                      ets:delete(ETS)
+                      db_ets:close(ETS)
               end, Phases).
 
 -spec split_slide_state(state(), intervals:interval()) -> SlideState::state().
@@ -234,14 +232,13 @@ split_slide_state(#state{phases = Phases} = State, _Interval) ->
 -spec add_slide_data(state()) -> state().
 add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
     ETSPhases = lists:map(fun({Round, MoR, Fun, false, false}) ->
-                                 ETS = ets:new(
-                                   list_to_atom(
-                                     lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round])))
+                                 ETS = db_ets:new(
+                                     lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round]))
                                    , [ordered_set]),
                                   {Round, MoR, Fun, ETS, intervals:empty()}
                           end, Phases),
-    TmpETS = ets:new(
-               list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
+    TmpETS = db_ets:new(
+               lists:append(["mr_", JobId, "_tmp"])
                , [ordered_set, public]),
     ?TRACE_SLIDE("mr_~p on ~p: received State: ~p~n", [JobId, self(), State]),
     State#state{phases = ETSPhases, phase_res = TmpETS}.
