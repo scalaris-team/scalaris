@@ -68,6 +68,7 @@ work(Source, {_Round, map, {erlanon, Fun}, Data, Interval, ResTable}) ->
                         db_ets:foldl(Data,
                                      fun(HK, Acc) ->
                                              {_HK, K, V} = db_ets:get(Data, HK),
+                                             ?TRACE("mapping ~p~n", [{K, V}]),
                                              Res = apply_erl(Fun, {K, V}),
                                              mr_state:accumulate_data(Res, Acc)
                                      end,
@@ -89,6 +90,7 @@ work(Source, {_Round, reduce, {erlanon, Fun}, Data, Interval, Acc}) ->
                        end,
                        [],
                        Interval),
+    ?TRACE("reducing ~p~n", [Args]),
     Res = apply_erl(Fun, Args),
     Results = lists:foldl(fun({K, V}, ETSAcc) ->
                         db_ets:put(ETSAcc, {?RT:hash_key(K), K, V}),
