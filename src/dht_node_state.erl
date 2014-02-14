@@ -24,6 +24,7 @@
 
 %-define(TRACE(X,Y), log:pal(X,Y)).
 -define(TRACE(X,Y), ok).
+-define(TRACE_MR_SLIDE(X,Y), io:format(X, Y)).
 
 -export([new/3,
          get/2,
@@ -81,7 +82,8 @@
 -type slide_delta() :: {{ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()]},
                         [{db_selector(), {Changed::db_prbr:db_as_list(),
                                           Deleted::[?RT:key()]}}],
-                        MRDelta::orddict:orddict()}.
+                        {MRDelta::orddict:orddict(),
+                         MRMasterDelta::orddict:orddict()}}.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
@@ -653,6 +655,7 @@ get_mr_slide_states(State = #state{mr_state = MRStates}, MovInterval) ->
       end,
       orddict:new(),
       MRStates),
+    %% ?TRACE_MR_SLIDE("slide states are ~p~n", [SlideStates]),
     {State, SlideStates}.
 
 -spec merge_mr_states(state(), orddict:orddict()) -> state().
@@ -662,11 +665,14 @@ merge_mr_states(State = #state{mr_state = MRStates1}, MRStates2) ->
     NewMRStates = orddict:merge(fun mr_state:add_slide_state/3,
                               MRStates1,
                               MRStates2),
+    %% ?TRACE_MR_SLIDE("merged slide states are ~p~n", [NewMRStates]),
     State#state{mr_state = NewMRStates}.
 
 -spec mr_get_delta_states(state(), intervals:interval()) -> {state(),
                                                              orddict:orddict()}.
-mr_get_delta_states(State = #state{mr_state = MRStates}, Interval) ->
+mr_get_delta_states(State = #state{mr_state = MRStates,
+                                   mr_master_state = MasterStates},
+                    Interval) ->
     {NewMRStates, MRDelta} = orddict:fold(
      fun(K, MRState, {StateAcc, DeltaAcc}) ->
              {NewState, Delta} = mr_state:get_slide_delta(MRState, Interval),
@@ -675,14 +681,50 @@ mr_get_delta_states(State = #state{mr_state = MRStates}, Interval) ->
      end,
      {orddict:new(), orddict:new()},
      MRStates),
-    {State#state{mr_state = NewMRStates}, MRDelta}.
+    ?TRACE_MR_SLIDE("fold over master states ~p~n", [MasterStates]),
+    {RemainingMasterState, MovingMasterState} =
+    orddict:fold(
+     fun(K, MasterState, {StayAcc, MoveAcc}) ->
+             case intervals:in(element(1, MasterState), Interval) of
+                 true ->
+                     ?TRACE_MR_SLIDE("~p is moving because ~p~n", [MasterState,
+                                                                  Interval]),
+                     {StayAcc,
+                      orddict:store(K, MasterState, MoveAcc)};
+                 _false ->
+                     ?TRACE_MR_SLIDE("~p is staying because ~p~n", [MasterState,
+                                                                  Interval]),
+                     {orddict:store(K, MasterState, StayAcc),
+                      MoveAcc}
+             end
+     end,
+     {orddict:new(), orddict:new()},
+     MasterStates),
+    %% ?TRACE_MR_SLIDE("delta mrstates are ~p~ndelta master states are~p~n", [{NewMRStates, MRDelta},
+    %%                                           {RemainingMasterState,
+    %%                                            MovingMasterState}]),
+    {State#state{mr_state = NewMRStates,
+                 mr_master_state = RemainingMasterState},
+     {MRDelta, MovingMasterState}}.
 
 -spec mr_add_delta(state(), orddict:orddict()) -> state().
-mr_add_delta(State = #state{mr_state = MRStates}, DeltaStates) ->
+mr_add_delta(State = #state{mr_state = MRStates,
+                            mr_master_state = MasterStates},
+             {MRDeltaStates, MasterDelta}) ->
     NewMRState = orddict:map(
      fun(K, MRState) ->
              mr_state:add_slide_delta(MRState,
-                                      orddict:fetch(K, DeltaStates))
+                                      orddict:fetch(K, MRDeltaStates))
      end,
      MRStates),
-    State#state{mr_state = NewMRState}.
+    NewMasterStates =
+    orddict:merge(
+     fun(_K, MasterState, _Delta) ->
+             %% there should never be a MasterState merge with the same key,
+             %% since there is only one Master per job
+             MasterState
+     end,
+     MasterStates,
+     MasterDelta),
+    State#state{mr_state = NewMRState,
+                mr_master_state = NewMasterStates}.
