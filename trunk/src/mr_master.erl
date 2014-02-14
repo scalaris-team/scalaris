@@ -112,7 +112,7 @@ filter_data(Data, Options) ->
     case lists:keyfind(tag, 1, Options) of
         {tag, FilterTag} ->
             ?TRACE("Filtering! tag is ~p~ndata: ~p~n", [FilterTag, Data]),
-            [{K, V} || {_HashedKey, {Tag, K, V}, _Version} <- Data, Tag =:= FilterTag];
+            [{HashedKey, K, V} || {HashedKey, {Tag, K, V}, _Version} <- Data, Tag =:= FilterTag];
         false ->
-            [{K, V} || {_HashedKey, {K, V}, _Version} <- Data]
+            [{HashedKey, K, V} || {HashedKey, {K, V}, _Version} <- Data]
     end.
