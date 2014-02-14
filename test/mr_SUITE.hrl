@@ -78,12 +78,12 @@ test_leave(_Config) ->
     ok.
 
 get_wc_job_erl() ->
-    Map = fun({_Key, Line}) -> 
+    Map = fun({_Key, Line}) ->
         Tokens = string:tokens(Line, " \n,.;:?!()\"'-_"),
         [{string:to_lower(X),1} || X <- Tokens]
     end,
-    Reduce = fun(KVList) -> 
-            lists:map(fun({K, V}) -> 
+    Reduce = fun(KVList) ->
+            lists:map(fun({K, V}) ->
                               {K, lists:sum(V)}
                         end, KVList)
     end,

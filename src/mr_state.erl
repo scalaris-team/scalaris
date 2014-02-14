@@ -33,6 +33,7 @@
         , next_phase/1
         , is_last_phase/1
         , add_data_to_next_phase/2
+        , accumulate_data/2
         , clean_up/1
         , split_slide_state/2
         , add_slide_data/1
@@ -160,22 +161,39 @@ set_acked(State, _OldAck) ->
 add_data_to_next_phase(State = #state{phases = Phases, current = Cur}, NewData) ->
     case lists:keyfind(Cur + 1, 1, Phases) of
         {_Round, _MoR, _Fun, ETS} ->
-            lists:foldl(fun({K, V}, ETSAcc) ->
-                                case ets:lookup(ETSAcc, K) of
-                                    [] ->
-                                        ets:insert(ETSAcc, {K, [V]});
-                                    [{K, ExV}] ->
-                                        ets:insert(ETSAcc, {K, [V | ExV]})
-                                end,
-                                ETSAcc
-                        end,
-                        ETS,
-                        NewData),
+            accumulate_data(NewData, ETS),
             State;
         false ->
             %% someone tries to add data to nonexisting phase...do nothing
             State
     end.
+
+-spec accumulate_data([{term(), term()}], data()) -> data().
+accumulate_data(Data, ETS) ->
+    %%returns and handle V that are
+    %%allready lists
+    ?TRACE("accumulating ~p~n", [Data]),
+    lists:foldl(fun({K, V}, ETSAcc) ->
+                        case ets:lookup(ETSAcc, K) of
+                            [] ->
+                                case is_list(V) of
+                                    true ->
+                                        ets:insert(ETSAcc, {K, V});
+                                    _ ->
+                                        ets:insert(ETSAcc, {K, [V]})
+                                end;
+                            [{K, ExV}] ->
+                                case is_list(V) of
+                                    true ->
+                                        ets:insert(ETSAcc, {K, V ++ ExV});
+                                    _ ->
+                                        ets:insert(ETSAcc, {K, [V | ExV]})
+                                end
+                        end,
+                        ETSAcc
+                end,
+                ETS,
+                Data).
 
 -spec merge_with_default_options(UserOptions::[mr:option()],
                                  DefaultOptions::[mr:option()]) ->
