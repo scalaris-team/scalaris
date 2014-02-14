@@ -64,17 +64,20 @@ on(Msg, State) ->
 work(Source, {_Round, map, {erlanon, Fun}, Data, ResTable}) ->
     ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     Results =
-    ets:foldl(fun(E, Acc) ->
-                      Res = apply_erl(Fun, E),
+    ets:foldl(fun({_HK, K, V}, Acc) ->
+                      Res = apply_erl(Fun, {K, V}),
                       mr_state:accumulate_data(Res, Acc)
               end,
               ResTable, Data),
     return(Source, Results);
 work(Source, {_Round, reduce, {erlanon, Fun}, Data, Acc}) ->
-    Res = apply_erl(Fun, ets:tab2list(Data)),
+    Res = apply_erl(Fun,
+                    ets:foldl(fun({_HK, K, V}, AccFold) -> [{K, V} | AccFold] end,
+                              [],
+                              Data)),
     %% TODO insert can handle lists
     Results = lists:foldl(fun({K, V}, ETSAcc) ->
-                        ets:insert(ETSAcc, {K, V}),
+                        ets:insert(ETSAcc, {?RT:hash_key(K), K, V}),
                         ETSAcc
                 end,
                 Acc,

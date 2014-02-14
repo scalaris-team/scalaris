@@ -50,9 +50,9 @@
 
 -type(fun_term() :: {erlanon, fun()} | {jsanon, binary()}).
 
+-type(data_list() :: [{?RT:key(), string(), term()}]).
+%% data in ets table has the same format
 -type(data_ets() :: ets:tab()).
-
--type(data_list() :: [{string(), term()}]).
 
 -type(data() :: data_list() | data_ets()).
 
@@ -109,16 +109,16 @@ new(JobId, Client, Master, InitalData, {Phases, Options}) ->
                                                                  Options}}]),
     InitalETS = ets:new(
                   list_to_atom(
-                    lists:append(["mr_", JobId, "_1"])), []),
+                    lists:append(["mr_", JobId, "_1"])), [ordered_set]),
     ets:insert(InitalETS, InitalData),
     TmpETS = ets:new(
                list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
-               , [public]),
+               , [ordered_set, public]),
     ExtraData = [{1, InitalETS} |
                  [{I, ets:new(
                         list_to_atom(lists:flatten(io_lib:format("mr_~s_~p",
                                                                  [JobId, I])))
-                        , [])}
+                        , [ordered_set])}
                   || I <- lists:seq(2, length(Phases))]],
     PhasesWithData = lists:zipwith(
             fun({MoR, Fun}, {Round, Data}) ->
@@ -173,32 +173,41 @@ add_data_to_next_phase(State = #state{phases = Phases, current = Cur}, NewData) 
             State
     end.
 
--spec accumulate_data(data_list(), data_ets()) -> data_ets().
+-spec accumulate_data({?RT:client_key(), term()}, data_ets()) -> data_ets().
 accumulate_data(Data, ETS) ->
     %%returns and handle V that are
     %%allready lists
     ?TRACE("accumulating ~p~n", [Data]),
     lists:foldl(fun({K, V}, ETSAcc) ->
-                        case ets:lookup(ETSAcc, K) of
-                            [] ->
-                                case is_list(V) of
-                                    true ->
-                                        ets:insert(ETSAcc, {K, V});
-                                    _ ->
-                                        ets:insert(ETSAcc, {K, [V]})
-                                end;
-                            [{K, ExV}] ->
-                                case is_list(V) of
-                                    true ->
-                                        ets:insert(ETSAcc, {K, V ++ ExV});
-                                    _ ->
-                                        ets:insert(ETSAcc, {K, [V | ExV]})
-                                end
-                        end,
-                        ETSAcc
+                        HK = ?RT:hash_key(K),
+                        acc_add_element(ETSAcc, {HK, K, V});
+                   ({HK, K, V}, ETSAcc) ->
+                        acc_add_element(ETSAcc, {HK, K, V})
                 end,
                 ETS,
                 Data).
+
+-spec acc_add_element(ets:tab(), {?RT:key(), ?RT:client_key(), term()} |
+                                 {?RT:client_key(), term()}) ->
+    ets:tab().
+acc_add_element(ETS, {HK, K, V}) ->
+    case ets:lookup(ETS, HK) of
+        [] ->
+            case is_list(V) of
+                true ->
+                    ets:insert(ETS, {HK, K, V});
+                _ ->
+                    ets:insert(ETS, {HK, K, [V]})
+            end;
+        [{HK, K, ExV}] ->
+            case is_list(V) of
+                true ->
+                    ets:insert(ETS, {HK, K, V ++ ExV});
+                _ ->
+                    ets:insert(ETS, {HK, K, [V | ExV]})
+            end
+    end,
+    ETS.
 
 -spec merge_with_default_options(UserOptions::[mr:option()],
                                  DefaultOptions::[mr:option()]) ->
@@ -223,13 +232,12 @@ split_slide_state(#state{phases = Phases} = State, Interval) ->
     SildePhases =
     lists:foldl(
       fun({Nr, MoR, Fun, ETS}, Slide) ->
-              New = ets:foldl(fun({K, _V} = Entry, SlideAcc) ->
-                                         case intervals:in(?RT:hash_key(K),
-                                                           Interval) of
+              New = ets:foldl(fun({HK, _K, _V} = Entry, SlideAcc) ->
+                                         case intervals:in(HK, Interval) of
                                              true ->
                                                  %% this creates a side effect...works
                                                  %% only with ets as data store
-                                                 _ = db_ets:delete(ETS, K),
+                                                 _ = db_ets:delete(ETS, HK),
                                                  [Entry | SlideAcc];
                                              false ->
                                                  SlideAcc
@@ -248,13 +256,13 @@ add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
                                  ETS = ets:new(
                                    list_to_atom(
                                      lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round])))
-                                   , []),
+                                   , [ordered_set]),
                                    _ = ets:insert(ETS, List),
                                   {Round, MoR, Fun, ETS}
                           end, Phases),
     TmpETS = ets:new(
                list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
-               , [public]),
+               , [ordered_set, public]),
     State#state{phases = ETSPhases, phase_res = TmpETS}.
 
 
@@ -265,13 +273,12 @@ get_slide_delta(#state{phases = Phases, current = Cur} = State, Interval) ->
         false ->
             {State, {Cur + 1, []}};
         {Nr, _MoR, _Fun, ETS} ->
-            Moving = ets:foldl(fun({K, _V} = New, DeltaAcc) ->
-                                          case intervals:in(?RT:hash_key(K),
-                                                            Interval) of
+            Moving = ets:foldl(fun({HK, _K, _V} = New, DeltaAcc) ->
+                                          case intervals:in(HK, Interval) of
                                               true ->
                                                   %% this creates a side effect...works
                                                   %% only with ets as data store
-                                                  _ = db_ets:delete(ETS, K),
+                                                  _ = db_ets:delete(ETS, HK),
                                                   [New | DeltaAcc];
                                               false ->
                                                   DeltaAcc

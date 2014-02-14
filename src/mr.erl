@@ -98,21 +98,30 @@ on({bulk_distribute, _Id, _Interval,
 on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
     ?TRACE("mr_~s on ~p: received phase results: ~p...~ndistributing...~n",
            [JobId, self(), ets:tab2list(Data)]),
-    Ref = uid:get_global_uid(),
-    NewMRState = mr_state:reset_acked(dht_node_state:get_mr_state(State, JobId), Ref),
-    case mr_state:is_last_phase(NewMRState) of
+    MRState = dht_node_state:get_mr_state(State, JobId),
+    NewMRState = case mr_state:is_last_phase(MRState) of
         false ->
+            MyRange = lists:foldl(fun({I, _SlideOp}, AccIn) -> intervals:union(I, AccIn) end,
+                                dht_node_state:get(State, my_range),
+                                dht_node_state:get(State, db_range)),
+            %% TODO partition data in Keep and Send
+            Ref = uid:get_global_uid(),
             Reply = comm:reply_as(comm:this(), 4, {mr, next_phase_data_ack,
                                                    {JobId, Ref, Range}, '_'}),
             bulkowner:issue_bulk_distribute(Ref, dht_node,
                                             5, {mr, next_phase_data, JobId, Reply, '_'},
-                                            {ets, Data});
+                                            {ets, Data}),
+            mr_state:reset_acked(MRState, Ref);
         _ ->
             ?TRACE("jobs last phase done...sending to client~n", []),
-            Master = mr_state:get(NewMRState, master),
+            Master = mr_state:get(MRState, master),
             comm:send(Master, {mr, job_completed, Range}),
-            Client = mr_state:get(NewMRState, client),
-            comm:send(Client, {mr_results, ets:tab2list(Data), Range, JobId})
+            Client = mr_state:get(MRState, client),
+            %% TODO send back only {K, V} without HK
+            comm:send(Client, {mr_results,
+                               ets:select(Data, [{{'_','$1','$2'}, [], [{{'$1', '$2'}}]}]),
+                               Range, JobId}),
+            MRState
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 

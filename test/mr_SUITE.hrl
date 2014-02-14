@@ -87,8 +87,8 @@ get_wc_job_erl() ->
                               {K, lists:sum(V)}
                         end, KVList)
     end,
-    {[{map, {erlanon, erlang:term_to_binary(Map)}},
-      {reduce, {erlanon, erlang:term_to_binary(Reduce)}}],
+    {[{map, {erlanon, Map}},
+      {reduce, {erlanon, Reduce}}],
      []}.
 
 add_data() ->

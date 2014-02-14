@@ -24,7 +24,8 @@
 -include("scalaris.hrl").
 
 % public API:
--export([issue_bulk_owner/3, issue_send_reply/4, issue_bulk_distribute/5,
+-export([issue_bulk_owner/3, issue_send_reply/4,
+         issue_bulk_distribute/5, issue_bulk_distribute/6,
          send_reply/5, send_reply_failed/6]).
 
 % only use inside the dht_node process:
@@ -70,6 +71,14 @@ issue_send_reply(Id, Target, Msg, Parents) ->
 issue_bulk_distribute(Id, Proc, Pos, Msg, Data) ->
     DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode, {bulkowner, start, Id, intervals:all(), {bulk_distribute, Proc,
+                                                        Pos, Msg, Data}}).
+
+-spec issue_bulk_distribute(ID::uid:global_uid(), atom(), pos_integer(),
+                           comm:message(), [{string(), term()}] | {ets, ets:tab()},
+                           intervals:interval()) -> ok.
+issue_bulk_distribute(Id, Proc, Pos, Msg, Data, Interval) ->
+    DHTNode = pid_groups:find_a(dht_node),
+    comm:send_local(DHTNode, {bulkowner, start, Id, Interval, {bulk_distribute, Proc,
                                                         Pos, Msg, Data}}).
 
 -spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(),
@@ -279,18 +288,15 @@ on({send_error, FailedTarget, {bulkowner, reply, Id, Target, Msg, Parents}, _Rea
 -spec get_range_data({ets, db_ets:db()} | [{nonempty_string(), term()},...],
                      intervals:interval()) -> [{nonempty_string(), term()}].
 get_range_data({ets, ETS}, Range) ->
-    ets:foldl(fun({K, _V} = E, Acc) ->
-                         case intervals:in(?RT:hash_key(K), Range) of
-                             true ->
-                                 [E | Acc];
-                             _ ->
-                                 Acc
-                         end
-                 end,
-                 [], ETS);
+    lists:foldl(fun(Interval, Acc1) ->
+                    db_ets:foldl(ETS,
+                                 fun(E, Acc) -> [db_ets:get(ETS,E) | Acc] end,
+                                 Acc1, Interval)
+                end,
+                [], intervals:get_simple_intervals(Range));
 get_range_data(Data, Range) ->
     lists:filter(
       fun(Entry) ->
-              intervals:in(?RT:hash_key(element(1, Entry)),
+              intervals:in(element(1, Entry),
                            Range)
       end, Data).
