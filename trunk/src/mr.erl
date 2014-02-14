@@ -69,7 +69,7 @@ on({mr, init, Client, JobId, Job}, State) ->
     JobDesc = {"mr_master_" ++ JobId,
                {mr_master, start_link,
                 [pid_groups:my_groupname(), {JobId, Client, Job}]},
-               transient, brutal_kill, worker, []},
+               temporary, brutal_kill, worker, []},
     SupDHT = pid_groups:get_my(sup_dht_node),
     %% TODO handle failed starts
     _Res = supervisor:start_child(SupDHT, JobDesc),
@@ -110,6 +110,14 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
             comm:send(Client, {mr_results, ets:tab2list(Data), Range, JobId})
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
+
+on({mr, phase_result, JobId, {worker_died, Reason}, Range}, State) ->
+    ?TRACE("runtime error in phase...terminating job~n", []),
+    Master = mr_state:get(State, master),
+    comm:send(Master, {mr, job_error, Range}),
+    Client = mr_state:get(State, client),
+    comm:send(Client, {mr_results, {error, Reason}, Range, JobId}),
+    State;
 
 on({bulk_distribute, _Id, Interval,
    {mr, next_phase_data, JobId, Source, Data}, _Parents}, State) ->

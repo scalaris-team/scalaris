@@ -91,6 +91,14 @@ on({mr, job_completed, Range}, {JobId, I}) ->
             {JobId, []}
     end;
 
+on({mr, job_error, _Range}, {JobId, _I} = State) ->
+    ?TRACE("mr_master_~s: job crashed...shutting down~n",
+             [JobId]),
+    bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
+                               {mr, terminate_job, JobId}),
+    exit(self(), shutdown),
+    State;
+
 on(Msg, State) ->
     ?TRACE("~p mr_master: revceived ~p~n",
            [comm:this(), Msg]),
