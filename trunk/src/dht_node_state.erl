@@ -716,11 +716,16 @@ mr_add_delta(State = #state{mr_state = MRStates,
      end,
      MRStates),
     NewMasterStates =
-    orddict:merge(
-     fun(_K, MasterState, _Delta) ->
-             %% there should never be a MasterState merge with the same key,
-             %% since there is only one Master per job
-             MasterState
+    orddict:foldl(
+     fun(K, NewState, Acc) ->
+             case mr_master_state:get(outstanding, NewState) of
+                 snapshot ->
+                     mr_master_state:dispatch_snapshot(K);
+                 false ->
+                     %% nothing to do
+                     ok
+             end,
+             orddict:store(K, NewState, Acc)
      end,
      MasterStates,
      MasterDelta),
