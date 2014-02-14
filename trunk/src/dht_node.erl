@@ -332,7 +332,13 @@ on(Msg, State) when mr =:= element(1, Msg) ->
     mr:on(Msg, State);
 
 on(Msg, State) when mr_master =:= element(1, Msg) ->
-    mr_master:on(Msg, State);
+    try
+        mr_master:on(Msg, State)
+    catch
+        error:function_clause ->
+            log:log(warn, "Received Message to non-existing master...irgnoring!"),
+            State
+    end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % active load balancing messages (see lb_active_*.erl)
