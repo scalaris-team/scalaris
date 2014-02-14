@@ -274,25 +274,63 @@ get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
     {State#state{phases = NewPhases}, SlidePhases}.
 
 -spec add_slide_delta(state(), [phase()]) -> state().
-add_slide_delta(State = #state{jobid = JobId}, DeltaPhases) ->
-    ETSPhases = lists:map(fun({Round, MoR, Fun, Data, Open, Done}) ->
-                                 ETS = db_ets:new(
-                                     lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round]))
-                                   , [ordered_set]),
-                                 lists:map(fun(E) -> db_ets:put(ETS, E) end,
-                                           Data),
-                                 case intervals:is_empty(Open) of
-                                     false ->
-                                         comm:send_local(self(), {mr, next_phase,
-                                                               JobId, Round,
-                                                               intervals:empty()});
-                                     _ ->
-                                         ok
-                                 end,
-                                  {Round, MoR, Fun, ETS, Open, Done}
+add_slide_delta(State = #state{jobid = JobId,
+                               phases = Phases,
+                               phase_res = Res}, DeltaPhases) ->
+    MergedPhases = lists:map(
+                  fun(DeltaPhase) ->
+                          merge_phase_delta(lists:keyfind(element(1, DeltaPhase),
+                                                          1,
+                                                          Phases),
+                                            DeltaPhase,
+                                            JobId)
                           end, DeltaPhases),
-    TmpETS = db_ets:new(
-               lists:append(["mr_", JobId, "_tmp"])
-               , [ordered_set, public]),
+    TmpETS = case Res of
+                 false ->
+                     db_ets:new(
+                       lists:append(["mr_", JobId, "_tmp"])
+                       , [ordered_set, public]);
+                 _ ->
+                     Res
+             end,
     ?TRACE_SLIDE("mr_~p on ~p: received delta: ~p~n", [JobId, self(), DeltaPhases]),
-    State#state{phases = ETSPhases, phase_res = TmpETS}.
+    trigger_work(MergedPhases, JobId),
+    State#state{phases = MergedPhases, phase_res = TmpETS}.
+
+merge_phase_delta({Round, MoR, Fun, false, Open, Done},
+                  {Round, MoR, Fun, Delta, DOpen, DDone},
+                  JobId) ->
+    ETS = db_ets:new(
+            lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round]))
+            , [ordered_set]),
+    %% side effect
+    %% also should be db_ets, but ets can add lists
+    ets:insert(ETS, Delta),
+    {Round, MoR, Fun, ETS, intervals:union(Open, DOpen),
+     intervals:union(Done, DDone)};
+merge_phase_delta({Round, MoR, Fun, ETS, Open, Done},
+                  {Round, MoR, Fun, Delta, DOpen, DDone},
+                  _JobId) ->
+    %% side effect
+    %% also should be db_ets, but ets can add lists
+    ets:insert(ETS, Delta),
+    {Round, MoR, Fun, ETS, intervals:union(Open, DOpen),
+     intervals:union(Done, DDone)}.
+
+trigger_work(Phases, JobId) ->
+    SmallestOpenPhase = lists:foldl(
+                         fun({Round, _, _, _, Open, _}, Acc) ->
+                                 case not intervals:is_empty(Open)
+                                      andalso Round < Acc of
+                                     true ->
+                                         Round;
+                                     _ ->
+                                         Acc
+                                 end
+                         end, length(Phases) + 1, Phases),
+    case SmallestOpenPhase of
+        N when N < length(Phases) ->
+            comm:send_local(self(), {mr, next_phase, JobId, N, intervals:empty()});
+        _N ->
+            ok
+    end.
