@@ -45,9 +45,9 @@
     dht_node_state:state().
 init_job(State, JobId, Job, Client) ->
     Id = dht_node_state:get(State, node_id),
-    State = mr_master_state:new(Id, Job, Client),
+    MasterState = mr_master_state:new(Id, Job, Client),
     dispatch_snapshot(JobId),
-    dht_node_state:set_mr_master_state(State, JobId, State).
+    dht_node_state:set_mr_master_state(State, JobId, MasterState).
 
 dispatch_snapshot(JobId) ->
     Reply = comm:reply_as(comm:this(), 4, {mr_master, JobId, snapshot, '_'}),
@@ -68,26 +68,33 @@ on({mr_master, JobId, snapshot, {work_done, Data}}, State) ->
                                      Job,
                                      '_'},
                                     FilteredData),
-    mr_master_state:set(State, [{outstanding, false}]);
+    dht_node_state:set_mr_master_state(State,
+                                       JobId,
+                                       mr_master_state:set(MasterState,
+                                                           [{outstanding, false}]));
+
+on({mr_master, JobId, snapshot, {worker_died, Reason}}, State) ->
+    log:log(error, "mr_master_~s: snapshot failed ~p", [JobId, Reason]),
+    dht_node_state:delete_mr_master_state(State, JobId);
 
 on({mr_master, JobId, phase_completed, Round, Range}, State) ->
     MasterState = dht_node_state:get_mr_master_state(State, JobId),
     I = mr_master_state:get(acked, MasterState),
     NewInterval = intervals:union(I, Range),
-    NewMRState = case intervals:is_all(NewInterval) of
+    NewMasterState = case intervals:is_all(NewInterval) of
         false ->
-            ?TRACE("mr_master_~s: phase ~p not yet completed...~p~n",
-                     [JobId, Round, NewInterval]),
-            mr_master_state:set(State, [{acked, NewInterval}]);
+            ?TRACE("~p mr_master_~s: phase ~p not yet completed...~p~n",
+                     [self(), JobId, Round, NewInterval]),
+            mr_master_state:set(MasterState, [{acked, NewInterval}]);
         _ ->
             ?TRACE("mr_master_~s: phase ~p completed...initiating next phase~n",
                      [JobId, Round]),
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                        {mr, next_phase, JobId, Round + 1}),
-            mr_master_state:set(State, [{acked, intervals:empty()},
+            mr_master_state:set(MasterState, [{acked, intervals:empty()},
                                         {round, Round + 1}])
     end,
-    dht_node_state:set_mr_master_state(State, JobId, NewMRState);
+    dht_node_state:set_mr_master_state(State, JobId, NewMasterState);
 
 on({mr_master, JobId, job_completed, Range}, State) ->
     MasterState = dht_node_state:get_mr_master_state(State, JobId),
@@ -95,7 +102,11 @@ on({mr_master, JobId, job_completed, Range}, State) ->
     NewInterval = intervals:union(I, Range),
     case intervals:is_all(NewInterval) of
         false ->
-            mr_master_state:set(State, [{acked, NewInterval}]);
+            dht_node_state:set_mr_master_state(State,
+                                               JobId,
+                                               mr_master_state:set(MasterState,
+                                                                   [{acked,
+                                                                     NewInterval}]));
         _ ->
             ?TRACE("mr_master_~s: job completed...shutting down~n",
                      [JobId]),
