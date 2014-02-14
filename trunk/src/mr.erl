@@ -120,6 +120,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
             %% TODO send back only {K, V} without HK
             comm:send(Client, {mr_results,
                                ets:select(Data, [{{'_','$1','$2'}, [], [{{'$1', '$2'}}]}]),
+                               %% ets:tab2list(Data),
                                Range, JobId}),
             MRState
     end,
