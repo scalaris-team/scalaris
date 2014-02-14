@@ -627,32 +627,48 @@ slide_stop_record(State, MovingInterval, Remove) ->
 get_split_key(State, Begin, End, TargetLoad, Direction) ->
     db_dht:get_split_key(get(State, db), Begin, End, TargetLoad, Direction).
 
--spec get_mr_slide_states(state(), intervals:interval()) -> orddict:orddict().
+-spec get_mr_slide_states(state(), intervals:interval()) -> {state(),
+                                                             orddict:orddict()}.
 get_mr_slide_states(State, MovInterval) ->
-    {State, orddict:new()}.
-    %% SlideStates = orddict:fold(
-    %%   fun(K, MRState, MovingAcc) ->
-    %%           Moving = mr_state:split_slide_state(MRState, MovInterval),
-    %%           orddict:store(K, Moving, MovingAcc)
+    SlideStates = orddict:fold(
+      fun(K, MRState, MovingAcc) ->
+              Moving = mr_state:split_slide_state(MRState, MovInterval),
+              orddict:store(K, Moving, MovingAcc)
 
-    %%   end,
-    %%   orddict:new(),
-    %%   get(State, mr_state)),
-    %% {State, SlideStates}.
+      end,
+      orddict:new(),
+      get(State, mr_state)),
+    {State, SlideStates}.
 
 -spec merge_mr_states(state(), orddict:orddict()) -> state().
 merge_mr_states(State, MRStates) ->
-    State.
-    %% mr state...change data lists to ets tables
-    %% AddedMRStates = orddict:map(fun(_K, MRState) ->
-    %%                                mr_state:add_slide_data(MRState)
-    %%                             end, MRStates).
-    %%and merge states!.
+    %% merge the two dicts. if they exist is both use the local state since no
+    %% data has been moved yet and the rest should be the same
+    NewMRStates = orddict:merge(fun mr_state:add_slide_state/3,
+                              get(State, mr_state),
+                              MRStates),
+    io:format("~p:new mr state: ~p~n", [self(), NewMRStates]),
+    State#state{mr_state = NewMRStates}.
 
--spec mr_get_delta_states(state(), intervals:interval()) -> state().
+-spec mr_get_delta_states(state(), intervals:interval()) -> {state(),
+                                                             orddict:orddict()}.
 mr_get_delta_states(State, Interval) ->
-    {State, orddict:new()}.
+    {MRStates, MRDelta} = orddict:fold(
+     fun(K, MRState, {StateAcc, DeltaAcc}) ->
+             {NewState, Delta} = mr_state:get_slide_delta(MRState, Interval),
+             {orddict:store(K, NewState, StateAcc),
+              orddict:store(K, Delta, DeltaAcc)}
+     end,
+     {orddict:new(), orddict:new()},
+     get(State, mr_state)),
+    {State#state{mr_state = MRStates}, MRDelta}.
 
 -spec mr_add_delta(state(), orddict:orddict()) -> state().
-mr_add_delta(State, MRStates) ->
-    State.
+mr_add_delta(State, DeltaStates) ->
+    NewMRState = orddict:map(
+     fun(K, MRState) ->
+             mr_state:add_slide_delta(MRState,
+                                      orddict:fetch(K, DeltaStates))
+     end,
+     get(State, mr_state)),
+    State#state{mr_state = NewMRState}.

@@ -44,7 +44,7 @@ init([]) ->
 
 -spec start_link(tuple()) -> {ok, pid()}.
 start_link(Options) ->
-    ?TRACE("wpool_worker: starting...~n", []),
+    ?TRACE("~p wpool_worker: starting...~n", [self()]),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [], [Options]).
 
 -spec on(message(), state()) -> state().

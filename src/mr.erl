@@ -203,8 +203,9 @@ work_on_phase(JobId, State, Round) ->
                     comm:send(Client, {mr_results, [], AckInterval, JobId})
             end;
         _Load ->
-            ?TRACE("mr_~s on ~p: starting to work on phase ~p~n", [JobId,
-                                                                   self(), Round]),
+            ?TRACE("mr_~s on ~p: starting to work on phase ~p
+                    sending work to ~p~n", [JobId, self(), Round,
+                                            pid_groups:get_my(wpool)]),
             Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
                                                    Open, Round}),
             comm:send_local(pid_groups:get_my(wpool),
