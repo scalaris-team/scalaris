@@ -42,11 +42,15 @@
 
 -include("scalaris.hrl").
 
+-ifdef(with_export_type_support).
+-export_type([job/0]).
+-endif.
+
 -type(ets() :: ets:tid() | atom()).
 
 -type(mr_job() :: {Round::pos_integer(),
                    map | reduce,
-                   {erlanon | jsanon, binary()},
+                   mr_state:fun_term(),
                    Data::ets(), Results::ets()}).
 
 -type(generic_job() :: {erlanon | jsanon, binary(), [tuple()]}).

@@ -36,7 +36,7 @@
 -include("scalaris.hrl").
 
 -type(phase_desc() :: {map | reduce,
-                     {erlanon | jsanon, binary()}}).
+                     mr_state:fun_term()}).
 
 -type(option() :: {tag, atom()}).
 
@@ -156,7 +156,7 @@ on({mr, next_phase, JobId}, State) ->
 
 on({mr, terminate_job, JobId}, State) ->
     MRState = dht_node_state:get_mr_state(State, JobId),
-    mr_state:clean_up(MRState),
+    _ = mr_state:clean_up(MRState),
     dht_node_state:delete_mr_state(State, JobId);
 
 on(Msg, State) ->

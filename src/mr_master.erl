@@ -107,8 +107,7 @@ on(Msg, State) ->
 -spec filter_data([{?RT:key(),
                    {{string(), term()} | {atom(), string(), term()}},
                    db_dht:version()}],
-                  [mr:option()]) ->
-    mr_state:data().
+                  [mr:option()]) -> mr_state:data_list().
 filter_data(Data, Options) ->
     case lists:keyfind(tag, 1, Options) of
         {tag, FilterTag} ->
