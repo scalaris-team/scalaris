@@ -26,21 +26,19 @@
 
 -define(DEF_OPTIONS, []).
 
--export([new/5
+-export([new/6
         , get/2
         , get_phase/1
         , is_acked_complete/1
         , set_acked/2
-        , reset_acked/2
-        , next_phase/1
+        , reset_acked/1
+        , next_phase/2
         , is_last_phase/1
-        , add_data_to_next_phase/2
+        , add_data_to_phase/4
         , accumulate_data/2
         , clean_up/1
         , split_slide_state/2
-        , add_slide_data/1
-        , get_slide_delta/2
-        , add_slide_delta/2]).
+        , add_slide_data/1]).
 
 -include("scalaris.hrl").
 %% for ?required macro
@@ -59,7 +57,7 @@
 -type(data() :: data_list() | data_ets()).
 
 -type(phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(),
-                     Input::data()}).
+                     Input::data(), intervals:interval()}).
 
 -type(jobid() :: nonempty_string()).
 
@@ -69,8 +67,7 @@
                 , phases    = ?required(state, phases) :: [phase(),...]
                 , options   = ?required(state, options) :: [mr:option()]
                 , current   = 0 :: non_neg_integer()
-                , acked     = {null, intervals:empty()} :: {null | uid:global_uid(),
-                                                            intervals:interval()}
+                , acked     = intervals:empty() :: intervals:interval()
                 , phase_res = ?required(state, phase_res) :: data()
                }).
 
@@ -101,9 +98,9 @@ get(#state{client     = Client
     end.
 
 -spec new(jobid(), comm:mypid(), comm:mypid(), data_list(),
-          mr:job_description()) ->
+          mr:job_description(), intervals:interval()) ->
     state().
-new(JobId, Client, Master, InitalData, {Phases, Options}) ->
+new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
     ?TRACE("mr_state: ~p~nnew state from: ~p~n", [comm:this(), {JobId, Client,
                                                                 Master,
                                                                 InitalData,
@@ -116,15 +113,15 @@ new(JobId, Client, Master, InitalData, {Phases, Options}) ->
     TmpETS = ets:new(
                list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
                , [ordered_set, public]),
-    ExtraData = [{1, InitalETS} |
+    ExtraData = [{1, InitalETS, Interval} |
                  [{I, ets:new(
                         list_to_atom(lists:flatten(io_lib:format("mr_~s_~p",
                                                                  [JobId, I])))
-                        , [ordered_set])}
+                        , [ordered_set]), intervals:empty()}
                   || I <- lists:seq(2, length(Phases))]],
     PhasesWithData = lists:zipwith(
-            fun({MoR, Fun}, {Round, Data}) ->
-                    {Round, MoR, Fun, Data}
+            fun({MoR, Fun}, {Round, Data, Int}) ->
+                    {Round, MoR, Fun, Data, Int}
             end, Phases, ExtraData),
     JobOptions = merge_with_default_options(Options, ?DEF_OPTIONS),
     NewState = #state{
@@ -137,9 +134,9 @@ new(JobId, Client, Master, InitalData, {Phases, Options}) ->
           },
     NewState.
 
--spec next_phase(state()) -> state().
-next_phase(State = #state{current = Cur}) ->
-    State#state{current = Cur + 1}.
+-spec next_phase(state(), pos_integer()) -> state().
+next_phase(State, Round) ->
+    State#state{current = Round}.
 
 -spec is_last_phase(state()) -> boolean().
 is_last_phase(#state{current = Cur, phases = Phases}) ->
@@ -150,26 +147,28 @@ get_phase(#state{phases = Phases, current = Cur}) ->
     lists:keyfind(Cur, 1, Phases).
 
 -spec is_acked_complete(state()) -> boolean().
-is_acked_complete(#state{acked = {_Ref, Interval}}) ->
+is_acked_complete(#state{acked = Interval}) ->
     intervals:is_all(Interval).
 
--spec reset_acked(state(), uid:global_uid()) -> state().
-reset_acked(State, NewRef) ->
-    State#state{acked = {NewRef, intervals:empty()}}.
+-spec reset_acked(state()) -> state().
+reset_acked(State) ->
+    State#state{acked = intervals:empty()}.
 
 -spec set_acked(state(), {uid:global_uid(), intervals:interval()}) -> state().
-set_acked(State = #state{acked = {Ref, Interval}}, {Ref, NewInterval}) ->
-    State#state{acked = {Ref, intervals:union(Interval, NewInterval)}};
-set_acked(State, _OldAck) ->
-    State.
+set_acked(State = #state{acked = Interval}, NewInterval) ->
+    State#state{acked = intervals:union(Interval, NewInterval)}.
 
--spec add_data_to_next_phase(state(), data_list()) -> state().
-add_data_to_next_phase(State = #state{phases = Phases, current = Cur}, NewData) ->
-    case lists:keyfind(Cur + 1, 1, Phases) of
-        {_Round, _MoR, _Fun, ETS} ->
+-spec add_data_to_phase(state(), data_list(), intervals:interval(),
+                             pos_integer()) -> state().
+add_data_to_phase(State = #state{phases = Phases}, NewData,
+                      Interval, Round) ->
+    case lists:keyfind(Round, 1, Phases) of
+        {Round, MoR, Fun, ETS, OldInterval} ->
             %% side effect is used here...only works with ets
             _ = accumulate_data(NewData, ETS),
-            State;
+            NextPhase = {Round, MoR, Fun, ETS, intervals:union(OldInterval,
+                                                               Interval)},
+            State#state{phases = lists:keyreplace(Round, 1, Phases, NextPhase)};
         false ->
             %% someone tries to add data to nonexisting phase...do nothing
             State
@@ -225,82 +224,33 @@ merge_with_default_options(UserOptions, DefaultOptions) ->
 -spec clean_up(state()) -> [true].
 clean_up(#state{phases = Phases, phase_res = Tmp}) ->
     ets:delete(Tmp),
-    lists:map(fun({_R, _MoR, _Fun, ETS}) ->
+    lists:map(fun({_R, _MoR, _Fun, ETS, _Interval}) ->
                       ets:delete(ETS)
               end, Phases).
 
 -spec split_slide_state(state(), intervals:interval()) -> SlideState::state().
-split_slide_state(#state{phases = Phases} = State, Interval) ->
+split_slide_state(#state{phases = Phases} = State, _Interval) ->
     SlidePhases =
     lists:foldl(
-      fun({Nr, MoR, Fun, ETS}, Slide) ->
-              New = ets:foldl(fun({HK, _K, _V} = Entry, SlideAcc) ->
-                                         case intervals:in(HK, Interval) of
-                                             true ->
-                                                 %% this creates a side effect...works
-                                                 %% only with ets as data store
-                                                 _ = db_ets:delete(ETS, HK),
-                                                 [Entry | SlideAcc];
-                                             false ->
-                                                 SlideAcc
-                                         end
-                                 end,
-                                 [], ETS),
-              [{Nr, MoR, Fun, New} | Slide]
+      fun({Nr, MoR, Fun, _ETS, _PhaseInterval}, Slide) ->
+              [{Nr, MoR, Fun, false, false} | Slide]
       end,
       [],
       Phases),
     ?TRACE_SLIDE("mr_ on ~p: sliding phases: ~p~n", [self(), SlidePhases]),
-    State#state{phases = SlidePhases}.
+    State#state{phases = SlidePhases, phase_res = false}.
 
 -spec add_slide_data(state()) -> state().
 add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
-    ETSPhases = lists:map(fun({Round, MoR, Fun, List}) ->
+    ETSPhases = lists:map(fun({Round, MoR, Fun, false, false}) ->
                                  ETS = ets:new(
                                    list_to_atom(
                                      lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round])))
                                    , [ordered_set]),
-                                   _ = ets:insert(ETS, List),
-                                  {Round, MoR, Fun, ETS}
+                                  {Round, MoR, Fun, ETS, intervals:empty()}
                           end, Phases),
     TmpETS = ets:new(
                list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
                , [ordered_set, public]),
     ?TRACE_SLIDE("mr_~p on ~p: received State: ~p~n", [JobId, self(), State]),
     State#state{phases = ETSPhases, phase_res = TmpETS}.
-
-
--spec get_slide_delta(state(), intervals:interval()) ->
-    SlideData::{Round::pos_integer(), data()}.
-get_slide_delta(#state{phases = Phases, current = Cur} = State, Interval) ->
-    case lists:keyfind(Cur + 1, 1, Phases) of
-        false ->
-            {State, {Cur + 1, []}};
-        {Nr, _MoR, _Fun, ETS} ->
-            Moving = ets:foldl(fun({HK, _K, _V} = New, DeltaAcc) ->
-                                          case intervals:in(HK, Interval) of
-                                              true ->
-                                                  %% this creates a side effect...works
-                                                  %% only with ets as data store
-                                                  _ = db_ets:delete(ETS, HK),
-                                                  [New | DeltaAcc];
-                                              false ->
-                                                  DeltaAcc
-                                          end
-                                  end,
-                                  [], ETS),
-            {Nr, Moving}
-    end.
-
--spec add_slide_delta(state(), Data::{Round::pos_integer(), [{string(),
-                                                              term()}]}) ->
-    state().
-add_slide_delta(#state{phases = Phases} = State, {Round, SlideData}) ->
-    case lists:keyfind(Round, 1, Phases) of
-        false ->
-            %% no further rounds; slide data should be empty in this case
-            State;
-        {_Round, _MoR, _Fun, ETS} ->
-            _ = ets:insert(ETS, SlideData),
-            State
-    end.

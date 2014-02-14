@@ -77,9 +77,7 @@
                        MovingMRState::orddict:orddict()}.
 -type slide_delta() :: {{ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()]},
                         [{db_selector(), {Changed::db_prbr:db_as_list(),
-                                          Deleted::[?RT:key()]}}],
-                        [{MRJobId::nonempty_string(), {RoundNr::pos_integer(),
-                                                       [{string(), term()}]}}]}.
+                                          Deleted::[?RT:key()]}}]}.
 
 %% userdevguide-begin dht_node_state:state
 -record(state, {rt         = ?required(state, rt)        :: ?RT:external_rt(),
@@ -371,12 +369,12 @@ set_slide(State, succ, SlideSucc) -> State#state{slide_succ=SlideSucc}.
 set_snapshot_state(State,NewInfo) -> State#state{snapshot_state=NewInfo}.
 
 -spec get_mr_state(State::state(), mr_state:jobid()) -> mr_state:state().
-get_mr_state(#state{mr_state = MRStateList}, JobId) ->
-    orddict:fetch(JobId, MRStateList).
+get_mr_state(#state{mr_state = MRStates}, JobId) ->
+    orddict:fetch(JobId, MRStates).
 
 -spec set_mr_state(State::state(), nonempty_string(), mr_state:state()) -> state().
-set_mr_state(#state{mr_state = MRStateList} = State, JobId, MRState) ->
-    State#state{mr_state = orddict:store(JobId, MRState, MRStateList)}.
+set_mr_state(#state{mr_state = MRStates} = State, JobId, MRState) ->
+    State#state{mr_state = orddict:store(JobId, MRState, MRStates)}.
 
 -spec delete_mr_state(State::state(), nonempty_string()) -> state().
 delete_mr_state(#state{mr_state = MRStateList} = State, JobId) ->
@@ -568,18 +566,6 @@ slide_take_delta_stop_record(State, MovingInterval) ->
            leases_1, leases_2, leases_3, leases_4]
          ),
 
-    %% mr delta
-    MRDelta = orddict:fold(
-                fun(K, MRState, DeltaAcc) ->
-                        Delta =
-                        mr_state:get_slide_delta(MRState,
-                                                 MovingInterval),
-                         [{K, Delta} | DeltaAcc]
-                end,
-                [],
-                get(State, mr_state)),
-
-
     %% db
     OldDB = get(State, db),
     ChangedData = db_dht:get_changes(OldDB, MovingInterval),
@@ -587,29 +573,16 @@ slide_take_delta_stop_record(State, MovingInterval) ->
     NewState = slide_stop_record(State, MovingInterval, true),
     ?TRACE("~p:slide_take_delta_stop_record: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), ChangedData, get(NewState, db)]),
-    {NewState, {ChangedData, DeltaRBR, MRDelta}}.
+    {NewState, {ChangedData, DeltaRBR}}.
 
 %% @doc Adds delta infos from slide_take_delta_stop_record/2 to the local DB.
 -spec slide_add_delta(state(), slide_delta()) -> state().
-slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta, MRDelta}) ->
+slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta}) ->
     NewDB1 = db_dht:add_data(get(State, db), ChangedData),
     NewDB2 = db_dht:delete_entries(NewDB1, intervals:from_elements(DeletedKeys)),
     ?TRACE("~p:slide_add_delta: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), {ChangedData, DeletedKeys}, NewDB2]),
     T1State = set_db(State, NewDB2),
-
-    %% mr delta
-    MRState = lists:foldl(
-                fun({_K, {_Round, []}}, StateAcc) -> StateAcc;
-                   ({K, Delta}, StateAcc) ->
-                        WithDelta = mr_state:add_slide_delta(
-                                      orddict:fetch(K, StateAcc),
-                                      Delta),
-                        orddict:store(K, WithDelta, StateAcc)
-                end,
-                get(T1State, mr_state),
-                MRDelta),
-    T2State = T1State#state{mr_state = MRState},
 
     %% all prbr dbs
     lists:foldl(
@@ -621,7 +594,7 @@ slide_add_delta(State, {{ChangedData, DeletedKeys}, PRBRDelta, MRDelta}) ->
                         intervals:from_elements(DelKeys)),
               set_prbr_state(AccState, X, NewDB)
       end,
-      T2State,
+      T1State,
       PRBRDelta).
 
 %% @doc Stops recording changes in the given interval.

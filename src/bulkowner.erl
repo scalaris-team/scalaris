@@ -235,7 +235,8 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                 {do_snapshot, _SnapNo, _Leader} ->
                     comm:send_local(pid_groups:get_my(dht_node), Msg);
                 MrMsg when mr =:= element(1, MrMsg) ->
-                    comm:send_local(pid_groups:get_my(dht_node), Msg)
+                    comm:send_local(pid_groups:get_my(dht_node),
+                                    erlang:append_element(Msg, MyRange))
             end
     end,
     RestRange = intervals:minus(MyRange0, MyRange),

@@ -37,14 +37,16 @@
 -include("scalaris.hrl").
 
 -type state() :: {JobID::nonempty_string(),
-                  AckedInterval::intervals:interval()}.
+                  AckedInterval::intervals:interval(),
+                  CurrentRound::non_neg_integer()}.
 
--type(message() :: {mr, phase_completed, intervals:interval()} |
+-type(message() :: {start_job, comm:mypid(), mr:job_description()} |
+                   {mr, phase_completed, intervals:interval()} |
                    {mr, job_completed, intervals:interval()}).
 
--spec init({nonempty_string(), comm:mypid(), mr:job_description()}) -> state().
+-spec init({nonempty_string()}) -> state().
 init({JobId}) ->
-    {JobId, []}.
+    {JobId, [], 0}.
 
 -spec start_link(pid_groups:groupname(), tuple()) -> {ok, pid()}.
 start_link(DHTNodeGroup, Options) ->
@@ -54,7 +56,7 @@ start_link(DHTNodeGroup, Options) ->
                               element(1, Options)}]).
 
 -spec on(message(), state()) -> state().
-on({start_job, Client, Job}, {JobId, _Acks} = State) ->
+on({start_job, Client, Job}, {JobId, _Acks, 0} = State) ->
     Data = filter_data(api_tx:get_system_snapshot(),
                           element(2, Job)),
     ?TRACE("mr_master: job ~p started~n", [JobId]),
@@ -63,36 +65,37 @@ on({start_job, Client, Job}, {JobId, _Acks} = State) ->
                                                   Client, Job, '_'},
                                     Data),
     State;
-on({mr, phase_completed, Range}, {JobId, I}) ->
+
+on({mr, phase_completed, Range}, {JobId, I, Round}) ->
     NewInterval = intervals:union(I, Range),
     case intervals:is_all(NewInterval) of
         false ->
             %% ?TRACE("mr_master_~s: phase completed...~p~n",
             %%          [JobId, Range]),
-            {JobId, NewInterval};
+            {JobId, NewInterval, Round};
         _ ->
-            ?TRACE("mr_master_~s: phase completed...initiating next phase~n",
-                     [JobId]),
+            ?TRACE("mr_master_~s: phase ~p completed...initiating next phase~n",
+                     [Round, JobId]),
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
-                                       {mr, next_phase, JobId}),
-            {JobId, []}
+                                       {mr, next_phase, JobId, Round + 1}),
+            {JobId, [], Round + 1}
     end;
 
-on({mr, job_completed, Range}, {JobId, I}) ->
+on({mr, job_completed, Range}, {JobId, I, Round}) ->
     NewInterval = intervals:union(I, Range),
     case intervals:is_all(NewInterval) of
         false ->
-            {JobId, NewInterval};
+            {JobId, NewInterval, Round};
         _ ->
             ?TRACE("mr_master_~s: job completed...shutting down~n",
                      [JobId]),
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                        {mr, terminate_job, JobId}),
             exit(self(), shutdown),
-            {JobId, []}
+            {JobId, [], Round}
     end;
 
-on({mr, job_error, _Range}, {JobId, _I} = State) ->
+on({mr, job_error, _Range}, {JobId, _I, _Round} = State) ->
     ?TRACE("mr_master_~s: job crashed...shutting down~n",
              [JobId]),
     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
