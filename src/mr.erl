@@ -118,7 +118,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
-on({mr, phase_result, JobId, {worker_died, Reason, _Round}, Range}, State) ->
+on({mr, phase_result, JobId, {worker_died, Reason}, Range, _Round}, State) ->
     %% processing of a failed worker result.
     %% for now abort the job
     ?TRACE("runtime error in phase...terminating job~n", []),
@@ -208,7 +208,7 @@ work_on_phase(JobId, State, Round) ->
             Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
                                                    Open, Round}),
             comm:send_local(pid_groups:get_my(wpool),
-                            {do_work, Reply, {Round, MoR, FunTerm, ETS, TmpETS}})
+                            {do_work, Reply, {Round, MoR, FunTerm, ETS, Open, TmpETS}})
     end.
 
 -spec validate_job(job_description) -> ok | {error, term()}.

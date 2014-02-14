@@ -26,6 +26,7 @@
 -behaviour(db_backend_beh).
 
 -define(TRACE(_X, _Y), ok).
+%% -define(TRACE(X, Y), io:format(X, Y)).
 %% -define(TRACE(X, Y), ct:pal(X, Y)).
 
 %% primitives

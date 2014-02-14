@@ -51,7 +51,7 @@
 -type(mr_job() :: {Round::pos_integer(),
                    map | reduce,
                    mr_state:fun_term(),
-                   Data::ets(), Results::ets()}).
+                   Data::ets(), Interval::intervals:interval(), Results::ets()}).
 
 -type(generic_job() :: {erlanon | jsanon, binary(), [tuple()]}).
 
