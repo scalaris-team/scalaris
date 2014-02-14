@@ -92,7 +92,7 @@ on({bulk_distribute, _Id, _Interval,
 
 on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
     ?TRACE("mr_~s on ~p: received phase results: ~p...~ndistributing...~n",
-           [JobId, self(), lists:sublist(Data, 1)]),
+           [JobId, self(), Data]),
     Ref = uid:get_global_uid(),
     NewMRState = mr_state:reset_acked(dht_node_state:get_mr_state(State, JobId), Ref),
     case mr_state:is_last_phase(NewMRState) of
@@ -101,13 +101,13 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
                                                    {JobId, Ref, Range}, '_'}),
             bulkowner:issue_bulk_distribute(Ref, dht_node,
                                             5, {mr, next_phase_data, JobId, Reply, '_'},
-                                            Data);
+                                            {ets, Data});
         _ ->
             ?TRACE("jobs last phase done...sending to client~n", []),
             Master = mr_state:get(NewMRState, master),
             comm:send(Master, {mr, job_completed, Range}), 
             Client = mr_state:get(NewMRState, client),
-            comm:send(Client, {mr_results, Data, Range, JobId})
+            comm:send(Client, {mr_results, ets:tab2list(Data), Range, JobId})
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
@@ -134,8 +134,8 @@ on({mr, next_phase_data_ack, {JobId, Ref, Range}, Interval}, State) ->
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
 on({mr, next_phase, JobId}, State) ->
-    %% io:format("master initiating next phase ~p~n~p",
-    %%           [JobId, State]),
+    ?TRACE("master initiated next phase ~p ~p~n",
+              [JobId, self()]),
     MrState = mr_state:next_phase(dht_node_state:get_mr_state(State, JobId)),
     Range = lists:foldl(fun({I, _SlideOp}, AccIn) -> intervals:union(I, AccIn) end,
                         dht_node_state:get(State, my_range),
@@ -144,6 +144,8 @@ on({mr, next_phase, JobId}, State) ->
     dht_node_state:set_mr_state(State, JobId, MrState);
 
 on({mr, terminate_job, JobId}, State) ->
+    MRState = dht_node_state:get_mr_state(State, JobId),
+    mr_state:clean_up(MRState),
     dht_node_state:delete_mr_state(State, JobId);
 
 on(Msg, State) ->
@@ -152,20 +154,27 @@ on(Msg, State) ->
 
 -spec work_on_phase(mr_state:jobid(), mr_state:state(), intervals:interval()) -> ok.
 work_on_phase(JobId, MRState, MyRange) ->
-    case mr_state:get_phase(MRState) of
-        {_Round, _MoR, _FunTerm, []} ->
+    {Round, MoR, FunTerm, ETS} = mr_state:get_phase(MRState),
+    TmpETS = mr_state:get(MRState, phase_res),
+    ets:delete_all_objects(TmpETS),
+    case ets:info(ETS, size) of
+        0 ->
             case mr_state:is_last_phase(MRState) of
                 false ->
+                    %% io:format("no data for phase...done...~p informs master~n", [self()]),
                     Master = mr_state:get(MRState, master),
-                    comm:send(Master, {mr, phase_completed, MyRange}),
-                    ?TRACE("no data for phase...done...~p informs master~n", [self()]);
+                    comm:send(Master, {mr, phase_completed, MyRange});
                 _ ->
+                    %% io:format("last phase and no data ~p~n", [Round]),
+                    Master = mr_state:get(MRState, master),
+                    comm:send(Master, {mr, job_completed, MyRange}), 
                     Client = mr_state:get(MRState, client),
-                    comm:send(Client, {mr_results, [], MyRange})
+                    comm:send(Client, {mr_results, [], MyRange, JobId})
             end;
-        Phase ->
+        _Load ->
+            ?TRACE("starting to work on phase ~p~n", [Round]),
             Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
-                                                  MyRange}),
+                                                   MyRange}),
             comm:send_local(pid_groups:get_my(wpool), 
-                            {do_work, Reply, Phase})
+                            {do_work, Reply, {Round, MoR, FunTerm, ETS, TmpETS}})
     end.

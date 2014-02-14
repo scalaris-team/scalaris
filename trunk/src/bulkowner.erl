@@ -103,11 +103,7 @@ bulk_owner(State, Id, I, Msg, Parents) ->
         false ->
             case Msg of
                 {bulk_distribute, Proc, N, Env, Data} ->
-                    {SuccData, _Rest} = lists:partition(
-                            fun(Entry) ->
-                                intervals:in(?RT:hash_key(element(1, Entry)),
-                                            SuccIntI)
-                            end, Data),
+                    SuccData = get_range_data(Data, SuccIntI),
                     comm:send(node:pidX(nodelist:succ(Neighbors)),
                               {bulkowner, deliver, Id, SuccIntI,
                               {bulk_distribute, Proc, N, Env, SuccData}, Parents});
@@ -151,11 +147,7 @@ bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
             false ->
                 case Msg of
                     {bulk_distribute, Proc, N, Env, Data} ->
-                        {RangeData, _Rest} = lists:partition(
-                                fun(Entry) ->
-                                    intervals:in(?RT:hash_key(element(1, Entry)),
-                                                Range)
-                                end, Data),
+                        RangeData = get_range_data(Data, Range),
                         comm:send(node:pidX(Head),
                               {bulkowner, Id, Range,
                               {bulk_distribute, Proc, N, Env, RangeData}, Parents});
@@ -190,10 +182,7 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                             %% FwdInt part of the data. otherwise we get duplicate
                             %% data
                             {bulk_distribute, Proc, N, Msg1, Data} ->
-                                RangeData =
-                                    [Entry || Entry <- Data,
-                                              intervals:in(?RT:hash_key(element(1, Entry)),
-                                                           FwdRange)],
+                                RangeData = get_range_data(Data, FwdRange),
                                 comm:send(FwdPid,
                                       {bulkowner, deliver, Id, FwdRange,
                                       {bulk_distribute, Proc, N, Msg1, RangeData},
@@ -225,10 +214,7 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                     % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
                     comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
                 {bulk_distribute, Proc, N, Msg1, Data} ->
-                    RangeData =
-                        [Entry || Entry <- Data,
-                                  intervals:in(?RT:hash_key(element(1, Entry)),
-                                               MyRange)],
+                    RangeData = get_range_data(Data, MyRange),
                     %% only deliver data in MyRange as data outside of it was
                     %% forwarded
                     comm:send_local(pid_groups:get_my(Proc),
@@ -289,3 +275,22 @@ on({bulkowner, gather, Id, Target, [H = {bulk_read_entry_response, _HRange, _HDa
 on({send_error, FailedTarget, {bulkowner, reply, Id, Target, Msg, Parents}, _Reason}, State) ->
     bulkowner:send_reply_failed(Id, Target, Msg, Parents, self(), FailedTarget),
     State.
+
+-spec get_range_data({ets, db_ets:db()} | [{nonempty_string(), term()},...],
+                     intervals:interval()) -> [{nonempty_string(), term()}].
+get_range_data({ets, ETS}, Range) ->
+    ets:foldl(fun({K, _V} = E, Acc) ->
+                         case intervals:in(?RT:hash_key(K), Range) of
+                             true ->
+                                 [E | Acc];
+                             _ ->
+                                 Acc
+                         end
+                 end,
+                 [], ETS);
+get_range_data(Data, Range) ->
+    lists:filter(
+      fun(Entry) ->
+              intervals:in(?RT:hash_key(element(1, Entry)),
+                           Range)
+      end, Data).

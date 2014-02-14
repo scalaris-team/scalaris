@@ -484,24 +484,22 @@ slide_get_data_start_record(State, MovingInterval) ->
          ),
 
     %% map reduce state
-    {StayingMrState, MovingMRState} =
+    MovingMRState =
         orddict:fold(
-          fun(K, MRState, {StayingAcc, MovingAcc}) ->
-                  {Staying, Moving} = mr_state:split_slide_state(MRState, MovingInterval),
-                  {orddict:store(K, Staying, StayingAcc),
-                   orddict:store(K, Moving, MovingAcc)}
+          fun(K, MRState, MovingAcc) ->
+                  Moving = mr_state:split_slide_state(MRState, MovingInterval),
+                   orddict:store(K, Moving, MovingAcc)
 
           end,
-          {orddict:new(), orddict:new()},
+          orddict:new(),
           get(T1State, mr_state)),
-    T2State = T1State#state{mr_state = StayingMrState},
 
     %% snapshot state and db
-    OldDB = get(T2State, db),
+    OldDB = get(T1State, db),
     MovingSnapData =
         case db_dht:snapshot_is_running(OldDB) of
             true ->
-                {get(T2State, snapshot_state),
+                {get(T1State, snapshot_state),
                  db_dht:get_snapshot_data(OldDB, MovingInterval)};
             false ->
                 {false}
@@ -514,13 +512,13 @@ slide_get_data_start_record(State, MovingInterval) ->
            interval ~p~n~p~n~p",
            [?MODULE, comm:this(), MovingData, MovingSnapData,
             MovingInterval, OldDB, NewDB]),
-    NewState = set_db(T2State, NewDB),
+    NewState = set_db(T1State, NewDB),
     {NewState, {{MovingData, MovingSnapData}, MoveRBRData, MovingMRState}}.
 
 
 %% @doc Adds data from slide_get_data_start_record/2 to the local DB.
 -spec slide_add_data(state(),slide_data()) -> state().
-slide_add_data(State, {{Data, SnapData}, PRBRData, MRState}) ->
+slide_add_data(State, {{Data, SnapData}, PRBRData, MRStates}) ->
     T1DB = db_dht:add_data(get(State, db), Data),
     ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~p~n~p",
            [?MODULE, comm:this(), Data, SnapData, NewDB]),
@@ -535,8 +533,11 @@ slide_add_data(State, {{Data, SnapData}, PRBRData, MRState}) ->
                 set_snapshot_state(T1State, SnapState)
         end,
 
-    %% mr state
-    T3State = T2State#state{mr_state = MRState},
+    %% mr state...change data lists to ets tables
+    AddedMRStates = orddict:map(fun(_K, MRState) ->
+                                   mr_state:add_slide_data(MRState)
+                           end, MRStates),
+    T3State = T2State#state{mr_state = AddedMRStates},
 
     %% all prbr dbs
     lists:foldl(
@@ -568,24 +569,23 @@ slide_take_delta_stop_record(State, MovingInterval) ->
          ),
 
     %% mr delta
-    {StayingMRState, MRDelta} = orddict:fold(
-                         fun(K, MRState, {StateAcc, DeltaAcc}) ->
-                             {Staying, Delta} =
-                                 mr_state:get_slide_delta(MRState,
-                                                          MovingInterval),
-                             {orddict:store(K, Staying, StateAcc),
-                              [{K, Delta} | DeltaAcc]}
-                         end,
-                         {orddict:new(), []},
-                         get(State, mr_state)),
-    T1State = State#state{mr_state = StayingMRState},
+    MRDelta = orddict:fold(
+                fun(K, MRState, {StateAcc, DeltaAcc}) ->
+                        {Staying, Delta} =
+                        mr_state:get_slide_delta(MRState,
+                                                 MovingInterval),
+                        {orddict:store(K, Staying, StateAcc),
+                         [{K, Delta} | DeltaAcc]}
+                end,
+                [],
+                get(State, mr_state)),
 
 
     %% db
-    OldDB = get(T1State, db),
+    OldDB = get(State, db),
     ChangedData = db_dht:get_changes(OldDB, MovingInterval),
 
-    NewState = slide_stop_record(T1State, MovingInterval, true),
+    NewState = slide_stop_record(State, MovingInterval, true),
     ?TRACE("~p:slide_take_delta_stop_record: ~p~nChangedData: ~n~p~n~p",
            [?MODULE, comm:this(), ChangedData, get(NewState, db)]),
     {NewState, {ChangedData, DeltaRBR, MRDelta}}.
