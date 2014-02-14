@@ -113,9 +113,10 @@ on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
 
 on({mr, phase_result, JobId, {worker_died, Reason}, Range}, State) ->
     ?TRACE("runtime error in phase...terminating job~n", []),
-    Master = mr_state:get(State, master),
+    MRState = dht_node_state:get_mr_state(State, JobId),
+    Master = mr_state:get(MRState, master),
     comm:send(Master, {mr, job_error, Range}),
-    Client = mr_state:get(State, client),
+    Client = mr_state:get(MRState, client),
     comm:send(Client, {mr_results, {error, Reason}, Range, JobId}),
     State;
 
