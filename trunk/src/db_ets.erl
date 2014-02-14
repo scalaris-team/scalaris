@@ -29,7 +29,7 @@
 %% -define(TRACE(X, Y), ct:pal(X, Y)).
 
 %% primitives
--export([new/1, open/1, close/1, put/2, get/2, delete/2]).
+-export([new/1, new/2, open/1, close/1, put/2, get/2, delete/2]).
 %% db info
 -export([get_name/1, get_load/1]).
 
@@ -52,6 +52,14 @@ new(DBName) ->
     %% tables. Other table types could throw bad_argument exceptions while
     %% calling ets:next/2
     ets:new(list_to_atom(DBName), [ordered_set | ?DB_ETS_ADDITIONAL_OPS]).
+
+%% @doc Creates new DB handle named DBName with possibility to pass Options.
+-spec new(DBName::nonempty_string(), Options::[term()] ) -> db().
+new(DBName, Options) ->
+    %% IMPORTANT: this module only works correctly when using ordered_set ets
+    %% tables. Other table types could throw bad_argument exceptions while
+    %% calling ets:next/2
+    ets:new(list_to_atom(DBName), [ordered_set | Options]).
 
 %% @doc Open a previously existing database. Not supported by ets.
 %%      A new database is created
