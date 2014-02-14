@@ -14,7 +14,7 @@
 
 %% @author Stefan Keidel <keidel@informatik.hu-berlin.de>
 %% @doc gen_component for (potential) leader of the snapshot algorithm
-%% @version $Id$ 
+%% @version $Id$
 -module(snapshot_leader).
 -author('keidel@informatik.hu-berlin.de').
 -vsn('$Id$').
@@ -58,9 +58,9 @@ on({init_snapshot, Client}, State) ->
 % TODO: too much redundant code below -> break this up into several functions
 
 on({local_snapshot_done, _From, SnapNumber, Range, Snapshot}, State) ->
-    case (snapshot_leader_state:is_in_progress(State) 
+    case (snapshot_leader_state:is_in_progress(State)
          andalso SnapNumber =:= snapshot_leader_state:get_number(State)) of
-        true -> 
+        true ->
             ?TRACE("snapshot_leader: local_snapshot_done ~p from ~p for range ~p~n",
                    [SnapNumber, From, Range]),
             TmpState = snapshot_leader_state:add_interval(State, Range),
@@ -90,7 +90,7 @@ on({local_snapshot_done, _From, SnapNumber, Range, Snapshot}, State) ->
     end;
 
 on({local_snapshot_failed, _From, SnapNumber, Range, _Msg}, State) ->
-    case (snapshot_leader_state:is_in_progress(State) 
+    case (snapshot_leader_state:is_in_progress(State)
          andalso SnapNumber =:= snapshot_leader_state:get_number(State)) of
         true ->
             NewState = snapshot_leader_state:add_error_interval(State, Range),
