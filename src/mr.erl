@@ -84,14 +84,14 @@ on({bulk_distribute, _Id, Interval,
     JobState = mr_state:new(JobId, Client, MasterId, InitalData, Job, Interval),
     %% send acc to master
     api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, phase_completed,
-                                            Interval}),
+                                             0, Interval}),
     dht_node_state:set_mr_state(State, JobId, JobState);
 
 on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
     %% processing of phase results from worker.
     %% distribute data and start sync phase
-    ?TRACE("mr_~s on ~p: received phase results: ~p...~ndistributing...~n",
-           [JobId, self(), ets:tab2list(Data)]),
+    ?TRACE("mr_~s on ~p: received phase results (round ~p): ~p...~ndistributing...~n",
+           [JobId, self(), Round, ets:tab2list(Data)]),
     MRState = dht_node_state:get_mr_state(State, JobId),
     NewMRState = mr_state:interval_processed(MRState, Range, Round),
     case mr_state:is_last_phase(MRState, Round) of
@@ -99,7 +99,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
             Ref = uid:get_global_uid(),
             bulkowner:issue_bulk_distribute(Ref, dht_node,
                                             5, {mr, next_phase_data, JobId,
-                                                Range, '_', Round + 1},
+                                                Range, '_', Round},
                                             {ets, Data});
         _ ->
             ?TRACE("jobs last phase done...sending to client~n", []),
@@ -115,10 +115,10 @@ on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
-on({mr, phase_result, JobId, {worker_died, Reason}, Range, _Round}, State) ->
+on({mr, phase_result, JobId, {worker_died, Reason}, Range, Round}, State) ->
     %% processing of a failed worker result.
     %% for now abort the job
-    ?TRACE("runtime error in phase...terminating job~n", []),
+    ?TRACE("runtime error in phase ~p...terminating job~n", [Round]),
     MRState = dht_node_state:get_mr_state(State, JobId),
     MasterId = mr_state:get(MRState, master_id),
     api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, job_error, Range}),
@@ -130,18 +130,19 @@ on({bulk_distribute, _Id, Interval,
    {mr, next_phase_data, JobId, AckRange, Data, Round}, _Parents}, State) ->
     %% processing of data for next phase.
     %% save data and send ack
-    ?TRACE("mr_~s on ~p: received next phase data for ~p: ~p~n",
-           [JobId, self(), Interval, Data]),
+    ?TRACE("mr_~s on ~p: received next phase data (round ~p) interval ~p: ~p~n",
+           [JobId, self(), Round, Interval, Data]),
     NewMRState = mr_state:add_data_to_phase(dht_node_state:get_mr_state(State,
                                                                             JobId),
-                                                 Data, Interval, Round),
+                                                 Data, Interval, Round + 1),
     %% send ack with delivery interval
     bulkowner:issue_bulk_owner(uid:get_global_uid(), AckRange, {mr,
                                                                 next_phase_data_ack,
-                                                               Interval, JobId}),
+                                                               Interval, JobId,
+                                                               Round}),
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
-on({mr, next_phase_data_ack, AckInterval, JobId, DeliveryInterval}, State) ->
+on({mr, next_phase_data_ack, AckInterval, JobId, Round, DeliveryInterval}, State) ->
     %% ack from other mr nodes.
     %% check if the whole interval waas acked. If so inform master, wait
     %% otherwise.
@@ -150,10 +151,13 @@ on({mr, next_phase_data_ack, AckInterval, JobId, DeliveryInterval}, State) ->
     case mr_state:is_acked_complete(NewMRState) of
         true ->
             MasterId = mr_state:get(NewMRState, master_id),
-            api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, phase_completed, DeliveryInterval}),
-            ?TRACE("Phase complete...~p informing master~n", [self()]);
+            api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId,
+                                                     phase_completed, Round, DeliveryInterval}),
+            ?TRACE("Phase ~p complete...~p informing master at ~p~n", [Round, self(),
+                                                                    MasterId]);
         false ->
-            ?TRACE("~p is still waiting for phase to complete~n", [self()])
+            ?TRACE("~p is still waiting for phase ~p to complete~n", [self(),
+                                                                      Round])
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
 
@@ -191,7 +195,9 @@ work_on_phase(JobId, State, Round) ->
                 false ->
                     %% io:format("no data for phase...done...~p informs master~n", [self()]),
                     MasterId = mr_state:get(MRState, master_id),
-                    api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, phase_completed, AckInterval});
+                    api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId,
+                                                             phase_completed,
+                                                             Round, AckInterval});
                 _ ->
                     %% io:format("last phase and no data ~p~n", [Round]),
                     MasterId = mr_state:get(MRState, master_id),
