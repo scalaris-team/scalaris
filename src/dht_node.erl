@@ -331,6 +331,9 @@ on({bulk_distribute, _Id, _Range, InnerMsg, _Parents} = Msg, State)
 on(Msg, State) when mr =:= element(1, Msg) ->
     mr:on(Msg, State);
 
+on(Msg, State) when mr_master =:= element(1, Msg) ->
+    mr_master:on(Msg, State);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % active load balancing messages (see lb_active_*.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
