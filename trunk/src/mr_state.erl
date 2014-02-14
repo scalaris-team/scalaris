@@ -72,7 +72,6 @@
                 , phases    = ?required(state, phases) :: [phase(),...]
                 , options   = ?required(state, options) :: [mr:option()]
                 , acked     = intervals:empty() :: intervals:interval()
-                , phase_res = ?required(state, phase_res) :: data()
                }).
 
 -type(state() :: #state{}).
@@ -80,21 +79,18 @@
 -spec get(state(), client | master) -> comm:mypid() | null;
          (state(), jobid)           -> nonempty_string();
          (state(), phases)          -> [phase()];
-         (state(), options)         -> [mr:option()];
-         (state(), phase_res)         -> db_ets:db().
+         (state(), options)         -> [mr:option()].
 get(#state{client        = Client
            , master_id   = Master
            , jobid       = JobId
            , phases      = Phases
            , options     = Options
-           , phase_res   = PhaseRes
           }, Key) ->
     case Key of
         client      -> Client;
         master_id   -> Master;
         phases      -> Phases;
         options     -> Options;
-        phase_res   -> PhaseRes;
         jobid       -> JobId
     end.
 
@@ -110,9 +106,6 @@ new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
     InitalETS = db_ets:new(
                     lists:append(["mr_", JobId, "_1"]), [ordered_set]),
     db_ets:put(InitalETS, InitalData),
-    TmpETS = db_ets:new(
-               lists:append(["mr_", JobId, "_tmp"])
-               , [ordered_set, public]),
     ExtraData = [{1, InitalETS, Interval, intervals:empty()} |
                  [{I, db_ets:new(
                         lists:flatten(io_lib:format("mr_~s_~p", [JobId, I]))
@@ -129,7 +122,6 @@ new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
                   , master_id   = Master
                   , phases   = PhasesWithData
                   , options  = JobOptions
-                  , phase_res = TmpETS
           },
     NewState.
 
@@ -203,7 +195,16 @@ add_data_to_phase(State = #state{phases = Phases}, NewData,
             State
     end.
 
--spec accumulate_data({?RT:client_key(), term()}, data_ets()) -> data_ets().
+-spec accumulate_data({?RT:client_key(), term()}, data()) -> data().
+accumulate_data(Data, List) when is_list(List) ->
+    lists:foldl(fun({K, V}, Acc) ->
+                        HK = ?RT:hash_key(K),
+                        acc_add_element(Acc, {HK, K, V});
+                   ({HK, K, V}, Acc) ->
+                        acc_add_element(Acc, {HK, K, V})
+                end,
+                List,
+                Data);
 accumulate_data(Data, ETS) ->
     ?TRACE("accumulating ~p~n", [Data]),
     lists:foldl(fun({K, V}, ETSAcc) ->
@@ -215,9 +216,25 @@ accumulate_data(Data, ETS) ->
                 ETS,
                 Data).
 
--spec acc_add_element(ets:tab(), {?RT:key(), ?RT:client_key(), term()} |
-                                 {?RT:client_key(), term()}) ->
-    ets:tab().
+-spec acc_add_element(data(), {?RT:key(), ?RT:client_key(), term()}) ->
+    data().
+acc_add_element(List, {HK, K, V} = T) when is_list(List) ->
+    case lists:keyfind(HK, 1, List) of
+        false ->
+            case is_list(V) of
+                true ->
+                    [T | List];
+                _ ->
+                    [{HK, K, [V]} | List]
+            end;
+        {HK, K, ExV} ->
+            case is_list(V) of
+                true ->
+                    [{HK, K, V ++ ExV} | List];
+                _ ->
+                    [{HK, K, [V | ExV]} | List]
+            end
+    end;
 acc_add_element(ETS, {HK, K, V}) ->
     case db_ets:get(ETS, HK) of
         {} ->
@@ -249,8 +266,7 @@ merge_with_default_options(UserOptions, DefaultOptions) ->
 %% TODO fix types data as ets or list
 
 -spec clean_up(state()) -> [true].
-clean_up(#state{phases = Phases, phase_res = Tmp}) ->
-    db_ets:close(Tmp),
+clean_up(#state{phases = Phases}) ->
     lists:map(fun({_R, _MoR, _Fun, ETS, _Interval, _Working}) ->
                       db_ets:close(ETS)
               end, Phases).
@@ -265,7 +281,7 @@ split_slide_state(#state{phases = Phases} = State, _Interval) ->
       [],
       Phases),
     ?TRACE_SLIDE("mr_ on ~p: sliding phases: ~p~n", [self(), SlidePhases]),
-    State#state{phases = SlidePhases, phase_res = false}.
+    State#state{phases = SlidePhases}.
 
 add_slide_state(_K, State1, _State2) ->
     ?TRACE_SLIDE("mr_ on ~p: adding state: ~p~n", [self(), State1]),
@@ -299,8 +315,7 @@ get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
 
 -spec add_slide_delta(state(), [phase()]) -> state().
 add_slide_delta(State = #state{jobid = JobId,
-                               phases = Phases,
-                               phase_res = Res}, DeltaPhases) ->
+                               phases = Phases}, DeltaPhases) ->
     MergedPhases = lists:map(
                   fun(DeltaPhase) ->
                           merge_phase_delta(lists:keyfind(element(1, DeltaPhase),
@@ -309,17 +324,9 @@ add_slide_delta(State = #state{jobid = JobId,
                                             DeltaPhase,
                                             JobId)
                           end, DeltaPhases),
-    TmpETS = case Res of
-                 false ->
-                     db_ets:new(
-                       lists:append(["mr_", JobId, "_tmp"])
-                       , [ordered_set, public]);
-                 _ ->
-                     Res
-             end,
     ?TRACE_SLIDE("mr_~p on ~p: received delta: ~p~n", [JobId, self(), DeltaPhases]),
     trigger_work(MergedPhases, JobId),
-    State#state{phases = MergedPhases, phase_res = TmpETS}.
+    State#state{phases = MergedPhases}.
 
 merge_phase_delta({Round, MoR, Fun, false, Open, Working},
                   {Round, MoR, Fun, Delta, DOpen, _DWorking},
