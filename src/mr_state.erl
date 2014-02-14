@@ -34,6 +34,7 @@
         , reset_acked/1
         , is_last_phase/2
         , add_data_to_phase/4
+        , interval_processed/3
         , accumulate_data/2
         , clean_up/1
         , split_slide_state/2
@@ -56,7 +57,8 @@
 -type(data() :: data_list() | data_ets()).
 
 -type(phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(),
-                     Input::data(), intervals:interval()}).
+                     Input::data(), OpenInterval::intervals:interval(),
+                     ProcessedInterval::intervals:interval()}).
 
 -type(jobid() :: nonempty_string()).
 
@@ -107,14 +109,14 @@ new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
     TmpETS = db_ets:new(
                lists:append(["mr_", JobId, "_tmp"])
                , [ordered_set, public]),
-    ExtraData = [{1, InitalETS, Interval} |
+    ExtraData = [{1, InitalETS, Interval, intervals:empty()} |
                  [{I, db_ets:new(
                         lists:flatten(io_lib:format("mr_~s_~p", [JobId, I]))
-                        , [ordered_set]), intervals:empty()}
+                        , [ordered_set]), intervals:empty(), intervals:empty()}
                   || I <- lists:seq(2, length(Phases))]],
     PhasesWithData = lists:zipwith(
-            fun({MoR, Fun}, {Round, Data, Int}) ->
-                    {Round, MoR, Fun, Data, Int}
+            fun({MoR, Fun}, {Round, Data, Done, Open}) ->
+                    {Round, MoR, Fun, Data, Done, Open}
             end, Phases, ExtraData),
     JobOptions = merge_with_default_options(Options, ?DEF_OPTIONS),
     NewState = #state{
@@ -147,16 +149,26 @@ reset_acked(State) ->
 set_acked(State = #state{acked = Interval}, NewInterval) ->
     State#state{acked = intervals:union(Interval, NewInterval)}.
 
+-spec interval_processed(state(), intervals:interval(), pos_integer()) ->
+    state().
+interval_processed(State = #state{phases = Phases}, Interval, Round) ->
+    {Round, MoR, Fun, ETS, Open, Done} = lists:keyfind(Round, 1, Phases),
+    NewPhases = lists:keyreplace(Round, 1, Phases,
+                                 {Round, MoR, Fun, ETS,
+                                  intervals:minus(Open, Interval),
+                                  intervals:union(Done, Interval)}),
+    State#state{phases = NewPhases}.
+
 -spec add_data_to_phase(state(), data_list(), intervals:interval(),
                              pos_integer()) -> state().
 add_data_to_phase(State = #state{phases = Phases}, NewData,
                       Interval, Round) ->
     case lists:keyfind(Round, 1, Phases) of
-        {Round, MoR, Fun, ETS, OldInterval} ->
+        {Round, MoR, Fun, ETS, Open, Done} ->
             %% side effect is used here...only works with ets
             _ = accumulate_data(NewData, ETS),
-            NextPhase = {Round, MoR, Fun, ETS, intervals:union(OldInterval,
-                                                               Interval)},
+            NextPhase = {Round, MoR, Fun, ETS, intervals:union(Open,
+                                                               Interval), Done},
             State#state{phases = lists:keyreplace(Round, 1, Phases, NextPhase)};
         false ->
             %% someone tries to add data to nonexisting phase...do nothing
@@ -165,8 +177,6 @@ add_data_to_phase(State = #state{phases = Phases}, NewData,
 
 -spec accumulate_data({?RT:client_key(), term()}, data_ets()) -> data_ets().
 accumulate_data(Data, ETS) ->
-    %%returns and handle V that are
-    %%allready lists
     ?TRACE("accumulating ~p~n", [Data]),
     lists:foldl(fun({K, V}, ETSAcc) ->
                         HK = ?RT:hash_key(K),
@@ -213,7 +223,7 @@ merge_with_default_options(UserOptions, DefaultOptions) ->
 -spec clean_up(state()) -> [true].
 clean_up(#state{phases = Phases, phase_res = Tmp}) ->
     db_ets:close(Tmp),
-    lists:map(fun({_R, _MoR, _Fun, ETS, _Interval}) ->
+    lists:map(fun({_R, _MoR, _Fun, ETS, _Interval, _Done}) ->
                       db_ets:close(ETS)
               end, Phases).
 
@@ -221,8 +231,8 @@ clean_up(#state{phases = Phases, phase_res = Tmp}) ->
 split_slide_state(#state{phases = Phases} = State, _Interval) ->
     SlidePhases =
     lists:foldl(
-      fun({Nr, MoR, Fun, _ETS, _PhaseInterval}, Slide) ->
-              [{Nr, MoR, Fun, false, false} | Slide]
+      fun({Nr, MoR, Fun, _ETS, _Open, _Done}, Slide) ->
+              [{Nr, MoR, Fun, false, intervals:empty(), intervals:empty()} | Slide]
       end,
       [],
       Phases),
@@ -231,11 +241,11 @@ split_slide_state(#state{phases = Phases} = State, _Interval) ->
 
 -spec add_slide_data(state()) -> state().
 add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
-    ETSPhases = lists:map(fun({Round, MoR, Fun, false, false}) ->
+    ETSPhases = lists:map(fun({Round, MoR, Fun, false, Open, Done}) ->
                                  ETS = db_ets:new(
                                      lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round]))
                                    , [ordered_set]),
-                                  {Round, MoR, Fun, ETS, intervals:empty()}
+                                  {Round, MoR, Fun, ETS, Open, Done}
                           end, Phases),
     TmpETS = db_ets:new(
                lists:append(["mr_", JobId, "_tmp"])
