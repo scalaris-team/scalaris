@@ -125,7 +125,9 @@ bulk_owner(State, Id, I, Msg, Parents) ->
             MyNode = nodelist:node(Neighbors),
             NewParents = [node:pidX(MyNode) | Parents],
             RTList = lists:reverse(?RT:to_list(State)),
-            bulk_owner_iter(RTList, Id, I, Msg, node:id(MyNode), NewParents)
+            RemainingInterval = intervals:minus(I, SuccIntI),
+            bulk_owner_iter(RTList, Id, RemainingInterval, Msg, node:id(MyNode),
+                            NewParents)
     end.
 
 %% @doc Iterates through the list of (unique) nodes in the routing table and
@@ -144,6 +146,8 @@ bulk_owner(State, Id, I, Msg, Parents) ->
                       I::intervals:interval(), Msg::comm:message(),
                       Limit::?RT:key(), Parents::[comm:mypid(),...]) -> ok.
 bulk_owner_iter([], _Id, _I, _Msg, _Limit, _Parents) ->
+    ok;
+bulk_owner_iter(_Neighbors, _Id, [], _Msg, _Limit, _Parents) ->
     ok;
 bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
     Interval_Head_Limit = node:mk_interval_between_ids(node:id(Head), Limit),
@@ -165,7 +169,8 @@ bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
                 node:id(Head);
             true  -> Limit
         end,
-    bulk_owner_iter(Tail, Id, I, Msg, NewLimit, Parents).
+    RemainingInterval = intervals:minus(I, Range),
+    bulk_owner_iter(Tail, Id, RemainingInterval, Msg, NewLimit, Parents).
 
 %% protocol implementation / called inside the dht_node on handler
 -spec on(bulkowner_msg(), dht_node_state:state()) -> dht_node_state:state().
