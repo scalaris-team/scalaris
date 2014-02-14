@@ -61,9 +61,8 @@ on(Msg, State) ->
 %%      executes Job and returns results to the local wpool. wpool associates
 %%      the worker pid to the jobs client and knows where the results go.
 -spec work(comm:mypid (), wpool:job()) -> ok.
-work(Source, {_Round, map, {erlanon, FunBin}, Data, ResTable}) ->
+work(Source, {_Round, map, {erlanon, Fun}, Data, ResTable}) ->
     ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
-    Fun = erlang:binary_to_term(FunBin, [safe]),
     Results =
     ets:foldl(fun(E, Acc) ->
                       Res = apply_erl(Fun, E),
@@ -71,8 +70,7 @@ work(Source, {_Round, map, {erlanon, FunBin}, Data, ResTable}) ->
               end,
               ResTable, Data),
     return(Source, Results);
-work(Source, {_Round, reduce, {erlanon, FunBin}, Data, Acc}) ->
-    Fun = erlang:binary_to_term(FunBin, [safe]),
+work(Source, {_Round, reduce, {erlanon, Fun}, Data, Acc}) ->
     Res = apply_erl(Fun, ets:tab2list(Data)),
     %% TODO insert can handle lists
     Results = lists:foldl(fun({K, V}, ETSAcc) ->
@@ -156,7 +154,7 @@ decode(BinString) when is_binary(BinString) ->
 decode(X) -> X.
 
 %% send results back to wpool
--spec return(pid_groups:groupname(), any()) -> ok.
+-spec return(comm:mypid(), any()) -> ok.
 return(Source, Data) ->
     comm:send_local(Source, {data, self(), Data}).
 

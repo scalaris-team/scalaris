@@ -45,12 +45,16 @@
 -include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
--export_type([data/0, jobid/0, state/0]).
+-export_type([data/0, jobid/0, state/0, fun_term/0, data_list/0]).
 -endif.
 
--type(fun_term() :: {erlanon, binary()} | {jsanon, binary()}).
+-type(fun_term() :: {erlanon, fun()} | {jsanon, binary()}).
 
--type(data() :: ets:tid() | atom()).
+-type(data_ets() :: ets:tab()).
+
+-type(data_list() :: [{string(), term()}]).
+
+-type(data() :: data_list() | data_ets()).
 
 -type(phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(),
                      Input::data()}).
@@ -94,7 +98,7 @@ get(#state{client     = Client
         jobid    -> JobId
     end.
 
--spec new(jobid(), comm:mypid(), comm:mypid(), data(),
+-spec new(jobid(), comm:mypid(), comm:mypid(), data_list(),
           mr:job_description()) ->
     state().
 new(JobId, Client, Master, InitalData, {Phases, Options}) ->
@@ -157,18 +161,19 @@ set_acked(State = #state{acked = {Ref, Interval}}, {Ref, NewInterval}) ->
 set_acked(State, _OldAck) ->
     State.
 
--spec add_data_to_next_phase(state(), data()) -> state().
+-spec add_data_to_next_phase(state(), data_list()) -> state().
 add_data_to_next_phase(State = #state{phases = Phases, current = Cur}, NewData) ->
     case lists:keyfind(Cur + 1, 1, Phases) of
         {_Round, _MoR, _Fun, ETS} ->
-            accumulate_data(NewData, ETS),
+            %% side effect is used here...only works with ets
+            _ = accumulate_data(NewData, ETS),
             State;
         false ->
             %% someone tries to add data to nonexisting phase...do nothing
             State
     end.
 
--spec accumulate_data([{term(), term()}], data()) -> data().
+-spec accumulate_data(data_list(), data_ets()) -> data_ets().
 accumulate_data(Data, ETS) ->
     %%returns and handle V that are
     %%allready lists
@@ -206,15 +211,14 @@ merge_with_default_options(UserOptions, DefaultOptions) ->
 
 %% TODO fix types data as ets or list
 
--spec clean_up(state()) -> true.
+-spec clean_up(state()) -> [true].
 clean_up(#state{phases = Phases, phase_res = Tmp}) ->
     ets:delete(Tmp),
     lists:map(fun({_R, _MoR, _Fun, ETS}) ->
                       ets:delete(ETS)
               end, Phases).
 
--spec split_slide_state(state(), intervals:interval()) -> {OldState::state(),
-                                                           SlideState::state()}.
+-spec split_slide_state(state(), intervals:interval()) -> SlideState::state().
 split_slide_state(#state{phases = Phases} = State, Interval) ->
     SildePhases =
     lists:foldl(
@@ -225,7 +229,7 @@ split_slide_state(#state{phases = Phases} = State, Interval) ->
                                              true ->
                                                  %% this creates a side effect...works
                                                  %% only with ets as data store
-                                                 db_ets:delete(ETS, K),
+                                                 _ = db_ets:delete(ETS, K),
                                                  [Entry | SlideAcc];
                                              false ->
                                                  SlideAcc
@@ -243,9 +247,9 @@ add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
     ETSPhases = lists:map(fun({Round, MoR, Fun, List}) ->
                                  ETS = ets:new(
                                    list_to_atom(
-                                     io_lib:format("mr_~s_~p", [JobId, Round]))
+                                     lists:flatten(io_lib:format("mr_~s_~p", [JobId, Round])))
                                    , []),
-                                   ets:insert(ETS, List),
+                                   _ = ets:insert(ETS, List),
                                   {Round, MoR, Fun, ETS}
                           end, Phases),
     State#state{phases = ETSPhases}.
@@ -264,7 +268,7 @@ get_slide_delta(#state{phases = Phases, current = Cur} = State, Interval) ->
                                               true ->
                                                   %% this creates a side effect...works
                                                   %% only with ets as data store
-                                                  db_ets:delete(ETS, K),
+                                                  _ = db_ets:delete(ETS, K),
                                                   [New | DeltaAcc];
                                               false ->
                                                   DeltaAcc
@@ -283,6 +287,6 @@ add_slide_delta(#state{phases = Phases} = State, {Round, SlideData}) ->
             %% no further rounds; slide data should be empty in this case
             State;
         {_Round, _MoR, _Fun, ETS} ->
-            ets:insert(ETS, SlideData),
+            _ = ets:insert(ETS, SlideData),
             State
     end.
