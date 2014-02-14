@@ -21,6 +21,8 @@
 
 -define(TRACE(X, Y), ok).
 %% -define(TRACE(X, Y), io:format(X, Y)).
+%% -define(TRACE_SLIDE(X, Y), ok).
+-define(TRACE_SLIDE(X, Y), io:format(X, Y)).
 
 -define(DEF_OPTIONS, []).
 
@@ -229,7 +231,7 @@ clean_up(#state{phases = Phases, phase_res = Tmp}) ->
 
 -spec split_slide_state(state(), intervals:interval()) -> SlideState::state().
 split_slide_state(#state{phases = Phases} = State, Interval) ->
-    SildePhases =
+    SlidePhases =
     lists:foldl(
       fun({Nr, MoR, Fun, ETS}, Slide) ->
               New = ets:foldl(fun({HK, _K, _V} = Entry, SlideAcc) ->
@@ -248,7 +250,8 @@ split_slide_state(#state{phases = Phases} = State, Interval) ->
       end,
       [],
       Phases),
-    State#state{phases = SildePhases}.
+    ?TRACE_SLIDE("mr_ on ~p: sliding phases: ~p~n", [self(), SlidePhases]),
+    State#state{phases = SlidePhases}.
 
 -spec add_slide_data(state()) -> state().
 add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
@@ -263,6 +266,7 @@ add_slide_data(State = #state{phases = Phases, jobid = JobId}) ->
     TmpETS = ets:new(
                list_to_atom(lists:append(["mr_", JobId, "_tmp"]))
                , [ordered_set, public]),
+    ?TRACE_SLIDE("mr_~p on ~p: received State: ~p~n", [JobId, self(), State]),
     State#state{phases = ETSPhases, phase_res = TmpETS}.
 
 

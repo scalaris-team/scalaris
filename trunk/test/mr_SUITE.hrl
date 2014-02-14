@@ -22,7 +22,11 @@
 -include("scalaris.hrl").
 -include("unittest.hrl").
 
--compile(export_all).
+tests_avail() ->
+    [test_sane_result].
+    %% [test_sane_result,
+    %%  test_join,
+    %%  test_leave].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -58,11 +62,40 @@ test_sane_result(_Config) ->
 
 test_join(_Config) ->
     ?proto_sched(start),
-    Res = api_mr:start_job(get_wc_job_erl()),
+    Pids = pid_groups:find_all(dht_node),
+    ct:pal("setting breakpoint before starting reduce phase"),
+    NextPhase = fun(Msg, State) ->
+            case Msg of
+                {mr, next_phase, JobId} ->
+                    case mr_state:get(
+                           dht_node_state:get_mr_state(State, JobId),
+                           current) of
+                        1 ->
+                            comm:send_local(self(), Msg),
+                            drop_single;
+                        _ -> false
+                    end;
+                _ ->
+                    false
+            end
+    end,
+    [gen_component:bp_set_cond(Pid, NextPhase, mr_bp) || Pid <- Pids],
+    ct:pal("starting job that triggers breakpoint"),
+    MrPid = spawn_link(fun() ->
+                    ct:pal("starting mr job"),
+                    Res = api_mr:start_job(get_wc_job_erl()),
+                    ct:pal("mr job finished"),
+                    check_results(Res)
+            end),
+    timer:sleep(1000),
+    ct:pal("adding node to provoke slide"),
     _ = api_vm:add_nodes(2),
     unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size_fully_joined(4),
-    check_results(Res),
+    ct:pal("ring fully joined (4)"),
+    ct:pal("removing breakpoints"),
+    [gen_component:bp_del(Pid, mr_bp) || Pid <- Pids],
+    util:wait_for_process_to_die(MrPid),
     ok.
 
 test_leave(_Config) ->
