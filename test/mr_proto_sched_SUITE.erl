@@ -20,6 +20,8 @@
 -author('fajerski@zib.de').
 -vsn('$Id$').
 
+-compile([export_all]).
+
 -define(proto_sched(Action),
         fun() ->
                 case Action of
@@ -40,11 +42,7 @@
 -include("mr_SUITE.hrl").
 
 all() ->
-    [
-     test_sane_result
-     , test_join
-     , test_leave
-    ].
+    tests_avail().
 
-suite() -> [ {timetrap, {seconds, 60}} ].
+suite() -> [ {timetrap, {seconds, 90}} ].
 
