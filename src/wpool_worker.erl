@@ -81,13 +81,27 @@ work(Source, {_Round, reduce, {erlanon, Fun}, Data, Acc}) ->
                 Res),
     return(Source, Results);
 
-work(Source, {_Round, map, {jsanon, FunBin}, Data}) ->
+work(Source, {_Round, map, {jsanon, FunBin}, Data, ResTable}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     {ok, VM} = js_driver:new(),
-    return(Source, lists:flatten([apply_js(FunBin, [X], VM) || X <- Data]));
-work(Source, {_Round, reduce, {jsanon, FunBin}, Data}) ->
+    Results =
+    ets:foldl(fun(E, Acc) ->
+                      Res = apply_js(FunBin, [E], VM),
+                      mr_state:accumulate_data(Res, Acc)
+              end,
+              ResTable, Data),
+    return(Source, Results);
+work(Source, {_Round, reduce, {jsanon, FunBin}, Data, Acc}) ->
     {ok, VM} = js_driver:new(),
-    return(Source, apply_js(FunBin, [Data], VM)).
+    Res = apply_js(FunBin, [ets:tab2list(Data)], VM),
+    %% TODO insert can handle lists
+    Results = lists:foldl(fun({K, V}, ETSAcc) ->
+                        ets:insert(ETSAcc, {K, V}),
+                        ETSAcc
+                end,
+                Acc,
+                Res),
+    return(Source, Results).
 
 %% @doc applies Fun with Args.
 -spec apply_erl(Fun::fun((Arg::term()) -> Res::A), Args::term()) -> A.
@@ -123,23 +137,23 @@ encode_args([H | T], Acc) ->
 
 -spec encode(term()) -> term().
 encode({K, V}) ->
-    {struct, [{encode(K), encode(V)}]};
+    {struct, [{encode(list_to_binary(K)), encode(V)}]};
 encode([{_K, _V} | _T] = KVList) ->
     %% {struct, [{encode(K), encode(V)} || {K, V} <- KVList]};
     %% [{struct, [{key, encode(K)}, {value, encode(V)}]} || {K, V} <- KVList];
     Fun = fun({K, V}, AccIn) ->
-                  EnK = encode(K), EnV = encode(V),
-                  case lists:keyfind(EnK, 1, AccIn) of
-                      false ->
-                          [{EnK, [EnV]} | AccIn];
-                      {EnK, VL} ->
-                          lists:keyreplace(EnK, 1, AccIn, {EnK, [EnV | VL]})
-                  end
+                  %% strings need to be encoded as binaries
+                  %% keys are always strings; if value is a string it needs to
+                  %% be passed as a binary
+                  EnK = encode(list_to_binary(K)), EnV = encode(V),
+                  [{EnK, EnV} | AccIn]
           end,
     Data = lists:foldl(Fun, [], KVList),
     {struct, Data};
-encode(String) when is_list(String) ->
-    list_to_binary(String);
+%% this poses a problem with lists as values. if value is a list it gets encoded
+%% to a binary and does not get encoded as an array.
+%% encode(String) when is_list(String) ->
+%%     list_to_binary(String);
 encode(X) -> X.
 
 -spec decode(term()) -> term().
