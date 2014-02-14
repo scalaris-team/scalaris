@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Jan Fajerski <fajerski@zib.de>
-%% @doc state for one map reduce job
+%% @doc state for one map reduce node
 %% @version $Id$
 -module(mr_state).
 -author('fajerski@zib.de').
@@ -67,7 +67,7 @@
 -type(jobid() :: nonempty_string()).
 
 -record(state, {jobid       = ?required(state, jobid) :: jobid()
-                , client    = null :: comm:mypid() | null
+                , client    = false :: comm:mypid() | false
                 , master_id = ?required(state, master_id) :: ?RT:key()
                 , phases    = ?required(state, phases) :: [phase(),...]
                 , options   = ?required(state, options) :: [mr:option()]
