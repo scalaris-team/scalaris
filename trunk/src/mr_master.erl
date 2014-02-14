@@ -33,7 +33,8 @@
 
 -include("scalaris.hrl").
 
--type state() :: {AckedInterval::intervals:interval(),
+-type state() :: {Id::?RT:key(),
+                  AckedInterval::intervals:interval(),
                   CurrentRound::non_neg_integer()}.
 
 -type(message() :: {mr_master, mr_state:jobid(), snapshot, {work_done, [term()]},
@@ -50,43 +51,45 @@ init_job(State, JobId, Job, Client) ->
                                           Client}),
     comm:send_local(pid_groups:get_my(wpool),
                     {do_work, Reply, {snapshot}}),
-    dht_node_state:set_mr_master_state(State, JobId, {[], 0}).
+    dht_node_state:set_mr_master_state(State, JobId,
+                                       {dht_node_state:get(State, node_id),[], 0}).
 
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state().
 on({mr_master, JobId, snapshot, {work_done, Data}, Job, Client}, State) ->
     FilteredData = filter_data(Data, element(2, Job)),
+    {Id, _Acked, _Round} = dht_node_state:get_mr_master_state(State, JobId),
     ?TRACE("mr_master: starting job ~p~n", [JobId]),
     bulkowner:issue_bulk_distribute(uid:get_global_uid(),
                                     dht_node, 7,
                                     {mr, job, JobId,
-                                     dht_node_state:get(State, node_id),
+                                     Id,
                                      Client, Job, '_'},
                                     FilteredData),
     State;
 
 on({mr_master, JobId, phase_completed, Range}, State) ->
-    {I, Round} = dht_node_state:get_mr_master_state(State, JobId),
+    {Id, I, Round} = dht_node_state:get_mr_master_state(State, JobId),
     NewInterval = intervals:union(I, Range),
     NewMRState = case intervals:is_all(NewInterval) of
         false ->
             ?TRACE("mr_master_~s: phase ~p not yet completed...~n",
                      [JobId, Round]),
-            {NewInterval, Round};
+            {Id, NewInterval, Round};
         _ ->
             ?TRACE("mr_master_~s: phase ~p completed...initiating next phase~n",
                      [JobId, Round]),
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                        {mr, next_phase, JobId, Round + 1}),
-            {[], Round + 1}
+            {Id, [], Round + 1}
     end,
     dht_node_state:set_mr_master_state(State, JobId, NewMRState);
 
 on({mr_master, JobId, job_completed, Range}, State) ->
-    {I, Round} = dht_node_state:get_mr_master_state(State, JobId),
+    {Id, I, Round} = dht_node_state:get_mr_master_state(State, JobId),
     NewInterval = intervals:union(I, Range),
     case intervals:is_all(NewInterval) of
         false ->
-            dht_node_state:set_mr_master_state(State, JobId, {NewInterval, Round});
+            dht_node_state:set_mr_master_state(State, JobId, {Id, NewInterval, Round});
         _ ->
             ?TRACE("mr_master_~s: job completed...shutting down~n",
                      [JobId]),
