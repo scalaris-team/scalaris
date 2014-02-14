@@ -68,28 +68,23 @@ on({mr, init, Client, JobId, Job}, State) ->
            [comm:this(), Client, Job]),
     case validate_job(Job) of
         ok ->
-            JobDesc = {"mr_master_" ++ JobId,
-                       {mr_master, start_link,
-                        [pid_groups:my_groupname(), {JobId}]},
-                       temporary, brutal_kill, worker, []},
-            SupDHT = pid_groups:get_my(sup_dht_node),
-            %% TODO handle failed starts
-            {ok, Pid} = supervisor:start_child(SupDHT, JobDesc),
-            comm:send_local(Pid, {start_job, Client, Job});
+            mr_master:init_job(State, JobId, Job, Client);
         {error, Reason} ->
-            comm:send(Client, {mr_results, {error, Reason}, intervals:all(), JobId})
-    end,
-    State;
+            comm:send(Client, {mr_results, {error, Reason}, intervals:all(),
+                               JobId}),
+            State
+    end;
 
 on({bulk_distribute, _Id, Interval,
-    {mr, job, JobId, Master, Client, Job, InitalData}, _Parents}, State) ->
+    {mr, job, JobId, MasterId, Client, Job, InitalData}, _Parents}, State) ->
     %% this message starts the worker supervisor and adds a job specific state
     %% to the dht node
     ?TRACE("mr_~s on ~p: received job with initial data: ~p...~n",
            [JobId, self(), InitalData]),
-    JobState = mr_state:new(JobId, Client, Master, InitalData, Job, Interval),
+    JobState = mr_state:new(JobId, Client, MasterId, InitalData, Job, Interval),
     %% send acc to master
-    comm:send(Master, {mr, phase_completed, Interval}),
+    api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, phase_completed,
+                                            Interval}),
     dht_node_state:set_mr_state(State, JobId, JobState);
 
 on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
@@ -108,8 +103,10 @@ on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
                                             {ets, Data});
         _ ->
             ?TRACE("jobs last phase done...sending to client~n", []),
-            Master = mr_state:get(MRState, master),
-            comm:send(Master, {mr, job_completed, Range}),
+            MasterId = mr_state:get(MRState, master_id),
+            api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId,
+                                                     job_completed,
+                                                     Range}),
             Client = mr_state:get(MRState, client),
             comm:send(Client, {mr_results,
                                ets:select(Data, [{{'_','$1','$2'}, [], [{{'$1', '$2'}}]}]),
@@ -123,8 +120,8 @@ on({mr, phase_result, JobId, {worker_died, Reason}, Range, _Round}, State) ->
     %% for now abort the job
     ?TRACE("runtime error in phase...terminating job~n", []),
     MRState = dht_node_state:get_mr_state(State, JobId),
-    Master = mr_state:get(MRState, master),
-    comm:send(Master, {mr, job_error, Range}),
+    MasterId = mr_state:get(MRState, master_id),
+    api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, job_error, Range}),
     Client = mr_state:get(MRState, client),
     comm:send(Client, {mr_results, {error, Reason}, Range, JobId}),
     State;
@@ -152,8 +149,8 @@ on({mr, next_phase_data_ack, AckInterval, JobId, DeliveryInterval}, State) ->
                                     AckInterval),
     case mr_state:is_acked_complete(NewMRState) of
         true ->
-            Master = mr_state:get(NewMRState, master),
-            comm:send(Master, {mr, phase_completed, DeliveryInterval}),
+            MasterId = mr_state:get(NewMRState, master_id),
+            api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, phase_completed, DeliveryInterval}),
             ?TRACE("Phase complete...~p informing master~n", [self()]);
         false ->
             ?TRACE("~p is still waiting for phase to complete~n", [self()])
@@ -193,12 +190,12 @@ work_on_phase(JobId, State, Round) ->
             case mr_state:is_last_phase(MRState, Round) of
                 false ->
                     %% io:format("no data for phase...done...~p informs master~n", [self()]),
-                    Master = mr_state:get(MRState, master),
-                    comm:send(Master, {mr, phase_completed, AckInterval});
+                    MasterId = mr_state:get(MRState, master_id),
+                    api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, phase_completed, AckInterval});
                 _ ->
                     %% io:format("last phase and no data ~p~n", [Round]),
-                    Master = mr_state:get(MRState, master),
-                    comm:send(Master, {mr, job_completed, AckInterval}),
+                    MasterId = mr_state:get(MRState, master_id),
+                    api_dht_raw:unreliable_lookup(MasterId, {mr_master, JobId, job_completed, AckInterval}),
                     Client = mr_state:get(MRState, client),
                     comm:send(Client, {mr_results, [], AckInterval, JobId})
             end;

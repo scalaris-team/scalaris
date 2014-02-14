@@ -66,7 +66,7 @@
 
 -record(state, {jobid       = ?required(state, jobid) :: jobid()
                 , client    = null :: comm:mypid() | null
-                , master    = null :: comm:mypid() | null
+                , master_id = ?required(state, master_id) :: ?RT:key()
                 , phases    = ?required(state, phases) :: [phase(),...]
                 , options   = ?required(state, options) :: [mr:option()]
                 , acked     = intervals:empty() :: intervals:interval()
@@ -80,23 +80,23 @@
          (state(), phases)          -> [phase()];
          (state(), options)         -> [mr:option()];
          (state(), phase_res)         -> db_ets:db().
-get(#state{client     = Client
-           , master   = Master
-           , jobid    = JobId
-           , phases   = Phases
-           , options  = Options
-           , phase_res  = PhaseRes
+get(#state{client        = Client
+           , master_id   = Master
+           , jobid       = JobId
+           , phases      = Phases
+           , options     = Options
+           , phase_res   = PhaseRes
           }, Key) ->
     case Key of
-        client   -> Client;
-        master   -> Master;
-        phases   -> Phases;
-        options  -> Options;
-        phase_res  -> PhaseRes;
-        jobid    -> JobId
+        client      -> Client;
+        master_id   -> Master;
+        phases      -> Phases;
+        options     -> Options;
+        phase_res   -> PhaseRes;
+        jobid       -> JobId
     end.
 
--spec new(jobid(), comm:mypid(), comm:mypid(), data_list(),
+-spec new(jobid(), comm:mypid(), ?RT:key(), data_list(),
           mr:job_description(), intervals:interval()) ->
     state().
 new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
@@ -124,7 +124,7 @@ new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
     NewState = #state{
                   jobid      = JobId
                   , client   = Client
-                  , master   = Master
+                  , master_id   = Master
                   , phases   = PhasesWithData
                   , options  = JobOptions
                   , phase_res = TmpETS

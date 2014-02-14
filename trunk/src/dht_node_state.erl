@@ -54,7 +54,10 @@
 %% map reduce
 -export([set_mr_state/3,
          get_mr_state/2,
-         delete_mr_state/2]).
+         delete_mr_state/2,
+         set_mr_master_state/3,
+         get_mr_master_state/2,
+         delete_mr_master_state/2]).
 
 
 -ifdef(with_export_type_support).
@@ -107,7 +110,8 @@
                 lease_db4 = ?required(state, prbr_state) :: prbr:state(),
                 lease_list = ?required(state, lease_list) :: lease_list:lease_list(),
                 snapshot_state   = null :: snapshot_state:snapshot_state() | null,
-                mr_state   = ?required(state, mr_state)  :: orddict:orddict()
+                mr_state   = ?required(state, mr_state)  :: orddict:orddict(),
+                mr_master_state   = ?required(state, mr_master_state)  :: orddict:orddict()
                }).
 -opaque state() :: #state{}.
 %% userdevguide-end dht_node_state:state
@@ -132,7 +136,8 @@ new(RT, RMState, DB) ->
            lease_db4 = prbr:init(lease_db4),
            lease_list = lease_list:empty(),
            snapshot_state = snapshot_state:new(),
-           mr_state = orddict:new()
+           mr_state = orddict:new(),
+           mr_master_state = orddict:new()
           }.
 
 %% @doc Gets the given property from the dht_node state.
@@ -205,15 +210,14 @@ new(RT, RMState, DB) ->
          (state(), lease_db2) -> prbr:state();
          (state(), lease_db3) -> prbr:state();
          (state(), lease_db4) -> prbr:state();
-         (state(), lease_list) -> lease_list:lease_list();
-         (state(), mr_state) -> orddict:orddict().
+         (state(), lease_list) -> lease_list:lease_list().
 get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
            db=DB, tx_tp_db=TxTpDb, proposer=Proposer,
            slide_pred=SlidePred, slide_succ=SlideSucc,
            db_range=DBRange, monitor_proc=MonitorProc, prbr_kv_db=PRBRState,
            txid_db1=TxIdDB1, txid_db2=TxIdDB2, txid_db3=TxIdDB3, txid_db4=TxIdDB4,
            lease_db1=LeaseDB1, lease_db2=LeaseDB2, lease_db3=LeaseDB3, lease_db4=LeaseDB4, lease_list=LeaseList,
-		   snapshot_state=SnapState, mr_state=MRState} = State, Key) ->
+		   snapshot_state=SnapState} = State, Key) ->
     case Key of
         rt           -> RT;
         rt_size      -> ?RT:get_size(RT);
@@ -266,8 +270,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         lease_db2    -> LeaseDB2;
         lease_db3    -> LeaseDB3;
         lease_db4    -> LeaseDB4;
-        lease_list   -> LeaseList;
-        mr_state     -> MRState
+        lease_list   -> LeaseList
     end.
 
 -spec get_prbr_state(state(), db_selector()) -> prbr:state().
@@ -380,6 +383,18 @@ set_mr_state(#state{mr_state = MRStates} = State, JobId, MRState) ->
 -spec delete_mr_state(State::state(), nonempty_string()) -> state().
 delete_mr_state(#state{mr_state = MRStateList} = State, JobId) ->
     State#state{mr_state = orddict:erase(JobId, MRStateList)}.
+
+-spec get_mr_master_state(State::state(), mr_state:jobid()) -> mr_master:state().
+get_mr_master_state(#state{mr_master_state = MRMStates}, JobId) ->
+    orddict:fetch(JobId, MRMStates).
+
+-spec set_mr_master_state(State::state(), nonempty_string(), mr_master:state()) -> state().
+set_mr_master_state(#state{mr_master_state = MRMStates} = State, JobId, MRMState) ->
+    State#state{mr_master_state = orddict:store(JobId, MRMState, MRMStates)}.
+
+-spec delete_mr_master_state(State::state(), nonempty_string()) -> state().
+delete_mr_master_state(#state{mr_master_state = MRMStateList} = State, JobId) ->
+    State#state{mr_master_state = orddict:erase(JobId, MRMStateList)}.
 
 -spec add_db_range(State::state(), Interval::intervals:interval(),
                    SlideId::slide_op:id()) -> state().
@@ -629,7 +644,7 @@ get_split_key(State, Begin, End, TargetLoad, Direction) ->
 
 -spec get_mr_slide_states(state(), intervals:interval()) -> {state(),
                                                              orddict:orddict()}.
-get_mr_slide_states(State, MovInterval) ->
+get_mr_slide_states(State = #state{mr_state = MRStates}, MovInterval) ->
     SlideStates = orddict:fold(
       fun(K, MRState, MovingAcc) ->
               Moving = mr_state:split_slide_state(MRState, MovInterval),
@@ -637,38 +652,37 @@ get_mr_slide_states(State, MovInterval) ->
 
       end,
       orddict:new(),
-      get(State, mr_state)),
+      MRStates),
     {State, SlideStates}.
 
 -spec merge_mr_states(state(), orddict:orddict()) -> state().
-merge_mr_states(State, MRStates) ->
+merge_mr_states(State = #state{mr_state = MRStates1}, MRStates2) ->
     %% merge the two dicts. if they exist is both use the local state since no
     %% data has been moved yet and the rest should be the same
     NewMRStates = orddict:merge(fun mr_state:add_slide_state/3,
-                              get(State, mr_state),
-                              MRStates),
-    io:format("~p:new mr state: ~p~n", [self(), NewMRStates]),
+                              MRStates1,
+                              MRStates2),
     State#state{mr_state = NewMRStates}.
 
 -spec mr_get_delta_states(state(), intervals:interval()) -> {state(),
                                                              orddict:orddict()}.
-mr_get_delta_states(State, Interval) ->
-    {MRStates, MRDelta} = orddict:fold(
+mr_get_delta_states(State = #state{mr_state = MRStates}, Interval) ->
+    {NewMRStates, MRDelta} = orddict:fold(
      fun(K, MRState, {StateAcc, DeltaAcc}) ->
              {NewState, Delta} = mr_state:get_slide_delta(MRState, Interval),
              {orddict:store(K, NewState, StateAcc),
               orddict:store(K, Delta, DeltaAcc)}
      end,
      {orddict:new(), orddict:new()},
-     get(State, mr_state)),
-    {State#state{mr_state = MRStates}, MRDelta}.
+     MRStates),
+    {State#state{mr_state = NewMRStates}, MRDelta}.
 
 -spec mr_add_delta(state(), orddict:orddict()) -> state().
-mr_add_delta(State, DeltaStates) ->
+mr_add_delta(State = #state{mr_state = MRStates}, DeltaStates) ->
     NewMRState = orddict:map(
      fun(K, MRState) ->
              mr_state:add_slide_delta(MRState,
                                       orddict:fetch(K, DeltaStates))
      end,
-     get(State, mr_state)),
+     MRStates),
     State#state{mr_state = NewMRState}.

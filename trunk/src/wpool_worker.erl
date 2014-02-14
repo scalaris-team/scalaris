@@ -134,7 +134,10 @@ work(Source, {_Round, reduce, {jsanon, Fun}, Data, Interval, Acc}) ->
                 end,
                 Acc,
                 Res),
-    return(Source, Results).
+    return(Source, Results);
+work(Source, {snapshot}) ->
+    Snapshot = api_tx:get_system_snapshot(),
+    return(Source, Snapshot).
 %% TODO add generic work loads
 
 %% @doc applies Fun with Args.

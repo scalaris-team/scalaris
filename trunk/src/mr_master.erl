@@ -16,92 +16,91 @@
 %% @doc Map reduce master file
 %%      The master is in charge of orchestrating the single phases of the job.
 %% @end
-%%      So far it is the single point of failiure. It should be replicated and
+%%      So far it is the single point of failure. It should be replicated and
 %%      it should have a mechanism to recover to an earlier stage of the job
 %% @version $Id$
 -module(mr_master).
 -author('fajerski@zib.de').
 -vsn('$Id$ ').
 
-%% -define(TRACE(X, Y), io:format(X, Y)).
--define(TRACE(X, Y), ok).
-
--behaviour(gen_component).
+-define(TRACE(X, Y), io:format(X, Y)).
+%% -define(TRACE(X, Y), ok).
 
 -export([
-        start_link/2
-        , on/2
-        , init/1
+         init_job/4,
+         on/2
         ]).
 
 -include("scalaris.hrl").
 
--type state() :: {JobID::nonempty_string(),
-                  AckedInterval::intervals:interval(),
+-type state() :: {AckedInterval::intervals:interval(),
                   CurrentRound::non_neg_integer()}.
 
--type(message() :: {start_job, comm:mypid(), mr:job_description()} |
-                   {mr, phase_completed, intervals:interval()} |
-                   {mr, job_completed, intervals:interval()}).
+-type(message() :: {mr_master, mr_state:jobid(), snapshot, {work_done, [term()]},
+                    mr:job_description(), comm:mypid()} |
+                   {mr_master, mr_state:jobid(), phase_completed, intervals:interval()} |
+                   {mr_master, mr_state:jobid(), job_completed, intervals:interval()} |
+                   {mr_master, mr_state:jobid(), job_error, intervals:interval()}).
 
--spec init({nonempty_string()}) -> state().
-init({JobId}) ->
-    {JobId, [], 0}.
+-spec init_job(dht_node_state:state(), nonempty_string(), mr:job_description(),
+              comm:mypid()) ->
+    dht_node_state:state().
+init_job(State, JobId, Job, Client) ->
+    Reply = comm:reply_as(comm:this(), 4, {mr_master, JobId, snapshot, '_', Job,
+                                          Client}),
+    comm:send_local(pid_groups:get_my(wpool),
+                    {do_work, Reply, {snapshot}}),
+    dht_node_state:set_mr_master_state(State, JobId, {[], 0}).
 
--spec start_link(pid_groups:groupname(), tuple()) -> {ok, pid()}.
-start_link(DHTNodeGroup, Options) ->
-    ?TRACE("mr_master: running on node ~p~n", [DHTNodeGroup]),
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, Options,
-                             [{pid_groups_join_as, DHTNodeGroup, "mr_master_" ++
-                              element(1, Options)}]).
-
--spec on(message(), state()) -> state().
-on({start_job, Client, Job}, {JobId, _Acks, 0} = State) ->
-    Data = filter_data(api_tx:get_system_snapshot(),
-                          element(2, Job)),
-    ?TRACE("mr_master: job ~p started~n", [JobId]),
+-spec on(message(), dht_node_state:state()) -> dht_node_state:state().
+on({mr_master, JobId, snapshot, {work_done, Data}, Job, Client}, State) ->
+    FilteredData = filter_data(Data, element(2, Job)),
+    ?TRACE("mr_master: starting job ~p~n", [JobId]),
     bulkowner:issue_bulk_distribute(uid:get_global_uid(),
-                                    dht_node, 7, {mr, job, JobId, comm:this(),
-                                                  Client, Job, '_'},
-                                    Data),
+                                    dht_node, 7,
+                                    {mr, job, JobId,
+                                     dht_node_state:get(State, node_id),
+                                     Client, Job, '_'},
+                                    FilteredData),
     State;
 
-on({mr, phase_completed, Range}, {JobId, I, Round}) ->
+on({mr_master, JobId, phase_completed, Range}, State) ->
+    {I, Round} = dht_node_state:get_mr_master_state(State, JobId),
     NewInterval = intervals:union(I, Range),
-    case intervals:is_all(NewInterval) of
+    NewMRState = case intervals:is_all(NewInterval) of
         false ->
-            %% ?TRACE("mr_master_~s: phase completed...~p~n",
-            %%          [JobId, Range]),
-            {JobId, NewInterval, Round};
+            ?TRACE("mr_master_~s: phase ~p not yet completed...~n",
+                     [JobId, Round]),
+            {NewInterval, Round};
         _ ->
             ?TRACE("mr_master_~s: phase ~p completed...initiating next phase~n",
-                     [Round, JobId]),
+                     [JobId, Round]),
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                        {mr, next_phase, JobId, Round + 1}),
-            {JobId, [], Round + 1}
-    end;
+            {[], Round + 1}
+    end,
+    dht_node_state:set_mr_master_state(State, JobId, NewMRState);
 
-on({mr, job_completed, Range}, {JobId, I, Round}) ->
+on({mr_master, JobId, job_completed, Range}, State) ->
+    {I, Round} = dht_node_state:get_mr_master_state(State, JobId),
     NewInterval = intervals:union(I, Range),
     case intervals:is_all(NewInterval) of
         false ->
-            {JobId, NewInterval, Round};
+            dht_node_state:set_mr_master_state(State, JobId, {NewInterval, Round});
         _ ->
             ?TRACE("mr_master_~s: job completed...shutting down~n",
                      [JobId]),
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                        {mr, terminate_job, JobId}),
-            exit(self(), shutdown),
-            {JobId, [], Round}
+            dht_node_state:delete_mr_master_state(State, JobId)
     end;
 
-on({mr, job_error, _Range}, {JobId, _I, _Round} = State) ->
+on({mr_master, JobId, job_error, _Range}, State) ->
     ?TRACE("mr_master_~s: job crashed...shutting down~n",
              [JobId]),
     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                {mr, terminate_job, JobId}),
-    exit(self(), shutdown),
-    State;
+    dht_node_state:delete_mr_master_state(State, JobId);
 
 on(Msg, State) ->
     ?TRACE("~p mr_master: revceived ~p~n",
