@@ -67,8 +67,7 @@
 -spec start_job(mr:job_description()) -> [any()].
 start_job(Job) ->
     Id = randoms:getRandomString(),
-    comm:send_local(pid_groups:find_a(dht_node),
-                    {mr, init, comm:this(), Id, Job}),
+    api_dht_raw:unreliable_lookup(api_dht:hash_key(Id), {mr, init, comm:this(), Id, Job}),
     wait_for_results([], intervals:empty(), Id).
 
 -spec wait_for_results([any()], intervals:interval(), nonempty_string()) -> [any()].
