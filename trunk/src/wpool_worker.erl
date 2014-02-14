@@ -21,8 +21,8 @@
 -author('fajerski@zib.de').
 -vsn('$Id$ ').
 
--define(TRACE(X, Y), ok).
-%% -define(TRACE(X, Y), io:format(X, Y)).
+%% -define(TRACE(X, Y), ok).
+-define(TRACE(X, Y), io:format(X, Y)).
 
 -behaviour(gen_component).
 
@@ -61,50 +61,81 @@ on(Msg, State) ->
 %%      executes Job and returns results to the local wpool. wpool associates
 %%      the worker pid to the jobs client and knows where the results go.
 -spec work(comm:mypid (), wpool:job()) -> ok.
-work(Source, {_Round, map, {erlanon, Fun}, Data, ResTable}) ->
-    ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
+work(Source, {_Round, map, {erlanon, Fun}, Data, Interval, ResTable}) ->
+    ?TRACE("worker: should apply map ~p to ~p in ~p~n", [Fun, Data, Interval]),
     Results =
-    ets:foldl(fun({_HK, K, V}, Acc) ->
-                      Res = apply_erl(Fun, {K, V}),
-                      mr_state:accumulate_data(Res, Acc)
-              end,
-              ResTable, Data),
+    lists:foldl(fun(SimpleInterval, Acc1) ->
+                        db_ets:foldl(Data,
+                                     fun(HK, Acc) ->
+                                             {_HK, K, V} = db_ets:get(Data, HK),
+                                             Res = apply_erl(Fun, {K, V}),
+                                             mr_state:accumulate_data(Res, Acc)
+                                     end,
+                                     Acc1, SimpleInterval)
+                end,
+                ResTable, Interval),
     return(Source, Results);
-work(Source, {_Round, reduce, {erlanon, Fun}, Data, Acc}) ->
-    Res = apply_erl(Fun,
-                    ets:foldl(fun({_HK, K, V}, AccFold) -> [{K, V} | AccFold] end,
-                              [],
-                              Data)),
-    %% TODO insert can handle lists
+work(Source, {_Round, reduce, {erlanon, Fun}, Data, Interval, Acc}) ->
+    ?TRACE("worker: should apply redcue ~p to ~p in ~p~n", [Fun, Data, Interval]),
+    Args = lists:foldl(fun(SimpleInterval, Acc1) ->
+                               db_ets:foldl(Data,
+                                            fun(HK, AccFold) ->
+                                                    {_HK, K, V} =
+                                                    db_ets:get(Data, HK),
+                                                    [{K, V} | AccFold]
+                                            end,
+                                         Acc1,
+                                         SimpleInterval)
+                       end,
+                       [],
+                       Interval),
+    Res = apply_erl(Fun, Args),
     Results = lists:foldl(fun({K, V}, ETSAcc) ->
-                        ets:insert(ETSAcc, {?RT:hash_key(K), K, V}),
+                        db_ets:put(ETSAcc, {?RT:hash_key(K), K, V}),
                         ETSAcc
                 end,
                 Acc,
                 Res),
     return(Source, Results);
 
-work(Source, {_Round, map, {jsanon, FunBin}, Data, ResTable}) ->
+work(Source, {_Round, map, {jsanon, Fun}, Data, Interval, ResTable}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     {ok, VM} = js_driver:new(),
     Results =
-    ets:foldl(fun(E, Acc) ->
-                      Res = apply_js(FunBin, [E], VM),
-                      mr_state:accumulate_data(Res, Acc)
-              end,
-              ResTable, Data),
+    lists:foldl(fun(SimpleInterval, Acc1) ->
+                        db_ets:foldl(Data,
+                                     fun(HK, Acc) ->
+                                             {_HK, K, V} = db_ets:get(Data, HK),
+                                             Res = apply_js(Fun, [{K, V}], VM),
+                                             mr_state:accumulate_data(Res, Acc)
+                                     end,
+                                     Acc1, SimpleInterval)
+                end,
+                ResTable, Interval),
     return(Source, Results);
-work(Source, {_Round, reduce, {jsanon, FunBin}, Data, Acc}) ->
+work(Source, {_Round, reduce, {jsanon, Fun}, Data, Interval, Acc}) ->
     {ok, VM} = js_driver:new(),
-    Res = apply_js(FunBin, [ets:tab2list(Data)], VM),
-    %% TODO insert can handle lists
+    Args = lists:foldl(fun(SimpleInterval, Acc1) ->
+                               db_ets:foldl(Data,
+                                            fun(HK, AccFold) ->
+                                                    {_HK, K, V} =
+                                                    db_ets:get(Data, HK),
+                                                    [{K, V} | AccFold]
+                                            end,
+                                         Acc1,
+                                         SimpleInterval)
+                       end,
+                       [],
+                       Interval),
+    Res = apply_js(Fun, [Args], VM),
     Results = lists:foldl(fun({K, V}, ETSAcc) ->
-                        ets:insert(ETSAcc, {K, V}),
+                        db_ets:put(ETSAcc, {?RT:hash_key(K), K, V}),
                         ETSAcc
                 end,
                 Acc,
                 Res),
     return(Source, Results).
+%% TODO add generic work loads
 
 %% @doc applies Fun with Args.
 -spec apply_erl(Fun::fun((Arg::term()) -> Res::A), Args::term()) -> A.
