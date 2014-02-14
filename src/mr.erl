@@ -91,7 +91,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
     %% processing of phase results from worker.
     %% distribute data and start sync phase
     ?TRACE("mr_~s on ~p: received phase results (round ~p) for interval ~p:~n~p...~ndistributing...~n",
-           [JobId, self(), Round, Range, ets:tab2list(Data)]),
+           [JobId, self(), Round, Range, Data]),
     MRState = dht_node_state:get_mr_state(State, JobId),
     NewMRState = mr_state:interval_processed(MRState, Range, Round),
     case mr_state:is_last_phase(MRState, Round) of
@@ -99,8 +99,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
             Ref = uid:get_global_uid(),
             bulkowner:issue_bulk_distribute(Ref, dht_node,
                                             5, {mr, next_phase_data, JobId,
-                                                Range, '_', Round},
-                                            {ets, Data});
+                                                Range, '_', Round}, Data);
         _ ->
             ?TRACE("jobs last phase done...sending to client~n", []),
             MasterId = mr_state:get(MRState, master_id),
@@ -109,8 +108,7 @@ on({mr, phase_result, JobId, {work_done, Data}, Range, Round}, State) ->
                                                      Range}),
             Client = mr_state:get(MRState, client),
             comm:send(Client, {mr_results,
-                               ets:select(Data, [{{'_','$1','$2'}, [], [{{'$1', '$2'}}]}]),
-                               %% ets:tab2list(Data),
+                               [{K, V} || {_HK, K, V} <- Data],
                                Range, JobId})
     end,
     dht_node_state:set_mr_state(State, JobId, NewMRState);
@@ -182,8 +180,6 @@ on(Msg, State) ->
 work_on_phase(JobId, State, Round) ->
     MRState = mr_state:reset_acked(dht_node_state:get_mr_state(State, JobId)),
     {Round, MoR, FunTerm, ETS, Open, _Working} = mr_state:get_phase(MRState, Round),
-    TmpETS = mr_state:get(MRState, phase_res),
-    ets:delete_all_objects(TmpETS),
     NewMrState = case db_ets:get_load(ETS) of
         0 ->
             ?TRACE("mr_~s on ~p: no data for this phase...phase complete ~p~n",
@@ -213,8 +209,7 @@ work_on_phase(JobId, State, Round) ->
             Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
                                                    Open, Round}),
             comm:send_local(pid_groups:get_my(wpool),
-                            {do_work, Reply, {Round, MoR, FunTerm, ETS, Open,
-                                              TmpETS}}),
+                            {do_work, Reply, {Round, MoR, FunTerm, ETS, Open}}),
             mr_state:interval_processing(MRState, Open, Round)
 
     end,

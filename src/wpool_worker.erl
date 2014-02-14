@@ -61,7 +61,7 @@ on(Msg, State) ->
 %%      executes Job and returns results to the local wpool. wpool associates
 %%      the worker pid to the jobs client and knows where the results go.
 -spec work(comm:mypid (), wpool:job()) -> ok.
-work(Source, {_Round, map, {erlanon, Fun}, Data, Interval, ResTable}) ->
+work(Source, {_Round, map, {erlanon, Fun}, Data, Interval}) ->
     ?TRACE("worker: should apply map ~p to ~p in ~p~n", [Fun, Data, Interval]),
     Results =
     lists:foldl(fun(SimpleInterval, Acc1) ->
@@ -74,9 +74,9 @@ work(Source, {_Round, map, {erlanon, Fun}, Data, Interval, ResTable}) ->
                                      end,
                                      Acc1, SimpleInterval)
                 end,
-                ResTable, Interval),
+                [], Interval),
     return(Source, Results);
-work(Source, {_Round, reduce, {erlanon, Fun}, Data, Interval, Acc}) ->
+work(Source, {_Round, reduce, {erlanon, Fun}, Data, Interval}) ->
     ?TRACE("worker: should apply redcue ~p to ~p in ~p~n", [Fun, Data, Interval]),
     Args = lists:foldl(fun(SimpleInterval, Acc1) ->
                                db_ets:foldl(Data,
@@ -92,15 +92,9 @@ work(Source, {_Round, reduce, {erlanon, Fun}, Data, Interval, Acc}) ->
                        Interval),
     ?TRACE("reducing ~p~n", [Args]),
     Res = apply_erl(Fun, Args),
-    Results = lists:foldl(fun({K, V}, ETSAcc) ->
-                        db_ets:put(ETSAcc, {?RT:hash_key(K), K, V}),
-                        ETSAcc
-                end,
-                Acc,
-                Res),
-    return(Source, Results);
+    return(Source, [{?RT:hash_key(K), K, V} || {K, V} <- Res]);
 
-work(Source, {_Round, map, {jsanon, Fun}, Data, Interval, ResTable}) ->
+work(Source, {_Round, map, {jsanon, Fun}, Data, Interval}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     {ok, VM} = js_driver:new(),
     Results =
@@ -113,9 +107,9 @@ work(Source, {_Round, map, {jsanon, Fun}, Data, Interval, ResTable}) ->
                                      end,
                                      Acc1, SimpleInterval)
                 end,
-                ResTable, Interval),
+                [], Interval),
     return(Source, Results);
-work(Source, {_Round, reduce, {jsanon, Fun}, Data, Interval, Acc}) ->
+work(Source, {_Round, reduce, {jsanon, Fun}, Data, Interval}) ->
     {ok, VM} = js_driver:new(),
     Args = lists:foldl(fun(SimpleInterval, Acc1) ->
                                db_ets:foldl(Data,
@@ -130,13 +124,7 @@ work(Source, {_Round, reduce, {jsanon, Fun}, Data, Interval, Acc}) ->
                        [],
                        Interval),
     Res = apply_js(Fun, [Args], VM),
-    Results = lists:foldl(fun({K, V}, ETSAcc) ->
-                        db_ets:put(ETSAcc, {?RT:hash_key(K), K, V}),
-                        ETSAcc
-                end,
-                Acc,
-                Res),
-    return(Source, Results);
+    return(Source, [{?RT:hash_key(K), K, V} || {K, V} <- Res]);
 work(Source, {snapshot}) ->
     Snapshot = api_tx:get_system_snapshot(),
     return(Source, Snapshot).
