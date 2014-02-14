@@ -684,18 +684,16 @@ mr_get_delta_states(State = #state{mr_state = MRStates,
     ?TRACE_MR_SLIDE("fold over master states ~p~n", [MasterStates]),
     {RemainingMasterState, MovingMasterState} =
     orddict:fold(
-     fun(K, MasterState, {StayAcc, MoveAcc}) ->
-             case intervals:in(element(1, MasterState), Interval) of
-                 true ->
-                     ?TRACE_MR_SLIDE("~p is moving because ~p~n", [MasterState,
-                                                                  Interval]),
-                     {StayAcc,
-                      orddict:store(K, MasterState, MoveAcc)};
-                 _false ->
-                     ?TRACE_MR_SLIDE("~p is staying because ~p~n", [MasterState,
-                                                                  Interval]),
-                     {orddict:store(K, MasterState, StayAcc),
-                      MoveAcc}
+     fun(K, MasterState, {StateAcc, DeltaAcc}) ->
+             case mr_master_state:get_slide_delta(MasterState, Interval) of
+                 {false, Delta} ->
+                     %% slide
+                     {StateAcc,
+                      orddict:store(K, Delta, DeltaAcc)};
+                 {NewState, false} ->
+                     %% no slide
+                     {orddict:store(K, NewState, StateAcc),
+                      DeltaAcc}
              end
      end,
      {orddict:new(), orddict:new()},
@@ -707,7 +705,7 @@ mr_get_delta_states(State = #state{mr_state = MRStates,
                  mr_master_state = RemainingMasterState},
      {MRDelta, MovingMasterState}}.
 
--spec mr_add_delta(state(), orddict:orddict()) -> state().
+-spec mr_add_delta(state(), {orddict:orddict(), orddict:orddict()}) -> state().
 mr_add_delta(State = #state{mr_state = MRStates,
                             mr_master_state = MasterStates},
              {MRDeltaStates, MasterDelta}) ->
