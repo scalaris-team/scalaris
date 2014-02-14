@@ -23,7 +23,8 @@
 -author('fajerski@zib.de').
 -vsn('$Id$ ').
 
--define(TRACE(X, Y), io:format(X, Y)).
+%% -define(TRACE(X, Y), io:format(X, Y)).
+-define(TRACE(X, Y), ok).
 
 -behaviour(gen_component).
 

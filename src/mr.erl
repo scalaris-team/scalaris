@@ -23,6 +23,7 @@
 -vsn('$Id$ ').
 
 -define(TRACE(X, Y), io:format(X, Y)).
+%% -define(TRACE(X, Y), ok).
 
 -export([
         on/2
@@ -77,7 +78,7 @@ on({mr, init, Client, JobId, Job}, State) ->
 on({bulk_distribute, _Id, _Interval,
     {mr, job, JobId, Master, Client, Job, InitalData}, _Parents}, State) ->
     ?TRACE("mr_~s on ~p: received job with initial data: ~p...~n",
-           [JobId, self(), hd(InitalData)]),
+           [JobId, self(), lists:sublist(InitalData, 1)]),
     %% @doc
     %% this message starts the worker supervisor and adds a job specific state
     %% to the dht node
@@ -93,7 +94,7 @@ on({bulk_distribute, _Id, _Interval,
 
 on({mr, phase_result, JobId, {work_done, Data}, Range}, State) ->
     ?TRACE("mr_~s on ~p: received phase results: ~p...~ndistributing...~n",
-           [JobId, self(), hd(Data)]),
+           [JobId, self(), lists:sublist(Data, 1)]),
     Ref = uid:get_global_uid(),
     NewMRState = mr_state:reset_acked(dht_node_state:get_mr_state(State, JobId), Ref),
     case mr_state:is_last_phase(NewMRState) of
