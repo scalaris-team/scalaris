@@ -1,4 +1,4 @@
-%  @copyright 2008-2013 Zuse Institute Berlin
+%  @copyright 2008-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -153,6 +153,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                   randoms:start(),
                   {ok, _GroupsPid} = pid_groups:start_link(),
                   NewOptions = prepare_config(Options),
+                  config:init(NewOptions),
                   {ok, _} = sup_scalaris:start_link(NewOptions),
                   mgmt_server:connect(),
                   Ids = IdsFun(), % config may be needed
@@ -204,6 +205,7 @@ make_ring(Size, Options) ->
                   randoms:start(),
                   {ok, _GroupsPid} = pid_groups:start_link(),
                   NewOptions = prepare_config(Options),
+                  config:init(NewOptions),
                   {ok, _} = sup_scalaris:start_link(NewOptions),
                   mgmt_server:connect(),
                   First = admin:add_node([{first}]),
@@ -302,11 +304,10 @@ check_ring_size(Size, CheckFun) ->
                       receive ?SCALARIS_RECV({get_list_length_response, L}, L) end
                   catch _:_ -> Size
                   end,
-              erlang:whereis(config) =/= undefined andalso
-                  BootSize =:= Size andalso
+              BootSize =:= Size andalso
                   Size =:= erlang:length(
-                [P || P <- pid_groups:find_all(dht_node),
-                      CheckFun(gen_component:get_state(P))])
+                             [P || P <- pid_groups:find_all(dht_node),
+                                   CheckFun(gen_component:get_state(P))])
       end, 500).
 
 -spec check_ring_size(Size::non_neg_integer()) -> ok.
@@ -378,7 +379,7 @@ start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
                   {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, CTConfig),
                   ConfigOptions2 = prepare_config(
                                      [{config, [{log_path, PrivDir} | ConfigOptions]}]),
-                  {ok, _ConfigPid} = config:start_link(ConfigOptions2),
+                  config:init(ConfigOptions2),
                   {ok, _LogPid} = log:start_link(),
                   case StartCommServer of
                       true ->

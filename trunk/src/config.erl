@@ -1,4 +1,4 @@
-%  @copyright 2007-2013 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@
 -include("scalaris.hrl").
 
 -export([
-         start_link/1, start_link/2, init/2,
          read/1, write/2,
+         init/1,
          check_config/0,
 
          cfg_exists/1, cfg_is_atom/1, cfg_is_bool/1, cfg_is_mypid/1,
@@ -32,12 +32,7 @@
          cfg_is_tuple/2, cfg_is_tuple/4, cfg_is_list/1, cfg_is_list/3, cfg_is_string/1,
          cfg_is_in_range/3, cfg_is_greater_than/2, cfg_is_greater_than_equal/2,
          cfg_is_less_than/2, cfg_is_less_than_equal/2, cfg_is_in/2, cfg_is_module/1,
-         cfg_test_and_error/3,
-
-         system_continue/3,
-         system_code_change/4,
-         system_terminate/4,
-         loop/0
+         cfg_test_and_error/3
         ]).
 
 %% public functions
@@ -67,12 +62,13 @@ read(Key) ->
                         [] -> Value = util:app_get_env(Key, failed),
                               case Value of
                                   failed -> ok;
-                                  _ -> case self() =:= erlang:whereis(config)
-                                       of
-                                           true -> ets:insert(config_ets,
-                                                              {Key, Value});
-                                           _    -> write(Key, Value)
-                                       end
+                                  _ -> %% case self() =:= erlang:whereis(config)
+                                       %% of
+                                       %%    true -> ets:insert(config_ets,
+                                       %%                       {Key, Value});
+                                       %%    _    ->
+                                            write(Key, Value)
+                                       %% end
                               end,
                               erlang:put({config,Key}, Value),
                               Value
@@ -86,58 +82,29 @@ read(Key) ->
 write(Key, Value) ->
     %% config is not dynamic. But we update the local cache, so one
     %% can write config in a local context (in unittests).
+    %% io:format("Writing ~p~n", [{Key, Value}]),
     erlang:put({config,Key}, Value),
-    comm:send_local(config, {write, self(), Key, Value}),
-    receive ?SCALARIS_RECV({write_done}, ok) end.
-
-%% gen_server setup
-
-%% @doc Starts the config process and determines the config files from
-%%      the application's environment. If there is no application,
-%%      "scalaris.cfg" and "scalaris.local.cfg" are used. If Options
-%%      contains a {config, [{Key1, Value1},...]} tuple, each Key is
-%%      set to its Value in the config.
--spec start_link(Options::[tuple()]) -> {ok, pid()}.
-start_link(Options) ->
-    Files = [util:app_get_env(config, "scalaris.cfg"),
-             util:app_get_env(local_config, "scalaris.local.cfg")],
-    start_link(Files, Options).
-
-%% @doc Starts the config process. If Options contains a {config,
-%%      [{Key1, Value1},...]} tuple, each Key is set to its Value in
-%%      the config.
--spec start_link(Filename::[file:name()], Options::[tuple()]) -> {ok, pid()}.
-start_link(Files, Options) ->
-    case whereis(config) of
-        Pid when is_pid(Pid) ->
-            %% error_logger:error_msg("There is already a Config process:~n"),
-            {ok, Pid};
-        _ ->
-            TheFiles = case util:app_get_env(add_config, []) of
-                           []         -> Files;
-                           ConfigFile -> lists:append(Files, [ConfigFile])
-                       end,
-%%             error_logger:info_msg("Config files: ~p~n", [TheFiles]),
-            Owner = self(),
-            Link = spawn_link(?MODULE, init, [TheFiles, Owner]),
-            receive
-                done -> ok;
-                X    -> error_logger:error_msg("unknown config message  ~p", [X])
-            end,
-            ConfigParameters = case lists:keyfind(config, 1, Options) of
-                                   {config, ConfPars} -> ConfPars;
-                                   _ -> []
-                               end,
-            _ = [write(K, V) || {K, V} <- ConfigParameters],
-            {ok, Link}
-    end.
+    ets:insert(config_ets, {Key, Value}),
+    ok.
 
 %@private
--spec init(Files::[file:name()], Owner::pid()) -> no_return().
-init(Files, Owner) ->
-    erlang:register(config, self()),
-    _ = ets:new(config_ets, [set, protected, named_table]),
-    _ = [ populate_db(File) || File <- Files],
+-spec init(Options::[tuple()]) -> ok | no_return().
+init(Options) ->
+    Files = [util:app_get_env(config, "scalaris.cfg"),
+             util:app_get_env(local_config, "scalaris.local.cfg")],
+    _ = ets:new(config_ets, [set, public, named_table]),
+    TheFiles = case util:app_get_env(add_config, []) of
+                   []         -> Files;
+                   ConfigFile -> lists:append(Files, [ConfigFile])
+               end,
+    _ = [ populate_db(File) || File <- TheFiles],
+
+    ConfigParameters = case lists:keyfind(config, 1, Options) of
+                           {config, ConfPars} -> ConfPars;
+                           _ -> []
+                       end,
+    _ = [write(K, V) || {K, V} <- ConfigParameters],
+
     try check_config() of
         true -> ok;
         _    -> % wait so the error output can be written:
@@ -148,38 +115,7 @@ init(Files, Owner) ->
                                    [Err, Reason, erlang:get_stacktrace()]),
             init:stop(1),
             receive nothing -> ok end
-    end,
-    Owner ! done,
-    loop().
-
--spec loop() -> no_return().
-loop() ->
-    receive
-        ?SCALARIS_RECV(
-            {write, Pid, Key, Value}, %% ->
-            begin
-                ets:insert(config_ets, {Key, Value}),
-                comm:send_local(Pid, {write_done}),
-                loop()
-            end
-          );
-        %% handle sys:suspend messages
-        {system, From, Msg} ->
-            sys:handle_system_msg(Msg, From, self(), config, [], no_state);
-        _ ->
-            loop()
     end.
-
--spec system_continue(any(), any(), any()) -> none().
-system_continue(_, _, _) ->
-    %% need a full qualified function call to change to new code
-    config:loop().
--spec system_code_change(any(), config, any(), any()) -> {ok, no_state}.
-system_code_change(_State, ?MODULE, _OldVsn, _Extra) ->
-    {ok, no_state}.
--spec system_terminate(any(), any(), any(), any()) -> ok.
-system_terminate(_Reason, _Parent, _Debug, _State) ->
-    ok.
 
 %@private
 -spec populate_db(File::file:name()) -> ok | fail.
