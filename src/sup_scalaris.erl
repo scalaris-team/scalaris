@@ -1,4 +1,4 @@
-%  @copyright 2007-2013 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -104,7 +104,6 @@ childs(Options) ->
         sup:supervisor_desc(sup_comm_layer, sup_comm_layer, start_link),
     CommStats =
         sup:worker_desc(comm_stats, comm_stats, start_link, ["comm_layer"]),
-    Config = sup:worker_desc(config, config, start_link, [Options]),
     ClientsDelayer =
         sup:worker_desc(clients_msg_delay, msg_delay, start_link,
                              ["clients_group"]),
@@ -160,7 +159,6 @@ childs(Options) ->
     %% order in the following list is the start order
     BasicServers = [TraceMPath,
                     ProtoSched,
-                    Config,
                     Logger,
                     ClientsDelayer,
                     BasicServicesDelayer,
@@ -199,7 +197,6 @@ start_first_services(Options) ->
     util:if_verbose("~p start randoms...~n", [?MODULE]),
     randoms:start(),
     util:if_verbose("~p start config...~n", [?MODULE]),
-    _ = config:start_link(Options),
     ErrorLoggerFile = filename:join(config:read(log_path),
                                     config:read(log_file_name_errorlogger)),
     ok = filelib:ensure_dir(ErrorLoggerFile),

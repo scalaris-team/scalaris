@@ -103,17 +103,9 @@ tester_type_check_config(_Config) ->
            [ {cfg_is_list, 3}, %% needs a fun as parameter
              {cfg_is_tuple, 4}, %% needs a fun as parameter
              {cfg_test_and_error, 3}, %% needs a fun as parameter
-             {check_config, 0},
-             {init, 2},
-             {start_link, 1}, {start_link, 2},
-
-             {write, 2}, %% cannot write to config_ets
-             {read, 1}, %% cannot write to config
-             {system_continue, 3}, %% no return
-             {loop, 0} %% no return
+             {init, 1} %% already initialised (config_ets table exists)
            ],
-           [ {populate_db, 1}, %% cannot create config filenames
-             {process_term, 1} %% cannot write config_ets
+           [ {populate_db, 1} %% cannot create config filenames
            ]}
         ],
     %% These tests generate errors which would be too verbose.

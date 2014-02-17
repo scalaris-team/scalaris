@@ -1,4 +1,4 @@
-%  @copyright 2010-2012 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -65,10 +65,11 @@ reload_with_options(Module, MyOptions) ->
     ok = fix_cwd_scalaris(),
     case compile:file(Src, lists:append(MyOptions, Options)) of
         {ok,_ModuleName,Binary} ->
-            case Module of
-                config -> sys:suspend(config);
-                _ -> ok
-            end,
+            %% config no longer needs explicit code reload callbacks
+            %% case Module of
+            %%     config -> sys:suspend(config);
+            %%     _ -> ok
+            %% end,
             {module, Module} = code:load_binary(Module, Src, Binary),
             code:soft_purge(Module), %% remove old code
 %% check_old_code not available in Erlang < R14B04
@@ -78,18 +79,20 @@ reload_with_options(Module, MyOptions) ->
 %%                 [] -> ok;
 %%                 _ -> ct:pal("Some modules have old code after 2nd soft_purge: ~.0p~n", [Old])
 %%             end,
-            case Module of
-                config -> sys:resume(config);
-                _ -> ok
-            end,
+            %% config no longer needs explicit code reload callbacks
+            %% case Module of
+            %%     config -> sys:resume(config);
+            %%     _ -> ok
+            %% end,
             %ct:pal("~p", [code:is_loaded(Module)]),
             ok;
         {ok,_ModuleName,Binary,_Warnings} ->
             %ct:pal("~p", [_Warnings]),
-            case Module of
-                config -> sys:suspend(config);
-                _ -> ok
-            end,
+            %% config no longer needs explicit code reload callbacks
+            %% case Module of
+            %%     config -> sys:suspend(config);
+            %%     _ -> ok
+            %% end,
             {module, Module} = erlang:load_module(Module, Binary),
             code:soft_purge(Module), %% remove old code
 %% check_old_code not available in Erlang < R14B04
@@ -98,10 +101,11 @@ reload_with_options(Module, MyOptions) ->
             %%     [] -> ok;
             %%     _ -> ct:pal("Some modules have old code after 2nd soft_purge: ~.0p~n", [Old])
             %% end,
-            case Module of
-                config -> sys:resume(config);
-                _ -> ok
-            end,
+            %% config no longer needs explicit code reload callbacks
+            %% case Module of
+            %%     config -> sys:resume(config);
+            %%     _ -> ok
+            %% end,
             %ct:pal("~w", [erlang:load_module(Module, Binary)]),
             ok;
         X ->
@@ -120,7 +124,7 @@ reload_with_options(Module, MyOptions) ->
         -> {FileName::string(), Flags::list()}.
 get_src_and_flags_for_module(Module) ->
     get_src_and_flags_for_module(Module, ["ebin", "test"]).
-    
+
 -spec get_src_and_flags_for_module(module(), RelativePaths::[string(),...])
         -> {FileName::string(), Flags::list()}.
 get_src_and_flags_for_module(Module, [Path | PathL]) ->
