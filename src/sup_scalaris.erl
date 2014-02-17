@@ -41,7 +41,7 @@ start_link() -> start_link([]).
 
 %% called by unittest_helper.erl
 -spec start_link([tuple()])
-        -> {ok, Pid::pid()} | 
+        -> {ok, Pid::pid()} |
            {error, Error::{already_started, Pid::pid()} | shutdown | term()}.
 start_link(Options) ->
     ServiceGroup = "basic_services",
@@ -73,7 +73,7 @@ start_link(Options) ->
                   PeriodInSeconds::pos_integer()},
                  [ProcessDescr::supervisor:child_spec()]}}.
 init(Options) ->
-    start_first_services(Options),
+    start_first_services(),
     supspec(Options).
 
 -spec supspec(any()) -> {ok, {{one_for_one, MaxRetries::pos_integer(),
@@ -192,7 +192,7 @@ add_additional_nodes() ->
     _ = api_vm:add_nodes(Size - 1),
     ok.
 
-start_first_services(Options) ->
+start_first_services() ->
     util:if_verbose("~p start first services...~n", [?MODULE]),
     util:if_verbose("~p start randoms...~n", [?MODULE]),
     randoms:start(),
