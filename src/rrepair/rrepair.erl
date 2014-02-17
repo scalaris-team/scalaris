@@ -502,7 +502,7 @@ init([]) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso % theoretically also 'iblt', but no full support for that yet
+    config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art, trivial]) andalso % theoretically also 'iblt', but no full support for that yet
         config:cfg_is_integer(rr_session_ttl) andalso
         config:cfg_is_greater_than(rr_session_ttl, 0) andalso
         config:cfg_is_integer(rr_trigger_probability) andalso

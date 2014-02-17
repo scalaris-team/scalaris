@@ -1,4 +1,4 @@
-% @copyright 2011, 2012, 2013 Zuse Institute Berlin
+% @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -1940,7 +1940,7 @@ check_percent(Atom) ->
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art]) andalso
+    config:cfg_is_in(rr_recon_method, [bloom, merkle_tree, art, trivial]) andalso
         config:cfg_is_float(rr_recon_p1e) andalso
         config:cfg_is_greater_than(rr_recon_p1e, 0) andalso
         config:cfg_is_less_than_equal(rr_recon_p1e, 1) andalso

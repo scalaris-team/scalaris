@@ -1,4 +1,4 @@
-% @copyright 2012 Zuse Institute Berlin
+% @copyright 2012-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ init_per_suite(Config) ->
 init_per_testcase(Testcase, Config) ->
     % dc_clustering must be activated and a radius must exist
     EnableClustering = {dc_clustering_enable, true},
-    ClusterRadius = {dc_clustering_radius, 1000},
+    ClusterRadius = {dc_clustering_radius, 1000.0},
     case Testcase of
         single_node ->
             unittest_helper:stop_ring(),
