@@ -1,4 +1,4 @@
-% @copyright 2010-2013 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -77,12 +77,12 @@ join_parameters_list() ->
     [{move_wait_for_reply_timeout, 300},
      {move_send_msg_retries, 3},
      {move_send_msg_retry_delay, 0},
-     {join_request_timeout, 100},
+     {join_request_timeout, 1000},
      {join_request_timeouts, 3},
-     {join_lookup_timeout, 300},
-     {join_known_hosts_timeout, 100},
+     {join_lookup_timeout, 1000},
+     {join_known_hosts_timeout, 1000},
      {join_timeout, 3000},
-     {join_get_number_of_samples_timeout, 100}].
+     {join_get_number_of_samples_timeout, 1000}].
 
 %% check whether we may loose some lookup when join is finished and
 %% slide operations are still going on.

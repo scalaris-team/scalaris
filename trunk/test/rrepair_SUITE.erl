@@ -373,8 +373,8 @@ session_ttl(Config) ->
     FType = mixed,
     TTL = 2000,
 
-    RRConf1 = lists:keyreplace(rr_session_ttl, 1, get_rep_upd_config(Method), {rr_session_ttl, TTL / 2}),
-    RRConf = lists:keyreplace(rr_gc_interval, 1, RRConf1, {rr_gc_interval, erlang:round(TTL / 2)}),
+    RRConf1 = lists:keyreplace(rr_session_ttl, 1, get_rep_upd_config(Method), {rr_session_ttl, TTL div 2}),
+    RRConf = lists:keyreplace(rr_gc_interval, 1, RRConf1, {rr_gc_interval, erlang:round(TTL div 2)}),
 
     %build and fill ring
     build_symmetric_ring(NodeCount, Config, RRConf),
