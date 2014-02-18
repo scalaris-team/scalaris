@@ -23,7 +23,7 @@
 
 %% functions called by Erlangs init module, triggered via command line
 %% (bin/scalarisctl and erl ... '-s scalaris')
--export([start/0, stop/0]).
+-export([start/0, stop/0, load/0]).
 %% (bin/scalarisctl and erl ... '-s scalaris cli')
 -export([cli/0, process/1]).
 
@@ -36,15 +36,7 @@
 %% (bin/scalarisctl and erl ... '-s scalaris')
 -spec start() -> ok | {error, Reason::term()}.
 start() ->
-    _ = application:load(
-          {application, scalaris,
-           [{description, "scalaris"},
-            {vsn, ?SCALARIS_VERSION},
-            {mod, {scalaris, []}},
-            {registered, []},
-            {applications, [kernel, stdlib]},
-            {env, []}
-           ]}),
+    _ = load(),
     %% preload at least the API modules (for Erlang shell usage)
     _ = code:ensure_loaded(api_dht),
     _ = code:ensure_loaded(api_dht_raw),
@@ -61,6 +53,18 @@ start() ->
 -spec stop() -> ok | {error, Reason::term()}.
 stop() ->
     application:stop(scalaris).
+
+-spec load() -> 'ok' | {'error', term()}.
+load() ->
+    application:load(
+      {application, scalaris,
+       [{description, "scalaris"},
+        {vsn, ?SCALARIS_VERSION},
+        {mod, {scalaris, []}},
+        {registered, []},
+        {applications, [kernel, stdlib]},
+        {env, []}
+       ]}).
 
 %% functions called by application:start(scalaris)
 %% triggered by ?MODULE:start/0.
