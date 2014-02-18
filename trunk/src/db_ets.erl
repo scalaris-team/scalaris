@@ -75,11 +75,17 @@ open(DBName) ->
 close(DBName) ->
     ets:delete(DBName).
 
-%% @doc Saves arbitrary tuple Entry in DB DBName and returns the new DB.
+%% @doc Saves arbitrary tuple Entry or list of tuples Entries
+%%      in DB DBName and returns the new DB.
 %%      The key is expected to be the first element of Entry.
--spec put(DBName::db(), Entry::entry()) -> db().
+-spec put(DBName::db(), Entry::entry() | [Entries::entry()]) -> db().
 put(DBName, Entry) ->
-    ?ASSERT(element(1, Entry) =/= '$end_of_table'),
+    ?ASSERT(case is_list(Entry) of
+                true ->
+                    element(1, hd(Entry)) =/= '$end_of_table';
+                false ->
+                    element(1, Entry) =/= '$end_of_table'
+            end),
     ets:insert(DBName, Entry),
     DBName.
 
