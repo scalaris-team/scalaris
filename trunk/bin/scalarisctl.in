@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2007-2013 Zuse Institute Berlin
+# Copyright 2007-2014 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -334,13 +334,19 @@ checkinstallation() {
     fi
 
     CHECKCONFIGMSG=`$ERL -noinput -pa $BEAMDIR \
-        -eval "config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"], []), halt(0)." 2>&1`
+         -scalaris config \"$ETCDIR/scalaris.cfg\" \
+         -scalaris local_config \"$ETCDIR/scalaris.local.cfg\" \
+         -s scalaris load -eval "config:init([]), halt(0)." 2>&1`
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
         echo -e "$MSG_FAILED"
         echo "$CHECKCONFIGMSG"
         echo "ERROR: some parameters in the config files are wrong or missing"
-        echo "We were trying to run: $ERL -noinput -pa $BEAMDIR -eval \"config:start_link([\"$ETCDIR/scalaris.cfg\", \"$ETCDIR/scalaris.local.cfg\"], []), halt(0).\""
+        echo "We were trying to run: \
+          $ERL -noinput -pa $BEAMDIR \
+          -scalaris config \"$ETCDIR/scalaris.cfg\" \
+          -scalaris local_config \"$ETCDIR/scalaris.local.cfg\" \
+          -s scalaris load -eval \"config:init([]), halt(0).\""
         exit 1
     fi
 
