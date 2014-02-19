@@ -227,12 +227,15 @@ req_list_commit_each(ReqList) ->
     util:par_map(fun commit_req/1, ReqList, 50).
 
 %% @doc Get system snapshot
--spec get_system_snapshot() -> list().
+-spec get_system_snapshot() -> [tuple()] | {snapshot_failed,
+                                            intervals:interval(),
+                                            [tuple()]}.
 get_system_snapshot() ->
-    snapshot_leader ! {init_snapshot,comm:this()},
+    Key = ?RT:hash_key(randoms:getRandomString()),
+    api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, snapshot_leader,
+                                       {init_snapshot, comm:this()}}),
     receive
-        {global_snapshot_done,Data} ->
-            Data;
-        {global_snapshot_done_with_errors,ErrorInterval,Data} ->
-            {snapshot_failed,ErrorInterval,Data}
+        ?SCALARIS_RECV({global_snapshot_done, Data}, Data);
+        ?SCALARIS_RECV({global_snapshot_done_with_errors, ErrorInterval, Data},
+                       {snapshot_failed, ErrorInterval, Data})
     end.
