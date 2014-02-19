@@ -79,6 +79,8 @@ close(DBName) ->
 %%      in DB DBName and returns the new DB.
 %%      The key is expected to be the first element of Entry.
 -spec put(DBName::db(), Entry::entry() | [Entries::entry()]) -> db().
+put(DBName, []) ->
+    DBName;
 put(DBName, Entry) ->
     ?ASSERT(case is_list(Entry) of
                 true ->
