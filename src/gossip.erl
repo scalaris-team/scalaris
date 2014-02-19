@@ -103,7 +103,8 @@
     {cb_reply, CBModule::cb_module(), Msg::comm:message()} |
     {get_values_best, CBModule::cb_module(), SourcePid::comm:mypid()} |
     {get_values_all, CBModule::cb_module(), SourcePid::comm:mypid()} |
-    {stop_gossip_task, CBModule::cb_module()}
+    {stop_gossip_task, CBModule::cb_module()} |
+    no_msg
 ).
 
 -type message() :: bh_message() | cb_message().
@@ -153,7 +154,7 @@ deactivate() ->
 
 
 -spec start_gossip_task(CBModule, Args) -> ok when
-    CBModule :: atom() | cb_module(),
+    CBModule :: atom() | cb_module() | {cb_module(), uid:global_uid()},
     Args :: list().
 start_gossip_task(ModuleName, Args) when is_atom(ModuleName) ->
     Id = uid:get_global_uid(),
@@ -256,7 +257,7 @@ on_inactive({stop_gossip_task, _CBModule}=Msg, State) ->
     msg_queue_add(Msg, State), State;
 
 
-on_inactive({start_gossip_task, _CBModule}=Msg, State) ->
+on_inactive({start_gossip_task, _CBModule, _Args}=Msg, State) ->
     msg_queue_add(Msg, State), State;
 
 
@@ -637,7 +638,8 @@ init_gossip_task(CBModule, Args, State) ->
         true -> {is_leader, MyRange};
         false -> {no_leader, MyRange}
     end,
-    % todo no_msg is no solution
+
+    % TODO no_msg is no solution
     _ = cb_call(notify_change, [leader, LeaderMsg], no_msg, CBModule, State),
 
     % configure and add trigger
@@ -668,7 +670,9 @@ init_gossip_task(CBModule, Args, State) ->
     state_set(round, 0, CBModule, State),
 
     % set cycle status to inactive (gets activated by trigger)
-    state_set(trigger_lock, free, CBModule, State).
+    state_set(trigger_lock, free, CBModule, State),
+
+    ok.
 
 
 -spec cb_call(FunName, CBModule) -> non_neg_integer() | pos_integer() when
