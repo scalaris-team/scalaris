@@ -132,7 +132,7 @@ convergence_count_best_values() ->
 %       once every cycle).
 % 2) When receiving a request (select_reply_data()) (this happens randomly,
 %       but *on average* once per round).
-    case config:read(gossip2_convergence_count_best_values) of
+    case config:read(gossip_convergence_count_best_values) of
         failed -> 10;
         Count -> Count
     end.
@@ -140,7 +140,7 @@ convergence_count_best_values() ->
 
 -spec convergence_count_new_round() -> pos_integer().
 convergence_count_new_round() ->
-    case config:read(gossip2_convergence_count_new_round) of
+    case config:read(gossip_convergence_count_new_round) of
         failed -> 20;
         Count -> Count
     end.
@@ -171,7 +171,7 @@ request_histogram(Size, SourcePid) when Size < 1 ->
     error(badarg, [Size, SourcePid]);
 
 request_histogram(Size, SourcePid) ->
-    gossip2:start_gossip_task(?MODULE, [Size, SourcePid]).
+    gossip:start_gossip_task(?MODULE, [Size, SourcePid]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -214,7 +214,7 @@ select_data(State) ->
             request_local_info(State);
         init ->
             LoadData = prepare_load_data(State),
-            Pid = pid_groups:get_my(gossip2),
+            Pid = pid_groups:get_my(gossip),
             comm:send_local(Pid, {selected_data, state_get(instance, State), LoadData})
     end,
     {ok, State}.
@@ -237,7 +237,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
             {send_back, State};
         init when RoundStatus =:= current_round ->
             Data1 = prepare_load_data(State),
-            Pid = pid_groups:get_my(gossip2),
+            Pid = pid_groups:get_my(gossip),
             comm:send_local(Pid, {selected_reply_data, state_get(instance, State), Data1, Ref, Round}),
 
             _ = merge_load_data(current_round, PData, State),
@@ -256,7 +256,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
                     log:log(?SHOW, "[ ~w ] select_reply_data in old_round", [?MODULE]),
                     PrevState = state_get(prev_state, State),
                     Data1 = prepare_load_data(PrevState),
-                    Pid = pid_groups:get_my(gossip2),
+                    Pid = pid_groups:get_my(gossip),
                     comm:send_local(Pid, {selected_reply_data, state_get(instance, State), Data1, Ref, Round}),
                     _ = merge_load_data(prev_round, PData, State),
                     {ok, State}
@@ -314,7 +314,7 @@ handle_msg({get_state_response, DHTNodeState}, State) ->
     state_set(status, init, State),
 
     % send PData to BHModule
-    Pid = pid_groups:get_my(gossip2),
+    Pid = pid_groups:get_my(gossip),
     comm:send_local(Pid, {selected_data, state_get(instance, State), NewData}),
     {ok, State}.
 
@@ -490,7 +490,7 @@ integrate_data_init(QData, RoundStatus, State) ->
                     log:log(?SHOW, "[ ~w ] integrate_data in old_round", [?MODULE])
             end
     end,
-    Pid = pid_groups:get_my(gossip2),
+    Pid = pid_groups:get_my(gossip),
     comm:send_local(Pid, {integrated_data, state_get(instance, State), RoundStatus}),
     {ok, State}.
 
@@ -535,7 +535,7 @@ finish_request(State) ->
         true ->
             Requestor = state_get(requestor, State),
             comm:send(Requestor, {histogram, Histo}),
-            gossip2:stop_gossip_task(state_get(instance, State));
+            gossip:stop_gossip_task(state_get(instance, State));
         false -> do_nothing
     end,
     {ok, State}.
@@ -1235,7 +1235,7 @@ merge_bucket_feeder({Key1, Val1}, {_Key2, Val2}) ->
 % hack to be able to suppress warnings when testing
 -spec warn() -> log:log_level().
 warn() ->
-    case config:read(gossip2_log_level_warn) of
+    case config:read(gossip_log_level_warn) of
         failed -> warn;
         Level -> Level
     end.
