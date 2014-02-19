@@ -430,15 +430,15 @@ test_spam_transactions_and_snapshots_on_fully_joined(_) ->
 
     ct:pal("spaming transactions..."),
     SpamPid1 = erlang:spawn(fun() ->
-                    [do_transaction_a(X) || X <- lists:seq(1, 500)]
+                    [do_transaction_a(X) || X <- lists:seq(1, 100)]
           end),
     SpamPid2 = erlang:spawn(fun() ->
-                    [do_transaction_b(X) || X <- lists:seq(1, 500)]
+                    [do_transaction_b(X) || X <- lists:seq(1, 100)]
           end),
 
     ct:pal("spaming snapshots..."),
     % spam snapshots here
-    tester:test(api_tx, get_system_snapshot, 0, 100),
+    tester:test(api_tx, get_system_snapshot, 0, 10),
 
     ct:pal("waiting for transaction spam..."),
     util:wait_for_process_to_die(SpamPid1),
@@ -504,7 +504,7 @@ bench_increment(_) ->
      SpamPid1 = erlang:spawn(fun() ->
                bench:increment(1, 1000)
           end),
-    Return = tester:test(api_tx, get_system_snapshot, 0, 200),
+    Return = tester:test(api_tx, get_system_snapshot, 0, 20),
     ct:pal("tester return: ~p ~n", [Return]),
     util:wait_for_process_to_die(SpamPid1),
     ok.

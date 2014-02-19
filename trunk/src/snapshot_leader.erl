@@ -24,7 +24,7 @@
 -behaviour(gen_component).
 
 %% functions for gen_component module and supervisor callbacks
--export([start_link/0, on/2, init/1]).
+-export([start_link/1, on/2, init/1]).
 
 -include("scalaris.hrl").
 
@@ -35,11 +35,11 @@
     {local_snapshot_failed, From::comm:erl_local_pid(), SnapNumber::non_neg_integer(), Msg::string()}.
 
 %% be startable via supervisor, use gen_component
--spec start_link() -> {ok, pid()}.
-start_link() ->
+-spec start_link(pid_groups:groupname()) -> {ok, pid()}.
+start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2,
                              [], % parameters passed to init
-                             [{erlang_register, snapshot_leader}]).
+                             [{pid_groups_join_as, DHTNodeGroup, snapshot_leader}]).
 
 %% initialize: return initial state.
 -spec init([]) -> snapshot_leader_state:state().

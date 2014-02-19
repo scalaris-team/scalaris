@@ -113,7 +113,8 @@ childs([{DHTNodeGroup, Options}]) ->
             _ -> []
         end,
     SnapshotLeader =
-        sup:worker_desc(snapshot_leader, snapshot_leader, start_link),
+        sup:worker_desc(snapshot_leader, snapshot_leader, start_link,
+                        [DHTNodeGroup]),
     SupWPool =
         sup:supervisor_desc(sup_wpool, sup_wpool, start_link, [DHTNodeGroup]),
     WPool = sup:worker_desc(wpool, wpool, start_link, [DHTNodeGroup, Options]),
