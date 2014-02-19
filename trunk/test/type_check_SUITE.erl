@@ -32,7 +32,6 @@ all()   -> [
             tester_type_check_api,
             tester_type_check_config,
 %%            tester_type_check_dht_node,
-            tester_type_check_gossip,
             tester_type_check_math,
             tester_type_check_node,
             tester_type_check_paxos,
@@ -40,7 +39,7 @@ all()   -> [
             tester_type_check_tx,
             tester_type_check_rdht_tx,
             tester_type_check_util,
-            tester_type_check_gossip2,
+            tester_type_check_gossip,
             tester_type_check_mr
            ].
 suite() -> [ {timetrap, {seconds, 480}} ].
@@ -136,36 +135,26 @@ tester_type_check_config(_Config) ->
 %%    true.
 
 tester_type_check_gossip(_Config) ->
-    Count = 500,
-    config:write(no_print_ring_data, true),
-    Modules =
-        [ {gossip_state, [], []}
-        ],
-    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
-          || {Mod, Excl, ExclPriv} <- Modules ],
-    true.
-
-tester_type_check_gossip2(_Config) ->
     unittest_helper:wait_for_stable_ring_deep(),
-    Group = pid_groups:group_with(gossip2),
-    pid_groups:join_as(Group, gossip2),
+    Group = pid_groups:group_with(gossip),
+    pid_groups:join_as(Group, gossip),
     Count = 500,
     config:write(no_print_ring_data, true),
-    config:write(gossip2_log_level_warn, debug),
-    config:write(gossip2_log_level_error, debug),
+    config:write(gossip_log_level_warn, debug),
+    config:write(gossip_log_level_error, debug),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
-    tester:register_type_checker({typedef, gossip2, state}, gossip2, is_state),
+    tester:register_type_checker({typedef, gossip, state}, gossip, is_state),
     tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram),
     tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state),
-    tester:register_value_creator({typedef, gossip2, state}, gossip2, tester_create_state, 9),
+    tester:register_value_creator({typedef, gossip, state}, gossip, tester_create_state, 9),
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
     tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 10),
-    Modules = [ {gossip2,
+    Modules = [ {gossip,
             % excluded (exported functions)
             [   {start_link, 1}, % would start a lot of processes
                 {init, 1}, % does not return fully filled state (as checked by type checker)
@@ -212,9 +201,9 @@ tester_type_check_gossip2(_Config) ->
     tester:unregister_value_creator({typedef, intervals, interval}),
     tester:unregister_value_creator({typedef, intervals, simple_interval}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
-    tester:unregister_type_checker({typedef, gossip2, state}),
+    tester:unregister_type_checker({typedef, gossip, state}),
     tester:unregister_type_checker({typedef, gossip_load, state}),
-    tester:unregister_value_creator({typedef, gossip2, state}),
+    tester:unregister_value_creator({typedef, gossip, state}),
     tester:unregister_value_creator({typedef, gossip_load, state}),
     tester:unregister_value_creator({typedef, gossip_load, histogram}),
     tester:unregister_type_checker({typedef, gossip_load, histogram}),

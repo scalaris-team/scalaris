@@ -123,8 +123,7 @@ init(Neighbors) ->
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
 
     % request approximated ring size
-    comm:send_local(pid_groups:get_my(gossip), {get_values_best, self()}),
-    %% comm:send_local(pid_groups:get_my(gossip2), {get_values_best, {gossip_load, default}, self()}),
+    comm:send_local(pid_groups:get_my(gossip), {get_values_best, {gossip_load, default}, self()}),
 
     update_entries(Neighbors, add_source_entry(nodelist:node(Neighbors), #rt_t{})).
 
@@ -489,10 +488,8 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
 
 handle_custom_message({gossip_get_values_best_response, Vals}, State) ->
     RT = rt_loop:get_rt(State),
-    NewRT = rt_set_ring_size(RT, gossip_state:get(Vals, size_kr)),
-    %% NewRT = rt_set_ring_size(RT, gossip_load:load_info_get(size_kr, Vals)),
-    msg_delay:send_local(config:read(rt_frt_gossip_interval), pid_groups:get_my(gossip),{get_values_best, self()}),
-    %% msg_delay:send_local(config:read(rt_frt_gossip_interval), pid_groups:get_my(gossip2),{get_values_best, {gossip_load, default}, self()}),
+    NewRT = rt_set_ring_size(RT, gossip_load:load_info_get(size_kr, Vals)),
+    msg_delay:send_local(config:read(rt_frt_gossip_interval), pid_groups:get_my(gossip),{get_values_best, {gossip_load, default}, self()}),
     RTExt = export_rt_to_dht_node(NewRT, rt_loop:get_neighb(State)),
     comm:send_local(pid_groups:get_my(dht_node), {rt_update, RTExt}),
     rt_loop:set_rt(State, NewRT);
@@ -992,13 +989,11 @@ rt_set_nodes(#rt_t{source=undefined}, _) -> erlang:error(source_node_undefined);
 rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 
 % @doc Set the size estimate of the ring
--spec rt_set_ring_size(RT :: rt_t(), Size :: unknown | gossip_state:size()) -> rt_t().
-%% -spec rt_set_ring_size(RT :: rt_t(), Size :: unknown | float()) -> rt_t().
+-spec rt_set_ring_size(RT :: rt_t(), Size :: unknown | float()) -> rt_t().
 rt_set_ring_size(RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
 
 % @doc Get the ring size estimate from the external routing table
--spec external_rt_get_ring_size(RT :: external_rt()) -> gossip_state:size() | unknown.
-%% -spec external_rt_get_ring_size(RT :: external_rt()) -> Size :: float() | unknown.
+-spec external_rt_get_ring_size(RT :: external_rt()) -> Size :: float() | unknown.
 external_rt_get_ring_size(RT) when element(1, RT) >= 0 orelse
                                    element(1, RT) == unknown ->
     element(1, RT).

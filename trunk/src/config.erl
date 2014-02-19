@@ -163,7 +163,6 @@ check_config() ->
                          fun sup_dht_node_core:check_config/0,
                          fun cyclon:check_config/0,
                          fun acceptor:check_config/0,
-                         fun gossip:check_config/0,
                          fun learner:check_config/0,
                          fun rdht_tx:check_config/0,
                          fun rdht_tx_read:check_config/0,

@@ -39,8 +39,7 @@
 -endif.
 
 -type custom_message() ::
-          {gossip_get_values_best_response, gossip_state:values()} |
-          %% {gossip_get_values_best_response, gossip_load:load_info()} |
+          {gossip_get_values_best_response, gossip_load:load_info()} |
           {get_split_key_response, SplitKey::{?RT:key(), TakenLoad::non_neg_integer()}}.
 
 %% @doc Gets the number of IDs to sample during join.
@@ -59,9 +58,7 @@ get_number_of_samples_remote(SourcePid, Connection) ->
                          {join, ?MODULE, '_',
                           {get_samples, SourcePid, Connection}}),
     GossipPid = pid_groups:get_my(gossip),
-    %% GossipPid = pid_groups:get_my(gossip2),
-    comm:send_local(GossipPid, {get_values_best, SPid}).
-    %% comm:send_local(GossipPid, {get_values_best, {gossip_load, default}, SPid}).
+    comm:send_local(GossipPid, {get_values_best, {gossip_load, default}, SPid}).
 
 %% @doc Creates a join operation if a node would join at my node with the
 %%      given key. This will simulate the join operation and return a lb_op()
@@ -77,9 +74,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
                                  {join, ?MODULE, '_',
                                   {create_join2, SelectedKey, SourcePid, Conn}}),
             GossipPid = pid_groups:get_my(gossip),
-            %% GossipPid = pid_groups:get_my(gossip2),
-            Msg = {get_values_best, SPid},
-            %% Msg = {get_values_best, {gossip_load, default}, SPid},
+            Msg = {get_values_best, {gossip_load, default}, SPid},
             ?TRACE_SEND(GossipPid, Msg),
             comm:send_local(GossipPid, Msg);
         _ ->
@@ -92,8 +87,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
     DhtNodeState.
 
 -spec create_join2(DhtNodeState::dht_node_state:state(), SelectedKey::?RT:key(),
-                   SourcePid::comm:mypid(), BestValues::gossip_state:values(),
-                   %% SourcePid::comm:mypid(), BestValues::gossip_load:load_info(),
+                   SourcePid::comm:mypid(), BestValues::gossip_load:load_info(),
                    Conn::dht_node_join:connection()) -> dht_node_state:state().
 create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
     case dht_node_state:get(DhtNodeState, slide_pred) of
@@ -105,8 +99,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                 if MyLoad >= 2 ->
 %%                        log:pal("[ ~.0p ] trying split by load", [self()]),
                        TargetLoad =
-                           case gossip_state:get(BestValues, avgLoad) of
-                           %% case gossip_load:load_info_get(avgLoad, BestValues) of
+                           case gossip_load:load_info_get(avgLoad, BestValues) of
                                unknown -> util:floor(MyLoad / 2);
                                AvgLoad when AvgLoad > 0 andalso MyLoad > AvgLoad ->
                                    util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
@@ -142,9 +135,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                                  {join, ?MODULE, '_',
                                   {create_join2, SelectedKey, SourcePid, Conn}}),
             GossipPid = pid_groups:get_my(gossip),
-            %% GossipPid = pid_groups:get_my(gossip2),
-            Msg = {get_values_best, SPid},
-            %% Msg = {get_values_best, {gossip_load, default}, SPid},
+            Msg = {get_values_best, {gossip_load, default}, SPid},
             ?TRACE_SEND(GossipPid, Msg),
             _ = comm:send_local_after(100, GossipPid, Msg),
             DhtNodeState
@@ -216,9 +207,7 @@ create_join3(DhtNodeState, SelectedKey, SourcePid, SplitKey0, Conn) ->
                                  {join, ?MODULE, '_',
                                   {create_join2, SelectedKey, SourcePid, Conn}}),
             GossipPid = pid_groups:get_my(gossip),
-            %% GossipPid = pid_groups:get_my(gossip2),
-            Msg = {get_values_best, SPid},
-            %% Msg = {get_values_best, {gossip_load, default}, SPid},
+            Msg = {get_values_best, {gossip_load, default}, SPid},
             ?TRACE_SEND(GossipPid, Msg),
             _ = comm:send_local_after(100, GossipPid, Msg),
             ok
@@ -238,14 +227,12 @@ sort_candidates(Ops) ->
 -spec process_join_msg(custom_message(),
         {get_samples, SourcePid::comm:mypid(), Conn::dht_node_join:connection()} |
             {create_join2, SelectedKey::?RT:key(), SourcePid::comm:mypid(), Conn::dht_node_join:connection()} |
-            {create_join3, SelectedKey::?RT:key(), SourcePid::comm:mypid(), BestValues::gossip_state:values(), Conn::dht_node_join:connection()},
-            %% {create_join3, SelectedKey::?RT:key(), SourcePid::comm:mypid(), BestValues::gossip_load:load_info(), Conn::dht_node_join:connection()},
+            {create_join3, SelectedKey::?RT:key(), SourcePid::comm:mypid(), BestValues::gossip_load:load_info(), Conn::dht_node_join:connection()},
         DhtNodeState::dht_node_state:state()) -> dht_node_state:state().
 process_join_msg({gossip_get_values_best_response, BestValues},
                  {get_samples, SourcePid, Conn}, DhtNodeState) ->
     MinSamples = conf_get_min_number_of_samples(),
-    Samples = case gossip_state:get(BestValues, size) of
-    %% Samples = case gossip_load:load_info_get(size, BestValues) of
+    Samples = case gossip_load:load_info_get(size, BestValues) of
                   unknown -> MinSamples;
                   % always round up:
                   Size    -> erlang:max(util:ceil((util:log2(Size))), MinSamples)
