@@ -124,10 +124,7 @@ work(Source, {_Round, reduce, {jsanon, Fun}, Data, Interval}) ->
                        [],
                        Interval),
     Res = apply_js(Fun, [Args], VM),
-    return(Source, [{?RT:hash_key(K), K, V} || {K, V} <- Res]);
-work(Source, {snapshot}) ->
-    Snapshot = api_tx:get_system_snapshot(),
-    return(Source, Snapshot).
+    return(Source, [{?RT:hash_key(K), K, V} || {K, V} <- Res]).
 %% TODO add generic work loads
 
 %% @doc applies Fun with Args.

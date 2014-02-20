@@ -34,7 +34,8 @@
 
 -include("scalaris.hrl").
 
--type(message() :: {mr_master, mr_state:jobid(), snapshot, {work_done, [term()]},
+-type(message() :: {mr_master, mr_state:jobid(), snapshot,
+                    snapshot_leader:result_message(),
                     mr:job_description(), comm:mypid()} |
                    {mr_master, mr_state:jobid(), phase_completed, intervals:interval()} |
                    {mr_master, mr_state:jobid(), job_completed, intervals:interval()} |
@@ -52,11 +53,11 @@ init_job(State, JobId, Job, Client) ->
 -spec dispatch_snapshot(mr_state:jobid()) -> ok.
 dispatch_snapshot(JobId) ->
     Reply = comm:reply_as(comm:this(), 4, {mr_master, JobId, snapshot, '_'}),
-    ok = comm:send_local(pid_groups:get_my(wpool),
-                    {do_work, Reply, {snapshot}}).
+    comm:send_local(pid_groups:find_a(snapshot_leader), {init_snapshot,
+                                                  Reply}).
 
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state().
-on({mr_master, JobId, snapshot, {work_done, Data}}, State) ->
+on({mr_master, JobId, snapshot, {global_snapshot_done, Data}}, State) ->
     MasterState = dht_node_state:get_mr_master_state(State, JobId),
     Job = mr_master_state:get(job, MasterState),
     FilteredData = filter_data(Data, element(2, Job)),
@@ -73,6 +74,12 @@ on({mr_master, JobId, snapshot, {work_done, Data}}, State) ->
                                        JobId,
                                        mr_master_state:set(MasterState,
                                                            [{outstanding, false}]));
+
+%% in case the snapshot failed, try again
+on({mr_master, JobId, snapshot, {global_snapshot_done_with_errors,
+                                 _ErrorInterval, _PartData}}, State) ->
+    dispatch_snapshot(JobId),
+    State;
 
 on({mr_master, JobId, snapshot, {worker_died, Reason}}, State) ->
     log:log(error, "mr_master_~s: snapshot failed ~p", [JobId, Reason]),

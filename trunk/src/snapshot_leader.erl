@@ -29,10 +29,20 @@
 -include("scalaris.hrl").
 
 % accepted messages of the snapshot_leader process
--type message() ::
-    {local_snapshot_done, From::comm:erl_local_pid(), SnapNumber::non_neg_integer(), DBRange::intervals:interval(), Snapshot::db_dht:db_as_list()} |
-    {init_snapshot, Client::comm:erl_local_pid()} |
-    {local_snapshot_failed, From::comm:erl_local_pid(), SnapNumber::non_neg_integer(), Msg::string()}.
+-type init_message() :: {init_snapshot, Client::comm:erl_local_pid()}.
+
+-type result_message() :: {local_snapshot_done, From::comm:erl_local_pid(),
+                           SnapNumber::non_neg_integer(),
+                           DBRange::intervals:interval(),
+                           Snapshot::db_dht:db_as_list()} |
+    {local_snapshot_failed, From::comm:erl_local_pid(),
+     SnapNumber::non_neg_integer(), Msg::string()}.
+
+-type message() :: init_message() | result_message().
+
+-ifdef(with_export_type_support).
+-export_type([result_message/0]).
+-endif.
 
 %% be startable via supervisor, use gen_component
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
