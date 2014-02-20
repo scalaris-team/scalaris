@@ -476,6 +476,10 @@ on({tx_tm_executed_decision, TxId, Key, Decision, {qwrite_done, _ReqId, _Round, 
             end
     end;
 
+on({tx_tm_executed_decision, TxId, Key, Decision, {qwrite_deny, _ReqId, _NextRound, _Val}}, State) ->
+    ct:pal("Oops we were not able to write our decision???"),
+    State;
+
 on({tx_tm_delete_txid, _TxId}, State) ->
     State;
 

@@ -1,5 +1,4 @@
-% @copyright 2009-2013 Zuse Institute Berlin,
-%            2009 onScale solutions GmbH
+% @copyright 2009-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -280,7 +279,7 @@ commit(TLog) ->
 %           case pid_groups:find_a(tx_tm) of
             case pid_groups:find_a(tx_tm_new) of
                 failed ->
-                    Msg = io_lib:format("No tx_tm found.~n", []),
+                    Msg = io_lib:format("No tx_tm_new found.~n", []),
 %%%% OLD TX
 %               tx_tm_rtm:msg_commit_reply(Client, ClientsId, {abort, Msg});
                     tx_tm:msg_commit_reply(Client, ClientsId, {abort, Msg});
@@ -339,7 +338,7 @@ commit(TLog) ->
 -endif.
 
 -spec receive_answer(ReqId::req_id()) -> tx_tlog:tlog_entry().
--ifdef(txnew).
+-ifdef(TXNEW).
  receive_answer(ReqId) ->
     receive
         ?SCALARIS_RECV(
@@ -370,7 +369,7 @@ receive_answer(ReqId) ->
 -endif.
 
 -spec receive_old_answers() -> ok.
--ifdef(txnew).
+-ifdef(TXNEW).
 receive_old_answers() ->
     receive
 %%%% OLD TX

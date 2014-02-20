@@ -1,4 +1,4 @@
-%  @copyright 2008-2013 Zuse Institute Berlin
+%  @copyright 2008-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@
 %% userdevguide-end scalaris:db
 
 %% when defined, use new tx protocol (which is not yet complete)
-%% -define(txnew, true).
+%% -define(TXNEW, true).
 
 %% userdevguide-begin scalaris:rm
 %%Standard chord ring maintenance
