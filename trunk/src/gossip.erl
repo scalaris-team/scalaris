@@ -35,7 +35,7 @@
 -export([init/1, on_inactive/2, on_active/2]).
 
 %API
--export([start_link/1, activate/1, deactivate/0, start_gossip_task/2, stop_gossip_task/1, remove_all_tombstones/0]).
+-export([start_link/1, activate/1, deactivate/0, start_gossip_task/2, stop_gossip_task/1, remove_all_tombstones/0, check_config/0]).
 
 % interaction with the ring maintenance:
 -export([rm_filter_slide_msg/3, rm_send_activation_msg/4, rm_my_range_changed/3, rm_send_new_range/4]).
@@ -1114,3 +1114,7 @@ error() ->
         failed -> warn;
         Level -> Level
     end.
+
+-spec check_config() -> boolean().
+check_config() ->
+    lists:foldl(fun({Module, _Args}, Acc) -> Acc andalso Module:check_config() end, true, ?CBMODULES).

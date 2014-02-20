@@ -27,7 +27,7 @@
 -export([request_histogram/2, load_info_get/2]).
 
 % gossip_beh
--export([init/1, init/2, init/3, init_delay/0, trigger_interval/0, select_node/1, select_data/1,
+-export([init/1, init/2, init/3, check_config/0, trigger_interval/0, select_node/1, select_data/1,
         select_reply_data/5, integrate_data/4, handle_msg/2, notify_change/3,
         min_cycles_per_round/0, max_cycles_per_round/0, round_has_converged/1,
         get_values_best/1, get_values_all/1, web_debug_info/1, shutdown/1]).
@@ -97,14 +97,14 @@
 %%      relation to the bh module (non-blocking).
 %%      Some metrics (e.g. size) wont work properly in first round when started
 %%      without delay.
--spec init_delay() -> non_neg_integer().
-init_delay() -> % in ms
-    1000.
+%% -spec init_delay() -> non_neg_integer().
+%% init_delay() -> % in ms
+%%     1000.
 
 %% @doc The time interval in ms in which message exchanges are initiated.
 -spec trigger_interval() -> pos_integer().
 trigger_interval() -> % in ms
-    1000.
+    config:read(gossip_load_interval).
 
 %% @doc The minimum number of cycles per round.
 %%      Only full cycles (i.e. received replies) are counted (ignored triggers
@@ -112,7 +112,7 @@ trigger_interval() -> % in ms
 %%      Only relevant for leader, all other nodes enter rounds when told to do so.
 -spec min_cycles_per_round() -> non_neg_integer().
 min_cycles_per_round() ->
-    10.
+    config:read(gossip_load_min_cycles_per_round).
 
 %% @doc The maximum number of cycles per round.
 %%      Only full cycles (i.e. received replies) are counted (ignored triggers
@@ -120,7 +120,7 @@ min_cycles_per_round() ->
 %%      Only relevant for leader, all other nodes enter rounds when told to do so.
 -spec max_cycles_per_round() -> pos_integer().
 max_cycles_per_round() ->
-    1000.
+    config:read(gossip_load_max_cycles_per_round).
 
 
 %%------------------- Private config functions ---------------------%%
@@ -132,30 +132,49 @@ convergence_count_best_values() ->
 %       once every cycle).
 % 2) When receiving a request (select_reply_data()) (this happens randomly,
 %       but *on average* once per round).
-    case config:read(gossip_convergence_count_best_values) of
-        failed -> 10;
-        Count -> Count
-    end.
+    config:read(gossip_load_convergence_count_best_values).
 
 
 -spec convergence_count_new_round() -> pos_integer().
 convergence_count_new_round() ->
-    case config:read(gossip_convergence_count_new_round) of
-        failed -> 20;
-        Count -> Count
-    end.
+    config:read(gossip_load_convergence_count_new_round).
 
 
 -spec convergence_epsilon() -> float().
 convergence_epsilon() ->
-    5.0.
+    config:read(gossip_load_convergence_epsilon).
 
 -spec discard_old_rounds() -> boolean().
 discard_old_rounds() ->
-    false.
+    config:read(gossip_load_discard_old_rounds).
 
 -spec no_of_buckets() -> pos_integer().
-no_of_buckets() -> 10.
+no_of_buckets() ->
+    config:read(gossip_load_number_of_buckets).
+
+check_config() ->
+    config:cfg_is_integer(gossip_load_interval) andalso
+    config:cfg_is_greater_than(gossip_load_interval, 0) andalso
+
+    config:cfg_is_integer(gossip_load_min_cycles_per_round) andalso
+    config:cfg_is_greater_than_equal(gossip_load_min_cycles_per_round, 0) andalso
+
+    config:cfg_is_integer(gossip_load_max_cycles_per_round) andalso
+    config:cfg_is_greater_than_equal(gossip_load_max_cycles_per_round, 1) andalso
+
+    config:cfg_is_float(gossip_load_convergence_epsilon) andalso
+    config:cfg_is_in_range(gossip_load_convergence_epsilon, 0.0, 100.0) andalso
+
+    config:cfg_is_bool(gossip_load_discard_old_rounds) andalso
+
+    config:cfg_is_integer(gossip_load_convergence_count_best_values) andalso
+    config:cfg_is_greater_than(gossip_load_convergence_count_best_values, 0) andalso
+
+    config:cfg_is_integer(gossip_load_convergence_count_new_round) andalso
+    config:cfg_is_greater_than(gossip_load_convergence_count_new_round, 0) andalso
+
+    config:cfg_is_integer(gossip_load_number_of_buckets) andalso
+    config:cfg_is_greater_than(gossip_load_number_of_buckets, 0).
 
 -spec no_of_buckets(State::state()) -> pos_integer().
 no_of_buckets(State) ->

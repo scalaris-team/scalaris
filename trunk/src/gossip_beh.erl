@@ -93,6 +93,8 @@
 -callback web_debug_info(State::cb_state()) ->
     {KeyValueList::[{Key::any(), Value::any()},...], cb_state()}.
 
+-callback check_config() -> boolean().
+
 % Erlang version < R15B
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
@@ -111,7 +113,8 @@ behaviour_info(callbacks) ->
     {notify_change, 3},
     {get_values_best, 1},
     {get_values_all, 1},
-    {web_debug_info,1}
+    {web_debug_info,1},
+    {check_config, 0}
   ];
 behaviour_info(_Other) ->
   undefined.
