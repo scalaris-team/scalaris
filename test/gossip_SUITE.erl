@@ -94,10 +94,12 @@ test_load(_Config) ->
     LoadInfoExpected = {load_info, Avg, Stddev, Size,     Size,    Min,     Max,      dc},
 
     % get values from gossiping (after round finishes)
-    wait_n_rounds(1),
+    % first round might be interrupted by node joins, thus wait two rounds
+    wait_n_rounds(2),
     send2gossip({get_values_best, {gossip_load,default}, self()}, 0),
+
     receive {gossip_get_values_best_response, LoadInfo} ->
-            ?compare(fun compare/2, LoadInfo, LoadInfoExpected)
+                ?compare(fun compare/2, LoadInfo, LoadInfoExpected)
     end.
 
 
@@ -151,7 +153,6 @@ send2gossip(Msg, Delay) ->
     Pid = pid_groups:pid_of(Group, gossip),
     comm:send_local_after(Delay, Pid, Msg).
 
-
 %% @doc Waits n rounds, pulling the web_debug_info every second.
 -spec wait_n_rounds(NoOfRounds::pos_integer()) -> ok.
 wait_n_rounds(NoOfRounds) ->
@@ -164,7 +165,7 @@ wait_n_rounds(NoOfRounds) ->
 wait_for_round(TargetRound) ->
     Round = get_current_round(),
     %% log:log("CurrentRound: ~w, TargetRound: ~w", [Round, TargetRound]),
-    if Round =:= TargetRound -> ok;
+    if Round >= TargetRound -> ok;
        Round =/= TargetRound -> wait_for_round(TargetRound)
     end.
 
