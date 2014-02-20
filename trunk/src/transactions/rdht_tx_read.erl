@@ -73,7 +73,7 @@ work_phase(ClientPid, ReqId, Request) ->
                      client_key(), ?RT:key(),
                      Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
         -> ok.
--ifdef(txnew).
+-ifdef(TXNEW).
 work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     ?TRACE("rdht_tx_read:work_phase asynch~n", []),
     %% PRE: No entry for key in TLog
