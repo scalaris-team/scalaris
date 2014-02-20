@@ -20,12 +20,15 @@
 -author('jensvfischer@gmail.com').
 -vsn('$Id$').
 
--export_type([exch_data/0, round_status/0, cb_return/0, instance/0]).
-
 % for behaviour
 -ifndef(have_callback_support).
 -export([behaviour_info/1]).
 -endif.
+
+% Erlang version >= R15B
+-ifdef(have_callback_support).
+
+-export_type([exch_data/0, round_status/0, cb_return/0, instance/0]).
 
 %% cb: callback
 -type cb_state() :: any().
@@ -38,9 +41,6 @@
 -type round() :: non_neg_integer().
 -type round_status() :: 'current_round' | 'old_round'.
 -type notify_keyword() :: new_round | leader | exch_failure.
-
-% Erlang version >= R15B
--ifdef(have_callback_support).
 
 % Startup
 
@@ -70,8 +70,6 @@
     cb_return().
 
 % Config and Misc
-
--callback init_delay() -> non_neg_integer().
 
 -callback trigger_interval() -> pos_integer().
 
@@ -105,7 +103,6 @@ behaviour_info(callbacks) ->
     {select_reply_data, 5},
     {integrate_data, 4},
     {handle_msg, 2},
-    {init_delay, 0},
     {trigger_interval, 0},
     {min_cycles_per_round, 0},
     {max_cycles_per_round, 0},
