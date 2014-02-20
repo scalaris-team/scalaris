@@ -183,6 +183,7 @@ check_config() ->
                          fun lb_psv_simple:check_config/0,
                          fun lb_psv_split:check_config/0,
                          fun lb_psv_gossip:check_config/0,
+                         fun gossip:check_config/0,
                          fun comm_acceptor:check_config/0,
                          fun monitor:check_config/0,
                          fun monitor_perf:check_config/0,
