@@ -1,4 +1,4 @@
-% @copyright 2007-2012 Zuse Institute Berlin
+% @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -56,6 +56,13 @@ stop() ->
 
 -spec load() -> 'ok' | {'error', term()}.
 load() ->
+    %% provide load/1 as a separate function (called from
+    %% 'bin/scalarisctl checkinstallation').
+    %% We need to have the scalaris application loaded to get access
+    %% to the scalaris application environment variables provided with
+    %% the '-scalaris key value' syntax on the 'erl' command line.
+    %% The mechanism is used to check whether config files can be
+    %% found without actually starting the application.
     application:load(
       {application, scalaris,
        [{description, "scalaris"},
