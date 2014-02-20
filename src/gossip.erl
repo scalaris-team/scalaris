@@ -612,9 +612,6 @@ start_p2p_exchange(Peer, PData, CBModule, State)  ->
 init_gossip_tasks(State) ->
     Fun = fun (CBModule) ->
             state_set(cb_status, unstarted, CBModule, State),
-            %% removed init delay
-            %% InitDelay = cb_call(init_delay, CBModule),
-            %% msg_delay:send_local(InitDelay div 1000, self(), {start_gossip_task, CBModule, []})
             comm:send_local(self(), {start_gossip_task, CBModule, []})
           end,
     lists:foreach(Fun, ?CBMODULES).
@@ -676,13 +673,13 @@ init_gossip_task(CBModule, Args, State) ->
 
 
 -spec cb_call(FunName, CBModule) -> non_neg_integer() | pos_integer() when
-    FunName :: init_delay | min_cycles_per_round | max_cycles_per_round | trigger_interval,
+    FunName :: min_cycles_per_round | max_cycles_per_round | trigger_interval,
     CBModule :: cb_module().
 cb_call(FunName, CBModule) ->
     cb_call(FunName, [], CBModule).
 
 -spec cb_call(FunName, Args, CBModule) -> Return when
-    FunName :: init | init_delay | min_cycles_per_round | max_cycles_per_round | trigger_interval,
+    FunName :: init | min_cycles_per_round | max_cycles_per_round | trigger_interval,
     Args :: list(),
     CBModule :: cb_module(),
     Return :: non_neg_integer() | pos_integer() | {ok, any()}.
