@@ -56,7 +56,7 @@ stop() ->
 
 -spec load() -> 'ok' | {'error', term()}.
 load() ->
-    %% provide load/1 as a separate function (called from
+    %% provide load/0 as a separate function (called from
     %% 'bin/scalarisctl checkinstallation').
     %% We need to have the scalaris application loaded to get access
     %% to the scalaris application environment variables provided with
