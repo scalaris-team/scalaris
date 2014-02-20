@@ -93,14 +93,6 @@
 
 %%--------- External config function (called by bh module) ---------%%
 
-%% @doc Defines how many ms the initialization of gossip_load is delayed in
-%%      relation to the bh module (non-blocking).
-%%      Some metrics (e.g. size) wont work properly in first round when started
-%%      without delay.
-%% -spec init_delay() -> non_neg_integer().
-%% init_delay() -> % in ms
-%%     1000.
-
 %% @doc The time interval in ms in which message exchanges are initiated.
 -spec trigger_interval() -> pos_integer().
 trigger_interval() -> % in ms
