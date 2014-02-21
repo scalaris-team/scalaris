@@ -144,6 +144,7 @@ discard_old_rounds() ->
 no_of_buckets() ->
     config:read(gossip_load_number_of_buckets).
 
+-spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_integer(gossip_load_interval) andalso
     config:cfg_is_greater_than(gossip_load_interval, 0) andalso
