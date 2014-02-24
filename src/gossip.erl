@@ -154,8 +154,8 @@ deactivate() ->
 
 
 -spec start_gossip_task(CBModule, Args) -> ok when
-    CBModule :: atom() | cb_module() | {cb_module(), uid:global_uid()},
-    Args :: list().
+    is_subtype(CBModule, atom() | cb_module() | {cb_module(), uid:global_uid()}),
+    is_subtype(Args, list()).
 start_gossip_task(ModuleName, Args) when is_atom(ModuleName) ->
     Id = uid:get_global_uid(),
     start_gossip_task({ModuleName, Id}, Args);
@@ -181,8 +181,8 @@ remove_all_tombstones() ->
 %% @doc Checks whether the received notification is a {slide_finished, succ} or
 %%      {slide_finished, pred} msg. Used as filter function for the ring maintanance.
 -spec rm_filter_slide_msg(Neighbors, Neighbors, Reason) -> boolean() when
-                          Neighbors :: nodelist:neighborhood(),
-                          Reason :: rm_loop:reason().
+                          is_subtype(Neighbors, nodelist:neighborhood()),
+                          is_subtype(Reason, rm_loop:reason()).
 rm_filter_slide_msg(_OldNeighbors, _NewNeighbors, Reason) ->
         Reason =:= {slide_finished, pred} orelse Reason =:= {slide_finished, succ}.
 
@@ -190,8 +190,8 @@ rm_filter_slide_msg(_OldNeighbors, _NewNeighbors, Reason) ->
 %%      Used to subscribe to the ring maintenance for {slide_finished, succ} or
 %%      {slide_finished, pred} msg.
 -spec rm_send_activation_msg(Subscriber, ?MODULE, Neighbours, Neighbours) -> ok when
-                             Subscriber :: pid(),
-                             Neighbours::nodelist:neighborhood().
+                             is_subtype(Subscriber, pid()),
+                             is_subtype(Neighbours, nodelist:neighborhood()).
 rm_send_activation_msg(_Pid, ?MODULE, _OldNeighbours, NewNeighbours) ->
     %% io:format("Pid: ~w. Self: ~w. PidGossip: ~w~n", [Pid, self(), Pid2]),
     MyRange = nodelist:node_range(NewNeighbours),
@@ -673,29 +673,29 @@ init_gossip_task(CBModule, Args, State) ->
 
 
 -spec cb_call(FunName, CBModule) -> non_neg_integer() | pos_integer() when
-    FunName :: min_cycles_per_round | max_cycles_per_round | trigger_interval,
-    CBModule :: cb_module().
+    is_subtype(FunName, min_cycles_per_round | max_cycles_per_round | trigger_interval),
+    is_subtype(CBModule, cb_module()).
 cb_call(FunName, CBModule) ->
     cb_call(FunName, [], CBModule).
 
 -spec cb_call(FunName, Args, CBModule) -> Return when
-    FunName :: init | min_cycles_per_round | max_cycles_per_round | trigger_interval,
-    Args :: list(),
-    CBModule :: cb_module(),
-    Return :: non_neg_integer() | pos_integer() | {ok, any()}.
+    is_subtype(FunName, init | min_cycles_per_round | max_cycles_per_round | trigger_interval),
+    is_subtype(Args, list()),
+    is_subtype(CBModule, cb_module()),
+    is_subtype(Return, non_neg_integer() | pos_integer() | {ok, any()}).
 cb_call(FunName, Args, CBModule) ->
     {CBModuleName, _Id} = CBModule,
     apply(CBModuleName, FunName, Args).
 
 
 -spec cb_call(FunName, Arguments, Msg, CBModule, State) -> Return when
-    FunName :: cb_fun_name(),
-    Arguments :: list(),
-    Msg :: message(),
-    CBModule :: cb_module(),
-    State :: state(),
-    Return :: ok | discard_msg
-        | send_back | boolean() | {any(), any(), any()} | list({list(), list()}).
+    is_subtype(FunName, cb_fun_name()),
+    is_subtype(Arguments, list()),
+    is_subtype(Msg, message()),
+    is_subtype(CBModule, cb_module()),
+    is_subtype(State, state()),
+    is_subtype(Return, ok | discard_msg
+        | send_back | boolean() | {any(), any(), any()} | list({list(), list()})).
 cb_call(FunName, Args, Msg, CBModule, State) ->
     {ModuleName, _InstanceId} = CBModule,
     CBState = state_get(cb_state, CBModule, State),
@@ -994,15 +994,15 @@ to_string(List) when is_list(List) ->
 
 -spec tester_create_state(Status, Range, Interval,
     CBState, CBStatus, ExchData, Round, TriggerLock, Cycles) -> state()
-    when    Status :: init | uninit,
-            Range :: intervals:interval(),
-            Interval :: pos_integer(),
-            CBState :: any(),
-            CBStatus :: unstarted | started | tombstone,
-            ExchData :: any(),
-            Round :: non_neg_integer(),
-            TriggerLock :: free | locked,
-            Cycles :: non_neg_integer().
+    when    is_subtype(Status, init | uninit),
+            is_subtype(Range, intervals:interval()),
+            is_subtype(Interval, pos_integer()),
+            is_subtype(CBState, any()),
+            is_subtype(CBStatus, unstarted | started | tombstone),
+            is_subtype(ExchData, any()),
+            is_subtype(Round, non_neg_integer()),
+            is_subtype(TriggerLock, free | locked),
+            is_subtype(Cycles, non_neg_integer()).
 tester_create_state(Status, Range, Interval, CBState, CBStatus,
         ExchData, Round, TriggerLock, Cycles) ->
     State = ?PDB:new(state, ?PDB_OPTIONS),
