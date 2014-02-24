@@ -69,7 +69,7 @@
 
 %% @doc Creates new DB handle named DBName.
 -spec new(DBName::nonempty_string()) -> db().
-new(_DBName) ->
+new(DBName) ->
     Dir = util:make_filename(atom_to_list(node())),
     FullDir = [config:read(db_directory), "/", Dir],
     _ = case file:make_dir(FullDir) of
@@ -81,8 +81,8 @@ new(_DBName) ->
     {{Year, Month, Day}, {Hour, Minute, Second}} =
         calendar:now_to_local_time(Now),
     FileBaseName = util:make_filename(
-                     io_lib:format("db_~B~B~B-~B~B~B\.~B.tch",
-                                   [Year, Month, Day, Hour, Minute, Second, Now_us])),
+                     io_lib:format("db_~s_~B~B~B-~B~B~B\.~B.tch",
+                                   [DBName, Year, Month, Day, Hour, Minute, Second, Now_us])),
     FullFileName = lists:flatten([FullDir, "/", FileBaseName]),
     new_db(FullFileName, [read, write, create, truncate]).
 
