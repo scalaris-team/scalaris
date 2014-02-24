@@ -63,32 +63,39 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type state() :: ets:tab().
+-type cb_module() :: ?CBMODULES_TYPE.
+-type state_key_cb() :: cb_state | cb_status | cycles | trigger_lock |
+                        exch_data | round.
 -type state_key() :: cb_modules | msg_queue | range | status |
                      {reply_peer, pos_integer()} |
                      {trigger_group, pos_integer()} |
                      {state_key_cb(), cb_module()} .
--type state_key_cb() :: cb_state | cb_status | cycles | trigger_lock |
-                        exch_data | round.
 -type cb_fun_name() :: get_values_all | get_values_best | handle_msg |
                        integrate_data | notify_change | round_has_converged |
                        select_data | select_node | select_reply_data |
                        web_debug_info | shutdown.
--type cb_module() :: ?CBMODULES_TYPE.
 
 % accepted messages of gossip behaviour module
--type(bh_message() ::
+
+-ifdef(forward_or_recursive_types_are_not_allowed).
+-type send_error() :: {send_error, _Pid::comm:mypid(), Msg::comm:message(), Reason::atom()}.
+-else.
+-type send_error() :: {send_error, _Pid::comm:mypid(), Msg::message(), Reason::atom()}.
+-endif.
+
+-type bh_message() ::
     {activate_gossip, Range::intervals:interval()} |
     {start_gossip_task, CBModule::cb_module(), Args::list()} |
     {gossip_trigger, TriggerInterval::pos_integer()} |
     {update_range, NewRange::intervals:interval()} |
     {web_debug_info, SourcePid::comm:mypid()} |
-    {send_error, _Pid::comm:mypid(), Msg::message(), Reason::atom()} |
+    send_error() |
     {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(),
         Msg::comm:message(), Parents::[comm:mypid(),...]} |
     {remove_all_tombstones}
-).
+.
 
--type(cb_message() ::
+-type cb_message() ::
     {selected_data, CBModule::cb_module(), PData::gossip_beh:exch_data()} |
     {selected_peer, CBModule::cb_module(), CyclonMsg::{cy_cache,
             RandomNodes::[node:node_type()]} } |
@@ -105,7 +112,7 @@
     {get_values_all, CBModule::cb_module(), SourcePid::comm:mypid()} |
     {stop_gossip_task, CBModule::cb_module()} |
     no_msg
-).
+.
 
 -type message() :: bh_message() | cb_message().
 
@@ -851,7 +858,7 @@ state_get(Key, State) ->
         {Key, Value} -> Value;
         undefined ->
             log:log(error(), "[ gossip ] Lookup of ~w in ~w failed", [Key, State]),
-            error(lookup_failed, [Key, State])
+            erlang:error(lookup_failed, [Key, State])
     end.
 
 -spec state_get_raw(Key::state_key(), State::state()) -> any().
@@ -868,7 +875,7 @@ state_take(Key, State) ->
         {Key, Value} -> Value;
         undefined ->
             log:log(error, "[ gossip ] Take of ~w in ~w failed", [Key, State]),
-            error(lookup_failed, [Key, State])
+            erlang:error(lookup_failed, [Key, State])
     end.
 
 -spec state_set(Key::state_key(), Value::any(), State::state()) -> ok.
