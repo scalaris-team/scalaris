@@ -1,4 +1,4 @@
-% @copyright 2007-2013 Zuse Institute Berlin,
+% @copyright 2007-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@
 
          members/1,           %% (GrpName) -> [Pids]
          members_by_name/1,   %% (GrpName) -> [pidname()]
-         
+
          pid_to_name/1,       %% translation of pids to strings for debugging
          pids_to_names/2]).
 
@@ -407,7 +407,13 @@ unhide(GrpName) ->
 %% @doc Starts the server
 -spec start_link() -> {ok, pid()}.
 start_link() ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [], [{erlang_register, ?MODULE}]).
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
+                             [{erlang_register, ?MODULE},
+                              %% we provide a protected ets table,
+                              %% that should be available when we
+                              %% started..., so we better wait for its
+                              %% creation.
+                              {wait_for_init}]).
 
 %% @doc Initiates the server
 %% @private
