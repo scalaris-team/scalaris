@@ -1,4 +1,4 @@
-% @copyright 2010-2013 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ test_join(_Config) ->
                                check_results(Res)
                        end),
     ct:pal("adding node to provoke slide"),
-    _AddPid = spawn_link(fun() ->
+    AddPid = spawn_link(fun() ->
                                  ?proto_sched(start),
                                  api_vm:add_nodes(2)
                          end),
@@ -64,6 +64,8 @@ test_join(_Config) ->
     unittest_helper:check_ring_size_fully_joined(4),
     ct:pal("ring fully joined (4)"),
     util:wait_for_process_to_die(MrPid),
+    %% wait before destroying the environment (to prevent exceptions)
+    util:wait_for_process_to_die(AddPid),
     ok.
 
 test_leave(_Config) ->
@@ -79,10 +81,11 @@ test_leave(_Config) ->
                                check_results(Res)
                        end),
     ct:pal("shutting down node ~p to provoke slide", [AddedNode]),
-    _VMPid = spawn_link(fun() ->
+    VMPid = spawn_link(fun() ->
                                 ?proto_sched(start),
                                 api_vm:shutdown_node(AddedNode)
                         end),
     util:wait_for_process_to_die(MrPid),
+    %% wait before destroying the environment (to prevent exceptions)
+    util:wait_for_process_to_die(VMPid),
     ok.
-
