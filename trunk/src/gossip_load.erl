@@ -180,7 +180,7 @@ no_of_buckets(State) ->
 
 -spec request_histogram(Size::pos_integer(), SourceId::comm:mypid()) -> ok.
 request_histogram(Size, SourcePid) when Size < 1 ->
-    error(badarg, [Size, SourcePid]);
+    erlang:error(badarg, [Size, SourcePid]);
 
 request_histogram(Size, SourcePid) ->
     gossip:start_gossip_task(?MODULE, [Size, SourcePid]).
@@ -508,8 +508,8 @@ integrate_data_init(QData, RoundStatus, State) ->
 
 
 -spec new_round(NewRound, State) -> {ok, State} when
-    NewRound :: non_neg_integer(),
-    State :: state().
+    is_subtype(NewRound, non_neg_integer()),
+    is_subtype(State, state()).
 new_round(NewRound, State) ->
     % Only replace prev round with current round if current has converged.
     % Cases in which current round has not converged: e.g. late joining, sleeped/paused.
@@ -540,7 +540,7 @@ has_converged(TargetConvergenceCount, State) ->
 
 
 -spec finish_request(State) -> {ok, State} when
-    State :: state().
+    is_subtype(State, state()).
 finish_request(State) ->
     Histo = load_data_get(histo, state_get(load_data, State)),
     case state_get(leader, State) of
@@ -650,7 +650,7 @@ state_get(Key, State) ->
     case ets:lookup(State, Key) of
         [] ->
             log:log(error, "[ ~w ] Lookup of ~w in ~w failed~n", [state_get(instance, State), Key, State]),
-            error(lookup_failed, [Key, State]);
+            erlang:error(lookup_failed, [Key, State]);
         [{Key, Value}] -> Value
     end.
 
@@ -1138,16 +1138,16 @@ to_string({ModuleName, Id}) ->
 %%      Used as value_creator in tester.erl (property testing).
 -spec tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
         NoOfBuckets, Request, Instance) -> state() when
-    ConvCount :: non_neg_integer(),
-    Leader :: boolean(),
-    LoadData::load_data(),
-    Merged :: non_neg_integer(),
-    Range :: intervals:non_empty_interval(),
-    Round :: non_neg_integer(),
-    Status :: init|uninit,
-    NoOfBuckets :: 1..50,
-    Request :: boolean(),
-    Instance :: instance().
+    is_subtype(ConvCount, non_neg_integer()),
+    is_subtype(Leader, boolean()),
+    is_subtype(LoadData, load_data()),
+    is_subtype(Merged, non_neg_integer()),
+    is_subtype(Range, intervals:non_empty_interval()),
+    is_subtype(Round, non_neg_integer()),
+    is_subtype(Status, init|uninit),
+    is_subtype(NoOfBuckets, 1..50),
+    is_subtype(Request, boolean()),
+    is_subtype(Instance, instance()).
 tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
         NoOfBuckets, Request, Instance) ->
     NewState = ets:new(cbstate, [set, protected]),
