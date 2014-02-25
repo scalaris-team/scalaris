@@ -1,4 +1,4 @@
-% @copyright 2010-2013 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -45,10 +45,12 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:make_ring(2),
     %% wait for all nodes to finish their join before writing data
     unittest_helper:check_ring_size_fully_joined(2),
+    unittest_helper:wait_for_stable_ring_deep(),
     Pid = erlang:spawn(fun add_data/0),
     util:wait_for_process_to_die(Pid),
     %% wait a bit for the rm-processes to settle
-    timer:sleep(500),
+    %% done by wait_for_stable_ring_deep
+    %% timer:sleep(500),
     Config.
 
 end_per_testcase(_TestCase, _Config) ->
