@@ -60,6 +60,7 @@ end_per_testcase(_TestCase, _Config) ->
 
 test_sane_result(_Config) ->
     ?proto_sched(start),
+    ?proto_sched(start_deliver),
     Res = api_mr:start_job(get_wc_job_erl()),
     %% each word only occurs once
     check_results(Res),
