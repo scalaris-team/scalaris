@@ -57,7 +57,7 @@ init([]) ->
         erlang:group_leader(Leader, self())
     catch _:_ -> ok
     end,
-    {pdb:new(?MODULE, [set, protected]), false, false,
+    {pdb:new(?MODULE, [set]), false, false,
      os:timestamp(), 0, _SortBy = 4, self()}.
 
 -spec top() -> ok.

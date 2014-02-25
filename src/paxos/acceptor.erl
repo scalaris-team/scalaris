@@ -1,5 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin,
-%            2010 onScale solutions GmbH
+% @copyright 2009-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -108,7 +107,7 @@ init([]) ->
     %%TableName = pid_groups:my_groupname() ++ "_acceptor",
     %%pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    TableName = pdb:new(?MODULE, [set, protected]),
+    TableName = pdb:new(?MODULE, [set]),
     _State = TableName.
 
 -spec on(comm:message(), atom()) -> atom().

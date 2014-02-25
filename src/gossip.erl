@@ -44,7 +44,7 @@
 -export([tester_create_state/9, is_state/1]).
 
 -define(PDB, pdb_ets).
--define(PDB_OPTIONS, [set, protected]).
+-define(PDB_OPTIONS, [set]). %%, protected]).
 
 % prevent warnings in the log
 % (node availability is not that important to gossip)
@@ -124,7 +124,8 @@
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
-                             [{pid_groups_join_as, DHTNodeGroup, gossip}]).
+                             [{wait_for_init},
+                              {pid_groups_join_as, DHTNodeGroup, gossip}]).
 
 
 % called by gen_component, results in on_inactive
