@@ -84,7 +84,8 @@
             max       = unknown :: unknown | max(), % maximum load
             merged    = unknown :: unknown | merged() % how often the data was merged since the node entered/created the round
     }).
--type(load_info() :: #load_info{}). %% @todo: mark as opaque (dialyzer currently crashes if set)
+
+-opaque(load_info() :: #load_info{}).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
