@@ -55,7 +55,6 @@
 -define(SHOW, debug).
 
 -define(CBMODULES, [{gossip_load, default}]). % callback modules as list
--define(CBMODULES_TYPE, {gossip_load, default}). % callback modules as union of atoms
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -63,7 +62,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type state() :: ets:tab().
--type cb_module() :: ?CBMODULES_TYPE.
+-type cb_module() :: [{Module::atom(), Name::atom()}].
+
 -type state_key_cb() :: cb_state | cb_status | cycles | trigger_lock |
                         exch_data | round.
 -type state_key() :: cb_modules | msg_queue | range | status |
