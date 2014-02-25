@@ -86,7 +86,11 @@ tester_type_check_api(_Config) ->
           {api_rdht, [], [ {delete_collect_results, 3} ]}, %% receives
           {api_tx,
            [ {get_system_snapshot, 0} %% receives msgs
-           ], []}
+           ], []},
+          {api_mr,
+           [ {start_job, 1} %% sends msgs
+           ],
+           [ {wait_for_results, 3}]} %%receives messages
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
@@ -705,10 +709,28 @@ tester_type_check_util(_Config) ->
 tester_type_check_mr(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
+    tester:register_type_checker({typedef, mr_state, fun_term}, mr_state,
+                                 tester_is_valid_funterm),
+    tester:register_value_creator({typedef, mr_state, fun_term}, mr_state,
+                                  tester_create_valid_funterm, 2),
     Modules =
-        [ {mr_state, [], []}
+        [ {mr_state,
+           [
+            {add_data_to_phase, 4}, %% needs ets table
+            {clean_up, 1}, %% closes ets tables
+            {accumulate_data, 2}, %% needs ets tables
+            {get_slide_delta, 2}, %% needs ets tables
+            {add_slide_delta, 2} %% needs ets tables
+           ],
+           [
+            {trigger_work, 2}, %% sends message
+            {merge_phase_delta, 2}, %% needs ets tables
+            {acc_add_element, 2} %% needs ets tables
+           ]}
           %% , {mr_master, [{on, 2}, {init, 1}, {start_link, 2}], []}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_type_checker({typedef, mr_state, fun_term}),
+    tester:unregister_value_creator({typedef, mr_state, fun_term}),
     true.
