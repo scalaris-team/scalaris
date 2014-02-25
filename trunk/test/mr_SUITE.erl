@@ -1,4 +1,4 @@
-% @copyright 2010-2013 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -55,8 +55,8 @@ test_join(_Config) ->
     timer:sleep(1000),
     ct:pal("adding node to provoke slide"),
     _ = api_vm:add_nodes(2),
-    unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size_fully_joined(4),
+    unittest_helper:wait_for_stable_ring_deep(),
     ct:pal("ring fully joined (4)"),
     ct:pal("removing breakpoints"),
     [gen_component:bp_del(Pid, mr_bp) || Pid <- Pids],
@@ -66,8 +66,8 @@ test_join(_Config) ->
 test_leave(_Config) ->
     api_vm:shutdown_nodes(1),
     {[AddedNode], _} = api_vm:add_nodes(1),
-    unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size_fully_joined(2),
+    unittest_helper:wait_for_stable_ring_deep(),
     Pids = pid_groups:find_all(dht_node),
     ct:pal("setting breakpoint before starting reduce phase on ~p", [Pids]),
     NextPhase = fun(Msg, _State) ->

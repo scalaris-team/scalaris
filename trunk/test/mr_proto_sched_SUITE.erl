@@ -44,7 +44,7 @@
 all() ->
     tests_avail() ++ [test_join, test_leave].
 
-suite() -> [ {timetrap, {seconds, 9}} ].
+suite() -> [ {timetrap, {seconds, 15}} ].
 
 test_join(_Config) ->
     ct:pal("starting job that triggers breakpoint"),
@@ -60,8 +60,8 @@ test_join(_Config) ->
                                  ?proto_sched(start),
                                  api_vm:add_nodes(2)
                          end),
-    unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size_fully_joined(4),
+    unittest_helper:wait_for_stable_ring_deep(),
     ct:pal("ring fully joined (4)"),
     util:wait_for_process_to_die(MrPid),
     %% wait before destroying the environment (to prevent exceptions)
@@ -71,8 +71,8 @@ test_join(_Config) ->
 test_leave(_Config) ->
     api_vm:shutdown_nodes(1),
     {[AddedNode], _} = api_vm:add_nodes(1),
-    unittest_helper:wait_for_stable_ring(),
     unittest_helper:check_ring_size_fully_joined(2),
+    unittest_helper:wait_for_stable_ring_deep(),
     MrPid = spawn_link(fun() ->
                                ?proto_sched(start),
                                ct:pal("starting mr job"),
