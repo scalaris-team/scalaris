@@ -43,7 +43,9 @@
         , add_slide_state/3
         , init_slide_phase/1
         , get_slide_delta/2
-        , add_slide_delta/2]).
+        , add_slide_delta/2
+        , tester_is_valid_funterm/1
+        , tester_create_valid_funterm/2]).
 
 -include("scalaris.hrl").
 %% for ?required macro
@@ -53,7 +55,14 @@
 -export_type([data/0, jobid/0, state/0, fun_term/0, data_list/0]).
 -endif.
 
--type(fun_term() :: {erlanon, fun()} | {jsanon, binary()}).
+-type(erl_fun() :: {map, erlanon, fun((Arg::{?RT:client_key(), term()}) ->
+                                          Res::[{?RT:client_key(), term()}])}
+                 | {reduce, erlanon, fun((Arg::[{?RT:client_key(), term()}]) ->
+                                            Res::[{?RT:client_key(), term()}])}).
+
+-type(js_fun() :: {map | reduce, jsanon, binary()}).
+
+-type(fun_term() :: erl_fun() | js_fun()).
 
 -type(data_list() :: [{?RT:key(), string(), term()}]).
 %% data in ets table has the same format
@@ -61,25 +70,33 @@
 
 -type(data() :: data_list() | data_ets()).
 
--type(phase() :: {PhaseNr::pos_integer(), map | reduce, fun_term(),
-                     Input::data(), ToWorkOn::intervals:interval(),
-                     WorkingOn::intervals:interval()}).
+-type(delta_phase() :: {PhaseNr::pos_integer(), fun_term(),
+                        Input::data_list(), ToWorkOn::intervals:interval(),
+                        WorkingOn::intervals:interval()}).
 
--type(jobid() :: nonempty_string()).
+-type(ets_phase() :: {PhaseNr::pos_integer(), fun_term(),
+                      Input::data_ets(), ToWorkOn::intervals:interval(),
+                      WorkingOn::intervals:interval()}).
+
+-type(phase() :: ets_phase() | delta_phase()).
+
+%% only allow strings that can be converted to atoms (used for ets names)
+-type(jobid() :: [0..255,...]).
 
 -record(state, {jobid       = ?required(state, jobid) :: jobid()
                 , client    = false :: comm:mypid() | false
                 , master_id = ?required(state, master_id) :: ?RT:key()
-                , phases    = ?required(state, phases) :: [phase(),...]
+                , phases    = ?required(state, phases) :: [ets_phase(),...]
                 , options   = ?required(state, options) :: [mr:option()]
                 , acked     = intervals:empty() :: intervals:interval()
                }).
 
 -type(state() :: #state{}).
 
--spec get(state(), client | master) -> comm:mypid() | null;
-         (state(), jobid)           -> nonempty_string();
+-spec get(state(), client)          -> comm:mypid() | false;
+         (state(), jobid)           -> jobid();
          (state(), phases)          -> [phase()];
+         (state(), master_id)       -> ?RT:key();
          (state(), options)         -> [mr:option()].
 get(#state{client        = Client
            , master_id   = Master
@@ -113,8 +130,8 @@ new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
                         , [ordered_set]), intervals:empty(), intervals:empty()}
                   || I <- lists:seq(2, length(Phases))]],
     PhasesWithData = lists:zipwith(
-            fun({MoR, Fun}, {Round, Data, Open, Working}) ->
-                    {Round, MoR, Fun, Data, Open, Working}
+            fun(Fun, {Round, Data, Open, Working}) ->
+                    {Round, Fun, Data, Open, Working}
             end, Phases, ExtraData),
     JobOptions = merge_with_default_options(Options, ?DEF_OPTIONS),
     NewState = #state{
@@ -149,45 +166,58 @@ set_acked(State = #state{acked = Interval}, NewInterval) ->
 -spec interval_processing(state(), intervals:interval(), pos_integer()) ->
     state().
 interval_processing(State = #state{phases = Phases}, Interval, Round) ->
-    {Round, MoR, Fun, ETS, Open, Working} = lists:keyfind(Round, 1, Phases),
-    NewPhases = lists:keyreplace(Round, 1, Phases,
-                                 {Round, MoR, Fun, ETS,
-                                  intervals:minus(Open, Interval),
-                                  intervals:union(Working, Interval)}),
-    ?TRACE("start working on ~p new open is ~p~n", [Interval,
-                                                       intervals:minus(Open,
-                                                                       Interval)]),
-    State#state{phases = NewPhases}.
+    case lists:keyfind(Round, 1, Phases) of
+        {Round, Fun, ETS, Open, Working} ->
+            NewPhases = lists:keyreplace(Round, 1, Phases,
+                                         {Round, Fun, ETS,
+                                          intervals:minus(Open, Interval),
+                                          intervals:union(Working, Interval)}),
+            ?TRACE("start working on ~p new open is ~p~n", [Interval,
+                                                            intervals:minus(Open,
+                                                                            Interval)]),
+            State#state{phases = NewPhases};
+        false ->
+            State
+    end.
 
 -spec interval_processed(state(), intervals:interval(), pos_integer()) ->
     state().
 interval_processed(State = #state{phases = Phases}, Interval, Round) ->
-    {Round, MoR, Fun, ETS, Open, Working} = lists:keyfind(Round, 1, Phases),
-    NewPhases = lists:keyreplace(Round, 1, Phases,
-                                 {Round, MoR, Fun, ETS,
-                                  Open,
-                                  intervals:minus(Working, Interval)}),
-    State#state{phases = NewPhases}.
+    case lists:keyfind(Round, 1, Phases) of
+        {Round, Fun, ETS, Open, Working} ->
+            NewPhases = lists:keyreplace(Round, 1, Phases,
+                                         {Round, Fun, ETS,
+                                          Open,
+                                          intervals:minus(Working, Interval)}),
+            State#state{phases = NewPhases};
+        false ->
+            State
+    end.
 
 -spec interval_empty(state(), intervals:interval(), pos_integer()) ->
     state().
 interval_empty(State = #state{phases = Phases}, Interval, Round) ->
-    {Round, MoR, Fun, ETS, Open, Working} = lists:keyfind(Round, 1, Phases),
-    NewPhases = lists:keyreplace(Round, 1, Phases,
-                                 {Round, MoR, Fun, ETS,
-                                  intervals:minus(Open, Interval),
-                                  Working}),
-    State#state{phases = NewPhases}.
+    case lists:keyfind(Round, 1, Phases) of
+        {Round, Fun, ETS, Open, Working} ->
+            NewPhases = lists:keyreplace(Round, 1, Phases,
+                                         {Round, Fun, ETS,
+                                          intervals:minus(Open, Interval),
+                                          Working}),
+            State#state{phases = NewPhases};
+        false ->
+            State
+    end.
 
+%% NEXT register new as value creator
 -spec add_data_to_phase(state(), data_list(), intervals:interval(),
                              pos_integer()) -> state().
 add_data_to_phase(State = #state{phases = Phases}, NewData,
                       Interval, Round) ->
     case lists:keyfind(Round, 1, Phases) of
-        {Round, MoR, Fun, ETS, Open, Working} ->
+        {Round, Fun, ETS, Open, Working} ->
             %% side effect is used here...only works with ets
             _ = accumulate_data(NewData, ETS),
-            NextPhase = {Round, MoR, Fun, ETS, intervals:union(Open,
+            NextPhase = {Round, Fun, ETS, intervals:union(Open,
                                                                Interval),
                          Working},
             State#state{phases = lists:keyreplace(Round, 1, Phases, NextPhase)};
@@ -267,7 +297,7 @@ merge_with_default_options(UserOptions, DefaultOptions) ->
 
 -spec clean_up(state()) -> [true].
 clean_up(#state{phases = Phases}) ->
-    lists:map(fun({_R, _MoR, _Fun, ETS, _Interval, _Working}) ->
+    lists:map(fun({_R, _Fun, ETS, _Interval, _Working}) ->
                       db_ets:close(ETS)
               end, Phases).
 
@@ -275,8 +305,8 @@ clean_up(#state{phases = Phases}) ->
 split_slide_state(#state{phases = Phases} = State, _Interval) ->
     SlidePhases =
     lists:foldl(
-      fun({Nr, MoR, Fun, _ETS, _Open, _Working}, Slide) ->
-              [{Nr, MoR, Fun, false, intervals:empty(), intervals:empty()} | Slide]
+      fun({Nr, Fun, _ETS, _Open, _Working}, Slide) ->
+              [{Nr, Fun, false, intervals:empty(), intervals:empty()} | Slide]
       end,
       [],
       Phases),
@@ -289,22 +319,22 @@ add_slide_state(_K, State1, _State2) ->
 -spec init_slide_phase(state()) -> state().
 init_slide_phase(State = #state{phases = Phases, jobid = JobId}) ->
     PhasesETS = lists:foldl(
-                  fun({Nr, MoR, Fun, false, Open, Working}, AccIn) ->
+                  fun({Nr, Fun, false, Open, Working}, AccIn) ->
                           ETS = db_ets:new(
                                   lists:flatten(io_lib:format("mr_~s_~p",
                                                               [JobId, Nr]))
                                   , [ordered_set]),
-                          [{Nr, MoR, Fun, ETS, Open, Working} | AccIn];
+                          [{Nr, Fun, ETS, Open, Working} | AccIn];
                      (Phase, AccIn) ->
                           [Phase | AccIn]
                   end, [], Phases),
     State#state{phases = PhasesETS}.
 
--spec get_slide_delta(state(), intervals:interval()) -> {state(), [phase()]}.
+-spec get_slide_delta(state(), intervals:interval()) -> {state(), [delta_phase()]}.
 get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
     {NewPhases, SlidePhases} =
     lists:foldl(
-      fun({Nr, MoR, Fun, ETS, Open, Working}, {PhaseAcc, SlideAcc}) ->
+      fun({Nr, Fun, ETS, Open, Working}, {PhaseAcc, SlideAcc}) ->
               SlideData = lists:foldl(
                             fun(SimpleInterval, AccI) ->
                                     db_ets:foldl(ETS,
@@ -319,14 +349,14 @@ get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
                             intervals:get_simple_intervals(SlideInterval)),
               NewOpen = intervals:minus(Open, SlideInterval),
               SlideOpen = intervals:intersection(Open, SlideInterval),
-              {[{Nr, MoR, Fun, ETS, NewOpen, Working} | PhaseAcc],
-               [{Nr, MoR, Fun, SlideData, SlideOpen, intervals:empty()} | SlideAcc]}
+              {[{Nr, Fun, ETS, NewOpen, Working} | PhaseAcc],
+               [{Nr, Fun, SlideData, SlideOpen, intervals:empty()} | SlideAcc]}
       end,
       {[], []},
       Phases),
     {State#state{phases = NewPhases}, SlidePhases}.
 
--spec add_slide_delta(state(), [phase()]) -> state().
+-spec add_slide_delta(state(), [delta_phase()]) -> state().
 add_slide_delta(State = #state{jobid = JobId,
                                phases = Phases}, DeltaPhases) ->
     MergedPhases = lists:map(
@@ -340,19 +370,19 @@ add_slide_delta(State = #state{jobid = JobId,
     trigger_work(MergedPhases, JobId),
     State#state{phases = MergedPhases}.
 
--spec merge_phase_delta(phase(), phase()) -> phase().
-merge_phase_delta({Round, MoR, Fun, ETS, Open, Working},
-                  {Round, MoR, Fun, Delta, DOpen, _DWorking}) ->
+-spec merge_phase_delta(ets_phase(), delta_phase()) -> ets_phase().
+merge_phase_delta({Round, Fun, ETS, Open, Working},
+                  {Round, Fun, Delta, DOpen, _DWorking}) ->
     %% side effect
     %% also should be db_ets, but ets can add lists
     ets:insert(ETS, Delta),
-    {Round, MoR, Fun, ETS, intervals:union(Open, DOpen),
+    {Round, Fun, ETS, intervals:union(Open, DOpen),
      Working}.
 
--spec trigger_work([phase()], jobid()) -> ok.
+-spec trigger_work([ets_phase()], jobid()) -> ok.
 trigger_work(Phases, JobId) ->
     SmallestOpenPhase = lists:foldl(
-                         fun({Round, _, _, _, Open, _}, Acc) ->
+                         fun({Round, _, _, Open, _}, Acc) ->
                                  case not intervals:is_empty(Open)
                                       andalso Round < Acc of
                                      true ->
@@ -367,3 +397,18 @@ trigger_work(Phases, JobId) ->
         _N ->
             ok
     end.
+
+-spec tester_is_valid_funterm(fun_term()) -> boolean().
+tester_is_valid_funterm({map, erlanon, Fun}) when is_function(Fun, 1) -> true;
+tester_is_valid_funterm({reduce, erlanon, Fun}) when is_function(Fun, 1) -> true;
+tester_is_valid_funterm({map, jsanon, Fun}) when is_binary(Fun) -> true;
+tester_is_valid_funterm({reduce, jsanon, Fun}) when is_binary(Fun) -> true;
+tester_is_valid_funterm(_) -> false.
+
+-spec tester_create_valid_funterm(erlanon | jsanon, map | reduce) -> fun_term().
+tester_create_valid_funterm(erlanon, map) ->
+    {map, erlanon, fun({"Foo", bar}) -> [{"Foo", bar}] end};
+tester_create_valid_funterm(erlanon, reduce) ->
+    {reduce, erlanon, fun([{"Foo", bar}]) -> [{"Foo", bar}] end};
+tester_create_valid_funterm(jsanon, MoR) ->
+    {MoR, jsanon, <<"some js function">>}.

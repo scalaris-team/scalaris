@@ -46,9 +46,7 @@
 -export_type([job/0]).
 -endif.
 
--type(mr_job() :: {Round::pos_integer(),
-                   map | reduce,
-                   mr_state:fun_term(),
+-type(mr_job() :: {mr_state:fun_term(),
                    Data::[term()], Interval::intervals:interval()}).
 
 -type(snapshot_job() :: {snapshot}).

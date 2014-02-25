@@ -61,7 +61,7 @@ on(_Msg, State) ->
 %%      executes Job and returns results to the local wpool. wpool associates
 %%      the worker pid to the jobs client and knows where the results go.
 -spec work(comm:mypid(), wpool:job()) -> ok.
-work(Source, {_Round, map, {erlanon, Fun}, Data, Interval}) ->
+work(Source, {{map, erlanon, Fun}, Data, Interval}) ->
     ?TRACE("worker: should apply map ~p to ~p in ~p~n", [Fun, Data, Interval]),
     Results =
     lists:foldl(fun(SimpleInterval, Acc1) ->
@@ -76,7 +76,7 @@ work(Source, {_Round, map, {erlanon, Fun}, Data, Interval}) ->
                 end,
                 [], Interval),
     return(Source, Results);
-work(Source, {_Round, reduce, {erlanon, Fun}, Data, Interval}) ->
+work(Source, {{reduce, erlanon, Fun}, Data, Interval}) ->
     ?TRACE("worker: should apply redcue ~p to ~p in ~p~n", [Fun, Data, Interval]),
     Args = lists:foldl(fun(SimpleInterval, Acc1) ->
                                db_ets:foldl(Data,
@@ -94,7 +94,7 @@ work(Source, {_Round, reduce, {erlanon, Fun}, Data, Interval}) ->
     Res = apply_erl(Fun, Args),
     return(Source, [{?RT:hash_key(K), K, V} || {K, V} <- Res]);
 
-work(Source, {_Round, map, {jsanon, Fun}, Data, Interval}) ->
+work(Source, {{map, jsanon, Fun}, Data, Interval}) ->
     %% ?TRACE("worker: should apply ~p to ~p~n", [FunBin, Data]),
     {ok, VM} = js_driver:new(),
     Results =
@@ -109,7 +109,7 @@ work(Source, {_Round, map, {jsanon, Fun}, Data, Interval}) ->
                 end,
                 [], Interval),
     return(Source, Results);
-work(Source, {_Round, reduce, {jsanon, Fun}, Data, Interval}) ->
+work(Source, {{reduce, jsanon, Fun}, Data, Interval}) ->
     {ok, VM} = js_driver:new(),
     Args = lists:foldl(fun(SimpleInterval, Acc1) ->
                                db_ets:foldl(Data,

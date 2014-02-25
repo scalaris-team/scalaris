@@ -42,8 +42,8 @@
 %%                                      {K, lists:sum(V)}
 %%                                end, KVList)
 %%            end,
-%%            api_mr:start_job({[{map, {erlanon, Map}},
-%%                               {reduce, {erlanon, Reduce}}],
+%%            api_mr:start_job({[{map, erlanon, Map},
+%%                               {reduce, erlanon, Reduce}],
 %%                              []}).
 %%         '''
 %%         It considers all `{string(), string()}' as input and returns the word count of all
