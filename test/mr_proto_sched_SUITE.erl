@@ -27,14 +27,15 @@
                 case Action of
                     start ->
                         ct:pal("Starting proto scheduler"),
-                        proto_sched:start(),
+                        proto_sched:start();
+                    start_deliver ->
                         proto_sched:start_deliver();
                     stop ->
                         proto_sched:stop(),
                         case erlang:whereis(pid_groups) =:= undefined orelse pid_groups:find_a(proto_sched) =:= failed of
                             true -> ok;
-                            false -> ct:pal("Proto scheduler stats: ~.2p", proto_sched:get_infos()),
-                                     proto_sched:cleanup()
+                            false ->
+                                proto_sched:cleanup()
                         end
                 end
         end()).
@@ -63,6 +64,7 @@ test_join(_Config) ->
     unittest_helper:check_ring_size_fully_joined(4),
     unittest_helper:wait_for_stable_ring_deep(),
     ct:pal("ring fully joined (4)"),
+    ?proto_sched(start_deliver),
     util:wait_for_process_to_die(MrPid),
     %% wait before destroying the environment (to prevent exceptions)
     util:wait_for_process_to_die(AddPid),
@@ -71,8 +73,6 @@ test_join(_Config) ->
 test_leave(_Config) ->
     api_vm:shutdown_nodes(1),
     {[AddedNode], _} = api_vm:add_nodes(1),
-    unittest_helper:check_ring_size_fully_joined(2),
-    unittest_helper:wait_for_stable_ring_deep(),
     MrPid = spawn_link(fun() ->
                                ?proto_sched(start),
                                ct:pal("starting mr job"),
@@ -85,6 +85,9 @@ test_leave(_Config) ->
                                 ?proto_sched(start),
                                 api_vm:shutdown_node(AddedNode)
                         end),
+    unittest_helper:check_ring_size_fully_joined(2),
+    unittest_helper:wait_for_stable_ring_deep(),
+    ?proto_sched(start_deliver),
     util:wait_for_process_to_die(MrPid),
     %% wait before destroying the environment (to prevent exceptions)
     util:wait_for_process_to_die(VMPid),
