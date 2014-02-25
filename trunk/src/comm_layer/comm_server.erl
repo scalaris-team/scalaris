@@ -1,4 +1,4 @@
-% @copyright 2008-2011 Zuse Institute Berlin
+% @copyright 2008-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -152,7 +152,8 @@ start_link(CommLayerGroup) ->
                              [ {erlang_register, ?MODULE},
                                {pid_groups_join_as, CommLayerGroup, ?MODULE},
                                {spawn_opts, [{fullsweep_after, 0},
-                                             {min_heap_size, 131071}]}
+                                             {min_heap_size, 131071}]},
+                               {wait_for_init} %% uses protected ets table
                              ]).
 
 %% @doc initialize: return initial state.

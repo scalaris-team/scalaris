@@ -83,13 +83,13 @@ start_link(ServiceGroup, RemotePid) ->
     RemoteFDPid = comm:get(fd, RemotePid),
     Name = lists:flatten(io_lib:format("fd <-> ~p", [RemoteFDPid])),
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [RemotePid],
-                             [{wait_for_init},
+                             [%% {wait_for_init}, %% when using protected ets table
                               {pid_groups_join_as, ServiceGroup, Name}]).
 
 -spec init([pid() | comm:mypid()]) -> state().
 init([RemotePid]) ->
     ?TRACE("fd_hbs init: RemotePid ~p~n", [RemotePid]),
-    TableName = pdb:new(?MODULE, [set, protected]),
+    TableName = pdb:new(?MODULE, [set]), %% debugging: ++ [protected]),
     RemoteFDPid = comm:get(fd, RemotePid),
     comm:send(RemoteFDPid,
               {subscribe_heartbeats, comm:this(), RemotePid},

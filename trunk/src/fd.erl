@@ -167,14 +167,15 @@ report_graceful_leave() ->
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
-      [{wait_for_init}, {erlang_register, ?MODULE},
+      [%% {wait_for_init}, %% when using protected table (for debugging)
+       {erlang_register, ?MODULE},
        {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 
 %% @doc Initialises the module with an empty state.
 -spec init([]) -> state().
 init([]) ->
     % local heartbeat processes
-    _ = pdb:new(fd_hbs, [set, protected, named_table]),
+    _ = pdb:new(fd_hbs, [set]), %% for debugging ++ [protected, named_table]),
     ok.
 
 %% @private
