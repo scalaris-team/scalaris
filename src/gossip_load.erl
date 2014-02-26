@@ -51,10 +51,10 @@
 -export([request_histogram/2, load_info_get/2]).
 
 % gossip_beh
--export([init/1, init/2, init/3, check_config/0, trigger_interval/0, select_node/1, select_data/1,
-        select_reply_data/5, integrate_data/4, handle_msg/2, notify_change/3,
-        min_cycles_per_round/0, max_cycles_per_round/0, round_has_converged/1,
-        get_values_best/1, get_values_all/1, web_debug_info/1, shutdown/1]).
+-export([init/1, init/2, init/3, check_config/0, trigger_interval/0, fanout/0,
+        select_node/1, select_data/1, select_reply_data/5, integrate_data/4,
+        handle_msg/2, notify_change/3, min_cycles_per_round/0, max_cycles_per_round/0,
+        round_has_converged/1, get_values_best/1, get_values_all/1, web_debug_info/1, shutdown/1]).
 
 %% for testing
 -export([tester_create_histogram/1, is_histogram/1, tester_create_state/10, is_state/1]).
@@ -124,6 +124,13 @@
 trigger_interval() -> % in ms
     config:read(gossip_load_interval).
 
+
+%% @doc The fanout (number of peers contacted per cycle).
+-spec fanout() -> pos_integer().
+fanout() ->
+    config:read(gossip_load_fanout).
+
+
 %% @doc The minimum number of cycles per round.
 %%      Only full cycles (i.e. received replies) are counted (ignored triggers
 %%      do not count as cycle).
@@ -131,6 +138,7 @@ trigger_interval() -> % in ms
 -spec min_cycles_per_round() -> non_neg_integer().
 min_cycles_per_round() ->
     config:read(gossip_load_min_cycles_per_round).
+
 
 %% @doc The maximum number of cycles per round.
 %%      Only full cycles (i.e. received replies) are counted (ignored triggers
@@ -156,7 +164,6 @@ convergence_count_best_values() ->
 -spec convergence_count_new_round() -> pos_integer().
 convergence_count_new_round() ->
     config:read(gossip_load_convergence_count_new_round).
-
 
 -spec convergence_epsilon() -> float().
 convergence_epsilon() ->
@@ -193,7 +200,10 @@ check_config() ->
     config:cfg_is_greater_than(gossip_load_convergence_count_new_round, 0) andalso
 
     config:cfg_is_integer(gossip_load_number_of_buckets) andalso
-    config:cfg_is_greater_than(gossip_load_number_of_buckets, 0).
+    config:cfg_is_greater_than(gossip_load_number_of_buckets, 0),
+
+    config:cfg_is_integer(gossip_load_fanout) andalso
+    config:cfg_is_greater_than(gossip_load_fanout, 0).
 
 -spec no_of_buckets(State::state()) -> pos_integer().
 no_of_buckets(State) ->
@@ -365,7 +375,6 @@ integrate_data(QData, RoundStatus, Round, State) ->
 handle_msg({get_state_response, DHTNodeState}, State) ->
     Load = dht_node_state:get(DHTNodeState, load),
     log:log(?SHOW, "[ ~w ] Load: ~w", [state_get(instance, State), Load]),
-    log:log(warn, "Node: ~w Cycle: ~w Avg: ~w", [self(),0, Load]),
 
     Data = state_get(load_data, State),
     Data1 = load_data_set(avg, {float(Load), 1.0}, Data),
