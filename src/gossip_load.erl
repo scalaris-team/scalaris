@@ -14,7 +14,31 @@
 %   limitations under the License.
 
 %% @author Jens V. Fischer <jensvfischer@gmail.com>
-%% @doc    Gossiping behaviour
+%% @doc Gossip based aggregation of load information.
+%%      This module implements the symmetric push-sum protocol. The algorithm is
+%%      used to compute aggregates of the load information, which is measured as
+%%      the count of items currently in a node's key range. <br/>
+%%      The aggregation of load information is used in Scalaris for two purposes:
+%%      First, for passive load balancing. When a node  joins, the gossiped load
+%%      information is used to decide where to place the new node. The node will
+%%      be placed so that the standard deviation of the load is reduced the most.
+%%      Second, the gossiping is used for system monitoring. The local estimates
+%%      of the gossiping can be viewed for example in the Web Interface of every
+%%      Scalaris node. <br/>
+%%      Different metrics are computed on the load information:
+%%      <ul>
+%%          <li> average load, the arithmetic mean of all nodes load information </li>
+%%          <li> the maximum load </li>
+%%          <li> the minimum load </li>
+%%          <li> standard deviation of the average load </li>
+%%          <li> leader based size, based on counting </li>
+%%          <li> key range bases size, calculated as address space of keys / average key range per node </li>
+%%          <li> histogram of load per key range (load measured as number of items per node) </li>
+%%      </ul>
+%%      The module is initialised during the startup of the gossiping framework,
+%%      continuously aggregating load information in the background. Additionally,
+%%      is it possible to start instances of the module for the purpose of computing
+%%      different sizes histograms, request_histogram/1.
 %% @end
 %% @version $Id$
 -module(gossip_load).
@@ -94,7 +118,8 @@
 
 %%--------- External config function (called by bh module) ---------%%
 
-%% @doc The time interval in ms in which message exchanges are initiated.
+%% @doc The time interval in ms after which a new cycle is trigger by the behaviour
+%%      module.
 -spec trigger_interval() -> pos_integer().
 trigger_interval() -> % in ms
     config:read(gossip_load_interval).
@@ -179,6 +204,9 @@ no_of_buckets(State) ->
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Request a histogram with Size number of Buckets. <br/>
+%%      The resulting histogram will be sent to SourceId, when all values have
+%%      properly converged.
 -spec request_histogram(Size::pos_integer(), SourceId::comm:mypid()) -> ok.
 request_histogram(Size, SourcePid) when Size < 1 ->
     erlang:error(badarg, [Size, SourcePid]);
@@ -191,14 +219,24 @@ request_histogram(Size, SourcePid) ->
 %% Callback Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Initiate the gossip_load module. <br/>
+%%      Called by the gossip module upon startup. <br/>
+%%      Instance makes the module aware of its own instance id, which is saved
+%%      in the state of the module.
 -spec init(Instance::instance()) -> {ok, state()}.
 init(Instance) ->
     init(Instance, no_of_buckets(), none).
 
+%% @doc Initiate the gossip_load module. <br/>
+%%      Used by gossip:start_gossip_task().
+%%      NoOfBuckets defines the size of the histogram calculated.
 -spec init(Instance::instance(), NoOfBuckets::non_neg_integer()) -> {ok, state()}.
 init(Instance, NoOfBuckets) ->
     init(Instance, NoOfBuckets, none).
 
+%% @doc Initiate the gossip_load module. <br/>
+%%      Used for request_histogram/1 (called by the gossip module). <br/>
+%%      the calculated histogram will be sent to the requestor.
 -spec init(Instance::instance(), NoOfBuckets::non_neg_integer(),
                 Requestor::comm:mypid()|none) -> {ok, state()}.
 init(Instance, NoOfBuckets, Requestor) ->
@@ -215,10 +253,17 @@ init(Instance, NoOfBuckets, Requestor) ->
     {ok, State}.
 
 
+%% @doc Returns false, i.e. peer selection is done by gossip module.
+%%      State: the state of the gossip_load module
 -spec select_node(State::state()) -> {boolean(), state()}.
 select_node(State) ->
     {false, State}.
 
+%% @doc Select and prepare the load information to be sent to the peer. <br/>
+%%      Called by the gossip module at the beginning of every cycle. <br/>
+%%      The selected exchange data is sent back to the gossip module as a message
+%%      of the form {selected_data, Instance, ExchangeData}.
+%%      State: the state of the gossip_load module
 -spec select_data(State::state()) -> {ok, state()}.
 select_data(State) ->
     log:log(debug, "[ ~w ] select_data: State: ~w", [state_get(instance, State), State]),
@@ -233,6 +278,13 @@ select_data(State) ->
     {ok, State}.
 
 
+%% @doc Process the data from the requestor and select reply data. <br/>
+%%      Called by the behaviour module upon a p2p_exch message. <br/>
+%%      PData: exchange data from the p2p_exch request <br/>
+%%      Ref: used by the gossip module to identify the request <br/>
+%%      RoundStatus / Round: round information used for special handling of
+%%          messages from previous rounds <br/>
+%%      State: the state of the gossip_load module
 -spec select_reply_data(PData::load_data(), Ref::pos_integer(),
     RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(),
     State::state()) -> {discard_msg | ok | retry | send_back, state()}.
@@ -276,7 +328,14 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
             end
     end.
 
-
+%% @doc Integrate the reply data. <br/>
+%%      Called by the behaviour module upon a p2p_exch message. <br/>
+%%      QData: the reply data from the peer <br/>
+%%      RoundStatus / Round: round information used for special handling of
+%%          messages from previous rounds <br/>
+%%      State: the state of the gossip_load module <br/>
+%%      Upon finishing the processing of the data, a message of the form
+%%      {integrated_§data, Instance, RoundStatus} is to be sent to the gossip module.
 -spec integrate_data(QData::load_data(), RoundStatus::gossip_beh:round_status(),
     Round::non_neg_integer(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
@@ -297,11 +356,16 @@ integrate_data(QData, RoundStatus, Round, State) ->
     end.
 
 
+%% @doc Handle get_state_response messages from the dht_node. <br/>
+%%      The received load information is stored and the status is set to init,
+%%      allowing the start of a new gossip round.
+%%      State: the state of the gossip_load module <br/>
 -spec handle_msg(Message::{get_state_response, DHTNodeState::dht_node_state:state()},
     State::state()) -> {ok, state()}.
 handle_msg({get_state_response, DHTNodeState}, State) ->
     Load = dht_node_state:get(DHTNodeState, load),
     log:log(?SHOW, "[ ~w ] Load: ~w", [state_get(instance, State), Load]),
+    log:log(warn, "Node: ~w Cycle: ~w Avg: ~w", [self(),0, Load]),
 
     Data = state_get(load_data, State),
     Data1 = load_data_set(avg, {float(Load), 1.0}, Data),
@@ -332,12 +396,27 @@ handle_msg({get_state_response, DHTNodeState}, State) ->
     {ok, State}.
 
 
+%% @doc Checks if the current round has converged yer <br/>
+%%      Returns true if the round has converged, false otherwise.
 -spec round_has_converged(State::state()) -> {boolean(), state()}.
 round_has_converged(State) ->
     ConvergenceCount = convergence_count_new_round(),
     {has_converged(ConvergenceCount, State), State}.
 
 
+%% @doc Notifies the gossip_load module about changes. <br/>
+%%      Changes can be one of the following:
+%%      <ol>
+%%          <li> new_round <br/>
+%%               Notifies the the callback module about the beginning of round </li>
+%%          <li> leader <br/>
+%%               Notifies the the callback module about a change in the key range
+%%               of the node. The MsgTag indicates whether the node is a leader
+%%               or not, the NewRange is the new key range of the node. </li>
+%%          <li> exch_failure <br/>
+%%               Notifies the the callback module about a failed message delivery,
+%%               including the exchange data and round from the original message. </li>
+%%      </ol>
 -spec notify_change(Keyword::new_round, NewRound::non_neg_integer(), State::state()) -> {ok, state()};
     (Keyword::leader, {MsgTag::is_leader | no_leader, NewRange::intervals:interval()},
             State::state()) -> {ok, state()};
@@ -383,7 +462,11 @@ notify_change(exch_failure, {_MsgTag, Data, Round}, State) ->
     {ok, State}.
 
 
-%% @doc
+%% @doc Returns the best aggregation result. <br/>
+%%      Called by the gossip module upon {get_values_best} messages.
+%%      Returns either the aggregation restult from the current or previous round,
+%%      depending on convergence_count_best_values. <br/>
+%%      State: the state of the gossip_load module.
 -spec get_values_best(state()) -> {load_info(), state()}.
 get_values_best(State) ->
     BestState = previous_or_current(State),
@@ -391,6 +474,11 @@ get_values_best(State) ->
     {LoadInfo, State}.
 
 
+%% @doc Returns all aggregation results. <br/>
+%%      Called by the gossip module upon {get_values_all} messages.
+%%      Returns the aggregation restult from a) the previous, b) the current
+%%      and c) the best round (current or previous).
+%%      State: the state of the gossip_load module.
 -spec get_values_all(state()) ->
     { {PreviousInfo::load_info(), CurrentInfo::load_info(), BestInfo::load_info()},
         NewState::state() }.
@@ -400,6 +488,9 @@ get_values_all(State) ->
     {list_to_tuple(InfosAll), State}.
 
 
+%% @doc Returns a key-value list of debug infos for the Web Interface. <br/>
+%%      Called by the gossip module upon {web_debug_info} messages.
+%%      State: the state of the gossip_load module.
 -spec web_debug_info(state()) ->
     {KeyValueList::[{Key::any(),Value::any()},...], NewState::state()}.
 web_debug_info(State) ->
@@ -438,6 +529,9 @@ web_debug_info(State) ->
     {KeyValueList, State}.
 
 
+%% @doc Shutd down the gossip_load module. <br/>
+%%      Called by the gossip module upon stop_gossip_task(CBModule).
+%%      Deletes both the current and the previous state.
 -spec shutdown(State::state()) -> {ok, state_deleted}.
 shutdown(State) ->
     delete_state(state_get(prev_state, State)),
