@@ -71,6 +71,8 @@
 
 % Config and Misc
 
+-callback fanout() -> pos_integer().
+
 -callback trigger_interval() -> pos_integer().
 
 -callback min_cycles_per_round() -> non_neg_integer().
@@ -104,6 +106,7 @@ behaviour_info(callbacks) ->
     {integrate_data, 4},
     {handle_msg, 2},
     {trigger_interval, 0},
+    {fanout, 0},
     {min_cycles_per_round, 0},
     {max_cycles_per_round, 0},
     {round_has_converged, 1},

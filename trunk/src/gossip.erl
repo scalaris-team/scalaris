@@ -43,8 +43,9 @@
 % testing
 -export([tester_create_state/9, is_state/1]).
 
--define(PDB, pdb_ets).
+%% -define(PDB, pdb_ets).
 -define(PDB_OPTIONS, [set]). %%, protected]).
+-define(PDB, pdb).
 
 % prevent warnings in the log
 % (node availability is not that important to gossip)
@@ -55,6 +56,8 @@
 -define(SHOW, debug).
 
 -define(CBMODULES, [{gossip_load, default}]). % callback modules as list
+
+-define(FIRST_TRIGGER_DELAY, 10). % delay in s for first trigger
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -437,14 +440,14 @@ handle_msg({selected_peer, CBModule, _Msg={cy_cache, []}}, State) ->
     State;
 
 
-handle_msg({selected_peer, CBModule, _Msg={cy_cache, [Node]}}, State) ->
+handle_msg({selected_peer, CBModule, _Msg={cy_cache, Nodes}}, State) ->
     % This message is received as a response to a get_subset message to the
     % cyclon process and should contain a random node.
     %% io:format("gossip: got random node from Cyclon: ~p~n",[node:pidX(Node)]),
     {_Node, PData} = state_get(exch_data, CBModule, State),
     case PData of
-        undefined -> state_set(exch_data, {Node, undefined}, CBModule, State);
-        _ -> start_p2p_exchange(Node, PData, CBModule, State)
+        undefined -> state_set(exch_data, {Nodes, undefined}, CBModule, State);
+        _ -> start_p2p_exchange(Nodes, PData, CBModule, State)
     end,
     State;
 
@@ -592,23 +595,25 @@ handle_msg({stop_gossip_task, CBModule}=Msg, State) ->
 
 % called by either on({selected_data,...}) or on({selected_peer, ...}),
 % depending on which finished first
--spec start_p2p_exchange(Peer::node:node_type(), PData::gossip_beh:exch_data(),
+-spec start_p2p_exchange(Peers::[node:node_type(),...], PData::gossip_beh:exch_data(),
     CBModule::cb_module(), State::state()) -> ok.
-start_p2p_exchange(Peer, PData, CBModule, State)  ->
-    case node:is_me(Peer) of
-        false ->
-            %% io:format("starting p2p exchange. Peer: ~w, Ref: ~w~n",[Peer, Ref]),
-            ?SEND_TO_GROUP_MEMBER(
-                    node:pidX(Peer), gossip,
-                    {p2p_exch, CBModule, comm:this(), PData, state_get(round, CBModule, State)}),
-            state_set(trigger_lock, free, CBModule, State);
-        true  ->
-            %% todo does this really happen??? cyclon should not have itself in the cache
-            log:log(?SHOW, "[ Gossip ] Node was ME, requesting new node"),
-            request_random_node(CBModule),
-            {Peer, Data} = state_get(exch_data, CBModule, State),
-            state_set(exch_data, {undefined, Data}, CBModule, State)
-    end,
+start_p2p_exchange(Peers, PData, CBModule, State)  ->
+    _ = [ begin
+        case node:is_me(Peer) of
+            false ->
+                %% io:format("starting p2p exchange. Peer: ~w, Ref: ~w~n",[Peer, Ref]),
+                ?SEND_TO_GROUP_MEMBER(
+                        node:pidX(Peer), gossip,
+                        {p2p_exch, CBModule, comm:this(), PData, state_get(round, CBModule, State)}),
+                state_set(trigger_lock, free, CBModule, State);
+            true  ->
+                %% todo does this really happen??? cyclon should not have itself in the cache
+                log:log(?SHOW, "[ Gossip ] Node was ME, requesting new node"),
+                request_random_node(CBModule),
+                {Peer, Data} = state_get(exch_data, CBModule, State),
+                state_set(exch_data, {undefined, Data}, CBModule, State)
+        end
+        end || Peer <- Peers],
     ok.
 
 
@@ -653,7 +658,7 @@ init_gossip_task(CBModule, Args, State) ->
     case state_get_raw({trigger_group, TriggerInterval}, State) of
         undefined ->
             % create and init new trigger group
-            msg_delay:send_trigger(0,  {gossip_trigger, TriggerInterval}),
+            msg_delay:send_trigger(?FIRST_TRIGGER_DELAY,  {gossip_trigger, TriggerInterval}),
             {[CBModule]};
         {OldTriggerGroup} ->
             % add CBModule to existing trigger group
@@ -681,13 +686,13 @@ init_gossip_task(CBModule, Args, State) ->
 
 
 -spec cb_call(FunName, CBModule) -> non_neg_integer() | pos_integer() when
-    is_subtype(FunName, min_cycles_per_round | max_cycles_per_round | trigger_interval),
+    is_subtype(FunName, fanout | min_cycles_per_round | max_cycles_per_round | trigger_interval),
     is_subtype(CBModule, cb_module()).
 cb_call(FunName, CBModule) ->
     cb_call(FunName, [], CBModule).
 
 -spec cb_call(FunName, Args, CBModule) -> Return when
-    is_subtype(FunName, init | min_cycles_per_round | max_cycles_per_round | trigger_interval),
+    is_subtype(FunName, init | fanout | min_cycles_per_round | max_cycles_per_round | trigger_interval),
     is_subtype(Args, list()),
     is_subtype(CBModule, cb_module()),
     is_subtype(Return, non_neg_integer() | pos_integer() | {ok, any()}).
@@ -762,7 +767,8 @@ select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
 request_random_node(CBModule) ->
     CyclonPid = pid_groups:get_my(cyclon),
     EnvPid = comm:reply_as(self(), 3, {selected_peer, CBModule, '_'}),
-    comm:send_local(CyclonPid, {get_subset_rand, 1, EnvPid}).
+    Fanout = cb_call(fanout, CBModule),
+    comm:send_local(CyclonPid, {get_subset_rand, Fanout, EnvPid}).
 
 
 -spec request_random_node_delayed(Delay::non_neg_integer(), CBModule::cb_module()) ->
@@ -770,7 +776,8 @@ request_random_node(CBModule) ->
 request_random_node_delayed(Delay, CBModule) ->
     CyclonPid = pid_groups:get_my(cyclon),
     EnvPid = comm:reply_as(self(), 3, {selected_peer, CBModule, '_'}),
-    comm:send_local_after(Delay, CyclonPid, {get_subset_rand, 1, EnvPid}).
+    Fanout = cb_call(fanout, CBModule),
+    comm:send_local_after(Delay, CyclonPid, {get_subset_rand, Fanout, EnvPid}).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -807,7 +814,7 @@ is_end_of_round(CBModule, State) ->
     log:log(debug, "[ Gossip ] check_end_of_round. Cycles: ~w", [Cycles]),
     Cycles >= cb_call(min_cycles_per_round, CBModule) andalso
     (   ( Cycles >= cb_call(max_cycles_per_round, CBModule)) orelse
-        ( cb_call(round_has_converged, [], no_msg, CBModule, State) ) ) .
+        ( cb_call(round_has_converged, [], no_msg, CBModule, State) ) ).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
