@@ -146,10 +146,11 @@
          msg_delay_queues        = ?required(state, msg_delay_queues)
                                        :: msg_delay_queues(),
          status                  = ?required(state, status)
-                                       :: stopped | running | start_delivery,
+                                       :: stopped | running | start_delivery
+                                        | delivered | {to_be_cleaned, pid()},
          passed_state            = ?required(state, passed_state)
                                        :: none | passed_state(),
-         num_possible_executions = ?required(state, passed_state)
+         num_possible_executions = ?required(state, num_possible_executions)
                                        :: pos_integer(),
          callback_on_deliver     = ?required(state, callback_on_deliver)
                                        :: callback_on_deliver()
@@ -238,8 +239,13 @@ cleanup() -> cleanup(default).
 
 -spec cleanup(trace_id()) -> ok.
 cleanup(TraceId) ->
+     %% clear infection
+    clear_infection(),
     ProtoSchedPid = pid_groups:find_a(?MODULE),
-    comm:send_local(ProtoSchedPid, {cleanup, TraceId}),
+    comm:send_local(ProtoSchedPid, {cleanup, TraceId, self()}),
+    %% restore infection
+    restore_infection(),
+    receive {cleanup_done} -> ok end,
     ok.
 
 %% Functions used to report tracing events from other modules
@@ -279,7 +285,7 @@ init(_Arg) -> [].
 
 -spec on(send_event() | comm:message(), state()) -> state().
 on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
-    ?TRACE("got msg to schedule ~p -> ~p: ~.0p~n", [From, To, UMsg]),
+    ?TRACE("proto_sched:on({log_send ... ~p -> ~p: ~.0p})", [From, To, UMsg]),
     TmpEntry = case lists:keyfind(TraceId, 1, State) of
                    false ->
                        add_message(From, To, UMsg, LorG, new(TraceId));
@@ -290,32 +296,42 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
         start_delivery ->
             NewEntry = TmpEntry#state{status = running},
             NewState = lists:keystore(TraceId, 1, State, {TraceId, NewEntry}),
+            ?TRACE("proto_sched:on({log_send ... ~p -> ~p: ~.0p}) postop deliver", [From, To, UMsg]),
             gen_component:post_op({deliver, TraceId}, NewState);
         _ ->
             lists:keystore(TraceId, 1, State, {TraceId, TmpEntry})
     end;
 
 on({start_deliver, TraceId}, State) ->
+    ?TRACE("proto_sched:on({start_deliver, ~p})", [TraceId]),
     %% initiate delivery: if messages are already queued, deliver
     %% first message, otherwise when first message arrives, start
     %% delivery with that message.
     case lists:keyfind(TraceId, 1, State) of
         false ->
             Entry = new(TraceId),
-            NewEntry = {TraceId, Entry#state{status = start_delivery}},
-            lists:keystore(TraceId, 1, State, NewEntry);
+            NewEntry = Entry#state{status = start_delivery},
+            lists:keystore(TraceId, 1, State, {TraceId, NewEntry});
         {TraceId, OldTrace} ->
-            NewEntry = {TraceId, OldTrace#state{status = running}},
-            NewState = lists:keystore(TraceId, 1, State, NewEntry),
+            NewEntry = OldTrace#state{status = running},
+            NewState = lists:keystore(TraceId, 1, State, {TraceId, NewEntry}),
+            ?TRACE("proto_sched:on({start_deliver, ~p}) postop deliver", [TraceId]),
             gen_component:post_op({deliver, TraceId}, NewState)
     end;
 
 on({deliver, TraceId}, State) ->
+    ?TRACE("proto_sched:on({deliver, ~p})", [TraceId]),
     case lists:keyfind(TraceId, 1, State) of
         false ->
-            %%log:log("Nothing to deliver, unknown trace id!~n"),
+            ?TRACE("proto_sched:on({deliver, ~p}) Nothing to deliver, unknown trace id!", [TraceId]),
             State;
         {TraceId, TraceEntry} ->
+            case TraceEntry#state.status of
+                delivered ->
+                    ?TRACE("There is already a delivered message pending", []),
+                    throw(proto_sched_already_in_delivered_mode);
+                _ -> ok
+            end,
             case TraceEntry#state.msg_queues of
                 [] ->
                     ?TRACE("Running out of messages, "
@@ -323,7 +339,7 @@ on({deliver, TraceId}, State) ->
                            "When protocol is finished, call proto_sched:stop(~p) and~n"
                            "proto_sched:cleanup(~p)",
                            [TraceId, TraceId, TraceId]),
-                    ?TRACE("Seen ~p possible executions so far for id '~p'.~n",
+                    ?TRACE("Seen ~p possible executions so far for id '~p'.",
                            [TraceEntry#state.num_possible_executions, TraceId]),
                     %% restart delivering when new messages arrive
                     NewEntry = TraceEntry#state{status = start_delivery},
@@ -331,17 +347,18 @@ on({deliver, TraceId}, State) ->
                 _ ->
                     {From, To, _LorG, Msg, NumPossible, TmpEntry} =
                         pop_random_message(TraceEntry),
-                    ?TRACE("Chosen from ~p possible next messages~n", [NumPossible]),
+                    ?TRACE("Chosen from ~p possible next messages.", [NumPossible]),
                     NewEntry =
                         TmpEntry#state{num_possible_executions
-                                       = NumPossible * TmpEntry#state.num_possible_executions},
+                                       = NumPossible * TmpEntry#state.num_possible_executions,
+                                      status = delivered},
                     %% we want to get raised messages, so we have to infect this message
                     PState = TraceEntry#state.passed_state,
                     InfectedMsg = epidemic_reply_msg(PState, From, To, Msg),
-                    ?TRACE("delivering msg to execute: ~.0p~n", [InfectedMsg]),
+                    ?TRACE("delivering msg to execute: ~p -> ~p: ~.0p.", [From, To, Msg]),
                     %% call the callback function (if any) before sending out the msg
-                    ?TRACE("executing callback function~n", []),
                     CallbackFun = TraceEntry#state.callback_on_deliver,
+                    ?TRACE("executing callback function ~p.", [CallbackFun]),
                     CallbackFun(From, To, Msg),
                     %% Send infected message with a shepherd. In case of send errors,
                     %% we will be informed by a {send_error, Pid, Msg, Reason} message.
@@ -352,15 +369,36 @@ on({deliver, TraceId}, State) ->
 
 on({on_handler_done, TraceId}, State) ->
     ?TRACE("on handler execution done~n", []),
-    gen_component:post_op({deliver, TraceId}, State);
+    case lists:keyfind(TraceId, 1, State) of
+         false ->
+             State;
+        {TraceId, TraceEntry} ->
+            case TraceEntry#state.status of
+                delivered ->
+                    %% enqueue a new deliver request for this TraceId
+                    ?TRACE("proto_sched:on({on_handler_done, ~p}) trigger next deliver 1.", [TraceId]),
+                    %% set status to running
+                    NewEntry = TraceEntry#state{status = running},
+                    NewState = lists:keystore(TraceId, 1, State, {TraceId, NewEntry}),
+                    gen_component:post_op({deliver, TraceId}, NewState);
+                {to_be_cleaned, CallerPid} ->
+                    ?TRACE("proto_sched:on({on_handler_done, ~p}) doing cleanup.", [TraceId]),
+                    gen_component:post_op({do_cleanup, TraceId, CallerPid}, State);
+                _X ->
+                    %% enqueue a new deliver request for this TraceId
+                    ?TRACE("proto_sched:on({on_handler_done, ~p}) trigger next deliver 2 ~p.", [TraceId, _X]),
+                    gen_component:post_op({deliver, TraceId}, State)
+            end
+    end;
 
 on({send_error, _Pid, Msg, _Reason} = _ShepherdMsg, State) ->
     %% call on_handler_done and continue with message delivery
     TraceId = get_trace_id(get_passed_state(Msg)),
-    ?TRACE("send error for trace id ~p: ~p calling on_handler_done~n", [TraceId, _ShepherdMsg]),
+    ?TRACE("send error for trace id ~p: ~p calling on_handler_done.", [TraceId, _ShepherdMsg]),
     gen_component:post_op({on_handler_done, TraceId}, State);
 
 on({register_callback, CallbackFun, TraceId, Client}, State) ->
+    ?TRACE("proto_sched:on({register_callback, ~p, ~p, ~p}).", [CallbackFun, TraceId, Client]),
     case lists:keyfind(TraceId, 1, State) of
         false ->
             comm:send(Client, {register_callback_reply, failed}),
@@ -372,6 +410,7 @@ on({register_callback, CallbackFun, TraceId, Client}, State) ->
     end;
 
 on({get_infos, Client, TraceId}, State) ->
+    ?TRACE("proto_sched:on({get_infos, ~p, ~p}).", [Client, TraceId]),
     case lists:keyfind(TraceId, 1, State) of
         false ->
             comm:send(Client, {get_infos_reply, []});
@@ -383,13 +422,34 @@ on({get_infos, Client, TraceId}, State) ->
     end,
     State;
 
-on({cleanup, TraceId}, State) ->
+on({cleanup, TraceId, CallerPid}, State) ->
+    ?TRACE("proto_sched:on({cleanup, ~p, ~p}).", [TraceId, CallerPid]),
+    case lists:keyfind(TraceId, 1, State) of
+        false ->
+            comm:send_local(CallerPid, {cleanup_done}),
+            State;
+        {TraceId, TraceEntry} ->
+            case TraceEntry#state.status of
+                delivered ->
+                    ?TRACE("proto_sched:on({cleanup, ~p, ~p}) set status to to_be_cleaned.", [TraceId, CallerPid]),
+                    NewEntry = TraceEntry#state{status = {to_be_cleaned, CallerPid}},
+                    lists:keyreplace(TraceId, 1, State, {TraceId, NewEntry});
+                _ ->
+                    gen_component:post_op({do_cleanup, TraceId, CallerPid}, State)
+            end
+    end;
+
+on({do_cleanup, TraceId, CallerPid}, State) ->
+    ?TRACE("proto_sched:on({do_cleanup, ~p, ~p}).", [TraceId, CallerPid]),
     case lists:keytake(TraceId, 1, State) of
         {value, {TraceId, TraceEntry}, TupleList2} ->
             send_out_pending_messages(TraceEntry#state.msg_queues),
             send_out_pending_messages(TraceEntry#state.msg_delay_queues),
+            comm:send_local(CallerPid, {cleanup_done}),
             TupleList2;
-        false -> State
+        false ->
+            comm:send_local(CallerPid, {cleanup_done}),
+            State
     end.
 
 passed_state_new(TraceId, Logger) ->

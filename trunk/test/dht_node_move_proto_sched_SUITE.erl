@@ -1,4 +1,4 @@
-% @copyright 2010-2013 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -28,14 +28,14 @@
         fun() ->
                 case Action of
                     start ->
-                        ct:pal("Starting proto scheduler"),
+                        %% ct:pal("Starting proto scheduler"),
                         proto_sched:start(),
                         proto_sched:start_deliver();
                     stop ->
                         proto_sched:stop(),
                         case erlang:whereis(pid_groups) =:= undefined orelse pid_groups:find_a(proto_sched) =:= failed of
                             true -> ok;
-                            false -> ct:pal("Proto scheduler stats: ~.2p", [proto_sched:get_infos()]),
+                            false -> %% ct:pal("Proto scheduler stats: ~.2p", [proto_sched:get_infos()]),
                                      proto_sched:cleanup()
                         end
                 end
