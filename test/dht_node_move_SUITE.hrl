@@ -1,4 +1,4 @@
-% @copyright 2010-2013 Zuse Institute Berlin
+% @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -782,6 +782,7 @@ slide_interleaving() ->
 slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
     SlideVariations1 = generate_slide_variation(SlideConf1),
     SlideVariations2 = generate_slide_variation(SlideConf2),
+    ?proto_sched(start),
     _ = [ begin
               Nodes = get_predspred_pred_node_succ(DhtNode),
               Node1 = select_from_nodes(Slide1#slideconf.node, Nodes),
@@ -793,7 +794,6 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
               Tag1 = Slide1#slideconf.name,
               Tag2 = Slide2#slideconf.name,
               ct:pal("Beginning ~p, ~p", [Tag1, Tag2]),
-              ?proto_sched(start),
               PidLocal1 = comm:make_local(node:pidX(Node1)),
               PidLocal2 = comm:make_local(node:pidX(Node2)),
               %% We use breakpoints to assure simultaneous slides.
@@ -825,9 +825,9 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
               Result2 = fun() -> receive ?SCALARIS_RECV({move, result, _Tag2, Result}, Result) end end(),
               ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
               VerifyFun(Result1, Result2, slide_interleaving()),
-              ?proto_sched(stop),
               timer:sleep(10)
           end || Slide1 <- SlideVariations1, Slide2 <- SlideVariations2],
+    ?proto_sched(stop),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
