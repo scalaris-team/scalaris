@@ -1,4 +1,4 @@
-% @copyright 2007-2013 Zuse Institute Berlin
+% @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -101,15 +101,15 @@
                 bulkowner_reply_timer   = null :: null | reference(),
                 bulkowner_reply_ids     = []   :: [uid:global_uid()],
                 monitor_proc            = ?required(state, monitor_proc) :: pid(),
-                prbr_kv_db = ?required(state, prbr_state) :: prbr:state(),
-                txid_db1 = ?required(state, prbr_state) :: prbr:state(),
-                txid_db2 = ?required(state, prbr_state) :: prbr:state(),
-                txid_db3 = ?required(state, prbr_state) :: prbr:state(),
-                txid_db4 = ?required(state, prbr_state) :: prbr:state(),
-                lease_db1 = ?required(state, prbr_state) :: prbr:state(),
-                lease_db2 = ?required(state, prbr_state) :: prbr:state(),
-                lease_db3 = ?required(state, prbr_state) :: prbr:state(),
-                lease_db4 = ?required(state, prbr_state) :: prbr:state(),
+                prbr_kv_db = ?required(state, prbr_kv_db) :: prbr:state(),
+                txid_db1 = ?required(state, txid_db1) :: prbr:state(),
+                txid_db2 = ?required(state, txid_db2) :: prbr:state(),
+                txid_db3 = ?required(state, txid_db3) :: prbr:state(),
+                txid_db4 = ?required(state, txid_db4) :: prbr:state(),
+                lease_db1 = ?required(state, lease_db1) :: prbr:state(),
+                lease_db2 = ?required(state, lease_db2) :: prbr:state(),
+                lease_db3 = ?required(state, lease_db3) :: prbr:state(),
+                lease_db4 = ?required(state, lease_db4) :: prbr:state(),
                 lease_list = ?required(state, lease_list) :: lease_list:lease_list(),
                 snapshot_state   = null :: snapshot_state:snapshot_state() | null,
                 mr_state   = ?required(state, mr_state)  :: orddict:orddict(),
