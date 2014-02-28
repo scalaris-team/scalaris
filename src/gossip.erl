@@ -13,8 +13,123 @@
 %   limitations under the License.
 
 %% @author Jens V. Fischer <jensvfischer@gmail.com>
-%% @doc    Behaviour modul for gossip_beh.erl. Implements the generic code
-%%         of the gossiping framework.
+%%
+%% @doc The behaviour modul (gossip_beh.erl) of the gossiping framework.
+%%
+%%      The framework is designed to allow the implementation of gossip based
+%%      dissemination and gossip based aggregation protocols. Anti-entropy
+%%      gossiping was not considered. The communication scheme used by the
+%%      framework is push-pull gossiping as this offers the best speed of
+%%      convergence. The membership protocol used for the peer selection is
+%%      Cyclon.
+%%
+%%      The gossiping framework comprises three kinds of components:
+%%      <ol>
+%%          <li> The gossiping behaviour (interface) gossip_beh.erl. The
+%%               behaviour defines the contract that allows the callback module
+%%               to be used by the behaviour module. The behaviour defines the
+%%               contract by specifying functions the callback module has to
+%%               implement. </li>
+%%          <li> The callback modules. A callback module implements a concrete
+%%               gossiping protocol by implementing the gossip_beh.erl, i.e. by
+%%               implementing the functions specified in the gossip_beh.erl.
+%%               The callback module provides the protocol specific code.
+%%               For an example callback module see gossip_load.erl.</li>
+%%          <li> The behaviour module gossip.erl (this module). The behaviour
+%%               module provides the generic code of the gossiping  framework.
+%%               It calls the callback functions of the callback modules defined
+%%               in gossip_beh.erl.</li>
+%%      </ol>
+%%
+%%      The relation between behaviour and callback modules is modelled as a
+%%      one-to-many relation. That is to say, the behaviour module is implemented
+%%      as single process (per node) and all the callback module run in the
+%%      context of this single process. This has the advantage of reducing the
+%%      number of spawned processes and allowing for a better grouping of messages.
+%%
+%%      The framework is started as part of the startup procedure of a dht_node.
+%%      The framework maintains a list of callback modules in the CBMODULES macro
+%%      which are started together with the framework. It is also possible to
+%%      individually start and stop callback modules later.
+%%
+%%      The pattern for communication between the behaviour module and a callback
+%%      module is the following: From the behaviour module to a callback module
+%%      communication occurs as a call to a function of the callback module.
+%%      These calls have to return quickly, no long-lasting operations, especially
+%%      no receiving of messages, are allowed. Therefore, the answers to these
+%%      function calls are mainly realised as messages from the respective
+%%      callback module to the behaviour module, not as return values of the
+%%      function calls.
+%%
+%%      == Phases of a Gossiping Operation ==
+%%
+%%      === Prepare-Request Phase ===
+%%
+%%      The  prepare-request phase consists of peer and data selection. The
+%%      selection of the peer is usually managed by the framework. At the beginning
+%%      of every cycle the behaviour module requests a peer from the Cyclon
+%%      module of Scalaris, which is then used for the data exchange. The peer
+%%      selection is governed by the select_node() function: returning
+%%      false causes the behaviour module to handle the peer selection as described.
+%%      Returning true causes the behaviour module to expect a selected_peer
+%%      message with a peer to be used by for the exchange. How many peers are
+%%      contracted for data exchanges every cycle depends on the fanout() config
+%%      function.
+%%
+%%      The selection of the exchange data is dependent on the specific gossiping
+%%      task and therefore done by a callback module. It is initiated by a call
+%%      to select_data(). When called with select_data(), the respective callback
+%%      module has to initiate a selected_data message to the behaviour module,
+%%      containing the selected exchange data. Both peer and data selection are
+%%      initiated in immediate succession through periodical trigger messages,
+%%      so they can run concurrently. When both data and peer are received by
+%%      the behaviour module, a p2p_exch message with the exchange data is sent
+%%      to the peer, that is to say to the gossip behaviour module of the peer.
+%%
+%%      === Prepare-Reply Phase ===
+%%
+%%      Upon receiving a p2p_exch message, a node enters the prepare-reply
+%%      phase and is now in its passive role as responder. This phase is about
+%%      the integration of the received data and the preparation of the reply data.
+%%      Both of these tasks need to be handled by the callback module. The
+%%      behaviour module passes the received data with a call to select_reply_data(QData)
+%%      to the correspondent callback module, which merges the data with its own
+%%      local data and prepares the reply data. The reply data is sent back to
+%%      the behaviour module with a selected_reply_data message. The behaviour
+%%      module then sends the reply data as a  p2p_exch_reply message back to
+%%      the original requester.
+%%
+%%      === Integrate-Reply Phase ===
+%%
+%%      The integrate-reply phase is triggered by a p2p_exch_reply message.
+%%      Every p2p_exch_reply is the response to an earlier p2p_exch (although
+%%      not necessarily to the last p2p_exch request. The p2p_exch_reply contains
+%%      the reply data from the peer, which is passed to the correspondent
+%%      callback module with a call to integrate_data(QData). The callback module
+%%      processes the received data and signals to the behaviour module the
+%%      completion with an integrated_data message. On a conceptual level, a full
+%%      cycle is finished at this point and the behaviour module counts cycles
+%%      by counting the \inline$integrated_§data$ messages. Due to the uncertainties
+%%      of message delays and local clock drift it should be clear however, that
+%%      this can only be an approximation. For instance, a new cycle could have
+%%      been started before the reply to the current request has been received
+%%      (phase interleaving) and, respectively, replies from the other cycle could
+%%      be "wrongly" counted as finishing the current cycle (cycle interleaving).
+%%
+%%      == Instantiation ==
+%%
+%%      Many of the interactions conducted by the behaviour module are specific
+%%      to a certain callback module. Therefore, all messages and function
+%%      concerning a certain callback module need to identify with which callback
+%%      module the message or call is associated. This is achieved by adding a
+%%      tuple of the module name and an instance id to all those messages and
+%%      calls. While the name would be enough to identify the module, adding the
+%%      instance id allows for multiple instantiation of the same callback module
+%%      by one behaviour module. This tuple of callback module and instance id
+%%      is also used to store information specific to a certain callback module
+%%      in the behaviour module's state.
+%%
+%%
 %%         Used abbreviations:
 %%         <ul>
 %%            <li> cb: callback module (a module implementing the
@@ -43,12 +158,11 @@
 % testing
 -export([tester_create_state/9, is_state/1]).
 
-%% -define(PDB, pdb_ets).
--define(PDB_OPTIONS, [set]). %%, protected]).
--define(PDB, pdb).
+%% -define(PDB, pdb_ets). % easier debugging because state accesible from outside the process
+-define(PDB_OPTIONS, [set]).
+-define(PDB, pdb). % better performance
 
 % prevent warnings in the log
-% (node availability is not that important to gossip)
 -define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg),
         comm:send(Pid, Msg, [{group_member, Process}, {shepherd, self()}])).
 
@@ -123,7 +237,8 @@
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% called by sup_dht_node
+%% @doc Start the process of the gossip module. <br/>
+%%      Called by sup_dht_node, calls gen_component:start_link to start the process.
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
@@ -131,7 +246,8 @@ start_link(DHTNodeGroup) ->
                               {pid_groups_join_as, DHTNodeGroup, gossip}]).
 
 
-% called by gen_component, results in on_inactive
+%% @doc Initialises the state of the gossip module. <br/>
+%%      Called by gen_component, results in on_inactive handler.
 -spec init([]) -> state().
 init([]) ->
     TabName = ?PDB:new(state, ?PDB_OPTIONS),
@@ -141,7 +257,10 @@ init([]) ->
     TabName.
 
 
-% called by dht_node_join, results in on_active
+%% @doc Activate the gossip module. <br/>
+%%      Called by dht_node_join. Activates process (when only node of the system)
+%%      or subscribes to the rm to activate on slide_finished messages. <br/>
+%%      Result of the activation is to switch to the on_active handler.
 -spec activate(Range::intervals:interval()) -> ok.
 activate(MyRange) ->
     case MyRange =:= intervals:all() of
@@ -164,6 +283,10 @@ deactivate() ->
     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
 
 
+%% @doc Globally starts a gossip task identified by CBModule. <br/>
+%%      Args is passed to the init function of the callback module. <br/>
+%%      CBModule is either the name of a callback module or an name-instance_id
+%%      tuple.
 -spec start_gossip_task(CBModule, Args) -> ok when
     is_subtype(CBModule, atom() | cb_module() | {cb_module(), uid:global_uid()}),
     is_subtype(Args, list()).
@@ -177,12 +300,14 @@ start_gossip_task({ModuleName, Id}, Args) when is_atom(ModuleName) ->
     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
 
 
+%% @doc Globally stop a gossip task.
 -spec stop_gossip_task(CBModule::cb_module()) -> ok.
 stop_gossip_task(CBModule) ->
     Msg = {?send_to_group_member, gossip, {stop_gossip_task, CBModule}},
     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
 
 
+%% @doc Globally removes all tombstones from previously stopped callback modules.
 -spec remove_all_tombstones() -> ok.
 remove_all_tombstones() ->
     Msg = {?send_to_group_member, gossip, {remove_all_tombstones}},
@@ -216,6 +341,7 @@ rm_send_activation_msg(_Pid, ?MODULE, _OldNeighbours, NewNeighbours) ->
 
 %%-------------------------- on_inactive ---------------------------%%
 
+%% @doc Message handler during the startup of the gossip module.
 -spec on_inactive(Msg::message(), State::state()) -> state().
 on_inactive({activate_gossip, MyRange}=Msg, State) ->
     ?PDB:set({status, init}, State),
@@ -282,6 +408,11 @@ on_inactive(_Msg, State) ->
 
 %%--------------------------- on_active ----------------------------%%
 
+%% @doc Message handler during the normal operation of the gossip module.
+%% @end
+
+%% This message is received from self() from init_gossip_task or through
+%% start_gossip_task()/bulkowner
 -spec on_active(Msg::message(), State::state()) -> state().
 on_active({start_gossip_task, CBModule, Args}, State) ->
     CBModules = state_get(cb_modules, State),
@@ -294,6 +425,7 @@ on_active({start_gossip_task, CBModule, Args}, State) ->
     State;
 
 
+%% trigger message starting a new cycle
 on_active({gossip_trigger, TriggerInterval}=Msg, State) ->
     msg_queue_send(State),
     log:log(debug, "[ Gossip ] Triggered: ~w", [Msg]),
@@ -335,6 +467,7 @@ on_active({gossip_trigger, TriggerInterval}=Msg, State) ->
     State;
 
 
+%% received through the rm on key range changes
 on_active({update_range, NewRange}=FullMsg, State) ->
     state_set(range, NewRange, State),
     Msg = case is_leader(NewRange) of
@@ -347,6 +480,7 @@ on_active({update_range, NewRange}=FullMsg, State) ->
     State;
 
 
+%% request for debug info
 on_active({web_debug_info, Requestor}=Msg, State) ->
     CBModules = lists:reverse(state_get(cb_modules, State)),
     Fun = fun (CBModule, Acc) -> Acc ++ [{"",""}] ++
@@ -356,7 +490,7 @@ on_active({web_debug_info, Requestor}=Msg, State) ->
     State;
 
 
-% received from shepherd, from on_inactive on from rejected messages
+%% received from shepherd, from on_inactive or from rejected messages
 on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
     % unpack msg if necessary
     MsgUnpacked = case Msg of
@@ -382,18 +516,20 @@ on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
     State;
 
 
-% unpack bulkowner msg
+%% unpack bulkowner msg
 on_active({bulkowner, deliver, _Id, _Range, Msg, _Parents}, State) ->
     comm:send_local(self(), Msg),
     State;
 
 
+%% received through remove_all_tombstones()/bulkowner
 on_active({remove_all_tombstones}, State) ->
     TombstoneKeys = get_tombstones(State),
     lists:foreach(fun (Key) -> ?PDB:delete(Key, State) end, TombstoneKeys),
     State;
 
 
+%% received through deactivate_gossip()/bulkowner
 on_active({deactivate_gossip}, State) ->
     log:log(warn, "[ Gossip ] deactivating gossip framwork"),
     rm_loop:unsubscribe(self(), ?MODULE),
@@ -411,10 +547,11 @@ on_active({deactivate_gossip}, State) ->
     gen_component:change_handler(State, fun ?MODULE:on_inactive/2);
 
 
-% messages expected reaching this on_active clause have the form:
-%   {MsgTag, CBModule, ...}
-%   element(1, Msg) = MsgTag
-%   element(2, Msg) = CBModule
+%% Only messages for callback modules are expected to reach this on_active clause.
+%% they have the form:
+%%   {MsgTag, CBModule, ...}
+%%   element(1, Msg) = MsgTag
+%%   element(2, Msg) = CBModule
 on_active(Msg, State) ->
     try state_get(cb_status, element(2, Msg), State) of
         tombstone ->
@@ -432,6 +569,8 @@ on_active(Msg, State) ->
     State.
 
 
+%% This message is received as a response to a get_subset message to the
+%% cyclon process and should contain a list of random nodes.
 -spec handle_msg(Msg::cb_message(), State::state()) -> state().
 % re-request node if node list is empty
 handle_msg({selected_peer, CBModule, _Msg={cy_cache, []}}, State) ->
@@ -441,8 +580,6 @@ handle_msg({selected_peer, CBModule, _Msg={cy_cache, []}}, State) ->
 
 
 handle_msg({selected_peer, CBModule, _Msg={cy_cache, Nodes}}, State) ->
-    % This message is received as a response to a get_subset message to the
-    % cyclon process and should contain a random node.
     %% io:format("gossip: got random node from Cyclon: ~p~n",[node:pidX(Node)]),
     {_Node, PData} = state_get(exch_data, CBModule, State),
     case PData of
@@ -452,6 +589,7 @@ handle_msg({selected_peer, CBModule, _Msg={cy_cache, Nodes}}, State) ->
     State;
 
 
+%% This message is a reply from a callback module to CBModule:select_data()
 handle_msg({selected_data, CBModule, PData}, State) ->
     % check if a peer has been received already
     {Peer, _PData} = state_get(exch_data, CBModule, State),
@@ -462,6 +600,8 @@ handle_msg({selected_data, CBModule, PData}, State) ->
     State;
 
 
+%% This message is a request from another peer (i.e. another gossip module) to
+%% exchange data, usually results in CBModule:select_reply_data()
 handle_msg({p2p_exch, CBModule, SourcePid, PData, OtherRound}=Msg, State) ->
     log:log(debug, "[ Gossip ] p2p_exch msg received from ~w. PData: ~w",[SourcePid, PData]),
     state_set({reply_peer, Ref=uid:get_pids_uid()}, SourcePid, State),
@@ -485,6 +625,7 @@ handle_msg({p2p_exch, CBModule, SourcePid, PData, OtherRound}=Msg, State) ->
     State;
 
 
+%% This message is a reply from a callback module to CBModule:select_reply_data()
 handle_msg({selected_reply_data, CBModule, QData, Ref, Round}, State)->
     Peer = state_take({reply_peer, Ref}, State),
     log:log(debug, "[ Gossip ] selected_reply_data. CBModule: ~w, QData ~w, Peer: ~w",
@@ -493,6 +634,8 @@ handle_msg({selected_reply_data, CBModule, QData, Ref, Round}, State)->
     State;
 
 
+%% This message is a reply from another peer (i.e. another gossip module) to
+%% a p2p_exch request, usually results in CBModule:integrate_data()
 handle_msg({p2p_exch_reply, CBModule, SourcePid, QData, OtherRound}=Msg, State) ->
     log:log(debug, "[ Gossip ] p2p_exch_reply, CBModule: ~w, QData ~w", [CBModule, QData]),
     _ = case check_round(OtherRound, CBModule, State) of
@@ -515,6 +658,8 @@ handle_msg({p2p_exch_reply, CBModule, SourcePid, QData, OtherRound}=Msg, State) 
     State;
 
 
+%% This message is a reply from a callback module to CBModule:integrate_data()
+%% Markes the end of a cycle
 handle_msg({integrated_data, CBModule, current_round}, State) ->
     state_update(cycles, fun (X) -> X+1 end, CBModule, State),
     State;
@@ -525,6 +670,9 @@ handle_msg({integrated_data, _CBModule, old_round}, State) ->
     State;
 
 
+%% pass messages for callback modules to the respective callback module
+%% messages to callback modules need to have the form {cb_reply, CBModule, Msg}.
+%% Use envelopes if necessary.
 handle_msg({cb_reply, CBModule, Msg}=FullMsg, State) ->
     _ = cb_call(handle_msg, [Msg], FullMsg, CBModule, State),
     State;
@@ -547,12 +695,16 @@ handle_msg({new_round, CBModule, NewRound}=Msg, State) ->
     State;
 
 
+%% passes a get_values_best request to the callback module
+%% received from webhelpers and lb_psv_gossip
 handle_msg({get_values_best, CBModule, SourcePid}=Msg, State) ->
     BestValues = cb_call(get_values_best, [], Msg, CBModule, State),
     comm:send_local(SourcePid, {gossip_get_values_best_response, BestValues}),
     State;
 
 
+%% passes a get_values_all (all: current, previous and best values) request to
+%% the callback module
 handle_msg({get_values_all, CBModule, SourcePid}=Msg, State) ->
     {Prev, Current, Best} = cb_call(get_values_all, [], Msg, CBModule, State),
     comm:send_local(SourcePid,
@@ -560,6 +712,9 @@ handle_msg({get_values_all, CBModule, SourcePid}=Msg, State) ->
     State;
 
 
+%% Received through stop_gossip_task/bulkowner
+%% Stops gossip tasks and cleans state of all garbage
+%% sets tombstone to handle possible subsequent request for already stopped tasks
 handle_msg({stop_gossip_task, CBModule}=Msg, State) ->
     log:log(?SHOW, "[ Gossip ] Stopping ~w", [CBModule]),
     % shutdown callback module
@@ -621,6 +776,7 @@ start_p2p_exchange(Peers, PData, CBModule, State)  ->
 %% Interacting with the Callback Modules
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% called when activating gossip module
 -spec init_gossip_tasks(State::state()) -> ok.
 init_gossip_tasks(State) ->
     Fun = fun (CBModule) ->
@@ -630,6 +786,8 @@ init_gossip_tasks(State) ->
     lists:foreach(Fun, ?CBMODULES).
 
 
+%% initialises a gossip task / callback mdoule
+%% called on activation of gossip module or on start_gossip_task message
 -spec init_gossip_task(CBModule::cb_module(), Args::list(), State::state()) -> ok.
 init_gossip_task(CBModule, Args, State) ->
 
@@ -701,6 +859,9 @@ cb_call(FunName, Args, CBModule) ->
     apply(CBModuleName, FunName, Args).
 
 
+%% call to a callback module
+%% wraps some common functionaly of all calls to callback modules, like inserting
+%% the respective callback module's state and unpacking the ModuleName/InstanceId tuple
 -spec cb_call(FunName, Arguments, Msg, CBModule, State) -> Return when
     is_subtype(FunName, cb_fun_name()),
     is_subtype(Arguments, list()),
@@ -744,6 +905,10 @@ cb_call(FunName, Args, Msg, CBModule, State) ->
     end.
 
 
+%% special function for calls to CBModule:select_reply_data
+%% removes the reply_peer from the state of the gossip module
+%% This is necessary if the callback module will not send an selected_reply_data
+%% message (because the message is dscarded or sent back directly)
 -spec select_reply_data(PData::gossip_beh:exch_data(), Ref::pos_integer(),
     RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(),
     Msg::message(), CBModule::cb_module(), State::state()) -> ok.
@@ -771,6 +936,9 @@ request_random_node(CBModule) ->
     comm:send_local(CyclonPid, {get_subset_rand, Fanout, EnvPid}).
 
 
+%% Used for rerequesting peers from cyclon when cyclon returned an empty list,
+%% which is usually the case during startup.
+%% The delay prohibits bombarding the cyclon process with requests.
 -spec request_random_node_delayed(Delay::non_neg_integer(), CBModule::cb_module()) ->
     reference().
 request_random_node_delayed(Delay, CBModule) ->
@@ -784,6 +952,7 @@ request_random_node_delayed(Delay, CBModule) ->
 %% Round Handling
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% called at every p2p_exch and p2p_exch_reply message
 -spec check_round(OtherRound::non_neg_integer(), CBModule::cb_module(), State::state())
     -> ok | start_new_round | enter_new_round | propagate_new_round.
 check_round(OtherRound, CBModule, State) ->
@@ -808,6 +977,7 @@ check_round(OtherRound, CBModule, State) ->
     end.
 
 
+%% checks the convergence of the current round (only called at leader)
 -spec is_end_of_round(CBModule::cb_module(), State::state()) -> boolean().
 is_end_of_round(CBModule, State) ->
     Cycles = state_get(cycles, CBModule, State),
@@ -869,6 +1039,7 @@ state_get(Key, State) ->
             erlang:error(lookup_failed, [Key, State])
     end.
 
+%% returns undefined on non-existing keys
 -spec state_get_raw(Key::state_key(), State::state()) -> any().
 state_get_raw(Key, State) ->
     case ?PDB:get(Key, State) of
@@ -877,6 +1048,7 @@ state_get_raw(Key, State) ->
     end.
 
 
+%% returns a removes an entry
 -spec state_take(Key::state_key(), State::state()) -> any().
 state_take(Key, State) ->
     case ?PDB:take(Key, State) of
@@ -886,11 +1058,12 @@ state_take(Key, State) ->
             erlang:error(lookup_failed, [Key, State])
     end.
 
+%% sets and entry
 -spec state_set(Key::state_key(), Value::any(), State::state()) -> ok.
 state_set(Key, Value, State) ->
     ?PDB:set({Key, Value}, State).
 
-
+%% updates an entry with the given update function
 -spec state_update(Key::state_key(), UpdateFun::fun(), State::state()) -> ok.
 state_update(Key, Fun, State) ->
     NewValue = apply(Fun, [state_get(Key, State)]),
@@ -898,7 +1071,7 @@ state_update(Key, Fun, State) ->
 
 %%---------------- Callback Module Specific State ------------------%%
 
-%% @doc Gets the given key from the given state.
+%% @doc Gets the given key belonging to the given callback module from the given state.
 %%      Allowed keys:
 %%      <ul>
 %%        <li>`cb_state', the state of the given callback module </li>
@@ -932,7 +1105,7 @@ state_get(Key, CBModule, State) ->
 state_set(Key, Value, CBModule, State) ->
     state_set({Key, CBModule}, Value, State).
 
-
+%% updates the state with the given function
 -spec state_update(Key::state_key_cb(), UpdateFun::fun(), CBModule::cb_module(), State::state()) -> ok.
 state_update(Key, Fun, CBModule, State) ->
     Value = apply(Fun, [state_get(Key, CBModule, State)]),
@@ -941,6 +1114,7 @@ state_update(Key, Fun, CBModule, State) ->
 
 %%------------------------- Message Queue --------------------------%%
 
+%% add to message queue and create message queue if necessary
 -spec msg_queue_add(Msg::message(), State::state()) -> ok.
 msg_queue_add(Msg, State) ->
     MsgQueue = case state_get_raw(msg_queue, State) of
@@ -951,6 +1125,7 @@ msg_queue_add(Msg, State) ->
     state_set(msg_queue, NewMsgQueue, State).
 
 
+%% send the messages from the current message queue and create a new message queue
 -spec msg_queue_send(State::state()) -> ok.
 msg_queue_send(State) ->
     NewMsgQueue = case state_get_raw(msg_queue, State) of
@@ -961,6 +1136,8 @@ msg_queue_send(State) ->
     end,
     state_set(msg_queue, NewMsgQueue, State).
 
+
+%% gets als the tombstones from the state of the gossip module
 -spec get_tombstones(State::state()) -> list({cb_status, cb_module()}).
 get_tombstones(State) ->
     StateList = ?PDB:tab2list(State),
@@ -976,6 +1153,8 @@ get_tombstones(State) ->
 %% Misc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% provide some debug information for the gossip moudle (to be added to the
+%% information of a the callback modules)
 -spec web_debug_info(State::state()) -> [{_,_}, ...].
 web_debug_info(State) ->
     CBModules = state_get(cb_modules, State),
@@ -989,6 +1168,7 @@ web_debug_info(State) ->
      ].
 
 
+%% contains function on list, returns true if list contains Element
 -spec contains(Element::any(), List::list()) -> boolean().
 contains(_Element, []) -> false;
 
@@ -997,6 +1177,8 @@ contains(Element, [H|List]) ->
        H =/= Element -> contains(Element, List)
     end.
 
+
+%% Returns a list as string
 -spec to_string(list()) -> string().
 to_string(List) when is_list(List) ->
     lists:flatten(io_lib:format("~w", [List])).
@@ -1007,6 +1189,7 @@ to_string(List) when is_list(List) ->
 %% For Testing
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Value creater for type_check_SUITE
 -spec tester_create_state(Status, Range, Interval,
     CBState, CBStatus, ExchData, Round, TriggerLock, Cycles) -> state()
     when    is_subtype(Status, init | uninit),
@@ -1038,8 +1221,7 @@ tester_create_state(Status, Range, Interval, CBState, CBStatus,
     lists:foreach(Fun, ?CBMODULES),
     State.
 
-%%% @doc Checks if a given state is a valid state.
-%%%      Used as type_checker in tester.erl (property testing).
+%%% @doc Type checker for type_check SUITE
 -spec is_state(State::state()) -> boolean().
 is_state(State) ->
     try
@@ -1062,6 +1244,7 @@ is_state(State) ->
         error:badarg -> false
     end.
 
+%% find {{keyword, CMbodule}, {Value}} tuples by only the keyword
 -spec tuplekeyfind(atom(), list()) -> {{atom(), any()}, any()} | false.
 tuplekeyfind(_Key, []) -> false;
 
@@ -1111,7 +1294,7 @@ state_feeder_helper(Key, State) ->
         _ -> {Key, State}
     end.
 
-% hack to be able to suppress warnings when testing via config:write()
+%% hack to be able to suppress warnings when testing via config:write()
 -spec warn() -> log:log_level().
 warn() ->
     case config:read(gossip_log_level_warn) of
@@ -1119,7 +1302,7 @@ warn() ->
         Level -> Level
     end.
 
-% hack to be able to suppress warnings when testing via config:write()
+%% hack to be able to suppress warnings when testing via config:write()
 -spec error() -> log:log_level().
 error() ->
     case config:read(gossip_log_level_error) of
@@ -1127,6 +1310,8 @@ error() ->
         Level -> Level
     end.
 
+%% @doc Check the config of the gossip module. <br/>
+%%      Calls the check_config functions of all callback modules.
 -spec check_config() -> boolean().
 check_config() ->
     lists:foldl(fun({Module, _Args}, Acc) -> Acc andalso Module:check_config() end, true, ?CBMODULES).
