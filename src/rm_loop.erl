@@ -57,6 +57,7 @@
 -endif.
 
 -type reason() :: {slide_finished, pred | succ | none} | % a slide finished
+                  {graceful_leave, pred | succ, Node::node:node_type()} | % the given node is about to leave
                   {node_crashed, Node::comm:mypid()} | % the given node crashed
                   {add_subscriber} | % a subscriber was added
                   {node_discovery} | % a new/changed node was discovered
@@ -252,10 +253,12 @@ on({rm, propose_new_neighbors, NewNodes}, State) ->
     ?RM:contact_new_nodes(NewNodes),
     State;
 
+% only from graceful leave
 on({rm, pred_left, OldPred, PredsPred}, State) ->
     RMFun = fun(RM_State) -> ?RM:remove_pred(RM_State, OldPred, PredsPred) end,
     update_state(State, RMFun);
 
+% only from graceful leave
 on({rm, succ_left, OldSucc, SuccsSucc}, State) ->
     RMFun = fun(RM_State) -> ?RM:remove_succ(RM_State, OldSucc, SuccsSucc) end,
     update_state(State, RMFun);

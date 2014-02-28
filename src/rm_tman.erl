@@ -213,11 +213,12 @@ new_succ(State, NewSucc) ->
     % similar to new_pred/2
     {{unknown}, update_nodes(State, [NewSucc], [], null)}.
 
+%% @doc Removes the given predecessor as a result from a graceful leave only!
 -spec remove_pred(State::state(), OldPred::node:node_type(),
                   PredsPred::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 remove_pred(State, OldPred, PredsPred) ->
-    {{unknown}, remove_pred_(State, OldPred, PredsPred)}.
+    {{graceful_leave, pred, OldPred}, remove_pred_(State, OldPred, PredsPred)}.
 
 -compile({inline, [remove_pred_/3]}).
 
@@ -242,13 +243,15 @@ remove_pred_(State, OldPred, PredsPred) ->
             remove_pred_(State2, MyNewPred, PredsPred)
     end.
 
+%% @doc Removes the given successor as a result from a graceful leave only!
 -spec remove_succ(State::state(), OldSucc::node:node_type(),
                   SuccsSucc::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 remove_succ(State, OldSucc, SuccsSucc) ->
     % in contrast to remove_pred/3, let rm repair a potentially wrong new succ
     % on its own
-    {{unknown}, update_nodes(State, [SuccsSucc], [OldSucc], null)}.
+    {{graceful_leave, succ, OldSucc},
+     update_nodes(State, [SuccsSucc], [OldSucc], null)}.
 
 -spec update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.

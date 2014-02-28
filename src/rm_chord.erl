@@ -152,21 +152,23 @@ new_succ({OldNeighborhood}, NewSucc) ->
                                         predListLength(), succListLength()),
     {{unknown}, {NewNeighborhood}}.
 
+%% @doc Removes the given predecessor as a result from a graceful leave only!
 -spec remove_pred(State::state(), OldPred::node:node_type(),
                   PredsPred::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 remove_pred({OldNeighborhood}, OldPred, PredsPred) ->
     NewNbh1 = nodelist:remove(OldPred, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, PredsPred, predListLength(), succListLength()),
-    {{unknown}, {NewNbh2}}.
+    {{graceful_leave, pred, OldPred}, {NewNbh2}}.
 
+%% @doc Removes the given successor as a result from a graceful leave only!
 -spec remove_succ(State::state(), OldSucc::node:node_type(),
                   SuccsSucc::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 remove_succ({OldNeighborhood}, OldSucc, SuccsSucc) ->
     NewNbh1 = nodelist:remove(OldSucc, OldNeighborhood),
     NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, predListLength(), succListLength()),
-    {{unknown}, {NewNbh2}}.
+    {{graceful_leave, succ, OldSucc}, {NewNbh2}}.
 
 -spec update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
