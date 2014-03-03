@@ -40,7 +40,6 @@
         , accumulate_data/2
         , clean_up/1
         , split_slide_state/2
-        , add_slide_state/3
         , init_slide_phase/1
         , get_slide_delta/2
         , add_slide_delta/2
@@ -311,10 +310,6 @@ split_slide_state(#state{phases = Phases} = State, _Interval) ->
       [],
       Phases),
     State#state{phases = SlidePhases}.
-
--spec add_slide_state(mr_state:jobid(), state(), state()) -> state().
-add_slide_state(_K, State1, _State2) ->
-    State1.
 
 -spec init_slide_phase(state()) -> state().
 init_slide_phase(State = #state{phases = Phases, jobid = JobId}) ->

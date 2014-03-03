@@ -30,7 +30,7 @@
 all() ->
     tests_avail() ++ [test_join, test_leave].
 
-suite() -> [ {timetrap, {seconds, 60}} ].
+suite() -> [ {timetrap, {seconds, 15}} ].
 
 test_join(_Config) ->
     Pids = pid_groups:find_all(dht_node),

@@ -29,7 +29,7 @@
            ]).
 
 tests_avail() ->
-    [test_sane_result].
+    [test_sane_result, test_error_on_kill].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
@@ -64,6 +64,19 @@ test_sane_result(_Config) ->
     Res = api_mr:start_job(get_wc_job_erl()),
     %% each word only occurs once
     check_results(Res),
+    ok.
+
+test_error_on_kill(_Config) ->
+    ?proto_sched(start),
+    ?proto_sched(start_deliver),
+    MrPid = spawn_link(fun() ->
+                               Res = api_mr:start_job(get_wc_job_erl()),
+                               ?equals(Res, {error, node_died})
+
+                       end),
+    KillPid = spawn_link(fun() -> api_vm:kill_nodes(1) end),
+    util:wait_for_process_to_die(MrPid),
+    util:wait_for_process_to_die(KillPid),
     ok.
 
 get_wc_job_erl() ->
