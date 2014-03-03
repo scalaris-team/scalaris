@@ -1073,21 +1073,30 @@ finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     % -> do not kill this process
     State1;
 finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
-    NewId = slide_op:get_jump_target_id(SlideOp),    
+    NewId = slide_op:get_jump_target_id(SlideOp),
     fd:report_graceful_leave(),
     State1 = finish_slide(State, SlideOp),
+
     SupDhtNodeId = erlang:get(my_sup_dht_node_id),
     SupDhtNode = pid_groups:get_my(sup_dht_node),
     ServicePerVM = pid_groups:find_a(service_per_vm),
     comm:send_local(ServicePerVM,
                     {delete_node, SupDhtNode, SupDhtNodeId}),
-    Options =
-    case config:read(lb_active_and_psv) of
-        true -> [{{dht_node, id}, NewId}];
-        _    -> [{{dht_node, id}, NewId}, {skip_psv_lb}]
-    end,
+    %% Get additional nodes for bootstrapping
+    %% If the only known host jumps, it can't bootstrap itself.
+    NodeDetails = dht_node_state:details(State),
+    PredList = node_details:get(NodeDetails, predlist),
+    SuccList = node_details:get(NodeDetails, succlist),
+    BootstrapNodes = [node:pidX(Node) || Node <- PredList ++ SuccList],
+    Options = [{{dht_node, id}, NewId}, {bootstrap_nodes, BootstrapNodes}],
+    NewOptions =
+        case config:read(lb_active_and_psv) of
+            true -> Options;
+            _    -> [{skip_psv_lb} | Options]
+        end,
+
     comm:send_local(ServicePerVM,
-                    {add_node, Options}),
+                    {add_node, NewOptions}),
     State1;
 finish_delta_ack2B(State, SlideOp, {none}) ->
     finish_slide_and_continue_with_next_op(State, SlideOp);

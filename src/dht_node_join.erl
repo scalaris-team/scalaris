@@ -161,7 +161,10 @@ process_join_state({get_dht_nodes_response, Nodes} = _Msg,
                    {join, JoinState, QueuedMessages})
   when element(1, JoinState) =:= phase2 ->
     ?TRACE_JOIN1(_Msg, JoinState),
-    Connections = [{null, Node} || Node <- Nodes, Node =/= comm:this()],
+    JoinOptions = get_join_options(JoinState),
+    %% additional nodes required when firstnode jumps and he's the only known host
+    DhtNodes = Nodes ++ proplists:get_value(bootstrap_nodes, JoinOptions, []),
+    Connections = [{null, Node} || Node <- DhtNodes, Node =/= comm:this()],
     JoinState1 = add_connections(Connections, JoinState, back),
     NewJoinState = phase2_next_step(JoinState1, Connections),
     ?TRACE_JOIN_STATE(NewJoinState),
@@ -955,6 +958,8 @@ finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId, NextOp) ->
 get_phase(JoinState)         -> element(1, JoinState).
 -spec get_join_uuid(phase_2_4()) -> pos_integer().
 get_join_uuid(JoinState)     -> element(2, JoinState).
+-spec get_join_options(phase_2_4()) -> [tuple()].
+get_join_options(JoinState) -> element(3, JoinState).
 -spec get_id_version(phase_2_4()) -> non_neg_integer().
 get_id_version(JoinState)    -> element(4, JoinState).
 -spec get_connections(phase_2_4()) -> [connection()].
