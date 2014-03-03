@@ -663,19 +663,37 @@ get_mr_slide_states(State = #state{mr_state = MRStates}, MovInterval) ->
 merge_mr_states(State = #state{mr_state = MRStates1}, MRStates2) ->
     %% merge the two dicts. if they exist is both use the local state since no
     %% data has been moved yet and the rest should be the same
-    NewMRStates = orddict:merge(fun mr_state:add_slide_state/3,
-                              MRStates1,
-                              MRStates2),
-    %% make sure the phases ets tables are initialized since it can happen, that
-    %% a mr_state is slided before the jobs init message arrives. this would
-    %% cause a db_ets:put(false, SomeData)
-    NewMRStatesETS = orddict:map(fun(_JobId, MRState) ->
-                                         mr_state:init_slide_phase(MRState)
-                                 end,
-                                 NewMRStates
-                                ),
-    ?TRACE_MR_SLIDE("~p merged slide states are ~p~n", [self(), NewMRStatesETS]),
-    State#state{mr_state = NewMRStatesETS}.
+    Keys = orddict:fetch_keys(MRStates1) ++ orddict:fetch_keys(MRStates2),
+    NewMRStates = lists:foldl(fun(JobId, AccDict) ->
+                                      case orddict:find(JobId, MRStates1) of
+                                          {ok, MRState} ->
+                                              orddict:store(JobId, MRState,
+                                                            AccDict);
+                                          error ->
+                                              MRState = mr_state:init_slide_phase(
+                                                          orddict:fetch(JobId,
+                                                                        MRStates2)),
+                                              MasterId = mr_state:get(MRState,
+                                                                      master_id),
+                                              Client = mr_state:get(MRState,
+                                                                    client),
+                                              rm_loop:subscribe(self(),
+                                                                {"mr_succ_fd",
+                                                                 JobId,
+                                                                 MasterId,
+                                                                 Client},
+                                                                fun mr:neighborhood_succ_crash_filter/3,
+                                                                fun mr:neighborhood_succ_crash/4,
+                                                                inf),
+                                              orddict:store(JobId,
+                                                            mr_state:init_slide_phase(MRState),
+                                                            AccDict)
+                                      end
+                              end,
+                              orddict:new(),
+                              Keys),
+    ?TRACE_MR_SLIDE("~p merged slide states are ~p~n", [self(), NewMRStates]),
+    State#state{mr_state = NewMRStates}.
 
 -spec mr_get_delta_states(state(), intervals:interval()) -> {state(),
                                                              {orddict:orddict(),

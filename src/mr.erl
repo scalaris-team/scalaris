@@ -26,7 +26,9 @@
 -define(TRACE(X, Y), ok).
 
 -export([
-        on/2
+        on/2,
+        neighborhood_succ_crash_filter/3,
+        neighborhood_succ_crash/4
         ]).
 
 -ifdef(with_export_type_support).
@@ -76,6 +78,10 @@ on({bulk_distribute, _Id, Interval,
     {mr, job, JobId, MasterId, Client, Job, InitalData}, _Parents}, State) ->
     %% this message starts the worker supervisor and adds a job specific state
     %% to the dht node
+    rm_loop:subscribe(self(), {"mr_succ_fd", JobId, MasterId, Client},
+                      fun neighborhood_succ_crash_filter/3,
+                      fun neighborhood_succ_crash/4,
+                      inf),
     MRState = case dht_node_state:get_mr_state(State, JobId) of
         error ->
             ?TRACE("~p mr_~s: received job init for ~p~n~p~n",
@@ -167,6 +173,9 @@ on({mr, next_phase, JobId, Round, _DeliveryInterval}, State) ->
 on({mr, terminate_job, JobId, _DeliveryInterval}, State) ->
     %% master wants to terminate job.
     {ok, MRState} = dht_node_state:get_mr_state(State, JobId),
+    Master = mr_state:get(MRState, master_id),
+    Client = mr_state:get(MRState, client),
+    rm_loop:unsubscribe(self(), {"mr_succ_fd", JobId, Master, Client}),
     _ = mr_state:clean_up(MRState),
     dht_node_state:delete_mr_state(State, JobId);
 
@@ -216,6 +225,27 @@ work_on_phase(JobId, State, Round) ->
             end,
             dht_node_state:set_mr_state(State, JobId, NewMrState)
     end.
+
+-spec neighborhood_succ_crash_filter(Old::nodelist:neighborhood(),
+                                     New::nodelist:neighborhood(),
+                                     rm_loop:reason()) -> boolean().
+neighborhood_succ_crash_filter(Old, New, {node_crashed, _Pid}) ->
+    %% only looking for succ changes
+    nodelist:succ(Old) /= nodelist:succ(New);
+neighborhood_succ_crash_filter(_Old, _New, _) -> false.
+
+-spec neighborhood_succ_crash(comm:mypid(), {string(), mr_state:jobid(),
+                                             ?RT:client_key(), comm:mypid()},
+                              Old::nodelist:neighborhood(),
+                              New::nodelist:neighborhood()) -> ok.
+neighborhood_succ_crash(Pid, {"mr_succ_fd", JobId, MasterId, Client}, _Old, _New) ->
+    io:format("~p: succ crashed...informing master~n",
+              [Pid]),
+    api_dht_raw:unreliable_lookup(MasterId,
+                                  {mr_master, JobId,
+                                   job_error,
+                                   intervals:empty()}),
+    comm:send(Client, {mr_results, {error, node_died}, intervals:empty(), JobId}).
 
 -spec send_to_master(mr_state:state(), mr_master:message()) -> ok.
 send_to_master(State, Msg) ->
