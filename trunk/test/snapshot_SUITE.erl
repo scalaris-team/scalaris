@@ -502,7 +502,7 @@ test_tx_snapshot_slide_interleave(_) ->
 bench_increment(_) ->
     unittest_helper:make_ring(4),
      SpamPid1 = erlang:spawn(fun() ->
-               bench:increment(1, 1000)
+               bench:increment(1, 200)
           end),
     Return = tester:test(api_tx, get_system_snapshot, 0, 20),
     ct:pal("tester return: ~p ~n", [Return]),
