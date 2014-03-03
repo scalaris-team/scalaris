@@ -20,7 +20,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
-%-define(TRACE(X,Y), io:format(X,Y)).
+%% -define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(_X,_Y), ok).
 -behaviour(gen_component).
 -include("scalaris.hrl").
@@ -29,9 +29,11 @@
 -export_type([cookie/0]).
 -endif.
 
--export([subscribe/1, subscribe/2, subscribe_refcount/2]).
--export([unsubscribe/1, unsubscribe/2, unsubscribe_refcount/2]).
--export([update_subscriptions/2]).
+-export([subscribe/1, subscribe/2, subscribe_refcount/2, subscribe_pid/2,
+         subscribe_pid/3]).
+-export([unsubscribe/1, unsubscribe/2, unsubscribe_refcount/2,
+         unsubscribe_pid/2, unsubscribe_pid/3]).
+-export([update_subscriptions/2, update_subscriptions_pid/3]).
 -export([report_graceful_leave/0]).
 %% gen_server & gen_component callbacks
 -export([start_link/1, init/1, on/2]).
@@ -43,6 +45,28 @@
 -type state() :: ok.
 
 -define(SEND_OPTIONS, [{channel, prio}]).
+
+%% @doc Generate a failure detector for the Subscriber pid on the Monitored pids
+%% (Subscribers can be self(), pid() or an envelop as created by
+%% comm:reply_as/3).
+-spec subscribe_pid(Monitored::comm:mypid() | [comm:mypid()], Subscriber::comm:mypid()) ->
+    ok.
+subscribe_pid(GlobalPids, Subscriber) ->
+    subscribe_pid(GlobalPids, Subscriber, {self(), '$fd_nil'}).
+
+%% @doc Generate a failure detector for the Subscriber pid and cookie on the Monitored pids
+%% (Subscribers can be self(), pid() or an envelop as created by
+%% comm:reply_as/3).
+-spec subscribe_pid(Monitored::comm:mypid() | [comm:mypid()], Subscriber::comm:mypid(),
+                    cookie()) -> ok.
+subscribe_pid([], _Subscriber, _Cookie) -> ok;
+subscribe_pid(GlobalPids, Subscriber, Cookie) when
+      is_list(GlobalPids)->
+    [Pid | RestPids] = GlobalPids,
+    subscribe_single(my_fd_pid(), Pid, Subscriber, Cookie),
+    subscribe_pid(RestPids, Subscriber, Cookie);
+subscribe_pid(Pid, Subscriber, Cookie) ->
+    subscribe_single(my_fd_pid(), Pid, Subscriber, Cookie).
 
 %% @doc Generates a failure detector for the calling process on the given pid.
 -spec subscribe(comm:mypid() | [comm:mypid()]) -> ok.
@@ -64,6 +88,10 @@ subscribe(GlobalPid, Cookie) ->
 -spec subscribe_single(FD::pid(), comm:mypid() | [comm:mypid()], cookie()) -> ok.
 subscribe_single(FD, GlobalPid, Cookie) ->
     comm:send_local(FD, {add_subscriber_via_fd, self(), GlobalPid, Cookie}).
+
+-spec subscribe_single(FD::pid(), comm:mypid() | [comm:mypid()], comm:mypid(), cookie()) -> ok.
+subscribe_single(FD, GlobalPid, Subscriber, Cookie) ->
+    comm:send_local(FD, {add_subscriber_via_fd, Subscriber, GlobalPid, Cookie}).
 
 %% @doc Generates a failure detector for the calling process and cookie on the
 %%      given pid - uses reference counting to be subscribed to a pid only once.
@@ -88,6 +116,24 @@ subscribe_single_refcount(FD, GlobalPid, Cookie) ->
     erlang:put(Key, OldCount + 1),
     ok.
 
+%% @doc Deletes the failure detector for the given pid and subscriber.
+-spec unsubscribe_pid(Monitored::comm:mypid() | [comm:mypid()], Subscriber::comm:mypid()) ->
+    ok.
+unsubscribe_pid(GlobalPids, Subscriber) ->
+    unsubscribe_pid(GlobalPids, Subscriber, {self(), '$fd_nil'}).
+
+%% @doc Deletes the failure detector for the given pid, subscriber and cookie.
+-spec unsubscribe_pid(Monitored::comm:mypid() | [comm:mypid()], Subscriber::comm:mypid(),
+                    cookie()) -> ok.
+unsubscribe_pid([], _Subscriber, _Cookie) -> ok;
+unsubscribe_pid(GlobalPids, Subscriber, Cookie) when
+      is_list(GlobalPids)->
+    [Pid | RestPids] = GlobalPids,
+    unsubscribe_single(my_fd_pid(), Pid, Subscriber, Cookie),
+    unsubscribe_pid(RestPids, Subscriber, Cookie);
+unsubscribe_pid(Pid, Subscriber, Cookie) ->
+    unsubscribe_single(my_fd_pid(), Pid, Subscriber, Cookie).
+
 %% @doc Deletes the failure detector for the given pid.
 -spec unsubscribe(comm:mypid() | [comm:mypid()]) -> ok.
 unsubscribe([])-> ok;
@@ -110,6 +156,10 @@ unsubscribe(GlobalPid, Cookie) ->
 -spec unsubscribe_single(FD::pid(), comm:mypid() | [comm:mypid()], cookie()) -> ok.
 unsubscribe_single(FD, GlobalPid, Cookie) ->
     comm:send_local(FD, {del_subscriber_via_fd, self(), GlobalPid, Cookie}).
+
+-spec unsubscribe_single(FD::pid(), comm:mypid() | [comm:mypid()], comm:mypid(), cookie()) -> ok.
+unsubscribe_single(FD, GlobalPid, Subscriber, Cookie) ->
+    comm:send_local(FD, {del_subscriber_via_fd, Subscriber, GlobalPid, Cookie}).
 
 %% @doc Deletes the failure detector for the given pid and cookie - uses
 %%      reference counting to be subscribed to a pid only once.
@@ -138,6 +188,17 @@ unsubscribe_single_refcount(FD, GlobalPid, Cookie) ->
                 erlang:put(Key, OldCount - 1)
         end,
     ok.
+
+%% @doc Unsubscribes Subscriber from the pids in OldPids but not in NewPids and subscribes
+%%      to the pids in NewPids but not in OldPids
+%%      (Subscribers can be self(), pid() or an envelop as created by
+%%      comm:reply_as/3).
+-spec update_subscriptions_pid([comm:mypid()], [comm:mypid()],
+                               Subscriber::comm:mypid()) -> ok.
+update_subscriptions_pid(OldPids, NewPids, Subscriber) ->
+    {OnlyOldPids, _Same, OnlyNewPids} = util:split_unique(OldPids, NewPids),
+    unsubscribe_pid(OnlyOldPids, Subscriber),
+    subscribe_pid(OnlyNewPids, Subscriber).
 
 %% @doc Unsubscribes from the pids in OldPids but not in NewPids and subscribes
 %%      to the pids in NewPids but not in OldPids.
@@ -296,7 +357,7 @@ forward_to_hbs(Pid, Msg) ->
              end,
     comm:send_local(HBSPid, Msg).
 
-%%@doc show subscriptions
+%% @doc show subscriptions
 -spec subscriptions() -> ok.
 subscriptions() ->
     FD = my_fd_pid(),
@@ -310,9 +371,14 @@ subscriptions() ->
                       io:format("fd_hbs: ~p~n", [pid_groups:group_and_name_of(X)]),
                       {dictionary, FD_HBS_Dict} = process_info(X, dictionary),
                       [ begin
+                            Sub = case pid_groups:group_and_name_of(LSub) of
+                                failed ->
+                                          LSub;
+                                GroupAndName ->
+                                    GroupAndName
+                            end,
                             io:format("  ~p ~p ~p~n",
-                                      [pid_groups:group_and_name_of(LSub),
-                                       Cookies, Count])
+                                      [Sub, Cookies, Count])
                         end
                         || {{LSub,{_,_,_}},
                             {{LSub,{_,_,_}}, Cookies, Count}}

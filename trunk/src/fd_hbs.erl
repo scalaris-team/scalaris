@@ -39,7 +39,7 @@
                    rempid_get_pending_demonitor/1, rempid_set_pending_demonitor/2
                   ]}).
 
-%-define(TRACE(X,Y), io:format(X,Y)).
+%% -define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(_X,_Y), ok).
 %-define(TRACEPONG(X,Y), io:format(X,Y)).
 -define(TRACEPONG(_X,_Y), ok).
@@ -261,6 +261,7 @@ on({crashed, WatchedPid, Warn}, State) ->
     %% inform all local subscribers
     Subscriptions = state_get_subscriptions(State, WatchedPid),
     %% only there because of delayed demonitoring?
+    ?TRACE("~p found subs: ~p~n", [self(), Subscriptions]),
     RemPids = state_get_rem_pids(State),
     case Subscriptions of
         [] ->
