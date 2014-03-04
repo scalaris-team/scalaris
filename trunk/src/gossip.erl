@@ -156,7 +156,7 @@
 -export([rm_filter_slide_msg/3, rm_send_activation_msg/4, rm_my_range_changed/3, rm_send_new_range/4]).
 
 % testing
--export([tester_create_state/9, is_state/1]).
+-export([tester_create_state/9, is_state/1, tester_gossip_beh_modules/1]).
 
 %% -define(PDB, pdb_ets). % easier debugging because state accesible from outside the process
 -define(PDB_OPTIONS, [set]).
@@ -179,14 +179,15 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type state() :: ets:tab().
--type cb_module() :: [{Module::atom(), Name::atom()}].
+-type cb_module() :: module().
+-type cb_module_name() :: [{Module::cb_module(), Name::atom()}].
 
 -type state_key_cb() :: cb_state | cb_status | cycles | trigger_lock |
                         exch_data | round.
 -type state_key() :: cb_modules | msg_queue | range | status |
                      {reply_peer, pos_integer()} |
                      {trigger_group, pos_integer()} |
-                     {state_key_cb(), cb_module()} .
+                     {state_key_cb(), cb_module_name()} .
 -type cb_fun_name() :: get_values_all | get_values_best | handle_msg |
                        integrate_data | notify_change | round_has_converged |
                        select_data | select_node | select_reply_data |
@@ -202,7 +203,7 @@
 
 -type bh_message() ::
     {activate_gossip, Range::intervals:interval()} |
-    {start_gossip_task, CBModule::cb_module(), Args::list()} |
+    {start_gossip_task, CBModule::cb_module_name(), Args::list()} |
     {gossip_trigger, TriggerInterval::pos_integer()} |
     {update_range, NewRange::intervals:interval()} |
     {web_debug_info, SourcePid::comm:mypid()} |
@@ -213,21 +214,21 @@
 .
 
 -type cb_message() ::
-    {selected_data, CBModule::cb_module(), PData::gossip_beh:exch_data()} |
-    {selected_peer, CBModule::cb_module(), CyclonMsg::{cy_cache,
+    {selected_data, CBModule::cb_module_name(), PData::gossip_beh:exch_data()} |
+    {selected_peer, CBModule::cb_module_name(), CyclonMsg::{cy_cache,
             RandomNodes::[node:node_type()]} } |
-    {p2p_exch, CBModule::cb_module(), SourcePid::comm:mypid(),
+    {p2p_exch, CBModule::cb_module_name(), SourcePid::comm:mypid(),
         PData::gossip_beh:exch_data(), OtherRound::non_neg_integer()} |
-    {selected_reply_data, CBModule::cb_module(), QData::gossip_beh:exch_data(),
+    {selected_reply_data, CBModule::cb_module_name(), QData::gossip_beh:exch_data(),
         Ref::pos_integer(), Round::non_neg_integer()} |
-    {p2p_exch_reply, CBModule::cb_module(), SourcePid::comm:mypid(),
+    {p2p_exch_reply, CBModule::cb_module_name(), SourcePid::comm:mypid(),
         QData::gossip_beh:exch_data(), OtherRound::non_neg_integer()} |
-    {integrated_data, CBModule::cb_module(), current_round} |
-    {new_round, CBModule::cb_module(), NewRound::non_neg_integer()} |
-    {cb_reply, CBModule::cb_module(), Msg::comm:message()} |
-    {get_values_best, CBModule::cb_module(), SourcePid::comm:mypid()} |
-    {get_values_all, CBModule::cb_module(), SourcePid::comm:mypid()} |
-    {stop_gossip_task, CBModule::cb_module()} |
+    {integrated_data, CBModule::cb_module_name(), current_round} |
+    {new_round, CBModule::cb_module_name(), NewRound::non_neg_integer()} |
+    {cb_reply, CBModule::cb_module_name(), Msg::comm:message()} |
+    {get_values_best, CBModule::cb_module_name(), SourcePid::comm:mypid()} |
+    {get_values_all, CBModule::cb_module_name(), SourcePid::comm:mypid()} |
+    {stop_gossip_task, CBModule::cb_module_name()} |
     no_msg
 .
 
@@ -288,7 +289,7 @@ deactivate() ->
 %%      CBModule is either the name of a callback module or an name-instance_id
 %%      tuple.
 -spec start_gossip_task(CBModule, Args) -> ok when
-    is_subtype(CBModule, atom() | cb_module() | {cb_module(), uid:global_uid()}),
+    is_subtype(CBModule, cb_module() | cb_module_name() | {cb_module_name(), uid:global_uid()}),
     is_subtype(Args, list()).
 start_gossip_task(ModuleName, Args) when is_atom(ModuleName) ->
     Id = uid:get_global_uid(),
@@ -301,7 +302,7 @@ start_gossip_task({ModuleName, Id}, Args) when is_atom(ModuleName) ->
 
 
 %% @doc Globally stop a gossip task.
--spec stop_gossip_task(CBModule::cb_module()) -> ok.
+-spec stop_gossip_task(CBModule::cb_module_name()) -> ok.
 stop_gossip_task(CBModule) ->
     Msg = {?send_to_group_member, gossip, {stop_gossip_task, CBModule}},
     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
@@ -751,7 +752,7 @@ handle_msg({stop_gossip_task, CBModule}=Msg, State) ->
 % called by either on({selected_data,...}) or on({selected_peer, ...}),
 % depending on which finished first
 -spec start_p2p_exchange(Peers::[node:node_type(),...], PData::gossip_beh:exch_data(),
-    CBModule::cb_module(), State::state()) -> ok.
+    CBModule::cb_module_name(), State::state()) -> ok.
 start_p2p_exchange(Peers, PData, CBModule, State)  ->
     _ = [ begin
         case node:is_me(Peer) of
@@ -788,7 +789,7 @@ init_gossip_tasks(State) ->
 
 %% initialises a gossip task / callback mdoule
 %% called on activation of gossip module or on start_gossip_task message
--spec init_gossip_task(CBModule::cb_module(), Args::list(), State::state()) -> ok.
+-spec init_gossip_task(CBModule::cb_module_name(), Args::list(), State::state()) -> ok.
 init_gossip_task(CBModule, Args, State) ->
 
     % initialize CBModule
@@ -845,14 +846,14 @@ init_gossip_task(CBModule, Args, State) ->
 
 -spec cb_call(FunName, CBModule) -> non_neg_integer() | pos_integer() when
     is_subtype(FunName, fanout | min_cycles_per_round | max_cycles_per_round | trigger_interval),
-    is_subtype(CBModule, cb_module()).
+    is_subtype(CBModule, cb_module_name()).
 cb_call(FunName, CBModule) ->
     cb_call(FunName, [], CBModule).
 
 -spec cb_call(FunName, Args, CBModule) -> Return when
     is_subtype(FunName, init | fanout | min_cycles_per_round | max_cycles_per_round | trigger_interval),
     is_subtype(Args, list()),
-    is_subtype(CBModule, cb_module()),
+    is_subtype(CBModule, cb_module_name()),
     is_subtype(Return, non_neg_integer() | pos_integer() | {ok, any()}).
 cb_call(FunName, Args, CBModule) ->
     {CBModuleName, _Id} = CBModule,
@@ -866,7 +867,7 @@ cb_call(FunName, Args, CBModule) ->
     is_subtype(FunName, cb_fun_name()),
     is_subtype(Arguments, list()),
     is_subtype(Msg, message()),
-    is_subtype(CBModule, cb_module()),
+    is_subtype(CBModule, cb_module_name()),
     is_subtype(State, state()),
     is_subtype(Return, ok | discard_msg
         | send_back | boolean() | {any(), any(), any()} | list({list(), list()})).
@@ -911,7 +912,7 @@ cb_call(FunName, Args, Msg, CBModule, State) ->
 %% message (because the message is dscarded or sent back directly)
 -spec select_reply_data(PData::gossip_beh:exch_data(), Ref::pos_integer(),
     RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(),
-    Msg::message(), CBModule::cb_module(), State::state()) -> ok.
+    Msg::message(), CBModule::cb_module_name(), State::state()) -> ok.
 select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
     case cb_call(select_reply_data, [PData, Ref, RoundStatus, Round], Msg, CBModule, State) of
         ok -> ok;
@@ -928,7 +929,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
 
 %% @doc Sends the local node's cyclon process an enveloped request for a random node.
 %%      on_active({selected_peer, CBModule, {cy_cache, Cache}}, State) will handle the response
--spec request_random_node(CBModule::cb_module()) -> ok.
+-spec request_random_node(CBModule::cb_module_name()) -> ok.
 request_random_node(CBModule) ->
     CyclonPid = pid_groups:get_my(cyclon),
     EnvPid = comm:reply_as(self(), 3, {selected_peer, CBModule, '_'}),
@@ -939,7 +940,7 @@ request_random_node(CBModule) ->
 %% Used for rerequesting peers from cyclon when cyclon returned an empty list,
 %% which is usually the case during startup.
 %% The delay prohibits bombarding the cyclon process with requests.
--spec request_random_node_delayed(Delay::non_neg_integer(), CBModule::cb_module()) ->
+-spec request_random_node_delayed(Delay::non_neg_integer(), CBModule::cb_module_name()) ->
     reference().
 request_random_node_delayed(Delay, CBModule) ->
     CyclonPid = pid_groups:get_my(cyclon),
@@ -953,7 +954,7 @@ request_random_node_delayed(Delay, CBModule) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% called at every p2p_exch and p2p_exch_reply message
--spec check_round(OtherRound::non_neg_integer(), CBModule::cb_module(), State::state())
+-spec check_round(OtherRound::non_neg_integer(), CBModule::cb_module_name(), State::state())
     -> ok | start_new_round | enter_new_round | propagate_new_round.
 check_round(OtherRound, CBModule, State) ->
     MyRound = state_get(round, CBModule, State),
@@ -978,7 +979,7 @@ check_round(OtherRound, CBModule, State) ->
 
 
 %% checks the convergence of the current round (only called at leader)
--spec is_end_of_round(CBModule::cb_module(), State::state()) -> boolean().
+-spec is_end_of_round(CBModule::cb_module_name(), State::state()) -> boolean().
 is_end_of_round(CBModule, State) ->
     Cycles = state_get(cycles, CBModule, State),
     log:log(debug, "[ Gossip ] check_end_of_round. Cycles: ~w", [Cycles]),
@@ -1090,7 +1091,7 @@ state_update(Key, Fun, State) ->
 %%              (allowed values: free, locked) </li>
 %%        <li>`cycles', cycle counter, </li>
 %%      </ul>
--spec state_get(Key::state_key_cb(), CBModule::cb_module(), State::state()) -> any().
+-spec state_get(Key::state_key_cb(), CBModule::cb_module_name(), State::state()) -> any().
 state_get(Key, CBModule, State) ->
     state_get({Key, CBModule}, State).
 
@@ -1101,12 +1102,12 @@ state_get(Key, CBModule, State) ->
 
 %% @doc Sets the given value for the given key in the given state.
 %%      Allowed keys see state_get/3
--spec state_set(Key::state_key_cb(), Value::any(), CBModule::cb_module(), State::state()) -> ok.
+-spec state_set(Key::state_key_cb(), Value::any(), CBModule::cb_module_name(), State::state()) -> ok.
 state_set(Key, Value, CBModule, State) ->
     state_set({Key, CBModule}, Value, State).
 
 %% updates the state with the given function
--spec state_update(Key::state_key_cb(), UpdateFun::fun(), CBModule::cb_module(), State::state()) -> ok.
+-spec state_update(Key::state_key_cb(), UpdateFun::fun(), CBModule::cb_module_name(), State::state()) -> ok.
 state_update(Key, Fun, CBModule, State) ->
     Value = apply(Fun, [state_get(Key, CBModule, State)]),
     state_set(Key, Value, CBModule, State).
@@ -1138,7 +1139,7 @@ msg_queue_send(State) ->
 
 
 %% gets als the tombstones from the state of the gossip module
--spec get_tombstones(State::state()) -> list({cb_status, cb_module()}).
+-spec get_tombstones(State::state()) -> list({cb_status, cb_module_name()}).
 get_tombstones(State) ->
     StateList = ?PDB:tab2list(State),
     Fun = fun ({{cb_status, CBModule}, Status}, Acc) ->
@@ -1221,6 +1222,11 @@ tester_create_state(Status, Range, Interval, CBState, CBStatus,
     lists:foreach(Fun, ?CBMODULES),
     State.
 
+%% @doc Value creater for type_check_SUITE.
+-spec tester_gossip_beh_modules(1) -> gossip:cb_module().
+tester_gossip_beh_modules(1) ->
+    gossip_load.
+
 %%% @doc Type checker for type_check SUITE
 -spec is_state(State::state()) -> boolean().
 is_state(State) ->
@@ -1258,7 +1264,7 @@ tuplekeyfind(Key, [H|List]) ->
     end.
 
 -compile({nowarn_unused_function, {init_gossip_task_feeder, 3}}).
--spec init_gossip_task_feeder(cb_module(), [1..50], state()) -> {cb_module(), list(), state()}.
+-spec init_gossip_task_feeder(cb_module_name(), [1..50], state()) -> {cb_module_name(), list(), state()}.
 init_gossip_task_feeder(CBModule, Args, State) ->
     Args1 = if length(Args)>1 -> [hd(Args)];
                true -> Args
@@ -1266,8 +1272,8 @@ init_gossip_task_feeder(CBModule, Args, State) ->
     {CBModule, Args1, State}.
 
 -compile({nowarn_unused_function, {request_random_node_delayed_feeder, 2}}).
--spec request_random_node_delayed_feeder(Delay::0..1000, CBModule::cb_module()) ->
-    {non_neg_integer(), cb_module()}.
+-spec request_random_node_delayed_feeder(Delay::0..1000, CBModule::cb_module_name()) ->
+    {non_neg_integer(), cb_module_name()}.
 request_random_node_delayed_feeder(Delay, CBModule) ->
     {Delay, CBModule}.
 
