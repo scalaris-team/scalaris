@@ -99,7 +99,7 @@
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
-  [ {init, 1},
+  [ {init, 1}, {init, 2}, {init, 3},
     {select_node, 1},
     {select_data, 1},
     {select_reply_data, 5},
