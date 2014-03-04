@@ -75,6 +75,8 @@ init([]) ->
                                 OldRange =/= NewRange;
                             {graceful_leave, _PredOrSucc, _Node} -> % @todo ?
                                 false;
+                            {update_id_failed} -> % @todo ?
+                                false;
                             {unknown} -> % @todo ?
                                 false
                         end
@@ -102,6 +104,8 @@ rm_filter(Old, New, Reason) ->
         {node_discovery} ->
             OldRange =/= NewRange;
         {graceful_leave, _PredOrSucc, _Node} -> % @todo ?
+            false;
+        {update_id_failed} -> % @todo ?
             false;
         {unknown} -> % @todo ?
             false

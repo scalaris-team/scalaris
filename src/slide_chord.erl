@@ -102,8 +102,9 @@ change_my_id(State, SlideOp, ReplyPid) ->
         _ ->
             rm_loop:subscribe(
               ReplyPid, {move, slide_op:get_id(SlideOp2)},
-              fun(_OldN, NewN, _Reason) ->
-                      nodelist:nodeid(NewN) =:= TargetId
+              fun(_OldN, NewN, Reason) ->
+                      nodelist:nodeid(NewN) =:= TargetId orelse
+                          Reason =:= {update_id_failed}
               % note: no need to check the id version
               end,
               fun ?MODULE:rm_exec/4,

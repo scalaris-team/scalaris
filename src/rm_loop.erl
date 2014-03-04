@@ -61,6 +61,7 @@
                   {node_crashed, Node::comm:mypid()} | % the given node crashed
                   {add_subscriber} | % a subscriber was added
                   {node_discovery} | % a new/changed node was discovered
+                  {update_id_failed} | % a request to update the node's ID failed
                   {unknown}. % any other reason, e.g. changes during slides
 
 -type subscriber_filter_fun() :: fun((OldNeighbors::nodelist:neighborhood(),
@@ -283,7 +284,7 @@ on({rm, update_id, NewId}, State) ->
                              nodelist:pred(Neighborhood),
                              nodelist:succ(Neighborhood),
                              Reason]),
-                    State
+                    update_state(State, fun(RM_State) -> {{update_id_failed}, RM_State} end)
             end
     end;
 
