@@ -503,11 +503,14 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
                     true when SendOrReceive =:= 'rcv' ->
                         {ok, {leave, SendOrReceive}};
                     false when SendOrReceive =:= 'rcv' -> % no leave/jump
-                        {ok, {slide, PredOrSucc, SendOrReceive}};
+                        case TId =:= node:id(MyNode) of
+                            true -> {abort, target_id_not_in_range, Type};
+                            _    -> {ok, Type}
+                        end;
                     false when SendOrReceive =:= 'send' -> % no leave/jump
                         TIdInRange = intervals:in(TId, nodelist:node_range(Neighbors)) andalso
                                          not dht_node_state:has_left(State),
-                        case not TIdInRange of
+                        case not TIdInRange orelse TId =:= node:id(MyNode) of
                             true -> {abort, target_id_not_in_range, Type};
                             _    -> {ok, Type}
                         end
