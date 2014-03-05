@@ -94,11 +94,15 @@
 %-compile({parse_transform, ct_line}).
 -endif.
 
+-define(ASSERT(X), true = X).
+-define(ASSERT(X, Y), case catch(X) of true -> ok; _ -> throw(Y) end).
 % debug mode:
 -ifdef(enable_debug).
--define(ASSERT(X), true = X).
+-define(DBG_ASSERT(X), ?ASSERT(X)).
+-define(DBG_ASSERT(X, Y), ?ASSERT(X, Y)).
 -else.
--define(ASSERT(X), ok).
+-define(DBG_ASSERT(X), ok).
+-define(DBG_ASSERT(X, Y), ok).
 -endif.
 
 % disable compression (the overhead is too high, at least for GbE)

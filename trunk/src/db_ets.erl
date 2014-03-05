@@ -1,4 +1,4 @@
-% @copyright 2013 Zuse Institute Berlin,
+% @copyright 2013-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ close(DBName) ->
 put(DBName, []) ->
     DBName;
 put(DBName, Entry) ->
-    ?ASSERT(case is_list(Entry) of
+    ?DBG_ASSERT(case is_list(Entry) of
                 true ->
                     element(1, hd(Entry)) =/= '$end_of_table';
                 false ->

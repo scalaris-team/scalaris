@@ -246,7 +246,7 @@ on({start_recon, RMethod, Params} = _Msg,
             #trivial_recon_struct{interval = MySyncI, reconPid = DestReconPid,
                                   db_chunk = DBChunk,
                                   sig_size = SigSize, ver_size = VSize} = Params,
-            ?ASSERT(DestReconPid =/= undefined),
+            ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
             % convert db_chunk to a gb_tree for faster access checks
             DBChunkTree =
@@ -257,14 +257,14 @@ on({start_recon, RMethod, Params} = _Msg,
         bloom ->
             #bloom_recon_struct{interval = MySyncI,
                                 reconPid = DestReconPid} = Params,
-            ?ASSERT(DestReconPid =/= undefined),
+            ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
             Params1 = Params,
             Reconcile = reconcile,
             Stage = reconciliation;
         merkle_tree ->
             #merkle_params{interval = MySyncI, reconPid = DestReconPid} = Params,
-            ?ASSERT(DestReconPid =/= undefined),
+            ?DBG_ASSERT(DestReconPid =/= undefined),
             fd:subscribe(DestRRPid),
             Params1 = Params,
             Reconcile = reconcile,
@@ -277,7 +277,7 @@ on({start_recon, RMethod, Params} = _Msg,
             Stage = reconciliation
     end,
     % client only sends non-empty sync intervals or exits
-    ?ASSERT(not intervals:is_empty(MySyncI)),
+    ?DBG_ASSERT(not intervals:is_empty(MySyncI)),
     
     DhtNodePid = State#rr_recon_state.dhtNodePid,
     send_chunk_req(DhtNodePid, self(), MySyncI, MySyncI, get_max_items(), Reconcile),
@@ -524,7 +524,7 @@ on({?check_nodes, ToCheck0, SigSize},
                            struct = Tree,             ownerPid = OwnerL,
                            dest_rr_pid = DestNodePid, stats = Stats,
                            dest_recon_pid = DestReconPid}) ->
-    ?ASSERT(comm:is_valid(DestReconPid)),
+    ?DBG_ASSERT(comm:is_valid(DestReconPid)),
     ToCheck = merkle_decompress_hashlist(ToCheck0, [], SigSize),
     {FlagsBin, RTree, MerkleSyncNew, MaxLeafCount} =
         check_node(ToCheck, Tree, SigSize, MerkleSync),
@@ -613,7 +613,7 @@ on({resolve_req, Hashes, BinKeyList} = _Msg,
           MerkleSync, Hashes, BinKeyList, DestRRPid, Stats, OwnerL, [],
           [], [], false, BinKeyList =/= []),
     case Hashes of
-        <<>> -> ?ASSERT(BinKeyListReq =:= []),
+        <<>> -> ?DBG_ASSERT(BinKeyListReq =:= []),
                 ok;
         _    -> comm:send(DestRCPid, {resolve_req, BinKeyListReq})
     end,
@@ -642,7 +642,7 @@ build_struct(DBList, SyncI, RestI,
                                      initiator = Initiator, stats = Stats,
                                      dhtNodePid = DhtNodePid, stage = Stage,
                                      kv_list = KVList}) ->
-    ?ASSERT(not intervals:is_empty(SyncI)),
+    ?DBG_ASSERT(not intervals:is_empty(SyncI)),
     % note: RestI already is a sub-interval of the sync interval
     BeginSync =
         case intervals:is_empty(RestI) of
@@ -1096,21 +1096,21 @@ p_process_tree_cmp_result(<<?recon_fail_stop_leaf:3, TR/bitstring>>, [Node | TN]
 p_process_tree_cmp_result(<<?recon_fail_stop_inner_found:3, TR/bitstring>>, [Node | TN], SigSize,
                           MerkleSyncIn, Stats, RestTreeAcc,
                           MerkleSyncAcc, AccMLC, AccCmp) ->
-    ?ASSERT(merkle_tree:is_leaf(Node)),
+    ?DBG_ASSERT(merkle_tree:is_leaf(Node)),
     p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, Stats, RestTreeAcc,
                               [{leaf, inner, SigSize, Node, _FoundSkipHash = true} | MerkleSyncAcc],
                               AccMLC, AccCmp + 1);
 p_process_tree_cmp_result(<<?recon_fail_stop_inner_notfound:3, TR/bitstring>>, [Node | TN], SigSize,
                           MerkleSyncIn, Stats, RestTreeAcc,
                           MerkleSyncAcc, AccMLC, AccCmp) ->
-    ?ASSERT(merkle_tree:is_leaf(Node)),
+    ?DBG_ASSERT(merkle_tree:is_leaf(Node)),
     p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, Stats, RestTreeAcc,
                               [{leaf, inner, SigSize, Node, _FoundSkipHash = false} | MerkleSyncAcc],
                               AccMLC, AccCmp + 1);
 p_process_tree_cmp_result(<<?recon_fail_cont_inner:3, TR/bitstring>>, [Node | TN], SigSize,
                           MerkleSyncIn, Stats, RestTreeAcc,
                           MerkleSyncAcc, AccMLC, AccCmp) ->
-    ?ASSERT(not merkle_tree:is_leaf(Node)),
+    ?DBG_ASSERT(not merkle_tree:is_leaf(Node)),
     NewAccMLC = erlang:max(AccMLC, merkle_tree:get_leaf_count(Node)),
     Childs = merkle_tree:get_childs(Node),
     p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, Stats,
@@ -1154,7 +1154,7 @@ merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply) ->
     % TODO: use formulae of compress_kv_list_p1e/4 for the version size (?) - have to have the same info on the other node!
     Bucket = merkle_tree:get_bucket(LeafNode),
     BucketSize = length(Bucket),
-    ?ASSERT(BucketSize < 255),
+    ?DBG_ASSERT(BucketSize < 255),
     HashesReply1 = <<HashesReply/bitstring, BucketSize:8>>,
 
     % note: we can reach the best compression if values and versions align to
@@ -1201,7 +1201,7 @@ merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, LeafNodes, true} | TL], H
   when is_list(LeafNodes) ->
     {ToSend1, NLeafNAcc} =
         lists:foldl(fun(N, {AccToSend, LeafNAccX}) ->
-                            ?ASSERT(merkle_tree:is_leaf(N)),
+                            ?DBG_ASSERT(merkle_tree:is_leaf(N)),
                             {lists:append([Key || {Key, _Version} <- merkle_tree:get_bucket(N)],
                                           AccToSend),
                              LeafNAccX + 1}
@@ -1215,13 +1215,13 @@ merkle_resolve_leaves_noninit([{inner, leaf, _SigSize, _LeafNodes, false} | TL],
                                   LeafNAcc);
 merkle_resolve_leaves_noninit([{leaf, leaf, SigSize0, LeafNode} | TL], HashesReply,
                               DestRRPid, Stats, OwnerL, ToSend, LeafNAcc) ->
-    ?ASSERT(merkle_tree:is_leaf(LeafNode)),
+    ?DBG_ASSERT(merkle_tree:is_leaf(LeafNode)),
     HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply),
     merkle_resolve_leaves_noninit(TL, HashesReply1, DestRRPid, Stats, OwnerL, ToSend,
                                   LeafNAcc + 1);
 merkle_resolve_leaves_noninit([{leaf, inner, SigSize0, LeafNode, false = _FoundSkipHash} | TL], HashesReply,
                               DestRRPid, Stats, OwnerL, ToSend, LeafNAcc) ->
-    ?ASSERT(merkle_tree:is_leaf(LeafNode)),
+    ?DBG_ASSERT(merkle_tree:is_leaf(LeafNode)),
     HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply),
     merkle_resolve_leaves_noninit(TL, HashesReply1, DestRRPid, Stats, OwnerL, ToSend,
                                   LeafNAcc + 1);
@@ -1251,7 +1251,7 @@ merkle_resolve_compare_inner_leaf(SigSize0, LeafNodes, Hashes, ToSend, ToReq,
         merkle_resolve_retrieve_leaf_hashes(Hashes, SigSize0),
     {MyBuckets, NLeafNAcc} =
         lists:foldl(fun(N, {AccBuckets, LeafNAccX}) ->
-                            ?ASSERT(merkle_tree:is_leaf(N)),
+                            ?DBG_ASSERT(merkle_tree:is_leaf(N)),
                             {lists:append(merkle_tree:get_bucket(N), AccBuckets),
                              LeafNAccX + 1}
                     end, {[], 0}, LeafNodes),
@@ -1358,7 +1358,7 @@ merkle_resolve_leaves_init([{leaf, inner, SigSize0, LeafNode, false = _FoundSkip
                            Hashes,
                            DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
                            ResolveNonEmpty, LeafNAcc, HashesReply) ->
-    ?ASSERT(merkle_tree:is_leaf(LeafNode)),
+    ?DBG_ASSERT(merkle_tree:is_leaf(LeafNode)),
     HashesReply1 = merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply),
     merkle_resolve_leaves_init(TL, Hashes, DestRRPid, Stats, OwnerL,
                                ToSend, ToReq, ToResolve, ResolveNonEmpty,
@@ -1496,7 +1496,7 @@ resolve_leaves(Nodes, Dest, SID, OwnerL) ->
                      Interval::intervals:interval(), Items::non_neg_integer())
         -> 0..1.
 resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
-    ?ASSERT(merkle_tree:is_leaf(Node)),
+    ?DBG_ASSERT(merkle_tree:is_leaf(Node)),
     LeafInterval = merkle_tree:get_interval(Node),
     IntervalNew = intervals:union(Interval, LeafInterval),
     ItemsNew = Items + merkle_tree:get_item_count(Node),
@@ -1613,7 +1613,7 @@ align_bitsize(SigSize0, VSize0) ->
                          Params::parameters() | {}, BeginSync::boolean())
         -> sync_struct().
 build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
-    ?ASSERT(not intervals:is_empty(I)),
+    ?DBG_ASSERT(not intervals:is_empty(I)),
     ItemCount = length(DBItems),
     {DBChunkBin, SigSize, VSize} =
         compress_kv_list_p1e(DBItems, ItemCount, ItemCount, get_p1e()),
@@ -1623,14 +1623,14 @@ build_recon_struct(trivial, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
 build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
-    ?ASSERT(not intervals:is_empty(I)),
+    ?DBG_ASSERT(not intervals:is_empty(I)),
     P1E = get_p1e(),
     ElementNum = length(DBItems),
     BF0 = bloom:new_p1e(ElementNum, P1E),
     BF = bloom:add_list(BF0, DBItems),
     #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginSync) ->
-    ?ASSERT(not intervals:is_empty(I)),
+    ?DBG_ASSERT(not intervals:is_empty(I)),
     case Params of
         {} ->
             BranchFactor = get_merkle_branch_factor(),
@@ -1646,8 +1646,8 @@ build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginS
                                  {bucket_size, BucketSize},
                                  {keep_bucket, true}]);
 build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params, BeginSync) ->
-    ?ASSERT(not intervals:is_empty(_I)),
-    ?ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
+    ?DBG_ASSERT(not intervals:is_empty(_I)),
+    ?DBG_ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
     NTree = merkle_tree:insert_list(DBItems, OldSyncStruct),
     if BeginSync ->
            % no more DB items -> finish tree
@@ -1657,7 +1657,7 @@ build_recon_struct(merkle_tree, OldSyncStruct, _I, DBItems, _Params, BeginSync) 
            NTree
     end;
 build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}, BeginSync) ->
-    ?ASSERT(not intervals:is_empty(I)),
+    ?DBG_ASSERT(not intervals:is_empty(I)),
     BranchFactor = get_merkle_branch_factor(),
     BucketSize = merkle_tree:get_opt_bucket_size(length(DBItems), BranchFactor, 1),
     Tree = merkle_tree:new(I, DBItems, [{branch_factor, BranchFactor},
@@ -1674,8 +1674,8 @@ build_recon_struct(art, _OldSyncStruct = {}, I, DBItems, _Params = {}, BeginSync
     end;
 build_recon_struct(art, OldSyncStruct, _I, DBItems, _Params = {}, BeginSync) ->
     % similar to continued merkle build
-    ?ASSERT(not intervals:is_empty(_I)),
-    ?ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
+    ?DBG_ASSERT(not intervals:is_empty(_I)),
+    ?DBG_ASSERT(merkle_tree:is_merkle_tree(OldSyncStruct)),
     Tree1 = merkle_tree:insert_list(DBItems, OldSyncStruct),
     if BeginSync ->
            % no more DB items -> finish tree, remove buckets, create art struct:
@@ -1711,7 +1711,7 @@ send_local(Pid, Msg) ->
     is_subtype(LPid,        comm:erl_local_pid()),
     is_subtype(I,           intervals:interval()).
 send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, reconcile) ->
-    ?ASSERT(intervals:is_subset(I, _DestI)),
+    ?DBG_ASSERT(intervals:is_subset(I, _DestI)),
     SrcPidReply = comm:reply_as(SrcPid, 2, {reconcile, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
@@ -1722,7 +1722,7 @@ send_chunk_req(DhtPid, SrcPid, I, DestI, MaxItems, create_struct) ->
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
                 fun get_chunk_kv/1, MaxItems});
 send_chunk_req(DhtPid, SrcPid, I, _DestI, MaxItems, resolve) ->
-    ?ASSERT(I =:= _DestI),
+    ?DBG_ASSERT(I =:= _DestI),
     SrcPidReply = comm:reply_as(SrcPid, 2, {resolve, '_'}),
     send_local(DhtPid,
                {get_chunk, SrcPidReply, I, fun get_chunk_filter/1,
@@ -1820,8 +1820,8 @@ quadrant_subints_(A, [Q | QT], Acc) ->
 -spec replicated_intervals(intervals:continuous_interval())
         -> [intervals:continuous_interval()].
 replicated_intervals(I) ->
-    ?ASSERT(intervals:is_continuous(I)),
-    ?ASSERT(1 =:= length([ok || Q <- quadrant_intervals(),
+    ?DBG_ASSERT(intervals:is_continuous(I)),
+    ?DBG_ASSERT(1 =:= length([ok || Q <- quadrant_intervals(),
                                 not intervals:is_empty(
                                   intervals:intersection(I, Q))])),
     case intervals:is_all(I) of
@@ -1844,7 +1844,7 @@ replicated_intervals(I) ->
                     % -> we can zip the sorted keys to get the replicated intervals
                     lists:zipwith(
                       fun(LKeyX, RKeyX) ->
-                              ?ASSERT(?RT:get_range(LKeyX, ?IIF(RKeyX =:= ?MINUS_INFINITY, ?PLUS_INFINITY, RKeyX)) =:=
+                              ?DBG_ASSERT(?RT:get_range(LKeyX, ?IIF(RKeyX =:= ?MINUS_INFINITY, ?PLUS_INFINITY, RKeyX)) =:=
                                           ?RT:get_range(LKey, RKey0)),
                               intervals:new(LBr, LKeyX, RKeyX, RBr)
                       end, LKeys, RKeys)
@@ -1858,8 +1858,8 @@ replicated_intervals(I) ->
 -spec find_sync_interval(intervals:continuous_interval(), intervals:continuous_interval())
         -> intervals:interval().
 find_sync_interval(A, B) ->
-    ?ASSERT(intervals:is_continuous(A)),
-    ?ASSERT(intervals:is_continuous(B)),
+    ?DBG_ASSERT(intervals:is_continuous(A)),
+    ?DBG_ASSERT(intervals:is_continuous(B)),
     Quadrants = quadrant_intervals(),
     InterSecs = [I || AQ <- quadrant_subints_(A, Quadrants, []),
                       BQ <- quadrant_subints_(B, Quadrants, []),
@@ -1878,9 +1878,9 @@ find_sync_interval(A, B) ->
 -spec map_interval(intervals:continuous_interval(), intervals:continuous_interval())
         -> intervals:interval().
 map_interval(A, B) ->
-    ?ASSERT(intervals:is_continuous(A)),
-    ?ASSERT(intervals:is_continuous(B)),
-    ?ASSERT(1 =:= length([ok || Q <- quadrant_intervals(),
+    ?DBG_ASSERT(intervals:is_continuous(A)),
+    ?DBG_ASSERT(intervals:is_continuous(B)),
+    ?DBG_ASSERT(1 =:= length([ok || Q <- quadrant_intervals(),
                                 not intervals:is_empty(
                                   intervals:intersection(B, Q))])),
     

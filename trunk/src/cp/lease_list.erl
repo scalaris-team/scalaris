@@ -1,4 +1,4 @@
-% @copyright 2012-2013 Zuse Institute Berlin,
+% @copyright 2012-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -120,7 +120,7 @@ update_lease_in_dht_node_state(Lease, State, Mode, Reason) ->
                                     update_lease_in_dht_node_state(Lease, State, passive);
                                 true ->
                                     log:log("shall merge non-adjacent leases"),
-                                    ?ASSERT(false),
+                                    ?DBG_ASSERT(false),
                                     State
                             end
                     end
@@ -222,7 +222,7 @@ update_active_lease(Lease, LeaseList = #lease_list_t{active=Active}) ->
                 false ->
                     ok
             end,
-            ?ASSERT(l_on_cseq:get_id(Lease) =:= l_on_cseq:get_id(Active)),
+            ?DBG_ASSERT(l_on_cseq:get_id(Lease) =:= l_on_cseq:get_id(Active)),
             % @todo new lease should be newer than the old lease !!!
             LeaseList#lease_list_t{active=Lease}
     end.

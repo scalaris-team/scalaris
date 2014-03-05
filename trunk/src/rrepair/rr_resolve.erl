@@ -1,4 +1,4 @@
-% @copyright 2011, 2012 Zuse Institute Berlin
+% @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -143,11 +143,11 @@ on({get_state_response, MyI}, State =
     MyIOtherKvvList = map_kvv_list(KvvList, MyI),
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p~n KVVListLen=~p",
            [key_upd, _Stats#resolve_stats.session_id, MyI, length(KvvList)], State),
-    
+
     % send requested entries (similar to key_upd_send handling)
     RepKeyInt = intervals:from_elements(map_key_list(ReqKeys, MyI)),
     comm:send_local(DhtPid, {get_entries, self(), RepKeyInt}),
-    
+
     % send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
     MyIOtherKvTree =
@@ -155,7 +155,7 @@ on({get_state_response, MyI}, State =
                             % assume, KVs at the same node have the same version
                             gb_trees:enter(KeyX, VersionX, TreeX)
                     end, gb_trees:empty(), MyIOtherKvvList),
-    
+
     % allow the garbage collection to clean up the ReqKeys here:
     % also update the KvvList
     State#rr_resolve_state{operation = {?key_upd, MyIOtherKvvList, []},
@@ -170,13 +170,13 @@ on({get_entries_response, EntryList}, State =
     ToUpdate = start_update_key_entry(MyIOtherKvvList, comm:this(), DhtPid),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p ; ToUpdate=~p - #Items: ~p",
            [key_upd, Stats#resolve_stats.session_id, ToUpdate, length(EntryList)], State),
-    
+
     % allow the garbage collection to clean up the KvvList here:
     NewState =
         State#rr_resolve_state{operation = {?key_upd, [], []},
                                stats = Stats#resolve_stats{diff_size = ToUpdate},
                                fb_send_kvv_req = lists:append(FbReqKVV, KvvList)},
-    
+
     if ToUpdate =:= 0 ->
            % use the same options as above in get_state_response:
            shutdown(resolve_ok, NewState);
@@ -258,7 +258,7 @@ on({get_entries_response, EntryList}, State =
     ToUpdate = start_update_key_entry(MyIOtherKvvList, comm:this(), DhtPid),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p, KVVListLen=~p ; ToUpdate=~p",
            [interval_upd, Stats#resolve_stats.session_id, length(EntryList), length(KvvList), ToUpdate], State),
-    
+
     % Send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
     MyIOtherKvTree =
@@ -268,7 +268,7 @@ on({get_entries_response, EntryList}, State =
                     end, gb_trees:empty(), MyIOtherKvvList),
     MissingOnOther = [entry_to_kvv(X) || X <- EntryList,
                                          not gb_trees:is_defined(db_entry:get_key(X), MyIOtherKvTree)],
-    
+
     % allow the garbage collection to clean up the KvvList here:
     NewState = State#rr_resolve_state{operation = {?interval_upd, I, []},
                                       stats = Stats#resolve_stats{diff_size = ToUpdate},
@@ -306,7 +306,7 @@ on({get_state_response, MyI} = _Msg,
    State = #rr_resolve_state{operation = {interval_upd_my, I}}) ->
     ?TRACE("GET INTERVAL - Operation=~p~n IntervalBounds=~p~n MyInterval=~p",
            [interval_upd_my, intervals:get_bounds(I), MyI], State),
-    ?ASSERT(State#rr_resolve_state.fb_dest_pid =:= undefined),
+    ?DBG_ASSERT(State#rr_resolve_state.fb_dest_pid =:= undefined),
     ISec = intervals:intersection(MyI, I),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
@@ -347,18 +347,18 @@ on({update_key_entry_ack, NewEntryList}, State =
     ?TRACE("GET ENTRY_ACK - Operation=~p~n SessionId:~p - #NewItems: ~p",
            [util:extint2atom(element(1, Op)), Stats#resolve_stats.session_id,
             length(NewEntryList)], State),
-    
+
     {NewUpdOk, NewUpdFail, NewRegenOk, NewRegenFail, NewFBItems} =
         integrate_update_key_entry_ack(
           NewEntryList, UpdOk, UpdFail, RegenOk, RegenFail, MissingOnOther, MyIOtherKvTree,
           FBDest =/= undefined),
-    
+
     NewStats = Stats#resolve_stats{update_count     = NewUpdOk + 1,
                                    regen_count      = NewRegenOk +1,
                                    upd_fail_count   = NewUpdFail + 1,
                                    regen_fail_count = NewRegenFail + 1},
     NewState = State#rr_resolve_state{stats = NewStats, fb_send_kvv = NewFBItems},
-    ?ASSERT(_Diff =:= (NewRegenOk + NewUpdOk + NewUpdFail + NewRegenFail)),
+    ?DBG_ASSERT(_Diff =:= (NewRegenOk + NewUpdOk + NewUpdFail + NewRegenFail)),
     ?TRACE("UPDATED = ~p - Regen=~p", [NewUpdOk, NewRegenOk], State),
     shutdown(resolve_ok, NewState);
 
@@ -377,14 +377,14 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
                              {?RT:key(), term()} |
                              {?RT:key(), term(), term()}).
 map_kvv_list(TplList, MyI) ->
-    ?ASSERT(length(TplList) =:= length(lists:ukeysort(1, TplList))),
+    ?DBG_ASSERT(length(TplList) =:= length(lists:ukeysort(1, TplList))),
     [setelement(1, E, RKey) || E <- TplList,
                                RKey <- ?RT:get_replica_keys(element(1, E)),
                                intervals:in(RKey, MyI)].
 
 -spec map_key_list([?RT:key()], intervals:interval()) -> [?RT:key()].
 map_key_list(KeyList, MyI) ->
-    ?ASSERT(length(KeyList) =:= length(lists:sort(KeyList))),
+    ?DBG_ASSERT(length(KeyList) =:= length(lists:sort(KeyList))),
     [RKey || Key <- KeyList,
              RKey <- ?RT:get_replica_keys(Key),
              intervals:in(RKey, MyI)].

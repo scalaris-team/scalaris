@@ -1,4 +1,4 @@
-%  @copyright 2007-2013 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -261,7 +261,7 @@ get(Name, {IP, Port, _Pid} = _Node) -> {IP, Port, Name}.
 -spec reply_as(plain_pid(), pos_integer(), tuple()) ->
                       mypid_with_reply_as() | erl_local_pid_with_reply_as().
 reply_as(Target, Nth, Envelope) ->
-    ?ASSERT('_' =:= element(Nth, Envelope)),
+    ?DBG_ASSERT('_' =:= element(Nth, Envelope)),
     {Target, e, Nth, Envelope}.
 
 %% @doc Check whether the given pid is well formed.
