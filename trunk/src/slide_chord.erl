@@ -291,6 +291,6 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
               Reason::rm_loop:reason()) -> ok.
 rm_exec(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors, Reason) ->
     case Reason of
-        update_id_failed -> send_abort_msg(Pid);
+        {update_id_failed} -> send_abort_msg(Pid);
         _ -> send_continue_msg(Pid)
     end.
