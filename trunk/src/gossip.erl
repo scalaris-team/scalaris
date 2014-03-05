@@ -153,7 +153,7 @@
 -export([start_link/1, activate/1, deactivate/0, start_gossip_task/2, stop_gossip_task/1, remove_all_tombstones/0, check_config/0]).
 
 % interaction with the ring maintenance:
--export([rm_filter_slide_msg/3, rm_send_activation_msg/4, rm_my_range_changed/3, rm_send_new_range/4]).
+-export([rm_filter_slide_msg/3, rm_send_activation_msg/5, rm_my_range_changed/3, rm_send_new_range/5]).
 
 % testing
 -export([tester_create_state/9, is_state/1, tester_gossip_beh_modules/1]).
@@ -274,7 +274,7 @@ activate(MyRange) ->
             % subscribe to ring maintenance (rm) for {slide_finished, succ} or {slide_finished, pred}
             rm_loop:subscribe(self(), ?MODULE,
                               fun gossip:rm_filter_slide_msg/3,
-                              fun gossip:rm_send_activation_msg/4, 1)
+                              fun gossip:rm_send_activation_msg/5, 1)
     end.
 
 %% @doc Deactivates all gossip processes.
@@ -326,10 +326,11 @@ rm_filter_slide_msg(_OldNeighbors, _NewNeighbors, Reason) ->
 %% @doc Sends the activation message to the behaviour module (this module)
 %%      Used to subscribe to the ring maintenance for {slide_finished, succ} or
 %%      {slide_finished, pred} msg.
--spec rm_send_activation_msg(Subscriber, ?MODULE, Neighbours, Neighbours) -> ok when
+-spec rm_send_activation_msg(Subscriber, ?MODULE, Neighbours, Neighbours, Reason) -> ok when
                              is_subtype(Subscriber, pid()),
-                             is_subtype(Neighbours, nodelist:neighborhood()).
-rm_send_activation_msg(_Pid, ?MODULE, _OldNeighbours, NewNeighbours) ->
+                             is_subtype(Neighbours, nodelist:neighborhood()),
+                             is_subtype(Reason, rm_loop:reason()).
+rm_send_activation_msg(_Pid, ?MODULE, _OldNeighbours, NewNeighbours, _Reason) ->
     %% io:format("Pid: ~w. Self: ~w. PidGossip: ~w~n", [Pid, self(), Pid2]),
     MyRange = nodelist:node_range(NewNeighbours),
     Pid = pid_groups:get_my(gossip),
@@ -350,7 +351,7 @@ on_inactive({activate_gossip, MyRange}=Msg, State) ->
     % subscribe to ring maintenance (rm)
     rm_loop:subscribe(self(), ?MODULE,
                       fun gossip:rm_my_range_changed/3,
-                      fun gossip:rm_send_new_range/4, inf),
+                      fun gossip:rm_send_new_range/5, inf),
 
     init_gossip_tasks(State),
 
@@ -1012,8 +1013,9 @@ rm_my_range_changed(OldNeighbors, NewNeighbors, _IsSlide) ->
 %%      Used to subscribe to the ring maintenance.
 -spec rm_send_new_range(Subscriber::pid(), Tag::?MODULE,
                         OldNeighbors::nodelist:neighborhood(),
-                        NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors) ->
+                        NewNeighbors::nodelist:neighborhood(),
+                        Reason::rm_loop:reason()) -> ok.
+rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors, _Reason) ->
     NewRange = nodelist:node_range(NewNeighbors),
     comm:send_local(Pid, {update_range, NewRange}).
 

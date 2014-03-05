@@ -28,7 +28,7 @@
 -export([
         on/2,
         neighborhood_succ_crash_filter/3,
-        neighborhood_succ_crash/4
+        neighborhood_succ_crash/5
         ]).
 
 -ifdef(with_export_type_support).
@@ -80,7 +80,7 @@ on({bulk_distribute, _Id, Interval,
     %% to the dht node
     rm_loop:subscribe(self(), {"mr_succ_fd", JobId, MasterId, Client},
                       fun neighborhood_succ_crash_filter/3,
-                      fun neighborhood_succ_crash/4,
+                      fun neighborhood_succ_crash/5,
                       inf),
     MRState = case dht_node_state:get_mr_state(State, JobId) of
         error ->
@@ -237,8 +237,9 @@ neighborhood_succ_crash_filter(_Old, _New, _) -> false.
 -spec neighborhood_succ_crash(comm:mypid(), {string(), mr_state:jobid(),
                                              ?RT:client_key(), comm:mypid()},
                               Old::nodelist:neighborhood(),
-                              New::nodelist:neighborhood()) -> ok.
-neighborhood_succ_crash(Pid, {"mr_succ_fd", JobId, MasterId, Client}, _Old, _New) ->
+                              New::nodelist:neighborhood(),
+                              Reason::rm_loop:reason()) -> ok.
+neighborhood_succ_crash(Pid, {"mr_succ_fd", JobId, MasterId, Client}, _Old, _New, _Reason) ->
     io:format("~p: succ crashed...informing master~n",
               [Pid]),
     api_dht_raw:unreliable_lookup(MasterId,

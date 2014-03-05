@@ -37,7 +37,7 @@
          finish_delta1/3, finish_delta2/3,
          finish_delta_ack1/3, finish_delta_ack2/4]).
 
--export([rm_exec/4]).
+-export([rm_exec/5]).
 
 -spec prepare_join_send(State::dht_node_state:state(), SlideOp::slide_op:slide_op())
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
@@ -107,7 +107,7 @@ change_my_id(State, SlideOp, ReplyPid) ->
                           Reason =:= {update_id_failed}
               % note: no need to check the id version
               end,
-              fun ?MODULE:rm_exec/4,
+              fun ?MODULE:rm_exec/5,
               1),
             rm_loop:update_id(TargetId),
             {ok, State1, SlideOp2}
@@ -186,7 +186,7 @@ send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid) ->
                           node:id(RMNewPred) =:= ExpPredId orelse
                           RMNewPred =/= OldPred
               end,
-              fun ?MODULE:rm_exec/4,
+              fun ?MODULE:rm_exec/5,
               1)
     end.
 
@@ -272,6 +272,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
 
 -spec rm_exec(pid(), term(),
               OldNeighbors::nodelist:neighborhood(),
-              NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_exec(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors) ->
+              NewNeighbors::nodelist:neighborhood(),
+              Reason::rm_loop:reason()) -> ok.
+rm_exec(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors, _Reason) ->
     send_continue_msg(Pid).

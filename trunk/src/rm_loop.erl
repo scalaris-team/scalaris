@@ -69,7 +69,8 @@
                                       Reason::reason()) -> boolean()).
 -type subscriber_exec_fun() :: fun((Subscriber::pid() | null, Tag::any(),
                                     OldNeighbors::nodelist:neighborhood(),
-                                    NewNeighbors::nodelist:neighborhood()) -> any()).
+                                    NewNeighbors::nodelist:neighborhood(),
+                                    Reason::reason()) -> any()).
 
 -type state_t() ::
           {RM_State    :: ?RM:state(),
@@ -489,7 +490,7 @@ call_subscribers_iter(OldNeighborhood, NewNeighborhood, Reason, SubscrTable, Cur
 call_subscribers_check(OldNeighborhood, NewNeighborhood, Reason,
         {{Pid, Tag}, FilterFun, ExecFun, MaxCalls}, SubscrTable) ->
     case FilterFun(OldNeighborhood, NewNeighborhood, Reason) of
-        true -> ExecFun(Pid, Tag, OldNeighborhood, NewNeighborhood),
+        true -> ExecFun(Pid, Tag, OldNeighborhood, NewNeighborhood, Reason),
                 case MaxCalls of
                     inf -> ok;
                     1   -> ets:delete(SubscrTable, {Pid, Tag}); % unsubscribe
