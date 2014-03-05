@@ -28,7 +28,7 @@
 -export([start_link/1, init/1, on/2]).
 
 %% rm subscriptions
--export([rm_filter/3, rm_exec/4]).
+-export([rm_filter/3, rm_exec/5]).
 
 -record(state, {
           takeovers     = ?required(state, takeovers) :: gb_tree()
@@ -83,7 +83,7 @@ init([]) ->
                 end,
     rm_loop:subscribe(self(), ?MODULE,
                       fun ?MODULE:rm_filter/3,
-                      fun ?MODULE:rm_exec/4, inf),
+                      fun ?MODULE:rm_exec/5, inf),
     #state{
        takeovers=gb_trees:empty()
       }.
@@ -113,8 +113,9 @@ rm_filter(Old, New, Reason) ->
 
 -spec rm_exec(pid(), Tag::?MODULE,
               OldNeighbors::nodelist:neighborhood(),
-              NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_exec(Pid, _Tag, Old, New) ->
+              NewNeighbors::nodelist:neighborhood(),
+              Reason::rm_loop:reason()) -> ok.
+rm_exec(Pid, _Tag, Old, New, _Reason) ->
   comm:send_local(Pid, {rm_change, nodelist:node_range(Old),
                         nodelist:node_range(New)}).
 

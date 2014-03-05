@@ -85,7 +85,7 @@ change_id_and_check(OldId, NewId) ->
     
     comm:send(DhtNode, {rm, subscribe, self(), rm_SUITE,
                         fun(OldN, NewN, _Reason) -> OldN =/= NewN end,
-                        fun(Pid, Tag, OldNeighbors, NewNeighbors) ->
+                        fun(Pid, Tag, OldNeighbors, NewNeighbors, _Reason) ->
                                 comm:send_local(Pid, {rm_changed, Tag, OldNeighbors, NewNeighbors})
                         end, inf}),
     comm:send(DhtNode, {rm, update_id, NewId}),

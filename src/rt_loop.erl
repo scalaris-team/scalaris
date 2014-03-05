@@ -30,7 +30,7 @@
          activate/1, deactivate/0,
          check_config/0,
          get_neighb/1, get_rt/1, set_rt/2,
-         rm_send_update/4]).
+         rm_send_update/5]).
 
 -ifdef(with_export_type_support).
 -export_type([state_active/0]).
@@ -101,7 +101,7 @@ on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages}) ->
     comm:send_local(self(), {periodic_rt_rebuild}),
     rm_loop:subscribe(self(), ?MODULE,
                       fun rm_loop:subscribe_dneighbor_change_filter/3,
-                      fun ?MODULE:rm_send_update/4, inf),
+                      fun ?MODULE:rm_send_update/5, inf),
     msg_queue:send(QueuedMessages),
     gen_component:change_handler(
       {Neighbors, ?RT:init(Neighbors)}, fun ?MODULE:on_active/2);
@@ -225,8 +225,9 @@ set_rt({Neighbors, _OldRT}, NewRT) ->
 %%      and/or successor. Used to subscribe to the ring maintenance.
 -spec rm_send_update(Subscriber::pid(), Tag::?MODULE,
                      OldNeighbors::nodelist:neighborhood(),
-                     NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors) ->
+                     NewNeighbors::nodelist:neighborhood(),
+                     Reason::rm_loop:reason()) -> ok.
+rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors, _Reason) ->
     comm:send_local(Pid, {update_rt, OldNeighbors, NewNeighbors}).
 
 -spec get_base_interval() -> pos_integer().

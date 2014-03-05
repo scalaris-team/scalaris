@@ -42,7 +42,7 @@
 
 %% functions for dht embedding
 %%-export([get_my/2]).
--export([rm_send_update/4]). %% subscribe to rm changes for local tx_ids
+-export([rm_send_update/5]). %% subscribe to rm changes for local tx_ids
 
 %% functions for gen_component module, supervisor callbacks and config
 -export([start_link/2]).
@@ -261,8 +261,9 @@ redecide_on_key(_Key) -> ok.
 %% @doc Notifies the tx_tm of a changed node ID.
 -spec rm_send_update(Subscriber::pid(), Tag::?MODULE,
                      OldNeighbors::nodelist:neighborhood(),
-                     NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors) ->
+                     NewNeighbors::nodelist:neighborhood(),
+                     Reason::rm_loop:reason()) -> ok.
+rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors, _Reason) ->
     OldId = node:id(nodelist:node(OldNeighbors)),
     NewId = node:id(nodelist:node(NewNeighbors)),
     case OldId =/= NewId of
@@ -298,7 +299,7 @@ init([]) ->
     %% subscribe to id changes
     rm_loop:subscribe(self(), ?MODULE,
                       fun rm_loop:subscribe_dneighbor_change_filter/3,
-                      fun ?MODULE:rm_send_update/4, inf),
+                      fun ?MODULE:rm_send_update/5, inf),
     State = {Table, _ID = unknown, _OpenTxNum = 0},
     gen_component:change_handler(State, fun ?MODULE:on_init/2).
 

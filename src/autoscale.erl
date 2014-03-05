@@ -74,7 +74,7 @@
 -export([check_config/0]).
 
 %% rm subscription
--export([rm_exec/4]).
+-export([rm_exec/5]).
 
 -define(TRACE1(X), ?TRACE(X, [])).
 %% -define(TRACE(X,Y), io:format("as: " ++ X ++ "~n",Y)).
@@ -516,7 +516,7 @@ init([]) ->
     % check my_range at direct neighborhood changes
     rm_loop:subscribe(
       self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_filter/3,
-      fun ?MODULE:rm_exec/4, inf),
+      fun ?MODULE:rm_exec/5, inf),
 
     % intial state
     {_IsLeader = false,
@@ -563,8 +563,9 @@ check_config() ->
 
 -spec rm_exec(pid(), Tag::?MODULE,
               OldNeighbors::nodelist:neighborhood(),
-              NewNeighbors::nodelist:neighborhood()) -> ok.
-rm_exec(Pid, ?MODULE, _OldN, _NewN) ->
+              NewNeighbors::nodelist:neighborhood(),
+              Reason::rm_loop:reason()) -> ok.
+rm_exec(Pid, ?MODULE, _OldN, _NewN, _Reason) ->
     DhtNodeOfPid = pid_groups:pid_of(pid_groups:group_of(Pid),
                                      dht_node),
     comm:send_local(DhtNodeOfPid,

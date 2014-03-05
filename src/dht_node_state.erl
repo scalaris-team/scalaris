@@ -683,7 +683,7 @@ merge_mr_states(State = #state{mr_state = MRStates1}, MRStates2) ->
                                                                  MasterId,
                                                                  Client},
                                                                 fun mr:neighborhood_succ_crash_filter/3,
-                                                                fun mr:neighborhood_succ_crash/4,
+                                                                fun mr:neighborhood_succ_crash/5,
                                                                 inf),
                                               orddict:store(JobId,
                                                             mr_state:init_slide_phase(MRState),
