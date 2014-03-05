@@ -29,7 +29,7 @@
            ]).
 
 tests_avail() ->
-    [test_sane_result, test_error_on_kill].
+    [test_sane_result]. %%, test_error_on_kill].
 
 init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
