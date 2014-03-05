@@ -135,9 +135,14 @@ prepare_send_data1(State, SlideOp, ReplyPid) ->
 %% @see dht_node_move:prepare_send_data2/3
 -spec prepare_send_data2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                          EmbeddedMsg::{continue})
-        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+        -> {ok, dht_node_state:state(), slide_op:slide_op()};
+                        (State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                         EmbeddedMsg::{abort})
+        -> {abort, dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_data2(State, SlideOp, {continue}) ->
-    {ok, State, SlideOp}.
+    {ok, State, SlideOp};
+prepare_send_data2(State, SlideOp, {abort}) ->
+    {abort, target_id_not_in_range, State, SlideOp}.
 
 %% @doc Accepts data received during the given (existing!) slide operation,
 %%      writes it to the DB and changes the own ID if necessary.
@@ -158,14 +163,24 @@ update_rcv_data1(State, SlideOp, ReplyPid) ->
 %% @see dht_node_move:update_rcv_data2/3
 -spec update_rcv_data2(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                        EmbeddedMsg::{continue})
-        -> {ok, dht_node_state:state(), slide_op:slide_op()}.
+        -> {ok, dht_node_state:state(), slide_op:slide_op()};
+                      (State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                       EmbeddedMsg::{abort})
+        -> {abort, dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}.
 update_rcv_data2(State, SlideOp, {continue}) ->
-    {ok, State, SlideOp}.
+    {ok, State, SlideOp};
+update_rcv_data2(State, SlideOp, {abort}) ->
+    {abort, target_id_not_in_range, State, SlideOp}.
 
 -spec send_continue_msg(Pid::comm:erl_local_pid()) -> ok.
 send_continue_msg(Pid) ->
     ?TRACE_SEND(Pid, {continue}),
     comm:send_local(Pid, {continue}).
+
+-spec send_abort_msg(Pid::comm:erl_local_pid()) -> ok.
+send_abort_msg(Pid) ->
+    ?TRACE_SEND(Pid, {abort}),
+    comm:send_local(Pid, {abort}).
 
 -spec send_continue_msg_when_pred_ok(
         State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
@@ -274,5 +289,8 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
               OldNeighbors::nodelist:neighborhood(),
               NewNeighbors::nodelist:neighborhood(),
               Reason::rm_loop:reason()) -> ok.
-rm_exec(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors, _Reason) ->
-    send_continue_msg(Pid).
+rm_exec(Pid, {move, _RMSlideId}, _RMOldNeighbors, _RMNewNeighbors, Reason) ->
+    case Reason of
+        update_id_failed -> send_abort_msg(Pid);
+        _ -> send_continue_msg(Pid)
+    end.
