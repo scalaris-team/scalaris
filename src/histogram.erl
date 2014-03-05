@@ -120,7 +120,7 @@ sliding_window_max(WindowSize, MaxPos, MaxSum, [H|T], Pos, OldVals, LastSum) ->
 %%      PRE: histogram maximum size > 0 (from create/1)
 -spec resize(Histogram::histogram()) -> histogram().
 resize(Histogram = #histogram{data = Data, size = ExpectedSize, data_size = ActualSize}) ->
-    ?ASSERT(ExpectedSize > 0),
+    ?DBG_ASSERT(ExpectedSize > 0),
     if
         (ActualSize > ExpectedSize) andalso (1 < ActualSize) ->
             %% we need at least two items to do the following:

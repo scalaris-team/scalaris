@@ -376,7 +376,7 @@ request_sync(State = #rrepair_state{round = Round, open_recon = OpenRecon,
         (intervals:continuous_interval(), ExcludeInterval::false) -> ?RT:key();
         (intervals:continuous_interval(), ExcludeInterval::true)  -> ?RT:key() | not_found.
 select_sync_node(Interval, ExcludeInterval) ->
-    ?ASSERT(intervals:is_continuous(Interval)),
+    ?DBG_ASSERT(intervals:is_continuous(Interval)),
     case intervals:is_all(Interval) of
         true when ExcludeInterval -> not_found; % no sync partner here!
         _ ->

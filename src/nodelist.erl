@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -515,7 +515,7 @@ lmerge_helper(Node1View, Node2View, BaseNode, PredsLength, SuccsLength) ->
     % favour the newly provided nodes over the present ones (they are probably newer)
     MergedView = util:smerge2(Node1ViewUpdSorted, Node2ViewUpdSorted, Ord,
                               fun(_E1, E2) ->
-                                      ?ASSERT(_E1 =:= E2 orelse not node:same_process(_E1, E2)),
+                                      ?DBG_ASSERT(_E1 =:= E2 orelse not node:same_process(_E1, E2)),
                                       [E2]
                               end),
     Preds = lists:sublist(lists:reverse(MergedView), PredsLength),

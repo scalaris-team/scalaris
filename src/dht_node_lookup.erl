@@ -31,7 +31,7 @@
 
 -spec envelope(pos_integer(), comm:message()) -> enveloped_message().
 envelope(Nth, Msg) ->
-    ?ASSERT('_' =:= element(Nth, Msg)),
+    ?DBG_ASSERT('_' =:= element(Nth, Msg)),
     {Nth, f, Msg}.
 
 %% userdevguide-begin dht_node_lookup:routing

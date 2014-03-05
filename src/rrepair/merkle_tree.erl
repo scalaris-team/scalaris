@@ -1,4 +1,4 @@
-% @copyright 2011, 2012 Zuse Institute Berlin
+% @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -166,7 +166,7 @@ lookup_(I, {_H, _Cnt, _LCnt, _Bkt, I, _CL} = Node) ->
 lookup_(_I, {_H, _Cnt, _LCnt, _Bkt, _NodeI, _CL = []}) ->
     not_found;
 lookup_(I, {_H, _Cnt, _LCnt, _Bkt, _NodeI, ChildList = [_|_]}) ->
-    ?ASSERT(1 >= length([C || C <- ChildList,
+    ?DBG_ASSERT(1 >= length([C || C <- ChildList,
                               intervals:is_subset(I, get_interval(C))])),
     case lists:dropwhile(fun(X) ->
                                  not intervals:is_subset(I, get_interval(X))
@@ -400,7 +400,7 @@ node_size({_H, Count, _LCnt, _Bkt, _I, _CL = [_|_]}) -> Count.
 -spec size_detail(merkle_tree()) -> mt_size().
 size_detail({merkle_tree, _, Root}) ->
     Result = {_Inner, _Leafs} = size_detail_node([Root], 0, 0),
-    ?ASSERT(get_leaf_count(Root) =:= -1 orelse _Leafs =:= get_leaf_count(Root)),
+    ?DBG_ASSERT(get_leaf_count(Root) =:= -1 orelse _Leafs =:= get_leaf_count(Root)),
     Result.
 
 -spec size_detail_node([mt_node() | [mt_node()]], InnerNodes::non_neg_integer(),

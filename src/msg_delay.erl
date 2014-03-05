@@ -79,7 +79,7 @@ send_trigger(Seconds, Msg) ->
     %% (2) We do not need a reply_as for self() in this case, as one can
     %%     easily put all infos in the message itself, when inside the
     %%     same process.
-    ?ASSERT(erlang:get(trace_mpath) =:= undefined),
+    ?DBG_ASSERT(erlang:get(trace_mpath) =:= undefined),
     send_local(Seconds, self(), Msg).
 
 %% userdevguide-begin gen_component:sample

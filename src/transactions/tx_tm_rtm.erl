@@ -242,7 +242,7 @@ on({tx_tm_rtm_commit, Client, ClientsID, TransLog}, State) ->
     ?TRACE("tx_tm_rtm:on({commit, ...}) for TLog ~p as ~p~n",
            [TransLog, state_get_role(State)]),
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     Maj = config:read(quorum_factor),
     GLLearner = state_get_gllearner(State),
     TLogUid = uid:get_global_uid(),
@@ -549,7 +549,7 @@ on({?register_TP, {Tid, ItemId, PaxosID, TP}} = Msg, State) ->
 on({tx_tm_rtm_propose_yourself, Tid}, State) ->
     ?TRACE("tx_tm_rtm:propose_yourself(~p) as ~p~n", [Tid, state_get_role(State)]),
     %% only on in rtm processes!
-    ?ASSERT(tx_tm =/= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =/= state_get_role(State)),
     %% after timeout take over and initiate new paxos round as proposer
     {ErrCodeTx, TxState} = get_tx_entry(Tid, State),
 %%    log:pal("propose yourself (~.0p/~.0p) for: ~.0p ~.0p~n",
@@ -615,7 +615,7 @@ on({tx_tm_rtm_propose_yourself, Tid}, State) ->
 %% sent by snapshot.erl to update tx_tm on new local snapshot numbers
 on({update_snapno, SnapNo}, State) ->
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     state_set_local_snapno(State, SnapNo);
 
 %% failure detector events
@@ -641,7 +641,7 @@ on({crash, Pid}, State) ->
 
 on({new_node_id, Id}, State) ->
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     RTMs = state_get_RTMs(State),
     IDs = ?RT:get_replica_keys(Id),
     NewRTMs = [ set_rtmkey(R, I) || {R, I} <- lists:zip(RTMs, IDs) ],
@@ -650,20 +650,20 @@ on({new_node_id, Id}, State) ->
 on({update_RTMs}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:update_RTMs in Pid ~p ~n", [self()]),
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     RTMs = state_get_RTMs(State),
     rtm_update(RTMs, config:read(tx_rtm_update_interval) div 1000,
                {update_RTMs}),
     State;
 on({update_RTMs_on_init}, State) ->
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     State;
 %% accept RTM updates
 on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:get_rtm_reply in Pid ~p for Pid ~p and State ~p~n", [self(), InPid, _State]),
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     RTMs = state_get_RTMs(State),
     NewRTMs = rtms_upd_entry(RTMs, InKey, InPid, InAcceptor),
     rtms_of_same_dht_node(NewRTMs),
@@ -675,7 +675,7 @@ on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
        {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state()}.
 on_init({get_node_details}, State) ->
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     util:wait_for(fun() -> comm:is_valid(comm:this()) end),
     comm:send_local(pid_groups:get_my(dht_node),
                     {get_node_details, comm:this(), [node]}),
@@ -688,7 +688,7 @@ on_init({get_node_details}, State) ->
 on_init({get_node_details_response, NodeDetails}, State) ->
     ?TRACE("tx_tm_rtm:on_init:get_node_details_response State; ~p~n", [_State]),
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     IdSelf = node:id(node_details:get(NodeDetails, node)),
     %% provide ids for RTMs (sorted by increasing latency to them).
     %% first entry is the locally hosted replica of IdSelf
@@ -703,7 +703,7 @@ on_init({get_node_details_response, NodeDetails}, State) ->
 
 on_init({update_RTMs}, State) ->
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     rtm_update(state_get_RTMs(State),
                config:read(tx_rtm_update_interval) div 1000,
                {update_RTMs}),
@@ -711,14 +711,14 @@ on_init({update_RTMs}, State) ->
 on_init({update_RTMs_on_init}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:update_RTMs in Pid ~p ~n", [self()]),
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     rtm_update(state_get_RTMs(State), 1, {update_RTMs_on_init}),
     State;
 
 on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:get_rtm_reply in Pid ~p for Pid ~p State ~p~n", [self(), InPid, _State]),
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     RTMs = state_get_RTMs(State),
     NewRTMs = rtms_upd_entry(RTMs, InKey, InPid, InAcceptor),
     case lists:keymember(unknown, 2, NewRTMs) of %% filled all entries?
@@ -730,7 +730,7 @@ on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
 
 on_init({new_node_id, Id}, State) ->
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     case state_get_RTMs(State) of
         [] ->
             %% new_node_id before first get_node_details: delay this info.
@@ -748,7 +748,7 @@ on_init({new_node_id, Id}, State) ->
 %% do not accept new commit requests when not enough rtms are valid
 on_init({tx_tm_rtm_commit, _Client, _ClientsID, _TransLog} = Msg, State) ->
     %% only in tx_tm not in rtm processes!
-    ?ASSERT(tx_tm =:= state_get_role(State)),
+    ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     %% forward request to a node which is ready to serve requests
     DHTNode = pid_groups:get_my(dht_node),
     %% there, redirect message to tx_tm
