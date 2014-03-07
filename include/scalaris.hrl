@@ -95,14 +95,19 @@
 -endif.
 
 -define(ASSERT(X), true = X).
--define(ASSERT(X, Y), case catch(X) of true -> ok; _ -> throw(Y) end).
-% debug mode:
+-define(ASSERT2(X, Y), case X of
+                           true -> ok;
+                           _ -> log:log("Exception ~p at ~.0p.",
+                                        [Y, util:get_stacktrace()]),
+                                throw(Y)
+                       end).
+%% debug mode (enable with ./configure --enable-debug)
 -ifdef(enable_debug).
 -define(DBG_ASSERT(X), ?ASSERT(X)).
--define(DBG_ASSERT(X, Y), ?ASSERT(X, Y)).
+-define(DBG_ASSERT2(X, Y), ?ASSERT2(X, Y)).
 -else.
 -define(DBG_ASSERT(X), ok).
--define(DBG_ASSERT(X, Y), ok).
+-define(DBG_ASSERT2(X, Y), ok).
 -endif.
 
 % disable compression (the overhead is too high, at least for GbE)
