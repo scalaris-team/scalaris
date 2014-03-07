@@ -329,18 +329,19 @@ pack_group_member(Msg, Opts)                           ->
 %%      (ugly hack to get a valid ip-address into the comm-layer)
 -spec init_and_wait_for_valid_pid() -> ok.
 init_and_wait_for_valid_pid() ->
-    KnownHosts1 = config:read(known_hosts),
-    % maybe the list of known nodes is empty and we have a mgmt_server?
-    MgmtServer = config:read(mgmt_server),
-    KnownHosts = case is_valid(MgmtServer) of
-                     true -> [MgmtServer | KnownHosts1];
-                     _ -> KnownHosts1
-                 end,
-    % note, comm:this() may be invalid at this moment
-    _ = [send(KnownHost, {hi}, [{group_member, service_per_vm}])
-        || KnownHost <- KnownHosts],
-    timer:sleep(100),
     case is_valid(this()) of
-        true  -> ok;
-        false -> init_and_wait_for_valid_pid()
+        true -> ok;
+        false ->
+            KnownHosts1 = config:read(known_hosts),
+            % maybe the list of known nodes is empty and we have a mgmt_server?
+            MgmtServer = config:read(mgmt_server),
+            KnownHosts = case is_valid(MgmtServer) of
+                             true -> [MgmtServer | KnownHosts1];
+                             _ -> KnownHosts1
+                         end,
+            % note, comm:this() may be invalid at this moment
+            _ = [send(KnownHost, {hi}, [{group_member, service_per_vm}, {?quiet}])
+                   || KnownHost <- KnownHosts],
+            timer:sleep(100),
+            init_and_wait_for_valid_pid()
     end.
