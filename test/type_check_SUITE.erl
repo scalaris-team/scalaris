@@ -698,7 +698,7 @@ tester_type_check_util(_Config) ->
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
     tester:unregister_type_checker({typedef, histogram, histogram}),
-    tester:unregister_value_creator({typedef, histogram, tester_create_histogram}),
+    tester:unregister_value_creator({typedef, histogram, histogram}),
 %% feeders are found automatically - sample explicit call would be:
 %%    tester:test(util, readable_utc_time, 1, 25, [with_feeder]),
 
