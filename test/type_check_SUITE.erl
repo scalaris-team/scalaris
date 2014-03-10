@@ -38,6 +38,7 @@ all()   -> [
             tester_type_check_rrepair,
             tester_type_check_tx,
             tester_type_check_rdht_tx,
+            tester_type_check_histogram,
             tester_type_check_util,
             tester_type_check_gossip,
             tester_type_check_mr
@@ -561,11 +562,31 @@ tester_type_check_rdht_tx(_Config) ->
     tester:unregister_value_creator({typedef, rdht_tx, encoded_value}),
     true.
 
-tester_type_check_util(_Config) ->
+tester_type_check_histogram(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, histogram, histogram}, histogram, tester_is_valid_histogram),
     tester:register_value_creator({typedef, histogram, histogram}, histogram, tester_create_histogram, 2),
+    %% [{modulename, [excludelist = {fun, arity}]}]
+    Modules =
+        [ {histogram,
+           [ {find_smallest_interval, 1}, % private API, needs feeder
+             {merge_interval, 2}, % private API, needs feeder
+             {find_largest_window, 2} % needs feeder for correct window size
+           ],
+           [ {resize, 1}, % needs feeder
+             {sliding_window_max, 7} % fed by find_largest_window/2
+           ]}
+        ],
+    _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
+          || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_type_checker({typedef, histogram, histogram}),
+    tester:unregister_value_creator({typedef, histogram, histogram}),
+    true.
+
+tester_type_check_util(_Config) ->
+    Count = 500,
+    config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {comm,
@@ -584,14 +605,6 @@ tester_type_check_util(_Config) ->
            ], []},
           %% {fix_queue, [], []}, %% queue as builtin type not supported yet
 
-          {histogram,
-           [ {find_smallest_interval, 1}, % private API, needs feeder
-             {merge_interval, 2}, % private API, needs feeder
-             {find_largest_window, 2} % needs feeder for correct window size
-           ],
-           [ {resize, 1}, % needs feeder
-             {sliding_window_max, 7} % fed by find_largest_window/2
-           ]},
           {msg_queue, [], []},
           {pdb, [], []},
           {pid_groups,
@@ -697,8 +710,6 @@ tester_type_check_util(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_type_checker({typedef, histogram, histogram}),
-    tester:unregister_value_creator({typedef, histogram, histogram}),
 %% feeders are found automatically - sample explicit call would be:
 %%    tester:test(util, readable_utc_time, 1, 25, [with_feeder]),
 
