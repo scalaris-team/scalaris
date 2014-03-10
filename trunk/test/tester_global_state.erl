@@ -85,23 +85,24 @@ get_last_call(Thread) ->
 
 -spec lookup(any()) -> failed | any().
 lookup(Key) ->
-    case check_whether_table_exists(false) of
-        true -> case ets:lookup(?MODULE, Key) of
-                    [{Key, Value}] -> Value;
-                    [] -> failed
-                end;
-        false -> failed
+    try ets:lookup(?MODULE, Key) of
+        [{Key, Value}] -> Value;
+        [] -> failed
+    catch error:badarg -> failed
     end.
 
 -spec insert(Key::term(), Value::term()) -> true.
 insert(Key, Value) ->
-    check_whether_table_exists(true),
-    ets:insert(?MODULE, {Key, Value}).
+    try ets:insert(?MODULE, {Key, Value})
+    catch error:badarg ->
+              % probably the table does not exist
+              create_table(),
+              ets:insert(?MODULE, {Key, Value})
+    end.
 
 -spec delete(Key::term()) -> true | ok.
 delete(Key) ->
-    case check_whether_table_exists(false) of
-        true ->
+    try begin
             case ets:member(?MODULE, Key) of
                 true ->
                     ets:delete(?MODULE, Key);
@@ -109,16 +110,12 @@ delete(Key) ->
                     %% unregister non registered object
                     ct:pal("Stacktrace: ~p", [util:get_stacktrace()]),
                     throw({tester_global_state_delete_unregistered_object, Key})
-            end;
-        false -> ok
-    end.
-
--spec check_whether_table_exists(Create::boolean()) -> boolean().
-check_whether_table_exists(Create) ->
-    case ets:info(?MODULE) of
-        undefined when Create -> create_table();
-        undefined -> false;
-        _ -> true
+            end
+        end
+    catch error:badarg ->
+              % probably the table does not exist
+              ct:pal("Stacktrace: ~p", [util:get_stacktrace()]),
+              throw({tester_global_state_unknown_table, Key})
     end.
 
 -spec create_table() -> true.
