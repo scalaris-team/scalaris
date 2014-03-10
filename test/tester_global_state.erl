@@ -108,7 +108,7 @@ delete(Key) ->
                 _ ->
                     %% unregister non registered object
                     ct:pal("Stacktrace: ~p", [util:get_stacktrace()]),
-                    throw({tester_global_state_delete_unregisterd_object, Key})
+                    throw({tester_global_state_delete_unregistered_object, Key})
             end;
         false -> ok
     end.
@@ -133,7 +133,7 @@ create_table() ->
                       Error:Reason ->
                           case ets:info(?MODULE) of
                               undefined ->
-                                  ?ct_fail("could create ets table for tester_global_state: ~p:~p",
+                                  ?ct_fail("could not create ets table for tester_global_state: ~p:~p",
                                            [Error, Reason]);
                               _ ->
                                   ok
