@@ -105,7 +105,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
                                    util:floor(erlang:min(MyLoad - AvgLoad, AvgLoad));
                                _       -> util:floor(MyLoad / 2)
                            end,
-%%                        log:pal("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_state:get(BestValues, avgLoad)]),
+%%                        log:pal("T: ~.0p, My: ~.0p, Avg: ~.0p~n", [TargetLoad, MyLoad, gossip_load:load_info_get(avgLoad, BestValues)]),
                        MyPredId = node:id(nodelist:pred(Neighbors)),
                        SPid = comm:reply_as(self(), 3,
                                             {join, ?MODULE, '_',

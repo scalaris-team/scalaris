@@ -32,12 +32,16 @@
          dispatch_snapshot/1
         ]).
 
+-ifdef(with_export_type_support).
+-export_type([message/0]).
+-endif.
+
 -include("scalaris.hrl").
 
 -type(message() :: {mr_master, mr_state:jobid(), snapshot,
                     snapshot_leader:result_message(),
                     mr:job_description(), comm:mypid()} |
-                   {mr_master, mr_state:jobid(), phase_completed, intervals:interval()} |
+                   {mr_master, mr_state:jobid(), phase_completed, Round::non_neg_integer(), Range::intervals:interval()} |
                    {mr_master, mr_state:jobid(), job_completed, intervals:interval()} |
                    {mr_master, mr_state:jobid(), job_error, intervals:interval()}).
 
