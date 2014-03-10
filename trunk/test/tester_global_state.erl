@@ -140,9 +140,17 @@ create_table() ->
                           end
                   end,
               P ! go,
-              util:sleep_for_ever()
+              sleep_for_ever()
       end),
     receive go -> true end.
+
+%% @doc Copy from util:sleep_for_ever/0.
+%%      NOTE: We cannot use the util function though because we want to be able
+%%            to test util but the function will not survive code reloads.
+-spec sleep_for_ever() -> no_return().
+sleep_for_ever() ->
+    timer:sleep(5000),
+    sleep_for_ever().
 
 -spec log_last_calls() -> ok.
 log_last_calls() ->
