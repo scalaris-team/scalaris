@@ -36,12 +36,14 @@
 -endif.
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 
 -type(option() :: {tag, atom()}).
 
 -type(job_description() :: {[mr_state:fun_term(),...], [option()]}).
 
--type(bulk_message() :: {mr, job, mr_state:jobid(), comm:mypid(), comm:mypid(),
+-type(bulk_message() :: {mr, job, mr_state:jobid(), MasterId::?RT:key(),
+                         Client::comm:mypid(),
                          job_description(), mr_state:data()} |
                         {mr, next_phase_data, mr_state:jobid(), comm:mypid(),
                          mr_state:data()}).
@@ -187,43 +189,43 @@ on(_Msg, State) ->
     dht_node_state:state().
 work_on_phase(JobId, State, Round) ->
     {ok, MRState} = dht_node_state:get_mr_state(State, JobId),
-    case mr_state:get_phase(MRState, Round) of
-        %% TODO dont match against [] for empty interval
-        {_Round, _FunTerm, _ETS, [], _Working} ->
-            %% nothing to do
-            State;
-        {Round, FunTerm, ETS, Open, _Working} ->
+    {Round, FunTerm, ETS, Open, _Working} = mr_state:get_phase(MRState, Round),
+    case intervals:is_empty(Open) of
+        false ->
             NewMrState =
-            case db_ets:get_load(ETS) of
-                0 ->
-                    ?TRACE("~p mr_~s: no data for this phase...phase complete ~p~n",
-                           [self(), JobId, Round]),
-                    case mr_state:is_last_phase(MRState, Round) of
-                        false ->
-                            %% io:format("no data for phase...done...~p informs master~n", [self()]),
-                            send_to_master(MRState,
-                                           {mr_master, JobId, phase_completed, Round, Open}),
-                            mr_state:interval_empty(MRState, Open, Round);
-                        _ ->
-                            %% io:format("last phase and no data ~p~n", [Round]),
-                            send_to_master(MRState, {mr_master, JobId, job_completed, Open}),
-
-                            send_to_client(MRState, {mr_results, [], Open, JobId}),
-                            mr_state:interval_empty(MRState, Open, Round)
-                    end;
-                _Load ->
-                    ?TRACE("~p mr_~s: starting to work on phase ~p
-                            sending work (~p)~n~p
-                            to ~p~n", [self(), JobId, Round, Open,
-                                       ets:tab2list(ETS),
-                                       pid_groups:get_my(wpool)]),
-                    Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
-                                                           Open, Round}),
-                    comm:send_local(pid_groups:get_my(wpool),
-                                    {do_work, Reply, {FunTerm, ETS, Open}}),
-                    mr_state:interval_processing(MRState, Open, Round)
-            end,
-            dht_node_state:set_mr_state(State, JobId, NewMrState)
+                case db_ets:get_load(ETS) of
+                    0 ->
+                        ?TRACE("~p mr_~s: no data for this phase...phase complete ~p~n",
+                               [self(), JobId, Round]),
+                        case mr_state:is_last_phase(MRState, Round) of
+                            false ->
+                                %% io:format("no data for phase...done...~p informs master~n", [self()]),
+                                send_to_master(MRState,
+                                               {mr_master, JobId, phase_completed, Round, Open}),
+                                mr_state:interval_empty(MRState, Open, Round);
+                            _ ->
+                                %% io:format("last phase and no data ~p~n", [Round]),
+                                send_to_master(MRState, {mr_master, JobId, job_completed, Open}),
+                                
+                                send_to_client(MRState, {mr_results, [], Open, JobId}),
+                                mr_state:interval_empty(MRState, Open, Round)
+                        end;
+                    _Load ->
+                        ?TRACE("~p mr_~s: starting to work on phase ~p
+                        sending work (~p)~n~p
+                               to ~p~n", [self(), JobId, Round, Open,
+                                          ets:tab2list(ETS),
+                                          pid_groups:get_my(wpool)]),
+                        Reply = comm:reply_as(comm:this(), 4, {mr, phase_result, JobId, '_',
+                                                               Open, Round}),
+                        comm:send_local(pid_groups:get_my(wpool),
+                                        {do_work, Reply, {FunTerm, ETS, Open}}),
+                        mr_state:interval_processing(MRState, Open, Round)
+                end,
+            dht_node_state:set_mr_state(State, JobId, NewMrState);
+        true ->
+            %% nothing to do
+            State
     end.
 
 -spec neighborhood_succ_crash_filter(Old::nodelist:neighborhood(),
@@ -235,7 +237,7 @@ neighborhood_succ_crash_filter(Old, New, {node_crashed, _Pid}) ->
 neighborhood_succ_crash_filter(_Old, _New, _) -> false.
 
 -spec neighborhood_succ_crash(comm:mypid(), {string(), mr_state:jobid(),
-                                             ?RT:client_key(), comm:mypid()},
+                                             ?RT:key(), comm:mypid()},
                               Old::nodelist:neighborhood(),
                               New::nodelist:neighborhood(),
                               Reason::rm_loop:reason()) -> ok.

@@ -57,7 +57,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
--type external_rt_t() :: {unknown | gossip_state:size(), gb_tree()}.
+-type external_rt_t() :: {unknown | float(), gb_tree()}.
 %% -type external_rt_t() :: {Size :: unknown | float(), gb_tree()}.
 
 % define the possible types of nodes in the routing table:
@@ -85,7 +85,7 @@
         source = undefined :: key_t() | undefined
         , num_active_learning_lookups = 0 :: non_neg_integer()
         , nodes = gb_trees:empty() :: gb_tree()
-        , nodes_in_ring = unknown :: unknown | gossip_state:size()
+        , nodes_in_ring = unknown :: unknown | float()
         %% , nodes_in_ring = unknown :: Size :: unknown | float()
     }).
 

@@ -150,31 +150,33 @@ bulk_owner(State, Id, I, Msg, Parents) ->
                       Limit::?RT:key(), Parents::[comm:mypid(),...]) -> ok.
 bulk_owner_iter([], _Id, _I, _Msg, _Limit, _Parents) ->
     ok;
-%% TODO dont match [] for empty interval...opaque term
-bulk_owner_iter(_Neighbors, _Id, [], _Msg, _Limit, _Parents) ->
-    ok;
 bulk_owner_iter([Head | Tail], Id, I, Msg, Limit, Parents) ->
-    Interval_Head_Limit = node:mk_interval_between_ids(node:id(Head), Limit),
-    Range = intervals:intersection(I, Interval_Head_Limit),
-%%     log:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
-    NewLimit =
-        case intervals:is_empty(Range) of
-            false ->
-                case Msg of
-                    {bulk_distribute, Proc, N, Env, Data} ->
-                        RangeData = get_range_data(Data, Range),
-                        comm:send(node:pidX(Head),
-                              {bulkowner, Id, Range,
-                              {bulk_distribute, Proc, N, Env, RangeData}, Parents});
-                    _ ->
-                        comm:send(node:pidX(Head),
-                                  {bulkowner, Id, Range, Msg, Parents})
+    case intervals:is_empty(I) of
+        false ->
+            Interval_Head_Limit =
+                node:mk_interval_between_ids(node:id(Head), Limit),
+            Range = intervals:intersection(I, Interval_Head_Limit),
+            %%     log:pal("send_bulk_owner_if: ~p ~p ~n", [I, Range]),
+            NewLimit =
+                case intervals:is_empty(Range) of
+                    false ->
+                        case Msg of
+                            {bulk_distribute, Proc, N, Env, Data} ->
+                                RangeData = get_range_data(Data, Range),
+                                comm:send(node:pidX(Head),
+                                          {bulkowner, Id, Range,
+                                           {bulk_distribute, Proc, N, Env, RangeData}, Parents});
+                            _ ->
+                                comm:send(node:pidX(Head),
+                                          {bulkowner, Id, Range, Msg, Parents})
+                        end,
+                        node:id(Head);
+                    true  -> Limit
                 end,
-                node:id(Head);
-            true  -> Limit
-        end,
-    RemainingInterval = intervals:minus(I, Range),
-    bulk_owner_iter(Tail, Id, RemainingInterval, Msg, NewLimit, Parents).
+            RemainingInterval = intervals:minus(I, Range),
+            bulk_owner_iter(Tail, Id, RemainingInterval, Msg, NewLimit, Parents);
+        true -> ok
+    end.
 
 %% protocol implementation / called inside the dht_node on handler
 -spec on(bulkowner_msg(), dht_node_state:state()) -> dht_node_state:state().

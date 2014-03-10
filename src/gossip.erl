@@ -1225,7 +1225,7 @@ tester_create_state(Status, Range, Interval, CBState, CBStatus,
     State.
 
 %% @doc Value creater for type_check_SUITE.
--spec tester_gossip_beh_modules(1) -> gossip:cb_module().
+-spec tester_gossip_beh_modules(1) -> cb_module().
 tester_gossip_beh_modules(1) ->
     gossip_load.
 

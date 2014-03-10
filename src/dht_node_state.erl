@@ -664,34 +664,29 @@ merge_mr_states(State = #state{mr_state = MRStates1}, MRStates2) ->
     %% merge the two dicts. if they exist is both use the local state since no
     %% data has been moved yet and the rest should be the same
     Keys = orddict:fetch_keys(MRStates1) ++ orddict:fetch_keys(MRStates2),
-    NewMRStates = lists:foldl(fun(JobId, AccDict) ->
-                                      case orddict:find(JobId, MRStates1) of
-                                          {ok, MRState} ->
-                                              orddict:store(JobId, MRState,
-                                                            AccDict);
-                                          error ->
-                                              MRState = mr_state:init_slide_phase(
-                                                          orddict:fetch(JobId,
-                                                                        MRStates2)),
-                                              MasterId = mr_state:get(MRState,
-                                                                      master_id),
-                                              Client = mr_state:get(MRState,
-                                                                    client),
-                                              rm_loop:subscribe(self(),
-                                                                {"mr_succ_fd",
-                                                                 JobId,
-                                                                 MasterId,
-                                                                 Client},
-                                                                fun mr:neighborhood_succ_crash_filter/3,
-                                                                fun mr:neighborhood_succ_crash/5,
-                                                                inf),
-                                              orddict:store(JobId,
-                                                            mr_state:init_slide_phase(MRState),
-                                                            AccDict)
-                                      end
-                              end,
-                              orddict:new(),
-                              Keys),
+    NewMRStates =
+        lists:foldl(
+          fun(JobId, AccDict) ->
+                  case orddict:find(JobId, MRStates1) of
+                      {ok, MRState} ->
+                          orddict:store(JobId, MRState, AccDict);
+                      error ->
+                          MRState = mr_state:init_slide_phase(
+                                      orddict:fetch(JobId, MRStates2)),
+                          MasterId = mr_state:get(MRState, master_id),
+                          Client = mr_state:get(MRState, client),
+                          rm_loop:subscribe(self(),
+                                            {"mr_succ_fd", JobId, MasterId, Client},
+                                            fun mr:neighborhood_succ_crash_filter/3,
+                                            fun mr:neighborhood_succ_crash/5,
+                                            inf),
+                          orddict:store(JobId,
+                                        mr_state:init_slide_phase(MRState),
+                                        AccDict)
+                  end
+          end,
+          orddict:new(),
+          Keys),
     ?TRACE_MR_SLIDE("~p merged slide states are ~p~n", [self(), NewMRStates]),
     State#state{mr_state = NewMRStates}.
 

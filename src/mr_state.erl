@@ -47,6 +47,7 @@
         , tester_create_valid_funterm/2]).
 
 -include("scalaris.hrl").
+-include("client_types.hrl").
 %% for ?required macro
 -include("record_helpers.hrl").
 
@@ -54,10 +55,10 @@
 -export_type([data/0, jobid/0, state/0, fun_term/0, data_list/0]).
 -endif.
 
--type(erl_fun() :: {map, erlanon, fun((Arg::{?RT:client_key(), term()}) ->
-                                          Res::[{?RT:client_key(), term()}])}
-                 | {reduce, erlanon, fun((Arg::[{?RT:client_key(), term()}]) ->
-                                            Res::[{?RT:client_key(), term()}])}).
+-type(erl_fun() :: {map, erlanon, fun((Arg::{client_key(), term()}) ->
+                                          Res::[{client_key(), term()}])}
+                 | {reduce, erlanon, fun((Arg::[{client_key(), term()}]) ->
+                                            Res::[{client_key(), term()}])}).
 
 -type(js_fun() :: {map | reduce, jsanon, binary()}).
 
@@ -225,7 +226,7 @@ add_data_to_phase(State = #state{phases = Phases}, NewData,
             State
     end.
 
--spec accumulate_data([{?RT:client_key(), term()}], data()) -> data().
+-spec accumulate_data([{client_key(), term()}], data()) -> data().
 accumulate_data(Data, List) when is_list(List) ->
     lists:foldl(fun({K, V}, Acc) ->
                         HK = ?RT:hash_key(K),
@@ -246,7 +247,7 @@ accumulate_data(Data, ETS) ->
                 ETS,
                 Data).
 
--spec acc_add_element(data(), {?RT:key(), ?RT:client_key(), term()}) ->
+-spec acc_add_element(data(), {?RT:key(), client_key(), term()}) ->
     data().
 acc_add_element(List, {HK, K, V} = T) when is_list(List) ->
     case lists:keyfind(HK, 1, List) of
