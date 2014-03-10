@@ -603,6 +603,21 @@ tester_type_check_util(_Config) ->
              {dec_version, 1}, % WL -1 is only allowed for empty_val
              {set_value, 3} % WL -1 is only allowed for empty_val
            ], []},
+          {debug,
+           [ {get_round_trip, 2}, %% needs gen_component pids
+             {dump3, 0}, %% type spec not valid
+             {dumpX, 1}, {dumpX, 2}, %% type spec not valid?
+             {topDumpX, 1},
+             {topDumpX, 3},
+             {topDumpXEvery, 3},
+             {topDumpXEvery, 5},
+             {topDumpXEvery_helper, 4}
+           ],
+           [ {get_round_trip_helper, 2}, %% needs gen_component pids
+             {dump_extract_from_list,2}, %% wrong spec
+             {dumpXNoSort,2}, %% needs fun
+             {default_dumpX_val_fun,2} %% spec too wide (must be tuple sometimes)
+           ]},
           %% {fix_queue, [], []}, %% queue as builtin type not supported yet
 
           {msg_queue, [], []},
@@ -640,8 +655,6 @@ tester_type_check_util(_Config) ->
            [ {collect_while, 1}, %% cannot create funs
              {debug_info, 0}, %% type spec not valid?
              {debug_info, 1}, %% type spec not valid?
-             {dump3, 0}, %% type spec not valid
-             {dumpX, 1}, {dumpX, 2}, %% type spec not valid?
              {extint2atom, 1}, %% type spec too wide
              {for_to, 3}, %% cannot create funs
              {for_to_ex, 3}, %% cannot create funs
@@ -672,11 +685,6 @@ tester_type_check_util(_Config) ->
              {ssplit_unique, 3}, %% cannot create funs
              {ssplit_unique, 4}, %% cannot create funs
              {tc, 1}, {tc, 2}, {tc, 3}, %% don't call arbitrary functions
-             {topDumpX, 1},
-             {topDumpX, 3},
-             {topDumpXEvery, 3},
-             {topDumpXEvery, 5},
-             {topDumpXEvery_helper, 4},
              {wait_for, 1}, %% cannot create funs
              {wait_for, 2}, %% cannot create funs
              {wait_for_process_to_die, 1}, %% could wait forever
@@ -688,9 +696,7 @@ tester_type_check_util(_Config) ->
              {rrd_combine_gauge_slots, 4}, %% values too big
              {rrd_combine_slots, 6} %% values too big
            ],
-           [ {dump_extract_from_list,2}, %% wrong spec
-             {dumpXNoSort,2}, %% needs fun
-             {lists_partition3, 5}, %% cannot create funs; tested via feeder
+           [ {lists_partition3, 5}, %% cannot create funs; tested via feeder
              {lists_remove_at_indices, 4}, %% indices must exist in list
              {shuffle_helper,4}, %% badarg error? why?
              {gb_trees_largest_smaller_than_iter,3}, %% err: function_clause
@@ -704,8 +710,7 @@ tester_type_check_util(_Config) ->
              {par_map_recv2, 2}, %% receives messages
              {sublist_, 4}, %% tested via feeder
              {collect_while,2}, %% needs fun
-             {gb_trees_foldl_iter,3}, %% needs fun
-             {default_dumpX_val_fun,2} %% spec too wide (must be tuple sometimes)
+             {gb_trees_foldl_iter,3} %% needs fun
            ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)

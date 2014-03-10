@@ -22,7 +22,7 @@
 
 -behaviour(gen_component).
 
--export([dump_node_states/0, kill_nodes/1, get_round_trip/2, register_dht_node/1, deregister_dht_node/1]).
+-export([dump_node_states/0, kill_nodes/1, register_dht_node/1, deregister_dht_node/1]).
 
 -export([start_link/1, init/1, on/2]).
 
@@ -156,21 +156,6 @@ on({trigger_gc}, State) ->
 %% message from comm:init_and_wait_for_valid_pid/0 (no reply needed)
 on({hi}, State) ->
     State.
-
--spec get_round_trip(GPid::comm:mypid(), Iterations::pos_integer()) -> float().
-get_round_trip(GPid, Iterations) ->
-    Start = os:timestamp(),
-    get_round_trip_helper(GPid, Iterations),
-    End = os:timestamp(),
-    timer:now_diff(End, Start) / Iterations.
-
--spec get_round_trip_helper(GPid::comm:mypid(), Iterations::pos_integer()) -> ok.
-get_round_trip_helper(_GPid, 0) ->
-    ok;
-get_round_trip_helper(GPid, Iterations) ->
-    comm:send(GPid, {ping, comm:this()}),
-    receive _Any -> ok end,
-    get_round_trip_helper(GPid, Iterations - 1).
 
 -spec get_service() -> comm:mypid() | failed.
 get_service() ->
