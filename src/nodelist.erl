@@ -364,8 +364,12 @@ lfilter([], _FilterFun, _EvalFun, Res) ->
 -spec filter(neighborhood(), FilterFun::filter_fun(),
              EvalFun::eval_fun()) -> neighborhood().
 filter({Preds, Node, Succs, _NodeIntv, _SuccIntv}, FilterFun, EvalFun) ->
-    NewPreds = lfilter(Preds, FilterFun, EvalFun),
-    NewSuccs = lfilter(Succs, FilterFun, EvalFun),
+    % note: cannot call lfilter/3 on the succ/pred lists (a node may be in both
+    %       lists but should have EvalFun evaluated only once)
+    {NewPreds, PredsRemoved} = lists:partition(FilterFun, Preds),
+    {NewSuccs, SuccsRemoved} = lists:partition(FilterFun, Succs),
+    Removed = lists:usort(lists:append(PredsRemoved, SuccsRemoved)),
+    lists:foreach(EvalFun, Removed),
     ensure_lists_not_empty(NewPreds, Node, NewSuccs).
 
 %% @doc Keeps any node for which FilterFun returns true in a node list but
