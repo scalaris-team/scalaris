@@ -180,8 +180,9 @@ tester_type_check_gossip(_Config) ->
                 {request_random_node_delayed, 2}, % testes via feeder
                 {check_round, 3}, % would need valid callback state
                 {is_end_of_round, 2}, % would need valid callback state
-                {state_get, 2}, % tested via feeder
-                {state_take, 2}, % tested via feeder
+                {state_get, 2}, % needs state in process dictionary
+                {state_get, 3}, % needs state in process dictionary
+                {state_take, 2}, % needs state in process dictionary
                 {state_update, 3}, % tester can not create a value of type fun()
                 {state_update, 4} % tester can not create a value of type fun()
             ]},

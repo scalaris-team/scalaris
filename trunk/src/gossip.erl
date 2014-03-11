@@ -1279,29 +1279,6 @@ init_gossip_task_feeder(CBModule, Args, State) ->
 request_random_node_delayed_feeder(Delay, CBModule) ->
     {Delay, CBModule}.
 
--compile({nowarn_unused_function, {state_get_feeder, 2}}).
--spec state_get_feeder(Key::state_key(), State::state()) -> {state_key(), state()}.
-state_get_feeder(Key, State) ->
-    state_feeder_helper(Key, State).
-
--compile({nowarn_unused_function, {state_take_feeder, 2}}).
--spec state_take_feeder(Key::state_key(), State::state()) -> {state_key(), state()}.
-state_take_feeder(Key, State) ->
-    state_feeder_helper(Key, State).
-
--compile({nowarn_unused_function, {state_feeder_helper, 2}}).
--spec state_feeder_helper(state_key(), state()) -> {state_key(), state()}.
-state_feeder_helper(Key, State) ->
-    case Key of
-        {reply_peer, _} ->
-            {KeyTuple, _Value} = tuplekeyfind(reply_peer, ?PDB:tab2list(State)),
-            {KeyTuple, State};
-        {trigger_group, _} ->
-            {KeyTuple, _Value} = tuplekeyfind(reply_peer, ?PDB:tab2list(State)),
-            {KeyTuple, State};
-        _ -> {Key, State}
-    end.
-
 %% hack to be able to suppress warnings when testing via config:write()
 -spec warn() -> log:log_level().
 warn() ->
