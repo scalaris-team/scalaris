@@ -511,23 +511,15 @@ on(Msg, UState, GCState) ->
                     ok;
                 {'$gen_component', [{post_op, Msg1}], NewUState} ->
                     on_post_op(Msg1, NewUState, T1GCState);
-                {'$gen_component', Commands, NewUState} ->
+                {'$gen_component', [{on_handler, NewHandler}], NewUState} ->
                     %% This is not counted as a bp_step
-                    case lists:keyfind(on_handler, 1, Commands) of
-                        {on_handler, NewHandler} ->
-                            loop(NewUState, gc_set_hand(T1GCState, NewHandler));
-                        false ->
-                            case lists:keyfind(post_op, 1, Commands) of
-                                {post_op, Msg1} ->
-                                    on_post_op(Msg1, NewUState, T1GCState);
-                                false ->
-                                    %% let's fail since the Config list was either
-                                    %% empty or contained an invalid entry
-                                    log:log(warn, "[ gen_component ] unknown command(s): ~.0p",
-                                            [Commands]),
-                                    erlang:throw('unknown gen_component command')
-                            end
-                    end;
+                    loop(NewUState, gc_set_hand(T1GCState, NewHandler));
+                {'$gen_component', Commands, _NewUState} ->
+                    %% let's fail since the Config list was either
+                    %% empty or contained an invalid entry
+                    log:log(warn, "[ gen_component ] unknown command(s): ~.0p",
+                            [Commands]),
+                    erlang:throw('unknown gen_component command');
                 unknown_event ->
                     %% drop T2State, as it contains the error message
                     on_unknown_event(Msg, UState, T1GCState),
@@ -577,26 +569,18 @@ on_traced_msg(Msg, UState, GCState) ->
             ok;
         {'$gen_component', [{post_op, Msg1}], NewUState} ->
             on_post_op(Msg1, NewUState, T1GCState);
-        {'$gen_component', Commands, NewUState} ->
+        {'$gen_component', [{on_handler, NewHandler}], NewUState} ->
             %% This is not counted as a bp_step
-            case lists:keyfind(on_handler, 1, Commands) of
-                {on_handler, NewHandler} ->
-                    MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
-                    trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
-                    trace_mpath:stop(),
-                    loop(NewUState, gc_set_hand(T1GCState, NewHandler));
-                false ->
-                    case lists:keyfind(post_op, 1, Commands) of
-                        {post_op, Msg1} ->
-                            on_post_op(Msg1, NewUState, T1GCState);
-                        false ->
-                            %% let's fail since the Config list was either
-                            %% empty or contained an invalid entry
-                            log:log(warn, "[ gen_component ] unknown command(s): ~.0p",
-                                    [Commands]),
-                            erlang:throw('unknown gen_component command')
-                    end
-            end;
+            MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+            trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+            trace_mpath:stop(),
+            loop(NewUState, gc_set_hand(T1GCState, NewHandler));
+        {'$gen_component', Commands, _NewUState} ->
+            %% let's fail since the Config list was either
+            %% empty or contained an invalid entry
+            log:log(warn, "[ gen_component ] unknown command(s): ~.0p",
+                    [Commands]),
+            erlang:throw('unknown gen_component command');
         unknown_event ->
             %% drop T2State, as it contains the error message
             on_unknown_event(Msg, UState, T1GCState),
