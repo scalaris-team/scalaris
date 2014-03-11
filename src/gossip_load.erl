@@ -74,7 +74,7 @@
 -type state_key() :: convergence_count | instance | leader | load_data | merged |
     no_of_buckets | prev_state | range | request | requestor | round | status.
 -type avg() :: {Value::float(), Weight::float()}.
--type avg_kr() :: {number(), float()}.
+-type avg_kr() :: {Value::number(), Weight::float()}.
 -type min() :: non_neg_integer().
 -type max() :: non_neg_integer().
 -type merged() :: non_neg_integer().
@@ -822,7 +822,7 @@ load_data_get(Key, #load_data{avg=Avg, avg2=Avg2, size_inv=Size_inv, avg_kr=AvgK
 
 
 -spec get_current_estimate(Key::avg | avg2 | size_inv | avg_kr,
-    LoadData::load_data()) -> float() | unknown.
+    LoadData::unknown | load_data()) -> float() | unknown.
 get_current_estimate(_Key, unknown) -> unknown;
 get_current_estimate(Key, #load_data{avg=Avg, avg2=Avg2, size_inv=Size_inv,
         avg_kr=AvgKR}) ->
@@ -1208,8 +1208,8 @@ inc(Value) ->
                (Instance::instance()) -> string().
 to_string(unknown) -> unknown;
 
-to_string(LoadInfo=#load_info{avg=Avg, stddev=Stddev, size_ldr=SizeLdr, size_kr=SizeKr,
-        min=Min, max=Max, merged=Merged}) when is_record(LoadInfo, load_info) ->
+to_string(#load_info{avg=Avg, stddev=Stddev, size_ldr=SizeLdr, size_kr=SizeKr,
+        min=Min, max=Max, merged=Merged}) ->
     Labels1 = ["avg", "stddev", "size_ldr", "size_kr"],
     Values1 = [Avg, Stddev, SizeLdr, SizeKr],
     LVZib = lists:zip(Labels1, Values1),
