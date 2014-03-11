@@ -28,7 +28,8 @@
                    gc_bpactive/1, gc_set_bpactive/2,
                    gc_bpqueue/1, gc_set_bpqueue/2,
                    gc_bpstepped/1, gc_set_bpstepped/2,
-                   gc_bpstepper/1, gc_set_bpstepper/2
+                   gc_bpstepper/1, gc_set_bpstepper/2,
+                   handle_message/3
                   ]}).
 
 -include("scalaris.hrl").
@@ -459,6 +460,27 @@ loop(UState, GCState) ->
             %% end
     end.
 
+%% @doc Helper for on/3 and on_traced_msg/3 handling gen_component-provided
+%%      default messages as well as user-messages.
+-spec handle_message(comm:message() | comm:group_message(), user_state(), handler())
+        -> user_state() | kill | unknown_event |
+           {'$gen_component', Commands::[{on_handler, Handler::handler()} |
+                                         {post_op, comm:message()}], user_state()}.
+handle_message({ping, Pid}, UState, _Handler) ->
+    %% generic ping message
+    comm:send(Pid, {pong, pid_groups:my_pidname()}, [{channel, prio}]),
+    UState;
+handle_message({?send_to_group_member, Processname, Msg}, UState, _Handler) ->
+    %% forward a message to group member by its process name
+    %% initiated via comm:send/3 with group_member
+    Pid = pid_groups:get_my(Processname),
+    case Pid of
+        failed -> ok;
+        _      -> comm:send_local(Pid, Msg)
+    end,
+    UState;
+handle_message(Msg, UState, Handler) ->
+    Handler(Msg, UState).
 
 %%%%%%%%%%%%%%%%%%%%
 %% Attention!:
@@ -472,22 +494,8 @@ loop(UState, GCState) ->
 -spec on(comm:message() | comm:group_message(), user_state(), gc_state())
         -> ok.
 on(GCMsg, UState, GCState)
-  when is_tuple(GCMsg)
-       andalso '$gen_component' =:= element(1, GCMsg) ->
+  when is_tuple(GCMsg) andalso '$gen_component' =:= element(1, GCMsg) ->
     on_gc_msg(GCMsg, UState, GCState);
-on({ping, Pid}, UState, GCState) ->
-    %% handle failure detector messages
-    comm:send(Pid, {pong, pid_groups:my_pidname()}, [{channel, prio}]),
-    loop(UState, GCState);
-on({?send_to_group_member, Processname, Msg}, UState, GCState) ->
-    %% forward a message to group member by its process name
-    %% initiated via comm:send/3 with group_member
-    Pid = pid_groups:get_my(Processname),
-    case Pid of
-        failed -> ok;
-        _      -> comm:send_local(Pid, Msg)
-    end,
-    loop(UState, GCState);
 on(Msg, UState, GCState) ->
     T1GCState = on_bp(Msg, UState, GCState),
     case T1GCState of
@@ -496,7 +504,7 @@ on(Msg, UState, GCState) ->
         _ ->
             Module  = gc_mod(T1GCState),
             Handler = gc_hand(T1GCState),
-            try Handler(Msg, UState) of
+            try handle_message(Msg, UState, Handler) of
                 kill ->
                     log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
                             [self(), Module, Handler]),
@@ -556,33 +564,13 @@ on(Msg, UState, GCState) ->
 -spec on_traced_msg(comm:message(), user_state(), gc_state())
                    -> ok.
 on_traced_msg(GCMsg, UState, GCState)
-  when is_tuple(GCMsg)
-       andalso '$gen_component' =:= element(1, GCMsg) ->
+  when is_tuple(GCMsg) andalso '$gen_component' =:= element(1, GCMsg) ->
     on_gc_msg(GCMsg, UState, GCState);
-on_traced_msg({ping, Pid}, UState, GCState) ->
-    %% handle failure detector messages
-    comm:send(Pid, {pong, pid_groups:my_pidname()}, [{channel, prio}]),
-    MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
-    trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
-    trace_mpath:stop(),
-    loop(UState, GCState);
-on_traced_msg({?send_to_group_member, Processname, Msg}, UState, GCState) ->
-    %% forward a message to group member by its process name
-    %% initiated via comm:send/3 with group_member
-    Pid = pid_groups:get_my(Processname),
-    case Pid of
-        failed -> ok;
-        _      -> comm:send_local(Pid, Msg)
-    end,
-    MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
-    trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
-    trace_mpath:stop(),
-    loop(UState, GCState);
 on_traced_msg(Msg, UState, GCState) ->
     T1GCState = on_bp(Msg, UState, GCState),
     Module  = gc_mod(T1GCState),
     Handler = gc_hand(T1GCState),
-    try Handler(Msg, UState) of
+    try handle_message(Msg, UState, Handler) of
         kill ->
             log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
                     [self(), Module, Handler]),
