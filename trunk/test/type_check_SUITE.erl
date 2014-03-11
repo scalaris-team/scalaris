@@ -679,6 +679,7 @@ tester_type_check_util(_Config) ->
              {sets_map, 2}, %% cannot create funs
              {smerge2, 3}, %% cannot create funs
              {smerge2, 4}, %% cannot create funs
+             {smerge2, 6}, %% cannot create funs
              {sleep_for_ever, 0},
              {split_unique, 3}, %% cannot create funs
              {split_unique, 4}, %% cannot create funs
@@ -702,7 +703,6 @@ tester_type_check_util(_Config) ->
              {gb_trees_largest_smaller_than_iter,3}, %% err: function_clause
              {'=:<_lists', 2}, %% need equal length lists
              {ssplit_unique_helper, 5}, %% needs fun
-             {smerge2, 6}, %% needs fun
              {smerge2_helper, 7}, %% needs fun
              {i_repeat,5}, %% needs fun
              {parallel_collect,3}, %% needs fun
