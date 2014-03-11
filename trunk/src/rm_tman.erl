@@ -391,7 +391,7 @@ update_nodes({OldNeighborhood, RandViewSize, OldCache, _Churn},
     case is_function(RemoveNodeEvalFun) of
         true ->
             Nbh1 = nodelist:filter(OldNeighborhood, FilterFun, RemoveNodeEvalFun),
-            NewCache = nodelist:lfilter(OldCache, FilterFun, RemoveNodeEvalFun);
+            NewCache = nodelist:lfilter(OldCache, FilterFun);
         _ ->
             Nbh1 = nodelist:filter(OldNeighborhood, FilterFun),
             NewCache = nodelist:lfilter(OldCache, FilterFun)
