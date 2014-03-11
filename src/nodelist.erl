@@ -528,9 +528,9 @@ lmerge_helper(Node1View, Node2View, BaseNode, PredsLength, SuccsLength) ->
             SuccsLength::pos_integer()) -> neighborhood().
 merge(Neighbors1, Neighbors2, PredsLength, SuccsLength) ->
     % note: similar to mk_neighborhood/4
-    Node1 = ?MODULE:node(Neighbors1),
     % create a sorted list of nodes in Neighbors1 and Neighbours2
     [Node1 | Neighbors1View] = to_list(Neighbors1),
+    ?ASSERT(Node1 =:= ?MODULE:node(Neighbors1)),
     Neighbors2View = lrebase_list(to_list(Neighbors2), Node1),
     lmerge_helper(Neighbors1View, Neighbors2View, Node1, PredsLength, SuccsLength).
 
@@ -578,8 +578,8 @@ add_nodes(Neighbors, [NodeToAdd], PredsLength, SuccsLength) ->
     add_node(Neighbors, NodeToAdd, PredsLength, SuccsLength);
 add_nodes(Neighbors, [_|_] = NodeList, PredsLength, SuccsLength) ->
     % note: similar to mk_neighborhood/4 and merge/4
-    Node = ?MODULE:node(Neighbors),
     [Node | NeighborsView] = to_list(Neighbors),
+    ?ASSERT(Node =:= ?MODULE:node(Neighbors)),
     {SmallerSorted, EqualSorted, LargerSorted} =
         lsplit_nodelist(NodeList, Node),
 
