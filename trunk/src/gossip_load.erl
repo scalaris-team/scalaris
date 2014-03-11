@@ -255,9 +255,7 @@ init(Instance, NoOfBuckets, Requestor) ->
     State = state_new(),
     state_set(prev_state, unknown, State),
     state_set(no_of_buckets, NoOfBuckets, State),
-    if Requestor =/= none -> state_set(request, true, State);
-       Requestor =:= none -> state_set(request, false, State)
-    end,
+    state_set(request, Requestor =/= none, State),
     state_set(requestor, Requestor, State),
     state_set(instance, Instance, State),
     {ok, State}.
@@ -567,12 +565,11 @@ is_valid_round(RoundStatus, RoundFromMessage, State) ->
         old_round -> prev_state_get(round, State)
     end,
 
-    case RoundFromState =:= RoundFromMessage of
-        true -> true;
-        false ->
-            log:log(debug, "[ ~w ] Invalid ~w. RoundFromState: ~w, RoundFromMessage: ~w",
-                [state_get(instance, State), RoundStatus, RoundFromState, RoundFromMessage]),
-            false
+    if RoundFromState =:= RoundFromMessage -> true;
+       true ->
+           log:log(debug, "[ ~w ] Invalid ~w. RoundFromState: ~w, RoundFromMessage: ~w",
+                   [state_get(instance, State), RoundStatus, RoundFromState, RoundFromMessage]),
+           false
     end.
 
 

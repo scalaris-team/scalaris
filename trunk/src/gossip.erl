@@ -418,7 +418,7 @@ on_inactive(_Msg, State) ->
 -spec on_active(Msg::message(), State::state()) -> state().
 on_active({start_gossip_task, CBModule, Args}, State) ->
     CBModules = state_get(cb_modules, State),
-    case contains(CBModule, CBModules) of
+    case lists:member(CBModule, CBModules) of
         true ->
             log:log(warn, "[ Gossip ] Trying to start an already existing Module: ~w ."
                 ++ "Request will be ignored.", [CBModule]);
@@ -436,29 +436,27 @@ on_active({gossip_trigger, TriggerInterval}=Msg, State) ->
             ok; %% trigger group does no longer exist, forget about this trigger
         {CBModules} ->
             _ = [
-                 begin
-                     case state_get(trigger_lock, CBModule, State) of
-                         free ->
-                             log:log(debug, "[ Gossip ] Module ~w got triggered", [CBModule]),
-                             log:log(?SHOW, "[ Gossip ] Cycle: ~w, Round: ~w",
-                                     [state_get(cycles, CBModule, State), state_get(round, CBModule, State)]),
-
-                             %% set cycle status to active
-                             state_set(trigger_lock, locked, CBModule, State),
-
-                             %% reset exch_data
-                             state_set(exch_data, {undefined, undefined}, CBModule, State),
-
-                             %% request node (by the cb module or the bh module)
-                             case cb_call(select_node, [], Msg, CBModule, State) of
-                                 true -> ok;
-                                 false -> request_random_node(CBModule)
-                             end,
-
-                             %% request data
-                             cb_call(select_data, [], Msg, CBModule, State);
-                         locked -> do_nothing % ignore trigger when within prepare-request phase
-                     end
+                 case state_get(trigger_lock, CBModule, State) of
+                     free ->
+                         log:log(debug, "[ Gossip ] Module ~w got triggered", [CBModule]),
+                         log:log(?SHOW, "[ Gossip ] Cycle: ~w, Round: ~w",
+                                 [state_get(cycles, CBModule, State), state_get(round, CBModule, State)]),
+                         
+                         %% set cycle status to active
+                         state_set(trigger_lock, locked, CBModule, State),
+                         
+                         %% reset exch_data
+                         state_set(exch_data, {undefined, undefined}, CBModule, State),
+                         
+                         %% request node (by the cb module or the bh module)
+                         case cb_call(select_node, [], Msg, CBModule, State) of
+                             true -> ok;
+                             false -> request_random_node(CBModule)
+                         end,
+                         
+                         %% request data
+                         cb_call(select_data, [], Msg, CBModule, State);
+                     locked -> do_nothing % ignore trigger when within prepare-request phase
                  end || CBModule <- CBModules
                 ],
 
@@ -1140,16 +1138,10 @@ msg_queue_send(State) ->
     state_set(msg_queue, NewMsgQueue, State).
 
 
-%% gets als the tombstones from the state of the gossip module
+%% @doc Gets all the tombstones from the state of the gossip module.
 -spec get_tombstones(State::state()) -> [{cb_status, cb_module_id()}].
 get_tombstones(State) ->
-    StateList = ?PDB:tab2list(State),
-    Fun = fun ({{cb_status, CBModule}, Status}, Acc) ->
-            if Status =:= tombstone -> [{cb_status, CBModule}|Acc];
-               Status =/= tombstone -> Acc
-            end;
-        (_Entry, Acc) -> Acc end,
-    lists:foldl(Fun, [], StateList).
+    [X || {{cb_status, _CBModule} = X, tombstone} <- ?PDB:tab2list(State)].
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1169,16 +1161,6 @@ web_debug_info(State) ->
          {"registered modules", to_string(CBModules)},
          {"tombstones",         to_string(Tombstones)}
      ].
-
-
-%% contains function on list, returns true if list contains Element
--spec contains(Element::any(), List::list()) -> boolean().
-contains(_Element, []) -> false;
-
-contains(Element, [H|List]) ->
-    if H =:= Element -> true;
-       H =/= Element -> contains(Element, List)
-    end.
 
 
 %% Returns a list as string
@@ -1252,26 +1234,24 @@ is_state(State) ->
         error:badarg -> false
     end.
 
-%% find {{keyword, CMbodule}, {Value}} tuples by only the keyword
+%% @doc Find {{keyword, CMbodule}, {Value}} tuples by only the keyword.
 -spec tuplekeyfind(atom(), list()) -> {{atom(), any()}, any()} | false.
-tuplekeyfind(_Key, []) -> false;
-
-tuplekeyfind(Key, [H|List]) ->
-    case H of
-        Tuple = {{TupleKey, _}, _} ->
-            if  Key =:= TupleKey -> Tuple;
-                Key =/= TupleKey -> tuplekeyfind(Key, List)
-            end;
-        _ -> tuplekeyfind(Key, List)
-    end.
+tuplekeyfind(_Key, []) ->
+    false;
+tuplekeyfind(Key, [{{Key, _}, _} = Tuple | _List]) ->
+    Tuple;
+tuplekeyfind(Key, [{{_Key1, _}, _} | List]) ->
+    tuplekeyfind(Key, List);
+tuplekeyfind(Key, [_ | List]) ->
+    tuplekeyfind(Key, List).
 
 -compile({nowarn_unused_function, {init_gossip_task_feeder, 3}}).
--spec init_gossip_task_feeder(cb_module_id(), [1..50], state()) -> {cb_module_id(), list(), state()}.
-init_gossip_task_feeder(CBModule, Args, State) ->
-    Args1 = if length(Args)>1 -> [hd(Args)];
-               true -> Args
-            end,
-    {CBModule, Args1, State}.
+-spec init_gossip_task_feeder(cb_module_id(), NoOfBuckets::1..50, state()) -> {cb_module_id(), list(), state()}.
+init_gossip_task_feeder(CBModule, NoOfBuckets, State) ->
+    %% note: gossip_load (the only supported cb_module for now) requires an
+    %%       integer NoOfBuckets parameter
+    %%       (other modules may have different parameters)
+    {CBModule, [NoOfBuckets], State}.
 
 -compile({nowarn_unused_function, {request_random_node_delayed_feeder, 2}}).
 -spec request_random_node_delayed_feeder(Delay::0..1000, CBModule::cb_module_id()) ->
