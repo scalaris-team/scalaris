@@ -385,14 +385,32 @@ update_nodes(State, [], [], _RemoveNodeEvalFun) ->
     State;
 update_nodes({OldNeighborhood, RandViewSize, OldCache, _Churn},
              NodesToAdd, NodesToRemove, RemoveNodeEvalFun) ->
-    % keep all nodes that are not in NodesToRemove - note: NodesToRemove should
-    % have 0 or 1 element - so lists:member/2 is not expensive
-    FilterFun = fun(N) -> not lists:any(fun(B) -> node:same_process(N, B) end, NodesToRemove) end,
-    case is_function(RemoveNodeEvalFun) of
-        true ->
+    % keep all nodes that are not in NodesToRemove
+    % note: NodesToRemove should have 0 or 1 element in most cases
+    case NodesToRemove of
+        [] ->
+            Nbh1 = OldNeighborhood,
+            NewCache = OldCache;
+        [Node] when is_function(RemoveNodeEvalFun) ->
+            FilterFun = fun(N) -> not node:same_process(N, Node) end,
             Nbh1 = nodelist:filter(OldNeighborhood, FilterFun, RemoveNodeEvalFun),
             NewCache = nodelist:lfilter(OldCache, FilterFun);
-        _ ->
+        [Node] ->
+            FilterFun = fun(N) -> not node:same_process(N, Node) end,
+            Nbh1 = nodelist:filter(OldNeighborhood, FilterFun),
+            NewCache = nodelist:lfilter(OldCache, FilterFun);
+        [_,_|_] when is_function(RemoveNodeEvalFun) ->
+            FilterFun = fun(N) -> not lists:any(
+                                    fun(B) -> node:same_process(N, B) end,
+                                    NodesToRemove)
+                        end,
+            Nbh1 = nodelist:filter(OldNeighborhood, FilterFun, RemoveNodeEvalFun),
+            NewCache = nodelist:lfilter(OldCache, FilterFun);
+        [_,_|_] ->
+            FilterFun = fun(N) -> not lists:any(
+                                    fun(B) -> node:same_process(N, B) end,
+                                    NodesToRemove)
+                        end,
             Nbh1 = nodelist:filter(OldNeighborhood, FilterFun),
             NewCache = nodelist:lfilter(OldCache, FilterFun)
     end,
