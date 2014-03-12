@@ -14,9 +14,8 @@
 
 %% @author Nico Kruber <kruber@zib.de>
 %% @doc    Unit tests for src/dht_node_move.erl (slide and jump operations).
-%%   First executes all tests using the erlang scheduler. Then executes using
-%%   the proto scheduler which produces a random interleaving between the
-%%   different channels.
+%%   Executes tests using the protocol scheduler producing a random interleaving
+%%   between the different channels.
 %% @end
 %% @version $Id$
 -module(dht_node_move_proto_sched_SUITE).

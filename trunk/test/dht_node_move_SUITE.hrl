@@ -16,7 +16,7 @@
 %% @doc    Unit tests for src/dht_node_move.erl (slide and jump operations).
 %%   dht_node_move_SUITE.erl:
 %%       The regular execution of the suite.
-%%   dht_node_move_proto_scheduler_SUITE.erl:
+%%   dht_node_move_proto_sched_SUITE.erl:
 %%       Executes using the proto scheduler which serializes all messages to
 %%       generate a random interleaving of messages on different channels.
 %% @end
