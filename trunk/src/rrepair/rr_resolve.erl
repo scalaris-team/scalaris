@@ -110,8 +110,9 @@
 % debug
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--define(TRACE(X,Y,State), ok).
-%-define(TRACE(X,Y,State), log:pal("~w [~p] " ++ X ++ "~n", [?MODULE, State#rr_resolve_state.ownerPid] ++ Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), log:pal("~w [~s:~p] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
+-define(TRACE_SEND(Pid, Msg), ?TRACE("to ~s:~.0p: ~.0p~n", [pid_groups:group_of(comm:make_local(element(1, comm:unpack_cookie(Pid, {no_msg})))), Pid, Msg])).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message handling
@@ -129,8 +130,8 @@ on({start, Operation, Options}, State) ->
                                        send_stats = StatsDest,
                                        from_my_node = FromMyNode },
     ?TRACE("RESOLVE START - Operation=~p~n FeedbackTo=~p~n SessionId:~p",
-           [util:extint2atom(element(1, Operation)), FBDest, SID], NewState),
-    comm:send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
+           [util:extint2atom(element(1, Operation)), FBDest, SID]),
+    send_local(State#rr_resolve_state.dhtNodePid, {get_state, comm:this(), my_range}),
     NewState;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -142,11 +143,11 @@ on({get_state_response, MyI}, State =
                           dhtNodePid = DhtPid, stats = _Stats }) ->
     MyIOtherKvvList = map_kvv_list(KvvList, MyI),
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p~n KVVListLen=~p",
-           [key_upd, _Stats#resolve_stats.session_id, MyI, length(KvvList)], State),
+           [key_upd, _Stats#resolve_stats.session_id, MyI, length(KvvList)]),
 
     % send requested entries (similar to key_upd_send handling)
     RepKeyInt = intervals:from_elements(map_key_list(ReqKeys, MyI)),
-    comm:send_local(DhtPid, {get_entries, self(), RepKeyInt}),
+    send_local(DhtPid, {get_entries, self(), RepKeyInt}),
 
     % send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
@@ -169,7 +170,7 @@ on({get_entries_response, EntryList}, State =
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     ToUpdate = start_update_key_entry(MyIOtherKvvList, comm:this(), DhtPid),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p ; ToUpdate=~p - #Items: ~p",
-           [key_upd, Stats#resolve_stats.session_id, ToUpdate, length(EntryList)], State),
+           [key_upd, Stats#resolve_stats.session_id, ToUpdate, length(EntryList)]),
 
     % allow the garbage collection to clean up the KvvList here:
     NewState =
@@ -189,9 +190,9 @@ on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = {key_upd_send, _Dest, SendKeys, _ReqKeys},
                           dhtNodePid = DhtPid, stats = _Stats }) ->
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n MyInterval=~p",
-           [key_upd_send, _Stats#resolve_stats.session_id, MyI], State),
+           [key_upd_send, _Stats#resolve_stats.session_id, MyI]),
     SendKeysMappedInterval = intervals:from_elements(map_key_list(SendKeys, MyI)),
-    comm:send_local(DhtPid, {get_entries, self(), SendKeysMappedInterval}),
+    send_local(DhtPid, {get_entries, self(), SendKeysMappedInterval}),
     State;
 
 on({get_entries_response, EntryList}, State =
@@ -200,7 +201,7 @@ on({get_entries_response, EntryList}, State =
                           stats = Stats }) ->
     SID = Stats#resolve_stats.session_id,
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
-           [key_upd_send, SID, length(EntryList)], State),
+           [key_upd_send, SID, length(EntryList)]),
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     % note: if ReqKeys contains any entries, we will get 2 replies per resolve!
     FBCount = if ReqKeys =/= [] -> 2;
@@ -239,11 +240,11 @@ on({get_state_response, MyI}, State =
     ?TRACE("GET INTERVAL - Operation=~p~n SessionId:~p~n IntervalBounds=~p~n MyInterval=~p~n IntersecBounds=~p",
            [util:extint2atom(element(1, Op)), _Stats#resolve_stats.session_id,
             intervals:get_bounds(element(2, Op)),
-            MyI, intervals:get_bounds(ISec)], State),
+            MyI, intervals:get_bounds(ISec)]),
     NewState = State#rr_resolve_state{ my_range = MyI },
     case intervals:is_empty(ISec) of
         false ->
-            comm:send_local(DhtPid, {get_entries, self(), ISec}),
+            send_local(DhtPid, {get_entries, self(), ISec}),
             NewState;
         true ->
             shutdown(resolve_abort, NewState)
@@ -257,7 +258,7 @@ on({get_entries_response, EntryList}, State =
     MyIOtherKvvList = map_kvv_list(KvvList, MyI),
     ToUpdate = start_update_key_entry(MyIOtherKvvList, comm:this(), DhtPid),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p, KVVListLen=~p ; ToUpdate=~p",
-           [interval_upd, Stats#resolve_stats.session_id, length(EntryList), length(KvvList), ToUpdate], State),
+           [interval_upd, Stats#resolve_stats.session_id, length(EntryList), length(KvvList), ToUpdate]),
 
     % Send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
@@ -287,7 +288,7 @@ on({get_entries_response, EntryList}, State =
                           stats = Stats }) ->
     SID = Stats#resolve_stats.session_id,
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
-           [interval_upd_send, SID, length(EntryList)], State),
+           [interval_upd_send, SID, length(EntryList)]),
 
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     ResStarted = send_request_resolve(Dest, {?interval_upd, I, KvvList}, SID,
@@ -305,7 +306,7 @@ on({get_entries_response, EntryList}, State =
 on({get_state_response, MyI} = _Msg,
    State = #rr_resolve_state{operation = {interval_upd_my, I}}) ->
     ?TRACE("GET INTERVAL - Operation=~p~n IntervalBounds=~p~n MyInterval=~p",
-           [interval_upd_my, intervals:get_bounds(I), MyI], State),
+           [interval_upd_my, intervals:get_bounds(I), MyI]),
     ?DBG_ASSERT(State#rr_resolve_state.fb_dest_pid =:= undefined),
     ISec = intervals:intersection(MyI, I),
     NewState = State#rr_resolve_state{ my_range = MyI },
@@ -322,8 +323,8 @@ on({get_state_response, MyI} = _Msg,
                          % -> the current implementation only tries once!
                          % note: bloom and art may not fully re-generate the
                          %       own range -> choose merkle_tree instead
-                         comm:send_local(pid_groups:get_my(rrepair),
-                                         {request_sync, merkle_tree, DKey}),
+                         send_local(pid_groups:get_my(rrepair),
+                                    {request_sync, merkle_tree, DKey}),
                          shutdown(resolve_ok, NewState)
                  end;
         true  -> shutdown(resolve_abort, NewState)
@@ -346,7 +347,7 @@ on({update_key_entry_ack, NewEntryList}, State =
        element(1, Op) =:= ?interval_upd ->
     ?TRACE("GET ENTRY_ACK - Operation=~p~n SessionId:~p - #NewItems: ~p",
            [util:extint2atom(element(1, Op)), Stats#resolve_stats.session_id,
-            length(NewEntryList)], State),
+            length(NewEntryList)]),
 
     {NewUpdOk, NewUpdFail, NewRegenOk, NewRegenFail, NewFBItems} =
         integrate_update_key_entry_ack(
@@ -359,7 +360,7 @@ on({update_key_entry_ack, NewEntryList}, State =
                                    regen_fail_count = NewRegenFail + 1},
     NewState = State#rr_resolve_state{stats = NewStats, fb_send_kvv = NewFBItems},
     ?DBG_ASSERT(_Diff =:= (NewRegenOk + NewUpdOk + NewUpdFail + NewRegenFail)),
-    ?TRACE("UPDATED = ~p - Regen=~p", [NewUpdOk, NewRegenOk], State),
+    ?TRACE("UPDATED = ~p - Regen=~p", [NewUpdOk, NewRegenOk]),
     shutdown(resolve_ok, NewState);
 
 on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
@@ -393,7 +394,7 @@ map_key_list(KeyList, MyI) ->
                              comm:erl_local_pid()) -> non_neg_integer().
 start_update_key_entry([], _MyPid, _DhtPid) -> 0;
 start_update_key_entry(MyIOtherKvvList, MyPid, DhtPid) ->
-    comm:send_local(DhtPid, {update_key_entry, MyPid, MyIOtherKvvList}),
+    send_local(DhtPid, {update_key_entry, MyPid, MyIOtherKvvList}),
     length(MyIOtherKvvList).
 
 -spec integrate_update_key_entry_ack(
@@ -447,7 +448,7 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
                                     from_my_node = FromMyNode} = _State) ->
     ?TRACE("SHUTDOWN ~p - Operation=~p~n SessionId:~p~n ~p items via key_upd to ~p~n Items: ~.2p",
            [_Reason, util:extint2atom(element(1, _Op)), Stats#resolve_stats.session_id,
-            length(FbKVV), FBDest, FbKVV], _State),
+            length(FbKVV), FBDest, FbKVV]),
     ResStarted =
         case FBDest of
             undefined ->
@@ -473,10 +474,10 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
     %       be counted for the session's rs_finish and it will not match
     %       its rs_called any more!
     if FromMyNode =:= 1 ->
-           comm:send_local(Owner, {resolve_progress_report, self(), Stats1});
+           send_local(Owner, {resolve_progress_report, self(), Stats1});
        true ->
-           comm:send_local(Owner, {resolve_progress_report, self(),
-                                   Stats1#resolve_stats{session_id = null}})
+           send_local(Owner, {resolve_progress_report, self(),
+                              Stats1#resolve_stats{session_id = null}})
     end,
     kill.
 
@@ -497,8 +498,8 @@ send_request_resolve(Dest, Op, SID, FromMyNode, FBDest, Options, IsFeedback) ->
              true       -> request_resolve
           end,
     case SID of
-        null -> comm:send(Dest, {Tag, Op, Options2});
-        SID -> comm:send(Dest, {Tag, SID, Op, Options2})
+        null -> send(Dest, {Tag, Op, Options2});
+        SID -> send(Dest, {Tag, SID, Op, Options2})
     end,
     ResStarted.
 
@@ -543,6 +544,16 @@ merge_stats(#resolve_stats{ session_id = ASID,
 % HELPER
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec send(Pid::comm:mypid(), Msg::comm:message() | comm:group_message()) -> ok.
+send(Pid, Msg) ->
+    ?TRACE_SEND(Pid, Msg),
+    comm:send(Pid, Msg).
+
+-spec send_local(Pid::comm:erl_local_pid(), Msg::comm:message() | comm:group_message()) -> ok.
+send_local(Pid, Msg) ->
+    ?TRACE_SEND(Pid, Msg),
+    comm:send_local(Pid, Msg).
+
 -spec entry_to_kvv(db_entry:entry()) -> {?RT:key(), db_dht:value(), db_dht:version()}.
 entry_to_kvv(Entry) ->
     {db_entry:get_key(Entry),
@@ -553,7 +564,7 @@ entry_to_kvv(Entry) ->
 send_stats(undefined, _) ->
     ok;
 send_stats(DestPid, Stats) ->
-    comm:send(DestPid, {resolve_stats, Stats}).
+    send(DestPid, {resolve_stats, Stats}).
 
 -spec print_resolve_stats(stats()) -> [any()].
 print_resolve_stats(Stats) ->
