@@ -91,7 +91,7 @@
 %% unittests). See the interfaces and exported functions below.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%-define(TRACE(X,Y), log:log(X,Y)).
+%-define(TRACE(X,Y), log:log("proto_sched: " ++ X,Y)).
 -define(TRACE(X,Y), ok).
 
 -include("scalaris.hrl").
