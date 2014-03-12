@@ -173,7 +173,10 @@ on({rr_trigger} = Msg, State) ->
            comm:send_local(self(), {request_sync, get_recon_method(), random});
        true -> ok
     end,
-    msg_delay:send_trigger(get_trigger_interval(), Msg),
+    case get_trigger_interval() of
+        0 -> ok;
+        X -> msg_delay:send_trigger(X, Msg)
+    end,
     State;
 
 on({rr_gc_trigger} = Msg, State = #rrepair_state{ open_sessions = Sessions }) ->
@@ -480,7 +483,7 @@ start_link(DHTNodeGroup) ->
 -spec init([]) -> state().
 init([]) ->
     case get_trigger_interval() of
-        0 -> null;
+        0 -> ok;
         X -> msg_delay:send_trigger(X, {rr_trigger})
     end,
     msg_delay:send_trigger(get_gc_interval(), {rr_gc_trigger}),
