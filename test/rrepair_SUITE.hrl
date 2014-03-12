@@ -382,7 +382,8 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) 
                      ?SCALARIS_RECV({get_node_details_response, NodeDetails},
                                     begin
                                         Node = node_details:get(NodeDetails, node),
-                                        {node:id(Node), node:pidX(Node)}
+                                        Pid = comm:make_local(node:pidX(Node)),
+                                        {node:id(Node), Pid, pid_groups:group_of(Pid)}
                                     end);
                      ?SCALARIS_RECV(Y, ?ct_fail("unexpected message while "
                                                 "waiting for get_node_details_response: ~.0p",
