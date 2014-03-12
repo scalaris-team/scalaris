@@ -687,8 +687,9 @@ build_symmetric_ring(NodeCount, Config, RRConfig) ->
                                RRConfig])}]),
     % wait for all nodes to finish their join
     unittest_helper:check_ring_size_fully_joined(NodeCount),
-    % wait a bit for the rm-processes to settle
-    timer:sleep(500),
+    % it should not be necessary to wait:
+%%     % wait a bit for the rm-processes to settle
+%%     timer:sleep(500),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
