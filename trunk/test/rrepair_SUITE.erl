@@ -708,7 +708,13 @@ startSyncRound(NodeKeys) ->
 waitForSyncRoundEnd(NodeKeys, RcvReqCompleteMsg) ->
     RcvReqCompleteMsg andalso
         receive
-            {request_sync_complete, _} -> true
+            ?SCALARIS_RECV(
+            {request_sync_complete = MsgTag, _}, % ->
+            begin
+                trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+                trace_mpath:stop(),
+                true
+            end)
         end,
     Req = {?send_to_group_member, rrepair,
            {get_state, comm:this(), [open_sessions, open_recon, open_resolve]}},
@@ -721,8 +727,10 @@ wait_for_sync_round_end2(Req, [Key | Keys]) ->
     KeyResult =
         receive
             ?SCALARIS_RECV(
-            {get_state_response, [Sessions, ORC, ORS]}, % ->
+            {get_state_response = MsgTag, [Sessions, ORC, ORS]}, % ->
             begin
+                trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+                trace_mpath:stop(),
                 if (ORC =:= 0 andalso ORS =:= 0 andalso
                         Sessions =:= []) ->
                        true;
