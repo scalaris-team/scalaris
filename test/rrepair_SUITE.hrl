@@ -484,7 +484,8 @@ build_symmetric_ring(NodeCount, Config, RRConfig) ->
 startSyncRound(NodeKeys) ->
     lists:foreach(
       fun(X) ->
-              Req = {?send_to_group_member, rrepair, {rr_trigger}},
+              Req = {?send_to_group_member, rrepair,
+                     {request_sync, config:read(rr_recon_method), random}},
               api_dht_raw:unreliable_lookup(X, Req)
       end,
       NodeKeys),
