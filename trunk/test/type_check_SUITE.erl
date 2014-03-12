@@ -158,7 +158,7 @@ tester_type_check_gossip(_Config) ->
     tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state),
     tester:register_value_creator({typedef, gossip, state}, gossip, tester_create_state, 9),
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
-    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 10),
+    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 11),
     tester:register_value_creator({typedef, gossip, cb_module}, gossip, tester_gossip_beh_modules, 1),
     Modules = [ {gossip,
             % excluded (exported functions)

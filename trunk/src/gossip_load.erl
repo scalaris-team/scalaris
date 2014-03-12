@@ -57,7 +57,7 @@
         round_has_converged/1, get_values_best/1, get_values_all/1, web_debug_info/1, shutdown/1]).
 
 %% for testing
--export([tester_create_histogram/1, is_histogram/1, tester_create_state/10, is_state/1]).
+-export([tester_create_histogram/1, is_histogram/1, tester_create_state/11, is_state/1]).
 
 %% -export_type([state/0]).
 -export_type([load_info/0]).
@@ -71,7 +71,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type state() :: ets:tab().
--type state_key() :: convergence_count | instance | leader | load_data | merged |
+-type state_key() :: convergence_count | instance | leader | load_data | ring_data | merged |
     no_of_buckets | prev_state | range | request | requestor | round | status.
 -type avg() :: {Value::float(), Weight::float()}.
 -type avg_kr() :: {Value::number(), Weight::float()}.
@@ -82,21 +82,31 @@
 -type histogram() :: [bucket()].
 -type instance() :: {Module :: gossip_load, Id :: atom() | uid:global_uid()}.
 
+%% Record for ring related gossipping data
+-record(ring_data, {
+            size_inv  = unknown :: unknown | avg(), % 1 / size
+            avg_kr    = unknown :: unknown | avg_kr() % average key range (distance between nodes in the address space)})
+    }).
 
-% record of load data values for gossiping
+-type ring_data_uninit() :: #ring_data{}.
+-type ring_data() :: {ring_data, SizeInv::avg(), AvgKr::avg_kr()}.
+
+%% record of load data values for gossiping
 -record(load_data, {
             avg       = unknown :: unknown | avg(), % average load
             avg2      = unknown :: unknown | avg(), % average of load^2
-            size_inv  = unknown :: unknown | avg(), % 1 / size
-            avg_kr    = unknown :: unknown | avg_kr(), % average key range (distance between nodes in the address space)
             min       = unknown :: unknown | min(),
             max       = unknown :: unknown | max(),
             histo     = unknown :: unknown | histogram()
     }).
+
 -type load_data_uninit() :: #load_data{}.
--type load_data() :: {load_data, Avg::avg(), Avg2::avg(), SizeInv::avg(),
-            AvgKr::avg_kr(), Min::non_neg_integer(), Max::non_neg_integer(),
-            Histogram::histogram()}.
+-type load_data() :: {load_data, Avg::avg(), Avg2::avg(),
+                      Min::non_neg_integer(), Max::non_neg_integer(),
+                      Histogram::histogram()}.
+
+%-type data_uninit() :: {load_data_uninit(), ring_data_uninit()}.
+-type data() :: {load_data(), ring_data()}.
 
 % record of load data values for use by other modules
 -record(load_info, {
@@ -279,9 +289,9 @@ select_data(State) ->
         uninit ->
             request_local_info(State);
         init ->
-            LoadData = prepare_load_data(State),
+            {LoadData, RingData} = prepare_data(State),
             Pid = pid_groups:get_my(gossip),
-            comm:send_local(Pid, {selected_data, state_get(instance, State), LoadData})
+            comm:send_local(Pid, {selected_data, state_get(instance, State), {LoadData, RingData}})
     end,
     {ok, State}.
 
@@ -293,7 +303,7 @@ select_data(State) ->
 %%      RoundStatus / Round: round information used for special handling of
 %%          messages from previous rounds <br/>
 %%      State: the state of the gossip_load module
--spec select_reply_data(PData::load_data(), Ref::pos_integer(),
+-spec select_reply_data(PData::data(), Ref::pos_integer(),
     RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(),
     State::state()) -> {discard_msg | ok | retry | send_back, state()}.
 select_reply_data(PData, Ref, RoundStatus, Round, State) ->
@@ -309,7 +319,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
                 [state_get(instance, State)]),
             {send_back, State};
         init when RoundStatus =:= current_round ->
-            Data1 = prepare_load_data(State),
+            Data1 = prepare_data(State),
             Pid = pid_groups:get_my(gossip),
             comm:send_local(Pid, {selected_reply_data, state_get(instance, State), Data1, Ref, Round}),
 
@@ -328,7 +338,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
                 false ->
                     log:log(?SHOW, "[ ~w ] select_reply_data in old_round", [?MODULE]),
                     PrevState = state_get(prev_state, State),
-                    Data1 = prepare_load_data(PrevState),
+                    Data1 = prepare_data(PrevState),
                     Pid = pid_groups:get_my(gossip),
                     comm:send_local(Pid, {selected_reply_data, state_get(instance, State), Data1, Ref, Round}),
                     _ = merge_load_data(prev_round, PData, State),
@@ -344,7 +354,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, State) ->
 %%      State: the state of the gossip_load module <br/>
 %%      Upon finishing the processing of the data, a message of the form
 %%      {integrated_§data, Instance, RoundStatus} is to be sent to the gossip module.
--spec integrate_data(QData::load_data(), RoundStatus::gossip_beh:round_status(),
+-spec integrate_data(QData::data(), RoundStatus::gossip_beh:round_status(),
     Round::non_neg_integer(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
 integrate_data(QData, RoundStatus, Round, State) ->
@@ -374,32 +384,35 @@ handle_msg({get_state_response, DHTNodeState}, State) ->
     Load = dht_node_state:get(DHTNodeState, load),
     log:log(?SHOW, "[ ~w ] Load: ~w", [state_get(instance, State), Load]),
 
-    Data = state_get(load_data, State),
-    Data1 = load_data_set(avg, {float(Load), 1.0}, Data),
-    Data2 = load_data_set(min, Load, Data1),
-    Data3 = load_data_set(max, Load, Data2),
-    Data4 = load_data_set(avg2, {float(Load*Load), 1.0}, Data3),
-    Data5 = case (state_get(leader, State)) of
-        true ->
-            load_data_set(size_inv, {1.0, 1.0}, Data4);
-        false ->
-            load_data_set(size_inv, {1.0, 0.0}, Data4)
-    end,
-    AvgKr = calc_initial_avg_kr(state_get(range, State)),
-    Data6 = load_data_set(avg_kr, AvgKr, Data5),
-
+    LoadData = state_get(load_data, State),
+    LoadData1 = data_set(avg, {float(Load), 1.0}, LoadData),
+    LoadData2 = data_set(min, Load, LoadData1),
+    LoadData3 = data_set(max, Load, LoadData2),
+    LoadData4 = data_set(avg2, {float(Load*Load), 1.0}, LoadData3),
     % histogram
     Histo = init_histo(DHTNodeState, State),
     log:log(?SHOW,"[ ~w ] Histo: ~s", [state_get(instance, State), to_string(Histo)]),
-    Data7 = load_data_set(histo, Histo, Data6),
+    LoadData5 = data_set(histo, Histo, LoadData4),
+    state_set(load_data, LoadData5, State),
 
-    state_set(load_data, Data7, State),
-    NewData = prepare_load_data(State),
+    RingData = state_get(ring_data, State),
+    RingData1 = case (state_get(leader, State)) of
+                    true ->
+                        data_set(size_inv, {1.0, 1.0}, RingData);
+                    false ->
+                        data_set(size_inv, {1.0, 0.0}, RingData)
+                end,
+    AvgKr = calc_initial_avg_kr(state_get(range, State)),
+    RingData2 = data_set(avg_kr, AvgKr, RingData1),
+    state_set(ring_data, RingData2, State),
+
+    {NewLoadData, NewRingData} = prepare_data(State),
     state_set(status, init, State),
 
     % send PData to BHModule
     Pid = pid_groups:get_my(gossip),
-    comm:send_local(Pid, {selected_data, state_get(instance, State), NewData}),
+    %% TODO CHANGE MESSAGE in handler!!!
+    comm:send_local(Pid, {selected_data, state_get(instance, State), {NewLoadData, NewRingData}}),
     {ok, State}.
 
 
@@ -427,7 +440,7 @@ round_has_converged(State) ->
 -spec notify_change(Keyword::new_round, NewRound::non_neg_integer(), State::state()) -> {ok, state()};
     (Keyword::leader, {MsgTag::is_leader | no_leader, NewRange::intervals:interval()},
             State::state()) -> {ok, state()};
-    (Keyword::exch_failure, {_MsgTag::atom(), Data::load_data(), _Round::non_neg_integer()},
+    (Keyword::exch_failure, {_MsgTag::atom(), Data::data(), _Round::non_neg_integer()},
              State::state()) -> {ok, state()}.
 notify_change(new_round, NewRound, State) ->
     log:log(debug, "[ ~w ] new_round notification. NewRound: ~w", [state_get(instance, State), NewRound]),
@@ -502,8 +515,10 @@ get_values_all(State) ->
     {KeyValueList::[{Key::any(),Value::any()},...], NewState::state()}.
 web_debug_info(State) ->
     PreviousState = state_get(prev_state, State),
-    PreviousData = prev_state_get(load_data, State),
-    CurrentData = state_get(load_data, State),
+    PreviousLoadData = prev_state_get(load_data, State),
+    CurrentLoadData = state_get(load_data, State),
+    PreviousRingData = prev_state_get(ring_data, State),
+    CurrentRingData = state_get(ring_data, State),
     BestState = previous_or_current(State),
     Best = if BestState =:= State -> current_data;
               BestState =:= PreviousState -> previous_data
@@ -515,24 +530,24 @@ web_debug_info(State) ->
          {"prev_round",          state_get(round, PreviousState)},
          {"prev_merged",         state_get(merged, PreviousState)},
          {"prev_conv_avg_count", state_get(convergence_count, PreviousState)},
-         {"prev_avg",            get_current_estimate(avg, PreviousData)},
-         {"prev_min",            load_data_get(min, PreviousData)},
-         {"prev_max",            load_data_get(max, PreviousData)},
-         {"prev_stddev",         calc_stddev(PreviousData)},
-         {"prev_size_ldr",       get_current_estimate(size_inv, PreviousData)},
-         {"prev_size_kr",        calc_size_kr(PreviousData)},
-         {"prev_histo",          to_string(load_data_get(histo, PreviousData))},
+         {"prev_avg",            get_current_estimate(avg, PreviousLoadData)},
+         {"prev_min",            data_get(min, PreviousLoadData)},
+         {"prev_max",            data_get(max, PreviousLoadData)},
+         {"prev_stddev",         calc_stddev(PreviousLoadData)},
+         {"prev_size_ldr",       get_current_estimate(size_inv, PreviousRingData)},
+         {"prev_size_kr",        calc_size_kr(PreviousRingData)},
+         {"prev_histo",          to_string(data_get(histo, PreviousLoadData))},
 
          {"cur_round",           state_get(round, State)},
          {"cur_merged",          state_get(merged, State)},
          {"cur_conv_avg_count",  state_get(convergence_count, State)},
-         {"cur_avg",             get_current_estimate(avg, CurrentData)},
-         {"cur_min",             load_data_get(min, CurrentData)},
-         {"cur_max",             load_data_get(max, CurrentData)},
-         {"cur_stddev",          calc_stddev(CurrentData)},
-         {"cur_size_ldr",        get_current_estimate(size_inv, CurrentData)},
-         {"cur_size_kr",         calc_size_kr(CurrentData)},
-         {"cur_histo",           to_string(load_data_get(histo, CurrentData))}],
+         {"cur_avg",             get_current_estimate(avg, CurrentLoadData)},
+         {"cur_min",             data_get(min, CurrentLoadData)},
+         {"cur_max",             data_get(max, CurrentLoadData)},
+         {"cur_stddev",          calc_stddev(CurrentLoadData)},
+         {"cur_size_ldr",        get_current_estimate(size_inv, CurrentRingData)},
+         {"cur_size_kr",         calc_size_kr(CurrentRingData)},
+         {"cur_histo",           to_string(data_get(histo, CurrentLoadData))}],
     {KeyValueList, State}.
 
 
@@ -573,12 +588,12 @@ is_valid_round(RoundStatus, RoundFromMessage, State) ->
     end.
 
 
--spec integrate_data_init(QData::load_data(), RoundStatus::gossip_beh:round_status(),
+-spec integrate_data_init(QData::data(), RoundStatus::gossip_beh:round_status(),
     State::state()) -> {ok, state()}.
 integrate_data_init(QData, RoundStatus, State) ->
     case RoundStatus of
         current_round ->
-            _NewData = merge_load_data(current_round, QData, State),
+            {_NewLoad, _NewRing} = merge_load_data(current_round, QData, State),
             %% _PrevState = state_get(prev_state, State),
             %% _PrevLoadInfo = get_load_info(_PrevState),
             %% _ValuesBest = get_values_best(State),
@@ -587,7 +602,7 @@ integrate_data_init(QData, RoundStatus, State) ->
             %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [state_get(instance, State), _ValuesAll]),
             %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [state_get(instance, State), _PrevLoadInfo]),
             _LoadInfo = get_load_info(State),
-            _Histo = load_data_get(histo, _NewData),
+            _Histo = data_get(histo, _NewLoad),
             log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
                 [state_get(instance, State), to_string(_LoadInfo), to_string(_Histo)]);
         old_round ->
@@ -643,7 +658,7 @@ has_converged(TargetConvergenceCount, State) ->
 -spec finish_request(State) -> {ok, State} when
     is_subtype(State, state()).
 finish_request(State) ->
-    Histo = load_data_get(histo, state_get(load_data, State)),
+    Histo = data_get(histo, state_get(load_data, State)),
     case state_get(leader, State) of
         true ->
             Requestor = state_get(requestor, State),
@@ -654,14 +669,14 @@ finish_request(State) ->
     {ok, State}.
 
 
--spec update_convergence_count(OldData::load_data(), NewData::load_data(), State::state()) -> true.
-update_convergence_count(OldData, NewData, State) ->
+-spec update_convergence_count(OldData::data(), NewData::data(), State::state()) -> true.
+update_convergence_count(OldData = {OldLoad, OldRing}, NewData = {NewLoad, NewRing}, State) ->
 
     % check whether all average based values changed less than epsilon percent
     AvgChangeEpsilon = convergence_epsilon(),
     Fun = fun(AvgType, Acc) ->
-            {OldAvg, OldWeight} = load_data_get(AvgType, OldData),
-            {NewAvg, NewWeight} = load_data_get(AvgType, NewData),
+            {OldAvg, OldWeight} = data_get(AvgType, select_data_record(AvgType, OldData)),
+            {NewAvg, NewWeight} = data_get(AvgType, select_data_record(AvgType, NewData)),
             OldValue = calc_current_estimate(OldAvg, OldWeight),
             NewValue = calc_current_estimate(NewAvg, NewWeight),
             log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
@@ -669,14 +684,14 @@ update_convergence_count(OldData, NewData, State) ->
             HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon,
             Acc andalso HasConverged
     end,
+
     HaveConverged1 = lists:foldl(Fun, true, [avg, avg2, size_inv, avg_kr]),
     log:log(debug, "Averages have converged: ~w", [HaveConverged1]),
 
     % Combine the avg values of the buckets of two histograms into one tuple list
-    Combine = fun ( {Interval, AvgOld}, {Interval, AvgNew} )
-        -> {AvgOld, AvgNew} end,
+    Combine = fun ({Interval, AvgOld}, {Interval, AvgNew}) -> {AvgOld, AvgNew} end,
     CompList = lists:zipwith(Combine,
-        load_data_get(histo, OldData), load_data_get(histo, NewData)),
+        data_get(histo, OldLoad), data_get(histo, NewLoad)),
 
     % check that all the buckets of histogram have changed less than epsilon percent
     Fun1 = fun({OldAvg, NewAvg}, AccIn) ->
@@ -707,6 +722,7 @@ state_new() ->
     NewState = ets:new(cbstate, [set, protected]),
     state_set(status, uninit, NewState),
     state_set(load_data, load_data_new(), NewState),
+    state_set(ring_data, ring_data_new(), NewState),
     state_set(leader, unknown, NewState),
     state_set(range, unknown, NewState),
     state_set(prev_state, unknown, NewState),
@@ -779,13 +795,17 @@ prev_state_get(Key, State) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Load Data
+%% Load Data and Ring Data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc creates a new load_data (for internal use by gossip_load.erl)
 -spec load_data_new() -> load_data_uninit().
 load_data_new() ->
     #load_data{}.
+
+-spec ring_data_new() -> ring_data_uninit().
+ring_data_new() ->
+    #ring_data{}.
 
 %% @doc Gets information from a load_data record.
 %%      Allowed keys include:
@@ -798,41 +818,52 @@ load_data_new() ->
 %%        <li>avg_kr = average key range (distance between nodes in the address space),</li>
 %%      </ul>
 %%      See type spec for details on which keys are allowed on which records.
--spec load_data_get(_, unknown) -> unknown;
-         (avg, load_data()) -> avg();
-         (avg2, load_data()) -> avg();
-         (size_inv, load_data()) -> avg();
-         (avg_kr, load_data()) -> avg_kr();
-         (min, load_data()) -> min();
-         (max, load_data()) -> max();
-         (histo, load_data()) -> histogram().
-load_data_get(_Key, unknown) -> unknown;
-
-load_data_get(Key, #load_data{avg=Avg, avg2=Avg2, size_inv=Size_inv, avg_kr=AvgKR,
+-spec data_get(_, unknown) -> unknown;
+             (avg, load_data()) -> avg();
+             (avg2, load_data()) -> avg();
+             (min, load_data()) -> min();
+             (max, load_data()) -> max();
+             (histo, load_data()) -> histogram();
+             (size_inv, ring_data()) -> avg();
+             (avg_kr, ring_data()) -> avg_kr().
+data_get(_Key, unknown) -> unknown;
+data_get(Key, #load_data{avg=Avg, avg2=Avg2,
         min=Min, max=Max, histo=Histo}) ->
     case Key of
         avg -> Avg;
         avg2 -> Avg2;
-        size_inv -> Size_inv;
-        avg_kr -> AvgKR;
         min -> Min;
         max -> Max;
         histo -> Histo
+    end;
+data_get(size_inv, #ring_data{size_inv = SizeInv}) ->
+    SizeInv;
+data_get(avg_kr, #ring_data{avg_kr = AvgKr}) ->
+    AvgKr.
+
+%% @doc select either the load or the ring data record
+-spec select_data_record(Key::atom(), Data::data()) -> load_data() | ring_data().
+select_data_record(Key, {LoadData, RingData}) ->
+    case lists:member(Key, [size_inv, avg_kr]) of
+        true -> RingData;
+        _    -> LoadData
     end.
 
-
--spec get_current_estimate(Key::avg | avg2 | size_inv | avg_kr,
-    LoadData::unknown | load_data()) -> float() | unknown.
+-spec get_current_estimate(Key::avg | avg2,
+                           unknown | load_data()) -> float() | unknown;
+                          (Key::size_inv | avg_kr,
+                           unknown | ring_data()) -> float() | unknown.
 get_current_estimate(_Key, unknown) -> unknown;
-get_current_estimate(Key, #load_data{avg=Avg, avg2=Avg2, size_inv=Size_inv,
-        avg_kr=AvgKR}) ->
+get_current_estimate(Key, #load_data{avg=Avg, avg2=Avg2}) ->
     case Key of
         avg -> calc_current_estimate(Avg);
-        avg2 -> calc_current_estimate(Avg2);
-        size_inv ->  calc_current_estimate(Size_inv);
-        avg_kr ->  calc_current_estimate(AvgKR)
+        avg2 -> calc_current_estimate(Avg2)
+    end;
+get_current_estimate(Key, #ring_data{size_inv = SizeInv, avg_kr = AvgKr}) ->
+    case Key of
+        size_inv -> calc_current_estimate(SizeInv);
+        avg_kr -> calc_current_estimate(AvgKr)
     end.
-
 
 %% get_size(Data) ->
 %%     Size_kr = calc_size_kr(Data),
@@ -854,65 +885,74 @@ get_current_estimate(Key, #load_data{avg=Avg, avg2=Avg2, size_inv=Size_inv,
 %%        <li>min = minimum load,</li>
 %%        <li>max = maximum load,</li>
 %%      </ul>
--spec load_data_set(avg, avg(), load_data()) -> load_data();
-         (min, min(), load_data()) -> load_data();
-         (max, max(), load_data()) -> load_data();
-         (avg2, avg(), load_data()) -> load_data();
-         (size_inv, avg(), load_data()) -> load_data();
-         (avg_kr, avg_kr(), load_data()) -> load_data();
-         (histo, histogram(), load_data()) -> load_data().
-load_data_set(Key, Value, LoadData) when is_record(LoadData, load_data) ->
+-spec data_set(avg, avg(), load_data()) -> load_data();
+              (min, min(), load_data()) -> load_data();
+              (max, max(), load_data()) -> load_data();
+              (avg2, avg(), load_data()) -> load_data();
+              (histo, histogram(), load_data()) -> load_data();
+              (size_inv, avg(), ring_data()) -> ring_data();
+              (avg_kr, avg_kr(), ring_data()) -> ring_data().
+data_set(Key, Value, LoadData) when is_record(LoadData, load_data) ->
     case Key of
         avg -> LoadData#load_data{avg = Value};
         avg2 -> LoadData#load_data{avg2 = Value};
-        size_inv -> LoadData#load_data{size_inv = Value};
-        avg_kr -> LoadData#load_data{avg_kr = Value};
         min -> LoadData#load_data{min = Value};
         max -> LoadData#load_data{max = Value};
         histo -> LoadData#load_data{histo = Value}
+    end;
+data_set(Key, Value, RingData) when is_record(RingData, ring_data) ->
+    case Key of
+         size_inv -> RingData#ring_data{size_inv = Value};
+         avg_kr -> RingData#ring_data{avg_kr = Value}
     end.
-
 
 %% @doc Prepares a load_data record for sending it to a peer and updates the
 %%      load_data of self accordingly.
--spec prepare_load_data(State::state()) -> load_data().
-prepare_load_data(State) ->
+-spec prepare_data(State::state()) -> {load_data(), ring_data()}.
+prepare_data(State) ->
     % Averages
-    Data1 = state_get(load_data, State),
+    LoadData1 = state_get(load_data, State),
     Fun = fun (AvgType, MyData) -> divide2(AvgType, MyData) end,
-    Data2 = lists:foldl(Fun, Data1, [avg, avg2, size_inv, avg_kr]),
+    LoadData2 = lists:foldl(Fun, LoadData1, [avg, avg2]),
 
     % Min and Max
     do_nothing,
 
     % Histogram
-    Data3 = divide2(Data2),
+    LoadData3 = divide2(LoadData2),
 
-    state_set(load_data, Data3, State),
-    Data3.
+    state_set(load_data, LoadData3, State),
+
+    % Averages ring data
+    RingData1 = state_get(ring_data, State),
+    RingData2 = lists:foldl(Fun, RingData1, [size_inv, avg_kr]),
+
+    state_set(ring_data, RingData2, State),
+
+    {LoadData3, RingData2}.
 
 
 %% @doc Cut the average values and associated weights in half.
--spec divide2(AvgType:: avg | avg2 | size_inv | avg_kr, MyData::load_data()) ->
-    load_data().
+-spec divide2(AvgType:: avg | avg2, MyData::load_data()) -> load_data();
+             (AvgType:: size_inv | avg_kr, MyData::ring_data()) -> ring_data().
 divide2(AvgType, MyData) ->
-    {Avg, Weight} = load_data_get(AvgType, MyData),
+    {Avg, Weight} = data_get(AvgType, MyData),
     NewAvg = Avg/2,
     NewWeight = Weight/2,
-    load_data_set(AvgType, {NewAvg, NewWeight}, MyData).
+    data_set(AvgType, {NewAvg, NewWeight}, MyData).
 
 
 %% @doc Merges the load_data from a failed exchange back into self's load_data.
 %%      Does not update the merge and convergence count.
--spec merge_failed_exch_data(Data::load_data(), State::state()) -> load_data().
+-spec merge_failed_exch_data(Data::data(), State::state()) -> data().
 merge_failed_exch_data(Data, State) ->
     merge_load_data1(noupdate, Data, State).
 
 
 %% @doc Merges the given load_data into self's load_data of the current or
 %%      previous round.
--spec merge_load_data(current_round, OtherData::load_data(), State::state()) -> load_data();
-        (prev_round, OtherData::load_data(), State::state()) -> load_data().
+-spec merge_load_data(current_round, OtherData::data(), State::state()) -> data();
+        (prev_round, OtherData::data(), State::state()) -> data().
 merge_load_data(current_round, OtherData, State) ->
     merge_load_data1(update, OtherData, State);
 
@@ -923,55 +963,63 @@ merge_load_data(prev_round, OtherData, State) ->
 
 %% @doc Helper function. Merge the given load_data with the given states load_data.
 %%      Set update is set, the merge and convergence count is updated, otherwise not.
--spec merge_load_data1(Update::update | noupdate, OtherData::load_data(),
-    State::state()) -> load_data().
-merge_load_data1(Update, OtherData, State) ->
+-spec merge_load_data1(Update::update | noupdate, OtherData::data(),
+    State::state()) -> data().
+merge_load_data1(Update, {OtherLoad, OtherRing}, State) ->
 
-    MyData1 = state_get(load_data, State),
+    MyLoad1 = state_get(load_data, State),
 
-    % Averages
-    Fun = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherData) end,
-    MyData2 = lists:foldl(Fun, MyData1, [avg, avg2, size_inv, avg_kr]),
+    % Averages load
+    Fun = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherLoad) end,
+    MyLoad2 = lists:foldl(Fun, MyLoad1, [avg, avg2]),
 
     % Min
-    MyMin = load_data_get(min, MyData2),
-    OtherMin = load_data_get(min, OtherData),
-    MyData3 =
-        if  MyMin =< OtherMin -> load_data_set(min, MyMin, MyData2);
-            MyMin > OtherMin -> load_data_set(min, OtherMin, MyData2)
+    MyMin = data_get(min, MyLoad2),
+    OtherMin = data_get(min, OtherLoad),
+    MyLoad3 =
+        if  MyMin =< OtherMin -> data_set(min, MyMin, MyLoad2);
+            MyMin > OtherMin -> data_set(min, OtherMin, MyLoad2)
         end,
 
     % Max
-    MyMax = load_data_get(max, MyData3),
-    OtherMax = load_data_get(max, OtherData),
-    MyData4 =
-        if  MyMax =< OtherMax -> load_data_set(max, OtherMax, MyData3);
-            MyMax > OtherMax -> load_data_set(max, MyMax, MyData3)
+    MyMax = data_get(max, MyLoad3),
+    OtherMax = data_get(max, OtherLoad),
+    MyLoad4 =
+        if  MyMax =< OtherMax -> data_set(max, OtherMax, MyLoad3);
+            MyMax > OtherMax -> data_set(max, MyMax, MyLoad3)
         end,
 
     % Histogram
-    MyData5 = merge_histo(MyData4, OtherData),
+    MyLoad5 = merge_histo(MyLoad4, OtherLoad),
+    state_set(load_data, MyLoad5, State),
 
-    NewData = MyData5,
+    %% Averages ring
+    MyRing1 = state_get(ring_data, State),
+    Fun2 = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherRing) end,
+    MyRing2 = lists:foldl(Fun2, MyRing1, [size_inv, avg_kr]),
+    state_set(ring_data, MyRing2, State),
+
+    NewData = {MyLoad5, MyRing2},
     case Update of
         update ->
             state_update(merged, fun inc/1, State),
-            update_convergence_count(MyData1, NewData, State);
+            update_convergence_count({MyLoad1, MyRing1}, NewData, State);
         noupdate -> do_nothing
     end,
-    state_set(load_data, NewData, State),
     NewData.
 
 
 %% @doc Helper function. Merges the given type of average from the given
 %%      load_data records.
--spec merge_avg(AvgType:: avg | avg2 | size_inv | avg_kr,
-    Data1::load_data(), Data2::load_data()) -> load_data().
+-spec merge_avg(AvgType:: avg | avg2, Data1::load_data(), Data2::load_data())
+                -> load_data();
+               (AvgType:: size_inv | avg_kr, Data1::ring_data(), Data2::ring_data())
+                -> ring_data().
 merge_avg(AvgType, Data1, Data2) ->
-    {AvgLoad1, AvgWeight1} = load_data_get(AvgType, Data1),
-    {AvgLoad2, AvgWeight2} = load_data_get(AvgType, Data2),
+    {AvgLoad1, AvgWeight1} = data_get(AvgType, Data1),
+    {AvgLoad2, AvgWeight2} = data_get(AvgType, Data2),
     NewAvg = {AvgLoad1+AvgLoad2, AvgWeight1+AvgWeight2},
-    load_data_set(AvgType, NewAvg, Data1).
+    data_set(AvgType, NewAvg, Data1).
 
 %% @doc Returns the previous load data if the current load data has not
 %%      sufficiently converged, otherwise returns the current load data.
@@ -1022,9 +1070,9 @@ get_load_for_interval(BucketInterval, MyRange, DB) ->
              (Bucket::bucket()) -> NewBucket::bucket().
 % divide the histogram in the given load_data
 divide2(LoadData) when is_record(LoadData, load_data) ->
-    Histogram = load_data_get(histo, LoadData),
+    Histogram = data_get(histo, LoadData),
     Histogram1 = lists:map(fun divide2/1, Histogram),
-    load_data_set(histo, Histogram1, LoadData);
+    data_set(histo, Histogram1, LoadData);
 
 % divide a single bucket of a histogram
 divide2({Interval, unknown}) ->
@@ -1038,10 +1086,10 @@ divide2({Interval, {Value, Weight}}) ->
 -spec merge_histo(MyData::load_data(), OtherData::load_data()) -> load_data().
 merge_histo(MyData, OtherData) when is_record(MyData, load_data)
         andalso is_record(OtherData, load_data)->
-    MyHisto = load_data_get(histo, MyData),
-    OtherHisto = load_data_get(histo, OtherData),
+    MyHisto = data_get(histo, MyData),
+    OtherHisto = data_get(histo, OtherData),
     MergedHisto = lists:zipwith(fun merge_bucket/2, MyHisto, OtherHisto),
-    load_data_set(histo, MergedHisto, MyData).
+    data_set(histo, MergedHisto, MyData).
 
 
 
@@ -1067,14 +1115,15 @@ merge_bucket({Key, {Value1, Weight1}}, {Key, {Value2, Weight2}}) ->
 %% @doc Builds a load_info record from the given state (current or previous state)
 -spec get_load_info(State::state()) -> load_info().
 get_load_info(State) ->
-    Data = state_get(load_data, State),
+    LoadData = state_get(load_data, State),
+    RingData = state_get(ring_data, State),
     _LoadInfo =
-        #load_info{ avg       = get_current_estimate(avg, Data),
-                    stddev    = calc_stddev(Data),
-                    size_ldr  = get_current_estimate(size_inv, Data),
-                    size_kr   = calc_size_kr(Data),
-                    min       = load_data_get(min, Data),
-                    max       = load_data_get(max, Data),
+        #load_info{ avg       = get_current_estimate(avg, LoadData),
+                    stddev    = calc_stddev(LoadData),
+                    size_ldr  = get_current_estimate(size_inv, RingData),
+                    size_kr   = calc_size_kr(RingData),
+                    min       = data_get(min, LoadData),
+                    max       = data_get(max, LoadData),
                     merged    = state_get(merged, State)
             }.
 
@@ -1176,10 +1225,10 @@ calc_stddev(Data) when is_record(Data, load_data) ->
 
 
 %% @doc Extracts and calculates the size_kr field from the load_data record
--spec calc_size_kr(unknown | load_data()) -> unknown | float().
+-spec calc_size_kr(unknown | ring_data()) -> unknown | float().
 calc_size_kr(unknown) -> unknown;
 
-calc_size_kr(Data) when is_record(Data, load_data) ->
+calc_size_kr(Data) when is_record(Data, ring_data) ->
     AvgKR = get_current_estimate(avg_kr, Data),
     try
         if
@@ -1237,11 +1286,12 @@ to_string({ModuleName, Id}) ->
 
 %% @doc Creates a random state() table within the given type specifications.
 %%      Used as value_creator in tester.erl (property testing).
--spec tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
+-spec tester_create_state(ConvCount, Leader, LoadData, RingData, Merged, Range, Round, Status,
         NoOfBuckets, Request, Instance) -> state() when
     is_subtype(ConvCount, non_neg_integer()),
     is_subtype(Leader, boolean()),
     is_subtype(LoadData, load_data()),
+    is_subtype(RingData, ring_data()),
     is_subtype(Merged, non_neg_integer()),
     is_subtype(Range, intervals:non_empty_interval()),
     is_subtype(Round, non_neg_integer()),
@@ -1249,12 +1299,13 @@ to_string({ModuleName, Id}) ->
     is_subtype(NoOfBuckets, 1..50),
     is_subtype(Request, boolean()),
     is_subtype(Instance, instance()).
-tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
+tester_create_state(ConvCount, Leader, LoadData, RingData, Merged, Range, Round, Status,
         NoOfBuckets, Request, Instance) ->
     NewState = ets:new(cbstate, [set, protected]),
     state_set(convergence_count, ConvCount, NewState),
     state_set(leader, Leader, NewState),
     state_set(load_data, LoadData, NewState),
+    state_set(ring_data, RingData, NewState),
     state_set(merged, Merged, NewState),
     state_set(prev_state, NewState, NewState),
     state_set(range, Range, NewState),
@@ -1268,6 +1319,7 @@ tester_create_state(ConvCount, Leader, LoadData, Merged, Range, Round, Status,
     NewState2 = state_new(NewState, NewState),
     % state_new only creates load_data_uninit, so we reuse the given LoadData
     state_set(load_data, LoadData, NewState2),
+    state_set(ring_data, RingData, NewState2),
     NewState2.
 
 
