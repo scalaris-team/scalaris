@@ -1485,16 +1485,17 @@ merkle_resolve_req_keys_init([], [], _DestRRPid, Stats, _OwnerL, [],
 %%      Returns the number of resolve requests (requests with feedback count 2).
 -spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid())
-        -> 0..1.
-resolve_leaves([], _Dest, _SID, _OwnerL) -> 0;
-resolve_leaves(Nodes, Dest, SID, OwnerL) ->
-    resolve_leaves(Nodes, Dest, SID, OwnerL, intervals:empty(), 0).
+        -> {ResolveCalled::0..1, FBCount::0..1}.
+resolve_leaves([_|_] = Nodes, Dest, SID, OwnerL) ->
+    resolve_leaves(Nodes, Dest, SID, OwnerL, intervals:empty(), 0);
+resolve_leaves([], _Dest, _SID, _OwnerL) ->
+    {0, 0}.
 
 %% @doc Helper for resolve_leaves/4.
 -spec resolve_leaves([merkle_tree:mt_node()], Dest::comm:mypid(),
                      rrepair:session_id(), OwnerLocal::comm:erl_local_pid(),
                      Interval::intervals:interval(), Items::non_neg_integer())
-        -> 0..1.
+        -> {ResolveCalled::0..1, FBCount::0..1}.
 resolve_leaves([Node | Rest], Dest, SID, OwnerL, Interval, Items) ->
     ?DBG_ASSERT(merkle_tree:is_leaf(Node)),
     LeafInterval = merkle_tree:get_interval(Node),
@@ -1510,14 +1511,14 @@ resolve_leaves([], Dest, SID, OwnerL, Interval, Items) ->
                    send_local(OwnerL, {request_resolve, SID,
                                        {interval_upd_send, Interval, Dest},
                                        [{from_my_node, 1} | Options]}),
-                   1;
+                   {1, 0};
                true ->
                    % we know that we don't have data in this range, so we must
                    % regenerate it from the other node
                    % -> send him this request directly!
                    send(Dest, {request_resolve, SID, {?interval_upd, Interval, []},
                                [{from_my_node, 0} | Options]}),
-                   1
+                   {1, 1}
             end
     end.
 
@@ -1533,11 +1534,13 @@ art_recon(Tree, Art, #rr_recon_state{ dest_rr_pid = DestPid,
                 {ASyncLeafs, NComp, NSkip, NLSync} =
                     art_get_sync_leaves([merkle_tree:get_root(Tree)], Art,
                                         [], 0, 0, 0),
-                ResolveCalled = resolve_leaves(ASyncLeafs, DestPid, SID, OwnerL),
+                {ResolveCalled, FBCount} =
+                    resolve_leaves(ASyncLeafs, DestPid, SID, OwnerL),
                 rr_recon_stats:inc([{tree_nodesCompared, NComp},
                                     {tree_compareSkipped, NSkip},
                                     {tree_leavesSynced, NLSync},
-                                    {resolve_started, ResolveCalled}], Stats);
+                                    {resolve_started, ResolveCalled},
+                                    {await_rs_fb, FBCount}], Stats);
             false -> Stats
         end,
     rr_recon_stats:set([{tree_size, merkle_tree:size_detail(Tree)}], NStats).
