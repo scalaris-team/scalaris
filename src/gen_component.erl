@@ -566,6 +566,9 @@ on_traced_msg(Msg, UState, GCState) ->
         kill ->
             log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
                     [self(), Module, Handler]),
+            MsgTag = erlang:erase('$gen_component_trace_mpath_msg_tag'),
+            trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
+            trace_mpath:stop(),
             ok;
         {'$gen_component', [{post_op, Msg1}], NewUState} ->
             on_post_op(Msg1, NewUState, T1GCState);
