@@ -869,7 +869,7 @@ cb_call(FunName, Args, CBModule) ->
     is_subtype(CBModule, cb_module_id()),
     is_subtype(State, state()),
     is_subtype(Return, ok | discard_msg
-        | send_back | boolean() | {any(), any(), any()} | list({list(), list()})).
+        | send_back | boolean() | {any(), any(), any()} | [{Key::string(), Value::any()}]).
 cb_call(FunName, Args, Msg, CBModule, State) ->
     {ModuleName, _InstanceId} = CBModule,
     CBState = state_get(cb_state, CBModule, State),
