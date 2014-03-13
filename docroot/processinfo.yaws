@@ -7,6 +7,6 @@ out(A) ->
 	   Id =:= undefined ->
       	   {ehtml, {pre, [], ""}};
 	   true ->
-	       {html, json:encode(pid_groups:get_web_debug_info(Group, Id))}
+	       {html, json2:encode(pid_groups:get_web_debug_info(Group, Id))}
     end.
 </erl>

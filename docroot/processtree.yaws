@@ -5,9 +5,9 @@ out(A) ->
         IsPost ->
             case postvar(A, "node") of
                 {ok, "processTreeRoot"} ->
-                    {html, json:encode(pid_groups:groups_as_json())};
+                    {html, json2:encode(pid_groups:groups_as_json())};
                 {ok, Node} ->
-                    {html, json:encode(pid_groups:members_by_name_as_json(Node))};
+                    {html, json2:encode(pid_groups:members_by_name_as_json(Node))};
                 _ ->
                     {ehtml, {pre, [], ""}}
             end;
