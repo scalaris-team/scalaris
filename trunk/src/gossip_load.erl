@@ -512,7 +512,7 @@ get_values_all(State) ->
 %%      Called by the gossip module upon {web_debug_info} messages.
 %%      State: the state of the gossip_load module.
 -spec web_debug_info(state()) ->
-    {KeyValueList::[{Key::any(),Value::any()},...], NewState::state()}.
+    {KeyValueList::[{Key::string(), Value::any()},...], NewState::state()}.
 web_debug_info(State) ->
     PreviousState = state_get(prev_state, State),
     PreviousLoadData = prev_state_get(load_data, State),

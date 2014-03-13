@@ -94,7 +94,7 @@
 -callback get_values_all(State::cb_state()) -> AllValues::aggregates().
 
 -callback web_debug_info(State::cb_state()) ->
-    {KeyValueList::[{Key::any(), Value::any()},...], cb_state()}.
+    {KeyValueList::[{Key::string(), Value::any()},...], cb_state()}.
 
 -callback check_config() -> boolean().
 
