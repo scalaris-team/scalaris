@@ -363,47 +363,53 @@ start(Module, Handler, Args, Options) ->
 -spec start(module(), handler(), term(), [option()], pid()) -> no_return() | ok.
 start(Module, DefaultHandler, Args, Options, Supervisor) ->
     %?SPAWNED(Module),
-    case lists:keyfind(pid_groups_join_as, 1, Options) of
-        {pid_groups_join_as, GroupId, {short_lived, PidName}} ->
-            % if short-lived processes are spawned multiple times, we cannot
-            % create a new atom for each spawn or we will run out of atoms!
-            pid_groups:join_as(GroupId, PidName),
-            log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p", [Supervisor, self(), Module, GroupId, PidName]),
-            ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
-                                         ++ randoms:getRandomString()), self()),
-            ok;
-        {pid_groups_join_as, GroupId, PidName} ->
-            pid_groups:join_as(GroupId, PidName),
-            log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p", [Supervisor, self(), Module, GroupId, PidName]),
-            ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
-                                         ++ randoms:getRandomString()), self()),
-            case lists:keyfind(erlang_register, 1, Options) of
-                false when is_atom(PidName) ->
-                    %% we can give this process a better name for
-                    %% debugging, for example for etop.
-                    EName = list_to_atom(GroupId ++ "-"
-                                         ++ atom_to_list(PidName)),
-                    catch(erlang:register(EName, self()));
-                false ->
-                    EName = list_to_atom(GroupId ++ "-" ++ PidName),
-                    catch(erlang:register(EName, self()));
-                _ -> ok
-            end;
-        false ->
-            log:log(info, "[ gen_component ] ~p started ~p:~p", [Supervisor, self(), Module])
-    end,
-    _ = case lists:keyfind(erlang_register, 1, Options) of
+    % note: register globally first (disables the registered name from a
+    %       potential DEBUG_REGISTER below)
+    Registered =
+        case lists:keyfind(erlang_register, 1, Options) of
             {erlang_register, Name} ->
                 _ = case whereis(Name) of
                         undefined -> ok;
                         _ -> catch(erlang:unregister(Name)) %% unittests may leave garbage
                     end,
-                catch(erlang:register(Name, self()));
+                erlang:register(Name, self()),
+                true;
             false ->
-                ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_"
-                                             ++ randoms:getRandomString()), self()),
-                ok
+                false
         end,
+    case lists:keyfind(pid_groups_join_as, 1, Options) of
+        {pid_groups_join_as, GroupId, {short_lived, PidName}} ->
+            % if short-lived processes are spawned multiple times, we cannot
+            % create a new atom (for process registration) for each spawn or
+            % we will run out of atoms!
+            % -> no DEBUG_REGISTER!
+            pid_groups:join_as(GroupId, PidName),
+            log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p",
+                    [Supervisor, self(), Module, GroupId, PidName]),
+            ok;
+        {pid_groups_join_as, GroupId, PidName} ->
+            pid_groups:join_as(GroupId, PidName),
+            log:log(info, "[ gen_component ] ~p started ~p:~p as ~s:~p",
+                    [Supervisor, self(), Module, GroupId, PidName]),
+            if Registered -> ok;
+               is_atom(PidName) ->
+                   %% we can give this process a better name for
+                   %% debugging, for example for etop.
+                   ?DEBUG_REGISTER(list_to_atom(GroupId ++ "-" ++ atom_to_list(PidName)),
+                                   self()),
+                   ok;
+               true ->
+                   ?DEBUG_REGISTER(list_to_atom(GroupId ++ "-" ++ PidName),
+                                   self()),
+                   ok
+            end;
+        false when Registered ->
+            log:log(info, "[ gen_component ] ~p started ~p:~p", [Supervisor, self(), Module]);
+        false ->
+            ?DEBUG_REGISTER(list_to_atom(atom_to_list(Module) ++ "_" ++ randoms:getRandomString()),
+                            self()),
+            log:log(info, "[ gen_component ] ~p started ~p:~p", [Supervisor, self(), Module])
+    end,
     WaitForInit = lists:member({wait_for_init}, Options),
     _ = case WaitForInit of
             true -> ok;
