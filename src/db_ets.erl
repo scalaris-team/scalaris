@@ -48,19 +48,19 @@
 
 %% @doc Creates new DB handle named DBName.
 -spec new(DBName::nonempty_string()) -> db().
-new(DBName) ->
+new(_DBName) ->
     %% IMPORTANT: this module only works correctly when using ordered_set ets
     %% tables. Other table types could throw bad_argument exceptions while
     %% calling ets:next/2
-    ets:new(list_to_atom(DBName), [ordered_set | ?DB_ETS_ADDITIONAL_OPS]).
+    ets:new(dht_node_db, [ordered_set | ?DB_ETS_ADDITIONAL_OPS]).
 
 %% @doc Creates new DB handle named DBName with possibility to pass Options.
 -spec new(DBName::nonempty_string(), Options::[term()] ) -> db().
-new(DBName, Options) ->
+new(_DBName, Options) ->
     %% IMPORTANT: this module only works correctly when using ordered_set ets
     %% tables. Other table types could throw bad_argument exceptions while
     %% calling ets:next/2
-    ets:new(list_to_atom(DBName), [ordered_set | Options]).
+    ets:new(dht_node_db, [ordered_set | Options]).
 
 %% @doc Open a previously existing database. Not supported by ets.
 %%      A new database is created

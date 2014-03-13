@@ -191,9 +191,11 @@ start_link(DHTNodeGroup) ->
 init([]) ->
     ?TRACE("rdht_tx_write: Starting rdht_tx_write for DHT node: ~p~n",
            [pid_groups:my_groupname()]),
-    DHTNodeGroup = pid_groups:my_groupname(),
-    _Table = pdb:new(DHTNodeGroup ++ "_rdht_tx_write",
-                     [set, private, named_table]).
+    %% For easier debugging, use a named table (generates an atom)
+    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_rdht_tx_write"),
+    %%_Table = pdb:new(TableName, [set, protected, named_table]).
+    %% use random table name provided by ets to *not* generate an atom
+    _Table = pdb:new(?MODULE, [set]).
 
 -spec on(comm:message(), pdb:tableid()) -> pdb:tableid().
 on({start_work_phase, ReqId, ClientPid, HashedKey, Key}, TableName) ->

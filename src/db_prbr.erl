@@ -369,11 +369,10 @@ subscr_delta_close_table(_Tag) ->
 %% @doc Check that the table storing changed keys exists and creates it if
 %%      necessary.
 -spec subscr_delta_check_table(State::db()) -> tid() | atom().
-subscr_delta_check_table({DB, _Subscr, _Snap}) ->
+subscr_delta_check_table(_State) ->
     DeltaDB = case erlang:get('$delta_tab') of
         undefined ->
-            CKDBname = list_to_atom(?DB:get_name(DB) ++ "_ck"), % changed keys
-            CKDB = ?CKETS:new(CKDBname, [ordered_set | ?DB_ETS_ADDITIONAL_OPS]),
+            CKDB = ?CKETS:new(dht_node_db_ck, [ordered_set | ?DB_ETS_ADDITIONAL_OPS]),
             erlang:put('$delta_tab', CKDB),
             CKDB;
         CKDB -> CKDB

@@ -28,7 +28,7 @@
 -ifdef(have_callback_support).
 -type tableid() :: term().
 
--callback new(TableName::atom() | nonempty_string(),
+-callback new(TableName::atom(),
               [set | ordered_set | bag | duplicate_bag |
                public | protected | private |
                named_table | {keypos, integer()} |

@@ -86,11 +86,12 @@ send_trigger(Seconds, Msg) ->
 %% initialize: return initial state.
 -spec init([]) -> state().
 init([]) ->
-    MyGroup = pid_groups:my_groupname(),
-    ?TRACE("msg_delay:init for pid group ~p~n", [MyGroup]),
-    TimeTable = pdb:new(MyGroup ++ "_msg_delay", [set, protected, named_table]),
+    ?TRACE("msg_delay:init for pid group ~p~n", [pid_groups:my_groupname()]),
+    %% For easier debugging, use a named table (generates an atom)
+    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_msg_delay"),
+    %%TimeTable = pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    %% TimeTable = pdb:new(?MODULE, [set, private]),
+    TimeTable = pdb:new(?MODULE, [set]),
     comm:send_local(self(), {msg_delay_periodic}),
     _State = {TimeTable, _Round = 0}.
 

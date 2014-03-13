@@ -33,15 +33,13 @@
 
 -type tableid() :: tid() | atom().
 
--spec new(TableName::atom() | nonempty_string(),
+-spec new(TableName::atom(),
           [set | ordered_set | bag | duplicate_bag |
            public | protected | private |
            named_table | {keypos, integer()} |
            {heir, pid(), term()} | {heir,none} |
            {write_concurrency, boolean()}]) -> tableid().
-new([_|_] = TableName, Params) ->
-    new(erlang:list_to_atom(TableName), Params);
-new(TableName, Params) when is_atom(TableName) ->
+new(TableName, Params) ->
     ets:new(TableName, Params).
 
 -spec get(term(), tableid()) -> tuple() | undefined.

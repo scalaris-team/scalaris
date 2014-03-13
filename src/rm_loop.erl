@@ -213,9 +213,7 @@ unsubscribe(RegPid, Tag) ->
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
     % create the ets table storing the subscriptions
-    TableName = pid_groups:my_groupname() ++ ":rm_tman",
-    SubscrTable = ets:new(list_to_atom(TableName ++ ":subscribers"),
-                          [ordered_set, private]),
+    SubscrTable = ets:new(rm_subscribers, [ordered_set, private]),
     dn_cache:subscribe(),
     RM_State = ?RM:init(Me, Pred, Succ),
     set_failuredetector(?RM:get_neighbors(RM_State)),
@@ -227,9 +225,7 @@ init(Me, Pred, Succ) ->
 %%      Pre: the process must have joined a group. See pid_groups:join_as/2.
 -spec unittest_create_state(Neighbors::nodelist:neighborhood(), HasLeft::boolean()) -> state().
 unittest_create_state(Neighbors, HasLeft) ->
-    TableName = pid_groups:my_groupname() ++ ":rm_tman",
-    SubscrTable = ets:new(list_to_atom(TableName ++ ":subscribers"),
-                          [ordered_set, protected]),
+    SubscrTable = ets:new(rm_subscribers, [ordered_set, protected]),
     {?RM:unittest_create_state(Neighbors), HasLeft, SubscrTable}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
