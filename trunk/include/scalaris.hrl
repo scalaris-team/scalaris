@@ -46,8 +46,8 @@
 
 % special parameters to be passed to ets:new/2 (not only used on db_ets!)
 % note: keep access level at least at protected for dht_node_db_cache to work!
-%-define(DB_ETS_ADDITIONAL_OPS, [protected]). % better, faster for production use
--define(DB_ETS_ADDITIONAL_OPS, [protected, named_table]). % better for debugging
+% note: named_table is not allowed any more and may result in exceptions due to non-unique table names
+-define(DB_ETS_ADDITIONAL_OPS, [protected]).
 %% userdevguide-end scalaris:db
 
 %% when defined, use new tx protocol (which is not yet complete)

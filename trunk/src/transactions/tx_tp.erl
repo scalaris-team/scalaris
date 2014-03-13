@@ -35,8 +35,11 @@
 
 -spec init() -> pdb:tableid().
 init() ->
-    InstanceID = pid_groups:my_groupname(),
-    pdb:new(InstanceID ++ "_tx_tp", [set, private, named_table]).
+    %% For easier debugging, use a named table (generates an atom)
+    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_tx_tp"),
+    %%Table = pdb:new(TableName, [set, protected, named_table]).
+    %% use random table name provided by ets to *not* generate an atom
+    Table = pdb:new(?MODULE, [set]).
 
 %%
 %% Attention: this is not a separate process!!

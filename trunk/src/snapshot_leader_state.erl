@@ -52,8 +52,7 @@ new(Number, InProgress, Client, {_, _, OldTable, _, _, _}) ->
 
 -spec new(non_neg_integer(), boolean(), comm:mypid() | false) -> state().
 new(Number, InProgress, Client) ->
-    SnapDBName = "db_" ++ randoms:getRandomString() ++ ":snapshot_leader",
-    {Number, InProgress, ets:new(list_to_atom(SnapDBName), [ordered_set, private]),
+    {Number, InProgress, ets:new(snapshot_leader_db, [ordered_set, private]),
      intervals:empty(), intervals:empty(), Client}.
 
 % getters

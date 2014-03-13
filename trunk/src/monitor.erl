@@ -333,8 +333,7 @@ start_link(DHTNodeGroup) ->
 -spec init(null) -> state().
 init(null) ->
     msg_delay:send_trigger(get_check_timeslots_interval(), {trigger_check_timeslots}),
-    TableName = pid_groups:my_groupname() ++ ":monitor",
-    {ets:new(list_to_atom(TableName), [ordered_set, protected]),
+    {ets:new(monitor, [ordered_set, protected]),
      init_apitx_reqlist_rrd(os:timestamp())}.
 
 -spec init_apitx_reqlist_rrd(Time::erlang_timestamp() | rrd:internal_time()) -> rrd:rrd().

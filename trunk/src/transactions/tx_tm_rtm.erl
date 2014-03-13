@@ -118,13 +118,13 @@ start_link(DHTNodeGroup, Role) ->
                              state()}.
 init([]) ->
     Role = pid_groups:my_pidname(),
-    DHTNodeGroup = pid_groups:my_groupname(),
-    ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n", [DHTNodeGroup, Role]),
+    ?TRACE("tx_tm_rtm:init for instance: ~p ~p~n",
+           [pid_groups:my_groupname(), Role]),
     %% For easier debugging, use a named table (generates an atom)
-    Table = pdb:new(DHTNodeGroup ++ "_tx_tm_rtm_" ++ atom_to_list(Role),
-                    [set, protected, named_table]),
+    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_tx_tm_rtm_" ++ atom_to_list(Role)),
+    %%Table = pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    %% Table = pdb:new(?MODULE, [set, private]),
+    Table = pdb:new(?MODULE, [set]),
     LAcceptor = get_my(Role, acceptor),
     GLLearner = comm:make_global(get_my(Role, learner)),
     %% start getting rtms and maintain them.

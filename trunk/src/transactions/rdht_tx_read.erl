@@ -334,12 +334,13 @@ start_link(DHTNodeGroup) ->
 %% initialize: return initial state.
 -spec init([]) -> state().
 init([]) ->
-    DHTNodeGroup = pid_groups:my_groupname(),
-    ?TRACE("rdht_tx_read: Starting rdht_tx_read for DHT node: ~p~n", [DHTNodeGroup]),
+    ?TRACE("rdht_tx_read: Starting rdht_tx_read for DHT node: ~p~n",
+           [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
-    Table = pdb:new(DHTNodeGroup ++ "_rdht_tx_read", [set, private, named_table]),
+    %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_rdht_tx_read"),
+    %%Table = pdb:new(TableName, [set, protected, named_table]),
     %% use random table name provided by ets to *not* generate an atom
-    %% Table = pdb:new(?MODULE, [set, private]),
+    Table = pdb:new(?MODULE, [set]),
     Reps = config:read(replication_factor),
     MajOk = quorum:majority_for_accept(Reps),
     MajDeny = quorum:majority_for_deny(Reps),

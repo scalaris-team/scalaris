@@ -32,9 +32,9 @@
 -export([new/2, get/2, set/2, delete/2, take/2, tab2list/1]).
 -include("scalaris.hrl").
 
--type tableid() :: atom() | nonempty_string().
+-type tableid() :: atom().
 
--spec new(TableName::atom() | nonempty_string(),
+-spec new(TableName::tableid(),
           [set | ordered_set | bag | duplicate_bag |
            public | protected | private |
            named_table | {keypos, integer()} |
