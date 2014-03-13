@@ -25,21 +25,24 @@
 -export([behaviour_info/1]).
 -endif.
 
-% Erlang version >= R15B
--ifdef(have_callback_support).
-
+-ifdef(with_export_type_support).
 -export_type([exch_data/0, round_status/0, cb_return/0, instance/0]).
+-endif.
 
 %% cb: callback
 -type cb_state() :: any().
 -type instance() :: {CBModule::module(), InstanceId:: atom() | uid:global_uid()}.
 -type exch_data() :: any().
+-type cb_return() :: {discard_msg | boolean() | ok | retry | send_back,
+                      cb_state()}.
+-type round_status() :: 'current_round' | 'old_round'.
+
+% Erlang version >= R15B
+-ifdef(have_callback_support).
+
 -type aggregates() :: any().
--type cb_return() :: {KeyValueList::list({list(), list()}) | discard_msg |
-    false | ok | retry | send_back | true, cb_state()}.
 -type new_leader_msg() :: {is_leader|no_leader, NewRange::intervals:interval()}.
 -type round() :: non_neg_integer().
--type round_status() :: 'current_round' | 'old_round'.
 -type notify_keyword() :: new_round | leader | exch_failure.
 
 % Startup
