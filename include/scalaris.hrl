@@ -73,13 +73,6 @@
 %% -define(LOG_MESSAGE(SNDRCV, MESSAGE, CHANNEL), comm_logger:log(SNDRCV, {CHANNEL, comm:get_msg_tag(MESSAGE)}, erlang:byte_size(erlang:term_to_binary(MESSAGE, [{minor_version, 1}])))).
 
 
-% enable native register for all processes in gen_component or disable
-% useful 4 debug (etop, appmon), but let memory usage grow over the time
-% enable:
-%-define(DEBUG_REGISTER(PROCESS,PID),erlang:register(PROCESS,PID)).
-% disable:
--define(DEBUG_REGISTER(PROCESS,PID),ok).
-
 % Replica Repair
 -define(REP_HFS, hfs_lhsp). %HashFunctionSet selection for usage by bloom filter
 
@@ -105,9 +98,13 @@
 -ifdef(enable_debug).
 -define(DBG_ASSERT(X), ?ASSERT(X)).
 -define(DBG_ASSERT2(X, Y), ?ASSERT2(X, Y)).
+% enable native register for all processes in gen_component
+% useful for debug (etop, appmon), but lets memory usage grow over time
+-define(DEBUG_REGISTER(PROCESS, PID), catch(erlang:register(PROCESS, PID))).
 -else.
 -define(DBG_ASSERT(X), ok).
 -define(DBG_ASSERT2(X, Y), ok).
+-define(DEBUG_REGISTER(PROCESS, PID), ok).
 -endif.
 
 % disable compression (the overhead is too high, at least for GbE)
