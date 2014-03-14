@@ -1,4 +1,4 @@
-%% @copyright 2011-2013 Zuse Institute Berlin
+%% @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -72,6 +72,7 @@ range_read(Interval) ->
         Done::intervals:interval(), Data::[db_entry:entry() | [db_entry:entry()]],
         TimerRef::reference()) -> {ok | timeout, [db_entry:entry()]}.
 range_read_loop(Interval, Id, Done, Data, TimerRef) ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({range_read_timeout, Id}, %% ->
             {timeout, lists:flatten(Data)});
@@ -94,6 +95,7 @@ delete_and_cleanup_timer(TimerRef, Id) ->
     %% cancel timeout
     _ = erlang:cancel_timer(TimerRef),
     %% consume potential timeout message
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({range_read_timeout, Id}, ok) %% -> ok
     after 0 -> ok

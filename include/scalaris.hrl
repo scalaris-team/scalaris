@@ -90,9 +90,7 @@
 -define(ASSERT(X), true = X).
 -define(ASSERT2(X, Y), case X of
                            true -> ok;
-                           _ -> log:log("Exception ~p at ~.0p.",
-                                        [Y, util:get_stacktrace()]),
-                                throw(Y)
+                           _ -> util:do_throw(Y)
                        end).
 %% debug mode (enable with ./configure --enable-debug)
 -ifdef(enable_debug).
@@ -138,11 +136,10 @@
                trace_mpath:log_recv(_ScalPState, _ScalFrom, _ScalTo, _ScalMsg),
                case erlang:get(trace_mpath) of
                    undefined ->
+                       trace_mpath:start(_ScalPState),
                        ok;
                    _ ->
-                       trace_mpath:log_info(_ScalPState, _ScalTo, {scalaris_recv, "SCALARIS_RECV at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE}),
-                       %% report done for proto_sched to go on...
-                       trace_mpath:log_info(_ScalPState, _ScalTo, {gc_on_done, scalaris_recv})
+                       trace_mpath:log_info(_ScalPState, _ScalTo, {scalaris_recv, "SCALARIS_RECV at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE})
                end,
                Y;
             X -> Y
@@ -154,11 +151,10 @@
                trace_mpath:log_recv(_ScalPState, _ScalFrom, _ScalTo, _ScalMsg),
                case erlang:get(trace_mpath) of
                    undefined ->
+                       trace_mpath:start(_ScalPState),
                        ok;
                    _ ->
-                       trace_mpath:log_info(_ScalPState, _ScalTo, {scalaris_recv, "SCALARIS_RECV at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE}),
-                       %% report done for proto_sched to go on...
-                       trace_mpath:log_info(_ScalPState, _ScalTo, {gc_on_done, scalaris_recv})
+                       trace_mpath:log_info(_ScalPState, _ScalTo, {scalaris_recv, "SCALARIS_RECV at client process (pid, module, line)~n", _ScalTo, ?MODULE, ?LINE})
                end,
                case gen_component:is_gen_component(self())
                    andalso ({current_function, {pid_groups, add, 3}}

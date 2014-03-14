@@ -1,4 +1,4 @@
-%% @copyright 2011, 2012 Zuse Institute Berlin
+%% @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -58,6 +58,7 @@ delete_collect_results([], _ClientsId, Results) ->
     OKs = length([ok || ok <- Results]),
     {ok, OKs, Results};
 delete_collect_results([_|_] = ReplicaKeys, ClientsId, Results) ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({delete_key_response, ClientsId, Key, Result}, %% ->
             case lists:member(Key, ReplicaKeys) of

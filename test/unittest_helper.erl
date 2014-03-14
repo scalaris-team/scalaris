@@ -301,6 +301,7 @@ check_ring_size(Size, CheckFun) ->
               BootSize =
                   try
                       mgmt_server:number_of_nodes(),
+                      trace_mpath:thread_yield(),
                       receive ?SCALARIS_RECV({get_list_length_response, L}, L) end
                   catch _:_ -> Size
                   end,

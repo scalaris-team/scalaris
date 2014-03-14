@@ -1,4 +1,4 @@
-%  @copyright 2011-2013 Zuse Institute Berlin
+%  @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -127,6 +127,7 @@ kill_nodes(Count) when is_integer(Count) andalso Count >= 0 ->
               wait_for_nodes_to_disappear(Ok),
               Pid ! {kill_nodes_done, Ok}
             end),
+    trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({kill_nodes_done, Result}, Result) end.
 
 -spec kill_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
@@ -140,6 +141,7 @@ kill_nodes_by_name(Names) when is_list(Names) ->
               wait_for_nodes_to_disappear(Ok),
               Pid ! {kill_nodes_done, Result}
             end),
+    trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({kill_nodes_done, Result}, Result) end.
 
 %% @doc Gets connection info for a random subset of known nodes by the cyclon
@@ -153,6 +155,7 @@ get_other_vms(MaxVMs) when is_integer(MaxVMs) andalso MaxVMs > 0 ->
                GlobalPid = comm:make_global(Pid),
                comm:send(GlobalPid, {get_subset_rand, MaxVMs, self()},
                          [{group_member, cyclon}]),
+               trace_mpath:thread_yield(),
                receive
                    ?SCALARIS_RECV({cy_cache, Cache}, %% ->
                        [{erlang:node(comm:make_local(node:pidX(Node))),

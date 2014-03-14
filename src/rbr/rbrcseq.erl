@@ -623,6 +623,7 @@ on({qwrite_collect, ReqId,
 %% failure- and concurrency-free path), we have the time to choose a
 %% random number. This is still faster than using msg_delay or
 %% comm:local_send_after() with a random delay.
+%% TODO: random is not allowed for proto_sched reproducability...
                     case randoms:rand_uniform(1,4) of
                         1 ->
                             retrigger(NewEntry, TableName, noincdelay),

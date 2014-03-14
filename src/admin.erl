@@ -160,6 +160,7 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
                     UId = uid:get_pids_uid(),
                     Self = comm:reply_as(self(), 3, {leave_result, UId, '_'}),
                     comm:send_local(DhtNode, {leave, Self}),
+                    trace_mpath:thread_yield(),
                     receive
                         ?SCALARIS_RECV(
                             {leave_result, UId, {move, result, leave, ok}}, %% ->
@@ -246,6 +247,7 @@ check_ring_deep_foldl(_, Previous) ->
 -spec number_of_nodes() -> non_neg_integer() | timeout.
 number_of_nodes() ->
     mgmt_server:number_of_nodes(),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
             {get_list_length_response, X}, %% ->
@@ -269,12 +271,15 @@ get_dump() ->
     _ = [comm:send(Server, {get_comm_layer_dump, comm:this()})
          || Server <- Servers],
     %% list({Map, StartTime})
-    Dumps = [receive
-                ?SCALARIS_RECV(
-                    {get_comm_layer_dump_response, Dump}, %% ->
-                    Dump
-                  )
-             end || _ <- Servers],
+    Dumps = [  begin
+                   trace_mpath:thread_yield(),
+                   receive
+                       ?SCALARIS_RECV(
+                          {get_comm_layer_dump_response, Dump}, %% ->
+                          Dump
+                         )
+                       end
+               end || _ <- Servers],
     StartTime = lists:min([Start || {_, _, Start} <- Dumps]),
     GetKeys =
         fun(DumpsX, ElementX) ->
@@ -348,6 +353,7 @@ start() ->
     loop().
 
 loop() ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
             {halt, N}, %% ->
@@ -370,11 +376,14 @@ loop() ->
 -spec(nodes/0 :: () -> list()).
 nodes() ->
     mgmt_server:node_list(),
-    Nodes = receive
-                ?SCALARIS_RECV(
-                    {get_list_response, List}, %% ->
-                    lists:usort([IP || {IP, _, _} <- List])
-                  )
+    Nodes = begin
+                trace_mpath:thread_yield(),
+                receive
+                    ?SCALARIS_RECV(
+                       {get_list_response, List}, %% ->
+                       lists:usort([IP || {IP, _, _} <- List])
+                      )
+                    end
             end,
     Nodes.
 
@@ -385,16 +394,20 @@ nodes() ->
 -spec print_ages() -> ok.
 print_ages() ->
     mgmt_server:node_list(),
-    _ = receive
-            ?SCALARIS_RECV(
-                {get_list_response, List}, %% ->
-                [ comm:send(Node, {get_ages, self()}, [{group_member, cyclon}]) || Node <- List ]
-              )
+    _ = begin 
+            trace_mpath:thread_yield(),
+            receive
+                ?SCALARIS_RECV(
+                   {get_list_response, List}, %% ->
+                   [ comm:send(Node, {get_ages, self()}, [{group_member, cyclon}]) || Node <- List ]
+                  )
+                end
         end,
     worker_loop().
 
 -spec worker_loop() -> ok.
 worker_loop() ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
             {cy_ages, Ages}, %% ->
@@ -411,11 +424,14 @@ worker_loop() ->
 -spec check_routing_tables(any()) -> ok.
 check_routing_tables(Port) ->
     mgmt_server:node_list(),
-    _ = receive
-            ?SCALARIS_RECV(
-                {get_list_response, List}, %% ->
-                [ comm:send(Node, {check, Port}, [{group_member, routing_table}]) || Node <- List ]
-              )
+    _ = begin
+            trace_mpath:thread_yield(),
+            receive
+                ?SCALARIS_RECV(
+                   {get_list_response, List}, %% ->
+                   [ comm:send(Node, {check, Port}, [{group_member, routing_table}]) || Node <- List ]
+                  )
+                end
         end,
     ok.
 

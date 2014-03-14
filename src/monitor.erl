@@ -186,6 +186,7 @@ proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
 -spec get_rrds(MonitorPid::comm:erl_local_pid(), Keys::list(table_index())) -> list({atom(), key(), rrd:rrd() | undefined}).
 get_rrds(MonitorPid, Keys) ->
     comm:send_local(MonitorPid, {get_rrds, Keys, comm:this()}),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
             {get_rrds_response, Response}, %% ->
@@ -372,6 +373,7 @@ get_rrd_keys() ->
 -spec get_rrd_keys(comm:erl_local_pid()) -> [table_index()] | timeout.
 get_rrd_keys(MonitorPid) ->
     comm:send_local(MonitorPid, {get_rrd_keys, self()}),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({get_rrd_keys, Keys}, Keys)
     after 2000 ->

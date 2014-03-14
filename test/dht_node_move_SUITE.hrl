@@ -568,6 +568,7 @@ symm4_slide_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
              ?proto_sched(start),
              symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
              ?proto_sched(stop),
+             trace_mpath:thread_yield(),
              receive
                  ?SCALARIS_RECV(Z,
                                 ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
@@ -593,6 +594,7 @@ get_pred_node_succ2(NodePid, FailMsg) when is_pid(NodePid) ->
     get_pred_node_succ2(comm:make_global(NodePid), FailMsg);
 get_pred_node_succ2(NodePid, FailMsg) ->
     comm:send(NodePid, {get_node_details, comm:this(), [node, pred, succ]}),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({get_node_details_response, NodeDetails},
                        begin
@@ -611,6 +613,7 @@ get_pred_node_succ2(NodePid, FailMsg) ->
         Node::node:node_type(), Other::node:node_type()) -> ok.
 symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other) ->
     comm:send_local(DhtNode, {move, start_slide, PredOrSucc, TargetId, Tag, self()}),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
         {move, result, Tag, ok}, begin
@@ -705,6 +708,7 @@ select_from_nodes(Selector, Nodes) ->
 
 get_node_details(DhtNode) ->
     comm:send(comm:make_global(DhtNode), {get_node_details, comm:this(), [node, pred, succ]}),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({get_node_details_response, NodeDetails},
                        begin
@@ -744,6 +748,7 @@ proto_sched_callback_fun() ->
     end.
 
 receive_result() ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(X, X)
     end.
@@ -821,8 +826,10 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
                       ok
               end,
               %% receive results
-              Result1 = fun() -> receive ?SCALARIS_RECV({move, result, _Tag1, Result}, Result) end end(),
-              Result2 = fun() -> receive ?SCALARIS_RECV({move, result, _Tag2, Result}, Result) end end(),
+              Result1 = fun() ->     trace_mpath:thread_yield(),
+receive ?SCALARIS_RECV({move, result, _Tag1, Result}, Result) end end(),
+              Result2 = fun() ->     trace_mpath:thread_yield(),
+receive ?SCALARIS_RECV({move, result, _Tag2, Result}, Result) end end(),
               ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
               VerifyFun(Result1, Result2, slide_interleaving()),
               timer:sleep(10)
@@ -971,6 +978,7 @@ test_slide_illegally(_Config) ->
               ct:pal("Beginning ~p", [Tag]),
               ?proto_sched(start),
               comm:send(node:pidX(Node), {move, start_slide, Direction, TargetId, {slide, Direction, Tag}, self()}),
+    trace_mpath:thread_yield(),
               receive
                   ?SCALARIS_RECV({move, result, {slide, Direction, Tag}, target_id_not_in_range}, ok);
                   ?SCALARIS_RECV(X, ?ct_fail("Illegal Slide ~p", [X]))

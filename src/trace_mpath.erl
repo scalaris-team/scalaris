@@ -1,4 +1,4 @@
-% @copyright 2012-2013 Zuse Institute Berlin
+% @copyright 2012-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@
 -export([infected/0]).
 -export([clear_infection/0, restore_infection/0]).
 -export([get_trace/0, get_trace/1, get_trace_raw/1, cleanup/0, cleanup/1]).
+-export([thread_yield/0]).
 
 %% trace analysis
 -export([send_histogram/1]).
@@ -203,6 +204,11 @@ get_trace(TraceId) ->
      end || Event <- LogRaw].
 
 -spec convert_msg(Msg::comm:message()) -> comm:message().
+convert_msg(Msg) when is_tuple(Msg)
+                      andalso size(Msg) =:= 3
+                      andalso f =:= element(2, Msg) ->
+    %% lookup envelope
+    setelement(1, Msg, util:extint2atom(element(1,element(3, Msg))));
 convert_msg(Msg) when is_tuple(Msg) andalso size(Msg) >= 1 ->
     setelement(1, Msg, util:extint2atom(element(1, Msg)));
 convert_msg(Msg) -> Msg.
@@ -211,6 +217,7 @@ convert_msg(Msg) -> Msg.
 get_trace_raw(TraceId) ->
     LoggerPid = pid_groups:find_a(trace_mpath),
     comm:send_local(LoggerPid, {get_trace, comm:this(), TraceId}),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({get_trace_reply, Log}, Log)
     end.
@@ -223,6 +230,14 @@ cleanup(TraceId) ->
     LoggerPid = pid_groups:find_a(trace_mpath),
     comm:send_local(LoggerPid, {cleanup, TraceId}),
     ok.
+
+%% for proto_sched and to mark end of client processing before
+%% receives
+-spec thread_yield() -> ok.
+thread_yield() ->
+    %% report done for proto_sched to go on...
+    log_info(self(), {gc_on_done, scalaris_recv}),
+    clear_infection().
 
 %% Functions for trace analysis
 -spec send_histogram(trace()) -> list().
@@ -575,8 +590,15 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
               {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg, FromPid, ToPid), ?IIF(LocalOrGlobal =:= local_after, local, LocalOrGlobal)}),
             true;
         {proto_sched, _} when LocalOrGlobal =:= local_after ->
+            %% Do delivery via proto_sched and *not* via
+            %% erlang:send_after (returning false here). Otherwise the
+            %% msg gets delivered a second time shortly after outside
+            %% the schedule.
             %% TODO: see comm:send_local_after
-            true;
+            %% TODO: Should be queued to another queue in the proto_sched to
+            %% allow violation of FIFO ordering
+            proto_sched:log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal),
+            false;
         {proto_sched, _} ->
             proto_sched:log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal),
             false
@@ -602,9 +624,10 @@ log_info(PState, FromPid, Info) ->
             send_log_msg(PState, LoggerPid, {log_info, Now, TraceId, FromPid, Info});
         {proto_sched, LoggerPid} ->
             case Info of
-                {gc_on_done, _Tag} ->
+                {gc_on_done, Tag} ->
                     TraceId = passed_state_trace_id(PState),
-                    send_log_msg(PState, LoggerPid, {on_handler_done, TraceId});
+                    send_log_msg(PState, LoggerPid,
+                                 {on_handler_done, TraceId, Tag});
                 _ -> ok
             end
     end,

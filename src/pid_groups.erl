@@ -135,6 +135,7 @@ join_as(GrpName, PidName) ->
 add(GrpName, PidName, Pid) ->
     comm:send_local(pid_groups_manager(),
                     {pid_groups_add, GrpName, PidName, Pid, self()}),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({pid_groups_add_done}, ok);
         ?SCALARIS_RECV(
@@ -328,7 +329,8 @@ pids_to_names(Pids, Timeout) ->
     [begin
          case erlang:is_reference(Ref) of
              false -> pid_to_name(Ref);
-             _     -> receive
+             _     -> trace_mpath:thread_yield(),
+                      receive
                           ?SCALARIS_RECV(
                               {ok, {group_and_name_of_response, Name}, Pid}, %% ->
                               begin
@@ -392,12 +394,14 @@ members_by_name_as_json(GrpName) ->
 hide(GrpName) ->
     comm:send_local(pid_groups_manager(),
                     {pid_groups_hide, GrpName, self()}),
+    trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({pid_groups_hide_done, GrpName}, ok) end.
 
 -spec unhide(groupname()) -> ok.
 unhide(GrpName) ->
     comm:send_local(pid_groups_manager(),
                     {pid_groups_unhide, GrpName, self()}),
+    trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({pid_groups_unhide_done, GrpName}, ok) end.
 
 %%

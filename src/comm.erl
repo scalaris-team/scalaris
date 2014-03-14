@@ -134,8 +134,14 @@ send(Pid, Msg, Options) ->
         undefined ->
             comm_server:send(RealPid, RealMsg, RealOpts);
         Logger ->
+            LocalPidPart = make_local(RealPid),
+            LocalNumericPid = case is_atom(LocalPidPart) of
+                                     true -> whereis(LocalPidPart);
+                                     false -> LocalPidPart
+                                 end,
+            RealNumericPid = make_global(LocalNumericPid),
             Deliver = trace_mpath:log_send(Logger, self(),
-                                           RealPid, RealMsg, global),
+                                           RealNumericPid, RealMsg, global),
             case Deliver of
                 false -> ok;
                 true ->
@@ -183,8 +189,12 @@ send_local(Pid, Msg) ->
                 ?SEND_LOCAL_CHECK_PID(RealPid, RealMsg),
                 RealPid ! RealMsg;
             Logger ->
+                RealNumericPid = case is_atom(RealPid) of
+                                     true -> whereis(RealPid);
+                                     false -> RealPid
+                                 end,
                 Deliver = trace_mpath:log_send(Logger, self(),
-                                               RealPid, RealMsg, local),
+                                               RealNumericPid, RealMsg, local),
                 case Deliver of
                     false -> ok;
                     true ->
@@ -209,6 +219,8 @@ send_local_after(Delay, Pid, Msg) ->
             %%       also to adapt trace_mpath then.
             Deliver = trace_mpath:log_send(Logger, self(),
                                            RealPid, RealMsg, local_after),
+            %% should we also deliver using the normal way?
+            %% (is it a trace (=true) or a proto_sched (=false)).
             case Deliver of
                 false ->
                     %% to keep the -spec we return a reference().  In

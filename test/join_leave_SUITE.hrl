@@ -102,18 +102,21 @@ join_lookup(Config) ->
                           {?lookup_aux, X, 0, {ping, This}}) || X <- Keys ],
 
     %% got all 4 replies? ok
-    [ receive ?SCALARIS_RECV({pong, dht_node}, ok) end || _ <- Keys ].
+    [ begin
+          trace_mpath:thread_yield(),
+          receive
+              ?SCALARIS_RECV({pong, dht_node}, ok) end
+      end || _ <- Keys ].
 
 add_9(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
                                             {rrepair_after_crash, false}
                                            | join_parameters_list()]}]),
-    ?proto_sched(start),
+    %% stop_time calls ?proto_sched(start)
     stop_time(fun add_9_test/0, "add_9").
 
 add_9_test() ->
-    ?proto_sched(start),
     _ = api_vm:add_nodes(9),
     check_size(10).
 
@@ -124,10 +127,10 @@ rm_5(Config) ->
                                            | join_parameters_list()]}]),
     _ = api_vm:add_nodes(9),
     check_size(10),
+    %% stop_time calls ?proto_sched(start)
     stop_time(fun rm_5_test/0, "rm_5").
 
 rm_5_test() ->
-    ?proto_sched(start),
     _ = api_vm:kill_nodes(5),
     check_size(5).
 
@@ -136,10 +139,10 @@ add_9_rm_5(Config) ->
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir},
                                             {rrepair_after_crash, false}
                                            | join_parameters_list()]}]),
+    %% stop_time calls ?proto_sched(start)
     stop_time(fun add_9_rm_5_test/0, "add_9_rm_5").
 
 add_9_rm_5_test() ->
-    ?proto_sched(start),
     _ = api_vm:add_nodes(9),
     check_size(10),
     _ = api_vm:kill_nodes(5),
@@ -156,7 +159,7 @@ add_3_rm_3_data(Config, Incremental) ->
     % note: there may be hash collisions -> count the number of unique DB entries!
     RandomHashedKeys = lists:append([?RT:get_replica_keys(?RT:hash_key(K)) || K <- RandomKeys]),
     ExpLoad = length(lists:usort(RandomHashedKeys)),
-    
+
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{move_max_transport_entries, 25},
                                             {move_use_incremental_slides, Incremental},
@@ -181,7 +184,9 @@ add_3_rm_3_data(Config, Incremental) ->
     _ = api_vm:shutdown_nodes(3),
     check_size(1),
     ct:pal("######## checking load ########"),
-    unittest_helper:check_ring_load(ExpLoad).
+    unittest_helper:check_ring_load(ExpLoad),
+    ct:pal("######## done ########"),
+    ok.
 
 add_2x3_load(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -189,6 +194,7 @@ add_2x3_load(Config) ->
                                             {rrepair_after_crash, false},
                                             {monitor_perf_interval, 0}
                                            | join_parameters_list()]}]),
+    %% stop_time calls ?proto_sched(start)
     stop_time(fun add_2x3_load_test/0, "add_2x3_load"),
     unittest_helper:check_ring_load(4),
     unittest_helper:check_ring_data().
@@ -222,6 +228,7 @@ make_4_add_x_rm_y_load(Config, X, Y, StartOnlyAdded) ->
       ?RT:get_replica_keys(?MINUS_INFINITY),
       [{config, [{log_path, PrivDir}, {rrepair_after_crash, false},
                  {monitor_perf_interval, 0} | join_parameters_list()]}]),
+    %% stop_time calls ?proto_sched(start)
     stop_time(fun() -> add_x_rm_y_load_test(X, Y, StartOnlyAdded) end, lists:flatten(io_lib:format("add_~B_rm_~B_load", [X, Y]))),
     unittest_helper:check_ring_load(40),
     unittest_helper:check_ring_data().
@@ -263,14 +270,14 @@ prop_join_at(FirstId, SecondId, Incremental) ->
     % note: there may be hash collisions -> count the number of unique DB entries!
     RandomHashedKeys = lists:append([?RT:get_replica_keys(?RT:hash_key(K)) || K <- RandomKeys]),
     ExpLoad = length(lists:usort(RandomHashedKeys)),
-    
+
     unittest_helper:make_ring_with_ids(
       [FirstId],
       [{config, [{move_max_transport_entries, 25},
                  {move_use_incremental_slides, Incremental},
                  pdb:get(log_path, ?MODULE), {rrepair_after_crash, false},
                  {monitor_perf_interval, 0} | join_parameters_list()]}]),
-    
+
     _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),
     % wait for late write messages to arrive at the original nodes
     % if all writes have arrived, a range read should return 4 values
@@ -279,7 +286,7 @@ prop_join_at(FirstId, SecondId, Incremental) ->
               {Status, Values} = api_dht_raw:range_read(0, 0),
               Status =:= ok andalso erlang:length(Values) =:= ExpLoad
       end),
-    
+
     BenchPid = erlang:spawn(fun() -> bench:increment(BenchSlaves, BenchRuns) end),
     _ = admin:add_node_at_id(SecondId),
     check_size(2),

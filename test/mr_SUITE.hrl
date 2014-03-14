@@ -60,7 +60,7 @@ end_per_testcase(_TestCase, _Config) ->
 
 test_sane_result(_Config) ->
     ?proto_sched(start),
-    ?proto_sched(start_deliver),
+    %% log:log("Start test_sane_result"),
     Res = api_mr:start_job(get_wc_job_erl()),
     %% each word only occurs once
     check_results(Res),
@@ -68,7 +68,6 @@ test_sane_result(_Config) ->
 
 test_error_on_kill(_Config) ->
     ?proto_sched(start),
-    ?proto_sched(start_deliver),
     MrPid = spawn_link(fun() ->
                                Res = api_mr:start_job(get_wc_job_erl()),
                                ?equals(Res, {error, node_died})

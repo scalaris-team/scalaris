@@ -289,7 +289,9 @@ commit(TLog) ->
                     tx_tm:commit(TM, Client, ClientsId, TLog)
             end,
             _Result =
-                receive
+                begin
+                    trace_mpath:thread_yield(),
+                    receive
                     ?SCALARIS_RECV(
 %%%% OLD TX
 %                  {tx_tm_rtm_commit_reply, ClientsId, commit}, %% ->
@@ -302,7 +304,7 @@ commit(TLog) ->
                        {tx_tm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
                          {fail, abort, FailedKeys} %% commit / abort;
                        )
-                end
+                end end
     end.
 -else.
 commit(TLog) ->
@@ -324,22 +326,25 @@ commit(TLog) ->
                     tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
             end,
             _Result =
-                receive
-                    ?SCALARIS_RECV(
-                       {tx_tm_rtm_commit_reply, ClientsId, commit}, %% ->
-                       {ok}  %% commit / abort;
-                      );
-                    ?SCALARIS_RECV(
-                       {tx_tm_rtm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
-                       {fail, abort, FailedKeys} %% commit / abort;
-                      )
-                end
+                begin
+                    trace_mpath:thread_yield(),
+                    receive
+                        ?SCALARIS_RECV(
+                           {tx_tm_rtm_commit_reply, ClientsId, commit}, %% ->
+                           {ok}  %% commit / abort;
+                          );
+                        ?SCALARIS_RECV(
+                           {tx_tm_rtm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
+                           {fail, abort, FailedKeys} %% commit / abort;
+                          )
+                    end end
     end.
 -endif.
 
 -spec receive_answer(ReqId::req_id()) -> tx_tlog:tlog_entry().
 -ifdef(TXNEW).
  receive_answer(ReqId) ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
 %%%% OLD TX
@@ -355,6 +360,7 @@ commit(TLog) ->
     end.
 -else.
 receive_answer(ReqId) ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
            {tx_tm_rtm_commit_reply, _, _}, %%->
@@ -371,6 +377,7 @@ receive_answer(ReqId) ->
 -spec receive_old_answers() -> ok.
 -ifdef(TXNEW).
 receive_old_answers() ->
+    trace_mpath:thread_yield(),
     receive
 %%%% OLD TX
 %   ?SCALARIS_RECV({tx_tm_rtm_commit_reply, _, _}, receive_old_answers());
@@ -380,6 +387,7 @@ receive_old_answers() ->
     end.
 -else.
 receive_old_answers() ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({tx_tm_commit_reply, _, _}, receive_old_answers());
         ?SCALARIS_RECV({_Op, _RdhtId, _RdhtTlog}, receive_old_answers())

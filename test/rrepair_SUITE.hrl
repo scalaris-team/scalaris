@@ -378,6 +378,7 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) 
     build_symmetric_ring(NodeCount, Config, [RRConfig, {rr_recon_p1e, P1E}]),
     Nodes = [begin
                  comm:send_local(NodePid, {get_node_details, comm:this(), [node]}),
+                 trace_mpath:thread_yield(),
                  receive
                      ?SCALARIS_RECV({get_node_details_response, NodeDetails},
                                     begin
@@ -494,16 +495,16 @@ startSyncRound(NodeKeys) ->
 
 -spec waitForSyncRoundEnd(NodeKeys::[?RT:key()], RcvReqCompleteMsg::boolean()) -> ok.
 waitForSyncRoundEnd(NodeKeys, RcvReqCompleteMsg) ->
-    RcvReqCompleteMsg andalso
-        receive
-            ?SCALARIS_RECV(
-            {request_sync_complete = MsgTag, _}, % ->
-            begin
-                trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
-                trace_mpath:stop(),
-                true
-            end)
-        end,
+    case RcvReqCompleteMsg of
+        true ->
+            trace_mpath:thread_yield(),
+            receive
+                ?SCALARIS_RECV(
+                   {request_sync_complete = _MsgTag, _}, % ->
+                   ok)
+                end;
+        false -> ok
+    end,
     Req = {?send_to_group_member, rrepair,
            {get_state, comm:this(), [open_sessions, open_recon, open_resolve]}},
     util:wait_for(fun() -> wait_for_sync_round_end2(Req, NodeKeys) end, 100).
@@ -513,12 +514,12 @@ wait_for_sync_round_end2(_Req, []) -> true;
 wait_for_sync_round_end2(Req, [Key | Keys]) ->
     api_dht_raw:unreliable_lookup(Key, Req),
     KeyResult =
+        begin
+        trace_mpath:thread_yield(),
         receive
             ?SCALARIS_RECV(
-            {get_state_response = MsgTag, [Sessions, ORC, ORS]}, % ->
+            {get_state_response = _MsgTag, [Sessions, ORC, ORS]}, % ->
             begin
-                trace_mpath:log_info(self(), {gc_on_done, MsgTag}),
-                trace_mpath:stop(),
                 if (ORC =:= 0 andalso ORS =:= 0 andalso
                         Sessions =:= []) ->
                        true;
@@ -528,7 +529,7 @@ wait_for_sync_round_end2(Req, [Key | Keys]) ->
                        false
                 end
             end)
-        end,
+        end end,
     if KeyResult -> wait_for_sync_round_end2(Req, Keys);
        true -> false
     end.

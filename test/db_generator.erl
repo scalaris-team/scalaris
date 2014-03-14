@@ -345,7 +345,9 @@ insert_db(KVV) ->
                   comm:send(Node, {get_state, comm:this(), my_range}),
                   % note: receive wrapped in anonymous functions to allow
                   %       ?SCALARIS_RECV in multiple receive statements
-                  NRange = fun() -> receive
+                  NRange = fun() ->
+                                   trace_mpath:thread_yield(),
+                                   receive
                                ?SCALARIS_RECV(
                                    {get_state_response, Range}, %% ->
                                    Range
@@ -360,6 +362,7 @@ insert_db(KVV) ->
           end,
           KVV, Nodes),
     _ = [begin
+             trace_mpath:thread_yield(),
              receive ?SCALARIS_RECV({add_data_reply}, ok) end
          end || _Node <- Nodes],
     ok.
@@ -372,6 +375,7 @@ remove_keys(Keys) ->
              comm:send(Node, {delete_keys, comm:this(), Keys})
          end || Node <- get_node_list()],
     _ = [begin
+             trace_mpath:thread_yield(),
              receive ?SCALARIS_RECV({delete_keys_reply}, ok) end
          end || _Node <- get_node_list()],
     ok.
@@ -600,6 +604,7 @@ select_random_keys([_|_] = Keys, KeysLen, Count, Acc) ->
 -spec get_node_list() -> [comm:mypid()].
 get_node_list() ->
     mgmt_server:node_list(),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
             {get_list_response, List}, %% ->

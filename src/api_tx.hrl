@@ -1,4 +1,4 @@
-%% @copyright 2011, 2012 Zuse Institute Berlin
+%% @copyright 2011, 2012, 2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -234,6 +234,7 @@ get_system_snapshot() ->
     Key = ?RT:hash_key(randoms:getRandomString()),
     api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, snapshot_leader,
                                        {init_snapshot, comm:this()}}),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({global_snapshot_done, Data}, Data);
         ?SCALARIS_RECV({global_snapshot_done_with_errors, ErrorInterval, Data},

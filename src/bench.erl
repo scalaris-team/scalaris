@@ -130,6 +130,7 @@ manage_run(ThreadsPerVM, Iterations, Options, Message) ->
                                             Msg),
                   comm:send_local(Pid, Res)
           end),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({ok, Result}, %% ->
             {ok, Result})
@@ -228,6 +229,7 @@ init_key(Key, Count) ->
 
 collect(0, L, _Print)     -> L;
 collect(Length, L, Print) ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({done, X, WallClockTime, MeanTime, Variance, MinTime, MaxTime, Aborts}, %% ->
          begin
