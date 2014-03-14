@@ -36,7 +36,7 @@
 -type(custom_message() ::
     {rm, trigger} |
     {rm, trigger_action} |
-    {{cy_cache, Cache::[node:node_type()]}, rm} |
+    {rm, {cy_cache, Cache::[node:node_type()]}} |
     {rm, {get_node_details_response, NodeDetails::node_details:node_details()}} |
     {rm, buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm, buffer_response, OtherNeighbors::nodelist:neighborhood()}).
