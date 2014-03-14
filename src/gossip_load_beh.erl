@@ -27,10 +27,10 @@
 -export_type([load/0]).
 -endif.
 
+-type load() :: number().
+
 % Erlang version >= R15B
 -ifdef(have_callback_support).
-
--type load() :: number().
 
 -callback get_load(DhtNodeState::dht_node_state:state()) -> load().
 
