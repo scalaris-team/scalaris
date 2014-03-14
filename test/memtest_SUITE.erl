@@ -136,8 +136,11 @@ write_1000(_Config) ->
 %%      written binary.
 write(Number, Size) when Number >= 1 ->
     Key = lists:flatten(io_lib:format("write_~B", [Number])),
+    DHTNodes = pid_groups:find_all(dht_node),
 %%     ct:pal("~p~n", [erlang:memory()]),
-    Table = hd([Tab || Tab <- ets:all(), is_atom(Tab), lists:prefix("db_", erlang:atom_to_list(Tab))]),
+    Table = hd([Tab || Tab <- ets:all(),
+                       ets:info(Tab, name) =:= dht_node_db,
+                       lists:member(ets:info(Tab, owner), DHTNodes)]),
     print_table_info(Table),
     PrevMemInfo = get_meminfo(),
     % only the last binary should be kept!
@@ -170,8 +173,11 @@ fill(Number, Size) ->
     fill(1, Number, Size).
 
 fill(Start, End, Size) when End >= Start ->
+    DHTNodes = pid_groups:find_all(dht_node),
 %%     ct:pal("~p~n", [erlang:memory()]),
-    Table = hd([Tab || Tab <- ets:all(), is_atom(Tab), lists:prefix("db_", erlang:atom_to_list(Tab))]),
+    Table = hd([Tab || Tab <- ets:all(),
+                       ets:info(Tab, name) =:= dht_node_db,
+                       lists:member(ets:info(Tab, owner), DHTNodes)]),
     print_table_info(Table),
     PrevMemInfo = get_meminfo(),
     MyBinSize =
@@ -202,8 +208,11 @@ modify(Number, Repeat, Size) ->
     modify(1, Number, Repeat, Size).
 
 modify(Start, End, Repeat, Size) when End >= Start andalso Repeat >= 1 ->
+    DHTNodes = pid_groups:find_all(dht_node),
 %%     ct:pal("~p~n", [erlang:memory()]),
-    Table = hd([Tab || Tab <- ets:all(), is_atom(Tab), lists:prefix("db_", erlang:atom_to_list(Tab))]),
+    Table = hd([Tab || Tab <- ets:all(),
+                       ets:info(Tab, name) =:= dht_node_db,
+                       lists:member(ets:info(Tab, owner), DHTNodes)]),
     print_table_info(Table),
     PrevMemInfo = get_meminfo(),
     MyBinSize =
