@@ -51,8 +51,6 @@ get_neighbors({Neighbors}) ->
 -spec init(Me::node:node_type(), Pred::node:node_type(),
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
-    msg_delay:send_trigger(stabilizationInterval(), {rm, trigger}),
-    comm:send_local(self(), {rm, trigger_action}),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     get_successorlist(node:pidX(Succ)),
     {Neighborhood}.
@@ -68,21 +66,6 @@ unittest_create_state(Neighbors) ->
 %% @doc Message handler when the module is fully initialized.
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
-handle_custom_message({rm, trigger}, {Neighborhood}) ->
-    msg_delay:send_trigger(stabilizationInterval(), {rm, trigger}),
-    handle_custom_message({rm, trigger_action}, {Neighborhood});
-
-handle_custom_message({rm, trigger_action}, {Neighborhood} = State) ->
-    % new stabilization interval
-    case nodelist:has_real_succ(Neighborhood) of
-        true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
-                          {get_node_details,
-                           comm:reply_as(comm:this(), 2, {rm, '_', from_succ}), [pred]},
-                          ?SEND_OPTIONS);
-        _    -> ok
-    end,
-    {{unknown}, State};
-
 handle_custom_message({rm, get_succlist, Source_Pid}, {Neighborhood} = State) ->
     comm:send(Source_Pid, {rm, get_succlist_response,
                            nodelist:node(Neighborhood),
@@ -137,6 +120,19 @@ handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
     {{unknown}, State};
 
 handle_custom_message(_, _State) -> unknown_event.
+
+-spec trigger_action(State::state())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+trigger_action({Neighborhood} = State) ->
+    % new stabilization interval
+    case nodelist:has_real_succ(Neighborhood) of
+        true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
+                          {get_node_details,
+                           comm:reply_as(comm:this(), 2, {rm, '_', from_succ}), [pred]},
+                          ?SEND_OPTIONS);
+        _    -> ok
+    end,
+    {{unknown}, State}.
 
 -spec new_pred(State::state(), NewPred::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
@@ -244,5 +240,5 @@ predListLength() -> 1.
 succListLength() -> config:read(succ_list_length).
 
 %% @doc the interval between two stabilization runs
--spec stabilizationInterval() -> pos_integer().
-stabilizationInterval() -> config:read(stabilization_interval_base) div 1000.
+-spec trigger_interval() -> pos_integer().
+trigger_interval() -> config:read(stabilization_interval_base) div 1000.
