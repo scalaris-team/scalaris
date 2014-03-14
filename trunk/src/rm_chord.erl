@@ -28,8 +28,8 @@
 
 % accepted messages of an initialized rm_chord process in addition to rm_loop
 -type(custom_message() ::
-    {rm_trigger} |
-    {rm_trigger_action} |
+    {rm, trigger} |
+    {rm, trigger_action} |
     {rm, get_succlist, Source_Pid::comm:mypid()} |
     {rm, {get_node_details_response, NodeDetails::node_details:node_details()}, from_succ | from_node} |
     {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
@@ -51,8 +51,8 @@ get_neighbors({Neighbors}) ->
 -spec init(Me::node:node_type(), Pred::node:node_type(),
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
-    msg_delay:send_trigger(stabilizationInterval(), {rm_trigger}),
-    comm:send_local(self(), {rm_trigger_action}),
+    msg_delay:send_trigger(stabilizationInterval(), {rm, trigger}),
+    comm:send_local(self(), {rm, trigger_action}),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     get_successorlist(node:pidX(Succ)),
     {Neighborhood}.
@@ -68,11 +68,11 @@ unittest_create_state(Neighbors) ->
 %% @doc Message handler when the module is fully initialized.
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
-handle_custom_message({rm_trigger}, {Neighborhood}) ->
-    msg_delay:send_trigger(stabilizationInterval(), {rm_trigger}),
-    handle_custom_message({rm_trigger_action}, {Neighborhood});
+handle_custom_message({rm, trigger}, {Neighborhood}) ->
+    msg_delay:send_trigger(stabilizationInterval(), {rm, trigger}),
+    handle_custom_message({rm, trigger_action}, {Neighborhood});
 
-handle_custom_message({rm_trigger_action}, {Neighborhood} = State) ->
+handle_custom_message({rm, trigger_action}, {Neighborhood} = State) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
         true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
@@ -175,7 +175,7 @@ remove_succ({OldNeighborhood}, OldSucc, SuccsSucc) ->
 update_node({OldNeighborhood}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
     % inform neighbors
-    handle_custom_message({rm_trigger_action}, {NewNeighborhood}).
+    handle_custom_message({rm, trigger_action}, {NewNeighborhood}).
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes(NewNodes) ->
