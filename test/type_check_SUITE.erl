@@ -159,6 +159,7 @@ tester_type_check_gossip(_Config) ->
     tester:register_value_creator({typedef, gossip, state}, gossip, tester_create_state, 9),
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
     tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 11),
+    tester:register_value_creator({typedef, gossip_load, load_data_list}, gossip_load, tester_create_load_data_list, 1),
     tester:register_value_creator({typedef, gossip, cb_module}, gossip, tester_gossip_beh_modules, 1),
     Modules = [ {gossip,
             % excluded (exported functions)
@@ -194,8 +195,7 @@ tester_type_check_gossip(_Config) ->
             % excluded (private functions)
             [  {state_new, 2}, % too many db tables
                {state_update, 3}, % cannot create funs
-               {init_histo, 2}, % needs DHTNodeState state
-               {get_load_for_interval, 3}, % needs dht db
+               {init_histo, 3}, % needs DHTNodeState state
                {merge_histo, 2}, % tested via feeder
                {merge_bucket, 2} % tested via feeder
             ]}
@@ -212,6 +212,7 @@ tester_type_check_gossip(_Config) ->
     tester:unregister_type_checker({typedef, gossip_load, state}),
     tester:unregister_value_creator({typedef, gossip, state}),
     tester:unregister_value_creator({typedef, gossip_load, state}),
+    tester:unregister_value_creator({typedef, gossip_load, load_data_list}),
     tester:unregister_value_creator({typedef, gossip_load, histogram}),
     tester:unregister_type_checker({typedef, gossip_load, histogram}),
     tester:unregister_value_creator({typedef, gossip, cb_module}),
