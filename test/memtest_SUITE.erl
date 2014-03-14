@@ -50,6 +50,7 @@ init_per_testcase(_TestCase, Config) ->
     InitKey = "memtest_SUITE",
     {ok} = api_tx:write(InitKey, 1),
     api_tx_SUITE:wait_for_dht_entries(?RT:get_replica_keys(?RT:hash_key(InitKey))),
+    _ = code:ensure_loaded(gossip_load_default), % otherwise loaded too late
     garbage_collect_all(),
     Config.
 
