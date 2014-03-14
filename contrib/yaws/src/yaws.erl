@@ -821,6 +821,7 @@ ticker(Time, Msg) ->
 ticker(Time, To, Msg ) ->
     spawn_link(fun() ->
                        process_flag(trap_exit, true),
+                       erlang:monitor(process, To),
                        yaws_ticker:ticker(Time, To, Msg)
                end).
 
