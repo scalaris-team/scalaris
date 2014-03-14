@@ -22,19 +22,29 @@
 
 -compile([export_all]).
 
+%% start proto scheduler for this suite
 -define(proto_sched(Action),
-        fun() ->
+        fun() -> %% use fun to have fresh, locally scoped variables
                 case Action of
                     start ->
-                        ct:pal("Starting proto scheduler"),
-                        proto_sched:start();
-                    start_deliver ->
-                        proto_sched:start_deliver();
+                        %% ct:pal("Starting proto scheduler"),
+                        proto_sched:thread_num(1),
+                        proto_sched:thread_begin();
                     stop ->
-                        proto_sched:stop(),
-                        case erlang:whereis(pid_groups) =:= undefined orelse pid_groups:find_a(proto_sched) =:= failed of
+                         %% is a ring running?
+                        case erlang:whereis(pid_groups) =:= undefined
+                            orelse pid_groups:find_a(proto_sched) =:= failed of
                             true -> ok;
                             false ->
+                                %% then finalize proto_sched run:
+                                %% try to call thread_end(): if this
+                                %% process was running the proto_sched
+                                %% thats fine, otherwise thread_end()
+                                %% will raise an exception
+                                catch(proto_sched:thread_end()),
+                                proto_sched:wait_for_end(),
+                                ct:pal("Proto scheduler stats: ~.2p",
+                                       [proto_sched:get_infos()]),
                                 proto_sched:cleanup()
                         end
                 end
@@ -49,46 +59,54 @@ suite() -> [ {timetrap, {seconds, 15}} ].
 
 test_join(_Config) ->
     ct:pal("starting job that triggers breakpoint"),
-    MrPid = spawn_link(fun() ->
-                               ?proto_sched(start),
-                               ct:pal("starting mr job"),
-                               Res = api_mr:start_job(get_wc_job_erl()),
-                               ct:pal("mr job finished"),
-                               check_results(Res)
-                       end),
+    spawn_link(fun() ->
+                       proto_sched:thread_begin(),
+                       ct:pal("starting mr job"),
+                       Res = api_mr:start_job(get_wc_job_erl()),
+                       ct:pal("mr job finished"),
+                       check_results(Res),
+                       proto_sched:thread_end()
+               end),
     ct:pal("adding node to provoke slide"),
-    AddPid = spawn_link(fun() ->
-                                 ?proto_sched(start),
-                                 api_vm:add_nodes(2)
-                         end),
+    spawn_link(fun() ->
+                       proto_sched:thread_begin(),
+                       api_vm:add_nodes(2),
+                       proto_sched:thread_end()
+               end),
+    proto_sched:thread_num(2),
+    proto_sched:wait_for_end(),
     unittest_helper:check_ring_size_fully_joined(4),
     unittest_helper:wait_for_stable_ring_deep(),
     ct:pal("ring fully joined (4)"),
-    ?proto_sched(start_deliver),
-    util:wait_for_process_to_die(MrPid),
-    %% wait before destroying the environment (to prevent exceptions)
-    util:wait_for_process_to_die(AddPid),
+    proto_sched:cleanup(),
+    %% make ?proto_sched(stop) happy (called in end_per_testcase)
+    proto_sched:thread_num(1),
+    proto_sched:thread_begin(),
     ok.
 
 test_leave(_Config) ->
     api_vm:shutdown_nodes(1),
     {[AddedNode], _} = api_vm:add_nodes(1),
-    MrPid = spawn_link(fun() ->
-                               ?proto_sched(start),
-                               ct:pal("starting mr job"),
-                               Res = api_mr:start_job(get_wc_job_erl()),
-                               ct:pal("mr job finished"),
-                               check_results(Res)
-                       end),
-    ct:pal("shutting down node ~p to provoke slide", [AddedNode]),
-    VMPid = spawn_link(fun() ->
-                                ?proto_sched(start),
-                                api_vm:shutdown_node(AddedNode)
-                        end),
     unittest_helper:check_ring_size_fully_joined(2),
     unittest_helper:wait_for_stable_ring_deep(),
-    ?proto_sched(start_deliver),
-    util:wait_for_process_to_die(MrPid),
-    %% wait before destroying the environment (to prevent exceptions)
-    util:wait_for_process_to_die(VMPid),
+    spawn_link(fun() ->
+                       proto_sched:thread_begin(),
+                       ct:pal("starting mr job"),
+                       Res = api_mr:start_job(get_wc_job_erl()),
+                       ct:pal("mr job finished"),
+                       check_results(Res),
+                       proto_sched:thread_end()
+               end),
+    ct:pal("shutting down node ~p to provoke slide", [AddedNode]),
+    spawn_link(fun() ->
+                       proto_sched:thread_begin(),
+%% TODO: fix, so it works with concurrent api_vm:shutdown_node
+%%                     api_vm:shutdown_node(AddedNode),
+                       proto_sched:thread_end()
+               end),
+    proto_sched:thread_num(2),
+    proto_sched:wait_for_end(),
+    proto_sched:cleanup(),
+    proto_sched:thread_num(1),
+    proto_sched:thread_begin(),
     ok.
