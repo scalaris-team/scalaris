@@ -34,8 +34,8 @@
 
 % accepted messages of an initialized rm_tman process in addition to rm_loop
 -type(custom_message() ::
-    {rm_trigger} |
-    {rm_trigger_action} |
+    {rm, trigger} |
+    {rm, trigger_action} |
     {{cy_cache, Cache::[node:node_type()]}, rm} |
     {rm, {get_node_details_response, NodeDetails::node_details:node_details()}} |
     {rm, buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
@@ -58,7 +58,7 @@ get_neighbors({Neighbors, _RandViewSize, _Cache, _Churn}) ->
 -spec init(Me::node:node_type(), Pred::node:node_type(),
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
-    msg_delay:send_trigger(0, {rm_trigger}),
+    msg_delay:send_trigger(0, {rm, trigger}),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
     {Neighborhood, config:read(cyclon_cache_size), [], true}.
@@ -74,11 +74,11 @@ unittest_create_state(Neighbors) ->
 %% @doc Message handler when the module is fully initialized.
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
-handle_custom_message({rm_trigger}, State) ->
-    msg_delay:send_trigger(get_base_interval(), {rm_trigger}),
+handle_custom_message({rm, trigger}, State) ->
+    msg_delay:send_trigger(get_base_interval(), {rm, trigger}),
     rm_trigger_action(State);
 
-handle_custom_message({rm_trigger_action}, State) ->
+handle_custom_message({rm, trigger_action}, State) ->
     rm_trigger_action(State);
 
 % got empty cyclon cache
