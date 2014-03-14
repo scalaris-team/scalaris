@@ -3,6 +3,7 @@
   "src/db_backend_beh.erl",
   "src/gen_component.erl",
   "src/gossip_beh.erl",
+  "src/gossip_load_beh.erl",
   "src/lb_psv_beh.erl",
   "src/pdb_beh.erl",
   "src/rm_beh.erl",
