@@ -709,23 +709,22 @@ finish_request(State) ->
 
 
 -spec update_convergence_count(OldData::data(), NewData::data(), State::state()) -> true.
-update_convergence_count(OldData = {OldLoad, OldRing}, NewData = {NewLoad, NewRing}, State) ->
+update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, State) ->
 
     % check whether all average based values changed less than epsilon percent
     AvgChangeEpsilon = convergence_epsilon(),
 
     %% Ring convergence
-    Fun = fun(AvgType, Acc) ->
+    Fun = fun(AvgType) ->
             {OldAvg, OldWeight} = data_get(AvgType, OldRing),
             {NewAvg, NewWeight} = data_get(AvgType, NewRing),
             OldValue = calc_current_estimate(OldAvg, OldWeight),
             NewValue = calc_current_estimate(NewAvg, NewWeight),
             log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
                 [state_get(instance, State), AvgType, OldValue, NewValue]),
-            HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon,
-            Acc andalso HasConverged
+            _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
     end,
-    RingConverged = lists:foldl(Fun, true, [size_inv, avg_kr]),
+    RingConverged = lists:all(Fun, [size_inv, avg_kr]),
 
     %% Load convergence
     LoadModulesConverged =
@@ -738,12 +737,11 @@ update_convergence_count(OldData = {OldLoad, OldRing}, NewData = {NewLoad, NewRi
                      [state_get(instance, State), AvgType, OldValue, NewValue]),
              _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
          end
-         || {OldLoadModule, NewLoadModule} <- lists:zip(OldLoad, NewLoad),
+         || {OldLoadModule, NewLoadModule} <- lists:zip(OldLoadList, NewLoadList),
             AvgType                        <- [avg, avg2]
         ],
 
-    LoadConverged = lists:foldl(fun(Mod, Acc) -> Acc andalso Mod end,
-                                true, LoadModulesConverged),
+    LoadConverged = lists:all(fun(X) -> X end, LoadModulesConverged),
 
     HaveConverged1 = RingConverged andalso LoadConverged,
     log:log(debug, "Averages have converged: ~w", [HaveConverged1]),
@@ -756,19 +754,17 @@ update_convergence_count(OldData = {OldLoad, OldRing}, NewData = {NewLoad, NewRi
                                        data_get(histo, OldLoadModule), data_get(histo, NewLoadModule)),
 
               % check that all the buckets of histogram have changed less than epsilon percent
-              Fun1 = fun({OldAvg, NewAvg}, AccIn) ->
+              Fun1 = fun({OldAvg, NewAvg}) ->
                              OldEstimate = calc_current_estimate(OldAvg),
                              NewEstimate = calc_current_estimate(NewAvg),
-                             HasConverged = calc_change(OldEstimate, NewEstimate) < AvgChangeEpsilon,
-                             AccIn andalso HasConverged
+                             _HasConverged = calc_change(OldEstimate, NewEstimate) < AvgChangeEpsilon
                      end,
-              _HaveConverged2 = lists:foldl(Fun1, true, CompList)
+              _HaveConverged2 = lists:all(Fun1, CompList)
           end
-          || {OldLoadModule, NewLoadModule} <- lists:zip(OldLoad, NewLoad)
+          || {OldLoadModule, NewLoadModule} <- lists:zip(OldLoadList, NewLoadList)
         ],
 
-    HaveConverged2 = lists:foldl(fun(Mod, Acc) -> Acc andalso Mod end,
-                                true, HistoModulesConverged),
+    HaveConverged2 = lists:all(fun(X) -> X end, HistoModulesConverged),
     log:log(debug, "Histogram has converged: ~w", [HaveConverged2]),
 
     HaveConverged = HaveConverged1 andalso HaveConverged2,
