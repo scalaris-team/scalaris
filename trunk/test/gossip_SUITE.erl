@@ -76,7 +76,7 @@ test_no_load(_Config) ->
     send2gossip({get_values_best, {gossip_load,default}, self()}, 0),
 
     %                 {load_info, avg, stddev, size_ldr, size_kr, minLoad, maxLoad, merged}
-    LoadInfoExpected ={load_info, 0.0, 0.0, 5.0, 5.0, 0, 0, whatever},
+    LoadInfoExpected ={load_info, 0.0, 0.0, 5.0, 5.0, 0, 0, whatever, []},
     receive {gossip_get_values_best_response, LoadInfo} ->
             ?compare(fun compare/2, LoadInfo, LoadInfoExpected)
     end.
@@ -93,8 +93,8 @@ test_load(_Config) ->
     Min = lists:min(Loads),
     Max = lists:max(Loads),
 
-    %                  {load_info, avg, stddev, size_ldr, size_kr, minLoad, maxLoad, merged}
-    LoadInfoExpected = {load_info, Avg, Stddev, Size,     Size,    Min,     Max,      dc},
+    %                  {load_info, avg, stddev, size_ldr, size_kr, minLoad, maxLoad, merged, other}
+    LoadInfoExpected = {load_info, Avg, Stddev, Size,     Size,    Min,     Max,      dc,    []},
 
     % get values from gossiping (after round finishes)
     % first round might be interrupted by node joins, thus wait two rounds

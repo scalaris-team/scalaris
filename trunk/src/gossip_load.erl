@@ -49,7 +49,7 @@
 -include("record_helpers.hrl").
 
 % API
--export([request_histogram/2, load_info_get/2]).
+-export([request_histogram/2, load_info_get/2, load_info_other_get/3]).
 
 % gossip_beh
 -export([init/1, init/2, init/3, check_config/0, trigger_interval/0, fanout/0,
@@ -68,9 +68,12 @@
 %% -define(SHOW, config:read(log_level)).
 -define(SHOW, debug).
 
-%% List of module names to use for aggregation
-%-define(MODULES, [gossip_load_default, gossip_load_cpu]).
--define(MODULES, [gossip_load_default]).
+-define(DEFAULT_MODULE, gossip_load_default).
+
+%% List of module names for additional aggregation
+%% (Modules need to implement gossip_load_beh)
+%-define(ADDITIONAL_MODULES, [gossip_load_cpu]).
+-define(ADDITIONAL_MODULES, [gossip_load_default]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -112,24 +115,34 @@
 -type load_data() :: {load_data, Name::atom(), Avg::avg(), Avg2::avg(),
                       Min::non_neg_integer(), Max::non_neg_integer(),
                       Histogram::histogram()}.
+
 -type load_data_list() :: [load_data(), ...].
 
-%-type data_uninit() :: {load_data_uninit(), ring_data_uninit()}.
 -type data() :: {load_data_list(), ring_data()}.
 
 % record of load data values for use by other modules
--record(load_info, {
+-record(load_info, { %% general info and default gossip values
             avg       = unknown :: unknown | float(),  % average load
             stddev    = unknown :: unknown | float(), % standard deviation of the load
             size_ldr  = unknown :: unknown | float(), % estimated ring size: 1/(average of leader=1, others=0)
             size_kr   = unknown :: unknown | float(), % estimated ring size based on average key ranges
             min       = unknown :: unknown | min(), % minimum load
             max       = unknown :: unknown | max(), % maximum load
-            merged    = unknown :: unknown | merged() % how often the data was merged since the node entered/created the round
+            merged    = unknown :: unknown | merged(), % how often the data was merged since the node entered/created the round
+            other     = []      :: [load_info_other()]
     }).
 
--opaque(load_info() :: #load_info{}).
+-record(load_info_other, { %% additional gossip values
+            name    = ?required(name, load_info_other) :: atom(),
+            avg     = unknown :: unknown | float(),  % average load
+            stddev  = unknown :: unknown | float(), % standard deviation of the load
+            min     = unknown :: unknown | min(), % minimum load
+            max     = unknown :: unknown | max() % maximum load
+    }).
 
+-type(load_info_other() :: #load_info_other{}).
+
+-opaque(load_info() :: #load_info{}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Config Functions
@@ -429,11 +442,6 @@ handle_msg({get_state_response, DHTNodeState}, State) ->
     comm:send_local(Pid, {selected_data, state_get(instance, State), {NewLoadData, NewRingData}}),
     {ok, State}.
 
-%% ;
-%% handle_msg(Msg, State) ->
-%%     gossip_load_default:handle_msg(Msg).
-
-
 %% @doc Checks if the current round has converged yer <br/>
 %%      Returns true if the round has converged, false otherwise.
 -spec round_has_converged(State::state()) -> {boolean(), state()}.
@@ -545,7 +553,7 @@ web_debug_info(State) ->
         [{to_string(state_get(instance, State)), ""},
          {"best",                Best},
          {"leader",              state_get(leader, State)},
-        %% previous round
+         %% previous round
          {"prev_round",          state_get(round, PreviousState)},
          {"prev_merged",         state_get(merged, PreviousState)},
          {"prev_conv_avg_count", state_get(convergence_count, PreviousState)},
@@ -640,7 +648,7 @@ integrate_data_init(QData, RoundStatus, State) ->
             %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [state_get(instance, State), _ValuesAll]),
             %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [state_get(instance, State), _PrevLoadInfo]),
             _LoadInfo = get_load_info(State),
-            _Histo = data_get(histo, _NewLoad),
+            _Histo = data_get(histo, get_default_load_data(_NewLoad)),
             log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
                 [state_get(instance, State), to_string(_LoadInfo), to_string(_Histo)]);
         old_round ->
@@ -729,16 +737,17 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, State) 
     %% Load convergence
     LoadModulesConverged =
         [begin
-             {OldAvg, OldWeight} = data_get(AvgType, OldLoadModule),
-             {NewAvg, NewWeight} = data_get(AvgType, NewLoadModule),
+             ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
+             {OldAvg, OldWeight} = data_get(AvgType, OldLoad),
+             {NewAvg, NewWeight} = data_get(AvgType, NewLoad),
              OldValue = calc_current_estimate(OldAvg, OldWeight),
              NewValue = calc_current_estimate(NewAvg, NewWeight),
              log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
                      [state_get(instance, State), AvgType, OldValue, NewValue]),
              _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
          end
-         || {OldLoadModule, NewLoadModule} <- lists:zip(OldLoadList, NewLoadList),
-            AvgType                        <- [avg, avg2]
+         || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList),
+            AvgType            <- [avg, avg2]
         ],
 
     LoadConverged = lists:all(fun(X) -> X end, LoadModulesConverged),
@@ -748,10 +757,11 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, State) 
 
     HistoModulesConverged =
         [ begin
+              ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
               % Combine the avg values of the buckets of two histograms into one tuple list
               Combine = fun ({Interval, AvgOld}, {Interval, AvgNew}) -> {AvgOld, AvgNew} end,
               CompList = lists:zipwith(Combine,
-                                       data_get(histo, OldLoadModule), data_get(histo, NewLoadModule)),
+                                       data_get(histo, OldLoad), data_get(histo, NewLoad)),
 
               % check that all the buckets of histogram have changed less than epsilon percent
               Fun1 = fun({OldAvg, NewAvg}) ->
@@ -761,7 +771,7 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, State) 
                      end,
               _HaveConverged2 = lists:all(Fun1, CompList)
           end
-          || {OldLoadModule, NewLoadModule} <- lists:zip(OldLoadList, NewLoadList)
+          || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList)
         ],
 
     HaveConverged2 = lists:all(fun(X) -> X end, HistoModulesConverged),
@@ -785,7 +795,7 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, State) 
 state_new() ->
     NewState = ets:new(cbstate, [set, protected]),
     state_set(status, uninit, NewState),
-    state_set(load_data, load_data_new(), NewState),
+    state_set(load_data, load_data_list_new(), NewState),
     state_set(ring_data, ring_data_new(), NewState),
     state_set(leader, unknown, NewState),
     state_set(range, unknown, NewState),
@@ -863,9 +873,14 @@ prev_state_get(Key, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc creates a new load_data (for internal use by gossip_load.erl)
--spec load_data_new() -> [load_data_uninit()].
-load_data_new() ->
-    [#load_data{name = Module} || Module <- ?MODULES].
+-spec load_data_new(Module::atom()) -> load_data_uninit().
+load_data_new(Module) ->
+    #load_data{name = Module}.
+
+-spec load_data_list_new() -> [load_data_uninit(), ...].
+load_data_list_new() ->
+    Modules = [?DEFAULT_MODULE | ?ADDITIONAL_MODULES],
+    [load_data_new(Module) || Module <- Modules].
 
 -spec ring_data_new() -> ring_data_uninit().
 ring_data_new() ->
@@ -875,10 +890,9 @@ ring_data_new() ->
                            (load_data_list()) -> load_data().
 get_default_load_data(unknown) -> unknown;
 get_default_load_data(LoadDataList) ->
-    %% name is second element of record
-    case lists:keyfind(gossip_load_default, 2, LoadDataList) of
-        false    -> hd(LoadDataList);
-            %throw(default_load_module_not_available);
+    %% name is the second element of record tuple
+    case lists:keyfind(?DEFAULT_MODULE, 2, LoadDataList) of
+        false    -> throw(default_load_module_not_available);
         LoadData -> LoadData
     end.
 
@@ -894,6 +908,7 @@ get_default_load_data(LoadDataList) ->
 %%      </ul>
 %%      See type spec for details on which keys are allowed on which records.
 -spec data_get(_, unknown) -> unknown;
+             (name, load_data()) -> atom();
              (avg, load_data()) -> avg();
              (avg2, load_data()) -> avg();
              (min, load_data()) -> min();
@@ -916,11 +931,12 @@ data_get(Key, #load_data{name = Name, avg=Avg, avg2=Avg2,
         max -> Max;
         histo -> Histo
     end;
-data_get(size_inv, #ring_data{size_inv = SizeInv}) ->
-    SizeInv;
-data_get(avg_kr, #ring_data{avg_kr = AvgKr}) ->
+data_get(Key, #ring_data{size_inv = SizeInv, avg_kr = AvgKr}) ->
+    case Key of
+        size_inv -> SizeInv;
+        avg_kr -> AvgKr
+    end.
 
-    AvgKr.
 -spec get_current_estimate(Key::avg | avg2,
                            unknown | load_data()) -> float() | unknown;
                           (Key::size_inv | avg_kr,
@@ -1040,11 +1056,12 @@ merge_load_data(prev_round, OtherData, State) ->
 %%      Set update is set, the merge and convergence count is updated, otherwise not.
 -spec merge_load_data1(Update::update | noupdate, OtherData::data(),
     State::state()) -> data().
-merge_load_data1(Update, {OtherLoadModules, OtherRing}, State) ->
+merge_load_data1(Update, {OtherLoadList, OtherRing}, State) ->
 
-    MyLoadModules = state_get(load_data, State),
+    MyLoadList = state_get(load_data, State),
     LoadDataNew =
         [begin
+             ?ASSERT(data_get(name, MyLoad1) =:= data_get(name, OtherLoad)),
              % Averages load
              Fun = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherLoad) end,
              MyLoad2 = lists:foldl(Fun, MyLoad1, [avg, avg2]),
@@ -1068,7 +1085,7 @@ merge_load_data1(Update, {OtherLoadModules, OtherRing}, State) ->
              % Histogram
              _MyLoad5 = merge_histo(MyLoad4, OtherLoad)
          end
-         || {MyLoad1, OtherLoad} <- lists:zip(MyLoadModules, OtherLoadModules)],
+         || {MyLoad1, OtherLoad} <- lists:zip(MyLoadList, OtherLoadList)],
 
     state_set(load_data, LoadDataNew, State),
 
@@ -1082,7 +1099,7 @@ merge_load_data1(Update, {OtherLoadModules, OtherRing}, State) ->
     case Update of
         update ->
             state_update(merged, fun inc/1, State),
-            update_convergence_count({MyLoadModules, MyRing1}, NewData, State);
+            update_convergence_count({MyLoadList, MyRing1}, NewData, State);
         noupdate -> do_nothing
     end,
     NewData.
@@ -1180,17 +1197,30 @@ merge_bucket({Key, {Value1, Weight1}}, {Key, {Value2, Weight2}}) ->
 get_load_info(State) ->
     LoadDataList = state_get(load_data, State),
     %% select default load data for output
-    LoadData = get_default_load_data(LoadDataList),
+    {DefaultLoadData, OtherLoadData} =
+        case lists:keytake(?DEFAULT_MODULE, 2, LoadDataList) of
+            false -> throw(default_load_module_not_available);
+            {value, LoadData, Other} -> {LoadData, Other}
+        end,
     RingData = state_get(ring_data, State),
+    OtherLoadInfo = [#load_info_other {
+                                       name   = data_get(name, LoadData),
+                                       avg    = get_current_estimate(avg, LoadData),
+                                       stddev = calc_stddev(LoadData),
+                                       min    = data_get(min, LoadData),
+                                       max    = data_get(max, LoadData)
+                                      }
+                    || LoadData <- OtherLoadData],
     _LoadInfo =
-        #load_info{ avg       = get_current_estimate(avg, LoadData),
-                    stddev    = calc_stddev(LoadData),
+        #load_info{ avg       = get_current_estimate(avg, DefaultLoadData),
+                    stddev    = calc_stddev(DefaultLoadData),
                     size_ldr  = get_current_estimate(size_inv, RingData),
                     size_kr   = calc_size_kr(RingData),
-                    min       = data_get(min, LoadData),
-                    max       = data_get(max, LoadData),
-                    merged    = state_get(merged, State)
-            }.
+                    min       = data_get(min, DefaultLoadData),
+                    max       = data_get(max, DefaultLoadData),
+                    merged    = state_get(merged, State),
+                    other     = OtherLoadInfo
+                  }.
 
 
 %% @doc Gets the value to the given key from the given load_info record.
@@ -1201,9 +1231,10 @@ get_load_info(State) ->
                    (Key::size, LoadInfoRecord::load_info()) -> unknown | float();
                    (Key::minLoad, LoadInfoRecord::load_info()) -> unknown | min();
                    (Key::maxLoad, LoadInfoRecord::load_info()) -> unknown | max();
-                   (Key::merged, LoadInfoRecord::load_info()) -> unknown | merged().
+                   (Key::merged, LoadInfoRecord::load_info()) -> unknown | merged();
+                   (Key::other, LoadInfoRecord::load_info()) -> [load_info_other()].
 load_info_get(Key, #load_info{avg=Avg, stddev=Stddev, size_ldr=SizeLdr,
-        size_kr=SizeKr, min=Min, max=Max, merged=Merged}) ->
+        size_kr=SizeKr, min=Min, max=Max, merged=Merged, other = Other}) ->
     case Key of
         avgLoad -> Avg;
         stddev -> Stddev;
@@ -1217,7 +1248,34 @@ load_info_get(Key, #load_info{avg=Avg, stddev=Stddev, size_ldr=SizeLdr,
             end;
         minLoad -> Min;
         maxLoad -> Max;
-        merged -> Merged
+        merged -> Merged;
+        other  -> Other
+    end.
+
+%% @doc Gets values from a load_info_other record which can be found in the load_info record.
+-spec load_info_other_get(Key::avgLoad, Module::atom(), LoadInfoRecord::load_info()) -> unknown | float();
+                         (Key::stddev, Module::atom(), LoadInfoRecord::load_info()) -> unknown | float();
+                         (Key::minLoad, Module::atom(), LoadInfoRecord::load_info()) -> unknown | min();
+                         (Key::maxLoad, Module::atom(), LoadInfoRecord::load_info()) -> unknown | max().
+load_info_other_get(Key, Module, #load_info{other = Other}) ->
+    case lists:keyfind(Module, 2, Other) of
+        false -> unknown;
+        LoadInfoOther -> load_info_other_get(Key, LoadInfoOther)
+    end.
+
+-spec load_info_other_get(Key::name, load_info_other()) -> atom();
+                   (Key::avgLoad, load_info_other()) -> unknown | float();
+                   (Key::stddev, load_info_other()) -> unknown | float();
+                   (Key::minLoad, load_info_other()) -> unknown | min();
+                   (Key::maxLoad, load_info_other()) -> unknown | max().
+load_info_other_get(Key, #load_info_other{name = Name, avg=Avg,
+                                          stddev=Stddev, min=Min, max=Max}) ->
+    case Key of
+        name -> Name;
+        avgLoad -> Avg;
+        stddev -> Stddev;
+        minLoad -> Min;
+        maxLoad -> Max
     end.
 
 
@@ -1425,11 +1483,24 @@ tester_create_histogram(ListOfAvgs) ->
                 lists:nth(random:uniform(length(ListOfAvgs)), ListOfAvgs)} end,
     lists:map(Fun, Histo1).
 
-%% @doc create a fixed size list of load_data. size must not change.
--spec tester_create_load_data_list({load_data(), load_data(), load_data()})
-                                   -> load_data_list().
-tester_create_load_data_list(LoadData) ->
-    erlang:tuple_to_list(LoadData).
+%% @doc Creates a fixed sized list of load_data every time. Size must not change once created.
+%% Tester fails with massive memory leak here when input type is load_data_list().
+-spec tester_create_load_data_list({load_data(), load_data(), load_data(), load_data()}) -> load_data_list().
+tester_create_load_data_list(LoadDataTuple) ->
+    % make first LoadData the default
+    case erlang:get(load_data_list) of
+        undefined ->
+            LoadDataList = erlang:tuple_to_list(LoadDataTuple),
+            LoadDataListNew =
+                case LoadDataList of
+                    [First | Rest] ->
+                        Default = First#load_data{name = ?DEFAULT_MODULE},
+                        [Default | Rest]
+                end,
+            erlang:put(load_data_list, LoadDataListNew),
+            LoadDataListNew;
+        Existing -> Existing
+    end.
 
 %% @doc Checks if a given list is a valid histogram.
 %%      Used as type_checker in tester.erl (property testing).
