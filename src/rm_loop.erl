@@ -212,6 +212,7 @@ unsubscribe(RegPid, Tag) ->
 -spec init(Me::node:node_type(), Pred::node:node_type(),
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
+    msg_delay:send_trigger(0, {rm, trigger}),
     % create the ets table storing the subscriptions
     SubscrTable = ets:new(rm_subscribers, [ordered_set, private]),
     dn_cache:subscribe(),
@@ -234,6 +235,15 @@ unittest_create_state(Neighbors, HasLeft) ->
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message() | ?RM:custom_message(), state()) -> state().
+on({rm, trigger}, State) ->
+    msg_delay:send_trigger(?RM:trigger_interval(), {rm, trigger}),
+    RMFun = fun(RM_State) -> ?RM:trigger_action(RM_State) end,
+    update_state(State, RMFun);
+
+on({rm, trigger_action}, State) ->
+    RMFun = fun(RM_State) -> ?RM:trigger_action(RM_State) end,
+    update_state(State, RMFun);
+
 on({rm, notify_new_pred, NewPred}, State) ->
     RMFun = fun(RM_State) -> ?RM:new_pred(RM_State, NewPred) end,
     update_state(State, RMFun);

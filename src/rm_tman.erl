@@ -58,7 +58,6 @@ get_neighbors({Neighbors, _RandViewSize, _Cache, _Churn}) ->
 -spec init(Me::node:node_type(), Pred::node:node_type(),
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
-    msg_delay:send_trigger(0, {rm, trigger}),
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
     {Neighborhood, config:read(cyclon_cache_size), [], true}.
@@ -74,13 +73,6 @@ unittest_create_state(Neighbors) ->
 %% @doc Message handler when the module is fully initialized.
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
-handle_custom_message({rm, trigger}, State) ->
-    msg_delay:send_trigger(get_base_interval(), {rm, trigger}),
-    rm_trigger_action(State);
-
-handle_custom_message({rm, trigger_action}, State) ->
-    rm_trigger_action(State);
-
 % got empty cyclon cache
 handle_custom_message({rm, {cy_cache, []}},
    {_Neighborhood, RandViewSize, _Cache, _Churn} = State)  ->
@@ -162,9 +154,9 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
 
 handle_custom_message(_, _State) -> unknown_event.
 
--spec rm_trigger_action(State::state_t())
+-spec trigger_action(State::state_t())
         -> {ChangeReason::rm_loop:reason(), state()}.
-rm_trigger_action({Neighborhood, RandViewSize, Cache, Churn} = State) ->
+trigger_action({Neighborhood, RandViewSize, Cache, Churn} = State) ->
     % Trigger an update of the Random view
     % Test for being alone:
     case nodelist:has_real_pred(Neighborhood) andalso
@@ -258,7 +250,7 @@ remove_succ(State, OldSucc, SuccsSucc) ->
 update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
     NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
     % inform neighbors
-    rm_trigger_action({NewNeighborhood, RandViewSize, Cache, Churn}).
+    trigger_action({NewNeighborhood, RandViewSize, Cache, Churn}).
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes(NewNodes) ->
@@ -431,12 +423,12 @@ update_nodes({OldNeighborhood, RandViewSize, OldCache, _Churn},
     NewState = {NewNeighborhood, NewRandViewSize, NewCache, NewChurn},
     case nodelist:pred(OldNeighborhood) =/= nodelist:pred(NewNeighborhood) orelse
         nodelist:succ(OldNeighborhood) =/= nodelist:succ(NewNeighborhood) of
-        true -> element(2, rm_trigger_action(NewState));
+        true -> element(2, trigger_action(NewState));
         _    -> NewState
     end.
 
--spec get_base_interval() -> pos_integer().
-get_base_interval() -> config:read(stabilization_interval_base) div 1000.
+-spec trigger_interval() -> pos_integer().
+trigger_interval() -> config:read(stabilization_interval_base) div 1000.
 
 -spec get_pred_list_length() -> pos_integer().
 get_pred_list_length() -> config:read(pred_list_length).
