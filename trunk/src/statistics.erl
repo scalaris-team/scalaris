@@ -1,4 +1,4 @@
-% @copyright 2007-2013 Zuse Institute Berlin
+% @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -82,16 +82,19 @@ get_memory({failed, _}) ->
 -spec get_ring_details() -> ring().
 get_ring_details() ->
     mgmt_server:node_list(true),
-    Nodes = receive
+    Nodes = begin
+                trace_mpath:thread_yield(),
+                receive
                 ?SCALARIS_RECV({get_list_response, N}, N);
                 ?SCALARIS_RECV({send_error, _, {get_list, _}, Reason},
                                begin
                                  log:log(error,"[ ST ] Mgmt server unavailable: ~p", [Reason]),
                                  throw('mgmt_server_timeout')
                                end)
-            after 2000 ->
-                log:log(error,"[ ST ] Timeout getting node list from mgmt server"),
-                throw('mgmt_server_timeout')
+                after 2000 ->
+                        log:log(error,"[ ST ] Timeout getting node list from mgmt server"),
+                        throw('mgmt_server_timeout')
+                end
             end,
     lists:sort(fun compare_node_details/2, get_ring_details(Nodes)).
 
@@ -176,6 +179,7 @@ get_node_details([_|_] = Pids, Ring, TimeInMS) ->
     end,
     case Continue of
         continue ->
+            trace_mpath:thread_yield(),
             receive
                 ?SCALARIS_RECV(
                     {ok, {get_node_details_response, Details}, Pid}, %% ->
@@ -237,6 +241,7 @@ getMonitorData(Monitor, Keys) ->
         true -> log:log(error, "This must not be called inside a gen_component ~p~n", [pid_groups:group_and_name_of(self())]);
         false -> ok
     end,
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
             {get_rrds_response, DataL}, %% ->

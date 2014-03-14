@@ -1,4 +1,4 @@
-% @copyright 2011, 2012 Zuse Institute Berlin
+% @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -87,9 +87,27 @@ on({get_chunk_response, {_, DBList}},
                          || K <- ?RT:get_replica_keys(Key), K =/= Key],
                   % note: receive wrapped in anonymous functions to allow
                   %       ?SCALARIS_RECV in multiple receive statements
-                  V1 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _, ?ok, ?value_dropped, V}, V) end end(),
-                  V2 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _, ?ok, ?value_dropped, V}, V) end end(),
-                  V3 = fun() -> receive ?SCALARIS_RECV({?read_op_with_id_reply, 0, _, ?ok, ?value_dropped, V}, V) end end(),
+                  V1 = fun() ->
+                               trace_mpath:thread_yield(),
+                               receive ?SCALARIS_RECV({?read_op_with_id_reply,
+                                                       0, _, ?ok,
+                                                       ?value_dropped, V},
+                                                      V)
+                               end end(),
+                  V2 = fun() ->
+                               trace_mpath:thread_yield(),
+                               receive ?SCALARIS_RECV({?read_op_with_id_reply,
+                                                       0, _, ?ok,
+                                                       ?value_dropped, V},
+                                                      V)
+                               end end(),
+                  V3 = fun() ->
+                               trace_mpath:thread_yield(),
+                               receive ?SCALARIS_RECV({?read_op_with_id_reply,
+                                                       0, _, ?ok,
+                                                       ?value_dropped, V},
+                                                      V)
+                        end end(),
                   case Ver =:= lists:max([V1, V2, V3]) of
                       true -> Acc;
                       false -> Acc + 1

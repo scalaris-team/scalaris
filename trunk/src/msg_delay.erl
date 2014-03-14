@@ -58,11 +58,17 @@
                            Msg::comm:message()) -> ok.
 send_local_as_client(Seconds, Dest, Msg) ->
     Delayer = pid_groups:pid_of("clients_group", msg_delay),
+    %% TODO: if infected with proto_sched logging, immediately log msg
+    %% to proto_sched for the 'delayed' messages pool (which is not
+    %% implemented yet) and do *not* deliver to msg_delay process.
     comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
 
 -spec send_local(Seconds::non_neg_integer(), Dest::comm:erl_local_pid(), Msg::comm:message()) -> ok.
 send_local(Seconds, Dest, Msg) ->
     Delayer = pid_groups:find_a(msg_delay),
+    %% TODO: if infected with proto_sched logging, immediately deliver
+    %% to proto_sched for the 'delayed' messages pool (which is not
+    %% implemented yet) and do *not* deliver to msg_delay process.
     comm:send_local(Delayer, {msg_delay_req, Seconds, Dest, Msg}).
 
 %% be startable via supervisor, use gen_component
@@ -121,9 +127,24 @@ on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
             _ = [ case Msg of
                       {'$gen_component', trace_mpath, PState, _From, _To, OrigMsg} ->
                           Restore = erlang:get(trace_mpath),
-                          trace_mpath:start(PState),
-                          comm:send_local(Dest, OrigMsg),
-                          erlang:put(trace_mpath, Restore);
+                          case element(2, PState) of %% elemnt 2 is the logger
+                              {proto_sched, _} ->
+                                  log:log("msg_delay: proto_sched not ready for delayed messages, so dropping this message: ~p", [OrigMsg]),
+                                  %% these messages should not be
+                                  %% accepted to the database of
+                                  %% mag_delay anyway, but instead
+                                  %% should be immediately delivered
+                                  %% to proto_sched for the 'delayed'
+                                  %% messages pool (which is not
+                                  %% implemented yet) (see send_local,
+                                  %% send_local_as_client)
+                                  %% erlang:throw(redirect_proto_sched_msgs_at_submission_please)
+                                  ok;
+                              _ ->
+                                  trace_mpath:start(PState),
+                                  comm:send_local(Dest, OrigMsg),
+                                  erlang:put(trace_mpath, Restore)
+                          end;
                       _ -> comm:send_local(Dest, Msg)
                   end || {Dest, Msg} <- MsgQueue ]
     end,

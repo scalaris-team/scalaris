@@ -220,6 +220,7 @@ disable_lease(State, Lease) ->
 unittest_lease_update(Old, New, Mode) ->
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, unittest_update, Old, New, Mode, self()}),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
             {l_on_cseq, unittest_update_success, Old, New}, %% ->
@@ -1145,6 +1146,7 @@ standard_check(Current, Next, CurrentEpoch, CurrentVersion) ->
 -spec read(lease_id()) -> api_tx:read_result().
 read(Key) ->
     read(Key, self()),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({qread_done, _ReqId, _Round, Value},
                        case Value of
@@ -1169,6 +1171,7 @@ read(Key, Pid) ->
 %%     %% quarter -> use lease_db2, ...
 %%     DB = get_db_for_id(Key),
 %%     rbrcseq:qwrite(DB, self(), Key, ContentCheck, Value),
+%%     trace_mpath:thread_yield(),
 %%     receive
 %%         ?SCALARIS_RECV({qwrite_done, _ReqId, _Round, _Value}, {ok} ) %%;
 %%         %% ?SCALARIS_RECV({qwrite_deny, _ReqId, _Round, _Value, Reason}, {fail, timeout} )

@@ -1,4 +1,4 @@
-%  @copyright 2007-2011 Zuse Institute Berlin
+%  @copyright 2007-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -57,6 +57,7 @@ has_first_quorum() ->
             learner:start_paxosid(MyLearner, PaxosId, Majority, comm:this(), client_cookie),
             proposer:start_paxosid(MyProposer, PaxosId,
                                    Acceptors, Proposal, Majority, MaxProposers, Rank),
+            trace_mpath:thread_yield(),
             receive
                 ?SCALARIS_RECV(
                     {learner_decide, client_cookie, PaxosId, {leader, TheLeader}}, %%->

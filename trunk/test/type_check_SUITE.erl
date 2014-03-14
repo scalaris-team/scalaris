@@ -657,6 +657,7 @@ tester_type_check_util(_Config) ->
            [ {collect_while, 1}, %% cannot create funs
              {debug_info, 0}, %% type spec not valid?
              {debug_info, 1}, %% type spec not valid?
+             {do_throw, 1}, %% throws exceptions
              {extint2atom, 1}, %% type spec too wide
              {for_to, 3}, %% cannot create funs
              {for_to_ex, 3}, %% cannot create funs

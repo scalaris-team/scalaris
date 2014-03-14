@@ -1,4 +1,4 @@
-% @copyright 2009-2011 Zuse Institute Berlin
+% @copyright 2009-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -36,12 +36,14 @@
 -spec start() -> ok.
 start() ->
     spawn(?MODULE, tracer, [self()]),
+    trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({done}, ok) end,
     ok.
 
 -spec start_perf() -> ok.
 start_perf() ->
     spawn(?MODULE, tracer_perf, [self()]),
+    trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({done}, ok) end,
     ok.
 
@@ -61,6 +63,7 @@ tracer_perf(Pid) ->
 
 -spec loop() -> no_return().
 loop() ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
             {trace, Pid, send_to_non_existing_process, Msg, To}, %% ->
@@ -99,6 +102,7 @@ loop() ->
 
 -spec loop_perf() -> no_return().
 loop_perf() ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
             {trace_ts, Pid, in, _, TS}, %% ->

@@ -31,6 +31,7 @@
          logged_exec/1,
          randomelem/1, randomelem_and_length/1, pop_randomelem/1, pop_randomelem/2,
          get_stacktrace/0, get_linetrace/0, get_linetrace/1,
+         do_throw/1,
          extract_from_list_may_not_exist/2,
          minus_all/2, minus_first/2,
          delete_if_exists/2,
@@ -197,7 +198,7 @@ log(X, B) -> math:log10(X) / math:log10(B).
 -spec log2(X::number()) -> float().
 log2(X) -> log(X, 2).
 
-%% @doc Returns the largest integer not larger than X. 
+%% @doc Returns the largest integer not larger than X.
 -spec floor(X::number()) -> integer().
 floor(X) when X >= 0 ->
     erlang:trunc(X);
@@ -208,7 +209,7 @@ floor(X) ->
         _    -> T - 1
     end.
 
-%% @doc Returns the smallest integer not smaller than X. 
+%% @doc Returns the smallest integer not smaller than X.
 -spec ceil(X::number()) -> integer().
 ceil(X) when X < 0 ->
     erlang:trunc(X);
@@ -259,6 +260,11 @@ get_linetrace() ->
 get_linetrace(Pid) ->
     {dictionary, Dict} = erlang:process_info(Pid, dictionary),
     extract_from_list_may_not_exist(Dict, test_server_loc).
+
+-spec do_throw(atom()) -> no_return().
+do_throw(Exception) ->
+    log:log("Exception ~p at ~.0p", [Exception, get_stacktrace()]),
+    erlang:throw(Exception).
 
 %% @doc Extracts a given ItemInfo from an ItemList or returns 'undefined' if
 %%      there is no such item.
@@ -321,12 +327,14 @@ delete_if_exists([], _Del, Result) ->
 get_proc_in_vms(Proc) ->
     mgmt_server:node_list(),
     Nodes =
-        receive
-            ?SCALARIS_RECV({get_list_response, X}, X)
+        begin
+            trace_mpath:thread_yield(),
+            receive
+                ?SCALARIS_RECV({get_list_response, X}, X)
         after 2000 ->
             log:log(error,"[ util ] Timeout getting node list from mgmt server"),
             throw('mgmt_server_timeout')
-        end,
+        end end,
     lists:usort([comm:get(Proc, DHTNode) || DHTNode <- Nodes]).
 
 -spec sleep_for_ever() -> no_return().
@@ -349,14 +357,14 @@ randomelem_and_length(List) ->
     Length = length(List) + 1,
     RandomNum = randoms:rand_uniform(1, Length),
     {lists:nth(RandomNum, List), Length - 1}.
-    
+
 %% @doc Removes a random element from the (non-empty!) list and returns the
 %%      resulting list and the removed element.
 -spec pop_randomelem(List::[X,...]) -> {NewList::[X], PoppedElement::X}.
 pop_randomelem([X]) -> {[], X};
 pop_randomelem(List) ->
     pop_randomelem(List, length(List)).
-    
+
 %% @doc Removes a random element from the first Size elements of a (non-empty!)
 %%      list and returns the resulting list and the removed element.
 %%      If Size is 0, the first element will be popped.
@@ -807,6 +815,7 @@ map_with_nr(F, [], _Nr) when is_function(F, 2) -> [].
 %% @doc Helper for par_map/2.
 -spec par_map_recv(Id::term(), {try_catch_result(), [B]}) -> {try_catch_result(), [B]}.
 par_map_recv(E, {ErrorX, ListX}) ->
+    trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({parallel_result, E, {ok, ResultY}},
                            {ErrorX, [ResultY | ListX]});
             ?SCALARIS_RECV({parallel_result, E, ErrorY},
@@ -835,6 +844,7 @@ par_map(Fun, []) when is_function(Fun, 1)-> [].
 -spec par_map_recv2(ListElem::term(), {try_catch_result(), [B], Id::non_neg_integer()})
         -> {try_catch_result(), [B], Id::non_neg_integer()}.
 par_map_recv2(_E, {ErrorX, ListX, Id}) ->
+    trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({parallel_result, Id, {ok, ResultY}},
                            {ErrorX, lists:reverse(ResultY, ListX), Id + 1});
             ?SCALARIS_RECV({parallel_result, Id, ErrorY},
@@ -1030,12 +1040,12 @@ repeat(Fun, Args, Times) ->
 repeat(Fun, Args, Times, Params) ->
     NewParams = case proplists:is_defined(collect, Params) of
                     false -> Params;
-                    _ -> [{accumulate, fun(I, R) -> [I | R] end, []} | 
+                    _ -> [{accumulate, fun(I, R) -> [I | R] end, []} |
                               proplists:delete(accumulate, Params)]
                 end,
     Acc = lists:keyfind(accumulate, 1, NewParams),
     case proplists:is_defined(parallel, NewParams) of
-        true -> 
+        true ->
             repeat(fun spawn/3, [?MODULE, parallel_run, [self(), Fun, Args, Acc =/= false, ok]], Times),
             case Acc of
                 false -> ok;
@@ -1053,7 +1063,7 @@ i_repeat(_, _, 0, Params, Acc) ->
         true -> Acc;
         _ -> ok
     end;
-i_repeat(Fun, Args, Times, Params, Acc) ->    
+i_repeat(Fun, Args, Times, Params, Acc) ->
     R = apply(Fun, Args),
     NewAcc = case lists:keyfind(accumulate, 1, Params) of
                  false -> Acc;
@@ -1062,7 +1072,7 @@ i_repeat(Fun, Args, Times, Params, Acc) ->
     i_repeat(Fun, Args, Times - 1, Params, NewAcc).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% parallel repeat helper functions 
+% parallel repeat helper functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec parallel_run(pid(), fun(), args(), boolean(), Id::any()) -> ok.
@@ -1072,7 +1082,7 @@ parallel_run(SrcPid, Fun, Args, DoAnswer, Id) ->
           end,
     case DoAnswer of
         true -> comm:send_local(SrcPid, {parallel_result, Id, Res});
-        _ -> ok 
+        _ -> ok
     end,
     ok.
 
@@ -1080,6 +1090,7 @@ parallel_run(SrcPid, Fun, Args, DoAnswer, Id) ->
 parallel_collect(0, _, Accumulator) ->
     Accumulator;
 parallel_collect(ExpectedResults, AccuFun, Accumulator) ->
+    trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({parallel_result, ok, {ok, Result}}, ok);
             ?SCALARIS_RECV({parallel_result, ok, Result}, ok) % TODO: throw the error here again?
     end,
@@ -1125,6 +1136,7 @@ debug_info(Pid) when is_pid(Pid) ->
             true ->
                 {Grp, Name} = pid_groups:group_and_name_of(Pid),
                 comm:send_local(Pid , {web_debug_info, self()}),
+                trace_mpath:thread_yield(),
                 receive
                     ?SCALARIS_RECV({web_debug_info_reply, LocalKVs}, %% ->
                                    {[{"pidgroup", Grp}, {"pidname", Name}],

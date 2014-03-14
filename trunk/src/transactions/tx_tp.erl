@@ -1,4 +1,4 @@
-%% @copyright 2009-2013 Zuse Institute Berlin
+%% @copyright 2009-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ init() ->
     %%TableName = erlang:list_to_atom(pid_groups:my_groupname() ++ "_tx_tp"),
     %%Table = pdb:new(TableName, [set, protected, named_table]).
     %% use random table name provided by ets to *not* generate an atom
-    Table = pdb:new(?MODULE, [set]).
+    _Table = pdb:new(?MODULE, [set]).
 
 %%
 %% Attention: this is not a separate process!!

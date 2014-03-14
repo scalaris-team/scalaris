@@ -1,4 +1,4 @@
-%  @copyright 2011-2013 Zuse Institute Berlin
+%  @copyright 2011-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -72,15 +72,19 @@ start_job(Job) ->
 
 -spec wait_for_results([any()], intervals:interval(), nonempty_string()) -> [any()].
 wait_for_results(Data, Interval, Id) ->
-    {NewData, NewInterval} = receive
-        ?SCALARIS_RECV({mr_results, PartData, PartInterval, Id},
-                       case PartData of
-                            {error, Reason} ->
-                                {[{error, Reason}], intervals:all()};
-                            PartData ->
-                               {[PartData | Data], intervals:union(PartInterval, Interval)}
-                        end)
-    end,
+    {NewData, NewInterval} =
+        begin
+            trace_mpath:thread_yield(),
+            receive
+                ?SCALARIS_RECV({mr_results, PartData, PartInterval, Id},
+                               case PartData of
+                                   {error, Reason} ->
+                                       {[{error, Reason}], intervals:all()};
+                                   PartData ->
+                                       {[PartData | Data], intervals:union(PartInterval, Interval)}
+                               end)
+                end
+        end,
     ?TRACE("mr_api: received data for job ~p: ~p~n", [Id, hd(NewData)]),
     case intervals:is_all(NewInterval) of
         true ->

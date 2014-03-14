@@ -1,4 +1,4 @@
-% @copyright 2012-2013 Zuse Institute Berlin,
+% @copyright 2012-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -85,6 +85,7 @@ rf_val_vers(X)          -> {val(X), vers(X)}.
 read(Key) ->
     rbrcseq:qread(kv_rbrcseq, self(), ?RT:hash_key(Key),
                   fun rf_val/1),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({qread_done, _ReqId, _NextFastWriteRound, Value},
                        case Value of
@@ -121,6 +122,7 @@ write(Key, Value) ->
                    fun rf_rl_wl_vers/1,
                    fun cc_single_write/3,
                    fun wf_set_vers_val/3, Value),
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({qwrite_done, _ReqId, _NextFastWriteRound, Value}, {ok}); %%;
         ?SCALARIS_RECV({qwrite_deny, _ReqId, _NextFastWriteRound, _Value, Reason},

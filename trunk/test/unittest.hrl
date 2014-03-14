@@ -1,4 +1,4 @@
-%  @copyright 2008-2012 Zuse Institute Berlin
+%  @copyright 2008-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -99,14 +99,14 @@
         fun() ->
                 try Cmd of
                     UnittestAny ->
-                        UnittestExpExceptionStr = "exception " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
+                        UnittestExpExceptionStr = "exception: " ??ExceptionType ++ ":" ++ ??ExceptionPattern,
                         unittest_helper:macro_equals_failed(
                           UnittestAny, UnittestExpExceptionStr, "=:=", ??Cmd, UnittestExpExceptionStr, null)
                 catch
                     ExceptionType:ExceptionPattern -> true;
                     UnittestOtherType:UnittestOtherException ->
-                        UnittestExpExceptionStr = "exception " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
-                        UnittestActExceptionStr = lists:flatten(io_lib:format("exception ~.0p:~.0p", [UnittestOtherType, UnittestOtherException])),
+                        UnittestExpExceptionStr = "exception: " ++ ??ExceptionType ++ ":" ++ ??ExceptionPattern,
+                        UnittestActExceptionStr = lists:flatten(io_lib:format("exception: ~.0p:~.0p", [UnittestOtherType, UnittestOtherException])),
                         unittest_helper:macro_equals_failed(
                           UnittestActExceptionStr, UnittestExpExceptionStr, "=:=", ??Cmd, UnittestExpExceptionStr, null)
                 end

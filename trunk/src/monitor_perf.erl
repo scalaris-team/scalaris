@@ -71,6 +71,7 @@ bench_service(Owner) ->
 
 -spec bench_service_loop(Owner::comm:erl_local_pid()) -> ok.
 bench_service_loop(Owner) ->
+    trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({bench}, %% ->
             begin

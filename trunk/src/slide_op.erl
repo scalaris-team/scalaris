@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -457,6 +457,7 @@ cancel_timer2(SlideOp) ->
         true ->
             _ = erlang:cancel_timer(TimerRef),
             % consume potential timeout message
+            trace_mpath:thread_yield(),
             receive ?SCALARIS_RECV(Msg, ok)
                 after 0 -> ok
             end;
