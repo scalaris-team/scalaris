@@ -517,6 +517,12 @@ process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, H
     end,
     State;
 
+% do not queue rm_trigger to prevent its infection with msg_queue:send/1
+process_join_state({rm, trigger}, State) ->
+    ?TRACE_JOIN1(Msg, State),
+    rm_loop:send_trigger(),
+    State;
+
 % Catch all other messages until the join procedure is complete
 process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
     ?TRACE_JOIN1(Msg, JoinState),

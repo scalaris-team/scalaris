@@ -35,7 +35,7 @@
 %%         end).
 -define(TRACE_STATE(OldState, NewState), ok).
 
--export([init/3, on/2,
+-export([send_trigger/0, init/3, on/2,
          leave/0, update_id/1,
          get_neighbors/1, has_left/1, is_responsible/2,
          notify_new_pred/2, notify_new_succ/2,
@@ -208,11 +208,18 @@ unsubscribe(RegPid, Tag) ->
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Starts the RM trigger.
+-spec send_trigger() -> ok.
+send_trigger() ->
+    msg_delay:send_trigger(?RM:trigger_interval(), {rm, trigger}).
+
 %% @doc Initializes the rm_loop state.
 -spec init(Me::node:node_type(), Pred::node:node_type(),
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
-    msg_delay:send_trigger(0, {rm, trigger}),
+    % do not wait for the first trigger to arrive here
+    % -> execute trigger action immediately
+    comm:send_local(self(), {rm, trigger_action}),
     % create the ets table storing the subscriptions
     SubscrTable = ets:new(rm_subscribers, [ordered_set, private]),
     dn_cache:subscribe(),
@@ -236,7 +243,7 @@ unittest_create_state(Neighbors, HasLeft) ->
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message() | ?RM:custom_message(), state()) -> state().
 on({rm, trigger}, State) ->
-    msg_delay:send_trigger(?RM:trigger_interval(), {rm, trigger}),
+    send_trigger(),
     RMFun = fun(RM_State) -> ?RM:trigger_action(RM_State) end,
     update_state(State, RMFun);
 
