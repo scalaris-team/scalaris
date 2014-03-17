@@ -33,7 +33,7 @@ all()   -> [
 groups() ->
     [
      {api_tx, [], [write_1000, fill_1000, fill_2000, modify_100x100]},
-     {ring,   [], [create_ring_100]}
+     {ring,   [], [create_ring_100, add_remove_nodes_50, add_kill_nodes_50]}
     ].
 
 suite() -> [ {timetrap, {seconds, 300}} ].
@@ -305,6 +305,58 @@ create_ring_100(Config) ->
     ?equals(OnlyNew, []),
 %%     ct:pal("~p~n", [erlang:memory()]),
     check_memory_inc(PrevMemInfo, NewMemInfo, 0, 0),
+    ok.
+
+add_remove_nodes_50(_Config) ->
+    config:write(vivaldi_latency_timeout, 500),
+    {[TmpNode], []} = api_vm:add_nodes(1), % loads all code needed for joins
+    api_vm:shutdown_nodes_by_name([TmpNode]), % loads all code needed for graceful leaves
+    garbage_collect_all(),
+    OldProcesses = unittest_helper:get_processes(),
+    PrevMemInfo = get_meminfo(),
+    {NewNodes, []} = api_vm:add_nodes(50),
+    unittest_helper:wait_for_stable_ring_deep(),
+    api_vm:shutdown_nodes_by_name(NewNodes),
+    timer:sleep(1000), % wait for vivaldi_latency timeouts
+    unittest_helper:wait_for_stable_ring_deep(),
+    garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
+%%     NewMemInfo = get_meminfo(),
+    NewProcesses = unittest_helper:get_processes(),
+    {_OnlyOld, _Both, OnlyNew} =
+        util:split_unique(OldProcesses, NewProcesses,
+                          fun(P1, P2) ->
+                                  element(1, P1) =< element(1, P2)
+                          end, fun(_P1, P2) -> P2 end),
+    ?equals(OnlyNew, []),
+%%     ct:pal("~p~n", [erlang:memory()]),
+    % TODO: add memory check? (process state may increase, e.g. dead nodes in fd)
+%%     check_memory_inc(PrevMemInfo, NewMemInfo, 0, 0),
+    ok.
+
+add_kill_nodes_50(_Config) ->
+    config:write(vivaldi_latency_timeout, 500),
+    {[TmpNode], []} = api_vm:add_nodes(1), % loads all code needed for joins
+    api_vm:kill_nodes_by_name([TmpNode]), % loads all code needed for killing nodes
+    garbage_collect_all(),
+    OldProcesses = unittest_helper:get_processes(),
+    PrevMemInfo = get_meminfo(),
+    {NewNodes, []} = api_vm:add_nodes(50),
+    unittest_helper:wait_for_stable_ring_deep(),
+    api_vm:kill_nodes_by_name(NewNodes),
+    timer:sleep(1000), % wait for vivaldi_latency timeouts
+    unittest_helper:wait_for_stable_ring_deep(),
+    garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
+%%     NewMemInfo = get_meminfo(),
+    NewProcesses = unittest_helper:get_processes(),
+    {_OnlyOld, _Both, OnlyNew} =
+        util:split_unique(OldProcesses, NewProcesses,
+                          fun(P1, P2) ->
+                                  element(1, P1) =< element(1, P2)
+                          end, fun(_P1, P2) -> P2 end),
+    ?equals(OnlyNew, []),
+%%     ct:pal("~p~n", [erlang:memory()]),
+    % TODO: add memory check? (process state may increase, e.g. dead nodes in fd)
+%%     check_memory_inc(PrevMemInfo, NewMemInfo, 0, 0),
     ok.
 
 %% @doc Starts garbage collection for all processes.
