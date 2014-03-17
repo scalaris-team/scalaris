@@ -456,6 +456,10 @@ on({local_snapshot_is_done}, State) ->
 init(Options) ->
     {my_sup_dht_node_id, MySupDhtNode} = lists:keyfind(my_sup_dht_node_id, 1, Options),
     erlang:put(my_sup_dht_node_id, MySupDhtNode),
+    % start trigger here to prevent infection when tracing e.g. node joins
+    % (otherwise the trigger would be started at the end of the join and thus
+    % be infected forever)
+    rm_loop:send_trigger(),
 
     Id = case {is_first(Options), config:read(leases)} of
              {true, true} ->
