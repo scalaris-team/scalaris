@@ -143,11 +143,21 @@ check_memory_inc_bool(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
         PrevMemInfo::#mem_info{}, NewMemInfo::#mem_info{},
         NewItems::non_neg_integer(), AddedSize::non_neg_integer()) -> ok.
 check_memory_inc(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
+    check_memory_inc_(PrevMemInfo, NewMemInfo, NewItems, AddedSize, true).
+
+%% @doc Helper for check_memory_inc/4.
+-spec check_memory_inc_(
+        PrevMemInfo::#mem_info{}, NewMemInfo::#mem_info{},
+        NewItems::non_neg_integer(), AddedSize::non_neg_integer(),
+        CheckAtoms::boolean()) -> ok.
+check_memory_inc_(PrevMemInfo, NewMemInfo, NewItems, AddedSize, CheckAtoms) ->
     % assume an entry for an item uses 4 * 1k memory for ets (excluding the binary size)
     EntryEtsSize = 4 * 1000,
     
     % we do not create additional atoms!
-    ?equals(NewMemInfo#mem_info.atom_used, PrevMemInfo#mem_info.atom_used),
+    ?IIF(CheckAtoms,
+         ?equals(NewMemInfo#mem_info.atom_used, PrevMemInfo#mem_info.atom_used),
+         ok),
     
     % tolerate 250k binary memory overhead for running maintenance processes and binary messages
     ?equals_pattern_w_note(NewMemInfo#mem_info.binary, X when X =< PrevMemInfo#mem_info.binary + AddedSize + 250000,
@@ -165,6 +175,20 @@ check_memory_inc(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
                                          [PrevMemInfo#mem_info.ets, NewMemInfo#mem_info.ets,
                                           NewMemInfo#mem_info.ets - PrevMemInfo#mem_info.ets])),
     ok.
+
+%% @doc If debugging is disabled, execute check_memory_inc/4 with atom_used
+%%      check, otherwise do not check atom_used (with debugging, atoms in the
+%%      form of registered processes are generated).
+-spec check_memory_inc_ring(
+        PrevMemInfo::#mem_info{}, NewMemInfo::#mem_info{},
+        NewItems::non_neg_integer(), AddedSize::non_neg_integer()) -> ok.
+-ifdef(enable_debug).
+check_memory_inc_ring(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
+    check_memory_inc_(PrevMemInfo, NewMemInfo, NewItems, AddedSize, false).
+-else.
+check_memory_inc_ring(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
+    check_memory_inc_(PrevMemInfo, NewMemInfo, NewItems, AddedSize, true).
+-endif.
 
 write_1000(_Config) ->
     write(1000, 200000). % ca. 1MiB RAM
@@ -304,7 +328,7 @@ create_ring_100(Config) ->
                           end, fun(_P1, P2) -> P2 end),
     ?equals(OnlyNew, []),
 %%     ct:pal("~p~n", [erlang:memory()]),
-    check_memory_inc(PrevMemInfo, NewMemInfo, 0, 0),
+    check_memory_inc_ring(PrevMemInfo, NewMemInfo, 0, 0),
     ok.
 
 add_remove_nodes_50(_Config) ->
@@ -330,7 +354,7 @@ add_remove_nodes_50(_Config) ->
     ?equals(OnlyNew, []),
 %%     ct:pal("~p~n", [erlang:memory()]),
     % TODO: add memory check? (process state may increase, e.g. dead nodes in fd)
-%%     check_memory_inc(PrevMemInfo, NewMemInfo, 0, 0),
+%%     check_memory_inc_ring(PrevMemInfo, NewMemInfo, 0, 0),
     ok.
 
 add_kill_nodes_50(_Config) ->
@@ -356,7 +380,7 @@ add_kill_nodes_50(_Config) ->
     ?equals(OnlyNew, []),
 %%     ct:pal("~p~n", [erlang:memory()]),
     % TODO: add memory check? (process state may increase, e.g. dead nodes in fd)
-%%     check_memory_inc(PrevMemInfo, NewMemInfo, 0, 0),
+%%     check_memory_inc_ring(PrevMemInfo, NewMemInfo, 0, 0),
     ok.
 
 %% @doc Starts garbage collection for all processes.
