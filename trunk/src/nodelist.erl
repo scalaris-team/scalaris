@@ -21,7 +21,8 @@
 -vsn('$Id$').
 
 -compile({inline, [node/1, nodeid/1, pred/1, preds/1, succ/1, succs/1,
-                   node_range/1, succ_range/1]}).
+                   node_range/1, succ_range/1,
+                   dict_add_valid_nodes/2, dict_make_unique_update/1]}).
 
 -export([% constructors:
          new_neighborhood/1, new_neighborhood/2, new_neighborhood/3,
@@ -656,29 +657,27 @@ succ_ord_id(K1, K2, BaseKey) ->
 %%     (node:id(N1) < BaseNodeId andalso node:id(N2) > BaseNodeId) orelse
 %%     (node:id(N1) =:= BaseNodeId).
 
-%% @doc Inserts or updates the node in Table and returns the newer node from the
-%%      (potentially) existing entry and the to-be-inserted one.
--spec ets_insert_newer_node(Table::tid() | atom(), node:node_type()) -> node:node_type().
-ets_insert_newer_node(Table, Node) ->
-    case node:is_valid(Node) of
-        true ->
-            EtsItem = {node:pidX(Node), Node},
-            case ets:insert_new(Table, EtsItem) of
-                false ->
-                    Previous = ets:lookup_element(Table, node:pidX(Node), 2),
-                    NewerNode = node:newer(Node, Previous),
-                    case NewerNode =/= Previous of
-                        true  ->
-                            ets:insert(Table, EtsItem),
-                            NewerNode;
-                        false ->
-                            NewerNode
-                    end;
-                true ->
-                    Node
-            end;
-        false -> Node
-    end.
+%% @doc Adds all valid nodes to the dictionary mapping node PIDs to a list of
+%%      node objects.
+-spec dict_add_valid_nodes(Dict::dict(), NodeList::[node:node_type()]) -> dict().
+dict_add_valid_nodes(Dict, NodeList) ->
+    lists:foldl(fun(NodeX, DictX) ->
+                        case node:is_valid(NodeX) of
+                            true ->
+                                dict:append(node:pidX(NodeX), NodeX, DictX);
+                            false ->
+                                DictX
+                        end
+                end, Dict, NodeList).
+
+%% @doc Makes a dictionary mapping node PIDs to a list of node objects map PIDs
+%%      to the most up-to-date version of the node object.
+-spec dict_make_unique_update(Dict::dict()) -> dict().
+dict_make_unique_update(Dict) ->
+    dict:map(fun(_PidX, [NodeX]) -> NodeX;
+                (_PidX, [H | RestX]) ->
+                     lists:foldl(fun node:newer/2, H, RestX)
+             end, Dict).
 
 %% @doc Removes any node with outdated ID information from the list as well as
 %%      any outdated node that shares the same process as Node and any invalid
@@ -686,19 +685,17 @@ ets_insert_newer_node(Table, Node) ->
 -spec lremove_outdated(NodeList::[node:node_type()], Node::node:node_type() | null)
         -> [node:node_type()].
 lremove_outdated(NodeList, Node) ->
-    Tab = ets:new(nodelist_helper_lremove_outdated, [set, private]),
-    % make a unique table of updated pids:
-    EtsInsertNewerNodeFun = fun(N) -> ets_insert_newer_node(Tab, N) end,
-    _ = lists:map(EtsInsertNewerNodeFun, NodeList),
+    % make a unique set of updated pids:
+    UpdNodes0 = dict_add_valid_nodes(dict:new(), NodeList),
+    UpdNodes = dict_make_unique_update(UpdNodes0),
     % now remove all out-dated nodes:
     NodeIsUpToDate = fun(N) ->
-                             NInTab = ets:lookup_element(Tab, node:pidX(N), 2),
-                             not node:is_newer(NInTab, N)
+                             NInDict = dict:fetch(node:pidX(N), UpdNodes),
+                             not node:is_newer(NInDict, N)
                      end,
     NodeListUpd = [N || N <- NodeList, node:is_valid(N),
                         not (node:same_process(N, Node) andalso (node:is_newer(Node, N))),
                         NodeIsUpToDate(N)],
-    ets:delete(Tab),
     NodeListUpd.
 
 %% @doc Removes any node with outdated ID information from the list as well as
@@ -715,17 +712,15 @@ lremove_outdated(NodeList) ->
 -spec lupdate_ids(L1::[node:node_type()], L2::[node:node_type()])
         -> {L1Upd::[node:node_type()], L2Upd::[node:node_type()]}.
 lupdate_ids(L1, L2) ->
-    L1L2Tab = ets:new(nodelist_helper_lupdate_ids, [set, private]),
-    % make a unique table of updated pids:
-    EtsInsertNewerNodeFun = fun(N) -> ets_insert_newer_node(L1L2Tab, N) end,
-    _ = lists:map(EtsInsertNewerNodeFun, L1),
-    _ = lists:map(EtsInsertNewerNodeFun, L2),
+    % make a unique set of updated pids:
+    UpdNodes0 = dict_add_valid_nodes(dict:new(), L1),
+    UpdNodes1 = dict_add_valid_nodes(UpdNodes0, L2),
+    UpdNodes = dict_make_unique_update(UpdNodes1),
 
-    GetNewNode = fun(Node) -> ets:lookup_element(L1L2Tab, node:pidX(Node), 2) end,
+    GetNewNode = fun(Node) -> dict:fetch(node:pidX(Node), UpdNodes) end,
     L1Upd = lists:map(GetNewNode, L1),
     L2Upd = lists:map(GetNewNode, L2),
 
-    ets:delete(L1L2Tab),
     {L1Upd, L2Upd}.
 
 %% @doc Returns whether NId is between MyId and Id and not equal to Id.
