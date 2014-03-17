@@ -62,8 +62,11 @@
 -export([tester_create_histogram/1, is_histogram/1, tester_create_state/11,
          is_state/1, tester_create_load_data_list/1]).
 
--export_type([state/0, histogram/0]). %% for config gossip_load_*.erl
--export_type([load_info/0]).
+-ifdef(with_export_type_support).
+-export_type([state/0, histogram/0, bucket/0]). %% for config gossip_load_*.erl
+-export_type([avg/0, avg_kr/0, min/0, max/0]). %% for config gossip_load_*.erl
+-export_type([load_info/0, load_info_other/0, merged/0]).
+-endif.
 
 %% -define(SHOW, config:read(log_level)).
 -define(SHOW, debug).
