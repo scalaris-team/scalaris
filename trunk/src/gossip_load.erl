@@ -120,6 +120,16 @@
 
 -type data() :: {load_data_list(), ring_data()}.
 
+-record(load_info_other, { %% additional gossip values
+            name    = ?required(name, load_info_other) :: atom(),
+            avg     = unknown :: unknown | float(),  % average load
+            stddev  = unknown :: unknown | float(), % standard deviation of the load
+            min     = unknown :: unknown | min(), % minimum load
+            max     = unknown :: unknown | max() % maximum load
+    }).
+
+-type(load_info_other() :: #load_info_other{}).
+
 % record of load data values for use by other modules
 -record(load_info, { %% general info and default gossip values
             avg       = unknown :: unknown | float(),  % average load
@@ -131,16 +141,6 @@
             merged    = unknown :: unknown | merged(), % how often the data was merged since the node entered/created the round
             other     = []      :: [load_info_other()]
     }).
-
--record(load_info_other, { %% additional gossip values
-            name    = ?required(name, load_info_other) :: atom(),
-            avg     = unknown :: unknown | float(),  % average load
-            stddev  = unknown :: unknown | float(), % standard deviation of the load
-            min     = unknown :: unknown | min(), % minimum load
-            max     = unknown :: unknown | max() % maximum load
-    }).
-
--type(load_info_other() :: #load_info_other{}).
 
 -opaque(load_info() :: #load_info{}).
 
