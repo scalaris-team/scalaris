@@ -26,23 +26,42 @@
 -include("record_helpers.hrl").
 
 all()   -> [
-            write_1000,
-            fill_1000,
-            fill_2000,
-            modify_100x100
+            {group, api_tx},
+            {group, ring}
            ].
+
+groups() ->
+    [
+     {api_tx, [], [write_1000, fill_1000, fill_2000, modify_100x100]},
+     {ring,   [], [create_ring_100]}
+    ].
+
 suite() -> [ {timetrap, {seconds, 300}} ].
 
 init_per_suite(Config) ->
+    _ = code:ensure_loaded(gossip_load_default), % otherwise loaded too late
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
+init_per_group(Group, Config) ->
+    ct:comment(io_lib:format("BEGIN ~p", [Group])),
+    Config.
+
+end_per_group(Group, Config) ->
+    ct:comment(io_lib:format("END ~p", [Group])),
+    Config.
+
 init_per_testcase(_TestCase, Config) ->
-    %% stop ring from previous test case (it may have run into a timeout
+%%     Group = case proplists:get_value(tc_group_properties, Config) of
+%%                 undefined                 -> undefined;
+%%                 Props when is_list(Props) -> proplists:get_value(name, Props)
+%%             end,
+    %% stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
+    % start ring:
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0}]}]),
     config:write(no_print_ring_data, true),
@@ -55,7 +74,7 @@ init_per_testcase(_TestCase, Config) ->
     Config.
 
 end_per_testcase(_TestCase, Config) ->
-    ct:pal("Memory before unittest_helper:stop_ring/0:~n~p~n", [erlang:memory()]),
+    ct:pal("Memory after test:~n~p~n", [erlang:memory()]),
     unittest_helper:stop_ring(),
     garbage_collect_all(),
     ct:pal("Memory after unittest_helper:stop_ring/0:~n~p~n", [erlang:memory()]),
@@ -67,15 +86,20 @@ end_per_testcase(_TestCase, Config) ->
                    ets            = ?required(mem_info, ets)            :: pos_integer()
                   }).
 
+%% @doc Creates an uncompressed binary of a list of Size integers starting at I.
 -spec make_binary(I::integer(), Size::non_neg_integer()) -> binary().
 make_binary(I, Size) when Size >= 0->
     Res = erlang:term_to_binary(lists:seq(I, I + Size)),
 %%     ct:pal("binary size: ~B", [erlang:byte_size(Res)]),
     Res.
 
+%% @doc Prints information about the given ets table ID and compares it with
+%%      the total Erlang VM memory stats.
 print_table_info(Table) ->
     print_table_info(Table, "").
 
+%% @doc Prints information about the given ets table ID and compares it with
+%%      the total Erlang VM memory stats (prefixes the message with Status). 
 print_table_info(Table, Status) ->
     Memory = ets:info(Table, memory),
     ContentSize = lists:sum([byte_size(element(2,X)) || X <- ets:tab2list(Table), is_binary(element(2, X))]),
@@ -83,6 +107,7 @@ print_table_info(Table, Status) ->
            [Status, erlang:memory(total), erlang:memory(binary), Table, Memory, ContentSize]),
     garbage_collect_all().
 
+%% @doc Gets memory statistics.
 -spec get_meminfo() -> #mem_info{}.
 get_meminfo() ->
     [{binary, BinSize}, {atom_used, AtomUSize}, {processes_used, ProcUSize}, {ets, EtsSize}] =
@@ -90,7 +115,13 @@ get_meminfo() ->
     #mem_info{binary = BinSize, atom_used = AtomUSize,
               processes_used = ProcUSize, ets = EtsSize}.
 
--spec check_memory_inc_bool(PrevMemInfo::#mem_info{}, NewMemInfo::#mem_info{}, NewItems::non_neg_integer(), AddedSize::non_neg_integer()) -> boolean().
+%% @doc Checks whether the NewMemInfo field indicates increased memory use
+%%      compared to PrevMemInfo and returns whether this is the case or not.
+%%      AddedSize is the expected binary size difference.
+%%      Note: Tolerates 50k binary and 50k processes_used overhead.
+-spec check_memory_inc_bool(
+        PrevMemInfo::#mem_info{}, NewMemInfo::#mem_info{},
+        NewItems::non_neg_integer(), AddedSize::non_neg_integer()) -> boolean().
 check_memory_inc_bool(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
     % assume an entry for an item uses 4 * 1k memory for ets (excluding the binary size)
     EntryEtsSize = 4 * 1000,
@@ -104,7 +135,13 @@ check_memory_inc_bool(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
     NewMemInfo#mem_info.processes_used =< (PrevMemInfo#mem_info.processes_used + 50000) andalso
     NewMemInfo#mem_info.ets =< (PrevMemInfo#mem_info.ets + 50000 + (EntryEtsSize * NewItems)).
 
--spec check_memory_inc(PrevMemInfo::#mem_info{}, NewMemInfo::#mem_info{}, NewItems::non_neg_integer(), AddedSize::non_neg_integer()) -> ok.
+%% @doc Checks whether the NewMemInfo field indicates increased memory use
+%%      compared to PrevMemInfo. AddedSize is the expected binary size
+%%      difference.
+%%      Note: Tolerates 250k binary and 250k processes_used overhead.
+-spec check_memory_inc(
+        PrevMemInfo::#mem_info{}, NewMemInfo::#mem_info{},
+        NewItems::non_neg_integer(), AddedSize::non_neg_integer()) -> ok.
 check_memory_inc(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
     % assume an entry for an item uses 4 * 1k memory for ets (excluding the binary size)
     EntryEtsSize = 4 * 1000,
@@ -243,6 +280,34 @@ modify(Start, End, Repeat, Size) when End >= Start andalso Repeat >= 1 ->
     check_memory_inc(PrevMemInfo, NewMemInfo, (End - Start + 1), MyBinSize),
     ok.
 
+create_ring_100(Config) ->
+    % stop the initial ring (the ring is needed to initialise atoms etc.)
+    unittest_helper:stop_ring(),
+    garbage_collect_all(),
+
+    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+    OldProcesses = unittest_helper:get_processes(),
+    PrevMemInfo = get_meminfo(),
+    util:for_to(
+      1, 100,
+      fun(_I) ->
+              unittest_helper:make_ring(1, [{config, [{log_path, PrivDir}, {monitor_perf_interval, 0}]}]),
+              unittest_helper:stop_ring()
+      end),
+    garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
+    NewMemInfo = get_meminfo(),
+    NewProcesses = unittest_helper:get_processes(),
+    {_OnlyOld, _Both, OnlyNew} =
+        util:split_unique(OldProcesses, NewProcesses,
+                          fun(P1, P2) ->
+                                  element(1, P1) =< element(1, P2)
+                          end, fun(_P1, P2) -> P2 end),
+    ?equals(OnlyNew, []),
+%%     ct:pal("~p~n", [erlang:memory()]),
+    check_memory_inc(PrevMemInfo, NewMemInfo, 0, 0),
+    ok.
+
+%% @doc Starts garbage collection for all processes.
 garbage_collect_all() ->
     _ = [erlang:garbage_collect(Pid) || Pid <- processes()],
     % wait a bit for the gc to finish
