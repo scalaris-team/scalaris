@@ -8,9 +8,7 @@
 
 ticker(Time, To, Msg) ->
     receive
-        {'EXIT', _} ->
-            exit(normal);
-        {'DOWN', _MonitorRef, process, To, _Info1} ->
+        {'EXIT', _, _} ->
             exit(normal)
     after Time ->
             To ! Msg
