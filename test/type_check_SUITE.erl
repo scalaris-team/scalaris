@@ -306,7 +306,8 @@ tester_type_check_node(_Config) ->
             {update_node, 2}, %% needs node in certain interval
             {remove, 3} %% cannot create funs
           ],
-          [ {ets_insert_newer_node,2}, %% cannot create tid()
+          [ {dict_add_valid_nodes, 2}, %% needs a dict() of node() objects
+            {dict_make_unique_update, 1}, %% needs a dict() of node() objects
             {throw_if_newer, 2}, %% throws
             {lfilter, 4} %% cannot create funs
           ]}
