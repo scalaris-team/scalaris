@@ -457,7 +457,7 @@ cancel_timer2(SlideOp) ->
         true ->
             _ = erlang:cancel_timer(TimerRef),
             % consume potential timeout message
-            trace_mpath:thread_yield(),
+            % note: do not yield trace_mpath thread with "after 0"!
             receive ?SCALARIS_RECV(Msg, ok)
                 after 0 -> ok
             end;

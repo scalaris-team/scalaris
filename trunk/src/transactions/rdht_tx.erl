@@ -377,7 +377,7 @@ receive_answer(ReqId) ->
 -spec receive_old_answers() -> ok.
 -ifdef(TXNEW).
 receive_old_answers() ->
-    trace_mpath:thread_yield(),
+    % note: do not yield trace_mpath thread with "after 0"!
     receive
 %%%% OLD TX
 %   ?SCALARIS_RECV({tx_tm_rtm_commit_reply, _, _}, receive_old_answers());
@@ -387,7 +387,7 @@ receive_old_answers() ->
     end.
 -else.
 receive_old_answers() ->
-    trace_mpath:thread_yield(),
+    % note: do not yield trace_mpath thread with "after 0"!
     receive
         ?SCALARIS_RECV({tx_tm_commit_reply, _, _}, receive_old_answers());
         ?SCALARIS_RECV({_Op, _RdhtId, _RdhtTlog}, receive_old_answers())

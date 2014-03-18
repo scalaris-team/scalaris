@@ -568,7 +568,7 @@ symm4_slide_load_test(NthNode, PredOrSucc, Tag, TargetIdFun, Count) ->
              ?proto_sched(start),
              symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, NewTag, NthNode, N, Node, Other),
              ?proto_sched(stop),
-             trace_mpath:thread_yield(),
+             % note: do not yield trace_mpath thread with "after 0"!
              receive
                  ?SCALARIS_RECV(Z,
                                 ?ct_fail("slide_~.0p(~B.~B, ~.0p) unexpected message: ~.0p",
