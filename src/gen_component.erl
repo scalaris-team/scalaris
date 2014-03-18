@@ -453,6 +453,7 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
 -spec loop(user_state(), gc_state()) -> no_return() | ok.
 loop(UState, GCState) ->
     ?CALLING_RECEIVE(Module),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_in_loop, self()}),
     receive Msg ->
 %%            try
                 on(Msg, UState, GCState)
@@ -501,11 +502,14 @@ handle_message(Msg, UState, Handler) ->
         -> ok.
 on(GCMsg, UState, GCState)
   when is_tuple(GCMsg) andalso '$gen_component' =:= element(1, GCMsg) ->
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_in_on, self(), GCMsg}),
     on_gc_msg(GCMsg, UState, GCState);
 on(Msg, UState, GCState) ->
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_in_on, self(), Msg}),
     T1GCState = on_bp(Msg, UState, GCState),
     case T1GCState of
         {drop_single, T2GCState} ->
+            ?DBG_ASSERT2(not trace_mpath:infected(), {infected_after_on, self(), Msg}),
             loop(UState, T2GCState);
         _ ->
             Module  = gc_mod(T1GCState),
@@ -519,6 +523,7 @@ on(Msg, UState, GCState) ->
                     on_post_op(Msg1, NewUState, T1GCState);
                 {'$gen_component', [{on_handler, NewHandler}], NewUState} ->
                     %% This is not counted as a bp_step
+                    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_after_on, self(), Msg}),
                     loop(NewUState, gc_set_hand(T1GCState, NewHandler));
                 {'$gen_component', Commands, _NewUState} ->
                     %% let's fail since the Config list was either
@@ -529,16 +534,19 @@ on(Msg, UState, GCState) ->
                 unknown_event ->
                     %% drop T2State, as it contains the error message
                     on_unknown_event(Msg, UState, T1GCState),
+                    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_after_on, self(), Msg}),
                     case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
                         false -> loop(UState, T1GCState);
                         true -> loop(UState, bp_step_done(Msg, T1GCState))
                     end;
                 NewUState ->
+                    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_after_on, self(), Msg}),
                     case gc_bpactive(T1GCState) andalso gc_bpstepped(T1GCState) of
                         false -> loop(NewUState, T1GCState);
                         true -> loop(NewUState, bp_step_done(Msg, T1GCState))
                     end
             catch Level:Reason ->
+                    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_after_on, self(), Msg}),
                     Stacktrace = erlang:get_stacktrace(),
                     case Stacktrace of
                         %% erlang < R15 : {Module, Handler, [Msg, State]}
@@ -563,8 +571,10 @@ on(Msg, UState, GCState) ->
                    -> ok.
 on_traced_msg(GCMsg, UState, GCState)
   when is_tuple(GCMsg) andalso '$gen_component' =:= element(1, GCMsg) ->
+    ?DBG_ASSERT2(trace_mpath:infected(), {not_infected_in_traced_msg, self(), GCMsg}),
     on_gc_msg(GCMsg, UState, GCState);
 on_traced_msg(Msg, UState, GCState) ->
+    ?DBG_ASSERT2(trace_mpath:infected(), {not_infected_in_traced_msg, self(), Msg}),
     T1GCState = on_bp(Msg, UState, GCState),
     Module  = gc_mod(T1GCState),
     Handler = gc_hand(T1GCState),
@@ -729,26 +739,31 @@ on_gc_msg({'$gen_component', kill}, _UState, GCState) ->
     log:log(info, "[ gen_component ] ~.0p killed (~.0p:~.0p/2):",
             [self(), gc_mod(GCState), gc_hand(GCState)]),
     ok;
-on_gc_msg({'$gen_component', bp, msg_in_bp_waiting, Pid}, UState, GCState) ->
+on_gc_msg({'$gen_component', bp, msg_in_bp_waiting, Pid} = _Msg, UState, GCState) ->
     Pid ! {'$gen_component', bp, msg_in_bp_waiting_response, false},
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), _Msg}),
     loop(UState, GCState);
-on_gc_msg({'$gen_component', sleep, Time}, UState, GCState) ->
+on_gc_msg({'$gen_component', sleep, Time} = _Msg, UState, GCState) ->
     timer:sleep(Time),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), _Msg}),
     loop(UState, GCState);
 on_gc_msg({'$gen_component', about_to_kill, Time, Pid} = Msg, UState, GCState) ->
     comm:send_local(Pid, Msg),
     process_flag(priority, low),
     timer:sleep(Time),
     process_flag(priority, normal),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, GCState);
-on_gc_msg({'$gen_component', get_state, Pid}, UState, GCState) ->
+on_gc_msg({'$gen_component', get_state, Pid} = _Msg, UState, GCState) ->
     comm:send_local(
       Pid, {'$gen_component', get_state_response, UState}),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), _Msg}),
     loop(UState, GCState);
-on_gc_msg({'$gen_component', get_component_state, Pid}, UState, GCState) ->
+on_gc_msg({'$gen_component', get_component_state, Pid} = _Msg, UState, GCState) ->
     comm:send_local(
       Pid, {'$gen_component', get_component_state_response,
             {gc_mod(GCState), gc_hand(GCState), GCState}}),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), _Msg}),
     loop(UState, GCState);
 on_gc_msg({'$gen_component', bp, bp_set_cond, Cond, BPName, Pid} = Msg, UState, GCState) ->
     NewGCState =
@@ -758,6 +773,7 @@ on_gc_msg({'$gen_component', bp, bp_set_cond, Cond, BPName, Pid} = Msg, UState, 
                 gc_bp_set_cond(GCState, Cond, BPName);
             _ -> gc_bp_hold_back(GCState, Msg)
         end,
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, NewGCState);
 on_gc_msg({'$gen_component', bp, bp_set, MsgTag, BPName, Pid} = Msg, UState, GCState) ->
     NewGCState =
@@ -767,6 +783,7 @@ on_gc_msg({'$gen_component', bp, bp_set, MsgTag, BPName, Pid} = Msg, UState, GCS
                 gc_bp_set(GCState, MsgTag, BPName);
             _ -> gc_bp_hold_back(GCState, Msg)
         end,
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, NewGCState);
 on_gc_msg({'$gen_component', bp, bp_del, BPName, Pid} = Msg, UState, GCState) ->
     NewGCState =
@@ -776,18 +793,22 @@ on_gc_msg({'$gen_component', bp, bp_del, BPName, Pid} = Msg, UState, GCState) ->
                 gc_bp_del(GCState, BPName);
             _ -> gc_bp_hold_back(GCState, Msg)
         end,
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, NewGCState);
 on_gc_msg({'$gen_component', bp, barrier} = Msg, UState, GCState) ->
     NewGCState = gc_bp_hold_back(GCState, Msg),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, NewGCState);
 
 on_gc_msg({'$gen_component', bp, breakpoint, step, _Stepper} = Msg,
           UState, GCState) ->
     NewGCState = gc_bp_hold_back(GCState, Msg),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, NewGCState);
 on_gc_msg({'$gen_component', bp, breakpoint, cont} = Msg,
           UState, GCState) ->
     NewGCState = gc_bp_hold_back(GCState, Msg),
+    ?DBG_ASSERT2(not trace_mpath:infected(), {infected_gc_msg, self(), Msg}),
     loop(UState, NewGCState).
 
 
