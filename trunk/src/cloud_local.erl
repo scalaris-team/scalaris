@@ -72,7 +72,7 @@ add_vms(N) ->
                 ?TRACE("Executing: ~p~n", [Cmd]),
                  NumberVMs = get_number_of_vms(),
                 _ = exec(Cmd),
-                util:wait_for(fun() -> get_number_of_vms() =:= NumberVMs + 1 end)
+                util:wait_for2(fun() -> get_number_of_vms() =:= NumberVMs + 1 end)
         end,
     _ = [SpawnFun(X) || X <- lists:seq(1, N), get_number_of_vms() < config:read(cloud_local_max_vms)],
     ok.
@@ -86,7 +86,7 @@ remove_vms(N) ->
                 NumberVMs = get_number_of_vms(),
                 ?TRACE("Executing: ~p~n", [Cmd]),
                 _ = exec(Cmd),
-                util:wait_for(fun() -> get_number_of_vms() =:= NumberVMs - 1 end)
+                util:wait_for2(fun() -> get_number_of_vms() =:= NumberVMs - 1 end)
         end,
     _ = [RemoveFun(NodeName) || NodeName <- lists:sublist(VMs, N),
                                 get_number_of_vms() > config:read(cloud_local_min_vms)],
