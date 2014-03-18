@@ -34,8 +34,6 @@
 
 % accepted messages of an initialized rm_tman process in addition to rm_loop
 -type(custom_message() ::
-    {rm, trigger} |
-    {rm, trigger_action} |
     {rm, {cy_cache, Cache::[node:node_type()]}} |
     {rm, {get_node_details_response, NodeDetails::node_details:node_details()}} |
     {rm, buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |

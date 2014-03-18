@@ -81,6 +81,8 @@
 
 % accepted messages of an initialized rm_loop process
 -type(message() ::
+    {rm, trigger} |
+    {rm, trigger_action} |
     {rm, check_ring, Token::non_neg_integer(), Master::node:node_type()} |
     {rm, init_check_ring, Token::non_neg_integer()} |
     {rm, notify_new_pred, NewPred::node:node_type()} |

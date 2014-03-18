@@ -28,8 +28,6 @@
 
 % accepted messages of an initialized rm_chord process in addition to rm_loop
 -type(custom_message() ::
-    {rm, trigger} |
-    {rm, trigger_action} |
     {rm, get_succlist, Source_Pid::comm:mypid()} |
     {rm, {get_node_details_response, NodeDetails::node_details:node_details()}, from_succ | from_node} |
     {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
@@ -171,7 +169,7 @@ remove_succ({OldNeighborhood}, OldSucc, SuccsSucc) ->
 update_node({OldNeighborhood}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
     % inform neighbors
-    handle_custom_message({rm, trigger_action}, {NewNeighborhood}).
+    trigger_action({NewNeighborhood}).
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes(NewNodes) ->
