@@ -62,6 +62,7 @@
 -export([if_verbose/1, if_verbose/2]).
 -export([tc/3, tc/2, tc/1]).
 -export([wait_for/1, wait_for/2,
+         wait_for2/1, wait_for2/2,
          wait_for_process_to_die/1,
          wait_for_table_to_disappear/2,
          ets_tables_of/1]).
@@ -98,17 +99,42 @@
                          collect |
                          {accumulate, accumulatorFun(any(), R), R}. %{accumulate, fun, accumulator init value}
 
+%% @doc Executes wait_for/2 with a WaitTime of 10ms.
 -spec wait_for(fun(() -> boolean())) -> ok.
 wait_for(F) -> wait_for(F, 10).
 
+%% @doc Waits for F/0 to become true and checks every WaitTime Milliseconds.
+%%      Uses send_local_after/2 and receive to wait to return control flow to
+%%       e.g. proto_sched and is thus _NOT_ suitable for gen_components.
 -spec wait_for(fun(() -> boolean()), WaitTimeInMs::pos_integer()) -> ok.
 wait_for(F, WaitTime) ->
     case F() of
         true  -> ok;
-        false -> timer:sleep(WaitTime),
-                 wait_for(F, WaitTime)
+        false ->
+            comm:send_local_after(WaitTime, self(), {continue_wait}),
+            trace_mpath:thread_yield(),
+            receive
+                ?SCALARIS_RECV({continue_wait},% ->
+                               wait_for(F, WaitTime))
+            end
     end.
 
+%% @doc Executes wait_for2/2 with a WaitTime of 10ms.
+-spec wait_for2(fun(() -> boolean())) -> ok.
+wait_for2(F) -> wait_for2(F, 10).
+
+%% @doc Waits for F/0 to become true and checks every WaitTime Milliseconds.
+%%      Uses timer:sleep/1 to wait and is thus suitable for gen_components.
+-spec wait_for2(fun(() -> boolean()), WaitTimeInMs::pos_integer()) -> ok.
+wait_for2(F, WaitTime) ->
+    case F() of
+        true  -> ok;
+        false -> timer:sleep(WaitTime),
+                 wait_for2(F, WaitTime)
+    end.
+
+%% @doc Waits for the given process (name or pid) to die using wait_for/1
+%%      and is thus _NOT_ suitable for gen_components.
 -spec wait_for_process_to_die(pid() | atom()) -> ok.
 wait_for_process_to_die(Name) when is_atom(Name) ->
     wait_for(fun() ->
@@ -120,6 +146,8 @@ wait_for_process_to_die(Name) when is_atom(Name) ->
 wait_for_process_to_die(Pid) when is_pid(Pid) ->
     wait_for(fun() -> not is_process_alive(Pid) end).
 
+%% @doc Waits for the given ets table to disappear using wait_for/1
+%%      and is thus _NOT_ suitable for gen_components.
 -spec wait_for_table_to_disappear(Pid::pid(), tid() | atom()) -> ok.
 wait_for_table_to_disappear(Pid, Table) ->
     wait_for(fun() ->
