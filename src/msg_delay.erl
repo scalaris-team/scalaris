@@ -121,18 +121,19 @@ on({msg_delay_req, Seconds, Dest, Msg} = _FullMsg,
 %% periodic trigger
 on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
     ?TRACE("msg_delay:on(~.0p, ~.0p)~n", [Trigger, State]),
+    % triggers are not allowed to be infected!
+    ?DBG_ASSERT2(not trace_mpath:infected(), trigger_infected),
     _ = case pdb:take(Counter, TimeTable) of
         undefined -> ok;
         {_, MsgQueue} ->
             _ = [ case Msg of
                       {'$gen_component', trace_mpath, PState, _From, _To, OrigMsg} ->
-                          Restore = erlang:get(trace_mpath),
-                          case element(2, PState) of %% elemnt 2 is the logger
+                          case element(2, PState) of %% element 2 is the logger
                               {proto_sched, _} ->
                                   log:log("msg_delay: proto_sched not ready for delayed messages, so dropping this message: ~p", [OrigMsg]),
                                   %% these messages should not be
                                   %% accepted to the database of
-                                  %% mag_delay anyway, but instead
+                                  %% msg_delay anyway, but instead
                                   %% should be immediately delivered
                                   %% to proto_sched for the 'delayed'
                                   %% messages pool (which is not
@@ -143,17 +144,14 @@ on({msg_delay_periodic} = Trigger, {TimeTable, Counter} = _State) ->
                               _ ->
                                   trace_mpath:start(PState),
                                   comm:send_local(Dest, OrigMsg),
-                                  erlang:put(trace_mpath, Restore)
+                                  trace_mpath:stop()
                           end;
-                      _ -> comm:send_local(Dest, Msg)
+                      _ ->
+                          ?DBG_ASSERT2(not trace_mpath:infected(), infected_with_uninfected_msg),
+                          comm:send_local(Dest, Msg)
                   end || {Dest, Msg} <- MsgQueue ]
     end,
-    ETrigger =
-        case erlang:get(trace_mpath) of
-            undefined -> Trigger;
-            PState -> trace_mpath:epidemic_reply_msg(PState, comm:this(), comm:this(), Trigger)
-        end,
-    _ = comm:send_local_after(1000, self(), ETrigger),
+    _ = comm:send_local_after(1000, self(), Trigger),
     {TimeTable, Counter + 1};
 
 on({web_debug_info, Requestor}, {TimeTable, Counter} = State) ->
