@@ -95,7 +95,7 @@ delete_and_cleanup_timer(TimerRef, Id) ->
     %% cancel timeout
     _ = erlang:cancel_timer(TimerRef),
     %% consume potential timeout message
-    trace_mpath:thread_yield(),
+    %% note: do not yield trace_mpath thread with "after 0"!
     receive
         ?SCALARIS_RECV({range_read_timeout, Id}, ok) %% -> ok
     after 0 -> ok
