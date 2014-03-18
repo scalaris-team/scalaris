@@ -137,6 +137,8 @@ start(TraceId, InLogger, MsgMapFun, FilterFun) ->
 
 -spec stop() -> ok.
 stop() ->
+    % assert infection when stop/0 is called
+    ?DBG_ASSERT(erlang:get(trace_mpath) =/= undefined),
     %% stop sending epidemic messages
     erlang:erase(trace_mpath),
     ok.
