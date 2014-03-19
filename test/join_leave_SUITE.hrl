@@ -69,7 +69,6 @@ init_per_testcase(_TestCase, Config) ->
     Config.
 
 end_per_testcase(_TestCase, Config) ->
-    ?proto_sched(stop),
     unittest_helper:stop_ring(),
     Config.
 
@@ -106,7 +105,8 @@ join_lookup(Config) ->
           trace_mpath:thread_yield(),
           receive
               ?SCALARIS_RECV({pong, dht_node}, ok) end
-      end || _ <- Keys ].
+      end || _ <- Keys ],
+    ?proto_sched(stop).
 
 add_9(Config) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
@@ -186,6 +186,7 @@ add_3_rm_3_data(Config, Incremental) ->
     ct:pal("######## checking load ########"),
     unittest_helper:check_ring_load(ExpLoad),
     ct:pal("######## done ########"),
+    ?proto_sched(stop),
     ok.
 
 add_2x3_load(Config) ->
@@ -461,6 +462,7 @@ stop_time(F, Tag) ->
     Frequency = 1 / ElapsedTime,
     ct:pal("~p took ~ps: ~p1/s~n",
            [Tag, ElapsedTime, Frequency]),
+    ?proto_sched(stop),
     ok.
 
 -spec check_size(Size::pos_integer()) -> ok.
