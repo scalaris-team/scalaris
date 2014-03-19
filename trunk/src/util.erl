@@ -108,6 +108,8 @@ wait_for(F) -> wait_for(F, 10).
 %%       e.g. proto_sched and is thus _NOT_ suitable for gen_components.
 -spec wait_for(fun(() -> boolean()), WaitTimeInMs::pos_integer()) -> ok.
 wait_for(F, WaitTime) ->
+    ?DBG_ASSERT2(not gen_component:is_gen_component(self),
+                 'use wait_for2 inside gen_components'),
     case F() of
         true  -> ok;
         false ->
@@ -127,6 +129,8 @@ wait_for2(F) -> wait_for2(F, 10).
 %%      Uses timer:sleep/1 to wait and is thus suitable for gen_components.
 -spec wait_for2(fun(() -> boolean()), WaitTimeInMs::pos_integer()) -> ok.
 wait_for2(F, WaitTime) ->
+    ?DBG_ASSERT2(gen_component:is_gen_component(self),
+                 'use wait_for outside gen_components'),
     case F() of
         true  -> ok;
         false -> timer:sleep(WaitTime),
