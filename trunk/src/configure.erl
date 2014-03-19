@@ -27,7 +27,7 @@
 -ifdef(enable_debug).
 is_enable_debug() -> true.
 -else.
-is_enable_debug() -> true.
+is_enable_debug() -> false.
 -endif.
 
 -spec get_proplist() -> list().
