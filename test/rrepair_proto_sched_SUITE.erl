@@ -39,7 +39,7 @@
                                 %% process was running the proto_sched
                                 %% thats fine, otherwise thread_end()
                                 %% will raise an exception
-                                catch(proto_sched:thread_end()),
+                                proto_sched:thread_end(),
                                 proto_sched:wait_for_end(),
                                 ct:pal("Proto scheduler stats: ~.2p",
                                        [proto_sched:get_infos()]),

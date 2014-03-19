@@ -41,7 +41,7 @@
                                 %% process was running the proto_sched
                                 %% thats fine, otherwise thread_end()
                                 %% will raise an exception
-                                catch(proto_sched:thread_end()),
+                                proto_sched:thread_end(),
                                 proto_sched:wait_for_end(),
                                 ct:pal("Proto scheduler stats: ~.2p",
                                        [proto_sched:get_infos()]),
@@ -79,9 +79,6 @@ test_join(_Config) ->
     unittest_helper:wait_for_stable_ring_deep(),
     ct:pal("ring fully joined (4)"),
     proto_sched:cleanup(),
-    %% make ?proto_sched(stop) happy (called in end_per_testcase)
-    proto_sched:thread_num(1),
-    proto_sched:thread_begin(),
     ok.
 
 test_leave(_Config) ->
@@ -100,13 +97,10 @@ test_leave(_Config) ->
     ct:pal("shutting down node ~p to provoke slide", [AddedNode]),
     spawn_link(fun() ->
                        proto_sched:thread_begin(),
-%% TODO: fix, so it works with concurrent api_vm:shutdown_node
-%%                     api_vm:shutdown_node(AddedNode),
+                       api_vm:shutdown_node(AddedNode),
                        proto_sched:thread_end()
                end),
     proto_sched:thread_num(2),
     proto_sched:wait_for_end(),
     proto_sched:cleanup(),
-    proto_sched:thread_num(1),
-    proto_sched:thread_begin(),
     ok.

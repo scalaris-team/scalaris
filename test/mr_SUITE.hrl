@@ -54,7 +54,6 @@ init_per_testcase(_TestCase, Config) ->
     Config.
 
 end_per_testcase(_TestCase, _Config) ->
-    ?proto_sched(stop),
     unittest_helper:stop_ring(),
     ok.
 
@@ -64,6 +63,7 @@ test_sane_result(_Config) ->
     Res = api_mr:start_job(get_wc_job_erl()),
     %% each word only occurs once
     check_results(Res),
+    ?proto_sched(stop),
     ok.
 
 test_error_on_kill(_Config) ->
@@ -76,6 +76,7 @@ test_error_on_kill(_Config) ->
     KillPid = spawn_link(fun() -> api_vm:kill_nodes(1) end),
     util:wait_for_process_to_die(MrPid),
     util:wait_for_process_to_die(KillPid),
+    ?proto_sched(stop),
     ok.
 
 get_wc_job_erl() ->
