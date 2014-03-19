@@ -495,7 +495,7 @@ on({new_node_id, Id}, State) ->
     -> state() |
        {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state()}.
 on_init({get_node_details}, State) ->
-    util:wait_for2(fun() -> comm:is_valid(comm:this()) end),
+    util:wait_for(fun() -> comm:is_valid(comm:this()) end),
     comm:send_local(pid_groups:get_my(dht_node),
                     {get_node_details, comm:this(), [node]}),
     State;
