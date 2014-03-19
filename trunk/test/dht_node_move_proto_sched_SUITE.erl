@@ -42,7 +42,7 @@
                                 %% process was running the proto_sched
                                 %% thats fine, otherwise thread_end()
                                 %% will raise an exception
-                                catch(proto_sched:thread_end()),
+                                proto_sched:thread_end(),
                                 proto_sched:wait_for_end(),
                                 ct:pal("Proto scheduler stats: ~.2p",
                                        [proto_sched:get_infos()]),
@@ -58,10 +58,10 @@
 
 all() ->
     [
-     %% {group, send_to_pred},            %% does not pass proto_sched yet
-     %% {group, send_to_pred_incremental},%% does not pass proto_sched yet
-     %% {group, send_to_succ},            %% does not pass proto_sched yet
-     %% {group, send_to_succ_incremental},%% does not pass proto_sched yet
+     {group, send_to_pred},
+     {group, send_to_pred_incremental},
+     {group, send_to_succ},
+     {group, send_to_succ_incremental},
      %% {group, send_to_both},            %% does not pass proto_sched yet
      %% {group, send_to_both_incremental},%% does not pass proto_sched yet
      {group, slide_illegally}
