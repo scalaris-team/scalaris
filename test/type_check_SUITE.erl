@@ -692,8 +692,6 @@ tester_type_check_util(_Config) ->
              {tc, 1}, {tc, 2}, {tc, 3}, %% don't call arbitrary functions
              {wait_for, 1}, %% cannot create funs
              {wait_for, 2}, %% cannot create funs
-             {wait_for2, 1}, %% cannot create funs
-             {wait_for2, 2}, %% cannot create funs
              {wait_for_process_to_die, 1}, %% could wait forever
              {wait_for_table_to_disappear, 2}, %% cannot create tids
              {zipfoldl, 5}, %% cannot create funs
@@ -715,6 +713,8 @@ tester_type_check_util(_Config) ->
              {par_map_recv, 2}, %% receives messages
              {par_map_recv2, 2}, %% receives messages
              {sublist_, 4}, %% tested via feeder
+             {wait_for1, 2}, %% cannot create funs
+             {wait_for2, 2}, %% cannot create funs
              {collect_while,2}, %% needs fun
              {gb_trees_foldl_iter,3} %% needs fun
            ]}
