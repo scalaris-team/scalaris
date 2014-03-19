@@ -677,7 +677,7 @@ on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
 on_init({get_node_details}, State) ->
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
-    util:wait_for2(fun() -> comm:is_valid(comm:this()) end),
+    util:wait_for(fun() -> comm:is_valid(comm:this()) end),
     comm:send_local(pid_groups:get_my(dht_node),
                     {get_node_details, comm:this(), [node]}),
     % update gllearner with determined ip-address
