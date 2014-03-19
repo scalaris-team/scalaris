@@ -121,7 +121,6 @@ kill_nodes(Count) when is_integer(Count) andalso Count >= 0 ->
     %% spawn to be sure that all nodes are killed, even when killing
     %% ourselves.
     Pid = self(),
-    log:log("Pid is ~p", [Pid]),
     Child = spawn(
               fun() -> %% infection is passed via {do_kill_nodes} message
                       trace_mpath:thread_yield(),
@@ -134,10 +133,7 @@ kill_nodes(Count) when is_integer(Count) andalso Count >= 0 ->
               end),
     comm:send_local(Child, {do_kill_nodes}),
     trace_mpath:thread_yield(),
-    receive ?SCALARIS_RECV({kill_nodes_done, Result},
-                           begin
-                               log:log("Received"),
-                           Result end) end.
+    receive ?SCALARIS_RECV({kill_nodes_done, Result}, Result) end.
 
 -spec kill_nodes_by_name(Names::[pid_groups:groupname()]) -> {Ok::[pid_groups:groupname()], NotFound::[pid_groups:groupname()]}.
 kill_nodes_by_name(Names) when is_list(Names) ->
