@@ -714,7 +714,7 @@ tester_type_check_util(_Config) ->
              {par_map_recv2, 2}, %% receives messages
              {sublist_, 4}, %% tested via feeder
              {wait_for1, 2}, %% cannot create funs
-             {wait_for, 2}, %% cannot create funs
+             {wait_for2, 2}, %% cannot create funs
              {collect_while,2}, %% needs fun
              {gb_trees_foldl_iter,3} %% needs fun
            ]}
