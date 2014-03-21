@@ -518,8 +518,8 @@ process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, H
     State;
 
 % do not queue rm_trigger to prevent its infection with msg_queue:send/1
-process_join_state({rm, trigger}, State) ->
-    ?TRACE_JOIN1(Msg, State),
+process_join_state({rm, trigger} = _Msg, State) ->
+    ?TRACE_JOIN1(_Msg, element(2, State)),
     rm_loop:send_trigger(),
     State;
 
