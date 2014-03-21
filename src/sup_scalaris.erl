@@ -49,6 +49,11 @@ start_link(Options) ->
                          [{service_group, ServiceGroup} | Options]),
     case Link of
         {ok, SupRef} when is_pid(SupRef) ->
+            case pid_groups:find_all(dht_node) of
+                [DhtNodePid] ->
+                    comm:send_local(DhtNodePid, {join, start});
+                [] -> ok
+            end,
             add_additional_nodes(),
             case util:is_unittest() of
                 true -> ok;

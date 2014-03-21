@@ -58,7 +58,10 @@ add_node(Options) ->
                [{my_sup_dht_node_id, DhtNodeId} | Options]}]),
     Sup = erlang:whereis(main_sup),
     case sup:start_sup_as_child([" +"], Sup, Desc) of
-        {ok, _Child, Group}           -> Group;
+        {ok, _Child, Group}           ->
+            DhtNodePid = pid_groups:pid_of(Group, dht_node),
+            comm:send_local(DhtNodePid, {join, start}),
+            Group;
         {error, already_present}      -> add_node(Options); % try again, different Id
         {error, {already_started, _}} -> add_node(Options); % try again, different Id
         {error, _Error} = X           -> X
