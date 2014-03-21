@@ -238,8 +238,10 @@ cleanup(TraceId) ->
 -spec thread_yield() -> ok.
 thread_yield() ->
     %% report done for proto_sched to go on...
-    log_info(self(), {gc_on_done, scalaris_recv}),
-    clear_infection().
+    log_info(self(), {gc_on_done, scalaris_recv}).
+    %% clear_infection().
+    %% we need to remain infected for receive after N clauses.
+
 
 %% Functions for trace analysis
 -spec send_histogram(trace()) -> list().
@@ -664,14 +666,14 @@ send_log_msg(RestoreThis, LoggerPid, Msg) ->
     %% don't log the sending of log messages ...
     case passed_state_logger(RestoreThis) of
         {proto_sched, _} ->
-            stop(),
+            clear_infection(),
             comm:send(LoggerPid, Msg),
             own_passed_state_put(RestoreThis);
         _ ->
             FilterFun = passed_state_filter_fun(RestoreThis),
             case FilterFun(Msg) of
                 true ->
-                    stop(),
+                    clear_infection(),
                     comm:send(LoggerPid, Msg),
                     own_passed_state_put(RestoreThis);
                 false -> ok
