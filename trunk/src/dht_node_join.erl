@@ -59,6 +59,7 @@
 
 -type(join_message() ::
     % messages at the joining node:
+    {join, start} |
     {get_dht_nodes_response, Nodes::[node:node_type()]} |
     {join, get_number_of_samples, Samples::non_neg_integer(), Conn::connection()} |
     {join, get_candidate_response, OrigJoinId::?RT:key(), Candidate::lb_op:lb_op(), Conn::connection()} |
@@ -99,6 +100,9 @@
 -type phase_2_4() :: phase2() | phase2b() | phase3() | phase4().
 
 -type join_state() ::
+    {join, {phase1,  JoinUUId::pos_integer(), Options::[tuple()], MyKeyVersion::non_neg_integer(),
+            ContactNodes::[], JoinIds::[?RT:key()], Candidates::[]},
+     QueuedMessages::msg_queue:msg_queue()} |
     {join, phase_2_4(), QueuedMessages::msg_queue:msg_queue()}.
 
 %% userdevguide-begin dht_node_join:join_as_first
@@ -122,13 +126,10 @@ join_as_other(Id, IdVersion, Options) ->
     log:log(info,"[ Node ~w ] joining, trying ID: (~.0p, ~.0p)",
             [self(), Id, IdVersion]),
     JoinUUID = uid:get_pids_uid(),
-    get_known_nodes(JoinUUID),
-    msg_delay:send_local(get_join_timeout() div 1000, self(),
-                         {join, timeout, JoinUUID}),
     gen_component:change_handler(
-      {join, {phase2, JoinUUID, Options, IdVersion, [], [Id], []},
+      {join, {phase1, JoinUUID, Options, IdVersion, [], [Id], []},
        msg_queue:new()},
-      fun dht_node_join:process_join_state/2).
+      fun ?MODULE:process_join_state/2).
 %% userdevguide-end dht_node_join:join_as_other
 
 % join protocol
@@ -137,6 +138,14 @@ join_as_other(Id, IdVersion, Options) ->
         -> join_state() |
            {'$gen_component', [{on_handler, Handler::gen_component:handler()}], dht_node_state:state()}.
 % !first node
+% start join (starting via message allows tracing with trace_mpath)
+process_join_state({join, start} = _Msg,
+                   {join, JoinState, QueuedMessages}) ->
+    JoinUUID = element(2, JoinState),
+    get_known_nodes(JoinUUID),
+    msg_delay:send_local(get_join_timeout() div 1000, self(),
+                         {join, timeout, JoinUUID}),
+    {join, set_phase(phase2, JoinState), QueuedMessages};
 % 2. Find known hosts
 % no matter which phase, if there are no contact nodes (yet), try to get some
 process_join_state({join, known_hosts_timeout, JoinUUId} = _Msg,
@@ -531,6 +540,8 @@ process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
 
 %% @doc Process requests from a joining node at a existing node:
 -spec process_join_msg(join_message(), dht_node_state:state()) -> dht_node_state:state().
+process_join_msg({join, start}, State) ->
+    State;
 process_join_msg({join, number_of_samples_request, SourcePid, LbPsv, Conn} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     call_lb_psv(LbPsv, get_number_of_samples_remote, [SourcePid, Conn]),
