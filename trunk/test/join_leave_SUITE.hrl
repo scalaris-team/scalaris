@@ -182,11 +182,11 @@ add_3_rm_3_data(Config, Incremental) ->
     unittest_helper:check_ring_size_fully_joined(4),
     ct:pal("######## starting graceful leave ########"),
     _ = api_vm:shutdown_nodes(3),
+    ?proto_sched(stop),
     check_size(1),
     ct:pal("######## checking load ########"),
     unittest_helper:check_ring_load(ExpLoad),
     ct:pal("######## done ########"),
-    ?proto_sched(stop),
     ok.
 
 add_2x3_load(Config) ->

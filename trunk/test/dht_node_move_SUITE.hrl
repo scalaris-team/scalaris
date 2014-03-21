@@ -787,7 +787,6 @@ slide_interleaving() ->
 slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
     SlideVariations1 = generate_slide_variation(SlideConf1),
     SlideVariations2 = generate_slide_variation(SlideConf2),
-    ?proto_sched(start),
     _ = [ begin
               Nodes = get_predspred_pred_node_succ(DhtNode),
               Node1 = select_from_nodes(Slide1#slideconf.node, Nodes),
@@ -798,9 +797,10 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
               TargetId2 = (Slide2#slideconf.targetid)(Nodes),
               Tag1 = Slide1#slideconf.name,
               Tag2 = Slide2#slideconf.name,
-              ct:pal("Beginning ~p, ~p", [Tag1, Tag2]),
               PidLocal1 = comm:make_local(node:pidX(Node1)),
               PidLocal2 = comm:make_local(node:pidX(Node2)),
+              ?proto_sched(start),
+              ct:pal("Beginning ~p, ~p", [Tag1, Tag2]),
               %% We use breakpoints to assure simultaneous slides.
               %% As these don't work with the proto scheduler, we test the timing of the slides using
               %% a callback function instead. The function sends out messages begin_of_slide and
@@ -826,15 +826,24 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
                       ok
               end,
               %% receive results
-              Result1 = fun() ->     trace_mpath:thread_yield(),
-receive ?SCALARIS_RECV({move, result, _Tag1, Result}, Result) end end(),
-              Result2 = fun() ->     trace_mpath:thread_yield(),
-receive ?SCALARIS_RECV({move, result, _Tag2, Result}, Result) end end(),
+              % we need to process any slide result message and cannot filter
+              % for a tag, otherwise we might hang if running with proto_sched
+              % -> Result1 may be the result of Tag2, similar for Result2
+              ReceiveResultFun =
+                  fun() ->
+                          trace_mpath:thread_yield(),
+                          receive
+                              ?SCALARIS_RECV({move, result, _Tag, Result},% ->
+                                             Result)
+                          end
+                  end,
+              Result1 = ReceiveResultFun(),
+              Result2 = ReceiveResultFun(),
+              ?proto_sched(stop),
               ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
               VerifyFun(Result1, Result2, slide_interleaving()),
               timer:sleep(10)
           end || Slide1 <- SlideVariations1, Slide2 <- SlideVariations2],
-    ?proto_sched(stop),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
