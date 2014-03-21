@@ -21,22 +21,6 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
-test_cases() ->
-    [
-     tester_join_at,
-     add_9, rm_5, add_9_rm_5,
-     add_2x3_load,
-     tester_join_at_timeouts
-    ].
-
-all() ->
-%%     unittest_helper:create_ct_all(test_cases()).
-    unittest_helper:create_ct_all([join_lookup]) ++
-        unittest_helper:create_ct_all([add_3_rm_3_data]) ++
-        unittest_helper:create_ct_all([add_3_rm_3_data_inc]) ++
-        [{group, graceful_leave_load}] ++
-        test_cases().
-
 groups() ->
 %%     unittest_helper:create_ct_groups(test_cases(), [{add_9_rm_5, [sequence, {repeat_until_any_fail, forever}]}]).
     unittest_helper:create_ct_groups([join_lookup], [{join_lookup, [sequence, {repeat_until_any_fail, 20}]}]) ++
