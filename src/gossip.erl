@@ -441,19 +441,19 @@ on_active({gossip_trigger, TriggerInterval}=Msg, State) ->
                          log:log(debug, "[ Gossip ] Module ~w got triggered", [CBModule]),
                          log:log(?SHOW, "[ Gossip ] Cycle: ~w, Round: ~w",
                                  [state_get(cycles, CBModule, State), state_get(round, CBModule, State)]),
-                         
+
                          %% set cycle status to active
                          state_set(trigger_lock, locked, CBModule, State),
-                         
+
                          %% reset exch_data
                          state_set(exch_data, {undefined, undefined}, CBModule, State),
-                         
+
                          %% request node (by the cb module or the bh module)
                          case cb_call(select_node, [], Msg, CBModule, State) of
                              true -> ok;
                              false -> request_random_node(CBModule)
                          end,
-                         
+
                          %% request data
                          cb_call(select_data, [], Msg, CBModule, State);
                      locked -> do_nothing % ignore trigger when within prepare-request phase
@@ -507,7 +507,7 @@ on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
         {p2p_exch, CBModule, _SourcePid, PData, Round} ->
             log:log(warn(), "[ Gossip ] p2p_exch failed because of ~w", [Reason]),
             _ = cb_call(notify_change, [exch_failure, {p2p_exch, PData, Round}], ErrorMsg, CBModule, State);
-        {p2p_exch_reply, CBModule, QData, Round} ->
+        {p2p_exch_reply, CBModule, _SourcePid, QData, Round} ->
             log:log(warn(), "[ Gossip ] p2p_exch_reply failed because of ~w", [Reason]),
             _ = cb_call(notify_change, [exch_failure, {p2p_exch_reply, QData, Round}], ErrorMsg, CBModule, State);
         _ ->
