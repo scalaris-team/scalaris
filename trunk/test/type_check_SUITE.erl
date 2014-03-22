@@ -160,7 +160,7 @@ tester_type_check_gossip(_Config) ->
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
     tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 11),
     tester:register_value_creator({typedef, gossip_load, load_data_list}, gossip_load, tester_create_load_data_list, 1),
-    tester:register_value_creator({typedef, gossip, cb_module}, gossip, tester_gossip_beh_modules, 1),
+    tester:register_value_creator({typedef, gossip, cb_module_name}, gossip, tester_create_cb_module_names, 1),
     Modules = [ {gossip,
             % excluded (exported functions)
             [   {start_link, 1}, % would start a lot of processes
@@ -215,7 +215,7 @@ tester_type_check_gossip(_Config) ->
     tester:unregister_value_creator({typedef, gossip_load, load_data_list}),
     tester:unregister_value_creator({typedef, gossip_load, histogram}),
     tester:unregister_type_checker({typedef, gossip_load, histogram}),
-    tester:unregister_value_creator({typedef, gossip, cb_module}),
+    tester:unregister_value_creator({typedef, gossip, cb_module_name}),
     true.
 
 
