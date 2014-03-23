@@ -191,7 +191,7 @@ basic_client_ping_pong_xing(_Config) ->
                                              end)
                               end,
                           ?ASSERT(proto_sched:infected()),
-                          comm:send_local(Parent, {from_child}),
+                          comm:send_local(Parent, {from_child})
           end),
 
     proto_sched:thread_num(1),
