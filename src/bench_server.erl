@@ -115,7 +115,7 @@ init([]) ->
 %% @doc spawns a bench_server
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [], [{pid_groups_join_as, ServiceGroup, ?MODULE}, 
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [], [{pid_groups_join_as, ServiceGroup, ?MODULE},
                                                              {erlang_register, ?MODULE}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -128,9 +128,19 @@ start_link(ServiceGroup) ->
                   fun((Parent::comm:erl_local_pid()) -> any())) -> ok.
 run_threads(Threads, Bench) ->
     Self = self(),
-    TraceMPath = erlang:get(trace_mpath),
-    util:for_to(1, Threads, fun(_X) -> spawn(fun()->
-                                                     erlang:put(trace_mpath, TraceMPath),
-                                                     Bench(Self)
-                                             end) end),
+    util:for_to(1, Threads,
+       fun(_X) ->
+           Pid = spawn_link(fun()->
+                         trace_mpath:thread_yield(),
+                         receive
+                             ?SCALARIS_RECV({start_thread}, ok)
+                         end,
+                log:log("Bench is infected ~p", [proto_sched:infected()]),
+
+                         Bench(Self),
+                         trace_mpath:thread_yield()
+                       end),
+               log:log("Sending to spawned Bench ~p", [proto_sched:infected()]),
+               comm:send_local(Pid, {start_thread})
+       end),
     ok.

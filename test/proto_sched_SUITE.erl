@@ -45,7 +45,8 @@ groups() ->
         basic_cleanup_infected,
         basic_cleanup_non_existing,
         basic_thread_yield_outside_proto_sched,
-        basic_start_bench_and_kill_it
+        basic_bench_increment%,
+%%        basic_start_bench_and_kill_it
       ]},
      {rbr_tests, [sequence],
       [ test_kv_on_cseq_read,
@@ -190,11 +191,7 @@ basic_client_ping_pong_xing(_Config) ->
                                              end)
                               end,
                           ?ASSERT(proto_sched:infected()),
-                          ct:pal("Child sends"),
                           comm:send_local(Parent, {from_child}),
-                          ct:pal("Child ends"),
-                          trace_mpath:thread_yield()
-                          %% not infected
           end),
 
     proto_sched:thread_num(1),
@@ -332,7 +329,17 @@ basic_thread_yield_outside_proto_sched(_Config) ->
     ?expect_exception(proto_sched:thread_yield(),
                       throw, 'yield_outside_thread_start_thread_end').
 
-basic_start_bench_and_kill_it() ->
+basic_bench_increment(_Config) ->
+    %% let run a short bench:increment with proto_sched
+    proto_sched:thread_num(1),
+    proto_sched:thread_begin(),
+    bench:increment(2,2),
+    proto_sched:thread_end(),
+    proto_sched:wait_for_end(),
+    %% TODO: check statistics
+    proto_sched:cleanup().
+
+basic_start_bench_and_kill_it(_Config) ->
     %% we start a long running bench:increment and kill it during
     %% execution to see what happens with proto_sched with killed
     %% processes. (Similarily done in dht_node_move_SUITE).
@@ -340,12 +347,12 @@ basic_start_bench_and_kill_it() ->
                           proto_sched:thread_begin(),
                           bench:increment(10,1000),
                           %% will be killed by steering thread
-                          ?ASSERT2(false, bench_was_to_fast)
+                          util:do_throw(bench_was_to_fast)
           end),
 
     proto_sched:thread_num(1),
     %% spawned process starts execution
-    timer:sleep(2000),
+    timer:sleep(500),
     erlang:exit(BenchPid, 'kill'),
     proto_sched:wait_for_end(),
     %% TODO: check statistics
