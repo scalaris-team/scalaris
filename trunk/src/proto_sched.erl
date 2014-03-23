@@ -161,7 +161,7 @@
          :: msg_delay_queues(),
          status                  = ?required(state, status)
          :: new | stopped | running
-          | {delivered, comm:mypid()} | {to_be_cleaned, pid()},
+          | {delivered, comm:mypid(), erlang:ref()} | {to_be_cleaned, pid()},
          passed_state            = ?required(state, passed_state)
          :: none | passed_state(),
          num_possible_executions = ?required(state, num_possible_executions)
@@ -412,7 +412,7 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
             %% still waiting for all threads to join
             ?DBG_ASSERT2(UMsg =:= {thread_release_to_run}, wrong_starting_msg),
             lists:keystore(TraceId, 1, State, {TraceId, TmpEntry});
-        {delivered, FromGPid} ->
+        {delivered, FromGPid, _Ref} ->
             %% only From is allowed to enqueue messages
             %% only when delivered or to_be_cleaned (during execution
             %% of a scheduled piece of code) new arbitrary messages
@@ -463,7 +463,7 @@ on({deliver, TraceId}, State) ->
             State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, _ToPid} ->
+                {delivered, _ToPid, _Ref} ->
                     ?TRACE("There is already message delivered to ~.0p",
                            [_ToPid]),
                     erlang:throw(proto_sched_already_in_delivered_mode);
@@ -489,10 +489,17 @@ on({deliver, TraceId}, State) ->
                     {From, To, _LorG, Msg, NumPossible, TmpEntry} =
                         pop_random_message(TraceEntry),
                     ?TRACE("Chosen from ~p possible next messages.", [NumPossible]),
+                    Monitor = case comm:is_local(comm:make_global(To)) of
+                                  true -> erlang:monitor(process,
+                                                         comm:make_local(To));
+                                  false -> none
+                              end,
                     NewEntry =
                         TmpEntry#state{num_possible_executions
                                        = NumPossible * TmpEntry#state.num_possible_executions,
-                                      status = {delivered, comm:make_global(To)}},
+                                      status = {delivered,
+                                                comm:make_global(To),
+                                                Monitor}},
                     %% we want to get raised messages, so we have to infect this message
                     PState = TraceEntry#state.passed_state,
                     InfectedMsg = epidemic_reply_msg(PState, From, To, Msg),
@@ -525,8 +532,10 @@ on({on_handler_done, TraceId, _Tag}, State) ->
              State;
          {TraceId, TraceEntry} ->
              case TraceEntry#state.status of
-                 {delivered, _To} ->
-                     %% this delivered was done, so we can schedule a new message
+                 {delivered, _To, Ref} ->
+                     %% this delivered was done, so we can schedule a new msg.
+                     erlang:demonitor(Ref),
+
                      %% enqueue a new deliver request for this TraceId
                      ?TRACE("~p proto_sched:on({on_handler_done, ~p})"
                             " trigger next deliver 1.", [_To, TraceId]),
@@ -609,7 +618,7 @@ on({cleanup, TraceId, CallerPid}, State) ->
             State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, _To} ->
+                {delivered, _To, _Ref} ->
                     ?TRACE("proto_sched:on({cleanup, ~p, ~p}) set status to to_be_cleaned.", [TraceId, CallerPid]),
                     NewEntry = TraceEntry#state{status = {to_be_cleaned, CallerPid}},
                     lists:keyreplace(TraceId, 1, State, {TraceId, NewEntry});
@@ -630,7 +639,30 @@ on({do_cleanup, TraceId, CallerPid}, State) ->
         false ->
             comm:send_local(CallerPid, {cleanup_done}),
             State
-    end.
+    end;
+
+on({'DOWN', Ref, process, Pid, Reason}, State) ->
+    ?TRACE("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
+           [Ref, Pid, Reason]),
+    log:log("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
+            [Ref, Pid, Reason]),
+    %% search for trace with status delivered, Pid and Ref
+    StateTail = lists:dropwhile(fun({_TraceId, X}) ->
+                                        case X#state.status of
+                                            {delivered, _Pid, Ref} -> false;
+                                            _ -> true
+                                        end end,
+                                State),
+    case StateTail of
+        [] -> ok; %% outdated 'DOWN' message - ok
+        [TraceEntry | _] ->
+            %% the process we delivered to has died, so we generate us a
+            %% gc_on_done message ourselves
+            comm:send_local(self(), {on_handler_done,
+                                     element(1, TraceEntry),
+                                     pid_ended_died_or_killed})
+    end,
+    State.
 
 passed_state_new(TraceId, Logger) ->
     {TraceId, Logger}.

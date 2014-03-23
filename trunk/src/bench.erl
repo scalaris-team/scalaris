@@ -122,14 +122,24 @@ load_stop() ->
                  Message::comm:message()) -> {ok, [{atom(), term()},...]}.
 manage_run(ThreadsPerVM, Iterations, Options, Message) ->
     Pid = self(),
-    TraceMPath = erlang:get(trace_mpath),
-    spawn(fun() ->
-                  erlang:put(trace_mpath, TraceMPath),
-                  Msg = setelement(5, Message, comm:this()),
-                  Res = manage_run_internal(ThreadsPerVM, Iterations, Options,
-                                            Msg),
-                  comm:send_local(Pid, Res)
-          end),
+    %% function is spawned to catch superfluous reply messages after
+    %% actual workload is done.
+    Child = spawn_link(fun() ->
+                  %% to get the newly spawned process in the
+                  %% proto_sched schedule we start it working by
+                  %% sending it a message (which also performs the
+                  %% infection).
+                  trace_mpath:thread_yield(), %noop, as not infected
+                  receive
+                      ?SCALARIS_RECV({start_work},%% ->
+                                     ok)
+                      end,
+                   Msg = setelement(5, Message, comm:this()),
+                   Res = manage_run_internal(ThreadsPerVM, Iterations, Options,
+                                                    Msg),
+                   comm:send_local(Pid, Res)
+                  end),
+    comm:send_local(Child, {start_work}),
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV({ok, Result}, %% ->
