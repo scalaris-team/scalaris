@@ -460,6 +460,7 @@ init(Options) ->
     % (otherwise the trigger would be started at the end of the join and thus
     % be infected forever)
     rm_loop:init_first(),
+    dht_node_move:send_trigger(),
 
     Id = case {is_first(Options), config:read(leases)} of
              {true, true} ->
