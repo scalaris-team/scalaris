@@ -441,10 +441,13 @@ interop3-test: interop-test python3
 	  true ; \
 	fi
 
-# delete all generated files (including test results)
-dist-clean: clean test-clean
+# delete all generated files (including test results and logs)
+dist-clean: clean test-clean log-clean
 
-# delete all generated files except test results
+log-clean:
+	-rm -rf log/*
+
+# delete all generated files except test results and logs
 clean: erlang-clean tags-clean python-clean python3-clean
 
 # delete all files related to our erlang sources
