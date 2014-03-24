@@ -80,29 +80,12 @@ unittest_create_state(Neighbors) ->
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
 % got empty cyclon cache
-handle_custom_message({rm, once, {cy_cache, []}}, State) ->
-    % ignore empty cache from cyclon
-    {{unknown}, State};
-
-% got cyclon cache
-handle_custom_message({rm, once, {cy_cache, NewCache}},
-   {Neighborhood, RandViewSize, _Cache, Churn}) ->
-    % increase RandViewSize (no error detected):
-    RandViewSizeNew =
-        case (RandViewSize < config:read(cyclon_cache_size)) of
-            true  -> RandViewSize + 1;
-            false -> RandViewSize
-        end,
-    MyRndView = get_RndView(RandViewSizeNew, NewCache),
-    OtherNeighborhood =
-        nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
-                                 get_pred_list_length(), get_succ_list_length()),
-    NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighborhood),
-    {{node_discovery}, {NewNeighborhood, RandViewSizeNew, NewCache, Churn}};
+handle_custom_message({rm, once, {cy_cache, NewCache}}, State) ->
+    add_cyclon_cache(NewCache, State);
 
 % got cyclon cache (as part of a repeating call)
-handle_custom_message({rm, {cy_cache, _NewCache} = CyMsg}, State) ->
-    NewState = handle_custom_message({rm, once, CyMsg}, State),
+handle_custom_message({rm, {cy_cache, NewCache}}, State) ->
+    NewState = add_cyclon_cache(NewCache, State),
     NewRandViewSize = element(2, element(2, NewState)),
     % trigger new cyclon cache request
     cyclon:get_subset_rand_next_interval(NewRandViewSize,
@@ -162,6 +145,27 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
     end;
 
 handle_custom_message(_, _State) -> unknown_event.
+
+%% @doc Integrates a non-empty cyclon cache into the own random view (empty
+%%      cyclon caches are ignored) and updates the random view size accordingly.
+-spec add_cyclon_cache(Cache::[node:node_type()], state_t())
+        -> {ChangeReason::{unknown} | {node_discovery}, state_t()}.
+add_cyclon_cache([], State) ->
+    % ignore empty cache from cyclon
+    {{unknown}, State};
+add_cyclon_cache(NewCache, {Neighborhood, RandViewSize, _Cache, Churn}) ->
+    % increase RandViewSize (no error detected):
+    RandViewSizeNew =
+        case (RandViewSize < config:read(cyclon_cache_size)) of
+            true  -> RandViewSize + 1;
+            false -> RandViewSize
+        end,
+    MyRndView = get_RndView(RandViewSizeNew, NewCache),
+    OtherNeighborhood =
+        nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
+                                 get_pred_list_length(), get_succ_list_length()),
+    NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighborhood),
+    {{node_discovery}, {NewNeighborhood, RandViewSizeNew, NewCache, Churn}}.
 
 -spec trigger_action(State::state_t())
         -> {ChangeReason::rm_loop:reason(), state()}.
