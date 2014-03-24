@@ -315,7 +315,8 @@ cleanup(TraceId) ->
 epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
     {'$gen_component', trace_mpath, PState, FromPid, ToPid, Msg}.
 
--spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global) -> ok.
+-spec log_send(passed_state(), anypid(), anypid(), comm:message(),
+               local | global | local_after) -> ok.
 log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
     case passed_state_logger(PState) of
         {proto_sched, LoggerPid} ->
