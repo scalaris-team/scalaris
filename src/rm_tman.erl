@@ -261,7 +261,7 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
     trigger_action({NewNeighborhood, RandViewSize, Cache, Churn}).
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
-contact_new_nodes(NewNodes) ->
+contact_new_nodes([_|_] = NewNodes) ->
     % TODO: add a local cache of contacted nodes in order not to contact them again
     ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_'}),
     case comm:is_valid(ThisWithCookie) of
@@ -272,7 +272,9 @@ contact_new_nodes(NewNodes) ->
                  end || Node <- NewNodes],
             ok;
         false -> ok
-    end.
+    end;
+contact_new_nodes([]) ->
+    ok.
 
 -spec leave(State::state()) -> ok.
 leave(_State) -> ok.
