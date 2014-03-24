@@ -52,12 +52,19 @@ get_neighbors({Neighbors, _RandViewSize, _Cache, _Churn}) ->
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Initializes the cyclon cache retrieval "trigger" (un-infected).
+-spec init_first() -> ok.
+init_first() ->
+    cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
+    ok.
+
 %% @doc Initialises the state when rm_loop receives an init_rm message.
 -spec init(Me::node:node_type(), Pred::node:node_type(),
            Succ::node:node_type()) -> state().
 init(Me, Pred, Succ) ->
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
-    cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
+    % ask cyclon once (a repeating trigger is already started in init_first/0)
+    cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, once, '_'})),
     {Neighborhood, config:read(cyclon_cache_size), [], true}.
 
 -spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
@@ -72,15 +79,12 @@ unittest_create_state(Neighbors) ->
 -spec handle_custom_message(custom_message(), state())
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
 % got empty cyclon cache
-handle_custom_message({rm, {cy_cache, []}},
-   {_Neighborhood, RandViewSize, _Cache, _Churn} = State)  ->
+handle_custom_message({rm, once, {cy_cache, []}}, State) ->
     % ignore empty cache from cyclon
-    cyclon:get_subset_rand_next_interval(RandViewSize,
-                                         comm:reply_as(self(), 2, {rm, '_'})),
     {{unknown}, State};
 
 % got cyclon cache
-handle_custom_message({rm, {cy_cache, NewCache}},
+handle_custom_message({rm, once, {cy_cache, NewCache}},
    {Neighborhood, RandViewSize, _Cache, Churn}) ->
     % increase RandViewSize (no error detected):
     RandViewSizeNew =
@@ -88,15 +92,21 @@ handle_custom_message({rm, {cy_cache, NewCache}},
             true  -> RandViewSize + 1;
             false -> RandViewSize
         end,
-    % trigger new cyclon cache request
-    cyclon:get_subset_rand_next_interval(RandViewSizeNew,
-                                         comm:reply_as(self(), 2, {rm, '_'})),
     MyRndView = get_RndView(RandViewSizeNew, NewCache),
     OtherNeighborhood =
         nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
                                  get_pred_list_length(), get_succ_list_length()),
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighborhood),
     {{node_discovery}, {NewNeighborhood, RandViewSizeNew, NewCache, Churn}};
+
+% got cyclon cache (as part of a repeating call)
+handle_custom_message({rm, {cy_cache, _NewCache} = CyMsg}, State) ->
+    NewState = handle_custom_message({rm, once, CyMsg}, State),
+    NewRandViewSize = element(2, element(2, NewState)),
+    % trigger new cyclon cache request
+    cyclon:get_subset_rand_next_interval(NewRandViewSize,
+                                         comm:reply_as(self(), 2, {rm, '_'})),
+    NewState;
 
 % got shuffle request
 handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},

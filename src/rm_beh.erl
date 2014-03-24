@@ -30,6 +30,7 @@
 -type custom_message() :: comm:message().
 
 -callback get_neighbors(state()) -> nodelist:neighborhood().
+-callback init_first() -> ok.
 -callback init(Me::node:node_type(), Pred::node:node_type(), Succ::node:node_type()) -> state().
 -callback trigger_action(State::state())
         -> {ChangeReason::rm_loop:reason(), state()}.
@@ -64,7 +65,7 @@
 behaviour_info(callbacks) ->
     [
      {get_neighbors, 1},
-     {init, 3}, {trigger_action, 1}, {handle_custom_message, 2},
+     {init_first, 0}, {init, 3}, {trigger_action, 1}, {handle_custom_message, 2},
      {trigger_interval, 0},
      {zombie_node, 2}, {crashed_node, 2},
      {new_pred, 2}, {new_succ, 2},

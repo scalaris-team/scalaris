@@ -35,7 +35,7 @@
 %%         end).
 -define(TRACE_STATE(OldState, NewState), ok).
 
--export([send_trigger/0, init/3, on/2,
+-export([send_trigger/0, init_first/0, init/3, on/2,
          leave/0, update_id/1,
          get_neighbors/1, has_left/1, is_responsible/2,
          notify_new_pred/2, notify_new_succ/2,
@@ -214,6 +214,14 @@ unsubscribe(RegPid, Tag) ->
 -spec send_trigger() -> ok.
 send_trigger() ->
     msg_delay:send_trigger(?RM:trigger_interval(), {rm, trigger}).
+
+%% @doc Initializes the rm_loop trigger and whatever the RM-specific code wants.
+%%      NOTE: this is called during dht_node:init/1 and thus is not infected
+%%            with trace_mpath.
+-spec init_first() -> ok.
+init_first() ->
+    send_trigger(),
+    ?RM:init_first().
 
 %% @doc Initializes the rm_loop state.
 -spec init(Me::node:node_type(), Pred::node:node_type(),

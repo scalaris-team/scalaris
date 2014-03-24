@@ -459,7 +459,7 @@ init(Options) ->
     % start trigger here to prevent infection when tracing e.g. node joins
     % (otherwise the trigger would be started at the end of the join and thus
     % be infected forever)
-    rm_loop:send_trigger(),
+    rm_loop:init_first(),
 
     Id = case {is_first(Options), config:read(leases)} of
              {true, true} ->
