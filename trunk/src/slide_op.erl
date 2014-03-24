@@ -32,8 +32,9 @@
          get_id/1, get_node/1, get_interval/1, get_target_id/1, get_jump_target_id/1,
          get_source_pid/1, get_tag/1, get_sendORreceive/1, get_type/1,
          get_predORsucc/1,
-         get_timer/1, set_timer/3, cancel_timer/1,
-         get_timeouts/1, inc_timeouts/1, reset_timeouts/1,
+         get_time_last_send/1, get_time_next_warn/1,
+         set_time_last_send/2, set_time_next_warn/2,
+         get_send_errors/1, inc_send_errors/1, reset_send_errors/1,
          get_phase/1, set_phase/2,
          is_setup_at_other/1, set_setup_at_other/1,
          get_next_op/1, set_next_op/2,
@@ -83,7 +84,9 @@
          jump_target_id    = null                           :: ?RT:key() | null, % ID to jump to in case of a jump operation which is preceeded by a slide to leave
          tag               = ?required(slide_op, tag)       :: any(),
          source_pid        = null              :: comm:mypid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
-         timer             = {null, nomsg, 0}  :: {reference(), comm:message(), non_neg_integer()} | {null, nomsg, non_neg_integer()}, % timeout timer, msg, number of timeouts
+         time_last_send    = never             :: erlang_timestamp() | never,
+         time_next_warn    = never             :: erlang_timestamp() | never,
+         send_errors       = 0                 :: non_neg_integer(),
          phase             = null              :: phase(),
          setup_at_other    = false             :: boolean(),
          % note: use a format which does not require conversion when read
@@ -423,60 +426,37 @@ is_incremental(#slide_op{next_op={jump, continue, _Id}}) -> true;
 is_incremental(#slide_op{next_op={leave, continue}}) -> true;
 is_incremental(_) -> false.
 
-%% @doc Returns the timer of the slide operation or {null, nomsg} if no timer
-%%      is set.
--spec get_timer(SlideOp::slide_op())
-        -> {TRef::reference(), Msg::comm:message(), Timeouts::non_neg_integer()} |
-           {TRef::null, Msg::nomsg, Timeouts::non_neg_integer()}.
-get_timer(#slide_op{timer=Timer}) -> Timer.
+%% @doc Returns the time of the last send operation.
+-spec get_time_last_send(SlideOp::slide_op()) -> erlang_timestamp() | never.
+get_time_last_send(#slide_op{time_last_send = X}) -> X.
 
-%% @doc Sets a timer that will send the given Message in Timeout ms. If Timeout
-%%      is null, no timer will be send and the stored timer will be set to
-%%      {null, nomsg}.
--spec set_timer(SlideOp::slide_op(), TimeOut::pos_integer(), Message::comm:message()) -> slide_op();
-               (SlideOp::slide_op(), Timer::null, Message::nomsg) -> slide_op().
-set_timer(SlideOp, Timeout, Message) ->
-    cancel_timer2(SlideOp),
-    TimerRef = case Timeout =/= null of
-                   true -> comm:send_local_after(Timeout, self(), Message);
-                   _    -> null
-               end,
-    SlideOp#slide_op{timer = {TimerRef, Message, 0}}.
+%% @doc Returns the time the next warning should be emitted if no further send
+%%      operation occurs.
+-spec get_time_next_warn(SlideOp::slide_op()) -> erlang_timestamp() | never.
+get_time_next_warn(#slide_op{time_next_warn = X}) -> X.
 
-%% @doc Resets the timer of the given SlideOp, consumes any of its timeout
-%%      messages and resets the timeout counter.
--spec cancel_timer(SlideOp::slide_op()) -> slide_op().
-cancel_timer(SlideOp) ->
-    cancel_timer2(SlideOp),
-    SlideOp#slide_op{timer = {null, nomsg, 0}}.
+%% @doc Sets the time of the last send operation.
+-spec set_time_last_send(SlideOp::slide_op(), erlang_timestamp()) -> slide_op().
+set_time_last_send(SlideOp, X) -> SlideOp#slide_op{time_last_send = X}.
 
--spec cancel_timer2(SlideOp::slide_op()) -> ok.
-cancel_timer2(SlideOp) ->
-    {TimerRef, Msg, _Timeouts} = get_timer(SlideOp),
-    case (TimerRef =/= null) of
-        true ->
-            _ = erlang:cancel_timer(TimerRef),
-            % consume potential timeout message
-            % note: do not yield trace_mpath thread with "after 0"!
-            receive ?SCALARIS_RECV(Msg, ok)
-                after 0 -> ok
-            end;
-        _ -> ok
-    end.
+%% @doc Sets the time the next warning should be emitted if no further send
+%%      operation occurs.
+-spec set_time_next_warn(SlideOp::slide_op(), erlang_timestamp()) -> slide_op().
+set_time_next_warn(SlideOp, X) -> SlideOp#slide_op{time_next_warn = X}.
 
-%% @doc Returns the number of timeouts received by a timer.
--spec get_timeouts(SlideOp::slide_op()) -> non_neg_integer().
-get_timeouts(#slide_op{timer={_TimerRef, _Msg, Timeouts}}) -> Timeouts.
+%% @doc Returns the number of send errors from messages with shepherd.
+-spec get_send_errors(SlideOp::slide_op()) -> non_neg_integer().
+get_send_errors(#slide_op{send_errors = X}) -> X.
 
-%% @doc Increases the number of timeouts received by a timer by 1.
--spec inc_timeouts(SlideOp::slide_op()) -> slide_op().
-inc_timeouts(SlideOp = #slide_op{timer={TimerRef, Msg, Timeouts}}) ->
-    SlideOp#slide_op{timer={TimerRef, Msg, Timeouts + 1}}.
+%% @doc Increases the number of send_errors from messages with shepherd by 1.
+-spec inc_send_errors(SlideOp::slide_op()) -> slide_op().
+inc_send_errors(SlideOp = #slide_op{send_errors = X}) ->
+    SlideOp#slide_op{send_errors = X + 1}.
 
-%% @doc Resets the number of timeouts to 0.
--spec reset_timeouts(SlideOp::slide_op()) -> slide_op().
-reset_timeouts(SlideOp = #slide_op{timer={TimerRef, Msg, _Timeouts}}) ->
-    SlideOp#slide_op{timer={TimerRef, Msg, 0}}.
+%% @doc Resets the number of send_errors from messages with shepherd to 0.
+-spec reset_send_errors(SlideOp::slide_op()) -> slide_op().
+reset_send_errors(SlideOp) ->
+    SlideOp#slide_op{send_errors = 0}.
 
 %% @doc Returns the current phase of the slide operation.
 -spec get_phase(SlideOp::slide_op()) -> phase().
