@@ -456,20 +456,17 @@ clean:
 	-rm -f doc/*.css
 	-rm -rf doc/edoc-info
 	-rm -f docroot/graphs/*.png
-	-rm -f TAGS TAGS.root TAGS.contrib TAGS.stdlib
+	-rm -f TAGS TAGS.root TAGS.contrib
 
-tags: TAGS.root TAGS.contrib TAGS.stdlib
+tags: TAGS.root TAGS.contrib
 	@$(ERL) -noinput -noshell -eval 'tags:subdirs(["src", "include", "test"]), halt(0).' ; true
-	@cat TAGS.contrib TAGS.root TAGS.stdlib >> TAGS ; true
+	@cat TAGS.contrib TAGS.root >> TAGS ; true
 
 TAGS.contrib:
 	@$(ERL) -noinput -noshell -eval 'tags:subdir("contrib", [{outfile, "TAGS.contrib"}]), halt(0).' ; true
 
 TAGS.root:
 	@$(ERL) -noinput -noshell -eval 'tags:root([{outfile, "TAGS.root"}]), halt(0).' ; true
-
-TAGS.stdlib:
-	@$(ERL) -noinput -noshell -eval 'tags:subdir("$(ERL_LIB_DIR)", [{outfile, "TAGS.stdlib"}]), halt(0).' ; true
 
 doc: .make-doc
 
