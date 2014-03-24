@@ -131,7 +131,7 @@
 
 -type logger()       :: {proto_sched, comm:mypid()}.
 -type anypid()       :: pid() | comm:mypid().
--type trace_id()     :: atom().
+-type trace_id()     :: term().
 -type send_event()   :: {log_send, Time::'_', trace_id(),
                          Source::anypid(), Dest::anypid(), comm:message(),
                          local | global}.
@@ -161,7 +161,9 @@
          :: msg_delay_queues(),
          status                  = ?required(state, status)
          :: new | stopped | running
-          | {delivered, comm:mypid(), reference()} | {to_be_cleaned, pid()},
+          | {delivered, comm:mypid(), reference()},
+         to_be_cleaned           = ?required(state, to_be_cleaned)
+         :: false | {to_be_cleaned, pid()},
          passed_state            = ?required(state, passed_state)
          :: none | passed_state(),
          num_possible_executions = ?required(state, num_possible_executions)
@@ -418,11 +420,6 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
             %% only when delivered or to_be_cleaned (during execution
             %% of a scheduled piece of code) new arbitrary messages
             %% can be added to the schedule
-            lists:keystore(TraceId, 1, State, {TraceId, TmpEntry});
-        {to_be_cleaned, _ClientPid} ->
-            %% only when delivered or to_be_cleaned (during execution
-            %% of a scheduled piece of code) new arbitrary messages
-            %% can be added to the schedule
             lists:keystore(TraceId, 1, State, {TraceId, TmpEntry})
     end;
 
@@ -543,11 +540,17 @@ on({on_handler_done, TraceId, _Tag}, State) ->
                      comm:send_local(self(), {deliver, TraceId}),
                      %% set status to running
                      NewEntry = TraceEntry#state{status = running},
-                     lists:keystore(TraceId, 1, State, {TraceId, NewEntry});
-                 {to_be_cleaned, CallerPid} ->
-                     ?TRACE("proto_sched:on({on_handler_done, ~p})"
-                            " doing cleanup.", [TraceId]),
-                     gen_component:post_op({do_cleanup, TraceId, CallerPid}, State);
+                     NewState = lists:keystore(TraceId, 1, State,
+                                               {TraceId, NewEntry}),
+                     case NewEntry#state.to_be_cleaned of
+                         {to_be_cleaned, CallerPid} ->
+                             ?TRACE("proto_sched:on({on_handler_done, ~p})"
+                                    " doing cleanup.", [TraceId]),
+                             gen_component:post_op({do_cleanup,
+                                                    TraceId,
+                                                    CallerPid}, NewState);
+                         false -> NewState
+                     end;
                   new ->
                       %% proto_sched:end() immediately after proto_sched:start()?
                       %% enqueue a new deliver request for this TraceId
@@ -634,7 +637,8 @@ on({cleanup, TraceId, CallerPid}, State) ->
             case TraceEntry#state.status of
                 {delivered, _To, _Ref} ->
                     ?TRACE("proto_sched:on({cleanup, ~p, ~p}) set status to to_be_cleaned.", [TraceId, CallerPid]),
-                    NewEntry = TraceEntry#state{status = {to_be_cleaned, CallerPid}},
+                    NewEntry = TraceEntry#state{
+                                 to_be_cleaned = {to_be_cleaned, CallerPid}},
                     lists:keyreplace(TraceId, 1, State, {TraceId, NewEntry});
                 _ ->
                     gen_component:post_op({do_cleanup, TraceId, CallerPid}, State)
@@ -695,6 +699,7 @@ new(TraceId) ->
     #state{ msg_queues = [],
             msg_delay_queues = [],
             status = new,
+            to_be_cleaned = false,
             passed_state = passed_state_new(TraceId, {proto_sched, Logger}),
             num_possible_executions = 1,
             callback_on_deliver = fun(_From, _To, _Msg) -> ok end,

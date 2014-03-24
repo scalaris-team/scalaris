@@ -44,6 +44,8 @@ groups() ->
         basic_cleanup_before_thread_end,
         basic_cleanup_infected,
         basic_cleanup_non_existing,
+        basic_cleanup_DOWN_interplay,
+        basic_cleanup_send_interplay,
         basic_thread_yield_outside_proto_sched,
         basic_bench_increment%,
 %%        basic_start_bench_and_kill_it
@@ -323,6 +325,61 @@ basic_cleanup_non_existing(_Config) ->
     %% cleanup of a non-existing traceid is prohibited.
     ?expect_exception(proto_sched:cleanup(),
                       throw, 'proto_sched:cleanup_trace_not_found').
+
+basic_cleanup_DOWN_interplay(_Config) ->
+    %% cleanup before 'DOWN' detected, but delivered.
+    %% using the status field for 'to_be_cleaned' made problems with
+    %% 'DOWN' reports, so it had to be separated in a separate record field
+    proto_sched:thread_num(1),
+    Parent = self(),
+    Child =
+        spawn(fun() ->
+                      proto_sched:thread_begin(),
+                      ?TRACE("Sending parent", []),
+                      %% to steer the flow control, we have to send
+                      %% directly here (uninfected)... (normally forbidden)
+                      Parent ! {ready_for_cleanup},
+                      %% let cleanup arrive at proto_sched
+                      timer:sleep(300)
+                      %% generate a 'DOWN' report by ending this process
+              end),
+
+    receive
+        {ready_for_cleanup} ->
+            ok
+    end,
+    proto_sched:cleanup(),
+    ?ASSERT(not proto_sched:infected()).
+
+basic_cleanup_send_interplay(_Config) ->
+    %% cleanup before 'DOWN' detected, but delivered.
+    %% using the status field for 'to_be_cleaned' made problems with
+    %% 'DOWN' reports, so it had to be separated in a separate record field
+    proto_sched:thread_num(1),
+    Parent = self(),
+    Child =
+        spawn(fun() ->
+                      proto_sched:thread_begin(),
+                      ?TRACE("Sending parent", []),
+                      %% to steer the flow control, we have to send
+                      %% directly here (uninfected)... (normally forbidden)
+                      Parent ! {ready_for_cleanup},
+                      %% let cleanup arrive at proto_sched
+                      timer:sleep(300),
+                      %% log a send
+                      comm:send_local(Parent, {child_done})
+              end),
+
+    receive
+        {ready_for_cleanup} ->
+            ok
+    end,
+    proto_sched:cleanup(),
+    %% we could/have to receive {child_done}?
+
+    ?ASSERT(not proto_sched:infected()).
+
+
 
 basic_thread_yield_outside_proto_sched(_Config) ->
     %% a thread_yield outside a proto_sched is prohibited.
