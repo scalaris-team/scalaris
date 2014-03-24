@@ -45,6 +45,11 @@ get_neighbors({Neighbors}) ->
 % Startup
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Nothing to do.
+-spec init_first() -> ok.
+init_first() ->
+    ok.
+
 %% @doc Initialises the state when rm_loop receives an init_rm message.
 -spec init(Me::node:node_type(), Pred::node:node_type(),
            Succ::node:node_type()) -> state().
