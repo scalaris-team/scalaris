@@ -161,7 +161,7 @@
          :: msg_delay_queues(),
          status                  = ?required(state, status)
          :: new | stopped | running
-          | {delivered, comm:mypid(), erlang:ref()} | {to_be_cleaned, pid()},
+          | {delivered, comm:mypid(), reference()} | {to_be_cleaned, pid()},
          passed_state            = ?required(state, passed_state)
          :: none | passed_state(),
          num_possible_executions = ?required(state, num_possible_executions)
