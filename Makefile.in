@@ -213,7 +213,6 @@ python-compile:
 	$(PYTHON2) -O -mcompileall python-api
 
 python-clean:
-	rm -f python-api/*.py
 	rm -f python-api/*.pyc
 	rm -f python-api/*.pyo
 
