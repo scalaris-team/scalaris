@@ -661,7 +661,9 @@ log_recv(PState, FromPid, ToPid, Msg) ->
     ok.
 
 -spec send_log_msg(passed_state(), comm:mypid(),
-                   trace_event() | {on_handler_done, trace_id()}) -> ok.
+                   trace_event() |
+                       {on_handler_done, trace_id(), MsgTag::atom() | integer()})
+        -> ok.
 send_log_msg(RestoreThis, LoggerPid, Msg) ->
     %% don't log the sending of log messages ...
     case passed_state_logger(RestoreThis) of
