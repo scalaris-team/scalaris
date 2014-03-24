@@ -65,7 +65,7 @@ init_first() ->
 init(Me, Pred, Succ) ->
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     % ask cyclon once (a repeating trigger is already started in init_first/0)
-    cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, once, '_'})),
+    cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 3, {rm, once, '_'})),
     {Neighborhood, config:read(cyclon_cache_size), [], true}.
 
 -spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
