@@ -557,11 +557,24 @@ on({on_handler_done, TraceId, _Tag}, State) ->
              end
      end;
 
-on({send_error, _Pid, Msg, _Reason} = _ShepherdMsg, State) ->
+on({send_error, Pid, Msg, _Reason} = _ShepherdMsg, State) ->
     %% call on_handler_done and continue with message delivery
     TraceId = get_trace_id(get_passed_state(Msg)),
     ?TRACE("send error for trace id ~p: ~p calling on_handler_done.", [TraceId, _ShepherdMsg]),
-    gen_component:post_op({on_handler_done, TraceId, send_error}, State);
+    case lists:keyfind(TraceId, 1, State) of
+        false -> State;
+        {TraceId, TraceEntry} ->
+            case TraceEntry#state.status of
+                {delivered, Pid, _Ref} ->
+                    %% send error, generate on_handler_done
+                    gen_component:post_op({on_handler_done, TraceId, send_error}, State);
+                _  ->
+                    %% not in state delivered, so probably the monitor
+                    %% already cleaned up for the died process with
+                    %% its 'DOWN' message.
+                    State
+            end
+    end;
 
 on({register_callback, CallbackFun, TraceId, Client}, State) ->
     ?TRACE("proto_sched:on({register_callback, ~p, ~p, ~p}).", [CallbackFun, TraceId, Client]),
@@ -654,15 +667,16 @@ on({'DOWN', Ref, process, Pid, Reason}, State) ->
                                         end end,
                                 State),
     case StateTail of
-        [] -> ok; %% outdated 'DOWN' message - ok
+        [] -> State; %% outdated 'DOWN' message - ok
         [TraceEntry | _] ->
             %% the process we delivered to has died, so we generate us a
-            %% gc_on_done message ourselves
-            comm:send_local(self(), {on_handler_done,
+            %% gc_on_done message ourselves.
+            %% use post_op to avoid concurrency with send_error
+            %% message when delivering to already dead nodes.
+            gen_component:post_op({on_handler_done,
                                      element(1, TraceEntry),
-                                     pid_ended_died_or_killed})
-    end,
-    State.
+                                     pid_ended_died_or_killed}, State)
+    end.
 
 passed_state_new(TraceId, Logger) ->
     {TraceId, Logger}.
