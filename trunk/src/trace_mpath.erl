@@ -147,6 +147,7 @@ stop() ->
 infected() ->
     case erlang:get(trace_mpath) of
         {_TraceId, _Logger} -> true;
+        {_TraceId, _Logger, _MsgMapFun, _FilterFun} -> true;
         _                   -> false
     end.
 
