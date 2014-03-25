@@ -87,11 +87,14 @@ get_random_node_id() ->
 -spec init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 init_stabilize(Neighbors, RT) ->
     % calculate the longest finger
-    Id = nodelist:nodeid(Neighbors),
-    Key = calculateKey(Id, first_index()),
-    % trigger a lookup for Key
-    api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, routing_table,
-                                        {rt_get_node, comm:this(), first_index()}}),
+    case first_index(Neighbors) of
+        null -> ok;
+        {Key, Index} ->
+            % trigger a lookup for Key
+            api_dht_raw:unreliable_lookup(
+              Key, {?send_to_group_member, routing_table,
+                    {rt_get_node, comm:this(), Index}})
+    end,
     RT.
 %% userdevguide-end rt_chord:init_stabilize
 
@@ -205,11 +208,12 @@ stabilize(Neighbors, RT, Index, Node) ->
                    nodelist:succ_range(Neighbors))) of
         true ->
             NewRT = gb_trees:enter(Index, Node, RT),
-            NextKey = calculateKey(MyId, next_index(Index)),
+            NextIndex = next_index(Index),
+            NextKey = calculateKey(MyId, NextIndex),
             CurrentKey = calculateKey(MyId, Index),
             case CurrentKey =/= NextKey of
                 true ->
-                    Msg = {rt_get_node, comm:this(), next_index(Index)},
+                    Msg = {rt_get_node, comm:this(), NextIndex},
                     api_dht_raw:unreliable_lookup(
                       NextKey, {?send_to_group_member, routing_table, Msg});
                 _ -> ok
@@ -268,10 +272,34 @@ calculateKey(Id, {I, J}) ->
     %io:format("~p: ~p + ~p~n", [{I, J}, Id, Offset]),
     normalize(Id + Offset).
 
+%% @doc Gets the first index not pointing to the own node.
+-spec first_index(Neighbors::nodelist:neighborhood()) -> {key_t(), index()} | null.
+first_index(Neighbors) ->
+    MyRange = nodelist:node_range(Neighbors),
+    case intervals:is_all(MyRange) of
+        true  -> null;
+        false -> Id = nodelist:nodeid(Neighbors),
+                 first_index_(Id, MyRange, first_index())
+    end.
+
+%% @doc Helper for first_index/1.
+-spec first_index_(Id::key() | key_t(), MyRange::intervals:interval(), index())
+        -> {key_t(), index()}.
+first_index_(Id, MyRange, Index) ->
+    Key = calculateKey(Id, Index),
+    case intervals:in(Key, MyRange) of
+        true  -> first_index_(Id, MyRange, next_index(Index));
+        false -> {Key, Index}
+    end.
+
+%% @doc Returns the first possible index, i.e. the index of the longest finger,
+%%      for the configured chord_base.
 -spec first_index() -> index().
 first_index() ->
    {1, config:read(chord_base) - 2}.
 
+%% @doc Calculates the next index, i.e. the index for the next shorter finger,
+%%      for the configured chord_base.
 -spec next_index(index()) -> index().
 next_index({I, 0}) ->
     {I + 1, config:read(chord_base) - 2};
