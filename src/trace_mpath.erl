@@ -74,21 +74,30 @@
                          {pid_groups:groupname(), pid_groups:pidname()} |
                              no_pid_name |
                              non_local_pid_name_unknown}.
--type anypid()       :: pid() | comm:mypid() | pidinfo().
+-type anypid()       :: pid() | comm:mypid().
 -type trace_id()     :: atom().
+-type send_event0()  :: {log_send, time(), trace_id(), %internal
+                         Source::anypid(), Dest::anypid(), comm:message(),
+                         local | global}.
 -type send_event()   :: {log_send, time(), trace_id(),
                          Source::pidinfo(), Dest::pidinfo(), comm:message(),
                          local | global}.
+-type info_event0()  :: {log_info, time(), trace_id(), %internal
+                         anypid(), comm:message()}.
 -type info_event()   :: {log_info, time(), trace_id(),
                          pidinfo(), comm:message()}.
+-type recv_event0()  :: {log_recv, time(), trace_id(), %internal
+                         Source::anypid(), Dest::anypid(), comm:message()}.
 -type recv_event()   :: {log_recv, time(), trace_id(),
                          Source::pidinfo(), Dest::pidinfo(), comm:message()}.
+-type trace_event0() :: send_event0() | info_event0() | recv_event0(). %internal
 -type trace_event()  :: send_event() | info_event() | recv_event().
 -type trace()        :: [trace_event()].
 -type msg_map_fun()  :: fun((comm:message(), Source::pid() | comm:mypid(),
                              Dest::pid() | comm:mypid()) -> comm:message()).
 -type filter_fun()   :: fun((trace_event()) -> boolean()).
--type passed_state() :: {trace_id(), logger(), msg_map_fun(), filter_fun()}
+-type passed_state1():: {trace_id(), logger(), msg_map_fun(), filter_fun()}.
+-type passed_state() :: passed_state1()
                         | {trace_id(), logger()}.
 -type gc_mpath_msg() :: {'$gen_component', trace_mpath, passed_state(),
                          Source::anypid(), Dest::anypid(), comm:message()}.
@@ -662,7 +671,7 @@ log_recv(PState, FromPid, ToPid, Msg) ->
     ok.
 
 -spec send_log_msg(passed_state(), comm:mypid(),
-                   trace_event() |
+                   trace_event0() |
                        {on_handler_done, trace_id(), MsgTag::atom() | integer()})
         -> ok.
 send_log_msg(RestoreThis, LoggerPid, Msg) ->
@@ -683,7 +692,7 @@ send_log_msg(RestoreThis, LoggerPid, Msg) ->
             end
     end.
 
--spec normalize_pidinfo(anypid()) -> pidinfo().
+-spec normalize_pidinfo(anypid() | pidinfo()) -> pidinfo().
 normalize_pidinfo(Pid) ->
     case is_pid(Pid) of
         true ->
@@ -744,15 +753,24 @@ on({cleanup, TraceId}, State) ->
         false                       -> State
     end.
 
+-spec passed_state_new(trace_id(), logger(), msg_map_fun(), filter_fun())
+        -> passed_state1().
 passed_state_new(TraceId, Logger, MsgMapFun, FilterFun) ->
     {TraceId, Logger, MsgMapFun, FilterFun}.
 
+-spec passed_state_trace_id(passed_state()) -> trace_id().
 passed_state_trace_id(State)      -> element(1, State).
+-spec passed_state_logger(passed_state()) -> logger().
 passed_state_logger(State)        -> element(2, State).
+-spec passed_state_msg_map_fun(passed_state1()) -> msg_map_fun().
 passed_state_msg_map_fun(State)   -> element(3, State).
+-spec passed_state_filter_fun(passed_state1()) -> filter_fun().
 passed_state_filter_fun(State)    -> element(4, State).
 
+-spec own_passed_state_put(passed_state()) -> ok.
 own_passed_state_put(State)       -> erlang:put(trace_mpath, State), ok.
+
+-spec own_passed_state_get() -> passed_state() | undefined.
 own_passed_state_get()            -> erlang:get(trace_mpath).
 
 state_add_log_event(State, TraceId, Msg) ->
