@@ -87,7 +87,7 @@ all: compile tags
 #all: compile dialyzer java test docs
 
 #cp priv/xbin/*beam bin/
-compile: contrib/log4erl/src/log4erl_parser.erl contrib/log4erl/src/log4erl_lex.erl .Emakefile
+compile: .Emakefile contrib/log4erl/src/log4erl_parser.erl contrib/log4erl/src/log4erl_lex.erl
 	@$(ERL) -pa contrib/yaws -pa ebin -noinput +B -eval 'case make:all() of up_to_date -> halt(0); error -> halt(1) end.'
 
 .Emakefile: Emakefile
