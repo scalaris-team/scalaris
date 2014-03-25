@@ -168,6 +168,12 @@
          :: none | passed_state(),
          num_possible_executions = ?required(state, num_possible_executions)
          :: pos_integer(),
+         num_delivered_msgs      = ?required(state, num_delivered_msgs)
+         :: non_neg_integer(),
+         delivered_msgs          = ?required(state, delivered_msgs)
+         :: [send_event()], %% delivered messages in reverse order
+         nums_chosen_from        = ?required(state, nums_chosen_from)
+         :: [pos_integer()], %% #possibilities for each delivered msg in reverse order
          callback_on_deliver     = ?required(state, callback_on_deliver)
          :: callback_on_deliver(),
          thread_num              = ?required(state, thread_num)
@@ -484,7 +490,7 @@ on({deliver, TraceId}, State) ->
                     NewEntry = TraceEntry#state{status = stopped},
                     lists:keystore(TraceId, 1, State, {TraceId, NewEntry});
                 _ ->
-                    {From, To, _LorG, Msg, NumPossible, TmpEntry} =
+                    {From, To, LorG, Msg, NumPossible, TmpEntry} =
                         pop_random_message(TraceEntry),
                     ?TRACE("Chosen from ~p possible next messages.", [NumPossible]),
                     Monitor = case comm:is_local(comm:make_global(To)) of
@@ -497,7 +503,15 @@ on({deliver, TraceId}, State) ->
                                        = NumPossible * TmpEntry#state.num_possible_executions,
                                       status = {delivered,
                                                 comm:make_global(To),
-                                                Monitor}},
+                                                Monitor},
+                                      num_delivered_msgs
+                                       = 1 + TmpEntry#state.num_delivered_msgs,
+                                      delivered_msgs
+                                       = [ {From, To, LorG, Msg}
+                                           | TmpEntry#state.delivered_msgs],
+                                      nums_chosen_from
+                                      = [ NumPossible
+                                          | TmpEntry#state.nums_chosen_from] },
                     %% we want to get raised messages, so we have to infect this message
                     PState = TraceEntry#state.passed_state,
                     InfectedMsg = epidemic_reply_msg(PState, From, To, Msg),
@@ -600,8 +614,20 @@ on({get_infos, Client, TraceId}, State) ->
         false ->
             comm:send(Client, {get_infos_reply, []});
         {TraceId, TraceEntry} ->
+            BranchingFactor =
+                case length(TraceEntry#state.nums_chosen_from) of
+                    0 -> 0;
+                    N -> lists:sum(TraceEntry#state.nums_chosen_from) / N
+                end,
             Infos =
-                [{num_possible_executions,
+                [{delivered_msgs,
+                  lists:reverse(TraceEntry#state.delivered_msgs)},
+                 {nums_chosen_from,
+                  lists:reverse(TraceEntry#state.nums_chosen_from)},
+                 {avg_branching_factor, BranchingFactor},
+                 {num_delivered_msgs,
+                  TraceEntry#state.num_delivered_msgs},
+                 {num_possible_executions,
                   TraceEntry#state.num_possible_executions}],
             comm:send(Client, {get_infos_reply, Infos})
     end,
@@ -702,6 +728,9 @@ new(TraceId) ->
             to_be_cleaned = false,
             passed_state = passed_state_new(TraceId, {proto_sched, Logger}),
             num_possible_executions = 1,
+            num_delivered_msgs = 0,
+            delivered_msgs = [],
+            nums_chosen_from = [],
             callback_on_deliver = fun(_From, _To, _Msg) -> ok end,
             thread_num = 0,
             threads_registered = 0,
