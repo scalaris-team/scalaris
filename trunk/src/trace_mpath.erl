@@ -355,7 +355,7 @@ to_texfile(Trace, Filename, DeltaFun, HaveRealTime) ->
     Nodes = lists:reverse(NodesR),
     DrawTrace = DeltaFun(Trace),
 
-    EndTime =  element(2, lists:last(DrawTrace)),
+    EndTime = element(2, lists:last(DrawTrace)),
 
     case 565 < (EndTime div ScaleX) of
         true -> io:format("Warning: trace (~pcm) will be to wide for LaTeX (max. 565cm).~n",
@@ -432,6 +432,29 @@ quote_latex([Char | Tail], Acc) ->
         end,
     quote_latex(Tail, NewAcc).
 
+%% @doc Gets the message tag of the given message. Special dht_node messages of
+%%      embedded processes get translated into a tuple of two message tags.
+-spec get_msg_tag(Msg::comm:message()) -> atom() | {atom(), atom()}.
+get_msg_tag(Msg) when tuple_size(Msg) =< 1 ->
+    element(1, Msg);
+get_msg_tag(Msg) ->
+    case element(1, Msg) of
+        TagX when (TagX =:= join orelse TagX =:= move orelse
+                           TagX =:= l_on_cseq orelse TagX =:= rm) ->
+            Element2 = element(2, Msg),
+            case is_tuple(Element2) andalso tuple_size(Element2) >= 1
+                andalso is_atom(element(1, Element2)) of
+                true  ->
+                    {TagX, element(1, Element2)};
+                false when is_atom(Element2) ->
+                    {TagX, Element2};
+                false ->
+                    TagX
+            end;
+        TagX ->
+            TagX
+    end.
+
 draw_messages(_File, _Nodes, _ScaleX, _HaveRealTime, []) -> ok;
 draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
     RemainingTrace =
@@ -457,8 +480,8 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
                     _ -> hd(Recv)
                 end,
             RecvTime = element(2, RecvEvent),
-            SendTag = term_to_latex_string(element(1, SendMsg)),
-            RecvTag = term_to_latex_string(element(1, element(6, RecvEvent))),
+            SendTag = term_to_latex_string(get_msg_tag(SendMsg)),
+            RecvTag = term_to_latex_string(get_msg_tag(element(6, RecvEvent))),
             Color = case element(7, X) of
                         local -> "green!30!black";
                         global -> "red!50!black"
