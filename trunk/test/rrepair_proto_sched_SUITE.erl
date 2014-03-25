@@ -41,8 +41,8 @@
                                 %% will raise an exception
                                 proto_sched:thread_end(),
                                 proto_sched:wait_for_end(),
-                                ct:pal("Proto scheduler stats: ~.2p",
-                                       [proto_sched:get_infos()]),
+                                ct:pal("Proto scheduler stats:~n~.2p",
+                                       [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]),
                                 proto_sched:cleanup()
                         end
                 end

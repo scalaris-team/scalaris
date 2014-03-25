@@ -113,7 +113,7 @@
 %%     scheduler
 -export([thread_yield/0]).
 
--export([get_infos/0, get_infos/1]).
+-export([get_infos/0, get_infos/1, info_shorten_messages/2]).
 -export([register_callback/1, register_callback/2]).
 -export([infected/0]).
 -export([clear_infection/0, restore_infection/0]).
@@ -278,6 +278,18 @@ register_callback(CallbackFun, TraceId) ->
     receive
         ?SCALARIS_RECV({register_callback_reply, Result}, Result)
     end.
+
+-spec info_shorten_messages(Infos, CharsPerMsg::pos_integer()) -> Infos
+        when is_subtype(Infos, [tuple()]).
+info_shorten_messages(Infos, CharsPerMsg) ->
+    {value, {delivered_msgs, DeliveredMsgs}, RestInfos} =
+        lists:keytake(delivered_msgs, 1, Infos),
+    DeliveredMsgs1 =
+        [begin
+             MsgStr = lists:flatten(io_lib:format("~111610.0p", [Msg])),
+             element(1, util:safe_split(CharsPerMsg, MsgStr))
+         end || Msg <- DeliveredMsgs],
+    [{delivered_msgs, DeliveredMsgs1} | RestInfos].
 
 -spec get_infos() -> [tuple()].
 get_infos() -> get_infos(default).
