@@ -109,6 +109,7 @@ basic_empty_sched(_Config) ->
     proto_sched:thread_begin(),
     proto_sched:thread_end(),
     proto_sched:wait_for_end(),
+    log:log("~.0p", [proto_sched:get_infos()]),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -131,6 +132,7 @@ basic_client_ping_pong(_Config) ->
     proto_sched:thread_end(),
     ?ASSERT(not proto_sched:infected()),
     proto_sched:wait_for_end(),
+    log:log("~.0p", [proto_sched:get_infos()]),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -167,6 +169,7 @@ basic_client_ping_pong2(_Config) ->
     proto_sched:thread_end(),
     ?ASSERT(not proto_sched:infected()),
     proto_sched:wait_for_end(),
+    log:log("~.0p", [proto_sched:get_infos()]),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -216,6 +219,7 @@ basic_client_ping_pong_xing(_Config) ->
     proto_sched:thread_end(),
     ?ASSERT(not proto_sched:infected()),
     proto_sched:wait_for_end(),
+    log:log("~.0p", [proto_sched:get_infos()]),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -227,6 +231,7 @@ basic_begin_after_running(_Config) ->
     ?expect_exception(proto_sched:thread_begin(),
                       throw, 'proto_sched:thread_begin-but_already_running'),
     proto_sched:wait_for_end(),
+    log:log("~.0p", [proto_sched:get_infos()]),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -241,6 +246,7 @@ basic_duplicate_begin(_Config) ->
                       throw, duplicate_thread_begin),
     proto_sched:thread_end(),
     proto_sched:wait_for_end(),
+    log:log("~.0p", [proto_sched:get_infos()]),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -256,6 +262,7 @@ basic_uninfected_thread_end(_Config) ->
     ?expect_exception(proto_sched:thread_end(),
                       throw, duplicate_or_uninfected_thread_end),
     proto_sched:wait_for_end(),
+    log:log("~.0p", [proto_sched:get_infos()]),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -318,6 +325,7 @@ basic_cleanup_infected(_Config) ->
                       throw, 'proto_sched:cleanup_called_infected'),
     proto_sched:thread_end(),
     proto_sched:wait_for_end(),
+    log:log("~.0p", [proto_sched:get_infos()]),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -393,6 +401,7 @@ basic_bench_increment(_Config) ->
     bench:increment(2,2),
     proto_sched:thread_end(),
     proto_sched:wait_for_end(),
+    log:log("~.0p", [proto_sched:get_infos()]),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -427,6 +436,7 @@ kv_on_cseq_read(_I) ->
     proto_sched:thread_end(_I),
     proto_sched:wait_for_end(_I),
     _Infos = proto_sched:get_infos(_I),
+    log:log("~.0p", [proto_sched:get_infos(_I)]),
     proto_sched:cleanup(_I).
 
 test_kv_on_cseq_read_2(_Config) ->
@@ -454,6 +464,7 @@ kv_on_cseq_read_2(_I) ->
     receive ok -> ok end,
     proto_sched:wait_for_end(_I),
     _Infos = proto_sched:get_infos(_I),
+    log:log("~.0p", [proto_sched:get_infos(_I)]),
     proto_sched:cleanup(_I).
 
 test_kv_on_cseq_write(_Config) ->
@@ -501,6 +512,7 @@ kv_on_cseq_write_2(_I) ->
     ?TRACE("Both done", []]),
     proto_sched:wait_for_end(_I),
     _Infos = proto_sched:get_infos(_I),
+    log:log("~.0p", [proto_sched:get_infos(_I)]),
     proto_sched:cleanup(_I).
 
 test_qwrite_qwrite_qread(_Config) ->
@@ -542,6 +554,7 @@ qwrite_qwrite_qread(_I) ->
 
     proto_sched:wait_for_end(),
     Infos = proto_sched:get_infos(),
+    log:log("~.0p", [Infos]),
     proto_sched:cleanup(),
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
