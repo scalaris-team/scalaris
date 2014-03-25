@@ -133,9 +133,8 @@ init([]) ->
     case Role of
         tx_tm ->
             comm:send_local(self(), {get_node_details}),
-            rtm_update(state_get_RTMs(InitialState),
-                       config:read(tx_rtm_update_interval) div 1000,
-                       {update_RTMs}),
+            rtm_update_trigger(state_get_RTMs(InitialState)),
+            msg_delay:send_trigger(1, {update_RTMs_on_init}),
             %% subscribe to id changes
             rm_loop:subscribe(self(), ?MODULE,
                               fun rm_loop:subscribe_dneighbor_change_filter/3,
@@ -653,8 +652,7 @@ on({update_RTMs}, State) ->
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
     RTMs = state_get_RTMs(State),
-    rtm_update(RTMs, config:read(tx_rtm_update_interval) div 1000,
-               {update_RTMs}),
+    rtm_update_trigger(RTMs),
     State;
 on({update_RTMs_on_init}, State) ->
     %% only in tx_tm not in rtm processes!
@@ -699,21 +697,20 @@ on_init({get_node_details_response, NodeDetails}, State) ->
                   {[rtm_entry_new(X, unknown, I, unknown) | Acc ], I - 1}
                 end,
                 {[], length(RTM_ids) - 1}, RTM_ids),
-    rtm_update(NewRTMs, 1, {update_RTMs_on_init}),
+    rtm_update_once(NewRTMs),
     state_set_RTMs(State, NewRTMs);
 
 on_init({update_RTMs}, State) ->
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
-    rtm_update(state_get_RTMs(State),
-               config:read(tx_rtm_update_interval) div 1000,
-               {update_RTMs}),
+    rtm_update_trigger(state_get_RTMs(State)),
     State;
 on_init({update_RTMs_on_init}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on_init:update_RTMs in Pid ~p ~n", [self()]),
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
-    rtm_update(state_get_RTMs(State), 1, {update_RTMs_on_init}),
+    rtm_update_once(state_get_RTMs(State)),
+    msg_delay:send_trigger(1, {update_RTMs_on_init}),
     State;
 
 on_init({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
@@ -784,8 +781,15 @@ on_init({crash, Pid}, State) ->
     handle_crash(Pid, State, on_init).
 
 %% functions for periodic RTM updates
--spec rtm_update(rtms(), pos_integer(), {update_RTMs} | {update_RTMs_on_init}) -> ok.
-rtm_update(RTMs, Delay, TriggerMsg) ->
+-spec rtm_update_trigger(rtms()) -> ok.
+rtm_update_trigger(RTMs) ->
+    rtm_update_once(RTMs),
+    msg_delay:send_trigger(config:read(tx_rtm_update_interval) div 1000,
+                           {update_RTMs}),
+    ok.
+
+-spec rtm_update_once(rtms()) -> ok.
+rtm_update_once(RTMs) ->
     This = comm:this(),
     _ = [ begin
               Name = get_nth_rtm_name(get_nth(RTM)),
@@ -793,8 +797,6 @@ rtm_update(RTMs, Delay, TriggerMsg) ->
               api_dht_raw:unreliable_lookup(Key, {get_rtm, This, Key, Name})
           end
           || RTM <- RTMs],
-    msg_delay:send_trigger(Delay, %config:read(tx_rtm_update_interval) div 1000,
-                           TriggerMsg),
     ok.
 
 %% functions for tx processing
@@ -1208,6 +1210,7 @@ handle_crash(Pid, State, Handler) ->
         andalso tx_tm =:= state_get_role(NewState)
         andalso on =:= Handler of
         true ->
+            % TODO: this may lead to a trigger infection!
             comm:send_local(self(), {update_RTMs_on_init}),
             gen_component:change_handler(
               state_set_RTMs(NewState, NewRTMs),
