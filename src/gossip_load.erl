@@ -727,10 +727,8 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, State) 
 
     %% Ring convergence
     Fun = fun(AvgType) ->
-            {OldAvg, OldWeight} = data_get(AvgType, OldRing),
-            {NewAvg, NewWeight} = data_get(AvgType, NewRing),
-            OldValue = calc_current_estimate(OldAvg, OldWeight),
-            NewValue = calc_current_estimate(NewAvg, NewWeight),
+            OldValue = calc_current_estimate(data_get(AvgType, OldRing)),
+            NewValue = calc_current_estimate(data_get(AvgType, NewRing)),
             log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
                 [state_get(instance, State), AvgType, OldValue, NewValue]),
             _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
@@ -741,10 +739,8 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, State) 
     LoadModulesConverged =
         [begin
              ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
-             {OldAvg, OldWeight} = data_get(AvgType, OldLoad),
-             {NewAvg, NewWeight} = data_get(AvgType, NewLoad),
-             OldValue = calc_current_estimate(OldAvg, OldWeight),
-             NewValue = calc_current_estimate(NewAvg, NewWeight),
+             OldValue = calc_current_estimate(data_get(AvgType, OldLoad)),
+             NewValue = calc_current_estimate(data_get(AvgType, NewLoad)),
              log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
                      [state_get(instance, State), AvgType, OldValue, NewValue]),
              _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
@@ -792,6 +788,9 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, State) 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% State of gossip_load: Getters, Setters and Helpers
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-compile({inline, [delete_state/1, state_get/2, state_set/3, state_update/3,
+                   prev_state_get/2]}).
 
 %% @doc Create a new state table with some initial values.
 -spec state_new() -> state().
@@ -875,6 +874,9 @@ prev_state_get(Key, State) ->
 %% Load Data and Ring Data
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-compile({inline, [load_data_new/1, load_data_list_new/0, ring_data_new/0,
+                   divide2/2, merge_failed_exch_data/2, merge_load_data/3, merge_avg/3]}).
+
 %% @doc creates a new load_data (for internal use by gossip_load.erl)
 -spec load_data_new(Module::atom()) -> load_data_uninit().
 load_data_new(Module) ->
@@ -924,37 +926,36 @@ data_get(_Key, []) ->
     [];
 data_get(Key, [LoadData | Other]) ->
     [data_get(Key, LoadData) | data_get(Key, Other)];
-data_get(Key, #load_data{name = Name, avg=Avg, avg2=Avg2,
-        min=Min, max=Max, histo=Histo}) ->
-    case Key of
-        name -> Name;
-        avg -> Avg;
-        avg2 -> Avg2;
-        min -> Min;
-        max -> Max;
-        histo -> Histo
-    end;
-data_get(Key, #ring_data{size_inv = SizeInv, avg_kr = AvgKr}) ->
-    case Key of
-        size_inv -> SizeInv;
-        avg_kr -> AvgKr
-    end.
+data_get(name, #load_data{name = Name}) ->
+    Name;
+data_get(avg, #load_data{avg = Avg}) ->
+    Avg;
+data_get(avg2, #load_data{avg2 = Avg2}) ->
+    Avg2;
+data_get(min, #load_data{min = Min}) ->
+    Min;
+data_get(max, #load_data{max = Max}) ->
+    Max;
+data_get(histo, #load_data{histo = Histo}) ->
+    Histo;
+data_get(size_inv, #ring_data{size_inv = SizeInv}) ->
+    SizeInv;
+data_get(avg_kr, #ring_data{avg_kr = AvgKr}) ->
+    AvgKr.
 
 -spec get_current_estimate(Key::avg | avg2,
                            unknown | load_data()) -> float() | unknown;
                           (Key::size_inv | avg_kr,
                            unknown | ring_data()) -> float() | unknown.
 get_current_estimate(_Key, unknown) -> unknown;
-get_current_estimate(Key, #load_data{avg=Avg, avg2=Avg2}) ->
-    case Key of
-        avg -> calc_current_estimate(Avg);
-        avg2 -> calc_current_estimate(Avg2)
-    end;
-get_current_estimate(Key, #ring_data{size_inv = SizeInv, avg_kr = AvgKr}) ->
-    case Key of
-        size_inv -> calc_current_estimate(SizeInv);
-        avg_kr -> calc_current_estimate(AvgKr)
-    end.
+get_current_estimate(avg, #load_data{avg=Avg}) ->
+    calc_current_estimate(Avg);
+get_current_estimate(avg2, #load_data{avg2=Avg2}) ->
+    calc_current_estimate(Avg2);
+get_current_estimate(size_inv, #ring_data{size_inv = SizeInv}) ->
+    calc_current_estimate(SizeInv);
+get_current_estimate(avg_kr, #ring_data{avg_kr = AvgKr}) ->
+    calc_current_estimate(AvgKr).
 
 %% get_size(Data) ->
 %%     Size_kr = calc_size_kr(Data),
@@ -1143,6 +1144,8 @@ previous_or_current(State) when is_atom(State) orelse is_integer(State) ->
 
 %%---------------------------- Histogram ---------------------------%%
 
+-compile({inline, [init_histo/3, divide2/1, merge_histo/2, merge_bucket/2]}).
+
 -spec init_histo(Module::module(), DHTNodeState::dht_node_state:state(),
                  State::state()) -> histogram().
 init_histo(Module, DHTNodeState, State) ->
@@ -1286,6 +1289,8 @@ load_info_other_get(Key, #load_info_other{name = Name, avg=Avg,
 %% Calculations on Load Data Values
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-compile({inline, [calc_current_estimate/1, calc_current_estimate/2]}).
+
 %% @doc Calculate the current estimate from a given {Value, Weight} tuple.
 -spec calc_current_estimate(unknown | avg()) -> float() | unknown.
 calc_current_estimate(unknown) -> unknown;
@@ -1297,20 +1302,21 @@ calc_current_estimate({Value, Weight}) ->
 %% @doc Calculate the current estimate from the given value and, weight.
 -spec calc_current_estimate(Value::float(), Weight::float()) -> float() | unknown.
 calc_current_estimate(Value, Weight) ->
-    try Value/Weight
+    try Value / Weight
     catch
         error:badarith -> unknown
     end.
 
 
 %% @doc Calculates the change in percent from the Old value to the New value.
--spec calc_change(OldValue::float(), NewValue::float()) -> float().
+-spec calc_change(OldValue::float() | unknown, NewValue::float() | unknown) -> float().
+calc_change(unknown, _NewValue) -> 100.0;
+calc_change(_OldValue, unknown) -> 100.0;
+calc_change(Value, Value)       -> 0.0;
+%calc_change(0, _NewValue)       -> 100.0; we only have floats!
+calc_change(0.0, _NewValue)     -> 100.0;
 calc_change(OldValue, NewValue) ->
-    if
-        (OldValue =/= unknown) andalso (OldValue =:= NewValue) -> 0.0;
-        (OldValue =:= unknown) orelse (NewValue =:= unknown) orelse (OldValue == 0) -> 100.0;
-        true -> ((OldValue + abs(NewValue - OldValue)) * 100.0 / OldValue) - 100
-    end.
+    ((OldValue + abs(NewValue - OldValue)) * 100.0 / OldValue) - 100.
 
 
 %% @doc Calculates the difference between the key of a node and its
@@ -1370,6 +1376,8 @@ calc_size_kr(Data) when is_record(Data, ring_data) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Misc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-compile({inline, inc/1}).
 
 %% @doc Increments given value with one.
 -spec inc(Value::integer()) -> integer().
