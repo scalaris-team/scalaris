@@ -41,15 +41,24 @@ start_link() ->
     Link = log4erl:start(log4erl, []),
     case Link of
         {ok, _} ->
+            LogLevel = config:read(log_level),
+            LogLevelFile = config:read(log_level_file),
+            % determine lowest log level, adapt cut-off level accordingly
+            case log4erl_utils:to_log(LogLevel, LogLevelFile) of
+                true  -> % LogLevel >= LogLevelFile
+                    log_filter_codegen:set_cutoff_level(LogLevelFile);
+                false -> % LogLevel < LogLevelFile
+                    log_filter_codegen:set_cutoff_level(LogLevel)
+            end,
             case util:is_unittest() of
                 true ->
                     log4erl:add_appender(?DEFAULT_LOGGER,
                                          {log4erl_ctpal_appender, ctpal},
-                                         {config:read(log_level),
+                                         {LogLevel,
                                           config:read(log_format)});
                 _ ->
                     log4erl:add_console_appender(stdout,
-                                                 {config:read(log_level),
+                                                 {LogLevel,
                                                   config:read(log_format)})
             end,
             ErrorLoggerFile = filename:join(config:read(log_path),
@@ -60,7 +69,7 @@ start_link() ->
                                              {size, config:read(log_file_size)},
                                              config:read(log_file_rotations),
                                              "txt",
-                                             config:read(log_level_file)}),
+                                             LogLevelFile}),
 
 %%             log4erl:change_format(stdout, config:read(log_format)),
             log4erl:change_format(file, config:read(log_format_file)),
