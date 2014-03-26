@@ -41,8 +41,8 @@ groups() ->
 all() ->
     [
      {group, tester_tests},
-     {group, kill_tests},
-     {group, rm_loop_tests}
+     {group, kill_tests}%,
+     %{group, rm_loop_tests} % TODO: add checks to test
      ].
 
 suite() -> [ {timetrap, {seconds, 400}} ].
@@ -113,7 +113,7 @@ test_single_kill(_Config) ->
     join_test(4, 5),
     log:log("kill nodes", []),
     synchronous_kill(5, 4),
-    timer:sleep(5000),
+    %timer:sleep(5000), % enable to see rest of protocol
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
