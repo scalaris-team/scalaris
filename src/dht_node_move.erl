@@ -42,7 +42,6 @@
                 dht_node_state:get(State, msg_fwd), dht_node_state:get(State, db_range)])).
 
 -export([process_move_msg/2, send_trigger/0,
-         can_slide_succ/3, can_slide_pred/3,
          make_slide/5,
          make_slide_leave/2, make_jump/4,
          crashed_node/3,
@@ -478,9 +477,12 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
         -> Command::command().
 check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
     PredOrSucc = slide_op:get_predORsucc(Type),
+    SlideSucc = dht_node_state:get(State, slide_succ),
+    DBRange = dht_node_state:get(State, db_range),
+    SlidePred = dht_node_state:get(State, slide_pred),
     CanSlide = case PredOrSucc of
-                   pred -> can_slide_pred(State, TId, Type);
-                   succ -> can_slide_succ(State, TId, Type)
+                   pred -> can_slide_pred(SlidePred, SlideSucc, DBRange, TId, Type);
+                   succ -> can_slide_succ(SlidePred, SlideSucc, DBRange, TId, Type)
                end,
     % correct pred/succ info? did pred/succ know our current ID? -> compare node info
     Neighbors = dht_node_state:get(State, neighbors),
@@ -508,10 +510,6 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
                                     TIdInRange     -> {ok, {slide, succ, 'send'}};
                                     TIdInSuccRange -> {ok, {slide, succ, 'rcv'}};
                                     true ->
-                                        SlideSucc =
-                                            dht_node_state:get(State, slide_succ),
-                                        SlidePred =
-                                            dht_node_state:get(State, slide_pred),
                                         case SlideSucc =:= null andalso
                                                  SlidePred =:= null of
                                             true -> {ok, {jump, 'send'}};
@@ -528,8 +526,7 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
                             _    -> {ok, Type}
                         end;
                     false when SendOrReceive =:= 'send' -> % no leave/jump
-                        TIdInRange = intervals:in(TId, nodelist:node_range(Neighbors)) andalso
-                                         not dht_node_state:has_left(State),
+                        TIdInRange = intervals:in(TId, nodelist:node_range(Neighbors)),
                         case not TIdInRange orelse TId =:= node:id(MyNode) of
                             true -> {abort, target_id_not_in_range, Type};
                             _    -> {ok, Type}
@@ -729,11 +726,11 @@ find_incremental_target_id(Neighbors, State, FinalTargetId, Type, OtherMTE) ->
               unknown -> get_max_transport_entries();
               _       -> erlang:min(OtherMTE, get_max_transport_entries())
           end,
-    % TODO: optimise here - if the remaining interval has no data, return FinalTargetId
     case slide_op:get_predORsucc(Type) of
         pred -> BeginId = node:id(nodelist:pred(Neighbors)), Dir = forward;
         succ -> BeginId = nodelist:nodeid(Neighbors), Dir = backward
     end,
+    % TODO: optimise here - if the remaining interval has no data, return FinalTargetId
     case dht_node_state:get_split_key(State, BeginId, FinalTargetId, MTE, Dir) of
         {SplitKey, MTE} -> SplitKey;
         {_SplitKey, MTEX} when MTEX < MTE -> FinalTargetId
@@ -1274,48 +1271,60 @@ get_slide(State, MoveFullId) ->
 
 %% @doc Returns whether a slide with the successor is possible for the given
 %%      target id.
-%% @see can_slide/3
--spec can_slide_succ(State::dht_node_state:state(), TargetId::?RT:key(), Type::slide_op:type()) -> boolean().
-can_slide_succ(State, TargetId, Type) ->
-    SlidePred = dht_node_state:get(State, slide_pred),
-    DBRange = dht_node_state:get(State, db_range),
-    dht_node_state:get(State, slide_succ) =:= null andalso
-        % 1) TargetId not interfering with SlidePred?
-        (SlidePred =:= null orelse
-             (not intervals:in(TargetId, slide_op:get_interval(SlidePred)) andalso
-                  not (slide_op:is_leave(Type) andalso slide_op:is_leave(SlidePred)))
-        ) andalso
-        % 2) no left-over DBRange (from sending data to successor) waiting for RM-update
-        % -> we need to integrate this range into my_range first in order to proceed
-        %    (most code does not look at db_range and only uses my_range to create intervals!)
-        (DBRange =:= [] orelse
-             (SlidePred =/= null andalso
-                  element(2, hd(DBRange)) =:= slide_op:get_id(SlidePred))
-        ).
+%%      1) TargetId not interfering with SlidePred?
+%%      2) no left-over DBRange (from send-to-succ) waiting for RM-update
+%%         -> needs to be integrated into my_range first to proceed (most code
+%%            only uses my_range to create intervals!)
+%% @see can_slide_pred/5
+-spec can_slide_succ(SlidePred::Slide, SlideSucc::Slide,
+                     DBRange::[{intervals:interval(), slide_op:id()}],
+                     TargetId::?RT:key(), Type::slide_op:type()) -> boolean()
+        when is_subtype(Slide, slide_op:slide_op() | null).
+can_slide_succ(null, null, [], _TargetId, _Type) ->
+    true;
+can_slide_succ(null, null, [_|_], _TargetId, _Type) ->
+    false;
+can_slide_succ(SlidePred, null, [], TargetId, Type) ->
+    % TargetId not interfering with SlidePred?
+    not intervals:in(TargetId, slide_op:get_interval(SlidePred)) andalso
+        not (slide_op:is_leave(Type) andalso slide_op:is_leave(SlidePred));
+can_slide_succ(SlidePred, null, [{_I, SlideId}], TargetId, Type) ->
+    % no left-over DBRange (from send-to-succ) waiting for RM-update
+    SlideId =:= slide_op:get_id(SlidePred) andalso
+        % TargetId not interfering with SlidePred?
+        (not intervals:in(TargetId, slide_op:get_interval(SlidePred)) andalso
+             not (slide_op:is_leave(Type) andalso slide_op:is_leave(SlidePred)));
+can_slide_succ(_SlidePred, _SlideSucc, _DBRange, _TargetId, _Type) ->
+    false.
 
 %% @doc Returns whether a slide with the predecessor is possible for the given
 %%      target id.
-%% @see can_slide/3
--spec can_slide_pred(State::dht_node_state:state(), TargetId::?RT:key(), Type::slide_op:type()) -> boolean().
-can_slide_pred(State, TargetId, _Type) ->
-    SlideSucc = dht_node_state:get(State, slide_succ),
-    DBRange = dht_node_state:get(State, db_range),
-    dht_node_state:get(State, slide_pred) =:= null andalso
-        % 1) TargetId not interfering with SlideSucc?
-        % 2) no left-over DBRange (from sending data to successor) waiting for RM-update
-        % -> we need to integrate this range into my_range first in order to proceed
-        %    (most code does not look at db_range and only uses my_range to create intervals!)
-        (SlideSucc =:= null orelse
-             (not intervals:in(TargetId, slide_op:get_interval(SlideSucc)) andalso
-                  not slide_op:is_leave(SlideSucc))
-        ) andalso
-        % 2) no left-over DBRange (from receiving data from predecessor) waiting for RM-update
-        % -> we need to integrate this range into my_range first in order to proceed
-        %    (most code does not look at db_range and only uses my_range to create intervals!)
-        (DBRange =:= [] orelse
-             (SlideSucc =/= null andalso tl(DBRange) =:= [] andalso % only one DBRange element
-                  element(2, hd(DBRange)) =:= slide_op:get_id(SlideSucc))
-        ).
+%%      1) TargetId not interfering with SlideSucc?
+%%      2) no left-over DBRange (from receive-from-pred) waiting for RM-update
+%%         -> needs to be integrated into my_range first to proceed (most code
+%%            only uses my_range to create intervals!)
+%% @see can_slide_succ/5
+-spec can_slide_pred(SlidePred::Slide, SlideSucc::Slide,
+                     DBRange::[{intervals:interval(), slide_op:id()}],
+                     TargetId::?RT:key(), Type::slide_op:type()) -> boolean()
+        when is_subtype(Slide, slide_op:slide_op() | null).
+can_slide_pred(null, null, [], _TargetId, _Type) ->
+    true;
+can_slide_pred(null, null, [_|_], _TargetId, _Type) ->
+    false;
+can_slide_pred(null, SlideSucc, [], TargetId, _Type) ->
+    % TargetId not interfering with SlideSucc?
+    not intervals:in(TargetId, slide_op:get_interval(SlideSucc)) andalso
+         not slide_op:is_leave(SlideSucc);
+can_slide_pred(null, SlideSucc, [{_I, SlideId}], TargetId, _Type) ->
+    % no left-over DBRange (from receive-from-pred) waiting for RM-update
+    SlideId =:= slide_op:get_id(SlideSucc) andalso
+        % TargetId not interfering with SlideSucc?
+        (not intervals:in(TargetId, slide_op:get_interval(SlideSucc)) andalso
+             not slide_op:is_leave(SlideSucc)
+        );
+can_slide_pred(_SlidePred, _SlideSucc, _DBRange, _TargetId, _Type) ->
+    false.
 
 %% @doc Sends the source pid the given message if it is not 'null'.
 -spec notify_source_pid(SourcePid::comm:mypid() | null, Message::result_message()) -> ok.
