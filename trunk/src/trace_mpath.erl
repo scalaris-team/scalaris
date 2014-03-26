@@ -598,7 +598,7 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
             EventTime = element(2, X),
             io:format(
               File, "\\draw [color=blue] (~pcm, -~p) ++(0, 0.1cm) node[rotate=60, anchor=west, inner sep=1pt] {\\tiny ~s}-- ++(0, -0.2cm);~n",
-              [EventTime/ScaleX, SrcNum/2, term_to_latex_string(element(1, element(5, X)))]),
+              [EventTime/ScaleX, SrcNum/2, term_to_latex_string(get_msg_tag(element(5, X)))]),
             %% not yet implemented
             DrawTrace
     end,
