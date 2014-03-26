@@ -402,7 +402,7 @@ delete_mr_master_state(#state{mr_master_state = MRMStateList} = State, JobId) ->
 -spec add_db_range(State::state(), Interval::intervals:interval(),
                    SlideId::slide_op:id()) -> state().
 add_db_range(State = #state{db_range=DBRange}, Interval, SlideId) ->
-    false = intervals:is_all(Interval),
+    ?DBG_ASSERT(not intervals:is_all(Interval)),
     ?TRACE("[ ~.0p ] add_db_range: ~.0p~n", [self(), Interval]),
     State#state{db_range = [{Interval, SlideId} | DBRange]}.
 
