@@ -23,14 +23,16 @@
 %-define(TRACE(X,Y), io:format(X,Y)).
 -define(TRACE(_X,_Y), ok).
 
--export([snapshot_is_done/1,on_do_snapshot/3,on_local_snapshot_is_done/1]).
+-export([on_do_snapshot/3, on_local_snapshot_is_done/1]).
 
 -spec snapshot_is_done(dht_node_state:state()) -> boolean().
 snapshot_is_done(DHTNodeState) ->
     SnapState = dht_node_state:get(DHTNodeState, snapshot_state),
-    DB = dht_node_state:get(DHTNodeState,db),
-    case {snapshot_state:is_in_progress(SnapState),db_dht:snapshot_is_running(DB),db_dht:snapshot_is_lockfree(DB)} of
-        {true,true,true} ->
+    DB = dht_node_state:get(DHTNodeState, db),
+    case snapshot_state:is_in_progress(SnapState) andalso
+            db_dht:snapshot_is_running(DB) andalso
+            db_dht:snapshot_is_lockfree(DB) of
+        true ->
             true;
         _ ->
             ?TRACE("~p snapshot:snapshot_is_done db: ~p~n",[comm:this(),DB]),
@@ -68,10 +70,10 @@ on_do_snapshot(SnapNumber, Leader, DHTNodeState) ->
         false ->
             % no snapshot is progress -> init new
             ?TRACE("snapshot: on_do_snapshot: init new snapshot~n",[]),
-            delete_and_init_snapshot(SnapNumber,Leader,DHTNodeState)
+            delete_and_init_snapshot(SnapNumber, Leader, DHTNodeState)
     end,
     % check if snapshot is already done (i.e. there were no active transactions when the snapshot arrived)
-    case snapshot:snapshot_is_done(NewState) of
+    case snapshot_is_done(NewState) of
         true ->
             comm:send(comm:this(), {local_snapshot_is_done});
         false ->
