@@ -49,14 +49,17 @@ end_per_suite(Config) ->
     ok.
 
 init_per_testcase(_TestCase, Config) ->
-    unittest_helper:make_ring(?NO_OF_NODES,  [{config, [
-                                                        {monitor_perf_interval, 0},  % deactivate monitor_perf
-                                                        {gossip_load_convergence_count_new_round, 5},
-                                                        {gossip_load_convergence_count_best_values, 1},
-                                                        {gossip_log_level_warn, warn},
-                                                        {gossip_log_level_error, error}
-                                                       ]
-                                              }]),
+    unittest_helper:make_ring(
+      ?NO_OF_NODES,
+      [{config, [
+                 {monitor_perf_interval, 0},  % deactivate monitor_perf
+                 {gossip_load_interval, 100}, % truncated to 0, i.e. immediate delivery
+                 {gossip_load_convergence_count_new_round, 5},
+                 {gossip_load_convergence_count_best_values, 1},
+                 {gossip_log_level_warn, warn},
+                 {gossip_log_level_error, error}
+                ]
+       }]),
     unittest_helper:wait_for_stable_ring_deep(),
     Config.
 
