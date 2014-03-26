@@ -80,7 +80,7 @@ get_error_interval(State) -> element(5, State).
 
 -spec set_number(state(), non_neg_integer()) -> state().
 set_number(SnapInfo, NewVal) -> 
-    erlang:put("local_snap_number", NewVal),
+    erlang:put(local_snap_number, NewVal),
     setelement(1, SnapInfo, NewVal).
 
 -spec add_snapshot(state(), any()) -> state().
