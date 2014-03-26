@@ -148,7 +148,8 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DH
     %% Check for DB responsibility:
     DB = dht_node_state:get(DHT_Node_State, db),
     Key = tx_tlog:get_entry_key(RTLogEntry),
-    OwnSnapNo = snapshot_state:get_number(dht_node_state:get(DHT_Node_State,snapshot_state)),
+    SnapState = dht_node_state:get(DHT_Node_State,snapshot_state),
+    OwnSnapNo = snapshot_state:get_number(SnapState),
     case dht_node_state:is_db_responsible(Key, DHT_Node_State) of
         true ->
             ?TRACE("~p tx_tp:update_db_or_forward before commit/abort~n",[comm:this()]),
@@ -169,15 +170,17 @@ update_db_or_forward(TM, TMItemId, RTLogEntry, Result, OwnProposal, TMSnapNo, DH
                 end,
             comm:send(TM, {?tp_committed, TMItemId}),
             % check if snapshot is running and if so, if it's already done
-            SnapState = dht_node_state:get(DHT_Node_State, snapshot_state),
-            case {snapshot_state:is_in_progress(SnapState),db_dht:snapshot_is_running(Res),db_dht:snapshot_is_lockfree(Res)} of
-                {true,true,true} ->
-                    ?TRACE_SNAP("~p tx_tp:update_db_or_forward snapshot is finally done~n",[comm:this()]),
-                    comm:send_local(self(), {local_snapshot_is_done});
-                {true,true,_} ->
-                    ?TRACE_SNAP("~p tx_tp:update_db_or_forward snapshot is still
-                                not done~n~p",[comm:this(), Res]),
-                    ok;
+            case snapshot_state:is_in_progress(SnapState) andalso db_dht:snapshot_is_running(Res) of
+                true ->
+                    case db_dht:snapshot_is_lockfree(Res) of
+                        true ->
+                            ?TRACE_SNAP("~p tx_tp:update_db_or_forward snapshot is finally done~n",[comm:this()]),
+                            comm:send_local(self(), {local_snapshot_is_done});
+                        _ ->
+                            ?TRACE_SNAP("~p tx_tp:update_db_or_forward snapshot is still
+                                        not done~n~p",[comm:this(), Res]),
+                            ok
+                    end;
                 _ ->
                     ?TRACE_SNAP("~p tx_tp:update_db_or_forward something
                                 else~n~p~n~p",[comm:this(), X, Res]),
