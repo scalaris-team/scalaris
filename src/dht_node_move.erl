@@ -724,7 +724,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
         State::dht_node_state:state(), FinalTargetId::?RT:key(), Type::slide_op:type(),
         OtherMaxTransportEntries::unknown | pos_integer()) -> ?RT:key().
 find_incremental_target_id(Neighbors, State, FinalTargetId, Type, OtherMTE) ->
-    'send' = slide_op:get_sendORreceive(Type), % just in case
+    ?DBG_ASSERT('send' =:= slide_op:get_sendORreceive(Type)), % just in case
     MTE = case OtherMTE of
               unknown -> get_max_transport_entries();
               _       -> erlang:min(OtherMTE, get_max_transport_entries())
