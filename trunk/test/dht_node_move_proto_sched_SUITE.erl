@@ -62,8 +62,8 @@ all() ->
      {group, send_to_pred_incremental},
      {group, send_to_succ},
      {group, send_to_succ_incremental},
-     %% {group, send_to_both},            %% does not pass proto_sched yet
-     %% {group, send_to_both_incremental},%% does not pass proto_sched yet
+     {group, send_to_both},
+     {group, send_to_both_incremental},
      {group, slide_illegally}
     ].
 
