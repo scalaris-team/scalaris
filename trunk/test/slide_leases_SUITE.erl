@@ -89,7 +89,7 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 tester_type_check_slide_leases(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     %tester:register_value_creator({typedef, dht_node_state, state}, slide_leases, tester_create_dht_node_state, 0),
     %tester:register_value_creator({typedef, dht_node_state, state}, slide_leases, tester_create_slide_ops, 0),
