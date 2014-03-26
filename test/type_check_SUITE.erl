@@ -143,7 +143,7 @@ tester_type_check_gossip(_Config) ->
     unittest_helper:wait_for_stable_ring_deep(),
     Group = pid_groups:group_with(gossip),
     pid_groups:join_as(Group, gossip),
-    Count = 500,
+    Count = 250,
     config:write(no_print_ring_data, true),
     config:write(gossip_log_level_warn, debug),
     config:write(gossip_log_level_error, debug),
@@ -220,7 +220,7 @@ tester_type_check_gossip(_Config) ->
 
 
 tester_type_check_math(_Config) ->
-    Count = 500,
+    Count = 250,
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
@@ -284,7 +284,7 @@ tester_type_check_math(_Config) ->
     true.
 
 tester_type_check_node(_Config) ->
-    Count = 500,
+    Count = 250,
     config:write(no_print_ring_data, true),
     Modules =
         [
@@ -362,7 +362,7 @@ tester_type_check_paxos(_Config) ->
     true.
 
 tester_type_check_rrepair(_Config) ->
-    Count = 500,
+    Count = 250,
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
@@ -461,7 +461,7 @@ tester_type_check_rrepair(_Config) ->
     true.
 
 tester_type_check_tx(_Config) ->
-    Count = 500,
+    Count = 250,
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
     tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
@@ -588,7 +588,7 @@ tester_type_check_histogram(_Config) ->
     true.
 
 tester_type_check_util(_Config) ->
-    Count = 500,
+    Count = 250,
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =

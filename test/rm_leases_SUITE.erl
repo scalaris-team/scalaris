@@ -81,7 +81,7 @@ end_per_testcase(_TestCase, Config) ->
     Config.
 
 tester_type_check_rm_leases(_Config) ->
-    Count = 1000,
+    Count = 500,
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
