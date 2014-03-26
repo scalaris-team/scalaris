@@ -32,12 +32,12 @@
 
 -spec new() -> snapshot_state().
 new() ->
-    erlang:put("local_snap_number", 0),
+    erlang:put(local_snap_number, 0),
     {0, false, []}.
 
 -spec new(non_neg_integer(), boolean(), [comm:mypid() | none]) -> snapshot_state().
 new(Number, InProgress, Leaders) ->
-    erlang:put("local_snap_number", Number),
+    erlang:put(local_snap_number, Number),
     {Number, InProgress, [X || X <- Leaders, X =/= none]}.
 
 % getters
@@ -55,7 +55,7 @@ get_leaders({_, _, Leaders}) -> Leaders.
 
 -spec set_number(snapshot_state(), non_neg_integer()) -> snapshot_state().
 set_number(SnapInfo, NewVal) ->
-    erlang:put("local_snap_number", NewVal),
+    erlang:put(local_snap_number, NewVal),
     setelement(1, SnapInfo, NewVal).
 
 -spec add_leader(snapshot_state(), comm:mypid() | none) -> snapshot_state().
