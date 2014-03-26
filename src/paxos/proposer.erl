@@ -100,7 +100,7 @@ start_link(DHTNodeGroup, PidName) ->
                                             {min_heap_size, 16383}]}]).
 
 %% initialize: return initial state.
--spec init([]) -> atom().
+-spec init([]) -> state().
 init([]) ->
     ?TRACE("Starting proposer for DHT node: ~p~n", [pid_groups:my_groupname()]),
     %% For easier debugging, use a named table (generates an atom)
@@ -125,14 +125,14 @@ on({?proposer_initialize, PaxosID, Acceptors, Proposal, Majority,
     ?TRACE("proposer:initialize for paxos id: ~p round ~p~n", [PaxosID,InitialRound]),
     case pdb:get(PaxosID, ETSTableName) of
         undefined ->
-            pdb:set(state_new(PaxosID, ReplyTo, Acceptors, Proposal,
-                              Majority, MaxProposers, InitialRound),
-                    ETSTableName);
-        _ ->
+            StateForID = state_new(PaxosID, ReplyTo, Acceptors, Proposal,
+                                   Majority, MaxProposers, InitialRound),
+            pdb:set(StateForID, ETSTableName);
+        StateForID ->
             log:log(error, "Duplicate proposer:initialize for paxos id ~p"
                            "Just triggering instead~n", [PaxosID])
     end,
-    gen_component:post_op({proposer_trigger, PaxosID, InitialRound}, State);
+    proposer_trigger(StateForID, PaxosID, InitialRound, State);
 
 % trigger new proposer round
 on({proposer_trigger, PaxosID}, ETSTableName = State) ->
@@ -143,9 +143,7 @@ on({proposer_trigger, PaxosID}, ETSTableName = State) ->
             TmpState = state_reset_state(StateForID),
             NewState = state_inc_round(TmpState),
             pdb:set(NewState, ETSTableName),
-            gen_component:post_op({proposer_trigger, PaxosID,
-                                   state_get_round(NewState)},
-                                  State)
+            proposer_trigger(StateForID, PaxosID, state_get_round(NewState), State)
     end;
 
 %% trigger for given round is needed for initial round without auto-increment
@@ -154,27 +152,9 @@ on({proposer_trigger, PaxosID}, ETSTableName = State) ->
 on({proposer_trigger, PaxosID, Round}, ETSTableName = State) ->
     ?TRACE("proposer:trigger for paxos id ~p and round ~p~n", [PaxosID, Round]),
     case pdb:get(PaxosID, ETSTableName) of
-        undefined -> ok;
-        StateForID ->
-            Acceptors = state_get_acceptors(StateForID),
-            ReplyTo = state_get_replyto(StateForID),
-            Proposal = state_get_proposal(StateForID),
-            _ = case Round of
-                0 -> [msg_accept(X, ReplyTo,
-                                 PaxosID, Round,
-                                 Proposal)
-                      || X <- Acceptors];
-                _ -> [msg_prepare(X, ReplyTo, PaxosID, Round)
-                      || X <- Acceptors]
-            end,
-            case Round > state_get_round(StateForID) of
-                true ->
-                    pdb:set(state_set_round(StateForID, Round),
-                            ETSTableName);
-                false -> ok
-            end
-    end,
-    State;
+        undefined  -> State;
+        StateForID -> proposer_trigger(StateForID, PaxosID, Round, ETSTableName)
+    end;
 
 on({acceptor_ack, PaxosID, Round, Value, RLast}, ETSTableName = State) ->
     ?TRACE("proposer:ack for paxos id ~p round ~p~n", [PaxosID, Round]),
@@ -219,6 +199,28 @@ on({?proposer_deleteids, ListOfPaxosIDs}, ETSTableName = State) ->
 
 on(_, _State) ->
     unknown_event.
+
+-spec proposer_trigger(StateForID::proposer_state(), PaxosID::any(),
+                       Round::non_neg_integer(), state()) -> state().
+proposer_trigger(StateForID, PaxosID, Round, ETSTableName = State) ->
+    Acceptors = state_get_acceptors(StateForID),
+    ReplyTo = state_get_replyto(StateForID),
+    Proposal = state_get_proposal(StateForID),
+    _ = case Round of
+            0 -> [msg_accept(X, ReplyTo,
+                             PaxosID, Round,
+                             Proposal)
+                    || X <- Acceptors];
+            _ -> [msg_prepare(X, ReplyTo, PaxosID, Round)
+                    || X <- Acceptors]
+        end,
+    case Round > state_get_round(StateForID) of
+        true ->
+            pdb:set(state_set_round(StateForID, Round),
+                    ETSTableName);
+        false -> ok
+    end,
+    State.
 
 start_new_higher_round(PaxosID, Round, ETSTableName) ->
     case pdb:get(PaxosID, ETSTableName) of
