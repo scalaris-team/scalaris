@@ -451,6 +451,9 @@ get_msg_tag(Msg) ->
                 false ->
                     TagX
             end;
+        ?send_to_group_member_atom ->
+            {?send_to_group_member_atom, _PidName, EmbeddedMsg} = Msg,
+            {send_to_group_member, get_msg_tag(EmbeddedMsg)};
         TagX ->
             TagX
     end.
