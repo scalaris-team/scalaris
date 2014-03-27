@@ -332,7 +332,7 @@ bp_about_to_kill(Pid) ->
 
 -type spawn_option() ::
             link | monitor
-          | {priority, Level::low | normal | high | max}
+          | {priority, Level::normal | high | max}
           | {fullsweep_after, Number::non_neg_integer()}
           | {min_heap_size, Size::non_neg_integer()}
           | {min_bin_vheap_size, VSize::non_neg_integer()}.
