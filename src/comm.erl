@@ -134,12 +134,19 @@ send(Pid, Msg, Options) ->
         undefined ->
             comm_server:send(RealPid, RealMsg, RealOpts);
         Logger ->
-            LocalPidPart = make_local(RealPid),
-            LocalNumericPid = case is_atom(LocalPidPart) of
-                                     true -> whereis(LocalPidPart);
-                                     false -> LocalPidPart
-                                 end,
-            RealNumericPid = make_global(LocalNumericPid),
+            RealNumericPid =
+                case comm_server:is_local(RealPid) of
+                    true ->
+                        LocalPidPart = make_local(RealPid),
+                        LocalNumericPid = case is_atom(LocalPidPart) of
+                                              true -> whereis(LocalPidPart);
+                                              false -> LocalPidPart
+                                          end,
+                        make_global(LocalNumericPid);
+                    false ->
+                        % TODO: convert named process on remote node?
+                        RealPid
+                end,
             Deliver = trace_mpath:log_send(Logger, self(),
                                            RealNumericPid, RealMsg, global),
             case Deliver of
