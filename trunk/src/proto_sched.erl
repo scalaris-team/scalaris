@@ -530,9 +530,9 @@ on({deliver, TraceId}, State) ->
                     ?TRACE("delivering msg to execute:"
                            " ~.0p (~.0p) -> ~.0p (~.0p): ~.0p.",
                            [From,
-                            pid_groups:group_and_name_of(From),
+                            pid_groups:group_and_name_of(comm:make_local(From)),
                             To,
-                            pid_groups:group_and_name_of(To),
+                            pid_groups:group_and_name_of(comm:make_local(To)),
                             Msg]),
                     %% call the callback function (if any) before sending out the msg
                     CallbackFun = TraceEntry#state.callback_on_deliver,
