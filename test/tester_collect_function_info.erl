@@ -73,6 +73,7 @@ collect_unknown_type_infos(ParseState, OldUnknownTypes) ->
 -spec collect_type_info/3 :: (module(), atom(), tester_parse_state:state()) ->
     tester_parse_state:state().
 collect_type_info(Module, Type, ParseState) ->
+    erlang:put(module, Module),
     case tester_parse_state:is_known_type(Module, Type, ParseState) of
         true ->
             ParseState;
@@ -133,6 +134,7 @@ parse_chunk({attribute, _Line, _AttributeName, _AttributeValue}, _Module,
             ParseState) ->
     ParseState;
 parse_chunk({function, _Line, _FunName, _FunArity, FunCode}, _Module, ParseState) ->
+    erlang:put(fun_name, _FunName),
     tester_value_collector:parse_expression(FunCode, ParseState);
 parse_chunk({eof, _Line}, _Module, ParseState) ->
     ParseState.
