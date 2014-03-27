@@ -124,5 +124,7 @@ parse_expression({string, _, String}, ParseState) ->
     tester_parse_state:add_string(String, ParseState);
 
 parse_expression(Expression, _ParseState) ->
-    ?ct_fail("unknown expression: ~w", [Expression]).
+    ?ct_fail("unknown expression: ~w in ~w:~w", [Expression,
+                                                 erlang:get(module),
+                                                 erlang:get(fun_name)]).
 
