@@ -74,15 +74,17 @@ send({{_IP1, _IP2, _IP3, _IP4} = TargetIP, TargetPort, TargetPid} = Target,
            end;
        MyIP =:= TargetIP andalso MyPort =:= TargetPort andalso is_atom(TargetPid) ->
            % named local process
-           case whereis(TargetPid) of
-               undefined ->
+           case erlang:process_info(TargetPid, priority) of
+               {priority, low} -> % about to be killed
+                   report_send_error(Options, Target, Message,
+                                     local_target_not_alive);
+               undefined -> % process is not alive
                    log:log(warn,
                            "[ CC ] Cannot locally send msg to unknown named"
                                " process ~p: ~.0p~n", [TargetPid, Message]),
                    report_send_error(Options, Target, Message, unknown_named_process);
-               PID ->
-                   % assume that whereis/1 does not report dead PIDs
-                   PID ! Message, ok
+               _ ->
+                   TargetPid ! Message, ok
            end;
        true ->
            ?LOG_MESSAGE('send', Message, proplists:get_value(channel, Options, main)),
