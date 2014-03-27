@@ -171,7 +171,7 @@
 
 -define(CBMODULES, [{gossip_load, default}]). % callback modules as list
 
--define(FIRST_TRIGGER_DELAY, 1). % delay in s for first trigger
+-define(FIRST_TRIGGER_DELAY, 2). % delay in s for first trigger
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
