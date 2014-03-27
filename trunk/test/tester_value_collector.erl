@@ -118,6 +118,8 @@ parse_expression({char, _, _Char}, ParseState) ->
     ParseState;
 parse_expression({integer, _, Integer}, ParseState) ->
     tester_parse_state:add_integer(Integer, ParseState);
+parse_expression({map, _, []}, ParseState) -> % map:new()
+    ParseState;
 parse_expression({nil, _}, ParseState) ->
     tester_parse_state:add_atom(nil, ParseState);
 parse_expression({string, _, String}, ParseState) ->
