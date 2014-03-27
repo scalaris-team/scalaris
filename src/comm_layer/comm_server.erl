@@ -58,19 +58,21 @@ send({{_IP1, _IP2, _IP3, _IP4} = TargetIP, TargetPort, TargetPid} = Target,
     {MyIP, MyPort} = get_local_address_port(),
     if MyIP =:= TargetIP andalso MyPort =:= TargetPort andalso is_pid(TargetPid) ->
            % local process identified by PID
-           case is_process_alive(TargetPid) andalso
-                    erlang:process_info(TargetPid, priority) =/= {priority, low} of
-               true ->
+           case erlang:process_info(TargetPid, priority) of
+               {priority, low} -> % about to be killed
+                   report_send_error(Options, Target, Message,
+                                     local_target_not_alive);
+               undefined -> % process is not alive
+                   report_send_error(Options, Target, Message,
+                                     local_target_not_alive);
+               _ ->
                    %% minor gap of error reporting, if PID
                    %% dies at this moment, but better than a
                    %% false positive reporting when first
                    %% sending and then checking, if message
                    %% leads to process termination (as in the
                    %% RPCs of the Java binding)
-                   TargetPid ! Message, ok;
-               false ->
-                   report_send_error(Options, Target, Message,
-                                     local_target_not_alive)
+                   TargetPid ! Message, ok
            end;
        MyIP =:= TargetIP andalso MyPort =:= TargetPort andalso is_atom(TargetPid) ->
            % named local process
