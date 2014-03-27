@@ -156,7 +156,9 @@ add_3_rm_3_data(Config, Incremental) ->
     ?proto_sched(start),
     ct:pal("######## starting join ########"),
     _ = api_vm:add_nodes(3),
+    ?proto_sched(stop),
     unittest_helper:check_ring_size_fully_joined(4),
+    ?proto_sched(start),
     ct:pal("######## starting graceful leave ########"),
     _ = api_vm:shutdown_nodes(3),
     ?proto_sched(stop),
@@ -434,16 +436,19 @@ stop_time(F, Tag) ->
     Start = erlang:now(),
     ?proto_sched(start),
     F(),
+    ?proto_sched(stop),
     Stop = erlang:now(),
     ElapsedTime = timer:now_diff(Stop, Start) / 1000000.0,
     Frequency = 1 / ElapsedTime,
     ct:pal("~p took ~ps: ~p1/s~n",
            [Tag, ElapsedTime, Frequency]),
-    ?proto_sched(stop),
     ok.
 
 -spec check_size(Size::pos_integer()) -> ok.
 check_size(Size) ->
+    Infected = trace_mpath:infected(),
+    ?IIF(Infected, ?proto_sched(stop), ok),
     unittest_helper:check_ring_size(Size),
     unittest_helper:wait_for_stable_ring(),
-    unittest_helper:check_ring_size_fully_joined(Size).
+    unittest_helper:check_ring_size_fully_joined(Size),
+    ?IIF(Infected, ?proto_sched(start), ok).
