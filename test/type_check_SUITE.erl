@@ -355,6 +355,7 @@ tester_type_check_paxos(_Config) ->
              {trigger, 2} %% tries to send messages
            ],
            [ {msg_prepare,4}, %% tries to send messages
+             {proposer_trigger, 4}, %% tries to send messages
              {start_new_higher_round,3}]} %% tries to send messages
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
