@@ -197,8 +197,10 @@ dump(RT) ->
 
 %% userdevguide-begin rt_chord:stabilize
 %% @doc Updates one entry in the routing table and triggers the next update.
--spec stabilize(Neighbors::nodelist:neighborhood(), OldRT::rt(),
-                Index::index(), Node::node:node_type()) -> NewRT::rt().
+%%      Changed indicates whether a new node was inserted (the RT structure may
+%%      change independently from this indicator!).
+-spec stabilize(Neighbors::nodelist:neighborhood(), OldRT::rt(), Index::index(),
+                Node::node:node_type()) -> {NewRT::rt(), Changed::boolean()}.
 stabilize(Neighbors, RT, Index, Node) ->
     MyId = nodelist:nodeid(Neighbors),
     Succ = nodelist:succ(Neighbors),
@@ -207,7 +209,6 @@ stabilize(Neighbors, RT, Index, Node) ->
                    node:id(Node),            %   than succ
                    nodelist:succ_range(Neighbors))) of
         true ->
-            NewRT = gb_trees:enter(Index, Node, RT),
             NextIndex = next_index(Index),
             NextKey = calculateKey(MyId, NextIndex),
             CurrentKey = calculateKey(MyId, Index),
@@ -218,8 +219,11 @@ stabilize(Neighbors, RT, Index, Node) ->
                       NextKey, {?send_to_group_member, routing_table, Msg});
                 _ -> ok
             end,
-            NewRT;
-        _ -> RT
+            Changed = (Index =:= first_index() orelse
+                          (gb_trees:lookup(prev_index(Index), RT) =/= {value, Node})),
+            {gb_trees:enter(Index, Node, RT), Changed};
+        _ ->
+            {RT, false}
     end.
 %% userdevguide-end rt_chord:stabilize
 
@@ -306,6 +310,15 @@ next_index({I, 0}) ->
 next_index({I, J}) ->
     {I, J - 1}.
 
+%% @doc Calculates the previous index, i.e. the index for the next longer finger,
+%%      for the configured chord_base.
+-spec prev_index(index()) -> index().
+prev_index({I, J}) ->
+    MaxJ = config:read(chord_base) - 2,
+    if J =:= MaxJ andalso I > 1 -> {I - 1, 0};
+       J =/= MaxJ -> {I, J + 1}
+    end.
+
 %% @doc Checks whether config parameters of the rt_chord process exist and are
 %%      valid.
 -spec check_config() -> boolean().
@@ -338,8 +351,11 @@ handle_custom_message({rt_get_node, Source_PID, Index}, State) ->
 handle_custom_message({rt_get_node_response, Index, Node}, State) ->
     OldRT = rt_loop:get_rt(State),
     Neighbors = rt_loop:get_neighb(State),
-    NewRT = stabilize(Neighbors, OldRT, Index, Node),
-    check(OldRT, NewRT, rt_loop:get_neighb(State), true),
+    case stabilize(Neighbors, OldRT, Index, Node) of
+        {NewRT, true} ->
+            check_do_update(OldRT, NewRT, rt_loop:get_neighb(State), true);
+        {NewRT, false} -> ok
+    end,
     rt_loop:set_rt(State, NewRT);
 handle_custom_message(_Message, _State) ->
     unknown_event.
@@ -350,8 +366,10 @@ handle_custom_message(_Message, _State) ->
 %%      Provided for convenience (see check/5).
 -spec check(OldRT::rt(), NewRT::rt(), Neighbors::nodelist:neighborhood(),
             ReportToFD::boolean()) -> ok.
+check(OldRT, OldRT, _Neighbors, _ReportToFD) ->
+    ok;
 check(OldRT, NewRT, Neighbors, ReportToFD) ->
-    check(OldRT, NewRT, Neighbors, Neighbors, ReportToFD).
+    check_do_update(OldRT, NewRT, Neighbors, ReportToFD).
 
 %% @doc Notifies the dht_node if the (external) routing table changed.
 %%      Also updates the failure detector if ReportToFD is set.
@@ -360,25 +378,30 @@ check(OldRT, NewRT, Neighbors, ReportToFD) ->
 -spec check(OldRT::rt(), NewRT::rt(), OldNeighbors::nodelist:neighborhood(),
             NewNeighbors::nodelist:neighborhood(), ReportToFD::boolean()) -> ok.
 check(OldRT, NewRT, OldNeighbors, NewNeighbors, ReportToFD) ->
-    case OldRT =:= NewRT andalso
-             nodelist:pred(OldNeighbors) =:= nodelist:pred(NewNeighbors) andalso
-             nodelist:succ(OldNeighbors) =:= nodelist:succ(NewNeighbors) of
+    case nodelist:pred(OldNeighbors) =:= nodelist:pred(NewNeighbors) andalso
+             nodelist:succ(OldNeighbors) =:= nodelist:succ(NewNeighbors) andalso
+             OldRT =:= NewRT of
         true -> ok;
-        _ ->
-            Pid = pid_groups:get_my(dht_node),
-            RT_ext = export_rt_to_dht_node(NewRT, NewNeighbors),
-            case Pid of
-                failed -> ok;
-                _      -> comm:send_local(Pid, {rt_update, RT_ext})
-            end,
-            % update failure detector:
-            case ReportToFD of
-                true ->
-                    NewPids = to_pid_list(NewRT),
-                    OldPids = to_pid_list(OldRT),
-                    fd:update_subscriptions(OldPids, NewPids);
-                _ -> ok
-            end
+        _ -> check_do_update(OldRT, NewRT, NewNeighbors, ReportToFD)
+    end.
+
+%% @doc Helper for check/4 and check/5.
+-spec check_do_update(OldRT::rt(), NewRT::rt(), NewNeighbors::nodelist:neighborhood(),
+                      ReportToFD::boolean()) -> ok.
+check_do_update(OldRT, NewRT, NewNeighbors, ReportToFD) ->
+    Pid = pid_groups:get_my(dht_node),
+    RT_ext = export_rt_to_dht_node(NewRT, NewNeighbors),
+    case Pid of
+        failed -> ok;
+        _      -> comm:send_local(Pid, {rt_update, RT_ext})
+    end,
+    % update failure detector:
+    case ReportToFD of
+        true ->
+            NewPids = to_pid_list(NewRT),
+            OldPids = to_pid_list(OldRT),
+            fd:update_subscriptions(OldPids, NewPids);
+        _ -> ok
     end.
 %% userdevguide-end rt_chord:check
 
