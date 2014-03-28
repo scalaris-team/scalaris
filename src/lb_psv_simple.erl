@@ -85,7 +85,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
                             OtherNodeDetails = node_details:set(node_details:new(), load, 0),
                             OtherNodeDetailsNew = node_details:set(
                                                     node_details:set(node_details:new(), new_key, SelectedKey), load, OtherLoadNew),
-                            lb_op:slide_op(OtherNodeDetails, MyNodeDetails,
+                            lb_op:slide_op(comm:this(), OtherNodeDetails, MyNodeDetails,
                                            OtherNodeDetailsNew, MyNodeDetailsNew)
                     end
                 catch
