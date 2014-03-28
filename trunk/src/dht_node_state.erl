@@ -77,8 +77,7 @@
 -type slide_snap() :: {snapshot_state:snapshot_state(), db_dht:db_as_list()} | {false}.
 
 -type slide_data() :: {{MovingData::db_dht:db_as_list(), slide_snap()},
-                       [{db_selector(), db_prbr:db_as_list()}],
-                       MovingMRState::orddict:orddict()}.
+                       [{db_selector(), db_prbr:db_as_list()}]}.
 -type slide_delta() :: {{ChangedData::db_dht:db_as_list(), DeletedKeys::[?RT:key()]},
                         [{db_selector(), {Changed::db_prbr:db_as_list(),
                                           Deleted::[?RT:key()]}}],
@@ -500,15 +499,12 @@ slide_get_data_start_record(State, MovingInterval) ->
            leases_1, leases_2, leases_3, leases_4]
          ),
 
-    %% map reduce state
-    {T2State, MovingMRState} = get_mr_slide_states(T1State, MovingInterval),
-
     %% snapshot state and db
-    OldDB = get(T2State, db),
+    OldDB = get(T1State, db),
     MovingSnapData =
         case db_dht:snapshot_is_running(OldDB) of
             true ->
-                {get(T2State, snapshot_state),
+                {get(T1State, snapshot_state),
                  db_dht:get_snapshot_data(OldDB, MovingInterval)};
             false ->
                 {false}
@@ -521,16 +517,16 @@ slide_get_data_start_record(State, MovingInterval) ->
            interval ~p~n~p~n~p",
            [?MODULE, comm:this(), MovingData, MovingSnapData,
             MovingInterval, OldDB, NewDB]),
-    NewState = set_db(T2State, NewDB),
-    {NewState, {{MovingData, MovingSnapData}, MoveRBRData, MovingMRState}}.
+    NewState = set_db(T1State, NewDB),
+    {NewState, {{MovingData, MovingSnapData}, MoveRBRData}}.
 
 
 %% @doc Adds data from slide_get_data_start_record/2 to the local DB.
 -spec slide_add_data(state(),slide_data()) -> state().
-slide_add_data(State, {{Data, SnapData}, PRBRData, MRStates}) ->
+slide_add_data(State, {{Data, SnapData}, PRBRData}) ->
     T1DB = db_dht:add_data(get(State, db), Data),
     ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~pPRBR: ~n~pMR: ~n~p",
-           [?MODULE, comm:this(), Data, SnapData, PRBRData, MRStates]),
+           [?MODULE, comm:this(), Data, SnapData, PRBRData]),
     T2State =
         case SnapData of
             {false} ->
@@ -542,8 +538,6 @@ slide_add_data(State, {{Data, SnapData}, PRBRData, MRStates}) ->
                 set_snapshot_state(T1State, SnapState)
         end,
 
-    T3State = merge_mr_states(T2State, MRStates),
-
     %% all prbr dbs
     lists:foldl(
       fun({X, XData}, AccState) ->
@@ -551,7 +545,7 @@ slide_add_data(State, {{Data, SnapData}, PRBRData, MRStates}) ->
               NewDB = db_prbr:add_data(DB, XData),
               set_prbr_state(AccState, X, NewDB)
       end,
-      T3State,
+      T2State,
       PRBRData).
 
 %% @doc Gets all DB changes in the given interval, stops recording delta infos
@@ -645,51 +639,6 @@ slide_stop_record(State, MovingInterval, Remove) ->
 get_split_key(State, Begin, End, TargetLoad, Direction) ->
     db_dht:get_split_key(get(State, db), Begin, End, TargetLoad, Direction).
 
--spec get_mr_slide_states(state(), intervals:interval()) -> {state(),
-                                                             orddict:orddict()}.
-get_mr_slide_states(State = #state{mr_state = MRStates}, MovInterval) ->
-    SlideStates = orddict:fold(
-      fun(K, MRState, MovingAcc) ->
-              Moving = mr_state:split_slide_state(MRState, MovInterval),
-              orddict:store(K, Moving, MovingAcc)
-
-      end,
-      orddict:new(),
-      MRStates),
-    ?TRACE_MR_SLIDE("~p slide states are ~p~n", [self(), SlideStates]),
-    {State, SlideStates}.
-
--spec merge_mr_states(state(), orddict:orddict()) -> state().
-merge_mr_states(State = #state{mr_state = MRStates1}, MRStates2) ->
-    %% merge the two dicts. if they exist is both use the local state since no
-    %% data has been moved yet and the rest should be the same
-    Keys = orddict:fetch_keys(MRStates1) ++ orddict:fetch_keys(MRStates2),
-    NewMRStates =
-        lists:foldl(
-          fun(JobId, AccDict) ->
-                  case orddict:find(JobId, MRStates1) of
-                      {ok, MRState} ->
-                          orddict:store(JobId, MRState, AccDict);
-                      error ->
-                          MRState = mr_state:init_slide_phase(
-                                      orddict:fetch(JobId, MRStates2)),
-                          MasterId = mr_state:get(MRState, master_id),
-                          Client = mr_state:get(MRState, client),
-                          rm_loop:subscribe(self(),
-                                            {"mr_succ_fd", JobId, MasterId, Client},
-                                            fun mr:neighborhood_succ_crash_filter/3,
-                                            fun mr:neighborhood_succ_crash/5,
-                                            inf),
-                          orddict:store(JobId,
-                                        mr_state:init_slide_phase(MRState),
-                                        AccDict)
-                  end
-          end,
-          orddict:new(),
-          Keys),
-    ?TRACE_MR_SLIDE("~p merged slide states are ~p~n", [self(), NewMRStates]),
-    State#state{mr_state = NewMRStates}.
-
 -spec mr_get_delta_states(state(), intervals:interval()) -> {state(),
                                                              {orddict:orddict(),
                                                               orddict:orddict()}}.
@@ -735,18 +684,18 @@ mr_add_delta(State = #state{mr_state = MRStates,
              {MRDeltaStates, MasterDelta}) ->
     ?TRACE_MR_SLIDE("~p adding delta state: ~p~n~p~n", [self(), MRDeltaStates,
                                               MasterDelta]),
-    NewMRState = orddict:map(
-     fun(K, MRState) ->
-             case orddict:find(K, MRDeltaStates) of
+    NewMRState = orddict:fold(
+     fun(K, MRState, Acc) ->
+             New = case orddict:find(K, Acc) of
+                 {ok, ExState} ->
+                     mr_state:merge_states(ExState, MRState);
                  error ->
-                     log:log(warn, "~p Slide with empty mr delta...should not
-                             happen~n~p  ~p", [self(), K, MRState]),
-                     MRState;
-                 {ok, Delta} ->
-                     mr_state:add_slide_delta(MRState, Delta)
-             end
+                     mr_state:init_slide_state(MRState)
+             end,
+             orddict:store(K, New, Acc)
      end,
-     MRStates),
+     MRStates,
+     MRDeltaStates),
     NewMasterStates =
     orddict:fold(
      fun(K, NewState, Acc) ->
@@ -764,5 +713,6 @@ mr_add_delta(State = #state{mr_state = MRStates,
      end,
      MasterStates,
      MasterDelta),
+    ?TRACE_MR_SLIDE("~p delta states added~n~p~n", [self(), NewMRState]),
     State#state{mr_state = NewMRState,
                 mr_master_state = NewMasterStates}.
