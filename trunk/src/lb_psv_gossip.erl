@@ -46,8 +46,9 @@
 %%      Note: this is executed at the joining node.
 -spec get_number_of_samples(Conn::dht_node_join:connection()) -> ok.
 get_number_of_samples({_, ContactNode} = Connection) ->
-    comm:send(ContactNode, {join, number_of_samples_request, comm:this(),
-                            ?MODULE, Connection}).
+    Msg = {join, number_of_samples_request, comm:this(), ?MODULE, Connection},
+    ?TRACE_SEND(ContactNode, Msg),
+    comm:send(ContactNode, Msg).
 
 %% @doc Sends the number of IDs to sample during join to the joining node.
 %%      Note: this is executed at the existing node.
@@ -58,7 +59,9 @@ get_number_of_samples_remote(SourcePid, Connection) ->
                          {join, ?MODULE, '_',
                           {get_samples, SourcePid, Connection}}),
     GossipPid = pid_groups:get_my(gossip),
-    comm:send_local(GossipPid, {get_values_best, {gossip_load, default}, SPid}).
+    Msg = {get_values_best, {gossip_load, default}, SPid},
+    ?TRACE_SEND(GossipPid, Msg),
+    comm:send_local(GossipPid, Msg).
 
 %% @doc Creates a join operation if a node would join at my node with the
 %%      given key. This will simulate the join operation and return a lb_op()
@@ -80,7 +83,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
         _ ->
             % postpone message:
             Msg = {join, get_candidate, SourcePid, SelectedKey, ?MODULE, Conn},
-            ?TRACE_SEND(SourcePid, Msg),
+            ?TRACE_SEND(self(), Msg),
             _ = comm:send_local_after(100, self(), Msg),
             ok
     end,
