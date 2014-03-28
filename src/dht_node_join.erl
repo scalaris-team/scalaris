@@ -215,7 +215,7 @@ process_join_state({join, get_number_of_samples_timeout, _Conn, _JoinId} = _Msg,
     State;
 
 %% userdevguide-begin dht_node_join:join_other_p2b
-% note: although this message was send in phase2, also accept message in
+% note: although this message was send in phase2b, also accept message in
 % phase2, e.g. messages arriving from previous calls
 process_join_state({join, get_number_of_samples, Samples, Conn} = _Msg,
                    {join, JoinState, QueuedMessages})
@@ -579,7 +579,7 @@ process_join_msg({join, join_request, NewPred, CandId, MaxTransportEntries} = _M
             dht_node_move:send(node:pidX(NewPred), Msg, MoveFullId),
             State1;
         {abort, ongoing_slide, JoinType} ->
-            ?TRACE("[ ~.0p ]~n  ignoring join_request from ~.0p due to a running slide~n",
+            ?TRACE("[ ~.0p ]~n  rejecting join_request from ~.0p due to a running slide~n",
                    [self(), NewPred]),
             ?TRACE_SEND(node:pidX(NewPred), {join, join_response, busy, CandId}),
             comm:send(node:pidX(NewPred), {join, join_response, busy, CandId}),
@@ -865,7 +865,7 @@ contact_best_candidate(JoinState) ->
         -> phase2() | phase2b() | phase4().
 send_join_request(JoinState, Timeouts) ->
     case get_candidates(JoinState) of
-        [] -> % no candidates -> start over (should not happen):
+        [] -> % no candidates -> start over (can happen, e.g. when join candidates are busy):
             start_over(JoinState);
         [BestCand | _] ->
             Id = node_details:get(lb_op:get(BestCand, n1_new), new_key),
