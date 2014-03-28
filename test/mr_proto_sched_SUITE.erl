@@ -53,11 +53,8 @@
 -include("mr_SUITE.hrl").
 
 all() ->
-    %% tests_avail() ++ [%test_join, % TODO: re-activate when node join with proto_sched runs through in debug mode
-    %%                   test_leave].
-    [tests_avail()|| _X <- lists:seq(1, 1000)] ++
-    [test_join || _X <- lists:seq(1, 1000)] ++
-    [test_leave || _X <- lists:seq(1, 1000)].
+tests_avail() ++ [%test_join, % TODO: re-activate when node join with proto_sched runs through in debug mode
+                  test_leave].
 
 suite() -> [ {timetrap, {seconds, 15}} ].
 
