@@ -354,8 +354,6 @@ on_inactive({activate_gossip, MyRange}=Msg, State) ->
                       fun gossip:rm_my_range_changed/3,
                       fun gossip:rm_send_new_range/5, inf),
 
-    init_gossip_tasks(State),
-
     % set range and notify cb modules about leader state
     state_set(range, MyRange, State),
     Msg1 = case is_leader(MyRange) of
@@ -366,6 +364,8 @@ on_inactive({activate_gossip, MyRange}=Msg, State) ->
     Fun = fun (CBModule) -> cb_call(notify_change, List, Msg, CBModule, State) end,
     CBModules = state_get(cb_modules, State),
     lists:foreach(Fun, CBModules),
+
+    init_gossip_tasks(State),
 
     % change handler to on_active
     gen_component:change_handler(State, fun ?MODULE:on_active/2);
@@ -558,10 +558,6 @@ on_active(Msg, State) ->
         tombstone ->
             log:log(warn(), "[ Gossip ] Got ~w msg for tombstoned module ~w",
                 [element(1, Msg), element(2, Msg)]);
-        unstarted ->
-            log:log(?SHOW, "[ Gossip ] Got ~w msg in cbstatus 'unstarted' for ~w",
-                [element(1, Msg), element(2, Msg)]),
-            msg_queue_add(Msg, State);
         started ->
             handle_msg(Msg, State)
     catch
@@ -781,8 +777,7 @@ start_p2p_exchange(Peers, PData, CBModule, State)  ->
 -spec init_gossip_tasks(State::state()) -> ok.
 init_gossip_tasks(State) ->
     Fun = fun (CBModule) ->
-            state_set(cb_status, unstarted, CBModule, State),
-            comm:send_local(self(), {start_gossip_task, CBModule, []})
+            init_gossip_task(CBModule, [], State)
           end,
     lists:foreach(Fun, ?CBMODULES).
 
@@ -1078,7 +1073,7 @@ state_update(Key, Fun, State) ->
 %%      <ul>
 %%        <li>`cb_state', the state of the given callback module </li>
 %%        <li>`cb_status', indicates, if `init()' was called on callback module
-%%                  (allowed values: unstarted, started) </li>
+%%                  (allowed values: started) </li>
 %%        <li>`exch_data', a tuple of the data to exchange and the peer to
 %%                  exchange the data with. Can be one of the following: </li>
 %%          <ul>
@@ -1182,7 +1177,7 @@ to_string(List) when is_list(List) ->
             is_subtype(Range, intervals:interval()),
             is_subtype(Interval, pos_integer()),
             is_subtype(CBState, any()),
-            is_subtype(CBStatus, unstarted | started | tombstone),
+            is_subtype(CBStatus, started | tombstone),
             is_subtype(ExchData, any()),
             is_subtype(Round, non_neg_integer()),
             is_subtype(TriggerLock, free | locked),
