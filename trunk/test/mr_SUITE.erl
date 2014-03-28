@@ -37,7 +37,7 @@ test_join(_Config) ->
     ct:pal("setting breakpoint before starting reduce phase"),
     NextPhase = fun(Msg, _State) ->
             case Msg of
-                {mr, next_phase, _JobId, 1, _Interval} ->
+                {bulkowner, start, _Id, _I, {mr, next_phase, _JobId, 1, _Interval}} ->
                     comm:send_local(self(), Msg),
                     drop_single;
                 _ ->
@@ -72,7 +72,7 @@ test_leave(_Config) ->
     ct:pal("setting breakpoint before starting reduce phase on ~p", [Pids]),
     NextPhase = fun(Msg, _State) ->
             case Msg of
-                {mr, next_phase, _JobId, 1, _Interval} ->
+                {bulkowner, start, _Id, _I, {mr, next_phase, _JobId, 1, _Interval}} ->
                     comm:send_local(self(), Msg),
                     drop_single;
                 _ ->
