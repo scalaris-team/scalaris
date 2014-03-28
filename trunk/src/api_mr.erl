@@ -64,13 +64,13 @@
 
 %% @doc synchronous call to start a map reduce job.
 %%      it will return the results of the job.
--spec start_job(mr:job_description()) -> [any()].
+-spec start_job(mr_state:job_description()) -> [any()].
 start_job(Job) ->
     Id = randoms:getRandomString(),
     api_dht_raw:unreliable_lookup(api_dht:hash_key(Id), {mr, init, comm:this(), Id, Job}),
     wait_for_results([], intervals:empty(), Id).
 
--spec wait_for_results([any()], intervals:interval(), nonempty_string()) -> [any()].
+-spec wait_for_results([any()], intervals:interval(), mr_state:jobid()) -> [any()].
 wait_for_results(Data, Interval, Id) ->
     {NewData, NewInterval} =
         begin

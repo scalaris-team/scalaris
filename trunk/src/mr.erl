@@ -32,25 +32,17 @@
         neighborhood_succ_crash/5
         ]).
 
--ifdef(with_export_type_support).
--export_type([job_description/0, option/0]).
--endif.
-
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
--type(option() :: {tag, atom()}).
-
--type(job_description() :: {[mr_state:fun_term(),...], [option()]}).
-
 -type(bulk_message() :: {mr, job, mr_state:jobid(), MasterId::?RT:key(),
                          Client::comm:mypid(),
-                         job_description(), mr_state:data()} |
+                         mr_state:job_description(), mr_state:data()} |
                         {mr, next_phase_data, mr_state:jobid(), comm:mypid(),
                          mr_state:data()}).
 
 -type(message() :: {mr, init, Client::comm:mypid(), mr_state:jobid(),
-                    JobSpec::job_description()} |
+                    JobSpec::mr_state:job_description()} |
                    {bulk_distribute, uid:global_uid(), intervals:interval(),
                     bulk_message(), Parents::[comm:mypid(),...]} |
                    {mr, phase_results, mr_state:jobid(), comm:message(),
@@ -194,12 +186,12 @@ on({mr, terminate_job, JobId, _DeliveryInterval}, State) ->
                 State
         end;
 
-on(_Msg, State) ->
+on(Msg, State) ->
     ?TRACE("~p mr: unknown message ~p~n", [comm:this(), Msg]),
     State.
 
--spec work_on_phase(mr_state:jobid(), dht_node_state:state(), pos_integer()) ->
-    dht_node_state:state().
+-spec work_on_phase(mr_state:jobid(), mr_state:state(), pos_integer()) ->
+    mr_state:state().
 work_on_phase(JobId, State, Round) ->
     {Round, FunTerm, ETS, Open, _Working} = mr_state:get_phase(State, Round),
     case intervals:is_empty(Open) of
@@ -270,7 +262,7 @@ send_to_client(State, Msg) ->
     Client = mr_state:get(State, client),
     comm:send(Client, Msg).
 
--spec validate_job(job_description()) -> ok | {error, term()}.
+-spec validate_job(mr_state:job_description()) -> ok | {error, term()}.
 validate_job({Phases, _Options}) ->
     validate_phases(Phases).
 

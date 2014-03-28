@@ -27,7 +27,7 @@
                 acked = intervals:empty() :: intervals:interval(),
                 round  = 0 :: non_neg_integer(),
                 outstanding    = false :: outstanding(),
-                job            = [] :: mr:job_description(),
+                job            = [] :: mr_state:job_description(),
                 client         = false :: false | comm:mypid()
                }).
 
@@ -42,7 +42,7 @@
         , set/2
         , get_slide_delta/2]).
 
--spec new(Id::?RT:key(), Job::mr:job_description(), Client::comm:mypid()) ->
+-spec new(Id::?RT:key(), Job::mr_state:job_description(), Client::comm:mypid()) ->
     state().
 new(Id, Job, Client) ->
     #state{id          = Id,
@@ -55,7 +55,7 @@ new(Id, Job, Client) ->
          (acked, state()) -> intervals:interval();
          (round, state()) -> non_neg_integer();
          (outstanding, state()) -> outstanding();
-         (job, state()) -> mr:job_description();
+         (job, state()) -> mr_state:job_description();
          (client, state()) -> comm:mypid().
 get(id, #state{id = X}) ->
     X;
