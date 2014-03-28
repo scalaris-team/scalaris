@@ -83,11 +83,15 @@ put(DBName, []) ->
     DBName;
 put(DBName, Entry) ->
     ?DBG_ASSERT(case is_list(Entry) of
-                true ->
-                    element(1, hd(Entry)) =/= '$end_of_table';
-                false ->
-                    element(1, Entry) =/= '$end_of_table'
-            end),
+                    true ->
+                        lists:all(
+                          fun(E) ->
+                                  element(1, E) =/= '$end_of_table'
+                          end,
+                          Entry);
+                    false ->
+                        element(1, Entry) =/= '$end_of_table'
+                end),
     ets:insert(DBName, Entry),
     DBName.
 
