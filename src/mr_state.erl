@@ -39,10 +39,9 @@
         , interval_empty/3
         , accumulate_data/2
         , clean_up/1
-        , split_slide_state/2
-        , init_slide_phase/1
         , get_slide_delta/2
-        , add_slide_delta/2
+        , init_slide_state/1
+        , merge_states/2
         , tester_is_valid_funterm/1
         , tester_create_valid_funterm/2]).
 
@@ -301,32 +300,7 @@ clean_up(#state{phases = Phases}) ->
                       db_ets:close(ETS)
               end, Phases).
 
--spec split_slide_state(state(), intervals:interval()) -> SlideState::state().
-split_slide_state(#state{phases = Phases} = State, _Interval) ->
-    SlidePhases =
-    lists:foldl(
-      fun({Nr, Fun, _ETS, _Open, _Working}, Slide) ->
-              [{Nr, Fun, false, intervals:empty(), intervals:empty()} | Slide]
-      end,
-      [],
-      Phases),
-    State#state{phases = SlidePhases}.
-
--spec init_slide_phase(state()) -> state().
-init_slide_phase(State = #state{phases = Phases, jobid = JobId}) ->
-    PhasesETS = lists:foldl(
-                  fun({Nr, Fun, false, Open, Working}, AccIn) ->
-                          ETS = db_ets:new(
-                                  lists:flatten(io_lib:format("mr_~s_~p",
-                                                              [JobId, Nr]))
-                                  , [ordered_set]),
-                          [{Nr, Fun, ETS, Open, Working} | AccIn];
-                     (Phase, AccIn) ->
-                          [Phase | AccIn]
-                  end, [], Phases),
-    State#state{phases = PhasesETS}.
-
--spec get_slide_delta(state(), intervals:interval()) -> {state(), [delta_phase()]}.
+-spec get_slide_delta(state(), intervals:interval()) -> {state(), state()}.
 get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
     {NewPhases, SlidePhases} =
     lists:foldl(
@@ -352,11 +326,26 @@ get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
       end,
       {[], []},
       Phases),
-    {State#state{phases = NewPhases}, SlidePhases}.
+    {State#state{phases = NewPhases}, State#state{phases = SlidePhases}}.
 
--spec add_slide_delta(state(), [delta_phase()]) -> state().
-add_slide_delta(State = #state{jobid = JobId,
-                               phases = Phases}, DeltaPhases) ->
+-spec init_slide_state(state()) -> state().
+init_slide_state(State = #state{phases = Phases, jobid = JobId}) ->
+    PhasesETS = lists:foldl(
+                  fun({Nr, Fun, Data, Open, Working}, AccIn) ->
+                          ETS = db_ets:new(
+                                  lists:flatten(io_lib:format("mr_~s_~p",
+                                                              [JobId, Nr]))
+                                  , [ordered_set]),
+                          db_ets:put(ETS, Data),
+                          [{Nr, Fun, ETS, Open, Working} | AccIn]
+                  end, [], Phases),
+    State#state{phases = PhasesETS}.
+
+-spec merge_states(state(), state()) -> state().
+merge_states(State = #state{jobid = JobId,
+                            phases = Phases},
+             #state{jobid = JobId,
+                    phases = DeltaPhases}) ->
     MergedPhases = lists:map(
                   fun(DeltaPhase) ->
                           merge_phase_delta(lists:keyfind(element(1, DeltaPhase),
