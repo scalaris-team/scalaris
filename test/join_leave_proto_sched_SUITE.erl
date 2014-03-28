@@ -57,26 +57,22 @@ suite() -> [ {timetrap, {seconds, 60}} ].
 test_cases() ->
     [
      tester_join_at,
-     %add_9, % TODO
-     rm_5,
-     %add_9_rm_5, % TODO
-     %add_2x3_load, % TODO
      tester_join_at_timeouts
     ].
 
 groups() ->
-%%     unittest_helper:create_ct_groups(test_cases(), [{add_9_rm_5, [sequence, {repeat_until_any_fail, forever}]}]).
     unittest_helper:create_ct_groups([join_lookup], [{join_lookup, [sequence, {repeat_until_any_fail, 20}]}]) ++
     unittest_helper:create_ct_groups([add_3_rm_3_data], [{add_3_rm_3_data, [sequence, {repeat_until_any_fail, 20}]}]) ++
     unittest_helper:create_ct_groups([add_3_rm_3_data_inc], [{add_3_rm_3_data_inc, [sequence, {repeat_until_any_fail, 20}]}]) ++
+    [{add_rm, [sequence, {repeat_until_any_fail, 20}], [add_9, rm_5, add_9_rm_5, add_2x3_load]}] ++
     [{graceful_leave_load, [sequence, {repeat_until_any_fail, 5}], [make_4_add_1_rm_1_load, make_4_add_2_rm_2_load, make_4_add_3_rm_3_load]}].
 
 all() ->
-%%     unittest_helper:create_ct_all(test_cases()).
     unittest_helper:create_ct_all([join_lookup]) ++
-%        unittest_helper:create_ct_all([add_3_rm_3_data]) ++ % TODO
-%        unittest_helper:create_ct_all([add_3_rm_3_data_inc]) ++ % TODO
-        [{group, graceful_leave_load}] ++
+        unittest_helper:create_ct_all([add_3_rm_3_data]) ++
+%        unittest_helper:create_ct_all([add_3_rm_3_data_inc]) ++ % TODO: too heavy for proto_sched to finish within 120s
+        [{group, add_rm},
+         {group, graceful_leave_load}] ++
         test_cases().
 
 -include("join_leave_SUITE.hrl").
