@@ -336,7 +336,7 @@ get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
                                     db_ets:foldl(ETS,
                                                  fun(K, Acc) ->
                                                          Entry = db_ets:get(ETS, K),
-                                                         _NewDB = db_ets:delete(ETS, K),
+                                                         %% _NewDB = db_ets:delete(ETS, K),
                                                          [Entry | Acc]
                                                  end,
                                                  AccI,
@@ -345,6 +345,8 @@ get_slide_delta(State = #state{phases = Phases}, SlideInterval) ->
                             intervals:get_simple_intervals(SlideInterval)),
               NewOpen = intervals:minus(Open, SlideInterval),
               SlideOpen = intervals:intersection(Open, SlideInterval),
+              ?TRACE_SLIDE("~p Open: ~p~nSlideInterval: ~p~nNewOpen: ~p~nSlideOpen: ~p~n",
+                     [self(), Open, SlideInterval, NewOpen, SlideOpen]),
               {[{Nr, Fun, ETS, NewOpen, Working} | PhaseAcc],
                [{Nr, Fun, SlideData, SlideOpen, intervals:empty()} | SlideAcc]}
       end,
@@ -362,9 +364,8 @@ add_slide_delta(State = #state{jobid = JobId,
                                                           Phases),
                                             DeltaPhase)
                           end, DeltaPhases),
-    ?TRACE_SLIDE("mr_~p on ~p: received delta: ~p~n", [JobId, self(), DeltaPhases]),
-    trigger_work(MergedPhases, JobId),
-    State#state{phases = MergedPhases}.
+    ?TRACE_SLIDE("~p mr_~p on: received delta: ~p~n", [self(), JobId, DeltaPhases]),
+    trigger_work(State#state{phases = MergedPhases}, JobId).
 
 -spec merge_phase_delta(ets_phase(), delta_phase()) -> ets_phase().
 merge_phase_delta({Round, Fun, ETS, Open, Working},
@@ -375,8 +376,8 @@ merge_phase_delta({Round, Fun, ETS, Open, Working},
     {Round, Fun, ETS, intervals:union(Open, DOpen),
      Working}.
 
--spec trigger_work([ets_phase()], jobid()) -> ok.
-trigger_work(Phases, JobId) ->
+-spec trigger_work(state(), jobid()) -> ok.
+trigger_work(#state{phases = Phases} = State, JobId) ->
     SmallestOpenPhase = lists:foldl(
                          fun({Round, _, _, Open, _}, Acc) ->
                                  case not intervals:is_empty(Open)
@@ -389,9 +390,9 @@ trigger_work(Phases, JobId) ->
                          end, length(Phases) + 1, Phases),
     case SmallestOpenPhase of
         N when N < length(Phases) ->
-            comm:send_local(self(), {mr, next_phase, JobId, N, intervals:empty()});
+            mr:work_on_phase(JobId, State, N);
         _N ->
-            ok
+            State
     end.
 
 -spec tester_is_valid_funterm(fun_term()) -> boolean().

@@ -120,16 +120,16 @@ on({mr_master, JobId, job_completed, Range}, State) ->
                                                                    [{acked,
                                                                      NewInterval}]));
         _ ->
-            ?TRACE("mr_master_~s: job completed...shutting down~n",
-                     [JobId]),
+            ?TRACE("~p mr_master_~s: job completed...shutting down~n",
+                     [self(), JobId]),
             bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                        {mr, terminate_job, JobId}),
             dht_node_state:delete_mr_master_state(State, JobId)
     end;
 
 on({mr_master, JobId, job_error, _Range}, State) ->
-    ?TRACE("mr_master_~s: job crashed...shutting down~n",
-             [JobId]),
+    ?TRACE("~p mr_master_~s: job crashed...shutting down~n",
+             [self(), JobId]),
     bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(),
                                {mr, terminate_job, JobId}),
     dht_node_state:delete_mr_master_state(State, JobId);

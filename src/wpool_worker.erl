@@ -77,7 +77,8 @@ work(Source, {{map, erlanon, Fun}, Data, Interval}) ->
                 [], Interval),
     return(Source, Results);
 work(Source, {{reduce, erlanon, Fun}, Data, Interval}) ->
-    ?TRACE("worker: should apply redcue ~p to ~p in ~p~n", [Fun, Data, Interval]),
+    ?TRACE("~p worker: should apply reduce ~p~n    in ~p~n",
+           [self(), ets:tab2list(Data), Interval]),
     Args = lists:foldl(fun(SimpleInterval, Acc1) ->
                                db_ets:foldl(Data,
                                             fun(HK, AccFold) ->
@@ -90,7 +91,7 @@ work(Source, {{reduce, erlanon, Fun}, Data, Interval}) ->
                        end,
                        [],
                        Interval),
-    ?TRACE("reducing ~p~n", [Args]),
+    ?TRACE("~p reducing ~p~n", [self(), Args]),
     Res = apply_erl(Fun, Args),
     return(Source, [{?RT:hash_key(K), K, V} || {K, V} <- Res]);
 
