@@ -83,25 +83,25 @@
 
 -type phase2() ::
     {phase2,  JoinUUId::pos_integer(), Options::[tuple()], MyKeyVersion::non_neg_integer(),
-     ContactNodes::[{null | pos_integer(), comm:mypid()}],
+     Connections::[{null | pos_integer(), comm:mypid()}],
      JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase2b() ::
     {phase2b, JoinUUId::pos_integer(), Options::[tuple()], MyKeyVersion::non_neg_integer(),
-     ContactNodes::[{null | pos_integer(), comm:mypid()},...],
+     Connections::[{null | pos_integer(), comm:mypid()},...],
      JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase3() ::
     {phase3,  JoinUUId::pos_integer(), Options::[tuple()], MyKeyVersion::non_neg_integer(),
-     ContactNodes::[{null | pos_integer(), comm:mypid()}],
+     Connections::[{null | pos_integer(), comm:mypid()}],
      JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase4() ::
     {phase4,  JoinUUId::pos_integer(), Options::[tuple()], MyKeyVersion::non_neg_integer(),
-     ContactNodes::[{null | pos_integer(), comm:mypid()}],
+     Connections::[{null | pos_integer(), comm:mypid()}],
      JoinIds::[?RT:key()], Candidates::[lb_op:lb_op()]}.
 -type phase_2_4() :: phase2() | phase2b() | phase3() | phase4().
 
 -type join_state() ::
     {join, {phase1,  JoinUUId::pos_integer(), Options::[tuple()], MyKeyVersion::non_neg_integer(),
-            ContactNodes::[], JoinIds::[?RT:key()], Candidates::[]},
+            Connections::[], JoinIds::[?RT:key()], Candidates::[]},
      QueuedMessages::msg_queue:msg_queue()} |
     {join, phase_2_4(), QueuedMessages::msg_queue:msg_queue()}.
 
@@ -669,8 +669,8 @@ phase2_next_step(JoinState, Connections) ->
     end.
 
 %% @doc Calls get_number_of_samples/1 on the configured passive load balancing
-%%      algorithm if there is a contact node in ContactNodes and then adds them
-%%      to the list of contact nodes.
+%%      algorithm if there is a contact node in Connections and then adds them
+%%      to the list of connections.
 -spec get_number_of_samples
         (Phase, Connections::[]) -> Phase when is_subtype(Phase, phase_2_4());
         (phase_2_4(), Connections::[connection(),...]) -> phase2b().
@@ -742,10 +742,10 @@ create_join_ids_helper(TotalCount, Ids) ->
     end.
 
 %% @doc Tries to do a lookup for all join IDs in JoinState by contacting the
-%%      first node among the ContactNodes, then go to phase 3. If there is no
+%%      first node among the Connections, then go to phase 3. If there is no
 %%      node to contact, try to get new contact nodes and continue in phase 2.
 %%      A node that has been contacted will be put at the end of the
-%%      ContactNodes list.
+%%      Connections list.
 %%      Note: the returned join state will stay in phase 4 if already in phase 4
 -spec lookup(phase2() | phase2b() | phase3()) -> NewState::phase_2_4().
 lookup(JoinState) ->
@@ -990,36 +990,36 @@ set_new_join_uuid(JoinState) -> setelement(2, JoinState, uid:get_pids_uid()).
 -spec set_join_ids(JoinIds::[?RT:key()], phase_2_4()) -> phase_2_4().
 set_join_ids(JoinIds, JoinState) -> setelement(6, JoinState, JoinIds).
 -spec remove_join_id(JoinId::?RT:key(), phase_2_4()) -> phase_2_4().
-remove_join_id(JoinIdToRemove, {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, JoinUUId, Options, CurIdVersion, ContactNodes,
+remove_join_id(JoinIdToRemove, {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, Candidates}) ->
+    {Phase, JoinUUId, Options, CurIdVersion, Connections,
      [Id || Id <- JoinIds, Id =/= JoinIdToRemove], Candidates}.
 -spec add_candidate_front(Candidate::lb_op:lb_op(), phase_2_4()) -> phase_2_4().
-add_candidate_front(Candidate, {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, [Candidate | Candidates]}.
+add_candidate_front(Candidate, {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, Candidates}) ->
+    {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, [Candidate | Candidates]}.
 -spec add_candidate_back(Candidate::lb_op:lb_op(), phase_2_4()) -> phase_2_4().
-add_candidate_back(Candidate, {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, Candidates}) ->
-    {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, lists:append(Candidates, [Candidate])}.
+add_candidate_back(Candidate, {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, Candidates}) ->
+    {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, lists:append(Candidates, [Candidate])}.
 -spec sort_candidates(phase_2_4()) -> phase_2_4().
-sort_candidates({Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, Candidates} = JoinState) ->
+sort_candidates({Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, Candidates} = JoinState) ->
     LbPsv = get_lb_psv(JoinState),
-    {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, LbPsv:sort_candidates(Candidates)}.
+    {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, LbPsv:sort_candidates(Candidates)}.
 -spec remove_candidate(CandId::lb_op:id(), phase_2_4()) -> phase_2_4().
 remove_candidate(CandId, {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, Candidates}) ->
     NewCandidates = [C || C <- Candidates, lb_op:get(C, id) =/= CandId],
     {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, NewCandidates}.
 -spec remove_candidate_front(phase_2_4()) -> phase_2_4().
-remove_candidate_front({Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, []}) ->
-    {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, []};
-remove_candidate_front({Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, [_ | Candidates]}) ->
-    {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, Candidates}.
+remove_candidate_front({Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, []}) ->
+    {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, []};
+remove_candidate_front({Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, [_ | Candidates]}) ->
+    {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, Candidates}.
 -spec remove_candidate_front_keep_id(phase_2_4()) -> phase_2_4().
-remove_candidate_front_keep_id({Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, []}) ->
-    {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, []};
-remove_candidate_front_keep_id({Phase, JoinUUId, Options, CurIdVersion, ContactNodes, JoinIds, [Front | Candidates]}) ->
+remove_candidate_front_keep_id({Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, []}) ->
+    {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, []};
+remove_candidate_front_keep_id({Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, [Front | Candidates]}) ->
     IdFront = node_details:get(lb_op:get(Front, n1_new), new_key),
-    {Phase, JoinUUId, Options, CurIdVersion, ContactNodes, [IdFront | JoinIds], Candidates}.
+    {Phase, JoinUUId, Options, CurIdVersion, Connections, [IdFront | JoinIds], Candidates}.
 -spec skip_psv_lb(phase_2_4()) -> boolean().
-skip_psv_lb({_Phase, _JoinUUId, Options, _CurIdVersion, _ContactNodes, _JoinIds, _Candidates}) ->
+skip_psv_lb({_Phase, _JoinUUId, Options, _CurIdVersion, _Connections, _JoinIds, _Candidates}) ->
     lists:member({skip_psv_lb}, Options).
 
 -spec new_connection(OldConn::{null | pos_integer(), comm:mypid()})
