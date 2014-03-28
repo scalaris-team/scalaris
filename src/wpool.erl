@@ -47,13 +47,11 @@
 -endif.
 
 -type(mr_job() :: {mr_state:fun_term(),
-                   Data::[term()], Interval::intervals:interval()}).
-
--type(snapshot_job() :: {snapshot}).
+                   Data::db_ets:db(), Interval::intervals:interval()}).
 
 %% -type(generic_job() :: {erlanon | jsanon, binary(), [tuple()]}).
 
--type(job() :: mr_job() | snapshot_job()).
+-type(job() :: mr_job()).
 
 -type(message() :: {do_work, Source::comm:mypid(), job()} |
                    %% TODO find better spec for Info

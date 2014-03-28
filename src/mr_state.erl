@@ -51,7 +51,8 @@
 -include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
--export_type([data/0, jobid/0, state/0, fun_term/0, data_list/0]).
+-export_type([data/0, jobid/0, state/0, fun_term/0, data_list/0,
+              job_description/0]).
 -endif.
 
 -type(erl_fun() :: {map, erlanon, fun((Arg::{client_key(), term()}) ->
@@ -60,6 +61,10 @@
                                             Res::[{client_key(), term()}])}).
 
 -type(js_fun() :: {map | reduce, jsanon, binary()}).
+
+-type(option() :: {tag, atom()}).
+
+-type job_description() :: {[erl_fun() | js_fun() ,...], [option()]}.
 
 -type(fun_term() :: erl_fun() | js_fun()).
 
@@ -85,8 +90,8 @@
 -record(state, {jobid       = ?required(state, jobid) :: jobid()
                 , client    = false :: comm:mypid() | false
                 , master_id = ?required(state, master_id) :: ?RT:key()
-                , phases    = ?required(state, phases) :: [ets_phase(),...]
-                , options   = ?required(state, options) :: [mr:option()]
+                , phases    = ?required(state, phases) :: [phase(),...]
+                , options   = ?required(state, options) :: [option()]
                 , acked     = intervals:empty() :: intervals:interval()
                }).
 
@@ -96,7 +101,7 @@
          (state(), jobid)           -> jobid();
          (state(), phases)          -> [phase()];
          (state(), master_id)       -> ?RT:key();
-         (state(), options)         -> [mr:option()].
+         (state(), options)         -> [option()].
 get(#state{client        = Client
            , master_id   = Master
            , jobid       = JobId
@@ -112,7 +117,7 @@ get(#state{client        = Client
     end.
 
 -spec new(jobid(), comm:mypid(), ?RT:key(), data_list(),
-          mr:job_description(), intervals:interval()) ->
+          job_description(), intervals:interval()) ->
     state().
 new(JobId, Client, Master, InitalData, {Phases, Options}, Interval) ->
     ?TRACE("mr_state: ~p~nnew state from: ~p~n", [comm:this(), {JobId, Client,
@@ -283,9 +288,9 @@ acc_add_element(ETS, {HK, K, V}) ->
             end
     end.
 
--spec merge_with_default_options(UserOptions::[mr:option()],
-                                 DefaultOptions::[mr:option()]) ->
-    JobOptions::[mr:option()].
+-spec merge_with_default_options(UserOptions::[option()],
+                                 DefaultOptions::[option()]) ->
+    JobOptions::[option()].
 merge_with_default_options(UserOptions, DefaultOptions) ->
     %% TODO merge by hand and skip everything that is not in DefaultOptions
     lists:keymerge(1,
@@ -336,7 +341,7 @@ init_slide_state(State = #state{phases = Phases, jobid = JobId}) ->
                                   lists:flatten(io_lib:format("mr_~s_~p",
                                                               [JobId, Nr]))
                                   , [ordered_set]),
-                          db_ets:put(ETS, Data),
+                          _NewETS = db_ets:put(ETS, Data),
                           [{Nr, Fun, ETS, Open, Working} | AccIn]
                   end, [], Phases),
     State#state{phases = PhasesETS}.
@@ -365,7 +370,7 @@ merge_phase_delta({Round, Fun, ETS, Open, Working},
     {Round, Fun, ETS, intervals:union(Open, DOpen),
      Working}.
 
--spec trigger_work(state(), jobid()) -> ok.
+-spec trigger_work(state(), jobid()) -> state().
 trigger_work(#state{phases = Phases} = State, JobId) ->
     SmallestOpenPhase = lists:foldl(
                          fun({Round, _, _, Open, _}, Acc) ->

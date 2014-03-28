@@ -74,7 +74,8 @@ work(Source, {{map, erlanon, Fun}, Data, Interval}) ->
                                      end,
                                      Acc1, SimpleInterval)
                 end,
-                [], Interval),
+                [],
+                intervals:get_simple_intervals(Interval)),
     return(Source, Results);
 work(Source, {{reduce, erlanon, Fun}, Data, Interval}) ->
     ?TRACE("~p worker: should apply reduce ~p~n    in ~p~n",
@@ -90,7 +91,7 @@ work(Source, {{reduce, erlanon, Fun}, Data, Interval}) ->
                                          SimpleInterval)
                        end,
                        [],
-                       Interval),
+                       intervals:get_simple_intervals(Interval)),
     ?TRACE("~p reducing ~p~n", [self(), Args]),
     Res = apply_erl(Fun, Args),
     return(Source, [{?RT:hash_key(K), K, V} || {K, V} <- Res]);
@@ -108,7 +109,8 @@ work(Source, {{map, jsanon, Fun}, Data, Interval}) ->
                                      end,
                                      Acc1, SimpleInterval)
                 end,
-                [], Interval),
+                [],
+                intervals:get_simple_intervals(Interval)),
     return(Source, Results);
 work(Source, {{reduce, jsanon, Fun}, Data, Interval}) ->
     {ok, VM} = js_driver:new(),
@@ -123,7 +125,7 @@ work(Source, {{reduce, jsanon, Fun}, Data, Interval}) ->
                                          SimpleInterval)
                        end,
                        [],
-                       Interval),
+                       intervals:get_simple_intervals(Interval)),
     Res = apply_js(Fun, [Args], VM),
     return(Source, [{?RT:hash_key(K), K, V} || {K, V} <- Res]).
 %% TODO add generic work loads

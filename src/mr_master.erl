@@ -40,12 +40,12 @@
 
 -type(message() :: {mr_master, mr_state:jobid(), snapshot,
                     snapshot_leader:result_message(),
-                    mr:job_description(), comm:mypid()} |
+                    mr_state:job_description(), comm:mypid()} |
                    {mr_master, mr_state:jobid(), phase_completed, Round::non_neg_integer(), Range::intervals:interval()} |
                    {mr_master, mr_state:jobid(), job_completed, intervals:interval()} |
                    {mr_master, mr_state:jobid(), job_error, intervals:interval()}).
 
--spec init_job(dht_node_state:state(), nonempty_string(), mr:job_description(),
+-spec init_job(dht_node_state:state(), nonempty_string(), mr_state:job_description(),
               comm:mypid()) ->
     dht_node_state:state().
 init_job(State, JobId, Job, Client) ->
@@ -64,7 +64,12 @@ dispatch_snapshot(JobId) ->
 on({mr_master, JobId, snapshot, {global_snapshot_done, Data}}, State) ->
     MasterState = dht_node_state:get_mr_master_state(State, JobId),
     Job = mr_master_state:get(job, MasterState),
-    FilteredData = filter_data(Data, element(2, Job)),
+    FilteredData = case lists:keyfind(tag, 1, element(2, Job)) of
+                       false ->
+                           filter_data(Data);
+                       Tag ->
+                           filter_data(Data, Tag)
+                   end,
     ?TRACE("mr_master: starting job ~p~n", [JobId]),
     bulkowner:issue_bulk_distribute(uid:get_global_uid(),
                                     dht_node, 7,
@@ -142,12 +147,14 @@ on(_Msg, State) ->
 -spec filter_data([{?RT:key(),
                    {{string(), term()} | {atom(), string(), term()}},
                    db_dht:version()}],
-                  [mr:option()]) -> mr_state:data_list().
-filter_data(Data, Options) ->
-    case lists:keyfind(tag, 1, Options) of
-        {tag, FilterTag} ->
-            ?TRACE("Filtering! tag is ~p~ndata: ~p~n", [FilterTag, Data]),
-            [{?RT:hash_key(K), K, V} || {_HashedKey, {Tag, K, V}, _Version} <- Data, Tag =:= FilterTag];
-        false ->
-            [{?RT:hash_key(K), K, V} || {_HashedKey, {K, V}, _Version} <- Data]
-    end.
+                  {tag, atom()}) -> mr_state:data_list().
+filter_data(Data, {tag, FilterTag}) ->
+    ?TRACE("Filtering! tag is ~p~ndata: ~p~n", [FilterTag, Data]),
+    [{?RT:hash_key(K), K, V} || {_HashedKey, {Tag, K, V}, _Version} <- Data, Tag
+                                =:= FilterTag].
+
+-spec filter_data([{?RT:key(),
+                   {{string(), term()} | {atom(), string(), term()}},
+                   db_dht:version()}]) -> mr_state:data_list().
+filter_data(Data) ->
+    [{?RT:hash_key(K), K, V} || {_HashedKey, {K, V}, _Version} <- Data].
