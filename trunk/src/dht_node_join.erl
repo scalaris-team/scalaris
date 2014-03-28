@@ -852,15 +852,8 @@ integrate_candidate(Candidate, JoinState, Position) ->
 -spec contact_best_candidate(JoinState::phase_2_4())
         -> phase2() | phase2b() | phase4().
 contact_best_candidate(JoinState) ->
-    contact_best_candidate(JoinState, 0).
-%% @doc Contacts the best candidate among all stored candidates and sends a
-%%      join_request. Timeouts is the number of join_request_timeout messages
-%%      previously received.
--spec contact_best_candidate(JoinState::phase_2_4(), Timeouts::non_neg_integer())
-        -> phase2() | phase2b() | phase4().
-contact_best_candidate(JoinState, Timeouts) ->
     JoinState1 = sort_candidates(JoinState),
-    send_join_request(JoinState1, Timeouts).
+    send_join_request(JoinState1, 0).
 %% userdevguide-end dht_node_join:contact_best_candidate
 
 %% userdevguide-begin dht_node_join:send_join_request
