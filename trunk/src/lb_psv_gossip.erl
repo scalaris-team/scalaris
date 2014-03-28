@@ -190,7 +190,7 @@ create_join3(DhtNodeState, SelectedKey, SourcePid, SplitKey0, Conn) ->
                             OtherNodeDetailsNew2 = node_details:set(OtherNodeDetailsNew1, load, OtherLoadNew),
                             Interval = node:mk_interval_between_ids(MyPredId, SplitKey),
                             OtherNodeDetailsNew = node_details:set(OtherNodeDetailsNew2, my_range, Interval),
-                            lb_op:slide_op(OtherNodeDetails, MyNodeDetails,
+                            lb_op:slide_op(comm:this(), OtherNodeDetails, MyNodeDetails,
                                            OtherNodeDetailsNew, MyNodeDetailsNew)
                     end
                 catch

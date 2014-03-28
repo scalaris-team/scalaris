@@ -995,7 +995,10 @@ remove_join_id(JoinIdToRemove, {Phase, JoinUUId, Options, CurIdVersion, Connecti
      [Id || Id <- JoinIds, Id =/= JoinIdToRemove], Candidates}.
 -spec add_candidate_front(Candidate::lb_op:lb_op(), phase_2_4()) -> phase_2_4().
 add_candidate_front(Candidate, {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, Candidates}) ->
-    {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, [Candidate | Candidates]}.
+    % filter previous candidates with the same ID (only use the newest one)
+    CandId = lb_op:get(Candidate, id),
+    Candidates1 = [C || C <- Candidates, lb_op:get(C, id) =/= CandId],
+    {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, [Candidate | Candidates1]}.
 -spec add_candidate_back(Candidate::lb_op:lb_op(), phase_2_4()) -> phase_2_4().
 add_candidate_back(Candidate, {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, Candidates}) ->
     {Phase, JoinUUId, Options, CurIdVersion, Connections, JoinIds, lists:append(Candidates, [Candidate])}.

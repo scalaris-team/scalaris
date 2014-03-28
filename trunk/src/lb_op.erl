@@ -20,7 +20,7 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
--export([no_op/0, slide_op/4, jump_op/6,
+-export([no_op/0, slide_op/5, jump_op/7,
         is_no_op/1, is_slide/1, is_jump/1, get/2]).
 
 -include("scalaris.hrl").
@@ -30,7 +30,7 @@
 -export_type([lb_op/0, id/0]).
 -endif.
 
--type id() :: uid:global_uid().
+-type id() :: any().
 
 -type type() :: slide | jump.
 
@@ -55,24 +55,24 @@ no_op() -> no_op.
 
 %% @doc Creates a new slide operation with the given nodes and their details
 %%      after the slide.
--spec slide_op(
+-spec slide_op(Id::id(),
     Node::node_details:node_details(), Successor::node_details:node_details(),
     NodeNew::node_details:node_details(), SuccessorNew::node_details:node_details())
         -> lb_op().
-slide_op(Node, Successor, NodeNew, SuccessorNew) ->
-    #lb_op{type = slide, id = uid:get_global_uid(),
+slide_op(Id, Node, Successor, NodeNew, SuccessorNew) ->
+    #lb_op{type = slide, id = Id,
            n1 = Node, n1succ = Successor,
            n1_new = NodeNew, n1succ_new = SuccessorNew}.
 
 %% @doc Creates a new jump operation with the given nodes and their details
 %%      after the jump.
--spec jump_op(
+-spec jump_op(Id::id(),
     NodeToMove::node_details:node_details(), NodeToMove_succ::node_details:node_details(), NodePosition::node_details:node_details(),
     NodeToMoveNew::node_details:node_details(), NodeToMove_succNew::node_details:node_details(), NodePositionNew::node_details:node_details())
         -> lb_op().
-jump_op(NodeToMove, NodeToMove_succ, NodePosition,
+jump_op(Id, NodeToMove, NodeToMove_succ, NodePosition,
         NodeToMoveNew, NodeToMove_succNew, NodePositionNew) ->
-    #lb_op{type = jump, id = uid:get_global_uid(),
+    #lb_op{type = jump, id = Id,
            n1 = NodeToMove, n1succ = NodeToMove_succ, n3 = NodePosition,
            n1_new = NodeToMoveNew, n1succ_new = NodeToMove_succNew, n3_new = NodePositionNew}.
 
