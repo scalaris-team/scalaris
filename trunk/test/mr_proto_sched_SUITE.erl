@@ -53,13 +53,15 @@
 -include("mr_SUITE.hrl").
 
 all() ->
-    tests_avail() ++ [%test_join, % TODO: re-activate when node join with proto_sched runs through in debug mode
-                      test_leave].
+    %% tests_avail() ++ [%test_join, % TODO: re-activate when node join with proto_sched runs through in debug mode
+    %%                   test_leave].
+    [tests_avail()|| _X <- lists:seq(1, 1000)] ++
+    [test_join || _X <- lists:seq(1, 1000)] ++
+    [test_leave || _X <- lists:seq(1, 1000)].
 
 suite() -> [ {timetrap, {seconds, 15}} ].
 
 test_join(_Config) ->
-    ct:pal("starting job that triggers breakpoint"),
     spawn_link(fun() ->
                        proto_sched:thread_begin(),
                        ct:pal("starting mr job"),

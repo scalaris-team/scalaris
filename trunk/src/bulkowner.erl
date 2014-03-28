@@ -195,6 +195,8 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                 case intervals:is_subset(FwdInt, AccI) of
                     true ->
                         FwdRange = intervals:intersection(AccI, FwdInt),
+                        ?TRACE("~p forwarding msg to ~p~nbecause of fwdInt ~p~n",
+                               [self(), FwdPid, FwdInt]),
                         case Msg of
                             %% when Msg = bulk_distribute only forward the
                             %% FwdInt part of the data. otherwise we get duplicate
@@ -221,46 +223,15 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
     MyDBRange = intervals:union(dht_node_state:get(State, my_range), DBRange),
     MyRange0 = lists:foldl(F, Range, MsgFwd),
     MyRange = intervals:intersection(MyRange0, MyDBRange),
-    case intervals:is_empty(MyRange) of
-        true -> ok;
+    NewState = case intervals:is_empty(MyRange) of
+        true -> State;
         _ ->
             %% check if node has left the ring via a slide
             %% if rm_loop:has_left/1 is true this message arrived through a
             %% msg_fwd and needs to be passed back into the system
             case rm_loop:has_left(dht_node_state:get(State, rm_state)) of
                 false ->
-                    case Msg of
-                        {bulk_read_entry, Issuer} ->
-                            Data = db_dht:get_entries(dht_node_state:get(State, db), MyRange),
-                            ReplyMsg = {bulk_read_entry_response, MyRange, Data},
-                            % for aggregation using a tree, activate this instead:
-                            % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
-                            comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg});
-                        {bulk_distribute, Proc, N, Msg1, Data} ->
-                            ?TRACE("~p bulkowner: delivering {~p, ~p} locally to ~p
-                           MyDbRange: ~p
-                           FwdRange: ~p",
-                                   [self(),
-                                    element(1, Msg1),
-                                    element(2, Msg1),
-                                    MyRange,
-                                    MyDBRange,
-                                    MyRange0]),
-                            RangeData = get_range_data(Data, MyRange),
-                            %% only deliver data in MyRange as data outside of it was
-                            %% forwarded
-                            comm:send_local(pid_groups:get_my(Proc),
-                                            {bulk_distribute, Id, MyRange,
-                                             setelement(N, Msg1, RangeData), Parents});
-                        {?send_to_group_member, Proc, Msg1} when Proc =/= dht_node ->
-                            comm:send_local(pid_groups:get_my(Proc),
-                                            {bulkowner, deliver, Id, MyRange, Msg1, Parents});
-                        {do_snapshot, _SnapNo, _Leader} ->
-                            comm:send_local(pid_groups:get_my(dht_node), Msg);
-                        MrMsg when mr =:= element(1, MrMsg) ->
-                            comm:send_local(pid_groups:get_my(dht_node),
-                                            erlang:append_element(Msg, MyRange))
-                    end;
+                    handle_delivery(Msg, MyRange, Id, Parents, State);
                 true ->
                     ?TRACE("~p bulkowner: delivering to leaving node...
                             forwarding msg ~p to succ ~p~n",
@@ -268,13 +239,14 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
                                                                           neighbors))]),
                     Neighbors = dht_node_state:get(State, neighbors),
                     comm:send(node:pidX(nodelist:succ(Neighbors)),
-                              {bulkowner, Id, Range, Msg, Parents})
+                              {bulkowner, Id, Range, Msg, Parents}),
+                    State
             end
     end,
     RestRange = intervals:minus(MyRange0, MyRange),
     % no need to check whether non-empty - this is a no-op anyway
     bulk_owner(State, Id, RestRange, Msg, Parents),
-    State;
+    NewState;
 
 on({bulkowner, reply, Id, Target, Msg, Parents}, State) ->
     State1 =
@@ -316,6 +288,47 @@ on({bulkowner, gather, Id, Target, [H = {bulk_read_entry_response, _HRange, _HDa
 
 on({send_error, FailedTarget, {bulkowner, reply, Id, Target, Msg, Parents}, _Reason}, State) ->
     bulkowner:send_reply_failed(Id, Target, Msg, Parents, self(), FailedTarget),
+    State.
+
+handle_delivery({bulk_read_entry, Issuer}, MyRange, Id, _Parents, State) ->
+    Data = db_dht:get_entries(dht_node_state:get(State, db), MyRange),
+    ReplyMsg = {bulk_read_entry_response, MyRange, Data},
+    % for aggregation using a tree, activate this instead:
+    % issue_send_reply(Id, Issuer, ReplyMsg, Parents);
+    comm:send(Issuer, {bulkowner, reply, Id, ReplyMsg}),
+    State;
+handle_delivery({bulk_distribute, Proc, N, Msg1, Data}, MyRange, Id, Parents, State) ->
+    ?TRACE("~p bulkowner: delivering {~p, ~p} locally to ~p",
+           [self(),
+            element(1, Msg1),
+            element(2, Msg1),
+            MyRange]),
+    RangeData = get_range_data(Data, MyRange),
+    %% only deliver data in MyRange as data outside of it was
+    %% forwarded
+    %% TODO us epost_op here
+    case Proc of
+        dht_node ->
+            gen_component:post_op({bulk_distribute, Id, MyRange,
+                                   setelement(N, Msg1, RangeData), Parents},
+                                  State);
+        _ ->
+            comm:send_local(pid_groups:get_my(Proc),
+                            {bulk_distribute, Id, MyRange,
+                             setelement(N, Msg1, RangeData), Parents}),
+            State
+    end;
+handle_delivery({?send_to_group_member, Proc, Msg1}, MyRange, Id, Parents, State) ->
+    comm:send_local(pid_groups:get_my(Proc),
+                    {bulkowner, deliver, Id, MyRange, Msg1, Parents}),
+    State;
+handle_delivery({do_snapshot, _SnapNo, _Leader} = Msg, _MyRange, _Id, _Parents, State) ->
+    gen_component:post_op(Msg, State);
+handle_delivery(MrMsg , MyRange, _Id, _Parents, State) when mr =:= element(1, MrMsg) ->
+    gen_component:post_op(erlang:append_element(MrMsg, MyRange), State);
+handle_delivery(Msg, _MyRange, _Id, _Parents, State) ->
+    log:log(warn, "[ ~p ] cannot deliver message ~p (don't know how to handle)",
+            [pid_groups:pid_to_name(self()), Msg]),
     State.
 
 -spec get_range_data({ets, db_ets:db()} | [{nonempty_string(), term()},...],

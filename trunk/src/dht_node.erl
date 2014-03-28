@@ -331,7 +331,7 @@ on(Msg, State) when mr_master =:= element(1, Msg) ->
         mr_master:on(Msg, State)
     catch
         error:function_clause ->
-            log:log(warn, "Received Message to non-existing master...irgnoring!"),
+            log:log(warn, "Received Message to non-existing master...ignoring!"),
             State
     end;
 
