@@ -741,11 +741,13 @@ tester_type_check_mr(_Config) ->
     Modules =
         [ {mr_state,
            [
+            {new, 6}, %% needs fun
             {add_data_to_phase, 4}, %% needs ets table
             {clean_up, 1}, %% closes ets tables
             {accumulate_data, 2}, %% needs ets tables
             {get_slide_delta, 2}, %% needs ets tables
-            {add_slide_delta, 2} %% needs ets tables
+            {init_slide_state, 1}, %% needs ets tables
+            {merge_states, 2} %% needs ets tables
            ],
            [
             {trigger_work, 2}, %% sends message
