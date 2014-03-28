@@ -367,6 +367,7 @@ on_inactive({activate_gossip, MyRange}=Msg, State) ->
 
     init_gossip_tasks(State),
 
+    msg_queue_send(State),
     % change handler to on_active
     gen_component:change_handler(State, fun ?MODULE:on_active/2);
 
@@ -386,7 +387,7 @@ on_inactive({get_values_best, _CBModule, _SourcePid}=Msg, State) ->
 
 
 on_inactive({get_values_all, _CBModule, _SourcePid}=Msg, State) ->
-   msg_queue_add(Msg, State), State;
+    msg_queue_add(Msg, State), State;
 
 
 on_inactive({web_debug_info, _Requestor}=Msg, State) ->
@@ -542,8 +543,8 @@ on_active({deactivate_gossip}, State) ->
     % cleanup state
     state_set(status, uninit, State),
     state_set(cb_modules, [], State),
-    lists:foreach(fun (Key) -> ?PDB:delete(Key, State) end,
-        [msg_queue, range]),
+    % TODO: also remove (some) queued messages? (must not remove client requests!)
+    ?PDB:delete(range, State),
 
     gen_component:change_handler(State, fun ?MODULE:on_inactive/2);
 
@@ -1114,10 +1115,7 @@ state_update(Key, Fun, CBModule, State) ->
 %% add to message queue and create message queue if necessary
 -spec msg_queue_add(Msg::message(), State::state()) -> ok.
 msg_queue_add(Msg, State) ->
-    MsgQueue = case state_get_raw(msg_queue, State) of
-        undefined -> msg_queue:new();
-        CurrentMsgQueue -> CurrentMsgQueue
-    end,
+    MsgQueue = state_get_raw(msg_queue, State),
     NewMsgQueue = msg_queue:add(MsgQueue, Msg),
     state_set(msg_queue, NewMsgQueue, State).
 
@@ -1125,13 +1123,8 @@ msg_queue_add(Msg, State) ->
 %% send the messages from the current message queue and create a new message queue
 -spec msg_queue_send(State::state()) -> ok.
 msg_queue_send(State) ->
-    NewMsgQueue = case state_get_raw(msg_queue, State) of
-        undefined -> msg_queue:new();
-        MsgQueue ->
-            msg_queue:send(MsgQueue),
-            msg_queue:new()
-    end,
-    state_set(msg_queue, NewMsgQueue, State).
+    msg_queue:send(state_get_raw(msg_queue, State)),
+    state_set(msg_queue, msg_queue:new(), State).
 
 
 %% @doc Gets all the tombstones from the state of the gossip module.
