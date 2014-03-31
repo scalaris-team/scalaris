@@ -49,6 +49,14 @@
 
 -include("scalaris.hrl").
 
+-ifdef(KEEP_TAG).
+    -define(GET_MSG_OR_TAG(Msg), comm:get_msg_tag(Msg)).
+    -define(PRETTY_PRINT_MSG(Tag), util:extint2atom(Tag)).
+-else.
+    -define(GET_MSG_OR_TAG(Msg), Msg).
+    -define(PRETTY_PRINT_MSG(Msg), setelement(1, Msg, util:extint2atom(element(1, Msg)))).
+-endif.
+
 -export([start_link/6, init/1, on/2]).
 
 -type msg_queue() :: {MQueue::[{DestPid::pid(), Message::comm:message()}],
@@ -270,6 +278,8 @@ on({web_debug_info, Requestor}, State) ->
                     SendAgv = SendCnt = SendBytes = "n/a"
             end
     end,
+    LastMsgsSent = [?PRETTY_PRINT_MSG(X) || X <- last_msg_sent(State)],
+    LastMsgsReceived = [?PRETTY_PRINT_MSG(X) || X <- last_msg_received(State)],
     KeyValueList =
         [
          {"status",
@@ -311,9 +321,9 @@ on({web_debug_info, Requestor}, State) ->
          {"time last message received",
           webhelpers:safe_html_string("~p sec ago", [SecondsAgoReceived])},
          {"last message sent:",
-          webhelpers:html_pre("~0p", [last_msg_sent(State)])},
+          webhelpers:html_pre("~0p", [LastMsgsSent])},
          {"last message received",
-          webhelpers:html_pre("~0p", [last_msg_received(State)])},
+          webhelpers:html_pre("~0p", [LastMsgsReceived])},
          {"session variables:", ""},
          {"num sessions",
           webhelpers:safe_html_string("~p", [session_count(State)])},
@@ -689,23 +699,29 @@ inc_session_count(State) -> setelement(18, State, session_count(State) + 1).
 -spec last_msg_sent(state()) -> [msg_or_tag()].
 last_msg_sent(State) -> element(19, State).
 -spec set_last_msg_sent(state(), [msg_or_tag()]) -> state().
-set_last_msg_sent(State, Msg) ->
+set_last_msg_sent(State, MsgList) ->
+    MsgListLen = length(MsgList),
     OldList = last_msg_sent(State),
-    NumToKeep = erlang:max(?NUM_KEEP - length(Msg), 0),
-    NewList = Msg ++ lists:sublist(OldList, NumToKeep),
+    NewList = case erlang:max(?NUM_KEEP - MsgListLen, 0) of
+                  0         -> MsgList;
+                  NumToKeep -> MsgList ++ lists:sublist(OldList, NumToKeep)
+              end,
     State2 = set_time_last_msg_seen(State),
-    State3 = inc_s_msg_count(State2, length(Msg)),
+    State3 = inc_s_msg_count(State2, MsgListLen),
     setelement(19, State3, NewList).
 
 -spec last_msg_received(state()) -> [msg_or_tag()].
 last_msg_received(State) -> element(20, State).
 -spec set_last_msg_received(state(), [msg_or_tag()]) -> state().
-set_last_msg_received(State, Msg) ->
+set_last_msg_received(State, MsgList) ->
+    MsgListLen = length(MsgList),
     OldList = last_msg_received(State),
-    NumToKeep = erlang:max(?NUM_KEEP - length(Msg), 0),
-    NewList = Msg ++ lists:sublist(OldList, NumToKeep),
+    NewList = case erlang:max(?NUM_KEEP - MsgListLen, 0) of
+                  0         -> MsgList;
+                  NumToKeep -> MsgList ++ lists:sublist(OldList, NumToKeep)
+              end,
     State2 = set_time_last_msg_received(State),
-    State3 = inc_r_msg_count(State2, length(Msg)),
+    State3 = inc_r_msg_count(State2, MsgListLen),
     setelement(20, State3, NewList).
 
 -spec save_n_msgs(comm:message() | [{any(), comm:message()}],
@@ -714,15 +730,8 @@ set_last_msg_received(State, Msg) ->
 save_n_msgs(Msg, SaveFun, State) when is_tuple(Msg) ->
     save_n_msgs([{single, Msg}], SaveFun, State);
 save_n_msgs(Msgs, SaveFun, State) when is_list(Msgs) ->
-    NumElements = erlang:min(?NUM_KEEP, length(Msgs)),
-    List = [get_msg_tag(M) || M <- lists:sublist(Msgs, NumElements)],
+    List = [get_msg_tag(M) || M <- lists:sublist(Msgs, ?NUM_KEEP)],
     SaveFun(State, List).
-
--ifdef(KEEP_TAG).
-    -define(GET_MSG_OR_TAG(Msg), util:extint2atom(comm:get_msg_tag(Msg))).
--else.
-    -define(GET_MSG_OR_TAG(Msg), setelement(1, Msg, util:extint2atom(element(1, Msg)))).
--endif.
 
 -spec get_msg_tag({any(), comm:message()}) -> msg_or_tag().
 get_msg_tag(Msg) ->
