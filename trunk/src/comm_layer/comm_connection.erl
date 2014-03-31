@@ -686,9 +686,9 @@ session_count(State) -> element(18, State).
 -spec inc_session_count(state()) -> state().
 inc_session_count(State) -> setelement(18, State, session_count(State) + 1).
 
--spec last_msg_sent(state()) -> [comm:message()].
+-spec last_msg_sent(state()) -> [msg_or_tag()].
 last_msg_sent(State) -> element(19, State).
--spec set_last_msg_sent(state(), [comm:message()]) -> state().
+-spec set_last_msg_sent(state(), [msg_or_tag()]) -> state().
 set_last_msg_sent(State, Msg) ->
     OldList = last_msg_sent(State),
     NumToKeep = erlang:max(?NUM_KEEP - length(Msg), 0),
@@ -697,9 +697,9 @@ set_last_msg_sent(State, Msg) ->
     State3 = inc_s_msg_count(State2, length(Msg)),
     setelement(19, State3, NewList).
 
--spec last_msg_received(state()) -> [comm:message()].
+-spec last_msg_received(state()) -> [msg_or_tag()].
 last_msg_received(State) -> element(20, State).
--spec set_last_msg_received(state(), [comm:message()]) -> state().
+-spec set_last_msg_received(state(), [msg_or_tag()]) -> state().
 set_last_msg_received(State, Msg) ->
     OldList = last_msg_received(State),
     NumToKeep = erlang:max(?NUM_KEEP - length(Msg), 0),
@@ -708,7 +708,9 @@ set_last_msg_received(State, Msg) ->
     State3 = inc_r_msg_count(State2, length(Msg)),
     setelement(20, State3, NewList).
 
--spec save_n_msgs([msg_or_tag()] | msg_or_tag(), fun((state(), [msg_or_tag()]) -> state()), state()) -> state().
+-spec save_n_msgs(comm:message() | [{any(), comm:message()}],
+                  fun((state(), MsgList::[msg_or_tag()]) -> state()),
+                  state()) -> state().
 save_n_msgs(Msg, SaveFun, State) when is_tuple(Msg) ->
     save_n_msgs([{single, Msg}], SaveFun, State);
 save_n_msgs(Msgs, SaveFun, State) when is_list(Msgs) ->
@@ -722,7 +724,7 @@ save_n_msgs(Msgs, SaveFun, State) when is_list(Msgs) ->
     -define(GET_MSG_OR_TAG(Msg), setelement(1, Msg, util:extint2atom(element(1, Msg)))).
 -endif.
 
--spec get_msg_tag(msg_or_tag()) -> comm:msg_tag() | comm:message().
+-spec get_msg_tag({any(), comm:message()}) -> msg_or_tag().
 get_msg_tag(Msg) ->
     {_Pid, ActualMessage} = Msg,
     ?GET_MSG_OR_TAG(ActualMessage).
