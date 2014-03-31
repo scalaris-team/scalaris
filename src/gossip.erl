@@ -813,7 +813,9 @@ init_gossip_task(CBModule, Args, State) ->
     case state_get_raw({trigger_group, TriggerInterval}, State) of
         undefined ->
             % create and init new trigger group
+            trace_mpath:clear_infection(), %% in case proto_sched or trace_mpath infected this msg
             msg_delay:send_trigger(?FIRST_TRIGGER_DELAY,  {gossip_trigger, TriggerInterval}),
+            trace_mpath:restore_infection(), %% restore infection if infected
             {[CBModule]};
         {OldTriggerGroup} ->
             % add CBModule to existing trigger group
