@@ -257,7 +257,7 @@ on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}, Mode},
    State) ->
     %log:pal("on renew ~w (~w)~n", [Old, Mode]),
     New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
-    ContentCheck = generic_content_check(Old),
+    ContentCheck = generic_content_check(Old, New, renew),
     DB = get_db_for_id(Id),
 %% @todo New passed for debugging only:
     Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New, Mode}),
@@ -362,7 +362,7 @@ on({l_on_cseq, handover, Old = #lease{id=Id, epoch=OldEpoch},
                             version = 0,
                             timeout = new_timeout()}
           end,
-    ContentCheck = generic_content_check(Old),
+    ContentCheck = generic_content_check(Old, New, handover),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 3, {l_on_cseq, handover_reply, '_', ReplyTo,
                                      NewOwner, New}),
@@ -598,7 +598,7 @@ on({l_on_cseq, split_reply_step1, L2=#lease{id=Id,epoch=OldEpoch}, R1, R2,
             aux     = {valid, split, R1, R2},
             version = 0,
             timeout = new_timeout()},
-    ContentCheck = generic_content_check(L2),
+    ContentCheck = generic_content_check(L2, New, split_reply_step1),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 9, {l_on_cseq, split_reply_step2, L1, R1, R2, Keep, ReplyTo, PostAux, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -662,7 +662,7 @@ on({l_on_cseq, split_reply_step2,
             aux     = PostAux,
             version = 0,
             timeout = new_timeout()},
-    ContentCheck = generic_content_check(L1),
+    ContentCheck = generic_content_check(L1, New, split_reply_step2),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 9, {l_on_cseq, split_reply_step3, L2, R1, R2, Keep, ReplyTo, PostAux, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -720,7 +720,7 @@ on({l_on_cseq, split_reply_step3,
             aux     = empty,
             version = 0,
             timeout = new_timeout()},
-    ContentCheck = generic_content_check(L2),
+    ContentCheck = generic_content_check(L2, New, split_reply_step3),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 9, {l_on_cseq, split_reply_step4, L1, R1, R2, Keep, ReplyTo, PostAux, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -807,12 +807,18 @@ on({l_on_cseq, renew_leases}, State) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec generic_content_check(lease_t()) ->
+-spec generic_content_check(lease_t(), lease_t(), atom()) ->
     fun ((any(), any(), any()) -> {boolean(), generic_failed_reason() | null}). %% content check
-generic_content_check(#lease{owner=OldOwner,aux = OldAux,range=OldRange,
-                             epoch=OldEpoch,version=OldVersion,timeout=OldTimeout}) ->
+generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange,
+                             epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
+                     New, Writer) ->
     fun (prbr_bottom, _WriteFilter, _Next) ->
             {false, lease_does_not_exist};
+        (Current, _WriteFilter, _Next) when Current =:= New ->
+            ct:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", [Current, _Next, Old, New, Writer]),
+            {true, null};
+        (#lease{id = Id0}, _, _)    when Id0 =/= OldId->
+            {false, unexpected_id};
         (#lease{owner = O0}, _, _)    when O0 =/= OldOwner->
             {false, unexpected_owner};
         (#lease{aux = Aux0}, _, _)    when Aux0 =/= OldAux->
