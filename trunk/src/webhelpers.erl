@@ -925,6 +925,6 @@ safe_html_string(String) ->
                    end || C <- lists:flatten(String)]).
 
 %% @doc Pre-formats a string (useful for reading erlang terms)
--spec html_pre(io:format(), io_lib:chars()) -> string().
-html_pre(Format, String) ->
-    "<pre>" ++ lists:flatten(io_lib:format(Format, String)) ++ "</pre>".
+-spec html_pre(io:format(), Data::[term()]) -> string().
+html_pre(Format, Data) ->
+    "<pre>" ++ lists:flatten(io_lib:format(Format, Data)) ++ "</pre>".
