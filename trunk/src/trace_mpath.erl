@@ -183,38 +183,68 @@ get_trace() -> get_trace(default).
 -spec get_trace(trace_id()) -> trace().
 get_trace(TraceId) ->
     LogRaw = get_trace_raw(TraceId),
-    [case Event of
-         {log_send, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}, LorG}
-           when Tag =:= ?lookup_aux orelse Tag =:= ?lookup_fin ->
-             {log_send, Time, TraceId,
-              normalize_pidinfo(Source),
-              normalize_pidinfo(Dest),
-              convert_msg({Tag, Key, Hops, convert_msg(Msg)}), LorG};
-         {log_send, Time, TraceId, Source, Dest, Msg, LorG} ->
-             {log_send, Time, TraceId,
-              normalize_pidinfo(Source),
-              normalize_pidinfo(Dest), convert_msg(Msg), LorG};
-         {log_recv, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}}
-           when Tag =:= ?lookup_aux orelse Tag =:= ?lookup_fin ->
-             {log_recv, Time, TraceId,
-              normalize_pidinfo(Source),
-              normalize_pidinfo(Dest),
-              convert_msg({Tag, Key, Hops, convert_msg(Msg)})};
-         {log_recv, Time, TraceId, Source, Dest, Msg} ->
-             {log_recv, Time, TraceId,
-              normalize_pidinfo(Source),
-              normalize_pidinfo(Dest), convert_msg(Msg)};
-         {log_info, Time, TraceId, Pid, Msg} ->
-             case Msg of
-                 {gc_on_done, Tag} ->
-                     {log_info, Time, TraceId,
-                      normalize_pidinfo(Pid),
-                      {gc_on_done, util:extint2atom(Tag)}};
-                 _ ->
-                     {log_info, Time, TraceId,
-                      normalize_pidinfo(Pid), convert_msg(Msg)}
-             end
-     end || Event <- LogRaw].
+    Trace =
+        [case Event of
+             {log_send, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}, LorG}
+               when Tag =:= ?lookup_aux orelse Tag =:= ?lookup_fin ->
+                 {log_send, Time, TraceId,
+                  normalize_pidinfo(Source),
+                  normalize_pidinfo(Dest),
+                  convert_msg({Tag, Key, Hops, convert_msg(Msg)}), LorG};
+             {log_send, Time, TraceId, Source, Dest, Msg, LorG} ->
+                 {log_send, Time, TraceId,
+                  normalize_pidinfo(Source),
+                  normalize_pidinfo(Dest), convert_msg(Msg), LorG};
+             {log_recv, Time, TraceId, Source, Dest, {Tag, Key, Hops, Msg}}
+               when Tag =:= ?lookup_aux orelse Tag =:= ?lookup_fin ->
+                 {log_recv, Time, TraceId,
+                  normalize_pidinfo(Source),
+                  normalize_pidinfo(Dest),
+                  convert_msg({Tag, Key, Hops, convert_msg(Msg)})};
+             {log_recv, Time, TraceId, Source, Dest, Msg} ->
+                 {log_recv, Time, TraceId,
+                  normalize_pidinfo(Source),
+                  normalize_pidinfo(Dest), convert_msg(Msg)};
+             {log_info, Time, TraceId, Pid, Msg} ->
+                 case Msg of
+                     {gc_on_done, Tag} ->
+                         {log_info, Time, TraceId,
+                          normalize_pidinfo(Pid),
+                          {gc_on_done, util:extint2atom(Tag)}};
+                     _ ->
+                         {log_info, Time, TraceId,
+                          normalize_pidinfo(Pid), convert_msg(Msg)}
+                 end
+         end || Event <- LogRaw],
+    resolve_remote_pids(Trace).
+
+-spec resolve_remote_pids(Trace::trace()) -> trace().
+resolve_remote_pids(Trace) ->
+    % remote pids are present in two forms (with each of them present!):
+    % (a) fully resolved pidinfo() and (b) non-resolved pidinfo()
+    % -> find (a) and replace (b):
+    DictResolved =
+        dict:from_list(
+          lists:flatten(
+            [begin
+                 Pid1 = element(4, Event),
+                 Pid2 = ?IIF(element(1, Event) =:= log_info, unknown, element(5, Event)),
+                 % known pids
+                 [{PidX, X} || X = {PidX, InfoX} <- [Pid1, Pid2], is_tuple(InfoX)]
+             end || Event <- Trace])),
+    [begin
+         Pid1 = element(4, Event),
+         Pid2 = ?IIF(element(1, Event) =:= log_info, unknown, element(5, Event)),
+         lists:foldl(fun({I, PidX}, EventX) ->
+                             case dict:find(PidX, DictResolved) of
+                                 error -> EventX;
+                                 {ok, Res} -> setelement(I, EventX, Res)
+                             end
+                     end, Event,
+                     % unknown pids:
+                     [{I, PidX} || {I, {PidX, InfoX}} <- [{4, Pid1}, {5, Pid2}],
+                                   is_atom(InfoX)])
+     end || Event <- Trace].
 
 -spec convert_msg(Msg::comm:message()) -> comm:message().
 convert_msg(Msg) when is_tuple(Msg)
@@ -632,7 +662,7 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
 -spec epidemic_reply_msg(passed_state(), anypid(), anypid(), comm:message()) ->
                                 gc_mpath_msg().
 epidemic_reply_msg(PState, FromPid, ToPid, Msg) ->
-    {'$gen_component', trace_mpath, PState, FromPid, ToPid, Msg}.
+    {'$gen_component', trace_mpath, PState, comm:make_global(FromPid), ToPid, Msg}.
 
 -spec log_send(passed_state(), anypid(), anypid(), comm:message(), local|global|local_after) -> DeliverAlsoDirectly :: boolean().
 log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
@@ -648,10 +678,20 @@ log_send(PState, FromPid, ToPid, Msg, LocalOrGlobal) ->
         {log_collector, LoggerPid} ->
             MsgMapFun = passed_state_msg_map_fun(PState),
             TraceId = passed_state_trace_id(PState),
+            case comm:is_local(LoggerPid) of
+                true ->
+                    % normalise names later...
+                    FromPid1 = FromPid, ToPid1 = ToPid, ok;
+                false ->
+                    % normalise names now (non-local loggers cannot resolve them)
+                    FromPid1 = normalize_pidinfo(FromPid),
+                    ToPid1 = normalize_pidinfo(ToPid),
+                    ok
+            end,
             send_log_msg(
               PState,
               LoggerPid,
-              {log_send, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg, FromPid, ToPid), ?IIF(LocalOrGlobal =:= local_after, local, LocalOrGlobal)}),
+              {log_send, Now, TraceId, FromPid1, ToPid1, MsgMapFun(Msg, FromPid, ToPid), ?IIF(LocalOrGlobal =:= local_after, local, LocalOrGlobal)}),
             true;
         {proto_sched, _} when LocalOrGlobal =:= local_after ->
             %% Do delivery via proto_sched and *not* via
@@ -685,7 +725,16 @@ log_info(PState, FromPid, Info) ->
                        Info]);
         {log_collector, LoggerPid} ->
             TraceId = passed_state_trace_id(PState),
-            send_log_msg(PState, LoggerPid, {log_info, Now, TraceId, FromPid, Info});
+            case comm:is_local(LoggerPid) of
+                true ->
+                    % normalise names later...
+                    FromPid1 = FromPid, ok;
+                false ->
+                    % normalise names now (non-local loggers cannot resolve them)
+                    FromPid1 = normalize_pidinfo(FromPid),
+                    ok
+            end,
+            send_log_msg(PState, LoggerPid, {log_info, Now, TraceId, FromPid1, Info});
         {proto_sched, LoggerPid} ->
             case Info of
                 {gc_on_done, Tag} ->
@@ -700,7 +749,7 @@ log_info(PState, FromPid, Info) ->
 -spec log_recv(passed_state(), anypid(), anypid(), comm:message()) -> ok.
 log_recv(PState, FromPid, ToPid, Msg) ->
     Now = os:timestamp(),
-    case  passed_state_logger(PState) of
+    case passed_state_logger(PState) of
         io_format ->
             MsgMapFun = passed_state_msg_map_fun(PState),
             io:format("~p recv ~.0p -> ~.0p:~n  ~.0p.~n",
@@ -711,10 +760,20 @@ log_recv(PState, FromPid, ToPid, Msg) ->
         {log_collector, LoggerPid} ->
             MsgMapFun = passed_state_msg_map_fun(PState),
             TraceId = passed_state_trace_id(PState),
+            case comm:is_local(LoggerPid) of
+                true ->
+                    % normalise names later...
+                    FromPid1 = FromPid, ToPid1 = ToPid, ok;
+                false ->
+                    % normalise names now (non-local loggers cannot resolve them)
+                    FromPid1 = normalize_pidinfo(FromPid),
+                    ToPid1 = normalize_pidinfo(ToPid),
+                    ok
+            end,
             send_log_msg(
               PState,
               LoggerPid,
-              {log_recv, Now, TraceId, FromPid, ToPid, MsgMapFun(Msg, FromPid, ToPid)});
+              {log_recv, Now, TraceId, FromPid1, ToPid1, MsgMapFun(Msg, FromPid, ToPid)});
         {proto_sched, _} ->
             ok
     end,
@@ -746,6 +805,7 @@ send_log_msg(RestoreThis, LoggerPid, Msg) ->
 normalize_pidinfo(Pid) ->
     case is_pid(Pid) of
         true ->
+            ?ASSERT(node(Pid) =:= node()),
             PidName = case pid_groups:group_and_name_of(Pid) of
                           failed -> no_pid_name;
                           Name -> Name
