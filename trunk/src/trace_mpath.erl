@@ -401,8 +401,8 @@ to_texfile(Trace, Filename, DeltaFun, HaveRealTime, ScaleX) ->
                           io:format(File,
                                     "\\foreach \\x in {~p,~p,...,~p}~n"
                                     "  \\node[anchor=south east,gray,inner sep=0pt] at (\\x, -~p) {\\tiny ~s};~n",
-                                    [300 div ScaleX, 600 div ScaleX,
-                                     ((trunc((EndTime+10)) div 300) * 300) div ScaleX,
+                                    [15, 30,
+                                     ((trunc((EndTime+10)) div 15) * 15) div ScaleX,
                                      length(Acc)/2, LatexNode]);
                       false -> ok
                   end,
