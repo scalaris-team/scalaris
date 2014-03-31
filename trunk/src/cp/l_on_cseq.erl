@@ -446,7 +446,7 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
                     version = 0,
                     aux     = {invalid, merge, get_range(L1), get_range(L2)},
                     timeout = new_timeout()},
-    ContentCheck = is_valid_merge_step1(OldEpoch, OldVersion),
+    ContentCheck = generic_content_check(L1, New, merge_step1),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step1, L2, ReplyTo, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -473,7 +473,7 @@ on({l_on_cseq, merge_reply_step1,
                    range   = intervals:union(L1#lease.range, L2#lease.range),
                    aux     = {valid, merge, get_range(L1), get_range(L2)},
                    timeout = new_timeout()},
-    ContentCheck = is_valid_merge_step2(OldEpoch, OldVersion),
+    ContentCheck = generic_content_check(L2, New, merge_step2),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step2, L1, ReplyTo, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -500,7 +500,7 @@ on({l_on_cseq, merge_reply_step2,
                    version = 0,
                    aux     = {invalid, merge, stopped},
                    timeout = new_timeout()},
-    ContentCheck = is_valid_merge_step3(OldEpoch, OldVersion),
+    ContentCheck = generic_content_check(L1, New, merge_step3),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step3, L2, ReplyTo, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -527,7 +527,7 @@ on({l_on_cseq, merge_reply_step3,
                    version = 0,
                    aux     = empty,
                    timeout = new_timeout()},
-    ContentCheck = is_valid_merge_step4(OldEpoch, OldVersion),
+    ContentCheck = generic_content_check(L2, New, merge_step4),
     DB = get_db_for_id(Id),
     Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step4, L1, ReplyTo, '_'}),
     rbrcseq:qwrite(DB, Self, Id,
@@ -940,81 +940,6 @@ is_valid_takeover(Epoch, Version) ->
                     {true, null}
             end
     end.
-%
-%    fun (Current, _WriteFilter, Next) ->
-%            log:log("is_valid_takeover~n~w~n~w~n", [Current, Next]),
-%            Res = standard_check(Current, Next, Epoch, Version)
-%            %% checks for debugging
-%                andalso (Current#lease.epoch+1 == Next#lease.epoch)
-%                andalso (Next#lease.owner == comm:make_global(pid_groups:get_my(dht_node)))
-%                andalso (Current#lease.owner =/= Next#lease.owner)
-%                andalso (Current#lease.range == Next#lease.range)
-%                andalso (Current#lease.aux == Next#lease.aux)
-%                andalso (Current#lease.timeout < Next#lease.timeout)
-%                andalso (os:timestamp() <  Next#lease.timeout)
-%                andalso not is_valid(Current), % Current has to be invalid!
-%            {Res, null}
-%    end.
-
--spec is_valid_merge_step1(non_neg_integer(), non_neg_integer()) ->
-    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
-is_valid_merge_step1(Epoch, Version) ->
-    fun (Current, _WriteFilter, Next) ->
-            Res = standard_check(Current, Next, Epoch, Version)
-            %% checks for debugging
-                andalso (Current#lease.epoch+1 == Next#lease.epoch)
-                andalso (Current#lease.owner == Next#lease.owner)
-                andalso (Current#lease.range == Next#lease.range)
-                andalso (Current#lease.aux =/= Next#lease.aux)
-                andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout),
-            {Res, null}
-    end.
-
--spec is_valid_merge_step2(non_neg_integer(), non_neg_integer()) ->
-    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
-is_valid_merge_step2(Epoch, Version) ->
-    fun (Current, _WriteFilter, Next) ->
-            Res = standard_check(Current, Next, Epoch, Version)
-            %% checks for debugging
-                andalso (Current#lease.epoch+1 == Next#lease.epoch)
-                andalso (Current#lease.owner == Next#lease.owner)
-                andalso (Current#lease.range =/= Next#lease.range)
-                andalso (Current#lease.aux =/= Next#lease.aux)
-                andalso (Current#lease.timeout < Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout),
-            {Res, null}
-    end.
-
--spec is_valid_merge_step3(non_neg_integer(), non_neg_integer()) ->
-    fun ((any(), any(), any()) -> {boolean, null}). %% content check
-is_valid_merge_step3(Epoch, Version) ->
-    fun (Current, _WriteFilter, Next) ->
-            Res = standard_check(Current, Next, Epoch, Version)
-            %% checks for debugging
-                andalso (Current#lease.epoch+1 == Next#lease.epoch)
-                andalso (Current#lease.owner == Next#lease.owner)
-                andalso (Current#lease.range == Next#lease.range)
-                andalso (Current#lease.aux =/= Next#lease.aux)
-                andalso (Current#lease.timeout == Next#lease.timeout),
-            {Res, null}
-    end.
-
--spec is_valid_merge_step4(non_neg_integer(), non_neg_integer()) ->
-    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
-is_valid_merge_step4(Epoch, Version) ->
-    fun (Current, _WriteFilter, Next) ->
-            Res = standard_check(Current, Next, Epoch, Version)
-            %% checks for debugging
-                andalso (Current#lease.epoch+1 == Next#lease.epoch)
-                andalso (Current#lease.owner == Next#lease.owner)
-                andalso (Current#lease.range == Next#lease.range)
-                andalso (Next#lease.aux == empty)
-                andalso (Current#lease.aux =/= Next#lease.aux)
-                andalso (Current#lease.timeout =/= Next#lease.timeout)
-                andalso (os:timestamp() <  Next#lease.timeout),
-            {Res, null}
-    end.
 
 -spec is_valid_split_step1() ->
     fun ((any(), any(), any()) -> {boolean(), split_step1_failed_reason() | null}). %% content check
@@ -1115,34 +1040,6 @@ is_valid_split_step1() ->
 %                    {true, null}
 %            end
 %    end.
-
--spec standard_check(prbr_bottom | lease_t(), lease_t(),
-                     non_neg_integer(), non_neg_integer()) -> boolean().
-standard_check(prbr_bottom, _, _, _) ->
-    %% do not create leases from thin air. There are only two
-    %% situations where a lease DB entry can be created:
-    %% 1. when a first node starts a new Scalaris system
-    %%    (this lease is directly put to the database)
-    %% 2. when a split is performed (this has to use another check)
-    false;
-standard_check(Current, Next, CurrentEpoch, CurrentVersion) ->
-%% this serializes all operations on leases
-%% additional checks only for debugging the protocol and ensuring
-%% valid maintenance of the lease data structure and state machine
-
-%% for serialization, we check whether epoch and version match
-    (Current#lease.epoch == CurrentEpoch)
-        andalso (Current#lease.version == CurrentVersion)
-
-%% normal operation incs version
-        andalso ( ( (Current#lease.version+1 == Next#lease.version)
-                    andalso (Current#lease.epoch == Next#lease.epoch))
-%% reset version counter on epoch change
-                  orelse ((0 == Next#lease.version)
-                          andalso (Current#lease.epoch+1 == Next#lease.epoch))
-                 )
-%% debugging test
-        andalso (Current#lease.id == Next#lease.id).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
