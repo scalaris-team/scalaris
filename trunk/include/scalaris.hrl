@@ -195,5 +195,14 @@
 -define(CRYPTO_SHA(V), crypto:sha(V)).
 -endif.
 
+-define(TRACE_MPATH_SAFE(Expression),
+        begin
+            %% in case proto_sched or trace_mpath infected this msg
+            trace_mpath:clear_infection(),
+            Expression,
+            %% restore infection if infected
+            trace_mpath:restore_infection()
+        end).
+
 -include("types.hrl").
 -include("atom_ext.hrl").
