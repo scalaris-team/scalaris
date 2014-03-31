@@ -51,7 +51,8 @@
 %% trace analysis
 -export([send_histogram/1]).
 -export([time_delta/1]).
--export([to_texfile/2, to_texfile_no_time/2]).
+-export([to_texfile/2, to_texfile/3,
+         to_texfile_no_time/2, to_texfile_no_time/3]).
 
 %% report tracing events from other modules
 -export([log_send/5]).
@@ -296,12 +297,34 @@ notime_delta(Trace) ->
 %%  P = pid_groups:find_a(trace_mpath). gen_component:bp_set_cond(P, fun(_,_) -> true end, mybp). api_tx:write("b", 1). trace_mpath:start(). api_tx:write("a", 1). trace_mpath:stop(). timer:sleep(1). gen_component:bp_del(P, mybp). gen_component:bp_cont(P). timer:sleep(10).  T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace.tex").
 %% P = pid_groups:find_a(trace_mpath). gen_component:bp_set_cond(P, fun(_,_)-> true end, mybp). rbrcseq:qread(self(), "b"). receive _ -> ok end. trace_mpath:start(). rbrcseq:qread(self(), "a"). receive _ -> ok end. trace_mpath:stop(). gen_component:bp_del(P, mybp). gen_component:bp_cont(P). T = trace_mpath:get_trace(). trace_mpath:to_texfile(T, "trace.tex").
 
--spec to_texfile(trace(), file:name()) -> ok | {error, file:posix() | badarg | terminated}.
+%% @doc Write the trace to a LaTeX file (20 microseconds in the trace are 1 cm
+%%      in the plot).
+-spec to_texfile(trace(), file:name())
+        -> ok | {error, file:posix() | badarg | terminated}.
 to_texfile(Trace, Filename) ->
-    to_texfile(Trace, Filename, fun time_delta/1, true).
+    to_texfile(Trace, Filename, 20).
 
--spec to_texfile_no_time(trace(), file:name()) -> ok | {error, file:posix() | badarg | terminated}.
+%% @doc Write the trace to a LaTeX file (ScaleX microseconds in the trace are 1
+%%      cm in the plot).
+-spec to_texfile(trace(), file:name(), ScaleX::pos_integer())
+        -> ok | {error, file:posix() | badarg | terminated}.
+to_texfile(Trace, Filename, ScaleX) ->
+    to_texfile(Trace, Filename, fun time_delta/1, true, ScaleX).
+
+%% @doc Write the trace to a LaTeX file (20 microseconds in the trace are 1 cm
+%%      in the plot). The representation will not have a time representation
+%%      but rather only show successive messages.
+-spec to_texfile_no_time(trace(), file:name())
+        -> ok | {error, file:posix() | badarg | terminated}.
 to_texfile_no_time(Trace, Filename) ->
+    to_texfile_no_time(Trace, Filename, 20).
+
+%% @doc Write the trace to a LaTeX file (ScaleX microseconds in the trace are 1
+%%      cm in the plot). The representation will not have a time representation
+%%      but rather only show successive messages.
+-spec to_texfile_no_time(trace(), file:name(), ScaleX::pos_integer())
+        -> ok | {error, file:posix() | badarg | terminated}.
+to_texfile_no_time(Trace, Filename, ScaleX) ->
     %% we do not need the gc_on_done messages
     F = fun(X) ->
                 case X of
@@ -310,14 +333,15 @@ to_texfile_no_time(Trace, Filename) ->
                 end
         end,
     FilteredTrace = [X || X <- Trace, F(X)],
-    to_texfile(FilteredTrace, Filename, fun notime_delta/1, false).
+    to_texfile(FilteredTrace, Filename, fun notime_delta/1, false, ScaleX).
 
+%% @doc Write the trace to a LaTeX file (ScaleX microseconds in the trace are
+%%      1 cm in the plot).
 -spec to_texfile(trace(), file:name(), DeltaFun::fun((trace()) -> trace()),
-                 HaveRealTime::boolean())
+                 HaveRealTime::boolean(), ScaleX::pos_integer())
         -> ok | {error, file:posix() | badarg | terminated}.
-to_texfile(Trace, Filename, DeltaFun, HaveRealTime) ->
-    ScaleX = 20, %% 1 cm is ScaleX microseconds in the plot
-    TicsFreq = 20, %% draw x-tics every TicsFreq microseconds
+to_texfile(Trace, Filename, DeltaFun, HaveRealTime, ScaleX) ->
+    TicsFreq = ScaleX, %% draw x-tics every TicsFreq microseconds
 
     {ok, File} = file:open(Filename, [write]),
     io:format(File,
