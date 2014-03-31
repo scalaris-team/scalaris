@@ -35,9 +35,9 @@
 
 -spec wait_for_correct_leases(pos_integer()) -> ok.
 wait_for_correct_leases(TargetSize) ->
-    wait_for(lease_checker(TargetSize)),
+    util:wait_for(lease_checker(TargetSize), 1000),
     ct:pal("have correct lease_checker"),
-    wait_for(fun check_leases_per_node/0),
+    util:wait_for(fun check_leases_per_node/0, 1000),
     ct:pal("have correct leases_per_node"),
     ok.
 
@@ -152,7 +152,10 @@ lease_checker(TargetSize) ->
             IsDisjoint = is_disjoint(ActiveIntervals),
             HaveAllActiveLeases = length(ActiveLeases) == TargetSize,
             HaveNoPassiveLeases = length(PassiveLeases) == 0,
-            %ct:pal("lease checker: ~w ~w ~w ~w", [IsAll, IsDisjoint, HaveAllActiveLeases, HaveNoPassiveLeases]),
+            HaveAllAuxEmpty = lists:all(fun(L) ->
+                                                L =/= empty andalso l_on_cseq:get_aux(L) =:= empty
+                                        end, ActiveLeases),
+            ct:pal("lease checker: ~w ~w ~w ~w~n~w~n~w~n", [IsAll, IsDisjoint, HaveAllActiveLeases, HaveNoPassiveLeases,PassiveLeases, NormalizedActiveIntervals]),
             case IsAll of
                 false ->
                     %print_all_active_leases(),
@@ -161,6 +164,7 @@ lease_checker(TargetSize) ->
                     ok
             end,
             IsAll andalso
+                HaveAllAuxEmpty andalso
                 IsDisjoint andalso
                 HaveAllActiveLeases andalso % @todo enable after garbage collection is implemented
                 HaveNoPassiveLeases
