@@ -71,8 +71,9 @@ init_per_testcase(TestCase, Config) ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
-                                                    {leases, true}]}]),
+            Ids = rt_simple:get_replica_keys(0),
+            unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
+                                                               {leases, true}]}]),
             Config
     end.
 
@@ -110,9 +111,8 @@ tester_type_check_rm_leases(_Config) ->
 
 test_single_kill(_Config) ->
 %    log:log("join nodes", []),
-    join_test(4, 5),
     log:log("kill nodes", []),
-    synchronous_kill(5, 4),
+    synchronous_kill(4, 3),
     %timer:sleep(5000), % enable to see rest of protocol
     ok.
 
@@ -172,6 +172,9 @@ joiner_helper(Current, Target) ->
 
 synchronous_join(TargetSize) ->
     api_vm:add_nodes(1),
+    check_ring_state(TargetSize).
+
+check_ring_state(TargetSize) ->
     lease_helper:wait_for_ring_size(TargetSize),
     lease_helper:wait_for_correct_ring(),
     lease_helper:wait_for_correct_leases(TargetSize).
