@@ -64,7 +64,7 @@ groups() ->
     unittest_helper:create_ct_groups([join_lookup], [{join_lookup, [sequence, {repeat_until_any_fail, 20}]}]) ++
     unittest_helper:create_ct_groups([add_3_rm_3_data], [{add_3_rm_3_data, [sequence, {repeat_until_any_fail, 20}]}]) ++
     unittest_helper:create_ct_groups([add_3_rm_3_data_inc], [{add_3_rm_3_data_inc, [sequence, {repeat_until_any_fail, 20}]}]) ++
-    [{add_rm, [sequence, {repeat_until_any_fail, 20}], [add_9,
+    [{add_rm, [sequence, {repeat_until_any_fail, 5}], [add_9,
                                                         rm_5,
                                                         add_9_rm_5,
                                                         add_2x3_load
