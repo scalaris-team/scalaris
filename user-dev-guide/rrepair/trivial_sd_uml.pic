@@ -1,0 +1,71 @@
+# Trivial Reconciliation 
+# by Nico Kruber
+
+.PS
+copy "sequence.pic";
+
+# Objects
+actor(U, "");
+object(A,"A:RR");
+placeholder_object(Dummy0); # more space
+placeholder_object(AA);
+placeholder_object(Dummy1); # more space
+placeholder_object(Dummy2); # more space
+placeholder_object(BB);
+placeholder_object(Dummy3); # more space
+object(B,"B:RR");
+step();
+
+# STEP 1
+message(U,A,"request_sync"); active(A);
+async(); # use asynchrone messages (non-filled arrowheads)
+message(A,B,"start_recon(interval I\sbA\eb)"); 
+inactive(A);
+active(B);
+
+# STEP 2
+sync();
+create_message(B,BB,"B:RC");
+async();
+message(B,BB,"create_struct(I\sbA\eb)"); 
+inactive(B); active(BB);
+step();
+
+message(BB,A,"continue_recon(S = {I\sbAB\eb, KSize, VSize, \*b(I\sbAB\eb) as compr. KV-list})");
+inactive(BB);
+active(A);
+# dmessage(BB,BB,""); inactive(BB);
+sync();
+create_message(A,AA,"A:RC");
+async();
+message(A,AA,"start_recon(S)");
+inactive(A);
+active(AA);
+step();
+message(AA,A,"request_resolve(\*D \ Reg(A,B))");
+active(A);
+message(AA,BB,"resolve_req(VSize, Reg(A,B) as compr. K-list)");
+active(BB);
+complete(AA);
+drawx(AA);
+begin_frame(A,F,"key_upd_s");
+end_frame(A,F);
+message(BB,B,"request_resolve(Reg(A,B))");
+active(B);
+step();
+begin_frame(B,F,"key_upd_s");
+end_frame(B,F);
+complete(BB);
+drawx(BB);
+step();
+inactive(A);
+inactive(B);
+
+
+# CLEAN UP
+step();
+complete(A);
+complete(B);
+complete(U);
+
+.PE
