@@ -383,6 +383,7 @@ overflow_aware_diff(A, B) when A < B andalso B < 18446744073709551616 -> % 2^64
 send_or_bundle(DestPid, Message, Options, State) ->
     case msg_queue_len(State) of
         0 ->
+            erlang:yield(), % give other processes a chance to enqueue more messages
             {_, MQL} = process_info(self(), message_queue_len),
             if MQL > 0 ->
                    %% start message bundle for sending
