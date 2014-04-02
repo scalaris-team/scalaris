@@ -248,11 +248,11 @@ resolve_remote_pids(Trace) ->
 
 -spec convert_msg(Msg::comm:message()) -> comm:message().
 convert_msg(Msg) when is_tuple(Msg)
-                      andalso size(Msg) =:= 3
+                      andalso tuple_size(Msg) =:= 3
                       andalso f =:= element(2, Msg) ->
     %% lookup envelope
     setelement(1, Msg, util:extint2atom(element(1,element(3, Msg))));
-convert_msg(Msg) when is_tuple(Msg) andalso size(Msg) >= 1 ->
+convert_msg(Msg) when is_tuple(Msg) andalso tuple_size(Msg) >= 1 ->
     setelement(1, Msg, util:extint2atom(element(1, Msg)));
 convert_msg(Msg) -> Msg.
 

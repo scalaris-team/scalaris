@@ -56,7 +56,7 @@ msg_reply(Id, TLogEntry) ->
 work_phase(ClientPid, ReqId, Request) ->
     Key = element(2, Request),
     Op = if element(1, Request) =/= read -> ?read; % e.g. {add_del_on_list, Key, ToAdd, ToRemove}
-            size(Request) =:= 3 ->
+            tuple_size(Request) =:= 3 ->
                 case element(3, Request) of
                     random_from_list -> ?random_from_list;
                      % let client crash if input data is not correct:

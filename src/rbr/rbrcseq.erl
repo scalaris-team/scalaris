@@ -688,7 +688,7 @@ on({next_period, NewPeriod}, State) ->
               retrigger(X, Table, incdelay)
           end
           || X <- ?PDB:tab2list(Table), is_tuple(X),
-             13 =:= erlang:size(X), NewPeriod > element(4, X) ],
+             13 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
 
     %% re-trigger next next_period
     msg_delay:send_trigger(1, {next_period, NewPeriod + 1}),
@@ -711,7 +711,7 @@ req_for_retrigger(Entry, IncDelay) ->
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
-    case erlang:size(Entry) of
+    case erlang:tuple_size(Entry) of
         13 when is_tuple(element(12, Entry)) -> %% write request
             {qwrite, entry_client(Entry),
              entry_key(Entry), entry_filters(Entry),
