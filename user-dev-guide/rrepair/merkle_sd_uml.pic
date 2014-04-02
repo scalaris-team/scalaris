@@ -1,5 +1,5 @@
 # Merkle Tree Reconciliation 
-# by Maik Lange
+# by Maik Lange, Nico Kruber
 
 .PS
 copy "sequence.pic";
@@ -7,16 +7,19 @@ copy "sequence.pic";
 # OBJEKTE
 actor(U, "");
 object(A,"A:RR");
+placeholder_object(Dummy0); # more space
 placeholder_object(AA);
+placeholder_object(Dummy1); # more space
 placeholder_object(Dummy2); # more space
 placeholder_object(BB);
+placeholder_object(Dummy3); # more space
 object(B,"B:RR");
 step();
 
-#---- Step1 RC sendet Interval an B
+#---- Step1 RC sends interval to B
 message(U,A,"request_sync"); active(A);
-async(); # use asynchrone messages (not-filled arrowheads)
-message(A,B,"interval I\sbA\eb"); 
+async(); # use asynchrone messages (non-filled arrowheads)
+message(A,B,"start_recon(interval I\sbA\eb)"); 
 inactive(A);
 active(B);
 
@@ -24,48 +27,91 @@ active(B);
 sync();
 create_message(B,BB,"B:RC");
 async();
-message(B,BB,"cont. I\sbA\eb"); 
+message(B,BB,"create_struct(I\sbA\eb)"); 
 inactive(B); active(BB);
 step();
 
-comment(BB,C,0.3 right 0.2, wid 1.7 ht 0.5 \
-        "1) activate failure detector" \
-        "for A and B, resp." \
-        "2) create merkle tree");
+comment(BB,BUILD_MERKLE,0.3 right 0.2, wid 1.6 ht 0.35 \
+        "create merkle tree");
 
-message(BB,A,"interval I\sbAB\eb");
+message(BB,A,"continue_recon(S = {I\sbAB\eb, BranchFactor, BucketSize})");
+inactive(BB);
 active(A);
 
 #---- STEP 3
 sync();
 create_message(A,AA,"A:RC");
 async();
-message(A,AA,"cont. I\sbAB\eb"); inactive(A);
+message(A,AA,"start_recon(S)");
+inactive(A);
 active(AA);
 step();
-
-connect_to_comment(AA,C);
+connect_to_comment(AA,BUILD_MERKLE);
+step();
 
 begin_frame(A,MT,"Loop");
 
-message(AA,BB,"check merkle node");
-rmessage(BB,AA,"result of comparison");
+comment(AA,AA_COMPRESS_HASHES,0.0 left 0.2, wid 1.9 ht 0.5 \
+        "compress all hashes of"\
+        "current level = CH(cur)");
+message(AA,BB,"check_nodes(HashSize, CH(cur))");
+active(BB);
 step();
-begin_frame(A,MTR,"opt");
-message(AA,A,"merkle node diff");
+comment(BB,MISMATCHES,-0.1 right 0.1, wid 2.6 ht 1.3 \
+        "mismatches:"\
+        "\*x\sb1\eb) inner\sbB\eb-leaf\sbA\eb, leaf-match"\
+        "\*x\sb2\eb) inner\sbB\eb-leaf\sbA\eb, no leaf-match"\
+        "\*y) leaf\sbB\eb-leaf\sbA\eb"\
+        "\*z\sb1\eb) leaf\sbB\eb-inner\sbA\eb, leaf-match"\
+        "\*z\sb2\eb) leaf\sbB\eb-inner\sbA\eb, no leaf-match");
+connect_to_comment(AA,MISMATCHES);
+step();
+comment(BB,BB_STORE_MISMATCHES,-0.15 left 0.2, wid 2.5 ht 0.3 \
+        "store mismatches \*x\sb1\eb, \*x\sb2\eb, \*y, \*z\sb2\eb");
+rmessage(BB,AA,"check_nodes_response(Flags, MaxLeafs\sbB\eb)");
+comment(AA,AA_STORE_MISMATCHES,0.0 left 0.2, wid 1.6 ht 0.5 \
+        "store mismatches"\
+        "\*x\sb1\eb, \*x\sb2\eb, \*y, \*z\sb2\eb");
+step();
+
+end_frame(B, MT);
+inactive(AA);
+step();
+
+message(BB,B,"request_resolve(\*x\sb1\eb)");
+active(B);
+message(BB,AA,"resolve_req(CH(\*y, \*z\sb2\eb))");
+inactive(BB);
+active(AA);
+begin_frame(B,F,"key_upd_s");
+end_frame(B,F);
+message(AA,A,"request_resolve(??)");
+inactive(B);
 active(A);
 step();
-begin_frame(A,F,"int_upd_s");
+begin_frame(A,F,"key_upd_s");
+end_frame(A,F);
+message(AA,BB,"resolve_req(HashesReply??, BinKeyList??)");
+inactive(A);
+active(BB);
+message(BB,B,"request_resolve(??)");
+active(B);
+message(BB,AA,"resolve_req(BinKeyListReq??)");
+complete(BB);
+drawx(BB);
+begin_frame(B,F,"key_upd_s");
+end_frame(B,F);
+step();
+inactive(B);
+message(AA,A,"request_resolve(??)");
+active(A);
+complete(AA);
+drawx(AA);
+step();
+begin_frame(A,F,"key_upd_s");
 end_frame(A,F);
 step();
 inactive(A);
-end_frame(AA,MTR);
-step();	
-
-end_frame(BB, MT);
-
-destroy_message(AA,BB,""); inactive(BB);
-destroy_message(AA,AA,""); inactive(AA);
 
 # Complete the lifelines
 step();

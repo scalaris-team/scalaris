@@ -31,10 +31,9 @@ message(B,BB,"create_struct(I\sbA\eb)");
 inactive(B); active(BB);
 step();
 
-message(BB,A,"continue_recon(S = {I\sbAB\eb, KSize, VSize, \*b(I\sbAB\eb) as compr. KV-list})");
+message(BB,A,"continue_recon(S = {I\sbAB\eb, K\sbSize\eb, V\sbSize\eb, CKV(\*b(I\sbAB\eb))})");
 inactive(BB);
 active(A);
-# dmessage(BB,BB,""); inactive(BB);
 sync();
 create_message(A,AA,"A:RC");
 async();
@@ -44,21 +43,21 @@ active(AA);
 step();
 message(AA,A,"request_resolve(\*D \ Reg(A,B))");
 active(A);
-message(AA,BB,"resolve_req(VSize, Reg(A,B) as compr. K-list)");
+message(AA,BB,"resolve_req(V\sbSize\eb, CK(Reg(A,B)))");
 active(BB);
 complete(AA);
 drawx(AA);
 begin_frame(A,F,"key_upd_s");
 end_frame(A,F);
 message(BB,B,"request_resolve(Reg(A,B))");
+complete(BB);
+drawx(BB);
+inactive(A);
 active(B);
 step();
 begin_frame(B,F,"key_upd_s");
 end_frame(B,F);
-complete(BB);
-drawx(BB);
 step();
-inactive(A);
 inactive(B);
 
 
