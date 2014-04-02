@@ -387,7 +387,7 @@ send_or_bundle(DestPid, Message, Options, State) ->
             {_, MQL} = process_info(self(), message_queue_len),
             if MQL > 0 ->
                    %% start message bundle for sending
-                   %% io:format("MQL ~p~n", [MQL]),
+                   %% log:log("MQL ~p~n", [MQL]),
                    MaxBundle = erlang:max(200, MQL div 100),
                    T1 = set_msg_queue(State, {[{DestPid, Message}], [Options]}),
                    T2 = set_msg_queue_len(T1, 1),
@@ -401,13 +401,26 @@ send_or_bundle(DestPid, Message, Options, State) ->
             {MsgQueue0, OptionQueue0} = msg_queue(State),
             MQueue = [{DestPid, Message} | MsgQueue0],
             OQueue = [Options | OptionQueue0],
+            % similar to send_bundle_if_ready/1 (keep in sync!)
             DBS = desired_bundle_size(State),
             MSBS = msgs_since_bundle_start(State),
             % can check for QL instead of QL+1 here due to DBS init above
             case (QL + MSBS) >= DBS of
-                true ->
-                    %%                            io:format("Bundle Size: ~p~n", [length(MQueue)]),
+                true when DBS >= 100 -> % quick path without message_queue_len check
+                    %% log:log("Bundle Size: ~p~n", [length(MQueue)]),
                     send_msg_bundle(State, MQueue, OQueue, QL + 1);
+                true ->
+                    erlang:yield(), % give other processes a chance to enqueue more messages
+                    {_, MQL} = process_info(self(), message_queue_len),
+                    if MQL > 0 ->
+                           %% add to message bundle
+                           T1 = set_msg_queue(State, {MQueue, OQueue}),
+                           T2 = set_msg_queue_len(T1, QL + 1),
+                           set_desired_bundle_size(T2, erlang:min(100, DBS + MQL));
+                       true ->
+                           %% log:log("Bundle Size: ~p~n", [length(MQueue)]),
+                           send_msg_bundle(State, MQueue, OQueue, QL + 1)
+                    end;
                 false ->
                     %% add to message bundle
                     T1 = set_msg_queue(State, {MQueue, OQueue}),
@@ -561,14 +574,25 @@ send_bundle_if_ready(InState) ->
     case QL of
         0 -> InState;
         _ ->
+            % similar to send_or_bundle/4 (keep in sync!)
             State = inc_msgs_since_bundle_start(InState),
             DBS = desired_bundle_size(State),
             MSBS = msgs_since_bundle_start(State),
             case (QL + MSBS) >= DBS of
-                true ->
-                    %% io:format("Sending packet with ~p msgs~n", [length(msg_queue(State))]),
+                true when DBS >= 100 -> % quick path without message_queue_len check
+                    %% log:log("Sending packet with ~p msgs~n", [length(element(1, msg_queue(State)))]),
                     {MQueue, OQueue} = msg_queue(State),
                     send_msg_bundle(State, MQueue, OQueue, QL);
+                true ->
+                    erlang:yield(), % give other processes a chance to enqueue more messages
+                    {_, MQL} = process_info(self(), message_queue_len),
+                    if MQL > 0 ->
+                           set_desired_bundle_size(State, erlang:min(100, DBS + MQL));
+                       true ->
+                           %% log:log("Sending packet with ~p msgs~n", [length(element(1, msg_queue(State)))]),
+                           {MQueue, OQueue} = msg_queue(State),
+                           send_msg_bundle(State, MQueue, OQueue, QL)
+                    end;
                 false -> State
             end
     end.
