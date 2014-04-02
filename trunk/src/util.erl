@@ -1067,41 +1067,42 @@ lists_check_min_length([_|T], I) ->
 %% @end
 -spec repeat(fun(), args(), pos_integer()) -> ok.
 repeat(Fun, Args, Times) ->
-    i_repeat(Fun, Args, Times, [], none).
+    NoAccFun = fun(_, _) -> ok end,
+    i_repeat(Fun, Args, Times, NoAccFun, ok).
 -spec repeat(fun(), args(), pos_integer(), [repeat_params()]) -> ok | any().
 repeat(Fun, Args, Times, Params) ->
-    NewParams = case proplists:is_defined(collect, Params) of
-                    false -> Params;
-                    _ -> [{accumulate, fun(I, R) -> [I | R] end, []} |
-                              proplists:delete(accumulate, Params)]
-                end,
-    Acc = lists:keyfind(accumulate, 1, NewParams),
-    case proplists:is_defined(parallel, NewParams) of
+    NoAccFun = fun(_, _) -> ok end,
+    case lists:member(collect, Params) of
         true ->
-            repeat(fun spawn/3, [?MODULE, parallel_run, [self(), Fun, Args, Acc =/= false, ok]], Times),
-            case Acc of
-                false -> ok;
-                {_, AccFun, AccInit} -> parallel_collect(Times, AccFun, AccInit)
+            AccFun = fun(I, R) -> [I | R] end,
+            AccInit = [],
+            ok;
+        false ->
+            case lists:keyfind(accumulate, 1, Params) of
+                false ->
+                    AccFun = NoAccFun,
+                    AccInit = ok;
+                {accumulate, AccFun, AccInit} ->
+                    ok
+            end
+    end,
+    case lists:member(parallel, Params) of
+        true ->
+            repeat(fun spawn/3, [?MODULE, parallel_run,
+                                 [self(), Fun, Args, AccFun =/= NoAccFun, ok]],
+                   Times),
+            case AccFun of
+                NoAccFun -> ok;
+                _ -> parallel_collect(Times, AccFun, AccInit)
             end;
-        _ -> i_repeat(Fun, Args, Times, NewParams, case Acc of
-                                                       false -> none;
-                                                       {_, _, I} -> I
-                                                   end)
+        _ -> i_repeat(Fun, Args, Times, AccFun, AccInit)
     end.
 
-%-spec i_repeat(fun(), args(), non_neg_integer(), any()) -> ok | any().
-i_repeat(_, _, 0, Params, Acc) ->
-    case proplists:is_defined(accumulate, Params) of
-        true -> Acc;
-        _ -> ok
-    end;
-i_repeat(Fun, Args, Times, Params, Acc) ->
+-spec i_repeat(fun(), args(), non_neg_integer(), accumulatorFun(any(), R), R) -> R.
+i_repeat(_, _, 0, _AccFun, Acc) -> Acc;
+i_repeat(Fun, Args, Times, AccFun, Acc) ->
     R = apply(Fun, Args),
-    NewAcc = case lists:keyfind(accumulate, 1, Params) of
-                 false -> Acc;
-                 {_, AccFun, _} -> AccFun(R, Acc)
-             end,
-    i_repeat(Fun, Args, Times - 1, Params, NewAcc).
+    i_repeat(Fun, Args, Times - 1, AccFun, AccFun(R, Acc)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % parallel repeat helper functions

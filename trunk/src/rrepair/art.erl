@@ -95,7 +95,8 @@ get_interval({art, _, I, _, _}) -> I.
     
 -spec get_correction_factor(art()) -> non_neg_integer().
 get_correction_factor({art, Config, _, _, _}) ->
-    proplists:get_value(correction_factor, Config).
+    {correction_factor, CF} = lists:keyfind(correction_factor, 1, Config),
+    CF.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
