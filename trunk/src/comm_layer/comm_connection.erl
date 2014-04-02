@@ -153,7 +153,7 @@ on({send, DestPid, Message, Options}, State) ->
             log:log(info, "Connecting to ~.0p:~.0p", [dest_ip(State), dest_port(State)]),
             Socket = new_connection(dest_ip(State), dest_port(State),
                                     local_listen_port(State),
-                                    proplists:get_value(channel, Options, main)),
+                                    channel(State)),
             case Socket of
                 fail ->
                     comm_server:report_send_error(Options,

@@ -140,8 +140,8 @@ get_port({_IP, Port, _Pid}) -> Port.
 
 -spec report_send_error(comm:send_options(), process_id(), comm:message(), atom()) -> ok.
 report_send_error(Options, Target, Message, Reason) ->
-    case proplists:get_value(shepherd, Options) of
-        undefined ->
+    case lists:keyfind(shepherd, 1, Options) of
+        false ->
             case lists:member({?quiet}, Options) of
                 false ->
                     log:log(warn, "~p (name: ~.0p) Send to ~.0p failed, drop message ~.0p due to ~p",
@@ -149,7 +149,7 @@ report_send_error(Options, Target, Message, Reason) ->
                 _ -> ok
             end,
             ok;
-        ShepherdPid ->
+        {shepherd, ShepherdPid} ->
             comm:send_local(ShepherdPid, {send_error, Target, Message, Reason})
     end,
     ok.
@@ -185,10 +185,11 @@ on({create_connection, Address, Port, Socket, Channel, Client}, State) ->
     Client ! {create_connection_done, ConnPid},
     State;
 on({send, Address, Port, Pid, Message, Options}, State) ->
-    {Channel, Dir} = case proplists:get_value(channel, Options, main) of
-                         main -> {main, 'send'};
-                         prio -> {prio, 'both'}
-                     end,
+    case lists:keyfind(channel, 1, Options) of
+        false -> Channel = main, Dir = 'send';
+        {channel, Channel = main} -> Dir = 'send';
+        {channel, Channel = prio} -> Dir = 'both'
+    end,
     ConnPid = get_connection(Address, Port, notconnected, Channel, Dir),
     ConnPid ! {send, Pid, Message, Options},
     State;
