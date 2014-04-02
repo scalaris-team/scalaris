@@ -185,13 +185,13 @@ on({create_connection, Address, Port, Socket, Channel, Client}, State) ->
     Client ! {create_connection_done, ConnPid},
     State;
 on({send, Address, Port, Pid, Message, Options}, State) ->
-    case lists:keyfind(channel, 1, Options) of
-        false -> Channel = main, Dir = 'send';
-        {channel, Channel = main} -> Dir = 'send';
-        {channel, Channel = prio} -> Dir = 'both'
+    case lists:keytake(channel, 1, Options) of
+        false -> Options1 = Options, Channel = main, Dir = 'send';
+        {value, {channel, Channel = main}, Options1} -> Dir = 'send';
+        {value, {channel, Channel = prio}, Options1} -> Dir = 'both'
     end,
     ConnPid = get_connection(Address, Port, notconnected, Channel, Dir),
-    ConnPid ! {send, Pid, Message, Options},
+    ConnPid ! {send, Pid, Message, Options1},
     State;
 
 on({unregister_conn, Address, Port, Client}, State) ->
