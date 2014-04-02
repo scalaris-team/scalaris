@@ -838,7 +838,7 @@ get_full_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
 get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
     Key = element(1, Tpl),
     Version = element(2, Tpl),
-    TplSize = size(Tpl),
+    TplSize = tuple_size(Tpl),
     {KeyBin, VersionShort} = compress_kv_pair(Key, Version, SigSize, VMod),
     case gb_trees:lookup(KeyBin, MyIOtKvTree) of
         none when TplSize =:= 3 ->
