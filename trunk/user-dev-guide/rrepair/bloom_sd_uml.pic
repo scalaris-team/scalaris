@@ -1,5 +1,5 @@
 # Bloom Reconciliation 
-# by Maik Lange
+# by Maik Lange, Nico Kruber
 
 .PS
 copy "sequence.pic";
@@ -7,16 +7,19 @@ copy "sequence.pic";
 # Objects
 actor(U, "");
 object(A,"A:RR");
+placeholder_object(Dummy0); # more space
 placeholder_object(AA);
+placeholder_object(Dummy1); # more space
 placeholder_object(Dummy2); # more space
 placeholder_object(BB);
+placeholder_object(Dummy3); # more space
 object(B,"B:RR");
 step();
 
 # STEP 1
 message(U,A,"request_sync"); active(A);
-async(); # use asynchrone messages (not-filled arrowheads)
-message(A,B,"interval I\sbA\eb"); 
+async(); # use asynchrone messages (non-filled arrowheads)
+message(A,B,"start_recon(interval I\sbA\eb)"); 
 inactive(A);
 active(B);
 
@@ -24,28 +27,42 @@ active(B);
 sync();
 create_message(B,BB,"B:RC");
 async();
-message(B,BB,"cont. I\sbA\eb"); 
+message(B,BB,"create_struct(I\sbA\eb)"); 
 inactive(B); active(BB);
 step();
 
-message(BB,A,"bloom filter BF(\*b(I\sbAB\eb))");
+message(BB,A,"continue_recon(S = {I\sbAB\eb, bloom filter BF(\*b(I\sbAB\eb))})");
+inactive(BB);
 active(A);
-dmessage(BB,BB,""); inactive(BB);
 sync();
 create_message(A,AA,"A:RC");
 async();
-message(A,AA,"cont. BF(\*b(I\sbAB\eb))");
+message(A,AA,"start_recon(S)");
 inactive(A);
 active(AA);
 step();
-message(AA,A,"\*D \ Reg(A,B)");
+message(AA,BB,"resolve_req({K\sbSize\eb, V\sbSize\eb, CKV(\*D \ Reg(A,B))})");
+inactive(AA);
+active(BB);
+step();
+message(BB,B,"request_resolve(Upd(*,*))");
+active(B);
+message(BB,AA,"resolve_req(V\sbSize\eb, CK(Reg(B,A)))");
+active(AA);
+complete(BB);
+drawx(BB);
+begin_frame(B,F,"key_upd_s");
+end_frame(B,F);
+message(AA,A,"request_resolve(Reg(B,A))");
+complete(AA);
+drawx(AA);
+inactive(B);
 active(A);
-dmessage(AA,AA,""); inactive(AA);
+step();
 begin_frame(A,F,"key_upd_s");
 end_frame(A,F);
 step();
 inactive(A);
-
 
 # CLEAN UP
 step();
