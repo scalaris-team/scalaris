@@ -449,11 +449,12 @@ send_internal(Pid, Message, Options, BinaryMessage, State, Timeouts, Errors) ->
         ok ->
             ?TRACE("~.0p Sent message ~.0p~n",
                    [pid_groups:my_pidname(), Message]),
+            SendMsgCount = s_msg_count_session(State),
             State2 = save_n_msgs(Message, fun set_last_msg_sent/2, State),
             %% only close in case of no_keep_alive if the
             %% connection was solely initiated for this send
-            case lists:member({no_keep_alive}, Options)
-                     andalso s_msg_count_session(State) =< 1 of
+            case SendMsgCount =< 1 andalso
+                     lists:member({no_keep_alive}, Options) of
                 true -> close_connection(Socket, State2);
                 _    -> State2
             end;
