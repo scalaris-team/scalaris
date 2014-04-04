@@ -370,9 +370,7 @@ to_texfile_no_time(Trace, Filename, ScaleX) ->
 -spec to_texfile(trace(), file:name(), DeltaFun::fun((trace()) -> trace()),
                  HaveRealTime::boolean(), ScaleX::pos_integer())
         -> ok | {error, file:posix() | badarg | terminated}.
-to_texfile(Trace, Filename, DeltaFun, HaveRealTime, ScaleX) ->
-    TicsFreq = ScaleX, %% draw x-tics every TicsFreq microseconds
-
+to_texfile(Trace, Filename, DeltaFun, HaveRealTime, ScaleX0) ->
     {ok, File} = file:open(Filename, [write]),
     io:format(File,
       "\\documentclass[10pt]{article}~n"
@@ -411,11 +409,17 @@ to_texfile(Trace, Filename, DeltaFun, HaveRealTime, ScaleX) ->
 
     EndTime = element(2, lists:last(DrawTrace)),
 
-    case 565 < (EndTime div ScaleX) of
-        true -> io:format("Warning: trace (~pcm) will be to wide for LaTeX (max. 565cm).~n",
-                          [EndTime div ScaleX]);
-        false -> ok
-    end,
+    ScaleX =
+        if (EndTime div ScaleX0) > 565 ->
+               NewScale = util:ceil(EndTime / 5650) * 10,
+               io:format("Warning: adapting scale to 1cm : ~Bus to fit "
+                         "the maximum LaTeX width of 565cm.~n", [NewScale]),
+               NewScale;
+           true ->
+               ScaleX0
+        end,
+    TicsFreq = ScaleX, %% draw x-tics every TicsFreq microseconds
+
     %% draw nodes and timelines
     _ = lists:foldl(
           fun(X, Acc) ->
