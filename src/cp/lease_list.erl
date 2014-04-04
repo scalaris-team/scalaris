@@ -27,9 +27,12 @@
 
 -type active_lease_t() :: l_on_cseq:lease_t() | empty.
 
+-type next_round_map() :: [{l_on_cseq:lease_id(), prbr:r_with_id()}].
+
 -record(lease_list_t, {
-          active  = ?required(lease, active ) :: active_lease_t(),
-          passive = ?required(lease, passive) :: [l_on_cseq:lease_t()]
+          active         = ?required(lease_list_t, active )        :: active_lease_t(),
+          passive        = ?required(lease_list_t, passive)        :: [l_on_cseq:lease_t()],
+          next_round_map = ?required(lease_list_t, next_round_map) :: next_round_map()
          }).
 
 -type lease_list() :: #lease_list_t{}.
@@ -44,21 +47,24 @@
 -export([remove_lease_from_dht_node_state/3]).
 %-export([remove_lease_from_dht_node_state/3]).
 %-export([disable_lease_in_dht_node_state/2]).
--export([make_lease_list/2]).
+-export([make_lease_list/3]).
 -export([get_active_lease/1]).
 -export([get_passive_leases/1]).
 -export([get_active_range/1]).
+-export([get_next_round/2]).
+-export([update_next_round/3]).
 
 -spec empty() -> lease_list().
 empty() ->
-    make_lease_list(empty, []).
+    make_lease_list(empty, [], []).
 
--spec make_lease_list(active_lease_t(), [l_on_cseq:lease_t()]) ->
+-spec make_lease_list(active_lease_t(), [l_on_cseq:lease_t()], next_round_map()) ->
                              lease_list().
-make_lease_list(Active, Passive) ->
+make_lease_list(Active, Passive, NextRounds) ->
     #lease_list_t{
        active = Active,
-       passive   = Passive
+       passive   = Passive,
+       next_round_map = NextRounds
       }.
 
 -spec get_active_lease(lease_list()) -> active_lease_t().
@@ -77,6 +83,41 @@ get_active_range(#lease_list_t{active=Active}) ->
 -spec get_passive_leases(lease_list()) -> list(l_on_cseq:lease_t()).
 get_passive_leases(#lease_list_t{passive=Passive}) ->
     Passive.
+
+-spec get_next_round(l_on_cseq:lease_id(), dht_node_state:state()) ->
+                            prbr:r_with_id() | failed.
+get_next_round(Id, State) ->
+    #lease_list_t{next_round_map=NextRounds} = dht_node_state:get(State, lease_list),
+    case lists:keyfind(Id, 1, NextRounds) of
+        {Id, NextRound} ->
+             NextRound;
+        false ->
+            failed
+    end.
+
+-spec update_next_round(l_on_cseq:lease_id(), prbr:r_with_id(), dht_node_state:state()) ->
+                            dht_node_state:state().
+update_next_round(Id, NextRound, State) ->
+    LeaseList = dht_node_state:get(State, lease_list),
+    NextRounds = LeaseList#lease_list_t.next_round_map,
+    NewList = case lists:keyfind(Id, 1, NextRounds) of
+                  {Id, _NextRound} ->
+                      NewNextRounds = lists:keyreplace(Id, 1, NextRounds,
+                                                       {Id, NextRound}),
+                      LeaseList#lease_list_t{next_round_map=NewNextRounds};
+                  false ->
+                      LeaseList#lease_list_t{next_round_map=[{Id, NextRound}|NextRounds]}
+              end,
+    dht_node_state:set_lease_list(State, NewList).
+
+-spec remove_next_round(l_on_cseq:lease_id(), dht_node_state:state()) ->
+                               dht_node_state:state().
+remove_next_round(Id, State) ->
+    LeaseList = dht_node_state:get(State, lease_list),
+    NextRounds = LeaseList#lease_list_t.next_round_map,
+    NewNextRounds = lists:keydelete(Id, 1, NextRounds),
+    dht_node_state:set_lease_list(State,
+                                  LeaseList#lease_list_t{next_round_map=NewNextRounds}).
 
 -spec update_lease_in_dht_node_state(l_on_cseq:lease_t(), dht_node_state:state(),
                                      active | passive,
@@ -155,7 +196,7 @@ remove_active_lease_from_dht_node_state(Lease, State) ->
         _ ->
             case l_on_cseq:get_id(Active) =:= Id of
                 true ->
-                    dht_node_state:set_lease_list(State,
+                    dht_node_state:set_lease_list(remove_next_round(Id, State),
                                                   LeaseList#lease_list_t{active=empty});
                 false ->
                     State
@@ -170,7 +211,7 @@ remove_passive_lease_from_dht_node_state(Lease, State) ->
     Passive = LeaseList#lease_list_t.passive,
     Id = l_on_cseq:get_id(Lease),
     NewPassive = lists:keydelete(Id, 2, Passive),
-    dht_node_state:set_lease_list(State,
+    dht_node_state:set_lease_list(remove_next_round(Id, State),
                                   LeaseList#lease_list_t{passive=NewPassive}).
 
 -spec remove_lease_from_dht_node_state(l_on_cseq:lease_t(), dht_node_state:state(),
