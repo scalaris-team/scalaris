@@ -238,7 +238,7 @@ thread_end() -> thread_end(default).
 thread_end(TraceId) ->
     ?ASSERT2(infected(), duplicate_or_uninfected_thread_end),
     %% inform proto_sched that we are finished.
-    send_steer_msg({on_handler_done, TraceId, thread_end}),
+    send_steer_msg({on_handler_done, TraceId, thread_end, comm:this()}),
     %% switch off the infection
     clear_infection(),
     ?DBG_ASSERT2(not infected(), infected_after_thread_end),
@@ -545,7 +545,7 @@ on({deliver, TraceId}, State) ->
             end
     end;
 
-on({on_handler_done, TraceId, _Tag}, State) ->
+on({on_handler_done, TraceId, _Tag, To}, State) ->
      ?TRACE("proto_sched:on({on_handler_done, ~p}).", [TraceId]),
      %% do not use gen_component:post_op to allow a pending cleanup
      %% call to interrupt us early.
@@ -556,7 +556,7 @@ on({on_handler_done, TraceId, _Tag}, State) ->
              State;
          {TraceId, TraceEntry} ->
              case TraceEntry#state.status of
-                 {delivered, _To, Ref} ->
+                 {delivered, To, Ref} ->
                      %% this delivered was done, so we can schedule a new msg.
                      erlang:demonitor(Ref),
 
@@ -597,7 +597,7 @@ on({send_error, Pid, Msg, _Reason} = _ShepherdMsg, State) ->
             case TraceEntry#state.status of
                 {delivered, Pid, _Ref} ->
                     %% send error, generate on_handler_done
-                    gen_component:post_op({on_handler_done, TraceId, send_error}, State);
+                    gen_component:post_op({on_handler_done, TraceId, send_error, Pid}, State);
                 _  ->
                     %% not in state delivered, so probably the monitor
                     %% already cleaned up for the died process with
@@ -718,7 +718,7 @@ on({'DOWN', Ref, process, Pid, Reason}, State) ->
             %% message when delivering to already dead nodes.
             gen_component:post_op({on_handler_done,
                                      element(1, TraceEntry),
-                                     pid_ended_died_or_killed}, State)
+                                     pid_ended_died_or_killed, comm:make_global(Pid)}, State)
     end.
 
 passed_state_new(TraceId, Logger) ->
