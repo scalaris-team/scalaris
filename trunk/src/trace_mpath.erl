@@ -744,7 +744,8 @@ log_info(PState, FromPid, Info) ->
                 {gc_on_done, Tag} ->
                     TraceId = passed_state_trace_id(PState),
                     send_log_msg(PState, LoggerPid,
-                                 {on_handler_done, TraceId, Tag});
+                                 {on_handler_done, TraceId, Tag,
+                                  element(1, normalize_pidinfo(FromPid))});
                 _ -> ok
             end
     end,
@@ -785,7 +786,8 @@ log_recv(PState, FromPid, ToPid, Msg) ->
 
 -spec send_log_msg(passed_state(), comm:mypid(),
                    trace_event0() |
-                       {on_handler_done, trace_id(), MsgTag::atom() | integer()})
+                       {on_handler_done, trace_id(),
+                        MsgTag::atom() | integer(), anypid()})
         -> ok.
 send_log_msg(RestoreThis, LoggerPid, Msg) ->
     %% don't log the sending of log messages ...
