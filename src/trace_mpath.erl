@@ -425,16 +425,16 @@ to_texfile(Trace, Filename, DeltaFun, HaveRealTime, ScaleX0) ->
           fun(X, Acc) ->
                   LatexNode = term_to_latex_string(X),
                   io:format(File,
-                            "\\draw (0, -~p) node[anchor=east] {~s};~n",
+                            "\\draw (0, -~f) node[anchor=east] {~s};~n",
                             [length(Acc)/2, LatexNode]),
                   io:format(File,
-                            "\\draw[color=gray,very thin] (0, -~p) -- (~pcm, -~p);~n",
+                            "\\draw[color=gray,very thin] (0, -~f) -- (~fcm, -~f);~n",
                             [length(Acc)/2, (EndTime+10)/ScaleX, length(Acc)/2]),
                   case EndTime > 600 of
                       true ->
                           io:format(File,
-                                    "\\foreach \\x in {~p,~p,...,~p}~n"
-                                    "  \\node[anchor=south east,gray,inner sep=0pt] at (\\x, -~p) {\\tiny ~s};~n",
+                                    "\\foreach \\x in {~B,~B,...,~B}~n"
+                                    "  \\node[anchor=south east,gray,inner sep=0pt] at (\\x, -~f) {\\tiny ~s};~n",
                                     [15, 30,
                                      ((trunc((EndTime+10)) div 15) * 15) div ScaleX,
                                      length(Acc)/2, LatexNode]);
@@ -449,9 +449,9 @@ to_texfile(Trace, Filename, DeltaFun, HaveRealTime, ScaleX0) ->
       1, EndSlot,
       fun(I) ->
               io:format(File,
-              "  \\draw[color=gray, very thin] (~pcm, 0.5)"
-              "  node[above] {~p" ++ ?IIF(HaveRealTime, "$\\mu$s", "") ++ "} --"
-              " (~p, -~p);~n",
+              "  \\draw[color=gray, very thin] (~fcm, 0.5)"
+              "  node[above] {~B" ++ ?IIF(HaveRealTime, "$\\mu$s", "") ++ "} --"
+              " (~f, -~f);~n",
               [I*TicsFreq/ScaleX,
                I*TicsFreq,
                I*TicsFreq/ScaleX, length(Nodes)/2])
@@ -570,9 +570,9 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
                             false -> SendTag ++ "\\\\[-0.5em]\\tiny " ++ RecvTag
                         end,
                     io:format(File,
-                              "\\draw[->, color=~s] (~pcm, -~p)"
+                              "\\draw[->, color=~s] (~fcm, -~f)"
                               " to node[inner sep=1pt, anchor=west,sloped,rotate=90,align=left] "
-                              "{\\tiny ~s} (~pcm, -~p) "
+                              "{\\tiny ~s} (~fcm, -~f) "
                               "node [anchor=north, inner sep=1pt] {\\tiny ~s};~n",
                               [Color, SendTime/ScaleX, SrcNum/2,
                                MsgTag,
@@ -585,9 +585,9 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
                             false -> RecvTag ++ "\\\\[-0.5em]\\tiny " ++ SendTag
                         end,
                     io:format(File,
-                              "\\draw[->, color=~s] (~pcm, -~p)"
+                              "\\draw[->, color=~s] (~fcm, -~f)"
                               " to node[inner sep=1pt, anchor=west,sloped,rotate=-90, align=left] "
-                              "{\\tiny ~s} (~pcm, -~p) "
+                              "{\\tiny ~s} (~fcm, -~f) "
                               "node [anchor=west, inner sep=1pt, rotate=60] {\\tiny ~s};~n",
                               [Color, SendTime/ScaleX, SrcNum/2,
                                MsgTag,
@@ -600,10 +600,10 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
                             false -> RecvTag ++ "\\\\[-0.5em]\\tiny " ++ SendTag
                         end,
                     io:format(File,
-                              "\\draw[->, color=~s] (~pcm, -~p)"
-                              " .. controls +(~pcm,-0.3) .."
+                              "\\draw[->, color=~s] (~fcm, -~f)"
+                              " .. controls +(~fcm,-0.3) .."
                               " node[inner sep=1pt,anchor=west,sloped,rotate=-90, align=left]"
-                              "{\\tiny ~s} (~pcm, -~p) "
+                              "{\\tiny ~s} (~fcm, -~f) "
                               "node [anchor=west, inner sep=1pt, rotate=60] {\\tiny ~s};~n",
                               [Color, element(2, X)/ScaleX, SrcNum/2,
                                (RecvTime - element(2, X))/ScaleX/2,
@@ -632,9 +632,9 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
                             DoneTime = element(2, hd(DoneEvents)),
                             if HaveRealTime ->
                                    io:format(File,
-                                             "\\draw[semithick] (~pcm, -~p)"
+                                             "\\draw[semithick] (~fcm, -~f)"
                                                  " -- "
-                                                 " (~pcm, -~p) node[inner sep=1pt, anchor=south] {\\tiny ~p};~n",
+                                                 " (~fcm, -~f) node[inner sep=1pt, anchor=south] {\\tiny ~B};~n",
                                              [RecvTime/ScaleX, DestNum/2,
                                               DoneTime/ScaleX, DestNum/2,
                                               DoneTime - RecvTime]);
@@ -655,7 +655,7 @@ draw_messages(File, Nodes, ScaleX, HaveRealTime, [X | DrawTrace]) ->
                               fun(Y) -> element(4, X) =/= Y end, Nodes)),
             EventTime = element(2, X),
             io:format(
-              File, "\\draw [color=blue] (~pcm, -~p) ++(0, 0.1cm) node[rotate=60, anchor=west, inner sep=1pt] {\\tiny ~s}-- ++(0, -0.2cm);~n",
+              File, "\\draw [color=blue] (~fcm, -~f) ++(0, 0.1cm) node[rotate=60, anchor=west, inner sep=1pt] {\\tiny ~s}-- ++(0, -0.2cm);~n",
               [EventTime/ScaleX, SrcNum/2, term_to_latex_string(get_msg_tag(element(5, X)))]),
             %% not yet implemented
             DrawTrace
