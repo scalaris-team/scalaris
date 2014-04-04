@@ -45,7 +45,6 @@ async();
 message(A,AA,"start_recon(S)");
 inactive(A);
 active(AA);
-step();
 connect_to_comment(AA,BUILD_MERKLE);
 step();
 
@@ -57,21 +56,22 @@ comment(AA,AA_COMPRESS_HASHES,0.0 left 0.2, wid 1.9 ht 0.5 \
 message(AA,BB,"check_nodes(HashSize, CH(cur))");
 active(BB);
 step();
-comment(BB,MISMATCHES,-0.1 right 0.1, wid 2.6 ht 1.3 \
+comment(BB,MISMATCHES,-0.05 right 0.175, wid 2.3 ht 1.45 \
         "mismatches:"\
-        "\*x\sb1\eb) inner\sbB\eb-leaf\sbA\eb, leaf-match"\
-        "\*x\sb2\eb) inner\sbB\eb-leaf\sbA\eb, no leaf-match"\
-        "\*y) leaf\sbB\eb-leaf\sbA\eb"\
-        "\*z\sb1\eb) leaf\sbB\eb-inner\sbA\eb, leaf-match"\
-        "\*z\sb2\eb) leaf\sbB\eb-inner\sbA\eb, no leaf-match");
+        "\*x\sb1\eb) inner\sbB\eb-leaf\sbA\eb, leaf-match*"\
+        "\*x\sb2\eb) inner\sbB\eb-leaf\sbA\eb \  \*x\sb1\eb              "\
+        "\*y) leaf\sbB\eb-leaf\sbA\eb                      "\
+        "\*z\sb1\eb) leaf\sbB\eb-inner\sbA\eb, leaf-match*"\
+        "\*z\sb2\eb) leaf\sbB\eb-inner\sbA\eb \  \*z\sb1\eb              "\
+        "\sp* all remaining leafs wil be resolved\ep");
 connect_to_comment(AA,MISMATCHES);
 step();
-comment(BB,BB_STORE_MISMATCHES,-0.15 left 0.2, wid 2.5 ht 0.3 \
-        "store mismatches \*x\sb1\eb, \*x\sb2\eb, \*y, \*z\sb2\eb");
+comment(BB,BB_STORE_MISMATCHES,-0.15 left 0.2, wid 2.7 ht 0.3 \
+        "store mismatches \*x\sb1\eb, \*x\sb2\eb, \*y, \*z\sb1\eb, \*z\sb2\eb");
 rmessage(BB,AA,"check_nodes_response(Flags, MaxLeafs\sbB\eb)");
 comment(AA,AA_STORE_MISMATCHES,0.0 left 0.2, wid 1.6 ht 0.5 \
         "store mismatches"\
-        "\*x\sb1\eb, \*x\sb2\eb, \*y, \*z\sb2\eb");
+        "\*x\sb1\eb, \*x\sb2\eb, \*y, \*z\sb1\eb, \*z\sb2\eb");
 step();
 
 end_frame(B, MT);
