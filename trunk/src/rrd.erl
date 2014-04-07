@@ -30,7 +30,7 @@
 -endif.
 
 % external API with transparent time handling
--export([create/3, create_timed/4,
+-export([create/3,
          add_now/2, check_timeslot_now/1,
          merge/2,
          dump/1, dump_with/2, dump_with/3]).
@@ -98,11 +98,6 @@
 create(SlotLength, Count, Type) ->
     create(SlotLength, Count, Type, os:timestamp()).
 
--spec create_timed(SlotLength::timespan(), Count::pos_integer(), Type::timeseries_type(),
-                   StartTime::time()) -> rrd().
-create_timed(SlotLength, Count, Type, {_,_,_} = StartTime) ->
-    create(SlotLength, Count, Type, StartTime).
-
 % @doc Note: gauge, counter and timing types accept only number() as value, event
 %      accepts any value.
 -spec add_now(Value::term(), rrd()) -> rrd().
@@ -160,7 +155,7 @@ merge(DB1 = #rrd{type = Type}, DB2 = #rrd{type = Type}) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% Internal API (allows to specify timestamps explicitly)
+% External API without transparent time handling and some internal API
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %@doc StepSize in milliseconds
