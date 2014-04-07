@@ -33,6 +33,8 @@
 
 -export([find_largest_window/2, find_largest_window_feeder/2]).
 -export([foldl_until/2, foldr_until/2]).
+% private but shared with histogram_normalized
+-export([foldl_until_helper/4]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
