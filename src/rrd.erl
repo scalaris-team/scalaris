@@ -185,8 +185,14 @@ select_fun(DB) ->
         gauge -> fun gauge_update_fun/3;
         counter -> fun counter_update_fun/3;
         event -> fun event_update_fun/3;
-        {histogram, Size} -> fun(One, Two, Three) -> histogram_update_fun(One, Two, Three, Size) end;
-        {histogram, Size, NormFun, InverseFun} -> fun(One, Two, Three) -> histogram_normalized_update_fun(One, Two, Three, Size, NormFun, InverseFun) end;
+        {histogram, Size} ->
+            fun(Time, OldValue, Value) ->
+                    histogram_update_fun(Time, OldValue, Value, Size)
+            end;
+        {histogram, Size, NormFun, InverseFun} ->
+            fun(Time, OldValue, Value) ->
+                    histogram_normalized_update_fun(Time, OldValue, Value, Size, NormFun, InverseFun)
+            end;
         {timing, _} -> fun timing_update_fun/3;
         {timing_with_hist, _} -> fun timing_with_hist_update_fun/3
     end.
