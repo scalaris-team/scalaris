@@ -22,7 +22,7 @@
 -vsn('$Id$').
 
 -ifdef(with_export_type_support).
--export_type([histogram/0]).
+-export_type([histogram/0, norm_fun/0]).
 -endif.
 
 -export([create/3, add/2, add/3, get_data/1,
