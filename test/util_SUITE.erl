@@ -341,9 +341,9 @@ rrd_combine_timing_slots_simple(_Config) ->
     DB0 = rrd:create(10, 10, {timing, us}, {0,0,0}),
     DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1),
-            [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42, {histogram,0,[],0}}},
-             {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30, {histogram,0,[],0}}},
-             {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3, {histogram,0,[],0}}}]),
+            [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42, {histogram,0,[],0,0}}},
+             {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30, {histogram,0,[],0,0}}},
+             {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3, {histogram,0,[],0,0}}}]),
     CurrentTS = {0,0,44}, % assume we are currently in the last slot
 
     Expected = {1 + 3 + 30 + 42, % sum
@@ -363,9 +363,9 @@ rrd_combine_timing_slots_subset(_Config) ->
     DB0 = rrd:create(10, 10, {timing, us}, {0,0,0}),
     DB1 = lists:foldl(fun rrd_SUITE:apply/2, DB0, Adds),
     ?equals(rrd:dump(DB1),
-            [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42, {histogram,0,[],0}}},
-             {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30, {histogram,0,[],0}}},
-             {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3, {histogram,0,[],0}}}]),
+            [{{0,0,40}, {0,0,50}, {42, 42*42, 1, 42, 42, {histogram,0,[],0,0}}},
+             {{0,0,30}, {0,0,40}, {30, 30*30, 1, 30, 30, {histogram,0,[],0,0}}},
+             {{0,0,20}, {0,0,30}, {1 + 3, 1*1 + 3*3, 2, 1, 3, {histogram,0,[],0,0}}}]),
 
     CurrentTS = {0,0,44}, % assume we are currently in the last slot
     Interval = 10, % overlap at most two slots
