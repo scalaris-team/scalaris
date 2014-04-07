@@ -77,7 +77,7 @@ get_num_inserts({Histogram, _NormFun, _InverseFun}) ->
 %%      and returns the value at this position.
 -spec foldl_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
-           {ok, Value::value(), Sum::pos_integer()}.
+           {ok, Value::value() | nil, Sum::non_neg_integer()}.
 foldl_until(TargetVal, CircularHist) ->
     HistData = get_data(CircularHist),
     histogram:foldl_until_helper(TargetVal, HistData, _SumSoFar = 0, _BestValue = nil).
@@ -85,7 +85,7 @@ foldl_until(TargetVal, CircularHist) ->
 %% @doc Like foldl_until but traverses the list from the right
 -spec foldr_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
-           {ok, Value::value(), Sum::pos_integer()}.
+           {ok, Value::value() | nil, Sum::non_neg_integer()}.
 foldr_until(TargetVal, CircularHist) ->
     HistData = get_data(CircularHist),
     histogram:foldl_until_helper(TargetVal, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).

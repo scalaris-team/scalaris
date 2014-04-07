@@ -94,7 +94,7 @@ merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
 %%      and returns the value at this position.
 -spec foldl_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
-           {ok, Value::value(), Sum::pos_integer()}.
+           {ok, Value::value() | nil, Sum::non_neg_integer()}.
 foldl_until(TargetVal, CircularHist) ->
     HistData = get_data(CircularHist),
     foldl_until_helper(TargetVal, HistData, _SumSoFar = 0, _BestValue = nil).
@@ -102,15 +102,15 @@ foldl_until(TargetVal, CircularHist) ->
 %% @doc Like foldl_until but traverses the list from the right
 -spec foldr_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
-           {ok, Value::value(), Sum::pos_integer()}.
+           {ok, Value::value() | nil, Sum::non_neg_integer()}.
 foldr_until(TargetVal, CircularHist) ->
     HistData = get_data(CircularHist),
     foldl_until_helper(TargetVal, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
 
 -spec foldl_until_helper(TargetVal::non_neg_integer(), DataList::data_list(),
-                         SumSoFar::non_neg_integer(), BestValue::non_neg_integer())
+                         SumSoFar::non_neg_integer(), BestValue::nil | non_neg_integer())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
-           {ok, Value::value(), Sum::pos_integer()}.
+           {ok, Value::value() | nil, Sum::non_neg_integer()}.
 foldl_until_helper(TargetVal, _List, SumSoFar, BestValue)
   when SumSoFar >= TargetVal ->
     {ok, BestValue, SumSoFar};
