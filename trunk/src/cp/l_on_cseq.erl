@@ -261,7 +261,8 @@ on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}, Mode},
     ContentCheck = generic_content_check(Old, New, renew),
 %% @todo New passed for debugging only:
     Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New, Mode}),
-    update_lease(Id, Self, ContentCheck, Old, New, State);
+    update_lease(Id, Self, ContentCheck, Old, New, State),
+    State;
 
 on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode}, State) ->
     %% log:pal("successful renew~n~w~n~w~n", [Value, l_on_cseq:get_id(Value)]),
@@ -402,7 +403,8 @@ on({l_on_cseq, handover, Old = #lease{id=Id, epoch=OldEpoch},
     ContentCheck = generic_content_check(Old, New, handover),
     Self = comm:reply_as(self(), 3, {l_on_cseq, handover_reply, '_', ReplyTo,
                                      NewOwner, New}),
-    update_lease(Id, Self, ContentCheck, Old, New, State);
+    update_lease(Id, Self, ContentCheck, Old, New, State),
+    State;
 
 
 on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value}, ReplyTo,
@@ -453,7 +455,8 @@ on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
                     timeout = new_timeout()},
     ContentCheck = is_valid_takeover(OldEpoch, OldVersion),
     Self = comm:reply_as(self(), 4, {l_on_cseq, takeover_reply, ReplyTo, '_'}),
-    update_lease(Id, Self, ContentCheck, Old, New, State);
+    update_lease(Id, Self, ContentCheck, Old, New, State),
+    State;
 
 
 on({l_on_cseq, takeover_reply, ReplyTo,
@@ -481,7 +484,8 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch}, L2, ReplyTo}, State) -
     ContentCheck = generic_content_check(L1, New, merge_step1),
     Self = comm:reply_as(self(), 5, {l_on_cseq, merge_reply_step1,
                                      L2, ReplyTo, '_'}),
-    update_lease(Id, Self, ContentCheck, L1, New, State);
+    update_lease(Id, Self, ContentCheck, L1, New, State),
+    State;
 
 on({l_on_cseq, merge_reply_step1, L2, _ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, Reason}}, State) ->
@@ -1331,6 +1335,9 @@ format_utc_timestamp({_,_,Micro} = TS) ->
     lists:flatten(io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w",
                   [Day,Mstr,Year,Hour,Minute,Second,Micro])).
 
+-spec update_lease(lease_id(), comm:erl_local_pid(),
+                   ContentCheck::fun((any(), any(), any()) -> {boolean(), atom()}),
+                   Old::lease_t(), New::lease_t(), dht_node_state:state()) -> ok.
 update_lease(Id, Self, ContentCheck, Old, New, State) ->
     DB = get_db_for_id(Id),
     case lease_list:get_next_round(Id, State) of
@@ -1339,4 +1346,4 @@ update_lease(Id, Self, ContentCheck, Old, New, State) ->
         NextRound ->
             rbrcseq:qwrite_fast(DB, Self, Id, ContentCheck, New, NextRound, Old)
     end,
-    State.
+    ok.
