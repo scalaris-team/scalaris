@@ -29,7 +29,7 @@
          get_num_elements/1, get_num_inserts/1]).
 -export([foldl_until/2, foldr_until/2]).
 
--include("record_helpers.hrl").
+-include("scalaris.hrl").
 
 -type value() :: number().
 -type data_item() :: {value(), pos_integer()}.
@@ -52,22 +52,23 @@ add(Value, Histogram) ->
     add(Value, 1, Histogram).
 
 -spec add(Value::value(), Count::pos_integer(), Histogram::histogram()) -> histogram().
-add(Value, Count, {Histogram, NormFun, InverseFun}) ->
+add(Value, Count, {Histogram, NormFun, _InverseFun}) ->
+    ?DBG_ASSERT(Value =:= _InverseFun(NormFun(Value))),
     NewHistogram = histogram:add(NormFun(Value), Count, Histogram),
-    {NewHistogram, NormFun, InverseFun}.
+    {NewHistogram, NormFun, _InverseFun}.
 
 -spec get_data(Histogram::histogram()) -> data_list().
-get_data({Histogram, NormFun, InverseFun}) ->
+get_data({Histogram, _NormFun, InverseFun}) ->
     %% data needs to be denormalized first
     Data = histogram:get_data(Histogram),
     lists:map(fun({Value, Count}) -> {InverseFun(Value), Count} end, Data).
 
 -spec get_num_elements(Histogram::histogram()) -> non_neg_integer().
-get_num_elements({Histogram, _NormFun}) ->
+get_num_elements({Histogram, _NormFun, _InverseFun}) ->
     histogram:get_num_elements(Histogram).
 
 -spec get_num_inserts(Histogram::histogram()) -> non_neg_integer().
-get_num_inserts({Histogram, _NormFun}) ->
+get_num_inserts({Histogram, _NormFun, _InverseFun}) ->
     histogram:get_num_inserts(Histogram).
 
 %% TODO merge/2 not implemented
