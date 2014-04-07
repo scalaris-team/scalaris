@@ -52,10 +52,10 @@ add(Value, Histogram) ->
     add(Value, 1, Histogram).
 
 -spec add(Value::value(), Count::pos_integer(), Histogram::histogram()) -> histogram().
-add(Value, Count, {Histogram, NormFun, _InverseFun}) ->
-    ?DBG_ASSERT(Value =:= _InverseFun(NormFun(Value))),
+add(Value, Count, {Histogram, NormFun, InverseFun}) ->
+    ?DBG_ASSERT(Value =:= InverseFun(NormFun(Value))),
     NewHistogram = histogram:add(NormFun(Value), Count, Histogram),
-    {NewHistogram, NormFun, _InverseFun}.
+    {NewHistogram, NormFun, InverseFun}.
 
 -spec get_data(Histogram::histogram()) -> data_list().
 get_data({Histogram, _NormFun, InverseFun}) ->
