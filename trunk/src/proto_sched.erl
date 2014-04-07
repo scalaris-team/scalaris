@@ -192,7 +192,7 @@ thread_num(N) -> thread_num(N, default).
 
 -spec thread_num(pos_integer(), trace_id()) -> ok.
 thread_num(N, TraceId) ->
-    send_steer_msg({thread_num, TraceId, N, comm:make_global(self())}),
+    send_steer_msg({thread_num, TraceId, N, comm:this()}),
     receive
         ?SCALARIS_RECV({thread_num_done}, ok);
         ?SCALARIS_RECV({thread_num_failed},
@@ -209,7 +209,7 @@ thread_begin(TraceId) ->
     %% ourselves?!  But we better send in a special way to be able to
     %% detect these thread_begin messages in a separate handler
     %% clause as we want to detect when thread_num was set to small.
-    send_steer_msg({thread_begin, TraceId, comm:make_global(self())}),
+    send_steer_msg({thread_begin, TraceId, comm:this()}),
     %% proto_sched will then schedule itself a proper infected
     %% message, that we then receive, which atomatically infects this
     %% client thread
