@@ -31,7 +31,7 @@ message(B,BB,"create_struct(I\sbA\eb)");
 inactive(B); active(BB);
 step();
 
-comment(BB,BUILD_MERKLE,0.3 right 0.2, wid 1.6 ht 0.35 \
+comment(BB,BUILD_MERKLE,0.5 right 0.175, wid 1.7 ht 0.25 \
         "create merkle tree");
 
 message(BB,A,"continue_recon(S = {I\sbAB\eb, BranchFactor, BucketSize})");
@@ -50,60 +50,82 @@ step();
 
 begin_frame(A,MT,"Loop");
 
-comment(AA,AA_COMPRESS_HASHES,0.0 left 0.2, wid 1.9 ht 0.5 \
-        "compress all hashes of"\
-        "current level = CH(cur)");
+comment(AA,AA_COMPRESS_HASHES,0.0 left 0.1, wid 2.01 ht 0.45 \
+        "CH(cur) := compressed"\
+        "hashes of current level");
 message(AA,BB,"check_nodes(HashSize, CH(cur))");
 active(BB);
+comment(BB,BB_MISMATCHES,0.00 right 0.175, wid 1.6 ht 0.45 \
+        "compare hashes,"\
+        "store mismatches");
+#step();
+#comment(BB,MISMATCHES,0.90 left 0.6, wid 2.325 ht 1.1 \
+#        "\*x\sb1\eb) leaf\sbA\eb-inner\sbB\eb, leaf\sbA\eb\moinner\sbB\eb"\
+#        "\*x\sb2\eb) leaf\sbA\eb-inner\sbB\eb, leaf\sbA\eb\nminner\sbB\eb"\
+#        "\*y) leaf\sbA\eb-leaf\sbB\eb                      \sb \eb"\
+#        "\*z\sb1\eb) inner\sbA\eb-leaf\sbB\eb, leaf\sbB\eb\moinner\sbA\eb"\
+#        "\*z\sb2\eb) inner\sbA\eb-leaf\sbB\eb, leaf\sbB\eb\nminner\sbA\eb");
+rmessage(BB,AA,"check_nodes_response(Flags, MaxLeafs\sbB\eb)");
+comment(BB,MISMATCHES,0.39 left 0.25, wid 3.2 ht 0.66 \
+        "\bu leaf\sbA\eb-leaf\sbB\eb (\*y)                                     \sb \eb"\
+        "\bu leaf\sbA\eb-inner\sbB\eb: leaf\sbA\eb\moi\sbB\eb (\*x\sb1\eb), leaf\sbA\eb\nmi\sbB\eb (\*x\sb2\eb)"\
+        "\bu inner\sbA\eb-leaf\sbB\eb: leaf\sbB\eb\moi\sbA\eb (\*z\sb1\eb), leaf\sbB\eb\nmi\sbA\eb (\*z\sb2\eb)");
 step();
-comment(BB,MISMATCHES,-0.05 right 0.175, wid 2.3 ht 1.45 \
-        "mismatches:"\
-        "\*x\sb1\eb) inner\sbB\eb-leaf\sbA\eb, leaf-match*"\
-        "\*x\sb2\eb) inner\sbB\eb-leaf\sbA\eb \  \*x\sb1\eb              "\
-        "\*y) leaf\sbB\eb-leaf\sbA\eb                      "\
-        "\*z\sb1\eb) leaf\sbB\eb-inner\sbA\eb, leaf-match*"\
-        "\*z\sb2\eb) leaf\sbB\eb-inner\sbA\eb \  \*z\sb1\eb              "\
-        "\sp* all remaining leafs wil be resolved\ep");
+comment(AA,AA_MISMATCHES,0.00 left 0.175, wid 1.8 ht 0.625 \
+        "calc. new HashSize,"\
+        "interpret Flags,"\
+        "store mismatches");
+step();
 connect_to_comment(AA,MISMATCHES);
 step();
-comment(BB,BB_STORE_MISMATCHES,-0.15 left 0.2, wid 2.7 ht 0.3 \
-        "store mismatches \*x\sb1\eb, \*x\sb2\eb, \*y, \*z\sb1\eb, \*z\sb2\eb");
-rmessage(BB,AA,"check_nodes_response(Flags, MaxLeafs\sbB\eb)");
-comment(AA,AA_STORE_MISMATCHES,0.0 left 0.2, wid 1.6 ht 0.5 \
-        "store mismatches"\
-        "\*x\sb1\eb, \*x\sb2\eb, \*y, \*z\sb1\eb, \*z\sb2\eb");
-step();
+#step();
+#step();
 
 end_frame(B, MT);
 inactive(AA);
 step();
 
-message(BB,B,"request_resolve(\*x\sb1\eb)");
+comment(BB,BB_RESOLVE1,-0.09 right 0.175, wid 1.4 ht 0.225 \
+        "\*d\sb1\eb := \*D \mo \*x\sb1\eb");
+message(BB,B,"request_resolve(\*d\sb1\eb)");
 active(B);
-message(BB,AA,"resolve_req(CH(\*y, \*z\sb2\eb))");
+message(BB,AA,"resolve_req(CKV(\*y, \*z\sb1,2\eb))");
 inactive(BB);
 active(AA);
 begin_frame(B,F,"key_upd_s");
 end_frame(B,F);
-message(AA,A,"request_resolve(??)");
+comment(AA,AA_RESOLVE1A,0.00 right 0.175, wid 2.8 ht 0.45 \
+        "\*d\sb2\eb := \*D \ Reg(A,B) \mo CKV(\*y, \*z\sb1,2\eb)"\
+        "\*d\sb3\eb := Reg(A,B) \mo CKV(\*y, \*z\sb1,2\eb)     ");
+message(AA,A,"request_resolve(\*d\sb2\eb)");
 inactive(B);
 active(A);
 step();
+comment(AA,AA_RESOLVE1B,0.20 left 0.175, wid 1.65 ht 0.45 \
+        "get list(key-value)"\
+        "from leaf\sbA\eb \mo \*x\sb2\eb");
 begin_frame(A,F,"key_upd_s");
 end_frame(A,F);
-message(AA,BB,"resolve_req(HashesReply??, BinKeyList??)");
+message(AA,BB,"resolve_req(CKV(\*x\sb2\eb), CH(\*d\sb3\eb))");
 inactive(A);
 active(BB);
-message(BB,B,"request_resolve(??)");
+comment(BB,BB_RESOLVE2,0.0 right 0.175, wid 2.45 ht 0.45 \
+        "\*d\sb4\eb := \*D \ Reg(A,B) \mo CKV(\*x\sb2\eb)"\
+        "\*d\sb5\eb := Reg(A,B) \mo CKV(\*x\sb2\eb)     ");
+step();
+comment(BB,RESOLVE_CH,0.8 left 0.65, wid 2.5 ht 0.225 \
+        "decode compressed hashes");
+message(BB,B,"request_resolve(\*d\sb3,4\eb)");
 active(B);
-message(BB,AA,"resolve_req(BinKeyListReq??)");
+message(BB,AA,"resolve_req(CH(\*d\sb5\eb))");
 complete(BB);
 drawx(BB);
 begin_frame(B,F,"key_upd_s");
 end_frame(B,F);
+connect_to_comment(AA,RESOLVE_CH);
 step();
 inactive(B);
-message(AA,A,"request_resolve(??)");
+message(AA,A,"request_resolve(\*d\sb5\eb)");
 active(A);
 complete(AA);
 drawx(AA);
