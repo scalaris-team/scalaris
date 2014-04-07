@@ -47,6 +47,12 @@
 % misc
 -export([check_config/0]).
 
+-type histogram_timeseries_type() ::
+          {histogram, Size::non_neg_integer()} |
+          {histogram, Size::non_neg_integer(),
+                      NormalizationFun::histogram_normalized:norm_fun(),
+                      InverseFun::histogram_normalized:norm_fun()}.
+
 % gauge: record newest value of a time slot,
 % counter: sum up all values of a time slot,
 % event: record every event (incl. timestamp) in a time slot,
@@ -54,10 +60,7 @@
 % timing: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x)}
 % timing_with_hist: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x), histogram(x)}
 -type timeseries_type() :: gauge | counter | event |
-                           {histogram, Size::non_neg_integer()} |
-                           {histogram, Size::non_neg_integer(),
-                                       NormalizationFun::histogram_normalized:norm_fun(),
-                                       InverseFun::histogram_normalized:norm_fun()} |
+                           histogram_timeseries_type() |
                            {timing | timing_with_hist, us | ms | s | count | percent}.
 -type fill_policy_type() :: set_undefined | keep_last_value.
 -type time() :: erlang_timestamp().
