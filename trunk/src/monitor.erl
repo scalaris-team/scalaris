@@ -138,7 +138,8 @@ proc_check_timeslot(Process, Key) ->
         _ ->
             NewValue = rrd:check_timeslot_now(OldValue),
             check_report(Process, Key, OldValue, NewValue),
-            erlang:put(InternalKey, NewValue)
+            erlang:put(InternalKey, NewValue),
+            ok
     end.
 
 %% @doc Advances the stored timeslots of the value at Key inside the current
