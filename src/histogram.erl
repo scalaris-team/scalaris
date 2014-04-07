@@ -23,12 +23,9 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--ifdef(with_export_type_support).
--export_type([histogram/0]).
--endif.
-
 % external API
--export([create/1, add/2, add/3, get_data/1, merge/2]).
+-export([create/1, add/2, add/3, get_data/1,
+         get_num_elements/1, get_num_inserts/1, merge/2]).
 
 % private API for unit tests:
 -export([find_smallest_interval/1, merge_interval/2,
@@ -39,12 +36,18 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--type value() :: float() | integer().
+-ifdef(with_export_type_support).
+-export_type([histogram/0]).
+-endif.
+
+-type value() :: number().
 -type data_item() :: {value(), pos_integer()}.
 -type data_list() :: list(data_item()).
 -record(histogram, {size = ?required(histogram, size):: non_neg_integer(),
                     data = [] :: data_list(),
-                    data_size = 0 :: non_neg_integer()}).
+                    data_size = 0 :: non_neg_integer(),
+                    inserts = 0 :: non_neg_integer()
+                   }).
 
 -opaque histogram() :: #histogram{}.
 
@@ -59,13 +62,22 @@ add(Value, Histogram) ->
 -spec add(Value::value(), Count::pos_integer(), Histogram::histogram()) -> histogram().
 add(_Value, _Count, Histogram = #histogram{size = 0}) ->
     Histogram;
-add(Value, Count, Histogram = #histogram{data = OldData}) ->
+add(Value, Count, Histogram = #histogram{data = OldData, inserts = Inserts}) ->
     DataNew = insert({Value, Count}, OldData),
-    resize(Histogram#histogram{data = DataNew, data_size = length(DataNew)}).
+    resize(Histogram#histogram{data = DataNew, data_size = length(DataNew),
+                               inserts = Inserts + Count}).
 
 -spec get_data(Histogram::histogram()) -> data_list().
 get_data(Histogram) ->
     Histogram#histogram.data.
+
+-spec get_num_elements(Histogram::histogram()) -> non_neg_integer().
+get_num_elements(Histogram) ->
+    Histogram#histogram.data_size.
+
+-spec get_num_inserts(Histogram::histogram()) -> non_neg_integer().
+get_num_inserts(Histogram) ->
+    Histogram#histogram.inserts.
 
 %% @doc Merges the given two histograms by adding every data point of Hist2
 %%      to Hist1.
