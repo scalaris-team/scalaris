@@ -332,8 +332,15 @@ type_check_module(Module, ExcludeExported, ExcludePrivate, Count) ->
     ResList = type_check_module_funs(
                 Module, ExpFuncs, [{behaviour_info, 1} | ExcludeList], Count),
 
-    type_check_private_funs(Module, ExcludePrivate, Count),
-
+    case cover:modules() of
+        [] ->
+            type_check_private_funs(Module, ExcludePrivate, Count);
+        _ ->
+            %% code reloading is not supported for cover analysis (see
+            %% docs of cover:compile/2)
+            ct:pal("*** Detected cover analysis, have to skip tests of private funs."),
+            ok
+    end,
     %% remained there anything to test?
     case [] =:= ExcludeExported orelse
         lists:any(fun(X) -> skipped =/= X end,
