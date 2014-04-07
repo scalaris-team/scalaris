@@ -30,7 +30,7 @@
 
 % functions (temporarily) storing monitoring values in the calling process:
 -export([proc_set_value/3, proc_get_value/2, proc_exists_value/2,
-         proc_check_timeslot/2, proc_check_all_timeslot/0]).
+         proc_clear_value/2, proc_check_timeslot/2, proc_check_all_timeslot/0]).
 
 % functions sending monitoring values directly to the monitor process
 -export([monitor_set_value/3, client_monitor_set_value/3]).
@@ -39,6 +39,7 @@
 -export([check_report/4]).
 
 -export([get_rrds/2
+         , clear_rrds/2
          , get_rrd_keys/0
          , get_rrd_keys/1
         ]).
@@ -173,6 +174,11 @@ proc_exists_value(Process, Key) ->
 proc_get_value(Process, Key) ->
     erlang:get(to_internal_key(Process, Key)).
 
+-spec proc_clear_value(Process::atom(), Key::key()) -> ok.
+proc_clear_value(Process, Key) ->
+    erlang:erase(to_internal_key(Process, Key)),
+    ok.
+
 %% @doc Reports the given value to the process' monitor process.
 -spec proc_report_to_my_monitor(Process::atom(), Key::key(), OldValue::rrd:rrd(), Value::rrd:rrd()) -> ok.
 proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
@@ -196,6 +202,10 @@ get_rrds(MonitorPid, Keys) ->
         2000 ->
             []
     end.
+
+-spec clear_rrds(MonitorPid::comm:erl_local_pid(), Keys::list(table_index())) -> ok.
+clear_rrds(MonitorPid, Keys) ->
+    comm:send_local(MonitorPid, {clear_rrds, Keys}).
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
@@ -249,6 +259,13 @@ on({get_rrds, TableIndexes, SourcePid}, {Table, ApiTxReqList} = State) ->
 on({get_rrd_keys, SourcePid}, {Table, _} = State) ->
     Keys = get_all_keys(Table),
     comm:send_local(SourcePid, {get_rrd_keys, Keys}),
+    State;
+
+on({clear_rrds, TableIndexes}, {Table, _ApiTxReqList} = State) ->
+    _ = [begin ets:delete(Table, TableIndex),
+               {Process, Key} = TableIndex,
+               erlang:erase(to_internal_key(Process, Key))
+         end || TableIndex <- TableIndexes],
     State;
 
 on({web_debug_info, Requestor}, {Table, _ApiTxReqList} = State) ->
