@@ -36,7 +36,7 @@
 -spec load_with_export_all(Module::module()) -> ok.
 load_with_export_all(Module) ->
     MyOptions = [return_errors,
-                 {parse_transform, tester_helper_parse_transform},
+                 export_all,
                  binary],
     ct:pal("Reload ~p module with 'export_all'.~n", [Module]),
     reload_with_options(Module, MyOptions).
