@@ -100,7 +100,7 @@ contrib/log4erl/src/log4erl_parser.erl: contrib/log4erl/src/log4erl_parser.yrl
 contrib/log4erl/src/log4erl_lex.erl: contrib/log4erl/src/log4erl_lex.xrl
 	cd contrib/log4erl/src && $(ERL) -noinput -noshell -s leex file log4erl_lex.xrl -s init stop
 
-test-all: test test-skipped java-test python-test ruby-test interop-test 
+test-all: all_TESTS java-test python-test ruby-test interop-test 
 
 test: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
@@ -109,10 +109,6 @@ test: compile
 test-skipped: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME)_$@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-skipped.cfg @CTHOOKS_FLAGS@ -noshell | tee ct-skipped.log ; \
 	! grep -E " [1-9]+ failed" ct-skipped.log
-
-test-with-cover: compile
-	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg -cover test/scalaris.coverspec @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
-	grep " 0 failed" ct.log
 
 %_SUITE: compile
 # use non standard ports to run a single SUITE so it can be executed
