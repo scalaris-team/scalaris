@@ -511,7 +511,7 @@ timing_with_hist_merge_fun(_Time, {Sum, Sum2, Count, Min, Max, Hist},
 %%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(rrd_timing_hist_size) andalso
+    config:cfg_is_integer(rrd_timing_hist_size) and
     config:cfg_is_greater_than_equal(rrd_timing_hist_size, 0).
 
 -spec get_timing_hist_size() -> non_neg_integer().
