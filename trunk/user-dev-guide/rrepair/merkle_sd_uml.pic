@@ -31,10 +31,11 @@ message(B,BB,"create_struct(I\sbA\eb)");
 inactive(B); active(BB);
 step();
 
-comment(BB,BUILD_MERKLE,0.5 right 0.175, wid 1.7 ht 0.25 \
+comment(BB,BUILD_MERKLE,0.8 left 1.0, wid 1.7 ht 0.45 \
+        "get data from DB,"\
         "create merkle tree");
 
-message(BB,A,"continue_recon(S = {I\sbAB\eb, BranchFactor, BucketSize})");
+message(BB,A,"continue_recon(S := {I\sbAB\eb, BranchFactor, BucketSize})");
 inactive(BB);
 active(A);
 
@@ -106,23 +107,23 @@ comment(AA,AA_RESOLVE1B,0.20 left 0.175, wid 1.65 ht 0.45 \
         "from leaf\sbA\eb \mo \*x\sb2\eb");
 begin_frame(A,F,"key_upd_s");
 end_frame(A,F);
-message(AA,BB,"resolve_req(CKV(\*x\sb2\eb), CH(\*d\sb3\eb))");
+message(AA,BB,"resolve_req(CKV(\*x\sb2\eb), CK(\*d\sb3\eb))");
 inactive(A);
 active(BB);
 comment(BB,BB_RESOLVE2,0.0 right 0.175, wid 2.45 ht 0.45 \
         "\*d\sb4\eb := \*D \ Reg(A,B) \mo CKV(\*x\sb2\eb)"\
         "\*d\sb5\eb := Reg(A,B) \mo CKV(\*x\sb2\eb)     ");
 step();
-comment(BB,RESOLVE_CH,0.8 left 0.65, wid 2.5 ht 0.225 \
-        "decode compressed hashes");
+comment(BB,RESOLVE_CK,0.8 left 0.75, wid 2.25 ht 0.225 \
+        "decode compressed keys");
 message(BB,B,"request_resolve(\*d\sb3,4\eb)");
 active(B);
-message(BB,AA,"resolve_req(CH(\*d\sb5\eb))");
+message(BB,AA,"resolve_req(CK(\*d\sb5\eb))");
 complete(BB);
 drawx(BB);
 begin_frame(B,F,"key_upd_s");
 end_frame(B,F);
-connect_to_comment(AA,RESOLVE_CH);
+connect_to_comment(AA,RESOLVE_CK);
 step();
 inactive(B);
 message(AA,A,"request_resolve(\*d\sb5\eb)");

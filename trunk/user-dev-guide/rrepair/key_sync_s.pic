@@ -6,59 +6,84 @@ copy "sequence.pic";
 
 # OBJEKTE
 actor(U,"");
-placeholder_object(Dummy1); # more space
+placeholder_object(Dummy0); # more space
 object(A,"A:RR");
+placeholder_object(Dummy1); # more space
 placeholder_object(AA);
-object(ADB,"A:DB");
 placeholder_object(Dummy2); # more space
+placeholder_object(Dummy3); # more space
 placeholder_object(BB);
-object(BDB,"B:DB");
+placeholder_object(Dummy4); # more space
 object(B,"B:RR");
 step();
 
 # Key_Upd_S
 async();
-message(U,A,"key_upd_s({K})"); active(A); 
+message(U,A,"request_resolve(Op\sbA1\eb)"); active(A);
+step();
+comment(A,A_REQUEST,-0.15 right 0.2, wid 2.65 ht 0.7 \
+        "Op\sbA1\eb := key_upd_s(K, Req)    "\
+        "K := list of keys to sync\sb \eb"\
+        "Req := list of keys to request");
 step();
 
 begin_frame(A,F,wid 1.2 "key_upd_s");
 sync();
-cmessage(A,AA,"A:RS"); active(AA);
+create_message(A,AA,"A:RS");
 async();
-message(A,AA,"key_upd_s");
-inactive(A);
+message(A,AA,"start(Op\sbA1\eb)");
+inactive(A); active(AA);
 step();
 
-message(AA,ADB,"{K}"); active(ADB);
-message(ADB,AA,"{KVV}"); inactive(ADB);
-message(AA,B,"key_upd\sbFB\eb({KVV})"); active(B);
-dmessage(AA,AA); inactive(AA);
+comment(AA,AA_GET_DB,0.3 left 0.2, wid 2.2 ht 0.7 \
+        "get data from DB,"\
+        "KVV := list of \..            "\
+        "  \.. {key,value,version}");
+message(AA,B,"request_resolve(Op\sbB1\eb := key_upd\sbFB\eb(KVV, Req))"); active(B);
+inactive(AA);
+complete(AA);
+drawx(AA);
+step();
 
-begin_frame(BB,F1,wid 1.0 "key_upd\sbFB\eb");
+begin_frame(BB,F1,wid 1.2 "key_upd\sbFB\eb");
 sync();
-cmessage(B,BB,"B:RS"); active(BB); 
+create_message(B,BB,"B:RS");
 async();
-message(B,BB,"key_upd\sbFB\eb({KVV})");
-inactive(B);
+message(B,BB,"start(Op\sbB1\eb)");
+inactive(B); active(BB);
 step();
-message(BB,BDB,"{KVV}"); active(BDB);
-message(BDB,BB,"{KVV\sbFB\eb}"); inactive(BDB);
-message(BB,A,"key_upd({KVV\sbFB\eb})"); active(A);
-dmessage(BB,BB); inactive(BB);
+comment(BB,BB_UPDATE_DB,0.3 right 0.2, wid 2.25 ht 0.475 \
+        "update DB & create FB,"\
+        "get Req from DB");
+message(BB,A,"continue_resolve(Op\sbA2\eb := key_upd(KVV\sbFB\eb, \es))");
+active(A);
 step();
+
+begin_frame(A,F2,wid 1.0 "key_upd");
 end_frame(B,F1);
-
-begin_frame(A,F2,wid 0.9 "key_upd");
 sync();
-cmessage(A,AA,"A:RS"); active(AA);
+create_message(A,AA,"A:RS");
 async();
-message(A,AA,"key_upd"); inactive(A);
-message(AA,ADB,"{KVV\sbFB\eb}"); active(ADB);
+message(A,AA,"start(Op\sbA2\eb)");
+inactive(A); active(AA);
 step();
-inactive(ADB);
-dmessage(AA,AA); inactive(AA);
+comment(AA,AA_UPDATE_DB,0.0 left 0.2, wid 1.8 ht 0.225 \
+        "update data in DB");
 step();
-end_frame(ADB,F2);
+complete(AA);
+drawx(AA);
+step();
+end_frame(AA,F2);
+step();
+message(BB,A,"continue_resolve(Op\sbA3\eb := key_upd\sbFB\eb(KVV\sbReq\eb, \es))");
+active(A);
+step();
+complete(BB);
+drawx(BB);
+begin_frame(A,F3,"key_upd\sbFB\eb");
+end_frame(A,F3);
+step();
+inactive(A);
 step();
 end_frame(B,F);
 
@@ -66,7 +91,5 @@ end_frame(B,F);
 step();
 complete(U);
 complete(A);
-complete(ADB);
 complete(B);
-complete(BDB);
 .PE
