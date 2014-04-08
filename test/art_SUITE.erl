@@ -51,8 +51,7 @@ end_per_suite(Config) ->
 prop_new(L, R) ->
     I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, 400, uniform, [{output, list_keytpl}]),
-    Art1 = art:new(),
-    Conf1 = art:get_config(Art1),
+    Conf1 = art:default_config(),
     Art2 = art:new(merkle_tree:new(I, DB, []), 
                    [{correction_factor, proplists:get_value(correction_factor, Conf1) + 1},
                     {inner_bf_fpr, proplists:get_value(inner_bf_fpr, Conf1) + 0.1},
