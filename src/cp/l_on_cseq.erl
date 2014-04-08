@@ -47,6 +47,7 @@
 % for unit tests
 -export([unittest_lease_update/3]).
 -export([unittest_create_lease/1]).
+-export([unittest_create_lease_with_range/1]).
 
 -export([get_db_for_id/1]).
 
@@ -1177,6 +1178,18 @@ unittest_create_lease(Id) ->
            epoch   = 1,
            owner   = comm:this(),
            range   = intervals:all(),
+           aux     = empty,
+           version = 1,
+           timeout = new_timeout()
+          }.
+
+-spec unittest_create_lease_with_range(intervals:interval()) -> lease_t().
+unittest_create_lease_with_range(Range) ->
+    Id = id(Range),
+    #lease{id      = Id,
+           epoch   = 1,
+           owner   = comm:this(),
+           range   = Range,
            aux     = empty,
            version = 1,
            timeout = new_timeout()
