@@ -1363,7 +1363,7 @@ merkle_resolve_leaves_init([{leaf, inner, SigSize0, LeafNode, false = _FoundSkip
     merkle_resolve_leaves_init(TL, Hashes, DestRRPid, Stats, OwnerL,
                                ToSend, ToReq, ToResolve, ResolveNonEmpty,
                                LeafNAcc + 1, HashesReply1);
-merkle_resolve_leaves_init([], _Hashes, DestRRPid, Stats, OwnerL, ToSend, ToReq,
+merkle_resolve_leaves_init([], <<>>, DestRRPid, Stats, OwnerL, ToSend, ToReq,
                            ToResolve, ResolveNonEmpty, LeafNAcc, HashesReply) ->
     {ToResolve1, NStats} =
         merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
