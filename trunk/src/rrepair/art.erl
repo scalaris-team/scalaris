@@ -29,7 +29,7 @@
 -include("record_helpers.hrl").
 -include("scalaris.hrl").
 
--export([new/0, new/1, new/2,
+-export([new/1, new/2, default_config/0,
          get_interval/1, get_correction_factor/1, get_config/1,
          lookup/2]).
 
@@ -45,15 +45,17 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type config_param() :: {correction_factor, non_neg_integer()} |
-                            {inner_bf_fpr,      float()} |
-                            {leaf_bf_fpr,       float()}.
+                        {inner_bf_fpr,      float()} |
+                        {leaf_bf_fpr,       float()}.
 -type config()       :: [config_param()].
 
 -type art() :: { art,
-                 Config     :: config(),
+                 CorrectionFactor :: non_neg_integer(),
+                 InnerBfFpr :: float(),
+                 LeafBfFpr  :: float(),
                  Interval   :: intervals:interval(),
-                 InnerNodes :: bloom:bloom_filter() | empty,
-                 Leafs      :: bloom:bloom_filter() | empty }.
+                 InnerNodes :: bloom:bloom_filter(),
+                 Leafs      :: bloom:bloom_filter()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Functions
@@ -67,73 +69,76 @@ default_config() ->
      {leaf_bf_fpr, 0.1}].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec new() -> art().
-new() ->
-    {art, default_config(), intervals:empty(), empty, empty}.
 
 -spec new(merkle_tree:merkle_tree()) -> art().
 new(Tree) ->
     new(Tree, default_config()).
 
 -spec new(merkle_tree:merkle_tree(), config()) -> art().
-new(Tree, _Config) ->
-    Config = merge_prop_lists(default_config(), _Config),
+new(Tree, Config0) ->
+    Config = merge_prop_lists(default_config(), Config0),
+    CorrectionFactor = proplists:get_value(correction_factor, Config),
+    InnerBfFpr = proplists:get_value(inner_bf_fpr, Config),
+    LeafBfFpr = proplists:get_value(leaf_bf_fpr, Config),
     {InnerCount, LeafCount} = merkle_tree:size_detail(Tree),
-    InnerBF = bloom:new_fpr(InnerCount, proplists:get_value(inner_bf_fpr, Config)),
-    LeafBF = bloom:new_fpr(LeafCount, proplists:get_value(leaf_bf_fpr, Config)),
+    InnerBF = bloom:new_fpr(InnerCount, InnerBfFpr),
+    LeafBF = bloom:new_fpr(LeafCount, LeafBfFpr),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),
     ?TRACE("INNER=~p~nLeaf=~p", [bloom:print(IBF), bloom:print(LBF)]),
-    {art, Config, merkle_tree:get_interval(Tree), IBF, LBF}.
+    {art, CorrectionFactor, InnerBfFpr, LeafBfFpr,
+     merkle_tree:get_interval(Tree), IBF, LBF}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc returns interval of the packed merkle tree (art-structure)
 -spec get_interval(art()) -> intervals:interval().
-get_interval({art, _, I, _, _}) -> I.
+get_interval({art, _CorFac, _IBfFpr, _LBfFpr, Interval, _IBF, _LBF}) -> Interval.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
 -spec get_correction_factor(art()) -> non_neg_integer().
-get_correction_factor({art, Config, _, _, _}) ->
-    {correction_factor, CF} = lists:keyfind(correction_factor, 1, Config),
-    CF.
+get_correction_factor({art, CorFac, _IBfFpr, _LBfFpr,
+                       _Interval, _IBF, _LBF}) ->
+    CorFac.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec get_config(art()) -> config().
-get_config({art, Config, _, _, _}) ->
-    Config.
+get_config({art, CorFac, IBfFpr, LBfFpr, _Interval, _IBF, _LBF}) ->
+    [{correction_factor, CorFac},
+     {inner_bf_fpr,      IBfFpr},
+     {leaf_bf_fpr,       LBfFpr}].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec lookup(merkle_tree:mt_node(), art()) -> boolean().
-lookup(Node, Art) ->
-    lookup_cf([{Node, get_correction_factor(Art)}], Art).
+lookup(Node, {art, CorrectionFactor, _IBfFpr, _LBfFpr, _Interval, IBF, LBF}) ->
+    lookup_cf([{Node, CorrectionFactor}], IBF, LBF).
 
--spec lookup_cf([{Node, CF}], Art) -> Result when
-    is_subtype(Art,    art()),
+-spec lookup_cf([{Node, CF}], IBF::BF, LBF::BF) -> Result when
+    is_subtype(BF,     bloom:bloom_filter()),
     is_subtype(Node,   merkle_tree:mt_node()),
     is_subtype(CF,     non_neg_integer()),        %correction factor
     is_subtype(Result, boolean()).
-lookup_cf([{Node, 0} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
+lookup_cf([{Node, 0} | L], IBF, LBF) ->
     NodeHash = merkle_tree:get_hash(Node),
     BF = ?IIF(merkle_tree:is_leaf(Node), LBF, IBF),
     ?TRACE("NodeHash=~p", [NodeHash]),
-    bloom:is_element(BF, NodeHash) andalso lookup_cf(L, Art);
-lookup_cf([{Node, CF} | L], {art, _Conf, _I, IBF, LBF} = Art) ->
+    bloom:is_element(BF, NodeHash) andalso lookup_cf(L, IBF, LBF);
+lookup_cf([{Node, CF} | L], IBF, LBF) ->
     NodeHash = merkle_tree:get_hash(Node),
     IsLeaf = merkle_tree:is_leaf(Node),
     BF = ?IIF(IsLeaf, LBF, IBF),
     ?TRACE("NodeHash=~p~nIsLeaf=~p", [NodeHash, IsLeaf]),
     case bloom:is_element(BF, NodeHash) of
         false -> false;
-        true  -> if IsLeaf -> lookup_cf(L, Art);
+        true  -> if IsLeaf -> lookup_cf(L, IBF, LBF);
                     true   -> Childs = merkle_tree:get_childs(Node),
                               NL = prepend_merkle_childs(L, Childs, CF - 1),
-                              lookup_cf(NL, Art)
+                              lookup_cf(NL, IBF, LBF)
                  end
     end;
-lookup_cf([], _Art) ->
+lookup_cf([], _IBF, _LBF) ->
     true.
 
 %% @doc Prepends the given merkle_tree Childs to the LookupList with the given
