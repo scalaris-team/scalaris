@@ -130,6 +130,7 @@ tester_type_check_l_on_cseq(_Config) ->
         [ {l_on_cseq,
            [ {add_first_lease_to_db, 2}, %% cannot create DB refs for State
              {lease_renew, 2}, %% sends messages
+             {lease_renew, 3}, %% sends messages
              {lease_handover, 3}, %% sends messages
              {lease_takeover, 2}, %% sends messages
              {lease_takeover_after, 3}, %% sends messages
@@ -148,6 +149,7 @@ tester_type_check_l_on_cseq(_Config) ->
            [
              {get_active_lease, 1}, %% cannot create reference (bulkowner uses one in dht_node_state
              {update_lease, 6}, %% cannot create reference (bulkowner uses one in dht_node_state
+             {renew_and_update_round, 4}, %% cannot create reference (bulkowner uses one in dht_node_state
              {format_utc_timestamp, 1} %% cannot create valid timestamps
            ]},
           {lease_list,
