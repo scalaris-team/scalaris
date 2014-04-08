@@ -1,0 +1,35 @@
+\chapter{Replica Repair}
+\label{chapter.rrepair}
+\svnrev{r6345}
+
+\section{Replica Reconciliation - \erlmodule{rr\_recon}}
+
+\subsection{Trivial Replica Repair}
+\subsubsection{Protocol}
+\includegraphics[width=\linewidth]{rrepair/trivial_sd_uml}
+
+\subsection{Replica Repair with Bloom Filters}
+\subsubsection{Protocol}
+\includegraphics[width=\linewidth]{rrepair/bloom_sd_uml}
+
+\subsection{Replica Repair with Merkle Trees}
+\subsubsection{Protocol}
+\includegraphics[width=\linewidth]{rrepair/merkle_sd_uml}
+
+% TODO: create ART sequence diagram
+% the current protocol implementation does not use the new techniques of the
+% other protocols yet
+
+% \subsection{Replica Repair with Approximate Reconciliation Trees (ART)}
+% \subsubsection{Protocol}
+% \includegraphics[width=\linewidth]{rrepair/art_sd_uml}
+
+\section{Resolve Replicas - \erlmodule{rr\_resolve}}
+\subsection{Updating a list of keys - \code{key_upd}}
+\includegraphics[width=\linewidth]{rrepair/key_sync_s}
+
+% TODO: interval_upd currently only used by ART
+% (a future version will probably drop that)
+% however, the interval_upd may be useful anyway
+
+% \subsection{Updating an interval - \code{interval_upd}}
