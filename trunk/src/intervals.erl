@@ -168,7 +168,7 @@ intersection_element({X} = A, B) ->
     end.
 
 %% @doc Creates the intersection of two simple intervals or empty lists.
--spec intersection_simple(A::simple_interval() | [], B::simple_interval() | []) -> simple_interval() | [].
+-spec intersection_simple(A::simple_interval(), B::simple_interval()) -> simple_interval() | [].
 intersection_simple(A, A) -> A;
 intersection_simple({A0Br, A0, A1, A1Br},
                     {B0Br, B0, B1, B1Br}) ->
@@ -211,8 +211,6 @@ intersection_simple({A0Br, A0, A1, A1Br},
     end;
 intersection_simple(all, B)    -> B;
 intersection_simple(A, all)    -> A;
-intersection_simple([] = A, _) -> A;
-intersection_simple(_, [] = B) -> B;
 intersection_simple({_} = A, B) -> intersection_simple_element(A, B);
 intersection_simple(A, {_} = B) -> intersection_simple_element(B, A).
 
