@@ -1227,7 +1227,7 @@ merkle_resolve_leaves_noninit([{leaf, inner, SigSize0, LeafNode, false = _FoundS
                                   LeafNAcc + 1);
 merkle_resolve_leaves_noninit([], HashesReply, DestRRPid, Stats, OwnerL, ToSend, LeafNAcc) ->
     SID = rr_recon_stats:get(session_id, Stats),
-    % resolve the leaf-leaf comparison's items as key_upd:
+    % resolve items from inner-leaf comparisons with leaf-hash matches as key_upd:
     KeyUpdResReqs =
         if ToSend =/= [] ->
                send_local(OwnerL, {request_resolve, SID,
@@ -1444,6 +1444,7 @@ merkle_resolve_req_keys_noninit([], <<>>, [], DestRRPid, Stats, OwnerL,
 merkle_resolve_req_keys_init([{leaf, inner, SigSize0, LeafNode, false = _FoundSkipHash} | TL],
                              [ReqKeys | BinKeyList],
                              DestRRPid, Stats, OwnerL, SendKeys, true) ->
+    % TODO: same as above -> extract function?
     SendKeys1 =
         case ReqKeys of
             [] -> SendKeys;
