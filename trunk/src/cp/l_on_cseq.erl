@@ -472,7 +472,7 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch}, L2, ReplyTo}, State) -
 on({l_on_cseq, merge_reply_step1, L2, _ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, Reason}}, State) ->
     % @todo if success update lease in State
-    ct:pal("merge step1 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    log:pal("merge step1 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
     %State;
     lease_list:update_next_round(l_on_cseq:get_id(L1), Round, State);
@@ -502,7 +502,7 @@ on({l_on_cseq, merge_reply_step1, L2 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
 on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2, Reason}}, State) ->
     % @todo if success update lease in State
-    ct:pal("merge step2 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    log:pal("merge step2 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
         unexpected_timeout ->
             % retry
@@ -538,7 +538,7 @@ on({l_on_cseq, merge_reply_step2, L1 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
 on({l_on_cseq, merge_reply_step3, L2, ReplyTo,
     {qwrite_deny, _ReqId, Round, L1, Reason}}, State) ->
     % @todo if success update lease in State
-    ct:pal("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    log:pal("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
         unexpected_timeout ->
             % retry
@@ -584,7 +584,7 @@ on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
 on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2, Reason}}, State) ->
     % @todo if success update lease in State
-    ct:pal("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    log:pal("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
     case Reason of
         unexpected_timeout ->
@@ -864,7 +864,7 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
     fun (prbr_bottom, _WriteFilter, _Next) ->
             {false, lease_does_not_exist};
         (Current, _WriteFilter, _Next) when Current =:= New ->
-            ct:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", [Current, _Next, Old, New, Writer]),
+            log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", [Current, _Next, Old, New, Writer]),
             {true, null};
         (#lease{id = Id0}, _, _)    when Id0 =/= OldId->
             {false, unexpected_id};
