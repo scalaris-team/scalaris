@@ -2,7 +2,7 @@ MAKEFLAGS=-k $MAKEFLAGS
 GNUPLOT=gnuplot
 PIC2PLOT=pic2plot -Tps
 GNU_FILES := $(patsubst %,.%-done,$(wildcard *.gnuplot))
-PIC_FILES := $(patsubst %,%.pdf,$(wildcard *.pic))
+PIC_FILES := $(patsubst %.pic,%.pdf,$(wildcard *.pic))
 
 .PHONY: all files allSims clean
 
@@ -20,10 +20,10 @@ files: $(GNU_FILES) $(PIC_FILES)
 	$(GNUPLOT) $<
 	touch $@
 
-sequence.pic.pdf: sequence.pic
+sequence.pdf: sequence.pic
 	
 
-%.pic.pdf: %.pic sequence.pic
+%.pdf: %.pic sequence.pic
 	$(PIC2PLOT) $< | epstopdf --filter > $@
 #	note: if pic2plot is broken (as in openSUSE 12.3), use this with some caveats, e.g. subscript not working:
 # 	pic $< | groff | epstopdf --filter > $@
