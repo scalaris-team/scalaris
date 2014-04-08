@@ -103,7 +103,7 @@
     {get_entries_response, db_dht:db_as_list()} |
     {get_chunk_response, {intervals:interval(), rr_recon:db_chunk_kvv()}} |
     {get_state_response, intervals:interval()} |
-    {update_key_entry_ack, [{db_entry:entry(), Exists::boolean(), Done::boolean()}]} |
+    {update_key_entries_ack, [{db_entry:entry(), Exists::boolean(), Done::boolean()}]} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -168,7 +168,7 @@ on({get_entries_response, EntryList}, State =
                           dhtNodePid = DhtPid, fb_send_kvv_req = FbReqKVV,
                           stats = Stats}) ->
     KvvList = [entry_to_kvv(E) || E <- EntryList],
-    ToUpdate = start_update_key_entry(MyIOtherKvvList, comm:this(), DhtPid),
+    ToUpdate = start_update_key_entries(MyIOtherKvvList, comm:this(), DhtPid),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p ; ToUpdate=~p - #Items: ~p",
            [key_upd, Stats#resolve_stats.session_id, ToUpdate, length(EntryList)]),
 
@@ -182,7 +182,7 @@ on({get_entries_response, EntryList}, State =
            % use the same options as above in get_state_response:
            shutdown(resolve_ok, NewState);
        true ->
-           % note: shutdown and feedback handled by update_key_entry_ack
+           % note: shutdown and feedback handled by update_key_entries_ack
            NewState
     end;
 
@@ -256,7 +256,7 @@ on({get_entries_response, EntryList}, State =
                           dhtNodePid = DhtPid,
                           stats = Stats }) ->
     MyIOtherKvvList = map_kvv_list(KvvList, MyI),
-    ToUpdate = start_update_key_entry(MyIOtherKvvList, comm:this(), DhtPid),
+    ToUpdate = start_update_key_entries(MyIOtherKvvList, comm:this(), DhtPid),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p, KVVListLen=~p ; ToUpdate=~p",
            [interval_upd, Stats#resolve_stats.session_id, length(EntryList), length(KvvList), ToUpdate]),
 
@@ -278,7 +278,7 @@ on({get_entries_response, EntryList}, State =
     if ToUpdate =:= 0 ->
            shutdown(resolve_ok, NewState);
        true ->
-           % note: shutdown and feedback handled by update_key_entry_ack
+           % note: shutdown and feedback handled by update_key_entries_ack
            NewState
     end;
 
@@ -332,7 +332,7 @@ on({get_state_response, MyI} = _Msg,
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-on({update_key_entry_ack, NewEntryList}, State =
+on({update_key_entries_ack, NewEntryList}, State =
        #rr_resolve_state{ operation = Op,
                           stats = #resolve_stats{ diff_size = _Diff,
                                                   regen_count = RegenOk,
@@ -350,7 +350,7 @@ on({update_key_entry_ack, NewEntryList}, State =
             length(NewEntryList)]),
 
     {NewUpdOk, NewUpdFail, NewRegenOk, NewRegenFail, NewFBItems} =
-        integrate_update_key_entry_ack(
+        integrate_update_key_entries_ack(
           NewEntryList, UpdOk, UpdFail, RegenOk, RegenFail, MissingOnOther, MyIOtherKvTree,
           FBDest =/= undefined),
 
@@ -390,14 +390,14 @@ map_key_list(KeyList, MyI) ->
              RKey <- ?RT:get_replica_keys(Key),
              intervals:in(RKey, MyI)].
 
--spec start_update_key_entry(MyIOtherKvvList::kvv_list(), comm:mypid(),
-                             comm:erl_local_pid()) -> non_neg_integer().
-start_update_key_entry([], _MyPid, _DhtPid) -> 0;
-start_update_key_entry(MyIOtherKvvList, MyPid, DhtPid) ->
-    send_local(DhtPid, {update_key_entry, MyPid, MyIOtherKvvList}),
+-spec start_update_key_entries(MyIOtherKvvList::kvv_list(), comm:mypid(),
+                               comm:erl_local_pid()) -> non_neg_integer().
+start_update_key_entries([], _MyPid, _DhtPid) -> 0;
+start_update_key_entries(MyIOtherKvvList, MyPid, DhtPid) ->
+    send_local(DhtPid, {update_key_entries, MyPid, MyIOtherKvvList}),
     length(MyIOtherKvvList).
 
--spec integrate_update_key_entry_ack(
+-spec integrate_update_key_entries_ack(
         [{Entry::db_entry:entry(), Exists::boolean(), Done::boolean()}],
         UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
         RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
@@ -405,10 +405,10 @@ start_update_key_entry(MyIOtherKvvList, MyPid, DhtPid) ->
         -> {UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
             RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
             FBItems::kvv_list()}.
-integrate_update_key_entry_ack([], UpdOk, UpdFail, RegenOk, RegenFail, FBItems,
+integrate_update_key_entries_ack([], UpdOk, UpdFail, RegenOk, RegenFail, FBItems,
                                _OtherKvTree, _FBOn) ->
     {UpdOk, UpdFail, RegenOk, RegenFail, FBItems};
-integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
+integrate_update_key_entries_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
                                RegenOk, RegenFail, FBItems, OtherKvTree, FBOn) ->
     NewFBItems =
         if not Done andalso Exists andalso FBOn ->
@@ -425,16 +425,16 @@ integrate_update_key_entry_ack([{Entry, Exists, Done} | Rest], UpdOk, UpdFail,
            true -> FBItems
         end,
     if Done andalso Exists ->
-           integrate_update_key_entry_ack(
+           integrate_update_key_entries_ack(
              Rest, UpdOk + 1, UpdFail, RegenOk, RegenFail, NewFBItems, OtherKvTree, FBOn);
        Done andalso not Exists ->
-           integrate_update_key_entry_ack(
+           integrate_update_key_entries_ack(
              Rest, UpdOk, UpdFail, RegenOk + 1, RegenFail, NewFBItems, OtherKvTree, FBOn);
        not Done and Exists ->
-           integrate_update_key_entry_ack(
+           integrate_update_key_entries_ack(
              Rest, UpdOk, UpdFail + 1, RegenOk, RegenFail, NewFBItems, OtherKvTree, FBOn);
        not Done and not Exists ->
-           integrate_update_key_entry_ack(
+           integrate_update_key_entries_ack(
              Rest, UpdOk, UpdFail, RegenOk, RegenFail + 1, NewFBItems, OtherKvTree, FBOn)
     end.
 

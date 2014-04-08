@@ -39,7 +39,7 @@
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), MaxChunkSize::pos_integer() | all} |
       {get_chunk, Source_PID::comm:mypid(), Interval::intervals:interval(), FilterFun::fun((db_entry:entry()) -> boolean()),
             ValFun::fun((db_entry:entry()) -> any()), MaxChunkSize::pos_integer() | all} |
-      {update_key_entry, Source_PID::comm:mypid(), [{HashedKey::?RT:key(), NewValue::db_dht:value(), NewVersion::db_dht:version()}]} |
+      {update_key_entries, Source_PID::comm:mypid(), [{HashedKey::?RT:key(), NewValue::db_dht:value(), NewVersion::db_dht:version()}]} |
 %%      % DB subscriptions:
 %%      {db_set_subscription, SubscrTuple::db_dht:subscr_t()} |
 %%      {db_get_subscription, Tag::any(), SourcePid::comm:erl_local_pid()} |
@@ -255,11 +255,11 @@ on({get_chunk, Source_PID, Interval, FilterFun, ValueFun, MaxChunkSize}, State) 
     comm:send_local(Source_PID, {get_chunk_response, Chunk}),
     State;
 
-on({update_key_entry, Source_PID, KvvList}, State) ->
+on({update_key_entries, Source_PID, KvvList}, State) ->
     DB = dht_node_state:get(State, db),
     {NewDB, NewEntryList} = update_key_entries(KvvList, DB, State, []),
-    % send caller update_key_entry_ack with list of {Entry, Exists (Yes/No), Updated (Yes/No)}
-    comm:send(Source_PID, {update_key_entry_ack, NewEntryList}),
+    % send caller update_key_entries_ack with list of {Entry, Exists (Yes/No), Updated (Yes/No)}
+    comm:send(Source_PID, {update_key_entries_ack, NewEntryList}),
     dht_node_state:set_db(State, NewDB);
 
 %%on({db_set_subscription, SubscrTuple}, State) ->
@@ -551,7 +551,7 @@ update_key_entries([{Key, NewValue, NewVersion} | Entries], DB, State, NewEntrie
                    andalso (WL =:= false orelse WL < NewVersion)
                    andalso IsResponsible,
     DoRegen = (not Exists) andalso IsResponsible,
-%%     log:pal("update_key_entry:~nold: ~p~nnew: ~p~nDoUpdate: ~w, DoRegen: ~w",
+%%     log:pal("update_key_entries:~nold: ~p~nnew: ~p~nDoUpdate: ~w, DoRegen: ~w",
 %%             [{db_entry:get_key(Entry), db_entry:get_version(Entry)},
 %%              {Key, NewVersion}, DoUpdate, DoRegen]),
     if
