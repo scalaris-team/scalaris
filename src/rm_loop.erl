@@ -83,8 +83,6 @@
 -type(message() ::
     {rm, trigger} |
     {rm, trigger_action} |
-    {rm, check_ring, Token::non_neg_integer(), Master::node:node_type()} |
-    {rm, init_check_ring, Token::non_neg_integer()} |
     {rm, notify_new_pred, NewPred::node:node_type()} |
     {rm, notify_new_succ, NewSucc::node:node_type()} |
     {rm, notify_slide_finished, SlideType::pred | succ} |
@@ -334,29 +332,6 @@ on({rm, subscribe, Pid, Tag, FilterFun, ExecFun, MaxCalls}, {RM_State, _HasLeft,
 
 on({rm, unsubscribe, Pid, Tag}, {_RM_State, _HasLeft, SubscrTable} = State) ->
     ets:delete(SubscrTable, {Pid, Tag}),
-    State;
-
-% triggered by admin:dd_check_ring
-on({rm, check_ring, Token, Master}, {RM_State, _HasLeft, _SubscrTable} = State) ->
-    Neighborhood = ?RM:get_neighbors(RM_State),
-    Me = nodelist:node(Neighborhood),
-    case {Token, Master} of
-        {0, Me}     -> io:format(" [ RM ] CheckRing   OK  ~n");
-        {0, _}      -> io:format(" [ RM ] CheckRing  reached TTL in Node ~p, not in ~p~n",
-                                 [Me, Master]);
-        {Token, Me} -> io:format(" [RM ] Token back with Value: ~p~n",[Token]);
-        {Token, _}  ->
-            Pred = nodelist:pred(Neighborhood),
-            comm:send(node:pidX(Pred), {rm, check_ring, Token - 1, Master}, ?SEND_OPTIONS)
-    end,
-    State;
-
-% trigger by admin:dd_check_ring
-on({rm, init_check_ring, Token}, {RM_State, _HasLeft, _SubscrTable} = State) ->
-    Neighborhood = ?RM:get_neighbors(RM_State),
-    Me = nodelist:node(Neighborhood),
-    Pred = nodelist:pred(Neighborhood),
-    comm:send(node:pidX(Pred), {rm, check_ring, Token - 1, Me}, ?SEND_OPTIONS),
     State;
 
 on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->

@@ -24,7 +24,7 @@
          get_dht_node_specs/0,
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
          get_dump_bw/0, diff_dump/2, print_ages/0,
-         check_routing_tables/1, dd_check_ring/1,dd_check_ring/0,
+         check_routing_tables/1,
          number_of_nodes/0]).
 
 -include("scalaris.hrl").
@@ -437,13 +437,3 @@ check_routing_tables(Port) ->
                 end
         end,
     ok.
-
--spec dd_check_ring() -> {token_on_the_way}.
-dd_check_ring() ->
-    dd_check_ring(0).
-
--spec dd_check_ring(non_neg_integer()) -> {token_on_the_way}.
-dd_check_ring(Token) ->
-    One = pid_groups:find_a(dht_node),
-    _ = comm:send_local(One, {rm, init_check_ring, Token}),
-    {token_on_the_way}.
