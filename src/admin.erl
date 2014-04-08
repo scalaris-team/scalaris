@@ -24,7 +24,6 @@
          get_dht_node_specs/0,
          check_ring/0, check_ring_deep/0, nodes/0, start_link/0, start/0, get_dump/0,
          get_dump_bw/0, diff_dump/2, print_ages/0,
-         check_routing_tables/1,
          number_of_nodes/0]).
 
 -include("scalaris.hrl").
@@ -422,18 +421,3 @@ worker_loop() ->
         after 400 ->
             ok
     end.
-
-%% TODO: the message this method sends is not received anywhere - either delete or update it! 
--spec check_routing_tables(any()) -> ok.
-check_routing_tables(Port) ->
-    mgmt_server:node_list(),
-    _ = begin
-            trace_mpath:thread_yield(),
-            receive
-                ?SCALARIS_RECV(
-                   {get_list_response, List}, %% ->
-                   [ comm:send(Node, {check, Port}, [{group_member, routing_table}]) || Node <- List ]
-                  )
-                end
-        end,
-    ok.
