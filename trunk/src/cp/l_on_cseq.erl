@@ -32,7 +32,7 @@
 
 -export([on/2]).
 
--export([lease_renew/2]).
+-export([lease_renew/2, lease_renew/3]).
 -export([lease_handover/3]).
 -export([lease_takeover/2]).
 -export([lease_takeover_after/3]).
@@ -150,7 +150,11 @@ delta() -> 10.
 
 -spec lease_renew(lease_t(), active | passive) -> ok.
 lease_renew(Lease, Mode) ->
-    comm:send_local(pid_groups:get_my(dht_node),
+    lease_renew(pid_groups:get_my(dht_node), Lease, Mode).
+
+-spec lease_renew(comm:mypid(), lease_t(), active | passive) -> ok.
+lease_renew(Pid, Lease, Mode) ->
+    comm:send_local(Pid,
                     {l_on_cseq, renew, Lease, Mode}),
     ok.
 
@@ -294,53 +298,30 @@ on({l_on_cseq, renew_reply,
         unexpected_aux     ->
             case get_aux(Value) of
                 empty                  ->
-                    lease_renew(Value, Mode),
-                    lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                                 Round, State);
+                    renew_and_update_round(Value, Round, Mode, State);
                 {invalid, split, _, _} ->
-                    lease_renew(Value, Mode),
-                    lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                                 Round, State);
+                    renew_and_update_round(Value, Round, Mode, State);
                 {invalid, merge, _, _} ->
-                    lease_renew(Value, Mode),
-                    lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                                 Round, State);
+                    renew_and_update_round(Value, Round, Mode, State);
                 {invalid, merge, stopped} ->
-                    lease_list:remove_lease_from_dht_node_state(Value, State,
-                                                                Mode);
+                    lease_list:remove_lease_from_dht_node_state(Value, State, Mode);
                 {valid, split, _, _}   ->
-                    lease_renew(Value, Mode),
-                    lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                                 Round, State);
+                    renew_and_update_round(Value, Round, Mode, State);
                 {valid, merge, _, _}   ->
-                    lease_renew(Value, Mode),
-                    lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                                 Round, State);
+                    renew_and_update_round(Value, Round, Mode, State);
                 {change_owner, _Pid}  ->
-                    lease_renew(Value, Mode),
-                    lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                                 Round, State)
+                    renew_and_update_round(Value, Round, Mode, State)
             end;
         unexpected_range   ->
-            lease_renew(Value, Mode),
-            lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                         Round, State);
+            renew_and_update_round(Value, Round, Mode, State);
         unexpected_timeout ->
-            lease_renew(Value, Mode),
-            lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                         Round, State);
+            renew_and_update_round(Value, Round, Mode, State);
         unexpected_epoch   ->
-            lease_renew(Value, Mode),
-            lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                         Round, State);
+            renew_and_update_round(Value, Round, Mode, State);
         unexpected_version ->
-            lease_renew(Value, Mode),
-            lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                         Round, State);
+            renew_and_update_round(Value, Round, Mode, State);
         timeout_is_not_newer_than_current_lease ->
-            lease_renew(Value, Mode),
-            lease_list:update_next_round(l_on_cseq:get_id(Value),
-                                         Round, State)
+                    renew_and_update_round(Value, Round, Mode, State)
     end;
 
 on({l_on_cseq, send_lease_to_node, Lease}, State) ->
@@ -862,9 +843,9 @@ on({l_on_cseq, renew_leases}, State) ->
     case ActiveLease of
         empty -> ok;
         _ ->
-            lease_renew(ActiveLease, active)
+            lease_renew(self(), ActiveLease, active)
     end,
-    _ = [lease_renew(L, passive) ||
+    _ = [lease_renew(self(), L, passive) ||
             L <- PassiveLeaseList, get_aux(L) =/= {invalid, merge, stopped}],
     msg_delay:send_trigger(delta() div 2, {l_on_cseq, renew_leases}),
     State.
@@ -1361,3 +1342,11 @@ update_lease(Id, Self, ContentCheck, Old, New, State) ->
             rbrcseq:qwrite_fast(DB, Self, Id, ContentCheck, New, NextRound, Old)
     end,
     ok.
+
+-spec renew_and_update_round(lease_t(), prbr:r_with_id(), active | passive,
+                       dht_node_state:state()) ->
+                              dht_node_state:state().
+% triggers renew of lease and updates known round number for the lease
+renew_and_update_round(Lease, Round, Mode, State) ->
+    lease_renew(self(), Lease, Mode),
+    lease_list:update_next_round(l_on_cseq:get_id(Lease), Round, State).
