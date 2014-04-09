@@ -267,7 +267,11 @@ tester_type_check_math(_Config) ->
            [ {find_bigger_prime, 3}, %% too slow for large integers
              {find_primes, 3} %% special precond; tested via feeder
            ]},
-          {randoms, [{start, 0}, {stop, 0}], []}
+          {randoms,
+           [ {start, 0},
+             {stop, 0},
+             {rand_uniform, 2} % tested via feeder
+           ], []}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],

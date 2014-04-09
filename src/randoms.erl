@@ -24,6 +24,9 @@
 
 -export([start/0, stop/0, getRandomString/0, getRandomInt/0, rand_uniform/2]).
 
+%% for tester
+-export([rand_uniform_feeder/2]).
+
 %% @doc Starts the crypto module's server.
 -spec start() -> ok.
 start() -> crypto:start().
@@ -38,14 +41,16 @@ getRandomString() ->
 getRandomInt() ->
     rand_uniform(1, 16#100000000).
 
+-spec rand_uniform_feeder(integer(), integer()) -> {Lo::integer(), Hi::integer()}.
+rand_uniform_feeder(X, Y) when X > Y -> {Y, X};
+rand_uniform_feeder(X, Y) when X < Y -> {X, Y};
+rand_uniform_feeder(X, X) -> {X, X + 1}.
+
 %% @doc Generates a random number N between Lo &lt;= N &lt; Hi using the crypto
 %%      library pseudo-random number generator.
 -spec rand_uniform(Lo::integer(), Hi::integer()) -> integer().
 rand_uniform(Lo, Hi) when Lo < Hi ->
-    crypto:rand_uniform(Lo, Hi);
-rand_uniform(Hi, Lo) when Lo < Hi ->
-    crypto:rand_uniform(Lo, Hi);
-rand_uniform(X, X) -> X.
+    crypto:rand_uniform(Lo, Hi).
 
 %% @doc Stops the crypto module's server.
 -spec stop() -> ok.
