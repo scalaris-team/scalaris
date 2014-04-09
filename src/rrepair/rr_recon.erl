@@ -32,7 +32,7 @@
 %-export([compress_kv_list/4, calc_signature_size_1_to_n/3, calc_signature_size_n_pair/3]).
 
 %export for testing
--export([find_sync_interval/2, quadrant_subints_/3]).
+-export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
 -export([merkle_compress_hashlist/3, merkle_decompress_hashlist/3]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

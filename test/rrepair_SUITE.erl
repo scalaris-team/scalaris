@@ -114,16 +114,11 @@ prop_map_key_to_interval(Key, I) ->
             case InGrp of
                 [W] -> ?equals(Mapped, W);
                 [_|_] ->
-                    NotIn = [Y || Y <- RGrp, Y =/= Key, not intervals:in(Y, I)],
-%%                     ct:pal("prop_map_key_to_interval(~p, ~p)~nmapped: ~p~nnot in: ~w",
-%%                            [I, Key, Mapped, NotIn]),
-                    _ = [begin
-                             MapZ = rr_recon:map_key_to_interval(Z, I),
-%%                              ct:pal("~p -> ~p", [Z, MapZ]),
-                             ?compare(fun erlang:'=/='/2, MapZ, Mapped)
-                         end
-                         || Z <- NotIn],
-                    ?assert(intervals:in(Mapped, I))
+                    ?assert(intervals:in(Mapped, I)),
+                    % mapped should always be the closest one to Key in I
+                    ?compare(fun({A1, _}, {A2, _}) -> A1 =:= A2 end,
+                             {rr_recon:key_dist(Key, Mapped), Mapped},
+                             lists:min([{rr_recon:key_dist(Key, M), M} || M <- InGrp]))
             end;
         _ -> ?equals(InGrp, [])
     end.
@@ -133,6 +128,7 @@ tester_map_key_to_interval(_) ->
     prop_map_key_to_interval(Q1, intervals:new('[', Q1, Q2, ']')),
     prop_map_key_to_interval(Q2, intervals:new('[', Q1, Q2, ']')),
     prop_map_key_to_interval(Q3, intervals:new('[', Q1, Q2, ']')),
+    prop_map_key_to_interval(Q2, intervals:union(intervals:new(Q1), intervals:new(Q3))),
     tester:test(?MODULE, prop_map_key_to_interval, 2, 1000, [{threads, 4}]).
 
 -spec prop_map_key_to_quadrant(?RT:key(), Quadrant::1..4) -> boolean().
