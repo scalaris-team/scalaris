@@ -1325,6 +1325,13 @@ tester_get_chunk4(_Config) ->
             prop_get_chunk4([2, 6, 7], 5, intervals:new('[',5,9,']'), 3);
         _ -> ok
     end,
+    % TODO: fix this test
+%%     prop_get_chunk4(
+%%       [rt_SUITE:number_to_key(510),
+%%        rt_SUITE:number_to_key(545)],
+%%       rt_SUITE:number_to_key(530),
+%%       intervals:new('(', rt_SUITE:number_to_key(532), rt_SUITE:number_to_key(530), ')'),
+%%       all),
 
     tester:test(?MODULE, prop_get_chunk4, 4, rw_suite_runs(10000), [{threads, 2}]).
 
@@ -1340,6 +1347,13 @@ tester_get_split_key5(_Config) ->
             prop_get_split_key5([11, 10, 9, 8, 7, 4], 10, 6, 2, backward);
         _ -> ok
     end,
+    % TODO: fix this test
+%%     prop_get_split_key5([rt_SUITE:number_to_key(510),
+%%                          rt_SUITE:number_to_key(520),
+%%                          rt_SUITE:number_to_key(545)],
+%%                         rt_SUITE:number_to_key(543),
+%%                         rt_SUITE:number_to_key(520),
+%%                         1, backward),
 
     tester:test(?MODULE, prop_get_split_key5, 5, rw_suite_runs(10000), [{threads, 2}]).
 
