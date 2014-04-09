@@ -227,7 +227,11 @@ prop_tree_hash(L, R, ToAdd) ->
     ?compare(fun erlang:'=/='/2, DB3RootHash1, DB1RootHash1).
 
 tester_tree_hash(_) ->
-    prop_tree_hash(310893024101176788593096495898246585537, 56222597632513189683777859800513757781, 83),
+    case rt_SUITE:default_rt_has_chord_keys() of
+        true ->
+            prop_tree_hash(310893024101176788593096495898246585537, 56222597632513189683777859800513757781, 83);
+        _ -> ok
+    end,
     tester:test(?MODULE, prop_tree_hash, 3, 100, [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

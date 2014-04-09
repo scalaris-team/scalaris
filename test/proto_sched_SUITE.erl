@@ -522,7 +522,7 @@ qwrite_qwrite_qread(_I) ->
     DB = lease_db1,
     ContentCheck = fun content_check/3,
     Self = comm:reply_as(self(), 2, {test_rbr, '_'}),
-    Id = 1,
+    Id = ?RT:hash_key("1"),
     Value1 = value_1,
     Value2 = value_2,
 

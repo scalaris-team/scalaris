@@ -71,7 +71,7 @@ init_per_testcase(TestCase, Config) ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            Ids = rt_simple:get_replica_keys(0),
+            Ids = ?RT:get_replica_keys(rt_SUITE:number_to_key(0)),
             unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
                                                                {leases, true}]}]),
             Config

@@ -1309,29 +1309,38 @@ tester_get_chunk_precond(_Config) ->
     ?equals(ets:first(Table), 5).
 
 tester_get_chunk4(_Config) ->
-    prop_get_chunk4([0, 4, 31], 0, intervals:new('[', 0, 4, ']'), 2),
-    prop_get_chunk4([1, 5, 127, 13], 3, intervals:new('[', 3, 2, ']'), 4),
-    prop_get_chunk4([30, 20, 8, 4], 9, intervals:union(intervals:new('[',0,10,']'), intervals:new('[',28,32,')')), all),
-    prop_get_chunk4([321412035892863292970556376746395450950,178033137068077382596514331220271255735,36274679037320551674149151592760931654,24467032062604602002936599440583551943],
-                    39662566533623950601697671725795532001,
-                    [{'[',0,117488216920678280505356111701746995698,']'},{161901968021578670353994653229245016552},{'[',225156471921460939006161924022031177737,340282366920938463463374607431768211456,')'}],
-                    all),
-    prop_get_chunk4([12, 13, 14, 15, 16],0,intervals:new('[', 10, 0, ']'),2),
-    prop_get_chunk4([12, 8, 6, 4], 4, intervals:new('[', 10, 0, ']'), 1),
-    prop_get_chunk4([3, 4], 10, [{'[',0,9,']'}], 1),
-    prop_get_chunk4([2, 6, 7], 5, intervals:new(4), 3),
-    prop_get_chunk4([2, 6, 7], 5, intervals:new('[',5,9,']'), 3),
+    case rt_SUITE:default_rt_has_chord_keys() of
+        true ->
+            prop_get_chunk4([0, 4, 31], 0, intervals:new('[', 0, 4, ']'), 2),
+            prop_get_chunk4([1, 5, 127, 13], 3, intervals:new('[', 3, 2, ']'), 4),
+            prop_get_chunk4([30, 20, 8, 4], 9, intervals:union(intervals:new('[',0,10,']'), intervals:new('[',28,32,')')), all),
+            prop_get_chunk4([321412035892863292970556376746395450950,178033137068077382596514331220271255735,36274679037320551674149151592760931654,24467032062604602002936599440583551943],
+                            39662566533623950601697671725795532001,
+                            [{'[',0,117488216920678280505356111701746995698,']'},{161901968021578670353994653229245016552},{'[',225156471921460939006161924022031177737,340282366920938463463374607431768211456,')'}],
+                            all),
+            prop_get_chunk4([12, 13, 14, 15, 16],0,intervals:new('[', 10, 0, ']'),2),
+            prop_get_chunk4([12, 8, 6, 4], 4, intervals:new('[', 10, 0, ']'), 1),
+            prop_get_chunk4([3, 4], 10, [{'[',0,9,']'}], 1),
+            prop_get_chunk4([2, 6, 7], 5, intervals:new(4), 3),
+            prop_get_chunk4([2, 6, 7], 5, intervals:new('[',5,9,']'), 3);
+        _ -> ok
+    end,
 
     tester:test(?MODULE, prop_get_chunk4, 4, rw_suite_runs(10000), [{threads, 2}]).
 
 tester_get_split_key5(_Config) ->
-    prop_get_split_key5([2], 6, 4, 12, backward),
-    prop_get_split_key5([12, 10, 4], 6, 8, 1, backward),
-    prop_get_split_key5([10, 9], 10, 6, 2, backward),
-    prop_get_split_key5([10, 9, 8], 10, 6, 2, backward),
-    prop_get_split_key5([10, 9, 8, 7], 10, 6, 2, backward),
-    prop_get_split_key5([10, 9, 8, 7, 4], 10, 6, 2, backward),
-    prop_get_split_key5([11, 10, 9, 8, 7, 4], 10, 6, 2, backward),
+    case rt_SUITE:default_rt_has_chord_keys() of
+        true ->
+            prop_get_split_key5([2], 6, 4, 12, backward),
+            prop_get_split_key5([12, 10, 4], 6, 8, 1, backward),
+            prop_get_split_key5([10, 9], 10, 6, 2, backward),
+            prop_get_split_key5([10, 9, 8], 10, 6, 2, backward),
+            prop_get_split_key5([10, 9, 8, 7], 10, 6, 2, backward),
+            prop_get_split_key5([10, 9, 8, 7, 4], 10, 6, 2, backward),
+            prop_get_split_key5([11, 10, 9, 8, 7, 4], 10, 6, 2, backward);
+        _ -> ok
+    end,
+
     tester:test(?MODULE, prop_get_split_key5, 5, rw_suite_runs(10000), [{threads, 2}]).
 
 tester_changed_keys_update_entries(_Config) ->

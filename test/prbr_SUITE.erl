@@ -68,7 +68,7 @@ init_per_testcase(TestCase, Config) ->
             %% stop ring from previous test case (it may have run into a timeout
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring_with_ids(?RT:get_replica_keys(0),
+            unittest_helper:make_ring_with_ids(?RT:get_replica_keys(rt_SUITE:number_to_key(0)),
                                                [{config, [{log_path, PrivDir}]}]),
             %% necessary for the consistency check:
             unittest_helper:check_ring_size_fully_joined(4),

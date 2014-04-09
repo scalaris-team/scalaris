@@ -49,8 +49,11 @@
 create_two_adjacent_leases() ->
     % we have a symmetric ring with four nodes, so we are going to use
     % the ranges: 0-1 and 1-2.
-    L1 = create_lease(0, 1),
-    L2 = create_lease(1, 2),
+    Key1 = rt_SUITE:number_to_key(0),
+    Key2 = rt_SUITE:number_to_key(2),
+    SplitKey = ?RT:get_split_key(Key1, Key2, {1, 2}),
+    L1 = create_lease(Key1, SplitKey),
+    L2 = create_lease(SplitKey, Key2),
     ct:pal("mock leases~n~w~n~w~n", [L1, L2]),
     {L1, L2}.
 

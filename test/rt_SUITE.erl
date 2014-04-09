@@ -45,6 +45,11 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
+%% @doc Returns whether the default routing table from ?RT has chord-like keys.
+-spec default_rt_has_chord_keys() -> boolean().
+default_rt_has_chord_keys() ->
+    lists:member(?RT, [rt_simple, rt_chord, rt_gfrtchord, rt_gfrtchord]).
+
 -spec prop_client_key_to_binary(Key1::client_key(), Key2::client_key()) -> true | no_return().
 prop_client_key_to_binary(Key1, Key2) ->
     Bin1 = ?RT:client_key_to_binary(Key1),
@@ -63,6 +68,7 @@ prop_hash_key(Key) ->
 tester_hash_key(_Config) ->
     tester:test(?MODULE, prop_hash_key, 1, 100000, [{threads, 2}]).
 
+-spec number_to_key(N::non_neg_integer()) -> ?RT:key().
 number_to_key(N) -> call_helper_fun(number_to_key, [N]).
 
 next_hop(_Config) ->
