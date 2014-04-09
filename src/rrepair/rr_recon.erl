@@ -1793,6 +1793,7 @@ quadrant_intervals() ->
 
 %% @doc Internal helper for quadrant_intervals/0 - keep in sync with
 %%      map_key_to_quadrant/2!
+%%      PRE: keys in Borders and HB must be unique (as created in quadrant_intervals/0)!
 %% TODO: use intervals:new('[', A, B, ')') instead so ?MINUS_INFINITY is in quadrant 1?
 %%       -> does not fit ranges that well as they are normally defined as (A,B]
 -spec quadrant_intervals_(Borders::[?RT:key(),...], ResultIn::[intervals:non_empty_interval()],
