@@ -96,8 +96,8 @@ get_db_feeder(I, Count0, Distribution0 = {non_uniform, RanGen}, Options) ->
 
 -spec get_db(intervals:continuous_interval(), non_neg_integer(), db_distribution(), [option()]) -> [result()].
 get_db(Interval, ItemCount, Distribution, Options) ->
-    ?ASSERT(intervals:is_continuous(Interval)),
-    ?ASSERT(Distribution =:= feeder_fix_rangen(Distribution, ItemCount)),
+    ?DBG_ASSERT(intervals:is_continuous(Interval)),
+    ?DBG_ASSERT(Distribution =:= feeder_fix_rangen(Distribution, ItemCount)),
     OutputType = proplists:get_value(output, Options, list_key),
     case Distribution of
         random -> gen_random([{Interval, ItemCount}], [], OutputType);
@@ -221,7 +221,7 @@ gen_value() ->
          OutputType::list_key_val) -> [result_kv()].
 non_uniform_key_list(_I, 0, _RanGen, Acc, _AccType) -> Acc;
 non_uniform_key_list(I, ToAdd, RanGen, Acc, AccType) ->
-    ?ASSERT(ToAdd =:= 1 orelse random_bias:numbers_left(RanGen) =:= ToAdd),
+    ?DBG_ASSERT(ToAdd =:= 1 orelse random_bias:numbers_left(RanGen) =:= ToAdd),
     SubIntervals = intervals:split(I, ToAdd),
     non_uniform_key_list_(SubIntervals, ToAdd, RanGen, Acc, length(Acc), AccType, 0.0).
 
@@ -236,7 +236,7 @@ non_uniform_key_list(I, ToAdd, RanGen, Acc, AccType) ->
          Fun::random_bias:generator(), Acc::[result_kv()], AccLen::non_neg_integer(),
          OutputType::list_key_val, RoundingError::float()) -> [result_kv()].
 non_uniform_key_list_([SubI | R], ToAdd, RanGen, Acc, AccLen, AccType, RoundingError) ->
-    ?ASSERT(not intervals:is_empty(SubI)),
+    ?DBG_ASSERT(not intervals:is_empty(SubI)),
     {Status, V, RanGen1} = random_bias:next(RanGen),
     Add0 = V * ToAdd + RoundingError,
     Add1 = erlang:max(0, erlang:trunc(Add0)),
@@ -445,7 +445,7 @@ p_gen_kvv_feeder(EDist0, Keys0, _WrongKeyCount, FType, FDest, FCount) ->
                 KeyCount::pos_integer(), failure_type(),
                 failure_dest(), FailCount::non_neg_integer()) -> {db_dht:db_as_list(), db_status()}.
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
-    ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
+    ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     {FKeys, GoodKeys} = select_random_keys(Keys, KeyCount, FCount, []),
     GoodDB = lists:append([get_rep_group(Key) || Key <- GoodKeys]),
     {DB, O} = lists:foldl(fun(FKey, {AccAll, Out}) ->
@@ -457,8 +457,8 @@ p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     DBSize = KeyCount * ?ReplicationFactor,
     {DB, {DBSize, Insert, DBSize - Insert, O}};
 p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
-    ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
-    ?ASSERT(KeyCount =:= 1 orelse random_bias:numbers_left(RanGen) =< KeyCount),
+    ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
+    ?DBG_ASSERT(KeyCount =:= 1 orelse random_bias:numbers_left(RanGen) =< KeyCount),
     FProbList = get_non_uniform_probs(RanGen, []),
     % note: don't use RanGen any more - we don't get the new state in the last call!
     CellLength = case length(FProbList) of
@@ -476,7 +476,7 @@ p_gen_kvv({non_uniform, RanGen}, Keys, KeyCount, FType, FDest, FCount) ->
     DBSize = KeyCount * ?ReplicationFactor,
     {DB, {DBSize, Insert, DBSize - Insert, Out}};
 p_gen_kvv(uniform, Keys, KeyCount, FType, FDest, FCount) ->
-    ?ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
+    ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
     FRate = case FCount of
                 0 -> KeyCount + 1;
                 _ -> erlang:max(1, erlang:trunc(KeyCount / FCount))
@@ -526,7 +526,7 @@ build_failure_cells([], T, _CellLength, [{P, Cell} | Acc]) ->
 build_failure_cells(_P, [], _CellLength, Acc) ->
     Acc;
 build_failure_cells([P | T], List, CellLength, Acc) ->
-    ?ASSERT(CellLength > 0), % otherwise no progress and endless loop!
+    ?DBG_ASSERT(CellLength > 0), % otherwise no progress and endless loop!
     {Cell, LT} = util:safe_split(CellLength, List),
     build_failure_cells(T, LT, CellLength, [{P, Cell}|Acc]).
 
