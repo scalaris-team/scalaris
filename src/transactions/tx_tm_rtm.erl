@@ -651,12 +651,13 @@ on({update_RTMs}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on:update_RTMs in Pid ~p ~n", [self()]),
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
-    RTMs = state_get_RTMs(State),
-    rtm_update_trigger(RTMs),
+    rtm_update_trigger(state_get_RTMs(State)),
     State;
 on({update_RTMs_on_init}, State) ->
     %% only in tx_tm not in rtm processes!
     ?DBG_ASSERT(tx_tm =:= state_get_role(State)),
+    %% keep trigger alive to avoid restarting it (possibly infected)
+    msg_delay:send_trigger(1, {update_RTMs_on_init}),
     State;
 %% accept RTM updates
 on({get_rtm_reply, InKey, InPid, InAcceptor}, State) ->
@@ -830,7 +831,7 @@ init_TPs(TxState, ItemStates, LocalSnapNumber) ->
           [ begin
                 Key = tx_tlog:get_entry_key(RTLog),
                 Msg1 = {?init_TP, {Tid, CleanRTMs, Accs, TM,
-                                   tx_tlog:drop_value(RTLog), ItemId, PaxId, 
+                                   tx_tlog:drop_value(RTLog), ItemId, PaxId,
                                    LocalSnapNumber}},
                 %% delivers message to a dht_node process, which has
                 %% also the role of a TP
@@ -1210,8 +1211,6 @@ handle_crash(Pid, State, Handler) ->
         andalso tx_tm =:= state_get_role(NewState)
         andalso on =:= Handler of
         true ->
-            % TODO: this may lead to a trigger infection!
-            comm:send_local(self(), {update_RTMs_on_init}),
             gen_component:change_handler(
               state_set_RTMs(NewState, NewRTMs),
               fun ?MODULE:on_init/2);
@@ -1240,4 +1239,3 @@ check_config() ->
     config:cfg_is_greater_than_equal(tx_timeout, 1000 div 3)
 %%     config:cfg_is_greater_than_equal(tx_timeout, 1000 div 2)
     .
-
