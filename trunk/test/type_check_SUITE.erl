@@ -448,6 +448,7 @@ tester_type_check_rrepair(_Config) ->
              {send, 2}, %% tries to send messages
              {send_local, 2}, %% tries to send messages
              {send_chunk_req, 6}, %% tries to send messages
+             {quadrant_intervals_, 3}, %% special pre-conditions, only private to quadrant_intervals/0, tested enough in there
              {replicated_intervals, 1} %% interval must be in a single quadrant
            ]}
         ],
