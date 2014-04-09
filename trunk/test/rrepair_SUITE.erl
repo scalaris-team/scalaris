@@ -167,11 +167,15 @@ prop_map_interval(A, B) ->
     end.
 
 tester_map_interval(_) ->
-    prop_map_interval(intervals:new(?MINUS_INFINITY),
-                      intervals:new('[', 45418374902990035001132940685036047259, ?MINUS_INFINITY, ']')),
-    prop_map_interval(intervals:new(?MINUS_INFINITY), intervals:all()),
-    prop_map_interval([{'[',0,52800909270899328435375133601130059363,')'}],
-                      [{'[',234596648080609640182865804133877994395,293423227623586592154289572207917413067,')'}]),
+    case rt_SUITE:default_rt_has_chord_keys() of
+        true ->
+            prop_map_interval(intervals:new(?MINUS_INFINITY),
+                              intervals:new('[', 45418374902990035001132940685036047259, ?MINUS_INFINITY, ']')),
+            prop_map_interval(intervals:new(?MINUS_INFINITY), intervals:all()),
+            prop_map_interval([{'[',0,52800909270899328435375133601130059363,')'}],
+                              [{'[',234596648080609640182865804133877994395,293423227623586592154289572207917413067,')'}]);
+        _ -> ok
+    end,
     tester:test(?MODULE, prop_map_interval, 2, 1000, [{threads, 1}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
