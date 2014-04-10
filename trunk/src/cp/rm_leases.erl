@@ -31,7 +31,8 @@
 -export([rm_filter/3, rm_exec/5]).
 
 -record(state, {
-          takeovers     = ?required(state, takeovers) :: gb_tree()
+          takeovers     = ?required(state, takeovers) :: gb_trees:gb_tree(?RT:key(),
+                                                                          l_on_cseq:lease_t())
          }).
 
 -type state_t() :: #state{}.
