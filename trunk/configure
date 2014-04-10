@@ -4063,6 +4063,168 @@ else
   cat > conftest.$ac_ext <<_ACEOF
 -module(conftest).
 -export([start/0]).
+-type(mytype()::gb_trees:tree(boolean(), boolean())).
+start() ->
+ok
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  GBTREE2=""; GBTREE2_EDOC=""; GBTREE2_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_trees:tree/2 is available" >&5
+$as_echo "$as_me: gb_trees:tree/2 is available" >&6;}
+else
+  GBTREE2=", {d, gbtree2_not_available}"; GBTREE2_EDOC=", {gbtree2_not_available, true}"; GBTREE2_DIALYZER=" -Dgbtree2_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_trees:tree/2 is not available" >&5
+$as_echo "$as_me: gb_trees:tree/2 is not available" >&6;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+-type(mytype()::gb_sets:set(boolean())).
+start() ->
+ok
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  GBSET1=""; GBSET1_EDOC=""; GBSET1_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_sets:set/1 is available" >&5
+$as_echo "$as_me: gb_sets:set/1 is available" >&6;}
+else
+  GBSET1=", {d, gbset1_not_available}"; GBSET1_EDOC=", {gbset1_not_available, true}"; GBSET1_DIALYZER=" -Dgbset1_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_sets:set/1 is not available" >&5
+$as_echo "$as_me: gb_sets:set/1 is not available" >&6;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+-type(mytype()::dict:dict(boolean(), boolean())).
+start() ->
+ok
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  DICT2=""; DICT2_EDOC=""; DICT2_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: dict:dict/2 is available" >&5
+$as_echo "$as_me: dict:dict/2 is available" >&6;}
+else
+  DICT2=", {d, dictdict2_not_available}"; DICT2_EDOC=", {dictdict2_not_available, true}"; DICT2_DIALYZER=" -Ddictdict2_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: dict:dict/2 is not available" >&5
+$as_echo "$as_me: dict:dict/2 is not available" >&6;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+-type(mytype()::ets:tid()).
+start() ->
+ok
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ETSTID=""; ETSTID_EDOC=""; ETSTID_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: ets:tid/0 is available" >&5
+$as_echo "$as_me: ets:tid/0 is available" >&6;}
+else
+  ETSTID=", {d, etstid_not_available}"; ETSTID_EDOC=", {etstid_not_available, true}"; ETSTID_DIALYZER=" -Detstid_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: ets:tid/0 is not available" >&5
+$as_echo "$as_me: ets:tid/0 is not available" >&6;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+-type(mytype()::queue:queue(boolean())).
+start() ->
+ok
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  QUEUE1=""; QUEUE1_EDOC=""; QUEUE1_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: queue:queue/1 is available" >&5
+$as_echo "$as_me: queue:queue/1 is available" >&6;}
+else
+  QUEUE1=", {d, queuequeue1_not_available}"; QUEUE1_EDOC=", {queuequeue1_not_available, true}"; QUEUE1_DIALYZER=" -Dqueuequeue1_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: queue:queue/1 is not available" >&5
+$as_echo "$as_me: queue:queue/1 is not available" >&6;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
+-type(mytype()::array:array(boolean())).
+start() ->
+ok
+.
+
+_ACEOF
+if ac_fn_erl_try_run "$LINENO"; then :
+  ARRAY1=""; ARRAY1_EDOC=""; ARRAY1_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: array:array/1 is available" >&5
+$as_echo "$as_me: array:array/1 is available" >&6;}
+else
+  ARRAY1=", {d, arrayarray1_not_available}"; ARRAY1_EDOC=", {arrayarray1_not_available, true}"; ARRAY1_DIALYZER=" -Darrayarray1_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: array:array/1 is not available" >&5
+$as_echo "$as_me: array:array/1 is not available" >&6;}
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+if test "$cross_compiling" = yes; then :
+  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "cannot run test program while cross compiling
+See \`config.log' for more details" "$LINENO" 5; }
+else
+  cat > conftest.$ac_ext <<_ACEOF
+-module(conftest).
+-export([start/0]).
 -type(mytype()::{ok, mytype()} | ok).
 start() ->
 ok
@@ -4305,10 +4467,10 @@ fi
 #
 ###########################################################
 
-EMAKEFILEDEFINES="${ENABLE_DEBUG}${HAVEHANOIDB}${HAVETOKE}${GBTREESISBUILTIN}${TERMISBUILTIN}${NODEISBUILTIN}${MODULEISBUILTIN}${BOOLEANISBUILTIN}${TIDISBUILTIN}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}${EXPORTTYPESUPPORT}${HAVE_ERLANG_TIMESTAMP}${CTLINESUPPORT}${CTHOOKS_EMAKEFILE}${CALLBACKSUPPORT}${CRYPTOHASHSUPPORT}${ERLANG_NATIVE_FLAGS}"
-EDOCMACROS="${ENABLE_DEBUG_EDOC}${HAVEHANOIDB_EDOC}${HAVETOKE_EDOC}${GBTREESISBUILTIN_EDOC}${TERMISBUILTIN_EDOC}${NODEISBUILTIN_EDOC}${MODULEISBUILTIN_EDOC}${BOOLEANISBUILTIN_EDOC}${TIDISBUILTIN_EDOC}${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}${EXPORTTYPESUPPORT_EDOC}${CTLINESUPPORT_EDOC}${CTHOOKS_EDOC}${CALLBACKSUPPORT_EDOC}${CRYPTOHASHSUPPORT_EDOC}"
+EMAKEFILEDEFINES="${ENABLE_DEBUG}${HAVEHANOIDB}${HAVETOKE}${GBTREESISBUILTIN}${TERMISBUILTIN}${NODEISBUILTIN}${MODULEISBUILTIN}${BOOLEANISBUILTIN}${TIDISBUILTIN}${GBTREE2}${GBSET1}${DICT2}${ETSTID}${QUEUE1}${ARRAY1}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}${EXPORTTYPESUPPORT}${HAVE_ERLANG_TIMESTAMP}${CTLINESUPPORT}${CTHOOKS_EMAKEFILE}${CALLBACKSUPPORT}${CRYPTOHASHSUPPORT}${ERLANG_NATIVE_FLAGS}"
+EDOCMACROS="${ENABLE_DEBUG_EDOC}${HAVEHANOIDB_EDOC}${HAVETOKE_EDOC}${GBTREESISBUILTIN_EDOC}${TERMISBUILTIN_EDOC}${NODEISBUILTIN_EDOC}${MODULEISBUILTIN_EDOC}${BOOLEANISBUILTIN_EDOC}${TIDISBUILTIN_EDOC}${GBTREE2_EDOC}${GBSET1_EDOC}${DICT2_EDOC}${ETSTID_EDOC}${QUEUE1_EDOC}${ARRAY1_EDOC}${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}${EXPORTTYPESUPPORT_EDOC}${CTLINESUPPORT_EDOC}${CTHOOKS_EDOC}${CALLBACKSUPPORT_EDOC}${CRYPTOHASHSUPPORT_EDOC}"
 EDOCMACROS="${EDOCMACROS#, }"
-DIALYZER_FLAGS="${ENABLE_DEBUG_DIALYZER}${HAVEHANOIDB_DIALYZER}${HAVETOKE_DIALYZER}${GBTREESISBUILTIN_DIALYZER}${TERMISBUILTIN_DIALYZER}${NODEISBUILTIN_DIALYZER}${MODULEISBUILTIN_DIALYZER}${BOOLEANISBUILTIN_DIALYZER}${TIDISBUILTIN_DIALYZER}${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${EXPORTTYPESUPPORT_DIALYZER}${HAVE_YAWS_SENDFILE_DIALYZER}${CTLINESUPPORT_DIALYZER}${CTHOOKS_DIALYZER}${CALLBACKSUPPORT_DIALYZER}${CRYPTOHASHSUPPORT_DIALYZER}"
+DIALYZER_FLAGS="${ENABLE_DEBUG_DIALYZER}${HAVEHANOIDB_DIALYZER}${HAVETOKE_DIALYZER}${GBTREESISBUILTIN_DIALYZER}${TERMISBUILTIN_DIALYZER}${NODEISBUILTIN_DIALYZER}${MODULEISBUILTIN_DIALYZER}${BOOLEANISBUILTIN_DIALYZER}${TIDISBUILTIN_DIALYZER}${GBTREE2_DIALYZER}${GBSET1_DIALYZER}${DICT2_DIALYZER}${ETSTID_DIALYZER}${QUEUE1_DIALYZER}${ARRAY1_DIALYZER}${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${EXPORTTYPESUPPORT_DIALYZER}${HAVE_YAWS_SENDFILE_DIALYZER}${CTLINESUPPORT_DIALYZER}${CTHOOKS_DIALYZER}${CALLBACKSUPPORT_DIALYZER}${CRYPTOHASHSUPPORT_DIALYZER}"
 
 
 
