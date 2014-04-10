@@ -157,6 +157,7 @@ move_config_parameters_incremental2() ->
 symm4_slide_succ_rcv_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+                      api_tx_SUITE:wait_for_dht_entries(440),
                       symm4_slide_load_test(1, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, ?NUM_SLIDES),
                       symm4_slide_load_test(2, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, ?NUM_SLIDES),
                       symm4_slide_load_test(3, succ, "slide_succ_rcv", fun id_my_to_succ_1_100/6, ?NUM_SLIDES),
@@ -171,6 +172,7 @@ symm4_slide_succ_rcv_load(_Config) ->
 symm4_slide_succ_send_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+                      api_tx_SUITE:wait_for_dht_entries(440),
                       symm4_slide_load_test(1, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, ?NUM_SLIDES),
                       symm4_slide_load_test(2, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, ?NUM_SLIDES),
                       symm4_slide_load_test(3, succ, "slide_succ_send", fun id_pred_to_my_99_100/6, ?NUM_SLIDES),
@@ -185,6 +187,7 @@ symm4_slide_succ_send_load(_Config) ->
 symm4_slide_pred_send_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+                      api_tx_SUITE:wait_for_dht_entries(440),
                       symm4_slide_load_test(1, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, ?NUM_SLIDES),
                       symm4_slide_load_test(2, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, ?NUM_SLIDES),
                       symm4_slide_load_test(3, pred, "slide_pred_send", fun id_pred_to_my_1_100/6, ?NUM_SLIDES),
@@ -199,6 +202,7 @@ symm4_slide_pred_send_load(_Config) ->
 symm4_slide_pred_rcv_load(_Config) ->
     stop_time(fun() ->
                       BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+                      api_tx_SUITE:wait_for_dht_entries(440),
                       symm4_slide_load_test(1, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, ?NUM_SLIDES),
                       symm4_slide_load_test(2, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, ?NUM_SLIDES),
                       symm4_slide_load_test(3, pred, "slide_pred_rcv", fun id_predspred_to_pred_99_100/6, ?NUM_SLIDES),
@@ -343,6 +347,7 @@ prop_symm4_slide_succ_rcv_load_timeouts_node(IgnoredMessages_) ->
 
 tester_symm4_slide_succ_rcv_load_timeouts_succ(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+    api_tx_SUITE:wait_for_dht_entries(440),
     tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_succ, 1, 25),
     unittest_helper:check_ring_load(440),
     unittest_helper:check_ring_data(),
@@ -351,6 +356,7 @@ tester_symm4_slide_succ_rcv_load_timeouts_succ(_Config) ->
 
 tester_symm4_slide_succ_rcv_load_timeouts_node(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+    api_tx_SUITE:wait_for_dht_entries(440),
     tester:test(?MODULE, prop_symm4_slide_succ_rcv_load_timeouts_node, 1, 25),
     unittest_helper:check_ring_load(440),
     unittest_helper:check_ring_data(),
@@ -397,6 +403,7 @@ prop_symm4_slide_succ_send_load_timeouts_node(IgnoredMessages_) ->
 
 tester_symm4_slide_succ_send_load_timeouts_succ(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+    api_tx_SUITE:wait_for_dht_entries(440),
     tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_succ, 1, 25),
     unittest_helper:check_ring_load(440),
     unittest_helper:check_ring_data(),
@@ -405,6 +412,7 @@ tester_symm4_slide_succ_send_load_timeouts_succ(_Config) ->
 
 tester_symm4_slide_succ_send_load_timeouts_node(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+    api_tx_SUITE:wait_for_dht_entries(440),
     tester:test(?MODULE, prop_symm4_slide_succ_send_load_timeouts_node, 1, 25),
     unittest_helper:check_ring_load(440),
     unittest_helper:check_ring_data(),
@@ -459,6 +467,7 @@ tester_symm4_slide_pred_send_load_timeouts_pred(_Config) ->
 
 tester_symm4_slide_pred_send_load_timeouts_node(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+    api_tx_SUITE:wait_for_dht_entries(440),
     tester:test(?MODULE, prop_symm4_slide_pred_send_load_timeouts_node, 1, 25),
     unittest_helper:check_ring_load(440),
     unittest_helper:check_ring_data(),
@@ -505,6 +514,7 @@ prop_symm4_slide_pred_rcv_load_timeouts_node(IgnoredMessages_) ->
 
 tester_symm4_slide_pred_rcv_load_timeouts_pred(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+    api_tx_SUITE:wait_for_dht_entries(440),
     tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_pred, 1, 25),
     unittest_helper:check_ring_load(440),
     unittest_helper:check_ring_data(),
@@ -513,6 +523,7 @@ tester_symm4_slide_pred_rcv_load_timeouts_pred(_Config) ->
 
 tester_symm4_slide_pred_rcv_load_timeouts_node(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 10000) end),
+    api_tx_SUITE:wait_for_dht_entries(440),
     tester:test(?MODULE, prop_symm4_slide_pred_rcv_load_timeouts_node, 1, 25),
     unittest_helper:check_ring_load(440),
     unittest_helper:check_ring_data(),
@@ -856,7 +867,7 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
 test_slide_adjacent(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 100000) end),
     % make sure all keys have been created...
-    timer:sleep(50),
+    api_tx_SUITE:wait_for_dht_entries(440),
     VerifyFun =
         fun(Result1, Result2, _Interleaved) ->
                 unittest_helper:check_ring_load(440),
@@ -919,7 +930,7 @@ test_slide_adjacent(_Config) ->
 test_slide_conflict(_Config) ->
     BenchPid = erlang:spawn(fun() -> bench:increment(10, 100000) end),
     % make sure all keys have been created...
-    timer:sleep(50),
+    api_tx_SUITE:wait_for_dht_entries(440),
     DhtNodes = pid_groups:find_all(dht_node),
     VerifyFun =
         fun (Result1, Result2, Interleaved) ->

@@ -99,12 +99,7 @@ transactions_X_failures_4_nodes_read(FailedNodes, RAfterFail, WAfterFail) ->
     ?equals_w_note(api_tx:write("0", 1), {ok}, "write_0_a"),
     ?equals_w_note(api_tx:read("0"), {ok, 1}, "read_0_a"),
     % wait for late write messages to arrive at the original nodes
-    % if all writes have arrived, a range read should return 4 values
-    util:wait_for(
-      fun() ->
-              {Status, Values} = api_dht_raw:range_read(0, 0),
-              Status =:= ok andalso erlang:length(Values) =:= 4
-      end),
+    api_tx_SUITE:wait_for_dht_entries(4),
     _ = api_vm:kill_nodes(FailedNodes),
     unittest_helper:check_ring_size(4 - FailedNodes),
     unittest_helper:wait_for_stable_ring(),

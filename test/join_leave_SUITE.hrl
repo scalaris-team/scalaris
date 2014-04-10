@@ -146,12 +146,7 @@ add_3_rm_3_data(Config, Incremental) ->
 
     _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),
     % wait for late write messages to arrive at the original nodes
-    % if all writes have arrived, a range read should return 4 values
-    util:wait_for(
-      fun() ->
-              {Status, Values} = api_dht_raw:range_read(0, 0),
-              Status =:= ok andalso erlang:length(Values) =:= ExpLoad
-      end),
+    api_tx_SUITE:wait_for_dht_entries(ExpLoad),
 
     ?proto_sched(start),
     ct:pal("######## starting join ########"),
@@ -260,12 +255,7 @@ prop_join_at(FirstId, SecondId, Incremental) ->
 
     _ = util:map_with_nr(fun(Key, X) -> {ok} = api_tx:write(Key, X) end, RandomKeys, 10000001),
     % wait for late write messages to arrive at the original nodes
-    % if all writes have arrived, a range read should return 4 values
-    util:wait_for(
-      fun() ->
-              {Status, Values} = api_dht_raw:range_read(0, 0),
-              Status =:= ok andalso erlang:length(Values) =:= ExpLoad
-      end),
+    api_tx_SUITE:wait_for_dht_entries(ExpLoad),
 
     BenchPid = erlang:spawn(fun() -> bench:increment(BenchSlaves, BenchRuns) end),
     _ = admin:add_node_at_id(SecondId),
