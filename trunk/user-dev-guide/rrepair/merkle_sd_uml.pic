@@ -109,7 +109,7 @@ begin_frame(A,F,"key_upd_s");
 end_frame(A,F);
 message(AA,BB,"resolve_req(CKV(\*x\sb2\eb), CK(\*d\sb3\eb))");
 inactive(A);
-active(BB);
+inactive(AA); active(BB);
 comment(BB,BB_RESOLVE2,0.0 right 0.175, wid 2.45 ht 0.45 \
         "\*d\sb4\eb := \*D \ Reg(A,B) \mo CKV(\*x\sb2\eb)"\
         "\*d\sb5\eb := Reg(A,B) \mo CKV(\*x\sb2\eb)     ");
@@ -119,6 +119,7 @@ comment(BB,RESOLVE_CK,0.8 left 0.75, wid 2.25 ht 0.225 \
 message(BB,B,"request_resolve(\*d\sb3,4\eb)");
 active(B);
 message(BB,AA,"resolve_req(CK(\*d\sb5\eb))");
+active(AA);
 complete(BB);
 drawx(BB);
 begin_frame(B,F,"key_upd_s");
