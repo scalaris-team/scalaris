@@ -136,7 +136,7 @@ qread(CSeqPidName, Client, Key, ReadFilter) ->
 -spec qwrite(pid_groups:pidname(),
              comm:erl_local_pid(),
              ?RT:key(),
-             fun ((any(), any(), any()) -> any()), %% CC (Content Check)
+             fun ((any(), any(), any()) -> {boolean(), any()}), %% CC (Content Check)
              client_value()) -> ok.
 qwrite(CSeqPidName, Client, Key, CC, Value) ->
     RF = fun prbr:noop_read_filter/1,
@@ -146,7 +146,7 @@ qwrite(CSeqPidName, Client, Key, CC, Value) ->
 -spec qwrite_fast(pid_groups:pidname(),
                   comm:erl_local_pid(),
                   ?RT:key(),
-                  fun ((any(), any(), any()) -> any()), %% CC (Content Check)
+                  fun ((any(), any(), any()) -> {boolean(), any()}), %% CC (Content Check)
                   client_value(), prbr:r_with_id(),
                   client_value() | prbr_bottom) -> ok.
 qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
@@ -158,7 +158,7 @@ qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
              comm:erl_local_pid(),
              ?RT:key(),
              fun ((any()) -> any()), %% read filter
-             fun ((any(), any(), any()) -> any()), %% content check
+             fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
              fun ((any(), any(), any()) -> any()), %% write filter
 %%              %% select what you need to read for the operation
 %%              fun ((CustomData) -> ReadInfo),
@@ -185,7 +185,7 @@ qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
              comm:erl_local_pid(),
              ?RT:key(),
              fun ((any()) -> any()), %% read filter
-             fun ((any(), any(), any()) -> any()), %% content check
+             fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
              fun ((any(), any(), any()) -> any()), %% write filter
              client_value(), prbr:r_with_id(), client_value() | prbr_bottom)
             -> ok.
