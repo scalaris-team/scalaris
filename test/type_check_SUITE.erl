@@ -450,6 +450,21 @@ tester_type_check_rrepair(_Config) ->
              {send_chunk_req, 6}, %% tries to send messages
              {quadrant_intervals_, 3}, %% special pre-conditions, only private to quadrant_intervals/0, tested enough in there
              {replicated_intervals, 1} %% interval must be in a single quadrant
+           ]},
+          {rr_resolve,
+           [
+             {on, 2}, %% tries to send messages, needs valid state with pid
+             {init, 1}, %% needs a pid in the state
+             {start, 0} %% tries to spawn processes
+           ],
+           [
+             {shutdown, 2}, %% tries to send messages
+             {send_request_resolve, 7}, %% tries to send messages
+             {send, 2}, %% tries to send messages
+             {send_local, 2}, %% tries to send messages
+             {send_stats, 2}, %% tries to send messages
+
+             {start_update_key_entries, 3} %% tries to send messages
            ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)

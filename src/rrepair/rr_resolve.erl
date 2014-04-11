@@ -103,7 +103,7 @@
     {get_entries_response, db_dht:db_as_list()} |
     {get_chunk_response, {intervals:interval(), rr_recon:db_chunk_kvv()}} |
     {get_state_response, intervals:interval()} |
-    {update_key_entries_ack, [{db_entry:entry(), Exists::boolean(), Done::boolean()}]} |
+    {update_key_entries_ack, [{db_entry:entry_ex(), Exists::boolean(), Done::boolean()}]} |
     {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -398,7 +398,7 @@ start_update_key_entries(MyIOtherKvvList, MyPid, DhtPid) ->
     length(MyIOtherKvvList).
 
 -spec integrate_update_key_entries_ack(
-        [{Entry::db_entry:entry(), Exists::boolean(), Done::boolean()}],
+        [{Entry::db_entry:entry_ex(), Exists::boolean(), Done::boolean()}],
         UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
         RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
         FBItems::kvv_list(), OtherKvTree::gb_trees:tree(?RT:key(), db_dht:version()), FBOn::boolean())
@@ -554,7 +554,7 @@ send_local(Pid, Msg) ->
     ?TRACE_SEND(Pid, Msg),
     comm:send_local(Pid, Msg).
 
--spec entry_to_kvv(db_entry:entry()) -> {?RT:key(), db_dht:value(), db_dht:version()}.
+-spec entry_to_kvv(db_entry:entry_ex()) -> {?RT:key(), db_dht:value(), db_dht:version()}.
 entry_to_kvv(Entry) ->
     {db_entry:get_key(Entry),
      db_entry:get_value(Entry),
