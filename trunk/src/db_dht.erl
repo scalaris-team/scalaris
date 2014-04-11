@@ -309,9 +309,12 @@ get_chunk({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSiz
             fun(all) -> false;
                ({Key}) ->
                     StartId > Key;
-               ({_LBr, _L, R, _RBr}) ->
-                StartId > R
+               ({_LBr, _L, R, ']'}) ->
+                StartId > R;
+               ({_LBr, _L, R, ')'}) ->
+                StartId >= R
             end, intervals:get_simple_intervals(Interval)),
+    ?TRACE_CHUNK("split: ~p~n~p~n", [Before, After]),
     RotatedInterval = case After of
         [] -> Before;
         [all] ->
@@ -1053,8 +1056,6 @@ calc_remaining_interval(StartId, _Remaining, Chunk, Interval) ->
     %% the interval covered by chunk is either the biggest key left of startid
     %% or if there are no keys left of startid simply the biggest key in chunk
     Last = calc_last_key_rem_int(Chunk, StartId),
-    ?TRACE_CHUNK("left: ~p~nright: ~p~ncalc_remaining:~n~p~nNext is ~p minus ~p",
-                 [Left, Right, Chunk, Interval, intervals:new('[', StartId, Last, ']')]),
     intervals:minus(Interval, intervals:new('[', StartId, Last, ']')).
 
 %% @doc Gets the largest key in Chunk left of StartId if there is one,

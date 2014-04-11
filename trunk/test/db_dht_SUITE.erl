@@ -909,13 +909,13 @@ prop_changed_keys_get_entries4(Data, ChangesInterval, Interval) ->
 -spec prop_get_chunk4(Keys::[?RT:key()], StartId::?RT:key(), Interval::intervals:interval(), ChunkSize::pos_integer() | all) -> true.
 prop_get_chunk4(Keys2, StartId, Interval, ChunkSize) ->
     Keys = lists:usort(Keys2),
-    %ct:pal("prop_get_chunk4(~w, ~w, ~w, ~w)", [Keys2, StartId, Interval, ChunkSize]),
+    %% ct:pal("prop_get_chunk4(~w, ~w, ~w, ~w)", [Keys2, StartId, Interval, ChunkSize]),
     DB = db_dht:new(),
     DB2 = lists:foldl(fun(Key, DBA) -> db_dht:write(DBA, Key, ?VALUE("Value"), 1) end, DB, Keys),
     {Next, Chunk} = db_dht:get_chunk(DB2, StartId, Interval, ChunkSize),
     % note: prevent erlang default printing from converting small int lists to strings:
     ChunkKeys = [{db_entry:get_key(C)} || C <- Chunk],
-    %ct:pal("-> ~.2p", [{Next, ChunkKeys}]),
+    %% ct:pal("-> ~.2p", [{Next, ChunkKeys}]),
     db_dht:close(DB2),
     ?equals(lists:usort(ChunkKeys), lists:sort(ChunkKeys)), % check for duplicates
     KeysInRange = [{Key} || Key <- Keys, intervals:in(Key, Interval)],
@@ -1326,12 +1326,12 @@ tester_get_chunk4(_Config) ->
         _ -> ok
     end,
     % TODO: fix this test
-%%     prop_get_chunk4(
-%%       [rt_SUITE:number_to_key(510),
-%%        rt_SUITE:number_to_key(545)],
-%%       rt_SUITE:number_to_key(530),
-%%       intervals:new('(', rt_SUITE:number_to_key(532), rt_SUITE:number_to_key(530), ')'),
-%%       all),
+    prop_get_chunk4(
+      [rt_SUITE:number_to_key(510),
+       rt_SUITE:number_to_key(545)],
+      rt_SUITE:number_to_key(530),
+      intervals:new('(', rt_SUITE:number_to_key(532), rt_SUITE:number_to_key(530), ')'),
+      all),
 
     tester:test(?MODULE, prop_get_chunk4, 4, rw_suite_runs(10000), [{threads, 2}]).
 
