@@ -1,5 +1,6 @@
 /Makefile
 /Emakefile
+/.Emakefile
 /config.status
 /ct_run.*ct*@*
 /all_runs.html
