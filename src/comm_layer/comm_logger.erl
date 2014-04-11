@@ -32,9 +32,14 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+-ifdef(with_export_type_support).
+-export_type([stat_tree/0]).
+-endif.
+
+-type stat_tree() :: gb_trees:tree(Tag::atom(), {Size::non_neg_integer(), Count::pos_integer()}).
 -record(state, {start    :: erlang_timestamp(),
-                received :: gb_tree(),
-                sent     :: gb_tree()}).
+                received :: stat_tree(),
+                sent     :: stat_tree()}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API
@@ -51,7 +56,7 @@ start_link() ->
 %% Function: log(Tag, Size) -> ok
 %% Description: logs a message type with its size
 %%--------------------------------------------------------------------
--spec log('send' | 'rcv', term(), integer()) -> ok.
+-spec log('send' | 'rcv', term(), non_neg_integer()) -> ok.
 log(SendRcv, Tag, Size) ->
     gen_server:cast(?MODULE, {log, SendRcv, Tag, Size}).
 
@@ -59,7 +64,7 @@ log(SendRcv, Tag, Size) ->
 %% Function: dump() -> {gb_tree:gb_trees(), {Date, Time}}
 %% Description: gets the logging state
 %%--------------------------------------------------------------------
--spec dump() -> {Received::gb_tree(), Sent::gb_tree(), erlang_timestamp()}.
+-spec dump() -> {Received::stat_tree(), Sent::stat_tree(), erlang_timestamp()}.
 dump() ->
     gen_server:call(?MODULE, {dump}).
 
@@ -87,7 +92,8 @@ init([]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
--spec handle_call({dump}, any(), #state{}) -> {reply, {Received::gb_tree(), Sent::gb_tree(), erlang_timestamp()}, #state{}}.
+-spec handle_call({dump}, any(), #state{})
+        -> {reply, {Received::stat_tree(), Sent::stat_tree(), erlang_timestamp()}, #state{}}.
 handle_call({dump}, _From, State) ->
     Reply = {State#state.received, State#state.sent, State#state.start},
     {reply, Reply, State};
@@ -101,7 +107,8 @@ handle_call(_Request, _From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
--spec handle_cast({log, 'send' | 'rcv', atom(), integer()}, #state{}) -> {noreply, #state{}}.
+-spec handle_cast({log, 'send' | 'rcv', atom(), non_neg_integer()}, #state{})
+        -> {noreply, #state{}}.
 handle_cast({log, 'rcv', Tag, Size}, State) ->
     case gb_trees:lookup(Tag, State#state.received) of
         none ->

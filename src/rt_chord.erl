@@ -25,9 +25,9 @@
 
 %% userdevguide-begin rt_chord:types
 -type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
--type rt_t() :: gb_tree().
--type external_rt_t() :: gb_tree().
 -type index() :: {pos_integer(), non_neg_integer()}.
+-type rt_t() :: gb_trees:tree(index(), Node::node:node_type()).
+-type external_rt_t() :: gb_trees:tree(NodeId::key(), Node::node:node_type()).
 -type custom_message() ::
        {rt_get_node, Source_PID::comm:mypid(), Index::index()} |
        {rt_get_node_response, Index::index(), Node::node:node_type()}.

@@ -37,7 +37,7 @@
     {send_error, Target::comm:mypid(), {ping, ThisWithCookie::comm:mypid()}, Reason::atom()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
--type(state() :: {fix_queue:fix_queue(), Subscribers::gb_set()}).
+-type(state() :: {fix_queue:fix_queue(), Subscribers::gb_sets:set(comm:erl_local_pid())}).
 
 -define(SEND_OPTIONS, [{channel, prio}]).
 
@@ -143,7 +143,7 @@ add_to_queue(Queue, Node) ->
                                           fun(_Old, New) -> New end)
     end.
 
--spec report_zombie(Subscribers::gb_set(), Zombie::node:node_type()) -> ok.
+-spec report_zombie(Subscribers::gb_sets:set(comm:erl_local_pid()), Zombie::node:node_type()) -> ok.
 report_zombie(Subscribers, Zombie) ->
     gb_sets:fold(fun(X, _) ->
                          comm:send_local(X, {zombie, Zombie})

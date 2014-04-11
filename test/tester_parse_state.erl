@@ -54,16 +54,16 @@
 -endif.
 
 -record(parse_state,
-        {type_infos        = gb_trees:empty() :: gb_tree(),
-         unknown_types     = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [type_name()]},
-         atoms             = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [atom()]},
-         binaries          = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [binary()]},
-         integers          = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [integer()]},
+        {type_infos        = gb_trees:empty() :: gb_trees:tree(type_name(), type_spec()),
+         unknown_types     = gb_sets:new()    :: gb_sets:set(type_name()) | {Length::non_neg_integer(), [type_name()]},
+         atoms             = gb_sets:new()    :: gb_sets:set(atom()) | {Length::non_neg_integer(), [atom()]},
+         binaries          = gb_sets:new()    :: gb_sets:set(binary()) | {Length::non_neg_integer(), [binary()]},
+         integers          = gb_sets:new()    :: gb_sets:set(integer()) | {Length::non_neg_integer(), [integer()]},
          pos_integers      = null             :: null     | {Length::non_neg_integer(), [pos_integer()]},
          neg_integers      = null             :: null     | {Length::non_neg_integer(), [neg_integer()]},
          non_neg_integers  = null             :: null     | {Length::non_neg_integer(), [non_neg_integer()]},
-         floats            = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [float()]},
-         non_empty_strings = gb_sets:new()    :: gb_set() | {Length::non_neg_integer(), [nonempty_string()]}
+         floats            = gb_sets:new()    :: gb_sets:set(float()) | {Length::non_neg_integer(), [float()]},
+         non_empty_strings = gb_sets:new()    :: gb_sets:set(nonempty_string()) | {Length::non_neg_integer(), [nonempty_string()]}
         }).
 -opaque state() :: #parse_state{}.
 
@@ -108,7 +108,7 @@ find_fun_info(Module, Func, Arity, ParseState) ->
 new_parse_state() ->
     #parse_state{unknown_types = gb_sets:singleton({type, tester, test_any})}.
 
--spec get_type_infos(state()) -> gb_tree().
+-spec get_type_infos(state()) -> gb_trees:tree(type_name(), type_spec()).
 get_type_infos(#parse_state{type_infos=TypeInfo}) ->
     TypeInfo.
 

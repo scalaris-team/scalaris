@@ -734,7 +734,7 @@ create_join_ids(Count, OldIds) ->
     {gb_sets:to_list(NewIdsSet), gb_sets:to_list(OnlyNewIdsSet)}.
 
 %% @doc Helper for create_join_ids/2 that creates the new unique IDs.
--spec create_join_ids_helper(TotalCount::pos_integer(), gb_set()) -> gb_set().
+-spec create_join_ids_helper(TotalCount::pos_integer(), gb_sets:set(?RT:key())) -> gb_sets:set(?RT:key()).
 create_join_ids_helper(TotalCount, Ids) ->
     case gb_sets:size(Ids) of
         TotalCount -> Ids;

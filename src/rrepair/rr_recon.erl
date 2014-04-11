@@ -72,12 +72,13 @@
 -type db_chunk_kvv()   :: [{?RT:key(), db_dht:version(), db_dht:value()}].
 
 -type signature_size() :: 1..160. % upper bound of 160 (SHA-1) to also limit testing
+-type kv_tree()        :: gb_trees:tree(KeyBin::bitstring(), VersionShort::non_neg_integer()).
 
 -record(trivial_recon_struct,
         {
          interval = intervals:empty()                         :: intervals:interval(),
          reconPid = undefined                                 :: comm:mypid() | undefined,
-         db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring() | gb_tree(),
+         db_chunk = ?required(trivial_recon_struct, db_chunk) :: bitstring() | kv_tree(),
          sig_size = 128                                       :: signature_size(),
          ver_size = 8                                         :: signature_size()
         }).
@@ -802,9 +803,9 @@ compress_kv_list([{K0, V} | TL], Bin, SigSize, VSize) ->
 
 %% @doc De-compresses the binary from compress_kv_list/4 into a gb_tree with a
 %%      binary key representation and the integer of the (shortened) version.
--spec decompress_kv_list(CompressedBin::bitstring(), AccTree::gb_tree(),
+-spec decompress_kv_list(CompressedBin::bitstring(), AccTree::kv_tree(),
                          SigSize::signature_size(), VSize::signature_size())
-        -> ResTree::gb_tree().
+        -> ResTree::kv_tree().
 decompress_kv_list(<<>>, Tree, _SigSize, _VSize) ->
     Tree;
 decompress_kv_list(Bin, Tree, SigSize, VSize) ->
@@ -817,22 +818,22 @@ decompress_kv_list(Bin, Tree, SigSize, VSize) ->
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
 -spec get_full_diff
-        (MyEntries::db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
+        (MyEntries::db_chunk_kvv(), MyIOtherKvTree::kv_tree(),
          AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
          SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()};
-        (MyEntries::db_chunk_kv(), MyIOtherKvTree::gb_tree(),
+        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()};
+        (MyEntries::db_chunk_kv(), MyIOtherKvTree::kv_tree(),
          AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
          SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
 get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
     get_full_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
                   util:pow(2, VSize)).
     
--spec get_full_diff_(MyEntries::db_chunk_kvv(), MyIOtherKvTree::gb_tree(),
+-spec get_full_diff_(MyEntries::db_chunk_kvv(), MyIOtherKvTree::kv_tree(),
                      AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
                      SigSize::signature_size(), VMod::pos_integer())
--> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+-> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
 get_full_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
     {FBItems, ReqItems, MyIOtKvTree};
 get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
@@ -870,19 +871,19 @@ get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
 %%      and the entry in MyEntries has a newer version than the one in the tree
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
--spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::gb_tree(),
+-spec get_part_diff(MyEntries::db_chunk_kv(), MyIOtherKvTree::kv_tree(),
                     AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
                     SigSize::signature_size(), VSize::signature_size())
-        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
 get_part_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
     get_part_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
                    util:pow(2, VSize)).
 
 %% @doc Helper for get_part_diff/6.
--spec get_part_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::gb_tree(),
+-spec get_part_diff_(MyEntries::db_chunk_kv(), MyIOtherKvTree::kv_tree(),
                      AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
                      SigSize::signature_size(), VMod::pos_integer())
-        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::gb_tree()}.
+        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
 get_part_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
     {FBItems, ReqItems, MyIOtKvTree};
 get_part_diff_([{Key, Version} | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
@@ -933,8 +934,8 @@ compress_key(Key, SigSize) ->
 
 %% @doc De-compresses a bitstring with hashes of SigSize number of bits
 %%      into a gb_set with a binary key representation.
--spec decompress_k_list(CompressedBin::bitstring(), AccSet::gb_set(),
-                         SigSize::signature_size()) -> ResSet::gb_set().
+-spec decompress_k_list(CompressedBin::bitstring(), AccSet::gb_sets:set(bitstring()),
+                         SigSize::signature_size()) -> ResSet::gb_sets:set(bitstring()).
 decompress_k_list(<<>>, Set, _SigSize) ->
     Set;
 decompress_k_list(Bin, Set, SigSize) ->
@@ -1167,7 +1168,7 @@ merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply) ->
 %%      returned by merkle_resolve_add_leaf_hash/3 during merkle sync.
 -spec merkle_resolve_retrieve_leaf_hashes(Hashes::bitstring(),
                                           SigSize0::signature_size())
-        -> {NHashes::bitstring(), OtherBucketTree::gb_tree(),
+        -> {NHashes::bitstring(), OtherBucketTree::kv_tree(),
             SigSize::signature_size(), VSize::signature_size()}.
 merkle_resolve_retrieve_leaf_hashes(
   <<BSize:8/integer-unit:1, HashesT/bitstring>>, SigSize0) ->

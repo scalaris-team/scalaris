@@ -57,8 +57,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
--type external_rt_t() :: {unknown | float(), gb_tree()}.
-%% -type external_rt_t() :: {Size :: unknown | float(), gb_tree()}.
+-type external_rt_t_tree() :: gb_trees:tree(NodeId::key(), Node::node:node_type()).
+-type external_rt_t() :: {Size :: unknown | float(), external_rt_t_tree()}.
 
 % define the possible types of nodes in the routing table:
 %  - normal nodes are nodes which have been added by entry learning
@@ -81,10 +81,11 @@
 -export_type([rt_entry/0]).
 -endif.
 
+-type rt_t_tree() :: gb_trees:tree(NodeId::key(), rt_entry()).
 -record(rt_t, {
         source = undefined :: key_t() | undefined
         , num_active_learning_lookups = 0 :: non_neg_integer()
-        , nodes = gb_trees:empty() :: gb_tree()
+        , nodes = gb_trees:empty() :: rt_t_tree()
         , nodes_in_ring = unknown :: unknown | float()
         %% , nodes_in_ring = unknown :: Size :: unknown | float()
     }).
@@ -910,7 +911,7 @@ set_source_node(SourceId, #rt_t{source=undefined}=RT) ->
     RT#rt_t{source=SourceId}.
 
 % @doc Get the gb_tree of the routing table containing its nodes
--spec get_rt_tree(Nodes::rt()) -> gb_tree().
+-spec get_rt_tree(Nodes::rt()) -> rt_t_tree().
 get_rt_tree(#rt_t{nodes=Nodes}) -> Nodes.
 
 % @doc Get the number of active learning lookups which have happened
@@ -984,7 +985,7 @@ rt_entry_distance(From, To) ->
 rt_get_nodes(RT) -> gb_trees:values(get_rt_tree(RT)).
 
 % @doc Set the treeof nodes of the routing table.
--spec rt_set_nodes(RT :: rt(), Nodes :: gb_tree()) -> rt().
+-spec rt_set_nodes(RT :: rt(), Nodes :: rt_t_tree()) -> rt().
 rt_set_nodes(#rt_t{source=undefined}, _) -> erlang:error(source_node_undefined);
 rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 
@@ -999,7 +1000,7 @@ external_rt_get_ring_size(RT) when element(1, RT) >= 0 orelse
     element(1, RT).
 
 % @doc Get the tree of an external rt
--spec external_rt_get_tree(RT :: external_rt()) -> gb_tree().
+-spec external_rt_get_tree(RT :: external_rt()) -> external_rt_t_tree().
 external_rt_get_tree(RT) when is_tuple(RT) ->
     element(2, RT).
 
