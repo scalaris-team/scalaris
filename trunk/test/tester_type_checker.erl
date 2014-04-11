@@ -107,15 +107,15 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
                            CheckStack, ParseState)
             catch _:_ -> {false, [{Value, dict_functions_thrown} | CheckStack]}
             end;
-        {builtin_type, gb_tree} ->
+        {builtin_type, gb_trees_tree, KeyType, ValueType} ->
             % there is no is_gb_tree/1, so try some functions on the tree to check
             try
                 _ = gb_trees:size(Value),
                 _ = gb_trees:is_defined('$non_existing_key', Value),
                 _ = gb_trees:enter('$non_existing_key', '$value', Value),
                 check_list(gb_trees:to_list(Value), % [{Key, Value}]
-                           {list, {tuple, [{typedef, tester, test_any},
-                                           {typedef, tester, test_any}]}},
+                           {list, {tuple, [KeyType,
+                                           ValueType]}},
                            CheckStack, ParseState)
             catch _:_ -> {false, [{Value, gb_trees_functions_thrown} | CheckStack]}
             end;
