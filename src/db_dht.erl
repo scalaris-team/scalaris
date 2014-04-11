@@ -157,7 +157,7 @@ get_load({DB, _Subscr, _Snap}, Interval) ->
 %% @doc Returns all (including empty, but not null) DB entries.
 -spec get_data(DB::db()) -> db_as_list().
 get_data(State) ->
-    element(2, get_chunk(State, 0, intervals:all(), all)).
+    element(2, get_chunk(State, ?MINUS_INFINITY, intervals:all(), all)).
 
 
 %%%%%%
