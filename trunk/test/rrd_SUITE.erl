@@ -53,6 +53,12 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
+init_per_group(Group, Config) ->
+    unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) ->
+    unittest_helper:end_per_group(Group, Config).
+
 simple_create(_Config) ->
     Adds = [{20, 5}, {25, 6}],
     DB0 = rrd:create(10, 10, gauge, {0,0,0}),
