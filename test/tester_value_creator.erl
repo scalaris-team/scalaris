@@ -81,11 +81,10 @@ create_value_({builtin_type, array}, Size, ParseState) ->
                        [{typedef, tester, test_any},
                         {typedef, tester, test_any}]}}, Size, ParseState),
     array:from_list(L);
-create_value_({builtin_type, gb_tree}, Size, ParseState) ->
+create_value_({builtin_type, gb_trees_tree, KeyType, ValueType}, Size, ParseState) ->
     L = create_value({list,
                       {tuple,
-                       [{typedef, tester, test_any},
-                        {typedef, tester, test_any}]}}, Size, ParseState),
+                       [KeyType, ValueType]}}, Size, ParseState),
     T = gb_trees:empty(),
     case L of
         [] -> T;

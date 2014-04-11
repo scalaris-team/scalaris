@@ -252,7 +252,8 @@ parse_type_({type, _Line, queue, []}, _Module, ParseState) ->
 parse_type_({type, _Line, gb_set, []}, _Module, ParseState) ->
     {{builtin_type, gb_set}, ParseState};
 parse_type_({type, _Line, gb_tree, []}, _Module, ParseState) ->
-    {{builtin_type, gb_tree}, ParseState};
+    {{builtin_type, gb_trees_tree, {typedef, tester, test_any},
+      {typedef, tester, test_any}}, ParseState};
 parse_type_({type, _Line, set, []}, _Module, ParseState) ->
     {{builtin_type, set}, ParseState};
 parse_type_({type, _Line, module, []}, _Module, ParseState) ->
@@ -263,8 +264,15 @@ parse_type_({type, _Line, map, any}, _Module, ParseState) -> % Erlang R17
     {{builtin_type, map}, ParseState};
 parse_type_({type, _Line, mfa, []}, _Module, ParseState) ->
     {{tuple, [atom, atom, {range, {integer, 0}, {integer, 255}}]}, ParseState};
+% gb_trees:tree(Key,Value)
+parse_type_({remote_type, _Line, [{atom, _Line2, gb_trees},
+                                 {atom, _Line3, tree}, [KeyType, ValueType]]},
+           Module, ParseState) ->
+    {Key2, ParseState2}   = parse_type(KeyType, Module, ParseState),
+    {Value2, ParseState3}   = parse_type(ValueType, Module, ParseState2),
+    {{builtin_type, gb_trees_tree, Key2, Value2}, ParseState3};
 parse_type_({remote_type, _Line, [{atom, _Line2, TypeModule},
-                                 {atom, _line3, TypeName}, []]},
+                                 {atom, _Line3, TypeName}, []]},
            _Module, ParseState) ->
     case tester_parse_state:is_known_type(TypeModule, TypeName, ParseState) of
         true ->
