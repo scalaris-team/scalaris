@@ -971,10 +971,6 @@ prop_get_split_key5(Keys2, Begin, End, TargetLoad, ForwardBackward) ->
     SplitInterval = case ForwardBackward of
                         forward  ->
                             intervals:new('(', Begin, SplitKey, ']');
-                        backward when TakenLoad < TargetLoad ->
-                            % not enough items to take - SplitKey =:= End
-                            ?equals(SplitKey, End),
-                            intervals:new('[', SplitKey, Begin, ']');
                         backward ->
                             intervals:new('(', SplitKey, Begin, ']')
                     end,
@@ -1342,18 +1338,20 @@ tester_get_split_key5(_Config) ->
             prop_get_split_key5([12, 10, 4], 6, 8, 1, backward),
             prop_get_split_key5([10, 9], 10, 6, 2, backward),
             prop_get_split_key5([10, 9, 8], 10, 6, 2, backward),
+            prop_get_split_key5([10, 6, 5], 6, 9, 1, forward),
+            prop_get_split_key5([10, 6, 5], 9, 6, 1, backward),
             prop_get_split_key5([10, 9, 8, 7], 10, 6, 2, backward),
             prop_get_split_key5([10, 9, 8, 7, 4], 10, 6, 2, backward),
             prop_get_split_key5([11, 10, 9, 8, 7, 4], 10, 6, 2, backward);
         _ -> ok
     end,
     % TODO: fix this test
-%%     prop_get_split_key5([rt_SUITE:number_to_key(510),
-%%                          rt_SUITE:number_to_key(520),
-%%                          rt_SUITE:number_to_key(545)],
-%%                         rt_SUITE:number_to_key(543),
-%%                         rt_SUITE:number_to_key(520),
-%%                         1, backward),
+    prop_get_split_key5([rt_SUITE:number_to_key(510),
+                         rt_SUITE:number_to_key(520),
+                         rt_SUITE:number_to_key(545)],
+                        rt_SUITE:number_to_key(543),
+                        rt_SUITE:number_to_key(520),
+                        1, backward),
 
     tester:test(?MODULE, prop_get_split_key5, 5, rw_suite_runs(10000), [{threads, 2}]).
 
