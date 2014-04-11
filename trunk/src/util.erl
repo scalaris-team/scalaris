@@ -441,7 +441,8 @@ shuffle_helper([], Acc, _Size, _ListSize) ->
 %%      Note: gb_trees offers only linear traversal or lookup of exact keys -
 %%      we implement a more flexible binary search here despite gb_tree being
 %%      defined as opaque.
--spec gb_trees_largest_smaller_than(Key, gb_tree()) -> {value, Key, Value::any()} | nil.
+-spec gb_trees_largest_smaller_than(Key, gb_trees:tree(Key, Value))
+        -> {value, Key, Value} | nil.
 gb_trees_largest_smaller_than(_Key, {0, _Tree}) ->
     nil;
 gb_trees_largest_smaller_than(MyKey, {_Size, InnerTree}) ->
@@ -466,7 +467,7 @@ gb_trees_largest_smaller_than_iter(_SearchKey, nil, _RightTree) ->
     nil.
 
 %% @doc Foldl over gb_trees.
--spec gb_trees_foldl(fun((Key::any(), Value::any(), Acc) -> Acc), Acc, gb_tree()) -> Acc.
+-spec gb_trees_foldl(fun((Key, Value, Acc) -> Acc), Acc, gb_trees:tree(Key, Value)) -> Acc.
 gb_trees_foldl(F, Acc, GBTree) ->
     gb_trees_foldl_iter(F, Acc, gb_trees:next(gb_trees:iterator(GBTree))).
 

@@ -267,7 +267,7 @@ number_of_nodes() ->
 % messages in total. get_dump/0 returns a map from message-tag to
 % message-count and message-size and a timestamp when the measurement
 % was started.
--spec get_dump() -> {Received::gb_tree(), Sent::gb_tree(), erlang_timestamp()}.
+-spec get_dump() -> {Received::comm_logger:stat_tree(), Sent::comm_logger:stat_tree(), erlang_timestamp()}.
 get_dump() ->
     Servers = util:get_proc_in_vms(admin_server),
     _ = [comm:send(Server, {get_comm_layer_dump, comm:this()})
@@ -325,12 +325,14 @@ get_aggregate(Tag, [Dump | Rest], Element) ->
             {AggSize + Size, AggCount + Count}
     end.
 
--spec diff_dump(gb_tree(), gb_tree()) -> list({atom(), integer(), integer()}).
+-spec diff_dump(Before::comm_logger:stat_tree(), After::comm_logger:stat_tree())
+        -> [{Tag::atom(), Size::integer(), Count::integer()}].
 diff_dump(BeforeDump, AfterDump) ->
-    Tags = lists:usort(lists:flatten([gb_trees:keys(BeforeDump),
-                                      gb_trees:keys(AfterDump)])),
+    Tags = lists:usort(gb_trees:keys(BeforeDump) ++ gb_trees:keys(AfterDump)),
     diff(Tags, BeforeDump, AfterDump).
 
+-spec diff(Tags::[atom()], Before::comm_logger:stat_tree(), After::comm_logger:stat_tree())
+        -> [{Tag::atom(), Size::integer(), Count::integer()}].
 diff([], _Before, _After) ->
     [];
 diff([Tag | Rest], Before, After) ->

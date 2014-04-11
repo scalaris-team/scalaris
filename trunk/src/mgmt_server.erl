@@ -42,7 +42,7 @@
     {connect}).
 
 % internal state (known nodes)
--type(state()::Nodes::gb_tree()).
+-type(state()::Nodes::gb_trees:tree(comm:mypid(), node:node_type())).
 
 %% @doc trigger a message with the number of nodes known to the mgmt server
 -spec number_of_nodes() -> ok.

@@ -89,7 +89,7 @@
          fb_send_kvv    = []                                      :: OutdatedOnOther::kvv_list(),
          fb_had_kvv_req = false                                   :: NonEmptyReqList::boolean(),
          fb_send_kvv_req= []                                      :: RequestedByOther::kvv_list(),
-         other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_tree(),
+         other_kv_tree  = gb_trees:empty()                        :: MyIOtherKvTree::gb_trees:tree(?RT:key(), db_dht:version()),
          send_stats     = undefined                               :: undefined | comm:mypid(),
          stats          = #resolve_stats{}                        :: stats(),
          from_my_node   = 1                                       :: 0 | 1
@@ -401,7 +401,7 @@ start_update_key_entries(MyIOtherKvvList, MyPid, DhtPid) ->
         [{Entry::db_entry:entry(), Exists::boolean(), Done::boolean()}],
         UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
         RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
-        FBItems::kvv_list(), OtherKvTree::gb_tree(), FBOn::boolean())
+        FBItems::kvv_list(), OtherKvTree::gb_trees:tree(?RT:key(), db_dht:version()), FBOn::boolean())
         -> {UpdOk::non_neg_integer(), UpdFail::non_neg_integer(),
             RegenOk::non_neg_integer(), RegenFail::non_neg_integer(),
             FBItems::kvv_list()}.
