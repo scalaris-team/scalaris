@@ -144,10 +144,15 @@ parse_chunk({eof, _Line}, _Module, ParseState) ->
 -ifdef(tid_not_builtin).
 parse_type(T, M, ParseState) -> parse_type_(T, M, ParseState).
 -else.
+% Erlang 17.0 has tid() as a builtin type but allows overriding it:
+-ifndef(etstid_not_available).
+parse_type(T, M, ParseState) -> parse_type_(T, M, ParseState).
+-else.
 parse_type({type, _Line, tid, []}, _Module, ParseState) ->
     {tid, ParseState};
 parse_type(T, M, ParseState) ->
     parse_type_(T, M, ParseState).
+-endif.
 -endif.
 
 -spec parse_type_/3 :: (any(), module(), tester_parse_state:state()) ->
