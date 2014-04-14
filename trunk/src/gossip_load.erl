@@ -76,7 +76,6 @@
 %% List of module names for additional aggregation
 %% (Modules need to implement gossip_load_beh)
 -define(ADDITIONAL_MODULES, [lb_active_gossip_load_metric, lb_active_gossip_request_metric]).
-%-define(ADDITIONAL_MODULES, []).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -214,31 +213,35 @@ no_of_buckets() ->
 
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(gossip_load_interval) andalso
-    config:cfg_is_greater_than(gossip_load_interval, 0) andalso
+    config:cfg_is_integer(gossip_load_interval) and
+    config:cfg_is_greater_than(gossip_load_interval, 0) and
 
-    config:cfg_is_integer(gossip_load_min_cycles_per_round) andalso
-    config:cfg_is_greater_than_equal(gossip_load_min_cycles_per_round, 0) andalso
+    config:cfg_is_integer(gossip_load_min_cycles_per_round) and
+    config:cfg_is_greater_than_equal(gossip_load_min_cycles_per_round, 0) and
 
-    config:cfg_is_integer(gossip_load_max_cycles_per_round) andalso
-    config:cfg_is_greater_than_equal(gossip_load_max_cycles_per_round, 1) andalso
+    config:cfg_is_integer(gossip_load_max_cycles_per_round) and
+    config:cfg_is_greater_than_equal(gossip_load_max_cycles_per_round, 1) and
 
-    config:cfg_is_float(gossip_load_convergence_epsilon) andalso
-    config:cfg_is_in_range(gossip_load_convergence_epsilon, 0.0, 100.0) andalso
+    config:cfg_is_float(gossip_load_convergence_epsilon) and
+    config:cfg_is_in_range(gossip_load_convergence_epsilon, 0.0, 100.0) and
 
-    config:cfg_is_bool(gossip_load_discard_old_rounds) andalso
+    config:cfg_is_bool(gossip_load_discard_old_rounds) and
 
-    config:cfg_is_integer(gossip_load_convergence_count_best_values) andalso
-    config:cfg_is_greater_than(gossip_load_convergence_count_best_values, 0) andalso
+    config:cfg_is_integer(gossip_load_convergence_count_best_values) and
+    config:cfg_is_greater_than(gossip_load_convergence_count_best_values, 0) and
 
-    config:cfg_is_integer(gossip_load_convergence_count_new_round) andalso
-    config:cfg_is_greater_than(gossip_load_convergence_count_new_round, 0) andalso
+    config:cfg_is_integer(gossip_load_convergence_count_new_round) and
+    config:cfg_is_greater_than(gossip_load_convergence_count_new_round, 0) and
 
-    config:cfg_is_integer(gossip_load_number_of_buckets) andalso
-    config:cfg_is_greater_than(gossip_load_number_of_buckets, 0),
+    config:cfg_is_integer(gossip_load_number_of_buckets) and
+    config:cfg_is_greater_than(gossip_load_number_of_buckets, 0) and
 
-    config:cfg_is_integer(gossip_load_fanout) andalso
-    config:cfg_is_greater_than(gossip_load_fanout, 0).
+    config:cfg_is_integer(gossip_load_fanout) and
+    config:cfg_is_greater_than(gossip_load_fanout, 0) and
+
+    config:cfg_is_list(gossip_load_additional_modules,
+                       fun(El) -> lists:member(El, ?ADDITIONAL_MODULES) end,
+                       "A valid additional gossip_load module").
 
 -spec no_of_buckets(State::state()) -> pos_integer().
 no_of_buckets(State) ->
@@ -884,7 +887,8 @@ load_data_new(Module) ->
 
 -spec load_data_list_new() -> [load_data_uninit(), ...].
 load_data_list_new() ->
-    Modules = [?DEFAULT_MODULE | ?ADDITIONAL_MODULES],
+    AdditionalModules = config:read(gossip_load_additional_modules),
+    Modules = [?DEFAULT_MODULE | AdditionalModules],
     [load_data_new(Module) || Module <- Modules].
 
 -spec ring_data_new() -> ring_data_uninit().
