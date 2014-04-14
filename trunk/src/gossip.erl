@@ -578,7 +578,6 @@ handle_msg({selected_peer, CBModule, _Msg={cy_cache, []}}, State) ->
 
 
 handle_msg({selected_peer, CBModule, _Msg={cy_cache, Nodes}}, State) ->
-    %% io:format("gossip: got random node from Cyclon: ~p~n",[node:pidX(Node)]),
     {_Node, PData} = state_get(exch_data, CBModule, State),
     case PData of
         undefined -> state_set(exch_data, {Nodes, undefined}, CBModule, State);

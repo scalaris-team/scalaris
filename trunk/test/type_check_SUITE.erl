@@ -155,10 +155,10 @@ tester_type_check_gossip(_Config) ->
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
     tester:register_type_checker({typedef, gossip, state}, gossip, is_state),
     tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram),
-    tester:register_type_checker({typedef, gossip_load, state}, gossip_load, is_state),
     tester:register_value_creator({typedef, gossip, state}, gossip, tester_create_state, 9),
-    tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
+    tester:register_value_creator({typedef, gossip_load, round}, gossip_load, tester_create_round, 1),
     tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 11),
+    tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
     tester:register_value_creator({typedef, gossip_load, load_data_list}, gossip_load, tester_create_load_data_list, 1),
     tester:register_value_creator({typedef, gossip, cb_module_name}, gossip, tester_create_cb_module_names, 1),
     Modules = [ {gossip,
@@ -189,12 +189,10 @@ tester_type_check_gossip(_Config) ->
             ]},
           {gossip_load,
             % excluded (exported functions)
-            [   {request_histogram, 2}, % starts gossip_load at all nodes, this produces to many ets tables
-                {handle_msg, 2} % would need valid dht_node_state / pid_groups:get_my()
+            [  {handle_msg, 2} % would need valid dht_node_state
             ],
             % excluded (private functions)
-            [  {state_new, 2}, % too many db tables
-               {state_update, 3}, % cannot create funs
+            [  {state_update, 3}, % cannot create funs
                {init_histo, 3}, % needs DHTNodeState state
                {merge_histo, 2}, % tested via feeder
                {merge_bucket, 2} % tested via feeder
@@ -209,8 +207,8 @@ tester_type_check_gossip(_Config) ->
     tester:unregister_value_creator({typedef, intervals, simple_interval}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
     tester:unregister_type_checker({typedef, gossip, state}),
-    tester:unregister_type_checker({typedef, gossip_load, state}),
     tester:unregister_value_creator({typedef, gossip, state}),
+    tester:unregister_value_creator({typedef, gossip_load, round}),
     tester:unregister_value_creator({typedef, gossip_load, state}),
     tester:unregister_value_creator({typedef, gossip_load, load_data_list}),
     tester:unregister_value_creator({typedef, gossip_load, histogram}),
