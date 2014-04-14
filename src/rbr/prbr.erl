@@ -1,4 +1,4 @@
-% @copyright 2012-2013 Zuse Institute Berlin,
+% @copyright 2012-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -46,6 +46,9 @@
 %% let users retrieve their smallest possible round for fast_write on
 %% entry creation.
 -export([smallest_round/1]).
+
+%% let fetch the number of DB entries
+-export([get_load/1]).
 
 -ifdef(with_export_type_support).
 -export_type([message/0]).
@@ -146,6 +149,9 @@ on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) -
                    entry_r_write(KeyEntry)),
 
     NewKeyEntry = entry_set_r_read(KeyEntry, TheRound),
+%%    log:log("read~n"
+%%            "Key: ~p~n"
+%%            "Val: ~p", [Key, NewKeyEntry]),
     _ = set_entry(NewKeyEntry, TableName),
     TableName;
 
@@ -156,9 +162,16 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
             {ok, NewKeyEntry, NextWriteRound} ->
                 NewVal = WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value),
+%%                log:log("write ok~n"
+%%                        "Key: ~p~n"
+%%                        "Ent: ~p~n"
+%%                        "Val: ~p", [Key, KeyEntry, NewVal]),
                 msg_write_reply(Proposer, Cons, Key, InRound, NextWriteRound),
                 set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
             {dropped, NewerRound} ->
+%%                log:log("write deny~n"
+%%                        "Key: ~p~n"
+%%                        "Val: ~p", [Key, KeyEntry]),
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
                 msg_write_deny(Proposer, Cons, Key, NewerRound)
         end,
@@ -186,6 +199,9 @@ set_entry(NewEntry, TableName) ->
 %% can perform a successful fast_write with its smallest_round. Voila!
 -spec smallest_round(comm:mypid()) -> r_with_id().
 smallest_round(Pid) -> {0, Pid}.
+
+-spec get_load(state()) -> non_neg_integer().
+get_load(State) -> ?PDB:get_load(State).
 
 %% operations for abstract data type entry()
 
