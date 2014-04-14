@@ -24,17 +24,18 @@
 -author('michels@zib.de').
 -vsn('$Id$').
 
--behavior(gen_component).
-
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), io:format(X,Y)).
 
--export([start_link/1, init/1]).
--export([on/2, process_lb_msg/2]).
--export([check_config/0]).
+
+-behavior(lb_active_beh).
+
+-export([init/0, check_config/0]).
+-export([handle_msg/2, handle_dht_msg/2]).
+-export([get_web_debug_key_value/1]).
 
 
 -type(load() :: integer()).
@@ -55,8 +56,6 @@
 -type(my_message() ::
            %% trigger messages
            {lb_trigger} |
-           %% actions for trigger
-           {trigger_action} |
            %% random node from cyclon
            {cy_cache, [node:node_type()]} |
            %% load response from dht node
@@ -76,16 +75,10 @@
 %%  Startup   %
 %%%%%%%%%%%%%%%
 
-%% @doc Start this process as a gen component and register it in the dht node group
--spec start_link(pid_groups:groupname()) -> {ok, pid()}.
-start_link(DHTNodeGroup) ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
-                             [{pid_groups_join_as, DHTNodeGroup, lb_active_karger}]).
-
-%% @doc Initialization of process called by gen_component.
--spec init([]) -> state().
-init([]) ->
-    msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
+%% @doc Initialization of module called by lb_active
+-spec init() -> state().
+init() ->
+    %msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
     Epsilon = config:read(lb_active_karger_epsilon),
     #state{epsilon = Epsilon}.
 
@@ -93,12 +86,9 @@ init([]) ->
 %%  Trigger   %
 %%%%%%%%%%%%%%%
 
--spec on(my_message(), state()) -> state().
-on({lb_trigger}, State) ->
+-spec handle_msg(my_message(), state()) -> state().
+handle_msg({lb_trigger}, State) ->
     msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
-    gen_component:post_op({trigger_action}, State);
-
-on({trigger_action}, State) ->
     %% Request 1 random node from cyclon
     %% TODO Request more to have a bigger sample size
     cyclon:get_subset_rand(1),
@@ -109,39 +99,39 @@ on({trigger_action}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% No random nodes available via cyclon
-on({cy_cache, []}, State) ->
+handle_msg({cy_cache, []}, State) ->
     ?TRACE("Cyclon returned no random node~n", []),
     State;
 
 %% Got a random node via cyclon
-on({cy_cache, [RandomNode]}, State) ->
+handle_msg({cy_cache, [RandomNode]}, State) ->
     ?TRACE("Got random node~n", []),
     Envelope = comm:reply_as(comm:this(), 2, {my_dht_response, '_'}),
     comm:send(comm:this(), {get_node_details, Envelope}, [{group_member, dht_node}]),
     State#state{rnd_node = RandomNode};
 
 %% Got load from my node
-on({my_dht_response, {get_node_details_response, NodeDetails}}, State) ->
+handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) ->
 	?TRACE("Received node details for own node~n", []),
 	RndNode = State#state.rnd_node,
 	Epsilon = State#state.epsilon,
 	comm:send(node:pidX(RndNode), {lb_active, {phase1, Epsilon, serialize(NodeDetails)}}, [{?quiet}]),
 	State#state{rnd_node = nil};
 
-on({move, result, {tag, _JumpOrSlide}, _Status}, State) ->
+handle_msg({move, result, {tag, _JumpOrSlide}, _Status}, State) ->
 	?TRACE("~p status: ~p~n", [_JumpOrSlide, _Status]),
 	State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Static methods called by dht_node message handler  %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec process_lb_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
+-spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
 %% First phase: We were contacted by another node who chose
 %% us as a random node. In this phase we'll determine if
 %% load balancing is necessary. If so, we'll try to balance
 %% assuming the two nodes are neighbors. If not we'll contact
 %% the light node's successor for more load information.
-process_lb_msg({lb_active, {phase1, Epsilon, NodeX}}, DhtState) ->
+handle_dht_msg({lb_active, {phase1, Epsilon, NodeX}}, DhtState) ->
 	MyLBInfo = serialize(dht_node_state:details(DhtState)),
 	MyLoad = get_load(MyLBInfo),
 	LoadX = get_load(NodeX),
@@ -168,7 +158,7 @@ process_lb_msg({lb_active, {phase1, Epsilon, NodeX}}, DhtState) ->
 %% more load than the HeavyNode. If so, we'll slide with the
 %% LightNode. Otherwise we instruct the HeavyNode to set up
 %% a jump operation with the Lightnode.
-process_lb_msg({lb_active, {phase2, HeavyNode, LightNode}}, DhtState) ->
+handle_dht_msg({lb_active, {phase2, HeavyNode, LightNode}}, DhtState) ->
 	?TRACE("In phase 2~n", []),
 	MyLBInfo = serialize(dht_node_state:details(DhtState)),
 	MyLoad = get_load(MyLBInfo),
@@ -185,7 +175,7 @@ process_lb_msg({lb_active, {phase2, HeavyNode, LightNode}}, DhtState) ->
 %% We received a jump or slide operation from a LightNode.
 %% In either case, we'll compute the target id and send out
 %% the jump or slide message to the LightNode.
-process_lb_msg({lb_active, {JumpOrSlide, LightNode}}, DhtState) ->
+handle_dht_msg({lb_active, {JumpOrSlide, LightNode}}, DhtState) ->
 	?TRACE("Before ~p Heavy: ~p Light: ~p~n",
            [JumpOrSlide, dht_node_state:get(DhtState, node_id), node:id(get_node(LightNode))]),
 	MyNode = serialize(dht_node_state:details(DhtState)),
@@ -245,6 +235,11 @@ get_target_load(slide, HeavyNode, LightNode) ->
 	(get_load(HeavyNode) + get_load(LightNode)) div 2;
 get_target_load(jump, HeavyNode, _LightNode) ->
 	 get_load(HeavyNode) div 2.
+
+%% @doc Key/Value List for web debug
+-spec get_web_debug_key_value(state()) -> [{string(), string()}].
+get_web_debug_key_value(State) ->
+    [{"state", webhelpers:html_pre(State)}].
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->

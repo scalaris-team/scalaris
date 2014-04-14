@@ -20,7 +20,6 @@
 -vsn('$Id$').
 
 -behavior(gen_component).
--behavior(lb_active_beh).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -33,7 +32,7 @@
 %% gen_component
 -export([on_inactive/2, on/2]).
 %% for calls from the dht node
--export([process_lb_msg/2]).
+-export([handle_dht_msg/2]).
 %% for db monitoring
 -export([init_db_monitors/0, update_db_monitor/2]).
 
@@ -79,7 +78,7 @@ on_inactive({lb_trigger}, State) ->
     trigger(lb_trigger),
     case monitor_vals_appeared() of
         true ->
-            InitState = apply(get_lb_module(), init, [[]]),
+            InitState = call_module(init, []),
             ?TRACE("Activating active load balancing~n", []),
             gen_component:change_handler(InitState, fun on/2);
         _    ->
@@ -102,21 +101,28 @@ on({collect_stats}, State) ->
     State;
 
 on({lb_trigger} = Msg, State) ->
-    io:format("All vals appeared!"),
+    io:format("All vals appeared!~n"),
     %% module can decide whether to trigger
     %% trigger(lb_trigger),
-    apply(get_lb_module(), on, [Msg, State]);
+    call_module(handle_msg, [Msg, State]);
+
+on({web_debug_info, Requestor}, State) ->
+    KVList =
+        [{"active module", webhelpers:safe_html_string("~p", [get_lb_module()])}
+        ],
+    Return = KVList ++ call_module(get_web_debug_key_value, [State]),
+    comm:send_local(Requestor, {web_debug_info_reply, Return}),
+    State;
 
 on(Msg, State) ->
-    apply(get_lb_module(), on, [Msg, State]).
+    call_module(handle_msg, [Msg, State]).
 
 %%%%%%%%%%%%%%%%%%%%%%%% Calls from dht_node %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Process load balancing messages sent to the dht node
--spec process_lb_msg(lb_message(), dht_node_state:state()) -> dht_node_state:state(). 
-process_lb_msg({lb_active, Msg}, DhtState) ->
-    io:format("Got message ~p~n", [Msg]),
-    DhtState.
+-spec handle_dht_msg(lb_message(), dht_node_state:state()) -> dht_node_state:state().
+handle_dht_msg({lb_active, Msg}, DhtState) ->
+    call_module(handle_dht_msg, [Msg, DhtState]).
 
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -184,6 +190,10 @@ get_metric(MonitorPid, Key) ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec call_module(atom(), list()) -> state().
+call_module(Fun, Args) ->
+    apply(get_lb_module(), Fun, Args). 
 
 -spec get_lb_module() -> atom() | failed.
 get_lb_module() ->

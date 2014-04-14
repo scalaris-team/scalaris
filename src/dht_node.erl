@@ -339,7 +339,7 @@ on(Msg, State) when mr_master =:= element(1, Msg) ->
 % active load balancing messages (see lb_active_*.erl)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on(Msg, State) when lb_active =:= element(1, Msg) ->
-    lb_active:process_lb_msg(Msg, State);
+    lb_active:handle_dht_msg(Msg, State);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % handling of failed sends
