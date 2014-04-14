@@ -160,7 +160,7 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     ItemsStdDev = gossip_load:load_info_get(stddev, LoadInfo),
     ItemsAvg = gossip_load:load_info_get(avgLoad, LoadInfo),
     Metrics =
-        case gossip_load:load_info_get(other, LoadInfo) of
+        case gossip_load:load_info_get(other, LoadInfo) of %% TODO automatically enable gossip when laod metric other than items is active
             [] -> [{avg, ItemsAvg}, {stddev, ItemsStdDev}];
             _ -> [{avg, gossip_load:load_info_other_get(avgLoad, gossip_load_lb_metric, LoadInfo)},
                   {stddev, gossip_load:load_info_other_get(stddev, gossip_load_lb_metric, LoadInfo)}]
