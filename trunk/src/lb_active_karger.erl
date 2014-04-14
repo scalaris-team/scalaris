@@ -126,7 +126,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
             ReqIds =
                 [begin
                       ReqId = randoms:getRandomInt(),
-                      ?TRACE("Sending out simulate request with ReqId ~p to ~p~n", [ReqId, RndNode]),
+                      ?TRACE("Sending out simulate request with ReqId ~p to ~p~n", [ReqId, node:pidX(RndNode)]),
                       OptionsNew = [{simulate, ReqId}, {reply_to, comm:this()}] ++ Options,
                       comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, OptionsNew},
                                 [?quiet]), %% TODO failure detector here?

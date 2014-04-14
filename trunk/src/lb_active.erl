@@ -55,8 +55,11 @@
 -record(lb_op, {id = ?required(id, lb_op)         :: uid:global_uid(),
                 type = ?required(type, lb_op)     :: slide_pred | slide_succ | jump,
                 light_node = ?required(light, lb_op)   :: node:node_type(),
+                light_node_succ = ?required(light_node_succ, lb_op) :: node:node_type(),
                 heavy_node = ?required(heavy, lb_op)   :: node:node_type(),
                 target = ?required(target, lb_op) :: ?RT:key(),
+                %% time of the oldest data used for the decision for this lb_op
+                data_time = ?required(data_time, lb_op) :: erlang:timestamp(),
                 time = os:timestamp()             :: erlang:timestamp()
                }).
 
@@ -77,6 +80,8 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialization of monitoring values
 -spec init([]) -> state().
 init([]) ->
+    set_time_last_balance(),
+    set_nodes_last_balance([]),
     case collect_stats() of
         true ->
             %% TODO configure minutes to collect
@@ -157,34 +162,126 @@ on({pre_balance, LightNode, HeavyNode, LightNodeSucc, {gossip_get_values_best_re
     comm:send(HeavyPid, {lb_active, balance, LightNode, HeavyNode, GlobalInfo}),
     State;
 
-%% lb_op received by dht_node and to be executed
-on({balance, Op}, State) ->
+%% lb_op received from dht_node and to be executed
+on({balance_phase1, Op}, State) ->
     case op_pending() of
         true  -> ?TRACE("Pending op. Won't jump or slide. Discarding op ~p~n", [Op]);
         false ->
-            set_pending_op(Op),
-            OpId = Op#lb_op.id,
-            Pid = node:pidX(Op#lb_op.light_node),
-            TargetKey = Op#lb_op.target,
-            ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
-            case Op#lb_op.type of
-                jump ->
-                    comm:send(Pid, {move, start_jump, TargetKey, {jump, OpId}, comm:this()});
-                slide_pred ->
-                    comm:send(Pid, {move, start_slide, pred, TargetKey, {slide, OpId}, comm:this()});
-                slide_succ ->
-                    comm:send(Pid, {move, start_slide, succ, TargetKey, {slide, OpId}, comm:this()})
+            case old_data(Op) of
+                true -> ?TRACE("Old data. Discarding op ~p~n", [Op]);
+                false ->
+                    set_pending_op(Op),
+                    case Op#lb_op.type of
+                        jump ->
+                            %% tell the succ of the light node in case of a jump
+                            LightNodeSuccPid = node:pidX(Op#lb_op.light_node_succ),
+                            comm:send(LightNodeSuccPid, {balance_phase2a, Op, comm:this()}, [{group_member, lb_active}]);
+                        _ -> 
+                            %% set pending op at other node
+                            LightNodePid = node:pidX(Op#lb_op.light_node),
+                            comm:send(LightNodePid, {balance_phase2b, Op, comm:this()}, [{group_member, lb_active}])
+                    end
             end
     end,
     State;
 
+on({balance_phase2a, Op, ReplyPid}, State) ->
+    case op_pending() of
+        true -> ?TRACE("Pending op in phase2a. Discarding op ~p and replying~n", [Op]),
+                comm:send(ReplyPid, {balance_failed, Op});
+        false ->
+            case old_data(Op) of
+                true -> ?TRACE("Old data. Discarding op ~p~n", [Op]),
+                        comm:send(ReplyPid, {balance_failed, Op});
+                false ->
+                    set_pending_op(Op),
+                    LightNodePid = node:pidX(Op#lb_op.light_node),
+                    comm:send(LightNodePid, {balance_phase2b, Op, ReplyPid}, [{group_member, lb_active}])
+            end
+    end,
+    State;
+
+
+on({balance_phase2b, Op, ReplyPid}, State) ->
+    case op_pending() of
+        true -> ?TRACE("Pending op in phase2b. Discarding op ~p and replying~n", [Op]),
+                comm:send(ReplyPid, {balance_failed, Op});
+        false ->
+            case old_data(Op) of
+                true -> ?TRACE("Old data. Discarding op ~p~n", [Op]),
+                        comm:send(ReplyPid, {balance_failed, Op#lb_op.id});
+                false ->
+                    set_pending_op(Op),
+                    OpId = Op#lb_op.id,
+                    Pid = node:pidX(Op#lb_op.light_node),
+                    TargetKey = Op#lb_op.target,
+                                set_pending_op(Op),
+                    ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
+                    case Op#lb_op.type of
+                        jump ->
+                            %% TODO replace with send_local
+                            %% TODO jump has another node to inform
+                            comm:send(Pid, {move, start_jump, TargetKey, {jump, OpId}, comm:this()});
+                        slide_pred ->
+                            comm:send(Pid, {move, start_slide, pred, TargetKey, {slide, OpId}, comm:this()});
+                        slide_succ ->
+                            comm:send(Pid, {move, start_slide, succ, TargetKey, {slide, OpId}, comm:this()})
+                    end
+            end
+    end,
+    State;
+
+on({balance_failed, OpId}, State) ->
+    case get_pending_op() of
+        undefined -> ?TRACE("Received balance_failed but OpId ~p was not pending~n", [OpId]);
+        Op when Op#lb_op.id =:= OpId ->
+            ?TRACE("Clearing pending op because of balance_failed ~p~n", [OpId]),
+            set_pending_op(undefined);
+        Op ->
+            ?TRACE("Received balance_failed answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
+    end,
+    State;
+
+on({balance_success, OpId}, State) ->
+    case get_pending_op() of
+        undefined -> ?TRACE("Received answer but OpId ~p was not pending~n", [OpId]);
+        Op when Op#lb_op.id =:= OpId ->
+            ?TRACE("Clearing pending op ~p~n", [OpId]),
+            set_pending_op(undefined),
+            set_time_last_balance(),
+            HeavyNode = Op#lb_op.heavy_node,
+            LightNode = Op#lb_op.light_node,
+            Nodes = [HeavyNode, LightNode],
+            set_nodes_last_balance(Nodes);
+        Op ->
+            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
+    end,
+    State;
+
+%% received reply at the sliding/jumping node
 on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
     ?TRACE("~p status with id ~p: ~p~n", [_JumpOrSlide, OpId, _Status]),
     case get_pending_op() of
         undefined -> ?TRACE("Received answer but OpId ~p was not pending~n", [OpId]);
         Op when Op#lb_op.id =:= OpId ->
-            ?TRACE("Clearing pending op ~p~n", [OpId]),
-            set_pending_op(undefined);
+            ?TRACE("Clearing pending op and replying to other node ~p~n", [OpId]),
+            HeavyNodePid = node:pidX(Op#lb_op.heavy_node),
+            comm:send(HeavyNodePid, {balance_success, OpId}, [{group_member, lb_active}]),
+            set_pending_op(undefined),
+            set_time_last_balance(),
+            HeavyNode = Op#lb_op.heavy_node,
+            LightNode = Op#lb_op.light_node,
+            Nodes = case Op#lb_op.type of
+                jump ->
+                    %% also reply to light node succ in case of jump
+                    LightNodeSucc = Op#lb_op.light_node_succ,
+                    LightNodeSuccPid = node:pidX(LightNodeSucc),
+                    comm:send(LightNodeSuccPid, {balance_success, OpId}, [{group_member, lb_active}]),
+                    [HeavyNode, LightNode, LightNodeSucc];
+                _ ->
+                    [HeavyNode, LightNode]
+            end,
+            set_nodes_last_balance(Nodes);
         Op ->
             ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
     end,
@@ -262,6 +359,28 @@ old_op(Op) ->
     ?TRACE("Diff:~p~n", [timer:now_diff(os:timestamp(), Op#lb_op.time)]),
     timer:now_diff(os:timestamp(), Op#lb_op.time) > Threshold.
 
+-spec old_data(lb_op()) -> boolean().
+old_data(Op) ->
+    LastBalanceTime = erlang:get(time_last_balance),
+    DataTime = Op#lb_op.data_time,
+    Nodes = [Op#lb_op.heavy_node, Op#lb_op.light_node],
+    LastBalancedNodes = get_nodes_last_balance(),
+    timer:now_diff(LastBalanceTime, DataTime) > 0.
+        %andalso lists:any(fun(Node) -> lists:member(Node, LastBalancedNodes) end, Nodes).
+
+set_time_last_balance() ->
+    erlang:put(time_last_balance, os:timestamp()),
+    ok.
+
+-spec get_nodes_last_balance() -> [node:node_type()].
+get_nodes_last_balance() ->
+    erlang:get(nodes_last_balance).
+
+-spec set_nodes_last_balance([node:node_type()]) -> ok.
+set_nodes_last_balance(Nodes) ->
+    erlang:put(nodes_last_balance, Nodes),
+    ok.
+
 %%%%%%%%%%%%%%%%%%%%%%%% Calls from dht_node %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Process load balancing messages sent to the dht node
@@ -306,10 +425,12 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                                     end,
                             Op = #lb_op{id = OpId, type = Type,
                                         light_node = lb_info:get_node(LightNode),
+                                        light_node_succ = lb_info:get_succ(LightNode),
                                         heavy_node = lb_info:get_node(HeavyNode),
-                                        target = SplitKey},
+                                        target = SplitKey,
+                                        data_time = erlang:min(lb_info:get_time(HeavyNode), lb_info:get_time(LightNode))},
                             LBModule = pid_groups:get_my(?MODULE),
-                            comm:send_local(LBModule, {balance, Op});
+                            comm:send_local(LBModule, {balance_phase1, Op});
                 ReqId ->
                     LoadChange =
                         case JumpOrSlide of
