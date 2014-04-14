@@ -28,7 +28,7 @@
 -define(TRACE(X,Y), io:format("lb_active: " ++ X, Y)).
 
 %% startup
--export([start_link/1, init/1, check_config/0]).
+-export([start_link/1, init/1, check_config/0, is_enabled/0]).
 %% gen_component
 -export([on_inactive/2, on/2]).
 %% for calls from the dht node
@@ -89,8 +89,8 @@ init([]) ->
     erlang:put(last_db_monitor_init, os:timestamp()), %% TODO ugly
     case collect_stats() of
         true ->
-            application:start(sasl),   %% required by os_mon.
-            application:start(os_mon), %% for monitoring cpu and memory usage.
+            _ = application:start(sasl),   %% required by os_mon.
+            _ = application:start(os_mon), %% for monitoring cpu and memory usage.
             trigger(collect_stats);
         _ -> ok
     end,
@@ -125,9 +125,6 @@ on_inactive({lb_trigger}, State) ->
             State
     end;
 
-on_inactive({monitor_trigger} = Msg, State) ->
-    on(Msg, State);
-
 on_inactive({collect_stats} = Msg, State) ->
     on(Msg, State);
 
@@ -160,12 +157,6 @@ on({collect_stats}, State) ->
     %monitor:client_monitor_set_value(lb_active, cpu5min, fun(Old) -> rrd:add_now(CPU, Old) end),
     monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end),
     %monitor:client_monitor_set_value(lb_active, mem5min, fun(Old) -> rrd:add_now(MEM, Old) end),
-    State;
-
-on({monitor_trigger}, State) ->
-    trigger(monitor_trigger),
-    monitor:proc_check_timeslot(lb_active, db_reads),
-    monitor:proc_check_timeslot(lb_active, db_writes),
     State;
 
 on({lb_trigger} = Msg, State) ->
@@ -332,8 +323,11 @@ on({reset_monitors}, State) ->
 on({web_debug_info, Requestor}, State) ->
     KVList =
         [{"active module", webhelpers:safe_html_string("~p", [get_lb_module()])},
-         {"metric"       , webhelpers:safe_html_string("~p", [config:read(lb_active_metric)])},
-         {"metric value:", webhelpers:safe_html_string("~p", [get_load_metric()])},
+         {"load metric", webhelpers:safe_html_string("~p", [config:read(lb_active_load_metric)])},
+         {"load metric value:", webhelpers:safe_html_string("~p", [get_load_metric()])},
+         {"request metric", webhelpers:safe_html_string("~p", [config:read(lb_active_request_metric)])},
+         {"request metric value", webhelpers:safe_html_string("~p", [get_request_metric()])},
+         {"balance with", webhelpers:safe_html_string("~p", [config:read(lb_active_balance_metric)])},
          {"last balance:", webhelpers:safe_html_string("~p", [get_time_last_balance()])},
          {"pending op:",   webhelpers:safe_html_string("~p", [get_pending_op()])}
         ],
@@ -378,7 +372,7 @@ balance_noop(Options) ->
 get_pending_op() ->
     erlang:get(pending_op).
 
--spec set_pending_op(lb_op()) -> ok.
+-spec set_pending_op(undefined | lb_op()) -> ok.
 set_pending_op(Op) ->
     erlang:put(pending_op, Op),
     ok.
@@ -458,10 +452,10 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
 
                 TargetLoad =
                     case gossip_available(Options) of
-                        true -> AvgItems = proplists:get_value(avg, Options),
+                        true -> Avg = proplists:get_value(avg, Options),
                                 %% don't take away more items than the average
-                                ?IIF(ProposedTargetLoad > AvgItems,
-                                     trunc(AvgItems), ProposedTargetLoad);
+                                ?IIF(ProposedTargetLoad > Avg,
+                                     trunc(Avg), ProposedTargetLoad);
                         false -> ProposedTargetLoad
                     end,
 
@@ -484,7 +478,8 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                                 %% TODO fall back in a more clever way / abort lb request
                                 failed ->
                                     ?TRACE("get_request_histogram failed~n", []),
-                                    dht_node_state:get_split_key(DhtState, From, To, 0, Direction);
+                                    %% TODO what to do now?
+                                    dht_node_state:get_split_key(DhtState, From, To, 1, Direction);
                                 Val -> Val
                             end
                     end,
@@ -576,7 +571,7 @@ init_db_monitors(MyId, MyRange) ->
                                         NormVal when NormVal =< ?MINUS_INFINITY ->
                                             ?PLUS_INFINITY + NormVal - 1;
                                         NormVal ->
-                                            NormVal
+                                            NormVal - 1
                                     end
                             end,
                         InverseFun =
@@ -630,7 +625,7 @@ init_stats() ->
 %% @doc initially checks if enough metric data has been collected
 -spec monitor_vals_appeared() -> boolean().
 monitor_vals_appeared() ->
-    Metric = config:read(lb_active_metric),
+    Metric = config:read(lb_active_load_metric),
     case erlang:get(metric_available) of
         true -> true;
         _ ->
@@ -658,21 +653,21 @@ collect_phase() ->
 get_load_metric() ->
     Metric = config:read(lb_active_load_metric),
     Value = case get_load_metric(Metric) of
-                unknown -> 0;
-                Val -> Val
+                unknown -> 0.0;
+                Val -> util:round(Val, 2)
             end,
     io:format("Load: ~p~n", [Value]),
     Value. %%TODO
 
--spec get_load_metric(load_metric()) -> items | number(). %% unknwon shouldn't happen here, in theory it can TODO
+-spec get_load_metric(load_metric()) -> unknown | items | number(). %% TODO unknwon shouldn't happen here, in theory it can TODO
 get_load_metric(Metric) ->
     get_load_metric(Metric, normal).
 
 -spec get_load_metric(load_metric(), normal | strict) -> unknown | items | number().
 get_load_metric(Metric, Mode) ->
     case Metric of
-        cpu          -> get_vm_metric({lb_active, cpu}, Mode) / 100;
-        mem          -> get_vm_metric({lb_active, mem}, Mode) / 100;
+        cpu          -> get_vm_metric(cpu, Mode);
+        mem          -> get_vm_metric(mem, Mode);
         %net_latency  ->
         %net_bandwith ->
         %tx_latency   -> get_dht_metric({api_tx, req_list}, avg, Mode);
@@ -681,41 +676,42 @@ get_load_metric(Metric, Mode) ->
         _            -> throw(metric_not_available)
     end.
 
--spec get_request_metric() -> ok.
+-spec get_request_metric() -> number().
 get_request_metric() ->
     Metric = config:read(lb_active_request_metric),
     Value = case get_request_metric(Metric) of
                 unknown -> 0;
-                Val -> Val
+                Val -> erlang:round(Val)
             end,
     io:format("Requests: ~p~n", [Value]),
     Value.
 
--spec get_request_metric(request_metric()) -> ok.
+-spec get_request_metric(request_metric()) -> unknown | number().
 get_request_metric(Metric) ->
     get_request_metric(Metric, normal).
 
--spec get_request_metric(request_metric(), normal | strict) -> ok.
+-spec get_request_metric(request_metric(), normal | strict) -> unknown | number().
 get_request_metric(Metric, Mode) ->
     case Metric of
-        db_reads -> get_dht_metric({lb_active, db_reads}, Mode);
-        db_writes -> get_dht_metric({lb_active, db_writes}, Mode)
+        db_reads -> get_dht_metric(db_reads, Mode);
+        db_writes -> get_dht_metric(db_writes, Mode)
         %db_requests  -> get_request_metric(db_reads, Mode) +
         %                get_request_metric(db_writes, Mode); %% TODO
     end.
 
--spec get_vm_metric(load_metric() | request_metric(), normal | strict) -> unknown | number().
+-spec get_vm_metric(load_metric(), normal | strict) -> unknown | number().
 get_vm_metric(Metric, Mode) ->
     ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
     get_metric(ClientMonitorPid, Metric, Mode).
 
+-spec get_dht_metric(load_metric() | request_metric(), normal | strict) -> unknown | number().
 get_dht_metric(Metric, Mode) ->
     MonitorPid = pid_groups:get_my(monitor),
     get_metric(MonitorPid, Metric, Mode).
 
 -spec get_metric(pid(), monitor:table_index(), normal | strict) -> unknown | number().
 get_metric(MonitorPid, Metric, Mode) ->
-    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [Metric]),
+    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, Metric}]),
     case RRD of
         undefined ->
             unknown;
@@ -726,11 +722,11 @@ get_metric(MonitorPid, Metric, Mode) ->
             Vals = [begin
                         %% get stable value off an old slot
                         Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs - Offset*SlotLength}),
-                        io:format("Value ~p~n", [Value]),
+                        %io:format("Value ~p~n", [Value]),
                         %case Value of undefined -> io:format("Undefined value considered.~n"); _->ok end,
                         get_value_type(Value, rrd:get_type(RRD))
                     end || Offset <- lists:seq(1, History)],
-            io:format("Vals: ~p~n", [Vals]),
+            io:format("~p Vals: ~p~n", [Metric, Vals]),
             case Mode of
                 strict -> ?IIF(lists:member(unknown, Vals), unknown, avg_weighted(Vals));
                 _ -> avg_weighted(Vals)
@@ -774,7 +770,8 @@ avg_weighted([Element | Other], Weight, N, Sum) ->
 get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
     MonitorPid = pid_groups:get_my(monitor),
     RequestMetric = config:read(lb_active_request_metric),
-    case monitor:get_rrds(MonitorPid, [{lb_active, RequestMetric}]) of
+    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, RequestMetric}]),
+    case RRD of
         undefined ->
             log:log(warn, "No request histogram available because no rrd is available."),
             failed;
@@ -784,6 +781,7 @@ get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
                     log:log(warn, "No request histogram available. Time slot not found."),
                     failed;
                 Histogram ->
+                    ?TRACE("Got histogram to compute split key: ~p~n", [Histogram]),
                     {Status, Key, TakenLoad} =
                         case {histogram_normalized:is_normalized(Histogram), Direction} of
                             {true, forward} -> histogram_normalized:foldl_until(TargetLoad, Histogram);
@@ -800,7 +798,11 @@ get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec call_module(atom(), list()) -> state().
+-spec is_enabled() -> boolean().
+is_enabled() ->
+    config:read(lb_active).
+
+-spec call_module(atom(), list()) -> term().
 call_module(Fun, Args) ->
     apply(get_lb_module(), Fun, Args).
 
@@ -811,7 +813,7 @@ get_lb_module() ->
 %% TODO!
 -spec collect_stats() -> boolean().
 collect_stats() ->
-    Metrics = [cpu, mem, db_reads, db_writes, db_requests, transactions],
+    Metrics = [cpu, mem],
     lists:member(config:read(lb_active_load_metric), Metrics).
 
 % TODO!
@@ -820,7 +822,7 @@ monitor_db() ->
     %case erlang:get(monitor_db) of
     %    undefined ->
             Metrics = [db_reads, db_writes, db_requests],
-            Status = lists:member(config:read(lb_active_load_metric), Metrics).
+            Status = lists:member(config:read(lb_active_request_metric), Metrics).
    %         erlang:put(monitor_db, Status),
    %         Status;
    %     Val -> Val
@@ -838,6 +840,8 @@ trigger(Trigger) ->
 %% @doc config check registered in config.erl
 -spec check_config() -> boolean().
 check_config() ->
+
+    config:cfg_is_bool(lb_active) and
     config:cfg_is_in(lb_active_module, ?MODULES) and
 
     config:cfg_is_integer(lb_active_interval) and
