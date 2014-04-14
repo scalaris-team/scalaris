@@ -35,6 +35,8 @@
 -export([handle_dht_msg/2]).
 %% for db monitoring
 -export([init_db_monitors/0, update_db_monitor/2]).
+%% get load
+-export([get_utilization/1]).
 
 -type lb_message() :: {lb_active, comm:message()}.
 
@@ -57,12 +59,15 @@ start_link(DHTNodeGroup) ->
 init([]) ->
     case collect_stats() of
         true ->
-            CPU  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
-            CPU2 = rrd:create(10 * 1000000, 1, gauge),
-            monitor:client_monitor_set_value(lb_active, cpu5min, CPU),
-            monitor:client_monitor_set_value(lb_active, cpu10sec, CPU2),
+            %% TODO configure minutes to collect
+            LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
+            ShortTerm = rrd:create(10 * 1000000, 1, gauge),
+            monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
+            monitor:client_monitor_set_value(lb_active, cpu10sec, ShortTerm),
+            monitor:client_monitor_set_value(lb_active, mem5min, LongTerm),
+            monitor:client_monitor_set_value(lb_active, mem10sec, ShortTerm),
             application:start(sasl),   %% required by os_mon.
-            application:start(os_mon), %% for monitoring cpu usage.
+            application:start(os_mon), %% for monitoring cpu and memory usage.
             trigger(collect_stats);
         _ ->
             ok
@@ -79,7 +84,7 @@ on_inactive({lb_trigger}, State) ->
     case monitor_vals_appeared() of
         true ->
             InitState = call_module(init, []),
-            ?TRACE("Activating active load balancing~n", []),
+            ?TRACE("All monitor data appeared. Activating active load balancing~n", []),
             gen_component:change_handler(InitState, fun on/2);
         _    ->
             State
@@ -95,13 +100,24 @@ on_inactive({collect_stats} = Msg, State) ->
 on({collect_stats}, State) ->
     trigger(collect_stats),
     CPU = cpu_sup:util(),
+    MEM = case memsup:get_system_memory_data() of
+              [{system_total_memory, Total},
+               {free_swap, FreeSwap},
+               {total_swap, TotalSwap},
+               {cached_memory, CachedMemory},
+               {buffered_memory, BufferedMemory},
+               {free_memory, FreeMemory},
+               {total_memory, TotalMemory}] ->
+                  FreeMemory / TotalMemory * 100
+          end,
     monitor:client_monitor_set_value(lb_active, cpu10sec, fun(Old) -> rrd:add_now(CPU, Old) end),
     monitor:client_monitor_set_value(lb_active, cpu5min, fun(Old) -> rrd:add_now(CPU, Old) end),
+    monitor:client_monitor_set_value(lb_active, mem10sec, fun(Old) -> rrd:add_now(MEM, Old) end),
+    monitor:client_monitor_set_value(lb_active, mem5min, fun(Old) -> rrd:add_now(MEM, Old) end),
     %io:format("CPU utilization: ~p~n", [CPU]),
     State;
 
 on({lb_trigger} = Msg, State) ->
-    io:format("All vals appeared!~n"),
     %% module can decide whether to trigger
     %% trigger(lb_trigger),
     call_module(handle_msg, [Msg, State]);
@@ -173,6 +189,18 @@ monitor_vals_appeared() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%-spec get_load_info(dht_node_state:state()) -> load_info().
+get_utilization(DhtState) ->
+    %% TODO what to do with the dht state?
+    _Utilization =
+        case config:read(lb_active_metric) of
+            cpu -> get_vm_metric(cpu10sec) / 100;
+            mem -> get_vm_metric(mem10sec) / 100;
+            _ -> log:log(warn, "~p: Falling back to default metric", [?MODULE])
+        end,
+    %% TODO remove this
+    randoms:rand_uniform(0, 101) / 100.
+
 -spec get_vm_metric(atom()) -> ok.
 get_vm_metric(Key) ->
     ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
@@ -185,8 +213,7 @@ get_dht_metric(Key) ->
 %% TODO
 get_metric(MonitorPid, Key) ->
     [{lb_active, Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, Key}]),
-    Value = rrd:get_value_by_offset(RRD, 0),
-    io:format("~p: ~p~n", [Key, Value]).
+    _Value = rrd:get_value_by_offset(RRD, 0).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -201,7 +228,7 @@ get_lb_module() ->
 
 -spec collect_stats() -> boolean().
 collect_stats() ->
-    config:read(lb_active_collect_stats) =:= true.
+    config:read(lb_active_collect_stats).
 
 -spec trigger(atom()) -> ok.
 trigger(Trigger) ->
