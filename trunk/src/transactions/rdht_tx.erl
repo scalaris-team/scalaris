@@ -32,9 +32,6 @@
 -export([req_props/1,
          req_get_key/1, req_get_op/1]).
 
-%% export to silence dialyzer
--export([decode_result/1]).
-
 -include("scalaris.hrl").
 -include("client_types.hrl").
 
@@ -256,10 +253,6 @@ encode_value(Value) ->
 %% decode_value(Value) when is_number(Value) -> Value;
 decode_value(Value) when is_binary(Value) -> erlang:binary_to_term(Value);
 decode_value(Value)                       -> Value.
-
--spec decode_result(api_tx:result()) -> api_tx:result().
-decode_result({ok, Value}) -> {ok, decode_value(Value)};
-decode_result(X)           -> X.
 
 %% commit phase
 -spec commit(tx_tlog:tlog()) ->  api_tx:commit_result().
