@@ -1,4 +1,4 @@
-%  @copyright 2010-2011 Zuse Institute Berlin
+%  @copyright 2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -27,9 +27,6 @@
 
 -ifdef(have_callback_support).
 -include("scalaris.hrl").
-
-%% TODO add more...
-%% TODO type specs
 
 %% callbacks
 

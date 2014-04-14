@@ -61,23 +61,43 @@
 
 -type options() :: [tuple()].
 
+-type message_inactive() :: {collect_stats} |
+                            {lb_trigger} |
+                            {reset_monitors}.
+
+-type message() :: {collect_stats} |
+                   {lb_trigger} |
+                   {reset_monitors} |
+                   {gossip_reply, LightNode::lb_info:lb_info(), HeavyNode::lb_info:lb_info(), LightNodeSucc::lb_info:lb_info(),
+                    Options::options(), {gossip_get_values_best_response, LoadInfo::gossip_load:load_info()}} |
+                   {balance_phase1, Op::lb_op()} |
+                   {balance_phase2a, Op::lb_op(), Pid::comm:mypid()} |
+                   {balance_phase2b, Op::lb_op(), Pid::comm:mypid()} |
+                   {balance_failed, OpId::uid:global_uid()} |
+                   {balance_success, OpId::uid:global_uid()} |
+                   {move, result, Tag::{jump | slide_pred | slide_succ, OpId::uid:global_uid()}, Result::ok | dht_node_move:abort_reason()} |
+                   {web_debug_info, Requestor::pid()}.
+
 -type dht_message() :: {lb_active, reset_db_monitors} |
                        {lb_active, balance,
                         HeavyNode::lb_info:lb_info(), LightNode::lb_info:lb_info(),
-                        LightNodeSucc::lb_info:lb_info(), options()}.
+                        LightNodeSucc::lb_info:lb_info(), Options::options()}.
 
 -type module_state() :: tuple().
 
 -type state() :: module_state().
 
--type load_metric() :: items | cpu | mem | tx_latency | net_throughput.
--type request_metric() :: db_reads | db_writes | db_requests.
--type balance_metric() :: items | requests | none.
--type metrics() :: [atom()]. %% TODO
+-type load_metric() :: items | cpu | mem.
+-type request_metric() :: db_reads | db_writes.
+%-type balance_metric() :: items | requests | none.
+%-type metrics() :: [atom()]. %% TODO
 
+%% possible metrics
+% items, cpu, mem, db_reads, db_writes, db_requests,
+% transactions, tx_latency, net_throughput, net_latency
 %% available metrics
--define(LOAD_METRICS, [items, cpu, mem, db_reads, db_writes, db_requests, transactions, tx_latency, net_throughput]). 
--define(REQUEST_METRICS, [db_reads, db_writes, db_requests, net_throughput, net_latency]).
+-define(LOAD_METRICS, [items, cpu, mem, db_reads, db_writes]).
+-define(REQUEST_METRICS, [db_reads, db_writes]).
 
 %% list of active load balancing modules available
 -define(MODULES, [lb_active_karger, lb_active_directories]).
@@ -121,7 +141,7 @@ init([]) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Startup message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Handles all messages until enough monitor data has been collected.
--spec on_inactive(comm:message(), state()) -> state().
+-spec on_inactive(message_inactive(), state()) -> state().
 on_inactive({lb_trigger}, State) ->
     trigger(lb_trigger),
     case monitor_vals_appeared() of
@@ -148,7 +168,7 @@ on_inactive(Msg, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc On handler after initialization
--spec on(comm:message(), state()) -> state().
+-spec on(message(), state()) -> state().
 on({collect_stats}, State) ->
     trigger(collect_stats),
     CPU = cpu_sup:util(),
@@ -180,7 +200,7 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     %% the standard deviation from the gossip process.
     Size = gossip_load:load_info_get(size, LoadInfo),
     Metrics =
-        case config:read(lb_active_balance_metric) of %% TODO automatically enable gossip when laod metric other than items is active
+        case config:read(lb_active_balance_metric) of
             items ->
                 [{avg, gossip_load:load_info_get(avgLoad, LoadInfo)},
                  {stddev, gossip_load:load_info_get(stddev, LoadInfo)}];
@@ -619,10 +639,10 @@ get_load_metric() ->
                 items -> items;
                 Val -> util:round(Val, 2)
             end,
-    ?TRACE("Load: ~p~n", [Value]),
+    %io:format("Load: ~p~n", [Value]),
     Value.
 
--spec get_load_metric(load_metric()) -> unknown | items | number(). %% TODO unknwon shouldn't happen here, in theory it can TODO
+-spec get_load_metric(load_metric()) -> unknown | items | number(). %% TODO unknwon shouldn't happen here, in theory it can
 get_load_metric(Metric) ->
     get_load_metric(Metric, normal).
 
@@ -631,10 +651,6 @@ get_load_metric(Metric, Mode) ->
     case Metric of
         cpu          -> get_vm_metric(cpu, Mode);
         mem          -> get_vm_metric(mem, Mode);
-        %net_latency  ->
-        %net_bandwith ->
-        %tx_latency   -> get_dht_metric({api_tx, req_list}, avg, Mode);
-        %transactions -> get_dht_metric({api_tx, req_list}, count, Mode);
         items        -> items;
         _            -> throw(metric_not_available)
     end.
@@ -644,9 +660,9 @@ get_request_metric() ->
     Metric = config:read(lb_active_request_metric),
     Value = case get_request_metric(Metric) of
                 unknown -> 0;
-                Val -> erlang:round(Val)
+                Val -> util:round(Val, 2)
             end,
-    io:format("Requests: ~p~n", [Value]),
+    %io:format("Requests: ~p~n", [Value]),
     Value.
 
 -spec get_request_metric(request_metric()) -> unknown | number().
@@ -685,11 +701,9 @@ get_metric(MonitorPid, Metric, Mode) ->
             Vals = [begin
                         %% get stable value off an old slot
                         Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs - Offset*SlotLength}),
-                        %io:format("Value ~p~n", [Value]),
-                        %case Value of undefined -> io:format("Undefined value considered.~n"); _->ok end,
                         get_value_type(Value, rrd:get_type(RRD))
                     end || Offset <- lists:seq(1, History)],
-            io:format("~p Vals: ~p~n", [Metric, Vals]),
+            %io:format("~p Vals: ~p~n", [Metric, Vals]),
             case Mode of
                 strict -> ?IIF(lists:member(unknown, Vals), unknown, avg_weighted(Vals));
                 _ -> avg_weighted(Vals)
@@ -760,6 +774,7 @@ get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-compile({inline, [is_enabled/0]}).
 -spec is_enabled() -> boolean().
 is_enabled() ->
     config:read(lb_active).
@@ -873,7 +888,7 @@ check_config() ->
 
     config:cfg_is_in(lb_active_request_metric, ?REQUEST_METRICS) and
 
-    config:cfg_is_in(lb_active_balance_metric, [items, requests]) and
+    config:cfg_is_in(lb_active_balance_metric, [items, requests, none]) and
 
     config:cfg_is_bool(lb_active_use_gossip) and
     config:cfg_is_greater_than(lb_active_gossip_stddev_threshold, 0) and
