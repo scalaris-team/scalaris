@@ -46,7 +46,7 @@
                        node     = ?required(node_details, node)     :: node:node_type(),
                        succlist = ?required(node_details, succlist) :: nodelist:non_empty_snodelist(),
                        load     = ?required(node_details, load)     :: load(),
-                       load2    = ?required(node_details, load)     :: load2(),
+                       load2    = ?required(node_details, load2)    :: load2(),
                        hostname = ?required(node_details, hostname) :: hostname(),
                        rt_size  = ?required(node_details, rt_size)  :: rt_size(),
                        memory   = ?required(node_details, memory)   :: memory()}).
