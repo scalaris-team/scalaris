@@ -41,31 +41,21 @@
 
 %% Defines the number of directories
 %% e.g. 1 implies a central directory
--define(NUM_DIRECTORIES, 2).
+-define(NUM_DIRECTORIES, 1).
 
 %-define(TRACE(X,Y), ok).
 -define(TRACE(X,Y), io:format(X,Y)).
-
--type utilization() :: float().
-
--record(lb_info, {utilization = ?required(lb_info, utilization)    :: utilization(), %% erlang sorts by first element in record/tuple
-               load     = 0                                     :: number(),
-               node     = ?required(lb_info, node)               :: node:node_type(),
-               pred     = ?required(lb_info, pred)              :: node:node_type(),
-               succ     = ?required(lb_info, succ)              :: node:node_type()
-               %capacity = 1                                 :: number(),
-               }).
 
 -type directory_name() :: string().
 
 -record(directory, {name         = ?required(directory, name) :: directory_name(), 
                     last_balance = nil                        :: nil | os:timestamp(),
-                    pool         = gb_sets:new()              :: gb_set() %% TODO really gb_set here? gb_tree is good enough
-                    %schedule     = []                        :: schedule()
+                    pool         = gb_sets:new()              :: gb_set(), %% TODO really gb_set here? gb_tree is good enough
+                    num_reported = 0                          :: non_neg_integer()
                     }).
 
--record(reassign, {light = ?required(reassign, from) :: node:node_type(),
-                   heavy = ?required(reassign, to)   :: node:node_type()
+-record(reassign, {light = ?required(reassign, from) :: lb_info:lb_info(),
+                   heavy = ?required(reassign, to)   :: lb_info:lb_info()
                    }).
 
 -type reassign() :: #reassign{}.
@@ -78,7 +68,6 @@
                 }).
 
 -type directory() :: #directory{}.
--type lb_info() :: #lb_info{}.
 
 -type state() :: #state{}.
 
@@ -93,7 +82,7 @@
 init() ->
     create_directories(?NUM_DIRECTORIES),
     %% post load to random directory
-    %% post_load(rand_directory),
+    request_dht_load(),
     trigger(publish_trigger),
     trigger(directory_trigger),
     request_dht_range(),
@@ -117,20 +106,21 @@ handle_msg({publish_trigger}, State) ->
           Schedule = State#state.schedule,
           perform_transfer(Schedule),
           % post_load()
-          MyDHT = pid_groups:get_my(dht_node),
-          DirKey = int_to_str(get_random_directory_key()),
           % request dht load to post it in the directory afterwards
           request_dht_load(),
           State#state{schedule = []}
     end;
 
 %% we received load because of publish load trigger or emergency
-handle_msg({post_load, LoadInfo, DirKey}, State) ->
+handle_msg({post_load, LoadInfo}, State) ->
     ?TRACE("Posting load ~p~n", [LoadInfo]),
+    %DirKey = int_to_str(get_random_directory_key()),
+    Directory = get_random_directory(),
+    DirKey = Directory#directory.name,
     post_load_to_directory(LoadInfo, DirKey),
     %% TODO Emergency Threshold has been already check at the node overloaded...
     EmergencyThreshold = State#state.threshold_emergency,
-    case LoadInfo#lb_info.utilization > EmergencyThreshold of
+    case lb_info:get_load(LoadInfo) > EmergencyThreshold of
         true  ->
             MySchedule = State#state.schedule,
             directory_routine(DirKey, emergency, MySchedule);
@@ -172,16 +162,13 @@ handle_msg(Msg, State) ->
 
 %% @doc Load balancing messages received by the dht node.
 -spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
-handle_dht_msg({request_load, DirKey, ReplyPid}, DhtState) ->
+handle_dht_msg({request_load, ReplyPid}, DhtState) ->
     %MyNodeDetails = dht_node_state:details(DhtState),
     %Capacity = node_details:get
     %% TODO make this more generic
-    Utilization = lb_active:get_utilization(DhtState),
-    Node = dht_node_state:get(DhtState, node),
-    Pred = dht_node_state:get(DhtState, pred),
-    Succ = dht_node_state:get(DhtState, succ),
-    LoadInfo = #lb_info{utilization = Utilization, node = Node, pred = Pred, succ = Succ},
-    comm:send_local(ReplyPid, {post_load, LoadInfo, DirKey}),
+    NodeDetails = dht_node_state:details(DhtState),
+    LoadInfo = lb_info:new(NodeDetails),
+    comm:send_local(ReplyPid, {post_load, LoadInfo}),
     DhtState;
 
 handle_dht_msg(Msg, DhtState) ->
@@ -217,13 +204,15 @@ directory_routine(DirKey, Type, Schedule) ->
                         %% clear directory only for periodic
                         NewDirectory = dir_clear_load(Directory),
                         set_directory(TLog, NewDirectory),
-                        AvgUtil = gb_sets:fold(fun(El, Acc) -> Acc + El#lb_info.utilization end, 0, Pool) / gb_sets:size(Pool),
+                        AvgUtil = gb_sets:fold(fun(El, Acc) -> Acc + lb_info:get_load(El) end, 0, Pool) / gb_sets:size(Pool),
+                        %% TODO calculate threshold according to metric
                         (1 + AvgUtil) / 2;
                     emergency ->
                         1.0
                 end,
-            LightNodes = gb_sets:filter(fun(El) -> El#lb_info.utilization =< K end, Pool),
-            HeavyNodes = gb_sets:filter(fun(El) -> El#lb_info.utilization >  K end, Pool),
+            ?TRACE("Threshold: ~p~n", [K]),
+            LightNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) =< K end, Pool),
+            HeavyNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) >  K end, Pool),
             ScheduleNew = find_matches(LightNodes, HeavyNodes, []),
             ?TRACE("New schedule: ~p~n", [ScheduleNew]),
             ScheduleNew
@@ -275,7 +264,7 @@ get_random_directory_key() ->
 get_directory_key_by_number(N) when N > 0 ->
     ?RT:hash_key("lb_active_dir" ++ int_to_str(N)).
 
--spec post_load_to_directory(lb_info(), directory_name()) -> ok.
+-spec post_load_to_directory(lb_info:lb_info(), directory_name()) -> ok.
 post_load_to_directory(Load, DirKey) ->
     TLog = api_tx:new_tlog(),
     case api_tx:read(TLog, DirKey) of
@@ -294,11 +283,21 @@ post_load_to_directory(Load, DirKey) ->
             ok
     end.
 
+%% selects two directories at random and returns the one which least nodes reported to
+get_random_directory() ->
+    {_TLog1, RandDir1} = get_directory(int_to_str(get_random_directory_key())),
+    {_TLog2, RandDir2} = get_directory(int_to_str(get_random_directory_key())),
+    case RandDir1#directory.num_reported >= RandDir2#directory.num_reported of
+        true -> RandDir1;
+        _    -> RandDir2
+    end.
+
+-spec get_directory(directory_name()) -> {api_tx:tlog(), directory()}.
 get_directory(DirKey) ->
     TLog = api_tx:new_tlog(),
     case api_tx:read(TLog, DirKey) of
         {TLog2, {ok, Directory}} ->
-            ?TRACE("~p: Got directory: ~p~n", [?MODULE, Directory]),
+            %?TRACE("~p: Got directory: ~p~n", [?MODULE, Directory]),
             {TLog2, Directory};
         _ -> 
             log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE]),
@@ -332,15 +331,16 @@ pop_load_in_directory(DirKey) ->
 
 %%%%%%%%%%%%%%%% Directory record %%%%%%%%%%%%%%%%%%%%%%
 
--spec dir_add_load(lb_info(), directory()) -> directory().
+-spec dir_add_load(lb_info:lb_info(), directory()) -> directory().
 dir_add_load(Load, Directory) ->
     Pool = Directory#directory.pool,
     PoolNew = gb_sets:add(Load, Pool),
-    Directory#directory{pool = PoolNew}.
+    NumReported = Directory#directory.num_reported,
+    Directory#directory{pool = PoolNew, num_reported = NumReported + 1}.
 
 -spec dir_clear_load(directory()) -> directory().
 dir_clear_load(Directory) ->
-    Directory#directory{pool = gb_sets:new()}.
+    Directory#directory{pool = gb_sets:new(), num_reported = 0}.
 
 %% dir_set_schedule(Schedule, Directory) ->
 %%     Directory#directory{schedule = Schedule}.
@@ -356,7 +356,13 @@ dir_is_empty(Directory) ->
 perform_transfer([]) ->
     ok;
 perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other]) ->
-    ?TRACE("~p: Reassigning ~p (light) and ~p (heavy)~n", [?MODULE, LightNode, HeavyNode]),
+    ?TRACE("~p: Reassigning ~p (light: ~p) and ~p (heavy: ~p)~n", [?MODULE, lb_info:get_node(LightNode), lb_info:get_load(LightNode), lb_info:get_node(HeavyNode), lb_info:get_load(HeavyNode)]),
+    DhtNode = lb_info:get_node(HeavyNode),
+    comm:send(node:pidX(DhtNode), {lb_active, {balance_with, LightNode}}),
+%%     case lb_info:neighbors(LightNode, HeavyNode) of
+%%         true  -> comm:send(node:pidX(DhtNode), {lb_active, {slide, LightNode}});
+%%         false -> comm:send(node:pidX(DhtNode), {lb_active, {jump, LightNode}})
+%%     end,
     perform_transfer(Other).
 
 %%%%%%%%%%%%

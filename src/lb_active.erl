@@ -34,9 +34,9 @@
 %% for calls from the dht node
 -export([handle_dht_msg/2]).
 %% for db monitoring
--export([init_db_monitors/0, update_db_monitor/2]).
-%% get load
--export([get_utilization/1]).
+-export([init_db_monitors/0, update_db_monitor/1]).
+
+
 
 -type lb_message() :: {lb_active, comm:message()}.
 
@@ -130,6 +130,10 @@ on({web_debug_info, Requestor}, State) ->
     comm:send_local(Requestor, {web_debug_info_reply, Return}),
     State;
 
+on({move, result, {_Tag, _JumpOrSlide}, _Status}, State) ->
+    ?TRACE("~p status: ~p~n", [_JumpOrSlide, _Status]),
+    State;
+
 on(Msg, State) ->
     call_module(handle_msg, [Msg, State]).
 
@@ -137,6 +141,40 @@ on(Msg, State) ->
 
 %% @doc Process load balancing messages sent to the dht node
 -spec handle_dht_msg(lb_message(), dht_node_state:state()) -> dht_node_state:state().
+
+%% We received a jump or slide operation from a LightNode.
+%% In either case, we'll compute the target id and send out
+%% the jump or slide message to the LightNode.
+handle_dht_msg({lb_active, {balance_with, LightNode}}, DhtState) ->
+    MyNode = lb_info:new(dht_node_state:details(DhtState)),
+    JumpOrSlide = case lb_info:neighbors(MyNode, LightNode) of
+                      true  -> slide;
+                      false -> jump
+                  end,
+    ?TRACE("Before ~p Heavy: ~p Light: ~p~n",
+           [JumpOrSlide, dht_node_state:get(DhtState, node_id), node:id(lb_info:get_node(LightNode))]),
+    TargetLoad = lb_info:get_target_load(JumpOrSlide, MyNode, LightNode),
+    {From, To, Direction} =
+        case JumpOrSlide =:= jump orelse lb_info:get_succ(MyNode) =:= lb_info:get_node(LightNode) of
+            true  -> %% Jump or heavy node is succ of light node
+                {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward};
+            false -> %% Light node is succ of heavy node
+                {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
+        end,
+    {SplitKey, _TakenLoad} = dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction),
+    ?TRACE("TargetLoad: ~p TakenLoad: ~p~n",
+            [TargetLoad, _TakenLoad]),
+    LbModule = comm:make_global(pid_groups:get_my(?MODULE)),
+    case JumpOrSlide of
+        jump ->
+            Node = lb_info:get_node(LightNode),
+            comm:send(node:pidX(Node), {move, start_jump, SplitKey, {tag, JumpOrSlide}, LbModule});
+        slide ->
+            Node = lb_info:get_node(LightNode),
+            comm:send(node:pidX(Node), {move, start_slide, succ, SplitKey, {tag, JumpOrSlide}, LbModule})
+    end,
+    DhtState;
+
 handle_dht_msg({lb_active, Msg}, DhtState) ->
     call_module(handle_dht_msg, [Msg, DhtState]).
 
@@ -147,16 +185,23 @@ handle_dht_msg({lb_active, Msg}, DhtState) ->
 init_db_monitors() ->
     case config:read(lb_active_monitor_db) of
         true ->
-            Reads   = rrd:create(15 * 1000000, 3, {timing_with_hist, count}),
-            Writes  = rrd:create(15 * 1000000, 3, {timing_with_hist, count}),
+            Keys   = rrd:create(15 * 1000000, 1, gauge),
+            Reads  = rrd:create(15 * 1000000, 3, {timing_with_hist, count}),
+            Writes = rrd:create(15 * 1000000, 3, {timing_with_hist, count}),
             monitor:proc_set_value(lb_active, reads, Reads),
-            monitor:proc_set_value(lb_active, writes, Writes);
+            monitor:proc_set_value(lb_active, writes, Writes),
+            monitor:proc_set_value(lb_active, keys, Keys);
         _ -> ok
     end.
 
 %% @doc Updates the local rrd for reads or writes and checks for reporting
--spec update_db_monitor(reads | writes, ?RT:key()) -> ok.
-update_db_monitor(Type, Key) ->
+-spec update_db_monitor([{reads | writes, ?RT:key()} | {keys, non_neg_integer()}]) -> ok.
+update_db_monitor([]) ->
+    ok;
+update_db_monitor([Pair | Other]) ->
+    update_db_monitor(Pair),
+    update_db_monitor(Other);
+update_db_monitor({Type, Key}) ->
     case config:read(lb_active_monitor_db) of
         true ->
             %% TODO Normalize key because histogram might contain circular elements, e.g. [MAXVAL, 0, 1]
@@ -186,35 +231,6 @@ monitor_vals_appeared() ->
     %io:format("LocalKeys: ~p~n", [LocalKeys]),
     %io:format("ClientKeys: ~p~n", [ClientKeys]),
     AllLocalAvailable andalso AllClientAvailable.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%-spec get_load_info(dht_node_state:state()) -> load_info().
-get_utilization(DhtState) ->
-    %% TODO what to do with the dht state?
-    _Utilization =
-        case config:read(lb_active_metric) of
-            cpu -> get_vm_metric(cpu10sec) / 100;
-            mem -> get_vm_metric(mem10sec) / 100;
-            _ -> log:log(warn, "~p: Falling back to default metric", [?MODULE])
-        end,
-    %% TODO remove this
-    randoms:rand_uniform(0, 101) / 100.
-
--spec get_vm_metric(atom()) -> ok.
-get_vm_metric(Key) ->
-    ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-    get_metric(ClientMonitorPid, Key).
-
-get_dht_metric(Key) ->
-    MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, Key).
-
-%% TODO
-get_metric(MonitorPid, Key) ->
-    [{lb_active, Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, Key}]),
-    _Value = rrd:get_value_by_offset(RRD, 0).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
