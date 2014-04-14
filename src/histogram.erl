@@ -24,7 +24,7 @@
 -vsn('$Id$').
 
 % external API
--export([create/1, add/2, add/3, get_data/1,
+-export([create/1, add/2, add/3, get_data/1, get_size/1,
          get_num_elements/1, get_num_inserts/1, merge/2]).
 
 % private API for unit tests:
@@ -33,6 +33,7 @@
 
 -export([find_largest_window/2, find_largest_window_feeder/2]).
 -export([foldl_until/2, foldr_until/2]).
+
 % private but shared with histogram_normalized
 -export([foldl_until_helper/4]).
 
@@ -74,6 +75,10 @@ add(Value, Count, Histogram = #histogram{data = OldData, inserts = Inserts}) ->
 get_data(Histogram) ->
     Histogram#histogram.data.
 
+-spec get_size(Histogram::histogram()) -> non_neg_integer().
+get_size(Histogram) ->
+    Histogram#histogram.size.
+
 -spec get_num_elements(Histogram::histogram()) -> non_neg_integer().
 get_num_elements(Histogram) ->
     Histogram#histogram.data_size.
@@ -92,19 +97,20 @@ merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
 
 %% @doc Traverses the histogram until TargetCount entries have been found
 %%      and returns the value at this position.
+%% TODO change this to exspect non empty histogram
 -spec foldl_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::value() | nil, Sum::non_neg_integer()}.
-foldl_until(TargetVal, CircularHist) ->
-    HistData = get_data(CircularHist),
+foldl_until(TargetVal, Histogram) ->
+    HistData = get_data(Histogram),
     foldl_until_helper(TargetVal, HistData, _SumSoFar = 0, _BestValue = nil).
 
 %% @doc Like foldl_until but traverses the list from the right
 -spec foldr_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::value() | nil, Sum::non_neg_integer()}.
-foldr_until(TargetVal, CircularHist) ->
-    HistData = get_data(CircularHist),
+foldr_until(TargetVal, Histogram) ->
+    HistData = get_data(Histogram),
     foldl_until_helper(TargetVal, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
 
 -spec foldl_until_helper(TargetVal::non_neg_integer(), DataList::data_list(),
