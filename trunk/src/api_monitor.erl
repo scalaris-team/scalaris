@@ -50,7 +50,7 @@ get_node_performance() ->
 -spec get_service_info() -> list().
 get_service_info() ->
     Ring = statistics:get_ring_details(),
-    [{total_load, statistics:get_total_load(Ring)},
+    [{total_load, statistics:get_total_load(load, Ring)},
      {nodes, length(Ring)}].
 
 -spec get_service_performance() -> list().

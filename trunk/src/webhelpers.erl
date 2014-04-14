@@ -421,22 +421,40 @@ getRingRendered() ->
             {p, [],
               [
               {table, [{bgcolor, "#CCDCEE"}, {width, "100%"}],
-               [
+               [%% items
                 {tr, [{bgcolor, "#000099"}],
                  [
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Load"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Load"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load (std. deviation)"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Real Ring Size"}}}
+                  {td, [{width, "10%"}], {strong, [], {font, [{color, "white"}], ""}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Std. Deviation"}}}
                  ]
                 },
                 {tr, [],
                  [
-                               {td, [], io_lib:format("~p", [statistics:get_total_load(Ring)])},
-                               {td, [], io_lib:format("~p", [statistics:get_average_load(Ring)])},
-                               {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(Ring)])},
-                               {td, [], io_lib:format("~p", [RingSize])}
-                           ]
+                  {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Items"}}},
+                  {td, [], io_lib:format("~p", [statistics:get_total_load(load, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_average_load(load, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load, RealRing)])}
+                 ]
+                },
+                %% load
+                {tr, [],
+                 [
+                  {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Load"}}},
+                  {td, [], io_lib:format("-", [])},
+                  {td, [], io_lib:format("~p", [statistics:get_average_load(load2, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load2, RealRing)])}
+                 ]
+                },
+                %% requests
+                {tr, [],
+                 [
+                  {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Requests"}}},
+                  {td, [], io_lib:format("~p", [statistics:get_total_load(load3, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_average_load(load3, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load3, RealRing)])}
+                 ]
                 }
                ]
               },
@@ -449,8 +467,9 @@ getRingRendered() ->
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succs"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "RTSize"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Items"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load2"}}}
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Requests"}}}
                  ]},
                 lists:append([renderRing(X) ||  X = {ok, _} <- RealRing],
                              [renderRing(X) ||  X = {failed, _} <- RealRing])
@@ -467,8 +486,9 @@ renderRing({ok, Details}) ->
     Node = node_details:get(Details, node),
     SuccList = node_details:get(Details, succlist),
     RTSize = node_details:get(Details, rt_size),
-    Load = node_details:get(Details, load),
-    Load2 = node_details:get(Details, load2),
+    Items = node_details:get(Details, load),
+    Load = node_details:get(Details, load2),
+    Requests = node_details:get(Details, load3),
     MyIndexStr = case get_indexed_id_by_node(Node) of
                      undefined -> dead_node();
                      MyIndex -> MyIndex
@@ -499,11 +519,9 @@ renderRing({ok, Details}) ->
        {td, [], io_lib:format("~p:&nbsp;~p", [MyIndexStr, node:id(Node)])},
        {td, [], io_lib:format("~.100p", [[NodeListFun(N) || N <- SuccList]])},
        {td, [], io_lib:format("~p", [RTSize])},
+       {td, [], io_lib:format("~p", [Items])},
        {td, [], io_lib:format("~p", [Load])},
-       case Load2 of
-           items -> {td, [], "-"};
-           Load2 -> {td, [], io_lib:format("~.2f", [float(Load2)])}
-       end
+       {td, [], io_lib:format("~p", [Requests])}
       ]};
 renderRing({failed, Pid}) ->
     {tr, [],
@@ -511,6 +529,7 @@ renderRing({failed, Pid}) ->
        {td, [], "-"},
        {td, [], "-"},
        {td, [], io_lib:format("- (~p)", [Pid])},
+       {td, [], "-"},
        {td, [], "-"},
        {td, [], "-"},
        {td, [], "-"}
@@ -528,21 +547,39 @@ getIndexedRingRendered() ->
             {p, [],
               [
               {table, [{bgcolor, "#CCDCEE"}, {width, "100%"}],
-               [
+               [%% items
                 {tr, [{bgcolor, "#000099"}],
                  [
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total Load"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average Load"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load (std. deviation)"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Real Ring Size"}}}
+                  {td, [{width, "10%"}], {strong, [], {font, [{color, "white"}], ""}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Total"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Average"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Std. Deviation"}}}
                  ]
                 },
                 {tr, [],
                  [
-                  {td, [], io_lib:format("~p", [statistics:get_total_load(RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(RealRing)])},
-                  {td, [], io_lib:format("~p", [RingSize])}
+                  {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Items"}}},
+                  {td, [], io_lib:format("~p", [statistics:get_total_load(load, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_average_load(load, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load, RealRing)])}
+                 ]
+                },
+                %% load
+                {tr, [],
+                 [
+                  {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Load"}}},
+                  {td, [], io_lib:format("-", [])},
+                  {td, [], io_lib:format("~p", [statistics:get_average_load(load2, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load2, RealRing)])}
+                 ]
+                },
+                %% requests
+                {tr, [],
+                 [
+                  {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Requests"}}},
+                  {td, [], io_lib:format("~p", [statistics:get_total_load(load3, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_average_load(load3, RealRing)])},
+                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load3, RealRing)])}
                  ]
                 }
                ]
@@ -556,7 +593,9 @@ getIndexedRingRendered() ->
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succs Offsets"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "RTSize"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}}
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Items"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Requests"}}}
                  ]},
                 lists:append([renderIndexedRing(X) ||  X = {ok, _} <- RealRing],
                              [renderIndexedRing(X) ||  X = {failed, _} <- RealRing])
@@ -577,7 +616,9 @@ renderIndexedRing({ok, Details}) ->
     Node = node_details:get(Details, node),
     SuccList = node_details:get(Details, succlist),
     RTSize = node_details:get(Details, rt_size),
-    Load = node_details:get(Details, load),
+    Items = node_details:get(Details, load),
+    Load = node_details:get(Details, load2),
+    Requests = node_details:get(Details, load3),
     MyIndex = get_indexed_id_by_node(Node),
     PredIndex = lists:map(fun(Pred) -> get_indexed_pred_id(Pred, MyIndex) end, PredList),
     SuccIndices = lists:map(fun(Succ) -> get_indexed_succ_id(Succ, MyIndex) end, SuccList),
@@ -612,7 +653,9 @@ renderIndexedRing({ok, Details}) ->
            false -> {td, [], io_lib:format("~p", [SuccIndices])}
        end,
        {td, [], io_lib:format("~p", [RTSize])},
-       {td, [], io_lib:format("~p", [Load])}
+       {td, [], io_lib:format("~p", [Items])},
+       {td, [], io_lib:format("~p", [Load])},
+       {td, [], io_lib:format("~p", [Requests])}
       ]};
 
 renderIndexedRing({failed, Pid}) ->
@@ -621,6 +664,8 @@ renderIndexedRing({failed, Pid}) ->
        {td, [], "-"},
        {td, [], "-"},
        {td, [], io_lib:format("- (~p)", [Pid])},
+       {td, [], "-"},
+       {td, [], "-"},
        {td, [], "-"},
        {td, [], "-"},
        {td, [], "-"}

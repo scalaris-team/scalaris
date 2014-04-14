@@ -28,7 +28,8 @@
 
 -ifdef(with_export_type_support).
 -export_type([node_details/0, node_details_name/0,
-              load/0, hostname/0, rt_size/0, message_log/0, memory/0]).
+              load/0, load2/0, load3/0,
+              hostname/0, rt_size/0, message_log/0, memory/0]).
 -endif.
 
 -type(load() :: integer()).
