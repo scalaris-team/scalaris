@@ -126,9 +126,12 @@ on_inactive({lb_trigger}, State) ->
 on_inactive({collect_stats} = Msg, State) ->
     on(Msg, State);
 
+on_inactive({reset_monitors} = Msg, State) ->
+    on(Msg, State);
+
 on_inactive(Msg, State) ->
     %% at the moment, we simply ignore lb messages.
-    ?TRACE("Unknown message received ~p~n. Ignoring.", [Msg]),
+    ?TRACE("Unknown message ~p~n. Ignoring.", [Msg]),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -518,26 +521,32 @@ handle_dht_msg(Msg, DhtState) ->
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Called by db process to initialize monitors
--spec init_db_monitors(Id::?RT:key(), Range::intervals:interval()) -> ok.
-init_db_monitors(Id, Range) ->
+-spec init_db_monitors(MyId::?RT:key(), MyRange::intervals:interval()) -> ok.
+init_db_monitors(MyId, MyRange) ->
     case monitor_db() of
         true ->
             MonitorRes = config:read(lb_active_monitor_resolution),
             History = config:read(lb_active_monitor_history),
             HistogramSize = config:read(lb_active_histogram_size),
             HistogramType =
-                case intervals:in(0, MyRange) andalso MyRange =/= intervals:all() of
-                    true ->
-                        NormFun = fun(Val) ->
-                                     Val - Id - 1; %% TODO calculate id
-                                     Val - 
-                                  end,
-                        {histogram, HistogramSize, NormFun, InverseFun} %% TODO off by one. Actually MyId - 1
-                    _ -> {histogram, HistogramSize}
-                end,
-                case NormalizationFactor of
-                    0 -> {histogram, HistogramSize};
-                    N -> {histogram, HistogramSize, N}
+                case intervals:in(?MINUS_INFINITY, MyRange) andalso MyRange =/= intervals:all() of
+                    false ->
+                        {histogram, HistogramSize};
+                    true -> %% we need a normalized histogram because of the key space overflow
+                        NormFun =
+                            fun(Val) ->
+                                    case Val - MyId of
+                                        NormVal when NormVal =< ?MINUS_INFINITY ->
+                                            ?PLUS_INFINITY + NormVal - 1;
+                                        NormVal ->
+                                            NormVal
+                                    end
+                            end,
+                        InverseFun =
+                            fun(NormVal) ->
+                                    (NormVal + MyId + 1) rem ?PLUS_INFINITY
+                            end,
+                        {histogram, HistogramSize, NormFun, InverseFun}
                 end,
             Reads  = rrd:create(MonitorRes * 1000, History + 1, HistogramType),
             Writes = rrd:create(MonitorRes * 1000, History + 1, HistogramType),
@@ -678,9 +687,9 @@ get_value_type(undefined, _Type) ->
     unknown;
 get_value_type(Value, _Type) when is_number(Value) ->
     Value;
-get_value_type(Value, {histogram, _}) ->
+get_value_type(Value, {histogram, _Size}) ->
     histogram:get_num_inserts(Value);
-get_value_type(Value, {histogram, _, _}) ->
+get_value_type(Value, {histogram, _Size, _NormFun, _InverseFun}) ->
     histogram_normalized:get_num_inserts(Value).
 
 %% @doc returns the weighted average of a list using decreasing weight
@@ -707,7 +716,7 @@ avg_weighted([Element | Other], Weight, N, Sum) ->
 
 -spec call_module(atom(), list()) -> state().
 call_module(Fun, Args) ->
-    apply(get_lb_module(), Fun, Args). 
+    apply(get_lb_module(), Fun, Args).
 
 -spec get_lb_module() -> atom() | failed.
 get_lb_module() ->
