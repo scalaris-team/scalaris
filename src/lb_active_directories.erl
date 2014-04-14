@@ -80,7 +80,6 @@
 
 -spec init() -> state().
 init() ->
-    create_directories(?NUM_DIRECTORIES),
     %% post load to random directory
     request_dht_load(),
     trigger(publish_trigger),
@@ -164,7 +163,7 @@ handle_msg(Msg, State) ->
 
 %% @doc Load balancing messages received by the dht node.
 -spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
-handle_dht_msg({request_load, ReplyPid}, DhtState) ->
+handle_dht_msg({lb_active, request_load, ReplyPid}, DhtState) ->
     %MyNodeDetails = dht_node_state:details(DhtState),
     %Capacity = node_details:get
     %% TODO make this more generic
@@ -206,7 +205,7 @@ directory_routine(DirKey, Type, Schedule) ->
                     periodic ->
                         %% clear directory only for periodic
                         NewDirectory = dir_clear_load(Directory),
-                        set_directory(TLog, NewDirectory),
+                        clear_directory(Directory),
                         %% TODO calculate threshold according to metric
                         %% From paper:
                         %(1 + AvgUtil) / 2;
@@ -260,32 +259,26 @@ get_random_directory() ->
         _    -> RandDir2
     end.
 
-%% @doc Check if directories exist, if not create them.
--spec create_directories(non_neg_integer()) -> ok.
-create_directories(0) ->
-    ok;
-create_directories(N) when N > 0 ->
-    Key = int_to_str(get_directory_key_by_number(N)),
-    TLog = api_tx:new_tlog(),
-
-    case api_tx:read(TLog, Key) of
-        {_TLog2, {ok, _Value}} ->
-            create_directories(N-1);
-        {TLog2, {fail, not_found}} ->
-            {TLog3, _Result} = api_tx:write(TLog2, Key, #directory{name = Key}),
-            case api_tx:commit(TLog3) of
-                {ok} ->
-                    create_directories(N-1);
-                {fail, abort, [Key]} ->
-                    create_directories(N)
-            end
-    end.
-
 -spec post_load_to_directory(lb_info:lb_info(), directory_name()) -> ok.
 post_load_to_directory(Load, DirKey) ->
     {TLog, Dir} = get_directory(DirKey),
     DirNew = dir_add_load(Load, Dir),
-    set_directory(TLog, DirNew).
+    case set_directory(TLog, DirNew) of
+        ok -> ok;
+        failed -> 
+            wait_randomly(),
+            post_load_to_directory(Load, DirKey)
+    end.
+
+-spec clear_directory(directory()) -> ok.
+clear_directory(Directory) ->
+    DirNew = dir_clear_load(Directory),
+    case set_directory(api_tx:new_tlog(), DirNew) of
+        ok -> ok;
+        failed ->
+            wait_randomly(),
+            clear_directory(Directory)
+    end.
 
 -spec get_directory(directory_name()) -> {api_tx:tlog(), directory()}.
 get_directory(DirKey) ->
@@ -294,9 +287,9 @@ get_directory(DirKey) ->
         {TLog2, {ok, Directory}} ->
             %?TRACE("~p: Got directory: ~p~n", [?MODULE, Directory]),
             {TLog2, Directory};
-        _ -> 
-            log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE]),
-            get_directory(DirKey)
+        {TLog2, {fail, not_found}} ->
+            log:log(warn, "~p: Directory not found: ~p", [?MODULE, DirKey]),
+            {TLog2, #directory{name = DirKey}}
     end.
 
 -spec set_directory(api_tx:tlog(), directory()) -> ok | failed.
@@ -307,7 +300,7 @@ set_directory(TLog, Directory) ->
             ok;
         Error ->
             log:log(warn, "~p: Failed to save directory ~p because of failed transaction: ~p", [?MODULE, DirKey, Error]),
-            % TODO What to do here?
+            % TODO Handle this case
             failed
     end.
 
@@ -347,16 +340,6 @@ perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other]) ->
     perform_transfer(Other).
 
 %%%%%%%%%%%%
-%% State
-%%
--spec state_get(capacity, state()) -> number();
-               (my_dirs,  state()) -> [directory_name()].
-state_get(Key, #state{my_dirs = Dirs}) ->
-    case Key of
-        my_dirs  -> Dirs
-    end.
-
-%%%%%%%%%%%%
 %% Helpers
 %%
 
@@ -368,11 +351,15 @@ request_dht_range() ->
 -spec request_dht_load() -> ok.
 request_dht_load() ->
     MyDHT = pid_groups:find_a(dht_node),
-    comm:send_local(MyDHT, {lb_active, {request_load, self()}}).
+    comm:send_local(MyDHT, {lb_active, request_load, self()}).
 
 -spec int_to_str(integer()) -> string().
 int_to_str(N) ->
     erlang:integer_to_list(N).
+
+-spec wait_randomly() -> ok.
+wait_randomly() ->
+    timer:sleep(randoms:rand_uniform(1, 50)).
 
 -spec trigger(trigger()) -> ok.
 trigger(Trigger) ->
