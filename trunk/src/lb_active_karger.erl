@@ -28,7 +28,7 @@
 -include("record_helpers.hrl").
 
 %-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), io:format("lb_active_karger: " ++ X,Y)).
 
 
 -behavior(lb_active_beh).
@@ -83,8 +83,7 @@ init() ->
 -spec handle_msg(my_message(), state()) -> state().
 handle_msg({lb_trigger}, State) ->
     msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
-    %% Request 1 random node from cyclon
-    %% TODO Request more to have a bigger sample size
+    %% Request N random nodes from cyclon
     NumNodes = config:read(lb_active_karger_rnd_nodes),
     cyclon:get_subset_rand(NumNodes),
     State;
@@ -130,7 +129,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
                       ?TRACE("Sending out simulate request with ReqId ~p to ~p~n", [ReqId, RndNode]),
                       OptionsNew = [{simulate, ReqId}, {reply_to, comm:this()}] ++ Options,
                       comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, OptionsNew},
-                                [{?quiet}]), %% TODO failure detector here?
+                                [?quiet]), %% TODO failure detector here?
                       {ReqId, RndNode}
                  end || RndNode <- RndNodes],
             %% TODO Parameter in config
@@ -152,8 +151,6 @@ handle_msg({simulation_result, Id, ThisReqId, LoadChange}, State) ->
                 end,
             ReqIds = State#state.req_ids,
             ReqIdsNew = proplists:delete(ThisReqId, ReqIds),
-            io:format("ThisReqId: ~p~n", [ThisReqId]),
-            io:format("ReqIdsNew: ~p~n", [ReqIdsNew]),
             case ReqIdsNew of
                 [] -> comm:send_local(self(), {decide_and_go_to_phase1, Id});
                 _  -> ok
@@ -215,8 +212,8 @@ handle_dht_msg({lb_active, phase1, NodeX, Options}, DhtState) ->
 					balance_adjacent(MyLBInfo, NodeX, Options);
 				true ->
 					%% no balancing
-                    lb_active:balance_noop(Options),
-					?TRACE("Won't balance~n", [])
+					?TRACE("Won't balance~n", []),
+                    lb_active:balance_noop(Options)
 			end;
 		_ -> ok
 	end,
@@ -248,8 +245,7 @@ handle_dht_msg({lb_active, phase2, HeavyNode, LightNode, Options}, DhtState) ->
 %% @doc Balance if the two nodes are adjacent, otherwise ask the light node's neighbor
 -spec balance_adjacent(lb_info:lb_info(), lb_info:lb_info(), options()) -> ok.
 balance_adjacent(HeavyNode, LightNode, Options) ->
-	case lb_info:is_succ(HeavyNode, LightNode) of
-		 %orelse node_details:get(HeavyNode, node) =:= node_details:get(LightNode, pred) of
+	case lb_info:neighbors(HeavyNode, LightNode) of %%lb_info:is_succ(HeavyNode, LightNode) of
 		true ->
 			% neighbors, thus sliding
 			?TRACE("We're neighbors~n", []),

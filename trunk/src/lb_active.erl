@@ -25,7 +25,7 @@
 -include("record_helpers.hrl").
 
 %%-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), io:format("lb_active: " ++ X, Y)).
 
 %% startup
 -export([start_link/1, init/1, check_config/0]).
@@ -42,13 +42,25 @@
 
 -type lb_message() :: comm:message(). %% TODO more specific?
 
--type state() :: {}.
-%% -record(state, {node_id 
-%%                 }).
-%% 
-%% -type my_state() :: #state{}.
-%% 
-%% -type (state() :: {my_state(), module_state()}). %% state of lb module
+-record(my_state, {init = nil,
+                   data_available = false,
+                   pending_ops = []
+                }).
+
+-type my_state() :: #my_state{}.
+-type module_state() :: tuple(). %% TODO more specific
+
+-type state() :: {my_state(), module_state()}. %% state of lb module
+
+-record(lb_op, {id = ?required(id, lb_op)         :: uid:global_uid(),
+                type = ?required(type, lb_op)     :: slide_pred | slide_succ | jump,
+                light_node = ?required(light, lb_op)   :: node:node_type(),
+                heavy_node = ?required(heavy, lb_op)   :: node:node_type(),
+                target = ?required(target, lb_op) :: ?RT:key(),
+                time = os:timestamp()             :: erlang:timestamp()
+               }).
+
+-type lb_op() :: #lb_op{}.
 
 %% list of active load balancing modules available
 -define(MODULES_AVAIL, [lb_active_karger, lb_active_directories]).
@@ -93,6 +105,7 @@ init([]) ->
 -spec on_inactive(comm:message(), state()) -> state().
 on_inactive({lb_trigger}, State) ->
     trigger(lb_trigger),
+     ?TRACE("Aha: ~p~n", [monitor_vals_appeared()]),
     case monitor_vals_appeared() of
         true ->
             InitState = call_module(init, []),
@@ -104,7 +117,10 @@ on_inactive({lb_trigger}, State) ->
     end;
 
 on_inactive({collect_stats} = Msg, State) ->
-    on(Msg, State).
+    on(Msg, State);
+
+on_inactive(Msg, State) ->
+    ?TRACE("Unknown message received ~p~n", [Msg]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -141,8 +157,37 @@ on({pre_balance, LightNode, HeavyNode, LightNodeSucc, {gossip_get_values_best_re
     comm:send(HeavyPid, {lb_active, balance, LightNode, HeavyNode, GlobalInfo}),
     State;
 
-on({move, result, {_Tag, _JumpOrSlide}, _Status}, State) ->
-    ?TRACE("~p status: ~p~n", [_JumpOrSlide, _Status]),
+%% lb_op received by dht_node and to be executed
+on({balance, Op}, State) ->
+    case op_pending() of
+        true  -> ?TRACE("Pending op. Won't jump or slide. Discarding op ~p~n", [Op]);
+        false ->
+            set_pending_op(Op),
+            OpId = Op#lb_op.id,
+            Pid = node:pidX(Op#lb_op.light_node),
+            TargetKey = Op#lb_op.target,
+            ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
+            case Op#lb_op.type of
+                jump ->
+                    comm:send(Pid, {move, start_jump, TargetKey, {jump, OpId}, comm:this()});
+                slide_pred ->
+                    comm:send(Pid, {move, start_slide, pred, TargetKey, {slide, OpId}, comm:this()});
+                slide_succ ->
+                    comm:send(Pid, {move, start_slide, succ, TargetKey, {slide, OpId}, comm:this()})
+            end
+    end,
+    State;
+
+on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
+    ?TRACE("~p status with id ~p: ~p~n", [_JumpOrSlide, OpId, _Status]),
+    case get_pending_op() of
+        undefined -> ?TRACE("Received answer but OpId ~p was not pending~n", [OpId]);
+        Op when Op#lb_op.id =:= OpId ->
+            ?TRACE("Clearing pending op ~p~n", [OpId]),
+            set_pending_op(undefined);
+        Op ->
+            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
+    end,
     State;
 
 on({web_debug_info, Requestor}, State) ->
@@ -186,6 +231,37 @@ balance_noop(Options) ->
             comm:send(ReplyTo, {simulation_result, Id, ReqId, 0})
     end.
 
+-spec get_pending_op() -> undefined | lb_op().
+get_pending_op() ->
+    erlang:get(pending_op).
+
+-spec set_pending_op(lb_op()) -> ok.
+set_pending_op(Op) ->
+    erlang:put(pending_op, Op),
+    ok.
+
+-spec op_pending() -> boolean().
+op_pending() ->
+    case erlang:get(pending_op) of
+        undefined -> false;
+        OtherOp ->
+            case old_op(OtherOp) of
+                false -> true;
+                true -> %% remove old op
+                    ?TRACE("Removing old op ~p~n", [OtherOp]),
+                    erlang:erase(pending_op),
+                    false
+            end
+    end.
+
+-spec old_op(lb_op()) -> boolean().
+old_op(Op) ->
+    %% TODO Parameterize
+    %% config:read(lb_active_wait_for_pending_ops)
+    Threshold = 10000 * 1000, %% microseconds
+    ?TRACE("Diff:~p~n", [timer:now_diff(os:timestamp(), Op#lb_op.time)]),
+    timer:now_diff(os:timestamp(), Op#lb_op.time) > Threshold.
+
 %%%%%%%%%%%%%%%%%%%%%%%% Calls from dht_node %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Process load balancing messages sent to the dht node
@@ -200,51 +276,50 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
 %% In either case, we'll compute the target id and send out
 %% the jump or slide message to the LightNode.
 handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options}, DhtState) ->
-    ?ASSERT(lb_info:get_node(HeavyNode) =:= dht_node_state:get(DhtState, node)),
-    %% TODO What are the benefits/disadvantages of getting the load info again?
-    MyNode = lb_info:new(dht_node_state:details(DhtState)),
-    JumpOrSlide = case lb_info:neighbors(MyNode, LightNode) of
-                      true  -> slide;
-                      false -> jump
-                  end,
-    ?TRACE("Before ~p Heavy: ~p Light: ~p (no global information)~n",
-           [JumpOrSlide, dht_node_state:get(DhtState, node_id), node:id(lb_info:get_node(LightNode))]),
-    TargetLoad = lb_info:get_target_load(JumpOrSlide, MyNode, LightNode),
-    {From, To, Direction} =
-        case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
-            true  -> %% Jump or heavy node is succ of light node
-                {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward}; %% TODO node_id-1 ?
-            false -> %% Light node is succ of heavy node
-                {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
-        end,
-    {SplitKey, TakenLoad} = dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction),
-    ?TRACE("SplitKey: ~p TargetLoad: ~p TakenLoad: ~p~n", [SplitKey, TargetLoad, TakenLoad]),
-    %% Report TakenLoad in case of simulation or exec load balancing decision
-    case proplists:get_value(simulate, Options) of
-         undefined ->
-            LbModule = comm:make_global(pid_groups:get_my(?MODULE)),
-            case JumpOrSlide of
-                jump ->
-                    Node = lb_info:get_node(LightNode),
-                    comm:send(node:pidX(Node), {move, start_jump, SplitKey, {tag, JumpOrSlide}, LbModule});
-                slide ->
-                    Node = lb_info:get_node(LightNode),
-                    PredOrSucc =
-                        case Direction of
-                            forward  -> succ;
-                            backward -> pred
-                        end,
-                    comm:send(node:pidX(Node), {move, start_slide, PredOrSucc, SplitKey, {tag, JumpOrSlide}, LbModule})
-            end;
-        ReqId ->
-            LoadChange =
-                case JumpOrSlide of
-                    slide -> lb_info:get_load_change_slide(TakenLoad, HeavyNode, LightNode);
-                    jump  -> lb_info:get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc)
+    case lb_info:get_node(HeavyNode) =/= dht_node_state:get(DhtState, node) of
+        true -> ?TRACE("I was mistaken for the HeavyNode. Doing nothing~n", []), ok;
+        false ->
+            %% TODO What are the benefits/disadvantages of getting the load info again?
+            MyNode = lb_info:new(dht_node_state:details(DhtState)),
+            JumpOrSlide = %case lb_info:neighbors(MyNode, LightNode) of
+                          case LightNodeSucc =:= nil of
+                              true  -> slide;
+                              false -> jump
+                          end,
+            TargetLoad = lb_info:get_target_load(JumpOrSlide, MyNode, LightNode),
+            {From, To, Direction} =
+                case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
+                    true  -> %% Jump or heavy node is succ of light node
+                        {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward}; %% TODO node_id-1 ?
+                    false -> %% Light node is succ of heavy node
+                        {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
                 end,
-            ReplyTo = proplists:get_value(reply_to, Options),
-            Id = proplists:get_value(id, Options),
-            comm:send(ReplyTo, {simulation_result, Id, ReqId, LoadChange})
+            {SplitKey, TakenLoad} = dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction),
+            ?TRACE("SplitKey: ~p TargetLoad: ~p TakenLoad: ~p~n", [SplitKey, TargetLoad, TakenLoad]),
+            %% Report TakenLoad in case of simulation or exec load balancing decision
+            case proplists:get_value(simulate, Options) of
+                 undefined ->
+                            OpId = uid:get_global_uid(),
+                            Type =  if  JumpOrSlide =:= jump -> jump;
+                                        Direction =:= forward -> slide_succ;
+                                        Direction =:= backward -> slide_pred
+                                    end,
+                            Op = #lb_op{id = OpId, type = Type,
+                                        light_node = lb_info:get_node(LightNode),
+                                        heavy_node = lb_info:get_node(HeavyNode),
+                                        target = SplitKey},
+                            LBModule = pid_groups:get_my(?MODULE),
+                            comm:send_local(LBModule, {balance, Op});
+                ReqId ->
+                    LoadChange =
+                        case JumpOrSlide of
+                            slide -> lb_info:get_load_change_slide(TakenLoad, HeavyNode, LightNode);
+                            jump  -> lb_info:get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc)
+                        end,
+                    ReplyTo = proplists:get_value(reply_to, Options),
+                    Id = proplists:get_value(id, Options),
+                    comm:send(ReplyTo, {simulation_result, Id, ReqId, LoadChange})
+            end
     end,
     DhtState;
 
@@ -258,12 +333,12 @@ handle_dht_msg(Msg, DhtState) ->
 init_db_monitors() ->
     case config:read(lb_active_monitor_db) of
         true ->
-            Items   = rrd:create(15 * 1000000, 1, gauge),
-            Reads  = rrd:create(15 * 1000000, 3, {timing_with_hist, count}),
-            Writes = rrd:create(15 * 1000000, 3, {timing_with_hist, count}),
+            %Items   = rrd:create(15 * 1000000, 1, gauge),  %% TODO do we need items here?
+            Reads  = rrd:add_now(0, rrd:create(15 * 1000000, 3, {timing_with_hist, count})),
+            Writes = rrd:add_now(0, rrd:create(15 * 1000000, 3, {timing_with_hist, count})),
             monitor:proc_set_value(lb_active, reads, Reads),
-            monitor:proc_set_value(lb_active, writes, Writes),
-            monitor:proc_set_value(lb_active, items, Items);
+            monitor:proc_set_value(lb_active, writes, Writes);
+            %monitor:proc_set_value(lb_active, items, Items);
         _ -> ok
     end.
 

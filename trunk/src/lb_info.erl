@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Maximilian Michels <michels@zib.de>
-%% @doc Active load balancing bootstrap module
+%% @doc For active load balancing: lb_info contains information about a node
 %% @version $Id$
 -module(lb_info).
 -author('michels@zib.de').
