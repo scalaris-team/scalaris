@@ -28,6 +28,7 @@
 -export([create/3, add/2, add/3, get_data/1,
          get_num_elements/1, get_num_inserts/1]).
 -export([foldl_until/2, foldr_until/2]).
+-export([is_normalized/1]).
 
 -include("scalaris.hrl").
 
@@ -71,7 +72,20 @@ get_num_elements({Histogram, _NormFun, _InverseFun}) ->
 get_num_inserts({Histogram, _NormFun, _InverseFun}) ->
     histogram:get_num_inserts(Histogram).
 
-%% TODO merge/2 not implemented
+%% @doc Merges the given two histograms by adding every data point of Hist2
+%%      to Hist1. If one of the histograms is a normalized histogram,
+%%      the output will be a normalized histogram.
+%-spec merge(Hist1::histogram(), Hist2::histogram()) -> histogram().
+%% merge(Hist1, Hist2)
+%%  when element(1, Hist1) =:= histogram
+%%   andalso size(Hist1) =:= size(Hist) ->
+%%     histogram:merrge(Hist1, Hist2);
+%% merge({Histogram, NormFun, InverseFun}, NormHisto2 = {Histogram2, NormFun2, InverseFun2}) ->
+%%     DenormalizedData = get_data(NormHisto2),
+%%     Size = get_size(NormHisto2),
+%%     create(Size, NormFun, InverseFun),
+%%     NewData = lists:foldl(fun insert/2, Hist1Data, Hist2Data),
+%%     resize(Hist1#histogram{data = NewData, data_size = length(NewData)}).
 
 %% @doc Traverses the histogram until TargetCount entries have been found
 %%      and returns the value at this position.
@@ -89,3 +103,9 @@ foldl_until(TargetVal, NormalizedHist) ->
 foldr_until(TargetVal, NormalizedHist) ->
     HistData = get_data(NormalizedHist),
     histogram:foldl_until_helper(TargetVal, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
+
+-spec is_normalized(histogram() | histogram:histogram()) -> boolean().
+is_normalized({Histogram, _NormFun, _InverseFun}) ->
+    true;
+is_normalized(_) ->
+    false.
