@@ -3316,7 +3316,7 @@ fi
 if test "x$ERLANG_UNAVAILABLE_LIBS" != x; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
 $as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "$ERLANG_UNAVAILABLE_LIBS not found - you won't be able ti compile the erlang sources
+as_fn_error $? "$ERLANG_UNAVAILABLE_LIBS not found - you won't be able to compile or run the erlang sources
 See \`config.log' for more details" "$LINENO" 5; }
 fi
 
