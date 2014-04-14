@@ -35,7 +35,7 @@
 
 -export([init/0, check_config/0]).
 -export([handle_msg/2, handle_dht_msg/2]).
--export([get_web_debug_key_value/1]).
+-export([get_web_debug_kv/1]).
 
 -record(state, {epsilon          = ?required(state, epsilon) :: float(),
                 rnd_node         = nil                       :: node:node_type() | nil
@@ -181,8 +181,8 @@ balance_adjacent(HeavyNodeDetails, LightNodeDetails) ->
 	end.
 
 %% @doc Key/Value List for web debug
--spec get_web_debug_key_value(state()) -> [{string(), string()}].
-get_web_debug_key_value(State) ->
+-spec get_web_debug_kv(state()) -> [{string(), string()}].
+get_web_debug_kv(State) ->
     [{"state", webhelpers:html_pre(State)}].
 
 -spec get_base_interval() -> pos_integer().

@@ -61,7 +61,7 @@ init([]) ->
         true ->
             %% TODO configure minutes to collect
             LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
-            ShortTerm = rrd:create(10 * 1000000, 1, gauge),
+            ShortTerm = rrd:create(15 * 1000000, 1, gauge),
             monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
             monitor:client_monitor_set_value(lb_active, cpu10sec, ShortTerm),
             monitor:client_monitor_set_value(lb_active, mem5min, LongTerm),
@@ -126,7 +126,7 @@ on({web_debug_info, Requestor}, State) ->
     KVList =
         [{"active module", webhelpers:safe_html_string("~p", [get_lb_module()])}
         ],
-    Return = KVList ++ call_module(get_web_debug_key_value, [State]),
+    Return = KVList ++ call_module(get_web_debug_kv, [State]),
     comm:send_local(Requestor, {web_debug_info_reply, Return}),
     State;
 
@@ -162,8 +162,7 @@ handle_dht_msg({lb_active, {balance_with, LightNode}}, DhtState) ->
                 {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
         end,
     {SplitKey, _TakenLoad} = dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction),
-    ?TRACE("TargetLoad: ~p TakenLoad: ~p~n",
-            [TargetLoad, _TakenLoad]),
+    ?TRACE("SplitKey: ~p TargetLoad: ~p TakenLoad: ~p~n", [SplitKey, TargetLoad, _TakenLoad]),
     LbModule = comm:make_global(pid_groups:get_my(?MODULE)),
     case JumpOrSlide of
         jump ->
@@ -171,7 +170,12 @@ handle_dht_msg({lb_active, {balance_with, LightNode}}, DhtState) ->
             comm:send(node:pidX(Node), {move, start_jump, SplitKey, {tag, JumpOrSlide}, LbModule});
         slide ->
             Node = lb_info:get_node(LightNode),
-            comm:send(node:pidX(Node), {move, start_slide, succ, SplitKey, {tag, JumpOrSlide}, LbModule})
+            PredOrSucc =
+                case Direction of %% reverse directions and bad things will happen....
+                    forward  -> pred;
+                    backward -> succ
+                end,
+            comm:send(node:pidX(Node), {move, start_slide, PredOrSucc, SplitKey, {tag, JumpOrSlide}, LbModule})
     end,
     DhtState;
 
