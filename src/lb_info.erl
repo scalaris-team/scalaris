@@ -69,12 +69,12 @@ get_time (#lb_info{time  = Time }) -> Time.
 is_succ(Succ, Node) ->
     get_succ(Node) =:= get_node(Succ).
 
--spec neighbors(lb_info(), lb_info()) -> boolean().
+-spec neighbors(Node1::lb_info(), Node2::lb_info()) -> boolean().
 neighbors(Node1, Node2) ->
     is_succ(Node1, Node2) orelse is_succ(Node2, Node1).
 
 %% @doc The number of db entries the heavy node will give to the light node
--spec get_target_load(slide | jump, lb_info(), lb_info()) -> non_neg_integer().
+-spec get_target_load(Op::slide | jump, HeavyNode::lb_info(), LightNode::lb_info()) -> non_neg_integer().
 get_target_load(JumpOrSlide, HeavyNode, LightNode) ->
     case config:read(lb_active_metric) of
         items -> get_target_load(JumpOrSlide, HeavyNode, 1, LightNode, 1);
@@ -88,7 +88,9 @@ get_target_load(JumpOrSlide, HeavyNode, LightNode) ->
                       end end).
 
 %% @doc The number of db entries the heavy node will give to the light node (weighted)
--spec get_target_load(slide | jump, lb_info(), number(), lb_info(), number()) -> non_neg_integer().
+-spec get_target_load(Op::slide | jump, HeavyNode::lb_info(), WeightHeavy::number(),
+                                        LightNode::lb_info(), WeightLight::number())
+                    -> non_neg_integer().
 get_target_load(slide, HeavyNode, WeightHeavy, LightNode, WeightLight) ->
     TotalItems = get_items(HeavyNode) + get_items(LightNode),
     AvgItems = TotalItems div 2,
@@ -104,26 +106,26 @@ get_target_load(jump, HeavyNode, WeightHeavy, _LightNode, WeightLight) ->
 %% TODO generic load change
 %% @doc Calculates the change in Variance
 %% no dht size available
--spec get_load_change_slide(non_neg_integer(), lb_info(), lb_info()) -> integer().
-get_load_change_slide(TakenLoad, HeavyNode, LightNode) ->
+-spec get_load_change_slide(TakenLoad::non_neg_integer(), HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::integer().
+get_load_change_slide(TakenLoad, HeavyNode, LightNode) -> 
     get_load_change_slide(TakenLoad, 1, HeavyNode, LightNode).
 
 %% @doc Calculates the change in Variance
 %% dht size available
--spec get_load_change_slide(non_neg_integer(), pos_integer(), lb_info(), lb_info()) -> integer().
+-spec get_load_change_slide(TakenLoad::non_neg_integer(), DhtSize::pos_integer(), HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::integer().
 get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode) ->
     get_load_change_diff(DhtSize, get_load(HeavyNode), get_load(HeavyNode) - TakenLoad) +
         get_load_change_diff(DhtSize, get_load(LightNode), get_load(LightNode) + TakenLoad).
 
 %% @doc Calculates the change in Variance
 %% no dht size available
--spec get_load_change_jump(non_neg_integer(), lb_info(), lb_info(), lb_info()) -> integer().
+-spec get_load_change_jump(TakenLoad::non_neg_integer(), HeavyNOde::lb_info(), LightNode::lb_info(), LightNodeSucc::lb_info()) -> LoadChange::integer().
 get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc) ->
     get_load_change_jump(TakenLoad, 1, HeavyNode, LightNode, LightNodeSucc).
 
 %% @doc Calculates the change in Variance
 %% dht size available
--spec get_load_change_jump(non_neg_integer(), pos_integer(), lb_info(), lb_info(), lb_info()) -> integer().
+-spec get_load_change_jump(non_neg_integer(), pos_integer(), lb_info(), lb_info(), lb_info()) -> LoadChange::integer().
 get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc) ->
     get_load_change_diff(DhtSize, get_load(LightNode), TakenLoad) +
         get_load_change_diff(DhtSize, get_load(LightNodeSucc), get_load(LightNodeSucc) + get_load(LightNode)) +
@@ -133,11 +135,11 @@ get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc) ->
 get_load_change_diff(DhtSize, OldItemLoad, NewItemLoad) ->
     NewItemLoad * NewItemLoad / DhtSize - OldItemLoad * OldItemLoad / DhtSize.
 
--spec get_oldest_data_time([lb_info()]) -> erlang:timestamp().
+-spec get_oldest_data_time([lb_info()]) -> OldestTime::erlang:timestamp().
 get_oldest_data_time([Node | Other]) ->
     get_oldest_data_time(Other, get_time(Node)).
 
--spec get_oldest_data_time([lb_info()], lb_info()) -> erlang:timestamp().
+-spec get_oldest_data_time([lb_info()], Oldest::lb_info()) -> OldestTime::erlang:timestamp().
 get_oldest_data_time([], Oldest) ->
     Oldest;
 get_oldest_data_time([Node | Other], Oldest) ->

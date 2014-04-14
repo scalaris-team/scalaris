@@ -694,7 +694,7 @@ get_metric(MonitorPid, Metric, Mode) ->
             end
     end.
 
--spec get_value_type(rrd:data_type(), rrd:timeseries_type()) -> unknown | number().
+-spec get_value_type(RRD::rrd:data_type(), Type::rrd:timeseries_type()) -> unknown | number().
 get_value_type(undefined, _Type) ->
     unknown;
 get_value_type(Value, _Type) when is_number(Value) ->
