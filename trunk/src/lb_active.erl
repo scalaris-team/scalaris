@@ -688,7 +688,7 @@ get_dht_metric(Metric, Mode) ->
     MonitorPid = pid_groups:get_my(monitor),
     get_metric(MonitorPid, Metric, Mode).
 
--spec get_metric(pid(), monitor:table_index(), normal | strict) -> unknown | number().
+-spec get_metric(pid(), load_metric() | request_metric(), normal | strict) -> unknown | number().
 get_metric(MonitorPid, Metric, Mode) ->
     [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, Metric}]),
     case RRD of
