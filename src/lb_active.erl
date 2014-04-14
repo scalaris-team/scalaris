@@ -36,7 +36,7 @@
 %% for db monitoring
 -export([init_db_monitors/0, update_db_monitor/2]).
 %% Metrics
--export([get_load_metric/0, get_load_metric/1]).
+-export([get_load_metric/0, get_load_metric/1, default_value/0]).
 % Load Balancing
 -export([balance_nodes/3, balance_nodes/4, balance_noop/1]).
 
@@ -118,7 +118,8 @@ on_inactive({collect_stats} = Msg, State) ->
 
 on_inactive(Msg, State) ->
     %% at the moment, we simply ignore lb messages.
-    ?TRACE("Unknown message received ~p~n. Ignoring.", [Msg]).
+    ?TRACE("Unknown message received ~p~n. Ignoring.", [Msg]),
+    State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -127,7 +128,6 @@ on_inactive(Msg, State) ->
 on({collect_stats}, State) ->
     trigger(collect_stats),
     CPU = cpu_sup:util(),
-    io:format("CPU: ~p~n", [CPU]),
     MEM = case memsup:get_system_memory_data() of
               [{system_total_memory, _Total},
                {free_swap, _FreeSwap},
@@ -384,11 +384,6 @@ set_time_last_balance() ->
 
 %% @doc Process load balancing messages sent to the dht node
 -spec handle_dht_msg(lb_message(), dht_node_state:state()) -> dht_node_state:state().
- %% TODO GlobalInfo
-handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options, GlobalInfo}, DhtState) ->
-    ?ASSERT(lb_info:get_node(HeavyNode) =:= dht_node_state:get(DhtState, node)),
-    ?TRACE("Global Info: ~p~n", [GlobalInfo]),
-    DhtState;
 
 %% We received a jump or slide operation from a LightNode.
 %% In either case, we'll compute the target id and send out
@@ -448,7 +443,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                                         Direction =:= forward -> slide_succ;
                                         Direction =:= backward -> slide_pred
                                     end,
-                            OldestDataTime = if Type =:= jump -> 
+                            OldestDataTime = if Type =:= jump ->
                                                     lb_info:get_oldest_data_time([LightNode, HeavyNode, LightNodeSucc]);
                                                 true ->
                                                     lb_info:get_oldest_data_time([LightNode, HeavyNode])
@@ -462,7 +457,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                             LBModule = pid_groups:get_my(?MODULE),
                             comm:send_local(LBModule, {balance_phase1, Op})
                       end;
-                ReqId ->
+                ReqId -> %% compute result of simulation and reply
                     LoadChange =
                         case JumpOrSlide of
                             slide -> lb_info:get_load_change_slide(TakenLoad, HeavyNode, LightNode);
@@ -544,7 +539,15 @@ monitor_vals_appeared() ->
 -spec get_load_metric() -> unknown | items | number().
 get_load_metric() ->
     Metric = config:read(lb_active_metric),
-    get_load_metric(Metric).
+    Val = get_load_metric(Metric),
+    io:format("Load Metric: ~p~n", [Val]),
+    Val.
+
+
+-define(DEFAULT(Val, Default), case Val of
+                         unknown -> Default;
+                         Val -> Val
+                     end).
 
 -spec get_load_metric(metric()) -> unknown | items | number().
 get_load_metric(Metric) ->
@@ -597,6 +600,11 @@ get_value_type(Value, avg) when is_tuple(Value) ->
         element(1, Value) / element(3, Value)
     catch
         error:badarith -> unknown
+    end.
+
+default_value() ->
+    case config:read(lb_active_metric) of
+        db_reads -> 0
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
