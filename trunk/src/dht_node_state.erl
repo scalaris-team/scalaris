@@ -165,7 +165,9 @@ new(RT, RMState, DB) ->
 %%        <li>db = DB storing the items,</li>
 %%        <li>tx_tp_db = transaction participant DB,</li>
 %%        <li>proposer = paxos proposer PID,</li>
-%%        <li>load = the load of the own node (provided for convenience).</li>
+%%        <li>load = the load (items) of the own node (provided for convenience).</li>
+%%        <li>load2 = the load (see in config lb_active_load_metric) of the own node (provided for convenience).</li>
+%%        <li>load3 = the load (see in config lb_active_request_metric) of the own node (provided for convenience).</li>
 %%        <li>slide_pred = information about the node's current slide operation with its predecessor.</li>
 %%        <li>slide_succ = information about the node's current slide operation with its successor.</li>
 %%        <li>snapshot_state = snapshot algorithm state information</li>
@@ -196,6 +198,8 @@ new(RT, RMState, DB) ->
          (state(), tx_tp_db) -> any();
          (state(), proposer) -> pid();
          (state(), load) -> integer();
+         (state(), load2) -> number();
+         (state(), load3) -> number();
          (state(), slide_pred) -> slide_op:slide_op() | null;
          (state(), slide_succ) -> slide_op:slide_op() | null;
          (state(), snapshot_state) -> snapshot_state:snapshot_state() | null;
@@ -265,6 +269,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
                         %% and the prbr kv entries:
                             + prbr:get_load(PRBRState);
         load2        -> lb_active:get_load_metric();
+        load3        -> lb_active:get_request_metric();
         prbr_kv_db   -> PRBRState;
         txid_db1     -> TxIdDB1;
         txid_db2     -> TxIdDB2;
@@ -481,9 +486,10 @@ details(State) ->
     Node = nodelist:node(Neighbors),
     Load = get(State, load),
     Load2 = get(State, load2),
+    Load3 = get(State, load3),
     Hostname = net_adm:localhost(),
     RTSize = get(State, rt_size),
-    node_details:new(PredList, Node, SuccList, Load, Load2, Hostname, RTSize, erlang:memory(total)).
+    node_details:new(PredList, Node, SuccList, Load, Load2, Load3, Hostname, RTSize, erlang:memory(total)).
 
 %% @doc Gets all entries to transfer (slide) in the given range and starts delta
 %%      recording on the DB for changes in this interval.
