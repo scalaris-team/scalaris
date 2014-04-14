@@ -182,14 +182,15 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     ItemsStdDev = gossip_load:load_info_get(stddev, LoadInfo),
     ItemsAvg = gossip_load:load_info_get(avgLoad, LoadInfo),
     Metrics =
-        case config:read(lb_active_gossip_balance_metric) of %% TODO automatically enable gossip when laod metric other than items is active
+        case config:read(lb_active_balance_metric) of %% TODO automatically enable gossip when laod metric other than items is active
             items ->
                 [{avg, ItemsAvg},
                  {stddev, ItemsStdDev}];
             requests ->
                 GossipModule = lb_active_gossip_request_metric,
                 [{avg, gossip_load:load_info_other_get(avgLoad, GossipModule, LoadInfo)},
-                 {stddev, gossip_load:load_info_other_get(stddev, GossipModule, LoadInfo)}]
+                 {stddev, gossip_load:load_info_other_get(stddev, GossipModule, LoadInfo)}];
+            _ -> [] %% TODO
         end,
     OptionsNew = [{dht_size, Size} | Metrics ++ Options],
 
@@ -251,12 +252,12 @@ on({balance_phase2b, Op, ReplyPid}, State) ->
                 false ->
                     set_pending_op(Op),
                     OpId = Op#lb_op.id,
-                    Pid = node:pidX(Op#lb_op.light_node),
+                    _Pid = node:pidX(Op#lb_op.light_node),
                     TargetKey = Op#lb_op.target,
                                 set_pending_op(Op),
                     ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
                     MyDHT = pid_groups:get_my(dht_node),
-                    ?DBG_ASSERT(Pid =:= comm:make_global(MyDHT)),
+                    ?DBG_ASSERT(_Pid =:= comm:make_global(MyDHT)),
                     case Op#lb_op.type of
                         jump ->
                             comm:send_local(MyDHT, {move, start_jump, TargetKey, {jump, OpId}, self()});
@@ -429,7 +430,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                     end,
 
                 {SplitKey, TakenLoad} =
-                    case config:read(lb_active_balance_metric) of
+                    case config:read(lb_active_balance_metric) of %% TODO getter
                         items ->
                             dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction);
                         none ->
