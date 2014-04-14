@@ -92,7 +92,7 @@ new(PredList, Node, SuccList, Load, Load2, Load3, Hostname, RTSize, Memory) ->
     }.
 
 %% @doc Converts a node details record into a list (only for internal use!).
--spec to_list(node_details()) -> node_details_list().
+-spec to_list(node_details_record()) -> node_details_list().
 to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, load2=Load2, load3=Load3,
   hostname=HostName, rt_size=RTSize, memory=Memory} = _NodeDetails) ->
     [{predlist, PredList},
@@ -103,9 +103,7 @@ to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, 
      {load3, Load3},
      {hostname, HostName},
      {rt_size, RTSize},
-     {memory, Memory}];
-to_list(NodeDetails) when is_list(NodeDetails) ->
-    NodeDetails.
+     {memory, Memory}].
 
 %% @doc Adds the given data to the node list object.
 %%      Beware: Setting pred/succ will overwrite predlist/succlist!
