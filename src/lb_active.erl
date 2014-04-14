@@ -36,7 +36,7 @@
 %% for db monitoring
 -export([init_db_monitors/0, update_db_monitor/2]).
 %% Metrics
--export([get_load_metric/0, get_load_metric/2]).
+-export([get_load_metric/0]).
 % Load Balancing
 -export([balance_nodes/3, balance_nodes/4, balance_noop/1]).
 
@@ -84,6 +84,7 @@ start_link(DHTNodeGroup) ->
 -spec init([]) -> state().
 init([]) ->
     set_time_last_balance(),
+    erlang:put(last_db_monitor_init, os:timestamp()), %% TODO ugly
     case collect_stats() of
         true ->
             application:start(sasl),   %% required by os_mon.
@@ -300,6 +301,8 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
 on({reset_monitors}, State) ->
     init_stats(),
     init_db_monitors(),
+    erlang:erase(metric_available),
+    ?TRACE("Reseting monitors ~n", []),
     gen_component:change_handler(State, fun on_inactive/2);
 
 on({web_debug_info, Requestor}, State) ->
@@ -372,11 +375,8 @@ op_pending() ->
 
 -spec old_op(lb_op()) -> boolean().
 old_op(Op) ->
-    %% TODO Parameterize
-    %% config:read(lb_active_wait_for_pending_ops)
-    Threshold = 10000 * 1000, %% microseconds
-    ?TRACE("Diff:~p~n", [timer:now_diff(os:timestamp(), Op#lb_op.time)]),
-    timer:now_diff(os:timestamp(), Op#lb_op.time) > Threshold.
+    Threshold = config:read(lb_active_wait_for_pending_ops),
+    timer:now_diff(os:timestamp(), Op#lb_op.time) div 1000 > Threshold.
 
 -spec old_data(lb_op()) -> boolean().
 old_data(Op) ->
@@ -511,10 +511,11 @@ init_db_monitors() ->
     case monitor_db() of
         true ->
             MonitorRes = config:read(lb_active_monitor_resolution),
-            Reads  = rrd:add_now(0, rrd:create(MonitorRes * 1000, 3, {timing_with_hist, count})),
-            Writes = rrd:add_now(0, rrd:create(MonitorRes * 1000, 3, {timing_with_hist, count})),
-            monitor:proc_set_value(lb_active, db_reads, Reads),
-            monitor:proc_set_value(lb_active, db_writes, Writes),
+            History = config:read(lb_active_monitor_history),
+            Reads  = rrd:add_now(0, rrd:create(MonitorRes * 1000, History + 1, {timing_with_hist, count})),
+            Writes = rrd:add_now(0, rrd:create(MonitorRes * 1000, History + 1, {timing_with_hist, count})),
+            %monitor:proc_set_value(lb_active, db_reads, Reads),
+            %monitor:proc_set_value(lb_active, db_writes, Writes),
             monitor:monitor_set_value(lb_active, db_reads, Reads),
             monitor:monitor_set_value(lb_active, db_writes, Writes);
         _ -> ok
@@ -531,8 +532,8 @@ update_db_monitor(Type, Value) ->
 %%                     %% TODO Normalize key because histogram might contain circular elements, e.g. [MAXVAL, 0, 1]
 %%
 %%             end,
-            monitor:proc_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
-            %monitor:monitor_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
+            %monitor:proc_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
+            monitor:monitor_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
         _ -> ok
     end.
 
@@ -551,77 +552,102 @@ init_stats() ->
             ok
     end.
 
+%% initially checks if enough metric data has been collected
 -spec monitor_vals_appeared() -> boolean().
 monitor_vals_appeared() ->
+    Metric = config:read(lb_active_metric),
     case erlang:get(metric_available) of
         true -> true;
         _ ->
-            case get_load_metric() of
-                unknown ->
+            case get_load_metric(Metric, strict) =:= unknown andalso collect_phase() of
+                true ->
                     false;
-                _Metric ->
+                _ ->
                     erlang:put(metric_available, true),
                     true
             end
     end.
+
+-spec collect_phase() -> boolean().
+collect_phase() ->
+    CollectPhase = config:read(lb_active_collect_init_phase),
+    LastInit = erlang:get(last_db_monitor_init),
+    timer:now_diff(os:timestamp(), LastInit) div 1000 =< CollectPhase.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec get_load_metric() -> items | number().
 get_load_metric() ->
     Metric = config:read(lb_active_metric),
-    Current = case get_load_metric(Metric, 0) of
-        unknown -> 0; %% no monitor data available due to inactivity of this node
+%%     Current = case get_load_metric(Metric, 0) of
+%%         unknown -> 0; %% no monitor data available due to inactivity of this node
+%%         Val -> Val
+%%     end,
+%%     Previous = case get_load_metric(Metric, 1) of
+%%         unknown -> 0; %% no monitor data available due to inactivity of this node
+%%         Val2 -> Val2
+%%     end,
+%%     PreviousPrevious = case get_load_metric(Metric, 1) of
+%%         unknown -> 0; %% no monitor data available due to inactivity of this node
+%%         Val3 -> Val3
+%%     end,
+%%     %% TODO config parameter
+%%     Average = 0.7 * Current + 0.2 * Previous + 0.1 * PreviousPrevious,
+    Value = case get_load_metric(Metric) of
+        unknown -> 0;
         Val -> Val
     end,
-    Previous = case get_load_metric(Metric, 1) of
-        unknown -> 0; %% no monitor data available due to inactivity of this node
-        Val2 -> Val2
-    end,
-    PreviousPrevious = case get_load_metric(Metric, 1) of
-        unknown -> 0; %% no monitor data available due to inactivity of this node
-        Val3 -> Val3
-    end,
-    %% TODO config parameter
-    Average = 0.7 * Current + 0.2 * Previous + 0.1 * PreviousPrevious,
-    io:format("Load: ~p~n", [Average]), Average. %%TODO
+    io:format("Load: ~p~n", [Value]),
+    Value. %%TODO
 
--spec get_load_metric(metric(), non_neg_integer()) -> unknown | items | number().
-get_load_metric(Metric, Offset) ->
+-spec get_load_metric(metric()) -> items | number(). %% unknwon shouldn't happen here, in theory it can TODO
+get_load_metric(Metric) ->
+    get_load_metric(Metric, normal).
+
+-spec get_load_metric(metric(), normal | strict) -> unknown | items | number().
+get_load_metric(Metric, Mode) ->
             case Metric of
-                cpu          -> get_vm_metric({lb_active, cpu10sec}, count, Offset) / 100;
-                mem          -> get_vm_metric({lb_active, mem10sec}, count, Offset) / 100;
-                db_reads     -> get_dht_metric({lb_active, db_reads}, count, Offset);
-                db_writes    -> get_dht_metric({lb_active, db_writes}, count, Offset);
-                db_requests  -> get_load_metric(db_reads, Offset) + get_load_metric(db_writes, Offset);
-                tx_latency   -> get_dht_metric({api_tx, req_list}, avg, Offset);
-                transactions -> get_dht_metric({api_tx, req_list}, count, Offset);
+                cpu          -> get_vm_metric({lb_active, cpu10sec}, count, Mode) / 100;
+                mem          -> get_vm_metric({lb_active, mem10sec}, count, Mode) / 100;
+                db_reads     -> get_dht_metric({lb_active, db_reads}, count, Mode);
+                db_writes    -> get_dht_metric({lb_active, db_writes}, count, Mode);
+                db_requests  -> get_load_metric(db_reads, Mode) + get_load_metric(db_writes, Mode); %% TODO
+                tx_latency   -> get_dht_metric({api_tx, req_list}, avg, Mode);
+                transactions -> get_dht_metric({api_tx, req_list}, count, Mode);
                 items        -> items;
                 _            -> throw(metric_not_available)
     end.
 
--spec get_vm_metric(metric(), avg | count, non_neg_integer()) -> unknown | number().
-get_vm_metric(Metric, Type, Offset) ->
+-spec get_vm_metric(metric(), avg | count, normal | strict) -> unknown | number().
+get_vm_metric(Metric, Type, Mode) ->
     ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-    get_metric(ClientMonitorPid, Metric, Type, Offset).
+    get_metric(ClientMonitorPid, Metric, Type, Mode).
 
-get_dht_metric(Metric, Type, Offset) ->
+get_dht_metric(Metric, Type, Mode) ->
     MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, Metric, Type, Offset).
+    get_metric(MonitorPid, Metric, Type, Mode).
 
--spec get_metric(pid(), monitor:table_index(), avg | count, non_neg_integer()) -> unknown | number().
-get_metric(MonitorPid, Metric, Type, Offset) ->
+-spec get_metric(pid(), monitor:table_index(), avg | count, normal | strict) -> unknown | number().
+get_metric(MonitorPid, Metric, Type, Mode) ->
     [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [Metric]),
     case RRD of
         undefined ->
             unknown;
         RRD ->
+            History = config:read(lb_active_monitor_history),
             SlotLength = rrd:get_slot_length(RRD),
             {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-            %% get stable value off an old slot
-            Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs-Offset*SlotLength}),
-            %io:format("VAlue: ~p~n", [Value]), TODO
-            get_value_type(Value, Type)
+            Vals = [begin
+                        %% get stable value off an old slot
+                        Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs - Offset*SlotLength}),
+                        %case Value of undefined -> io:format("Undefined value considered.~n"); _->ok end,
+                        get_value_type(Value, Type)
+                    end || Offset <- lists:seq(1, History)],
+            io:format("Vals: ~p~n", [Vals]),
+            case Mode of
+                strict -> ?IIF(lists:member(unknown, Vals), unknown, avg_weighted(Vals));
+                _ -> avg_weighted(Vals)
+            end
     end.
 
 -spec get_value_type(rrd:data_type(), avg | count) -> unknown | number().
@@ -637,6 +663,26 @@ get_value_type(Value, avg) when is_tuple(Value) ->
     catch
         error:badarith -> unknown
     end.
+
+%% @doc returns the weighted average of a list using decreasing weight
+-spec avg_weighted([number()]) -> number().
+avg_weighted([]) ->
+    0;
+avg_weighted(List) ->
+    avg_weighted(List, _Weight=length(List), _Normalize=0, _Sum=0).
+
+%% @doc returns the weighted average of a list using decreasing weight
+-spec avg_weighted([], Weight::0, Normalize::pos_integer(), Sum::number()) -> unknown | float();
+                  ([number()| unknown,...], Weight::pos_integer(), Normalize::non_neg_integer(), Sum::number()) -> unknown | float().
+avg_weighted([], 0, 0, _Sum) ->
+    unknown;
+avg_weighted([], 0, N, Sum) ->
+    Sum/N;
+avg_weighted([unknown | Other], Weight, N, Sum) ->
+    %% ignore unknown vals but decrease weight
+    avg_weighted(Other, Weight - 1, N, Sum);
+avg_weighted([Element | Other], Weight, N, Sum) ->
+    avg_weighted(Other, Weight - 1, N + Weight, Sum + Weight * Element).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -696,5 +742,14 @@ check_config() ->
     config:cfg_is_greater_than(lb_active_monitor_interval, 0) andalso
 
     config:cfg_is_less_than(lb_active_monitor_interval, config:read(lb_active_monitor_resolution)) andalso
+
+    config:cfg_is_integer(lb_active_monitor_history) andalso
+    config:cfg_is_greater_than(lb_active_monitor_history, 0) andalso
+
+    config:cfg_is_integer(lb_active_collect_init_phase) andalso
+    config:cfg_is_greater_than(lb_active_collect_init_phase, 0) andalso
+
+    config:cfg_is_integer(lb_active_wait_for_pending_ops) andalso
+    config:cfg_is_greater_than(lb_active_wait_for_pending_ops, 0) andalso
 
     apply(get_lb_module(), check_config, []).
