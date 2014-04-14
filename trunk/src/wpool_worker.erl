@@ -34,7 +34,7 @@
 
 -include("scalaris.hrl").
 
--type(message() :: {work, Source::comm:mypid(), wpool:job()}).
+-type(message() :: {work, Source::comm:erl_local_pid(), wpool:job()}).
 
 -type(state() :: {}).
 
@@ -60,7 +60,7 @@ on(_Msg, State) ->
 %% @doc do the actual work.
 %%      executes Job and returns results to the local wpool. wpool associates
 %%      the worker pid to the jobs client and knows where the results go.
--spec work(comm:mypid(), wpool:job()) -> ok.
+-spec work(comm:erl_local_pid(), wpool:job()) -> ok.
 work(Source, {{map, erlanon, Fun}, Data, Interval}) ->
     ?TRACE("worker: should apply map ~p to ~p in ~p~n", [Fun, Data, Interval]),
     Results =
@@ -195,7 +195,7 @@ decode(BinString) when is_binary(BinString) ->
 decode(X) -> X.
 
 %% send results back to wpool
--spec return(comm:mypid(), [term()]) -> ok.
+-spec return(comm:erl_local_pid(), [term()]) -> ok.
 return(Source, Data) ->
     comm:send_local(Source, {data, self(), Data}).
 
