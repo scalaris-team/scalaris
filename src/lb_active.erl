@@ -758,8 +758,7 @@ avg_weighted([], 0, 0, _Sum) ->
 avg_weighted([], 0, N, Sum) ->
     Sum/N;
 avg_weighted([unknown | Other], Weight, N, Sum) ->
-    %% ignore unknown vals but decrease weight
-    avg_weighted(Other, Weight - 1, N, Sum);
+    avg_weighted(Other, Weight - 1, N + Weight, Sum);
 avg_weighted([Element | Other], Weight, N, Sum) ->
     avg_weighted(Other, Weight - 1, N + Weight, Sum + Weight * Element).
 
