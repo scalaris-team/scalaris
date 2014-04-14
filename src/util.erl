@@ -472,7 +472,7 @@ gb_trees_foldl(F, Acc, GBTree) ->
     gb_trees_foldl_iter(F, Acc, gb_trees:next(gb_trees:iterator(GBTree))).
 
 -spec gb_trees_foldl_iter(fun((Key, Value, Acc) -> Acc), Acc,
-                          {Key, Value, Iter::term()} | none) -> Acc.
+                          {Key, Value, Iter::gb_trees:iter(Key, Value)} | none) -> Acc.
 gb_trees_foldl_iter(_F, Acc, none) ->
     Acc;
 gb_trees_foldl_iter(F, Acc, {Key, Val, Iter}) ->
