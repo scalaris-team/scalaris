@@ -16,11 +16,10 @@
 %% @doc Implementation of a modified version of the paper below. This implementation 
 %%      doesn't use virtual servers but can still benefit from the load balancing
 %%      algorithm's attributes, respectively the load directories and the emergency
-%%      transfer of load. In addition, gossipping information has been added to improve
-%%      the balancing process.
+%%      transfer of load.
 %%
 %%      Many-to-Many scheme
-%%
+%% @end
 %% @reference B. Godfrey, S. Surana, K. Lakshminarayanan, R. Karp, and I. Stoica
 %%            "Load balancing in dynamic structured peer-to-peer systems"
 %%            Performance Evaluation, vol. 63, no. 3, pp. 217-240, 2006.
@@ -49,7 +48,7 @@
 -type directory_name() :: string().
 
 -record(directory, {name         = ?required(directory, name) :: directory_name(),
-                    pool         = gb_sets:new()              :: gb_sets:set(lb_info:lb_info()), %% TODO really gb_set here? gb_tree is good enough
+                    pool         = gb_sets:new()              :: gb_sets:set(lb_info:lb_info()),
                     num_reported = 0                          :: non_neg_integer()
                     }).
 
@@ -171,9 +170,6 @@ handle_msg(Msg, State) ->
 %% @doc Load balancing messages received by the dht node.
 -spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
 handle_dht_msg({lb_active, request_load, ReplyPid}, DhtState) ->
-    %MyNodeDetails = dht_node_state:details(DhtState),
-    %Capacity = node_details:get
-    %% TODO make this more generic
     NodeDetails = dht_node_state:details(DhtState),
     LoadInfo = lb_info:new(NodeDetails),
     comm:send_local(ReplyPid, {post_load, LoadInfo}),
@@ -212,7 +208,7 @@ directory_routine(DirKey, Type, Schedule) ->
     %%      nodes to avoid too many jumps.
     {_TLog, Directory} = get_directory(DirKey),
     case dir_is_empty(Directory) of
-        true -> Schedule; %% TODO why return old schedule here?
+        true -> Schedule;
         false ->
             Pool = Directory#directory.pool,
             AvgUtil = gb_sets:fold(fun(El, Acc) -> Acc + lb_info:get_load(El) end, 0, Pool) / gb_sets:size(Pool),
@@ -315,7 +311,6 @@ set_directory(TLog, Directory) ->
             ok;
         Error ->
             log:log(warn, "~p: Failed to save directory ~p because of failed transaction: ~p", [?MODULE, DirKey, Error]),
-            % TODO Handle this case
             failed
     end.
 

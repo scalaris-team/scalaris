@@ -15,6 +15,7 @@
 %% @author Maximilian Michels <michels@zib.de>
 %% @doc Implementation of Karger and Ruhl's item balancing load balancing algorithm.
 %%      Modified to sample N nodes and use gossip information.
+%% @end
 %% @reference D. R. Karger and M. Ruhl,
 %%            "Simple efficient load balancing algorithms for peer-to-peer systems,"
 %%            in Proceedings of the sixteenth annual ACM symposium on Parallelism in algorithms and architectures,
@@ -131,10 +132,8 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
                                 [{?quiet}]), %% TODO failure detector here?
                       {ReqId, RndNode}
                  end || RndNode <- RndNodes],
-            %% TODO Parameter in config
-            %% don't wait too long for the responses
-            %%WaitTime = config:read(lb_active_interval) div 1000 div 2,
-            msg_delay:send_local(3, self(), {pick_best_candidate, Id}),
+            Timeout = config:read(lb_active_karger_simulation_timeout) div 1000,
+            msg_delay:send_local(Timeout, self(), {pick_best_candidate, Id}),
             State#state{round_id = Id, my_lb_info = MyLBInfo, req_ids = ReqIds}
     end;
 
@@ -180,7 +179,7 @@ handle_msg({pick_best_candidate, Id}, State) ->
                     comm:send(BestPid, {lb_active, phase1, MyLBInfo, Options});
                 _ -> ?TRACE("No best candidate in Round ~p~n", [Id])
             end,
-            State#state{best_candidate = nil, round_id = nil}; % TODO state cleaning?
+            State#state{best_candidate = nil, round_id = nil};
         _ ->
             ?TRACE("Old decision message for round ~p~n", [Id]),
             State
@@ -269,8 +268,12 @@ get_base_interval() ->
 
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_float(lb_active_karger_epsilon) andalso
-    config:cfg_is_greater_than(lb_active_karger_epsilon, 0.0) andalso
-    config:cfg_is_less_than(lb_active_karger_epsilon, 0.25) andalso
-    config:cfg_is_integer(lb_active_karger_rnd_nodes) andalso
-    config:cfg_is_greater_than_equal(lb_active_karger_rnd_nodes, 1).
+    config:cfg_is_float(lb_active_karger_epsilon) and
+    config:cfg_is_greater_than(lb_active_karger_epsilon, 0.0) and
+    config:cfg_is_less_than(lb_active_karger_epsilon, 0.25) and
+
+    config:cfg_is_integer(lb_active_karger_rnd_nodes) and
+    config:cfg_is_greater_than_equal(lb_active_karger_rnd_nodes, 1) and
+
+    config:cfg_is_integer(lb_active_karger_simulation_timeout) and
+    config:cfg_is_greater_than(lb_active_karger_simulation_timeout, 0).
