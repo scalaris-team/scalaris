@@ -26,28 +26,37 @@
 
 %% all() -> [test_tx_snapshot_slide_interleave || _X <- lists:seq(1, 100)].
 all() ->
+    [{group, without_ring},
+     {group, with_ring}
+    ].
+
+groups() ->
     [
-     test_copy_value_to_snapshot_table, test_set_get_for_snapshot_table,
-     test_delete_from_snapshot_table, test_init_snapshot, test_delete_snapshot,
-     tester_get_snapshot_data,
-     tester_add_snapshot_data,
-     %% rdht_tx_read
-     test_rdht_tx_read_validate_should_abort, test_rdht_tx_read_validate_should_prepare,
-     test_rdht_tx_read_validate_db_copy, test_rdht_tx_read_commit_with_snap_1,
-     test_rdht_tx_read_commit_with_snap_2, test_rdht_tx_read_commit_without_snap,
-     %% rdht_tx_write
-     test_rdht_tx_write_validate_should_abort, test_rdht_tx_write_validate_should_prepare,
-     test_rdht_tx_write_validate_db_copy, test_rdht_tx_write_commit_with_snap,
-     test_rdht_tx_write_commit_without_snap, test_rdht_tx_write_abort_without_snap,
-     test_rdht_tx_write_abort_with_snap,
-     %% lock counting
-     test_lock_counting_on_live_db,
-     %% integration
-     test_basic_race_multiple_snapshots, test_single_snapshot_call,
-     test_spam_transactions_and_snapshots_on_fully_joined,
-     test_tx_snapshot_slide_interleave,
-     %% misc
-     bench_increment
+     {without_ring, [],
+      [
+       test_copy_value_to_snapshot_table, test_set_get_for_snapshot_table,
+       test_delete_from_snapshot_table, test_init_snapshot, test_delete_snapshot,
+       tester_get_snapshot_data,
+       tester_add_snapshot_data,
+       %% rdht_tx_read
+       test_rdht_tx_read_validate_should_abort, test_rdht_tx_read_validate_should_prepare,
+       test_rdht_tx_read_validate_db_copy, test_rdht_tx_read_commit_with_snap_1,
+       test_rdht_tx_read_commit_with_snap_2, test_rdht_tx_read_commit_without_snap,
+       %% rdht_tx_write
+       test_rdht_tx_write_validate_should_abort, test_rdht_tx_write_validate_should_prepare,
+       test_rdht_tx_write_validate_db_copy, test_rdht_tx_write_commit_with_snap,
+       test_rdht_tx_write_commit_without_snap, test_rdht_tx_write_abort_without_snap,
+       test_rdht_tx_write_abort_with_snap,
+       %% lock counting
+       test_lock_counting_on_live_db]},
+
+     {with_ring, [],
+      [%% integration
+       test_basic_race_multiple_snapshots, test_single_snapshot_call,
+       test_spam_transactions_and_snapshots_on_fully_joined,
+       test_tx_snapshot_slide_interleave,
+       %% misc
+       bench_increment]}
     ].
 
 suite() -> [ {timetrap, {seconds, 30}} ].
@@ -56,8 +65,17 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
+
+init_per_group(without_ring, Config) ->
+    unittest_helper:start_minimal_procs(Config, [], false);
+init_per_group(_GroupName, Config) ->
+    Config.
+
+end_per_group(without_ring, Config) ->
+    unittest_helper:stop_minimal_procs(Config);
+end_per_group(_GroupName, Config) ->
+    Config.
 
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
