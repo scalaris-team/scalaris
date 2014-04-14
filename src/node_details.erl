@@ -20,7 +20,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([new/0, new/8,
+-export([new/0, new/9,
          contains/2, get/2, set/3]).
 
 -include("scalaris.hrl").
@@ -33,6 +33,7 @@
 
 -type(load() :: integer()).
 -type(load2() :: number()).
+-type(load3() :: number()).
 -type(hostname() :: string()).
 -type(rt_size() :: integer()).
 -type(message_log() :: any()).
@@ -47,6 +48,7 @@
                        succlist = ?required(node_details, succlist) :: nodelist:non_empty_snodelist(),
                        load     = ?required(node_details, load)     :: load(),
                        load2    = ?required(node_details, load2)    :: load2(),
+                       load3    = ?required(node_details, load3)    :: load3(),
                        hostname = ?required(node_details, hostname) :: hostname(),
                        rt_size  = ?required(node_details, rt_size)  :: rt_size(),
                        memory   = ?required(node_details, memory)   :: memory()}).
@@ -58,6 +60,8 @@
      {my_range, intervals:interval()} |
      {succlist, nodelist:non_empty_snodelist()} |
      {load, load()} |
+     {load2, load2()} |
+     {load3, load3()} |
      {hostname, hostname()} |
      {rt_size, rt_size()} |
      {message_log, message_log()} |
@@ -72,14 +76,15 @@
 new() -> [].
 
 %% @doc Creates a new node details object with the given data.
--spec new(PredList::nodelist:non_empty_snodelist(), Node::node:node_type(), SuccList::nodelist:non_empty_snodelist(), Load::load(), Load2::load2(), Hostname::hostname(), RTSize::rt_size(), Memory::memory()) -> node_details().
-new(PredList, Node, SuccList, Load, Load2, Hostname, RTSize, Memory) ->
+-spec new(PredList::nodelist:non_empty_snodelist(), Node::node:node_type(), SuccList::nodelist:non_empty_snodelist(), Load::load(), Load2::load2(), Load3::load3(), Hostname::hostname(), RTSize::rt_size(), Memory::memory()) -> node_details().
+new(PredList, Node, SuccList, Load, Load2, Load3, Hostname, RTSize, Memory) ->
     #node_details{
      predlist = PredList,
      node = Node,
      succlist = SuccList,
      load = Load,
      load2 = Load2,
+     load3 = Load3,
      hostname = Hostname,
      rt_size = RTSize,
      memory = Memory
@@ -87,12 +92,14 @@ new(PredList, Node, SuccList, Load, Load2, Hostname, RTSize, Memory) ->
 
 %% @doc Converts a node details record into a list (only for internal use!).
 -spec to_list(node_details()) -> node_details_list().
-to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load,
+to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, load2=Load2, load3=Load3,
   hostname=HostName, rt_size=RTSize, memory=Memory} = _NodeDetails) ->
     [{predlist, PredList},
      {node, Me},
      {succlist, SuccList},
      {load, Load},
+     {load2, Load2},
+     {load3, Load3},
      {hostname, HostName},
      {rt_size, RTSize},
      {memory, Memory}];
@@ -165,7 +172,7 @@ contains(NodeDetails, Key) when is_list(NodeDetails) ->
           (node_details(), message_log) -> message_log();
           (node_details(), memory) -> memory();
           (node_details(), new_key) -> ?RT:key().
-get(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, load2=Load2,
+get(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, load2=Load2, load3=Load3,
   hostname=HostName, rt_size=RTSize, memory=Memory} = _NodeDetails, Key) ->
     case Key of
         predlist -> PredList;
@@ -175,6 +182,7 @@ get(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, load
         succ -> hd(SuccList);
         load -> Load;
         load2 -> Load2;
+        load3 -> Load3;
         hostname -> HostName;
         rt_size -> RTSize;
         memory -> Memory;
