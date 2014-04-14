@@ -367,12 +367,6 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
     log:log(info, "[ ~p - ~p] shutdown due to rrepair shut down", [?MODULE, comm:this()]),
     kill.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Starts updating the local entries with the given KvvList.
-%%      -> Returns number of send update requests.
-%%      PreCond: KvvList contains only unique keys
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %% @doc Maps the given tuple list (with keys as first elements) to the MyI
 %%      interval.
 %%      Precond: tuple list with unique keys
@@ -394,8 +388,11 @@ map_key_list(KeyList, MyI) ->
              RKey <- ?RT:get_replica_keys(Key),
              intervals:in(RKey, MyI)].
 
+%% @doc Starts updating the local entries with the given KvvList.
+%%      -> Returns number of send update requests.
+%%      PreCond: KvvList contains only unique keys
 -spec start_update_key_entries(MyIOtherKvvList::kvv_list(), comm:mypid(),
-                               comm:erl_local_pid()) -> non_neg_integer().
+                               comm:erl_local_pid()) -> UpdRequests::non_neg_integer().
 start_update_key_entries([], _MyPid, _DhtPid) -> 0;
 start_update_key_entries(MyIOtherKvvList, MyPid, DhtPid) ->
     send_local(DhtPid, {update_key_entries, MyPid, MyIOtherKvvList}),
