@@ -123,6 +123,9 @@ on_inactive({lb_trigger}, State) ->
             State
     end;
 
+on_inactive({monitor_trigger} = Msg, State) ->
+    on(Msg, State);
+
 on_inactive({collect_stats} = Msg, State) ->
     on(Msg, State);
 
@@ -155,6 +158,12 @@ on({collect_stats}, State) ->
     %monitor:client_monitor_set_value(lb_active, cpu5min, fun(Old) -> rrd:add_now(CPU, Old) end),
     monitor:client_monitor_set_value(lb_active, mem10sec, fun(Old) -> rrd:add_now(MEM, Old) end),
     %monitor:client_monitor_set_value(lb_active, mem5min, fun(Old) -> rrd:add_now(MEM, Old) end),
+    State;
+
+on({monitor_trigger}, State) ->
+    trigger(monitor_trigger),
+    monitor:proc_check_timeslot(lb_active, db_reads),
+    monitor:proc_check_timeslot(lb_active, db_writes),
     State;
 
 on({lb_trigger} = Msg, State) ->
