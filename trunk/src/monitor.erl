@@ -125,6 +125,11 @@ monitor_set_value(Process, Key, NewValue_or_UpdateFun) ->
     MyMonitor = pid_groups:get_my(monitor),
     comm:send_local(MyMonitor, {report_single, Process, Key, NewValue_or_UpdateFun}).
 
+%% % TODO
+%% monitor_get_value(Process, Key) ->
+%%     MyMonitor = pid_groups:get_my(monitor).
+%%     %comm:send_local(MyMonitor, Msg).
+
 %% @doc Advances the stored timeslots of the value at Key inside the current
 %%      process (if necessary) to the current time.
 %%      If a new time slot is started by updating the value, then the rrd()
@@ -316,8 +321,15 @@ web_debug_info_dump_fun(DB, From_us, To_us, Value) ->
                               count -> "";
                               _     -> " " ++ erlang:atom_to_list(Unit)
                           end,
-                io_lib:format("&nbsp;&nbsp;count: ~B (avg: ~.2f / s), avg: ~.2f~s, min: ~.2f~s, max: ~.2f~s, stddev: ~.2f~s<br />&nbsp;&nbsp;hist:~p",
-                              [Count, AvgPerS, Avg, UnitStr, float(Min), UnitStr, float(Max), UnitStr, Stddev, UnitStr, histogram:get_data(Hist)]);
+                Temp = io_lib:format("&nbsp;&nbsp;count: ~B (avg: ~.2f / s), avg: ~.2f~s, min: ~.2f~s, max: ~.2f~s, stddev: ~.2f~s<br />",
+                              [Count, AvgPerS, Avg, UnitStr, float(Min), UnitStr, float(Max), UnitStr, Stddev, UnitStr]),
+                case histogram:get_num_elements(Hist) of 
+                    0 ->
+                        Temp;
+                    _ ->
+                        %Temp ++ io_lib:format("&nbsp;&nbsp;hist:<pre>~.0p</pre><br />Largest Window: ~p", [histogram:get_data(Hist), histogram:find_largest_window(N div 2, Hist)])
+                        Temp ++ io_lib:format("&nbsp;&nbsp;hist:<pre>~.0p</pre>", [histogram:get_data(Hist)])
+                end;
             counter ->
                 io_lib:format("&nbsp;&nbsp;sum: ~p (avg: ~.2f / s)", [Value, Value / Diff_in_s]);
             event ->
