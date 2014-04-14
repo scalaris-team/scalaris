@@ -63,6 +63,8 @@
 -type node() :: #node{}.
 -type state() :: #state{}.
 
+-type trigger() :: publish_trigger | directory_trigger.
+
 -type dht_message() :: none.
 
 -define(HASH(K), api_dht:hash_key(K)).
@@ -74,25 +76,21 @@ start_link(DHTNodeGroup) ->
                              [{pid_groups_join_as, DHTNodeGroup, lb_active_directories}]).
 
 init([]) ->
-    Interval = config:read(lb_active_interval),
-    msg_delay:send_trigger(Interval div 1000, {publish_trigger}),
-    msg_delay:send_trigger(Interval div 1000, {directory_trigger}),
+    trigger(publish_trigger),
+    trigger(directory_trigger),
     request_dht_range(),
-    %rm_loop:sub
-    This = comm:this(),
     rm_loop:subscribe(
        self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_filter/3,
-       fun(_,_,_,_) -> comm:send_local(self(), {get_state, This, my_range}) end, inf),
+       fun(_,_,_,_) -> request_dht_range() end, inf),
     #state{}.
 
 on({publish_trigger}, State) ->
+    trigger(publish_trigger),
     State;
 
 on({directory_trigger}, State) ->
-    Interval = config:read(lb_active_interval),
-    msg_delay:send_trigger(Interval div 1000, {directory_trigger}),
+    trigger(directory_trigger),
     ?TRACE("~p My Directories: ~p~n", [self(), State#state.my_dirs]),
-    %request_dht_range(),
     State;
 
 on({get_state_response, MyRange}, State) ->
@@ -157,6 +155,11 @@ read_from_directory() -> ok.
 -spec int_to_str(integer()) -> string().
 int_to_str(N) ->
     erlang:integer_to_list(N).
+
+-spec trigger(trigger()) -> ok.
+trigger(Trigger) ->
+    Interval = config:read(lb_active_trigger),
+    msg_delay:send_trigger(Interval div 1000, {Trigger}).
 
 -spec check_config() -> boolean().
 check_config() ->
