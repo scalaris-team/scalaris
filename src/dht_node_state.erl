@@ -345,10 +345,12 @@ is_db_responsible__no_msg_fwd_check(Key, #state{db_range = DBRange, rm_state = R
         {Type::pred | succ, SlideOp::slide_op:slide_op()} |
         not_found.
 get_slide(#state{slide_pred=SlidePred, slide_succ=SlideSucc}, MoveFullId) ->
-    case SlidePred =/= null andalso slide_op:get_id(SlidePred) =:= MoveFullId of
+    case slide_op:is_slide(SlidePred) andalso
+             slide_op:get_id(SlidePred) =:= MoveFullId of
         true -> {pred, SlidePred};
         _ ->
-            case SlideSucc =/= null andalso slide_op:get_id(SlideSucc) =:= MoveFullId of
+            case slide_op:is_slide(SlideSucc) andalso
+                     slide_op:get_id(SlideSucc) =:= MoveFullId of
                 true -> {succ, SlideSucc};
                 _ -> not_found
             end

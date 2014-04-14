@@ -154,7 +154,7 @@ process_move_msg({move, slide_abort, PredOrSucc, MoveFullId, Reason} = _Msg, Sta
                   pred -> dht_node_state:get(State, slide_pred);
                   succ -> dht_node_state:get(State, slide_succ)
               end,
-    case SlideOp =/= null andalso slide_op:get_id(SlideOp) =:= MoveFullId of
+    case slide_op:is_slide(SlideOp) andalso slide_op:get_id(SlideOp) =:= MoveFullId of
         true ->
             abort_slide(State, SlideOp, Reason, false);
         _ ->
@@ -169,7 +169,7 @@ process_move_msg({move, node_leave} = _Msg, State) ->
     % note: can't use safe_operation/6 - there is no slide op id
     SlideOp = dht_node_state:get(State, slide_succ),
     % only handle node_update in wait_for_continue phase
-    case SlideOp =/= null andalso slide_op:is_leave(SlideOp) andalso
+    case slide_op:is_slide(SlideOp) andalso slide_op:is_leave(SlideOp) andalso
              slide_op:get_phase(SlideOp) =:= wait_for_continue andalso
              slide_op:get_sendORreceive(SlideOp) =:= 'send' of
         true ->
