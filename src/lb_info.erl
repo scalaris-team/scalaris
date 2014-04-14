@@ -82,19 +82,23 @@ get_target_load(jump, HeavyNode, _LightNode) ->
      get_items(HeavyNode) div 2.
 
 %% TODO generic load change
+%% no dht size available
 -spec get_load_change_slide(non_neg_integer(), lb_info(), lb_info()) -> integer().
 get_load_change_slide(TakenLoad, HeavyNode, LightNode) ->
     get_load_change_slide(TakenLoad, 1, HeavyNode, LightNode).
 
+%% dht size available
 -spec get_load_change_slide(non_neg_integer(), pos_integer(), lb_info(), lb_info()) -> integer().
 get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode) ->
     get_load_change_diff(DhtSize, get_items(HeavyNode), get_items(HeavyNode) - TakenLoad) +
         get_load_change_diff(DhtSize, get_items(LightNode), get_items(LightNode) + TakenLoad).
 
+%% no dht size available
 -spec get_load_change_jump(non_neg_integer(), lb_info(), lb_info(), lb_info()) -> integer().
 get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc) ->
     get_load_change_jump(TakenLoad, 1, HeavyNode, LightNode, LightNodeSucc).
 
+%% dht size available
 -spec get_load_change_jump(non_neg_integer(), pos_integer(), lb_info(), lb_info(), lb_info()) -> integer().
 get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc) ->
     get_load_change_diff(DhtSize, get_items(LightNode), TakenLoad) +
@@ -103,12 +107,13 @@ get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc) ->
 
 -spec get_load_change_diff(pos_integer(), non_neg_integer(), non_neg_integer()) -> integer().
 get_load_change_diff(DhtSize, OldItemLoad, NewItemLoad) ->
-    %% if DhtSize is available, we compute the variance change
     NewItemLoad * NewItemLoad / DhtSize - OldItemLoad * OldItemLoad / DhtSize.
 
+-spec get_oldest_data_time([lb_info()]) -> erlang:timestamp().
 get_oldest_data_time([Node | Other]) ->
     get_oldest_data_time(Other, get_time(Node)).
 
+-spec get_oldest_data_time([lb_info()], lb_info()) -> erlang:timestamp().
 get_oldest_data_time([], Oldest) ->
     Oldest;
 get_oldest_data_time([Node | Other], Oldest) ->

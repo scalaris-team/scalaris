@@ -48,8 +48,7 @@
 
 -type directory_name() :: string().
 
--record(directory, {name         = ?required(directory, name) :: directory_name(), 
-                    last_balance = nil                        :: nil | os:timestamp(),
+-record(directory, {name         = ?required(directory, name) :: directory_name(),
                     pool         = gb_sets:new()              :: gb_set(), %% TODO really gb_set here? gb_tree is good enough
                     num_reported = 0                          :: non_neg_integer()
                     }).
@@ -62,8 +61,8 @@
 -type schedule() :: [reassign()].
 
 -record(state, {my_dirs = [] :: [directory_name()],
-                threshold_periodic  = 0.5, %% k_p = (1 + average directory utilization) / 2
-                threshold_emergency = 1.0,  %% k_e
+                %threshold_periodic  = 0.5, %% k_p = (1 + average directory utilization) / 2
+                %threshold_emergency = 1.0,  %% k_e
                 schedule = [] :: schedule()
                 }).
 
@@ -117,15 +116,15 @@ handle_msg({post_load, LoadInfo}, State) ->
     DirKey = Directory#directory.name,
     post_load_to_directory(LoadInfo, DirKey),
     %% TODO Emergency Threshold has been already checked at the node overloaded...
-    EmergencyThreshold = State#state.threshold_emergency,
-    case lb_info:get_load(LoadInfo) > EmergencyThreshold of
-        true  ->
-            ?TRACE("Emergency in post_load~n", []),
-            MySchedule = State#state.schedule,
-            Schedule = directory_routine(DirKey, emergency, MySchedule),
-            perform_transfer(Schedule);
-        false -> ok
-    end,
+%%     EmergencyThreshold = State#state.threshold_emergency,
+%%     case lb_info:get_load(LoadInfo) > EmergencyThreshold of
+%%         true  ->
+%%             ?TRACE("Emergency in post_load~n", []),
+%%             MySchedule = State#state.schedule,
+%%             Schedule = directory_routine(DirKey, emergency, MySchedule),
+%%             perform_transfer(Schedule);
+%%         false -> ok
+%%     end,
     State;
 
 handle_msg({directory_trigger}, State) ->
@@ -170,6 +169,14 @@ handle_dht_msg({lb_active, request_load, ReplyPid}, DhtState) ->
     NodeDetails = dht_node_state:details(DhtState),
     LoadInfo = lb_info:new(NodeDetails),
     comm:send_local(ReplyPid, {post_load, LoadInfo}),
+    DhtState;
+
+%% This handler is for requesting load information from the succ of
+%% the light node in case of a jump (we are the succ of the light node).
+handle_dht_msg({lb_active, before_jump, HeavyNode, LightNode}, DhtState) ->
+    NodeDetails = dht_node_state:details(DhtState),
+    LightNodeSucc = lb_info:new(NodeDetails),
+    lb_active:balance_nodes(HeavyNode, LightNode, LightNodeSucc, []),
     DhtState;
 
 handle_dht_msg(Msg, DhtState) ->
@@ -332,11 +339,13 @@ perform_transfer([]) ->
     ok;
 perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other]) ->
     ?TRACE("~p: Reassigning ~p (light: ~p) and ~p (heavy: ~p)~n", [?MODULE, lb_info:get_node(LightNode), lb_info:get_load(LightNode), lb_info:get_node(HeavyNode), lb_info:get_load(HeavyNode)]),
-    lb_active:balance_nodes(HeavyNode, LightNode),
-%%     case lb_info:neighbors(LightNode, HeavyNode) of
-%%         true  -> comm:send(node:pidX(DhtNode), {lb_active, {slide, LightNode}});
-%%         false -> comm:send(node:pidX(DhtNode), {lb_active, {jump, LightNode}})
-%%     end,
+    case lb_info:neighbors(HeavyNode, LightNode) of
+        true -> 
+            lb_active:balance_nodes(HeavyNode, LightNode, []);
+        false -> %% send message to succ of LightNode to get his load
+            LightNodeSucc = lb_info:get_succ(LightNode),
+            comm:send(node:pidX(LightNodeSucc), {lb_active, before_jump, HeavyNode, LightNode})
+    end,
     perform_transfer(Other).
 
 %%%%%%%%%%%%
@@ -363,7 +372,12 @@ wait_randomly() ->
 
 -spec trigger(trigger()) -> ok.
 trigger(Trigger) ->
-    Interval = config:read(lb_active_interval),
+    %Interval = config:read(lb_active_interval),
+    Interval =
+        case Trigger of
+            publish_trigger -> config:read(lb_active_directories_publish_interval);
+            directory_trigger -> config:read(lb_active_directories_directory_interval)
+        end,
     msg_delay:send_trigger(Interval div 1000, {Trigger}).
 
 -spec get_web_debug_kv(state()) -> [{string(), string()}].
@@ -372,7 +386,9 @@ get_web_debug_kv(State) ->
 
 -spec check_config() -> boolean().
 check_config() ->
-    % lb_active_interval => publish_interval
-    % lb_active_intervak => balance_interval
+    config:cfg_is_integer(lb_active_directories_publish_interval) andalso
+    config:cfg_is_greater_than(lb_active_directories_publish_interval, 1000) andalso
+    config:cfg_is_integer(lb_active_directories_directory_interval) andalso
+    config:cfg_is_greater_than(lb_active_directories_directory_interval, 1000) andalso
     % emergency treshold
     true.
