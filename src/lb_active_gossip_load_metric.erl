@@ -12,7 +12,8 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 %% @version $Id$
--module(gossip_load_lb_metric).
+-module(lb_active_gossip_load_metric).
+-author('michels@zib.de').
 -vsn('$Id$').
 
 -behavior(gossip_load_beh).
