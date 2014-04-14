@@ -39,9 +39,9 @@
 
 -record(state, {epsilon          = ?required(state, epsilon) :: float(),
                 rnd_node         = []                        :: [node:node_type()],
-                best_candidate   = nil                       :: {LoadChange::non_neg_integer(), lb_info:lb_info()},
-                round_id         = 0                         :: non_neg_integer(),
-                my_lb_info       = nil                       :: lb_info:lb_info(),
+                best_candidate   = nil                       :: {LoadChange::non_neg_integer(), node:node_type()} | nil,
+                round_id         = nil                       :: nil | non_neg_integer(),
+                my_lb_info       = nil                       :: lb_info:lb_info() | nil,
                 req_ids          = []                        :: [{integer(), node:node_type()}]
                }).
 
@@ -121,7 +121,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
     case RandomNodes of
         [RndNode] ->
             comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, Options}, [{?quiet}]),
-            State#state{rnd_node = nil};
+            State#state{rnd_node = []};
         RndNodes ->
             ReqIds =
                 [begin
@@ -129,7 +129,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
                       ?TRACE("Sending out simulate request with ReqId ~p to ~.0p~n", [ReqId, node:pidX(RndNode)]),
                       OptionsNew = [{simulate, ReqId}, {reply_to, comm:this()}] ++ Options,
                       comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, OptionsNew},
-                                [?quiet]), %% TODO failure detector here?
+                                [{?quiet}]), %% TODO failure detector here?
                       {ReqId, RndNode}
                  end || RndNode <- RndNodes],
             %% TODO Parameter in config
