@@ -51,7 +51,6 @@ new(NodeDetails) ->
 -spec get_load(lb_info()) -> load() | node:node_type().
 get_load(#lb_info{load = Load}) -> Load.
 get_db_keys(#lb_info{db_keys = Keys}) -> Keys.
-%get_util(#lb_info{util = Util}) -> Util.
 get_node(#lb_info{node = Node}) -> Node.
 get_succ(#lb_info{succ = Succ}) -> Succ.
 

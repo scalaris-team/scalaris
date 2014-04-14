@@ -43,8 +43,8 @@
 %% e.g. 1 implies a central directory
 -define(NUM_DIRECTORIES, 1).
 
-%-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X,Y)).
 
 -type directory_name() :: string().
 
@@ -89,7 +89,7 @@ init() ->
     This = comm:this(),
     rm_loop:subscribe(
        self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_slide_filter/3,
-       fun(_,_,_,_) -> comm:send_local(self(), {get_state, This, my_range}) end, inf),
+       fun(_,_,_,_,_) -> comm:send_local(self(), {get_state, This, my_range}) end, inf),
     #state{}.
 
 %%%%%%%%%%%%%%%% Process Messages %%%%%%%%%%%%%%%%%%%%%%%
@@ -230,6 +230,28 @@ find_matches(LightNodes, HeavyNodes, Result) ->
             lists:reverse(Result)
     end.
 
+-spec get_all_directory_keys() ->  ?RT:key().
+get_all_directory_keys() ->
+    [get_directory_key_by_number(N) || N <- lists:seq(1, ?NUM_DIRECTORIES)].
+
+-spec get_random_directory_key() ->  ?RT:key().
+get_random_directory_key() ->
+    Rand = randoms:rand_uniform(1, ?NUM_DIRECTORIES+1),
+    get_directory_key_by_number(Rand).
+
+-spec get_directory_key_by_number(pos_integer()) -> ?RT:key().
+get_directory_key_by_number(N) when N > 0 ->
+    ?RT:hash_key("lb_active_dir" ++ int_to_str(N)).
+
+%% selects two directories at random and returns the one which least nodes reported to
+get_random_directory() ->
+    {_TLog1, RandDir1} = get_directory(int_to_str(get_random_directory_key())),
+    {_TLog2, RandDir2} = get_directory(int_to_str(get_random_directory_key())),
+    case RandDir1#directory.num_reported >= RandDir2#directory.num_reported of
+        true -> RandDir1;
+        _    -> RandDir2
+    end.
+
 %% @doc Check if directories exist, if not create them.
 -spec create_directories(non_neg_integer()) -> ok.
 create_directories(0) ->
@@ -251,18 +273,20 @@ create_directories(N) when N > 0 ->
             end
     end.
 
--spec get_all_directory_keys() ->  ?RT:key().
-get_all_directory_keys() ->
-    [get_directory_key_by_number(N) || N <- lists:seq(1, ?NUM_DIRECTORIES)].
-
--spec get_random_directory_key() ->  ?RT:key().
-get_random_directory_key() ->
-    Rand = randoms:rand_uniform(1, ?NUM_DIRECTORIES+1),
-    get_directory_key_by_number(Rand).
-
--spec get_directory_key_by_number(pos_integer()) -> ?RT:key().
-get_directory_key_by_number(N) when N > 0 ->
-    ?RT:hash_key("lb_active_dir" ++ int_to_str(N)).
+%% TODO make the three below more generic...
+-spec pop_load_in_directory(directory_name()) -> directory().
+pop_load_in_directory(DirKey) ->
+    TLog = api_tx:new_tlog(),
+    case api_tx:read(TLog, DirKey) of
+        {TLog2, {ok, Directory}} ->
+            case api_tx:req_list(TLog2, [{write, DirKey, dir_clear_load(Directory)}, {commit}]) of
+                {[], ok, ok} -> Directory;
+                Error -> log:log(warn, "~p: Failed to save directory ~p because of failed transaction: ~p", [?MODULE, DirKey, Error]),
+                         pop_load_in_directory(DirKey)
+            end;
+        {_TLog2, {fail, not_found}} ->
+            log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE])
+    end.
 
 -spec post_load_to_directory(lb_info:lb_info(), directory_name()) -> ok.
 post_load_to_directory(Load, DirKey) ->
@@ -281,15 +305,6 @@ post_load_to_directory(Load, DirKey) ->
         {_TLog2, {fail, not_found}} ->
             log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE]),
             ok
-    end.
-
-%% selects two directories at random and returns the one which least nodes reported to
-get_random_directory() ->
-    {_TLog1, RandDir1} = get_directory(int_to_str(get_random_directory_key())),
-    {_TLog2, RandDir2} = get_directory(int_to_str(get_random_directory_key())),
-    case RandDir1#directory.num_reported >= RandDir2#directory.num_reported of
-        true -> RandDir1;
-        _    -> RandDir2
     end.
 
 -spec get_directory(directory_name()) -> {api_tx:tlog(), directory()}.
@@ -313,20 +328,6 @@ set_directory(TLog, Directory) ->
         Error ->
             log:log(warn, "~p: Failed to save directory ~p because of failed transaction: ~p", [?MODULE, DirKey, Error]),
             failed
-    end.
-
--spec pop_load_in_directory(directory_name()) -> directory().
-pop_load_in_directory(DirKey) ->
-    TLog = api_tx:new_tlog(),
-    case api_tx:read(TLog, DirKey) of
-        {TLog2, {ok, Directory}} ->
-            case api_tx:req_list(TLog2, [{write, DirKey, dir_clear_load(Directory)}, {commit}]) of
-                {[], ok, ok} -> Directory;
-                Error -> log:log(warn, "~p: Failed to save directory ~p because of failed transaction: ~p", [?MODULE, DirKey, Error]),
-                         pop_load_in_directory(DirKey)
-            end;
-        {_TLog2, {fail, not_found}} ->
-            log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE])
     end.
 
 %%%%%%%%%%%%%%%% Directory record %%%%%%%%%%%%%%%%%%%%%%
