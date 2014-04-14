@@ -119,7 +119,6 @@ new() ->
     RandomName = randoms:getRandomString(),
     DBName = "db_" ++ RandomName,
     SubscrName = DBName ++ ":subscribers",
-    lb_active:init_db_monitors(),
     {?DB:new(DBName), ?DB:new(SubscrName), {false, 0, 0}}.
 
 %% @doc Closes the given DB and deletes all contents (this DB can thus not be

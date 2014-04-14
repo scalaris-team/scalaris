@@ -34,7 +34,7 @@
 %% for calls from the dht node
 -export([handle_dht_msg/2]).
 %% for db monitoring
--export([init_db_monitors/0, update_db_monitor/2]).
+-export([init_db_monitors/2, update_db_monitor/2]).
 %% Metrics
 -export([get_load_metric/0]).
 % Load Balancing
@@ -95,9 +95,16 @@ init([]) ->
     init_stats(),
     trigger(lb_trigger),
     %% keep the node id in state, currently needed to normalize histogram
-    %%     rm_loop:subscribe(
-    %%        self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_filter/3,
-    %%        fun(_,_,_,_,_) -> comm:send_local(self(), {get_node_details, This, node_id}) end, inf),
+    rm_loop:subscribe(
+       self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_slide_filter/3,
+       fun(Pid, _Tag, _Old, _New, _Reason) ->
+           %% send reset message to dht node and lb_active process
+           comm:send_local(self(), {lb_active, reset_db_monitors}),
+           comm:send_local(Pid, {reset_monitors})
+       end, inf),
+    DhtNode = pid_groups:get_my(dht_node),
+    comm:send_local(DhtNode, {lb_active, reset_db_monitors}),
+    comm:send_local(self(), {reset_monitors}),
     {}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Startup message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -300,7 +307,6 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
 
 on({reset_monitors}, State) ->
     init_stats(),
-    init_db_monitors(),
     erlang:erase(metric_available),
     ?TRACE("Reseting monitors ~n", []),
     gen_component:change_handler(State, fun on_inactive/2);
@@ -408,6 +414,12 @@ is_simulation(Options) ->
 %% @doc Process load balancing messages sent to the dht node
 -spec handle_dht_msg(lb_message(), dht_node_state:state()) -> dht_node_state:state().
 
+handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
+    MyRange = dht_node_state:get(DhtState, my_range),
+    MyId = dht_node_state:get(DhtState, node_id),
+    init_db_monitors(MyId, MyRange),
+    DhtState;
+
 %% We received a jump or slide operation from a LightNode.
 %% In either case, we'll compute the target id and send out
 %% the jump or slide message to the LightNode.
@@ -506,18 +518,36 @@ handle_dht_msg(Msg, DhtState) ->
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Called by db process to initialize monitors
--spec init_db_monitors() -> ok.
-init_db_monitors() ->
+-spec init_db_monitors(Id::?RT:key(), Range::intervals:interval()) -> ok.
+init_db_monitors(Id, Range) ->
     case monitor_db() of
         true ->
             MonitorRes = config:read(lb_active_monitor_resolution),
             History = config:read(lb_active_monitor_history),
-            Reads  = rrd:add_now(0, rrd:create(MonitorRes * 1000, History + 1, {timing_with_hist, count})),
-            Writes = rrd:add_now(0, rrd:create(MonitorRes * 1000, History + 1, {timing_with_hist, count})),
+            HistogramSize = config:read(lb_active_histogram_size),
+            HistogramType =
+                case intervals:in(0, MyRange) andalso MyRange =/= intervals:all() of
+                    true ->
+                        NormFun = fun(Val) ->
+                                     Val - Id - 1; %% TODO calculate id
+                                     Val - 
+                                  end,
+                        {histogram, HistogramSize, NormFun, InverseFun} %% TODO off by one. Actually MyId - 1
+                    _ -> {histogram, HistogramSize}
+                end,
+                case NormalizationFactor of
+                    0 -> {histogram, HistogramSize};
+                    N -> {histogram, HistogramSize, N}
+                end,
+            Reads  = rrd:create(MonitorRes * 1000, History + 1, HistogramType),
+            Writes = rrd:create(MonitorRes * 1000, History + 1, HistogramType),
             Monitor = pid_groups:get_my(monitor),
+            %% TODO not really necessary just wait for all values to disappear
+            monitor:proc_clear_value(lb_active, db_reads),
+            monitor:proc_clear_value(lb_active, db_writes),
             monitor:clear_rrds(Monitor, [{lb_active, db_reads}, {lb_active, db_writes}]),
-            %monitor:proc_set_value(lb_active, db_reads, Reads),
-            %monitor:proc_set_value(lb_active, db_writes, Writes),
+            monitor:proc_set_value(lb_active, db_reads, Reads),
+            monitor:proc_set_value(lb_active, db_writes, Writes),
             monitor:monitor_set_value(lb_active, db_reads, Reads),
             monitor:monitor_set_value(lb_active, db_writes, Writes);
         _ -> ok
@@ -534,8 +564,8 @@ update_db_monitor(Type, Value) ->
 %%                     %% TODO Normalize key because histogram might contain circular elements, e.g. [MAXVAL, 0, 1]
 %%
 %%             end,
-            %monitor:proc_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
-            monitor:monitor_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
+            monitor:proc_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
+            %monitor:monitor_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
         _ -> ok
     end.
 
@@ -572,7 +602,11 @@ monitor_vals_appeared() ->
 
 -spec collect_phase() -> boolean().
 collect_phase() ->
-    CollectPhase = config:read(lb_active_collect_init_phase),
+    %% TODO CollectPhase config to be removed
+    %CollectPhase = config:read(lb_active_collect_init_phase),
+    History = config:read(lb_active_monitor_history),
+    Resolution = config:read(lb_active_monitor_resolution),
+    CollectPhase = History * Resolution,
     LastInit = erlang:get(last_db_monitor_init),
     timer:now_diff(os:timestamp(), LastInit) div 1000 =< CollectPhase.
 
@@ -595,28 +629,28 @@ get_load_metric(Metric) ->
 -spec get_load_metric(metric(), normal | strict) -> unknown | items | number().
 get_load_metric(Metric, Mode) ->
             case Metric of
-                cpu          -> get_vm_metric({lb_active, cpu10sec}, count, Mode) / 100;
-                mem          -> get_vm_metric({lb_active, mem10sec}, count, Mode) / 100;
-                db_reads     -> get_dht_metric({lb_active, db_reads}, count, Mode);
-                db_writes    -> get_dht_metric({lb_active, db_writes}, count, Mode);
+                cpu          -> get_vm_metric({lb_active, cpu10sec}, Mode) / 100;
+                mem          -> get_vm_metric({lb_active, mem10sec}, Mode) / 100;
+                db_reads     -> get_dht_metric({lb_active, db_reads}, Mode);
+                db_writes    -> get_dht_metric({lb_active, db_writes}, Mode);
                 db_requests  -> get_load_metric(db_reads, Mode) + get_load_metric(db_writes, Mode); %% TODO
-                tx_latency   -> get_dht_metric({api_tx, req_list}, avg, Mode);
-                transactions -> get_dht_metric({api_tx, req_list}, count, Mode);
+                %tx_latency   -> get_dht_metric({api_tx, req_list}, avg, Mode);
+                %transactions -> get_dht_metric({api_tx, req_list}, count, Mode);
                 items        -> items;
                 _            -> throw(metric_not_available)
     end.
 
--spec get_vm_metric(metric(), avg | count, normal | strict) -> unknown | number().
-get_vm_metric(Metric, Type, Mode) ->
+-spec get_vm_metric(metric(), normal | strict) -> unknown | number().
+get_vm_metric(Metric, Mode) ->
     ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-    get_metric(ClientMonitorPid, Metric, Type, Mode).
+    get_metric(ClientMonitorPid, Metric, Mode).
 
-get_dht_metric(Metric, Type, Mode) ->
+get_dht_metric(Metric, Mode) ->
     MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, Metric, Type, Mode).
+    get_metric(MonitorPid, Metric, Mode).
 
--spec get_metric(pid(), monitor:table_index(), avg | count, normal | strict) -> unknown | number().
-get_metric(MonitorPid, Metric, Type, Mode) ->
+-spec get_metric(pid(), monitor:table_index(), normal | strict) -> unknown | number().
+get_metric(MonitorPid, Metric, Mode) ->
     [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [Metric]),
     case RRD of
         undefined ->
@@ -628,8 +662,9 @@ get_metric(MonitorPid, Metric, Type, Mode) ->
             Vals = [begin
                         %% get stable value off an old slot
                         Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs - Offset*SlotLength}),
+                        io:format("Value ~p~n", [Value]),
                         %case Value of undefined -> io:format("Undefined value considered.~n"); _->ok end,
-                        get_value_type(Value, Type)
+                        get_value_type(Value, rrd:get_type(RRD))
                     end || Offset <- lists:seq(1, History)],
             io:format("Vals: ~p~n", [Vals]),
             case Mode of
@@ -638,19 +673,15 @@ get_metric(MonitorPid, Metric, Type, Mode) ->
             end
     end.
 
--spec get_value_type(rrd:data_type(), avg | count) -> unknown | number().
+-spec get_value_type(rrd:data_type(), rrd:timeseries_type()) -> unknown | number().
 get_value_type(undefined, _Type) ->
     unknown;
 get_value_type(Value, _Type) when is_number(Value) ->
     Value;
-get_value_type(Value, count) when is_tuple(Value) ->
-    element(3, Value);
-get_value_type(Value, avg) when is_tuple(Value) ->
-    try
-        element(1, Value) / element(3, Value)
-    catch
-        error:badarith -> unknown
-    end.
+get_value_type(Value, {histogram, _}) ->
+    histogram:get_num_inserts(Value);
+get_value_type(Value, {histogram, _, _}) ->
+    histogram_normalized:get_num_inserts(Value).
 
 %% @doc returns the weighted average of a list using decreasing weight
 -spec avg_weighted([number()]) -> number().
