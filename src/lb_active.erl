@@ -179,13 +179,11 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     %% check the load balancing configuration by using
     %% the standard deviation from the gossip process.
     Size = gossip_load:load_info_get(size, LoadInfo),
-    ItemsStdDev = gossip_load:load_info_get(stddev, LoadInfo),
-    ItemsAvg = gossip_load:load_info_get(avgLoad, LoadInfo),
     Metrics =
         case config:read(lb_active_balance_metric) of %% TODO automatically enable gossip when laod metric other than items is active
             items ->
-                [{avg, ItemsAvg},
-                 {stddev, ItemsStdDev}];
+                [{avg, gossip_load:load_info_get(avgLoad, LoadInfo)},
+                 {stddev, gossip_load:load_info_get(stddev, LoadInfo)}];
             requests ->
                 GossipModule = lb_active_gossip_request_metric,
                 [{avg, gossip_load:load_info_other_get(avgLoad, GossipModule, LoadInfo)},
@@ -853,6 +851,14 @@ trigger(Trigger) ->
         end,
     msg_delay:send_trigger(Interval div 1000, {Trigger}).
 
+-spec check_for_gossip_modules() -> boolean().
+check_for_gossip_modules() ->
+    RequiredModule = lb_active_gossip_request_metric,
+    Fun = fun(Value) -> lists:member(RequiredModule, Value) end,
+    Msg = io_lib:format("~p required when lb_active_use_gossip enabled.~n", [RequiredModule]),
+    not config:read(lb_active) orelse not config:read(lb_active_use_gossip) orelse
+        config:cfg_test_and_error(gossip_load_additional_modules, Fun, Msg).
+
 %% @doc config check registered in config.erl
 -spec check_config() -> boolean().
 check_config() ->
@@ -890,5 +896,7 @@ check_config() ->
 
     config:cfg_is_integer(lb_active_wait_for_pending_ops) and
     config:cfg_is_greater_than(lb_active_wait_for_pending_ops, 0) and
+
+    check_for_gossip_modules() and
 
     call_module(check_config, []).
