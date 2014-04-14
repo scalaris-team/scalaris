@@ -514,6 +514,8 @@ init_db_monitors() ->
             History = config:read(lb_active_monitor_history),
             Reads  = rrd:add_now(0, rrd:create(MonitorRes * 1000, History + 1, {timing_with_hist, count})),
             Writes = rrd:add_now(0, rrd:create(MonitorRes * 1000, History + 1, {timing_with_hist, count})),
+            Monitor = pid_groups:get_my(monitor),
+            monitor:clear_rrds(Monitor, [{lb_active, db_reads}, {lb_active, db_writes}]),
             %monitor:proc_set_value(lb_active, db_reads, Reads),
             %monitor:proc_set_value(lb_active, db_writes, Writes),
             monitor:monitor_set_value(lb_active, db_reads, Reads),
@@ -559,7 +561,7 @@ monitor_vals_appeared() ->
     case erlang:get(metric_available) of
         true -> true;
         _ ->
-            case get_load_metric(Metric, strict) =:= unknown andalso collect_phase() of
+            case collect_phase() andalso get_load_metric(Metric, strict) =:= unknown of
                 true ->
                     false;
                 _ ->
@@ -579,20 +581,6 @@ collect_phase() ->
 -spec get_load_metric() -> items | number().
 get_load_metric() ->
     Metric = config:read(lb_active_metric),
-%%     Current = case get_load_metric(Metric, 0) of
-%%         unknown -> 0; %% no monitor data available due to inactivity of this node
-%%         Val -> Val
-%%     end,
-%%     Previous = case get_load_metric(Metric, 1) of
-%%         unknown -> 0; %% no monitor data available due to inactivity of this node
-%%         Val2 -> Val2
-%%     end,
-%%     PreviousPrevious = case get_load_metric(Metric, 1) of
-%%         unknown -> 0; %% no monitor data available due to inactivity of this node
-%%         Val3 -> Val3
-%%     end,
-%%     %% TODO config parameter
-%%     Average = 0.7 * Current + 0.2 * Previous + 0.1 * PreviousPrevious,
     Value = case get_load_metric(Metric) of
         unknown -> 0;
         Val -> Val

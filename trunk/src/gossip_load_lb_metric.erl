@@ -21,7 +21,10 @@
 
 -spec get_load(dht_node_state:state()) -> gossip_load_beh:load().
 get_load(_DHTNodeState) ->
-    lb_active:get_load_metric().
+    case lb_active:get_load_metric() of
+        items -> 0;
+        Val -> Val
+    end.
 
 -spec init_histo(DHTNodeState::dht_node_state:state(), NumberOfBuckets::pos_integer()) 
                     -> gossip_load:histogram().
@@ -38,7 +41,9 @@ get_load_for_interval(BucketInterval, MyRange) ->
     case intervals:is_empty(Intersection) of
         true -> unknown;
         false ->
-            Load = lb_active:get_load_metric(),
-            %% TODO Load = histogram:approximate_load_in_interval(BucketInterval),
+            Load = case lb_active:get_load_metric() of
+                       items -> 0;
+                       Val -> Val
+                   end,
             {float(Load), 1.0}
     end.
