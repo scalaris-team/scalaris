@@ -81,17 +81,25 @@ get_target_load(JumpOrSlide, HeavyNode, LightNode) ->
         _ -> get_target_load(JumpOrSlide, HeavyNode, get_load(HeavyNode), LightNode, get_load(LightNode))
     end.
 
+-define(BOUND(X,Y,Z), begin From = X, To = Z, V = Y,
+                      if   V < From -> From;
+                           V > To -> To;
+                           true     -> V
+                      end end).
+
 %% @doc The number of db entries the heavy node will give to the light node (weighted)
 -spec get_target_load(slide | jump, lb_info(), number(), lb_info(), number()) -> non_neg_integer().
 get_target_load(slide, HeavyNode, WeightHeavy, LightNode, WeightLight) ->
     TotalItems = get_items(HeavyNode) + get_items(LightNode),
     AvgItems = TotalItems div 2,
-    Factor = try WeightHeavy / WeightLight catch error:badarith -> WeightHeavy end,
-    _ItemsToShed = max(0, get_items(HeavyNode) - trunc(Factor * AvgItems));
+    Factor = try WeightLight / WeightHeavy catch error:badarith -> 1 end,
+    ItemsToShed = get_items(HeavyNode) - trunc(Factor * AvgItems),
+    ?BOUND(0, ItemsToShed, get_items(HeavyNode));
 get_target_load(jump, HeavyNode, WeightHeavy, _LightNode, WeightLight) ->
     AvgItems = get_items(HeavyNode) div 2,
-    Factor = try WeightHeavy / WeightLight catch error:badarith -> WeightHeavy end,
-    _ItemsToShed = max(0, get_items(HeavyNode) - trunc(Factor * AvgItems)).
+    Factor = try WeightLight / WeightHeavy catch error:badarith -> 1 end,
+    ItemsToShed = get_items(HeavyNode) - trunc(Factor * AvgItems),
+    ?BOUND(0, ItemsToShed, get_items(HeavyNode)).
 
 %% TODO generic load change
 %% @doc Calculates the change in Variance
@@ -104,8 +112,8 @@ get_load_change_slide(TakenLoad, HeavyNode, LightNode) ->
 %% dht size available
 -spec get_load_change_slide(non_neg_integer(), pos_integer(), lb_info(), lb_info()) -> integer().
 get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode) ->
-    get_load_change_diff(DhtSize, get_items(HeavyNode), get_items(HeavyNode) - TakenLoad) +
-        get_load_change_diff(DhtSize, get_items(LightNode), get_items(LightNode) + TakenLoad).
+    get_load_change_diff(DhtSize, get_load(HeavyNode), get_load(HeavyNode) - TakenLoad) +
+        get_load_change_diff(DhtSize, get_load(LightNode), get_load(LightNode) + TakenLoad).
 
 %% @doc Calculates the change in Variance
 %% no dht size available
@@ -117,9 +125,9 @@ get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc) ->
 %% dht size available
 -spec get_load_change_jump(non_neg_integer(), pos_integer(), lb_info(), lb_info(), lb_info()) -> integer().
 get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc) ->
-    get_load_change_diff(DhtSize, get_items(LightNode), TakenLoad) +
-        get_load_change_diff(DhtSize, get_items(LightNodeSucc), get_items(LightNodeSucc) + get_items(LightNode)) +
-        get_load_change_diff(DhtSize, get_items(HeavyNode), get_items(HeavyNode) - TakenLoad).
+    get_load_change_diff(DhtSize, get_load(LightNode), TakenLoad) +
+        get_load_change_diff(DhtSize, get_load(LightNodeSucc), get_load(LightNodeSucc) + get_load(LightNode)) +
+        get_load_change_diff(DhtSize, get_load(HeavyNode), get_load(HeavyNode) - TakenLoad).
 
 -spec get_load_change_diff(pos_integer(), non_neg_integer(), non_neg_integer()) -> integer().
 get_load_change_diff(DhtSize, OldItemLoad, NewItemLoad) ->
