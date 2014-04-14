@@ -23,15 +23,17 @@
 -include("record_helpers.hrl").
 
 -export([new/1]).
--export([get_load/1, get_node/1, get_succ/1, get_items/1]).
+-export([get_load/1, get_node/1, get_succ/1, get_items/1, get_time/1]).
 -export([is_succ/2, neighbors/2, get_target_load/3]).
+-export([get_load_change_slide/3, get_load_change_jump/4]).
 
 -type(load() :: number()).
 
 -record(lb_info, {load  = ?required(lb_info, load)  :: load(),
                   items = ?required(lb_info, items) :: load(),
                   node  = ?required(lb_info, node)  :: node:node_type(),
-                  succ  = ?required(lb_info, succ)  :: node:node_type()
+                  succ  = ?required(lb_info, succ)  :: node:node_type(),
+                  time  = os:timestamp()            :: erlang:timestamp()
                  }).
 
 -opaque(lb_info() :: #lb_info{}).
@@ -43,8 +45,14 @@
 %% Convert node details to lb_info
 -spec new(node_details:node_details()) -> lb_info().
 new(NodeDetails) ->
-    #lb_info{load  = lb_active:get_load_metric(),
-             items = node_details:get(NodeDetails, load),
+    Items = node_details:get(NodeDetails, load),
+    Load = %% TODO how do we ensure all nodes have the same load metric??
+        case lb_active:get_load_metric() of
+            unknown -> Items;
+            Metric -> Metric
+        end,
+    #lb_info{load  = Load,
+             items = Items,
              node  = node_details:get(NodeDetails, node),
              succ  = node_details:get(NodeDetails, succ)}.
 
@@ -54,6 +62,7 @@ get_load (#lb_info{load  = Load }) -> Load.
 get_items(#lb_info{items = Items}) -> Items.
 get_node (#lb_info{node  = Node }) -> Node.
 get_succ (#lb_info{succ  = Succ }) -> Succ.
+get_time (#lb_info{time  = Time }) -> Time.
 
 is_succ(Succ, Node) ->
     get_succ(Node) =:= get_node(Succ).
@@ -68,3 +77,20 @@ get_target_load(slide, HeavyNode, LightNode) ->
     (get_items(HeavyNode) + get_items(LightNode)) div 2;
 get_target_load(jump, HeavyNode, _LightNode) ->
      get_items(HeavyNode) div 2.
+
+%% TODO generic load change
+-spec get_load_change_slide(non_neg_integer(), lb_info(), lb_info()) -> integer().
+get_load_change_slide(TakenLoad, HeavyNode, LightNode) ->
+    get_load_change_diff(get_items(HeavyNode), get_items(HeavyNode) - TakenLoad) +
+        get_load_change_diff(get_items(LightNode), get_items(LightNode) + TakenLoad).
+
+-spec get_load_change_jump(non_neg_integer(), lb_info(), lb_info(), lb_info()) -> integer().
+get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc) ->
+    get_load_change_diff(get_items(LightNode), TakenLoad) +
+        get_load_change_diff(get_items(LightNodeSucc), get_items(LightNodeSucc) + get_items(LightNode)) +
+        get_load_change_diff(get_items(HeavyNode), get_items(HeavyNode) - TakenLoad).
+
+-spec get_load_change_diff(non_neg_integer(), non_neg_integer()) -> integer().
+get_load_change_diff(OldItemLoad, NewItemLoad) ->
+    NewItemLoad * NewItemLoad - OldItemLoad * OldItemLoad.
+    %NewItemLoad - OldItemLoad.

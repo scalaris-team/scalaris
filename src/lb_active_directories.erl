@@ -363,7 +363,7 @@ perform_transfer([]) ->
     ok;
 perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other]) ->
     ?TRACE("~p: Reassigning ~p (light: ~p) and ~p (heavy: ~p)~n", [?MODULE, lb_info:get_node(LightNode), lb_info:get_load(LightNode), lb_info:get_node(HeavyNode), lb_info:get_load(HeavyNode)]),
-    lb_active:balance_nodes(LightNode, HeavyNode),
+    lb_active:balance_nodes(HeavyNode, LightNode),
 %%     case lb_info:neighbors(LightNode, HeavyNode) of
 %%         true  -> comm:send(node:pidX(DhtNode), {lb_active, {slide, LightNode}});
 %%         false -> comm:send(node:pidX(DhtNode), {lb_active, {jump, LightNode}})

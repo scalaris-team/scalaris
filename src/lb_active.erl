@@ -38,7 +38,7 @@
 %% Metrics
 -export([get_load_metric/0, get_load_metric/1]).
 % Load Balancing
--export([balance_nodes/2]).
+-export([balance_nodes/3, balance_nodes/4, balance_noop/1]).
 
 -type lb_message() :: comm:message(). %% TODO more specific?
 
@@ -136,7 +136,7 @@ on({lb_trigger} = Msg, State) ->
     call_module(handle_msg, [Msg, State]);
 
 %% Gossip response before balancing takes place
-on({pre_balance, LightNode, HeavyNode, {gossip_get_values_best_response, GlobalInfo}}, State) ->
+on({pre_balance, LightNode, HeavyNode, LightNodeSucc, {gossip_get_values_best_response, GlobalInfo}}, State) ->
     HeavyPid = node:pidX(lb_info:get_node(HeavyNode)),
     comm:send(HeavyPid, {lb_active, balance, LightNode, HeavyNode, GlobalInfo}),
     State;
@@ -158,19 +158,32 @@ on(Msg, State) ->
 
 %%%%%%%%%%%%%%%%%%%%%%% Load Balancing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec balance_nodes(lb_info:lb_info(), lb_info:lb_info()) -> ok.
-balance_nodes(LightNode, HeavyNode) ->
+balance_nodes(HeavyNode, LightNode, Options) ->
+    balance_nodes(HeavyNode, LightNode, nil, Options).
+
+%% TODO -spec balance_nodes(lb_info:lb_info(), lb_info:lb_info()) -> ok.
+balance_nodes(HeavyNode, LightNode, LightNodeSucc, Options) ->
     %% Retrieve global info from gossip
     case config:read(lb_active_use_gossip) of
-        true ->
+        true -> %% TODO Options in this case
             GossipPid = pid_groups:get_my(gossip),
             LBActivePid = pid_groups:get_my(lb_active),
-            Envelope = {pre_balance, LightNode, HeavyNode, '_'},
+            Envelope = {pre_balance, LightNode, HeavyNode, LightNodeSucc, '_'},
             ReplyPid = comm:reply_as(LBActivePid, 4, Envelope),
             comm:send_local(GossipPid, {get_values_best, {gossip_load, default}, ReplyPid});
         _ ->
             HeavyPid = node:pidX(lb_info:get_node(HeavyNode)),
-            comm:send(HeavyPid, {lb_active, balance, LightNode, HeavyNode})
+            comm:send(HeavyPid, {lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options})
+    end.
+
+%% no op but we sent back simulation results
+balance_noop(Options) ->
+    case proplists:get_value(simulate, Options) of
+        undefined -> ok;
+        ReqId ->
+            ReplyTo = proplists:get_value(reply_to, Options),
+            Id = proplists:get_value(id, Options),
+            comm:send(ReplyTo, {simulation_result, Id, ReqId, 0})
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%% Calls from dht_node %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -178,7 +191,7 @@ balance_nodes(LightNode, HeavyNode) ->
 %% @doc Process load balancing messages sent to the dht node
 -spec handle_dht_msg(lb_message(), dht_node_state:state()) -> dht_node_state:state().
  %% TODO GlobalInfo
-handle_dht_msg({lb_active, balance, LightNode, HeavyNode, GlobalInfo}, DhtState) ->
+handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options, GlobalInfo}, DhtState) ->
     ?ASSERT(lb_info:get_node(HeavyNode) =:= dht_node_state:get(DhtState, node)),
     ?TRACE("Global Info: ~p~n", [GlobalInfo]),
     DhtState;
@@ -186,7 +199,7 @@ handle_dht_msg({lb_active, balance, LightNode, HeavyNode, GlobalInfo}, DhtState)
 %% We received a jump or slide operation from a LightNode.
 %% In either case, we'll compute the target id and send out
 %% the jump or slide message to the LightNode.
-handle_dht_msg({lb_active, balance, LightNode, HeavyNode}, DhtState) ->
+handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options}, DhtState) ->
     ?ASSERT(lb_info:get_node(HeavyNode) =:= dht_node_state:get(DhtState, node)),
     %% TODO What are the benefits/disadvantages of getting the load info again?
     MyNode = lb_info:new(dht_node_state:details(DhtState)),
@@ -198,27 +211,40 @@ handle_dht_msg({lb_active, balance, LightNode, HeavyNode}, DhtState) ->
            [JumpOrSlide, dht_node_state:get(DhtState, node_id), node:id(lb_info:get_node(LightNode))]),
     TargetLoad = lb_info:get_target_load(JumpOrSlide, MyNode, LightNode),
     {From, To, Direction} =
-        case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of %lb_info:get_succ(MyNode) =:= lb_info:get_node(LightNode) of
+        case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
             true  -> %% Jump or heavy node is succ of light node
                 {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward}; %% TODO node_id-1 ?
             false -> %% Light node is succ of heavy node
                 {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
         end,
-    {SplitKey, _TakenLoad} = dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction),
-    ?TRACE("SplitKey: ~p TargetLoad: ~p TakenLoad: ~p~n", [SplitKey, TargetLoad, _TakenLoad]),
-    LbModule = comm:make_global(pid_groups:get_my(?MODULE)),
-    case JumpOrSlide of
-        jump ->
-            Node = lb_info:get_node(LightNode),
-            comm:send(node:pidX(Node), {move, start_jump, SplitKey, {tag, JumpOrSlide}, LbModule});
-        slide ->
-            Node = lb_info:get_node(LightNode),
-            PredOrSucc =
-                case Direction of
-                    forward  -> succ;
-                    backward -> pred
+    {SplitKey, TakenLoad} = dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction),
+    ?TRACE("SplitKey: ~p TargetLoad: ~p TakenLoad: ~p~n", [SplitKey, TargetLoad, TakenLoad]),
+    %% Report TakenLoad in case of simulation or exec load balancing decision
+    case proplists:get_value(simulate, Options) of
+         undefined ->
+            LbModule = comm:make_global(pid_groups:get_my(?MODULE)),
+            case JumpOrSlide of
+                jump ->
+                    Node = lb_info:get_node(LightNode),
+                    comm:send(node:pidX(Node), {move, start_jump, SplitKey, {tag, JumpOrSlide}, LbModule});
+                slide ->
+                    Node = lb_info:get_node(LightNode),
+                    PredOrSucc =
+                        case Direction of
+                            forward  -> succ;
+                            backward -> pred
+                        end,
+                    comm:send(node:pidX(Node), {move, start_slide, PredOrSucc, SplitKey, {tag, JumpOrSlide}, LbModule})
+            end;
+        ReqId ->
+            LoadChange =
+                case JumpOrSlide of
+                    slide -> lb_info:get_load_change_slide(TakenLoad, HeavyNode, LightNode);
+                    jump  -> lb_info:get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc)
                 end,
-            comm:send(node:pidX(Node), {move, start_slide, PredOrSucc, SplitKey, {tag, JumpOrSlide}, LbModule})
+            ReplyTo = proplists:get_value(reply_to, Options),
+            Id = proplists:get_value(id, Options),
+            comm:send(ReplyTo, {simulation_result, Id, ReqId, LoadChange})
     end,
     DhtState;
 
@@ -297,7 +323,7 @@ get_load_metric() ->
 %% TODO spec
 get_load_metric(Metric) ->
     case monitor_vals_appeared() of
-        false -> 0;
+        false -> unknown;
         true  ->
             case Metric of
                 cpu        -> get_vm_metric(cpu10sec) / 100;
