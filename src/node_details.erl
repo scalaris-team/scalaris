@@ -168,6 +168,7 @@ contains(NodeDetails, Key) when is_list(NodeDetails) ->
           (node_details(), is_leaving) -> boolean();
           (node_details(), load) -> load();
           (node_details(), load2) -> load2();
+          (node_details(), load3) -> load3();
           (node_details(), hostname) -> hostname();
           (node_details(), rt_size) -> rt_size();
           (node_details(), message_log) -> message_log();

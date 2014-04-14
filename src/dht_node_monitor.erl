@@ -30,7 +30,7 @@
                     {Msg::db_op_init, Value::?RT:key(), Range::intervals:interval()} |
                     {Key::db_op, Value::?RT:key()}.
 -type state() :: {LookupHops::rrd:rrd(),
-                  DBOps::rrd:rrd()}.
+                  DBOps::rrd:rrd() | uninit}.
 
 %% @doc message handler
 -spec on(message(), state()) -> state().
@@ -53,8 +53,7 @@ init(_Options) ->
     % 1m monitoring interval, only keep newest
     LookupHops = rrd:create(60 * 1000000, 1, {timing, count}),
     %% initialized by dht_node with handler db_op_init
-    DBOps = {},
-    {LookupHops, DBOps}.
+    {LookupHops, uninit}.
 
 %% @doc spawns a dht_node_monitor, called by the scalaris supervisor process
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.

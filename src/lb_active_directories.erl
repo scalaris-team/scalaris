@@ -49,7 +49,7 @@
 -type directory_name() :: string().
 
 -record(directory, {name         = ?required(directory, name) :: directory_name(),
-                    pool         = gb_sets:new()              :: gb_set(), %% TODO really gb_set here? gb_tree is good enough
+                    pool         = gb_sets:new()              :: gb_sets:set(lb_info:lb_info()), %% TODO really gb_set here? gb_tree is good enough
                     num_reported = 0                          :: non_neg_integer()
                     }).
 
@@ -240,7 +240,7 @@ directory_routine(DirKey, Type, Schedule) ->
             ScheduleNew
     end.
 
--spec find_matches(gb_set(), gb_set(), schedule()) -> schedule().
+-spec find_matches(gb_sets:set(lb_info:lb_info()), gb_sets:set(lb_info:lb_info()), schedule()) -> schedule().
 find_matches(LightNodes, HeavyNodes, Result) ->
     case gb_sets:size(LightNodes) > 0 andalso gb_sets:size(HeavyNodes) > 0 of
         true ->
@@ -295,7 +295,7 @@ clear_directory(Directory) ->
             clear_directory(Directory)
     end.
 
--spec get_directory(directory_name()) -> {api_tx:tlog(), directory()}.
+-spec get_directory(directory_name()) -> {tx_tlog:tlog(), directory()}.
 get_directory(DirKey) ->
     TLog = api_tx:new_tlog(),
     case api_tx:read(TLog, DirKey) of
@@ -307,7 +307,7 @@ get_directory(DirKey) ->
             {TLog2, #directory{name = DirKey}}
     end.
 
--spec set_directory(api_tx:tlog(), directory()) -> ok | failed.
+-spec set_directory(tx_tlog:tlog(), directory()) -> ok | failed.
 set_directory(TLog, Directory) ->
     DirKey = Directory#directory.name,
     case api_tx:req_list(TLog, [{write, DirKey, Directory}, {commit}]) of
