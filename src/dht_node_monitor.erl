@@ -26,22 +26,35 @@
 -export([start_link/2, on/2, init/1]).
 
 % accepted messages of dht_node_monitor processes
--type message() :: {Key::lookup_hops, Value::pos_integer()}.
--type state() :: {LookupHops::rrd:rrd()}.
+-type message() :: {Key::lookup_hops, Value::pos_integer()} |
+                    {Msg::db_op_init, Value::?RT:key(), Range::intervals:interval()} |
+                    {Key::db_op, Value::?RT:key()}.
+-type state() :: {LookupHops::rrd:rrd(),
+                  DBOps::rrd:rrd()}.
 
 %% @doc message handler
 -spec on(message(), state()) -> state().
-on({lookup_hops, Hops}, {OldLookupHops}) ->
+on({lookup_hops, Hops}, {OldLookupHops, OldDBOps}) ->
     NewLookupHops = rrd:add_now(Hops, OldLookupHops),
     monitor:check_report(dht_node, 'lookup_hops', OldLookupHops, NewLookupHops),
-    {NewLookupHops}.
+    {NewLookupHops, OldDBOps};
+
+on({db_op_init, Id, Range}, {OldLookupHops, _OldDBOps}) ->
+    NewDBOps = lb_active:init_db_rrd(Id, Range),
+    {OldLookupHops, NewDBOps};
+
+on({db_op, Key}, {OldLookupHops, OldDBOps}) ->
+    NewDBOps = lb_active:update_db_rrd(Key, OldDBOps),
+    {OldLookupHops, NewDBOps}.
 
 %% @doc initialisation
 -spec init(Options::[tuple()]) -> state().
 init(_Options) ->
     % 1m monitoring interval, only keep newest
     LookupHops = rrd:create(60 * 1000000, 1, {timing, count}),
-    {LookupHops}.
+    %% initialized by dht_node with handler db_op_init
+    DBOps = {},
+    {LookupHops, DBOps}.
 
 %% @doc spawns a dht_node_monitor, called by the scalaris supervisor process
 -spec start_link(pid_groups:groupname(), [tuple()]) -> {ok, pid()}.
