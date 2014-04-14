@@ -116,7 +116,7 @@ get_type_infos(#parse_state{type_infos=TypeInfo}) ->
 has_unknown_types(#parse_state{unknown_types=UnknownTypes}) ->
     case gb_sets:is_set(UnknownTypes) of
         true -> not gb_sets:is_empty(UnknownTypes);
-        _    -> UnknownTypes =/= []
+        _    -> element(1, UnknownTypes) =/= 0
     end.
 
 -spec get_unknown_types(state()) -> {Length::non_neg_integer(), [type_name()]}.
