@@ -51,7 +51,6 @@
 new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
     Load = case lb_active:get_load_metric() of
-               unknown -> lb_active:default_value();
                items -> Items;
                Metric -> Metric
            end,
