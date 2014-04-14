@@ -72,7 +72,7 @@ get_num_elements({Histogram, _NormFun, _InverseFun}) ->
 get_num_inserts({Histogram, _NormFun, _InverseFun}) ->
     histogram:get_num_inserts(Histogram).
 
-%% @doc Merges the given two histograms by adding every data point of Hist2
+%% doc: Merges the given two histograms by adding every data point of Hist2
 %%      to Hist1. If one of the histograms is a normalized histogram,
 %%      the output will be a normalized histogram.
 %-spec merge(Hist1::histogram(), Hist2::histogram()) -> histogram().
