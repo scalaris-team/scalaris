@@ -529,12 +529,11 @@ handle_dht_msg(Msg, DhtState) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% @doc Called by db process to initialize monitors
+%% @doc Called by dht node process to initialize the db monitors
 -spec init_db_monitors(MyId::?RT:key(), MyRange::intervals:interval()) -> ok.
 init_db_monitors(MyId, MyRange) ->
     case monitor_db() of
         true ->
-            MonitorRes = config:read(lb_active_monitor_resolution),
             History = config:read(lb_active_monitor_history),
             HistogramSize = config:read(lb_active_histogram_size),
             HistogramType =
@@ -557,8 +556,12 @@ init_db_monitors(MyId, MyRange) ->
                             end,
                         {histogram, HistogramSize, NormFun, InverseFun}
                 end,
-            Reads  = rrd:create(MonitorRes * 1000, History + 1, HistogramType),
-            Writes = rrd:create(MonitorRes * 1000, History + 1, HistogramType),
+            MonitorResSecs = config:read(lb_active_monitor_resolution) div 1000,
+            {MegaSecs, Secs, _Microsecs} = os:timestamp(),
+            %% synchronize the start time for all monitors to a divisible of the monitor interval
+            StartTime = {MegaSecs, Secs - Secs rem MonitorResSecs + MonitorResSecs, 0},
+            Reads  = rrd:create_timed(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
+            Writes = rrd:create_timed(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
             Monitor = pid_groups:get_my(monitor),
             %% TODO not really necessary just wait for all values to disappear
             monitor:proc_clear_value(lb_active, db_reads),
