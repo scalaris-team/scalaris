@@ -201,16 +201,22 @@ directory_routine(DirKey, Type, Schedule) ->
         true -> Schedule; %% TODO why return old schedule here?
         false ->
             Pool = Directory#directory.pool,
+            AvgUtil = gb_sets:fold(fun(El, Acc) -> Acc + lb_info:get_load(El) end, 0, Pool) / gb_sets:size(Pool),
             K = case Type of
                     periodic ->
                         %% clear directory only for periodic
                         NewDirectory = dir_clear_load(Directory),
                         set_directory(TLog, NewDirectory),
-                        AvgUtil = gb_sets:fold(fun(El, Acc) -> Acc + lb_info:get_load(El) end, 0, Pool) / gb_sets:size(Pool),
                         %% TODO calculate threshold according to metric
-                        (1 + AvgUtil) / 2;
+                        %% From paper:
+                        %(1 + AvgUtil) / 2;
+                        %% Karger style:
+                        1.24 * AvgUtil;
                     emergency ->
-                        1.0
+                        %% from paper:
+                        %1.0
+                        %% Gossip: max value
+                        AvgUtil * 10
                 end,
             ?TRACE("Threshold: ~p~n", [K]),
             LightNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) =< K end, Pool),
@@ -275,41 +281,11 @@ create_directories(N) when N > 0 ->
             end
     end.
 
-%% TODO make the three below more generic...
--spec pop_load_in_directory(directory_name()) -> directory().
-pop_load_in_directory(DirKey) ->
-    TLog = api_tx:new_tlog(),
-    case api_tx:read(TLog, DirKey) of
-        {TLog2, {ok, Directory}} ->
-            case api_tx:req_list(TLog2, [{write, DirKey, dir_clear_load(Directory)}, {commit}]) of
-                {[], ok, ok} -> Directory;
-                Error -> log:log(warn, "~p: Failed to save directory ~p because of failed transaction: ~p", [?MODULE, DirKey, Error]),
-                         timer:sleep(10),
-                         pop_load_in_directory(DirKey)
-            end;
-        {_TLog2, {fail, not_found}} ->
-            log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE])
-    end.
-
 -spec post_load_to_directory(lb_info:lb_info(), directory_name()) -> ok.
 post_load_to_directory(Load, DirKey) ->
-    TLog = api_tx:new_tlog(),
-    case api_tx:read(TLog, DirKey) of
-        {TLog2, {ok, Content}} ->
-            ContentNew = dir_add_load(Load, Content),
-            {TLog3, _Result} = api_tx:write(TLog2, DirKey, ContentNew),
-            case api_tx:commit(TLog3) of
-                {ok} ->
-                    ok;
-                {fail, abort, [DirKey]} ->
-                    log:log(warn, "~p: Failed to write to directory, retrying...", [?MODULE]),
-                    timer:sleep(10),
-                    post_load_to_directory(Load, DirKey)
-            end;
-        {_TLog2, {fail, not_found}} ->
-            log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE]),
-            ok
-    end.
+    {TLog, Dir} = get_directory(DirKey),
+    DirNew = dir_add_load(Load, Dir),
+    set_directory(TLog, DirNew).
 
 -spec get_directory(directory_name()) -> {api_tx:tlog(), directory()}.
 get_directory(DirKey) ->
