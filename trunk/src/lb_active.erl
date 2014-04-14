@@ -42,20 +42,16 @@
 
 -type lb_message() :: comm:message(). %% TODO more specific?
 
--record(my_state, {init = nil,
-                   data_available = false,
-                   pending_ops = []
-                }).
-
--type my_state() :: #my_state{}.
 -type module_state() :: tuple(). %% TODO more specific
 
--type state() :: {my_state(), module_state()}. %% state of lb module
+-type state() :: module_state(). %% state of lb module
 
 -record(lb_op, {id = ?required(id, lb_op)         :: uid:global_uid(),
                 type = ?required(type, lb_op)     :: slide_pred | slide_succ | jump,
+                %% receives load
                 light_node = ?required(light, lb_op)   :: node:node_type(),
                 light_node_succ = ?required(light_node_succ, lb_op) :: node:node_type(),
+                %% sheds load
                 heavy_node = ?required(heavy, lb_op)   :: node:node_type(),
                 target = ?required(target, lb_op) :: ?RT:key(),
                 %% time of the oldest data used for the decision for this lb_op
@@ -64,6 +60,9 @@
                }).
 
 -type lb_op() :: #lb_op{}.
+
+-type metric() :: cpu | mem | db_reads | db_writes | db_requests |
+                  tx_latency | transactions | items.
 
 %% list of active load balancing modules available
 -define(MODULES_AVAIL, [lb_active_karger, lb_active_directories]).
@@ -81,7 +80,6 @@ start_link(DHTNodeGroup) ->
 -spec init([]) -> state().
 init([]) ->
     set_time_last_balance(),
-    set_nodes_last_balance([]),
     case collect_stats() of
         true ->
             %% TODO configure minutes to collect
@@ -110,7 +108,6 @@ init([]) ->
 -spec on_inactive(comm:message(), state()) -> state().
 on_inactive({lb_trigger}, State) ->
     trigger(lb_trigger),
-     ?TRACE("Aha: ~p~n", [monitor_vals_appeared()]),
     case monitor_vals_appeared() of
         true ->
             InitState = call_module(init, []),
@@ -157,9 +154,18 @@ on({lb_trigger} = Msg, State) ->
     call_module(handle_msg, [Msg, State]);
 
 %% Gossip response before balancing takes place
-on({pre_balance, LightNode, HeavyNode, LightNodeSucc, {gossip_get_values_best_response, GlobalInfo}}, State) ->
+on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
+    {gossip_get_values_best_response, LoadInfo}}, State) ->
+    %% check the load balancing configuration by using
+    %% the standard deviation from the gossip process.
+
+    %% TODO switch for metric
+    Size = gossip_load:load_info_get(size, LoadInfo),
+    StdDev = gossip_load:load_info_get(stddev, LoadInfo),
+    Avg = gossip_load:load_info_get(avgLoad, LoadInfo),
+    OptionsNew = [{dht_size, Size}, {avg, Avg}, {stddev, StdDev}] ++ Options,
     HeavyPid = node:pidX(lb_info:get_node(HeavyNode)),
-    comm:send(HeavyPid, {lb_active, balance, LightNode, HeavyNode, GlobalInfo}),
+    comm:send(HeavyPid, {lb_active, balance, HeavyNode, LightNode, LightNodeSucc, OptionsNew}),
     State;
 
 %% lb_op received from dht_node and to be executed
@@ -220,12 +226,11 @@ on({balance_phase2b, Op, ReplyPid}, State) ->
                     case Op#lb_op.type of
                         jump ->
                             %% TODO replace with send_local
-                            %% TODO jump has another node to inform
                             comm:send(Pid, {move, start_jump, TargetKey, {jump, OpId}, comm:this()});
                         slide_pred ->
-                            comm:send(Pid, {move, start_slide, pred, TargetKey, {slide, OpId}, comm:this()});
+                            comm:send(Pid, {move, start_slide, pred, TargetKey, {slide_pred, OpId}, comm:this()});
                         slide_succ ->
-                            comm:send(Pid, {move, start_slide, succ, TargetKey, {slide, OpId}, comm:this()})
+                            comm:send(Pid, {move, start_slide, succ, TargetKey, {slide_succ, OpId}, comm:this()})
                     end
             end
     end,
@@ -248,11 +253,7 @@ on({balance_success, OpId}, State) ->
         Op when Op#lb_op.id =:= OpId ->
             ?TRACE("Clearing pending op ~p~n", [OpId]),
             set_pending_op(undefined),
-            set_time_last_balance(),
-            HeavyNode = Op#lb_op.heavy_node,
-            LightNode = Op#lb_op.light_node,
-            Nodes = [HeavyNode, LightNode],
-            set_nodes_last_balance(Nodes);
+            set_time_last_balance();
         Op ->
             ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
     end,
@@ -269,19 +270,15 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
             comm:send(HeavyNodePid, {balance_success, OpId}, [{group_member, lb_active}]),
             set_pending_op(undefined),
             set_time_last_balance(),
-            HeavyNode = Op#lb_op.heavy_node,
-            LightNode = Op#lb_op.light_node,
-            Nodes = case Op#lb_op.type of
+            case Op#lb_op.type of
                 jump ->
                     %% also reply to light node succ in case of jump
                     LightNodeSucc = Op#lb_op.light_node_succ,
                     LightNodeSuccPid = node:pidX(LightNodeSucc),
-                    comm:send(LightNodeSuccPid, {balance_success, OpId}, [{group_member, lb_active}]),
-                    [HeavyNode, LightNode, LightNodeSucc];
+                    comm:send(LightNodeSuccPid, {balance_success, OpId}, [{group_member, lb_active}]);
                 _ ->
-                    [HeavyNode, LightNode]
-            end,
-            set_nodes_last_balance(Nodes);
+                    ok
+            end;
         Op ->
             ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
     end,
@@ -289,7 +286,11 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
 
 on({web_debug_info, Requestor}, State) ->
     KVList =
-        [{"active module", webhelpers:safe_html_string("~p", [get_lb_module()])}
+        [{"active module", webhelpers:safe_html_string("~p", [get_lb_module()])},
+         {"metric"       , webhelpers:safe_html_string("~p", [config:read(lb_active_metric)])},
+         {"metric value:", webhelpers:safe_html_string("~p", [get_load_metric()])},
+         {"last balance:", webhelpers:safe_html_string("~p", [get_time_last_balance()])},
+         {"pending op:",   webhelpers:safe_html_string("~p", [get_pending_op()])}
         ],
     Return = KVList ++ call_module(get_web_debug_kv, [State]),
     comm:send_local(Requestor, {web_debug_info_reply, Return}),
@@ -305,13 +306,12 @@ balance_nodes(HeavyNode, LightNode, Options) ->
 
 %% TODO -spec balance_nodes(lb_info:lb_info(), lb_info:lb_info()) -> ok.
 balance_nodes(HeavyNode, LightNode, LightNodeSucc, Options) ->
-    %% Retrieve global info from gossip
     case config:read(lb_active_use_gossip) of
-        true -> %% TODO Options in this case
+        true -> %% Retrieve global info from gossip before balancing
             GossipPid = pid_groups:get_my(gossip),
             LBActivePid = pid_groups:get_my(lb_active),
-            Envelope = {pre_balance, LightNode, HeavyNode, LightNodeSucc, '_'},
-            ReplyPid = comm:reply_as(LBActivePid, 4, Envelope),
+            Envelope = {gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options, '_'},
+            ReplyPid = comm:reply_as(LBActivePid, 6, Envelope),
             comm:send_local(GossipPid, {get_values_best, {gossip_load, default}, ReplyPid});
         _ ->
             HeavyPid = node:pidX(lb_info:get_node(HeavyNode)),
@@ -363,22 +363,13 @@ old_op(Op) ->
 old_data(Op) ->
     LastBalanceTime = erlang:get(time_last_balance),
     DataTime = Op#lb_op.data_time,
-    Nodes = [Op#lb_op.heavy_node, Op#lb_op.light_node],
-    LastBalancedNodes = get_nodes_last_balance(),
     timer:now_diff(LastBalanceTime, DataTime) > 0.
-        %andalso lists:any(fun(Node) -> lists:member(Node, LastBalancedNodes) end, Nodes).
+
+get_time_last_balance() ->
+    erlang:get(time_last_balance).
 
 set_time_last_balance() ->
     erlang:put(time_last_balance, os:timestamp()),
-    ok.
-
--spec get_nodes_last_balance() -> [node:node_type()].
-get_nodes_last_balance() ->
-    erlang:get(nodes_last_balance).
-
--spec set_nodes_last_balance([node:node_type()]) -> ok.
-set_nodes_last_balance(Nodes) ->
-    erlang:put(nodes_last_balance, Nodes),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%% Calls from dht_node %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -399,7 +390,12 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
         true -> ?TRACE("I was mistaken for the HeavyNode. Doing nothing~n", []), ok;
         false ->
             %% TODO What are the benefits/disadvantages of getting the load info again?
-            MyNode = lb_info:new(dht_node_state:details(DhtState)),
+            MyNode = %try
+                        lb_info:new(dht_node_state:details(DhtState)),
+%%                      catch
+%%                          throw:no_load_data_available ->
+%%                              io:format("What to do now?????????") %% TODO
+%%                      end,
             JumpOrSlide = %case lb_info:neighbors(MyNode, LightNode) of
                           case LightNodeSucc =:= nil of
                               true  -> slide;
@@ -418,19 +414,50 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
             %% Report TakenLoad in case of simulation or exec load balancing decision
             case proplists:get_value(simulate, Options) of
                  undefined ->
+                     ItPaysOff = %% this is a verbose name
+                         case proplists:is_defined(dht_size, Options) of
+                             %% gossip information available
+                             true ->
+                                 S = 2, % TODO config: lb_active_gossip_threshold
+                                 DhtSize = proplists:get_value(dht_size, Options),
+                                 %Avg = proplists:get_value(avg, Options), %% TODO AVG?
+                                 StdDev = proplists:get_value(stddev, Options),
+                                 Variance = StdDev * StdDev,
+                                 VarianceChange =
+                                     case JumpOrSlide of
+                                         slide -> lb_info:get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode);
+                                         jump -> lb_info:get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc)
+                                     end,
+                                 VarianceNew = Variance + VarianceChange,
+                                 StdDevNew = ?IIF(VarianceNew > 0, math:sqrt(VarianceNew), StdDev),
+                                 ?TRACE("New StdDev: ~p Old StdDev: ~p~n", [StdDevNew, StdDev]),
+                                 StdDevNew < StdDev * (1 - S / DhtSize);
+                             %% gossip not available, skipping this test
+                             false -> true
+                         end,
+                     case ItPaysOff of
+                        false -> ?TRACE("No balancing: stddev was not reduced enough.~n", []);
+                        true ->
+                            ?TRACE("Sending out lb op.~n", []),
                             OpId = uid:get_global_uid(),
                             Type =  if  JumpOrSlide =:= jump -> jump;
                                         Direction =:= forward -> slide_succ;
                                         Direction =:= backward -> slide_pred
                                     end,
+                            OldestDataTime = if Type =:= jump -> 
+                                                    lb_info:get_oldest_data_time([LightNode, HeavyNode, LightNodeSucc]);
+                                                true ->
+                                                    lb_info:get_oldest_data_time([LightNode, HeavyNode])
+                                             end,
                             Op = #lb_op{id = OpId, type = Type,
                                         light_node = lb_info:get_node(LightNode),
                                         light_node_succ = lb_info:get_succ(LightNode),
                                         heavy_node = lb_info:get_node(HeavyNode),
                                         target = SplitKey,
-                                        data_time = erlang:min(lb_info:get_time(HeavyNode), lb_info:get_time(LightNode))},
+                                        data_time = OldestDataTime},
                             LBModule = pid_groups:get_my(?MODULE),
-                            comm:send_local(LBModule, {balance_phase1, Op});
+                            comm:send_local(LBModule, {balance_phase1, Op})
+                      end;
                 ReqId ->
                     LoadChange =
                         case JumpOrSlide of
@@ -454,19 +481,17 @@ handle_dht_msg(Msg, DhtState) ->
 init_db_monitors() ->
     case config:read(lb_active_monitor_db) of
         true ->
-            %Items   = rrd:create(15 * 1000000, 1, gauge),  %% TODO do we need items here?
             Reads  = rrd:add_now(0, rrd:create(15 * 1000000, 3, {timing_with_hist, count})),
             Writes = rrd:add_now(0, rrd:create(15 * 1000000, 3, {timing_with_hist, count})),
-            monitor:proc_set_value(lb_active, reads, Reads),
-            monitor:proc_set_value(lb_active, writes, Writes),
-            monitor:monitor_set_value(lb_active, reads, Reads),
-            monitor:monitor_set_value(lb_active, writes, Writes);
-            %monitor:proc_set_value(lb_active, items, Items);
+            monitor:proc_set_value(lb_active, db_reads, Reads),
+            monitor:proc_set_value(lb_active, db_writes, Writes),
+            monitor:monitor_set_value(lb_active, db_reads, Reads),
+            monitor:monitor_set_value(lb_active, db_writes, Writes);
         _ -> ok
     end.
 
 %% @doc Updates the local rrd for reads or writes and checks for reporting
--spec update_db_monitor(Type::reads | writes, Value::?RT:key()) -> ok;
+-spec update_db_monitor(Type::db_reads | db_writes, Value::?RT:key()) -> ok;
                        (Type::items, Value::non_neg_integer())   -> ok.
 update_db_monitor(Type, Value) ->
     case config:read(lb_active_monitor_db) of
@@ -474,7 +499,7 @@ update_db_monitor(Type, Value) ->
 %%             if
 %%                 Type =:= reads orelse Type =:= writes ->
 %%                     %% TODO Normalize key because histogram might contain circular elements, e.g. [MAXVAL, 0, 1]
-%%                     
+%%
 %%             end,
             monitor:proc_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
         _ -> ok
@@ -482,86 +507,91 @@ update_db_monitor(Type, Value) ->
 
 -spec monitor_vals_appeared() -> boolean().
 monitor_vals_appeared() ->
-%%     case erlang:get(lb_active_vals_appeared) of
-%%         undefined ->
-    MonitorPid = pid_groups:get_my(monitor),
-    ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-    LocalKeys = monitor:get_rrd_keys(MonitorPid),
-    ClientKeys = monitor:get_rrd_keys(ClientMonitorPid),
-    ReqLocalKeys =  case collect_stats() of
-                        true -> [{lb_active, reads}, {lb_active, writes}, {api_tx, req_list}];
-                        _ ->    [{api_tx, req_list}]
-                    end,
-    ReqClientKeys = case collect_stats() of
-                        % %{api_tx, req_list},
-                        true -> [{monitor_perf, mem_total}, {monitor_perf, rcv_bytes}, {monitor_perf, send_bytes}, {lb_active, cpu10sec}]; %{lb_active, cpu5min}],],
-                        _    -> [{monitor_perf, mem_total}, {monitor_perf, rcv_bytes}, {monitor_perf, send_bytes}]
-                    end,
-    AllLocalAvailable  = lists:foldl(fun(Key, Acc) -> Acc andalso lists:member(Key, LocalKeys) end, true, ReqLocalKeys),
-    AllClientAvailable = lists:foldl(fun(Key, Acc) -> Acc andalso lists:member(Key, ClientKeys) end, true, ReqClientKeys),
-    %io:format("LocalKeys: ~p~n", [LocalKeys]),
-    %io:format("ClientKeys: ~p~n", [ClientKeys]),
-    AllLocalAvailable andalso AllClientAvailable.
-%%     case AllLocalAvailable andalso AllClientAvailable of
-%%         true -> erlang:put(lb_active_vals_appeared, true),
-%%                 true;
-%%         false -> false
-%%     end.
+    case erlang:get(vals_appeared) of
+        true -> true;
+        _ ->
+            MonitorPid = pid_groups:get_my(monitor),
+            ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
+            LocalKeys = monitor:get_rrd_keys(MonitorPid),
+            ClientKeys = monitor:get_rrd_keys(ClientMonitorPid),
+            ReqLocalKeys =  case collect_stats() of
+                                true -> [{lb_active, db_reads}, {lb_active, db_writes}, {api_tx, req_list}];
+                                _ ->    [{api_tx, req_list}]
+                            end,
+            ReqClientKeys = case collect_stats() of
+                                % %{api_tx, req_list},
+                                true -> [{monitor_perf, mem_total}, {monitor_perf, rcv_bytes}, {monitor_perf, send_bytes}, {lb_active, cpu10sec}]; %{lb_active, cpu5min}],],
+                                _    -> [{monitor_perf, mem_total}, {monitor_perf, rcv_bytes}, {monitor_perf, send_bytes}]
+                            end,
+            AllLocalAvailable  = lists:foldl(fun(Key, Acc) -> Acc andalso lists:member(Key, LocalKeys) end, true, ReqLocalKeys),
+            AllClientAvailable = lists:foldl(fun(Key, Acc) -> Acc andalso lists:member(Key, ClientKeys) end, true, ReqClientKeys),
+            %io:format("LocalKeys: ~p~n", [LocalKeys]),
+            %io:format("ClientKeys: ~p~n", [ClientKeys]),
+            case AllLocalAvailable andalso AllClientAvailable of
+                true -> erlang:put(vals_appeared, true), true;
+                false -> false
+            end
+    end.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %-spec get_load_info(dht_node_state:state()) -> load_info().
 get_load_metric() ->
-        Metric = config:read(lb_active_metric),
-        get_load_metric(Metric).
-    %% TODO remove this
-    %randoms:rand_uniform(0, 101) / 100.
+    Metric = config:read(lb_active_metric),
+    get_load_metric(Metric).
 
-%% TODO spec
+-spec get_load_metric(metric()) -> items | unknown | number().
 get_load_metric(Metric) ->
     case monitor_vals_appeared() of
         false -> unknown;
         true  ->
             case Metric of
-                cpu        -> get_vm_metric(cpu10sec) / 100;
-                mem        -> get_vm_metric(mem10sec) / 100;
-                %tx_latency -> get_dht_metric(api_tx, req_list);
-                items      -> unknown; %get_dht_metric(lb_active, items);
-                reads      -> get_dht_metric(lb_active, reads);
-                writes     -> get_dht_metric(lb_active, writes);
-                requests   -> get_load_metric(reads) + get_load_metric(writes)
-            %transactions -> get_dht_metric()
+                cpu          -> get_vm_metric({lb_active, cpu10sec}, count) / 100;
+                mem          -> get_vm_metric({lb_active, mem10sec}, count) / 100;
+                db_reads     -> get_dht_metric({lb_active, db_reads}, count);
+                db_writes    -> get_dht_metric({lb_active, db_writes}, count);
+                db_requests  -> get_load_metric(db_reads) + get_load_metric(db_writes);
+                tx_latency   -> get_dht_metric({api_tx, req_list}, avg);
+                transactions -> get_dht_metric({api_tx, req_list}, count);
+                _            -> items
             end
     end.
 
--spec get_vm_metric(atom()) -> ok.
-get_vm_metric(Key) ->
-    get_vm_metric(lb_active, Key).
+%%%-spec get_vm_metric(atom()) -> ok.
 
-get_vm_metric(Process, Key) ->
+get_vm_metric(Metric, Type) ->
     ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-    get_metric(ClientMonitorPid, Process, Key).
+    get_metric(ClientMonitorPid, Metric, Type).
 
-get_dht_metric(Key) ->
+get_dht_metric(Metric, Type) ->
     MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, lb_active, Key).
+    get_metric(MonitorPid, Metric, Type).
 
-get_dht_metric(Process, Key) ->
-    MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, Process, Key).
+get_metric(MonitorPid, Metric, Type) ->
+    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [Metric]),
+    io:format("RRD: ~p~n", [RRD]),
+    SlotLength = rrd:get_slot_length(RRD),
+    io:format("Slot Length: ~p~n", [SlotLength]),
+    {MegaSecs, Secs, MicroSecs} = os:timestamp(),
+    %% get stable value off an old slot
+    Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs-SlotLength}),
+    io:format("VAlue: ~p~n", [Value]),
+    get_value_type(Value, Type).
 
-get_metric(MonitorPid, Process, Key) ->
-    [{Process, Key, RRD}] = monitor:get_rrds(MonitorPid, [{Process, Key}]),
-    Value = rrd:get_value_by_offset(RRD, 0),
-    get_count(Value).
-
-get_count(undefined) ->
-    0;
-get_count(Value) when is_number(Value) ->
+-spec get_value_type(rrd:data_type(), avg | count) -> unknown | number().
+get_value_type(undefined, _Type) ->
+    0; %unknown; TODO
+get_value_type(Value, _Type) when is_number(Value) ->
     Value;
-get_count(Timing) when is_tuple(Timing) -> %% TODO implement rrd:get_count?
-    element(3, Timing).
+get_value_type(Value, count) when is_tuple(Value) ->
+    element(3, Value);
+get_value_type(Value, avg) when is_tuple(Value) ->
+    try
+        element(1, Value) / element(3, Value)
+    catch
+        error:badarith -> unknown
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
