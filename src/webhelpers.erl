@@ -500,7 +500,10 @@ renderRing({ok, Details}) ->
        {td, [], io_lib:format("~.100p", [[NodeListFun(N) || N <- SuccList]])},
        {td, [], io_lib:format("~p", [RTSize])},
        {td, [], io_lib:format("~p", [Load])},
-       {td, [], io_lib:format("~.2f", [float(Load2)])}
+       case Load2 of
+           items -> {td, [], "-"};
+           Load2 -> {td, [], io_lib:format("~.2f", [float(Load2)])}
+       end
       ]};
 renderRing({failed, Pid}) ->
     {tr, [],
