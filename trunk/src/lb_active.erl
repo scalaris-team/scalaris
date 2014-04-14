@@ -24,6 +24,8 @@
 
 -type lb_message() :: {lb_active, comm:message()}.
 
+-define(MODULES_AVAIL, [lb_active_karger, lb_active_directories]).
+
 %% @doc The load balancing process running inside each dht_node
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
@@ -44,9 +46,7 @@ get_lb_module() ->
 %% @doc config check registered in config.erl
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_exists(lb_active_modules_avail) andalso
-    config:cfg_is_list(lb_active_modules_avail) andalso
     config:cfg_exists(lb_active_module) andalso
-    config:cfg_is_in(lb_active_module, config:read(lb_active_modules_avail)) andalso
+    config:cfg_is_in(lb_active_module, ?MODULES_AVAIL) andalso
     config:cfg_exists(lb_active_metric) andalso
     apply(get_lb_module(), check_config, []).

@@ -15,7 +15,7 @@
 %% @author Maximilian Michels <michels@zib.de>
 %% @doc Active load balancing service process
 %% @version $Id$
--module(lb_active_request).
+-module(lb_active_metrics).
 -author('michels@zib.de').
 -vsn('$Id$').
 
@@ -65,7 +65,7 @@
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on_inactive/2, [],
-                             [{pid_groups_join_as, DHTNodeGroup, lb_active_request}]).
+                             [{pid_groups_join_as, DHTNodeGroup, lb_active_metrics}]).
 
 %% @doc Initialization of monitoring values
 -spec init([]) -> state().
@@ -200,26 +200,26 @@ process_lb_msg({lb_active, Msg}, DhtState) ->
 %% @doc Called by db process to initialize monitors
 -spec init_db_monitors() -> ok.
 init_db_monitors() ->
-    case pid_groups:get_my(?MODULE) of
-        failed -> ok;
-        _PID ->
+    case config:read(lb_active_monitor_db) of
+        true ->
             Reads   = rrd:create(15 * 1000000, 3, {timing_with_hist, count}),
             Writes  = rrd:create(15 * 1000000, 3, {timing_with_hist, count}),
             monitor:proc_set_value(lb_active, reads, Reads),
-            monitor:proc_set_value(lb_active, writes, Writes)
+            monitor:proc_set_value(lb_active, writes, Writes);
+        _ -> ok
     end.
 
 %% @doc Updates the local rrd for reads or writes and checks for reporting
 %% TODO report in trigger and not every time 
 -spec update_db_monitor(reads | writes, ?RT:key()) -> ok.
 update_db_monitor(Type, Key) ->
-    case pid_groups:get_my(?MODULE) of
-        failed -> ok;
-        _PID ->
+    case config:read(lb_active_monitor_db) of
+        true ->
             %% TODO Normalize key because histogram might contain circular elements, e.g. [MAXVAL, 0, 1]
             % KeyNorm = Key + intervals:get_bounds(_)
-            monitor:proc_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Key, Old) end),
-            monitor:proc_check_timeslot(lb_active, Type)
+            monitor:proc_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Key, Old) end);
+            % monitor:proc_check_timeslot(lb_active, Type);
+        _ -> ok
     end.
 
 -spec monitor_vals_appeared() -> boolean().
