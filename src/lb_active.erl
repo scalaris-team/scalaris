@@ -95,7 +95,7 @@ start_link(DHTNodeGroup) ->
 -spec init([]) -> state().
 init([]) ->
     set_time_last_balance(),
-    erlang:put(last_db_monitor_init, os:timestamp()), %% TODO ugly
+    set_last_db_monitor_init(),
     case collect_stats() of
         true ->
             _ = application:start(sasl),   %% required by os_mon.
@@ -418,8 +418,15 @@ get_time_last_balance() ->
 
 -spec set_time_last_balance() -> ok.
 set_time_last_balance() ->
-    erlang:put(time_last_balance, os:timestamp()),
-    ok.
+    erlang:put(time_last_balance, os:timestamp()), ok.
+
+-spec set_last_db_monitor_init() -> ok.
+set_last_db_monitor_init() ->
+    erlang:put(last_db_monitor_init, os:timestamp()), ok.
+
+-spec get_last_db_monitor_init() -> erlang:timestamp().
+get_last_db_monitor_init() ->
+    erlang:get(last_db_monitor_init), ok.
 
 -spec gossip_available(options()) -> boolean().
 gossip_available(Options) ->
@@ -662,7 +669,7 @@ collect_phase() ->
     History = config:read(lb_active_monitor_history),
     Resolution = config:read(lb_active_monitor_resolution),
     CollectPhase = History * Resolution,
-    LastInit = erlang:get(last_db_monitor_init),
+    LastInit = get_last_db_monitor_init(),
     timer:now_diff(os:timestamp(), LastInit) div 1000 =< CollectPhase.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
