@@ -264,6 +264,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         load         -> db_dht:get_load(DB)
                         %% and the prbr kv entries:
                             + prbr:get_load(PRBRState);
+        load2        -> lb_active:get_load_metric();
         prbr_kv_db   -> PRBRState;
         txid_db1     -> TxIdDB1;
         txid_db2     -> TxIdDB2;
@@ -479,9 +480,10 @@ details(State) ->
     SuccList = nodelist:succs(Neighbors),
     Node = nodelist:node(Neighbors),
     Load = get(State, load),
+    Load2 = get(State, load2),
     Hostname = net_adm:localhost(),
     RTSize = get(State, rt_size),
-    node_details:new(PredList, Node, SuccList, Load, Hostname, RTSize, erlang:memory(total)).
+    node_details:new(PredList, Node, SuccList, Load, Load2, Hostname, RTSize, erlang:memory(total)).
 
 %% @doc Gets all entries to transfer (slide) in the given range and starts delta
 %%      recording on the DB for changes in this interval.

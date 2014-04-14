@@ -449,7 +449,8 @@ getRingRendered() ->
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Node"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Succs"}}},
                   {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "RTSize"}}},
-                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}}
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load"}}},
+                  {td, [{align, "center"}], {strong, [], {font, [{color, "white"}], "Load2"}}}
                  ]},
                 lists:append([renderRing(X) ||  X = {ok, _} <- RealRing],
                              [renderRing(X) ||  X = {failed, _} <- RealRing])
@@ -467,6 +468,7 @@ renderRing({ok, Details}) ->
     SuccList = node_details:get(Details, succlist),
     RTSize = node_details:get(Details, rt_size),
     Load = node_details:get(Details, load),
+    Load2 = node_details:get(Details, load2),
     MyIndexStr = case get_indexed_id_by_node(Node) of
                      undefined -> dead_node();
                      MyIndex -> MyIndex
@@ -497,7 +499,8 @@ renderRing({ok, Details}) ->
        {td, [], io_lib:format("~p:&nbsp;~p", [MyIndexStr, node:id(Node)])},
        {td, [], io_lib:format("~.100p", [[NodeListFun(N) || N <- SuccList]])},
        {td, [], io_lib:format("~p", [RTSize])},
-       {td, [], io_lib:format("~p", [Load])}
+       {td, [], io_lib:format("~p", [Load])},
+       {td, [], io_lib:format("~.2f", [float(Load2)])}
       ]};
 renderRing({failed, Pid}) ->
     {tr, [],
