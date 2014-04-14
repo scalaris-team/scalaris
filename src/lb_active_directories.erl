@@ -95,10 +95,10 @@ init() ->
 handle_msg({publish_trigger}, State) ->
     trigger(publish_trigger),
     case emergency of %% emergency when load(node) > k_e
-      true ->
+      % true ->
          %post_load(),
          %get && perform_transfer()
-         State;
+      %   State;
       _ ->
           % get && perform transfer() without overloading
           Schedule = State#state.schedule,
@@ -217,12 +217,12 @@ directory_routine(DirKey, Type, Schedule) ->
                         %% From paper:
                         %(1 + AvgUtil) / 2;
                         %% Karger style:
-                        {0.75 * AvgUtil, 1.25 * AvgUtil};
-                    emergency ->
-                        %% from paper:
-                        %1.0
-                        %% Gossip: max value
-                        AvgUtil * 10 %% TODO
+                        {0.75 * AvgUtil, 1.25 * AvgUtil}
+%%                     emergency ->
+%%                         %% from paper:
+%%                         %1.0
+%%                         %% Gossip: max value
+%%                         AvgUtil * 10 %% TODO
                 end,
             ?TRACE("Threshold: ~p~n", [{LowerBound, UpperBound}]),
             LightNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) =< LowerBound end, Pool),
@@ -232,7 +232,7 @@ directory_routine(DirKey, Type, Schedule) ->
             ScheduleNew
     end.
 
--spec find_matches(gb_set(), gb_set(), []) -> [schedule()]. 
+-spec find_matches(gb_set(), gb_set(), schedule()) -> schedule().
 find_matches(LightNodes, HeavyNodes, Result) ->
     case gb_sets:size(LightNodes) > 0 andalso gb_sets:size(HeavyNodes) > 0 of
         true ->
@@ -244,7 +244,7 @@ find_matches(LightNodes, HeavyNodes, Result) ->
             lists:reverse(Result)
     end.
 
--spec get_all_directory_keys() ->  ?RT:key().
+-spec get_all_directory_keys() -> [?RT:key()].
 get_all_directory_keys() ->
     [get_directory_key_by_number(N) || N <- lists:seq(1, ?NUM_DIRECTORIES)].
 
