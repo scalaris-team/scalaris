@@ -31,15 +31,14 @@
 -vsn('$Id$').
 
 -behavior(lb_active_beh).
--export([process_lb_msg/2, check_config/0]).
+-export([init/0, check_config/0]).
+-export([handle_msg/2, handle_dht_msg/2]).
+-export([get_web_debug_key_value/1]).
 
--behavior(gen_component).
--export([init/1, on/2]).
+%-compile([export_all]).
 
--compile([export_all]).
-
-%-define(TRACE(X;Y), ok).
--define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X,Y)).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -71,7 +70,8 @@
 
 -type dht_message() :: none.
 
-init([]) ->
+-spec init() -> state().
+init() ->
     trigger(publish_trigger),
     trigger(directory_trigger),
     request_dht_range(),
@@ -81,28 +81,28 @@ init([]) ->
        fun(_,_,_,_) -> comm:send_local(self(), {get_state, This, my_range}) end, inf),
     #state{}.
 
-on({publish_trigger}, State) ->
+handle_msg({publish_trigger}, State) ->
     trigger(publish_trigger),
     State;
 
-on({directory_trigger}, State) ->
+handle_msg({directory_trigger}, State) ->
     trigger(directory_trigger),
     ?TRACE("~p My Directories: ~p~n", [self(), State#state.my_dirs]),
     State;
 
-on({get_state_response, MyRange}, State) ->
+handle_msg({get_state_response, MyRange}, State) ->
     Directories = get_all_directories(),
     MyDirectories = [Dir || Dir <- Directories, intervals:in(Dir, MyRange)],
     ?TRACE("~p: I am responsible for ~p~n", [self(), MyDirectories]),
     State#state{my_dirs = MyDirectories};
 
-on(Msg, State) ->
+handle_msg(Msg, State) ->
     ?TRACE("Unknown message: ~p~n", [Msg]),
     State.
 
 %% @doc Load balancing messages received by the dht node.
--spec process_lb_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
-process_lb_msg({lb_active, Msg}, DhtState) ->
+-spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
+handle_dht_msg({lb_active, Msg}, DhtState) ->
     DhtState.
 
 request_dht_range() ->
@@ -157,6 +157,10 @@ int_to_str(N) ->
 trigger(Trigger) ->
     Interval = config:read(lb_active_interval),
     msg_delay:send_trigger(Interval div 1000, {Trigger}).
+
+-spec get_web_debug_key_value(state()) -> [{string(), string()}].
+get_web_debug_key_value(State) ->
+    [{"state", webhelpers:html_pre(State)}].
 
 -spec check_config() -> boolean().
 check_config() ->

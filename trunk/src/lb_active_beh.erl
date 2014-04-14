@@ -30,11 +30,20 @@
 
 %% TODO add more...
 
-%-callback start_link_per_vm (pid_groups:groupname()) -> {ok, pid()}.
-%-callback start_link_per_dht(pid_groups:groupname()) -> {ok, pid()}.
+%% new load balancing modules have to be added here
+-type state() :: lb_active_karger:state() | lb_active_directories:state().
 
--callback process_lb_msg(lb_active:lb_message(), dht_node_state:state())
+%% callbacks
+
+-callback init(Args::list()) -> state().
+
+-callback handle_msg(comm:message(), state())
+        -> state().
+
+-callback handle_dht_msg(lb_active:lb_message(), dht_node_state:state())
         -> dht_node_state:state().
+
+-callback get_web_debug_kv(state()) -> [{string(), string()}].
 
 -callback check_config() -> boolean().
 
@@ -42,12 +51,13 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     % start link for central service
-     %{start_link_per_vm, 1},
-     % start link for dht node service
-     %{start_link_per_dht, 1},
+     {init, 1},
+     % handle msg from lb_active module
+     {handle_msg, 2},
      % process lb message at dht node
-     {process_lb_msg, 2},
+     {handle_dht_msg, 2},
+     % returns key / value list to be shown in web debug interface
+     {get_web_debug_key_value, 1},
      % config check performed by lb_active.erl 
      {check_config, 0}
     ];
