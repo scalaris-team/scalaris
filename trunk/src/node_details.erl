@@ -20,7 +20,7 @@
 -author('schuett@zib.de').
 -vsn('$Id$').
 
--export([new/0, new/7,
+-export([new/0, new/8,
          contains/2, get/2, set/3]).
 
 -include("scalaris.hrl").
@@ -32,6 +32,7 @@
 -endif.
 
 -type(load() :: integer()).
+-type(load2() :: number()).
 -type(hostname() :: string()).
 -type(rt_size() :: integer()).
 -type(message_log() :: any()).
@@ -45,6 +46,7 @@
                        node     = ?required(node_details, node)     :: node:node_type(),
                        succlist = ?required(node_details, succlist) :: nodelist:non_empty_snodelist(),
                        load     = ?required(node_details, load)     :: load(),
+                       load2    = ?required(node_details, load)     :: load2(),
                        hostname = ?required(node_details, hostname) :: hostname(),
                        rt_size  = ?required(node_details, rt_size)  :: rt_size(),
                        memory   = ?required(node_details, memory)   :: memory()}).
@@ -70,13 +72,14 @@
 new() -> [].
 
 %% @doc Creates a new node details object with the given data.
--spec new(PredList::nodelist:non_empty_snodelist(), Node::node:node_type(), SuccList::nodelist:non_empty_snodelist(), Load::load(), Hostname::hostname(), RTSize::rt_size(), Memory::memory()) -> node_details().
-new(PredList, Node, SuccList, Load, Hostname, RTSize, Memory) ->
+-spec new(PredList::nodelist:non_empty_snodelist(), Node::node:node_type(), SuccList::nodelist:non_empty_snodelist(), Load::load(), Load2::load2(), Hostname::hostname(), RTSize::rt_size(), Memory::memory()) -> node_details().
+new(PredList, Node, SuccList, Load, Load2, Hostname, RTSize, Memory) ->
     #node_details{
      predlist = PredList,
      node = Node,
      succlist = SuccList,
      load = Load,
+     load2 = Load2,
      hostname = Hostname,
      rt_size = RTSize,
      memory = Memory
@@ -156,12 +159,13 @@ contains(NodeDetails, Key) when is_list(NodeDetails) ->
           (node_details(), my_range) -> intervals:interval();
           (node_details(), is_leaving) -> boolean();
           (node_details(), load) -> load();
+          (node_details(), load2) -> load2();
           (node_details(), hostname) -> hostname();
           (node_details(), rt_size) -> rt_size();
           (node_details(), message_log) -> message_log();
           (node_details(), memory) -> memory();
           (node_details(), new_key) -> ?RT:key().
-get(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load,
+get(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, load2=Load2,
   hostname=HostName, rt_size=RTSize, memory=Memory} = _NodeDetails, Key) ->
     case Key of
         predlist -> PredList;
@@ -170,6 +174,7 @@ get(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load,
         succlist -> SuccList;
         succ -> hd(SuccList);
         load -> Load;
+        load2 -> Load2;
         hostname -> HostName;
         rt_size -> RTSize;
         memory -> Memory;
