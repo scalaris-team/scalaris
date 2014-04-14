@@ -46,26 +46,28 @@
 
 -type state() :: module_state(). %% state of lb module
 
--record(lb_op, {id = ?required(id, lb_op)         :: uid:global_uid(),
-                type = ?required(type, lb_op)     :: slide_pred | slide_succ | jump,
+-record(lb_op, {id = ?required(id, lb_op)                           :: uid:global_uid(),
+                type = ?required(type, lb_op)                       :: slide_pred | slide_succ | jump,
                 %% receives load
-                light_node = ?required(light, lb_op)   :: node:node_type(),
+                light_node = ?required(light, lb_op)                :: node:node_type(),
                 light_node_succ = ?required(light_node_succ, lb_op) :: node:node_type(),
                 %% sheds load
-                heavy_node = ?required(heavy, lb_op)   :: node:node_type(),
-                target = ?required(target, lb_op) :: ?RT:key(),
+                heavy_node = ?required(heavy, lb_op)                :: node:node_type(),
+                target = ?required(target, lb_op)                   :: ?RT:key(),
                 %% time of the oldest data used for the decision for this lb_op
-                data_time = ?required(data_time, lb_op) :: erlang:timestamp(),
-                time = os:timestamp()             :: erlang:timestamp()
+                data_time = ?required(data_time, lb_op)             :: erlang:timestamp(),
+                time = os:timestamp()                               :: erlang:timestamp()
                }).
 
 -type lb_op() :: #lb_op{}.
 
--type metric() :: cpu | mem | db_reads | db_writes | db_requests |
-                  tx_latency | transactions | items.
+-type metric() :: items | cpu | mem | db_reads | db_writes | db_requests | transactions | tx_latency | net_throughput | net_latency.
+
+%% available metrics
+-define(METRICS, [items, cpu, mem, db_reads, db_writes, db_requests, transactions, tx_latency, net_throughput, net_latency]).
 
 %% list of active load balancing modules available
--define(MODULES_AVAIL, [lb_active_karger, lb_active_directories]).
+-define(MODULES, [lb_active_karger, lb_active_directories]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Initialization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -191,6 +193,8 @@ on({balance_phase1, Op}, State) ->
     end,
     State;
 
+%% Received by the succ of the light node which takes the light nodes' load
+%% in case of a jump.
 on({balance_phase2a, Op, ReplyPid}, State) ->
     case op_pending() of
         true -> ?TRACE("Pending op in phase2a. Discarding op ~p and replying~n", [Op]),
@@ -207,7 +211,7 @@ on({balance_phase2a, Op, ReplyPid}, State) ->
     end,
     State;
 
-
+%% The light node which receives load from the heavy node and initiates the lb op.
 on({balance_phase2b, Op, ReplyPid}, State) ->
     case op_pending() of
         true -> ?TRACE("Pending op in phase2b. Discarding op ~p and replying~n", [Op]),
@@ -418,7 +422,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                          case proplists:is_defined(dht_size, Options) of
                              %% gossip information available
                              true ->
-                                 S = 2, % TODO config: lb_active_gossip_threshold
+                                 S = config:read(lb_active_gossip_stddev_threshold),
                                  DhtSize = proplists:get_value(dht_size, Options),
                                  %Avg = proplists:get_value(avg, Options), %% TODO AVG?
                                  StdDev = proplists:get_value(stddev, Options),
@@ -615,9 +619,11 @@ trigger(Trigger) ->
 %% @doc config check registered in config.erl
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_in(lb_active_module, ?MODULES_AVAIL) andalso
+    config:cfg_is_in(lb_active_module, ?MODULES) andalso
+    config:cfg_is_integer(lb_active_interval) andalso
     config:cfg_is_greater_than(lb_active_interval, 0) andalso
-    config:cfg_exists(lb_active_monitor_db) andalso
-    config:cfg_exists(lb_active_metric) andalso
+    config:cfg_is_bool(lb_active_monitor_db) andalso
+    config:cfg_is_in(lb_active_metric, ?METRICS) andalso
     config:cfg_is_bool(lb_active_use_gossip) andalso
+    config:cfg_is_greater_than(lb_active_gossip_stddev_threshold, 0) andalso
     apply(get_lb_module(), check_config, []).

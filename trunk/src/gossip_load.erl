@@ -75,7 +75,8 @@
 
 %% List of module names for additional aggregation
 %% (Modules need to implement gossip_load_beh)
--define(ADDITIONAL_MODULES, [gossip_load_requests]).
+%-define(ADDITIONAL_MODULES, [gossip_load_requests]).
+-define(ADDITIONAL_MODULES, []).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
