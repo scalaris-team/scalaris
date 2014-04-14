@@ -31,39 +31,47 @@
 -vsn('$Id$').
 
 -behavior(lb_active_beh).
+%% implements
 -export([init/0, check_config/0]).
 -export([handle_msg/2, handle_dht_msg/2]).
 -export([get_web_debug_key_value/1]).
-
-%-compile([export_all]).
-
--define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), io:format(X,Y)).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
 %% Defines the number of directories
-%% e.g. 1 means a central directory
+%% e.g. 1 implies a central directory
 -define(NUM_DIRECTORIES, 5).
 
--record(node, {pid      = ?required(node, pid)  :: comm:mypid(),
-               load     = ?required(node, load) :: number(),
-               capacity = 1                     :: number()
-              }).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X,Y)).
 
--record(directory, {name         = ?required(directory, name) :: string(), 
+-type utilization() :: float().
+
+-record(node, {utilization = ?required(node, utilization)    :: utilization(),
+               capacity = 1                                  :: number(),
+               load     = ?required(node, load)              :: number(),
+               pid      = ?required(node, pid)               :: comm:mypid()
+               }).
+
+-type directory_name() :: string().
+
+-record(directory, {name         = ?required(directory, name) :: directory_name(), 
                     last_balance = nil                        :: nil | os:timestamp(),
-                    light_nodes  = []                         :: [node()],
-                    heavy_nodes  = []                         :: [node()]
+                    pool         = gb_sets:new()              :: gb_set()
+                    %light_nodes  = []                         :: [node()],
+                    %heavy_nodes  = []                         :: [node()]
                     }).
 
--record(state, {capacity = 1,
-                my_dirs = []
+-record(state, {capacity = 1500, %% free cpu usage, free memory, bandwith...
+                my_dirs = [],
+                threshold_periodic  = 0.5, %% k_p = (1 + average directory utilization) / 2
+                threshold_emergency = 1.0  %% k_e
                 }).
 
 -type directory() :: #directory{}.
 -type node() :: #node{}.
+
 -type state() :: #state{}.
 
 -type trigger() :: publish_trigger | directory_trigger.
@@ -72,6 +80,9 @@
 
 -spec init() -> state().
 init() ->
+    create_directories(?NUM_DIRECTORIES),
+    %% post load to random directory
+    %% post_load(rand_directory),
     trigger(publish_trigger),
     trigger(directory_trigger),
     request_dht_range(),
@@ -83,15 +94,42 @@ init() ->
 
 handle_msg({publish_trigger}, State) ->
     trigger(publish_trigger),
+    case emergency of %% emergency when load(node) > k_e
+      true ->
+         %post_load(),
+         %get && perform_transfer()
+         ok;
+      _ ->
+         %get && perform transfer() without overloading
+         %post_load()
+         ok
+    end,
     State;
 
 handle_msg({directory_trigger}, State) ->
     trigger(directory_trigger),
+    MyDirectories = State#state.my_dirs,
+    %Reassignments = [balance(Dir) || Dir <- MyDirectories],
+    %PeriodicThreshold =
+    %% Threshold k_p = Average laod in directory
+    %% Threshold k_e = 1 meaning full capacity
+    %% Upon receipt of load information:
+    %%      add_to_directory(load_information),
+    %%      case node_overloaded of
+    %%          true -> compute_reassign(directory_load, node, k_e);
+    %%          _    -> compute_reassign(directory_load, node, k_p),
+    %%                  clear_directory()
+    %%      end
+    %% compute_reassign:
+    %%  for every node from heavist to lightest in directory 
+    %%    if l_n / c_n > k 
+    %%       balance such that (l_n + l_x) / c_n gets minimized
+    %%  return assignment 
     ?TRACE("~p My Directories: ~p~n", [self(), State#state.my_dirs]),
     State;
 
 handle_msg({get_state_response, MyRange}, State) ->
-    Directories = get_all_directories(),
+    Directories = get_all_directory_keys(),
     MyDirectories = [Dir || Dir <- Directories, intervals:in(Dir, MyRange)],
     ?TRACE("~p: I am responsible for ~p~n", [self(), MyDirectories]),
     State#state{my_dirs = MyDirectories};
@@ -121,17 +159,17 @@ create_directories(N) when N > 0 ->
         {_TLog2, {ok, _Value}} ->
             create_directories(N-1);
         {TLog2, {fail, not_found}} ->
-            {TLog3, _Result} = api_tx:write(TLog2, Key, directory_init_val()),
+            {TLog3, _Result} = api_tx:write(TLog2, Key, #directory{name = Key}),
             case api_tx:commit(TLog3) of
-                {fail, abort, [Key]} ->
-                    create_directories(N);
                 {ok} ->
-                    create_directories(N-1)
+                    create_directories(N-1);
+                {fail, abort, [Key]} ->
+                    create_directories(N)
             end
     end.
 
--spec get_all_directories() -> [?RT:key()].
-get_all_directories() ->
+-spec get_all_directory_keys() -> [?RT:key()].
+get_all_directory_keys() ->
     [get_directory_by_number(N) || N <- lists:seq(1, ?NUM_DIRECTORIES)].
 
 -spec get_random_directory() -> ?RT:key().
@@ -143,11 +181,43 @@ get_random_directory() ->
 get_directory_by_number(N) when N > 0 ->
     ?RT:hash_key("lb_active_dir" ++ int_to_str(N)).
 
-directory_init_val() -> [].
+post_load_to_directory(Load, Directory) ->
+    TLog = api_tx:new_tlog(),
+    case api_tx:read(TLog, Directory) of
+        {TLog2, {ok, Content}} ->
+            ContentNew = gb_sets:add(Load, Content),
+            {TLog3, _Result} = api_tx:write(TLog2, Directory, ContentNew),
+            case api_tx:commit(TLog3) of
+                {ok} ->
+                    ok;
+                {fail, abort, [Directory]} ->
+                    log:log(warn, "~p: Failed to write to directory, retrying...", [?MODULE]),
+                    post_load_to_directory(Load, Directory)
+            end;
+        {_TLog2, {fail, not_found}} ->
+            log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE]),
+            ok
+    end.
 
 write_to_directory() -> ok.
 
 read_from_directory() -> ok.
+
+%%%%%%%%%%%%
+%% State
+%%
+-spec state_get(capacity, state()) -> number();
+               (my_dirs,  state()) -> [directory_name()].
+state_get(Key, #state{capacity = Capacity, 
+                      my_dirs = Dirs}) ->
+    case Key of
+        capacity -> Capacity;
+        my_dirs  -> Dirs
+    end.
+
+%%%%%%%%%%%%
+%% Helpers
+%%
 
 -spec int_to_str(integer()) -> string().
 int_to_str(N) ->
