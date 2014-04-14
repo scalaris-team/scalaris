@@ -23,7 +23,7 @@
 -include("record_helpers.hrl").
 
 -export([new/1]).
--export([get_load/1, get_node/1, get_succ/1, get_items/1, get_time/1]).
+-export([get_load/1, get_reqs/1, get_node/1, get_succ/1, get_items/1, get_time/1]).
 -export([is_succ/2, neighbors/2, get_target_load/3, get_target_load/5]).
 %% without dht size
 -export([get_load_change_slide/3, get_load_change_jump/4]).
@@ -33,7 +33,8 @@
 
 -type(load() :: number()).
 
--record(lb_info, {load  = ?required(lb_info, load)  :: load(),
+-record(lb_info, {load  = unknown                   :: unknown | load(),
+                  reqs  = unknown                   :: unknown | load(),
                   items = ?required(lb_info, items) :: load(),
                   node  = ?required(lb_info, node)  :: node:node_type(),
                   succ  = ?required(lb_info, succ)  :: node:node_type(),
@@ -47,20 +48,23 @@
 -endif.
 
 %% Convert node details to lb_info
--spec new(node_details:node_details()) -> lb_info().
+-spec new(NodeDetails::node_details:node_details()) -> lb_info().
 new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
     Load = case lb_active:get_load_metric() of
                items -> Items;
                Metric -> Metric
            end,
+    Requests = lb_active:get_request_metric(),
     #lb_info{load  = Load,
+             reqs  = Requests,
              items = Items,
              node  = node_details:get(NodeDetails, node),
              succ  = node_details:get(NodeDetails, succ)}.
 
--spec get_load(lb_info()) -> load() | node:node_type().
+-spec get_load(LBInfo::lb_info()) -> load() | node:node_type().
 get_load (#lb_info{load  = Load }) -> Load.
+get_reqs (#lb_info{reqs  = Requests}) -> Requests.
 get_items(#lb_info{items = Items}) -> Items.
 get_node (#lb_info{node  = Node }) -> Node.
 get_succ (#lb_info{succ  = Succ }) -> Succ.
@@ -76,34 +80,34 @@ neighbors(Node1, Node2) ->
 %% @doc The number of db entries the heavy node will give to the light node
 -spec get_target_load(Op::slide | jump, HeavyNode::lb_info(), LightNode::lb_info()) -> non_neg_integer().
 get_target_load(JumpOrSlide, HeavyNode, LightNode) ->
-    case config:read(lb_active_metric) of
-        items -> get_target_load(JumpOrSlide, HeavyNode, 1, LightNode, 1);
-        _ -> get_target_load(JumpOrSlide, HeavyNode, get_load(HeavyNode), LightNode, get_load(LightNode))
+    case config:read(lb_active_balance_metric) of
+        items -> get_target_load(JumpOrSlide,
+                                 get_items(HeavyNode), 1,
+                                 get_items(LightNode), 1);
+        requests -> get_target_load(JumpOrSlide,
+                                    get_reqs(HeavyNode), 1,
+                                    get_reqs(LightNode), 1);
+        none -> get_target_load(JumpOrSlide,
+                                get_items(HeavyNode), get_load(HeavyNode),
+                                get_items(LightNode), get_load(LightNode))
     end.
 
--define(BOUND(X,Y,Z), begin From = X, To = Z, V = Y,
-                      if   V < From -> From;
-                           V > To -> To;
-                           true     -> V
-                      end end).
-
 %% @doc The number of db entries the heavy node will give to the light node (weighted)
--spec get_target_load(Op::slide | jump, HeavyNode::lb_info(), WeightHeavy::number(),
-                                        LightNode::lb_info(), WeightLight::number())
+-spec get_target_load(Op::slide | jump, HeavyNode::load(), WeightHeavy::number(),
+                                        LightNode::load(), WeightLight::number())
                     -> non_neg_integer().
 get_target_load(slide, HeavyNode, WeightHeavy, LightNode, WeightLight) ->
-    TotalItems = get_items(HeavyNode) + get_items(LightNode),
+    TotalItems = HeavyNode + LightNode,
     AvgItems = TotalItems div 2,
     Factor = try WeightLight / WeightHeavy catch error:badarith -> 1 end,
-    ItemsToShed = get_items(HeavyNode) - trunc(Factor * AvgItems),
-    ?BOUND(0, ItemsToShed, get_items(HeavyNode));
+    ItemsToShed = HeavyNode - trunc(Factor * AvgItems),
+    bound(0, ItemsToShed, HeavyNode);
 get_target_load(jump, HeavyNode, WeightHeavy, _LightNode, WeightLight) ->
-    AvgItems = get_items(HeavyNode) div 2,
+    AvgItems = HeavyNode div 2,
     Factor = try WeightLight / WeightHeavy catch error:badarith -> 1 end,
-    ItemsToShed = get_items(HeavyNode) - trunc(Factor * AvgItems),
-    ?BOUND(0, ItemsToShed, get_items(HeavyNode)).
+    ItemsToShed = HeavyNode - trunc(Factor * AvgItems),
+    bound(0, ItemsToShed, HeavyNode).
 
-%% TODO generic load change
 %% @doc Calculates the change in Variance
 %% no dht size available
 -spec get_load_change_slide(TakenLoad::non_neg_integer(), HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::integer().
@@ -145,3 +149,10 @@ get_oldest_data_time([], Oldest) ->
 get_oldest_data_time([Node | Other], Oldest) ->
     OldestNew = erlang:min(get_time(Node), Oldest),
     get_oldest_data_time(Other, OldestNew).
+
+-spec bound(LowerBound::number(), Value::number(), UpperBound::number()) -> number().
+bound(LowerBound, Value, UpperBound) ->
+    if Value < LowerBound -> LowerBound;
+       Value > UpperBound -> UpperBound;
+       true -> Value
+    end.
