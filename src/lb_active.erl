@@ -155,13 +155,20 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     %% check the load balancing configuration by using
     %% the standard deviation from the gossip process.
 
-    %% TODO switch for metric
     Size = gossip_load:load_info_get(size, LoadInfo),
-    StdDev = gossip_load:load_info_get(stddev, LoadInfo),
-    Avg = gossip_load:load_info_get(avgLoad, LoadInfo),
-    OptionsNew = [{dht_size, Size}, {avg, Avg}, {stddev, StdDev}] ++ Options,
+    ItemsStdDev = gossip_load:load_info_get(stddev, LoadInfo),
+    ItemsAvg = gossip_load:load_info_get(avgLoad, LoadInfo),
+    Metrics =
+        case gossip_load:load_info_get(other, LoadInfo) of
+            [] -> [{avg, ItemsAvg}, {stddev, ItemsStdDev}];
+            _ -> [{stddev, gossip_load:load_info_other_get(stddev, gossip_load_lb_metric, LoadInfo)},
+                  {avg, gossip_load:load_info_other_get(avgLoad, gossip_load_lb_metric, LoadInfo)}]
+        end,
+    OptionsNew = [{dht_size, Size} | Metrics ++ Options],
+
     HeavyPid = node:pidX(lb_info:get_node(HeavyNode)),
     comm:send(HeavyPid, {lb_active, balance, HeavyNode, LightNode, LightNodeSucc, OptionsNew}),
+
     State;
 
 %% lb_op received from dht_node and to be executed
@@ -539,10 +546,10 @@ monitor_vals_appeared() ->
 -spec get_load_metric() -> unknown | items | number().
 get_load_metric() ->
     Metric = config:read(lb_active_metric),
-    Val = get_load_metric(Metric),
-    io:format("Load Metric: ~p~n", [Val]),
-    Val.
-
+    case get_load_metric(Metric) of
+        unknown -> io:format("Unknown metric.~n"), 0;
+        Val -> Val
+    end.
 
 -define(DEFAULT(Val, Default), case Val of
                          unknown -> Default;
@@ -602,6 +609,7 @@ get_value_type(Value, avg) when is_tuple(Value) ->
         error:badarith -> unknown
     end.
 
+%% TODO
 default_value() ->
     case config:read(lb_active_metric) of
         db_reads -> 0
