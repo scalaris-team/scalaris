@@ -98,44 +98,44 @@ get_target_load(JumpOrSlide, HeavyNode, LightNode) ->
                     -> non_neg_integer().
 get_target_load(slide, HeavyNode, WeightHeavy, LightNode, WeightLight) ->
     TotalItems = HeavyNode + LightNode,
-    AvgItems = TotalItems div 2,
+    AvgItems = trunc(TotalItems) div 2,
     Factor = try WeightLight / WeightHeavy catch error:badarith -> 1 end,
     ItemsToShed = HeavyNode - trunc(Factor * AvgItems),
     bound(0, ItemsToShed, HeavyNode);
 get_target_load(jump, HeavyNode, WeightHeavy, _LightNode, WeightLight) ->
-    AvgItems = HeavyNode div 2,
+    AvgItems = trunc(HeavyNode) div 2,
     Factor = try WeightLight / WeightHeavy catch error:badarith -> 1 end,
     ItemsToShed = HeavyNode - trunc(Factor * AvgItems),
     bound(0, ItemsToShed, HeavyNode).
 
 %% @doc Calculates the change in Variance
 %% no dht size available
--spec get_load_change_slide(TakenLoad::non_neg_integer(), HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::integer().
+-spec get_load_change_slide(TakenLoad::non_neg_integer(), HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::number().
 get_load_change_slide(TakenLoad, HeavyNode, LightNode) -> 
     get_load_change_slide(TakenLoad, 1, HeavyNode, LightNode).
 
 %% @doc Calculates the change in Variance
 %% dht size available
--spec get_load_change_slide(TakenLoad::non_neg_integer(), DhtSize::pos_integer(), HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::integer().
+-spec get_load_change_slide(TakenLoad::non_neg_integer(), DhtSize::pos_integer(), HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::number().
 get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode) ->
     get_load_change_diff(DhtSize, get_load(HeavyNode), get_load(HeavyNode) - TakenLoad) +
         get_load_change_diff(DhtSize, get_load(LightNode), get_load(LightNode) + TakenLoad).
 
 %% @doc Calculates the change in Variance
 %% no dht size available
--spec get_load_change_jump(TakenLoad::non_neg_integer(), HeavyNOde::lb_info(), LightNode::lb_info(), LightNodeSucc::lb_info()) -> LoadChange::integer().
+-spec get_load_change_jump(TakenLoad::non_neg_integer(), HeavyNOde::lb_info(), LightNode::lb_info(), LightNodeSucc::lb_info()) -> LoadChange::number().
 get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc) ->
     get_load_change_jump(TakenLoad, 1, HeavyNode, LightNode, LightNodeSucc).
 
 %% @doc Calculates the change in Variance
 %% dht size available
--spec get_load_change_jump(non_neg_integer(), pos_integer(), lb_info(), lb_info(), lb_info()) -> LoadChange::integer().
+-spec get_load_change_jump(non_neg_integer(), pos_integer(), lb_info(), lb_info(), lb_info()) -> LoadChange::number().
 get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc) ->
     get_load_change_diff(DhtSize, get_load(LightNode), TakenLoad) +
         get_load_change_diff(DhtSize, get_load(LightNodeSucc), get_load(LightNodeSucc) + get_load(LightNode)) +
         get_load_change_diff(DhtSize, get_load(HeavyNode), get_load(HeavyNode) - TakenLoad).
 
--spec get_load_change_diff(pos_integer(), non_neg_integer(), non_neg_integer()) -> integer().
+-spec get_load_change_diff(pos_integer(), non_neg_integer(), non_neg_integer()) -> number().
 get_load_change_diff(DhtSize, OldItemLoad, NewItemLoad) ->
     NewItemLoad * NewItemLoad / DhtSize - OldItemLoad * OldItemLoad / DhtSize.
 
@@ -143,7 +143,7 @@ get_load_change_diff(DhtSize, OldItemLoad, NewItemLoad) ->
 get_oldest_data_time([Node | Other]) ->
     get_oldest_data_time(Other, get_time(Node)).
 
--spec get_oldest_data_time([lb_info()], Oldest::lb_info()) -> OldestTime::erlang:timestamp().
+-spec get_oldest_data_time([lb_info()], Oldest::erlang:timestamp()) -> OldestTime::erlang:timestamp().
 get_oldest_data_time([], Oldest) ->
     Oldest;
 get_oldest_data_time([Node | Other], Oldest) ->
