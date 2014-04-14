@@ -373,7 +373,10 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %%      PreCond: KvvList contains only unique keys
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec map_kvv_list([Tpl], intervals:interval()) -> [Tpl]
+%% @doc Maps the given tuple list (with keys as first elements) to the MyI
+%%      interval.
+%%      Precond: tuple list with unique keys
+-spec map_kvv_list([Tpl], MyI::intervals:interval()) -> [Tpl]
         when is_subtype(Tpl, {?RT:key()} |
                              {?RT:key(), term()} |
                              {?RT:key(), term(), term()}).
@@ -383,9 +386,10 @@ map_kvv_list(TplList, MyI) ->
                                RKey <- ?RT:get_replica_keys(element(1, E)),
                                intervals:in(RKey, MyI)].
 
--spec map_key_list([?RT:key()], intervals:interval()) -> [?RT:key()].
+%% @doc Maps the given (unique!) key list to the MyI interval.
+-spec map_key_list([?RT:key()], MyI::intervals:interval()) -> [?RT:key()].
 map_key_list(KeyList, MyI) ->
-    ?DBG_ASSERT(length(KeyList) =:= length(lists:sort(KeyList))),
+    ?DBG_ASSERT(length(KeyList) =:= length(lists:usort(KeyList))),
     [RKey || Key <- KeyList,
              RKey <- ?RT:get_replica_keys(Key),
              intervals:in(RKey, MyI)].
