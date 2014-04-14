@@ -48,20 +48,25 @@
 
 -type utilization() :: float().
 
--record(node, {utilization = ?required(node, utilization)    :: utilization(),
+-record(node, {utilization = ?required(node, utilization)    :: utilization(), %% erlang sorts by first element in record/tuple
+               pid      = ?required(node, pid)               :: comm:mypid(),
                capacity = 1                                  :: number(),
-               load     = ?required(node, load)              :: number(),
-               pid      = ?required(node, pid)               :: comm:mypid()
+               load     = ?required(node, load)              :: number()
                }).
 
 -type directory_name() :: string().
 
 -record(directory, {name         = ?required(directory, name) :: directory_name(), 
                     last_balance = nil                        :: nil | os:timestamp(),
-                    pool         = gb_sets:new()              :: gb_set()
-                    %light_nodes  = []                         :: [node()],
-                    %heavy_nodes  = []                         :: [node()]
+                    pool         = gb_sets:new()              :: gb_set(),
+                    schedule     = []                         :: [reassign()]
                     }).
+
+-record(reassign, {from = ?required(reassign, from) :: node:node_type(),
+                   to   = ?required(reassign, to)   :: node:node_type()
+                   }).
+
+-type reassign() :: #reassign{}.
 
 -record(state, {capacity = 1500, %% free cpu usage, free memory, bandwith...
                 my_dirs = [],
@@ -106,11 +111,22 @@ handle_msg({publish_trigger}, State) ->
     end,
     State;
 
+%% In case of an emergency, we check immediately
+handle_msg({emergency, LoadInfo, DirKey}, State) ->
+    %% TODO just write directly to db instead
+    post_load_to_directory(LoadInfo, DirKey),
+    %% TODO Emergency Threshold has been already check at the node overloaded...
+    EmergencyThreshold = State#state.threshold_emergency,
+    case LoadInfo#node.utilization > EmergencyThreshold of
+        true  ->
+            MyDirKeys = State#state.my_dirs,
+            directory_routine(DirKey, emergency);
+        false -> State
+    end;
+
 handle_msg({directory_trigger}, State) ->
     trigger(directory_trigger),
-    MyDirectories = State#state.my_dirs,
-    %Reassignments = [balance(Dir) || Dir <- MyDirectories],
-    %PeriodicThreshold =
+    ?TRACE("~p My Directories: ~p~n", [self(), State#state.my_dirs]),
     %% Threshold k_p = Average laod in directory
     %% Threshold k_e = 1 meaning full capacity
     %% Upon receipt of load information:
@@ -124,8 +140,9 @@ handle_msg({directory_trigger}, State) ->
     %%  for every node from heavist to lightest in directory 
     %%    if l_n / c_n > k 
     %%       balance such that (l_n + l_x) / c_n gets minimized
-    %%  return assignment 
-    ?TRACE("~p My Directories: ~p~n", [self(), State#state.my_dirs]),
+    %%  return assignment
+    MyDirKeys = State#state.my_dirs,
+    manage_directories(MyDirKeys),
     State;
 
 handle_msg({get_state_response, MyRange}, State) ->
@@ -143,6 +160,48 @@ handle_msg(Msg, State) ->
 handle_dht_msg({lb_active, Msg}, DhtState) ->
     DhtState.
 
+manage_directories([]) ->
+    ok;
+manage_directories([DirKey | Rest]) ->
+    directory_routine(DirKey, periodic),
+    manage_directories(Rest).
+
+directory_routine(DirKey, Type) ->
+    %% Because of the lack of virtual servers/nodes, the load
+    %% balancing is differs from the paper here. We try to
+    %% balance the most loaded node with the least loaded
+    %% node.
+    %% TODO Some preference should be given to neighboring
+    %%      nodes to avoid too many jumps.
+    {TLog, Directory} = get_directory(DirKey),
+    Pool = Directory#directory.pool,
+    K = case Type of
+            periodic ->
+                AvgUtil = lists:foldl(fun(El, Acc) -> Acc + El#node.utilization end, 0, Pool) / length(Pool),
+                (1 + AvgUtil) / 2;
+            emergency ->
+                1.0
+        end,
+    LightNodes = gb_sets:filter(fun(El) -> El#node.utilization =< K end, Pool),
+    HeavyNodes = gb_sets:filter(fun(El) -> El#node.utilization >  K end, Pool),
+    Schedule = find_matches(LightNodes, HeavyNodes, []),
+    NewDirectory = dir_set_schedule(Schedule, dir_clear_load(Directory)),
+    %% TODO Should this be inside a transcaction? We may not want atomic attributes here
+    set_directory(TLog, NewDirectory),
+    ok.
+
+find_matches(LightNodes, HeavyNodes, Result) ->
+    case gb_sets:size(LightNodes) > 0 andalso gb_sets:size(HeavyNodes) > 0 of
+        true ->
+            {LightNode, LightNodes2} = gb_sets:take_smallest(LightNodes),
+            {HeavyNode, HeavyNodes2} = gb_sets:take_largest(HeavyNodes),
+            find_matches(LightNodes2, HeavyNodes2, [{LightNode, HeavyNode} | Result]);
+        false ->
+            %% TODO we want to have the heaviest load first, this could be more efficient...
+            lists:reverse(Result)
+    end.
+
+-spec request_dht_range() -> ok.
 request_dht_range() ->
     MyDHT = pid_groups:get_my(dht_node),
     comm:send_local(MyDHT, {get_state, comm:this(), my_range}).
@@ -152,7 +211,7 @@ request_dht_range() ->
 create_directories(0) ->
     ok;
 create_directories(N) when N > 0 ->
-    Key = int_to_str(get_directory_by_number(N)),
+    Key = int_to_str(get_directory_key_by_number(N)),
     TLog = api_tx:new_tlog(),
 
     case api_tx:read(TLog, Key) of
@@ -168,40 +227,84 @@ create_directories(N) when N > 0 ->
             end
     end.
 
--spec get_all_directory_keys() -> [?RT:key()].
+-spec get_all_directory_keys() ->  ?RT:key().
 get_all_directory_keys() ->
-    [get_directory_by_number(N) || N <- lists:seq(1, ?NUM_DIRECTORIES)].
+    [get_directory_key_by_number(N) || N <- lists:seq(1, ?NUM_DIRECTORIES)].
 
--spec get_random_directory() -> ?RT:key().
-get_random_directory() ->
+-spec get_random_directory_key() ->  ?RT:key().
+get_random_directory_key() ->
     Rand = randoms:rand_uniform(1, ?NUM_DIRECTORIES+1),
-    get_directory_by_number(Rand).
+    get_directory_key_by_number(Rand).
 
--spec get_directory_by_number(pos_integer()) -> ?RT:key().
-get_directory_by_number(N) when N > 0 ->
+-spec get_directory_key_by_number(pos_integer()) -> ?RT:key().
+get_directory_key_by_number(N) when N > 0 ->
     ?RT:hash_key("lb_active_dir" ++ int_to_str(N)).
 
-post_load_to_directory(Load, Directory) ->
+-spec post_load_to_directory(node(), directory_name()) -> ok.
+post_load_to_directory(Load, DirKey) ->
     TLog = api_tx:new_tlog(),
-    case api_tx:read(TLog, Directory) of
+    case api_tx:read(TLog, DirKey) of
         {TLog2, {ok, Content}} ->
-            ContentNew = gb_sets:add(Load, Content),
-            {TLog3, _Result} = api_tx:write(TLog2, Directory, ContentNew),
+            ContentNew = dir_add_load(Load, Content),
+            {TLog3, _Result} = api_tx:write(TLog2, DirKey, ContentNew),
             case api_tx:commit(TLog3) of
                 {ok} ->
                     ok;
-                {fail, abort, [Directory]} ->
+                {fail, abort, [DirKey]} ->
                     log:log(warn, "~p: Failed to write to directory, retrying...", [?MODULE]),
-                    post_load_to_directory(Load, Directory)
+                    post_load_to_directory(Load, DirKey)
             end;
         {_TLog2, {fail, not_found}} ->
             log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE]),
             ok
     end.
 
-write_to_directory() -> ok.
+-spec dir_add_load(node(), directory()) -> directory().
+dir_add_load(Load, Directory) ->
+    Pool = Directory#directory.pool,
+    PoolNew = gb_sets:add(Load, Pool),
+    Directory#directory{pool = PoolNew}.
 
-read_from_directory() -> ok.
+-spec pop_load_in_directory(directory_name()) -> directory().
+pop_load_in_directory(DirKey) ->
+    TLog = api_tx:new_tlog(),
+    case api_tx:read(TLog, DirKey) of
+        {TLog2, {ok, Directory}} ->
+            case api_tx:req_list(TLog2, [{write, DirKey, dir_clear_load(Directory)}, {commit}]) of
+                {[], ok, ok} -> Directory;
+                _ -> pop_load_in_directory(DirKey)
+            end;
+        {_TLog2, {fail, not_found}} ->
+            log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE])
+    end.
+
+-spec dir_clear_load(directory()) -> directory().
+dir_clear_load(Directory) ->
+    Directory#directory{pool = gb_sets:new()}.
+
+dir_set_schedule(Schedule, Directory) ->
+    Directory#directory{schedule = Schedule}.
+
+get_directory(DirKey) ->
+    TLog = api_tx:new_tlog(),
+    case api_tx:read(TLog, DirKey) of
+        {TLog2, {ok, Directory}} -> 
+            {TLog2, Directory};
+        _ -> 
+            log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE]),
+            get_directory(DirKey)
+    end.
+
+-spec set_directory(api_tx:tlog(), directory()) -> ok | failed.
+set_directory(TLog, Directory) ->
+    DirKey = Directory#directory.name,
+    case api_tx:req_list(TLog, [{write, DirKey, Directory}, {commit}]) of
+        {[], ok, ok} -> 
+            ok;
+        _  ->
+            log:log(warn, "~p: Failed to save directory ~p because of failed transaction.", [?MODULE, DirKey]),
+            failed
+    end.
 
 %%%%%%%%%%%%
 %% State
