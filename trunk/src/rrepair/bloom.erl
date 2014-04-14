@@ -49,8 +49,7 @@
                 hfs           = ?required(bloom, hfs) :: ?REP_HFS:hfs(),   %HashFunctionSet
                 items_count   = 0                     :: non_neg_integer() %number of inserted items
                }).
-%-opaque bloom_filter() :: #bloom{}.
--type bloom_filter() :: #bloom{}. %make opaque causes lots of dialyzer warnings
+-opaque bloom_filter() :: #bloom{}.
 -type key() :: any().
 
 -ifdef(with_export_type_support).

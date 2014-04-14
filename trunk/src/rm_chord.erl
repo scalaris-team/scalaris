@@ -24,7 +24,7 @@
 
 -behavior(rm_beh).
 
--type(state() :: {Neighbors :: nodelist:neighborhood()}).
+-opaque state() :: {Neighbors :: nodelist:neighborhood()}.
 
 % accepted messages of an initialized rm_chord process in addition to rm_loop
 -type(custom_message() ::

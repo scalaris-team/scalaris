@@ -72,12 +72,11 @@
                                     NewNeighbors::nodelist:neighborhood(),
                                     Reason::reason()) -> any()).
 
--type state_t() ::
+-opaque state() ::
           {RM_State    :: ?RM:state(),
            HasLeft     :: boolean(),
            % subscribers to node change events, i.e. node ID changes:
            SubscrTable :: tid()}.
--opaque state() :: state_t().
 
 % accepted messages of an initialized rm_loop process
 -type(message() ::
@@ -410,13 +409,13 @@ get_web_debug_info({RM_State, _HasLeft, SubscrTable}) ->
 
 %% @doc Calls RMFun (which may update the Neighborhood), then calls all
 %%      subscribers and updates the failure detector if necessary.
--spec update_state(OldState::state_t(), RMFun::fun((?RM:state()) -> {reason(), ?RM:state()}))
-        -> NewState::state_t().
+-spec update_state(OldState::state(), RMFun::fun((?RM:state()) -> {reason(), ?RM:state()}))
+        -> NewState::state().
 update_state(OldState, RMFun) ->
     update_state(OldState, RMFun, null).
 
--spec update_state(OldState::state_t(), RMFun::fun((?RM:state()) -> {reason(), ?RM:state()}),
-                   CrashedPid::comm:mypid() | null) -> NewState::state_t().
+-spec update_state(OldState::state(), RMFun::fun((?RM:state()) -> {reason(), ?RM:state()}),
+                   CrashedPid::comm:mypid() | null) -> NewState::state().
 update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun, CrashedPid) ->
     OldNeighborhood = ?RM:get_neighbors(OldRM_State),
     {Reason, NewRM_State} = RMFun(OldRM_State),

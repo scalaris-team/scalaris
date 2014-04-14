@@ -24,10 +24,10 @@
 -include("scalaris.hrl").
 
 %% userdevguide-begin rt_chord:types
--type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
+-type key() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
 -type index() :: {pos_integer(), non_neg_integer()}.
--type rt_t() :: gb_trees:tree(index(), Node::node:node_type()).
--type external_rt_t() :: gb_trees:tree(NodeId::key_t(), Node::node:node_type()).
+-opaque rt() :: gb_trees:tree(index(), Node::node:node_type()).
+-type external_rt() :: gb_trees:tree(NodeId::key(), Node::node:node_type()). %% @todo: make opaque
 -type custom_message() ::
        {rt_get_node, Source_PID::comm:mypid(), Index::index()} |
        {rt_get_node_response, Index::index(), Node::node:node_type()}.
@@ -55,15 +55,9 @@ init(Neighbors) -> empty(Neighbors).
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(binary() | client_key()) -> key().
-hash_key(Key) -> hash_key_(Key).
-
-%% @doc Hashes the key to the identifier space (internal function to allow
-%%      use in e.g. get_random_node_id without dialyzer complaining about the
-%%      opaque key type).
--spec hash_key_(client_key() | binary()) -> key_t().
-hash_key_(Key) when not is_binary(Key) ->
-    hash_key_(client_key_to_binary(Key));
-hash_key_(Key) ->
+hash_key(Key) when not is_binary(Key) ->
+    hash_key(client_key_to_binary(Key));
+hash_key(Key) ->
     <<N:128>> = ?CRYPTO_MD5(Key),
     N.
 
@@ -72,10 +66,10 @@ hash_key_(Key) ->
 -spec get_random_node_id() -> key().
 get_random_node_id() ->
     case config:read(key_creator) of
-        random -> hash_key_(randoms:getRandomString());
+        random -> hash_key(randoms:getRandomString());
         random_with_bit_mask ->
             {Mask1, Mask2} = config:read(key_creator_bitmask),
-            (hash_key_(randoms:getRandomString()) band Mask2) bor Mask1
+            (hash_key(randoms:getRandomString()) band Mask2) bor Mask1
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -119,28 +113,20 @@ get_size(RT) ->
     gb_trees:size(RT).
 
 %% @doc Keep a key in the address space. See n/0.
--spec normalize(non_neg_integer()) -> key_t().
+-spec normalize(non_neg_integer()) -> key().
 normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
 %% @doc Returns the size of the address space.
--spec n() -> integer().
-n() -> n_().
-%% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
--spec n_() -> 16#100000000000000000000000000000000.
-n_() -> 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF + 1.
+-spec n() -> 16#100000000000000000000000000000000.
+n() -> 16#100000000000000000000000000000000.
 
 %% @doc Gets the number of keys in the interval (Begin, End]. In the special
 %%      case of Begin==End, the whole key range as specified by n/0 is returned.
 -spec get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
-get_range(Begin, End) -> get_range_(Begin, End).
-
-%% @doc Helper for get_range/2 to make dialyzer happy with internal use of
-%%      get_range/2 in the other methods, e.g. get_split_key/3.
--spec get_range_(Begin::key_t(), End::key_t() | ?PLUS_INFINITY_TYPE) -> number().
-get_range_(Begin, Begin) -> n_(); % I am the only node
-get_range_(?MINUS_INFINITY, ?PLUS_INFINITY) -> n_(); % special case, only node
-get_range_(Begin, End) when End > Begin -> End - Begin;
-get_range_(Begin, End) when End < Begin -> (n_() - Begin) + End.
+get_range(Begin, Begin) -> n(); % I am the only node
+get_range(?MINUS_INFINITY, ?PLUS_INFINITY) -> n(); % special case, only node
+get_range(Begin, End) when End > Begin -> End - Begin;
+get_range(Begin, End) when End < Begin -> (n() - Begin) + End.
 
 %% @doc Gets the key that splits the interval (Begin, End] so that the first
 %%      interval will (roughly) be (Num/Denom) * range(Begin, End). In the
@@ -152,7 +138,7 @@ get_range_(Begin, End) when End < Begin -> (n_() - Begin) + End.
 get_split_key(Begin, _End, {Num, _Denom}) when Num == 0 -> Begin;
 get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
 get_split_key(Begin, End, {Num, Denom}) ->
-    normalize(Begin + (get_range_(Begin, End) * Num) div Denom).
+    normalize(Begin + (get_range(Begin, End) * Num) div Denom).
 
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and
 %%      calculates a random key in this range. Fails with an exception if there
@@ -269,7 +255,7 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 %% Finger calculation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % @private
--spec calculateKey(key() | key_t(), index()) -> key_t().
+-spec calculateKey(key(), index()) -> key().
 calculateKey(Id, {I, J}) ->
     % N / K^I * (J + 1)
     Offset = (n() div util:pow(config:read(chord_base), I)) * (J + 1),
@@ -277,7 +263,7 @@ calculateKey(Id, {I, J}) ->
     normalize(Id + Offset).
 
 %% @doc Gets the first index not pointing to the own node.
--spec first_index(Neighbors::nodelist:neighborhood()) -> {key_t(), index()} | null.
+-spec first_index(Neighbors::nodelist:neighborhood()) -> {key(), index()} | null.
 first_index(Neighbors) ->
     MyRange = nodelist:node_range(Neighbors),
     case intervals:is_all(MyRange) of
@@ -287,8 +273,8 @@ first_index(Neighbors) ->
     end.
 
 %% @doc Helper for first_index/1.
--spec first_index_(Id::key() | key_t(), MyRange::intervals:interval(), index())
-        -> {key_t(), index()}.
+-spec first_index_(Id::key(), MyRange::intervals:interval(), index())
+        -> {key(), index()}.
 first_index_(Id, MyRange, Index) ->
     Key = calculateKey(Id, Index),
     case intervals:in(Key, MyRange) of
@@ -479,7 +465,7 @@ to_list(State) ->
 
 %% userdevguide-begin rt_chord:wrap_message
 %% @doc Wrap lookup messages. This is a noop in Chord.
--spec wrap_message(Key::key_t(), Msg::comm:message(), State::dht_node_state:state(),
+-spec wrap_message(Key::key(), Msg::comm:message(), State::dht_node_state:state(),
                    Hops::non_neg_integer()) -> comm:message().
 wrap_message(_Key, Msg, _State, _Hops) -> Msg.
 %% userdevguide-end rt_chord:wrap_message

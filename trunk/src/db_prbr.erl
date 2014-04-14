@@ -471,10 +471,9 @@ call_subscribers(State = {_DB, Subscr, _SnapState}, Operation) ->
     NewState.
 
 %% @doc Iterates over all susbcribers and calls their subscribed functions.
--spec call_subscribers_iter(subscr_t(), {State::db(), Operation::close_db |
-                                         subscr_op_t()}) -> {db(),
-                                                             Operation::close_db
-                                                             | subscr_op_t()}.
+-spec call_subscribers_iter(subscr_t(),
+                            {State::db(), Operation::close_db | subscr_op_t()})
+        -> {db(), Operation::close_db | subscr_op_t()}.
 call_subscribers_iter(Tag, {{_DB, Subscr, _SnapState} = State, Op}) ->
     % assume the key exists (it should since we are iterating over the table!)
     {Tag, I, ChangesFun, RemSubscrFun} = ?DB:get(Subscr, Tag),

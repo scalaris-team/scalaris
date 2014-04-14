@@ -130,16 +130,6 @@ new_neighborhood(Pred, Node, Succ) ->
             new_neighborhood(Node, Succ)
     end.
 
-%% @doc Creates a new neighborhood structure with the given elements.
-%%      Only for internal use (to make dialyzer happy with opaque types).
-%%      Note: Call this method when passing newly created neighborhood objects
-%%      to functions that expect those. Public functions, for example, work on
-%%      opaque neighborhood structures. Dialyzer will complain if you provide
-%%      the tuple yourself.
--spec new(Preds::non_empty_snodelist(), Node::node:node_type(), Succs::non_empty_snodelist()) -> neighborhood().
-new(Preds, Node, Succs) ->
-    add_intervals(Preds, Node, Succs).
-
 %% @doc Helper function to make sure a (temporary) neighborhood object has
 %%      non-empty predecessor and successor lists (fills them with itself if
 %%      necessary).
@@ -185,16 +175,16 @@ node_range(Neighborhood) -> element(4, Neighborhood).
 %%      the ID of the predecessor and successor. Otherwise throws an exception.
 -spec update_node(neighborhood(), NewBaseNode::node:node_type()) -> neighborhood().
 update_node({[Node], Node, [Node], _NodeIntv, _SuccIntv}, NewBaseNode) ->
-    new([NewBaseNode], NewBaseNode, [NewBaseNode]);
+    add_intervals([NewBaseNode], NewBaseNode, [NewBaseNode]);
 update_node({[Pred], _Node, [Pred] = Neighbors, _NodeIntv, _SuccIntv}, NewBaseNode) ->
     case node:id(NewBaseNode) =:= node:id(Pred) of
-        false -> new(Neighbors, NewBaseNode, Neighbors);
+        false -> add_intervals(Neighbors, NewBaseNode, Neighbors);
         _     -> throw('cannot update base node - not within (id(Pred), id(Succ))')
     end;
 update_node({[Pred | _] = Preds, _Node, [Succ | _] = Succs, _NodeIntv, _SuccIntv}, NewBaseNode) ->
     case intervals:in(node:id(NewBaseNode),
                       intervals:new('(', node:id(Pred), node:id(Succ), ')')) of
-        true -> new(Preds, NewBaseNode, Succs);
+        true -> add_intervals(Preds, NewBaseNode, Succs);
         _    -> throw('cannot update base node - not within (id(Pred), id(Succ))')
     end.
 
@@ -565,7 +555,7 @@ add_node({Preds, BaseNode, Succs, _NodeIntv, _SuccIntv}, NodeToAdd, PredsLength,
             SuccsUpdSorted = lists:usort(SuccOrd, ViewUpd),
             PredsUpdSorted = lists:reverse(SuccsUpdSorted),
 
-            trunc(new(PredsUpdSorted, BaseNode, SuccsUpdSorted), PredsLength, SuccsLength);
+            trunc(add_intervals(PredsUpdSorted, BaseNode, SuccsUpdSorted), PredsLength, SuccsLength);
         true ->
             throw_if_newer(NodeToAdd, BaseNode),
             % eventually

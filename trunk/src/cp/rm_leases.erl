@@ -35,9 +35,7 @@
                                                                        l_on_cseq:lease_t())
          }).
 
--type state_t() :: #state{}.
-
--type state() :: state_t().
+-type state() :: #state{}.
 
 %% gen_component functions
 %% @doc Starts the failure detector server

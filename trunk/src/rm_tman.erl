@@ -26,11 +26,10 @@
 
 -behavior(rm_beh).
 
--type state_t() :: {Neighbors      :: nodelist:neighborhood(),
+-opaque state() :: {Neighbors      :: nodelist:neighborhood(),
                     RandomViewSize :: pos_integer(),
                     Cache          :: [node:node_type()], % random cyclon nodes
                     Churn          :: boolean()}.
--opaque state() :: state_t().
 
 % accepted messages of an initialized rm_tman process in addition to rm_loop
 -type(custom_message() ::
@@ -148,8 +147,8 @@ handle_custom_message(_, _State) -> unknown_event.
 
 %% @doc Integrates a non-empty cyclon cache into the own random view (empty
 %%      cyclon caches are ignored) and updates the random view size accordingly.
--spec add_cyclon_cache(Cache::[node:node_type()], state_t())
-        -> {ChangeReason::{unknown} | {node_discovery}, state_t()}.
+-spec add_cyclon_cache(Cache::[node:node_type()], state())
+        -> {ChangeReason::{unknown} | {node_discovery}, state()}.
 add_cyclon_cache([], State) ->
     % ignore empty cache from cyclon
     {{unknown}, State};
@@ -167,7 +166,7 @@ add_cyclon_cache(NewCache, {Neighborhood, RandViewSize, _Cache, Churn}) ->
     NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighborhood),
     {{node_discovery}, {NewNeighborhood, RandViewSizeNew, NewCache, Churn}}.
 
--spec trigger_action(State::state_t())
+-spec trigger_action(State::state())
         -> {ChangeReason::rm_loop:reason(), state()}.
 trigger_action({Neighborhood, RandViewSize, Cache, Churn} = State) ->
     % Trigger an update of the Random view
@@ -223,14 +222,6 @@ new_succ(State, NewSucc) ->
                   PredsPred::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 remove_pred(State, OldPred, PredsPred) ->
-    {{graceful_leave, pred, OldPred}, remove_pred_(State, OldPred, PredsPred)}.
-
--compile({inline, [remove_pred_/3]}).
-
-% private fun with non-opaque types to make dialyzer happy:
--spec remove_pred_(State::state_t(), OldPred::node:node_type(),
-                   PredsPred::node:node_type()) -> state_t().
-remove_pred_(State, OldPred, PredsPred) ->
     State2 = update_nodes(State, [PredsPred], [OldPred], null),
     % in order for incremental leaves to finish correctly, we must remove any
     % out-dated PredsPred in our state here!
@@ -238,14 +229,15 @@ remove_pred_(State, OldPred, PredsPred) ->
 
     MyNewPred = nodelist:pred(NewNeighborhood),
     case node:same_process(MyNewPred, PredsPred) of
-        true -> State2;
+        true ->
+            {{graceful_leave, pred, OldPred}, State2};
         false ->
             % assume the pred in my neighborhood is old
             % (the previous pred must know better about his pred)
             % -> just in case he was wrong, try to add it:
             contact_new_nodes([MyNewPred]),
             % try as long as MyNewPred is the same as PredsPred
-            remove_pred_(State2, MyNewPred, PredsPred)
+            remove_pred(State2, MyNewPred, PredsPred)
     end.
 
 %% @doc Removes the given successor as a result from a graceful leave only!
@@ -383,11 +375,11 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
 %%      occurred or was already determined, min_interval if chosen for the next
 %%      interval, otherwise max_interval. If the successor or predecessor
 %%      changes, the trigger will be called immediately.
--spec update_nodes(State::state_t(),
+-spec update_nodes(State::state(),
                    NodesToAdd::[node:node_type()],
                    NodesToRemove::[node:node_type() | comm:mypid() | pid()],
                    RemoveNodeEvalFun::fun((node:node_type()) -> any()) | null)
-        -> NewState::state_t().
+        -> NewState::state().
 update_nodes(State, [], [], _RemoveNodeEvalFun) ->
     State;
 update_nodes({OldNeighborhood, RandViewSize, OldCache, _Churn},
