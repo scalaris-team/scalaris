@@ -80,7 +80,7 @@ allowed_nodes(RT) ->
     end.
 
 -spec rt_entry_info(Node :: node:node_type(), Type :: entry_type(),
-                    PredId :: key_t(), SuccId :: key_t()) -> rt_entry_info_t().
+                    PredId :: key(), SuccId :: key()) -> rt_entry_info_t().
 rt_entry_info(Node, _Type, _PredId, _SuccId) ->
     #rt_entry_info{group=case comm:get_ip(node:pidX(Node)) =:= comm:get_ip(comm:this()) of
             true -> same_dc;

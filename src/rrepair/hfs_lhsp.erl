@@ -35,8 +35,7 @@
 
 -type itemKey() :: any().
 -type hfs_fun() :: fun((binary()) -> non_neg_integer() | binary()).
--type hfs_t()   :: {hfs_lhsp, Hf_count::pos_integer(), H1_fun::hfs_fun(), H2_fun::hfs_fun()}.
--type hfs()     :: hfs_t(). %todo make opaque
+-opaque hfs()   :: {hfs_lhsp, Hf_count::pos_integer(), H1_fun::hfs_fun(), H2_fun::hfs_fun()}.
 
 -ifdef(with_export_type_support).
 -export_type([hfs/0]).
@@ -54,7 +53,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc returns a new lhsp hfs with default functions
--spec new(pos_integer()) -> hfs_t().
+-spec new(pos_integer()) -> hfs().
 new(HFCount) ->
     new([fun erlang:adler32/1, fun erlang:md5/1], HFCount).
 
@@ -63,12 +62,12 @@ new(HFCount) ->
 new_feeder({H1, H2}, HFCount) ->
     {[H1, H2], HFCount}.
 
--spec new([hfs_fun(),...], pos_integer()) -> hfs_t().
+-spec new([hfs_fun(),...], pos_integer()) -> hfs().
 new([H1, H2], HFCount) ->
     {hfs_lhsp, HFCount, H1, H2}.
 
 % @doc Applies Val to all hash functions in container HC
--spec apply_val(hfs_t(), itemKey()) -> [non_neg_integer(),...].
+-spec apply_val(hfs(), itemKey()) -> [non_neg_integer(),...].
 apply_val({hfs_lhsp, K, H1, H2}, Val) ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
@@ -76,20 +75,20 @@ apply_val({hfs_lhsp, K, H1, H2}, Val) ->
     util:for_to_ex(0, K - 1, fun(I) -> HV1 + I * HV2 end).
 
 % @doc Applies Val to all hash functions in container HC and returns only remainders
--spec apply_val_rem(hfs_t(), itemKey(), pos_integer()) -> [non_neg_integer(),...].
+-spec apply_val_rem(hfs(), itemKey(), pos_integer()) -> [non_neg_integer(),...].
 apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
     HV2 = hash_value(ValBin, H2),
     util:for_to_ex(0, K - 1, fun(I) -> (HV1 + I * HV2) rem Rem end).
 
--spec apply_val_feeder(hfs_t(), pos_integer(), itemKey())
-        -> {hfs_t(), pos_integer(), itemKey()}.
+-spec apply_val_feeder(hfs(), pos_integer(), itemKey())
+        -> {hfs(), pos_integer(), itemKey()}.
 apply_val_feeder({hfs_lhsp, K, H1, H2}, I, Val) ->
     {{hfs_lhsp, K, H1, H2}, erlang:min(K, I), Val}.
     
 % @doc Apply hash function I to given value; I = 1..hfs_size
--spec apply_val(hfs_t(), pos_integer(), itemKey()) -> non_neg_integer().
+-spec apply_val(hfs(), pos_integer(), itemKey()) -> non_neg_integer().
 apply_val({hfs_lhsp, K, H1, H2}, I, Val) when I =< K ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
@@ -97,7 +96,7 @@ apply_val({hfs_lhsp, K, H1, H2}, I, Val) when I =< K ->
     HV1 + (I - 1) * HV2.
 
 % @doc Returns number of hash functions in the container
--spec size(hfs_t()) -> pos_integer().
+-spec size(hfs()) -> pos_integer().
 size({hfs_lhsp, K, _, _}) ->
     K.
 

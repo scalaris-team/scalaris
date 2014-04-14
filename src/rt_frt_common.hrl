@@ -44,10 +44,14 @@
 
 % The following functions are only used when ?RT == rt_frtchord. Dialyzer should not
 % complain when they are not called.
--export([get_num_active_learning_lookups/1,
-         set_num_active_learning_lookups/2,
-         inc_num_active_learning_lookups/1]).
--export([rt_entry_distance/2, rt_entry_id/1, set_custom_info/2, get_custom_info/1]).
+-compile({nowarn_unused_function,
+          [{get_num_active_learning_lookups, 1},
+           {set_num_active_learning_lookups, 2},
+           {inc_num_active_learning_lookups, 1},
+           {rt_entry_distance, 2},
+           {rt_entry_id, 1},
+           {set_custom_info, 2},
+           {get_custom_info, 1}]}).
 
 % Functions which are to be implemented in modules including this header
 -export([allowed_nodes/1, frt_check_config/0, rt_entry_info/4]).
@@ -56,9 +60,9 @@
 %%% RT Implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type key_t() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
--type external_rt_t_tree() :: gb_trees:tree(NodeId::key_t(), Node::node:node_type()).
--type external_rt_t() :: {Size :: unknown | float(), external_rt_t_tree()}.
+-type key() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
+-type external_rt_t_tree() :: gb_trees:tree(NodeId::key(), Node::node:node_type()).
+-type external_rt() :: {Size :: unknown | float(), external_rt_t_tree()}. %% @todo: make opaque
 
 % define the possible types of nodes in the routing table:
 %  - normal nodes are nodes which have been added by entry learning
@@ -70,9 +74,9 @@
 -record(rt_entry, {
         node :: node:node_type(),
         type :: entry_type(),
-        adjacent_fingers = {undefined, undefined} :: {key_t() |
-                                                        'undefined', key_t() |
-                                                        'undefined'},
+        adjacent_fingers = {undefined, undefined} :: {key() |
+                                                      'undefined', key() |
+                                                      'undefined'},
         custom = undefined :: custom_info()
     }).
 
@@ -81,19 +85,19 @@
 -export_type([rt_entry/0]).
 -endif.
 
--type rt_t_tree() :: gb_trees:tree(NodeId::key_t(), rt_entry()).
+-type rt_t_tree() :: gb_trees:tree(NodeId::key(), rt_entry()).
 -record(rt_t, {
-        source = undefined :: key_t() | undefined
+        source = undefined :: key() | undefined
         , num_active_learning_lookups = 0 :: non_neg_integer()
         , nodes = gb_trees:empty() :: rt_t_tree()
         , nodes_in_ring = unknown :: unknown | float()
         %% , nodes_in_ring = unknown :: Size :: unknown | float()
     }).
 
--type(rt_t() :: #rt_t{}).
+-opaque rt() :: #rt_t{}.
 
 -type custom_message() :: {get_rt, SourcePID :: comm:mypid()}
-                        | {get_rt_reply, RT::rt_t()}
+                        | {get_rt_reply, RT::rt()}
                         | {trigger_random_lookup}
                         | {rt_get_node, From :: comm:mypid()}
                         | {rt_learn_node, NewNode :: node:node_type()}
@@ -130,13 +134,7 @@ init(Neighbors) ->
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(client_key() | binary()) -> key().
-hash_key(Key) -> hash_key_(Key).
-
-%% @doc Hashes the key to the identifier space (internal function to allow
-%%      use in e.g. get_random_node_id without dialyzer complaining about the
-%%      opaque key type).
--spec hash_key_(client_key() | binary()) -> key_t().
-hash_key_(Key) ->
+hash_key(Key) ->
     <<N:128>> = ?CRYPTO_MD5(client_key_to_binary(Key)),
     N.
 %% userdevguide-end rt_frtchord:hash_key
@@ -146,10 +144,10 @@ hash_key_(Key) ->
 -spec get_random_node_id() -> key().
 get_random_node_id() ->
     case config:read(key_creator) of
-        random -> hash_key_(randoms:getRandomString());
+        random -> hash_key(randoms:getRandomString());
         random_with_bit_mask ->
             {Mask1, Mask2} = config:read(key_creator_bitmask),
-            (hash_key_(randoms:getRandomString()) band Mask2) bor Mask1
+            (hash_key(randoms:getRandomString()) band Mask2) bor Mask1
     end.
 %% userdevguide-end rt_frtchord:get_random_node_id
 
@@ -271,29 +269,21 @@ get_size(RT) -> external_rt_get_size(RT).
 
 %% userdevguide-begin rt_frtchord:n
 %% @doc Returns the size of the address space.
--spec n() -> integer().
-n() -> n_().
-%% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
--spec n_() -> 16#100000000000000000000000000000000.
-n_() -> 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF + 1.
+-spec n() -> 16#100000000000000000000000000000000.
+n() -> 16#100000000000000000000000000000000.
 %% userdevguide-end rt_frtchord:n
 
 %% @doc Keep a key in the address space. See n/0.
--spec normalize(Key::key_t()) -> key_t().
+-spec normalize(Key::key()) -> key().
 normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 
 %% @doc Gets the number of keys in the interval (Begin, End]. In the special
 %%      case of Begin==End, the whole key range as specified by n/0 is returned.
 -spec get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
-get_range(Begin, End) -> get_range_(Begin, End).
-
-%% @doc Helper for get_range/2 to make dialyzer happy with internal use of
-%%      get_range/2 in the other methods, e.g. get_split_key/3.
--spec get_range_(Begin::key_t(), End::key_t() | ?PLUS_INFINITY_TYPE) -> number().
-get_range_(Begin, Begin) -> n_(); % I am the only node
-get_range_(?MINUS_INFINITY, ?PLUS_INFINITY) -> n_(); % special case, only node
-get_range_(Begin, End) when End > Begin -> End - Begin;
-get_range_(Begin, End) when End < Begin -> (n_() - Begin) + End.
+get_range(Begin, Begin) -> n(); % I am the only node
+get_range(?MINUS_INFINITY, ?PLUS_INFINITY) -> n(); % special case, only node
+get_range(Begin, End) when End > Begin -> End - Begin;
+get_range(Begin, End) when End < Begin -> (n() - Begin) + End.
 
 %% @doc Gets the key that splits the interval (Begin, End] so that the first
 %%      interval will be (Num/Denom) * range(Begin, End). In the special case of
@@ -305,7 +295,7 @@ get_range_(Begin, End) when End < Begin -> (n_() - Begin) + End.
 get_split_key(Begin, _End, {Num, _Denom}) when Num == 0 -> Begin;
 get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
 get_split_key(Begin, End, {Num, Denom}) ->
-    normalize(Begin + (get_range_(Begin, End) * Num) div Denom).
+    normalize(Begin + (get_range(Begin, End) * Num) div Denom).
 
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and
 %%      calculates a random key in this range. Fails with an exception if there
@@ -585,8 +575,8 @@ empty_ext(_Neighbors) -> {unknown, gb_trees:empty()}.
 
 %% userdevguide-begin rt_frtchord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop_(dht_node_state:state(), key()) -> node:node_type().
-next_hop_(State, Id) ->
+-spec next_hop_node(dht_node_state:state(), key()) -> node:node_type().
+next_hop_node(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
         true -> nodelist:succ(Neighbors);
@@ -609,7 +599,7 @@ next_hop_(State, Id) ->
 
 -spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
 next_hop(State, Id) ->
-    node:pidX(next_hop_(State, Id)).
+    node:pidX(next_hop_node(State, Id)).
 %% userdevguide-end rt_frtchord:next_hop
 
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
@@ -736,7 +726,7 @@ sticky_entry_to_normal_node(EntryKey, RT) ->
 
 
 -spec rt_entry_from(Node::node:node_type(), Type :: entry_type(),
-                    PredId :: key_t(), SuccId :: key_t()) -> rt_entry().
+                    PredId :: key(), SuccId :: key()) -> rt_entry().
 rt_entry_from(Node, Type, PredId, SuccId) ->
     #rt_entry{node=Node , type=Type , adjacent_fingers={PredId, SuccId},
              custom=rt_entry_info(Node, Type, PredId, SuccId)}.
@@ -990,7 +980,7 @@ rt_set_nodes(#rt_t{source=undefined}, _) -> erlang:error(source_node_undefined);
 rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
 
 % @doc Set the size estimate of the ring
--spec rt_set_ring_size(RT :: rt_t(), Size :: unknown | float()) -> rt_t().
+-spec rt_set_ring_size(RT :: rt(), Size :: unknown | float()) -> rt().
 rt_set_ring_size(RT, Size) -> RT#rt_t{nodes_in_ring=Size}.
 
 % @doc Get the ring size estimate from the external routing table
@@ -1018,7 +1008,7 @@ rt_get_node(NodeId, RT)  -> gb_trees:get(NodeId, get_rt_tree(RT)).
 rt_lookup_node(NodeId, RT) -> gb_trees:lookup(NodeId, get_rt_tree(RT)).
 
 % @doc Get the id of a given node
--spec rt_entry_id(Entry :: rt_entry()) -> key_t().
+-spec rt_entry_id(Entry :: rt_entry()) -> key().
 rt_entry_id(Entry) -> node:id(rt_entry_node(Entry)).
 
 %% @doc Check if the given routing table entry is of the given entry type.
@@ -1124,7 +1114,7 @@ check_rt_integrity(#rt_t{} = RT) ->
 %% userdevguide-begin rt_frtchord:wrap_message
 %% @doc Wrap lookup messages.
 %% For node learning in lookups, a lookup message is wrapped with the global Pid of the
--spec wrap_message(Key::key_t(), Msg::comm:message(), State::dht_node_state:state(),
+-spec wrap_message(Key::key(), Msg::comm:message(), State::dht_node_state:state(),
                    Hops::non_neg_integer()) ->
     {'$wrapped', comm:mypid(), comm:message()} | comm:message().
 wrap_message(_Key, Msg, State, 0) -> {'$wrapped', dht_node_state:get(State, node), Msg};
@@ -1136,7 +1126,7 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
             MyId = dht_node_state:get(State, node_id),
             SenderId = node:id(Issuer),
             SenderPid = node:pidX(Issuer),
-            NextHop = next_hop_(State, Key),
+            NextHop = next_hop_node(State, Key),
             SendMsg = case external_rt_get_ring_size(dht_node_state:get(State, rt)) of
                 unknown -> true;
                 RingSize ->

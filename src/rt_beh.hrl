@@ -17,11 +17,6 @@
 %% @end
 %% @version $Id$
 
-% note: define key_t(), rt_t() and external_rt_t() in the RT-implementation!
--type key()::key_t().
--opaque rt()::rt_t().
--type external_rt()::external_rt_t(). %% @todo: make opaque
-
 -include("client_types.hrl").
 
 -ifdef(with_export_type_support).
