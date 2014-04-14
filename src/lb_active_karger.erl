@@ -14,6 +14,7 @@
 
 %% @author Maximilian Michels <michels@zib.de>
 %% @doc Implementation of Karger and Ruhl's item balancing load balancing algorithm.
+%%      Modified to sample N nodes and use gossip information.
 %% @reference D. R. Karger and M. Ruhl,
 %%            "Simple efficient load balancing algorithms for peer-to-peer systems,"
 %%            in Proceedings of the sixteenth annual ACM symposium on Parallelism in algorithms and architectures,
@@ -98,7 +99,8 @@ on({lb_trigger}, State) ->
     gen_component:post_op({trigger_action}, State);
 
 on({trigger_action}, State) ->
-    %% Request N random nodes from cyclon
+    %% Request 1 random node from cyclon
+    %% TODO Request more to have a bigger sample size
     cyclon:get_subset_rand(1),
     State;
 
@@ -147,6 +149,7 @@ process_lb_msg({lb_active, {phase1, Epsilon, NodeX}}, DhtState) ->
 		true ->
 			if
     % first check if load balancing is necessary
+    % TODO gossip here to improve load balancing
 				MyLoad =< Epsilon * LoadX ->
 					?TRACE("My node is light~n", []),
 					balance_adjacent(NodeX, MyLBInfo);
@@ -199,7 +202,7 @@ process_lb_msg({lb_active, {JumpOrSlide, LightNode}}, DhtState) ->
 			comm:send(node:pidX(Node), {move, start_jump, SplitKey, {tag, JumpOrSlide}, LbModule});
 		slide ->
 			Node = get_node(LightNode),
-			comm:send(node:pidX(Node),{move, start_slide, succ, SplitKey, {tag, JumpOrSlide}, LbModule})
+			comm:send(node:pidX(Node), {move, start_slide, succ, SplitKey, {tag, JumpOrSlide}, LbModule})
 	end,
 	DhtState.
 

@@ -24,7 +24,7 @@
 
 -type lb_message() :: {lb_active, comm:message()}.
 
-%% @doc Start this process as a gen component and register it in the dht node group
+%% @doc The load balancing process running inside each dht_node
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     apply(get_lb_module(), start_link, [DHTNodeGroup]).
