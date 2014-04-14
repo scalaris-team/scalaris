@@ -65,6 +65,7 @@
          wait_for_process_to_die/1,
          wait_for_table_to_disappear/2,
          ets_tables_of/1]).
+-export([round/2]).
 
 -export([repeat/3, repeat/4, parallel_run/5]).
 
@@ -1375,3 +1376,9 @@ rrd_combine_slots(DB, CurrentTS, Interval, Epsilon, InitialValue, UpdateValue) -
             {_, Results} -> Results;
             {Interval} -> undefined
         end.
+
+%% @doc Rounds a float according to some precision
+-spec round(Number::float(), Precision::pos_integer()) -> float().
+round(Number, Precision) ->
+    P = pow(10, Precision),
+    erlang:round(Number * P) / P.
