@@ -34,6 +34,9 @@ start_link(DHTNodeGroup) ->
 process_lb_msg(Msg, State) ->
     apply(get_lb_module(), process_lb_msg, [Msg, State]).
 
+get_lb_metric() ->
+    config:read(lb_active_metric).
+
 -spec get_lb_module() -> any() | failed.
 get_lb_module() ->
     config:read(lb_active_module).
@@ -45,4 +48,5 @@ check_config() ->
     config:cfg_is_list(lb_active_modules_avail) andalso
     config:cfg_exists(lb_active_module) andalso
     config:cfg_is_in(lb_active_module, config:read(lb_active_modules_avail)) andalso
+    config:cfg_exists(lb_active_metric) andalso
     apply(get_lb_module(), check_config, []).

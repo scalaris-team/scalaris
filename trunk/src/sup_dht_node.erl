@@ -119,7 +119,6 @@ childs([{DHTNodeGroup, Options}]) ->
     WPool = sup:worker_desc(wpool, wpool, start_link, [DHTNodeGroup, Options]),
 
     lists:flatten([ %% RepUpd may be [] and lists:flatten eliminates this
-                    LBActive,
                     Monitor,
                     Delayer,
                     Reregister,
@@ -137,5 +136,6 @@ childs([{DHTNodeGroup, Options}]) ->
                     MonitorPerf,
                     RepUpdate,
                     Autoscale,
-                    RMLeases
+                    RMLeases,
+                    LBActive
            ]).
