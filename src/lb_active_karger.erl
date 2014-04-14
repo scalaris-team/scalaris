@@ -30,7 +30,6 @@
 %-define(TRACE(X,Y), ok).
 -define(TRACE(X,Y), io:format("lb_active_karger: " ++ X,Y)).
 
-
 -behavior(lb_active_beh).
 
 -export([init/0, check_config/0]).
@@ -45,7 +44,7 @@
                 req_ids          = []                        :: [{integer(), node:node_type()}]
                }).
 
--type(state() :: #state{}).
+-type state() :: #state{}.
 
 -type(my_message() ::
            %% trigger messages
@@ -53,17 +52,17 @@
            %% random node from cyclon
            {cy_cache, [node:node_type()]} |
            %% load response from dht node
-           {my_dht_response, DhtNode :: comm:mypid(), {get_state_response, Load :: lb_info:load()}} |
+           {my_dht_response, DhtNode :: comm:mypid(), {get_state_response, Load :: number()}} |
            %% Result from slide or jump
            dht_node_move:result_message()).
 
 -type options() :: [{epsilon, float()} | {id, integer()} | {simulate} | {reply_to, comm:mypid()}].
 
--type(dht_message() ::
+-type dht_message() ::
 		   %% phase1
 		   {lb_active, phase1, NodeX :: lb_info:lb_info(), options()} |
 		   %% phase2
-		   {lb_active, phase2, HeavyNode :: lb_info:lb_info(), LightNode :: lb_info:lb_info()}).
+		   {lb_active, phase2, HeavyNode :: lb_info:lb_info(), LightNode :: lb_info:lb_info()}.
 
 %%%%%%%%%%%%%%%
 %%  Startup   %

@@ -72,7 +72,14 @@
 
 -type trigger() :: publish_trigger | directory_trigger.
 
--type dht_message() :: none.
+-type message() :: {publish_trigger} |
+                   {post_load, lb_info:lb_info()} |
+                   {directory_trigger} |
+                   {get_state_response, intervals:interval()}.
+
+-type dht_message() :: {lb_active, request_load, pid()} |
+                       {lb_active, before_jump,
+                        HeavyNode::lb_info:lb_info(), LightNode::lb_info:lb_info()}.
 
 
 %%%%%%%%%%%%%%%% Initialization %%%%%%%%%%%%%%%%%%%%%%%
@@ -92,6 +99,7 @@ init() ->
 
 %%%%%%%%%%%%%%%% Process Messages %%%%%%%%%%%%%%%%%%%%%%%
 
+-spec handle_msg(message(), state()) -> state().
 handle_msg({publish_trigger}, State) ->
     trigger(publish_trigger),
     case emergency of %% emergency when load(node) > k_e
