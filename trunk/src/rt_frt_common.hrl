@@ -398,7 +398,7 @@ handle_custom_message({get_rt_reply, RT}, State) ->
 
         false -> OldRT
     end,
-    ?RT:check(OldRT, NewRT, rt_loop:get_neighb(State), true),
+    check(OldRT, NewRT, rt_loop:get_neighb(State), true),
     rt_loop:set_rt(State, NewRT);
 
 % lookup a random key chosen with a pdf:
@@ -406,7 +406,7 @@ handle_custom_message({get_rt_reply, RT}, State) ->
 % where rnd is chosen uniformly from [0,1)
 handle_custom_message({trigger_random_lookup}, State) ->
     RT = rt_loop:get_rt(State),
-    SourceNode = ?RT:get_source_node(RT),
+    SourceNode = get_source_node(RT),
     SourceNodeId = entry_nodeid(SourceNode),
     {PredId, SuccId} = adjacent_fingers(SourceNode),
     Key = get_random_key_from_generator(SourceNodeId, PredId, SuccId),
@@ -564,7 +564,7 @@ next_hop(State, Id) ->
 
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
 %% @doc Converts the internal RT to the external RT used by the dht_node.
-%% The external routing table is optimized to speed up ?RT:next_hop/2. For this, it is
+%% The external routing table is optimized to speed up next_hop/2. For this, it is
 %%  only a gb_tree with keys being node ids and values being of type node:node_type().
 -spec export_rt_to_dht_node_helper(rt()) -> external_rt().
 export_rt_to_dht_node_helper(RT) ->
@@ -934,7 +934,7 @@ rt_entry_distance(From, To) ->
 -spec rt_get_nodes(RT :: rt()) -> [rt_entry()].
 rt_get_nodes(RT) -> gb_trees:values(get_rt_tree(RT)).
 
-% @doc Set the treeof nodes of the routing table.
+% @doc Set the tree of nodes of the routing table.
 -spec rt_set_nodes(RT :: rt(), Nodes :: rt_t_tree()) -> rt().
 rt_set_nodes(#rt_t{source=undefined}, _) -> erlang:error(source_node_undefined);
 rt_set_nodes(#rt_t{} = RT, Nodes) -> RT#rt_t{nodes=Nodes}.
