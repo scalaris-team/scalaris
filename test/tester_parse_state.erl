@@ -123,7 +123,7 @@ has_unknown_types(#parse_state{unknown_types=UnknownTypes}) ->
 get_unknown_types(#parse_state{unknown_types=UnknownTypes}) ->
     case gb_sets:is_set(UnknownTypes) of
         true -> UnknownTypesList = gb_sets:to_list(UnknownTypes),
-                {erlang:length(UnknownTypesList), UnknownTypesList};
+                {gb_sets:size(UnknownTypes), UnknownTypesList};
         _    -> UnknownTypes
     end.
 
@@ -131,7 +131,7 @@ get_unknown_types(#parse_state{unknown_types=UnknownTypes}) ->
 get_atoms(#parse_state{atoms=Atoms}) ->
     case gb_sets:is_set(Atoms) of
         true -> AtomsList = gb_sets:to_list(Atoms),
-                {erlang:length(AtomsList), AtomsList};
+                {gb_sets:size(Atoms), AtomsList};
         _    -> Atoms
     end.
 
@@ -139,7 +139,7 @@ get_atoms(#parse_state{atoms=Atoms}) ->
 get_binaries(#parse_state{binaries=Binaries}) ->
     case gb_sets:is_set(Binaries) of
         true -> BinariesList = gb_sets:to_list(Binaries),
-                {erlang:length(BinariesList), BinariesList};
+                {gb_sets:size(Binaries), BinariesList};
         _    -> Binaries
     end.
 
@@ -147,7 +147,7 @@ get_binaries(#parse_state{binaries=Binaries}) ->
 get_floats(#parse_state{floats=Floats}) ->
     case gb_sets:is_set(Floats) of
         true -> FloatsList = gb_sets:to_list(Floats),
-                {erlang:length(FloatsList), FloatsList};
+                {gb_sets:size(Floats), FloatsList};
         _    -> Floats
     end.
 
@@ -155,7 +155,7 @@ get_floats(#parse_state{floats=Floats}) ->
 get_integers(#parse_state{integers=Integers}) ->
     case gb_sets:is_set(Integers) of
         true -> IntegerList = gb_sets:to_list(Integers),
-                {erlang:length(IntegerList), IntegerList};
+                {gb_sets:size(Integers), IntegerList};
         _    -> Integers
     end.
 
@@ -184,7 +184,7 @@ get_non_neg_integers(#parse_state{non_neg_integers=NonNegIntegers}) ->
 get_strings(#parse_state{non_empty_strings=Strings}) ->
     case gb_sets:is_set(Strings) of
         true -> StringList = ["" | gb_sets:to_list(Strings)],
-                {erlang:length(StringList), StringList};
+                {gb_sets:size(Strings) + 1, StringList};
         _    -> {L, S} = Strings,
                 {L + 1, ["" | S]}
     end.
@@ -193,7 +193,7 @@ get_strings(#parse_state{non_empty_strings=Strings}) ->
 get_non_empty_strings(#parse_state{non_empty_strings=Strings}) ->
     case gb_sets:is_set(Strings) of
         true -> StringsList = gb_sets:to_list(Strings),
-                {erlang:length(StringsList), StringsList};
+                {gb_sets:size(Strings), StringsList};
         _    -> Strings
     end.
 
@@ -249,20 +249,20 @@ finalize(#parse_state{unknown_types=UnknownTypes, atoms=Atoms,
                       binaries=Binaries, integers=Integers, floats=Floats,
                       non_empty_strings=Strings} = ParseState) ->
     IntegersList = gb_sets:to_list(Integers),
-    PosIntegersList = [I || I <- IntegersList, I > 0],
-    NegIntegersList = [I || I <- IntegersList, I < 0],
     NonNegIntegersList = [I || I <- IntegersList, I >= 0],
+    PosIntegersList = [I || I <- NonNegIntegersList, I > 0],
+    NegIntegersList = [I || I <- IntegersList, I < 0],
     UnknownTypesList = gb_sets:to_list(UnknownTypes),
     AtomsList = gb_sets:to_list(Atoms),
     BinariesList = gb_sets:to_list(Binaries),
     FloatsList = gb_sets:to_list(Floats),
     StringsList = gb_sets:to_list(Strings),
-    ParseState#parse_state{unknown_types     = {erlang:length(UnknownTypesList), UnknownTypesList},
-                           atoms             = {erlang:length(AtomsList), AtomsList},
-                           binaries          = {erlang:length(BinariesList), BinariesList},
-                           integers          = {erlang:length(IntegersList), IntegersList},
+    ParseState#parse_state{unknown_types     = {gb_sets:size(UnknownTypes), UnknownTypesList},
+                           atoms             = {gb_sets:size(Atoms), AtomsList},
+                           binaries          = {gb_sets:size(Binaries), BinariesList},
+                           integers          = {gb_sets:size(Integers), IntegersList},
                            pos_integers      = {erlang:length(PosIntegersList), PosIntegersList},
                            neg_integers      = {erlang:length(NegIntegersList), NegIntegersList},
                            non_neg_integers  = {erlang:length(NonNegIntegersList), NonNegIntegersList},
-                           floats            = {erlang:length(FloatsList), FloatsList},
-                           non_empty_strings = {erlang:length(StringsList), StringsList}}.
+                           floats            = {gb_sets:size(Floats), FloatsList},
+                           non_empty_strings = {gb_sets:size(Strings), StringsList}}.
