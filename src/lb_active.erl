@@ -13,7 +13,7 @@
 %   limitations under the License.
 
 %% @author Maximilian Michels <michels@zib.de>
-%% @doc Active load balancing bootstrap module
+%% @doc Active load balancing core module
 %% @version $Id$
 -module(lb_active).
 -author('michels@zib.de').
@@ -36,7 +36,7 @@
 %% for db monitoring
 -export([init_db_monitors/2, update_db_monitor/2]).
 %% Metrics
--export([get_load_metric/0]).
+-export([get_load_metric/0, get_request_metric/0]).
 % Load Balancing
 -export([balance_nodes/3, balance_nodes/4, balance_noop/1]).
 
@@ -63,10 +63,12 @@
 
 -type options() :: [tuple()].
 
--type metric() :: items | cpu | mem | db_reads | db_writes | db_requests | transactions | tx_latency | net_throughput.
+-type load_metric() :: items | cpu | mem | tx_latency | net_throughput.
+-type request_metric() :: db_reads | db_writes | db_requests.
 
 %% available metrics
--define(METRICS, [items, cpu, mem, db_reads, db_writes, db_requests, transactions, tx_latency, net_throughput]).
+-define(LOAD_METRICS, [items, cpu, mem, db_reads, db_writes, db_requests, transactions, tx_latency, net_throughput]). 
+-define(REQUEST_METRICS, [db_reads, db_writes, db_requests, net_throughput, net_latency]).
 
 %% list of active load balancing modules available
 -define(MODULES, [lb_active_karger, lb_active_directories]).
@@ -154,9 +156,9 @@ on({collect_stats}, State) ->
                {total_memory, TotalMemory}] ->
                   FreeMemory / TotalMemory * 100
           end,
-    monitor:client_monitor_set_value(lb_active, cpu10sec, fun(Old) -> rrd:add_now(CPU, Old) end),
+    monitor:client_monitor_set_value(lb_active, cpu, fun(Old) -> rrd:add_now(CPU, Old) end),
     %monitor:client_monitor_set_value(lb_active, cpu5min, fun(Old) -> rrd:add_now(CPU, Old) end),
-    monitor:client_monitor_set_value(lb_active, mem10sec, fun(Old) -> rrd:add_now(MEM, Old) end),
+    monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end),
     %monitor:client_monitor_set_value(lb_active, mem5min, fun(Old) -> rrd:add_now(MEM, Old) end),
     State;
 
@@ -180,10 +182,14 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     ItemsStdDev = gossip_load:load_info_get(stddev, LoadInfo),
     ItemsAvg = gossip_load:load_info_get(avgLoad, LoadInfo),
     Metrics =
-        case gossip_load:load_info_get(other, LoadInfo) of %% TODO automatically enable gossip when laod metric other than items is active
-            [] -> [{avg, ItemsAvg}, {stddev, ItemsStdDev}];
-            _ -> [{avg, gossip_load:load_info_other_get(avgLoad, gossip_load_lb_metric, LoadInfo)},
-                  {stddev, gossip_load:load_info_other_get(stddev, gossip_load_lb_metric, LoadInfo)}]
+        case config:read(lb_active_gossip_balance_metric) of %% TODO automatically enable gossip when laod metric other than items is active
+            items ->
+                [{avg, ItemsAvg},
+                 {stddev, ItemsStdDev}];
+            requests ->
+                GossipModule = lb_active_gossip_request_metric,
+                [{avg, gossip_load:load_info_other_get(avgLoad, GossipModule, LoadInfo)},
+                 {stddev, gossip_load:load_info_other_get(stddev, GossipModule, LoadInfo)}]
         end,
     OptionsNew = [{dht_size, Size} | Metrics ++ Options],
 
@@ -447,25 +453,46 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                     true  -> slide;
                     false -> jump
                 end,
-            ProposedTargetLoad = lb_info:get_target_load(JumpOrSlide, MyNode, LightNode),
-            TargetLoad =
-                case gossip_available(Options) of
-                    true -> AvgItems = proplists:get_value(avg, Options),
-                            %% don't take away more items than the average
-                            ?IIF(ProposedTargetLoad > AvgItems, AvgItems, ProposedTargetLoad);
-                    false -> ProposedTargetLoad
-                end,
-            {From, To, Direction} =
-                case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
-                    true  -> %% Jump or heavy node is succ of light node
-                        {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward}; %% TODO node_id-1 ?
-                    false -> %% Light node is succ of heavy node
-                        {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
-                end,
-            {SplitKey, TakenLoad} = dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction),
-            ?TRACE("SplitKey: ~p TargetLoad: ~p TakenLoad: ~p~n", [SplitKey, TargetLoad, TakenLoad]),
+
+                ProposedTargetLoad = lb_info:get_target_load(JumpOrSlide, MyNode, LightNode),
+
+                TargetLoad =
+                    case gossip_available(Options) of
+                        true -> AvgItems = proplists:get_value(avg, Options),
+                                %% don't take away more items than the average
+                                ?IIF(ProposedTargetLoad > AvgItems,
+                                     trunc(AvgItems), ProposedTargetLoad);
+                        false -> ProposedTargetLoad
+                    end,
+
+                {From, To, Direction} =
+                    case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
+                        true  -> %% Jump or heavy node is succ of light node
+                            {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id) -1, forward}; %% TODO node_id-1 ?
+                        false -> %% Light node is succ of heavy node
+                            {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
+                    end,
+
+                {SplitKey, TakenLoad} =
+                    case config:read(lb_active_balance_metric) of
+                        items ->
+                            dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction);
+                        none ->
+                            dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction);
+                        requests ->
+                            case get_request_histogram_split_key(TargetLoad, Direction, lb_info:get_time(HeavyNode)) of
+                                %% TODO fall back in a more clever way / abort lb request
+                                failed ->
+                                    ?TRACE("get_request_histogram failed~n", []),
+                                    dht_node_state:get_split_key(DhtState, From, To, 0, Direction);
+                                Val -> Val
+                            end
+                    end,
+
+                ?TRACE("SplitKey: ~p TargetLoad: ~p TakenLoad: ~p~n", [SplitKey, TargetLoad, TakenLoad]),
 
             case is_simulation(Options) of
+
                 true -> %% compute result of simulation and reply
                     ReqId = proplists:get_value(simulate, Options),
                     LoadChange =
@@ -476,6 +503,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                     ReplyTo = proplists:get_value(reply_to, Options),
                     Id = proplists:get_value(id, Options),
                     comm:send(ReplyTo, {simulation_result, Id, ReqId, LoadChange});
+
                 false -> %% perform balancing
                     StdDevTest =
                         case gossip_available(Options) of
@@ -521,6 +549,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                             comm:send_local(LBModule, {balance_phase1, Op})
                     end
             end
+
     end,
     DhtState;
 
@@ -540,7 +569,7 @@ init_db_monitors(MyId, MyRange) ->
                 case intervals:in(?MINUS_INFINITY, MyRange) andalso MyRange =/= intervals:all() of
                     false ->
                         {histogram, HistogramSize};
-                    true -> %% we need a normalized histogram because of the key space overflow
+                    true -> %% we need a normalized histogram because of the circular key space
                         NormFun =
                             fun(Val) ->
                                     case Val - MyId of
@@ -560,10 +589,9 @@ init_db_monitors(MyId, MyRange) ->
             {MegaSecs, Secs, _Microsecs} = os:timestamp(),
             %% synchronize the start time for all monitors to a divisible of the monitor interval
             StartTime = {MegaSecs, Secs - Secs rem MonitorResSecs + MonitorResSecs, 0},
-            Reads  = rrd:create_timed(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
-            Writes = rrd:create_timed(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
+            Reads  = rrd:create(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
+            Writes = rrd:create(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
             Monitor = pid_groups:get_my(monitor),
-            %% TODO not really necessary just wait for all values to disappear
             monitor:proc_clear_value(lb_active, db_reads),
             monitor:proc_clear_value(lb_active, db_writes),
             monitor:clear_rrds(Monitor, [{lb_active, db_reads}, {lb_active, db_writes}]),
@@ -579,14 +607,8 @@ init_db_monitors(MyId, MyRange) ->
                        (Type::items, Value::non_neg_integer())   -> ok.
 update_db_monitor(Type, Value) ->
     case monitor_db() of
-        true ->
-%%             if
-%%                 Type =:= reads orelse Type =:= writes ->
-%%                     %% TODO Normalize key because histogram might contain circular elements, e.g. [MAXVAL, 0, 1]
-%%
-%%             end,
-            monitor:proc_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
-            %monitor:monitor_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
+        true -> monitor:proc_set_value(lb_active, Type,
+                                       fun(Old) -> rrd:add_now(Value, Old) end);
         _ -> ok
     end.
 
@@ -594,18 +616,18 @@ update_db_monitor(Type, Value) ->
 init_stats() ->
     case collect_stats() of
         true ->
-            Interval = config:read(lb_active_monitor_resolution),
+            Resolution = config:read(lb_active_monitor_resolution),
             %LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
-            ShortTerm = rrd:create(Interval * 1000, 5, gauge),
             %monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
-            monitor:client_monitor_set_value(lb_active, cpu10sec, ShortTerm),
             %monitor:client_monitor_set_value(lb_active, mem5min, LongTerm),
-            monitor:client_monitor_set_value(lb_active, mem10sec, ShortTerm);
+            ShortTerm = rrd:create(Resolution * 1000, 5, gauge),
+            monitor:client_monitor_set_value(lb_active, cpu, ShortTerm),
+            monitor:client_monitor_set_value(lb_active, mem, ShortTerm);
         _ ->
             ok
     end.
 
-%% initially checks if enough metric data has been collected
+%% @doc initially checks if enough metric data has been collected
 -spec monitor_vals_appeared() -> boolean().
 monitor_vals_appeared() ->
     Metric = config:read(lb_active_metric),
@@ -621,10 +643,9 @@ monitor_vals_appeared() ->
             end
     end.
 
+%% @doc checks if the load balancing is in the data collection phase
 -spec collect_phase() -> boolean().
 collect_phase() ->
-    %% TODO CollectPhase config to be removed
-    %CollectPhase = config:read(lb_active_collect_init_phase),
     History = config:read(lb_active_monitor_history),
     Resolution = config:read(lb_active_monitor_resolution),
     CollectPhase = History * Resolution,
@@ -635,33 +656,55 @@ collect_phase() ->
 
 -spec get_load_metric() -> items | number().
 get_load_metric() ->
-    Metric = config:read(lb_active_metric),
+    Metric = config:read(lb_active_load_metric),
     Value = case get_load_metric(Metric) of
-        unknown -> 0;
-        Val -> Val
-    end,
+                unknown -> 0;
+                Val -> Val
+            end,
     io:format("Load: ~p~n", [Value]),
     Value. %%TODO
 
--spec get_load_metric(metric()) -> items | number(). %% unknwon shouldn't happen here, in theory it can TODO
+-spec get_load_metric(load_metric()) -> items | number(). %% unknwon shouldn't happen here, in theory it can TODO
 get_load_metric(Metric) ->
     get_load_metric(Metric, normal).
 
--spec get_load_metric(metric(), normal | strict) -> unknown | items | number().
+-spec get_load_metric(load_metric(), normal | strict) -> unknown | items | number().
 get_load_metric(Metric, Mode) ->
-            case Metric of
-                cpu          -> get_vm_metric({lb_active, cpu10sec}, Mode) / 100;
-                mem          -> get_vm_metric({lb_active, mem10sec}, Mode) / 100;
-                db_reads     -> get_dht_metric({lb_active, db_reads}, Mode);
-                db_writes    -> get_dht_metric({lb_active, db_writes}, Mode);
-                db_requests  -> get_load_metric(db_reads, Mode) + get_load_metric(db_writes, Mode); %% TODO
-                %tx_latency   -> get_dht_metric({api_tx, req_list}, avg, Mode);
-                %transactions -> get_dht_metric({api_tx, req_list}, count, Mode);
-                items        -> items;
-                _            -> throw(metric_not_available)
+    case Metric of
+        cpu          -> get_vm_metric({lb_active, cpu}, Mode) / 100;
+        mem          -> get_vm_metric({lb_active, mem}, Mode) / 100;
+        %net_latency  ->
+        %net_bandwith ->
+        %tx_latency   -> get_dht_metric({api_tx, req_list}, avg, Mode);
+        %transactions -> get_dht_metric({api_tx, req_list}, count, Mode);
+        items        -> items;
+        _            -> throw(metric_not_available)
     end.
 
--spec get_vm_metric(metric(), normal | strict) -> unknown | number().
+-spec get_request_metric() -> ok.
+get_request_metric() ->
+    Metric = config:read(lb_active_request_metric),
+    Value = case get_request_metric(Metric) of
+                unknown -> 0;
+                Val -> Val
+            end,
+    io:format("Requests: ~p~n", [Value]),
+    Value.
+
+-spec get_request_metric(request_metric()) -> ok.
+get_request_metric(Metric) ->
+    get_request_metric(Metric, normal).
+
+-spec get_request_metric(request_metric(), normal | strict) -> ok.
+get_request_metric(Metric, Mode) ->
+    case Metric of
+        db_reads -> get_dht_metric({lb_active, db_reads}, Mode);
+        db_writes -> get_dht_metric({lb_active, db_writes}, Mode)
+        %db_requests  -> get_request_metric(db_reads, Mode) +
+        %                get_request_metric(db_writes, Mode); %% TODO
+    end.
+
+-spec get_vm_metric(load_metric() | request_metric(), normal | strict) -> unknown | number().
 get_vm_metric(Metric, Mode) ->
     ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
     get_metric(ClientMonitorPid, Metric, Mode).
@@ -724,6 +767,37 @@ avg_weighted([unknown | Other], Weight, N, Sum) ->
 avg_weighted([Element | Other], Weight, N, Sum) ->
     avg_weighted(Other, Weight - 1, N + Weight, Sum + Weight * Element).
 
+-spec get_request_histogram_split_key(TargetLoad::pos_integer(),
+                                      Direction::forward | backward,
+                                      erlang:timestamp())
+        -> {?RT:key(), TakenLoad::non_neg_integer()} | failed.
+get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
+    MonitorPid = pid_groups:get_my(monitor),
+    RequestMetric = config:read(lb_active_request_metric),
+    case monitor:get_rrds(MonitorPid, [{lb_active, RequestMetric}]) of
+        undefined ->
+            log:log(warn, "No request histogram available because no rrd is available."),
+            failed;
+        RRD ->
+            case rrd:get_value(RRD, Time) of
+                undefined ->
+                    log:log(warn, "No request histogram available. Time slot not found."),
+                    failed;
+                Histogram ->
+                    {Status, Key, TakenLoad} =
+                        case {histogram_normalized:is_normalized(Histogram), Direction} of
+                            {true, forward} -> histogram_normalized:foldl_until(TargetLoad, Histogram);
+                            {true, backward} -> histogram_normalized:foldr_until(TargetLoad, Histogram);
+                            {false, forward} -> histogram:foldl_until(TargetLoad, Histogram);
+                            {false, backward} -> histogram:foldr_until(TargetLoad, Histogram)
+                        end,
+                    case {Status, Direction} of
+                        {fail, _} -> failed;
+                        {ok, _} -> {Key, TakenLoad}
+                    end
+            end
+    end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec call_module(atom(), list()) -> state().
@@ -734,17 +808,19 @@ call_module(Fun, Args) ->
 get_lb_module() ->
     config:read(lb_active_module).
 
+%% TODO!
 -spec collect_stats() -> boolean().
 collect_stats() ->
     Metrics = [cpu, mem, db_reads, db_writes, db_requests, transactions],
-    lists:member(config:read(lb_active_metric), Metrics).
+    lists:member(config:read(lb_active_load_metric), Metrics).
 
+% TODO!
 -spec monitor_db() -> boolean().
 monitor_db() ->
     %case erlang:get(monitor_db) of
     %    undefined ->
             Metrics = [db_reads, db_writes, db_requests],
-            Status = lists:member(config:read(lb_active_metric), Metrics).
+            Status = lists:member(config:read(lb_active_load_metric), Metrics).
    %         erlang:put(monitor_db, Status),
    %         Status;
    %     Val -> Val
@@ -762,34 +838,35 @@ trigger(Trigger) ->
 %% @doc config check registered in config.erl
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_in(lb_active_module, ?MODULES) andalso
+    config:cfg_is_in(lb_active_module, ?MODULES) and
 
-    config:cfg_is_integer(lb_active_interval) andalso
-    config:cfg_is_greater_than(lb_active_interval, 0) andalso
+    config:cfg_is_integer(lb_active_interval) and
+    config:cfg_is_greater_than(lb_active_interval, 0) and
 
-    config:cfg_is_in(lb_active_metric, ?METRICS) andalso
+    config:cfg_is_in(lb_active_load_metric, ?LOAD_METRICS) and
 
-    config:cfg_is_bool(lb_active_use_gossip) andalso
-    config:cfg_is_greater_than(lb_active_gossip_stddev_threshold, 0) andalso
+    config:cfg_is_in(lb_active_request_metric, ?REQUEST_METRICS) and
 
-    config:cfg_is_integer(lb_active_histogram_size) andalso
-    config:cfg_is_greater_than(lb_active_histogram_size, 0) andalso
+    config:cfg_is_in(lb_active_balance_metric, [items, requests]) and
 
-    config:cfg_is_integer(lb_active_monitor_resolution) andalso
-    config:cfg_is_greater_than(lb_active_monitor_resolution, 0) andalso
+    config:cfg_is_bool(lb_active_use_gossip) and
+    config:cfg_is_greater_than(lb_active_gossip_stddev_threshold, 0) and
 
-    config:cfg_is_integer(lb_active_monitor_interval) andalso
-    config:cfg_is_greater_than(lb_active_monitor_interval, 0) andalso
+    config:cfg_is_integer(lb_active_histogram_size) and
+    config:cfg_is_greater_than(lb_active_histogram_size, 0) and
 
-    config:cfg_is_less_than(lb_active_monitor_interval, config:read(lb_active_monitor_resolution)) andalso
+    config:cfg_is_integer(lb_active_monitor_resolution) and
+    config:cfg_is_greater_than(lb_active_monitor_resolution, 0) and
 
-    config:cfg_is_integer(lb_active_monitor_history) andalso
-    config:cfg_is_greater_than(lb_active_monitor_history, 0) andalso
+    config:cfg_is_integer(lb_active_monitor_interval) and
+    config:cfg_is_greater_than(lb_active_monitor_interval, 0) and
 
-    config:cfg_is_integer(lb_active_collect_init_phase) andalso
-    config:cfg_is_greater_than(lb_active_collect_init_phase, 0) andalso
+    config:cfg_is_less_than(lb_active_monitor_interval, config:read(lb_active_monitor_resolution)) and
 
-    config:cfg_is_integer(lb_active_wait_for_pending_ops) andalso
-    config:cfg_is_greater_than(lb_active_wait_for_pending_ops, 0) andalso
+    config:cfg_is_integer(lb_active_monitor_history) and
+    config:cfg_is_greater_than(lb_active_monitor_history, 0) and
 
-    apply(get_lb_module(), check_config, []).
+    config:cfg_is_integer(lb_active_wait_for_pending_ops) and
+    config:cfg_is_greater_than(lb_active_wait_for_pending_ops, 0) and
+
+    call_module(check_config, []).
