@@ -458,7 +458,7 @@ count_dbsize(Key) ->
 get_db_status() ->
     DBSize = erlang:get(?DBSizeKey),
     Ring = statistics:get_ring_details(),
-    Stored = statistics:get_total_load(Ring),
+    Stored = statistics:get_total_load(load, Ring),
     {DBSize, Stored, DBSize - Stored, count_outdated()}.
 
 -spec get_symmetric_keys(pos_integer()) -> [?RT:key()].

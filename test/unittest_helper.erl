@@ -668,7 +668,7 @@ end.
 -spec check_ring_load(ExpLoad::pos_integer()) -> true | no_return().
 check_ring_load(ExpLoad) ->
     Ring = statistics:get_ring_details(),
-    Load = statistics:get_total_load(Ring),
+    Load = statistics:get_total_load(load, Ring),
     ?equals(Load, ExpLoad).
 
 -spec check_ring_data() -> boolean().

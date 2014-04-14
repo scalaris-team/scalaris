@@ -20,7 +20,7 @@
 -vsn('$Id$').
 
 -export([get_ring_details/0, get_ring_details_neighbors/1,
-         get_total_load/1, get_average_load/1, get_load_std_deviation/1,
+         get_total_load/2, get_average_load/2, get_load_std_deviation/2,
          get_average_rt_size/1, get_rt_size_std_deviation/1,
          get_memory_usage/1, get_max_memory_usage/1,
          getTimingMonitorStats/3, getGaugeMonitorStats/4]).
@@ -33,15 +33,18 @@
 
 -type ring_element() :: {ok, Details::node_details:node_details()} | {failed, comm:mypid()}.
 -type ring() :: [ring_element()].
+-type load() :: load | load2 | load3.
+-type load_type() :: node_details:load() | node_details:load2() | node_details:load3().
 
--spec get_total_load(Ring::ring()) -> node_details:load().
-get_total_load(Ring) ->
-    lists:foldl(fun (X, Sum) -> X + Sum end, 0, lists:map(fun get_load/1, Ring)).
+-spec get_total_load(Which::load(), Ring::ring()) -> load_type().
+get_total_load(Which, Ring) ->
+    lists:foldl(fun (X, Sum) -> X + Sum end, 0,
+                lists:map(fun(Node) -> get_load(Which, Node) end, Ring)).
 
--spec get_average_load(Ring::ring()) -> float().
-get_average_load(Ring) ->
+-spec get_average_load(Which::load(), Ring::ring()) -> float().
+get_average_load(Which, Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    get_total_load(FilteredRing) / length(FilteredRing).
+    get_total_load(Which, FilteredRing) / length(FilteredRing).
 
 -spec get_memory_usage(Ring::ring()) -> float().
 get_memory_usage(Ring) ->
@@ -54,19 +57,20 @@ get_max_memory_usage(Ring) ->
     lists:foldl(fun (X, Sum) -> erlang:max(X, Sum) end, 0,
                 lists:map(fun get_memory/1, Ring)).
 
--spec get_load_std_deviation(Ring::ring()) -> float().
-get_load_std_deviation(Ring) ->
+-spec get_load_std_deviation(Which::load(), Ring::ring()) -> float().
+get_load_std_deviation(Which, Ring) ->
     FilteredRing = lists:filter(fun (X) -> is_valid(X) end, Ring),
-    Average = get_average_load(FilteredRing),
+    Average = get_average_load(Which, FilteredRing),
     math:sqrt(lists:foldl(fun (Load, Acc) ->
                                    Acc + (Load - Average) * (Load - Average)
                           end, 0,
-                          lists:map(fun get_load/1, FilteredRing)) / length(FilteredRing)).
+                          lists:map(fun(Node) -> get_load(Which, Node) end,
+                                    FilteredRing)) / length(FilteredRing)).
 
--spec get_load(ring_element()) -> node_details:load().
-get_load({ok, Details}) ->
-    node_details:get(Details, load);
-get_load({failed, _}) ->
+-spec get_load(Which::load(), ring_element()) -> node_details:load().
+get_load(Which, {ok, Details}) ->
+    node_details:get(Details, Which);
+get_load(_Which, {failed, _}) ->
     0.
 
 -spec get_memory(ring_element()) -> node_details:memory().
