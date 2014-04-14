@@ -1135,11 +1135,11 @@ previous_or_current(State) when is_atom(State) orelse is_integer(State) ->
                             init -> true;
                             uninit -> false
                         end,
+    PrevInitialized = state_get(prev_state, State) =/= unknown,
     HasConverged = has_converged(convergence_count_best_values(), State),
-    Round = state_get(round, State),
     _BestValue =
         case (not CurrentInitialized) orelse (not HasConverged) of
-            true when Round =/= 0 -> state_get(prev_state, State);
+            true when PrevInitialized -> state_get(prev_state, State);
             true -> State;
             false -> State
         end.
