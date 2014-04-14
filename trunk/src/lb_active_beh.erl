@@ -35,7 +35,7 @@
 
 %% callbacks
 
--callback init(Args::list()) -> state().
+-callback init() -> state().
 
 -callback handle_msg(comm:message(), state())
         -> state().
@@ -51,7 +51,7 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
     [
-     {init, 1},
+     {init, 0},
      % handle msg from lb_active module
      {handle_msg, 2},
      % process lb message at dht node
