@@ -31,17 +31,15 @@
 %% TODO add more...
 %% TODO type specs
 
-%% new load balancing modules have to be added here
--type state() :: lb_active_karger:state() | lb_active_directories:state().
-
 %% callbacks
+
+-type state() :: term().
 
 -callback init() -> state().
 
--callback handle_msg(comm:message(), state())
-        -> state().
+-callback handle_msg(comm:message(), state()) -> state().
 
--callback handle_dht_msg(lb_active:lb_message(), dht_node_state:state())
+-callback handle_dht_msg(comm:message(), dht_node_state:state())
         -> dht_node_state:state().
 
 -callback get_web_debug_kv(state()) -> [{string(), string()}].

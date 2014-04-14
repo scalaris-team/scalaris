@@ -40,11 +40,9 @@
 % Load Balancing
 -export([balance_nodes/3, balance_nodes/4, balance_noop/1]).
 
--type lb_message() :: comm:message(). %% TODO more specific?
-
--type module_state() :: tuple(). %% TODO more specific
-
--type state() :: module_state(). %% state of lb module
+-ifdef(with_export_type_support).
+-export_type([dht_message/0]).
+-endif.
 
 -record(lb_op, {id = ?required(id, lb_op)                           :: uid:global_uid(),
                 type = ?required(type, lb_op)                       :: slide_pred | slide_succ | jump,
@@ -62,6 +60,15 @@
 -type lb_op() :: #lb_op{}.
 
 -type options() :: [tuple()].
+
+-type dht_message() :: {lb_active, reset_db_monitors} |
+                       {lb_active, balance,
+                        HeavyNode::lb_info:lb_info(), LightNode::lb_info:lb_info(),
+                        LightNodeSucc::lb_info:lb_info(), options()}.
+
+-type module_state() :: tuple().
+
+-type state() :: module_state().
 
 -type load_metric() :: items | cpu | mem | tx_latency | net_throughput.
 -type request_metric() :: db_reads | db_writes | db_requests.
@@ -340,6 +347,7 @@ on(Msg, State) ->
 
 %%%%%%%%%%%%%%%%%%%%%%% Load Balancing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec balance_nodes(lb_info:lb_info(), lb_info:lb_info(), options()) -> ok.
 balance_nodes(HeavyNode, LightNode, Options) ->
     balance_nodes(HeavyNode, LightNode, nil, Options).
 
@@ -424,7 +432,7 @@ is_simulation(Options) ->
 %%%%%%%%%%%%%%%%%%%%%%%% Calls from dht_node %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Process load balancing messages sent to the dht node
--spec handle_dht_msg(lb_message(), dht_node_state:state()) -> dht_node_state:state().
+-spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
 
 handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
     MyRange = dht_node_state:get(DhtState, my_range),
@@ -654,6 +662,7 @@ get_load_metric() ->
     Metric = config:read(lb_active_load_metric),
     Value = case get_load_metric(Metric) of
                 unknown -> 0.0;
+                items -> items;
                 Val -> util:round(Val, 2)
             end,
     io:format("Load: ~p~n", [Value]),
@@ -821,7 +830,7 @@ monitor_db() ->
     %case erlang:get(monitor_db) of
     %    undefined ->
             Metrics = [db_reads, db_writes, db_requests],
-            Status = lists:member(config:read(lb_active_request_metric), Metrics).
+            _Status = lists:member(config:read(lb_active_request_metric), Metrics).
    %         erlang:put(monitor_db, Status),
    %         Status;
    %     Val -> Val

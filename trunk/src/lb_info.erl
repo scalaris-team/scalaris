@@ -31,7 +31,7 @@
 -export([get_load_change_slide/4, get_load_change_jump/5]).
 -export([get_oldest_data_time/1]).
 
--type(load() :: number()).
+-type load() :: number().
 
 -record(lb_info, {load  = unknown                   :: unknown | load(),
                   reqs  = unknown                   :: unknown | load(),
@@ -41,7 +41,7 @@
                   time  = os:timestamp()            :: erlang:timestamp()
                  }).
 
--opaque(lb_info() :: #lb_info{}).
+-opaque lb_info() :: #lb_info{}.
 
 -ifdef(with_export_type_support).
 -export_type([lb_info/0]).
@@ -62,14 +62,25 @@ new(NodeDetails) ->
              node  = node_details:get(NodeDetails, node),
              succ  = node_details:get(NodeDetails, succ)}.
 
--spec get_load(LBInfo::lb_info()) -> load() | node:node_type().
+-spec get_load(LBInfo::lb_info()) -> load().
 get_load (#lb_info{load  = Load }) -> Load.
+
+-spec get_reqs(LBInfo::lb_info()) -> load().
 get_reqs (#lb_info{reqs  = Requests}) -> Requests.
+
+-spec get_items(LBInfo::lb_info()) -> load().
 get_items(#lb_info{items = Items}) -> Items.
+
+-spec get_node(LBInfo::lb_info()) -> node:node_type().
 get_node (#lb_info{node  = Node }) -> Node.
+
+-spec get_succ(LBInfo::lb_info()) -> node:node_type().
 get_succ (#lb_info{succ  = Succ }) -> Succ.
+
+-spec get_time(LBInfo::lb_info()) -> erlang:timestamp().
 get_time (#lb_info{time  = Time }) -> Time.
 
+-spec is_succ(Node1::lb_info(), Node2::lb_info()) -> boolean().
 is_succ(Succ, Node) ->
     get_succ(Node) =:= get_node(Succ).
 
