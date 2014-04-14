@@ -404,7 +404,15 @@ on({work_phase_done, ClientPid, Key, Op,
                   _ -> ?value
               end,
     T5 = case ValType of
-             ?not_found -> state_set_decided(T4, ?ok);
+             ?not_found ->
+                 case Op of
+                     {?sublist, _, _} ->
+                         state_set_decided(T4, ?fail);
+                     ?random_from_list ->
+                         state_set_decided(T4, ?fail);
+                     _ ->
+                         state_set_decided(T4, ?ok)
+                 end;
              ?value -> state_set_decided(T4, ?ok)
          end,
     set_and_inform_client(ClientPid, T5, 1, Table, ValType),
