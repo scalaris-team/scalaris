@@ -73,7 +73,7 @@
 -type histogram_type() :: histogram:histogram() | histogram_normalized:histogram().
 -type timing_type() :: {Sum::number(), Sum2::number(), Count::pos_integer(), Min::number(), Max::number(), Hist::histogram:histogram()}.
 -type event_type(T) :: [{internal_time(), T}].
--type data_type() :: gauge_type() | counter_type() | timing_type() | event_type(term()).
+-type data_type() :: gauge_type() | counter_type() | histogram_type() | timing_type() | event_type(term()).
 
 -record(rrd, {slot_length   = ?required(rrd, slot_length)   :: timespan(),
               count         = ?required(rrd, count)         :: pos_integer(),
