@@ -40,6 +40,7 @@ all()   -> [
             write2_read2,
             multi_write,
             write_test_race_mult_rings,
+            ops_on_not_found,
             read_write_2old,
             read_write_2old_locked,
             read_write_notfound,
@@ -402,6 +403,74 @@ write_test(Config) ->
     ?equals_pattern_w_note(FirstWriteTime, X when X =< 1000000,
        "We need more than a second to become operational?!"),
     ?equals_pattern(SecondWriteTime, X when X =< 1000000).
+
+-spec ops_on_not_found(Config::[tuple()]) -> ok.
+ops_on_not_found(_Config) ->
+    %% perform operations on non existing key (TLog of that) and
+    %% check for the return values
+    %% also documents expected behaviour a bit
+    {NotFoundTLog,_} = api_tx:read(api_tx:new_tlog(), "a"),
+
+    [ ?equals_w_note(api_tx:req_list(NotFoundTLog, [Req]),
+                     {ExpectedTLog, ExpectedRes},
+                     Note)
+      || {Req, {ExpectedTLog, ExpectedRes}, Note} <-
+             [{ {read, "a"},
+                % {[{76,"a",-1,84,0,78,78}],[{fail,not_found}]} }
+                {[{?read,"a",-1,?ok,0,?value_dropped,?value_dropped}],
+                 [{fail,not_found}]},
+                "read_failed"
+              },
+              { {read, "a", random_from_list},
+                {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
+                 [{fail,not_found}]},
+                "random_from_list_failed"
+              },
+              { {read, "a", {sublist, 1, 2}},
+                {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
+                 [{fail,not_found}]},
+                "sublist_failed"
+              },
+              { {write, "a", 7},
+                %% {77,"a",-1,84,0,75,7}
+                {[{?write,"a",-1,?ok,0,?value,7}],
+                 [{ok}]},
+                "write_failed"
+              },
+              { {add_del_on_list, "a", [7], [8]},
+                %% {77,\"a\",-1,84,0,75,<<131,107,0,1,7>>}]
+                {[{?write,"a",-1,?ok,0,?value,term_to_binary([7])}],
+                 [{ok}]},
+                "add_del_on_list_failed"
+              },
+              { {add_del_on_list, "a", 7, 8},
+                %% {77,\"a\",-1,84,0,75,<<131,107,0,1,7>>}]
+                {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
+                 [{fail, not_a_list}]},
+                "add_del_on_list_type_mismatch_failed"
+              },
+              { {add_on_nr, "a", 7},
+                %% {77,\"a\",-1,84,0,75,7}]
+                {[{?write,"a",-1,?ok,0,?value,7}],
+                 [{ok}]},
+                "add_on_nr_failed"
+              },
+              { {add_on_nr, "a", [7]},
+                %% {77,\"a\",-1,84,0,75,7}]
+                {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
+                 [{fail, not_a_number}]},
+                "add_on_nr_type_mismatch_failed"
+              },
+              { {test_and_set, "a", 0, 7},
+                %% {77,\"a\",-1,84,0,75,7}]
+                {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
+                 [{fail,not_found}]},
+                "test_and_set_failed"
+              }
+             ]
+    ],
+
+    ok.
 
 -spec read_write_2old(Config::[tuple()]) -> ok.
 read_write_2old(_Config) ->
