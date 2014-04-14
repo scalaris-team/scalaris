@@ -255,16 +255,15 @@ on({balance_phase2b, Op, ReplyPid}, State) ->
                     TargetKey = Op#lb_op.target,
                                 set_pending_op(Op),
                     ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
+                    MyDHT = pid_groups:get_my(dht_node),
+                    ?DBG_ASSERT(Pid =:= comm:make_global(MyDHT)),
                     case Op#lb_op.type of
                         jump ->
-                            %% TODO could be replaced with send_local and comm:this() with self().
-                            %% probably better to let the node slide/jump for itself.
-                            %% revert changes in dht_node_move also...
-                            comm:send(Pid, {move, start_jump, TargetKey, {jump, OpId}, comm:this()});
+                            comm:send_local(MyDHT, {move, start_jump, TargetKey, {jump, OpId}, self()});
                         slide_pred ->
-                            comm:send(Pid, {move, start_slide, pred, TargetKey, {slide_pred, OpId}, comm:this()});
+                            comm:send_local(MyDHT, {move, start_slide, pred, TargetKey, {slide_pred, OpId}, self()});
                         slide_succ ->
-                            comm:send(Pid, {move, start_slide, succ, TargetKey, {slide_succ, OpId}, comm:this()})
+                            comm:send_local(MyDHT, {move, start_slide, succ, TargetKey, {slide_succ, OpId}, self()})
                     end
             end
     end,
