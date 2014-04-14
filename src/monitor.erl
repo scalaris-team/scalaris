@@ -125,11 +125,6 @@ monitor_set_value(Process, Key, NewValue_or_UpdateFun) ->
     MyMonitor = pid_groups:get_my(monitor),
     comm:send_local(MyMonitor, {report_single, Process, Key, NewValue_or_UpdateFun}).
 
-%% % TODO
-%% monitor_get_value(Process, Key) ->
-%%     MyMonitor = pid_groups:get_my(monitor).
-%%     %comm:send_local(MyMonitor, Msg).
-
 %% @doc Advances the stored timeslots of the value at Key inside the current
 %%      process (if necessary) to the current time.
 %%      If a new time slot is started by updating the value, then the rrd()
