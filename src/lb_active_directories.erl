@@ -34,7 +34,7 @@
 %% implements
 -export([init/0, check_config/0]).
 -export([handle_msg/2, handle_dht_msg/2]).
--export([get_web_debug_key_value/1]).
+-export([get_web_debug_kv/1]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -348,7 +348,7 @@ dir_clear_load(Directory) ->
 -spec dir_is_empty(directory()) -> boolean().
 dir_is_empty(Directory) ->
     Pool = Directory#directory.pool,
-    gb_sets:size(Pool) =:= 0.
+    gb_sets:is_empty(Pool).
 
 %%%%%%%%%%%%%% Reassignments %%%%%%%%%%%%%%%%%%%%%
 
@@ -398,9 +398,9 @@ trigger(Trigger) ->
     Interval = config:read(lb_active_interval),
     msg_delay:send_trigger(Interval div 1000, {Trigger}).
 
--spec get_web_debug_key_value(state()) -> [{string(), string()}].
-get_web_debug_key_value(State) ->
-    [{"state", webhelpers:html_pre(State)}].
+-spec get_web_debug_kv(state()) -> [{string(), string()}].
+get_web_debug_kv(State) ->
+    [{"state", webhelpers:html_pre("~p", State)}].
 
 -spec check_config() -> boolean().
 check_config() ->

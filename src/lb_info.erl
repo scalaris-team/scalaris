@@ -98,5 +98,5 @@ get_dht_metric(Process, Key) ->
     get_metric(MonitorPid, Process, Key).
 
 get_metric(MonitorPid, Process, Key) ->
-    [{lb_active, Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, Key}]),
+    [{Process, Key, RRD}] = monitor:get_rrds(MonitorPid, [{Process, Key}]),
     _Value = rrd:get_value_by_offset(RRD, 0).

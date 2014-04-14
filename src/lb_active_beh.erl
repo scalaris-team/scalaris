@@ -57,7 +57,7 @@ behaviour_info(callbacks) ->
      % process lb message at dht node
      {handle_dht_msg, 2},
      % returns key / value list to be shown in web debug interface
-     {get_web_debug_key_value, 1},
+     {get_web_debug_kv, 1},
      % config check performed by lb_active.erl 
      {check_config, 0}
     ];
