@@ -210,7 +210,7 @@ directory_routine(DirKey, Type, Schedule) ->
     %% node.
     %% TODO Some preference should be given to neighboring
     %%      nodes to avoid too many jumps.
-    {TLog, Directory} = get_directory(DirKey),
+    {_TLog, Directory} = get_directory(DirKey),
     case dir_is_empty(Directory) of
         true -> Schedule; %% TODO why return old schedule here?
         false ->
@@ -219,7 +219,7 @@ directory_routine(DirKey, Type, Schedule) ->
             {LowerBound, UpperBound} = case Type of
                     periodic ->
                         %% clear directory only for periodic
-                        NewDirectory = dir_clear_load(Directory),
+                        %NewDirectory = dir_clear_load(Directory),
                         clear_directory(Directory),
                         %% TODO calculate threshold according to metric
                         %% From paper:
