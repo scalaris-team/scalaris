@@ -34,7 +34,7 @@
 -export([process_lb_msg/2, check_config/0]).
 
 -behavior(gen_component).
--export([init/1, on/2, start_link/1]).
+-export([init/1, on/2]).
 
 -compile([export_all]).
 
@@ -43,6 +43,10 @@
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
+
+%% Defines the number of directories
+%% e.g. 1 means a central directory
+-define(NUM_DIRECTORIES, 5).
 
 -record(node, {pid      = ?required(node, pid)  :: comm:mypid(),
                load     = ?required(node, load) :: number(),
@@ -67,21 +71,14 @@
 
 -type dht_message() :: none.
 
--define(HASH(K), api_dht:hash_key(K)).
--define(NUM_DIRECTORIES, 5).
-
--spec start_link(pid_groups:groupname()) -> {ok, pid()}.
-start_link(DHTNodeGroup) ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
-                             [{pid_groups_join_as, DHTNodeGroup, lb_active_directories}]).
-
 init([]) ->
     trigger(publish_trigger),
     trigger(directory_trigger),
     request_dht_range(),
+    This = comm:this(),
     rm_loop:subscribe(
-       self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_filter/3,
-       fun(_,_,_,_) -> request_dht_range() end, inf),
+       self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_slide_filter/3,
+       fun(_,_,_,_) -> comm:send_local(self(), {get_state, This, my_range}) end, inf),
     #state{}.
 
 on({publish_trigger}, State) ->
@@ -100,7 +97,7 @@ on({get_state_response, MyRange}, State) ->
     State#state{my_dirs = MyDirectories};
 
 on(Msg, State) ->
-    ?TRACE("Unknown message: ~p~n", []),
+    ?TRACE("Unknown message: ~p~n", [Msg]),
     State.
 
 %% @doc Load balancing messages received by the dht node.
@@ -144,7 +141,7 @@ get_random_directory() ->
 
 -spec get_directory_by_number(pos_integer()) -> ?RT:key().
 get_directory_by_number(N) when N > 0 ->
-    ?HASH("lb_active_dir" ++ int_to_str(N)).
+    ?RT:hash_key("lb_active_dir" ++ int_to_str(N)).
 
 directory_init_val() -> [].
 
@@ -158,7 +155,7 @@ int_to_str(N) ->
 
 -spec trigger(trigger()) -> ok.
 trigger(Trigger) ->
-    Interval = config:read(lb_active_trigger),
+    Interval = config:read(lb_active_interval),
     msg_delay:send_trigger(Interval div 1000, {Trigger}).
 
 -spec check_config() -> boolean().
