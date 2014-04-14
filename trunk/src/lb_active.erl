@@ -36,7 +36,7 @@
 %% for db monitoring
 -export([init_db_monitors/0, update_db_monitor/2]).
 %% Metrics
--export([get_load_metric/0, get_load_metric/1, default_value/0]).
+-export([get_load_metric/0, get_load_metric/1]).
 % Load Balancing
 -export([balance_nodes/3, balance_nodes/4, balance_noop/1]).
 
@@ -60,6 +60,8 @@
                }).
 
 -type lb_op() :: #lb_op{}.
+
+-type options() :: [tuple()].
 
 -type metric() :: items | cpu | mem | db_reads | db_writes | db_requests | transactions | tx_latency | net_throughput.
 
@@ -154,15 +156,14 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     {gossip_get_values_best_response, LoadInfo}}, State) ->
     %% check the load balancing configuration by using
     %% the standard deviation from the gossip process.
-
     Size = gossip_load:load_info_get(size, LoadInfo),
     ItemsStdDev = gossip_load:load_info_get(stddev, LoadInfo),
     ItemsAvg = gossip_load:load_info_get(avgLoad, LoadInfo),
     Metrics =
         case gossip_load:load_info_get(other, LoadInfo) of
             [] -> [{avg, ItemsAvg}, {stddev, ItemsStdDev}];
-            _ -> [{stddev, gossip_load:load_info_other_get(stddev, gossip_load_lb_metric, LoadInfo)},
-                  {avg, gossip_load:load_info_other_get(avgLoad, gossip_load_lb_metric, LoadInfo)}]
+            _ -> [{avg, gossip_load:load_info_other_get(avgLoad, gossip_load_lb_metric, LoadInfo)},
+                  {stddev, gossip_load:load_info_other_get(stddev, gossip_load_lb_metric, LoadInfo)}]
         end,
     OptionsNew = [{dht_size, Size} | Metrics ++ Options],
 
@@ -230,7 +231,9 @@ on({balance_phase2b, Op, ReplyPid}, State) ->
                     ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
                     case Op#lb_op.type of
                         jump ->
-                            %% TODO replace with send_local
+                            %% TODO could be replaced with send_local and comm:this() with self().
+                            %% probably better to let the node slide/jump for itself.
+                            %% revert changes in dht_node_move also...
                             comm:send(Pid, {move, start_jump, TargetKey, {jump, OpId}, comm:this()});
                         slide_pred ->
                             comm:send(Pid, {move, start_slide, pred, TargetKey, {slide_pred, OpId}, comm:this()});
@@ -319,7 +322,7 @@ on(Msg, State) ->
 balance_nodes(HeavyNode, LightNode, Options) ->
     balance_nodes(HeavyNode, LightNode, nil, Options).
 
-%% TODO -spec balance_nodes(lb_info:lb_info(), lb_info:lb_info()) -> ok.
+-spec balance_nodes(lb_info:lb_info(), lb_info:lb_info(), lb_info:lb_info() | nil, options()) -> ok.
 balance_nodes(HeavyNode, LightNode, LightNodeSucc, Options) ->
     case config:read(lb_active_use_gossip) of
         true -> %% Retrieve global info from gossip before balancing
@@ -333,6 +336,7 @@ balance_nodes(HeavyNode, LightNode, LightNodeSucc, Options) ->
             comm:send(HeavyPid, {lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options})
     end.
 
+-spec balance_noop(options()) -> ok.
 %% no op but we sent back simulation results
 balance_noop(Options) ->
     case proplists:get_value(simulate, Options) of
@@ -380,12 +384,24 @@ old_data(Op) ->
     DataTime = Op#lb_op.data_time,
     timer:now_diff(LastBalanceTime, DataTime) > 0.
 
+-spec get_time_last_balance() -> erlang:timestamp().
 get_time_last_balance() ->
     erlang:get(time_last_balance).
 
+-spec set_time_last_balance() -> ok.
 set_time_last_balance() ->
     erlang:put(time_last_balance, os:timestamp()),
     ok.
+
+-spec gossip_available(options()) -> boolean().
+gossip_available(Options) ->
+    proplists:is_defined(dht_size, Options) andalso
+        proplists:is_defined(avg, Options) andalso
+        proplists:is_defined(stddev, Options).
+
+-spec is_simulation(options()) -> boolean().
+is_simulation(Options) ->
+    proplists:is_defined(simulate, Options).
 
 %%%%%%%%%%%%%%%%%%%%%%%% Calls from dht_node %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -396,18 +412,25 @@ set_time_last_balance() ->
 %% In either case, we'll compute the target id and send out
 %% the jump or slide message to the LightNode.
 handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options}, DhtState) ->
-    %% TODO check for active state here before doing anything?
+    %% check if we are the correct node
     case lb_info:get_node(HeavyNode) =/= dht_node_state:get(DhtState, node) of
         true -> ?TRACE("I was mistaken for the HeavyNode. Doing nothing~n", []), ok;
         false ->
-            %% TODO What are the benefits/disadvantages of getting the load info again?
+            %% get our load info again to have the newest data available
             MyNode = lb_info:new(dht_node_state:details(DhtState)),
             JumpOrSlide = %case lb_info:neighbors(MyNode, LightNode) of
-                          case LightNodeSucc =:= nil of
-                              true  -> slide;
-                              false -> jump
-                          end,
-            TargetLoad = lb_info:get_target_load(JumpOrSlide, MyNode, LightNode),
+                case LightNodeSucc =:= nil of
+                    true  -> slide;
+                    false -> jump
+                end,
+            ProposedTargetLoad = lb_info:get_target_load(JumpOrSlide, MyNode, LightNode),
+            TargetLoad =
+                case gossip_available(Options) of
+                    true -> AvgItems = proplists:get_value(avg, Options),
+                            %% don't take away more items than the average
+                            ?IIF(ProposedTargetLoad > AvgItems, AvgItems, ProposedTargetLoad);
+                    false -> ProposedTargetLoad
+                end,
             {From, To, Direction} =
                 case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
                     true  -> %% Jump or heavy node is succ of light node
@@ -417,31 +440,40 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                 end,
             {SplitKey, TakenLoad} = dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction),
             ?TRACE("SplitKey: ~p TargetLoad: ~p TakenLoad: ~p~n", [SplitKey, TargetLoad, TakenLoad]),
-            %% Report TakenLoad in case of simulation or exec load balancing decision
-            case proplists:get_value(simulate, Options) of
-                 undefined ->
-                     ItPaysOff = %% this is a verbose name
-                         case proplists:is_defined(dht_size, Options) of
-                             %% gossip information available
-                             true ->
-                                 S = config:read(lb_active_gossip_stddev_threshold),
-                                 DhtSize = proplists:get_value(dht_size, Options),
-                                 %Avg = proplists:get_value(avg, Options), %% TODO AVG?
-                                 StdDev = proplists:get_value(stddev, Options),
-                                 Variance = StdDev * StdDev,
-                                 VarianceChange =
-                                     case JumpOrSlide of
-                                         slide -> lb_info:get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode);
-                                         jump -> lb_info:get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc)
-                                     end,
-                                 VarianceNew = Variance + VarianceChange,
-                                 StdDevNew = ?IIF(VarianceNew > 0, math:sqrt(VarianceNew), StdDev),
-                                 ?TRACE("New StdDev: ~p Old StdDev: ~p~n", [StdDevNew, StdDev]),
-                                 StdDevNew < StdDev * (1 - S / DhtSize);
-                             %% gossip not available, skipping this test
-                             false -> true
-                         end,
-                     case ItPaysOff of
+
+            case is_simulation(Options) of
+                true -> %% compute result of simulation and reply
+                    ReqId = proplists:get_value(simulate, Options),
+                    LoadChange =
+                        case JumpOrSlide of
+                            slide -> lb_info:get_load_change_slide(TakenLoad, HeavyNode, LightNode);
+                            jump  -> lb_info:get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc)
+                        end,
+                    ReplyTo = proplists:get_value(reply_to, Options),
+                    Id = proplists:get_value(id, Options),
+                    comm:send(ReplyTo, {simulation_result, Id, ReqId, LoadChange});
+                false -> %% perform balancing
+                    StdDevTest =
+                        case gossip_available(Options) of
+                            %% gossip information available
+                            true ->
+                                S = config:read(lb_active_gossip_stddev_threshold),
+                                DhtSize = proplists:get_value(dht_size, Options),
+                                StdDev = proplists:get_value(stddev, Options),
+                                Variance = StdDev * StdDev,
+                                VarianceChange =
+                                    case JumpOrSlide of
+                                        slide -> lb_info:get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode);
+                                        jump -> lb_info:get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc)
+                                    end,
+                                VarianceNew = Variance + VarianceChange,
+                                StdDevNew = ?IIF(VarianceNew >= 0, math:sqrt(VarianceNew), StdDev),
+                                ?TRACE("New StdDev: ~p Old StdDev: ~p~n", [StdDevNew, StdDev]),
+                                StdDevNew < StdDev * (1 - S / DhtSize);
+                            %% gossip not available, skipping this test
+                            false -> true
+                        end,
+                    case StdDevTest of
                         false -> ?TRACE("No balancing: stddev was not reduced enough.~n", []);
                         true ->
                             ?TRACE("Sending out lb op.~n", []),
@@ -463,16 +495,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                                         data_time = OldestDataTime},
                             LBModule = pid_groups:get_my(?MODULE),
                             comm:send_local(LBModule, {balance_phase1, Op})
-                      end;
-                ReqId -> %% compute result of simulation and reply
-                    LoadChange =
-                        case JumpOrSlide of
-                            slide -> lb_info:get_load_change_slide(TakenLoad, HeavyNode, LightNode);
-                            jump  -> lb_info:get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc)
-                        end,
-                    ReplyTo = proplists:get_value(reply_to, Options),
-                    Id = proplists:get_value(id, Options),
-                    comm:send(ReplyTo, {simulation_result, Id, ReqId, LoadChange})
+                    end
             end
     end,
     DhtState;
@@ -543,18 +566,13 @@ monitor_vals_appeared() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_load_metric() -> unknown | items | number().
+-spec get_load_metric() -> items | number().
 get_load_metric() ->
     Metric = config:read(lb_active_metric),
     case get_load_metric(Metric) of
-        unknown -> io:format("Unknown metric.~n"), 0;
+        unknown -> 0; %% no monitor data available due to inactivity of this node
         Val -> Val
     end.
-
--define(DEFAULT(Val, Default), case Val of
-                         unknown -> Default;
-                         Val -> Val
-                     end).
 
 -spec get_load_metric(metric()) -> unknown | items | number().
 get_load_metric(Metric) ->
@@ -607,12 +625,6 @@ get_value_type(Value, avg) when is_tuple(Value) ->
         element(1, Value) / element(3, Value)
     catch
         error:badarith -> unknown
-    end.
-
-%% TODO
-default_value() ->
-    case config:read(lb_active_metric) of
-        db_reads -> 0
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
