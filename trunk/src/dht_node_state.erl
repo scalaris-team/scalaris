@@ -261,7 +261,9 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         node         -> nodelist:node(rm_loop:get_neighbors(RMState));
         node_id      -> nodelist:nodeid(rm_loop:get_neighbors(RMState));
         join_time    -> JoinTime;
-        load         -> db_dht:get_load(DB);
+        load         -> db_dht:get_load(DB)
+                        %% and the prbr kv entries:
+                            + prbr:get_load(PRBRState);
         prbr_kv_db   -> PRBRState;
         txid_db1     -> TxIdDB1;
         txid_db2     -> TxIdDB2;
