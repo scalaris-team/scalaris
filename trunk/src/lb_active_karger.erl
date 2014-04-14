@@ -38,7 +38,11 @@
 -export([get_web_debug_kv/1]).
 
 -record(state, {epsilon          = ?required(state, epsilon) :: float(),
-                rnd_node         = nil                       :: node:node_type() | nil
+                rnd_node         = []                        :: [node:node_type()],
+                best_candidate   = nil                       :: {LoadChange::non_neg_integer(), lb_info:lb_info()},
+                round_id         = 0                         :: non_neg_integer(),
+                my_lb_info       = nil                       :: lb_info:lb_info(),
+                req_ids          = []                        :: [{integer(), node:node_type()}]
                }).
 
 -type(state() :: #state{}).
@@ -53,13 +57,13 @@
            %% Result from slide or jump
            dht_node_move:result_message()).
 
+-type options() :: [{epsilon, float()} | {id, integer()} | {simulate} | {reply_to, comm:mypid()}].
+
 -type(dht_message() ::
 		   %% phase1
-		   {lb_active, phase1, Epsilon :: float(), NodeX :: lb_info:lb_info()} |
+		   {lb_active, phase1, NodeX :: lb_info:lb_info(), options()} |
 		   %% phase2
 		   {lb_active, phase2, HeavyNode :: lb_info:lb_info(), LightNode :: lb_info:lb_info()}).
-		   %% TODO final phase (handled by lb_active module)
-		   %{lb_active, balance_with, LightNode :: lb_info:lb_info()}).
 
 %%%%%%%%%%%%%%%
 %%  Startup   %
@@ -81,7 +85,8 @@ handle_msg({lb_trigger}, State) ->
     msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
     %% Request 1 random node from cyclon
     %% TODO Request more to have a bigger sample size
-    cyclon:get_subset_rand(1),
+    NumNodes = config:read(lb_active_karger_rnd_nodes),
+    cyclon:get_subset_rand(NumNodes),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -94,19 +99,107 @@ handle_msg({cy_cache, []}, State) ->
     State;
 
 %% Got a random node via cyclon
-handle_msg({cy_cache, [RandomNode]}, State) ->
+handle_msg({cy_cache, RandomNodes}, State) ->
     ?TRACE("Got random node~n", []),
+    MyDhtNode = pid_groups:get_my(dht_node),
     Envelope = comm:reply_as(comm:this(), 2, {my_dht_response, '_'}),
-    comm:send(comm:this(), {get_node_details, Envelope}, [{group_member, dht_node}]),
-    State#state{rnd_node = RandomNode};
+    comm:send_local(MyDhtNode, {get_node_details, Envelope}),
+    State#state{rnd_node = RandomNodes};
 
 %% Got load from my node
 handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) ->
 	?TRACE("Received node details for own node~n", []),
-	RndNode = State#state.rnd_node,
+	RandomNodes = State#state.rnd_node,
 	Epsilon = State#state.epsilon,
-	comm:send(node:pidX(RndNode), {lb_active, phase1, Epsilon, lb_info:new(NodeDetails)}, [{?quiet}]),
-	State#state{rnd_node = nil}.
+    %% If we deal only with one random node, we don't have
+    %% any choice but to go to the next phase.
+    %% Otherwise, we ask all random nodes for their load 
+    %% and calculate the load changes before going to the 
+    %% next phase.
+    MyLBInfo = lb_info:new(NodeDetails),
+    Id = randoms:getRandomInt(), %%uid:get_global_uid(),
+    Options = [{id, Id}, {epsilon, Epsilon}],
+    case RandomNodes of
+        [RndNode] ->
+            comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, Options}, [{?quiet}]),
+            State#state{rnd_node = nil};
+        RndNodes ->
+            ReqIds =
+                [begin
+                      ReqId = randoms:getRandomInt(),
+                      ?TRACE("Sending out simulate request with ReqId ~p to ~p~n", [ReqId, RndNode]),
+                      OptionsNew = [{simulate, ReqId}, {reply_to, comm:this()}] ++ Options,
+                      comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, OptionsNew},
+                                [{shepherd, self()}]),
+                      {ReqId, RndNode}
+                 end || RndNode <- RndNodes],
+            %% TODO Parameter in config
+            %% don't wait too long for the responses
+            %%WaitTime = config:read(lb_active_interval) div 1000 div 2,
+            msg_delay:send_local(3, self(), {decide_and_go_to_phase1, Id}),
+            State#state{round_id = Id, my_lb_info = MyLBInfo, req_ids = ReqIds}
+    end;
+
+%% phase0 load change send errors
+handle_msg({send_error, _Pid, {lb_active, phase1, _, Options}, _Reason}, State) ->
+    ?TRACE("Send error in simulation phase ~n", []),
+    ReqIds = State#state.req_ids,
+    ThisReqId = proplists:get_value(simulate, Options),
+    Id = proplists:get_value(id, Options),
+    ReqIdsNew = proplists:delete(ThisReqId, ReqIds),
+    case ReqIdsNew of
+                [] -> comm:send_local(self(), {decide_and_go_to_phase1, Id});
+                _  -> ok
+    end,
+    State#state{req_ids = ReqIdsNew};
+
+%% collect all the load change responses and save the best candidate
+handle_msg({simulation_result, Id, ThisReqId, LoadChange}, State) ->
+    ?TRACE("Received load change ~p in round ~p~n", [LoadChange, Id]),
+    case State#state.round_id of
+        Id ->
+            BestLoadChange =
+                case State#state.best_candidate of
+                    {LoadChangeBest, _BestLBInfo} -> LoadChangeBest;
+                    nil -> 0
+                end,
+            ReqIds = State#state.req_ids,
+            ReqIdsNew = proplists:delete(ThisReqId, ReqIds),
+            io:format("ThisReqId: ~p~n", [ThisReqId]),
+            io:format("ReqIdsNew: ~p~n", [ReqIdsNew]),
+            case ReqIdsNew of
+                [] -> comm:send_local(self(), {decide_and_go_to_phase1, Id});
+                _  -> ok
+            end,
+            NodeX = proplists:get_value(ThisReqId, ReqIds),
+            case LoadChange < BestLoadChange of
+                    true  -> State#state{req_ids = ReqIdsNew, best_candidate = {LoadChange, NodeX}};
+                    false -> State#state{req_ids = ReqIdsNew}
+            end;
+        _ ->
+           ?TRACE("Discarding old round with Id ~p~n", [Id]),
+           State
+    end;
+
+handle_msg({decide_and_go_to_phase1, Id}, State) ->
+    ?TRACE("Deciding in round ~p~n",[Id]),
+    case State#state.round_id of
+        Id ->
+            case State#state.best_candidate of
+                {_BestLoadChange, BestCandidate} ->
+                    BestPid = node:pidX(BestCandidate),
+                    Epsilon = State#state.epsilon,
+                    MyLBInfo = State#state.my_lb_info,
+                    ?TRACE("Sending out decision in round ~p: LoadChange: ~p LBInfo: ~p~n", [Id, _BestLoadChange, MyLBInfo]),
+                    Options = [{id, Id}, {epsilon, Epsilon}],
+                    comm:send(BestPid, {lb_active, phase1, MyLBInfo, Options});
+                _ -> ?TRACE("No best candidate in Round ~p~n", [Id])
+            end,
+            State#state{best_candidate = nil, round_id = nil}; % TODO state cleaning?
+        _ ->
+            ?TRACE("Old decision message for round ~p~n", [Id]),
+            State
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  Static methods called by dht_node message handler  %
@@ -117,23 +210,25 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
 %% load balancing is necessary. If so, we'll try to balance
 %% assuming the two nodes are neighbors. If not we'll contact
 %% the light node's successor for more load information.
-handle_dht_msg({lb_active, phase1, Epsilon, NodeX}, DhtState) ->
+handle_dht_msg({lb_active, phase1, NodeX, Options}, DhtState) ->
+    Epsilon = proplists:get_value(epsilon, Options),
 	MyLBInfo = lb_info:new(dht_node_state:details(DhtState)),
 	MyLoad = lb_info:get_load(MyLBInfo),
 	LoadX = lb_info:get_load(NodeX),
 	case MyLoad =/= 0 orelse LoadX =/= 0 of
 		true ->
 			if
-    % first check if load balancing is necessary
-    % TODO gossip here to improve load balancing
+                % first check if load balancing is necessary
+                % TODO gossip here to improve load balancing
 				MyLoad =< Epsilon * LoadX ->
 					?TRACE("My node is light~n", []),
-					balance_adjacent(NodeX, MyLBInfo);
+					balance_adjacent(NodeX, MyLBInfo, Options);
 				LoadX =< Epsilon * MyLoad ->
 					?TRACE("My node is heavy~n", []),
-					balance_adjacent(MyLBInfo, NodeX);
+					balance_adjacent(MyLBInfo, NodeX, Options);
 				true ->
 					%% no balancing
+                    lb_active:balance_noop(Options),
 					?TRACE("Won't balance~n", [])
 			end;
 		_ -> ok
@@ -144,16 +239,18 @@ handle_dht_msg({lb_active, phase1, Epsilon, NodeX}, DhtState) ->
 %% more load than the HeavyNode. If so, we'll slide with the
 %% LightNode. Otherwise we instruct the HeavyNode to set up
 %% a jump operation with the Lightnode.
-handle_dht_msg({lb_active, phase2, HeavyNode, LightNode}, DhtState) ->
+handle_dht_msg({lb_active, phase2, HeavyNode, LightNode, Options}, DhtState) ->
 	?TRACE("In phase 2~n", []),
 	MyLBInfo = lb_info:new(dht_node_state:details(DhtState)),
 	MyLoad = lb_info:get_load(MyLBInfo),
 	LoadHeavyNode = lb_info:get_load(HeavyNode),
 	case MyLoad > LoadHeavyNode of
 		true ->
-			balance_adjacent(MyLBInfo, LightNode);
+            % slide
+            lb_active:balance_nodes(HeavyNode, LightNode, Options);
 		_ ->
-            lb_active:balance_nodes(LightNode, HeavyNode)
+            % jump
+            lb_active:balance_nodes(HeavyNode, LightNode, MyLBInfo, Options)
 	end,
 	DhtState.
 
@@ -162,26 +259,26 @@ handle_dht_msg({lb_active, phase2, HeavyNode, LightNode}, DhtState) ->
 %%%%%%%%%%%%%%%%%%%%
 
 %% @doc Balance if the two nodes are adjacent, otherwise ask the light node's neighbor
--spec balance_adjacent(lb_info:lb_info(), lb_info:lb_info()) -> ok.
-balance_adjacent(HeavyNode, LightNode) ->
+-spec balance_adjacent(lb_info:lb_info(), lb_info:lb_info(), options()) -> ok.
+balance_adjacent(HeavyNode, LightNode, Options) ->
 	case lb_info:is_succ(HeavyNode, LightNode) of
 		 %orelse node_details:get(HeavyNode, node) =:= node_details:get(LightNode, pred) of
 		true ->
 			% neighbors, thus sliding
 			?TRACE("We're neighbors~n", []),
             %% slide in phase1 or phase2
-            lb_active:balance_nodes(LightNode, HeavyNode);
+            lb_active:balance_nodes(HeavyNode, LightNode, Options);
 		_ ->
 			% ask the successor of the light node how much load he carries
 			?TRACE("Nodes not adjacent, requesting information about neighbors~n", []),
             LightNodeSucc = lb_info:get_succ(LightNode),
-			comm:send(node:pidX(LightNodeSucc), {lb_active, phase2, HeavyNode, LightNode})
+			comm:send(node:pidX(LightNodeSucc), {lb_active, phase2, HeavyNode, LightNode, Options})
 	end.
 
 %% @doc Key/Value List for web debug
 -spec get_web_debug_kv(state()) -> [{string(), string()}].
 get_web_debug_kv(State) ->
-    [{"state", webhelpers:html_pre(State)}].
+    [{"state", webhelpers:html_pre("~p", [State])}].
 
 -spec get_base_interval() -> pos_integer().
 get_base_interval() ->
@@ -189,8 +286,8 @@ get_base_interval() ->
 
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(lb_active_interval) andalso
-    config:cfg_is_greater_than(lb_active_interval, 0) andalso
     config:cfg_is_float(lb_active_karger_epsilon) andalso
     config:cfg_is_greater_than(lb_active_karger_epsilon, 0.0) andalso
-    config:cfg_is_less_than(lb_active_karger_epsilon, 0.25).
+    config:cfg_is_less_than(lb_active_karger_epsilon, 0.25) andalso
+    config:cfg_is_integer(lb_active_karger_rnd_nodes) andalso
+    config:cfg_is_greater_than_equal(lb_active_karger_rnd_nodes, 1).
