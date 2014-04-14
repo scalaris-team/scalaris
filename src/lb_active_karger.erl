@@ -55,11 +55,11 @@
 
 -type(dht_message() ::
 		   %% phase1
-		   {lb_active, {phase1, Epsilon :: float(), NodeX :: lb_info:lb_info()}} |
+		   {lb_active, phase1, Epsilon :: float(), NodeX :: lb_info:lb_info()} |
 		   %% phase2
-		   {lb_active, {phase2, HeavyNode :: lb_info:lb_info(), LightNode :: lb_info:lb_info()}} |
-		   %% final phase
-		   {lb_active, {balance_with, LightNode :: lb_info:lb_info()}}).
+		   {lb_active, phase2, HeavyNode :: lb_info:lb_info(), LightNode :: lb_info:lb_info()}).
+		   %% TODO final phase (handled by lb_active module)
+		   %{lb_active, balance_with, LightNode :: lb_info:lb_info()}).
 
 %%%%%%%%%%%%%%%
 %%  Startup   %
@@ -105,7 +105,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
 	?TRACE("Received node details for own node~n", []),
 	RndNode = State#state.rnd_node,
 	Epsilon = State#state.epsilon,
-	comm:send(node:pidX(RndNode), {lb_active, {phase1, Epsilon, lb_info:new(NodeDetails)}}, [{?quiet}]),
+	comm:send(node:pidX(RndNode), {lb_active, phase1, Epsilon, lb_info:new(NodeDetails)}, [{?quiet}]),
 	State#state{rnd_node = nil}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,7 +117,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
 %% load balancing is necessary. If so, we'll try to balance
 %% assuming the two nodes are neighbors. If not we'll contact
 %% the light node's successor for more load information.
-handle_dht_msg({phase1, Epsilon, NodeX}, DhtState) ->
+handle_dht_msg({lb_active, phase1, Epsilon, NodeX}, DhtState) ->
 	MyLBInfo = lb_info:new(dht_node_state:details(DhtState)),
 	MyLoad = lb_info:get_load(MyLBInfo),
 	LoadX = lb_info:get_load(NodeX),
@@ -144,7 +144,7 @@ handle_dht_msg({phase1, Epsilon, NodeX}, DhtState) ->
 %% more load than the HeavyNode. If so, we'll slide with the
 %% LightNode. Otherwise we instruct the HeavyNode to set up
 %% a jump operation with the Lightnode.
-handle_dht_msg({phase2, HeavyNode, LightNode}, DhtState) ->
+handle_dht_msg({lb_active, phase2, HeavyNode, LightNode}, DhtState) ->
 	?TRACE("In phase 2~n", []),
 	MyLBInfo = lb_info:new(dht_node_state:details(DhtState)),
 	MyLoad = lb_info:get_load(MyLBInfo),
@@ -153,8 +153,7 @@ handle_dht_msg({phase2, HeavyNode, LightNode}, DhtState) ->
 		true ->
 			balance_adjacent(MyLBInfo, LightNode);
 		_ ->
-			Node = lb_info:get_node(HeavyNode),
-			comm:send(node:pidX(Node), {lb_active, {balance_with, LightNode}})
+            lb_active:balance_nodes(LightNode, HeavyNode)
 	end,
 	DhtState.
 
@@ -164,20 +163,19 @@ handle_dht_msg({phase2, HeavyNode, LightNode}, DhtState) ->
 
 %% @doc Balance if the two nodes are adjacent, otherwise ask the light node's neighbor
 -spec balance_adjacent(lb_info:lb_info(), lb_info:lb_info()) -> ok.
-balance_adjacent(HeavyNodeDetails, LightNodeDetails) ->
-	HeavyNode = lb_info:get_node(HeavyNodeDetails),
-	LightNodeSucc = lb_info:get_succ(LightNodeDetails),
-	case HeavyNode =:= LightNodeSucc of
+balance_adjacent(HeavyNode, LightNode) ->
+	case lb_info:is_succ(HeavyNode, LightNode) of
 		 %orelse node_details:get(HeavyNode, node) =:= node_details:get(LightNode, pred) of
 		true ->
 			% neighbors, thus sliding
 			?TRACE("We're neighbors~n", []),
             %% slide in phase1 or phase2
-			comm:send(node:pidX(HeavyNode), {lb_active, {balance_with, LightNodeDetails}});
+            lb_active:balance_nodes(LightNode, HeavyNode);
 		_ ->
 			% ask the successor of the light node how much load he carries
 			?TRACE("Nodes not adjacent, requesting information about neighbors~n", []),
-			comm:send(node:pidX(LightNodeSucc), {lb_active, {phase2, HeavyNodeDetails, LightNodeDetails}})
+            LightNodeSucc = lb_info:get_succ(LightNode),
+			comm:send(node:pidX(LightNodeSucc), {lb_active, phase2, HeavyNode, LightNode})
 	end.
 
 %% @doc Key/Value List for web debug

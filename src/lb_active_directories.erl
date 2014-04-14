@@ -43,8 +43,8 @@
 %% e.g. 1 implies a central directory
 -define(NUM_DIRECTORIES, 1).
 
--define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), io:format(X,Y)).
+%-define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format(X,Y)).
 
 -type directory_name() :: string().
 
@@ -114,18 +114,20 @@ handle_msg({publish_trigger}, State) ->
 %% we received load because of publish load trigger or emergency
 handle_msg({post_load, LoadInfo}, State) ->
     ?TRACE("Posting load ~p~n", [LoadInfo]),
-    %DirKey = int_to_str(get_random_directory_key()),
     Directory = get_random_directory(),
     DirKey = Directory#directory.name,
     post_load_to_directory(LoadInfo, DirKey),
-    %% TODO Emergency Threshold has been already check at the node overloaded...
+    %% TODO Emergency Threshold has been already checked at the node overloaded...
     EmergencyThreshold = State#state.threshold_emergency,
     case lb_info:get_load(LoadInfo) > EmergencyThreshold of
         true  ->
+            ?TRACE("Emergency in post_load~n", []),
             MySchedule = State#state.schedule,
-            directory_routine(DirKey, emergency, MySchedule);
-        false -> State
-    end;
+            Schedule = directory_routine(DirKey, emergency, MySchedule),
+            perform_transfer(Schedule);
+        false -> ok
+    end,
+    State;
 
 handle_msg({directory_trigger}, State) ->
     trigger(directory_trigger),
@@ -196,7 +198,7 @@ directory_routine(DirKey, Type, Schedule) ->
     %%      nodes to avoid too many jumps.
     {TLog, Directory} = get_directory(DirKey),
     case dir_is_empty(Directory) of
-        true -> Schedule;
+        true -> Schedule; %% TODO why return old schedule here?
         false ->
             Pool = Directory#directory.pool,
             K = case Type of
@@ -282,6 +284,7 @@ pop_load_in_directory(DirKey) ->
             case api_tx:req_list(TLog2, [{write, DirKey, dir_clear_load(Directory)}, {commit}]) of
                 {[], ok, ok} -> Directory;
                 Error -> log:log(warn, "~p: Failed to save directory ~p because of failed transaction: ~p", [?MODULE, DirKey, Error]),
+                         timer:sleep(10),
                          pop_load_in_directory(DirKey)
             end;
         {_TLog2, {fail, not_found}} ->
@@ -300,6 +303,7 @@ post_load_to_directory(Load, DirKey) ->
                     ok;
                 {fail, abort, [DirKey]} ->
                     log:log(warn, "~p: Failed to write to directory, retrying...", [?MODULE]),
+                    timer:sleep(10),
                     post_load_to_directory(Load, DirKey)
             end;
         {_TLog2, {fail, not_found}} ->
@@ -327,6 +331,7 @@ set_directory(TLog, Directory) ->
             ok;
         Error ->
             log:log(warn, "~p: Failed to save directory ~p because of failed transaction: ~p", [?MODULE, DirKey, Error]),
+            % TODO What to do here?
             failed
     end.
 
@@ -358,8 +363,7 @@ perform_transfer([]) ->
     ok;
 perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other]) ->
     ?TRACE("~p: Reassigning ~p (light: ~p) and ~p (heavy: ~p)~n", [?MODULE, lb_info:get_node(LightNode), lb_info:get_load(LightNode), lb_info:get_node(HeavyNode), lb_info:get_load(HeavyNode)]),
-    DhtNode = lb_info:get_node(HeavyNode),
-    comm:send(node:pidX(DhtNode), {lb_active, {balance_with, LightNode}}),
+    lb_active:balance_nodes(LightNode, HeavyNode),
 %%     case lb_info:neighbors(LightNode, HeavyNode) of
 %%         true  -> comm:send(node:pidX(DhtNode), {lb_active, {slide, LightNode}});
 %%         false -> comm:send(node:pidX(DhtNode), {lb_active, {jump, LightNode}})
@@ -401,7 +405,7 @@ trigger(Trigger) ->
 
 -spec get_web_debug_kv(state()) -> [{string(), string()}].
 get_web_debug_kv(State) ->
-    [{"state", webhelpers:html_pre("~p", State)}].
+    [{"state", webhelpers:html_pre("~p", [State])}].
 
 -spec check_config() -> boolean().
 check_config() ->

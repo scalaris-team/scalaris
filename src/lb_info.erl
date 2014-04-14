@@ -23,15 +23,15 @@
 -include("record_helpers.hrl").
 
 -export([new/1]).
--export([get_load/1, get_node/1, get_succ/1]).
--export([neighbors/2, get_target_load/3]).
+-export([get_load/1, get_node/1, get_succ/1, get_items/1]).
+-export([is_succ/2, neighbors/2, get_target_load/3]).
 
 -type(load() :: number()).
 
--record(lb_info, {load    = ?required(lb_info, load) :: load(),
-                  db_keys = ?required(lb_info, keys) :: load(),
-                  node    = ?required(lb_info, node) :: node:node_type(),
-                  succ    = ?required(lb_info, succ) :: node:node_type()
+-record(lb_info, {load  = ?required(lb_info, load)  :: load(),
+                  items = ?required(lb_info, items) :: load(),
+                  node  = ?required(lb_info, node)  :: node:node_type(),
+                  succ  = ?required(lb_info, succ)  :: node:node_type()
                  }).
 
 -opaque(lb_info() :: #lb_info{}).
@@ -43,59 +43,28 @@
 %% Convert node details to lb_info
 -spec new(node_details:node_details()) -> lb_info().
 new(NodeDetails) ->
-    #lb_info{load = get_load_metric(),
-             db_keys = node_details:get(NodeDetails, load),
-             node = node_details:get(NodeDetails, node),
-             succ = node_details:get(NodeDetails, succ)}.
+    #lb_info{load  = lb_active:get_load_metric(),
+             items = node_details:get(NodeDetails, load),
+             node  = node_details:get(NodeDetails, node),
+             succ  = node_details:get(NodeDetails, succ)}.
 
 -spec get_load(lb_info()) -> load() | node:node_type().
-get_load(#lb_info{load = Load}) -> Load.
-get_db_keys(#lb_info{db_keys = Keys}) -> Keys.
-get_node(#lb_info{node = Node}) -> Node.
-get_succ(#lb_info{succ = Succ}) -> Succ.
+get_load (#lb_info{load  = unknown}) -> throw(no_load_available);
+get_load (#lb_info{load  = Load }) -> Load.
+get_items(#lb_info{items = Items}) -> Items.
+get_node (#lb_info{node  = Node }) -> Node.
+get_succ (#lb_info{succ  = Succ }) -> Succ.
+
+is_succ(Succ, Node) ->
+    get_succ(Node) =:= get_node(Succ).
 
 -spec neighbors(lb_info(), lb_info()) -> boolean().
 neighbors(Node1, Node2) ->
-    get_succ(Node1) =:= get_node(Node2) orelse get_succ(Node2) =:= get_node(Node1).
+    is_succ(Node1, Node2) orelse is_succ(Node2, Node1).
 
+%% @doc The number of db entries the heavy node will give to the light node
 -spec get_target_load(slide | jump, lb_info(), lb_info()) -> non_neg_integer().
 get_target_load(slide, HeavyNode, LightNode) ->
-    (get_db_keys(HeavyNode) + get_db_keys(LightNode)) div 2;
+    (get_items(HeavyNode) + get_items(LightNode)) div 2;
 get_target_load(jump, HeavyNode, _LightNode) ->
-     get_db_keys(HeavyNode) div 2.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%-spec get_load_info(dht_node_state:state()) -> load_info().
-get_load_metric() ->
-    _Utilization =
-        case config:read(lb_active_metric) of
-            cpu        -> get_vm_metric(cpu10sec) / 100;
-            mem        -> get_vm_metric(mem10sec) / 100;
-            tx_latency -> get_dht_metric(api_tx, req_list);
-            keys       -> get_dht_metric(lb_active, keys);
-            _          -> log:log(warn, "~p: Falling back to default metric", [?MODULE]),
-                          get_dht_metric(lb_active, keys)
-        end,
-    %% TODO remove this
-    randoms:rand_uniform(0, 101) / 100.
-
--spec get_vm_metric(atom()) -> ok.
-get_vm_metric(Key) ->
-    get_vm_metric(lb_active, Key).
-
-get_vm_metric(Process, Key) ->
-    ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-    get_metric(ClientMonitorPid, Process, Key).
-
-get_dht_metric(Key) ->
-    MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, lb_active, Key).
-
-get_dht_metric(Process, Key) ->
-    MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, Process, Key).
-
-get_metric(MonitorPid, Process, Key) ->
-    [{Process, Key, RRD}] = monitor:get_rrds(MonitorPid, [{Process, Key}]),
-    _Value = rrd:get_value_by_offset(RRD, 0).
+     get_items(HeavyNode) div 2.
