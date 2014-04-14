@@ -105,7 +105,7 @@ foldr_until(TargetVal, NormalizedHist) ->
     histogram:foldl_until_helper(TargetVal, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
 
 -spec is_normalized(histogram() | histogram:histogram()) -> boolean().
-is_normalized({Histogram, _NormFun, _InverseFun}) ->
+is_normalized({_Histogram, _NormFun, _InverseFun}) ->
     true;
 is_normalized(_) ->
     false.
