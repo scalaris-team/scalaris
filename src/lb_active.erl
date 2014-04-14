@@ -337,7 +337,9 @@ init_db_monitors() ->
             Reads  = rrd:add_now(0, rrd:create(15 * 1000000, 3, {timing_with_hist, count})),
             Writes = rrd:add_now(0, rrd:create(15 * 1000000, 3, {timing_with_hist, count})),
             monitor:proc_set_value(lb_active, reads, Reads),
-            monitor:proc_set_value(lb_active, writes, Writes);
+            monitor:proc_set_value(lb_active, writes, Writes),
+            monitor:monitor_set_value(lb_active, reads, Reads),
+            monitor:monitor_set_value(lb_active, writes, Writes);
             %monitor:proc_set_value(lb_active, items, Items);
         _ -> ok
     end.
