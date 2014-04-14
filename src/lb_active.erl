@@ -378,66 +378,6 @@ balance_noop(Options) ->
             comm:send(ReplyTo, {simulation_result, Id, ReqId, 0})
     end.
 
--spec get_pending_op() -> undefined | lb_op().
-get_pending_op() ->
-    erlang:get(pending_op).
-
--spec set_pending_op(undefined | lb_op()) -> ok.
-set_pending_op(Op) ->
-    erlang:put(pending_op, Op),
-    ok.
-
--spec op_pending() -> boolean().
-op_pending() ->
-    case erlang:get(pending_op) of
-        undefined -> false;
-        OtherOp ->
-            case old_op(OtherOp) of
-                false -> true;
-                true -> %% remove old op
-                    ?TRACE("Removing old op ~p~n", [OtherOp]),
-                    erlang:erase(pending_op),
-                    false
-            end
-    end.
-
--spec old_op(lb_op()) -> boolean().
-old_op(Op) ->
-    Threshold = config:read(lb_active_wait_for_pending_ops),
-    timer:now_diff(os:timestamp(), Op#lb_op.time) div 1000 > Threshold.
-
--spec old_data(lb_op()) -> boolean().
-old_data(Op) ->
-    LastBalanceTime = erlang:get(time_last_balance),
-    DataTime = Op#lb_op.data_time,
-    timer:now_diff(LastBalanceTime, DataTime) > 0.
-
--spec get_time_last_balance() -> erlang:timestamp().
-get_time_last_balance() ->
-    erlang:get(time_last_balance).
-
--spec set_time_last_balance() -> ok.
-set_time_last_balance() ->
-    erlang:put(time_last_balance, os:timestamp()), ok.
-
--spec set_last_db_monitor_init() -> ok.
-set_last_db_monitor_init() ->
-    erlang:put(last_db_monitor_init, os:timestamp()), ok.
-
--spec get_last_db_monitor_init() -> erlang:timestamp().
-get_last_db_monitor_init() ->
-    erlang:get(last_db_monitor_init), ok.
-
--spec gossip_available(options()) -> boolean().
-gossip_available(Options) ->
-    proplists:is_defined(dht_size, Options) andalso
-        proplists:is_defined(avg, Options) andalso
-        proplists:is_defined(stddev, Options).
-
--spec is_simulation(options()) -> boolean().
-is_simulation(Options) ->
-    proplists:is_defined(simulate, Options).
-
 %%%%%%%%%%%%%%%%%%%%%%%% Calls from dht_node %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Process load balancing messages sent to the dht node
@@ -484,7 +424,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                 {From, To, Direction} =
                     case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
                         true  -> %% Jump or heavy node is succ of light node
-                            {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id) -1, forward}; %% TODO node_id-1 ?
+                            {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward};
                         false -> %% Light node is succ of heavy node
                             {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
                     end,
@@ -500,7 +440,6 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                                 %% TODO fall back in a more clever way / abort lb request
                                 failed ->
                                     ?TRACE("get_request_histogram failed~n", []),
-                                    %% TODO what to do now?
                                     dht_node_state:get_split_key(DhtState, From, To, 1, Direction);
                                 Val -> Val
                             end
@@ -682,8 +621,8 @@ get_load_metric() ->
                 items -> items;
                 Val -> util:round(Val, 2)
             end,
-    io:format("Load: ~p~n", [Value]),
-    Value. %%TODO
+    ?TRACE("Load: ~p~n", [Value]),
+    Value.
 
 -spec get_load_metric(load_metric()) -> unknown | items | number(). %% TODO unknwon shouldn't happen here, in theory it can TODO
 get_load_metric(Metric) ->
@@ -835,16 +774,75 @@ call_module(Fun, Args) ->
 get_lb_module() ->
     config:read(lb_active_module).
 
-%% TODO!
 -spec collect_stats() -> boolean().
 collect_stats() ->
-    Metrics = [cpu, mem],
+    Metrics = [cpu, mem], %% TODO
     lists:member(config:read(lb_active_load_metric), Metrics).
 
 -compile({inline, [monitor_db/0]}).
 -spec monitor_db() -> boolean().
 monitor_db() ->
     is_enabled() andalso config:read(lb_active_db_monitor) =/= none.
+
+-spec get_pending_op() -> undefined | lb_op().
+get_pending_op() ->
+    erlang:get(pending_op).
+
+-spec set_pending_op(undefined | lb_op()) -> ok.
+set_pending_op(Op) ->
+    erlang:put(pending_op, Op),
+    ok.
+
+-spec op_pending() -> boolean().
+op_pending() ->
+    case erlang:get(pending_op) of
+        undefined -> false;
+        OtherOp ->
+            case old_op(OtherOp) of
+                false -> true;
+                true -> %% remove old op
+                    ?TRACE("Removing old op ~p~n", [OtherOp]),
+                    erlang:erase(pending_op),
+                    false
+            end
+    end.
+
+-spec old_op(lb_op()) -> boolean().
+old_op(Op) ->
+    Threshold = config:read(lb_active_wait_for_pending_ops),
+    timer:now_diff(os:timestamp(), Op#lb_op.time) div 1000 > Threshold.
+
+-spec old_data(lb_op()) -> boolean().
+old_data(Op) ->
+    LastBalanceTime = erlang:get(time_last_balance),
+    DataTime = Op#lb_op.data_time,
+    timer:now_diff(LastBalanceTime, DataTime) > 0.
+
+-spec get_time_last_balance() -> erlang:timestamp().
+get_time_last_balance() ->
+    erlang:get(time_last_balance).
+
+-spec set_time_last_balance() -> ok.
+set_time_last_balance() ->
+    erlang:put(time_last_balance, os:timestamp()), ok.
+
+-spec set_last_db_monitor_init() -> ok.
+set_last_db_monitor_init() ->
+    erlang:put(last_db_monitor_init, os:timestamp()), ok.
+
+-spec get_last_db_monitor_init() -> erlang:timestamp().
+get_last_db_monitor_init() ->
+    erlang:get(last_db_monitor_init).
+
+-spec gossip_available(options()) -> boolean().
+gossip_available(Options) ->
+    proplists:is_defined(dht_size, Options) andalso
+        proplists:is_defined(avg, Options) andalso
+        proplists:is_defined(stddev, Options).
+
+-spec is_simulation(options()) -> boolean().
+is_simulation(Options) ->
+    proplists:is_defined(simulate, Options).
 
 -spec trigger(atom()) -> ok.
 trigger(Trigger) ->
