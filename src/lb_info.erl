@@ -25,7 +25,11 @@
 -export([new/1]).
 -export([get_load/1, get_node/1, get_succ/1, get_items/1, get_time/1]).
 -export([is_succ/2, neighbors/2, get_target_load/3]).
+%% without dht size
 -export([get_load_change_slide/3, get_load_change_jump/4]).
+%% with dht size available
+-export([get_load_change_slide/4, get_load_change_jump/5]).
+-export([get_oldest_data_time/1]).
 
 -type(load() :: number()).
 
@@ -46,18 +50,17 @@
 -spec new(node_details:node_details()) -> lb_info().
 new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
-    Load = %% TODO how do we ensure all nodes have the same load metric??
-        case lb_active:get_load_metric() of
-            unknown -> Items;
-            Metric -> Metric
-        end,
+    Load = case lb_active:get_load_metric() of
+               unknown -> erlang:throw(no_load_data_available);
+               items -> Items;
+               Metric -> Metric
+           end,
     #lb_info{load  = Load,
              items = Items,
              node  = node_details:get(NodeDetails, node),
              succ  = node_details:get(NodeDetails, succ)}.
 
 -spec get_load(lb_info()) -> load() | node:node_type().
-get_load (#lb_info{load  = unknown}) -> throw(no_load_available);
 get_load (#lb_info{load  = Load }) -> Load.
 get_items(#lb_info{items = Items}) -> Items.
 get_node (#lb_info{node  = Node }) -> Node.
@@ -81,16 +84,33 @@ get_target_load(jump, HeavyNode, _LightNode) ->
 %% TODO generic load change
 -spec get_load_change_slide(non_neg_integer(), lb_info(), lb_info()) -> integer().
 get_load_change_slide(TakenLoad, HeavyNode, LightNode) ->
-    get_load_change_diff(get_items(HeavyNode), get_items(HeavyNode) - TakenLoad) +
-        get_load_change_diff(get_items(LightNode), get_items(LightNode) + TakenLoad).
+    get_load_change_slide(TakenLoad, 1, HeavyNode, LightNode).
+
+-spec get_load_change_slide(non_neg_integer(), pos_integer(), lb_info(), lb_info()) -> integer().
+get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode) ->
+    get_load_change_diff(DhtSize, get_items(HeavyNode), get_items(HeavyNode) - TakenLoad) +
+        get_load_change_diff(DhtSize, get_items(LightNode), get_items(LightNode) + TakenLoad).
 
 -spec get_load_change_jump(non_neg_integer(), lb_info(), lb_info(), lb_info()) -> integer().
 get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc) ->
-    get_load_change_diff(get_items(LightNode), TakenLoad) +
-        get_load_change_diff(get_items(LightNodeSucc), get_items(LightNodeSucc) + get_items(LightNode)) +
-        get_load_change_diff(get_items(HeavyNode), get_items(HeavyNode) - TakenLoad).
+    get_load_change_jump(TakenLoad, 1, HeavyNode, LightNode, LightNodeSucc).
 
--spec get_load_change_diff(non_neg_integer(), non_neg_integer()) -> integer().
-get_load_change_diff(OldItemLoad, NewItemLoad) ->
-    NewItemLoad * NewItemLoad - OldItemLoad * OldItemLoad.
-    %NewItemLoad - OldItemLoad.
+-spec get_load_change_jump(non_neg_integer(), pos_integer(), lb_info(), lb_info(), lb_info()) -> integer().
+get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc) ->
+    get_load_change_diff(DhtSize, get_items(LightNode), TakenLoad) +
+        get_load_change_diff(DhtSize, get_items(LightNodeSucc), get_items(LightNodeSucc) + get_items(LightNode)) +
+        get_load_change_diff(DhtSize, get_items(HeavyNode), get_items(HeavyNode) - TakenLoad).
+
+-spec get_load_change_diff(pos_integer(), non_neg_integer(), non_neg_integer()) -> integer().
+get_load_change_diff(DhtSize, OldItemLoad, NewItemLoad) ->
+    %% if DhtSize is available, we compute the variance change
+    NewItemLoad * NewItemLoad / DhtSize - OldItemLoad * OldItemLoad / DhtSize.
+
+get_oldest_data_time([Node | Other]) ->
+    get_oldest_data_time(Other, get_time(Node)).
+
+get_oldest_data_time([], Oldest) ->
+    Oldest;
+get_oldest_data_time([Node | Other], Oldest) ->
+    OldestNew = erlang:min(get_time(Node), Oldest),
+    get_oldest_data_time(Other, OldestNew).

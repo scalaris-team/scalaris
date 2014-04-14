@@ -201,7 +201,7 @@ directory_routine(DirKey, Type, Schedule) ->
         false ->
             Pool = Directory#directory.pool,
             AvgUtil = gb_sets:fold(fun(El, Acc) -> Acc + lb_info:get_load(El) end, 0, Pool) / gb_sets:size(Pool),
-            K = case Type of
+            {LowerBound, UpperBound} = case Type of
                     periodic ->
                         %% clear directory only for periodic
                         NewDirectory = dir_clear_load(Directory),
@@ -210,16 +210,16 @@ directory_routine(DirKey, Type, Schedule) ->
                         %% From paper:
                         %(1 + AvgUtil) / 2;
                         %% Karger style:
-                        1.24 * AvgUtil;
+                        {0.75 * AvgUtil, 1.25 * AvgUtil};
                     emergency ->
                         %% from paper:
                         %1.0
                         %% Gossip: max value
-                        AvgUtil * 10
+                        AvgUtil * 10 %% TODO
                 end,
-            ?TRACE("Threshold: ~p~n", [K]),
-            LightNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) =< K end, Pool),
-            HeavyNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) >  K end, Pool),
+            ?TRACE("Threshold: ~p~n", [{LowerBound, UpperBound}]),
+            LightNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) =< LowerBound end, Pool),
+            HeavyNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) >= UpperBound end, Pool),
             ScheduleNew = find_matches(LightNodes, HeavyNodes, []),
             ?TRACE("New schedule: ~p~n", [ScheduleNew]),
             ScheduleNew

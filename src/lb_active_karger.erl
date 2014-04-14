@@ -135,7 +135,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
             %% TODO Parameter in config
             %% don't wait too long for the responses
             %%WaitTime = config:read(lb_active_interval) div 1000 div 2,
-            msg_delay:send_local(3, self(), {decide_and_go_to_phase1, Id}),
+            msg_delay:send_local(3, self(), {pick_best_candidate, Id}),
             State#state{round_id = Id, my_lb_info = MyLBInfo, req_ids = ReqIds}
     end;
 
@@ -152,7 +152,7 @@ handle_msg({simulation_result, Id, ThisReqId, LoadChange}, State) ->
             ReqIds = State#state.req_ids,
             ReqIdsNew = proplists:delete(ThisReqId, ReqIds),
             case ReqIdsNew of
-                [] -> comm:send_local(self(), {decide_and_go_to_phase1, Id});
+                [] -> comm:send_local(self(), {pick_best_candidate, Id});
                 _  -> ok
             end,
             NodeX = proplists:get_value(ThisReqId, ReqIds),
@@ -165,7 +165,9 @@ handle_msg({simulation_result, Id, ThisReqId, LoadChange}, State) ->
            State
     end;
 
-handle_msg({decide_and_go_to_phase1, Id}, State) ->
+%% In case we have a best candidate, start the actual
+%% load balancing algorithm.
+handle_msg({pick_best_candidate, Id}, State) ->
     ?TRACE("Deciding in round ~p~n",[Id]),
     case State#state.round_id of
         Id ->
@@ -203,7 +205,6 @@ handle_dht_msg({lb_active, phase1, NodeX, Options}, DhtState) ->
 		true ->
 			if
                 % first check if load balancing is necessary
-                % TODO gossip here to improve load balancing
 				MyLoad =< Epsilon * LoadX ->
 					?TRACE("My node is light~n", []),
 					balance_adjacent(NodeX, MyLBInfo, Options);
@@ -215,7 +216,7 @@ handle_dht_msg({lb_active, phase1, NodeX, Options}, DhtState) ->
 					?TRACE("Won't balance~n", []),
                     lb_active:balance_noop(Options)
 			end;
-		_ -> ok
+		_ -> lb_active:balance_noop(Options)
 	end,
 	DhtState;
 

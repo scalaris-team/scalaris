@@ -174,7 +174,7 @@ get_entry({KVStore, _Subscr, _Snap}, Key) ->
             db_entry:new(Key);
         Entry ->
             %% report read to process rrd and check for report to monitor
-            lb_active:update_db_monitor(reads, Key),
+            lb_active:update_db_monitor(db_reads, Key),
             Entry
     end.
 
@@ -190,7 +190,7 @@ set_entry(State, Entry, TLogSnapNo, OwnSnapNo) ->
             delete_entry(State, Entry);
         _ ->
             %% report write to process rrd and check for report to monitor
-            lb_active:update_db_monitor(writes, db_entry:get_key(Entry)),
+            lb_active:update_db_monitor(db_writes, db_entry:get_key(Entry)),
             %% do lockcounting and copy-on-write logic
             OldEntry = get_entry(State, db_entry:get_key(Entry)),
             {KVStore, Subscr, Snap} = snaps(State, OldEntry, Entry, TLogSnapNo, OwnSnapNo),
