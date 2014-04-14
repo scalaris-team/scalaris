@@ -130,7 +130,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
                       ?TRACE("Sending out simulate request with ReqId ~p to ~p~n", [ReqId, RndNode]),
                       OptionsNew = [{simulate, ReqId}, {reply_to, comm:this()}] ++ Options,
                       comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, OptionsNew},
-                                [{shepherd, self()}]),
+                                [{?quiet}]), %% TODO failure detector here?
                       {ReqId, RndNode}
                  end || RndNode <- RndNodes],
             %% TODO Parameter in config
@@ -139,19 +139,6 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
             msg_delay:send_local(3, self(), {decide_and_go_to_phase1, Id}),
             State#state{round_id = Id, my_lb_info = MyLBInfo, req_ids = ReqIds}
     end;
-
-%% phase0 load change send errors
-handle_msg({send_error, _Pid, {lb_active, phase1, _, Options}, _Reason}, State) ->
-    ?TRACE("Send error in simulation phase ~n", []),
-    ReqIds = State#state.req_ids,
-    ThisReqId = proplists:get_value(simulate, Options),
-    Id = proplists:get_value(id, Options),
-    ReqIdsNew = proplists:delete(ThisReqId, ReqIds),
-    case ReqIdsNew of
-                [] -> comm:send_local(self(), {decide_and_go_to_phase1, Id});
-                _  -> ok
-    end,
-    State#state{req_ids = ReqIdsNew};
 
 %% collect all the load change responses and save the best candidate
 handle_msg({simulation_result, Id, ThisReqId, LoadChange}, State) ->
