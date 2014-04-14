@@ -61,10 +61,10 @@
 
 -type lb_op() :: #lb_op{}.
 
--type metric() :: items | cpu | mem | db_reads | db_writes | db_requests | transactions | tx_latency | net_throughput | net_latency.
+-type metric() :: items | cpu | mem | db_reads | db_writes | db_requests | transactions | tx_latency | net_throughput.
 
 %% available metrics
--define(METRICS, [items, cpu, mem, db_reads, db_writes, db_requests, transactions, tx_latency, net_throughput, net_latency]).
+-define(METRICS, [items, cpu, mem, db_reads, db_writes, db_requests, transactions, tx_latency, net_throughput]).
 
 %% list of active load balancing modules available
 -define(MODULES, [lb_active_karger, lb_active_directories]).
@@ -84,19 +84,12 @@ init([]) ->
     set_time_last_balance(),
     case collect_stats() of
         true ->
-            %% TODO configure minutes to collect
-            LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
-            ShortTerm = rrd:create(15 * 1000000, 1, gauge),
-            monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
-            monitor:client_monitor_set_value(lb_active, cpu10sec, ShortTerm),
-            monitor:client_monitor_set_value(lb_active, mem5min, LongTerm),
-            monitor:client_monitor_set_value(lb_active, mem10sec, ShortTerm),
             application:start(sasl),   %% required by os_mon.
             application:start(os_mon), %% for monitoring cpu and memory usage.
             trigger(collect_stats);
-        _ ->
-            ok
+        _ -> ok
     end,
+    init_stats(),
     trigger(lb_trigger),
     %% keep the node id in state, currently needed to normalize histogram
     %%     rm_loop:subscribe(
@@ -124,7 +117,8 @@ on_inactive({collect_stats} = Msg, State) ->
     on(Msg, State);
 
 on_inactive(Msg, State) ->
-    ?TRACE("Unknown message received ~p~n", [Msg]).
+    %% at the moment, we simply ignore lb messages.
+    ?TRACE("Unknown message received ~p~n. Ignoring.", [Msg]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -133,21 +127,21 @@ on_inactive(Msg, State) ->
 on({collect_stats}, State) ->
     trigger(collect_stats),
     CPU = cpu_sup:util(),
+    io:format("CPU: ~p~n", [CPU]),
     MEM = case memsup:get_system_memory_data() of
-              [{system_total_memory, Total},
-               {free_swap, FreeSwap},
-               {total_swap, TotalSwap},
-               {cached_memory, CachedMemory},
-               {buffered_memory, BufferedMemory},
+              [{system_total_memory, _Total},
+               {free_swap, _FreeSwap},
+               {total_swap, _TotalSwap},
+               {cached_memory, _CachedMemory},
+               {buffered_memory, _BufferedMemory},
                {free_memory, FreeMemory},
                {total_memory, TotalMemory}] ->
                   FreeMemory / TotalMemory * 100
           end,
     monitor:client_monitor_set_value(lb_active, cpu10sec, fun(Old) -> rrd:add_now(CPU, Old) end),
-    monitor:client_monitor_set_value(lb_active, cpu5min, fun(Old) -> rrd:add_now(CPU, Old) end),
+    %monitor:client_monitor_set_value(lb_active, cpu5min, fun(Old) -> rrd:add_now(CPU, Old) end),
     monitor:client_monitor_set_value(lb_active, mem10sec, fun(Old) -> rrd:add_now(MEM, Old) end),
-    monitor:client_monitor_set_value(lb_active, mem5min, fun(Old) -> rrd:add_now(MEM, Old) end),
-    %io:format("CPU utilization: ~p~n", [CPU]),
+    %monitor:client_monitor_set_value(lb_active, mem5min, fun(Old) -> rrd:add_now(MEM, Old) end),
     State;
 
 on({lb_trigger} = Msg, State) ->
@@ -251,11 +245,15 @@ on({balance_failed, OpId}, State) ->
     end,
     State;
 
+%% success does not imply the slide or jump was successfull. however,
+%% slide or jump failures should very rarly occur because of the locking
+%% and stale data detection.
 on({balance_success, OpId}, State) ->
     case get_pending_op() of
         undefined -> ?TRACE("Received answer but OpId ~p was not pending~n", [OpId]);
         Op when Op#lb_op.id =:= OpId ->
             ?TRACE("Clearing pending op ~p~n", [OpId]),
+            comm:send_local(self(), {reset_monitors}),
             set_pending_op(undefined),
             set_time_last_balance();
         Op ->
@@ -272,6 +270,7 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
             ?TRACE("Clearing pending op and replying to other node ~p~n", [OpId]),
             HeavyNodePid = node:pidX(Op#lb_op.heavy_node),
             comm:send(HeavyNodePid, {balance_success, OpId}, [{group_member, lb_active}]),
+            comm:send_local(self(), {reset_monitors}),
             set_pending_op(undefined),
             set_time_last_balance(),
             case Op#lb_op.type of
@@ -287,6 +286,11 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
             ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
     end,
     State;
+
+on({reset_monitors}, State) ->
+    init_stats(),
+    init_db_monitors(),
+    gen_component:change_handler(State, fun on_inactive/2);
 
 on({web_debug_info, Requestor}, State) ->
     KVList =
@@ -390,16 +394,12 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
 %% In either case, we'll compute the target id and send out
 %% the jump or slide message to the LightNode.
 handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options}, DhtState) ->
+    %% TODO check for active state here before doing anything?
     case lb_info:get_node(HeavyNode) =/= dht_node_state:get(DhtState, node) of
         true -> ?TRACE("I was mistaken for the HeavyNode. Doing nothing~n", []), ok;
         false ->
             %% TODO What are the benefits/disadvantages of getting the load info again?
-            MyNode = %try
-                        lb_info:new(dht_node_state:details(DhtState)),
-%%                      catch
-%%                          throw:no_load_data_available ->
-%%                              io:format("What to do now?????????") %% TODO
-%%                      end,
+            MyNode = lb_info:new(dht_node_state:details(DhtState)),
             JumpOrSlide = %case lb_info:neighbors(MyNode, LightNode) of
                           case LightNodeSucc =:= nil of
                               true  -> slide;
@@ -483,10 +483,11 @@ handle_dht_msg(Msg, DhtState) ->
 %% @doc Called by db process to initialize monitors
 -spec init_db_monitors() -> ok.
 init_db_monitors() ->
-    case config:read(lb_active_monitor_db) of
+    case monitor_db() of
         true ->
-            Reads  = rrd:add_now(0, rrd:create(15 * 1000000, 3, {timing_with_hist, count})),
-            Writes = rrd:add_now(0, rrd:create(15 * 1000000, 3, {timing_with_hist, count})),
+            MonitorRes = config:read(lb_active_monitor_resolution),
+            Reads  = rrd:add_now(0, rrd:create(MonitorRes * 1000, 3, {timing_with_hist, count})),
+            Writes = rrd:add_now(0, rrd:create(MonitorRes * 1000, 3, {timing_with_hist, count})),
             monitor:proc_set_value(lb_active, db_reads, Reads),
             monitor:proc_set_value(lb_active, db_writes, Writes),
             monitor:monitor_set_value(lb_active, db_reads, Reads),
@@ -498,7 +499,7 @@ init_db_monitors() ->
 -spec update_db_monitor(Type::db_reads | db_writes, Value::?RT:key()) -> ok;
                        (Type::items, Value::non_neg_integer())   -> ok.
 update_db_monitor(Type, Value) ->
-    case config:read(lb_active_monitor_db) of
+    case monitor_db() of
         true ->
 %%             if
 %%                 Type =:= reads orelse Type =:= writes ->
@@ -509,47 +510,44 @@ update_db_monitor(Type, Value) ->
         _ -> ok
     end.
 
+-spec init_stats() -> ok.
+init_stats() ->
+    case collect_stats() of
+        true ->
+            Interval = config:read(lb_active_monitor_resolution),
+            %LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
+            ShortTerm = rrd:create(Interval * 1000, 1, gauge),
+            %monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
+            monitor:client_monitor_set_value(lb_active, cpu10sec, ShortTerm),
+            %monitor:client_monitor_set_value(lb_active, mem5min, LongTerm),
+            monitor:client_monitor_set_value(lb_active, mem10sec, ShortTerm);
+        _ ->
+            ok
+    end.
+
 -spec monitor_vals_appeared() -> boolean().
 monitor_vals_appeared() ->
-    case erlang:get(vals_appeared) of
+    case erlang:get(metric_available) of
         true -> true;
         _ ->
-            MonitorPid = pid_groups:get_my(monitor),
-            ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-            LocalKeys = monitor:get_rrd_keys(MonitorPid),
-            ClientKeys = monitor:get_rrd_keys(ClientMonitorPid),
-            ReqLocalKeys =  case collect_stats() of
-                                true -> [{lb_active, db_reads}, {lb_active, db_writes}, {api_tx, req_list}];
-                                _ ->    [{api_tx, req_list}]
-                            end,
-            ReqClientKeys = case collect_stats() of
-                                % %{api_tx, req_list},
-                                true -> [{monitor_perf, mem_total}, {monitor_perf, rcv_bytes}, {monitor_perf, send_bytes}, {lb_active, cpu10sec}]; %{lb_active, cpu5min}],],
-                                _    -> [{monitor_perf, mem_total}, {monitor_perf, rcv_bytes}, {monitor_perf, send_bytes}]
-                            end,
-            AllLocalAvailable  = lists:foldl(fun(Key, Acc) -> Acc andalso lists:member(Key, LocalKeys) end, true, ReqLocalKeys),
-            AllClientAvailable = lists:foldl(fun(Key, Acc) -> Acc andalso lists:member(Key, ClientKeys) end, true, ReqClientKeys),
-            %io:format("LocalKeys: ~p~n", [LocalKeys]),
-            %io:format("ClientKeys: ~p~n", [ClientKeys]),
-            case AllLocalAvailable andalso AllClientAvailable of
-                true -> erlang:put(vals_appeared, true), true;
-                false -> false
+            case get_load_metric() of
+                unknown ->
+                    false;
+                _Metric ->
+                    erlang:put(metric_available, true),
+                    true
             end
     end.
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%-spec get_load_info(dht_node_state:state()) -> load_info().
+-spec get_load_metric() -> unknown | items | number().
 get_load_metric() ->
     Metric = config:read(lb_active_metric),
     get_load_metric(Metric).
 
--spec get_load_metric(metric()) -> items | unknown | number().
+-spec get_load_metric(metric()) -> unknown | items | number().
 get_load_metric(Metric) ->
-    case monitor_vals_appeared() of
-        false -> unknown;
-        true  ->
             case Metric of
                 cpu          -> get_vm_metric({lb_active, cpu10sec}, count) / 100;
                 mem          -> get_vm_metric({lb_active, mem10sec}, count) / 100;
@@ -558,12 +556,11 @@ get_load_metric(Metric) ->
                 db_requests  -> get_load_metric(db_reads) + get_load_metric(db_writes);
                 tx_latency   -> get_dht_metric({api_tx, req_list}, avg);
                 transactions -> get_dht_metric({api_tx, req_list}, count);
-                _            -> items
-            end
+                items        -> items;
+                _            -> throw(metric_not_available)
     end.
 
-%%%-spec get_vm_metric(atom()) -> ok.
-
+-spec get_vm_metric(metric(), avg | count) -> unknown | number().
 get_vm_metric(Metric, Type) ->
     ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
     get_metric(ClientMonitorPid, Metric, Type).
@@ -572,20 +569,25 @@ get_dht_metric(Metric, Type) ->
     MonitorPid = pid_groups:get_my(monitor),
     get_metric(MonitorPid, Metric, Type).
 
+-spec get_metric(pid(), monitor:table_index(), avg | count) -> unknown | number().
 get_metric(MonitorPid, Metric, Type) ->
     [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [Metric]),
-    io:format("RRD: ~p~n", [RRD]),
-    SlotLength = rrd:get_slot_length(RRD),
-    io:format("Slot Length: ~p~n", [SlotLength]),
-    {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-    %% get stable value off an old slot
-    Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs-SlotLength}),
-    io:format("VAlue: ~p~n", [Value]),
-    get_value_type(Value, Type).
+    case RRD of
+        undefined ->
+            unknown;
+        RRD ->
+            SlotLength = rrd:get_slot_length(RRD),
+            io:format("Slot Length: ~p~n", [SlotLength]),
+            {MegaSecs, Secs, MicroSecs} = os:timestamp(),
+            %% get stable value off an old slot
+            Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs-SlotLength}),
+            io:format("VAlue: ~p~n", [Value]),
+            get_value_type(Value, Type)
+    end.
 
 -spec get_value_type(rrd:data_type(), avg | count) -> unknown | number().
 get_value_type(undefined, _Type) ->
-    0; %unknown; TODO
+    unknown;
 get_value_type(Value, _Type) when is_number(Value) ->
     Value;
 get_value_type(Value, count) when is_tuple(Value) ->
@@ -609,21 +611,51 @@ get_lb_module() ->
 
 -spec collect_stats() -> boolean().
 collect_stats() ->
-    config:read(lb_active_collect_stats).
+    Metrics = [cpu, mem, db_reads, db_writes, db_requests, transactions],
+    lists:member(config:read(lb_active_metric), Metrics).
+
+-spec monitor_db() -> boolean().
+monitor_db() ->
+    case erlang:get(monitor_db) of
+        undefined ->
+            Metrics = [db_reads, db_writes, db_requests],
+            Status = lists:member(config:read(lb_active_metric), Metrics),
+            erlang:put(monitor_db, Status),
+            Status;
+        Val -> Val
+    end.
 
 -spec trigger(atom()) -> ok.
 trigger(Trigger) ->
-    Interval = config:read(lb_active_interval),
+    Interval =
+        case Trigger of
+            lb_trigger -> config:read(lb_active_interval);
+            collect_stats -> config:read(lb_active_monitor_interval)
+        end,
     msg_delay:send_trigger(Interval div 1000, {Trigger}).
 
 %% @doc config check registered in config.erl
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_in(lb_active_module, ?MODULES) andalso
+
     config:cfg_is_integer(lb_active_interval) andalso
     config:cfg_is_greater_than(lb_active_interval, 0) andalso
-    config:cfg_is_bool(lb_active_monitor_db) andalso
+
     config:cfg_is_in(lb_active_metric, ?METRICS) andalso
+
     config:cfg_is_bool(lb_active_use_gossip) andalso
     config:cfg_is_greater_than(lb_active_gossip_stddev_threshold, 0) andalso
+
+    config:cfg_is_integer(lb_active_histogram_size) andalso
+    config:cfg_is_greater_than(lb_active_histogram_size, 0) andalso
+
+    config:cfg_is_integer(lb_active_monitor_resolution) andalso
+    config:cfg_is_greater_than(lb_active_monitor_resolution, 0) andalso
+
+    config:cfg_is_integer(lb_active_monitor_interval) andalso
+    config:cfg_is_greater_than(lb_active_monitor_interval, 0) andalso
+
+    config:cfg_is_less_than(lb_active_monitor_interval, config:read(lb_active_monitor_resolution)) andalso
+
     apply(get_lb_module(), check_config, []).
