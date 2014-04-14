@@ -119,8 +119,22 @@ handle_msg({publish_trigger}, State) ->
           % post_load()
           MyDHT = pid_groups:get_my(dht_node),
           DirKey = int_to_str(get_random_directory_key()),
-          comm:send_local(MyDHT, {lb_active, {request_load, DirKey, self()}}),
+          % request dht load to post it in the directory afterwards
+          request_dht_load(),
           State#state{schedule = []}
+    end;
+
+%% we received load because of publish load trigger or emergency
+handle_msg({post_load, LoadInfo, DirKey}, State) ->
+    ?TRACE("Posting load ~p~n", [LoadInfo]),
+    post_load_to_directory(LoadInfo, DirKey),
+    %% TODO Emergency Threshold has been already check at the node overloaded...
+    EmergencyThreshold = State#state.threshold_emergency,
+    case LoadInfo#lb_info.utilization > EmergencyThreshold of
+        true  ->
+            MySchedule = State#state.schedule,
+            directory_routine(DirKey, emergency, MySchedule);
+        false -> State
     end;
 
 handle_msg({directory_trigger}, State) ->
@@ -149,19 +163,6 @@ handle_msg({get_state_response, MyRange}, State) ->
     MyDirectories = [int_to_str(Dir) || Dir <- Directories, intervals:in(Dir, MyRange)],
     ?TRACE("~p: I am responsible for ~p~n", [self(), MyDirectories]),
     State#state{my_dirs = MyDirectories};
-
-%% we received load because of publish load trigger or emergency
-handle_msg({post_load, LoadInfo, DirKey}, State) ->
-    ?TRACE("Posting load ~p~n", [LoadInfo]),
-    post_load_to_directory(LoadInfo, DirKey),
-    %% TODO Emergency Threshold has been already check at the node overloaded...
-    EmergencyThreshold = State#state.threshold_emergency,
-    case LoadInfo#lb_info.utilization > EmergencyThreshold of
-        true  ->
-            MySchedule = State#state.schedule,
-            directory_routine(DirKey, emergency, MySchedule);
-        false -> State
-    end;
 
 handle_msg(Msg, State) ->
     ?TRACE("Unknown message: ~p~n", [Msg]),
@@ -213,6 +214,9 @@ directory_routine(DirKey, Type, Schedule) ->
             Pool = Directory#directory.pool,
             K = case Type of
                     periodic ->
+                        %% clear directory only for periodic
+                        NewDirectory = dir_clear_load(Directory),
+                        set_directory(TLog, NewDirectory),
                         AvgUtil = gb_sets:fold(fun(El, Acc) -> Acc + El#lb_info.utilization end, 0, Pool) / gb_sets:size(Pool),
                         (1 + AvgUtil) / 2;
                     emergency ->
@@ -222,9 +226,6 @@ directory_routine(DirKey, Type, Schedule) ->
             HeavyNodes = gb_sets:filter(fun(El) -> El#lb_info.utilization >  K end, Pool),
             ScheduleNew = find_matches(LightNodes, HeavyNodes, []),
             ?TRACE("New schedule: ~p~n", [ScheduleNew]),
-            NewDirectory = dir_clear_load(Directory),
-            %% TODO Should this be inside a transcaction? We may not want atomic attributes here
-            set_directory(TLog, NewDirectory),
             ScheduleNew
     end.
 
@@ -322,7 +323,8 @@ pop_load_in_directory(DirKey) ->
         {TLog2, {ok, Directory}} ->
             case api_tx:req_list(TLog2, [{write, DirKey, dir_clear_load(Directory)}, {commit}]) of
                 {[], ok, ok} -> Directory;
-                _ -> pop_load_in_directory(DirKey)
+                Error -> log:log(warn, "~p: Failed to save directory ~p because of failed transaction: ~p", [?MODULE, DirKey, Error]),
+                         pop_load_in_directory(DirKey)
             end;
         {_TLog2, {fail, not_found}} ->
             log:log(warn, "~p: Directory not found while posting load. This should never happen...", [?MODULE])
@@ -375,6 +377,11 @@ state_get(Key, #state{my_dirs = Dirs}) ->
 request_dht_range() ->
     MyDHT = pid_groups:get_my(dht_node),
     comm:send_local(MyDHT, {get_state, comm:this(), my_range}).
+
+-spec request_dht_load() -> ok.
+request_dht_load() ->
+    MyDHT = pid_groups:find_a(dht_node),
+    comm:send_local(MyDHT, {lb_active, {request_load, self()}}).
 
 -spec int_to_str(integer()) -> string().
 int_to_str(N) ->
