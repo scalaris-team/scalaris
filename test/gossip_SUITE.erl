@@ -251,13 +251,13 @@ get_load_for_interval(BucketInterval, MyRange, DB) ->
 compare(LoadInfo1, LoadInfo2) when is_tuple(LoadInfo1) andalso is_tuple(LoadInfo2) ->
     %% log:log("LoadInfo1: ~w~n", [LoadInfo1]),
     %% log:log("LoadInfo2: ~w~n", [LoadInfo2]),
-    Fun = fun (Key, Acc) ->
+    Fun = fun (Key) ->
             Value1 = gossip_load:load_info_get(Key, LoadInfo1),
             Value2 = gossip_load:load_info_get(Key, LoadInfo2),
-            Acc andalso calc_diff(Value1, Value2) < 5.0
+            calc_diff(Value1, Value2) < 5.0
     end,
     % merged counter is excluded from comparison
-    lists:foldl(Fun, true, [avgLoad, stddev, size_ldr, size_kr, minLoad, maxLoad]);
+    lists:all(Fun, [avgLoad, stddev, size_ldr, size_kr, minLoad, maxLoad]);
 
 compare(Histo1, Histo2) when is_list(Histo1) andalso is_list(Histo2) ->
     Fun = fun(Val1, Val2) -> calc_diff(Val1, Val2) < 5.0 end,
@@ -266,7 +266,7 @@ compare(Histo1, Histo2) when is_list(Histo1) andalso is_list(Histo2) ->
 
 
 %% @doc Calculates the difference in percent from one value to another value.
--spec calc_diff(Value1::float(), Value2::float()) -> float().
+-spec calc_diff(Value1::float()|unknown, Value2::float()|unknown) -> float().
 calc_diff(Value1, Value2) ->
     if
         (Value1 =/= unknown) andalso (Value1 =:= Value2) -> 0.0;
