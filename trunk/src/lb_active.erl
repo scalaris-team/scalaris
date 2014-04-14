@@ -36,7 +36,7 @@
 %% for db monitoring
 -export([init_db_monitors/0, update_db_monitor/2]).
 %% Metrics
--export([get_load_metric/0, get_load_metric/1]).
+-export([get_load_metric/0, get_load_metric/2]).
 % Load Balancing
 -export([balance_nodes/3, balance_nodes/4, balance_noop/1]).
 
@@ -473,7 +473,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                             %% gossip not available, skipping this test
                             false -> true
                         end,
-                    case StdDevTest of
+                    case StdDevTest andalso TakenLoad > 0 of
                         false -> ?TRACE("No balancing: stddev was not reduced enough.~n", []);
                         true ->
                             ?TRACE("Sending out lb op.~n", []),
@@ -532,6 +532,7 @@ update_db_monitor(Type, Value) ->
 %%
 %%             end,
             monitor:proc_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
+            %monitor:monitor_set_value(lb_active, Type, fun(Old) -> rrd:add_now(Value, Old) end);
         _ -> ok
     end.
 
@@ -541,7 +542,7 @@ init_stats() ->
         true ->
             Interval = config:read(lb_active_monitor_resolution),
             %LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
-            ShortTerm = rrd:create(Interval * 1000, 1, gauge),
+            ShortTerm = rrd:create(Interval * 1000, 5, gauge),
             %monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
             monitor:client_monitor_set_value(lb_active, cpu10sec, ShortTerm),
             %monitor:client_monitor_set_value(lb_active, mem5min, LongTerm),
@@ -569,47 +570,57 @@ monitor_vals_appeared() ->
 -spec get_load_metric() -> items | number().
 get_load_metric() ->
     Metric = config:read(lb_active_metric),
-    case get_load_metric(Metric) of
+    Current = case get_load_metric(Metric, 0) of
         unknown -> 0; %% no monitor data available due to inactivity of this node
         Val -> Val
-    end.
+    end,
+    Previous = case get_load_metric(Metric, 1) of
+        unknown -> 0; %% no monitor data available due to inactivity of this node
+        Val2 -> Val2
+    end,
+    PreviousPrevious = case get_load_metric(Metric, 1) of
+        unknown -> 0; %% no monitor data available due to inactivity of this node
+        Val3 -> Val3
+    end,
+    %% TODO config parameter
+    Average = 0.7 * Current + 0.2 * Previous + 0.1 * PreviousPrevious,
+    io:format("Load: ~p~n", [Average]), Average. %%TODO
 
--spec get_load_metric(metric()) -> unknown | items | number().
-get_load_metric(Metric) ->
+-spec get_load_metric(metric(), non_neg_integer()) -> unknown | items | number().
+get_load_metric(Metric, Offset) ->
             case Metric of
-                cpu          -> get_vm_metric({lb_active, cpu10sec}, count) / 100;
-                mem          -> get_vm_metric({lb_active, mem10sec}, count) / 100;
-                db_reads     -> get_dht_metric({lb_active, db_reads}, count);
-                db_writes    -> get_dht_metric({lb_active, db_writes}, count);
-                db_requests  -> get_load_metric(db_reads) + get_load_metric(db_writes);
-                tx_latency   -> get_dht_metric({api_tx, req_list}, avg);
-                transactions -> get_dht_metric({api_tx, req_list}, count);
+                cpu          -> get_vm_metric({lb_active, cpu10sec}, count, Offset) / 100;
+                mem          -> get_vm_metric({lb_active, mem10sec}, count, Offset) / 100;
+                db_reads     -> get_dht_metric({lb_active, db_reads}, count, Offset);
+                db_writes    -> get_dht_metric({lb_active, db_writes}, count, Offset);
+                db_requests  -> get_load_metric(db_reads, Offset) + get_load_metric(db_writes, Offset);
+                tx_latency   -> get_dht_metric({api_tx, req_list}, avg, Offset);
+                transactions -> get_dht_metric({api_tx, req_list}, count, Offset);
                 items        -> items;
                 _            -> throw(metric_not_available)
     end.
 
--spec get_vm_metric(metric(), avg | count) -> unknown | number().
-get_vm_metric(Metric, Type) ->
+-spec get_vm_metric(metric(), avg | count, non_neg_integer()) -> unknown | number().
+get_vm_metric(Metric, Type, Offset) ->
     ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-    get_metric(ClientMonitorPid, Metric, Type).
+    get_metric(ClientMonitorPid, Metric, Type, Offset).
 
-get_dht_metric(Metric, Type) ->
+get_dht_metric(Metric, Type, Offset) ->
     MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, Metric, Type).
+    get_metric(MonitorPid, Metric, Type, Offset).
 
--spec get_metric(pid(), monitor:table_index(), avg | count) -> unknown | number().
-get_metric(MonitorPid, Metric, Type) ->
+-spec get_metric(pid(), monitor:table_index(), avg | count, non_neg_integer()) -> unknown | number().
+get_metric(MonitorPid, Metric, Type, Offset) ->
     [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [Metric]),
     case RRD of
         undefined ->
             unknown;
         RRD ->
             SlotLength = rrd:get_slot_length(RRD),
-            io:format("Slot Length: ~p~n", [SlotLength]),
             {MegaSecs, Secs, MicroSecs} = os:timestamp(),
             %% get stable value off an old slot
-            Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs-SlotLength}),
-            io:format("VAlue: ~p~n", [Value]),
+            Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs-Offset*SlotLength}),
+            %io:format("VAlue: ~p~n", [Value]), TODO
             get_value_type(Value, Type)
     end.
 
@@ -644,14 +655,14 @@ collect_stats() ->
 
 -spec monitor_db() -> boolean().
 monitor_db() ->
-    case erlang:get(monitor_db) of
-        undefined ->
+    %case erlang:get(monitor_db) of
+    %    undefined ->
             Metrics = [db_reads, db_writes, db_requests],
-            Status = lists:member(config:read(lb_active_metric), Metrics),
-            erlang:put(monitor_db, Status),
-            Status;
-        Val -> Val
-    end.
+            Status = lists:member(config:read(lb_active_metric), Metrics).
+   %         erlang:put(monitor_db, Status),
+   %         Status;
+   %     Val -> Val
+   % end.
 
 -spec trigger(atom()) -> ok.
 trigger(Trigger) ->
