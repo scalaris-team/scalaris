@@ -255,7 +255,7 @@ parse_type_({type, _Line, dict, []}, _Module, ParseState) ->
 parse_type_({type, _Line, queue, []}, _Module, ParseState) ->
     {{builtin_type, queue}, ParseState};
 parse_type_({type, _Line, gb_set, []}, _Module, ParseState) ->
-    {{builtin_type, gb_set}, ParseState};
+    {{builtin_type, gb_sets_set, {typedef, tester, test_any}}, ParseState};
 parse_type_({type, _Line, gb_tree, []}, _Module, ParseState) ->
     {{builtin_type, gb_trees_tree, {typedef, tester, test_any},
       {typedef, tester, test_any}}, ParseState};
@@ -276,6 +276,12 @@ parse_type_({remote_type, _Line, [{atom, _Line2, gb_trees},
     {Key2, ParseState2}   = parse_type(KeyType, Module, ParseState),
     {Value2, ParseState3}   = parse_type(ValueType, Module, ParseState2),
     {{builtin_type, gb_trees_tree, Key2, Value2}, ParseState3};
+% gb_sets:set(Value)
+parse_type_({remote_type, _Line, [{atom, _Line2, gb_sets},
+                                 {atom, _Line3, set}, [ValueType]]},
+           Module, ParseState) ->
+    {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
+    {{builtin_type, gb_sets_set, Value}, ParseState2};
 parse_type_({remote_type, _Line, [{atom, _Line2, TypeModule},
                                  {atom, _Line3, TypeName}, []]},
            _Module, ParseState) ->
@@ -370,6 +376,7 @@ parse_type_({ann_type,_Line,[Left,Right]}, _Module, ParseState) ->
     {{ann_type, [Left, Right]}, ParseState};
 parse_type_(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
+    ?DBG_ASSERT2(false, "unknown type found"),
     {unkown, ParseState}.
 
 -spec parse_type_list/3 :: (list(type_spec()), module(), tester_parse_state:state()) ->

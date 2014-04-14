@@ -95,8 +95,8 @@ create_value_({builtin_type, gb_trees_tree, KeyType, ValueType}, Size, ParseStat
                        end
                end, T, L)
     end;
-create_value_({builtin_type, gb_set}, Size, ParseState) ->
-    L = create_value({list, {typedef, tester, test_any}}, Size, ParseState),
+create_value_({builtin_type, gb_sets_set, ValueType}, Size, ParseState) ->
+    L = create_value({list, ValueType}, Size, ParseState),
     T = gb_sets:empty(),
     case L of
         [] -> T;
