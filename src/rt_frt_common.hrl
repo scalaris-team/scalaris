@@ -60,7 +60,7 @@
 %%% RT Implementation
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type key() :: 0..16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF. % 128 bit numbers
+-type key() :: rt_chord:key().
 -type external_rt_t_tree() :: gb_trees:tree(NodeId::key(), Node::node:node_type()).
 -type external_rt() :: {Size :: unknown | float(), external_rt_t_tree()}. %% @todo: make opaque
 
@@ -134,21 +134,13 @@ init(Neighbors) ->
 
 %% @doc Hashes the key to the identifier space.
 -spec hash_key(client_key() | binary()) -> key().
-hash_key(Key) ->
-    <<N:128>> = ?CRYPTO_MD5(client_key_to_binary(Key)),
-    N.
+hash_key(Key) -> rt_chord:hash_key(Key).
 %% userdevguide-end rt_frtchord:hash_key
 
 %% userdevguide-begin rt_frtchord:get_random_node_id
 %% @doc Generates a random node id, i.e. a random 128-bit number.
 -spec get_random_node_id() -> key().
-get_random_node_id() ->
-    case config:read(key_creator) of
-        random -> hash_key(randoms:getRandomString());
-        random_with_bit_mask ->
-            {Mask1, Mask2} = config:read(key_creator_bitmask),
-            (hash_key(randoms:getRandomString()) band Mask2) bor Mask1
-    end.
+get_random_node_id() -> rt_chord:get_random_node_id().
 %% userdevguide-end rt_frtchord:get_random_node_id
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -273,17 +265,10 @@ get_size(RT) -> external_rt_get_size(RT).
 n() -> 16#100000000000000000000000000000000.
 %% userdevguide-end rt_frtchord:n
 
-%% @doc Keep a key in the address space. See n/0.
--spec normalize(Key::key()) -> key().
-normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
-
 %% @doc Gets the number of keys in the interval (Begin, End]. In the special
 %%      case of Begin==End, the whole key range as specified by n/0 is returned.
 -spec get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
-get_range(Begin, Begin) -> n(); % I am the only node
-get_range(?MINUS_INFINITY, ?PLUS_INFINITY) -> n(); % special case, only node
-get_range(Begin, End) when End > Begin -> End - Begin;
-get_range(Begin, End) when End < Begin -> (n() - Begin) + End.
+get_range(Begin, End) -> rt_chord:get_range(Begin, End).
 
 %% @doc Gets the key that splits the interval (Begin, End] so that the first
 %%      interval will be (Num/Denom) * range(Begin, End). In the special case of
@@ -292,47 +277,24 @@ get_range(Begin, End) when End < Begin -> (n() - Begin) + End.
 %%      down and may thus be Begin.
 -spec get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
                     SplitFraction::{Num::non_neg_integer(), Denom::pos_integer()}) -> key() | ?PLUS_INFINITY_TYPE.
-get_split_key(Begin, _End, {Num, _Denom}) when Num == 0 -> Begin;
-get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
-get_split_key(Begin, End, {Num, Denom}) ->
-    normalize(Begin + (get_range(Begin, End) * Num) div Denom).
+get_split_key(Begin, End, SplitFraction) ->
+    rt_chord:get_split_key(Begin, End, SplitFraction).
 
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and
 %%      calculates a random key in this range. Fails with an exception if there
 %%      is no key.
 -spec get_random_in_interval(intervals:simple_interval2()) -> key().
-get_random_in_interval({LBr, L, R, RBr}) ->
-    case intervals:wraps_around(LBr, L, R, RBr) of
-        false -> normalize(get_random_in_interval2(LBr, L, R, RBr));
-        true  -> normalize(get_random_in_interval2(LBr, L, ?PLUS_INFINITY + R, RBr))
-    end.
-
-% TODO: return a failure constant if the interval is empty? (currently fails with an exception)
--spec get_random_in_interval2(intervals:left_bracket(), key(), non_neg_integer(),
-                              intervals:right_bracket()) -> non_neg_integer().
-get_random_in_interval2('[', L, R, ')') ->
-    randoms:rand_uniform(L, R);
-get_random_in_interval2('(', L, R, ')') ->
-    randoms:rand_uniform(L + 1, R);
-get_random_in_interval2('(', L, R, ']') ->
-    randoms:rand_uniform(L + 1, R + 1);
-get_random_in_interval2('[', L, R, ']') ->
-    randoms:rand_uniform(L, R + 1).
+get_random_in_interval(SimpleI) ->
+    rt_chord:get_random_in_interval(SimpleI).
 
 %% userdevguide-begin rt_frtchord:get_replica_keys
 %% @doc Returns the replicas of the given key.
 -spec get_replica_keys(key()) -> [key()].
-get_replica_keys(Key) ->
-    [Key,
-     Key bxor 16#40000000000000000000000000000000,
-     Key bxor 16#80000000000000000000000000000000,
-     Key bxor 16#C0000000000000000000000000000000
-    ].
+get_replica_keys(Key) -> rt_chord:get_replica_keys(Key).
 %% userdevguide-end rt_frtchord:get_replica_keys
 
 -spec get_key_segment(key()) -> pos_integer().
-get_key_segment(Key) ->
-    (Key bsr 126) + 1.
+get_key_segment(Key) -> rt_chord:get_key_segment(Key).
 
 %% userdevguide-begin rt_frtchord:dump
 %% @doc Dumps the RT state for output in the web interface.
@@ -391,20 +353,18 @@ check_config() ->
 %% TODO I floor the key for now; the key generator should return ints, but returns
 %float. It is currently unclear if this is a bug in the original paper by Nagao and
 %Shudo. Using erlang:trunc/1 should be enough for flooring, as X >= 0
-% TODO using the remainder might destroy the CDF. why can X > 2^128?
 -spec get_random_key_from_generator(SourceNodeId :: key(),
                                     PredId :: key(),
                                     SuccId :: key()
                                    ) -> key().
 get_random_key_from_generator(SourceNodeId, PredId, SuccId) ->
     Rand = random:uniform(),
-    X = SourceNodeId + get_range(SourceNodeId, SuccId) *
-        math:pow(get_range(SourceNodeId, PredId) /
-                    get_range(SourceNodeId, SuccId),
-                    Rand
-                ),
-    erlang:trunc(X) rem n()
-    .
+    X = erlang:trunc(get_range(SourceNodeId, SuccId) *
+                         math:pow(get_range(SourceNodeId, PredId) /
+                                      get_range(SourceNodeId, SuccId),
+                                  Rand
+                                 )),
+    rt_chord:add_range(SourceNodeId, X).
 
 %% userdevguide-begin rt_frtchord:handle_custom_message
 %% @doc Handle custom messages. The following messages can occur:

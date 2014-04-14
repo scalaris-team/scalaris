@@ -35,6 +35,8 @@
 
 -define(SEND_OPTIONS, [{channel, prio}]).
 
+-export([add_range/2]).
+
 % Note: must include rt_beh.hrl AFTER the type definitions for erlang < R13B04
 % to work.
 -include("rt_beh.hrl").
@@ -119,6 +121,11 @@ normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
 %% @doc Returns the size of the address space.
 -spec n() -> 16#100000000000000000000000000000000.
 n() -> 16#100000000000000000000000000000000.
+
+%% @doc Adds the given range, i.e. Range/n() parts of the key space, to the
+%%      given key.
+-spec add_range(key(), Range::non_neg_integer()) -> key().
+add_range(Key, Range) -> normalize(Key + Range).
 
 %% @doc Gets the number of keys in the interval (Begin, End]. In the special
 %%      case of Begin==End, the whole key range as specified by n/0 is returned.
