@@ -34,7 +34,7 @@
 %% for calls from the dht node
 -export([handle_dht_msg/2]).
 %% for db monitoring
--export([init_db_monitors/2, update_db_monitor/2]).
+-export([init_db_rrd/2, update_db_rrd/2, update_db_monitor/2]).
 %% Metrics
 -export([get_load_metric/0, get_request_metric/0]).
 % Load Balancing
@@ -72,6 +72,8 @@
 
 -type load_metric() :: items | cpu | mem | tx_latency | net_throughput.
 -type request_metric() :: db_reads | db_writes | db_requests.
+-type balance_metric() :: items | requests | none.
+-type metrics() :: [atom()]. %% TODO
 
 %% available metrics
 -define(LOAD_METRICS, [items, cpu, mem, db_reads, db_writes, db_requests, transactions, tx_latency, net_throughput]). 
@@ -435,9 +437,14 @@ is_simulation(Options) ->
 -spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
 
 handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
-    MyRange = dht_node_state:get(DhtState, my_range),
-    MyId = dht_node_state:get(DhtState, node_id),
-    init_db_monitors(MyId, MyRange),
+    case monitor_db() of
+        true ->
+            MyRange = dht_node_state:get(DhtState, my_range),
+            MyId = dht_node_state:get(DhtState, node_id),
+            DhtNodeMonitor = dht_node_state:get(DhtState, monitor_proc),
+            comm:send_local(DhtNodeMonitor, {db_op_init, MyId, MyRange});
+        false -> ok
+    end,
     DhtState;
 
 %% We received a jump or slide operation from a LightNode.
@@ -561,59 +568,62 @@ handle_dht_msg(Msg, DhtState) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-compile({inline, [init_db_rrd/2]}).
 %% @doc Called by dht node process to initialize the db monitors
--spec init_db_monitors(MyId::?RT:key(), MyRange::intervals:interval()) -> ok.
-init_db_monitors(MyId, MyRange) ->
-    case monitor_db() of
+-spec init_db_rrd(MyId::?RT:key(), MyRange::intervals:interval()) -> rrd:rrd().
+init_db_rrd(MyId, MyRange) ->
+    Type = config:read(lb_active_db_monitor),
+    History = config:read(lb_active_monitor_history),
+    HistogramSize = config:read(lb_active_histogram_size),
+    HistogramType =
+        case intervals:in(?MINUS_INFINITY, MyRange) andalso MyRange =/= intervals:all() of
+            false ->
+                {histogram, HistogramSize};
+            true -> %% we need a normalized histogram because of the circular key space
+                NormFun =
+                    fun(Val) ->
+                            case Val - MyId of
+                                NormVal when NormVal =< ?MINUS_INFINITY ->
+                                    ?PLUS_INFINITY + NormVal - 1;
+                                NormVal ->
+                                    NormVal - 1
+                            end
+                    end,
+                InverseFun =
+                    fun(NormVal) ->
+                            (NormVal + MyId + 1) rem ?PLUS_INFINITY
+                    end,
+                {histogram, HistogramSize, NormFun, InverseFun}
+        end,
+    MonitorResSecs = config:read(lb_active_monitor_resolution) div 1000,
+    {MegaSecs, Secs, _Microsecs} = os:timestamp(),
+    %% synchronize the start time for all monitors to a divisible of the monitor interval
+    StartTime = {MegaSecs, Secs - Secs rem MonitorResSecs + MonitorResSecs, 0},
+    RRD  = rrd:create(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
+    Monitor = pid_groups:get_my(monitor),
+    monitor:clear_rrds(Monitor, [{lb_active, Type}]),
+    monitor:monitor_set_value(lb_active, Type, RRD),
+    RRD.
+
+-compile({inline, [update_db_monitor/2]}).
+%% @doc Updates the local rrd for reads or writes and checks for reporting
+-spec update_db_monitor(Type::db_reads | db_writes, Value::?RT:key()) -> ok.
+update_db_monitor(Type, Value) ->
+    case monitor_db() andalso config:read(lb_active_db_monitor) =:= Type of
         true ->
-            History = config:read(lb_active_monitor_history),
-            HistogramSize = config:read(lb_active_histogram_size),
-            HistogramType =
-                case intervals:in(?MINUS_INFINITY, MyRange) andalso MyRange =/= intervals:all() of
-                    false ->
-                        {histogram, HistogramSize};
-                    true -> %% we need a normalized histogram because of the circular key space
-                        NormFun =
-                            fun(Val) ->
-                                    case Val - MyId of
-                                        NormVal when NormVal =< ?MINUS_INFINITY ->
-                                            ?PLUS_INFINITY + NormVal - 1;
-                                        NormVal ->
-                                            NormVal - 1
-                                    end
-                            end,
-                        InverseFun =
-                            fun(NormVal) ->
-                                    (NormVal + MyId + 1) rem ?PLUS_INFINITY
-                            end,
-                        {histogram, HistogramSize, NormFun, InverseFun}
-                end,
-            MonitorResSecs = config:read(lb_active_monitor_resolution) div 1000,
-            {MegaSecs, Secs, _Microsecs} = os:timestamp(),
-            %% synchronize the start time for all monitors to a divisible of the monitor interval
-            StartTime = {MegaSecs, Secs - Secs rem MonitorResSecs + MonitorResSecs, 0},
-            Reads  = rrd:create(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
-            Writes = rrd:create(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
-            Monitor = pid_groups:get_my(monitor),
-            monitor:proc_clear_value(lb_active, db_reads),
-            monitor:proc_clear_value(lb_active, db_writes),
-            monitor:clear_rrds(Monitor, [{lb_active, db_reads}, {lb_active, db_writes}]),
-            monitor:proc_set_value(lb_active, db_reads, Reads),
-            monitor:proc_set_value(lb_active, db_writes, Writes),
-            monitor:monitor_set_value(lb_active, db_reads, Reads),
-            monitor:monitor_set_value(lb_active, db_writes, Writes);
+            DhtNodeMonitor = pid_groups:get_my(dht_node_monitor),
+            comm:send_local(DhtNodeMonitor, {db_op, Value});
         _ -> ok
     end.
 
+-compile({inline, [update_db_rrd/2]}).
 %% @doc Updates the local rrd for reads or writes and checks for reporting
--spec update_db_monitor(Type::db_reads | db_writes, Value::?RT:key()) -> ok;
-                       (Type::items, Value::non_neg_integer())   -> ok.
-update_db_monitor(Type, Value) ->
-    case monitor_db() of
-        true -> monitor:proc_set_value(lb_active, Type,
-                                       fun(Old) -> rrd:add_now(Value, Old) end);
-        _ -> ok
-    end.
+-spec update_db_rrd(Value::?RT:key(), RRD::rrd:rrd()) -> rrd:rrd().
+update_db_rrd(Key, OldRRD) ->
+    Type = config:read(lb_active_db_monitor),
+    NewRRD = rrd:add_now(Key, OldRRD),
+    monitor:check_report(lb_active, Type, OldRRD, NewRRD),
+    NewRRD.
 
 -spec init_stats() -> ok.
 init_stats() ->
@@ -824,17 +834,10 @@ collect_stats() ->
     Metrics = [cpu, mem],
     lists:member(config:read(lb_active_load_metric), Metrics).
 
-% TODO!
+-compile({inline, [monitor_db/0]}).
 -spec monitor_db() -> boolean().
 monitor_db() ->
-    %case erlang:get(monitor_db) of
-    %    undefined ->
-            Metrics = [db_reads, db_writes, db_requests],
-            _Status = lists:member(config:read(lb_active_request_metric), Metrics).
-   %         erlang:put(monitor_db, Status),
-   %         Status;
-   %     Val -> Val
-   % end.
+    config:read(lb_active_db_monitor) =/= none.
 
 -spec trigger(atom()) -> ok.
 trigger(Trigger) ->
@@ -877,6 +880,8 @@ check_config() ->
 
     config:cfg_is_integer(lb_active_monitor_history) and
     config:cfg_is_greater_than(lb_active_monitor_history, 0) and
+
+    config:cfg_is_in(lb_active_db_monitor, [none, db_reads, db_writes]) and
 
     config:cfg_is_integer(lb_active_wait_for_pending_ops) and
     config:cfg_is_greater_than(lb_active_wait_for_pending_ops, 0) and
