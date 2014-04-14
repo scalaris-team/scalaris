@@ -31,6 +31,10 @@
 -export([get_load_change_slide/4, get_load_change_jump/5]).
 -export([get_oldest_data_time/1]).
 
+-ifdef(with_export_type_support).
+-export_type([lb_info/0]).
+-endif.
+
 -type load() :: number().
 
 -record(lb_info, {load  = unknown                   :: unknown | load(),
@@ -43,17 +47,13 @@
 
 -opaque lb_info() :: #lb_info{}.
 
--ifdef(with_export_type_support).
--export_type([lb_info/0]).
--endif.
-
 %% Convert node details to lb_info
 -spec new(NodeDetails::node_details:node_details()) -> lb_info().
 new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
-    Load = case lb_active:get_load_metric() of
+    Load = case config:read(lb_active_load_metric) of
                items -> Items;
-               Metric -> Metric
+               _ -> lb_active:get_load_metric()
            end,
     Requests = lb_active:get_request_metric(),
     #lb_info{load  = Load,

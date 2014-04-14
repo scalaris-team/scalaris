@@ -386,7 +386,7 @@ balance_nodes(HeavyNode, LightNode, LightNodeSucc, Options) ->
     end.
 
 -spec balance_noop(options()) -> ok.
-%% no op but we sent back simulation results
+%% no op but we send back simulation results
 balance_noop(Options) ->
     case proplists:get_value(simulate, Options) of
         undefined -> ok;
@@ -631,12 +631,12 @@ collect_phase() ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_load_metric() -> items | number().
+-spec get_load_metric() -> number().
 get_load_metric() ->
     Metric = config:read(lb_active_load_metric),
     Value = case get_load_metric(Metric) of
                 unknown -> 0.0;
-                items -> items;
+                items -> 0.0;
                 Val -> util:round(Val, 2)
             end,
     %io:format("Load: ~p~n", [Value]),
