@@ -837,7 +837,7 @@ collect_stats() ->
 -compile({inline, [monitor_db/0]}).
 -spec monitor_db() -> boolean().
 monitor_db() ->
-    config:read(lb_active_db_monitor) =/= none.
+    is_enabled() andalso config:read(lb_active_db_monitor) =/= none.
 
 -spec trigger(atom()) -> ok.
 trigger(Trigger) ->
