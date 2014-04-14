@@ -27,6 +27,7 @@
          new_sending_slide_jump/6,
          update_target_id/4,
          other_type_to_my_type/1,
+         is_slide/1,
          is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1, is_jump/2,
          is_incremental/1,
          get_id/1, get_node/1, get_interval/1, get_target_id/1, get_jump_target_id/1,
@@ -378,6 +379,11 @@ other_type_to_my_type({TypeTag, SendOrReceive}) ->
                            ('rcv') -> 'send'.
 switch_sendORreceive2('send') -> 'rcv';
 switch_sendORreceive2('rcv') -> 'send'.
+
+%% @doc Returns whether the given term is a slide op or not.
+-spec is_slide(any()) -> boolean().
+is_slide(#slide_op{}) -> true;
+is_slide(_) -> false.
 
 %% @doc Returns whether the given slide op or type is a join operation.
 -spec is_join(SlideOp::slide_op() | type()) -> boolean().

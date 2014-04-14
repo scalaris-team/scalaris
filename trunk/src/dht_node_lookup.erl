@@ -116,11 +116,11 @@ lookup_fin_chord(State, Key, Hops, Msg) ->
                     SlidePred = dht_node_state:get(State, slide_pred),
                     SlideSucc = dht_node_state:get(State, slide_succ),
                     Neighbors = dht_node_state:get(State, neighbors),
-                    case ((SlidePred =/= null andalso
+                    case ((slide_op:is_slide(SlidePred) andalso
                                slide_op:get_sendORreceive(SlidePred) =:= 'send' andalso
                                intervals:in(Key, slide_op:get_interval(SlidePred)))
                               orelse
-                              (SlideSucc =/= null andalso
+                              (slide_op:is_slide(SlideSucc) andalso
                                    slide_op:get_sendORreceive(SlideSucc) =:= 'send' andalso
                                    intervals:in(Key, slide_op:get_interval(SlideSucc)))
                               orelse
