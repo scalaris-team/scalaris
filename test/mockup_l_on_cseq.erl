@@ -114,16 +114,17 @@ on(Msg, {State, MockState}) when l_on_cseq =:= element(1, Msg) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec init(any()) -> {dht_node_state:state(), mock_state_t()}.
-init(_) ->
+-spec init({comm:mypid()}) -> {dht_node_state:state(), mock_state_t()}.
+init({Owner}) ->
     DHTNodeGrp = pid_groups:group_with(dht_node),
     pid_groups:join_as(DHTNodeGrp, ?MODULE),
     ct:log("mock_l_on_cseq running on ~w~n", [self()]),
+    comm:send_local(Owner, {pong, mockup_l_on_cseq}),
     {dht_node_state:new(rt_external_rt, rm_loop_state, dht_db), new_mock_state()}.
 
 -spec start_link() -> {ok, pid()}.
 start_link() ->
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, {}, []).
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, {self()}, []).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % mock_state
