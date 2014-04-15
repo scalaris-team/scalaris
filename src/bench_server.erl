@@ -135,12 +135,11 @@ run_threads(Threads, Bench) ->
                          receive
                              ?SCALARIS_RECV({start_thread}, ok)
                          end,
-                log:log("Bench is infected ~p", [proto_sched:infected()]),
-
+                         log:log(debug, "Bench is infected ~p", [proto_sched:infected()]),
                          Bench(Self),
                          trace_mpath:thread_yield()
                        end),
-               log:log("Sending to spawned Bench ~p", [proto_sched:infected()]),
+                         log:log(debug, "Sending to spawned Bench ~p", [proto_sched:infected()]),
                comm:send_local(Pid, {start_thread})
        end),
     ok.
