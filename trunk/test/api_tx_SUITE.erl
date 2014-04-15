@@ -439,22 +439,18 @@ ops_on_not_found(_Config) ->
                  [{ok}]}
               },
               { {add_del_on_list, "a", 7, 8},
-                %% {77,\"a\",-1,84,0,75,<<131,107,0,1,7>>}]
                 {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
                  [{fail, not_a_list}]}
               },
               { {add_on_nr, "a", 7},
-                %% {77,\"a\",-1,84,0,75,7}]
                 {[{?write,"a",-1,?ok,0,?value,7}],
                  [{ok}]}
               },
               { {add_on_nr, "a", [7]},
-                %% {77,\"a\",-1,84,0,75,7}]
                 {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
                  [{fail, not_a_number}]}
               },
               { {test_and_set, "a", 0, 7},
-                %% {77,\"a\",-1,84,0,75,7}]
                 {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
                  [{fail,not_found}]}
               }
