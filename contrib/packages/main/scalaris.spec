@@ -23,8 +23,8 @@ Requires:       screen
 ## Fedora, RHEL or CentOS
 ##########################################################################################
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
-BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-parsetools, erlang-ssl, erlang-tools, erlang-xmerl
-Requires:       erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl
+BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-parsetools, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
+Requires:       erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl, erlang-os_mon
 BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
