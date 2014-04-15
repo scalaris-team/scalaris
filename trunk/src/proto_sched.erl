@@ -68,7 +68,7 @@
 %%
 %% Quick start:
 %% 1. call proto_sched:thread_num(N) %% seed has to be put somehow in
-%% 2. in each process/thread partifipating call
+%% 2. in each process/thread participating call
 %% 2.1. call proto_sched:thread_begin()
 %% 2.2. perform a synchronous request like api_tx:read("a")
 %% 2.3. call proto_sched:thread_end()
@@ -562,7 +562,7 @@ on({on_handler_done, TraceId, _Tag, To}, State) ->
 
                      %% enqueue a new deliver request for this TraceId
                      ?TRACE("~p proto_sched:on({on_handler_done, ~p})"
-                            " trigger next deliver 1.", [_To, TraceId]),
+                            " trigger next deliver 1.", [To, TraceId]),
                      comm:send_local(self(), {deliver, TraceId}),
                      %% set status to running
                      NewEntry = TraceEntry#state{status = running},
