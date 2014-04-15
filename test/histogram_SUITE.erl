@@ -25,8 +25,10 @@
 -compile(export_all).
 
 all()   -> [
-            add,
-            add_identical,
+            add2,
+            add3,
+            add2_identical,
+            add3_identical,
             resize,
             insert,
             find_smallest_interval,
@@ -43,14 +45,23 @@ init_per_suite(Config) ->
 end_per_suite(_Config) ->
     ok.
 
-add(_Config) ->
+add2(_Config) ->
     H = histogram:create(10),
     Values = [3.5, 3.0, 2.0, 1.0],
     H2 = lists:foldl(fun histogram:add/2, H, Values),
     ?equals(histogram:get_data(H2), [{1.0,1}, {2.0,1}, {3.0,1}, {3.5,1}]),
     ok.
 
-add_identical(_Config) ->
+add3(_Config) ->
+    H = histogram:create(10),
+    Values = [{3.5, 2}, {3.0, 1}, {2.0, 5}, {1.0, 7}],
+    H2 = lists:foldl(fun ({Value, Count}, Histogram) ->
+                              histogram:add(Value, Count, Histogram)
+                     end, H, Values),
+    ?equals(histogram:get_data(H2), [{1.0, 7}, {2.0, 5}, {3.0, 1}, {3.5, 2}]),
+    ok.
+
+add2_identical(_Config) ->
     H = histogram:create(3),
     Values = [1.25, 5.0, 5.0],
     H2 = lists:foldl(fun histogram:add/2, H, Values),
@@ -58,6 +69,16 @@ add_identical(_Config) ->
     H3 = histogram:add(7.0, H2),
     H4 = lists:foldl(fun histogram:add/2, H3, Values),
     ?equals(histogram:get_data(H4), [{1.25, 2}, {5.0, 4}, {7.0, 1}]),
+    ok.
+
+add3_identical(_Config) ->
+    H = histogram:create(10),
+    Values = [{2.0, 1}, {3.5, 2}, {3.0, 1}, {2.0, 6}, {1.0, 3}],
+    H2 = lists:foldl(fun({Value, Count}, Histogram) ->
+                             histogram:add(Value, Count, Histogram)
+                     end,
+                     H, Values),
+    ?equals(histogram:get_data(H2), [{1.0, 3}, {2.0, 7}, {3.0, 1}, {3.5, 2}]),
     ok.
 
 resize(_Config) ->
