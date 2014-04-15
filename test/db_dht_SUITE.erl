@@ -983,6 +983,12 @@ prop_get_split_key5(Keys2, Begin, End, TargetLoad, ForwardBackward) ->
 
     ?compare(fun erlang:'=<'/2, TakenLoad, TargetLoad),
     ?compare(fun erlang:'=<'/2, length(Chunk), TargetLoad),
+    case TakenLoad < TargetLoad of
+        true ->
+            ?equals(SplitKey, End);
+        _ ->
+            ok
+    end,
     ?equals(length(Chunk), TakenLoad),
     true.
 
