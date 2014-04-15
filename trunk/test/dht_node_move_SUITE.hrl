@@ -623,7 +623,7 @@ get_pred_node_succ2(NodePid, FailMsg) ->
         TargetId::?RT:key(), Tag::any(), NthNode::1..4, N::pos_integer(),
         Node::node:node_type(), Other::node:node_type()) -> ok.
 symm4_slide_load_test_slide(DhtNode, PredOrSucc, TargetId, Tag, NthNode, N, Node, Other) ->
-    comm:send_local(DhtNode, {move, start_slide, PredOrSucc, TargetId, Tag, self()}),
+    comm:send_local(DhtNode, {move, start_slide, PredOrSucc, TargetId, Tag, comm:this()}),
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
@@ -824,8 +824,8 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
                       proto_sched:register_callback(proto_sched_callback_fun())
               end,
               %% send out slides
-              comm:send(node:pidX(Node1), {move, start_slide, Direction1, TargetId1, {slide1, Direction1, Tag1}, self()}),
-              comm:send(node:pidX(Node2), {move, start_slide, Direction2, TargetId2, {slide2, Direction2, Tag2}, self()}),
+              comm:send(node:pidX(Node1), {move, start_slide, Direction1, TargetId1, {slide1, Direction1, Tag1}, comm:this()}),
+              comm:send(node:pidX(Node2), {move, start_slide, Direction2, TargetId2, {slide2, Direction2, Tag2}, comm:this()}),
               %% Continue once both slides have reached the gen_component
               case proto_sched:infected() of
                   false ->
@@ -997,7 +997,7 @@ test_slide_illegally(_Config) ->
               Tag = Slide#slideconf.name,
               ct:pal("Beginning ~p", [Tag]),
               ?proto_sched(start),
-              comm:send(node:pidX(Node), {move, start_slide, Direction, TargetId, {slide, Direction, Tag}, self()}),
+              comm:send(node:pidX(Node), {move, start_slide, Direction, TargetId, {slide, Direction, Tag}, comm:this()}),
     trace_mpath:thread_yield(),
               receive
                   ?SCALARIS_RECV({move, result, {slide, Direction, Tag}, target_id_not_in_range}, ok);

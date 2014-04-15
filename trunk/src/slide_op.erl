@@ -71,9 +71,9 @@
         {slide, continue, Id::?RT:key()} |
         {jump, continue, Id::?RT:key()} |
         {leave, continue} |
-        {slide, pred | succ, Id::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
-        {jump, Id::?RT:key(), Tag::any(), SourcePid::comm:erl_local_pid() | null} |
-        {leave, SourcePid::comm:erl_local_pid() | null} |
+        {slide, pred | succ, Id::?RT:key(), Tag::any(), SourcePid::comm:mypid() | null} |
+        {jump, Id::?RT:key(), Tag::any(), SourcePid::comm:mypid() | null} |
+        {leave, SourcePid::comm:mypid() | null} |
         {none}.
 
 -record(slide_op,
@@ -84,7 +84,7 @@
          target_id         = ?required(slide_op, target_id) :: ?RT:key(), % ID to move the predecessor of the two participating nodes to
          jump_target_id    = null                           :: ?RT:key() | null, % ID to jump to in case of a jump operation which is preceeded by a slide to leave
          tag               = ?required(slide_op, tag)       :: any(),
-         source_pid        = null              :: comm:erl_local_pid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
+         source_pid        = null              :: comm:mypid() | null, % pid of the process that requested the move (and will thus receive a message about its state)
          time_last_send    = never             :: erlang_timestamp() | never,
          time_next_warn    = never             :: erlang_timestamp() | never,
          send_errors       = 0                 :: non_neg_integer(),
@@ -101,7 +101,7 @@
 %% @doc Sets up a slide operation of the given type. One of the nodes will
 %%      change its ID to TargetId.
 -spec new_slide(MoveId::uid:global_uid(), Type::type(), CurTargetId::?RT:key(),
-                Tag::any(), SourcePid::comm:erl_local_pid() | null,
+                Tag::any(), SourcePid::comm:mypid() | null,
                 OtherMTE::unknown | pos_integer(), NextOp::next_op(),
                 Neighbors::nodelist:neighborhood())
         -> slide_op().
