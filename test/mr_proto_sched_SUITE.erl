@@ -26,10 +26,6 @@
 -define(proto_sched(Action),
         fun() -> %% use fun to have fresh, locally scoped variables
                 case Action of
-                    start ->
-                        %% ct:pal("Starting proto scheduler"),
-                        proto_sched:thread_num(1),
-                        proto_sched:thread_begin();
                     stop ->
                          %% is a ring running?
                         case erlang:whereis(pid_groups) =:= undefined
@@ -41,44 +37,50 @@
                                 %% process was running the proto_sched
                                 %% thats fine, otherwise thread_end()
                                 %% will raise an exception
-                                proto_sched:thread_end(),
-                                proto_sched:wait_for_end(),
-                                ct:pal("Proto scheduler stats: ~.2p",
-                                       [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]),
-                                proto_sched:cleanup()
-                        end
+                                proto_sched:thread_end()
+                        end;
+                    start ->
+                        proto_sched:thread_begin()
+                end
+        end()).
+-define(proto_sched2(Action, Arg),
+        fun() ->
+                case Action of
+                    setup ->
+                        proto_sched:thread_num(Arg);
+                    cleanup ->
+                        proto_sched:wait_for_end(),
+                        ct:pal("Proto scheduler stats: ~.2p",
+                               [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]),
+                        proto_sched:cleanup()
                 end
         end()).
 
 -include("mr_SUITE.hrl").
 
 all() ->
-tests_avail() ++ [%test_join, % TODO: re-activate when node join with proto_sched runs through in debug mode
-                  test_leave].
+tests_avail() ++ [test_join, test_leave].
 
 suite() -> [ {timetrap, {seconds, 15}} ].
 
 test_join(_Config) ->
-    spawn_link(fun() ->
-                       proto_sched:thread_begin(),
+    ?proto_sched2(setup, 2),
+    spawn(fun() ->
+                       ?proto_sched(start),
                        ct:pal("starting mr job"),
                        Res = api_mr:start_job(get_wc_job_erl()),
                        ct:pal("mr job finished"),
                        check_results(Res),
-                       proto_sched:thread_end()
+                       ?proto_sched(stop)
                end),
     ct:pal("adding node to provoke slide"),
-    spawn_link(fun() ->
-                       proto_sched:thread_begin(),
+    spawn(fun() ->
+                       ?proto_sched(start),
                        api_vm:add_nodes(2),
-                       proto_sched:thread_end()
+                       ?proto_sched(stop)
                end),
-    proto_sched:thread_num(2),
-    proto_sched:wait_for_end(),
-    unittest_helper:check_ring_size_fully_joined(4),
-    unittest_helper:wait_for_stable_ring_deep(),
+    ?proto_sched2(cleanup, []),
     ct:pal("ring fully joined (4)"),
-    proto_sched:cleanup(),
     ok.
 
 test_leave(_Config) ->
@@ -86,21 +88,20 @@ test_leave(_Config) ->
     {[AddedNode], _} = api_vm:add_nodes(1),
     unittest_helper:check_ring_size_fully_joined(2),
     unittest_helper:wait_for_stable_ring_deep(),
+    ?proto_sched2(setup, 2),
     spawn_link(fun() ->
-                       proto_sched:thread_begin(),
+                       ?proto_sched(start),
                        ct:pal("starting mr job"),
                        Res = api_mr:start_job(get_wc_job_erl()),
                        ct:pal("mr job finished"),
                        check_results(Res),
-                       proto_sched:thread_end()
+                       ?proto_sched(stop)
                end),
     ct:pal("shutting down node ~p to provoke slide", [AddedNode]),
     spawn_link(fun() ->
-                       proto_sched:thread_begin(),
+                       ?proto_sched(start),
                        api_vm:shutdown_node(AddedNode),
-                       proto_sched:thread_end()
+                       ?proto_sched(stop)
                end),
-    proto_sched:thread_num(2),
-    proto_sched:wait_for_end(),
-    proto_sched:cleanup(),
+    ?proto_sched2(cleanup, []),
     ok.
