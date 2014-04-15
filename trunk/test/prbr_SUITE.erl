@@ -284,6 +284,7 @@ tester_type_check_rbr(_Config) ->
            ]},
           {prbr,
            [ {on, 2},       %% sends messages
+             {get_load, 1}, %% needs valid tid()
              {set_entry, 2} %% needs valid tid()
           ],
            [ {msg_read_reply, 5},  %% sends messages
