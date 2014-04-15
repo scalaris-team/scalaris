@@ -160,7 +160,7 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
                 failed  -> {error, not_found};
                 DhtNode ->
                     UId = uid:get_pids_uid(),
-                    Self = comm:reply_as(self(), 3, {leave_result, UId, '_'}),
+                    Self = comm:reply_as(comm:this(), 3, {leave_result, UId, '_'}),
                     comm:send_local(DhtNode, {leave, Self}),
                     trace_mpath:thread_yield(),
                     receive
