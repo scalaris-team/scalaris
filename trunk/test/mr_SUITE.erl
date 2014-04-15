@@ -24,6 +24,13 @@
 
 %% no proto scheduler for this suite
 -define(proto_sched(_Action), ok).
+-define(proto_sched2(Action, Arg),
+        fun () ->
+                case Action of
+                    cleanup ->
+                        [util:wait_for_process_to_die(Pid) || Pid <- Arg]
+                end
+        end).
 
 -include("mr_SUITE.hrl").
 

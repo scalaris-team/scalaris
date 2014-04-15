@@ -48,9 +48,6 @@ init_per_testcase(_TestCase, Config) ->
     unittest_helper:wait_for_stable_ring_deep(),
     Pid = erlang:spawn(fun add_data/0),
     util:wait_for_process_to_die(Pid),
-    %% wait a bit for the rm-processes to settle
-    %% done by wait_for_stable_ring_deep
-    %% timer:sleep(500),
     Config.
 
 end_per_testcase(_TestCase, _Config) ->
@@ -58,25 +55,31 @@ end_per_testcase(_TestCase, _Config) ->
     ok.
 
 test_sane_result(_Config) ->
+    ?proto_sched2(setup, 1),
     ?proto_sched(start),
-    %% log:log("Start test_sane_result"),
+
     Res = api_mr:start_job(get_wc_job_erl()),
+
     %% each word only occurs once
-    check_results(Res),
     ?proto_sched(stop),
+    ?proto_sched2(cleanup, []),
+    check_results(Res),
     ok.
 
 test_error_on_kill(_Config) ->
-    ?proto_sched(start),
+    ?proto_sched2(setup, 2),
     MrPid = spawn_link(fun() ->
+                               ?proto_sched(start),
                                Res = api_mr:start_job(get_wc_job_erl()),
-                               ?equals(Res, {error, node_died})
-
+                               ?equals(Res, {error, node_died}),
+                               ?proto_sched(stop)
                        end),
-    KillPid = spawn_link(fun() -> api_vm:kill_nodes(1) end),
-    util:wait_for_process_to_die(MrPid),
-    util:wait_for_process_to_die(KillPid),
-    ?proto_sched(stop),
+    KillPid = spawn_link(fun() ->
+                                 ?proto_sched(start),
+                                 api_vm:kill_nodes(1),
+                                 ?proto_sched(stop)
+                         end),
+    ?proto_sched2(cleanup, [MrPid, KillPid]),
     ok.
 
 get_wc_job_erl() ->
