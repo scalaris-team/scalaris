@@ -183,8 +183,8 @@ resize(Histogram = #histogram{data = Data, size = ExpectedSize, data_size = Actu
     end.
 
 -spec insert(Value::data_item(), Data::data_list()) -> data_list().
-insert({Value, _}, [{Value2, Count} | Rest]) when Value =:= Value2 ->
-    [{Value, Count + 1} | Rest];
+insert({Value, Count}, [{Value2, Count2} | Rest]) when Value =:= Value2 ->
+    [{Value, Count + Count2} | Rest];
 insert({Value, _} = DataItem, [{Value2, _} | _] = Data) when Value < Value2 ->
     [DataItem | Data];
 insert(DataItem, [DataItem2 | Rest]) ->
