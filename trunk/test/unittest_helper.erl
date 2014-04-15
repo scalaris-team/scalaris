@@ -622,13 +622,13 @@ print_ring_data() ->
     ct:pal("Scalaris ring data:~n~.0p~n", [DataAll]).
 
 -spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(),
-                   ExpectedStr::string(), Note::iolist() | null) -> true | no_return().
+                   ExpectedStr::string(), Note::term()) -> true | no_return().
 macro_equals(Actual, ExpectedVal, ActualStr, ExpectedStr, Note) ->
     macro_compare(fun erlang:'=:='/2, Actual, ExpectedVal, "=:=", ActualStr, ExpectedStr, Note).
 
 -spec macro_compare(CompFun::fun((T, T) -> boolean()), Actual::any(), ExpectedVal::any(),
                     CompFunStr::string(), ActualStr::string(), ExpectedStr::string(),
-                    Note::iolist() | null) -> true | no_return().
+                    Note::term()) -> true | no_return().
 macro_compare(CompFun, Actual, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, Note) ->
     case CompFun(Actual, ExpectedVal) of
         true  -> true;
@@ -636,25 +636,21 @@ macro_compare(CompFun, Actual, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, 
     end.
 
 -spec macro_equals_failed(ActualVal::any(), ExpectedVal::any(), CompFunStr::string(),
-                          ActualStr::string(), ExpectedStr::string(), Note::iolist() | null)
+                          ActualStr::string(), ExpectedStr::string(), Note::term())
         -> no_return().
-macro_equals_failed(ActualVal, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, Note0) ->
-    Note =
-        case Note0 of
-            null -> "";
-            _    -> lists:flatten(
-                      io_lib:format("(Note: ~.0p)~n", [lists:flatten(Note0)]))
-        end,
+macro_equals_failed(ActualVal, ExpectedVal, CompFunStr, ActualStr, ExpectedStr, Note) ->
     log:log(error, "Failed (in ~.0p)~n"
-           " Message    ~s evaluated to~n"
-           "             \"~.0p\"~n"
-           "            which is not ~s the expected ~s that evaluates to~n"
-           "             \"~.0p\"~n~s"
-           " Stacktrace ~p~n"
-           " Linetrace  ~p~n",
+           " Call:        ~s~n"
+           " Returns:     ~.0p~n"
+           " is not (~s)~n"
+           " Exp. term:   ~s~n"
+           " Exp. return: ~.0p~n"
+           " Note:        ~.0p~n"
+           " Stacktrace:  ~p~n"
+           " Linetrace:   ~p~n",
            [self(), ActualStr, ActualVal, CompFunStr, ExpectedStr, ExpectedVal, Note,
             util:get_stacktrace(), util:get_linetrace()]),
-    ?ct_fail("~s evaluated to \"~.0p\" which is not ~s the expected ~s that evaluates to \"~.0p\"~n~.0p",
+    ?ct_fail("~s returned ~.0p which is not ~s the expected ~s that returns ~.0p. Note: ~.0p",
              [ActualStr, ActualVal, CompFunStr, ExpectedStr, ExpectedVal, Note]).
 
 -spec expect_no_message_timeout(Timeout::pos_integer()) -> true | no_return().

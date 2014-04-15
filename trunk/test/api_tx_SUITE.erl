@@ -413,59 +413,50 @@ ops_on_not_found(_Config) ->
 
     [ ?equals_w_note(api_tx:req_list(NotFoundTLog, [Req]),
                      {ExpectedTLog, ExpectedRes},
-                     Note)
-      || {Req, {ExpectedTLog, ExpectedRes}, Note} <-
+                     {'NotFoundTLog: ', NotFoundTLog, ' Req: ', Req})
+      || {Req, {ExpectedTLog, ExpectedRes}} <-
              [{ {read, "a"},
                 % {[{76,"a",-1,84,0,78,78}],[{fail,not_found}]} }
                 {[{?read,"a",-1,?ok,0,?value_dropped,?value_dropped}],
-                 [{fail,not_found}]},
-                "read_failed"
+                 [{fail,not_ound}]}
               },
               { {read, "a", random_from_list},
                 {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
-                 [{fail,not_found}]},
-                "random_from_list_failed"
+                 [{fail,not_found}]}
               },
               { {read, "a", {sublist, 1, 2}},
                 {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
-                 [{fail,not_found}]},
-                "sublist_failed"
+                 [{fail,not_found}]}
               },
               { {write, "a", 7},
                 %% {77,"a",-1,84,0,75,7}
                 {[{?write,"a",-1,?ok,0,?value,7}],
-                 [{ok}]},
-                "write_failed"
+                 [{ok}]}
               },
               { {add_del_on_list, "a", [7], [8]},
                 %% {77,\"a\",-1,84,0,75,<<131,107,0,1,7>>}]
                 {[{?write,"a",-1,?ok,0,?value,term_to_binary([7])}],
-                 [{ok}]},
-                "add_del_on_list_failed"
+                 [{ok}]}
               },
               { {add_del_on_list, "a", 7, 8},
                 %% {77,\"a\",-1,84,0,75,<<131,107,0,1,7>>}]
                 {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
-                 [{fail, not_a_list}]},
-                "add_del_on_list_type_mismatch_failed"
+                 [{fail, not_a_list}]}
               },
               { {add_on_nr, "a", 7},
                 %% {77,\"a\",-1,84,0,75,7}]
                 {[{?write,"a",-1,?ok,0,?value,7}],
-                 [{ok}]},
-                "add_on_nr_failed"
+                 [{ok}]}
               },
               { {add_on_nr, "a", [7]},
                 %% {77,\"a\",-1,84,0,75,7}]
                 {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
-                 [{fail, not_a_number}]},
-                "add_on_nr_type_mismatch_failed"
+                 [{fail, not_a_number}]}
               },
               { {test_and_set, "a", 0, 7},
                 %% {77,\"a\",-1,84,0,75,7}]
                 {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
-                 [{fail,not_found}]},
-                "test_and_set_failed"
+                 [{fail,not_found}]}
               }
              ]
     ],
@@ -482,7 +473,7 @@ read_write_2old(_Config) ->
     _ = [comm:send_local(DhtNode, {delete_keys, GSelf, [HK1, HK2]}) || DhtNode <- pid_groups:find_all(dht_node)],
     receive {delete_keys_reply} -> ok end,
     receive {delete_keys_reply} -> ok end,
-    
+
     ?equals(api_tx:write(Key, 2), {ok}),
     ok.
 
@@ -505,7 +496,7 @@ read_write_2old_locked(_Config) ->
     end,
     ?equals(db_entry:get_version(Entry1), db_entry:get_version(Entry2)),
     OldVersion = db_entry:get_version(Entry1),
-    
+
     % write new value
     ?equals_w_note(api_tx:write(Key, 2), {ok}, "write_2_a"),
     util:wait_for(
@@ -516,7 +507,7 @@ read_write_2old_locked(_Config) ->
                                     db_entry:get_version(E) =:= (OldVersion + 1)
                             end, Values)
       end),
-    
+
     % set two outdated, locked entries:
     Entry1L = db_entry:set_writelock(Entry1, OldVersion - 1),
     Entry2L = db_entry:set_writelock(Entry2, OldVersion - 1),
@@ -524,7 +515,7 @@ read_write_2old_locked(_Config) ->
     api_dht_raw:unreliable_lookup(db_entry:get_key(Entry2L), {set_key_entry, GSelf, Entry2L}),
     receive {set_key_entry_reply, Entry1L} -> ok end,
     receive {set_key_entry_reply, Entry2L} -> ok end,
-    
+
     % now try to write
     ?equals_w_note(api_tx:write(Key, 3), {ok}, "write_3_a"),
     ok.
@@ -542,14 +533,14 @@ read_write_notfound_test(Key, HashedKeyToExclude, Mode) ->
     [HK1, HK2, _HK3, _HK4] = HashedKeys = ?RT:get_replica_keys(?RT:hash_key(Key)),
     Note = io_lib:format("Key: ~p, Hashed: ~p, Excl.: ~p, Mode: ~p",
                          [Key, HashedKeys, HashedKeyToExclude, Mode]),
-    % init 
+    % init
     ?equals_w_note(api_tx:write(Key, 1), {ok}, Note ++ " (write_0_a)"),
     wait_for_dht_entries(HashedKeys),
     _ = [begin
              comm:send_local(DhtNode, {delete_keys, comm:make_global(self()), [HK1, HK2]}),
              receive {delete_keys_reply} -> ok end
          end || DhtNode <- pid_groups:find_all(dht_node)],
-    
+
     % test
     case HashedKeyToExclude of
         none -> ok;
@@ -569,7 +560,7 @@ read_write_notfound_test(Key, HashedKeyToExclude, Mode) ->
             {_T1, [R1, R2, R3]} = api_tx:req_list(api_tx:new_tlog(), [{read, Key}, {write, Key, 2}, {commit}]),
             ok
     end,
-    
+
     ?equals_w_note(R2, {ok}, Note ++ " (write result)"),
     % the following should be true but is not at the moment:
     case R1 of
@@ -578,7 +569,7 @@ read_write_notfound_test(Key, HashedKeyToExclude, Mode) ->
         {ok, 1} ->
             ?equals_pattern_w_note(R3, {ok}, Note ++ " (commit result)")
     end,
-    
+
     % cleanup
     stop_drop_read_op_on_key(HashedKeyToExclude),
     ok.
@@ -603,7 +594,7 @@ drop_read_op_on_key(HashedKey) ->
                          false
                  end
         end,
-    
+
     _ = [gen_component:bp_set_cond(DhtNode, SkipHashedKeyFun, drop_read_op_on_key)
         || DhtNode <- pid_groups:find_all(dht_node)],
     ok.
@@ -796,7 +787,7 @@ prop_random_from_list(Key, Value) ->
     ?equals_pattern(
         api_tx:req_list([{read, Key, random_from_list}]),
         {[{?read, Key, Version, ?ok, SnapNumber, ?value_dropped, ?value_dropped}],
-         [{ok, { Value, 1 } }]} when is_integer(Version) 
+         [{ok, { Value, 1 } }]} when is_integer(Version)
                                     andalso Version >= 0
                                     andalso is_integer(SnapNumber)
                                     andalso SnapNumber >= 0),
@@ -1045,7 +1036,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                     % status must not change between OldEntry and NewEntry!
                     ?equals(?fail, tx_tlog:get_entry_status(NewEntry));
                 ?ok ->
-                    
+
                     % result must be the same as if executed alone
                     % note: previous write may have changed the value!
                     {ExpResAlone, ReqsAlone} =
@@ -1057,7 +1048,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                         end,
                     {_, NRes2} = api_tx:req_list(ReqsAlone),
                     same_result_if_not_random(Req, NRes, NRes2, ExpResAlone, Note),
-                    
+
                     {_, OReadRes} = api_tx:read(TLog, ReqKey),
                     case OReadRes of
                         {fail, not_found} ->
@@ -1079,7 +1070,7 @@ check_op_on_tlog(TLog, Req, NTLog, NRes, RingVal) ->
                                     ?equals(tx_tlog:get_entry_value_type(NewEntry), ?value_dropped),
                                     ?equals(NRes, [{fail, not_found}]);
                                 {test_and_set, _Key, _Old, _New} ->
-                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?fail), 
+                                    ?equals(tx_tlog:get_entry_status(NewEntry), ?fail),
                                     ?equals(tx_tlog:get_entry_value_type(NewEntry), ?value_dropped),
                                     ?equals(NRes, [{fail, not_found}]);
                                 {add_on_nr, _Key, X} when NRes =:= [{ok}] ->
