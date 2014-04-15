@@ -272,17 +272,17 @@ on({balance_phase2b, Op, ReplyPid}, State) ->
                     OpId = Op#lb_op.id,
                     _Pid = node:pidX(Op#lb_op.light_node),
                     TargetKey = Op#lb_op.target,
-                                set_pending_op(Op),
+                    set_pending_op(Op),
                     ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
                     MyDHT = pid_groups:get_my(dht_node),
                     ?DBG_ASSERT(_Pid =:= comm:make_global(MyDHT)),
                     case Op#lb_op.type of
                         jump ->
-                            comm:send_local(MyDHT, {move, start_jump, TargetKey, {jump, OpId}, self()});
+                            comm:send_local(MyDHT, {move, start_jump, TargetKey, {jump, OpId}, comm:this()});
                         slide_pred ->
-                            comm:send_local(MyDHT, {move, start_slide, pred, TargetKey, {slide_pred, OpId}, self()});
+                            comm:send_local(MyDHT, {move, start_slide, pred, TargetKey, {slide_pred, OpId}, comm:this()});
                         slide_succ ->
-                            comm:send_local(MyDHT, {move, start_slide, succ, TargetKey, {slide_succ, OpId}, self()})
+                            comm:send_local(MyDHT, {move, start_slide, succ, TargetKey, {slide_succ, OpId}, comm:this()})
                     end
             end
     end,
