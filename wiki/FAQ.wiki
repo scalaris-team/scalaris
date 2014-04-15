@@ -100,10 +100,11 @@ Available packages are listed in the following table:
 
 For those distributions which provide a recent-enough Erlang version, we build the packages using their Erlang package and recommend using the same version that came with the distribution. In this case we do not provide Erlang packages in our repository.
 
-Exceptions are made for RHEL-based distributions, SLE, openSUSE 11.4 and Debian 5.0:
-  * For SLE and openSUSE 11.4, we provide Erlang R14B04.
+Exceptions are made for RHEL-based distributions, SLE, openSUSE 11.4, Debian 5.0 and Arch Linux:
+  * For SLE and openSUSE 11.4, we provide Erlang !R14B04.
   * For RHEL-based distributions (CentOS 5 & 6, RHEL 5 & 6) we include the Erlang package from the EPEL repository of RHEL 6.
   * For Debian 5.0 we include the Erlang package of Ubuntu 11.04.
+  * For Arch Linux we include the Erlang package from the [https://www.archlinux.org/packages/community/x86_64/erlang/ community repository].
 
 === How to add our repository to openSUSE-based distributions (openSUSE, SLE)? ===
 
