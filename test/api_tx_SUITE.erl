@@ -418,7 +418,7 @@ ops_on_not_found(_Config) ->
              [{ {read, "a"},
                 % {[{76,"a",-1,84,0,78,78}],[{fail,not_found}]} }
                 {[{?read,"a",-1,?ok,0,?value_dropped,?value_dropped}],
-                 [{fail,not_ound}]}
+                 [{fail,not_found}]}
               },
               { {read, "a", random_from_list},
                 {[{?read,"a",-1,?fail,0,?value_dropped,?value_dropped}],
