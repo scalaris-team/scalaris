@@ -67,10 +67,6 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
                                                                {leases, true}]}]),
             mockup_l_on_cseq:start_link(),
-            % synchronous start
-            receive
-                {pong, mockup_l_on_cseq} -> ok
-            end,
             Config
     end.
 
