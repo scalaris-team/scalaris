@@ -122,10 +122,11 @@ wait_for1(F, WaitTime) ->
     case F() of
         true  -> ok;
         false ->
-            comm:send_local_after(WaitTime, self(), {continue_wait}),
+            WaitID = uid:get_pids_uid(),
+            comm:send_local_after(WaitTime, self(), {continue_wait, WaitID}),
             trace_mpath:thread_yield(),
             receive
-                ?SCALARIS_RECV({continue_wait},% ->
+                ?SCALARIS_RECV({continue_wait, WaitID},% ->
                                wait_for1(F, WaitTime))
             end
     end.
