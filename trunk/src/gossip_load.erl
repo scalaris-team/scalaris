@@ -340,7 +340,7 @@ select_data({PrevState, CurState}) ->
     log:log(debug, "[ ~w ] select_data: State: ~w", [state_get(instance, CurState), CurState]),
     CurState1 = case state_get(status, CurState) of
         uninit ->
-            request_dht_state(CurState), CurState;
+            request_node_details(CurState), CurState;
         init ->
             {Data, NewCurState1} = prepare_data(CurState),
             Pid = pid_groups:get_my(gossip),
@@ -431,21 +431,21 @@ integrate_data(QData, RoundStatus, Round, {PrevState, CurState}=FullState) ->
 %%      The received load information is stored and the status is set to init,
 %%      allowing the start of a new gossip round.
 %%      State: the state of the gossip_load module <br/>
--spec handle_msg(Message::{get_state_response, DHTNodeState::dht_node_state:state()},
+-spec handle_msg(Message::{get_node_details_response, node_details:node_details()},
     FullState::full_state()) -> {ok, full_state()}.
-handle_msg({get_state_response, DHTNodeState}, {PrevState, CurState}) ->
+handle_msg({get_node_details_response, NodeDetails}, {PrevState, CurState}) ->
 
     LoadDataNew =
         [ begin
               Module = data_get(name, LoadData),
-              Load = Module:get_load(DHTNodeState),
+              Load = Module:get_load(NodeDetails),
               log:log(?SHOW, "[ ~w ] Load: ~w", [state_get(instance, CurState), Load]),
               LoadData1 = data_set(avg, {float(Load), 1.0}, LoadData),
               LoadData2 = data_set(min, Load, LoadData1),
               LoadData3 = data_set(max, Load, LoadData2),
               LoadData4 = data_set(avg2, {float(Load*Load), 1.0}, LoadData3),
               % histogram
-              Histo = init_histo(Module, DHTNodeState, CurState),
+              Histo = init_histo(Module, NodeDetails, CurState),
               log:log(?SHOW,"[ ~w ] Histo: ~s", [state_get(instance, CurState), to_string(Histo)]),
               _LoadData5 = data_set(histo, Histo, LoadData4)
           end
@@ -645,13 +645,12 @@ shutdown(_FullState) ->
 
 %%------------------- Callback Functions: Helpers ------------------%%
 
--spec request_dht_state(State::state()) -> ok.
-request_dht_state(State) ->
+-spec request_node_details(State::state()) -> ok.
+request_node_details(State) ->
     % get state of dht node
     DHT_Node = pid_groups:get_my(dht_node),
     EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, state_get(instance, State), '_'}),
-    % send_local doesn't work
-    comm:send(comm:make_global(DHT_Node), {get_state, EnvPid}).
+    comm:send_local(DHT_Node, {get_node_details, EnvPid, [load, load2, load3, db, my_range]}).
 
 -spec is_valid_round(RoundStatus::gossip_beh:round_status(), RoundFromMessage::round(),
     PrevState::state(), CurState::state()) -> boolean().
@@ -1181,11 +1180,11 @@ previous_or_current(PrevState, CurState) when is_record(PrevState, state) andals
 
 -compile({inline, [init_histo/3, divide2/1, merge_histo/2, merge_bucket/2]}).
 
--spec init_histo(Module::module(), DHTNodeState::dht_node_state:state(),
+-spec init_histo(Module::module(), node_details:node_details(),
                  CurState::state()) -> histogram().
-init_histo(Module, DHTNodeState, CurState) ->
+init_histo(Module, NodeDetails, CurState) ->
     NumberOfBuckets = no_of_buckets(CurState),
-    Module:init_histo(DHTNodeState, NumberOfBuckets).
+    Module:init_histo(NodeDetails, NumberOfBuckets).
 
 -spec divide2(LoadData::load_data()) -> NewLoadData::load_data();
              (Bucket::bucket()) -> NewBucket::bucket().

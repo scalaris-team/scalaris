@@ -19,15 +19,15 @@
 
 -export([get_load/1, init_histo/2]).
 
--spec get_load(dht_node_state:state()) -> gossip_load_beh:load().
-get_load(DHTNodeState) ->
-    dht_node_state:get(DHTNodeState, load).
+-spec get_load(node_details:node_details()) -> gossip_load_beh:load().
+get_load(NodeDetails) ->
+    node_details:get(NodeDetails, load).
 
--spec init_histo(DHTNodeState::dht_node_state:state(), NumberOfBuckets::pos_integer()) 
+-spec init_histo(node_details:node_details(), NumberOfBuckets::pos_integer())
                     -> gossip_load:histogram().
-init_histo(DHTNodeState, NumberOfBuckets) ->
-    DB = dht_node_state:get(DHTNodeState, db),
-    MyRange = dht_node_state:get(DHTNodeState, my_range),
+init_histo(NodeDetails, NumberOfBuckets) ->
+    DB = node_details:get(NodeDetails, db),
+    MyRange = node_details:get(NodeDetails, my_range),
     Buckets = intervals:split(intervals:all(), NumberOfBuckets),
     [ {BucketInterval, get_load_for_interval(BucketInterval, MyRange, DB)}
         || BucketInterval <- Buckets ].
