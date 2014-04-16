@@ -204,22 +204,7 @@ write(NoOfEntries) ->
 -spec get_node_states() -> [dht_node_state:state(), ...].
 get_node_states() ->
     % request load from all nodes and calc expected values manually
-    DHTNodes = pid_groups:find_all(dht_node),
-    lists:foreach(fun (Pid) -> comm:send(comm:make_global(Pid), {get_state, comm:this()}) end,
-        DHTNodes),
-    receive_node_states(?NO_OF_NODES, []).
-
-
-%% @doc Collects all get_state_responses
--spec receive_node_states(NoOfExpectedReceives::non_neg_integer(),
-    Accumulator::[dht_node_state:state()]) -> [dht_node_state:state()].
-receive_node_states(0, Acc) ->
-    Acc;
-receive_node_states(N, Acc) ->
-    State = receive {get_state_response, DHTNodeState} ->
-            DHTNodeState
-    end,
-    receive_node_states(N-1, [State|Acc]).
+    [gen_component:get_state(Pid) || Pid <- pid_groups:find_all(dht_node)].
 
 
 %% @doc Builds a initial histogram, i.e. a histogram for a single node.
