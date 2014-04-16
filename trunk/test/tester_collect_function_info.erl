@@ -254,7 +254,7 @@ parse_type_({type, _Line, dict, []}, _Module, ParseState) ->
     {{builtin_type, dict_dict, {typedef, tester, test_any},
       {typedef, tester, test_any}}, ParseState};
 parse_type_({type, _Line, queue, []}, _Module, ParseState) ->
-    {{builtin_type, queue}, ParseState};
+    {{builtin_type, queue_queue, {typedef, tester, test_any}}, ParseState};
 parse_type_({type, _Line, gb_set, []}, _Module, ParseState) ->
     {{builtin_type, gb_sets_set, {typedef, tester, test_any}}, ParseState};
 parse_type_({type, _Line, gb_tree, []}, _Module, ParseState) ->
@@ -283,6 +283,12 @@ parse_type_({remote_type, _Line, [{atom, _Line2, gb_sets},
            Module, ParseState) ->
     {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
     {{builtin_type, gb_sets_set, Value}, ParseState2};
+% queue:queue(Value)
+parse_type_({remote_type, _Line, [{atom, _Line2, queue},
+                                 {atom, _Line3, queue}, [ValueType]]},
+           Module, ParseState) ->
+    {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
+    {{builtin_type, queue_queue, Value}, ParseState2};
 % gb_trees:tree(Key,Value)
 parse_type_({remote_type, _Line, [{atom, _Line2, gb_trees},
                                  {atom, _Line3, tree}, [KeyType, ValueType]]},
