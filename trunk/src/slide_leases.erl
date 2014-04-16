@@ -257,8 +257,4 @@ find_lease(State, SlideOp, Mode) ->
 -spec tester_create_dht_node_state() -> dht_node_state:state().
 tester_create_dht_node_state() ->
     DHTNode = pid_groups:find_a(dht_node),
-    comm:send_local(DHTNode, {get_state, comm:this()}),
-    receive
-        {get_state_response, State} ->
-            State
-    end.
+    gen_component:get_state(DHTNode).
