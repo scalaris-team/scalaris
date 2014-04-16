@@ -807,8 +807,8 @@ add_to_list_of_queues(Key, M, Queues) ->
     end.
 
 -spec update_queue_in_list_of_queues
-        (queue_key(), queue(), msg_queues()) -> msg_queues().%;
-        %(delay_queue_key(), queue(), msg_delay_queues()) -> msg_delay_queues().
+        (queue_key(), queue:queue({local | global, comm:message()}), msg_queues()) -> msg_queues().%;
+        %(delay_queue_key(), queue:queue(comm:message()), msg_delay_queues()) -> msg_delay_queues().
 update_queue_in_list_of_queues(Key, Q, Queues) ->
     case queue:is_empty(Q) of
         true ->

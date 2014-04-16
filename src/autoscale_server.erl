@@ -38,7 +38,7 @@
 % types
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -type(state() ::
-    {PlotData::dict()} |
+    {PlotData::dict:dict(PlotKey::atom(), {Timestamp::pos_integer(), Value::number()})} |
     unknown_event).
 
 -type(message() ::

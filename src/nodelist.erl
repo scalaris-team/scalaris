@@ -649,7 +649,8 @@ succ_ord_id(K1, K2, BaseKey) ->
 
 %% @doc Adds all valid nodes to the dictionary mapping node PIDs to a list of
 %%      node objects.
--spec dict_add_valid_nodes(Dict::dict(), NodeList::[node:node_type()]) -> dict().
+-spec dict_add_valid_nodes(Dict, NodeList::[node:node_type()]) -> Dict
+        when is_subtype(Dict, dict:dict(comm:mypid(), node:node_type())).
 dict_add_valid_nodes(Dict, NodeList) ->
     lists:foldl(fun(NodeX, DictX) ->
                         case node:is_valid(NodeX) of
@@ -662,7 +663,8 @@ dict_add_valid_nodes(Dict, NodeList) ->
 
 %% @doc Makes a dictionary mapping node PIDs to a list of node objects map PIDs
 %%      to the most up-to-date version of the node object.
--spec dict_make_unique_update(Dict::dict()) -> dict().
+-spec dict_make_unique_update(Dict) -> Dict
+        when is_subtype(Dict, dict:dict(comm:mypid(), node:node_type())).
 dict_make_unique_update(Dict) ->
     dict:map(fun(_PidX, [NodeX]) -> NodeX;
                 (_PidX, [H | RestX]) ->
