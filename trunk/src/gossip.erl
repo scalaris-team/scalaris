@@ -1242,12 +1242,6 @@ init_gossip_task_feeder(CBModule, NoOfBuckets, State) ->
     %%       (other modules may have different parameters)
     {CBModule, [NoOfBuckets], State}.
 
--compile({nowarn_unused_function, {request_random_node_delayed_feeder, 2}}).
--spec request_random_node_delayed_feeder(Delay::0..1000, CBModule::cb_module()) ->
-    {non_neg_integer(), cb_module()}.
-request_random_node_delayed_feeder(Delay, CBModule) ->
-    {Delay, CBModule}.
-
 %% hack to be able to suppress warnings when testing via config:write()
 -spec warn() -> log:log_level().
 warn() ->
