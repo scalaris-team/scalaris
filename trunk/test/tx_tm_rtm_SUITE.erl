@@ -54,19 +54,22 @@ init_per_testcase(TestCase, Config) ->
                 unittest_helper:stop_ring(),
                 {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
                 unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-                timer:sleep(500);
+                unittest_helper:wait_for_stable_ring(),
+                unittest_helper:wait_for_stable_ring_deep();
             tp_crash ->
                 %% stop ring from previous test case (may ran into a timeout)
                 unittest_helper:stop_ring(),
                 {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
                 unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-                timer:sleep(500);
+                unittest_helper:wait_for_stable_ring(),
+                unittest_helper:wait_for_stable_ring_deep();
             all_tp_crash ->
                 %% stop ring from previous test case (may ran into a timeout)
                 unittest_helper:stop_ring(),
                 {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
                 unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-                timer:sleep(500);
+                unittest_helper:wait_for_stable_ring(),
+                unittest_helper:wait_for_stable_ring_deep();
             _ -> ok
         end,
     Config.
