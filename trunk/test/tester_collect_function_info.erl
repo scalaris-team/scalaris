@@ -251,7 +251,8 @@ parse_type_({integer, _Line, Value}, _Module, ParseState) ->
 parse_type_({type, _Line, array, []}, _Module, ParseState) ->
     {{builtin_type, array}, ParseState};
 parse_type_({type, _Line, dict, []}, _Module, ParseState) ->
-    {{builtin_type, dict}, ParseState};
+    {{builtin_type, dict_dict, {typedef, tester, test_any},
+      {typedef, tester, test_any}}, ParseState};
 parse_type_({type, _Line, queue, []}, _Module, ParseState) ->
     {{builtin_type, queue}, ParseState};
 parse_type_({type, _Line, gb_set, []}, _Module, ParseState) ->
@@ -269,6 +270,19 @@ parse_type_({type, _Line, map, any}, _Module, ParseState) -> % Erlang R17
     {{builtin_type, map}, ParseState};
 parse_type_({type, _Line, mfa, []}, _Module, ParseState) ->
     {{tuple, [atom, atom, {range, {integer, 0}, {integer, 255}}]}, ParseState};
+% dict:dict(Key,Value)
+parse_type_({remote_type, _Line, [{atom, _Line2, dict},
+                                 {atom, _Line3, dict}, [KeyType, ValueType]]},
+           Module, ParseState) ->
+    {Key2, ParseState2}   = parse_type(KeyType, Module, ParseState),
+    {Value2, ParseState3}   = parse_type(ValueType, Module, ParseState2),
+    {{builtin_type, dict_dict, Key2, Value2}, ParseState3};
+% gb_sets:set(Value)
+parse_type_({remote_type, _Line, [{atom, _Line2, gb_sets},
+                                 {atom, _Line3, set}, [ValueType]]},
+           Module, ParseState) ->
+    {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
+    {{builtin_type, gb_sets_set, Value}, ParseState2};
 % gb_trees:tree(Key,Value)
 parse_type_({remote_type, _Line, [{atom, _Line2, gb_trees},
                                  {atom, _Line3, tree}, [KeyType, ValueType]]},
@@ -283,12 +297,6 @@ parse_type_({remote_type, _Line, [{atom, _Line2, gb_trees},
     {Key2, ParseState2}   = parse_type(KeyType, Module, ParseState),
     {Value2, ParseState3}   = parse_type(ValueType, Module, ParseState2),
     {{builtin_type, gb_trees_iter, Key2, Value2}, ParseState3};
-% gb_sets:set(Value)
-parse_type_({remote_type, _Line, [{atom, _Line2, gb_sets},
-                                 {atom, _Line3, set}, [ValueType]]},
-           Module, ParseState) ->
-    {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
-    {{builtin_type, gb_sets_set, Value}, ParseState2};
 parse_type_({remote_type, _Line, [{atom, _Line2, TypeModule},
                                  {atom, _Line3, TypeName}, []]},
            _Module, ParseState) ->

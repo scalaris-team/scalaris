@@ -101,8 +101,9 @@
     | {atom, atom()}
     | {integer, integer()}
     | {builtin_type, builtin_type()}
-    | {builtin_type, gb_trees_tree, KeyType::any(), ValueType::any()}
+    | {builtin_type, dict_dict, KeyType::any(), ValueType::any()}
     | {builtin_type, gb_sets_set, ValueType::any()}
+    | {builtin_type, gb_trees_tree, KeyType::any(), ValueType::any()}
     | {record, [record_field_type()]} % TODO: is this still used?
     | {record, module(), Name::atom()}
     | {record, module(), Name::atom(), FieldTypes::[any()]}
@@ -147,8 +148,9 @@
     | {atom, atom()}
     | {integer, integer()}
     | {builtin_type, builtin_type()}
-    | {builtin_type, gb_trees_tree, KeyType::type_spec(), ValueType::type_spec()}
+    | {builtin_type, dict_dict, KeyType::type_spec(), ValueType::type_spec()}
     | {builtin_type, gb_sets_set, ValueType::type_spec()}
+    | {builtin_type, gb_trees_tree, KeyType::type_spec(), ValueType::type_spec()}
     | {record, [record_field_type()]} % TODO: is this still used?
     | {record, module(), Name::atom()}
     | {record, module(), Name::atom(), FieldTypes::[type_spec()]}
