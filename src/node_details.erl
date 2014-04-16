@@ -42,7 +42,7 @@
 
 -type(node_details_name() :: predlist | pred | node | my_range | succ |
                              succlist | load | hostname | rt_size |
-                             message_log | memory | new_key | is_leaving).
+                             message_log | memory | new_key | db | is_leaving).
 
 -record(node_details, {predlist = ?required(node_details, predlist) :: nodelist:non_empty_snodelist(),
                        node     = ?required(node_details, node)     :: node:node_type(),
@@ -68,6 +68,7 @@
      {message_log, message_log()} |
      {memory, memory()} |
      {new_key, ?RT:key()} |
+     {db, db_dht:db()} | % only useful locally for read access!
      {is_leaving, boolean()}]).
 
 -opaque(node_details() :: node_details_record() | node_details_list()).
@@ -115,6 +116,7 @@ to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, 
           (node_details(), is_leaving, boolean()) -> node_details();
           (node_details(), succ, node:node_type()) -> node_details();
           (node_details(), succlist, nodelist:non_empty_snodelist()) -> node_details();
+          (node_details(), db, boolean()) -> node_details();
           (node_details(), load, load()) -> node_details();
           (node_details(), load2, load2()) -> node_details();
           (node_details(), load2, load3()) -> node_details();
@@ -141,7 +143,8 @@ set(NodeDetails, Key, Value) when is_record(NodeDetails, node_details) ->
         my_range -> [{Key, Value} | to_list(NodeDetails)];
         is_leaving -> [{Key, Value} | to_list(NodeDetails)];
         message_log -> [{Key, Value} | to_list(NodeDetails)];
-        new_key -> [{Key, Value} | to_list(NodeDetails)]
+        new_key -> [{Key, Value} | to_list(NodeDetails)];
+        db -> [{Key, Value} | to_list(NodeDetails)]
     end;
 set(NodeDetails, Key, Value) when is_list(NodeDetails) ->
     case Key of
