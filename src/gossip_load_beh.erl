@@ -32,9 +32,9 @@
 % Erlang version >= R15B
 -ifdef(have_callback_support).
 
--callback get_load(DhtNodeState::dht_node_state:state()) -> load().
+-callback get_load(node_details:node_details()) -> load().
 
--callback init_histo(DHTNodeState::dht_node_state:state(), NumberOfBuckets::pos_integer())
+-callback init_histo(node_details:node_details(), NumberOfBuckets::pos_integer())
                     -> gossip_load:histogram().
 
 % Erlang version < R15B
