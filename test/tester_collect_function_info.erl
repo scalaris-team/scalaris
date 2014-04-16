@@ -261,7 +261,7 @@ parse_type_({type, _Line, gb_tree, []}, _Module, ParseState) ->
     {{builtin_type, gb_trees_tree, {typedef, tester, test_any},
       {typedef, tester, test_any}}, ParseState};
 parse_type_({type, _Line, set, []}, _Module, ParseState) ->
-    {{builtin_type, set}, ParseState};
+    {{builtin_type, set_set, {typedef, tester, test_any}}, ParseState};
 parse_type_({type, _Line, module, []}, _Module, ParseState) ->
     {{builtin_type, module}, ParseState};
 parse_type_({type, _Line, iodata, []}, _Module, ParseState) ->
@@ -277,18 +277,18 @@ parse_type_({remote_type, _Line, [{atom, _Line2, dict},
     {Key2, ParseState2}   = parse_type(KeyType, Module, ParseState),
     {Value2, ParseState3}   = parse_type(ValueType, Module, ParseState2),
     {{builtin_type, dict_dict, Key2, Value2}, ParseState3};
-% gb_sets:set(Value)
-parse_type_({remote_type, _Line, [{atom, _Line2, gb_sets},
-                                 {atom, _Line3, set}, [ValueType]]},
-           Module, ParseState) ->
-    {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
-    {{builtin_type, gb_sets_set, Value}, ParseState2};
 % queue:queue(Value)
 parse_type_({remote_type, _Line, [{atom, _Line2, queue},
                                  {atom, _Line3, queue}, [ValueType]]},
            Module, ParseState) ->
     {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
     {{builtin_type, queue_queue, Value}, ParseState2};
+% gb_sets:set(Value)
+parse_type_({remote_type, _Line, [{atom, _Line2, gb_sets},
+                                 {atom, _Line3, set}, [ValueType]]},
+           Module, ParseState) ->
+    {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
+    {{builtin_type, gb_sets_set, Value}, ParseState2};
 % gb_trees:tree(Key,Value)
 parse_type_({remote_type, _Line, [{atom, _Line2, gb_trees},
                                  {atom, _Line3, tree}, [KeyType, ValueType]]},
@@ -303,6 +303,12 @@ parse_type_({remote_type, _Line, [{atom, _Line2, gb_trees},
     {Key2, ParseState2}   = parse_type(KeyType, Module, ParseState),
     {Value2, ParseState3}   = parse_type(ValueType, Module, ParseState2),
     {{builtin_type, gb_trees_iter, Key2, Value2}, ParseState3};
+% sets:set(Value)
+parse_type_({remote_type, _Line, [{atom, _Line2, sets},
+                                 {atom, _Line3, set}, [ValueType]]},
+           Module, ParseState) ->
+    {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
+    {{builtin_type, set_set, Value}, ParseState2};
 parse_type_({remote_type, _Line, [{atom, _Line2, TypeModule},
                                  {atom, _Line3, TypeName}, []]},
            _Module, ParseState) ->
