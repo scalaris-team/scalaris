@@ -1,4 +1,4 @@
-% @copyright 2008-2012 Zuse Institute Berlin
+% @copyright 2008-2012, 2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -25,13 +25,13 @@
 -include("scalaris.hrl").
 
 all() ->
-    [%%abort_prepared_r,
-     %%abort_prepared_w,
-     %%abort_prepared_rc,
-     %%abort_prepared_rmc,
-     %%abort_prepared_wmc,
-     %%tm_crash,
-     %%tp_crash,
+    [abort_prepared_r,
+     abort_prepared_w,
+     abort_prepared_rc,
+     abort_prepared_rmc,
+     abort_prepared_wmc,
+     tm_crash,
+     tp_crash,
      all_tp_crash
     ].
 
