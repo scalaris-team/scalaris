@@ -83,7 +83,7 @@
               % current slot starts at current_time and lasts for step_size
               % time units
               current_time  = ?required(rrd, current_time)  :: internal_time(),
-              data          = ?required(rrd, data)          :: array(),
+              data          = ?required(rrd, data)          :: array:array(data_type() | undefined),
               fill_policy   = ?required(rrd, fill_policy)   :: fill_policy_type()
             }).
 
@@ -244,9 +244,10 @@ add_with(Time, Value, DB = #rrd{slot_length = SlotLength,
             end
     end.
 
--spec fill(array(), fill_policy_type(), Count::pos_integer(),
+-spec fill(Array, fill_policy_type(), Count::pos_integer(),
            StartIndex::non_neg_integer(), StopIndex::non_neg_integer(),
-           IndexLastValue::non_neg_integer()) -> array().
+           IndexLastValue::non_neg_integer()) -> Array
+        when is_subtype(Array, array:array(data_type() | undefined)).
 fill(Data, FillPolicy, Count, StartIndex, StopIndex, IndexLastValue) ->
     case FillPolicy of
         set_undefined ->
@@ -255,8 +256,9 @@ fill(Data, FillPolicy, Count, StartIndex, StopIndex, IndexLastValue) ->
             fill(Data, Count, StartIndex, StopIndex, array:get(IndexLastValue, Data))
     end.
 
--spec fill(array(), Count::pos_integer(), StartIndex::non_neg_integer(),
-           StopIndex::non_neg_integer(), NewValue::data_type() | undefined) -> array().
+-spec fill(Array, Count::pos_integer(), StartIndex::non_neg_integer(),
+           StopIndex::non_neg_integer(), NewValue::data_type() | undefined) -> Array
+        when is_subtype(Array, array:array(data_type() | undefined)).
 fill(Data, _Count, StopIndex, StopIndex, _NewValue) ->
     Data;
 fill(Data, Count, CurrentGapIndex, StopIndex, NewValue) ->

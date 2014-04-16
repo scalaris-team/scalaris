@@ -166,7 +166,7 @@ init_stabilize(Neighbors, RT) ->
 %% userdevguide-end rt_frtchord:init_stabilize
 
 % Get the adjacent nodes. The source node is filtered.
--spec get_node_neighbors(nodelist:neighborhood()) -> set().
+-spec get_node_neighbors(nodelist:neighborhood()) -> sets:set(node:node_type()).
 get_node_neighbors(Neighborhood) ->
     Source = nodelist:node(Neighborhood),
     % filter the source node and add other nodes to a set

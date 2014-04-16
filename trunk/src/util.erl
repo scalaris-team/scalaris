@@ -1288,7 +1288,7 @@ extint2atom(X) when is_integer(X) ->
     end.
 -endif.
 
--spec sets_map(Fun :: fun((A :: any()) -> B :: any()), Set :: set()) -> [any()].
+-spec sets_map(Fun::fun((V) -> X), Set::sets:set(V)) -> [X].
 sets_map(Fun, Set) ->
     lists:reverse(sets:fold(fun (El, Acc) ->
                 [Fun(El) | Acc]

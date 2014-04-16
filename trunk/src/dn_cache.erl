@@ -37,7 +37,7 @@
     {send_error, Target::comm:mypid(), {ping, ThisWithCookie::comm:mypid()}, Reason::atom()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}).
 
--type(state() :: {fix_queue:fix_queue(), Subscribers::gb_sets:set(comm:erl_local_pid())}).
+-type(state() :: {fix_queue:fix_queue(node:node_type()), Subscribers::gb_sets:set(comm:erl_local_pid())}).
 
 -define(SEND_OPTIONS, [{channel, prio}]).
 
@@ -133,8 +133,8 @@ on({web_debug_info, Requestor}, {Queue, Subscribers} = State) ->
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State.
 
--spec add_to_queue(Queue::fix_queue:fix_queue(), Node::node:node_type())
-        -> fix_queue:fix_queue().
+-spec add_to_queue(Queue::fix_queue:fix_queue(node:node_type()), Node::node:node_type())
+        -> fix_queue:fix_queue(node:node_type()).
 add_to_queue(Queue, Node) ->
     case node:is_valid(Node) of
         true -> fix_queue:add_unique_head(Node, Queue, fun node:same_process/2,

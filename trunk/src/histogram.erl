@@ -151,8 +151,10 @@ find_largest_window_feeder(WindowSize, #histogram{size = Size, data_size = DataS
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% @doc Helper function for find_largest_window/2
--spec sliding_window_max(WindowSize::pos_integer(), MaxPos::pos_integer(), MaxSum::non_neg_integer(),
-                         Data::list(), Pos::pos_integer(), OldVals::queue(), Sum::non_neg_integer())
+-spec sliding_window_max(WindowSize::pos_integer(), MaxPos::pos_integer(),
+                         MaxSum::non_neg_integer(), Data::[pos_integer()],
+                         Pos::pos_integer(), OldVals::queue:queue(pos_integer()),
+                         Sum::non_neg_integer())
                       -> Max::{Pos::pos_integer(), Sum::pos_integer()}.
 sliding_window_max(0, MaxPos, MaxSum, [], _Pos, _OldVals, _Sum) ->
     {MaxPos, MaxSum};
