@@ -30,7 +30,7 @@
                     cleanup ->
                         [util:wait_for_process_to_die(Pid) || Pid <- Arg]
                 end
-        end).
+        end()).
 
 -include("mr_SUITE.hrl").
 
