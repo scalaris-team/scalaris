@@ -116,6 +116,8 @@ to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, 
           (node_details(), succ, node:node_type()) -> node_details();
           (node_details(), succlist, nodelist:non_empty_snodelist()) -> node_details();
           (node_details(), load, load()) -> node_details();
+          (node_details(), load2, load2()) -> node_details();
+          (node_details(), load2, load3()) -> node_details();
           (node_details(), hostname, hostname()) -> node_details();
           (node_details(), rt_size, rt_size()) -> node_details();
           (node_details(), message_log, message_log()) -> node_details();
@@ -128,6 +130,8 @@ set(NodeDetails, Key, Value) when is_record(NodeDetails, node_details) ->
         node -> NodeDetails#node_details{node = Value};
         succlist -> NodeDetails#node_details{succlist = Value};
         load -> NodeDetails#node_details{load = Value};
+        load2 -> NodeDetails#node_details{load2 = Value};
+        load3 -> NodeDetails#node_details{load3 = Value};
         hostname -> NodeDetails#node_details{hostname = Value};
         rt_size -> NodeDetails#node_details{rt_size = Value};
         memory -> NodeDetails#node_details{memory = Value};
