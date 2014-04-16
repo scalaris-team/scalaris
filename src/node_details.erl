@@ -116,7 +116,7 @@ to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, 
           (node_details(), is_leaving, boolean()) -> node_details();
           (node_details(), succ, node:node_type()) -> node_details();
           (node_details(), succlist, nodelist:non_empty_snodelist()) -> node_details();
-          (node_details(), db, boolean()) -> node_details();
+          (node_details(), db, db_dht:db()) -> node_details();
           (node_details(), load, load()) -> node_details();
           (node_details(), load2, load2()) -> node_details();
           (node_details(), load2, load3()) -> node_details();
@@ -171,6 +171,7 @@ contains(NodeDetails, Key) when is_list(NodeDetails) ->
           (node_details(), pred | node | succ) -> node:node_type();
           (node_details(), my_range) -> intervals:interval();
           (node_details(), is_leaving) -> boolean();
+          (node_details(), db) -> db_dht:db();
           (node_details(), load) -> load();
           (node_details(), load2) -> load2();
           (node_details(), load3) -> load3();
@@ -206,6 +207,7 @@ get(NodeDetails, Key) when is_list(NodeDetails) ->
               (node_details_list(), pred | node | succ) -> node:node_type();
               (node_details_list(), my_range) -> intervals:interval();
               (node_details_list(), is_leaving) -> boolean();
+              (node_details_list(), db) -> db_dht:db();
               (node_details_list(), load) -> load();
               (node_details_list(), hostname) -> hostname();
               (node_details_list(), rt_size) -> rt_size();
