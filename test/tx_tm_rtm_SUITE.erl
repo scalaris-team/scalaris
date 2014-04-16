@@ -25,13 +25,13 @@
 -include("scalaris.hrl").
 
 all() ->
-    [abort_prepared_r,
-     abort_prepared_w,
-     abort_prepared_rc,
-     abort_prepared_rmc,
-     abort_prepared_wmc,
-     tm_crash,
-     tp_crash,
+    [%%abort_prepared_r,
+     %%abort_prepared_w,
+     %%abort_prepared_rc,
+     %%abort_prepared_rmc,
+     %%abort_prepared_wmc,
+     %%tm_crash,
+     %%tp_crash,
      all_tp_crash
     ].
 
@@ -408,10 +408,18 @@ all_tp_crash(_) ->
     %% ct:pal("Starting read commit~n"),
     Res = api_tx:req_list([{read, "a"}, {commit}]),
 
+    %% expecting {[], [{ok,"Hello world!"}, {fail,abort,["a"]}]}
+    %% because the proposers are hold, the rtms try to decide abort,
+    %% which leads to the commit fail.
     ct:pal("Res: ~p~n", [Res]),
 
     %%[ erlang:exit(Pid, kill) || Pid <- Pids ],
 
-    _ = [ gen_component:bp_del(Proposer, all_tp_crash) ||  Proposer <- Proposers],
-    _ = [ gen_component:bp_cont(Proposer) || Proposer <- Proposers],
+    ct:pal("Removing breakpoints.~n"),
+    _ = [ gen_component:bp_del_async(Proposer, all_tp_crash)
+          ||  Proposer <- Proposers],
+    ct:pal("Continue breakpoints.~n"),
+    _ = [ gen_component:bp_cont(Proposer)
+          || Proposer <- Proposers],
+    ct:pal("Done.~n"),
     ok.
