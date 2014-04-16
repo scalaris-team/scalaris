@@ -249,7 +249,7 @@ parse_type_({op, _Line1,'-',{integer,_Line2,Value}}, _Module, ParseState) ->
 parse_type_({integer, _Line, Value}, _Module, ParseState) ->
     {{integer, Value}, ParseState};
 parse_type_({type, _Line, array, []}, _Module, ParseState) ->
-    {{builtin_type, array}, ParseState};
+    {{builtin_type, array_array, {typedef, tester, test_any}}, ParseState};
 parse_type_({type, _Line, dict, []}, _Module, ParseState) ->
     {{builtin_type, dict_dict, {typedef, tester, test_any},
       {typedef, tester, test_any}}, ParseState};
@@ -270,6 +270,12 @@ parse_type_({type, _Line, map, any}, _Module, ParseState) -> % Erlang R17
     {{builtin_type, map}, ParseState};
 parse_type_({type, _Line, mfa, []}, _Module, ParseState) ->
     {{tuple, [atom, atom, {range, {integer, 0}, {integer, 255}}]}, ParseState};
+% array:array(Value)
+parse_type_({remote_type, _Line, [{atom, _Line2, array},
+                                 {atom, _Line3, array}, [ValueType]]},
+           Module, ParseState) ->
+    {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
+    {{builtin_type, array_array, Value}, ParseState2};
 % dict:dict(Key,Value)
 parse_type_({remote_type, _Line, [{atom, _Line2, dict},
                                  {atom, _Line3, dict}, [KeyType, ValueType]]},

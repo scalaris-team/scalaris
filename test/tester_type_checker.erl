@@ -88,9 +88,12 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
         byte ->
             inner_check(Value, {range, {integer, 0}, {integer, 255}},
                         CheckStack, ParseState);
-        {builtin_type, array} ->
+        {builtin_type, array_array, ValueType} ->
             case array:is_array(Value) of
-                true -> true;
+                true ->
+                    check_list(array:to_list(Value), % [Value]
+                               {list, ValueType},
+                               CheckStack, ParseState);
                 false -> {false, [{Value, array_is_array_returned_false} | CheckStack]}
             end;
         {builtin_type, module} ->

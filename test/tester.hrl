@@ -101,6 +101,7 @@
     | {atom, atom()}
     | {integer, integer()}
     | {builtin_type, builtin_type()}
+    | {builtin_type, array_array, ValueType::any()}
     | {builtin_type, dict_dict, KeyType::any(), ValueType::any()}
     | {builtin_type, queue_queue, ValueType::any()}
     | {builtin_type, gb_sets_set, ValueType::any()}
@@ -150,6 +151,7 @@
     | {atom, atom()}
     | {integer, integer()}
     | {builtin_type, builtin_type()}
+    | {builtin_type, array_array, ValueType::type_spec()}
     | {builtin_type, dict_dict, KeyType::type_spec(), ValueType::type_spec()}
     | {builtin_type, queue_queue, ValueType::type_spec()}
     | {builtin_type, gb_sets_set, ValueType::type_spec()}

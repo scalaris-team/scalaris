@@ -75,11 +75,8 @@ create_value_(bool, _Size, _ParseState) ->
         0 -> false;
         1 -> true
     end;
-create_value_({builtin_type, array}, Size, ParseState) ->
-    L = create_value({list,
-                      {tuple,
-                       [{typedef, tester, test_any},
-                        {typedef, tester, test_any}]}}, Size, ParseState),
+create_value_({builtin_type, array_array, ValueType}, Size, ParseState) ->
+    L = create_value({list, ValueType}, Size, ParseState),
     array:from_list(L);
 create_value_({builtin_type, gb_trees_tree, KeyType, ValueType}, Size, ParseState) ->
     L = create_value({list,
