@@ -25,8 +25,10 @@
 %% no proto scheduler for this suite
 -define(proto_sched(_Action), ok).
 -define(proto_sched2(Action, Arg),
-        fun () ->
+        fun() ->
                 case Action of
+                    setup ->
+                        ok;
                     cleanup ->
                         [util:wait_for_process_to_die(Pid) || Pid <- Arg]
                 end
