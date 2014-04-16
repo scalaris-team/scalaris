@@ -167,18 +167,22 @@ tester_type_check_gossip(_Config) ->
                 {init, 1}, % does not return fully filled state (as checked by type checker)
                 {start_gossip_task, 2}, % spec to wide
                 {stop_gossip_task, 1}, % would prohibit subsequent tests
+                {activate, 1}, % sends messages
                 {deactivate, 0}, % would prohibit subsequent tests
                 {on_inactive, 2}, % too much interaction / spec to wide
-                {on_active, 2} % too much interaction / spec to wide
+                {on_active, 2}, % too much interaction / spec to wide
+                {rm_send_activation_msg, 5}, % sends messages
+                {rm_send_new_range, 5} % sends messages
             ],
             % excluded (private functions)
-            [   {handle_msg, 2}, % spec to wide
+            [   {handle_msg, 2}, % spec to wide, sends messages
                 {start_p2p_exchange, 4}, % would need valid peer
                 {init_gossip_task, 3}, % test via feeder
                 {cb_call, 3}, % unbounded_fun?
-                {cb_call, 5}, % spec to wide
+                {cb_call, 5}, % spec to wide, sends messages
                 {select_reply_data, 7}, % would need to valid load_data
-                {request_random_node_delayed, 2}, % testes via feeder
+                {request_random_node, 1}, % sends messages
+                {request_random_node_delayed, 2}, % sends messages
                 {check_round, 3}, % would need valid callback state
                 {is_end_of_round, 2}, % would need valid callback state
                 {state_get, 2}, % needs state in process dictionary
@@ -189,13 +193,18 @@ tester_type_check_gossip(_Config) ->
             ]},
           {gossip_load,
             % excluded (exported functions)
-            [  {handle_msg, 2} % would need valid dht_node_state
+            [  {handle_msg, 2}, % would need valid dht_node_state, sends messages
+               {select_data, 1}, % sends messages
+               {select_reply_data, 5}, % sends messages
+               {integrate_data, 4} % sends messages
             ],
             % excluded (private functions)
             [  {state_update, 3}, % cannot create funs
                {init_histo, 3}, % needs DHTNodeState state
                {merge_histo, 2}, % tested via feeder
-               {merge_bucket, 2} % tested via feeder
+               {merge_bucket, 2}, % tested via feeder
+               {integrate_data_init, 3}, % sends messages
+               {request_node_details, 1} % sends messages
             ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
