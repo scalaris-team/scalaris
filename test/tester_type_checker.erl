@@ -95,15 +95,14 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             end;
         {builtin_type, module} ->
             inner_check(Value, atom, CheckStack, ParseState);
-        {builtin_type, dict} ->
+        {builtin_type, dict_dict, KeyType, ValueType} ->
             % there is no is_dict/1, so try some functions on the dict to check
             try
                 _ = dict:size(Value),
                 _ = dict:find('$non_existing_key', Value),
                 _ = dict:store('$non_existing_key', '$value', Value),
                 check_list(dict:to_list(Value), % [{Key, Value}]
-                           {list, {tuple, [{typedef, tester, test_any},
-                                           {typedef, tester, test_any}]}},
+                           {list, {tuple, [KeyType, ValueType]}},
                            CheckStack, ParseState)
             catch _:_ -> {false, [{Value, dict_functions_thrown} | CheckStack]}
             end;
@@ -114,8 +113,7 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
                 _ = gb_trees:is_defined('$non_existing_key', Value),
                 _ = gb_trees:enter('$non_existing_key', '$value', Value),
                 check_list(gb_trees:to_list(Value), % [{Key, Value}]
-                           {list, {tuple, [KeyType,
-                                           ValueType]}},
+                           {list, {tuple, [KeyType, ValueType]}},
                            CheckStack, ParseState)
             catch _:_ -> {false, [{Value, gb_trees_functions_thrown} | CheckStack]}
             end;
