@@ -42,11 +42,6 @@
          slide_stop_record/3,
          get_split_key/5,
          add_db_range/3, rm_db_range/2]).
-%% bulk owner:
--export([add_bulkowner_reply_msg/5,
-        take_bulkowner_reply_msgs/1,
-        get_bulkowner_reply_timer/1,
-        set_bulkowner_reply_timer/2]).
 %% prbr DBs and states:
 -export([get_prbr_state/2]).
 -export([set_prbr_state/3]).
@@ -97,8 +92,6 @@
                 slide_succ              = null :: slide_op:slide_op() | null,
                 % additional range to respond to during a move:
                 db_range   = []   :: [{intervals:interval(), slide_op:id()}],
-                bulkowner_reply_timer   = null :: null | reference(),
-                bulkowner_reply_ids     = []   :: [uid:global_uid()],
                 monitor_proc            = ?required(state, monitor_proc) :: pid(),
                 prbr_kv_db = ?required(state, prbr_kv_db) :: prbr:state(),
                 txid_db1 = ?required(state, txid_db1) :: prbr:state(),
@@ -419,37 +412,6 @@ add_db_range(State = #state{db_range=DBRange}, Interval, SlideId) ->
 rm_db_range(State = #state{db_range=DBRange}, SlideId) ->
     ?TRACE("[ ~.0p ] rm_db_range: ~.0p~n", [self(), [I || {I, Id} <- DBRange, Id =:= SlideId]]),
     State#state{db_range = [X || X = {_, Id} <- DBRange, Id =/= SlideId]}.
-
--spec add_bulkowner_reply_msg(State::state(), Id::uid:global_uid(), Target::comm:mypid(),
-                              Msg::comm:message(), Parents::[comm:mypid()]) -> state().
-add_bulkowner_reply_msg(State = #state{bulkowner_reply_ids = IDs}, Id, Target, Msg, Parents) ->
-    PrevMsgs = case erlang:get({'$bulkowner_reply_msg', Id}) of
-                   undefined    -> [];
-                   {_, _, X, _} -> X
-               end,
-    % parent, target information should be the same - use the latest
-    _ = erlang:put({'$bulkowner_reply_msg', Id}, {Id, Target, [Msg | PrevMsgs], Parents}),
-    State#state{bulkowner_reply_ids = [Id | IDs]}.
-
--spec take_bulkowner_reply_msgs(State::state())
-        -> {state(), [{Id::uid:global_uid(), Target::comm:mypid(),
-                       Msgs::[comm:message()], Parents::[comm:mypid()]}]}.
-take_bulkowner_reply_msgs(State = #state{bulkowner_reply_ids = IDs}) ->
-    {State#state{bulkowner_reply_ids = []},
-     [erlang:erase({'$bulkowner_reply_msg', Id}) || Id <- IDs]}.
-
--spec get_bulkowner_reply_timer(State::state()) -> null | reference().
-get_bulkowner_reply_timer(#state{bulkowner_reply_timer = null}) ->
-    null;
-get_bulkowner_reply_timer(#state{bulkowner_reply_timer = Timer}) ->
-    case erlang:read_timer(Timer) of
-        false -> null;
-        _     -> Timer
-    end.
-
--spec set_bulkowner_reply_timer(State::state(), Timer::null | reference()) -> state().
-set_bulkowner_reply_timer(State, Timer) ->
-    State#state{bulkowner_reply_timer = Timer}.
 
 %%% util
 -spec dump(state()) -> ok.
