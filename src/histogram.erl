@@ -24,7 +24,7 @@
 -vsn('$Id$').
 
 % external API
--export([create/1, add/2, add/3, get_data/1, get_size/1,
+-export([create/1, create/2, add/2, add/3, get_data/1, get_size/1,
          get_num_elements/1, get_num_inserts/1, merge/2]).
 
 % private API for unit tests:
@@ -34,14 +34,14 @@
 -export([find_largest_window/2, find_largest_window_feeder/2]).
 -export([foldl_until/2, foldr_until/2]).
 
-% private but shared with histogram_normalized
--export([foldl_until_helper/4]).
+% private but shared with histogram_rt
+-export([insert/2, resize/1, foldl_until_helper/4]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
 -ifdef(with_export_type_support).
--export_type([histogram/0]).
+-export_type([histogram/0, value/0]).
 -endif.
 
 -type value() :: number().
@@ -55,9 +55,22 @@
 
 -opaque histogram() :: #histogram{}.
 
+%% @doc Creates an empty Size sized histogram
 -spec create(Size::non_neg_integer()) -> histogram().
 create(Size) ->
     #histogram{size = Size}.
+
+%% @doc Creates a histogram with a size and existing data.
+-spec create(Size::non_neg_integer(), Data::data_list()) -> histogram().
+create(0, _Data) ->
+    create(0);
+create(Size, Data) ->
+    Histogram = #histogram{data_size = Size, data = Data},
+    if length(Data) > 1 ->
+           resize(Histogram);
+       true ->
+           Histogram
+    end.
 
 -spec add(Value::value(), Histogram::histogram()) -> histogram().
 add(Value, Histogram) ->
@@ -113,6 +126,7 @@ foldr_until(TargetVal, Histogram) ->
     HistData = get_data(Histogram),
     foldl_until_helper(TargetVal, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
 
+%% @doc Private method only exported for histogram_rt
 -spec foldl_until_helper(TargetVal::non_neg_integer(), DataList::data_list(),
                          SumSoFar::non_neg_integer(), BestValue::nil | non_neg_integer())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
@@ -171,19 +185,18 @@ sliding_window_max(WindowSize, MaxPos, MaxSum, [H|T], Pos, OldVals, LastSum) ->
 %% @doc Resizes the given histogram to fit its maximum size (reduces the data).
 %%      PRE: histogram maximum size > 0 (from create/1)
 -spec resize(Histogram::histogram()) -> histogram().
-resize(Histogram = #histogram{data = Data, size = ExpectedSize, data_size = ActualSize}) ->
-    ?DBG_ASSERT(ExpectedSize > 0),
-    if
-        (ActualSize > ExpectedSize) andalso (1 < ActualSize) ->
-            %% we need at least two items to do the following:
-            MinSecondValue = find_smallest_interval(Data),
-            NewHistogram = Histogram#histogram{data = merge_interval(MinSecondValue, Data),
-                                               data_size = ActualSize - 1},
-            resize(NewHistogram);
-        true ->
-            Histogram
-    end.
+resize(Histogram = #histogram{data = Data, size = Size, data_size = DataSize})
+  when DataSize > Size andalso DataSize > 1 ->
+    ?DBG_ASSERT(Size > 0),
+    %% we need at least two items to do the following:
+    MinSecondValue = find_smallest_interval(Data),
+    NewHistogram = Histogram#histogram{data = merge_interval(MinSecondValue, Data),
+                                       data_size = DataSize - 1},
+    resize(NewHistogram);
+resize(#histogram{} = Histogram) ->
+    Histogram.
 
+%% @doc Private method only exported for histogram_rt
 -spec insert(Value::data_item(), Data::data_list()) -> data_list().
 insert({Value, Count}, [{Value2, Count2} | Rest]) when Value =:= Value2 ->
     [{Value, Count + Count2} | Rest];
