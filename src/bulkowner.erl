@@ -269,8 +269,8 @@ on({bulkowner, reply_process_all}, State) ->
                                      {bulkowner, gather, Id, Target, Msgs, Parents});
                  [{?send_to_group_member, Proc, _Msg} | _] ->
                      Msgs1 = [Msg1 || {?send_to_group_member, _Proc, Msg1} <- Msgs],
-                     comm:send_local(pid_groups:get_my(Proc),
-                                     {bulkowner, gather, Id, Target, Msgs1, Parents})
+                     comm:forward_to_group_member(
+                       Proc, {bulkowner, gather, Id, Target, Msgs1, Parents})
              end
          end || {Id, Target, Msgs, Parents} <- Replies],
     State1;
@@ -306,21 +306,20 @@ handle_delivery({bulk_distribute, Proc, N, Msg1, Data}, MyRange, Id, Parents, St
     RangeData = get_range_data(Data, MyRange),
     %% only deliver data in MyRange as data outside of it was
     %% forwarded
-    %% TODO us epost_op here
     case Proc of
         dht_node ->
             gen_component:post_op({bulk_distribute, Id, MyRange,
                                    setelement(N, Msg1, RangeData), Parents},
                                   State);
         _ ->
-            comm:send_local(pid_groups:get_my(Proc),
-                            {bulk_distribute, Id, MyRange,
-                             setelement(N, Msg1, RangeData), Parents}),
+            comm:forward_to_group_member(
+              Proc, {bulk_distribute, Id, MyRange,
+                     setelement(N, Msg1, RangeData), Parents}),
             State
     end;
 handle_delivery({?send_to_group_member, Proc, Msg1}, MyRange, Id, Parents, State) ->
-    comm:send_local(pid_groups:get_my(Proc),
-                    {bulkowner, deliver, Id, MyRange, Msg1, Parents}),
+    comm:forward_to_group_member(
+      Proc, {bulkowner, deliver, Id, MyRange, Msg1, Parents}),
     State;
 handle_delivery({do_snapshot, _SnapNo, _Leader} = Msg, _MyRange, _Id, _Parents, State) ->
     gen_component:post_op(Msg, State);

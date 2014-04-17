@@ -34,7 +34,8 @@
 -include("scalaris.hrl").
 
 %% Sending messages
--export([send/2, send/3, send_local/2, send_local_after/3]).
+-export([send/2, send/3, send_local/2, send_local_after/3,
+         forward_to_group_member/2]).
 
 %% Pid manipulation
 -export([make_global/1, make_local/1]).
@@ -341,6 +342,17 @@ pack_group_member(Msg, Opts)                           ->
         false                                   -> {Msg, Opts};
         {value, {group_member, Process}, Opts2} ->
             {{?send_to_group_member, Process, Msg}, Opts2}
+    end.
+
+%% @doc Forwards a message to a group member by its process name.
+%%      NOTE: Does _not_ warn if the group member does not exist (should only
+%%            happen during node leave operations).
+-spec forward_to_group_member(atom(), message()) -> ok.
+forward_to_group_member(Processname, Msg) ->
+    Pid = pid_groups:get_my(Processname),
+    case Pid of
+        failed -> ok;
+        _      -> comm:send_local(Pid, Msg)
     end.
 
 %% @doc Initializes the comm layer by sending a message to known_hosts. A
