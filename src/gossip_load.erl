@@ -1463,20 +1463,11 @@ to_string({ModuleName, Id}) ->
 %% @doc Creates a state record with greatly reduced variety in the round numbers
 %%      to reduce warings.
 %%      Used as value_creator in tester.erl (property testing).
--spec tester_create_state(Status, Instance, LoadDataList, RingData, Leader, Range,
-                          Request, NoOfBuckets, Round, Merged, ConvergenceCount)
-                            -> state() when
-      is_subtype(Status, status()),
-      is_subtype(Instance, instance()),
-      is_subtype(LoadDataList, load_data_list()),
-      is_subtype(RingData, ring_data()),
-      is_subtype(Leader, boolean()),
-      is_subtype(Range, intervals:non_empty_interval()),
-      is_subtype(Request, boolean()),
-      is_subtype(NoOfBuckets, 1..50),
-      is_subtype(Round, round()),
-      is_subtype(Merged, non_neg_integer()),
-      is_subtype(ConvergenceCount, non_neg_integer()).
+-spec tester_create_state(status(), instance(), load_data_list(), ring_data(),
+                          Leader::boolean(), Range::intervals:non_empty_interval(),
+                          Request::boolean(), NoOfBuckets::1..50, round(),
+                          Merged::non_neg_integer(),
+                          ConvergenceCount::non_neg_integer()) -> state().
 tester_create_state(Status, Instance, LoadDataList, RingData, Leader, Range,
                     Request, NoOfBuckets, Round, Merged, ConvergenceCountRound) ->
     #state{status = Status,
