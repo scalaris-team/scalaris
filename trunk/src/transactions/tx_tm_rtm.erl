@@ -1151,11 +1151,7 @@ get_failed_keys(TxState, State) ->
                    ?abort =:= tx_item_get_decided(
                      TxItem = element(2, get_item_entry(TxItemId, State)))]
     end,
-    case length(Result) of
-        NumAbort -> ok;
-        ResultL  -> log:pal("This should not happen: ~p =/= ~p~n",
-                    [NumAbort, ResultL])
-    end,
+    ?DBG_ASSERT(length(Result) =:= NumAbort),
     Result.
 
 -spec handle_crash(pid(), state(), on | on_init)

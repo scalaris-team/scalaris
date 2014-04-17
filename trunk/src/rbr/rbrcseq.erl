@@ -843,9 +843,7 @@ add_write_reply(Entry, Round, _Cons) ->
                 %% this is the first reply, all other positive replies
                 %% should have the same round number, as otherwise they
                 %% would be denies.
-                ?IIF(entry_num_acks(Entry) > 0,
-                     log:pal("This should not happen in real life~n"),
-                     ok),
+                ?DBG_ASSERT(entry_num_acks(Entry) > 0),
                 %% set rack and store newer round
                 entry_set_latest_seen(Entry, Round)
         end,

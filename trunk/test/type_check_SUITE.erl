@@ -518,6 +518,7 @@ tester_type_check_tx(_Config) ->
              {start_link,2}
            ],
            [ {get_paxos_ids, 2}, %% requires item entries in dictionary
+             {get_failed_keys, 2}, %% needs number of aborts in item list to match numabort
              {msg_tp_do_commit_abort,4}, %% tries to send
              {init_RTMs, 2}, %% tries to send
              {init_TPs, 3}, %% tries to send
