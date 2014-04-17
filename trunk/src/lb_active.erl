@@ -779,9 +779,14 @@ get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
 is_enabled() ->
     config:read(lb_active).
 
--spec call_module(atom(), list()) -> term().
+-spec call_module(atom(), list()) -> module_state().
 call_module(Fun, Args) ->
-    apply(get_lb_module(), Fun, Args).
+    case get_lb_module() of
+        none ->
+            {};
+        Module ->
+            apply(Module, Fun, Args)
+    end.
 
 -spec get_lb_module() -> atom() | failed.
 get_lb_module() ->
@@ -874,12 +879,20 @@ check_for_gossip_modules() ->
     not config:read(lb_active) orelse not config:read(lb_active_use_gossip) orelse
         config:cfg_test_and_error(gossip_load_additional_modules, Fun, Msg).
 
+-spec check_module_config() -> boolean().
+check_module_config() ->
+    case get_lb_module() of
+        none -> true;
+        Module -> apply(Module, check_config, [])
+    end.
+
 %% @doc config check registered in config.erl
 -spec check_config() -> boolean().
 check_config() ->
 
     config:cfg_is_bool(lb_active) and
-    config:cfg_is_in(lb_active_module, ?MODULES) and
+
+    config:cfg_is_in(lb_active_module, [none | ?MODULES]) and
 
     config:cfg_is_integer(lb_active_interval) and
     config:cfg_is_greater_than(lb_active_interval, 0) and
@@ -914,4 +927,4 @@ check_config() ->
 
     check_for_gossip_modules() and
 
-    call_module(check_config, []).
+    check_module_config().
