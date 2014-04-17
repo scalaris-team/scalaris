@@ -94,17 +94,17 @@ merge({Histogram, BaseKey} = Hist1, Hist2) ->
 -spec foldl_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::key() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::key() | nil, Sum::non_neg_integer()}.
-foldl_until(TargetVal, NormalizedHist) ->
+foldl_until(TargetCount, NormalizedHist) ->
     HistData = get_data(NormalizedHist),
-    histogram:foldl_until_helper(TargetVal, HistData, _SumSoFar = 0, _BestValue = nil).
+    histogram:foldl_until_helper(TargetCount, HistData, _SumSoFar = 0, _BestValue = nil).
 
 %% @doc Like foldl_until but traverses the list from the right
 -spec foldr_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::key() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::key() | nil, Sum::non_neg_integer()}.
-foldr_until(TargetVal, NormalizedHist) ->
+foldr_until(TargetCount, NormalizedHist) ->
     HistData = get_data(NormalizedHist),
-    histogram:foldl_until_helper(TargetVal, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
+    histogram:foldl_until_helper(TargetCount, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
 
 -compile({inline, [normalize/2]}).
 -spec normalize(Value::key(), BaseKey::base_key()) -> internal_value().
