@@ -249,38 +249,41 @@ on({bulkowner, deliver, Id, Range, Msg, Parents}, State) ->
     NewState;
 
 on({bulkowner, reply, Id, Target, Msg, Parents}, State) ->
-    State1 =
-        case dht_node_state:get_bulkowner_reply_timer(State) =:= null of
-            true ->
-                Timer = comm:send_local_after(100, self(), {bulkowner, reply_process_all}),
-                dht_node_state:set_bulkowner_reply_timer(State, Timer);
-            false ->
-                State
+    % target information should be the same
+    PrevMsgs =
+        case erlang:get({'$bulkowner_reply_msg', Id}) of
+            undefined ->
+                _ = comm:send_local_after(100, self(),
+                                          {bulkowner, reply_process_all, Id}),
+                [];
+            {Id, Target, X = [_|_], _PrevParents} ->
+                X
         end,
-    dht_node_state:add_bulkowner_reply_msg(State1, Id, Target, Msg, Parents);
+    % Parents may be different if the node is twice in the tree -> use the latest:
+    _ = erlang:put({'$bulkowner_reply_msg', Id},
+                   {Id, Target, [Msg | PrevMsgs], Parents}),
+    State;
 
-on({bulkowner, reply_process_all}, State) ->
-    {State1, Replies} = dht_node_state:take_bulkowner_reply_msgs(State),
-    _ = [begin
-             case Msgs of
-                 [] -> ok;
-                 [{bulk_read_entry_response, _HRange, _HData} | _] ->
-                     %% all messages must have the same type:
-                     ?DBG_ASSERT([] =:= [Msg1 || Msg1 <- Msgs,
-                                                 element(1, Msg1) =/= bulk_read_entry_response]),
-                     comm:send_local(self(),
-                                     {bulkowner, gather, Id, Target, Msgs, Parents});
-                 [{?send_to_group_member, Proc, _Msg} | _] ->
-                     %% all messages must have the same type:
-                     ?DBG_ASSERT([] =:= [Msg1 || Msg1 <- Msgs,
-                                                 element(1, Msg1) =/= ?send_to_group_member orelse
-                                                     element(2, Msg1) =/= Proc]),
-                     Msgs1 = [Msg1 || {?send_to_group_member, _Proc, Msg1} <- Msgs],
-                     comm:forward_to_group_member(
-                       Proc, {bulkowner, gather, Id, Target, Msgs1, Parents})
-             end
-         end || {Id, Target, Msgs, Parents} <- Replies],
-    State1;
+on({bulkowner, reply_process_all, Id}, State) ->
+    {Id, Target, Msgs, Parents} = erlang:erase({'$bulkowner_reply_msg', Id}),
+    case Msgs of
+        [] -> ok;
+        [{bulk_read_entry_response, _HRange, _HData} | _] ->
+            %% all messages must have the same type:
+            ?DBG_ASSERT([] =:= [Msg1 || Msg1 <- Msgs,
+                                        element(1, Msg1) =/= bulk_read_entry_response]),
+            comm:send_local(self(),
+                            {bulkowner, gather, Id, Target, Msgs, Parents});
+        [{?send_to_group_member, Proc, _Msg} | _] ->
+            %% all messages must have the same type:
+            ?DBG_ASSERT([] =:= [Msg1 || Msg1 <- Msgs,
+                                        element(1, Msg1) =/= ?send_to_group_member orelse
+                                            element(2, Msg1) =/= Proc]),
+            Msgs1 = [Msg1 || {?send_to_group_member, _Proc, Msg1} <- Msgs],
+            comm:forward_to_group_member(
+              Proc, {bulkowner, gather, Id, Target, Msgs1, Parents})
+    end,
+    State;
 
 on({bulkowner, gather, Id, Target, [H = {bulk_read_entry_response, _HRange, _HData} | T], Parents}, State) ->
     Msg = lists:foldl(
