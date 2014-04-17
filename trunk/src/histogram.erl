@@ -114,30 +114,30 @@ merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
 -spec foldl_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::value() | nil, Sum::non_neg_integer()}.
-foldl_until(TargetVal, Histogram) ->
+foldl_until(TargetCount, Histogram) ->
     HistData = get_data(Histogram),
-    foldl_until_helper(TargetVal, HistData, _SumSoFar = 0, _BestValue = nil).
+    foldl_until_helper(TargetCount, HistData, _SumSoFar = 0, _BestValue = nil).
 
 %% @doc Like foldl_until but traverses the list from the right
 -spec foldr_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::value() | nil, Sum::non_neg_integer()}.
-foldr_until(TargetVal, Histogram) ->
+foldr_until(TargetCount, Histogram) ->
     HistData = get_data(Histogram),
-    foldl_until_helper(TargetVal, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
+    foldl_until_helper(TargetCount, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
 
 %% @doc Private method only exported for histogram_rt
--spec foldl_until_helper(TargetVal::non_neg_integer(), DataList::data_list(),
+-spec foldl_until_helper(TargetCount::non_neg_integer(), DataList::data_list(),
                          SumSoFar::non_neg_integer(), BestValue::nil | non_neg_integer())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::value() | nil, Sum::non_neg_integer()}.
-foldl_until_helper(TargetVal, _List, SumSoFar, BestValue)
-  when SumSoFar >= TargetVal ->
+foldl_until_helper(TargetCount, _List, SumSoFar, BestValue)
+  when SumSoFar >= TargetCount ->
     {ok, BestValue, SumSoFar};
 foldl_until_helper(_TargetVal, [], SumSoFar, BestValue) ->
     {fail, BestValue, SumSoFar};
-foldl_until_helper(TargetVal, [{Val, Count} | Other], SumSoFar, _BestValue) ->
-    foldl_until_helper(TargetVal, Other, SumSoFar + Count, Val).
+foldl_until_helper(TargetCount, [{Val, Count} | Other], SumSoFar, _BestValue) ->
+    foldl_until_helper(TargetCount, Other, SumSoFar + Count, Val).
 
 %% @doc Determines the maximum number of occurances under a sliding window
 -spec find_largest_window(WindowSize::pos_integer(), Histogram::histogram()) -> {Pos::pos_integer(), Sum::pos_integer()}.
