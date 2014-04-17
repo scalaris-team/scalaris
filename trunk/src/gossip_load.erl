@@ -60,7 +60,8 @@
 
 %% for testing
 -export([tester_create_round/1, tester_create_state/11, tester_create_histogram/1,
-        tester_create_load_data_list/1, is_histogram/1 ]).
+         tester_create_load_data_list/1, is_histogram/1,
+         request_histogram_feeder/2]).
 
 -ifdef(with_export_type_support).
 -export_type([state/0, histogram/0, bucket/0]). %% for config gossip_load_*.erl
@@ -275,10 +276,15 @@ no_of_buckets(State) ->
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec request_histogram_feeder(Size::1..50, SourcePid::comm:erl_local_pid())
+        -> {Size::1..50, SourcePid::comm:mypid()}.
+request_histogram_feeder(Size, SourcePid) ->
+    {Size, comm:make_global(SourcePid)}.
+
 %% @doc Request a histogram with Size number of Buckets. <br/>
 %%      The resulting histogram will be sent to SourceId, when all values have
 %%      properly converged.
--spec request_histogram(Size::pos_integer(), SourceId::comm:mypid()) -> ok.
+-spec request_histogram(Size::pos_integer(), SourcePid::comm:mypid()) -> ok.
 request_histogram(Size, SourcePid) when Size < 1 ->
     erlang:error(badarg, [Size, SourcePid]);
 
@@ -309,7 +315,7 @@ init(Instance, NoOfBuckets) ->
 %%      Used for request_histogram/1 (called by the gossip module). <br/>
 %%      the calculated histogram will be sent to the requestor.
 -spec init(Instance::instance(), NoOfBuckets::non_neg_integer(),
-                Requestor::comm:mypid()|none) -> {ok, full_state()}.
+           Requestor::comm:mypid() | none) -> {ok, full_state()}.
 init(Instance, NoOfBuckets, Requestor) ->
     log:log(debug, "[ ~w ] CBModule initiated. NoOfBuckets: ~w, Requestor: ~w",
         [Instance, NoOfBuckets, Requestor]),
