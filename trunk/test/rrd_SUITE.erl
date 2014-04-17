@@ -184,10 +184,7 @@ prop_empty_rrd(SlotLength, Count, Type, StartTime, Offsets, Times) ->
 -type rrd_data_us() :: [{rrd:internal_time(), number()},...].
 
 tester_empty_rrd(_Config) ->
-    tester:register_value_creator({typedef, rrd, histogram_timeseries_type},
-                                   rrd_SUITE, tester_create_histogram_timeseries, 1),
-    tester:test(?MODULE, prop_empty_rrd, 6, 1000, [{threads, 2}]),
-    tester:unregister_value_creator({typedef, rrd, histogram_timeseries_type}).
+    tester:test(?MODULE, prop_empty_rrd, 6, 1000, [{threads, 2}]).
 
 -spec round_us_time(Time::rrd:internal_time(), SlotLength::rrd:timespan(),
                     StartTime::rrd:internal_time()) -> rrd:internal_time().
@@ -282,10 +279,3 @@ tester_gauge_rrd(_Config) ->
     rrd_SUITE:prop_gauge_rrd(87, 10, {130,381,3}, [{78,153},{64,-0.236915872440062}], [2,1000], [{388,0,5000}]),
     rrd_SUITE:prop_gauge_rrd(85, 6, 4, [{107,4},{52,0.9981532170299772},{302,4},{232,417}], [126,42,3,4], [{143,255,5},209,138,{5,407,0}]),
     tester:test(?MODULE, prop_gauge_rrd, 6, 5000, [{threads, 2}]).
-
-
--spec tester_create_histogram_timeseries(number()) -> rrd:histogram_timeseries_type().
-tester_create_histogram_timeseries(Number) ->
-    {histogram,
-     fun(Val) -> Val + Number end,
-     fun(Val) -> Val - Number end}.

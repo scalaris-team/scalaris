@@ -34,7 +34,7 @@
 %% for calls from the dht node
 -export([handle_dht_msg/2]).
 %% for db monitoring
--export([init_db_rrd/2, update_db_rrd/2, update_db_monitor/2]).
+-export([init_db_rrd/1, update_db_rrd/2, update_db_monitor/2]).
 %% Metrics
 -export([get_load_metric/0, get_request_metric/0]).
 % Load Balancing
@@ -404,10 +404,9 @@ balance_noop(Options) ->
 handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
     case monitor_db() of
         true ->
-            MyRange = dht_node_state:get(DhtState, my_range),
-            MyId = dht_node_state:get(DhtState, node_id),
+            MyPredId = dht_node_state:get(DhtState, pred_id),
             DhtNodeMonitor = dht_node_state:get(DhtState, monitor_proc),
-            comm:send_local(DhtNodeMonitor, {db_op_init, MyId, MyRange});
+            comm:send_local(DhtNodeMonitor, {db_op_init, MyPredId});
         false -> ok
     end,
     DhtState;
@@ -532,33 +531,14 @@ handle_dht_msg(Msg, DhtState) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--compile({inline, [init_db_rrd/2]}).
+-compile({inline, [init_db_rrd/1]}).
 %% @doc Called by dht node process to initialize the db monitors
--spec init_db_rrd(MyId::?RT:key(), MyRange::intervals:interval()) -> rrd:rrd().
-init_db_rrd(MyId, MyRange) ->
+-spec init_db_rrd(Id::?RT:key()) -> rrd:rrd().
+init_db_rrd(Id) ->
     Type = config:read(lb_active_db_monitor),
     History = config:read(lb_active_monitor_history),
     HistogramSize = config:read(lb_active_histogram_size),
-    HistogramType =
-        case intervals:in(?MINUS_INFINITY, MyRange) andalso MyRange =/= intervals:all() of
-            false ->
-                {histogram, HistogramSize};
-            true -> %% we need a normalized histogram because of the circular key space
-                NormFun =
-                    fun(Val) ->
-                            case Val - MyId of
-                                NormVal when NormVal =< ?MINUS_INFINITY ->
-                                    ?PLUS_INFINITY + NormVal - 1;
-                                NormVal ->
-                                    NormVal - 1
-                            end
-                    end,
-                InverseFun =
-                    fun(NormVal) ->
-                            (NormVal + MyId + 1) rem ?PLUS_INFINITY
-                    end,
-                {histogram, HistogramSize, NormFun, InverseFun}
-        end,
+    HistogramType = {histogram_rt, HistogramSize, Id},
     MonitorResSecs = config:read(lb_active_monitor_resolution) div 1000,
     {MegaSecs, Secs, _Microsecs} = os:timestamp(),
     %% synchronize the start time for all monitors to a divisible of the monitor interval
@@ -717,8 +697,8 @@ get_value_type(Value, _Type) when is_number(Value) ->
     Value;
 get_value_type(Value, {histogram, _Size}) ->
     histogram:get_num_inserts(Value);
-get_value_type(Value, {histogram, _Size, _NormFun, _InverseFun}) ->
-    histogram_normalized:get_num_inserts(Value).
+get_value_type(Value, {histogram_rt, _Size, _BaseKey}) ->
+    histogram_rt:get_num_inserts(Value).
 
 %% @doc returns the weighted average of a list using decreasing weight
 -spec avg_weighted([number()]) -> number().
@@ -759,11 +739,9 @@ get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
                 Histogram ->
                     ?TRACE("Got histogram to compute split key: ~p~n", [Histogram]),
                     {Status, Key, TakenLoad} =
-                        case {histogram_normalized:is_normalized(Histogram), Direction} of
-                            {true, forward} -> histogram_normalized:foldl_until(TargetLoad, Histogram);
-                            {true, backward} -> histogram_normalized:foldr_until(TargetLoad, Histogram);
-                            {false, forward} -> histogram:foldl_until(TargetLoad, Histogram);
-                            {false, backward} -> histogram:foldr_until(TargetLoad, Histogram)
+                        case Direction of
+                            forward -> histogram_rt:foldl_until(TargetLoad, Histogram);
+                            backward -> histogram_rt:foldr_until(TargetLoad, Histogram)
                         end,
                     case {Status, Direction} of
                         {fail, _} -> failed;

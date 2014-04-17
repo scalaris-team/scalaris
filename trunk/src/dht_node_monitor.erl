@@ -39,8 +39,8 @@ on({lookup_hops, Hops}, {OldLookupHops, OldDBOps}) ->
     monitor:check_report(dht_node, 'lookup_hops', OldLookupHops, NewLookupHops),
     {NewLookupHops, OldDBOps};
 
-on({db_op_init, Id, Range}, {OldLookupHops, _OldDBOps}) ->
-    NewDBOps = lb_active:init_db_rrd(Id, Range),
+on({db_op_init, Id}, {OldLookupHops, _OldDBOps}) ->
+    NewDBOps = lb_active:init_db_rrd(Id),
     {OldLookupHops, NewDBOps};
 
 on({db_op, Key}, {OldLookupHops, OldDBOps}) ->

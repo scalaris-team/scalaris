@@ -47,12 +47,6 @@
 % misc
 -export([check_config/0]).
 
--type histogram_timeseries_type() ::
-          {histogram, Size::non_neg_integer()} |
-          {histogram, Size::non_neg_integer(),
-                      NormalizationFun::histogram_normalized:norm_fun(),
-                      InverseFun::histogram_normalized:norm_fun()}.
-
 % gauge: record newest value of a time slot,
 % counter: sum up all values of a time slot,
 % event: record every event (incl. timestamp) in a time slot,
@@ -60,7 +54,8 @@
 % timing: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x)}
 % timing_with_hist: record time spans, store {sum(x), sum(x^2), count(x), min(x), max(x), histogram(x)}
 -type timeseries_type() :: gauge | counter | event |
-                           histogram_timeseries_type() |
+                           {histogram, Size::non_neg_integer()} |
+                           {histogram_rt, Size::non_neg_integer(), BaseKey::histogram_rt:base_key()} |
                            {timing | timing_with_hist, us | ms | s | count | percent}.
 -type fill_policy_type() :: set_undefined | keep_last_value.
 -type time() :: erlang_timestamp().
@@ -70,7 +65,7 @@
 
 -type gauge_type() :: number().
 -type counter_type() :: number().
--type histogram_type() :: histogram:histogram() | histogram_normalized:histogram().
+-type histogram_type() :: histogram:histogram() | histogram_rt:histogram().
 -type timing_type() :: {Sum::number(), Sum2::number(), Count::pos_integer(), Min::number(), Max::number(), Hist::histogram:histogram()}.
 -type event_type(T) :: [{internal_time(), T}].
 -type data_type() :: gauge_type() | counter_type() | histogram_type() | timing_type() | event_type(term()).
@@ -189,9 +184,9 @@ select_fun(DB) ->
             fun(Time, OldValue, Value) ->
                     histogram_update_fun(Time, OldValue, Value, Size)
             end;
-        {histogram, Size, NormFun, InverseFun} ->
+        {histogram_rt, Size, BaseKey} ->
             fun(Time, OldValue, Value) ->
-                    histogram_normalized_update_fun(Time, OldValue, Value, Size, NormFun, InverseFun)
+                    histogram_rt_update_fun(Time, OldValue, Value, Size, BaseKey)
             end;
         {timing, _} -> fun timing_update_fun/3;
         {timing_with_hist, _} -> fun timing_with_hist_update_fun/3
@@ -432,20 +427,20 @@ event_update_fun(Time, undefined, New) -> [{Time, New}];
 event_update_fun(Time, Old, New) -> lists:append(Old, [{Time, New}]).
 
 -spec histogram_update_fun(Time::internal_time(), Old::histogram_type() | undefined, NewV::number(), Size::non_neg_integer())
-        -> histogram_type().
+        -> histogram:histogram().
 histogram_update_fun(_Time, undefined, New, Size) ->
     Hist = histogram:create(Size),
     histogram:add(New, Hist);
 histogram_update_fun(_Time, Hist, New, _Size) ->
     histogram:add(New, Hist).
 
--spec histogram_normalized_update_fun(Time::internal_time(), Old::histogram_type() | undefined, NewV::number(), Size::non_neg_integer(), NormFun::histogram_normalized:norm_fun(), InverseFun::histogram_normalized:norm_fun())
-        -> histogram_type().
-histogram_normalized_update_fun(_Time, undefined, New, Size, NormFun, InverseFun) ->
-    Hist = histogram_normalized:create(Size, NormFun, InverseFun),
-    histogram_normalized:add(New, Hist);
-histogram_normalized_update_fun(_Time, Hist, New, _Size, _NormFun, _InverseFun) ->
-    histogram_normalized:add(New, Hist).
+-spec histogram_rt_update_fun(Time::internal_time(), Old::histogram_type() | undefined, NewV::number(), Size::non_neg_integer(), BaseKey::histogram_rt:base_key())
+        -> histogram_rt:histogram().
+histogram_rt_update_fun(_Time, undefined, New, Size, BaseKey) ->
+    Hist = histogram_rt:create(Size, BaseKey),
+    histogram_rt:add(New, Hist);
+histogram_rt_update_fun(_Time, Hist, New, _Size, _BaseKey) ->
+    histogram_rt:add(New, Hist).
 
 -spec timing_update_fun(Time::internal_time(), Old::timing_type() | undefined, New::number())
         -> timing_type().
