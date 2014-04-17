@@ -480,11 +480,7 @@ handle_message({ping, Pid}, UState, _Handler) ->
 handle_message({?send_to_group_member, Processname, Msg}, UState, _Handler) ->
     %% forward a message to group member by its process name
     %% initiated via comm:send/3 with group_member
-    Pid = pid_groups:get_my(Processname),
-    case Pid of
-        failed -> ok;
-        _      -> comm:send_local(Pid, Msg)
-    end,
+    comm:forward_to_group_member(Processname, Msg),
     UState;
 handle_message(Msg, UState, Handler) ->
     Handler(Msg, UState).
