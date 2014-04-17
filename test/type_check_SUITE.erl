@@ -196,7 +196,8 @@ tester_type_check_gossip(_Config) ->
             [  {handle_msg, 2}, % would need valid dht_node_state, sends messages
                {select_data, 1}, % sends messages
                {select_reply_data, 5}, % sends messages
-               {integrate_data, 4} % sends messages
+               {integrate_data, 4}, % sends messages
+               {request_histogram, 2} % tested via feeder
             ],
             % excluded (private functions)
             [  {state_update, 3}, % cannot create funs
