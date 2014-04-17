@@ -265,9 +265,16 @@ on({bulkowner, reply_process_all}, State) ->
              case Msgs of
                  [] -> ok;
                  [{bulk_read_entry_response, _HRange, _HData} | _] ->
+                     %% all messages must have the same type:
+                     ?DBG_ASSERT([] =:= [Msg1 || Msg1 <- Msgs,
+                                                 element(1, Msg1) =/= bulk_read_entry_response]),
                      comm:send_local(self(),
                                      {bulkowner, gather, Id, Target, Msgs, Parents});
                  [{?send_to_group_member, Proc, _Msg} | _] ->
+                     %% all messages must have the same type:
+                     ?DBG_ASSERT([] =:= [Msg1 || Msg1 <- Msgs,
+                                                 element(1, Msg1) =/= ?send_to_group_member orelse
+                                                     element(2, Msg1) =/= Proc]),
                      Msgs1 = [Msg1 || {?send_to_group_member, _Proc, Msg1} <- Msgs],
                      comm:forward_to_group_member(
                        Proc, {bulkowner, gather, Id, Target, Msgs1, Parents})
