@@ -265,7 +265,6 @@ wf_set_wl(DBEntry, _UI = none, {TxId, _Vers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for commit_read
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
-%% commit read releases the read lock of a given entry, if it was set.
 -spec commit_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), ok,
                          prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                 {tx_tlog:tlog_entry(),
@@ -276,6 +275,7 @@ wf_set_wl(DBEntry, _UI = none, {TxId, _Vers}) ->
 commit_read_feeder(TLogEntry, TxId, ok, Round, OldVal) ->
     {TLogEntry, TxId, self(), Round, OldVal}.
 
+%% @doc Releases the read lock of a given entry, if it was set.
 -spec commit_read(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
                   prbr:r_with_id(), any()) -> ok.
 commit_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
@@ -324,11 +324,6 @@ wf_unset_rl(DBEntry, _UI = none, {TxId, _TLogVers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for commit_write
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
-%% commit write releases the write lock of a given entry, if it was
-%% set, and writes the new value.
-
-%% erlang shell test call: api_tx:write("a", 1).
-
 -spec commit_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), ok,
                           prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                  {tx_tlog:tlog_entry_write(), ?RT:key(),
@@ -340,6 +335,9 @@ commit_write_feeder(TLogEntry, TxId, ok, Round, OldVal) ->
     SaneCommitWriteTLogEntry = tx_tlog:set_entry_value(TLogEntry, ?value, Val),
     {SaneCommitWriteTLogEntry, TxId, self(), Round, OldVal}.
 
+%% @doc Releases the write lock of a given entry, if it was
+%%      set, and writes the new value.
+%% erlang shell test call: api_tx:write("a", 1).
 -spec commit_write(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
                    prbr:r_with_id(), any()) -> ok.
 commit_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
@@ -400,7 +398,6 @@ wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for abort_read
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
-%% abort read releases the read lock of a given entry, if it was set.
 -spec abort_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), ok,
                          prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                 {tx_tlog:tlog_entry(),
@@ -411,6 +408,7 @@ wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
 abort_read_feeder(TLogEntry, TxId, ok, Round, OldVal) ->
     {TLogEntry, TxId, self(), Round, OldVal}.
 
+%% @doc Releases the read lock of a given entry, if it was set.
 -spec abort_read(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
                   prbr:r_with_id(), any()) -> ok.
 abort_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
@@ -451,11 +449,6 @@ cc_abort_read({_RL, _Vers}, _WF, _Val = {_TxId, _TLogVers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for abort_write
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
-%% abort write releases the write lock of a given entry, if it was
-%% set.
-
-%% erlang shell test call: api_tx:write("a", 1).
-
 -spec abort_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), ok,
                           prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                  {tx_tlog:tlog_entry_write(), ?RT:key(),
@@ -467,6 +460,8 @@ abort_write_feeder(TLogEntry, TxId, ok, Round, OldVal) ->
     SaneCommitWriteTLogEntry = tx_tlog:set_entry_value(TLogEntry, ?value, Val),
     {SaneCommitWriteTLogEntry, TxId, self(), Round, OldVal}.
 
+%% @doc Releases the write lock of a given entry, if it was set.
+%% erlang shell test call: api_tx:write("a", 1).
 -spec abort_write(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
                    prbr:r_with_id(), any()) -> ok.
 abort_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
