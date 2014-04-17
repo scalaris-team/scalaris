@@ -31,6 +31,7 @@ all()   -> [
             add3_identical,
             resize,
             insert,
+            get_num_inserts,
             find_smallest_interval,
             merge_interval,
             perf_add,
@@ -93,6 +94,20 @@ insert(_Config) ->
     Values = [3.5, 3.0, 2.0, 1.0],
     H2 = lists:foldl(fun histogram:add/2, H, Values),
     ?equals(histogram:get_data(H2), [{1.0,1}, {2.0,1}, {3.0,1}, {3.5,1}]),
+    ok.
+
+get_num_inserts(_Config) ->
+    H = histogram:create(10),
+    ?equals(histogram:get_num_inserts(H), 0),
+    Values = [3.5, 3.0, 2.0, 1.0],
+    H2 = lists:foldl(fun histogram:add/2, H, Values),
+    ?equals(histogram:get_num_inserts(H2), 4),
+    Values2 = [{2.0, 1}, {3.5, 2}, {3.0, 1}, {2.0, 6}, {1.0, 3}],
+    H3 = lists:foldl(fun({Value, Count}, Histogram) ->
+                             histogram:add(Value, Count, Histogram)
+                     end,
+                     H2, Values2),
+    ?equals(histogram:get_num_inserts(H3), 17),
     ok.
 
 find_smallest_interval(_Config) ->
