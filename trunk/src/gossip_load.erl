@@ -267,10 +267,6 @@ check_config() ->
                        fun(El) -> lists:member(El, ?ADDITIONAL_MODULES) end,
                        "A valid additional gossip_load module").
 
--spec no_of_buckets(State::state()) -> pos_integer().
-no_of_buckets(State) ->
-    state_get(no_of_buckets, State).
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API
@@ -1189,7 +1185,7 @@ previous_or_current(PrevState, CurState) when is_record(PrevState, state) andals
 -spec init_histo(Module::module(), node_details:node_details(),
                  CurState::state()) -> histogram().
 init_histo(Module, NodeDetails, CurState) ->
-    NumberOfBuckets = no_of_buckets(CurState),
+    NumberOfBuckets = state_get(no_of_buckets, CurState),
     Module:init_histo(NodeDetails, NumberOfBuckets).
 
 -spec divide2(LoadData::load_data()) -> NewLoadData::load_data();
