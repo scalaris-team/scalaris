@@ -102,10 +102,10 @@ increment_iter(Key, Iterations, Aborts) ->
     case Result of
         {ok}              -> increment_iter(Key, Iterations - 1, Aborts);
         {fail, abort, [Key]}     ->
-            timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
+            timer:sleep(randoms:rand_uniform(1, erlang:max(2, 10 * Aborts + 1))),
             increment_iter(Key, Iterations, Aborts + 1);
         {fail, not_found} ->
-            timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
+            timer:sleep(randoms:rand_uniform(1, erlang:max(2, 10 * Aborts + 1))),
             increment_iter(Key, Iterations, Aborts + 1);
         X -> log:log(warn, "~p", [X])
     end.
@@ -122,10 +122,10 @@ increment_with_histo_iter(H, Key, Iterations, Aborts) ->
                                histogram:add(timer:now_diff(After, Before) / 1000, H),
                                Key, Iterations - 1, Aborts);
         {fail, abort, [Key]}     ->
-            timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
+            timer:sleep(randoms:rand_uniform(1, erlang:max(2, 10 * Aborts + 1))),
             increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
         {fail, not_found} ->
-            timer:sleep(randoms:rand_uniform(1, 10 * Aborts + 1)),
+            timer:sleep(randoms:rand_uniform(1, erlang:max(2, 10 * Aborts + 1))),
             increment_with_histo_iter(H, Key, Iterations, Aborts + 1);
         X -> log:log(warn, "~p", [X])
     end.
