@@ -35,7 +35,9 @@ all()   -> [
             find_smallest_interval,
             merge_interval,
             perf_add,
-            find_largest_window
+            find_largest_window,
+            foldl_until,
+            foldr_until
            ].
 
 suite() -> [ {timetrap, {seconds, 40}} ].
@@ -164,4 +166,40 @@ find_largest_window(_Config) ->
     F(100, 20, {1, 20}),
     F(1000, 100, {1, 100}),
     F(10000, 300, {1, 300}),
+    ok.
+
+foldl_until(_Config) ->
+    H1 = histogram:create(10),
+    Values = [1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5],
+    H2 = lists:foldl(fun histogram:add/2, H1, Values),
+    %% sum found
+    {ok, Val, Sum} = histogram:foldl_until(6, H2),
+    ?equals(Val, 3),
+    ?equals(Sum, 6),
+    %% target value too high
+    {fail, Val2, Sum2} = histogram:foldl_until(1000, H2),
+    ?equals(Val2, 5),
+    ?equals(Sum2, 12),
+    %% target value too low
+    {ok, Val3, Sum3} = histogram:foldl_until(0, H2),
+    ?equals(Val3, nil),
+    ?equals(Sum3, 0),
+    ok.
+
+foldr_until(_Config) ->
+    H1 = histogram:create(10),
+    Values = [1, 1, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5],
+    H2 = lists:foldl(fun histogram:add/2, H1, Values),
+    %% sum found
+    {ok, Val, Sum} = histogram:foldr_until(6, H2),
+    ?equals(Val, 4),
+    ?equals(Sum, 6),
+    %% target value too high
+    {fail, Val2, Sum2} = histogram:foldr_until(1000, H2),
+    ?equals(Val2, 1),
+    ?equals(Sum2, 12),
+    %% target value too low
+    {ok, Val3, Sum3} = histogram:foldr_until(0, H2),
+    ?equals(Val3, nil),
+    ?equals(Sum3, 0),
     ok.
