@@ -35,7 +35,7 @@
 -export([foldl_until/2, foldr_until/2]).
 
 % private but shared with histogram_rt
--export([insert/2, resize/1, foldl_until_helper/4]).
+-export([insert/2, resize/1]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
