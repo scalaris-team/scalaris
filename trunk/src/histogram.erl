@@ -24,7 +24,7 @@
 -vsn('$Id$').
 
 % external API
--export([create/1, create/2, add/2, add/3, get_data/1, get_size/1,
+-export([create/1, add/2, add/3, get_data/1, get_size/1,
          get_num_elements/1, get_num_inserts/1, merge/2]).
 
 % private API for unit tests:
@@ -33,9 +33,6 @@
 
 -export([find_largest_window/2, find_largest_window_feeder/2]).
 -export([foldl_until/2, foldr_until/2]).
-
-% private but shared with histogram_rt
--export([insert/2, resize/1]).
 
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
@@ -59,18 +56,6 @@
 -spec create(Size::non_neg_integer()) -> histogram().
 create(Size) ->
     #histogram{size = Size}.
-
-%% @doc Creates a histogram with a size and existing data.
--spec create(Size::non_neg_integer(), Data::data_list()) -> histogram().
-create(0, _Data) ->
-    create(0);
-create(Size, Data) ->
-    Histogram = #histogram{data_size = Size, data = Data},
-    if length(Data) > 1 ->
-           resize(Histogram);
-       true ->
-           Histogram
-    end.
 
 -spec add(Value::value(), Histogram::histogram()) -> histogram().
 add(Value, Histogram) ->
@@ -110,7 +95,7 @@ merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
 
 %% @doc Traverses the histogram until TargetCount entries have been found
 %%      and returns the value at this position.
-%% TODO change this to exspect non empty histogram
+%% TODO change this to expect non empty histogram
 -spec foldl_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::value() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::value() | nil, Sum::non_neg_integer()}.
@@ -196,7 +181,6 @@ resize(Histogram = #histogram{data = Data, size = Size, data_size = DataSize})
 resize(#histogram{} = Histogram) ->
     Histogram.
 
-%% @doc Private method only exported for histogram_rt
 -spec insert(Value::data_item(), Data::data_list()) -> data_list().
 insert({Value, Count}, [{Value2, Count2} | Rest]) when Value =:= Value2 ->
     [{Value, Count + Count2} | Rest];

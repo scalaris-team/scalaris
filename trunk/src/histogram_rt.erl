@@ -20,7 +20,7 @@
 -author('michels@zib.de').
 -vsn('$Id$').
 
--export([create/2, add/2, add/3, get_data/1, merge/2,
+-export([create/2, add/2, add/3, get_data/1, get_size/1, merge/2,
          get_num_elements/1, get_num_inserts/1]).
 -export([foldl_until/2, foldr_until/2]).
 -export([is_histogram/1]).
@@ -64,6 +64,10 @@ get_data({Histogram, BaseKey}) ->
                       {denormalize(Value, BaseKey), Count}
               end, Data).
 
+-spec get_size(Histogram::histogram()) -> non_neg_integer().
+get_size({Histogram, _BaseKey}) ->
+    histogram:get_size(Histogram).
+
 -spec get_num_elements(Histogram::histogram()) -> non_neg_integer().
 get_num_elements({Histogram, _BaseKey}) ->
     histogram:get_num_elements(Histogram).
@@ -74,19 +78,15 @@ get_num_inserts({Histogram, _BaseKey}) ->
 
 %% @doc: Merges the given two histograms by adding every data point of Hist2
 -spec merge(Hist1::histogram(), Hist2::histogram()) -> histogram().
-merge({Histogram, BaseKey} = Hist1, Hist2) ->
-    case histogram:get_size(Histogram) of
+merge(Hist1, Hist2) ->
+    case get_size(Hist1) of
         0 -> Hist1;
         _ ->
             DataHist2 = get_data(Hist2),
-            NewHistData = lists:foldl(fun({Value, Count}, Hist) ->
-                                              Entry = {normalize(Value, BaseKey), Count},
-                                              histogram:insert(Entry, Hist)
-                                      end,
-                                      Histogram, DataHist2),
-            NewHistSize = histogram:get_size(Histogram),
-            NewHistogram = histogram:create(NewHistSize, NewHistData),
-            {NewHistogram, BaseKey}
+            lists:foldl(fun({Value, Count}, Hist) ->
+                                add(Value, Count, Hist)
+                        end,
+                        Hist1, DataHist2)
     end.
 
 %% @doc Traverses the histogram until TargetCount entries have been found
