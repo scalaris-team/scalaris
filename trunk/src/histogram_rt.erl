@@ -61,7 +61,7 @@ add(Value, Count, {Histogram, BaseKey}) ->
 get_data({Histogram, BaseKey}) ->
     Data = histogram:get_data(Histogram),
     lists:map(fun({Value, Count}) ->
-                      {?RT:get_split_key(BaseKey, BaseKey, {Value, ?RT:n()}), Count}
+                      {denormalize(Value, BaseKey), Count}
               end, Data).
 
 -spec get_num_elements(Histogram::histogram()) -> non_neg_integer().
@@ -94,22 +94,33 @@ merge({Histogram, BaseKey} = Hist1, Hist2) ->
 -spec foldl_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::key() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::key() | nil, Sum::non_neg_integer()}.
-foldl_until(TargetCount, NormalizedHist) ->
-    HistData = get_data(NormalizedHist),
-    histogram:foldl_until_helper(TargetCount, HistData, _SumSoFar = 0, _BestValue = nil).
+foldl_until(TargetCount, {Histogram, BaseKey}) ->
+    Result = histogram:foldl_until(TargetCount, Histogram),
+    case Result of
+        {_Status, nil, _Sum} -> Result;
+        {Status, Range, Sum} -> {Status, denormalize(Range, BaseKey), Sum}
+    end.
 
 %% @doc Like foldl_until but traverses the list from the right
 -spec foldr_until(TargetCount::non_neg_integer(), histogram())
         -> {fail, Value::key() | nil, SumSoFar::non_neg_integer()} |
            {ok, Value::key() | nil, Sum::non_neg_integer()}.
-foldr_until(TargetCount, NormalizedHist) ->
-    HistData = get_data(NormalizedHist),
-    histogram:foldl_until_helper(TargetCount, lists:reverse(HistData), _SumSoFar = 0, _BestValue = nil).
+foldr_until(TargetCount, {Histogram, BaseKey}) ->
+    Result = histogram:foldr_until(TargetCount, Histogram),
+    case Result of
+        {_Status, nil, _Sum} -> Result;
+        {Status, Range, Sum} -> {Status, denormalize(Range, BaseKey), Sum}
+    end.
 
 -compile({inline, [normalize/2]}).
 -spec normalize(Value::key(), BaseKey::base_key()) -> internal_value().
 normalize(Value, BaseKey) ->
     ?RT:get_range(BaseKey, Value).
+
+-compile({inline, [denormalize/2]}).
+-spec denormalize(Value::internal_value(), BaseKey::base_key()) -> key().
+denormalize(Value, BaseKey) ->
+    ?RT:get_split_key(BaseKey, BaseKey, {Value, ?RT:n()}).
 
 -spec is_histogram(histogram() | any()) -> boolean().
 is_histogram({_Histogram, _BaseKey}) ->
