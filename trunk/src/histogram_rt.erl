@@ -25,6 +25,9 @@
 -export([foldl_until/2, foldr_until/2]).
 -export([is_histogram/1]).
 
+%% for testing
+-export([tester_create_histogram/2]).
+
 -include("scalaris.hrl").
 
 -ifdef(with_export_type_support).
@@ -127,3 +130,8 @@ is_histogram({_Histogram, _BaseKey}) ->
     true;
 is_histogram(_) ->
     false.
+
+-spec tester_create_histogram(Entries::[{key(), pos_integer()}], BaseKey::base_key()) -> histogram().
+tester_create_histogram(Entries, BaseKey) ->
+    HistogramRT = create(length(Entries), BaseKey),
+    lists:foldl(fun({Value, Count}, Hist) -> add(Value, Count, Hist) end, HistogramRT, Entries).

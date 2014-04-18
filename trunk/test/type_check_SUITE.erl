@@ -602,21 +602,28 @@ tester_type_check_histogram(_Config) ->
     config:write(no_print_ring_data, true),
     tester:register_type_checker({typedef, histogram, histogram}, histogram, tester_is_valid_histogram),
     tester:register_value_creator({typedef, histogram, histogram}, histogram, tester_create_histogram, 2),
+    tester:register_value_creator({typedef, histogram_rt, histogram}, histogram_rt, tester_create_histogram, 2),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {histogram,
            [ {find_smallest_interval, 1}, % private API, needs feeder
              {merge_interval, 2}, % private API, needs feeder
-             {find_largest_window, 2} % needs feeder for correct window size
+             {find_largest_window, 2}    % needs feeder for correct window size
            ],
            [ {resize, 1}, % needs feeder
              {sliding_window_max, 7} % fed by find_largest_window/2
-           ]}
+           ]},
+          {histogram_rt,
+           [],
+           [ {denormalize, 2} % TODO needs feeder according to ?RT:get_range/2 output
+           ]
+          }
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
     tester:unregister_type_checker({typedef, histogram, histogram}),
     tester:unregister_value_creator({typedef, histogram, histogram}),
+    tester:unregister_value_creator({typedef, histogram_rt, histogram}),
     true.
 
 tester_type_check_util(_Config) ->
