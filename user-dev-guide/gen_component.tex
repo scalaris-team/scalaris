@@ -57,9 +57,9 @@ for this \erlmodule{gen\_component}. Later, the current state of the
 component can be retrieved using \erlfun{gen\_component}{get\_state}{/1}.
 
 To react on messages / events, a message handler is used. The default
-message handler is given to \erlfun{gen\_component}{start\_link}{/3} or
+message handler is given to or
 \erlfun{gen\_component}{start\_link}{/4} as well as
-\erlfun{gen\_component}{start}{/3}, \erlfun{gen\_component}{start}{/4} or
+\erlfun{gen\_component}{start}{/4} or
 \erlfun{gen\_component}{start}{/5}. It can be
 changed by calling \erlfun{gen\_component}{change\_handler}{/2} (see
 Section~\ref{sec:gen_component:change_handler}). When an event / message for
@@ -76,11 +76,12 @@ the updated state of the component or the atoms \texttt{unknown\_event} or
 
 A \erlmodule{gen\_component} can be started using one of:
 
-\erlfun{gen\_component}{start}{Module, Args, GenCOptions = []}\\
-\erlfun{gen\_component}{start\_link}{Module, Args, GenCOptions = []}
+\erlfun{gen\_component}{start}{Module, Handler, Args, GenCOptions = []}\\
+\erlfun{gen\_component}{start\_link}{Module, Handler, Args, GenCOptions = []}
 \begin{erlfunparams}
 \erlparam{Module}{the name of the module your component is
    implemented in}
+   \erlparam{Handler}{the inital message handler}
 \erlparam{Args}{List of parameters passed to \code{Module:init/1}
    for initialization}
 \erlparam{GenCOptions}{optional parameter.
