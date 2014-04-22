@@ -295,7 +295,7 @@ get_linetrace(Pid) ->
     {dictionary, Dict} = erlang:process_info(Pid, dictionary),
     extract_from_list_may_not_exist(Dict, test_server_loc).
 
--spec do_throw(atom()) -> no_return().
+-spec do_throw(term()) -> no_return().
 do_throw(Exception) ->
     log:log("Exception ~p at ~.0p", [Exception, get_stacktrace()]),
     erlang:throw(Exception).
