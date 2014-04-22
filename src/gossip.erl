@@ -1235,7 +1235,8 @@ tuplekeyfind(Key, [_ | List]) ->
     tuplekeyfind(Key, List).
 
 -compile({nowarn_unused_function, {init_gossip_task_feeder, 3}}).
--spec init_gossip_task_feeder(cb_module(), NoOfBuckets::1..50, state()) -> {cb_module(), list(), state()}.
+-spec init_gossip_task_feeder(cb_module(), NoOfBuckets::gossip_load:histogram_size(), state())
+        -> {cb_module(), list(), state()}.
 init_gossip_task_feeder(CBModule, NoOfBuckets, State) ->
     %% note: gossip_load (the only supported cb_module for now) requires an
     %%       integer NoOfBuckets parameter
