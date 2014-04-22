@@ -281,10 +281,7 @@ request_histogram_feeder(Size, SourcePid) ->
 %%      The resulting histogram will be sent to SourceId, when all values have
 %%      properly converged.
 -spec request_histogram(Size::pos_integer(), SourcePid::comm:mypid()) -> ok.
-request_histogram(Size, SourcePid) when Size < 1 ->
-    erlang:error(badarg, [Size, SourcePid]);
-
-request_histogram(Size, SourcePid) ->
+request_histogram(Size, SourcePid) when Size >= 1 ->
     gossip:start_gossip_task(?MODULE, [Size, SourcePid]).
 
 
