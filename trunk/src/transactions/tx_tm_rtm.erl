@@ -1151,7 +1151,9 @@ get_failed_keys(TxState, State) ->
                    ?abort =:= tx_item_get_decided(
                      TxItem = element(2, get_item_entry(TxItemId, State)))]
     end,
-    ?DBG_ASSERT(length(Result) =:= NumAbort),
+    ?DBG_ASSERT2(length(Result) =:= NumAbort,
+                 {'NumAbort counter differs from actual TxItem states',
+                  length(Result), '=/=', NumAbort}),
     Result.
 
 -spec handle_crash(pid(), state(), on | on_init)
