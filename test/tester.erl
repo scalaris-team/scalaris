@@ -25,6 +25,9 @@
          register_type_checker/3, unregister_type_checker/1,
          register_value_creator/4, unregister_value_creator/1]).
 
+% pseudo proc for the value_creator to create pids
+-export([start_pseudo_proc/0, pseudo_proc_fun/0]).
+
 -export([type_check_module/4]).
 
 -include("tester.hrl").
@@ -82,6 +85,19 @@ repeat(F, 1) ->
 repeat(F, Repetitions) ->
     _Res = F(),
     repeat(F, Repetitions - 1).
+
+-spec pseudo_proc_fun() -> no_return().
+pseudo_proc_fun() ->
+    receive
+        _Msg -> ok
+    end,
+    pseudo_proc_fun().
+
+-spec start_pseudo_proc() -> pid().
+start_pseudo_proc() ->
+    Pid = erlang:spawn_link(?MODULE, pseudo_proc_fun, []),
+    erlang:register(tester_pseudo_proc, Pid),
+    Pid.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

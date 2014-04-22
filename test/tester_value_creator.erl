@@ -161,8 +161,9 @@ create_value_(non_neg_integer, _Size, ParseState) ->
       ParseState, fun tester_parse_state:get_non_neg_integers/1,
       fun() -> crypto:rand_uniform(0, integer_max() + 1) end);
 create_value_(pid, _Size, _ParseState) ->
-    % @todo
-    self();
+    case erlang:whereis(tester_pseudo_proc) of
+        Pid when is_pid(Pid) -> Pid
+    end;
 % 1..
 create_value_(pos_integer, _Size, ParseState) ->
     create_val_50rand_50coll(
