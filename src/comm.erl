@@ -61,7 +61,19 @@
 -export_type([mypid_plain/0]).
 -endif.
 
--type envelope()                  :: tuple().
+%% there is no variable length-tuple definition for types
+%% -> declare up to 10 here:
+-type envelope() ::
+          {any()} |
+          {any(), any()} |
+          {any(), any(), any()} |
+          {any(), any(), any(), any()} |
+          {any(), any(), any(), any(), any()} |
+          {any(), any(), any(), any(), any(), any()} |
+          {any(), any(), any(), any(), any(), any(), any()} |
+          {any(), any(), any(), any(), any(), any(), any(), any()} |
+          {any(), any(), any(), any(), any(), any(), any(), any(), any()} |
+          {any(), any(), any(), any(), any(), any(), any(), any(), any(), any()}.
 -type reg_name()                  :: atom().
 -type erl_local_pid_plain()       :: pid() | reg_name().
 -type mypid_plain() :: {inet:ip_address(),
@@ -278,7 +290,7 @@ get(Name, {IP, Port, _Pid} = _Node) -> {IP, Port, Name}.
 %% @doc Encapsulates the given pid (local or global) with the reply_as
 %%      request, so a send/2 to the generated target will put a reply
 %%      message at the Nth position of the given envelope.
--spec reply_as(plain_pid(), pos_integer(), tuple()) ->
+-spec reply_as(plain_pid(), pos_integer(), envelope()) ->
                       mypid_with_reply_as() | erl_local_pid_with_reply_as().
 reply_as(Target, Nth, Envelope) ->
     ?DBG_ASSERT('_' =:= element(Nth, Envelope)),
