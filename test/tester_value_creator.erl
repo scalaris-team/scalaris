@@ -23,7 +23,7 @@
 -include("unittest.hrl").
 -include("tester.hrl").
 
--export([create_value/3]).
+-export([create_value/3, create_value_wo_scalaris/3]).
 
 list_length_min() -> 0.
 list_length_max() -> 5.
@@ -31,9 +31,21 @@ list_length_max() -> 5.
 integer_min() -> 0. %don't change this! (negative values will be created between -max and +max)
 integer_max() -> 5.
 
-%% @doc create a random value of the given type
+%% @doc Create a random value of the given type, taking global Scalaris types
+%%      into account.
 -spec create_value(type_spec(), non_neg_integer(), tester_parse_state:state()) -> term().
 create_value(Type, Size, ParseState) ->
+    case tester_value_creator_scalaris:create_value(Type, Size, ParseState) of
+        failed ->
+            create_value_wo_scalaris(Type, Size, ParseState);
+        {value, Value} ->
+            Value
+    end.
+
+%% @doc Create a random value of the given type, not taking global Scalaris
+%%      types into account at the top level of the given type spec.
+-spec create_value_wo_scalaris(type_spec(), non_neg_integer(), tester_parse_state:state()) -> term().
+create_value_wo_scalaris(Type, Size, ParseState) ->
     %ct:pal("create_value ~p", [Type]),
     case tester_global_state:get_value_creator(Type) of
         failed ->
