@@ -159,6 +159,7 @@ tester_type_check_gossip(_Config) ->
     tester:register_value_creator({typedef, gossip_load, round}, gossip_load, tester_create_round, 1),
     tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 11),
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
+    tester:register_value_creator({typedef, gossip_load, histogram_size}, gossip_load, tester_create_histogram_size, 1),
     tester:register_value_creator({typedef, gossip_load, load_data_list}, gossip_load, tester_create_load_data_list, 1),
     tester:register_value_creator({typedef, gossip, cb_module_name}, gossip, tester_create_cb_module_names, 1),
     Modules = [ {gossip,
@@ -222,6 +223,7 @@ tester_type_check_gossip(_Config) ->
     tester:unregister_value_creator({typedef, gossip_load, state}),
     tester:unregister_value_creator({typedef, gossip_load, load_data_list}),
     tester:unregister_value_creator({typedef, gossip_load, histogram}),
+    tester:unregister_value_creator({typedef, gossip_load, histogram_size}),
     tester:unregister_type_checker({typedef, gossip_load, histogram}),
     tester:unregister_value_creator({typedef, gossip, cb_module_name}),
     true.

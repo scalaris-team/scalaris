@@ -61,10 +61,10 @@
 %% for testing
 -export([tester_create_round/1, tester_create_state/11, tester_create_histogram/1,
          tester_create_load_data_list/1, is_histogram/1,
-         request_histogram_feeder/2]).
+         tester_create_histogram_size/1]).
 
 -ifdef(with_export_type_support).
--export_type([state/0, histogram/0, bucket/0]). %% for config gossip_load_*.erl
+-export_type([state/0, histogram/0, histogram_size/0, bucket/0]). %% for config gossip_load_*.erl
 -export_type([avg/0, avg_kr/0, min/0, max/0]). %% for config gossip_load_*.erl
 -export_type([load_info/0, load_info_other/0, merged/0]).
 -endif.
@@ -92,6 +92,7 @@
 -type merged() :: non_neg_integer().
 -type bucket() :: {Interval::intervals:interval(), Avg::avg()|unknown}.
 -type histogram() :: [bucket()].
+-type histogram_size() :: pos_integer().
 -type instance() :: {Module :: gossip_load, Id :: atom() | uid:global_uid()}.
 -type status() :: init | uninit.
 -type round() :: non_neg_integer().
@@ -231,7 +232,7 @@ convergence_epsilon() ->
 discard_old_rounds() ->
     config:read(gossip_load_discard_old_rounds).
 
--spec no_of_buckets() -> pos_integer().
+-spec no_of_buckets() -> histogram_size().
 no_of_buckets() ->
     config:read(gossip_load_number_of_buckets).
 
@@ -272,15 +273,10 @@ check_config() ->
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec request_histogram_feeder(Size::1..50, SourcePid::comm:erl_local_pid())
-        -> {Size::1..50, SourcePid::comm:mypid()}.
-request_histogram_feeder(Size, SourcePid) ->
-    {Size, comm:make_global(SourcePid)}.
-
 %% @doc Request a histogram with Size number of Buckets. <br/>
 %%      The resulting histogram will be sent to SourceId, when all values have
 %%      properly converged.
--spec request_histogram(Size::pos_integer(), SourcePid::comm:mypid()) -> ok.
+-spec request_histogram(Size::histogram_size(), SourcePid::comm:mypid()) -> ok.
 request_histogram(Size, SourcePid) when Size >= 1 ->
     gossip:start_gossip_task(?MODULE, [Size, SourcePid]).
 
@@ -1458,7 +1454,7 @@ to_string({ModuleName, Id}) ->
 %%      Used as value_creator in tester.erl (property testing).
 -spec tester_create_state(status(), instance(), load_data_list(), ring_data(),
                           Leader::boolean(), Range::intervals:non_empty_interval(),
-                          Request::boolean(), NoOfBuckets::1..50, round(),
+                          Request::boolean(), NoOfBuckets::histogram_size(), round(),
                           Merged::non_neg_integer(),
                           ConvergenceCount::non_neg_integer()) -> state().
 tester_create_state(Status, Instance, LoadDataList, RingData, Leader, Range,
@@ -1480,10 +1476,8 @@ tester_create_state(Status, Instance, LoadDataList, RingData, Leader, Range,
 %% @doc Creates round values with greatly reduces variance, so that more rounds
 %%      are valid rounds (i.e. rounds from messages and from the state match).
 -spec tester_create_round(Round::0..10) -> round().
-tester_create_round(Round) ->
-    if Round =:= 0 -> 0;
-       Round =/= 0 -> 1
-    end.
+tester_create_round(0) -> 0;
+tester_create_round(_) -> 1.
 
 
 %% @doc Creates a histogram() within the specifications of this modules, i.e.
@@ -1498,6 +1492,9 @@ tester_create_histogram(ListOfAvgs) ->
     Fun = fun ({BucketInterval, {}}) -> {BucketInterval,
                 lists:nth(random:uniform(length(ListOfAvgs)), ListOfAvgs)} end,
     lists:map(Fun, Histo1).
+
+-spec tester_create_histogram_size(1..50) -> histogram_size().
+tester_create_histogram_size(Size) -> Size.
 
 
 %% @doc Creates a fixed sized list of load_data every time. Size must not change once created.
