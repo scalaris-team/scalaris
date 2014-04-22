@@ -34,7 +34,7 @@
 
 -export([work_phase_async/4]).
 
--export([set_lock/3, set_lock_feeder/3]).
+-export([set_lock/3]).
 -export([commit_read/5, commit_read_feeder/5]).
 -export([commit_write/5, commit_write_feeder/5]).
 -export([abort_read/5, abort_read_feeder/5]).
@@ -171,11 +171,6 @@ wf_set_vers_val(Entry, Version, WriteValue) ->
 %% functions for set_lock
 %% %%%%%%%%%%%%%%%%%%%%%%
 
--spec set_lock_feeder(tx_tlog:tlog_entry(), ?RT:key(), ok) ->
-                      {tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid()}.
-set_lock_feeder(TLogEntry, TxId, ok) ->
-    {TLogEntry, TxId, self()}.
-
 -spec set_lock(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid()) -> ok.
 set_lock(TLogEntry, TxId, ReplyTo) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
@@ -265,15 +260,15 @@ wf_set_wl(DBEntry, _UI = none, {TxId, _Vers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for commit_read
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
--spec commit_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), ok,
+-spec commit_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
                          prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                 {tx_tlog:tlog_entry(),
                                  ?RT:key(),
                                  comm:erl_local_pid(),
                                  prbr:r_with_id(),
                                  {txid_on_cseq:txid(), version()}}.
-commit_read_feeder(TLogEntry, TxId, ok, Round, OldVal) ->
-    {TLogEntry, TxId, self(), Round, OldVal}.
+commit_read_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
+    {TLogEntry, TxId, Pid, Round, OldVal}.
 
 %% @doc Releases the read lock of a given entry, if it was set.
 -spec commit_read(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
@@ -324,16 +319,16 @@ wf_unset_rl(DBEntry, _UI = none, {TxId, _TLogVers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for commit_write
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
--spec commit_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), ok,
+-spec commit_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
                           prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                  {tx_tlog:tlog_entry_write(), ?RT:key(),
                                   comm:erl_local_pid(),
                                   prbr:r_with_id(),
                                   {txid_on_cseq:txid(), version()}}.
-commit_write_feeder(TLogEntry, TxId, ok, Round, OldVal) ->
+commit_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
     {_, Val} = tx_tlog:get_entry_value(TLogEntry),
     SaneCommitWriteTLogEntry = tx_tlog:set_entry_value(TLogEntry, ?value, Val),
-    {SaneCommitWriteTLogEntry, TxId, self(), Round, OldVal}.
+    {SaneCommitWriteTLogEntry, TxId, Pid, Round, OldVal}.
 
 %% @doc Releases the write lock of a given entry, if it was
 %%      set, and writes the new value.
@@ -398,15 +393,15 @@ wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for abort_read
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
--spec abort_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), ok,
+-spec abort_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
                          prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                 {tx_tlog:tlog_entry(),
                                  ?RT:key(),
                                  comm:erl_local_pid(),
                                  prbr:r_with_id(),
                                  {txid_on_cseq:txid(), version()}}.
-abort_read_feeder(TLogEntry, TxId, ok, Round, OldVal) ->
-    {TLogEntry, TxId, self(), Round, OldVal}.
+abort_read_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
+    {TLogEntry, TxId, Pid, Round, OldVal}.
 
 %% @doc Releases the read lock of a given entry, if it was set.
 -spec abort_read(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
@@ -449,16 +444,16 @@ cc_abort_read({_RL, _Vers}, _WF, _Val = {_TxId, _TLogVers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for abort_write
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
--spec abort_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), ok,
+-spec abort_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
                           prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
                                  {tx_tlog:tlog_entry_write(), ?RT:key(),
                                   comm:erl_local_pid(),
                                   prbr:r_with_id(),
                                   {txid_on_cseq:txid(), version()}}.
-abort_write_feeder(TLogEntry, TxId, ok, Round, OldVal) ->
+abort_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
     {_, Val} = tx_tlog:get_entry_value(TLogEntry),
     SaneCommitWriteTLogEntry = tx_tlog:set_entry_value(TLogEntry, ?value, Val),
-    {SaneCommitWriteTLogEntry, TxId, self(), Round, OldVal}.
+    {SaneCommitWriteTLogEntry, TxId, Pid, Round, OldVal}.
 
 %% @doc Releases the write lock of a given entry, if it was set.
 %% erlang shell test call: api_tx:write("a", 1).

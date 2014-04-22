@@ -26,7 +26,7 @@
 -include("client_types.hrl").
 
 -export([read/2]).
--export([new/3, new_feeder/3]).
+-export([new/3]).
 -export([decide/5]).
 -export([delete/2]).
 
@@ -60,11 +60,6 @@ read(Key, ReplyTo) ->
     DB = get_db_for_id(Key),
     %% perform qread
     rbrcseq:qread(DB, ReplyTo, Key).
-
--spec new_feeder(txid(), [client_key()], ok) ->
-                 {txid(), [client_key()], comm:erl_local_pid()}.
-new_feeder(Key, InvolvedKeys, ok) ->
-    {Key, InvolvedKeys, self()}.
 
 -spec new(txid(), [client_key()], comm:erl_local_pid()) -> ok.
 new(Key, InvolvedKeys, ReplyTo) ->
