@@ -840,10 +840,11 @@ add_write_reply(Entry, Round, _Cons) ->
         case Round > entry_latest_seen(Entry) of
             false -> Entry;
             true ->
-                %% this is the first reply, all other positive replies
-                %% should have the same round number, as otherwise they
-                %% would be denies.
-                ?DBG_ASSERT(entry_num_acks(Entry) > 0),
+                %% this is the first reply with this round number.
+                %% Older replies are (already) counted as denies, so
+                %% we expect no accounted acks here.
+                ?DBG_ASSERT2(entry_num_acks(Entry) =< 0,
+                             {found_unexpected_acks, entry_num_acks(Entry)}),
                 %% set rack and store newer round
                 entry_set_latest_seen(Entry, Round)
         end,
