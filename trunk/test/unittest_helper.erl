@@ -154,6 +154,7 @@ make_ring_with_ids(IdsFun, Options) when is_function(IdsFun, 0) ->
                   {ok, _GroupsPid} = pid_groups:start_link(),
                   NewOptions = prepare_config(Options),
                   config:init(NewOptions),
+                  tester:start_pseudo_proc(),
                   {ok, _} = sup_scalaris:start_link(NewOptions),
                   mgmt_server:connect(),
                   Ids = IdsFun(), % config may be needed
@@ -206,6 +207,7 @@ make_ring(Size, Options) ->
                   {ok, _GroupsPid} = pid_groups:start_link(),
                   NewOptions = prepare_config(Options),
                   config:init(NewOptions),
+                  tester:start_pseudo_proc(),
                   {ok, _} = sup_scalaris:start_link(NewOptions),
                   mgmt_server:connect(),
                   First = admin:add_node([{first}]),
@@ -382,6 +384,7 @@ start_minimal_procs(CTConfig, ConfigOptions, StartCommServer) ->
                                      [{config, [{log_path, PrivDir} | ConfigOptions]}]),
                   config:init(ConfigOptions2),
                   {ok, _LogPid} = log:start_link(),
+                  tester:start_pseudo_proc(),
                   case StartCommServer of
                       true ->
                           {ok, _CommPid} = sup:sup_start(
