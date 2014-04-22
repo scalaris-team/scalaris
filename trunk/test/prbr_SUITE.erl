@@ -247,7 +247,6 @@ tester_type_check_rbr(_Config) ->
            [ {is_valid_new, 3}, %% cannot create funs
              {is_valid_decide, 3}, %% cannot create funs
              {is_valid_delete, 3}, %% cannot create funs
-             {new, 3}, %% tested via feeder
              {decide, 5}, %% cannot create pids
              {delete, 2}, %% cannot create pids
              {read, 2} %% cannot create pids
@@ -271,8 +270,7 @@ tester_type_check_rbr(_Config) ->
            [ {commit_read, 5}, %% tested via feeder
              {commit_write, 5}, %% tested via feeder
              {abort_read, 5}, %% tested via feeder
-             {abort_write, 5}, %% tested via feeder
-             {set_lock, 3} %% tested via feeder
+             {abort_write, 5} %% tested via feeder
            ],
            [ {cc_single_write, 3}, %% cannot create funs
              {cc_set_rl, 3}, %% cannot create funs
