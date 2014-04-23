@@ -539,7 +539,7 @@ state_del_watched_pid(State, WatchedPid, Subscriber) ->
 
 -spec state_add_monitor(state(), comm:mypid()) -> state().
 state_add_monitor(State, WatchedPid) ->
-    MonRef = erlang:monitor(process, comm:make_local(WatchedPid)),
+    MonRef = erlang:monitor(process, comm:make_local(comm:get_plain_pid(WatchedPid))),
     state_set_monitors(
       State, [{WatchedPid, MonRef} | state_get_monitors(State)]).
 

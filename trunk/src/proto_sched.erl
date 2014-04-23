@@ -507,7 +507,7 @@ on({deliver, TraceId}, State) ->
                     ?TRACE("Chosen from ~p possible next messages.", [NumPossible]),
                     Monitor = case comm:is_local(comm:make_global(To)) of
                                   true -> erlang:monitor(process,
-                                                         comm:make_local(To));
+                                                         comm:make_local(comm:get_plain_pid(To)));
                                   false -> none
                               end,
                     NewEntry =
