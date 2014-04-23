@@ -418,7 +418,6 @@ tester_type_check_rrepair(_Config) ->
           {rr_recon,
            [
              {on, 2}, %% tries to send messages, needs valid state with pid
-             {init, 1}, %% needs a pid in the state
              {start, 2}, %% tries to spawn processes
              {map_interval, 2}, %% second interval must be in a single quadrant
 
@@ -464,7 +463,6 @@ tester_type_check_rrepair(_Config) ->
           {rr_resolve,
            [
              {on, 2}, %% tries to send messages, needs valid state with pid
-             {init, 1}, %% needs a pid in the state
              {start, 0} %% tries to spawn processes
            ],
            [
@@ -528,8 +526,6 @@ tester_type_check_tx(_Config) ->
              {inform_rtms, 3}, %% tries to send
              {inform_tps, 3}, %% tries to send
              {send_to_rtms, 2}, %% tries to send
-             {state_subscribe, 2}, %% tries to create pids / envelopes
-             {state_unsubscribe, 2}, %% tries to create pids / envelopes
              {merge_item_states, 6}, %% needs specially-crafted lists
              {tx_item_new, 3}, %% TODO: not a list error
              {tx_item_new, 5} %% TODO invalid result type
