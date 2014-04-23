@@ -86,7 +86,7 @@ getVivaldiMap() ->
     This = comm:this(),
     _ = [erlang:spawn(
            fun() ->
-                   SourcePid = comm:reply_as(This, 1, {'_', Pid}),
+                   SourcePid = comm:reply_as(This, 2, {webhelpers, '_', Pid}),
                    comm:send(Pid, {get_coordinate, SourcePid}, [{group_member, vivaldi}])
            end) || Pid <- NodePids],
     lists:zip(Nodes, get_vivaldi(NodePids, [], 0))
@@ -110,7 +110,7 @@ get_vivaldi(Pids, Coords, TimeInMS) ->
             trace_mpath:thread_yield(),
             receive
                 ?SCALARIS_RECV(
-                    {{vivaldi_get_coordinate_response, Coordinate, _Confidence}, Pid}, %% ->
+                    {webhelpers, {vivaldi_get_coordinate_response, Coordinate, _Confidence}, Pid}, %% ->
                     get_vivaldi(lists:delete(Pid, Pids), [Coordinate | Coords],
                                 TimeInMS)
                   )
