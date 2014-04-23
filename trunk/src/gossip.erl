@@ -1206,21 +1206,14 @@ is_state(State) ->
     try
         StateAsList = ?PDB:tab2list(State),
         SimpleKeys = [cb_modules, msg_queue, range],
-        Fun1 = fun (Key, AccIn) ->
-                case lists:keyfind(Key, 1, StateAsList) of
-                    false -> AccIn andalso false;
-                    _ -> AccIn andalso true
-                end
-        end,
-        HasKeys1 = lists:foldl(Fun1, true, SimpleKeys),
-        % reply_peer exlcuded
+        % reply_peer excluded
         TupleKeys = [trigger_group, cb_state, cycles, trigger_lock, exch_data, round],
-        Fun2 = fun (Key, AccIn) -> AccIn andalso tuplekeyfind(Key, StateAsList) =/= false end,
-        HasKeys2 = lists:foldl(Fun2, true, TupleKeys),
-        HasKeys1 andalso HasKeys2
+        Fun1 = fun(Key) -> lists:keymember(Key, 1, StateAsList) end,
+        Fun2 = fun(Key) -> tuplekeyfind(Key, StateAsList) =/= false end,
+        lists:all(Fun1, SimpleKeys) andalso lists:all(Fun2, TupleKeys)
     catch
-        % if ets table does not exist
-        error:badarg -> false
+        % if ets table does not exist or otherwise invalid parameters
+        _:_ -> false
     end.
 
 %% @doc Find {{keyword, CMbodule}, {Value}} tuples by only the keyword.
