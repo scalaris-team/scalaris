@@ -119,7 +119,7 @@ to_list(#node_details{predlist=PredList, node=Me, succlist=SuccList, load=Load, 
           (node_details(), db, db_dht:db()) -> node_details();
           (node_details(), load, load()) -> node_details();
           (node_details(), load2, load2()) -> node_details();
-          (node_details(), load2, load3()) -> node_details();
+          (node_details(), load3, load3()) -> node_details();
           (node_details(), hostname, hostname()) -> node_details();
           (node_details(), rt_size, rt_size()) -> node_details();
           (node_details(), message_log, message_log()) -> node_details();
