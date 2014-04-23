@@ -280,10 +280,10 @@ make_local(Pid) -> comm_server:make_local(Pid).
 -spec this() -> mypid_plain().
 this() -> comm_server:this().
 
-%% @doc Create the PID a process with name Name would have on node _Node.
--spec get(erl_local_pid_plain(), mypid()) -> mypid().
-get(Name, {Pid, e, Nth, Envelope} = _Node) ->
-    {get(Name, Pid), e, Nth, Envelope};
+%% @doc Creates the plain PID a process with name Name would have on node Node.
+-spec get(Name::erl_local_pid_plain(), Node::mypid()) -> mypid_plain().
+get(Name, {Pid, e, _Nth, _Envelope} = _Node) ->
+    get(Name, Pid);
 get(Name, {IP, Port, _Pid} = _Node) -> {IP, Port, Name}.
 
 
