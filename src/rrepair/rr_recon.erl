@@ -125,8 +125,8 @@
 
 -record(rr_recon_state,
         {
-         ownerPid           = ?required(rr_recon_state, ownerPid)    :: comm:erl_local_pid(),
-         dhtNodePid         = ?required(rr_recon_state, dhtNodePid)  :: comm:erl_local_pid(),
+         ownerPid           = ?required(rr_recon_state, ownerPid)    :: pid(),
+         dhtNodePid         = ?required(rr_recon_state, dhtNodePid)  :: pid(),
          dest_rr_pid        = ?required(rr_recon_state, dest_rr_pid) :: comm:mypid(), %dest rrepair pid
          dest_recon_pid     = undefined                              :: comm:mypid() | undefined, %dest recon process pid
          method             = undefined                              :: method() | undefined,
@@ -183,7 +183,7 @@
     % internal
     {shutdown, exit_reason()} |
     {crash, DeadPid::comm:mypid()} |
-    {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}
+    {'DOWN', MonitorRef::reference(), process, Owner::pid(), Info::any()}
     .
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
