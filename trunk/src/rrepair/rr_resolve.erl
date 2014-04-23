@@ -81,8 +81,8 @@
 
 -record(rr_resolve_state,
         {
-         ownerPid       = ?required(rr_resolve_state, ownerPid)   :: comm:erl_local_pid(),
-         dhtNodePid     = ?required(rr_resolve_state, dhtNodePid) :: comm:erl_local_pid(),
+         ownerPid       = ?required(rr_resolve_state, ownerPid)   :: pid(),
+         dhtNodePid     = ?required(rr_resolve_state, dhtNodePid) :: pid(),
          operation      = undefined                               :: undefined | operation(),
          my_range       = undefined                               :: undefined | intervals:interval(),
          fb_dest_pid    = undefined                               :: undefined | comm:mypid(),
@@ -104,7 +104,7 @@
     {get_chunk_response, {intervals:interval(), rr_recon:db_chunk_kvv()}} |
     {get_state_response, intervals:interval()} |
     {update_key_entries_ack, [{db_entry:entry_ex(), Exists::boolean(), Done::boolean()}]} |
-    {'DOWN', MonitorRef::reference(), process, Owner::comm:erl_local_pid(), Info::any()}.
+    {'DOWN', MonitorRef::reference(), process, Owner::pid(), Info::any()}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % debug
