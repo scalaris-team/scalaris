@@ -68,7 +68,7 @@
        [rempid()],  %% subscribed rem. pids + ref counting
        erlang_timestamp(),  %% local time of last pong arrival
        erlang_timestamp(),  %% remote is crashed if no pong arrives until this
-       atom(),       %% ets table name
+       pdb:tableid(),       %% ets table name
        %% locally erlang:monitored() pids for a remote hbs:
        [{comm:mypid(), reference()}]
      }).
@@ -82,12 +82,12 @@
 start_link(ServiceGroup, RemotePid) ->
     RemoteFDPid = comm:get(fd, RemotePid),
     Name = lists:flatten(io_lib:format("fd <-> ~p", [RemoteFDPid])),
-    gen_component:start_link(?MODULE, fun ?MODULE:on/2, [RemotePid],
+    gen_component:start_link(?MODULE, fun ?MODULE:on/2, RemotePid,
                              [%% {wait_for_init}, %% when using protected ets table
                               {pid_groups_join_as, ServiceGroup, Name}]).
 
--spec init([pid() | comm:mypid()]) -> state().
-init([RemotePid]) ->
+-spec init(pid() | comm:mypid()) -> state().
+init(RemotePid) ->
     ?TRACE("fd_hbs init: RemotePid ~p~n", [RemotePid]),
     TableName = pdb:new(?MODULE, [set]), %% debugging: ++ [protected]),
     RemoteFDPid = comm:get(fd, RemotePid),
@@ -372,8 +372,8 @@ trigger_delayed_del_watching(RemPidEntry) ->
     rempid_set_pending_demonitor(E1, true).
 
 -spec state_new(comm:mypid(), [rempid()],
-                erlang_timestamp(), erlang_timestamp(), atom()) -> state().
-state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter,Table) ->
+                erlang_timestamp(), erlang_timestamp(), pdb:tableid()) -> state().
+state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter, Table) ->
     {RemoteHBS, RemotePids, LastPong, CrashedAfter, Table, []}.
 
 -spec state_get_rem_hbs(state())    -> comm:mypid().
@@ -392,7 +392,7 @@ state_set_last_pong(State, Val)     -> setelement(3, State, Val).
 state_get_crashed_after(State)      -> element(4, State).
 -spec state_set_crashed_after(state(), erlang_timestamp()) -> state().
 state_set_crashed_after(State, Val) -> setelement(4, State, Val).
--spec state_get_table(state()) -> atom().
+-spec state_get_table(state()) -> pdb:tableid().
 state_get_table(State)              -> element(5, State).
 -spec state_get_monitors(state())   -> [{comm:mypid(), reference()}].
 state_get_monitors(State)           -> element(6, State).
