@@ -310,19 +310,34 @@ tester_type_check_node(_Config) ->
           [ {get, 2}], %% throws 'not_available' on empty nodelist
           [ {get_list, 2}]}, %% throws 'not_available'
          {nodelist,
-          [ {lremove, 3}, %% cannot create funs
+          [ {new_neighborhood, 2}, % the two given nodes must have different PIDs
+            {new_neighborhood, 3}, % the pred/succ nodes must have different PIDs than the base node
+            {mk_nodelist, 2}, % base node must not be in node list
+            {mk_neighborhood, 2}, % base node must not be in node list
+            {mk_neighborhood, 4}, % base node must not be in node list
+            {add_node, 4}, % base node must not be in node list
+            {add_nodes, 4}, % base node must not be in node list
+            {lremove, 3}, %% cannot create funs
+            {lremove_outdated, 1}, % base node must not be in node list
+            {lremove_outdated, 2}, % base node must not be in node list
             {lfilter_min_length, 3}, %% cannot create funs
             {filter_min_length, 4}, %% cannot create funs
             {lfilter, 2}, %% cannot create funs
             {lfilter, 3}, %% cannot create funs
             {filter, 2}, %% cannot create funs
             {filter, 3}, %% cannot create funs
+            {update_ids, 2}, % base node must not be in node list
+            {lupdate_ids, 2}, % base node must not be in node list
             {update_node, 2}, %% needs node in certain interval
+            {merge, 4}, % base node must not be in node list of the other neighbour's object
             {remove, 3} %% cannot create funs
           ],
           [ {dict_add_valid_nodes, 2}, %% needs a dict() of node() objects
             {dict_make_unique_update, 1}, %% needs a dict() of node() objects
             {throw_if_newer, 2}, %% throws
+            {lsplit_nodelist, 2}, %% base node must not be in node list
+            {lusplit_nodelist, 2}, %% base node must not be in node list
+            {lmerge_helper, 5}, %% base node must not be in node list
             {lfilter, 4} %% cannot create funs
           ]}
         ],
