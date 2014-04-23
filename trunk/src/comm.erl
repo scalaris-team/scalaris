@@ -46,7 +46,7 @@
 
 %% Message manipulation
 -export([get_msg_tag/1]).
--export([unpack_cookie/2]).
+-export([unpack_cookie/2, get_plain_pid/1]).
 
 %% initialization
 -export([init_and_wait_for_valid_pid/0]).
@@ -305,20 +305,17 @@ is_valid(Pid) -> comm_server:is_valid(Pid).
 %%      pid of the current node.
 -spec is_local(mypid()) -> boolean().
 is_local(Pid) ->
-    {CleanPid, _} = unpack_cookie(Pid, {whatever}),
-    comm_server:is_local(CleanPid).
+    comm_server:is_local(get_plain_pid(Pid)).
 
 %% @doc Gets the IP address of the given (global) mypid().
 -spec get_ip(mypid()) -> inet:ip_address().
 get_ip(Pid) ->
-    {CleanPid, _} = unpack_cookie(Pid, {whatever}),
-    comm_server:get_ip(CleanPid).
+    comm_server:get_ip(get_plain_pid(Pid)).
 
 %% @doc Gets the port of the given (global) mypid().
 -spec get_port(mypid()) -> non_neg_integer().
 get_port(Pid) ->
-    {CleanPid, _} = unpack_cookie(Pid, {whatever}),
-    comm_server:get_port(CleanPid).
+    comm_server:get_port(get_plain_pid(Pid)).
 
 
 %% @doc Gets the tag of a message (the first element of its tuple - should be an
@@ -338,7 +335,15 @@ get_msg_tag(Msg)
                    (erl_local_pid(), message()) -> {erl_local_pid_plain(), message()}.
 unpack_cookie({Pid, e, Nth, Envelope}, Msg) ->
     unpack_cookie(Pid, setelement(Nth, Envelope, Msg));
-unpack_cookie(Pid, Msg)              -> {Pid, Msg}.
+unpack_cookie(Pid, Msg) ->
+    {Pid, Msg}.
+
+-spec get_plain_pid(mypid()) -> mypid_plain();
+                   (erl_local_pid()) -> erl_local_pid_plain().
+get_plain_pid({Pid, e, _Nth, _Envelope}) ->
+    get_plain_pid(Pid);
+get_plain_pid(Pid) ->
+    Pid.
 
 %% @doc Creates a group member message and filter out the send options for the
 %%      comm_server process.

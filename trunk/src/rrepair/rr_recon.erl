@@ -41,7 +41,7 @@
 
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), log:pal("~w: [ ~s:~.0p ] " ++ X ++ "~n", [?MODULE, pid_groups:my_groupname(), self()] ++ Y)).
--define(TRACE_SEND(Pid, Msg), ?TRACE("to ~s:~.0p: ~.0p~n", [pid_groups:group_of(comm:make_local(element(1, comm:unpack_cookie(Pid, {no_msg})))), Pid, Msg])).
+-define(TRACE_SEND(Pid, Msg), ?TRACE("to ~s:~.0p: ~.0p~n", [pid_groups:group_of(comm:make_local(comm:get_plain_pid(Pid))), Pid, Msg])).
 -define(TRACE1(Msg, State),
         ?TRACE("~n  Msg: ~.0p~n"
                "  State: method: ~.0p;  stage: ~.0p;  initiator: ~.0p~n"
