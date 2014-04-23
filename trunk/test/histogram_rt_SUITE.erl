@@ -28,27 +28,23 @@
 
 all()    ->
     [
-     {group, test_cases}
-    ].
-
-groups() ->
-    [
-     {test_cases, [{repeat, 50}], [add_keys, merge_keys]}
+     add_keys,
+     merge_keys
     ].
 
 suite() -> [ {timetrap, {seconds, 30}} ].
 
 init_per_suite(Config) ->
-    Config.
+    unittest_helper:init_per_suite(Config).
 
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
+    _ = unittest_helper:end_per_suite(Config),
     ok.
 
-add_keys(_Config) ->
-    %% insert keys
-    BaseKey = get_rnd_key(),
-    H = histogram_rt:create(10, BaseKey),
-    Values = [number_to_key(N) || N <- lists:seq(1, 10)],
+-spec prop_add_keys(BaseKey::?RT:key(), Size::1..50, Values::[?RT:key(),...]) -> true.
+prop_add_keys(BaseKey, Size, Values0) ->
+    H = histogram_rt:create(Size, BaseKey),
+    Values = lists:sublist(Values0, Size),
     H2 = lists:foldl(fun histogram_rt:add/2, H, Values),
     %% check results
     SortedValues = lists:sort(fun(Val, Val2) ->
@@ -56,14 +52,15 @@ add_keys(_Config) ->
                               end, Values),
     Result = lists:map(fun(Value) -> {Value, 1} end, SortedValues),
     ?equals(histogram_rt:get_data(H2), Result),
-    ok.
+    true.
 
-merge_keys(_Config) ->
+add_keys(_Config) ->
+    tester:test(?MODULE, prop_add_keys, 3, 250, [{threads, 2}]).
+
+-spec prop_merge_keys(BaseKey::?RT:key(), Key1::?RT:key(), Key2::?RT:key()) -> true.
+prop_merge_keys(BaseKey, Key1, Key2) ->
     %% insert two keys which will
-    BaseKey = get_rnd_key(),
     H = histogram_rt:create(1, BaseKey),
-    Key1 = get_rnd_key(),
-    Key2 = get_rnd_key(),
     H2 = histogram_rt:add(Key1, H),
     H3 = histogram_rt:add(Key2, H2),
     %% check results
@@ -72,10 +69,7 @@ merge_keys(_Config) ->
         false -> SplitKey = ?RT:get_split_key(Key2, Key1, {1,2})
     end,
     ?equals(histogram_rt:get_data(H3), [{SplitKey, 2}]),
-    ok.
+    true.
 
-get_rnd_key() ->
-    ?RT:get_random_in_interval({'[', ?MINUS_INFINITY, ?PLUS_INFINITY, ')'}).
-
-number_to_key(Val) ->
-    ?RT:hash_key(erlang:integer_to_list(Val)).
+merge_keys(_Config) ->
+    tester:test(?MODULE, prop_merge_keys, 3, 250, [{threads, 2}]).
