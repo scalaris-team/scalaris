@@ -110,7 +110,7 @@ test_load(_Config) ->
 
 
 test_request_histogram1(_Config) ->
-    ?expect_exception(gossip_load:request_histogram(0, comm:this()), error, badarg).
+    ?expect_exception(gossip_load:request_histogram(0, comm:this()), error, function_clause).
 
 
 test_request_histogram2(_Config) ->
