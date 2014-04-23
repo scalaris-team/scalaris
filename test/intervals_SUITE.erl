@@ -60,7 +60,7 @@ suite() ->
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    Config3 = unittest_helper:start_minimal_procs(Config2, [], false),
+    Config3 = unittest_helper:start_minimal_procs(Config2, [], true),
     tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
     tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
