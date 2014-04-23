@@ -79,6 +79,17 @@ state_inc_round(State) ->
 -spec state_reset_state(proposer_state()) -> proposer_state().
 state_reset_state(State) ->           setelement(10, State, 0).
 
+-compile({nowarn_unused_function, state_add_ack_msg_feeder/4}).
+-spec state_add_ack_msg_feeder(InState, InAckRound, InAckValue, InAckRLast)
+        -> {InState, InAckRound, InAckValue, InAckRLast}
+            when is_subtype(InState, proposer_state()),
+                 is_subtype(InAckRound, non_neg_integer()),
+                 is_subtype(InAckRLast, non_neg_integer()).
+state_add_ack_msg_feeder(InState, InAckRound, InAckValue, InAckRLast) ->
+    StateRound = state_get_round(InState),
+    {state_set_round(InState, erlang:max(StateRound, InAckRound)),
+     erlang:min(StateRound, InAckRound), InAckValue, InAckRLast}.
+
 -spec state_add_ack_msg(proposer_state(), non_neg_integer(), any(),
                         non_neg_integer()) -> {ok | majority_acked, proposer_state()}.
 state_add_ack_msg(InState, InAckRound, InAckValue, InAckRLast) ->
@@ -100,15 +111,12 @@ state_add_ack_msg(InState, InAckRound, InAckValue, InAckRLast) ->
                {PaxosID, ReplyTo, Acceptors, Proposal, Majority, MaxProposers,
                 StateRound, NewRLast_highest, NewLatestValue, AckRecCount + 1};
            true ->
-               %% if InAckRound > StateRound ->
-               %%   reset state and start counting for InAckRound again
-               if InAckRound =< StateRound ->
-                      InState; %% old ack message -> drop it
-                  true ->
-                      % we only receive msgs for round we started ourselves
-                      log:log(error, "~nmust not happen~n"),
-                      InState
-               end
+               %% InAckRound =< StateRound -> old ack message, drop it
+               %% InAckRound > StateRound should not happen
+               %% (we only receive msgs for round we started ourselves)
+               ?DBG_ASSERT2(InAckRound =< StateRound,
+                            {got_higher_round, InAckRound, StateRound}),
+               InState
         end,
     case state_get_ack_count(NewState) =:= state_get_majority(NewState) of
         %% if collected majority of answers
