@@ -55,7 +55,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -export([start_link/1, init/1, on/2, check_config/0,
-         session_id_equal/2,
          select_sync_node/2]).
 
 -ifdef(with_export_type_support).
@@ -403,15 +402,11 @@ next_round(R) -> R + 1.
 new_session(Round, Pid, RCMethod, Principal) ->
     #session{ id = {Round, Pid}, rc_method = RCMethod, ttl = get_session_ttl(), principal = Principal }.
 
--spec session_id_equal(session_id(), session_id()) -> boolean().
-session_id_equal({R, Pid}, {R, Pid}) -> true;
-session_id_equal(_, _) -> false.
-
 -spec extract_session(session_id() | null, [session()]) -> {session(), Remain::[session()]} | not_found.
 extract_session(null, _Sessions) -> not_found;
 extract_session(Id, Sessions) ->
     {Satis, NotSatis} = lists:partition(fun(#session{ id = I }) ->
-                                                session_id_equal(Id, I)
+                                                Id =:= I
                                         end,
                                         Sessions),
     case Satis of
