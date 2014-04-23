@@ -478,7 +478,8 @@ tester_type_check_rrepair(_Config) ->
           {rr_resolve,
            [
              {on, 2}, %% tries to send messages, needs valid state with pid
-             {start, 0} %% tries to spawn processes
+             {start, 0}, %% tries to spawn processes
+             {merge_stats, 2} %% tested via feeder
            ],
            [
              {shutdown, 2}, %% tries to send messages

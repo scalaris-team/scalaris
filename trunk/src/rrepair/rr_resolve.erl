@@ -44,6 +44,9 @@
 -export([get_stats_session_id/1, get_stats_resolve_started/1, merge_stats/2]).
 -export([print_resolve_stats/1]).
 
+% for tester:
+-export([merge_stats_feeder/2]).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % type definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -514,32 +517,31 @@ get_stats_session_id(Stats) -> Stats#resolve_stats.session_id.
 -spec get_stats_resolve_started(stats()) -> non_neg_integer().
 get_stats_resolve_started(Stats) -> Stats#resolve_stats.resolve_started.
 
-%% @doc merges two stats records with identical session_id, otherwise error will be raised
--spec merge_stats(stats(), stats()) -> stats() | error.
-merge_stats(#resolve_stats{ session_id = ASID,
+-spec merge_stats_feeder(stats(), stats()) -> {stats(), stats()}.
+merge_stats_feeder(A, B) ->
+    {A, B#resolve_stats{session_id = A#resolve_stats.session_id}}.
+
+%% @doc Merges two stats records with an identical session_id
+%%      (otherwise error will be raised).
+-spec merge_stats(stats(), stats()) -> stats().
+merge_stats(#resolve_stats{ session_id = SID,
                             diff_size = ADiff,
                             regen_count = ARC,
                             regen_fail_count = AFC,
                             upd_fail_count = AUFC,
                             update_count = AUC },
-            #resolve_stats{ session_id = BSID,
+            #resolve_stats{ session_id = SID,
                             diff_size = BDiff,
                             regen_count = BRC,
                             regen_fail_count = BFC,
                             upd_fail_count = BUFC,
                             update_count = BUC }) ->
-    case rrepair:session_id_equal(ASID, BSID) of
-        true ->
-            #resolve_stats{ session_id = ASID,
-                            diff_size = ADiff + BDiff,
-                            regen_count = ARC + BRC,
-                            regen_fail_count = AFC + BFC,
-                            upd_fail_count = AUFC + BUFC,
-                            update_count = AUC + BUC };
-        false ->
-            log:log(error,"[ ~p ]: Trying to Merge stats with non identical rounds",[?MODULE]),
-            error
-    end.
+    #resolve_stats{ session_id = SID,
+                    diff_size = ADiff + BDiff,
+                    regen_count = ARC + BRC,
+                    regen_fail_count = AFC + BFC,
+                    upd_fail_count = AUFC + BUFC,
+                    update_count = AUC + BUC }.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % HELPER
