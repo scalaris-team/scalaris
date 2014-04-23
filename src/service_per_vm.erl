@@ -100,7 +100,7 @@ init(_Arg) ->
 % @doc registers a dht node
 on({register_dht_node, Pid}, State) ->
     % only local processes may register!
-    MonRef = erlang:monitor(process, comm:make_local(Pid)),
+    MonRef = erlang:monitor(process, comm:make_local(comm:get_plain_pid(Pid))),
     [{MonRef, Pid} | State];
 
 % @doc de-registers a dht node

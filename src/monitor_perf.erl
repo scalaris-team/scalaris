@@ -64,7 +64,7 @@ init_bench() ->
     monitor:proc_set_value(
       ?MODULE, 'read_read', rrd:create(60 * 1000000, 1, {timing_with_hist, ms})).
 
--spec bench_service(Owner::comm:erl_local_pid()) -> ok.
+-spec bench_service(Owner::pid()) -> ok.
 bench_service(Owner) ->
     erlang:monitor(process, Owner),
     bench_service_loop(Owner).

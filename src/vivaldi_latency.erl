@@ -88,7 +88,7 @@ on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _St
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec init({comm:erl_local_pid(), comm:mypid(), {vivaldi:network_coordinate(), vivaldi:error()}}) -> state().
+-spec init({pid(), comm:mypid(), {vivaldi:network_coordinate(), vivaldi:error()}}) -> state().
 init({Owner, RemotePid, Token}) ->
     %io:format("vivaldi_latency start ~n"),
     _ = comm:send_local_after(config:read(vivaldi_latency_timeout), self(), {shutdown}),
