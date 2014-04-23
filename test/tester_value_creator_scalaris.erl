@@ -34,14 +34,14 @@ create_value({typedef, comm, erl_local_pid_with_reply_as} = Type, Size, ParseSta
     {Pid, e, _WrongPos, Env} =
         tester_value_creator:create_value_wo_scalaris(Type, Size, ParseState),
     Pos = tester_value_creator:create_value_wo_scalaris(
-            {range, {integer, 1}, {integer, tuple_size(Env)}}, Size, ParseState),
-    {value, {Pid, e, Pos, Env}};
+            {range, {integer, 2}, {integer, tuple_size(Env)}}, Size, ParseState),
+    {value, {Pid, e, Pos, setelement(Pos, Env, '_')}};
 create_value({typedef, comm, mypid_with_reply_as} = Type, Size, ParseState) ->
     {Pid, e, _WrongPos, Env} =
         tester_value_creator:create_value_wo_scalaris(Type, Size, ParseState),
     Pos = tester_value_creator:create_value_wo_scalaris(
-            {range, {integer, 1}, {integer, tuple_size(Env)}}, Size, ParseState),
-    {value, {Pid, e, Pos, Env}};
+            {range, {integer, 2}, {integer, tuple_size(Env)}}, Size, ParseState),
+    {value, {Pid, e, Pos, setelement(Pos, Env, '_')}};
 create_value({typedef, comm, mypid_plain}, _Size, _ParseState) ->
     ?ASSERT2(is_pid(whereis(tester_pseudo_proc)), process__tester_pseudo_proc__must_exist),
     case crypto:rand_uniform(0, 2) of

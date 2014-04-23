@@ -61,19 +61,29 @@
 -export_type([mypid_plain/0]).
 -endif.
 
+-type msg_tag() :: atom() | byte(). %% byte() in case of compact external atoms. See include/atom_ext.hrl
+
 %% there is no variable length-tuple definition for types
-%% -> declare up to 10 here:
+%% -> declare messages with up to 15 parameters here:
 -type envelope() ::
-          {any()} |
-          {any(), any()} |
-          {any(), any(), any()} |
-          {any(), any(), any(), any()} |
-          {any(), any(), any(), any(), any()} |
-          {any(), any(), any(), any(), any(), any()} |
-          {any(), any(), any(), any(), any(), any(), any()} |
-          {any(), any(), any(), any(), any(), any(), any(), any()} |
-          {any(), any(), any(), any(), any(), any(), any(), any(), any()} |
-          {any(), any(), any(), any(), any(), any(), any(), any(), any(), any()}.
+        {msg_tag(), any()} |
+        {msg_tag(), any(), any()} |
+        {msg_tag(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
+        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()}.
+-type message() ::
+        {msg_tag()} | envelope().
+
 -type reg_name()                  :: atom().
 -type erl_local_pid_plain()       :: pid() | reg_name().
 -type mypid_plain() :: {inet:ip_address(),
@@ -91,24 +101,6 @@
 -type plain_pid() :: mypid_plain() | erl_local_pid_plain().
 
 -type channel() :: main | prio.
-
--type msg_tag() :: atom() | byte(). %% byte() in case of compact external atoms. See include/atom_ext.hrl
-
-
-%% there is no variable length-tuple definition for types -> declare
-%% messages with up to 10 parameters here:
--type message() ::
-        {msg_tag()} |
-        {msg_tag(), any()} |
-        {msg_tag(), any(), any()} |
-        {msg_tag(), any(), any(), any()} |
-        {msg_tag(), any(), any(), any(), any()} |
-        {msg_tag(), any(), any(), any(), any(), any()} |
-        {msg_tag(), any(), any(), any(), any(), any(), any()} |
-        {msg_tag(), any(), any(), any(), any(), any(), any(), any()} |
-        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any()} |
-        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any()} |
-        {msg_tag(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()}.
 
 -ifdef(forward_or_recursive_types_are_not_allowed).
 % define 3 levels of recursion manually:
@@ -290,8 +282,8 @@ get(Name, {IP, Port, _Pid} = _Node) -> {IP, Port, Name}.
 %% @doc Encapsulates the given pid (local or global) with the reply_as
 %%      request, so a send/2 to the generated target will put a reply
 %%      message at the Nth position of the given envelope.
--spec reply_as(plain_pid(), pos_integer(), envelope()) ->
-                      mypid_with_reply_as() | erl_local_pid_with_reply_as().
+-spec reply_as(plain_pid(), 2..16, envelope()) ->
+               mypid_with_reply_as() | erl_local_pid_with_reply_as().
 reply_as(Target, Nth, Envelope) ->
     ?DBG_ASSERT('_' =:= element(Nth, Envelope)),
     {Target, e, Nth, Envelope}.
