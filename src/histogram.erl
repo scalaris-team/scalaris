@@ -28,7 +28,7 @@
          get_num_elements/1, get_num_inserts/1, merge/2]).
 
 % private API for unit tests:
--export([find_smallest_interval/1, merge_interval/2,
+-export([find_smallest_interval/1, merge_interval/3,
          tester_create_histogram/2, tester_is_valid_histogram/1]).
 
 -export([foldl_until/2, foldr_until/2]).
@@ -136,15 +136,15 @@ resize(Histogram = #histogram{data = Data, size = Size, data_size = DataSize})
   when DataSize > Size andalso DataSize > 1 ->
     ?DBG_ASSERT(Size > 0),
     %% we need at least two items to do the following:
-    MinSecondValue = find_smallest_interval(Data),
-    NewHistogram = Histogram#histogram{data = merge_interval(MinSecondValue, Data),
+    PosMinSecondValue = find_smallest_interval(Data),
+    NewHistogram = Histogram#histogram{data = merge_interval(PosMinSecondValue, 1, Data),
                                        data_size = DataSize - 1},
     resize(NewHistogram);
 resize(#histogram{} = Histogram) ->
     Histogram.
 
 -spec insert(Value::data_item(), Data::data_list()) -> data_list().
-insert({Value, _} = DataItem, [{Value2, _} | _] = Data) when Value < Value2 ->
+insert({Value, _} = DataItem, [{Value2, _} | _] = Data) when Value =< Value2 ->
     [DataItem | Data];
 insert(DataItem, [DataItem2 | Rest]) ->
     [DataItem2 | insert(DataItem, Rest)];
@@ -152,35 +152,37 @@ insert(DataItem, []) ->
     [DataItem].
 
 %% @doc Finds the smallest interval between two consecutive values and returns
-%%      the second value (in the list's order).
+%%      the position of the first value (in the list's order).
+%%      Returning the position instead of the value ensures that the correct
+%%      items are merged when duplicate entries are in the histogram.
 %%      PRE: length(Data) >= 2
--spec find_smallest_interval(Data::data_list()) -> MinSecondValue::value().
+-spec find_smallest_interval(Data::data_list()) -> PosMinValue::pos_integer().
 find_smallest_interval([{Value, _}, {Value2, _} | Rest]) ->
-    find_smallest_interval_loop(Value2 - Value, Value2, Value2, Rest).
+    find_smallest_interval_loop(Value2 - Value, 1, Value2, 2, Rest).
 
--spec find_smallest_interval_loop(MinInterval::value(), MinSecondValue::value(), LastValue::value(), Data::data_list()) -> MinSecondValue::value().
-find_smallest_interval_loop(MinInterval, MinSecondValue, LastValue, [{Value, _} | Rest]) ->
+-spec find_smallest_interval_loop(MinInterval::value(), PosMinValue::pos_integer(), LastValue::number(), CurPos::pos_integer(), Data::data_list()) -> PosMinValue::pos_integer().
+find_smallest_interval_loop(MinInterval, PosMinValue, LastValue, CurPos, [{Value, _} | Rest]) ->
     Diff = Value - LastValue,
     case MinInterval =< Diff of
         true -> NewMinInterval = MinInterval,
-                NewMinSecondValue = MinSecondValue;
+                NewPosMinValue = PosMinValue;
         _    -> NewMinInterval = Diff,
-                NewMinSecondValue = Value
+                NewPosMinValue = CurPos
     end,
-    find_smallest_interval_loop(NewMinInterval, NewMinSecondValue, Value, Rest);
-find_smallest_interval_loop(_MinInterval, MinSecondValue, _LastValue, []) ->
-    MinSecondValue.
+    find_smallest_interval_loop(NewMinInterval, NewPosMinValue, Value, CurPos + 1, Rest);
+find_smallest_interval_loop(_MinInterval, PosMinValue, _LastValue, _CurPos, []) ->
+    PosMinValue.
 
-%% @doc Merges two consecutive values if the second of them is MinSecondValue.
+%% @doc Merges two consecutive values if the first one of them is at PosMinValue.
 %%      Stops after the first match.
 %%      PRE: length(Data) >= 2, two consecutive values with the given difference
--spec merge_interval(MinSecondValue::value(), Data::data_list()) -> data_list().
-merge_interval(Value2, [{Value, Count}, {Value2, Count2} | Rest]) when is_float(Value) orelse is_float(Value2) ->
+-spec merge_interval(PosMinValue::pos_integer(), CurPos::pos_integer(), Data::data_list()) -> data_list().
+merge_interval(PosMinValue, PosMinValue, [{Value, Count}, {Value2, Count2} | Rest]) when is_float(Value) orelse is_float(Value2) ->
     [{(Value * Count + Value2 * Count2) / (Count + Count2), Count + Count2} | Rest];
-merge_interval(Value2, [{Value, Count}, {Value2, Count2} | Rest]) ->
+merge_interval(PosMinValue, PosMinValue, [{Value, Count}, {Value2, Count2} | Rest]) ->
     [{(Value * Count + Value2 * Count2) div (Count + Count2), Count + Count2} | Rest];
-merge_interval(MinSecondValue, [DataItem | Rest]) ->
-    [DataItem | merge_interval(MinSecondValue, Rest)].
+merge_interval(MinSecondValue, CurPos, [DataItem | Rest]) ->
+    [DataItem | merge_interval(MinSecondValue, CurPos + 1, Rest)].
 
 -spec tester_create_histogram(Size::non_neg_integer(), Data::data_list()) -> histogram().
 tester_create_histogram(Size = 0, _Data) ->
