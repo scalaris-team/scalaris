@@ -587,7 +587,6 @@ PACKAGE_URL=''
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 DRIVER_OS
-ENABLEONEINSTALL
 ENABLEPYTHON3INSTALL
 PYTHON3SITELIBDIR
 PYTHON3
@@ -697,7 +696,6 @@ enable_debug
 with_java_functions
 with_build_classpath
 with_ruby_sitelibdir
-enable_opennebula
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1318,9 +1316,6 @@ Optional Features:
   --enable-toke[=DIR]     enable support for tokyo cabinet through toke
   --enable-native         enable compilation to native code using HiPE
   --enable-debug          enable debugging mode
-  --disable-opennebula    disable support for opennebula
-  --enable-opennebula[=DIR]
-                          enable support for opennebula
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -4786,27 +4781,6 @@ $as_echo_n "checking for python 3.x sitelibdir... " >&6; }
 $as_echo "$PYTHON3SITELIBDIR" >&6; }
        ENABLEPYTHON3INSTALL="install-python3"
 fi
-
-
-###########################################################
-#
-# check opennebula
-#
-###########################################################
-
-ENABLEONEINSTALL=
-ONEPREFIX=
-# Check whether --enable-opennebula was given.
-if test "${enable_opennebula+set}" = set; then :
-  enableval=$enable_opennebula; ONEPREFIX=no
-fi
-
-# Check whether --enable-opennebula was given.
-if test "${enable_opennebula+set}" = set; then :
-  enableval=$enable_opennebula; ENABLEONEINSTALL="install-one"
-               ONEPREFIX=$enableval
-fi
-
 
 
 ###########################################################
