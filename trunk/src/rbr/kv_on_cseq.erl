@@ -51,8 +51,8 @@
 
 -type txid() :: ?RT:key().
 
--type readlock()  :: [txid()]. %% non_neg_integer(). %% later: [tx_id_keys].
--type writelock() :: txid() | false. %% later: tx_id_key | write_lock_is_free
+-type readlock()  :: [txid()].
+-type writelock() :: txid() | no_write_lock.
 
 -type version()   :: non_neg_integer() | -1.
 -type value()     :: any().
@@ -153,13 +153,13 @@ cc_single_write(no_value_yet, _WriteFilter, _Val) ->
     {true, -1};
 cc_single_write({RL, WL, Vers}, _WriteFilter, _Val) ->
     Checks = [ { [] =:= RL,    readlock_is_set },
-               { false =:= WL, writelock_is_set } ],
+               { no_write_lock =:= WL, writelock_is_set } ],
     cc_return_val(cc_single_write, Checks, _UI_if_ok = Vers, ?LOG_CC_FAILS).
 
 -spec wf_set_vers_val(db_entry() | prbr_bottom, version(),
                       client_value()) -> db_entry().
 wf_set_vers_val(prbr_bottom, Version, WriteValue) ->
-    {_RL = [], _WL = false, Version, WriteValue};
+    {_RL = [], _WL = no_write_lock, Version, WriteValue};
 wf_set_vers_val(Entry, Version, WriteValue) ->
     T = set_vers(Entry, Version + 1),
     set_val(T, WriteValue).
@@ -211,8 +211,8 @@ rf_wl_vers(X) -> {writelock(X), vers(X)}.
 cc_set_rl(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
     {true, none};
 cc_set_rl({WL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
-    Checks = [ { TLogVers =:= Vers, {version_mismatch, TLogVers, Vers} },
-               { false =:= WL,      writelock_is_set } ],
+    Checks = [ { TLogVers =:= Vers, {cc_set_rl_version_mismatch, TLogVers, Vers} },
+               { no_write_lock =:= WL,      cc_set_rl_writelock_is_set } ],
     cc_return_val(cc_set_rl, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_set_rl(db_entry(), UI :: {writelock(), version()} | no_value_yet,
@@ -236,10 +236,10 @@ cc_set_wl(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
     {true, none};
 cc_set_wl({RL, WL, Vers}, _WF, _Val = {TxId, TLogVers}) ->
     Checks =
-        [ { TLogVers =:= Vers,  {version_mismatch, TLogVers, Vers} },
-          { false =:= WL
-            orelse TxId =:= WL, {txid_mismatch, WL, TxId} },
-          { [] =:= RL,          {readlock_not_empty, RL} } ],
+        [ { TLogVers =:= Vers,  {cc_set_wl_version_mismatch, TLogVers, Vers} },
+          { no_write_lock =:= WL
+            orelse TxId =:= WL, {cc_set_wl_txid_mismatch, WL, TxId} },
+          { [] =:= RL,          {cc_set_wl_readlock_not_empty, RL} } ],
     cc_return_val(cc_set_wl, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_set_wl
@@ -293,7 +293,8 @@ commit_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
 -spec rf_rl_vers(db_entry() | prbr_bottom) ->
                            {readlock(), version()} | no_value_yet.
 rf_rl_vers(prbr_bottom) -> no_value_yet;
-rf_rl_vers(X) ->           {readlock(X), vers(X)}.
+rf_rl_vers(X) ->
+    {readlock(X), vers(X)}.
 
 -spec cc_commit_read(no_value_yet | {readlock, version()}, prbr:write_filter(),
                 {txid_on_cseq:txid(), version()}) ->
@@ -302,7 +303,11 @@ cc_commit_read(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
     {true, none};
 cc_commit_read({_RL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
     Checks =
-        [ { TLogVers =:= Vers,  {version_mismatch, TLogVers, Vers} } ],
+        [ { TLogVers =:= Vers,  {cc_commit_read_version_mismatch, TLogVers, Vers} } ],
+    cc_return_val(cc_commit_read, Checks, _UI_if_ok = none, ?LOG_CC_FAILS);
+cc_commit_read({_RL, _WL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
+    Checks =
+        [ { TLogVers =:= Vers,  {cc_commit_read_version_mismatch, TLogVers, Vers} } ],
     cc_return_val(cc_commit_read, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_unset_rl
@@ -364,15 +369,47 @@ commit_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
                              {false, Reason :: any()}.
 cc_commit_write(no_value_yet, _WF, _Val = {_TxId, _TLogVers, _NewVal}) ->
     {true, none};
-cc_commit_write({_WL, Vers}, _WF, _Val = {_TxId, TLogVers, _NewVal}) ->
+cc_commit_write({WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
+    %% normal write:
+
+    %% The system may already went on, as the consensus may already be
+    %% free for others when the value was written half and another process
+    %% performed a write through.
+    %% It is ensured, that our write value was a consensus once, because
+    %% otherwise the content checkes of concurrent actions would fail:
+    %% (1) this tx was committed, so we proved that we were able to acquire
+    %%     the write_lock
+    %% (2) only one tx can acquire a write lock.
+
+    %% content check is performed on the latest quorum value, but we
+    %% have to accept also the newly written value, which may have
+    %% been propagated by a write through of concurrent operation, but
+    %% then we do not want to write again (let the cc fail).
     Checks =
-        [ { Vers =:= TLogVers,  {version_mismatch, TLogVers, Vers} } ],
+        [ {  %% we release the lock
+             (Vers =:= TLogVers andalso WL =:= TxId)
+             %% we were interrupted during the release lock and
+             %% another process made a write through? But then the
+             %% register is free to be used for further ops... and any
+             %% value would be ok? So the outcome of the commit_write
+             %% is not important at all?
+             %%orelse (Vers >= TLogVers), %% Vers =:= (1 + TLogVers)),
+  ,          {cc_commit_write_tlog_version_to_small, WL, TxId, TLogVers, Vers} } ],
     cc_return_val(cc_commit_write, Checks, _UI_if_ok = none, ?LOG_CC_FAILS);
-%% in case of fast write we get the value of the last read as write
-%% value, which here was produced by the read filter of set_lock
-cc_commit_write({_RL, _WL, Vers}, _WF, _Val = {_TxId, TLogVers, _NewVal}) ->
+
+
+cc_commit_write({_RL, WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
+    %% fast_write:
+    %% in case of fast write we get the value of the last read as
+    %% write value, which here was produced by the read filter of
+    %% set_lock.
+
+    %% As we are in the case of fast_write, we can expect the
+    %% writelock to be in place and the version to match.
     Checks =
-        [ { Vers =:= TLogVers,  {version_mismatch, TLogVers, Vers} } ],
+        [ { Vers =:= TLogVers,  {cc_commit_write_tlog_version_to_small,
+                                 TLogVers, Vers} },
+          { WL =:= TxId, {cc_commit_write_lock_is_not_txid, WL, TxId} } ],
     cc_return_val(cc_commit_write, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 
@@ -381,7 +418,7 @@ cc_commit_write({_RL, _WL, Vers}, _WF, _Val = {_TxId, TLogVers, _NewVal}) ->
        (db_entry(), UI :: none, {txid_on_cseq:txid(), version(), value()}) -> db_entry().
 wf_val_unset_wl(prbr_bottom, _UI = none, {_TxId, _Vers, _Val}) -> prbr_bottom;
 wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
-    T1 = set_writelock(DBEntry, false),
+    T1 = set_writelock(DBEntry, no_write_lock),
     T2 = set_val(T1, Val),
     %% increment version counter on write
     set_vers(T2, 1 + TLogVers).
@@ -423,22 +460,43 @@ abort_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
                         NextRound, OldVal),
     ok.
 
+%% @doc The content check for abort_read has only to ensure, that the
+%% readlock is eliminated when it is there. The write operation (unset
+%% read lock) is performed, when the result is {true, _}. Otherwise,
+%% the tx still passes and it is assumed that either the readlock was
+%% not acquired, or was already eliminated by a write_through
+%% operation of the rbrcseq module due to concurrency.
 -spec cc_abort_read(no_value_yet | {readlock, version()}, prbr:write_filter(),
                 {txid_on_cseq:txid(), version()}) ->
                        {boolean(), UI :: none}.
 cc_abort_read(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
-    {true, none};
-cc_abort_read({_RL, _Vers}, _WF, _Val = {_TxId, _TLogVers}) ->
-    {true, none}.
-
-%.%% in case of fast write we get the value of the last read as
-%.  %% value, which here was produced by the read filter of set_lock
-%.  cc_abort_read({_RL, Vers}, _WF, _Val = {_TxId, TLogVers}) ->
-%%      {true, none}.
-
-
-
-
+    %% we do not see a readlock, so it was not acquired
+    {false, none};
+cc_abort_read({_WL = no_write_lock, _Vers}, _WF, _Val = {TxId, _TLogVers}) ->
+    %% we can get the write_filter value...
+    %% we do not see a readlock, so it was not acquired
+    {false, none};
+cc_abort_read({RL, _Vers}, _WF, _Val = {TxId, _TLogVers}) when is_list(RL) ->
+    %% ensure readlock is gone...
+    case lists:member(TxId, RL) of
+        true -> {true, none};
+        false -> {false, none}
+                 %% RL is already gone or was not acquired, so we do not
+                 %% need to update the entry
+    end;
+cc_abort_read({_WL, _Vers}, _WF, _Val = {TxId, _TLogVers}) ->
+    %% we can get the write_filter value...
+    %% we do not see a readlock, so it was not acquired
+    {false, none};
+cc_abort_read({RL, _WL, _Vers}, _WF, _Val = {TxId, _TLogVers}) ->
+    %% we can get the write_filter value...
+    %% ensure readlock is gone...
+    case lists:member(TxId, RL) of
+        true -> {true, none};
+        false -> {false, none}
+                 %% RL is already gone or was not acquired, so we do
+                 %% not need to update the entry
+    end.
 
 
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -486,11 +544,26 @@ abort_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
                      {txid_on_cseq:txid(), version(), NewVal :: any()}) ->
                             {true, UI :: none}.
 cc_abort_write(no_value_yet, _WF, _Val = {_TxId, _TLogVers, _NewVal}) ->
-    {true, none};
-cc_abort_write({_WL, _Vers}, _WF, _Val = {_TxId, _TLogVers, _NewVal}) ->
-    {true, none};
-cc_abort_write({_RL, _WL, _Vers}, _WF, _Val = {_TxId, _TLogVers, _NewVal}) ->
-    {true, none}.
+    {false, none};
+cc_abort_write({WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
+    %% normal qwrite
+
+    %% if there is our lock, we release it, otherwise we do not touch the value
+    Checks =
+        [ { Vers =:= TLogVers,  {cc_abort_write_tlog_version_mismatch,
+                                 TLogVers, Vers} },
+          { WL =:= TxId, {cc_abort_write_lock_is_not_txid, WL, TxId} } ],
+    cc_return_val(cc_abort_write, Checks, _UI_if_ok = none, ?LOG_CC_FAILS);
+cc_abort_write({_RL, WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
+    %% qwrite_fast
+    %% if there is our lock, we release it, otherwise we were not able
+    %% to acquire the lock during validation, so we do not touch the
+    %% value (let the cc fail).
+    Checks =
+        [ { Vers =:= TLogVers,  {cc_abort_write_tlog_version_mismatch,
+                                 TLogVers, Vers} },
+          { WL =:= TxId, {cc_abort_write_lock_is_not_txid, WL, TxId} } ],
+    cc_return_val(cc_abort_write, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_unset_wl
        (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0, _}) -> prbr_bottom;
@@ -498,7 +571,7 @@ cc_abort_write({_RL, _WL, _Vers}, _WF, _Val = {_TxId, _TLogVers, _NewVal}) ->
 wf_unset_wl(prbr_bottom, _UI = none, {_TxId, _Vers, _Val}) -> prbr_bottom;
 wf_unset_wl(DBEntry, _UI = none, {TxId, _TLogVers, _Val}) ->
     case writelock(DBEntry) of
-       TxId -> set_writelock(DBEntry, false);
+       TxId -> set_writelock(DBEntry, no_write_lock);
         _ -> DBEntry
     end.
 
@@ -540,7 +613,7 @@ cc_return_val(WhichCC, Checks, UI, Log) ->
 
 -spec new_entry() -> db_entry().
 new_entry() ->
-    {[], false, -1, ?value_dropped}.
+    {[], no_write_lock, -1, ?value_dropped}.
 
 -spec readlock(db_entry()) -> readlock().
 readlock(Entry) -> element(1, Entry).
@@ -559,7 +632,7 @@ unset_readlock(Entry, TxId) ->
 
 -spec writelock(db_entry()) -> writelock().
 writelock(Entry) -> element(2, Entry).
--spec set_writelock(db_entry(), ?RT:key() | false) -> db_entry().
+-spec set_writelock(db_entry(), writelock()) -> db_entry().
 set_writelock(Entry, TxId) -> setelement(2, Entry, TxId).
 -spec vers(db_entry()) -> version().
 vers(Entry) -> element(3, Entry).

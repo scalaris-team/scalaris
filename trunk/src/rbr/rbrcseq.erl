@@ -209,7 +209,7 @@ start_link(DHTNodeGroup, Name, DBSelector) ->
 -spec init(dht_node_state:db_selector()) -> state().
 init(DBSelector) ->
     msg_delay:send_trigger(1, {next_period, 1}),
-    {?PDB:new(?MODULE, [set, protected]), DBSelector, 0}.
+    {?PDB:new(?MODULE, [set]), DBSelector, 0}.
 
 -spec on(comm:message(), state()) -> state().
 %% ; ({qread, any(), client_key(), fun ((any()) -> any())},
@@ -293,12 +293,27 @@ on({qread_collect,
                     %% in case a consensus was started, but not yet finished,
                     %% we first have to finish it
 
-                    %% delete entry, so outdated answers from minority
-                    %% are not considered
-                    ?PDB:delete(ReqId, tablename(State)),
-
-                    gen_component:post_op({qread_initiate_write_through, NewEntry},
-                      State)
+                    %% log:log("Write through necessary"),
+                    case randoms:rand_uniform(1,4) of
+                        1 ->
+                            %% delete entry, so outdated answers from minority
+                            %% are not considered
+                            ?PDB:delete(ReqId, tablename(State)),
+                            gen_component:post_op({qread_initiate_write_through,
+                                                   NewEntry}, State);
+                        2 ->
+                            %% delay a bit
+                            _ = comm:send_local_after(
+                                  15 + randoms:rand_uniform(1,10), self(),
+                                  {qread_initiate_write_through, NewEntry}),
+                            ?PDB:delete(ReqId, tablename(State)),
+                            State;
+                        3 ->
+                            ?PDB:delete(ReqId, tablename(State)),
+                            comm:send_local(self(), {qread_initiate_write_through,
+                                                   NewEntry}),
+                            State
+                        end
             end
         end;
 
@@ -624,6 +639,7 @@ on({qwrite_collect, ReqId,
 %% random number. This is still faster than using msg_delay or
 %% comm:local_send_after() with a random delay.
 %% TODO: random is not allowed for proto_sched reproducability...
+                    %% log:log("Concurrency retry"),
                     case randoms:rand_uniform(1,4) of
                         1 ->
                             retrigger(NewEntry, TableName, noincdelay),
