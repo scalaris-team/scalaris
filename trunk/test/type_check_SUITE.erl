@@ -623,7 +623,7 @@ tester_type_check_histogram(_Config) ->
     Modules =
         [ {histogram,
            [ {find_smallest_interval, 1}, % private API, needs feeder
-             {merge_interval, 2} % private API, needs feeder
+             {merge_interval, 3} % private API, needs feeder
            ],
            [ {resize, 1} % needs feeder
            ]},

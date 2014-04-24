@@ -64,17 +64,16 @@ add3(_Config) ->
     ok.
 
 add2_identical(_Config) ->
-    H = histogram:create(3),
+    H = histogram:create(2),
     Values = [1.25, 5.0, 5.0],
     H2 = lists:foldl(fun histogram:add/2, H, Values),
     ?equals(histogram:get_data(H2), [{1.25, 1}, {5.0, 2}]),
-    H3 = histogram:add(7.0, H2),
-    H4 = lists:foldl(fun histogram:add/2, H3, Values),
-    ?equals(histogram:get_data(H4), [{1.25, 2}, {5.0, 4}, {7.0, 1}]),
+    H3 = lists:foldl(fun histogram:add/2, H2, Values),
+    ?equals(histogram:get_data(H3), [{1.25, 2}, {5.0, 4}]),
     ok.
 
 add3_identical(_Config) ->
-    H = histogram:create(10),
+    H = histogram:create(4),
     Values = [{2.0, 1}, {3.5, 2}, {3.0, 1}, {2.0, 6}, {1.0, 3}],
     H2 = lists:foldl(fun({Value, Count}, Histogram) ->
                              histogram:add(Value, Count, Histogram)
@@ -119,10 +118,10 @@ find_smallest_interval(_Config) ->
     H1a = histogram:create(10),
     Values1a = [3.5, 3.0, 2.0, 1.0],
     H1b = lists:foldl(fun histogram:add/2, H1a, Values1a),
-    ?equals(3.5, histogram:find_smallest_interval(histogram:get_data(H1b))),
+    ?equals(3, histogram:find_smallest_interval(histogram:get_data(H1b))),
     Values2a = [4.0, 2.5, 2.0, 1.0],
     H2b = lists:foldl(fun histogram:add/2, H1a, Values2a),
-    ?equals(2.5, histogram:find_smallest_interval(histogram:get_data(H2b))),
+    ?equals(2, histogram:find_smallest_interval(histogram:get_data(H2b))),
     ok.
 
 merge_interval(_Config) ->
@@ -130,8 +129,8 @@ merge_interval(_Config) ->
     Values = [3.5, 3.0, 2.0, 1.0],
     H2 = lists:foldl(fun histogram:add/2, H, Values),
     MinInterval = histogram:find_smallest_interval(histogram:get_data(H2)),
-    H3 = histogram:merge_interval(MinInterval, histogram:get_data(H2)),
-    ?equals(3.5, MinInterval),
+    H3 = histogram:merge_interval(MinInterval, 1, histogram:get_data(H2)),
+    ?equals(3, MinInterval),
     ?equals(H3, [{1.0,1}, {2.0,1}, {3.25,2}]),
     ok.
 
