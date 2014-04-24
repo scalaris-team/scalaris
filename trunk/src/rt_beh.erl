@@ -53,7 +53,7 @@
 -callback n() -> number().
 -callback get_range(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE) -> number().
 -callback get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
-                        SplitFraction::{Num::non_neg_integer(), Denom::pos_integer()})
+                        SplitFraction::{Num::number(), Denom::pos_integer()})
         -> key() | ?PLUS_INFINITY_TYPE.
 -callback get_random_in_interval(intervals:simple_interval2()) -> key().
 
