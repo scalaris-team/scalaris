@@ -37,6 +37,7 @@
          delete_if_exists/2,
          map_with_nr/3,
          par_map/2, par_map/3,
+         lists_take/2,
          lists_split/2, lists_keystore2/5,
          lists_partition3/2,
          lists_remove_at_indices/2,
@@ -910,6 +911,17 @@ par_map(Fun, [_|_] = List, MaxThreads) ->
         {{Level, Reason}, _, _} -> erlang:Level(Reason) % throw the error here again
     end;
 par_map(Fun, [], _MaxThreads) when is_function(Fun, 1) -> [].
+
+%% @doc Delete an element from a list (once). When not found, return false.
+-spec lists_take(any(), [any()]) -> [any()] | false.
+lists_take(Elem, L) ->
+    lists_take_iter(Elem, L, []).
+
+-spec lists_take_iter(any(), [any()], [any()]) -> [any()] | false.
+lists_take_iter(_Elem, [], _Acc) -> false;
+lists_take_iter(Elem, [Elem|T], Acc) -> lists:reverse(Acc) ++ T;
+lists_take_iter(Elem, [H|T], Acc) ->
+    lists_take_iter(Elem, T, [H|Acc]).
 
 %% @doc Splits the given list into several partitions, returning a list of parts
 %%      of the original list. Both the parts and their contents are reversed
