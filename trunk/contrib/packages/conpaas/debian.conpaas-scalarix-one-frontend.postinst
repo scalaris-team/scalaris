@@ -1,8 +1,0 @@
-#!/bin/bash
-
-set -e
-
-gem install json oca --no-rdoc --no-ri
-
-#DEBHELPER#
-
