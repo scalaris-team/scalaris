@@ -169,6 +169,11 @@
 %% -define(SHOW, config:read(log_level)).
 -define(SHOW, debug).
 
+%-define(TRACE(X,Y), log:pal(X,Y)).
+%% -define(TRACE(X,Y), ok).
+-define(TRACE_TRIGGER(FormatString, Data), ok).
+%% -define(TRACE_TRIGGER(FormatString, Data), log:pal(FormatString, Data)).
+
 -define(CBMODULES, [{gossip_load, default}]). % callback modules as list
 
 -define(FIRST_TRIGGER_DELAY, 2). % delay in s for first trigger
@@ -185,7 +190,7 @@
 
 -type state_key_cb() :: cb_state | cb_status | cycles | trigger_lock |
                         exch_data | round.
--type state_key() :: cb_modules | msg_queue | range | status |
+-type state_key() :: cb_modules | msg_queue | range | status | trigger_add | trigger_remove |
                      {reply_peer, pos_integer()} |
                      {trigger_group, pos_integer()} |
                      {state_key_cb(), cb_module()} .
@@ -206,6 +211,7 @@
     {activate_gossip, Range::intervals:interval()} |
     {start_gossip_task, CBModule::cb_module(), Args::list()} |
     {gossip_trigger, TriggerInterval::pos_integer()} |
+    {trigger_action, TriggerInterval::pos_integer()} |
     {update_range, NewRange::intervals:interval()} |
     {web_debug_info, SourcePid::comm:mypid()} |
     send_error() |
@@ -252,11 +258,16 @@ start_link(DHTNodeGroup) ->
 %%      Called by gen_component, results in on_inactive handler.
 -spec init([]) -> state().
 init([]) ->
-    TabName = ?PDB:new(state, ?PDB_OPTIONS),
-    state_set(status, uninit, TabName),
-    state_set(cb_modules, [], TabName),
-    state_set(msg_queue, msg_queue:new(), TabName),
-    TabName.
+    State = ?PDB:new(state, ?PDB_OPTIONS),
+    state_set(status, uninit, State),
+    state_set(cb_modules, [], State),
+    state_set(msg_queue, msg_queue:new(), State),
+    state_set(trigger_remove, [], State),
+    state_set(trigger_add, [], State),
+
+    % initialise a base trigger
+    msg_delay:send_trigger(?FIRST_TRIGGER_DELAY,  {gossip_trigger, 1}),
+    State.
 
 
 %% @doc Activate the gossip module. <br/>
@@ -344,6 +355,7 @@ rm_send_activation_msg(_Pid, ?MODULE, _OldNeighbours, NewNeighbours, _Reason) ->
 
 %%-------------------------- on_inactive ---------------------------%%
 
+
 %% @doc Message handler during the startup of the gossip module.
 -spec on_inactive(Msg::message(), State::state()) -> state().
 on_inactive({activate_gossip, MyRange}=Msg, State) ->
@@ -370,6 +382,11 @@ on_inactive({activate_gossip, MyRange}=Msg, State) ->
     msg_queue_send(State),
     % change handler to on_active
     gen_component:change_handler(State, fun ?MODULE:on_active/2);
+
+
+on_inactive({gossip_trigger, TriggerInterval}, State) ->
+    msg_delay:send_trigger(TriggerInterval, {gossip_trigger, TriggerInterval}),
+    State;
 
 
 on_inactive({p2p_exch, _CBModule, SourcePid, _PData, _Round}=Msg, State) ->
@@ -406,6 +423,7 @@ on_inactive({remove_all_tombstones}=Msg, State) ->
     msg_queue_add(Msg, State), State;
 
 
+%% consume all other message (inluding: trigger messages)
 on_inactive(_Msg, State) ->
     State.
 
@@ -429,44 +447,56 @@ on_active({start_gossip_task, CBModule, Args}, State) ->
     State;
 
 
-%% trigger message starting a new cycle
-on_active({gossip_trigger, TriggerInterval}=Msg, State) ->
-    msg_queue_send(State),
-    log:log(debug, "[ Gossip ] Triggered: ~w", [Msg]),
-    case state_get_raw({trigger_group, TriggerInterval}, State) of
-        undefined ->
-            ok; %% trigger group does no longer exist, forget about this trigger
-        {CBModules} ->
-            _ = [
-                 case state_get(trigger_lock, CBModule, State) of
-                     free ->
-                         log:log(debug, "[ Gossip ] Module ~w got triggered", [CBModule]),
-                         log:log(?SHOW, "[ Gossip ] Cycle: ~w, Round: ~w",
-                                 [state_get(cycles, CBModule, State), state_get(round, CBModule, State)]),
+%% Trigger message starting a new cycle.
+%% To avoid infecting mpath traces with infinite triggers, a basetrigger with
+%% interval 1s is started during the startup of the process. This trigger is
+%% uninfected, even if it belongs to a node which was added during infection.
+%%
+%% To add and remove callback module specific triggers without infecting the triggers,
+%% the request for the addition/removel of a trigger is saved to the state and
+%% processed during the handling of the base trigger.
+on_active({gossip_trigger, TriggerInterval}=_Msg, State) ->
+    ?TRACE_TRIGGER("[ Gossip ]:~w", [_Msg]),
 
-                         %% set cycle status to active
-                         state_set(trigger_lock, locked, CBModule, State),
+    % check for trigger removal
+    case lists:member(TriggerInterval, state_get(trigger_remove, State)) of
+        true -> % remove trigger by not renewing the trigger
+            ?TRACE_TRIGGER("Remove trigger: ~w", [TriggerInterval]),
+            state_update(trigger_remove,
+                fun (Triggers) -> lists:delete(TriggerInterval, Triggers) end, State),
 
-                         %% reset exch_data
-                         state_set(exch_data, {undefined, undefined}, CBModule, State),
-
-                         %% request node (by the cb module or the bh module)
-                         case cb_call(select_node, [], Msg, CBModule, State) of
-                             true -> ok;
-                             false -> request_random_node(CBModule)
-                         end,
-
-                         %% request data
-                         cb_call(select_data, [], Msg, CBModule, State);
-                     locked -> do_nothing % ignore trigger when within prepare-request phase
-                 end || CBModule <- CBModules
-                ],
-
-            %% trigger next
-            msg_delay:send_trigger(TriggerInterval, {gossip_trigger, TriggerInterval}),
-            state_set({trigger_group, TriggerInterval}, {CBModules}, State)
+            % unconditionally renew basetrigger, even if the last trigger was removed
+            if TriggerInterval =:= 1 ->
+                msg_delay:send_trigger(TriggerInterval, {gossip_trigger, TriggerInterval});
+               TriggerInterval =/= 1 -> ok
+            end;
+        false -> % renew trigger
+            msg_delay:send_trigger(TriggerInterval, {gossip_trigger, TriggerInterval})
     end,
-    State;
+
+    % check for new new triggers to add
+    case state_get(trigger_add, State) of
+        [] -> ok;
+        NewTriggerIntervals ->
+            ?TRACE_TRIGGER("Add triggers: ~w", [NewTriggerIntervals]),
+            lists:foreach(fun (NewTriggerInterval) ->
+                                msg_delay:send_trigger(NewTriggerInterval, {gossip_trigger, NewTriggerInterval})
+                          end, NewTriggerIntervals),
+            state_set(trigger_add, [], State)
+    end,
+    gen_component:post_op({trigger_action, TriggerInterval}, State);
+
+
+on_active({trigger_action, TriggerInterval}, State) ->
+    msg_queue_send(State),
+    State1 = case state_get_raw({trigger_group, TriggerInterval}, State) of
+        undefined ->
+            State; %% trigger group does not exist, do nothing (e.g. during startup)
+        CBModules ->
+            lists:foldl(fun (CBModule, NewState) -> do_trigger_action(CBModule, NewState) end,
+                            State, CBModules)
+    end,
+    State1;
 
 
 %% received through the rm on key range changes
@@ -727,19 +757,47 @@ handle_msg({stop_gossip_task, CBModule}=Msg, State) ->
 
     % remove from trigger group
     Interval = cb_call(trigger_interval, CBModule) div 1000,
-    {CBModules} = state_get({trigger_group, Interval}, State),
+    CBModules = state_get({trigger_group, Interval}, State),
     NewCBModules = lists:delete(CBModule, CBModules),
     case NewCBModules of
         [] ->
-            ?PDB:delete({trigger_group, Interval}, State);
+            ?PDB:delete({trigger_group, Interval}, State),
+            state_update(trigger_remove, fun (Intervals) -> [Interval|Intervals] end, State);
         _ ->
-            state_set({trigger_group, Interval}, {NewCBModules}, State)
+            state_set({trigger_group, Interval}, NewCBModules, State)
     end,
 
     % set tombstone
     state_set(cb_status, tombstone, CBModule, State),
     State.
 
+
+-spec do_trigger_action(CBModule::cb_module(), State::state()) -> state().
+do_trigger_action(CBModule, State) ->
+    Msg = {trigger_action, CBModule},
+    _ = case state_get(trigger_lock, CBModule, State) of
+        free ->
+            log:log(debug, "[ Gossip ] Module ~w got triggered", [CBModule]),
+            log:log(?SHOW, "[ Gossip ] Cycle: ~w, Round: ~w",
+                    [state_get(cycles, CBModule, State), state_get(round, CBModule, State)]),
+
+            %% set cycle status to active
+            state_set(trigger_lock, locked, CBModule, State),
+
+            %% reset exch_data
+            state_set(exch_data, {undefined, undefined}, CBModule, State),
+
+            %% request node (by the cb module or the bh module)
+            case cb_call(select_node, [], Msg, CBModule, State) of
+                true -> ok;
+                false -> request_random_node(CBModule)
+            end,
+
+            %% request data
+            cb_call(select_data, [], Msg, CBModule, State);
+        locked -> do_nothing % ignore trigger when within prepare-request phase
+    end,
+    State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Msg Exchange with Peer
@@ -808,18 +866,18 @@ init_gossip_task(CBModule, Args, State) ->
 
     % configure and add trigger
     TriggerInterval = cb_call(trigger_interval, CBModule) div 1000,
-    {TriggerGroup} =
+    ?TRACE_TRIGGER("Initiating Trigger for ~w. Interval: ~w", [CBModule, TriggerInterval]),
+    TriggerGroup =
     case state_get_raw({trigger_group, TriggerInterval}, State) of
         undefined ->
-            % deactivate trace_mpath temporarily if running
-            % create and init new trigger group
-            ?TRACE_MPATH_SAFE(msg_delay:send_trigger(?FIRST_TRIGGER_DELAY,  {gossip_trigger, TriggerInterval})),
-            {[CBModule]};
-        {OldTriggerGroup} ->
+            % create and init new trigger group and request the new trigger
+            state_update(trigger_add, fun (List) -> [TriggerInterval|List] end, State),
+            [CBModule];
+        OldTriggerGroup ->
             % add CBModule to existing trigger group
-            {[CBModule|OldTriggerGroup]}
+            [CBModule|OldTriggerGroup]
     end,
-    state_set({trigger_group, TriggerInterval}, {TriggerGroup}, State),
+    state_set({trigger_group, TriggerInterval}, TriggerGroup, State),
 
     % add CBModule to list of cbmodules
     CBModules = state_get(cb_modules, State),
@@ -1183,7 +1241,9 @@ tester_create_state(Status, Range, Interval, CBState, CBStatus,
     state_set(msg_queue, msg_queue:new(), State),
     state_set(range, Range, State),
     state_set({reply_peer, uid:get_pids_uid()}, comm:this(), State),
-    state_set({trigger_group, Interval}, {?CBMODULES}, State),
+    state_set({trigger_group, Interval}, ?CBMODULES, State),
+    state_set(trigger_add, [], State),
+    state_set(trigger_remove, [], State),
     Fun = fun (CBModule) ->
             state_set(cb_state, CBState, CBModule, State),
             state_set(cb_status, CBStatus, CBModule, State),

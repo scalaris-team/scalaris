@@ -176,7 +176,8 @@ tester_type_check_gossip(_Config) ->
                 {rm_send_new_range, 5} % sends messages
             ],
             % excluded (private functions)
-            [   {handle_msg, 2}, % spec to wide, sends messages
+            [   {do_trigger_action, 2}, % needs state in process dictionary
+                {handle_msg, 2}, % spec to wide, sends messages
                 {start_p2p_exchange, 4}, % would need valid peer
                 {init_gossip_task, 3}, % test via feeder
                 {cb_call, 3}, % unbounded_fun?
