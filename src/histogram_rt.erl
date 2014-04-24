@@ -15,6 +15,7 @@
 %% @author Maximilian Michels <michels@zib.de>
 %% @doc Like histogram.erl but takes ?RT:key() as value and operates
 %%      in the key space according to the used routing table.
+%%      The histogram's interval span is ['[', BaseKey, BaseKey, ')'].
 %% @version $Id$
 -module(histogram_rt).
 -author('michels@zib.de').
@@ -117,6 +118,8 @@ foldr_until(TargetCount, {Histogram, BaseKey}) ->
 
 -compile({inline, [normalize/2]}).
 -spec normalize(Value::key(), BaseKey::base_key()) -> internal_value().
+normalize(BaseKey, BaseKey) ->
+    0;
 normalize(Value, BaseKey) ->
     ?RT:get_range(BaseKey, Value).
 
