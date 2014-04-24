@@ -634,7 +634,7 @@ succ_ord_id(K1, K2, BaseKey) ->
     % (slightly) faster version:
     (K1 =:= BaseKey) orelse
     (K1 > BaseKey andalso K2 < BaseKey) orelse
-    (K1 =< K2 andalso (not (K1 < BaseKey andalso K2 >= BaseKey))).
+    (K1 =< K2 andalso (K1 >= BaseKey orelse K2 < BaseKey)).
 
 %% %%  doc Defines a 'less than or equal' order starting from a base node going
 %% %%      along the ring towards the predecessor where nodes that are further away
