@@ -136,8 +136,8 @@ resize(Histogram = #histogram{data = Data, size = Size, data_size = DataSize})
   when DataSize > Size andalso DataSize > 1 ->
     ?DBG_ASSERT(Size > 0),
     %% we need at least two items to do the following:
-    PosMinSecondValue = find_smallest_interval(Data),
-    NewHistogram = Histogram#histogram{data = merge_interval(PosMinSecondValue, 1, Data),
+    PosMinValue = find_smallest_interval(Data),
+    NewHistogram = Histogram#histogram{data = merge_interval(PosMinValue, 1, Data),
                                        data_size = DataSize - 1},
     resize(NewHistogram);
 resize(#histogram{} = Histogram) ->
@@ -181,8 +181,8 @@ merge_interval(PosMinValue, PosMinValue, [{Value, Count}, {Value2, Count2} | Res
     [{(Value * Count + Value2 * Count2) / (Count + Count2), Count + Count2} | Rest];
 merge_interval(PosMinValue, PosMinValue, [{Value, Count}, {Value2, Count2} | Rest]) ->
     [{(Value * Count + Value2 * Count2) div (Count + Count2), Count + Count2} | Rest];
-merge_interval(MinSecondValue, CurPos, [DataItem | Rest]) ->
-    [DataItem | merge_interval(MinSecondValue, CurPos + 1, Rest)].
+merge_interval(PosMinValue, CurPos, [DataItem | Rest]) ->
+    [DataItem | merge_interval(PosMinValue, CurPos + 1, Rest)].
 
 -spec tester_create_histogram(Size::non_neg_integer(), Data::data_list()) -> histogram().
 tester_create_histogram(Size = 0, _Data) ->
