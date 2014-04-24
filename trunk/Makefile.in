@@ -637,7 +637,8 @@ install-erlang: compile
 	           docroot/*.yaws \
 	           docroot/*.css \
 	           docroot/*.js \
-	           docroot/*.gif
+	           docroot/*.gif \
+	           docroot/*.ico
 	install -m 644 -t $(DOCROOTDIR)/api \
 	           docroot/api/*
 	install -m 644 -t $(DOCROOTDIR)/flot \
