@@ -716,7 +716,10 @@ new_round(NewRound, PrevState, CurState) ->
             {CurState, NewState1};
         false ->
             % make the old previous state the new previous state and discard the current state
-            log:log(warn(), "[ ~w ] Entering new round, but old round has not converged", [?MODULE]),
+            ConvCount = state_get(convergence_count, CurState),
+            CurRound = state_get(round, CurState),
+            log:log(warn(), "[ ~w ] Entering new round (~w), but current round (~w) "++
+                "has not converged. Convergence Count: ~w", [?MODULE, NewRound, CurRound, ConvCount]),
             NewState1 = state_new(CurState),
             {PrevState, NewState1}
     end,
