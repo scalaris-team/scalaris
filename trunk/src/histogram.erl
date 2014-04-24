@@ -31,7 +31,6 @@
 -export([find_smallest_interval/1, merge_interval/2,
          tester_create_histogram/2, tester_is_valid_histogram/1]).
 
--export([find_largest_window/2, find_largest_window_feeder/2]).
 -export([foldl_until/2, foldr_until/2]).
 
 -include("scalaris.hrl").
@@ -124,48 +123,11 @@ foldl_until_helper(_TargetVal, [], SumSoFar, BestValue) ->
 foldl_until_helper(TargetCount, [{Val, Count} | Other], SumSoFar, _BestValue) ->
     foldl_until_helper(TargetCount, Other, SumSoFar + Count, Val).
 
-%% @doc Determines the maximum number of occurances under a sliding window
--spec find_largest_window(WindowSize::pos_integer(), Histogram::histogram()) -> {Pos::pos_integer(), Sum::pos_integer()}.
-find_largest_window(WindowSize, #histogram{data = HistData, data_size = Len})  when Len >= WindowSize ->
-    Data = lists:map(fun({_, Count}) -> Count end, HistData),
-    sliding_window_max(WindowSize, 1, 0, Data, 1, queue:new(), 0).
-
-%% @doc Feeder function to create valid window sizes for the tester
-%%      In case of empty or zero sized histograms a default histogram is used
--spec find_largest_window_feeder(WindowSize::pos_integer(), Hist::histogram()) -> {WindowSize::pos_integer(), Histogram::histogram()}.
-find_largest_window_feeder(WindowSize, #histogram{size = Size, data_size = DataSize} = Hist) ->
-    case DataSize =:= 0 orelse Size =:= 0 of
-        true ->
-            Hist2 = histogram:create(100),
-            Elements = lists:seq(1, 100),
-            Hist3 = lists:foldl(fun histogram:add/2, Hist2, Elements),
-            {20, Hist3};
-        _ ->
-            {erlang:min(WindowSize, DataSize), Hist}
-    end.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % private
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% @doc Helper function for find_largest_window/2
--spec sliding_window_max(WindowSize::pos_integer(), MaxPos::pos_integer(),
-                         MaxSum::non_neg_integer(), Data::[pos_integer()],
-                         Pos::pos_integer(), OldVals::queue:queue(pos_integer()),
-                         Sum::non_neg_integer())
-                      -> Max::{Pos::pos_integer(), Sum::pos_integer()}.
-sliding_window_max(0, MaxPos, MaxSum, [], _Pos, _OldVals, _Sum) ->
-    {MaxPos, MaxSum};
-sliding_window_max(0, MaxPos, MaxSum, List, Pos, OldVals, Sum) ->
-    {{value, OldVal}, NewOldVals} = queue:out(OldVals),
-    sliding_window_max(1, MaxPos, MaxSum, List, Pos + 1, NewOldVals, Sum - OldVal);
-sliding_window_max(WindowSize, MaxPos, MaxSum, [H|T], Pos, OldVals, LastSum) ->
-    Sum = LastSum + H,
-    case Sum > MaxSum of
-        true -> sliding_window_max(WindowSize - 1, Pos   , Sum   , T, Pos, queue:in(H, OldVals), Sum);
-        _    -> sliding_window_max(WindowSize - 1, MaxPos, MaxSum, T, Pos, queue:in(H, OldVals), Sum)
-    end.
 
 %% @doc Resizes the given histogram to fit its maximum size (reduces the data).
 %%      PRE: histogram maximum size > 0 (from create/1)
