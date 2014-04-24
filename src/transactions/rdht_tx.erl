@@ -181,12 +181,16 @@ initiate_rdht_ops(ReqList) ->
 
 %% @doc Collect replies from the quorum DHT operations.
 -spec collect_replies(tx_tlog:tlog(), [req_id()]) -> tx_tlog:tlog().
-collect_replies(TLog, [ReqId | RestReqIds] = _ReqIdsList) ->
-    ?TRACE("rdht_tx:collect_replies(~p, ~p)~n", [TLog, _ReqIdsList]),
+collect_replies(TLog, [_H | _T] = ReqIdsList) ->
+    ?TRACE("rdht_tx:collect_replies(~p, ~p)~n", [TLog, ReqIdsList]),
     % receive only matching replies
-    RdhtTlogEntry = receive_answer(ReqId),
-    NewTLog = tx_tlog:add_entry(TLog, RdhtTlogEntry),
-    collect_replies(NewTLog, RestReqIds);
+    {ReqId, RdhtTlogEntry} = receive_answer(),
+    case util:lists_take(ReqId, ReqIdsList) of
+        false -> collect_replies(TLog, ReqIdsList);
+        RemainingReqIds ->
+            NewTLog = tx_tlog:add_entry(TLog, RdhtTlogEntry),
+            collect_replies(NewTLog, RemainingReqIds)
+    end;
 collect_replies(TLog, []) ->
     %% Drop outdated results...
     receive_old_answers(),
@@ -334,9 +338,9 @@ commit(TLog) ->
     end.
 -endif.
 
--spec receive_answer(ReqId::req_id()) -> tx_tlog:tlog_entry().
+-spec receive_answer() -> {req_id(), tx_tlog:tlog_entry()}.
 -ifdef(TXNEW).
- receive_answer(ReqId) ->
+ receive_answer() ->
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
@@ -344,25 +348,25 @@ commit(TLog) ->
 % {tx_tm_rtm_commit_reply, _, _}, %%->
            {tx_tm_commit_reply, _, _}, %%->
            %% probably an outdated commit reply: drop it.
-             receive_answer(ReqId)
+             receive_answer()
           );
         ?SCALARIS_RECV(
            {_Op, ReqId, RdhtTlog}, %% ->
-             RdhtTlog
+             {ReqId, RdhtTlog}
           )
     end.
 -else.
-receive_answer(ReqId) ->
+receive_answer() ->
     trace_mpath:thread_yield(),
     receive
         ?SCALARIS_RECV(
            {tx_tm_rtm_commit_reply, _, _}, %%->
            %% probably an outdated commit reply: drop it.
-           receive_answer(ReqId)
+           receive_answer()
           );
         ?SCALARIS_RECV(
            {_Op, ReqId, RdhtTlog}, %% ->
-           RdhtTlog
+           {ReqId, RdhtTlog}
           )
         end.
 -endif.

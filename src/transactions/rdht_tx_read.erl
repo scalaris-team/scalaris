@@ -102,7 +102,9 @@ work_phase_key(ClientPid, ReqId, Key, HashedKey, Op) ->
     %% inform CollectorPid on whom to inform after quorum reached
     comm:send_local(CollectorPid, {client_is, ReqId, ClientPid, Key, Op}),
     ok.
+-endif.
 
+%% not needed for newtx, but required by type_check_SUITE (excluded private fun)
 -spec quorum_read(CollectorPid::comm:mypid(), ReqId::rdht_tx:req_id() | rdht_tx_write:req_id(),
                   HashedKey::?RT:key(),
                   Op::?read | ?write | ?random_from_list | {?sublist, Start::pos_integer() | neg_integer(), Len::integer()})
@@ -114,7 +116,6 @@ quorum_read(CollectorPid, ReqId, HashedKey, Op) ->
             RKey, {?read_op, CollectorPid, ReqId, RKey, Op})
         || RKey <- RKeys ],
     ok.
--endif.
 
 %% @doc Performs the requested operation in the dht_node context.
 -spec extract_from_value
