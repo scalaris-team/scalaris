@@ -623,11 +623,9 @@ tester_type_check_histogram(_Config) ->
     Modules =
         [ {histogram,
            [ {find_smallest_interval, 1}, % private API, needs feeder
-             {merge_interval, 2}, % private API, needs feeder
-             {find_largest_window, 2}    % needs feeder for correct window size
+             {merge_interval, 2} % private API, needs feeder
            ],
-           [ {resize, 1}, % needs feeder
-             {sliding_window_max, 7} % fed by find_largest_window/2
+           [ {resize, 1} % needs feeder
            ]},
           {histogram_rt,
            [],
