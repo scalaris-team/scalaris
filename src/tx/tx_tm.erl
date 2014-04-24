@@ -33,6 +33,9 @@
 -export([redecide/1]).         %% take over an open tx based on a txid
 -export([redecide_on_key/1]).  %% take over an open tx based on an involved key
 
+%% detect whether txnew is enabled or not
+-export([is_txnew_enabled/0]).
+
 %% TODO: commit should return the txid (maybe on the layer above) and
 %% include that in its replies, so duplicate replies can be detected
 %% and eliminated / ignored by the client or a proxy process. A client
@@ -257,6 +260,12 @@ redecide(_TxId) ->
 -spec redecide_on_key(?RT:key()) -> ok.
 redecide_on_key(_Key) -> ok.
 
+-spec is_txnew_enabled() -> boolean().
+-ifdef(TXNEW).
+is_txnew_enabled() -> true.
+-else.
+is_txnew_enabled() -> false.
+-endif.
 
 %% @doc Notifies the tx_tm of a changed node ID.
 -spec rm_send_update(Subscriber::pid(), Tag::?MODULE,
@@ -327,7 +336,8 @@ on({tx_tm_commit, Client, ClientsID, TLog}, State) ->
     state_inc_opentxnum(State);
 
 %% tx is stored in txid store
-on({tx_tm_txid_stored, TxId, {qwrite_done, _ReqId, NextWriteRound, WrittenVal}}, State) ->
+on({tx_tm_txid_stored, TxId,
+    {qwrite_done, _ReqId, NextWriteRound, WrittenVal}}, State) ->
     %% store NextWriteRound and WrittenValue for fast write of decision
     TxState = get_entry(TxId, State),
     T1TxState = tx_state_set_txid_next_write_token(TxState, NextWriteRound),
@@ -357,7 +367,8 @@ on({tx_tm_acquire_locks, TxId}, State) ->
     State;
 
 %% lock for a tlog entry was acquired (or not)
-on({tx_tm_lock_get_done, TxId, Key, {qwrite_done, _ReqId, NextRound, WrittenVal}}, State) ->
+on({tx_tm_lock_get_done, TxId, Key,
+    {qwrite_done, _ReqId, NextRound, WrittenVal}}, State) ->
     case get_entry(TxId, State) of
         undefined ->
             State;
@@ -380,7 +391,8 @@ on({tx_tm_lock_get_done, TxId, Key, {qwrite_done, _ReqId, NextRound, WrittenVal}
             end
     end;
 
-on({tx_tm_lock_get_done, TxId, Key, {qwrite_deny, _ReqId, NextRound, WrittenVal, _Reason}}, State) ->
+on({tx_tm_lock_get_done, TxId, Key,
+    {qwrite_deny, _ReqId, NextRound, WrittenVal, Reason}}, State) ->
     %% a lock was not acquirable -> abort the tx
     case get_entry(TxId, State) of
         undefined ->
@@ -410,7 +422,6 @@ on({tx_tm_lock_get_done, TxId, Key, {qwrite_deny, _ReqId, NextRound, WrittenVal,
 
 %% step 2: Write the decision to the txid store
 on({tx_tm_write_decision, TxId, Decision, WriteRound, OldVal}, State) ->
-
     ReplyAs = comm:reply_as(self(), 3,
                             {tx_tm_decision_stored, TxId, '_'}),
 
@@ -418,7 +429,8 @@ on({tx_tm_write_decision, TxId, Decision, WriteRound, OldVal}, State) ->
     txid_on_cseq:decide(TxId, Decision, ReplyAs, WriteRound, OldVal),
     State;
 
-on({tx_tm_decision_stored, TxId, {qwrite_done, _ReqId, _Round, Decision}}, State) ->
+on({tx_tm_decision_stored, TxId,
+    {qwrite_done, _ReqId, _Round, Decision}}, State) ->
     gen_component:post_op({tx_tm_execute_decision, TxId, Decision}, State);
 
 on({tx_tm_execute_decision, TxId, Decision}, State) ->
@@ -449,7 +461,14 @@ on({tx_tm_execute_decision, TxId, Decision}, State) ->
           || {Key, NextRound, OldVal} <- tx_state_open_commits(TxState) ],
     State;
 
-on({tx_tm_executed_decision, TxId, Key, Decision, {qwrite_done, _ReqId, _Round, _Val}}, State) ->
+on({tx_tm_executed_decision, TxId, Key, Decision,
+    _QwriteAnswer},
+    %% either: {qwrite_done, _ReqId, _Round, _Val}}
+    %% or:     {qwrite_deny, _ReqId, _Round, _Val, Reason}}
+    %% deny is also ok, probably the decision was propagated otherwise
+    %% (write_through during concurrency, so we accept a write deny).
+    %% We had the lock, and only we can release it.
+    State) ->
     case get_entry(TxId, State) of
         %% this should not happen!
         %% undefined ->
@@ -468,7 +487,6 @@ on({tx_tm_executed_decision, TxId, Key, Decision, {qwrite_done, _ReqId, _Round, 
                             msg_commit_reply(Client, ClientsId, {abort, tx_state_failed_locks(TxState)})
                     end,
                     %% proceed to next step
-                    
                     gen_component:post_op({tx_tm_delete_txid, TxId}, State);
                 _ ->
                     NewTxState = tx_state_set_open_commits(TxState, NewOpenCommits),
@@ -477,19 +495,15 @@ on({tx_tm_executed_decision, TxId, Key, Decision, {qwrite_done, _ReqId, _Round, 
             end
     end;
 
-on({tx_tm_executed_decision, TxId, Key, Decision, {qwrite_deny, _ReqId, _NextRound, _Val}}, State) ->
-    ct:pal("Oops we were not able to write our decision???"),
-    State;
-
-on({tx_tm_delete_txid, _TxId}, State) ->
+on({tx_tm_delete_txid, TxId}, State) ->
+    %% TODO: delete in dht
+    %% delete locally:
+    pdb:delete(TxId, state_get_tablename(State)),
     State;
 
 on({new_node_id, Id}, State) ->
     %% change txid range to remain local with the txids
     state_set_id(State, Id).
-
-
-
 
 -spec on_init(comm:message(), state())
     -> state() |
@@ -583,7 +597,7 @@ tx_state_new(TxId, Client, ClientId, TLog) ->
      prbr_bottom, %% last written val for txid
      _ToBeLockedKeys = InvolvedKeys,
      _ToBeCommittedKeys =
-         [ {X, _NextRoundPlaceholder = '_', written_value_placeholder}
+         [ {X, _NextRoundPlaceholder = '_', no_value_yet} %% written_value_placeholder}
            || X <- InvolvedKeys],
      _FailedLocks = []}.
 
