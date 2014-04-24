@@ -503,25 +503,6 @@ AC_SUBST(ENABLEPYTHON3INSTALL)
 
 ###########################################################
 #
-# check opennebula
-#
-###########################################################
-
-ENABLEONEINSTALL=
-ONEPREFIX=
-AC_ARG_ENABLE([opennebula],
-              AS_HELP_STRING([--disable-opennebula],
-                 [disable support for opennebula]),
-              [ONEPREFIX=no])
-AC_ARG_ENABLE([opennebula],
-              AS_HELP_STRING([--enable-opennebula@<:@=DIR@:>@],
-                 [enable support for opennebula]),
-              [ENABLEONEINSTALL="install-one"
-               ONEPREFIX=$enableval])
-AC_SUBST(ENABLEONEINSTALL)
-
-###########################################################
-#
 # check MACOSX vs. Linux for flexbisonparse driver
 #
 ###########################################################
