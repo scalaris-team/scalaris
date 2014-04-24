@@ -176,7 +176,8 @@
 
 -define(CBMODULES, [{gossip_load, default}]). % callback modules as list
 
--define(FIRST_TRIGGER_DELAY, 2). % delay in s for first trigger
+% for developement, should be disabled for production
+-define(FIRST_TRIGGER_DELAY, 0). % delay in s for first trigger
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
