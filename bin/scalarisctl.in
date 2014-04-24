@@ -125,6 +125,10 @@ fix_paths() {
         SCALARISCLIENT_PYTHON="$SCALARISDIR/python-api/scalaris_client.py"
         SCALARISCLIENT_PYTHON3="$SCALARISDIR/python3-api/scalaris_client.py"
         SCALARISCLIENT_RUBY="$SCALARISDIR/ruby-api/scalaris_client.rb"
+    else
+        if [ ! -d "$LOGDIR" -o ! -w "$LOGDIR" ] ; then
+            LOGDIR="$HOME/.scalaris/log"
+        fi
     fi
 }
 
