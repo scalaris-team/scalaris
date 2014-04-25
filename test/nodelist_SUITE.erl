@@ -33,7 +33,7 @@ all() ->
      test_update_ids, test_to_list, test_lupdate_ids, test_lremove_outdated,
      tester_largest_smaller_than2, largest_smaller_than2,
      tester_largest_smaller_than3, largest_smaller_than3,
-     test_node_succ_id].
+     test_succ_ord_id].
 
 suite() -> [ {timetrap, {seconds, 40}} ].
 
@@ -2726,7 +2726,7 @@ largest_smaller_than3(_Config) ->
       1, 1, 2, {node, proc3, 3, 1, 8000})
 .
 
-test_node_succ_id(_Config) ->
+test_succ_ord_id(_Config) ->
     ?assert(nodelist:succ_ord_id(5, 6, 3)),
     ?assert(nodelist:succ_ord_id(6, 5, 3) =:= false),
     ?assert(nodelist:succ_ord_id(5, 6, 7)),
