@@ -32,7 +32,8 @@ all() ->
      test_filter_min_length4, test_merge, test_add_node, test_add_nodes,
      test_update_ids, test_to_list, test_lupdate_ids, test_lremove_outdated,
      tester_largest_smaller_than2, largest_smaller_than2,
-     tester_largest_smaller_than3, largest_smaller_than3].
+     tester_largest_smaller_than3, largest_smaller_than3,
+     test_node_succ_id].
 
 suite() -> [ {timetrap, {seconds, 40}} ].
 
@@ -2724,3 +2725,21 @@ largest_smaller_than3(_Config) ->
       [{node, proc2, 5, 0, 8000}, {node, proc3, 3, 1, 8000}],
       1, 1, 2, {node, proc3, 3, 1, 8000})
 .
+
+test_node_succ_id(_Config) ->
+    ?assert(nodelist:succ_ord_id(5, 6, 3)),
+    ?assert(nodelist:succ_ord_id(6, 5, 3) =:= false),
+    ?assert(nodelist:succ_ord_id(5, 6, 7)),
+    ?assert(nodelist:succ_ord_id(6, 5, 7) =:= false),
+
+    ?assert(nodelist:succ_ord_id(5, 5, 5)),
+    ?assert(nodelist:succ_ord_id(5, 5, 6)),
+    ?assert(nodelist:succ_ord_id(5, 5, 4)),
+
+    ?assert(nodelist:succ_ord_id(?RT:n(), 4, 5)),
+    ?assert(nodelist:succ_ord_id(?RT:n(), ?MINUS_INFINITY, 5)),
+    ?assert(nodelist:succ_ord_id(4, ?RT:n(), 5) =:= false),
+    ?assert(nodelist:succ_ord_id(?MINUS_INFINITY, ?RT:n(), 5) =:= false),
+
+    ?assert(nodelist:succ_ord_id(4, 8, 4)),
+    ?assert(nodelist:succ_ord_id(8, 4, 4) =:= false).
