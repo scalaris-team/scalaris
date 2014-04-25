@@ -50,7 +50,7 @@ prop_add_keys(BaseKey, Size, Values0) ->
     H2 = lists:foldl(fun histogram_rt:add/2, H, Values),
     %% check results
     SortedValues = lists:sort(fun(Val, Val2) ->
-                                      nodelist:succ_ord_id(Val, Val2, BaseKey)
+                                      succ_ord_key(Val, Val2, BaseKey)
                               end, Values),
     %ct:pal("BaseKey: ~p SortedValues: ~p Result: ~p", [BaseKey, SortedValues, histogram_rt:get_data(H2)]),
     Result = lists:map(fun(Value) -> {Value, 1} end, SortedValues),
@@ -70,12 +70,12 @@ prop_merge_keys(BaseKey, Key1, Key2) ->
     case Key1 =:= Key2 of
         true -> SplitKey = Key1;
         false ->
-            case nodelist:succ_ord_id(Key1, Key2, BaseKey) of
+            case succ_ord_key(Key1, Key2, BaseKey) of
                 true -> SplitKey = ?RT:get_split_key(Key1, Key2, {1,2});
                 false -> SplitKey = ?RT:get_split_key(Key2, Key1, {1,2})
             end
     end,
-    %ct:pal("Key1: ~p Key2: ~p BaseKey: ~p SplitKey: ~p Result: ~p, Raw: ~p", [Key1, Key2, BaseKey, SplitKey, histogram_rt:get_data(H3), histogram:get_data(element(1, H3))]),
+    %ct:pal("Key1: ~p (Range: ~p) Key2: ~p (Range: ~p) BaseKey: ~p SplitKey: ~p Result: ~p, Raw: ~p", [Key1, ?RT:get_range(Key1, BaseKey), Key2, ?RT:get_range(Key2, BaseKey), BaseKey, SplitKey, histogram_rt:get_data(H3), histogram:get_data(element(1, H3))]),
     ?compare(fun(Actual, Expected) -> check_result(Actual, Expected, BaseKey) end, histogram_rt:get_data(H3), [{SplitKey, 2}]),
     true.
 
@@ -94,12 +94,20 @@ check_elements([], [], _BaseKey) ->
     true;
 check_elements([{El1, Count1} | Rest], [{El2, Count2} | Rest2], BaseKey) ->
     %ct:pal("El: ~p, El2:~p", [El1, El2]),
-    case nodelist:succ_ord_id(El1, El2, BaseKey) of
+    case succ_ord_key(El1, El2, BaseKey) of
         true -> Range = ?RT:get_range(El1, El2);
         false -> Range = ?RT:get_range(El2, El1)
     end,
     %ct:pal("Range: ~p", [Range]),
-    %ct:pal("Check: ~p", [Range < Epsilon orelse Range == ?RT:n()]),
+    %ct:pal("Check: ~p", [Range < ?EPSILON orelse El1 =:= El2]),
     ?assert(Range < ?EPSILON orelse El1 =:= El2),
     ?equals(Count1, Count2),
     check_elements(Rest, Rest2, BaseKey).
+
+%% @doc Like nodelist:succ_ord_id/3 but here the BaseKey is the biggest
+%% possible key and not the smallest.
+-spec succ_ord_key(K1::?RT:key(), K2::?RT:key(), BaseKey::?RT:key()) -> boolean().
+succ_ord_key(K1, K2, BaseKey) ->
+    (K1 > BaseKey andalso K2 > BaseKey andalso K1 =< K2) orelse
+    (K1 < BaseKey andalso K2 =< BaseKey andalso K1 =< K2) orelse
+    (K1 > BaseKey andalso K2 =< BaseKey).
