@@ -1,6 +1,10 @@
 Scalaris 0.6.1+svn
 ============================================================
 
+API:
+
+- Java-API: integrate new OtpErlang library (1.5.9 from Erlang 17.0)
+
 Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
                                  and Contrail http://contrail-project.eu):
 
