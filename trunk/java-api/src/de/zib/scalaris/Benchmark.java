@@ -390,8 +390,8 @@ public class Benchmark {
         }
 
         @Override
-        protected void pre_init() throws Exception {
-            final Transaction tx_init = new Transaction();
+        protected void pre_init(final Connection conn) throws Exception {
+            final Transaction tx_init = new Transaction(conn);
             tx_init.write(key, 0);
             tx_init.commit();
             tx_init.closeConnection();
@@ -516,12 +516,12 @@ public class Benchmark {
 
         @SuppressWarnings("unchecked")
         @Override
-        protected void pre_init() throws Exception {
+        protected void pre_init(final Connection conn) throws Exception {
             final T[] valueInit = (T[]) Array.newInstance(value.getClass(), keys.length);
             for (int i = 0; i < keys.length; ++i) {
                 valueInit[i] = (T) getRandom(BENCH_DATA_SIZE, value.getClass());
             }
-            final Transaction tx_init = new Transaction();
+            final Transaction tx_init = new Transaction(conn);
             final Transaction.RequestList reqs = new Transaction.RequestList();
             for (int i = 0; i < keys.length; ++i) {
                 reqs.addOp(new WriteOp(keys[i], valueInit[i]));
@@ -691,8 +691,8 @@ public class Benchmark {
         }
 
         @Override
-        protected void pre_init(final int j) throws Exception {
-            final Transaction tx_init = new Transaction();
+        protected void pre_init(final Connection conn, final int j) throws Exception {
+            final Transaction tx_init = new Transaction(conn);
             final Transaction.RequestList reqs = new Transaction.RequestList();
             reqs.addOp(new WriteOp(key + '_' + j, valueInit)).addCommit();
             final Transaction.ResultList results = tx_init.req_list(reqs);
@@ -880,18 +880,26 @@ public class Benchmark {
         /**
          * Will be called before the benchmark starts.
          *
+         * @param conn
+         *            connection to use
+         *
          * @throws Exception
          */
-        protected void pre_init() throws Exception {
+        protected void pre_init(final Connection conn) throws Exception {
         }
 
         /**
          * Will be called before the benchmark starts with all possible
          * variations of "j" in the {@link #operation(int)} call.
          *
+         * @param conn
+         *            connection to use
+         * @param j
+         *            the index {@link #operation(int)} will be called with
+         *
          * @throws Exception
          */
-        protected void pre_init(final int j) throws Exception {
+        protected void pre_init(final Connection conn, final int j) throws Exception {
         }
 
         /**
@@ -923,23 +931,29 @@ public class Benchmark {
         @Override
         final public void run() {
             Thread.currentThread().setName("BenchRunnable-" + key);
-            for (int retry = 0; (retry < 3) && !stop; ++retry) {
-                try {
-                    pre_init();
-                    for (int j = 0; j < operations; ++j) {
-                        pre_init(j);
+            try {
+                final Connection conn = ConnectionFactory.getInstance()
+                        .createConnection();
+                for (int retry = 0; (retry < 3) && !stop; ++retry) {
+                    try {
+                        pre_init(conn);
+                        for (int j = 0; j < operations; ++j) {
+                            pre_init(conn, j);
+                        }
+                        testBegin();
+                        init();
+                        for (int j = 0; j < operations; ++j) {
+                            operation(j);
+                        }
+                        cleanup();
+                        this.speed = testEnd(operations);
+                        break;
+                    } catch (final Exception e) {
+                        // e.printStackTrace();
                     }
-                    testBegin();
-                    init();
-                    for (int j = 0; j < operations; ++j) {
-                        operation(j);
-                    }
-                    cleanup();
-                    this.speed = testEnd(operations);
-                    break;
-                } catch (final Exception e) {
-                    // e.printStackTrace();
                 }
+            } catch (final Exception e) {
+                // e.printStackTrace();
             }
         }
 
