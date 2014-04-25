@@ -118,19 +118,19 @@ find_smallest_interval(_Config) ->
     H1a = histogram:create(10),
     Values1a = [3.5, 3.0, 2.0, 1.0],
     H1b = lists:foldl(fun histogram:add/2, H1a, Values1a),
-    ?equals(3, histogram:find_smallest_interval(histogram:get_data(H1b))),
+    ?equals(3.0, histogram:find_smallest_interval(histogram:get_data(H1b))),
     Values2a = [4.0, 2.5, 2.0, 1.0],
     H2b = lists:foldl(fun histogram:add/2, H1a, Values2a),
-    ?equals(2, histogram:find_smallest_interval(histogram:get_data(H2b))),
+    ?equals(2.0, histogram:find_smallest_interval(histogram:get_data(H2b))),
     ok.
 
 merge_interval(_Config) ->
     H = histogram:create(10),
     Values = [3.5, 3.0, 2.0, 1.0],
     H2 = lists:foldl(fun histogram:add/2, H, Values),
-    MinInterval = histogram:find_smallest_interval(histogram:get_data(H2)),
-    H3 = histogram:merge_interval(MinInterval, 1, histogram:get_data(H2)),
-    ?equals(3, MinInterval),
+    MinFirstValue = histogram:find_smallest_interval(histogram:get_data(H2)),
+    H3 = histogram:merge_interval(MinFirstValue, histogram:get_data(H2)),
+    ?equals(3.0, MinFirstValue),
     ?equals(H3, [{1.0,1}, {2.0,1}, {3.25,2}]),
     ok.
 
