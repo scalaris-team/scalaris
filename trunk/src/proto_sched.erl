@@ -435,7 +435,7 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
             %% still waiting for all threads to join
             ?DBG_ASSERT2(UMsg =:= {thread_release_to_run}, wrong_starting_msg),
             lists:keystore(TraceId, 1, State, {TraceId, TmpEntry});
-        {delivered, FromGPid, _Ref, _Time} ->
+        {delivered, FromGPid, _Ref, _DeliverTime} ->
             %% only From is allowed to enqueue messages
             %% only when delivered or to_be_cleaned (during execution
             %% of a scheduled piece of code) new arbitrary messages
