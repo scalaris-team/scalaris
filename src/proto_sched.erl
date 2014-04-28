@@ -161,7 +161,7 @@
          :: msg_delay_queues(),
          status                  = ?required(state, status)
          :: new | stopped | running
-          | {delivered, comm:mypid(), reference()},
+          | {delivered, comm:mypid(), reference(), erlang_timestamp()},
          to_be_cleaned           = ?required(state, to_be_cleaned)
          :: false | {to_be_cleaned, pid()},
          passed_state            = ?required(state, passed_state)
@@ -363,7 +363,9 @@ start_link(ServiceGroup) ->
                               {pid_groups_join_as, ServiceGroup, ?MODULE}]).
 
 -spec init(any()) -> state().
-init(_Arg) -> [].
+init(_Arg) ->
+    msg_delay:send_trigger(1, {check_slow_handler_trigger}),
+    [].
 
 -spec on(send_event() | comm:message(), state()) -> state().
 on({thread_begin, TraceId, Client}, State) ->
@@ -433,7 +435,7 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
             %% still waiting for all threads to join
             ?DBG_ASSERT2(UMsg =:= {thread_release_to_run}, wrong_starting_msg),
             lists:keystore(TraceId, 1, State, {TraceId, TmpEntry});
-        {delivered, FromGPid, _Ref} ->
+        {delivered, FromGPid, _Ref, _Time} ->
             %% only From is allowed to enqueue messages
             %% only when delivered or to_be_cleaned (during execution
             %% of a scheduled piece of code) new arbitrary messages
@@ -479,7 +481,7 @@ on({deliver, TraceId}, State) ->
             State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, _ToPid, _Ref} ->
+                {delivered, _ToPid, _Ref, _Time} ->
                     ?TRACE("There is already message delivered to ~.0p",
                            [_ToPid]),
                     erlang:throw(proto_sched_already_in_delivered_mode);
@@ -515,7 +517,8 @@ on({deliver, TraceId}, State) ->
                                        = NumPossible * TmpEntry#state.num_possible_executions,
                                       status = {delivered,
                                                 comm:make_global(To),
-                                                Monitor},
+                                                Monitor,
+                                                os:timestamp()},
                                       num_delivered_msgs
                                        = 1 + TmpEntry#state.num_delivered_msgs,
                                       delivered_msgs
@@ -556,7 +559,7 @@ on({on_handler_done, TraceId, _Tag, To}, State) ->
              State;
          {TraceId, TraceEntry} ->
              case TraceEntry#state.status of
-                 {delivered, To, Ref} ->
+                 {delivered, To, Ref, _Time} ->
                      %% this delivered was done, so we can schedule a new msg.
                      erlang:demonitor(Ref),
 
@@ -595,7 +598,7 @@ on({send_error, Pid, Msg, _Reason} = _ShepherdMsg, State) ->
         false -> State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, Pid, _Ref} ->
+                {delivered, Pid, _Ref, _Time} ->
                     %% send error, generate on_handler_done
                     gen_component:post_op({on_handler_done, TraceId, send_error, Pid}, State);
                 _  ->
@@ -673,7 +676,7 @@ on({cleanup, TraceId, CallerPid}, State) ->
             State;
         {TraceId, TraceEntry} ->
             case TraceEntry#state.status of
-                {delivered, _To, _Ref} ->
+                {delivered, _To, _Ref, _Time} ->
                     ?TRACE("proto_sched:on({cleanup, ~p, ~p}) set status to to_be_cleaned.", [TraceId, CallerPid]),
                     NewEntry = TraceEntry#state{
                                  to_be_cleaned = {to_be_cleaned, CallerPid}},
@@ -705,7 +708,8 @@ on({'DOWN', Ref, process, Pid, Reason}, State) ->
     %% search for trace with status delivered, Pid and Ref
     StateTail = lists:dropwhile(fun({_TraceId, X}) ->
                                         case X#state.status of
-                                            {delivered, _Pid, Ref} -> false;
+                                            {delivered, _Pid, Ref, _Time} ->
+                                                false;
                                             _ -> true
                                         end end,
                                 State),
@@ -719,7 +723,53 @@ on({'DOWN', Ref, process, Pid, Reason}, State) ->
             gen_component:post_op({on_handler_done,
                                      element(1, TraceEntry),
                                      pid_ended_died_or_killed, comm:make_global(Pid)}, State)
-    end.
+    end;
+
+on({check_slow_handler_trigger}, State) ->
+    msg_delay:send_trigger(1, {check_slow_handler_trigger}),
+    gen_component:post_op({check_slow_handler_action}, State);
+
+on({check_slow_handler_action}, State) ->
+    %% check for delivered messages that take longer than a second
+    %% and output diagnostic information on it.
+
+    %% trace id
+    %% executing process
+    %% message to process
+    %% amount of time the response is pending
+    %% current function of the process delivered to (when local)
+    [ case TState#state.status of
+          {delivered, GPid, _Ref, StartTime} ->
+              Delta = timer:now_diff(os:timestamp(), StartTime) div 1000000,
+              case 1 =< Delta of
+                  true ->
+                      LPid = comm:make_local(GPid),
+                      log:log("proto_sched: Msg takes longer than ~p s to process:~n"
+                              "TraceId: ~p~n"
+                              "Process: ~p (~p)~n"
+                              "DeliMsg: ~10000.0p~n"
+                              "Msg No:  ~p~n"
+                              "StackTr: ~p~n",
+                              [ Delta,
+                                TId,
+                                GPid, pid_groups:group_and_name_of(LPid),
+                                hd(TState#state.delivered_msgs),
+                                TState#state.num_delivered_msgs,
+                                try erlang:process_info(LPid,
+                                                        current_stacktrace)
+                                catch error:badarg ->
+                                        %% older erlang version
+                                        %% -> fall back to current function
+                                        erlang:process_info(LPid,
+                                                            current_function)
+                                end
+                              ]);
+                  _ -> ok
+              end;
+          _ -> ok
+      end
+      || {TId, TState} <- State ],
+    State.
 
 passed_state_new(TraceId, Logger) ->
     {TraceId, Logger}.
