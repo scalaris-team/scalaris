@@ -25,6 +25,10 @@ Requires:       screen
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-parsetools, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
 Requires:       erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl, erlang-os_mon
+%if 0%{?fedora_version} >= 19
+BuildRequires:  erlang-js
+Requires:       erlang-js
+%endif
 BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
@@ -48,6 +52,10 @@ Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %if 0%{?suse_version}
 BuildRequires:  erlang >= R13B01
 Requires:       erlang >= R13B01
+%if 0%{?suse_version} >= 1110
+BuildRequires:  erlang-erlang_js
+Requires:       erlang-erlang_js
+%endif
 BuildRequires:  pkg-config
 Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
