@@ -2,7 +2,16 @@ scalaris-bindings (0.7.0+svn-1) unstable; urgency=low
 
   * svn snapshot from trunk
 
- -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
+ -- Nico Kruber <kruber@zib.de>  Mon, 28 Apr 2014 12:00:00 +0200
+
+scalaris-bindings (0.7.0-1) stable; urgency=low
+
+  * API:
+    - Java-API: integrate new OtpErlang library (1.5.9 from Erlang 17.0)
+  * Bugs:
+    - fix numerous more (less severe) bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 28 Apr 2014 12:00:00 +0200
 
 scalaris-bindings (0.6.1-1) stable; urgency=low
 

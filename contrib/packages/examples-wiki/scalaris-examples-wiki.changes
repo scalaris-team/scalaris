@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Mon Apr 28 10:00:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.0
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/
+     and Contrail http://contrail-project.eu):
+    - add support for reading 7z dumps
+  * Bugs:
+    - fix numerous more (less severe) bugs
+
+-------------------------------------------------------------------
 Fri Oct 11 13:00:00 UTC 2013 - kruber@zib.de
 
 - Scalaris 0.6.1

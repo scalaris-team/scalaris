@@ -2,7 +2,18 @@ scalaris-examples-wiki (0.7.0+svn-1) unstable; urgency=low
 
   * svn snapshot from trunk
 
- -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 21:20:13 +0200
+ -- Nico Kruber <kruber@zib.de>  Mon, 28 Apr 2014 12:00:00 +0200
+
+scalaris-examples-wiki (0.7.0-1) stable; urgency=low
+
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/
+     and Contrail http://contrail-project.eu):
+    - add support for reading 7z dumps
+  * Bugs:
+    - fix numerous more (less severe) bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 28 Apr 2014 12:00:00 +0200
 
 scalaris-examples-wiki (0.6.0-1) stable; urgency=low
 
