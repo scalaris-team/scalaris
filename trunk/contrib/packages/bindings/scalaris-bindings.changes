@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Mon Apr 28 10:00:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.0
+  * API:
+    - Java-API: integrate new OtpErlang library (1.5.9 from Erlang 17.0)
+  * Bugs:
+    - fix numerous more (less severe) bugs
+
+-------------------------------------------------------------------
 Fri Oct 11 13:00:00 UTC 2013 - kruber@zib.de
 
 - Scalaris 0.6.1

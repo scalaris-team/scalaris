@@ -1,4 +1,73 @@
 -------------------------------------------------------------------
+Mon Apr 28 10:00:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.0
+  * API:
+    - Java-API: integrate new OtpErlang library (1.5.9 from Erlang 17.0)
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/
+     and Contrail http://contrail-project.eu):
+    - add support for reading 7z dumps
+  * Business Logic
+    (partly supported by the EU project IES Cities http://iescities.eu/
+     and the EIT ICT Labs project MCData):
+    - add an experimental Map-Reduce framework on top of Scalaris
+    - add experimental support for active load balancing with Karger and
+      Ruhl's algorithm including more flexible "load" definitions
+    - rrepair: completely new merkle tree sync protocol with an order of
+               magnitude lower traffic costs (use dynamic signature sizes based
+               on a "recon probability of one error" (p1e) in the leaf nodes)
+    - rrepair: add a trivial probabilistic reconciliation protocol using the
+               "recon probability of one error" (p1e)
+    - rrepair: replace bloom_fpr parameter with a generic "recon probability of
+               one error" (p1e)
+    - rrepair: add a trivial reconciliation phase for the differences identified
+               by bloom
+    - rrepair: more efficient resolve also including a list of keys to request
+    - gossip: completely new (more flexible) gossip framework
+    - slide: add support for 'jump' operations
+    - slide: do not create a timer for each received message (use a periodic
+             cleanup)
+    - comm_layer: tune TCP connection parameters to increase throughput and
+                  latency (no delay_send)
+    - comm_layer: close idle TCP connections, support for no_keep_alive
+                  connections (used by cyclon, for example)
+    - comm_layer: try to bundle more messages
+    - node join: less overhead during joins, especially in small rings
+    - rm_tman: less overhead by not adding nodes in the cache to the dn_cache
+    - rt_chord: skip trying to contact nodes in the own range
+    - rt_chord: stop stabilize when the own node is reached
+  * Infrastructure:
+    - intervals: more compact (and transfer-friendly) representation
+    - trigger: replace modules with msg_delay:send_trigger/2
+    - config: replace implementation with a public ets table
+    - tune the garbage collection of some core processes and periodically
+      garbage collect all processes
+    - reduce the number of generated atoms and the number of ets tables used
+    - several smaller performance optimisations
+    - support for Erlang R13B01 up to 17.0 and current otp master
+  * Tests:
+    - improve test coverage (manual tests and random tests)
+    - change test definitions and allow groups of tests, e.g.
+      test (default), test-skipped,
+      all_TESTS, all_with_cover_TESTS, performance_TESTS, proto_sched_TESTS,
+      type_check_TESTS
+  * Documentation:
+    - add rrepair documentation
+  * Tools:
+    - proto_sched: new API, better determinism, more strict self-control
+    - proto_sched: support for short-lived processes
+    - proto_sched: more information in get_infos
+    - trace_mpath: more flexible LaTeX exports with more detailed message info
+    - trace_mpath: support meaningful PID names when tracing remote messages
+    - tester: full support for Erlang 17.0
+    - make: re-compile after Emakefile changes
+  * Bugs:
+    - rrepair: fix unnecessary feedback for KVV items of the same version
+    - bulkowner: some fixes for (gracefully) leaving nodes
+    - fix numerous more (less severe) bugs
+
+-------------------------------------------------------------------
 Fri Oct 11 13:00:00 UTC 2013 - kruber@zib.de
 
 - Scalaris 0.6.1
