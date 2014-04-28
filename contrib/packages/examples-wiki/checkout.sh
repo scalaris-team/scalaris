@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.7.0+svn"
+SCALARIS_VERSION="0.7.0"
 date=`date +"%Y%m%d"`
 name="scalaris-examples-wiki" # folder base name (without version)
 url="http://scalaris.googlecode.com/svn/trunk/contrib/wikipedia"
