@@ -15,7 +15,7 @@ Description: Java-API and Java-Client for scalaris
 Package: scalaris-ruby
 Section: ruby
 Architecture: all
-Depends: ruby, ruby-dev, ruby-json (>= 1.4.1)
+Depends: ruby, ruby-dev, ruby-json (>= 1.4.1), rubygems-integration
 Description: Ruby-API and Ruby-client for scalaris
  Ruby bindings and Ruby command line client for scalaris.
 
