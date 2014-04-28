@@ -163,10 +163,10 @@ childs(Options) ->
         end,
     %% order in the following list is the start order
     BasicServers = [TraceMPath,
-                    ProtoSched,
                     Logger,
                     ClientsDelayer,
                     BasicServicesDelayer,
+                    ProtoSched,
                     ClientsMonitor,
                     Top,
                     Monitor,
