@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+ - Copyright 2012 Zuse Institute Berlin
+ - Contact: kruber@zib.de
+ -
+ - Licensed under the Apache License, Version 2.0 (the "License");
+ - you may not use this file except in compliance with the License.
+ - You may obtain a copy of the License at
+ -
+ -     http://www.apache.org/licenses/LICENSE-2.0
+ -
+ - Unless required by applicable law or agreed to in writing, software
+ - distributed under the License is distributed on an "AS IS" BASIS,
+ - WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ - See the License for the specific language governing permissions and
+ - limitations under the License.
+ - - - - - - -w - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+-->
+<probe-config xmlns="org.ow2.jasmine.probe:probe-config"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="org.ow2.jasmine.probe:probe-config
+                                  http://jasmine.ow2.org/xsds/probe-config-1.4.xsd">
+
+  <!-- outputs -->
+  <output name="stdio" type="console" default="true" />
+  <output name="log1" type="file">
+    <property key="path" value="scalaris.csv"/>
+  </output>
+
+  <!-- Scalaris Java JMX target -->
+  <target name="scalaris" type="jmx">
+    <property key="url" value="service:jmx:rmi:///jndi/rmi://localhost:14193/jmxrmi"/>
+  </target>
+
+  <!-- Scalaris Java JMX node indicators -->
+  <indicator name="ScalarisNode_CurLatencyAvg" type="jmx">
+    <property key="target" value="scalaris"/>
+    <property key="mbean" value="de.zib.scalaris:type=MonitorNode"/>
+    <property key="attr" value="CurLatencyAvg"/>
+  </indicator>
+  <indicator name="ScalarisNode_CurLatencyStddev" type="jmx">
+    <property key="target" value="scalaris"/>
+    <property key="mbean" value="de.zib.scalaris:type=MonitorNode"/>
+    <property key="attr" value="CurLatencyStddev"/>
+  </indicator>
+  
+  <!-- Scalaris Java JMX service indicators -->
+  <indicator name="ScalarisService_CurLatencyAvg" type="jmx">
+    <property key="target" value="scalaris"/>
+    <property key="mbean" value="de.zib.scalaris:type=MonitorService"/>
+    <property key="attr" value="CurLatencyAvg"/>
+  </indicator>
+  <indicator name="ScalarisService_CurLatencyStddev" type="jmx">
+    <property key="target" value="scalaris"/>
+    <property key="mbean" value="de.zib.scalaris:type=MonitorService"/>
+    <property key="attr" value="CurLatencyStddev"/>
+  </indicator>
+  <indicator name="ScalarisService_LoadEstimate" type="jmx">
+    <property key="target" value="scalaris"/>
+    <property key="mbean" value="de.zib.scalaris:type=MonitorService"/>
+    <property key="attr" value="TotalLoad"/>
+  </indicator>
+
+  <!-- Scalaris Java JMX probe -->
+  <probe id="ScalarisProbe" status="started">
+    <output>stdio</output>
+    <output>log1</output>
+    <indicator>ScalarisNode_CurLatencyAvg</indicator>
+    <indicator>ScalarisNode_CurLatencyStddev</indicator>
+    <indicator>ScalarisService_CurLatencyAvg</indicator>
+    <indicator>ScalarisService_CurLatencyStddev</indicator>
+    <indicator>ScalarisService_LoadEstimate</indicator>
+  </probe>
+</probe-config>

@@ -1,0 +1,79 @@
+# Trivial Reconciliation 
+# by Nico Kruber
+
+.PS
+copy "sequence.pic";
+
+# Objects
+actor(U, "");
+object(A,"A:RR");
+placeholder_object(Dummy0); # more space
+placeholder_object(AA);
+placeholder_object(Dummy1); # more space
+placeholder_object(Dummy2); # more space
+placeholder_object(BB);
+placeholder_object(Dummy3); # more space
+object(B,"B:RR");
+step();
+
+# STEP 1
+message(U,A,"request_sync"); active(A);
+async(); # use asynchrone messages (non-filled arrowheads)
+message(A,B,"start_recon(interval I\sbA\eb)"); 
+inactive(A);
+active(B);
+
+# STEP 2
+sync();
+create_message(B,BB,"B:RC");
+async();
+message(B,BB,"create_struct(I\sbA\eb)"); 
+inactive(B); active(BB);
+step();
+
+comment(BB,GET_DB,0.8 left 1.0, wid 1.6 ht 0.25 \
+        "get data from DB");
+
+message(BB,A,"continue_recon(S := {I\sbAB\eb, K\sbSize\eb, V\sbSize\eb, CKV(\*b(I\sbAB\eb))})");
+comment(BB,BUILD_TRIVIAL,0.0 right 0.2, wid 1.8 ht 0.45 \
+        "create compressed"\
+        "key-version binary");
+inactive(BB);
+active(A);
+sync();
+create_message(A,AA,"A:RC");
+async();
+message(A,AA,"start_recon(S)");
+inactive(A);
+active(AA);
+step();
+connect_to_comment(AA,GET_DB);
+message(AA,A,"request_resolve(\*D \ Reg(A,B))");
+active(A);
+message(AA,BB,"resolve_req(V\sbSize\eb, CK(Reg(A,B)))");
+active(BB);
+comment(BB,RESOLVE_CK,0.0 right 0.2, wid 2.25 ht 0.225 \
+        "decode compressed keys");
+complete(AA);
+drawx(AA);
+begin_frame(A,F,"key_upd_s");
+end_frame(A,F);
+message(BB,B,"request_resolve(Reg(A,B))");
+complete(BB);
+drawx(BB);
+inactive(A);
+active(B);
+step();
+begin_frame(B,F,"key_upd_s");
+end_frame(B,F);
+step();
+inactive(B);
+
+
+# CLEAN UP
+step();
+complete(A);
+complete(B);
+complete(U);
+
+.PE

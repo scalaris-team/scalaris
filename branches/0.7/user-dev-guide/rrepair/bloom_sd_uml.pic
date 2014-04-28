@@ -1,0 +1,81 @@
+# Bloom Reconciliation 
+# by Maik Lange, Nico Kruber
+
+.PS
+copy "sequence.pic";
+
+# Objects
+actor(U, "");
+object(A,"A:RR");
+placeholder_object(Dummy0); # more space
+placeholder_object(AA);
+placeholder_object(Dummy1); # more space
+placeholder_object(Dummy2); # more space
+placeholder_object(BB);
+placeholder_object(Dummy3); # more space
+object(B,"B:RR");
+step();
+
+# STEP 1
+message(U,A,"request_sync"); active(A);
+async(); # use asynchrone messages (non-filled arrowheads)
+message(A,B,"start_recon(interval I\sbA\eb)"); 
+inactive(A);
+active(B);
+
+# STEP 2
+sync();
+create_message(B,BB,"B:RC");
+async();
+message(B,BB,"create_struct(I\sbA\eb)"); 
+inactive(B); active(BB);
+step();
+
+comment(BB,GET_DB,0.8 left 1.0, wid 1.6 ht 0.25 \
+        "get data from DB");
+
+message(BB,A,"continue_recon(S := {I\sbAB\eb, bloom filter BF(\*b(I\sbAB\eb))})");
+comment(BB,BUILD_BLOOM,0.0 right 0.2, wid 1.7 ht 0.25 \
+        "create bloom filter");
+inactive(BB);
+active(A);
+sync();
+create_message(A,AA,"A:RC");
+async();
+message(A,AA,"start_recon(S)");
+inactive(A);
+active(AA);
+step();
+connect_to_comment(AA,GET_DB);
+message(AA,BB,"resolve_req({K\sbSize\eb, V\sbSize\eb, CKV(\*D \ Reg(A,B))})");
+inactive(AA);
+active(BB);
+step();
+message(BB,B,"request_resolve(Upd(*,*))");
+active(B);
+message(BB,AA,"resolve_req(V\sbSize\eb, CK(Reg(B,A)))");
+active(AA);
+comment(AA,RESOLVE_CH,0.0 left 0.2, wid 2.25 ht 0.225 \
+        "decode compressed keys");
+complete(BB);
+drawx(BB);
+begin_frame(B,F,"key_upd_s");
+end_frame(B,F);
+message(AA,A,"request_resolve(Reg(B,A))");
+complete(AA);
+drawx(AA);
+inactive(B);
+active(A);
+step();
+begin_frame(A,F,"key_upd_s");
+end_frame(A,F);
+step();
+inactive(A);
+
+# CLEAN UP
+step();
+complete(A);
+complete(B);
+complete(U);
+
+.PE

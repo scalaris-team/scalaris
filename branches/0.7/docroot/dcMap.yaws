@@ -1,0 +1,18 @@
+<erl>
+% vim: set ft=erlang:
+out(_A) ->
+    {Nodes, Centroids, Epoch, Radius} = webhelpers:getDCClustersAndNodes(),
+
+    NodesJSON = webhelpers:format_nodes(Nodes),
+    CentroidsJSON = webhelpers:format_centroids(Centroids),
+
+    %% this is actually json, but we\"ll trick yaws. YAWS doesn\"t know json as a return
+    % atom here.
+    {html, io_lib:format("{
+        \"nodes\":~s,
+        \"centroids\":~s,
+        \"epoch\":~p,
+        \"cluster_radius\":~p
+    }",[NodesJSON, CentroidsJSON, Epoch, Radius])}
+.
+</erl>

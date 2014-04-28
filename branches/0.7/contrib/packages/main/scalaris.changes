@@ -1,0 +1,489 @@
+-------------------------------------------------------------------
+Mon Apr 28 10:00:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.0
+  * API:
+    - Java-API: integrate new OtpErlang library (1.5.9 from Erlang 17.0)
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/
+     and Contrail http://contrail-project.eu):
+    - add support for reading 7z dumps
+  * Business Logic
+    (partly supported by the EU project IES Cities http://iescities.eu/
+     and the EIT ICT Labs project MCData):
+    - add an experimental Map-Reduce framework on top of Scalaris
+    - add experimental support for active load balancing with Karger and
+      Ruhl's algorithm including more flexible "load" definitions
+    - rrepair: completely new merkle tree sync protocol with an order of
+               magnitude lower traffic costs (use dynamic signature sizes based
+               on a "recon probability of one error" (p1e) in the leaf nodes)
+    - rrepair: add a trivial probabilistic reconciliation protocol using the
+               "recon probability of one error" (p1e)
+    - rrepair: replace bloom_fpr parameter with a generic "recon probability of
+               one error" (p1e)
+    - rrepair: add a trivial reconciliation phase for the differences identified
+               by bloom
+    - rrepair: more efficient resolve also including a list of keys to request
+    - gossip: completely new (more flexible) gossip framework
+    - slide: add support for 'jump' operations
+    - slide: do not create a timer for each received message (use a periodic
+             cleanup)
+    - comm_layer: tune TCP connection parameters to increase throughput and
+                  latency (no delay_send)
+    - comm_layer: close idle TCP connections, support for no_keep_alive
+                  connections (used by cyclon, for example)
+    - comm_layer: try to bundle more messages
+    - node join: less overhead during joins, especially in small rings
+    - rm_tman: less overhead by not adding nodes in the cache to the dn_cache
+    - rt_chord: skip trying to contact nodes in the own range
+    - rt_chord: stop stabilize when the own node is reached
+  * Infrastructure:
+    - intervals: more compact (and transfer-friendly) representation
+    - trigger: replace modules with msg_delay:send_trigger/2
+    - config: replace implementation with a public ets table
+    - tune the garbage collection of some core processes and periodically
+      garbage collect all processes
+    - reduce the number of generated atoms and the number of ets tables used
+    - several smaller performance optimisations
+    - support for Erlang R13B01 up to 17.0 and current otp master
+  * Tests:
+    - improve test coverage (manual tests and random tests)
+    - change test definitions and allow groups of tests, e.g.
+      test (default), test-skipped,
+      all_TESTS, all_with_cover_TESTS, performance_TESTS, proto_sched_TESTS,
+      type_check_TESTS
+  * Documentation:
+    - add rrepair documentation
+  * Tools:
+    - proto_sched: new API, better determinism, more strict self-control
+    - proto_sched: support for short-lived processes
+    - proto_sched: more information in get_infos
+    - trace_mpath: more flexible LaTeX exports with more detailed message info
+    - trace_mpath: support meaningful PID names when tracing remote messages
+    - tester: full support for Erlang 17.0
+    - make: re-compile after Emakefile changes
+  * Bugs:
+    - rrepair: fix unnecessary feedback for KVV items of the same version
+    - bulkowner: some fixes for (gracefully) leaving nodes
+    - fix numerous more (less severe) bugs
+
+-------------------------------------------------------------------
+Fri Oct 11 13:00:00 UTC 2013 - kruber@zib.de
+
+- Scalaris 0.6.1
+  * Packaging:
+    - add ArchLinux ruby API packages
+  * API:
+    - Java-API: add Maven build support
+    - Java-API: add CircularByteArrayOutputStream#clear()
+    - Java-API: fix ConnectionPool#getConnection(timeout) throwing
+                IllegalMonitorStateException if a single ConnectionPool is used
+                by multiple threads and no more connections are available
+    - Java-API: add a "-monitor" command line parameter
+    - api_monitor: return the latency and stddev values of the micro-benchmark
+                   executed by monitor_perf for node and service performance
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
+    - separate list counters from their list partitions for a better data layout
+    - fix high memory use of the Scalaris import if the import is slow
+    - use tomcat 7.0.42
+  * Business Logic:
+    - rrepair: reduce overhead of ART reconciliation
+    - rrepair: allow resolving of multiple merkle node leaves with a single
+               resolve request
+    - rrepair: don't create resolve requests for empty intervals
+    - rrepair: reduce overhead of update_key_entry requests (use a single
+               request with all the data instead of one request for each item)
+    - rrepair: allow arbitrary intervals in interval_upd and interval_upd_send
+               resolve requests again
+    - rrepair: when hashing merkle_tree/ART children, also include the
+               represented interval (fixes indistinguishable empty leaf nodes
+               in ART)
+    - tx_tm_rtm: re-enable takeover by rtms on tm crash
+    - rt_chord: only re-build the RT if the pred or succ processes change or the
+                own new node ID is not between the new pred and succ any more
+  * Infrastructure:
+    - DB: improve performance of fold[lr] implementations by a factor of 2
+    - FD: get rid of annoying, wrongly raised log warnings
+    - RM: provide a more generic Reason for RM subscriptions
+    - RM: remove trigger infections
+    - RT: don't trigger an update when a slide finishes
+    - RT, FRT: reduce the number of messages sent on lookups
+    - log: don't exit with a badmatch if our error_logger is not the only one
+  * Tests:
+    - add protocol scheduler tests for slide, join and leave
+  * Documentation:
+    - user-dev-guide: add section on scalarisctl checkinstallation
+    - user-dev-guide: clarify the section about how to set up Scalaris
+  * Tools:
+    - proto scheduler: continue in case of send errors
+    - top: improve process messages output
+  * Bugs:
+    - node join: fix not being able to join a system with passive load balancer
+                 if the number of items in the DB is too high
+    - tx_tm_rtm: fix wrong asserts
+    - fix node resposibility check not always including message forward and
+      db_range intervals
+    - tx_tp: add missing snapshot number in tp_do_commit_abort message
+    - bulkowner: respect the nodes' DB ranges and forward requests for
+                 non-responsible ranges
+    - dn_cache: fix reporting wrong PIDs back as zombies after node reboots
+    - fix some more (less severe) bugs
+
+-------------------------------------------------------------------
+Fri Aug 16 21:20:13 UTC 2013 - kruber@zib.de
+
+- Scalaris 0.6.0 (codename "Conus scalaris")
+  * Packaging:
+    - add ArchLinux packages
+    - add support for new distribution versions
+  * API:
+    - no more timeouts in client APIs
+    - Java-API: re-worked the request and result list handling
+      -> move result processing to the operation classes
+    - Java-API: better support for custom operations
+    - Java-API: support the new partial reads:
+                ReadRandomFromListOp and ReadSublistOp
+    - Java-API: compile with "vars" debug info
+    - Java-API: integrate new OtpErlang library (1.5.8 from R16B) with fixed
+                support for compressed binaries
+    - Java-API: add back-ports from the Wiki on Scalaris demonstrator:
+      * list-change operations: ScalarisChangeListOp and
+                                ScalarisListAppendRemoveOp
+      * MultiMap classes are now in de.zib.tools
+      * CircularByteArrayOutputStream
+    - Java-API: fix hostname issues with Erlang and Java
+    - Java-API: slightly changed the delete API
+    - JSON-API: add API for auto-scale requests
+    - Python-API: add API for auto-scale requests
+    - Python-API: use default socket timeout
+    - Ruby-API: use default socket timeout
+    - all APIs: support lists of composite types
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
+    - allow monitoring via JMX in the FourCaastMonitoringPlugin
+    - support for getting random articles via the new partial read op
+    - new optimisation scheme "Buckets with Write Cache" - uses a single big
+      list to read from and the rest of the buckets to write to
+    - improve import and dump-processing (faster, more memory-efficient)
+    - add on-the-fly conversion to the different optimisation schemes during
+      import (only one prepared DB dump needed now)
+    - several UI enhancements and rendering fixes
+    - update bliki lib (includes code ported to upstream)
+    - add auto-import ability
+    - use tomcat 7.0.33
+  * Business Logic:
+    - replace common message tags with integers to reduce bandwidth
+    - more flexible read operations (easier to extend)
+    - add support for the following partial reads: random_from_list and sublist
+    - save bandwidth by not returning the full value for write operations
+      (only the version is required)
+    - new DB back-end implementation with a smaller and cleaner interface
+    - faster DB get_chunk processing
+    - tx: allow overwriting old/outdated DB entries
+    - tx: allow overwriting old/outdated write-locked entries
+    - tx: allow setting write lock on old/outdated read-locked entries
+    - tx: always reply when the majority replied during read
+    - tx: make sure that if not_found is reported to the user (while reading),
+          a write cannot go through if it is not also based on not_found
+    - tx: committing a test_and_set op on a non-existing entry now fails as well
+          (the op itself already returned the failure)
+    - tx: add a 2s delay to wait for slow learner_decide answers before cleaning
+          up (results in a faster state cleanup after the fourth response)
+    - tx: small performance improvements in several modules
+    - rm: only add alive, non-leaving nodes
+    - rm: if a predecessor crashes, start repairing the range (rrepair)
+    - rrepair: stabilised rrepair (not considered experimental any more)
+    - rrepair: also update entries with existing but outdated WriteLocks
+    - rrepair: several performance improvements
+               (bloom, merkle_tree, art and rrepair processes in general)
+    - rrepair: re-design of rr_recon
+    - rrepair: don't offload heavy work onto the dht_node (increases
+               responsiveness of the dht_node process during replica repair)
+    - rrepair: improve db_generator tool and random_bias binomial distribution
+               used for tests
+    - rrepair: support differently configured nodes (use the same reconciliation
+               structure parameters)
+    - rrepair: de-activate self-repair (a node with multiple copies of the same
+               items does not need a reconciliation structure to repair some of
+               them)
+    - rrepair: activate rrepair periodically every 10 minutes with a probability
+               of 33%
+    - slide v2.0: fewer message to initiate a slide
+    - slide v2.0: generic (asynchronous) call-backs for different ring
+                  maintenance algorithms
+    - slide v2.0: re-work handling of planned next operations, e.g. used by
+                  incremental slides
+    - slide v2.0: don't directly work on the DB any more (there may be more
+                  data needed to slide) - let dht_node_state decide
+    - slide v2.0: activate incremental join and leave operations
+    - slide v2.0: actively report graceful node shutdown to the local FD of the
+                  leaving node to inform subscribers
+    - slide v2.0: code clean-up
+    - slide v2.0: some fixes for incremental slides
+    - slide v2.0: more robust in general
+    - more smooth node joins by also reporting when a join is not possible due
+      to a running slide at the existing node
+    - passive load balancing: random selection of (equally qualified) nodes
+    - add new routing algorithms FRT-Chord (flexible routing tables) and
+      GFRT-Chord (supports proximity routing and data centers) as alternatives
+      to Chord (see rt_frtchord and rt_gfrtchord modules)
+    - add auto-scale framework, e.g. for cloud environments (supported by
+      Contrail http://contrail-project.eu/) which is able to scale the
+      deployment to maintain a given target latency of executed transactions
+    - cache config reads in the process dictionary for better performance
+    - cyclon: if the cache is empty, try one of the nodes in known_hosts
+    - add support for consistent snapshots (experimental)
+  * Infrastructure:
+    - add a daemon to monitor Scalaris via JMX
+    - disable message compression (only client values are compressed - the rest
+      is too expensive, at least on GbE)
+    - support for distributions with python3 available as "python" and
+      python2 as "python2"
+    - support for Ruby 1.9
+    - yaws 1.96 (with patch to compile on otp master and a patch to fix a
+      performance regression)
+    - support for Erlang R13B01 up to R16B01 and current otp master
+  * Tests:
+    - add test suite to find memory leaks
+    - let "make test" run the major test suites and "make test-skipped" for
+      some more (time-consuming) tests
+    - clean-up ring after timetrap timeout failures via common test hook
+    - new ?compare macro for custom comparison functions
+    - higher test coverage with more random-testing via the "tester"
+  * Documentation:
+    - user-dev-guide: add user tutorial on using scalaris
+    - user-dev-guide: add a section about the slide protocol
+    - user-dev-guide: extended description of scientific background
+    - add replica repair sequence diagrams
+    - better code descriptions
+  * Tools:
+    - gen_component: synchronous breakpoint set and delete for more
+                     deterministic usage
+    - trace_mpath: allow selective tracing via filter fun
+    - trace_mpath: fix several triggers becoming infected by trace_mpath
+                   resulting in infinite tracing
+    - trace_mpath: improve latex output of traces
+    - tester: copy dictionary to worker threads
+    - tester: add support for more types, e.g. neg_integer(), gb_rees
+    - tester: better type check error reporting
+    - tester: print tester last calls when aborting unit tests
+              (timeout or exception)
+    - tester: add support for constraints in type specs ("when is_subtype(A,B)")
+    - web debug interface: add cluster graph visualisation
+    - web debug interface: display vivaldi distance
+    - web debug interface: add IP addresses and ports to the ring charts and
+                           tables
+    - web debug interface: allow navigating to the web interfaces of shown nodes
+    - top: support for showing messages in message queue of an inspected PID
+    - top: support for showing larger dictionary values
+    - allow recursive reply_as envelopes
+    - experimental protocol scheduler to check protocols with random message
+      interleavings (see proto_sched module)
+  * Bugs:
+    - fix RM handling of (out-dated) nodes with the same ID as newly added nodes
+    - fix ganglia integration not working any more
+    - restore the ability to start nodes at a specific key via
+      "scalarisctl -k <key> ..."
+    - fix some memory leaks in the tx system
+    - fix statistics of comm_connection (not send in some cases, not
+      overflow-aware)
+    - use /bin/bash instead of /bin/sh which may not result in a bash session
+    - fix init.d scripts not checking for existing processes correctly
+    - fix dc_clustering
+    - fix numerous other bugs
+
+-------------------------------------------------------------------
+Thu Oct 11 10:30:00 UTC 2012 - kruber@zib.de
+
+- Scalaris 0.5.0 (codename "Saperda scalaris")
+  * Packaging:
+    - new init.d script to start Scalaris
+    - added chef scripts to deploy Scalaris nodes
+    - improved Windows start scripts (support for R15B01 and R15B02, don't
+      close command prompt window immediately after shutdown if
+      double-clicked)
+    - more flexible scalarisctl (arbitrary parameter order, allow setting
+      cookie, ports and number of nodes in VM via parameters, allow using
+      screen for daemonised sessions, allow graceful leave via "gstop"
+      command, new "status" command)
+    - support for new linux distributions (Fedora 17, Ubuntu 12.04,
+      openSUSE 12.2)
+    - let scalarisctl checkinstallation also perform runtime tests for the
+      APIs
+  * API:
+    - allow Scalaris monitoring via JMX through the Java API
+    - added an executor-service to the Java-API (de.zib.scalaris.executor.*)
+    - added a node discovery daemon to the Java-API
+    - allow compressed communication between the Java-API and Erlang for
+      increased performance, especially if the two are on separate nodes
+    - added VM management support to the JSON- and Python-API
+    - added transaction log filtering to the Java-API, i.e. only sent the
+      needed parts of the tlog back to Erlang and re-combine the result
+    - fixed api_tx:req_list_commit_each/1 not running requests in parallel
+      -> do not assure any order of requests, even if on same key!
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/):
+    - allow different partitioned data models for better performance and
+      scalability
+    - allow logging of user requests
+    - added support for checking whether another article exists (approximate)
+      -> show link colours based on this check
+    - added check for bad page titles
+    - allow SERVERNAME and SERVERPATH in config for setups with load
+      balancers
+    - reduced memory footprint of Wiki data in Scalaris
+    - support for newer wiki xml dumps
+    - added support for using a MediaWiki-like SQLite-DB backend for e.g.
+      filtering
+    - improved overall performance
+    - several rendering fixes
+  * Business Logic:
+    - added (experimental) support for replica repair (disabled by default)
+      (thanks to Maik Lange)
+    - added monitoring of memory statistics (also available via web
+      interface)
+    - better error reporting in the failure detector
+    - reduced message overhead by UIDs and message/tuple tags
+    - reduced overall message size of transactions:
+      * do not include the (uncompressed) value in messages of the read phase
+        of write operations
+      * do not include the value in init_TP messages
+    - allow VM-flag "first" to be set via config file
+    - gather overall connection statistics in comm_stats (also available via
+      web interface)
+    - reduced erroneous failure messages on node shutdown
+    - integrated comm_layer into comm_server
+    - better scalability in pid_groups (find processes round-robin in
+      find_a/1)
+    - several changes to improve overall performance and/or CPU time at the
+      nodes
+  * Tests:
+    - support for more types in the runtime type-checker
+    - verify several API functions via runtime type-checker (also test
+      private functions if possible!)
+  * Tools:
+    - distributed protocol visualisation via trace_mpath (text-based or
+      latex-file for graphical presentation)
+    - better profiling via top for Erlang processes
+    - better debugging, e.g. via ASCII supervisor-tree rendering in verbose
+      mode
+  * Bugs:
+    - fixed memory leaks in read and write operations
+    - fixed memory leaks in tx_tm_rtm
+    - prevent potential endless loops in tx_tm_rtm
+    - fixed inform RTMs sometimes informing the wrong RTMs
+    - fixed numerous other bugs
+
+-------------------------------------------------------------------
+Thu Mar 22 09:51:00 UTC 2012 - kruber@zib.de
+
+- Scalaris 0.4.1
+  * Packaging:
+    - new official ConPaaS packages (http://www.conpaas.eu/)
+    - install rubygem dependencies in Debian postinstall scripts for Ruby API
+    - improved Windows start scripts (if set, uses the ERLANG_HOME
+      environment variable to find Erlang, otherwise searches for Erlang in
+      common paths)
+  * Bugs:
+    - better tx cleanup (should fix rare occurance of duplicate client
+      inform)
+    - forward additional parameters of the start scripts to new syntax of
+      scalarisctl
+
+-------------------------------------------------------------------
+Wed Jan 24 23:48:00 UTC 2012 - kruber@zib.de
+
+- Scalaris 0.4.0 (codename "Pomacea scalaris")
+  * API:
+    - new functions for incremental data change:
+      test_and_set: check for a provided old value before setting a new one
+      add_on_nr: increment a numeric value
+      add_del_on_list: append or delete entries from a list value
+    - added VM API to manage Scalaris nodes inside an Erlang virtual machine
+    - added monitoring API to retrieve some live metrics
+    - added a connection pool convenience class (Java, Python)
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/):
+    - improved performance of page edits
+    - improved performance of Wikipedia dump loading
+    - several rendering fixes
+  * Business Logic:
+    - improved handling of large values by reducing overhead of transaction
+      log handling (empty TLog after commit), no copy of value in TLog
+      returned to user after read requests)
+    - eliminated timeouts in data hand-over protocol (relies on fd now)
+    - added a DB subscribe mechanism, e.g. to become informed when locks
+      are freed
+    - fixed a strong consistency issue in the tx protocol
+    - gather some run-time statistics and expose them via the APIs and the
+      web debug interface
+  * Infrastructure:
+    - support for Erlang 15B
+    - fd now also uses feedback from TCP layer
+    - made message sending more flexible (gets an option list)
+    - added and corrected several Erlang type specifications
+    - added scripts to create Scalaris images for OpenNebula
+    - added tools for using Scalaris as the Database as a Service
+      component in ConPaaS (http://www.conpaas.eu/) which is part of the
+      EU project Contrail (http://contrail-project.eu/)
+    - added a separate communication channel for priority messages, e.g. fd
+      (reduces falsely reported node crashes under heavy load)
+  * Tests:
+    - added runtime type-checker for random testing extended unittests
+  * Documentation:
+    - updated documentation to extended APIs
+  * Bugs:
+    - fixed numerous bugs
+
+-------------------------------------------------------------------
+Fri Jul 15 15:01:00 UTC 2011 - kruber@zib.de
+
+- Scalaris 0.3.0 (codename "Rhinechis Scalaris")
+  * API
+    - new API with interoperable bindings to Java, Python, Ruby, and JSON
+    - support for several data types, including strings, integers, JSON
+      objects, binary objects.
+    - new transaction interface with support for bundled requests for better
+      latency.
+    - separate APIs to access the raw DHT, a DHT with replication, and the
+      transactional DHT
+  * Demonstrator
+    - added Wikipedia-hosting using Scalaris as demonstrator application
+  * Business Logic
+    - fault-tolerant startup: start Scalaris when a quorum of the known_hosts
+      becomes available (option -q in bin/scalarisctl)
+    - perform data hand-over when nodes join/gracefully leave (also works when
+      transactions are executed concurrently)
+    - added passive load balancing (when a node joins a ring, it samples
+      several other nodes and joins at the node that balances the number of
+      stored items the most)
+    - completely rewritten transaction layer (more modular, more extendible,
+      less latency)
+    - modularized / reimplemented Paxos algorithm, so the algorithm can also
+      be used outside transactions (e.g. used for quorum-startup)
+    - switched almost all components to our component framework
+     'gen_component'
+    - added gossiping for estimating e.g. the number of nodes or the average
+      load in a ring
+    - more reliable unreliable look-up
+    - better ring start-up on slow networks
+  * Infrastructure
+    - Vivaldi and topology inference
+    - support for Erlang 13B01 and newer
+    - faster TCP/IP communication between Scalaris nodes
+    - completely rewritten failure detector framework for more accurate
+      detection of node failures
+    - added numerous Erlang type specifications
+    - extended unittests
+  * Tests
+    - added own random testing framework that reads type specifications and
+      scans the source code for constants to generate proper random test-data
+    - extended gen_component with breakpoint-support for debugging and testing
+      (perform deterministic pseudo-random message interleaving tests)
+    - added numerous unittests
+    - added language-binding interoperability tests
+  * Documentation
+    - extended, but - as always - by far not enough...
+  * Bugs
+    - fixed countless bugs

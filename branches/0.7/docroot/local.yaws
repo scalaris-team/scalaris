@@ -1,0 +1,51 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <link rel='shortcut icon' type='image/x-icon' href='/favicon.ico' />
+<erl>
+out(Arg) ->
+    {header, {cache_control, "no-cache"}}.
+</erl>
+    <title>Scalaris Management Interface</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  <!--[if lte IE 5.5999]>
+    <style type="text/css">@import url(ie55-.css);</style>
+  <![endif]-->
+  </head>
+  <body>
+
+<fieldset style="border: 1px black solid">
+
+<legend style="border: 1px black solid; margin-left: 1em; padding: 0.2em 0.8em ">Local Nodes</legend>
+
+<erl>
+make_local_link(Node) -> io_lib:format("node.yaws?group=~s", [Node]).
+
+make_a(Node) -> {a, [{href, make_local_link(Node)}], Node}.
+out(A) ->
+    Groups = pid_groups:groups(),
+    Nodes = [Group || Group <- Groups, lists:prefix("dht_node_", Group)],
+    Rows = lists:map(fun (Node) -> {tr, [], [{td, [], make_a(Node)}]} end, Nodes),
+    {ehtml, {table, [], Rows}}.
+</erl>
+</fieldset>
+
+<fieldset style="border: 1px black solid">
+<legend style="border: 1px black solid; margin-left: 1em; padding: 0.2em 0.8em ">Failure Detector</legend>
+
+</fieldset>
+
+<hr />
+<p>Last update:
+<erl>
+ out(Arg) ->
+    {Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
+</erl></p>
+</body>
+</html>

@@ -1,0 +1,72 @@
+From f79c8c8ce5ba28952d7f9406cbdf39e1aca5c197 Mon Sep 17 00:00:00 2001
+From: Nico Kruber <kruber@zib.de>
+Date: Sat, 9 Nov 2013 16:11:10 +0100
+Subject: [PATCH] rt_chord: reduce key size to 16 bits for better debugging
+
+---
+ include/scalaris.hrl |  4 ++--
+ src/rt_chord.erl     | 14 +++++++-------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/include/scalaris.hrl b/include/scalaris.hrl
+index 17fb0d2..ced216e 100644
+--- a/include/scalaris.hrl
++++ b/include/scalaris.hrl
+@@ -31,8 +31,8 @@
+ -define(MINUS_INFINITY, 0).
+ -define(MINUS_INFINITY_TYPE, 0).
+ % first invalid key:
+--define(PLUS_INFINITY, 16#100000000000000000000000000000000).
+--define(PLUS_INFINITY_TYPE, 16#100000000000000000000000000000000).
++-define(PLUS_INFINITY, 16#10000).
++-define(PLUS_INFINITY_TYPE, 16#10000).
+ 
+ %%Simple routingtable
+ %-define(RT, rt_simple).
+diff --git a/src/rt_chord.erl b/src/rt_chord.erl
+index a3260df..cb32c19 100644
+--- a/src/rt_chord.erl
++++ b/src/rt_chord.erl
+@@ -64,7 +64,7 @@ hash_key(Key) -> hash_key_(Key).
+ hash_key_(Key) when not is_binary(Key) ->
+     hash_key_(client_key_to_binary(Key));
+ hash_key_(Key) ->
+-    <<N:128>> = ?CRYPTO_MD5(Key),
++    <<N:16,_:112>> = ?CRYPTO_MD5(Key),
+     N.
+ 
+ %% @doc Generates a random node id, i.e. a random 128-bit number, based on the
+@@ -117,14 +117,14 @@ get_size(RT) ->
+ 
+ %% @doc Keep a key in the address space. See n/0.
+ -spec normalize(non_neg_integer()) -> key_t().
+-normalize(Key) -> Key band 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF.
++normalize(Key) -> Key band 16#FFFF.
+ 
+ %% @doc Returns the size of the address space.
+ -spec n() -> integer().
+ n() -> n_().
+ %% @doc Helper for n/0 to make dialyzer happy with internal use of n/0.
+--spec n_() -> 16#100000000000000000000000000000000.
+-n_() -> 16#FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF + 1.
++-spec n_() -> 16#10000.
++n_() -> 16#FFFF + 1.
+ 
+ %% @doc Gets the number of keys in the interval (Begin, End]. In the special
+ %%      case of Begin==End, the whole key range as specified by n/0 is returned.
+@@ -179,9 +179,9 @@ get_random_in_interval2('[', L, R, ']') ->
+ -spec get_replica_keys(key()) -> [key()].
+ get_replica_keys(Key) ->
+     [Key,
+-     Key bxor 16#40000000000000000000000000000000,
+-     Key bxor 16#80000000000000000000000000000000,
+-     Key bxor 16#C0000000000000000000000000000000
++     Key bxor 16#4000,
++     Key bxor 16#8000,
++     Key bxor 16#C000
+     ].
+ 
+ -spec get_key_segment(key()) -> pos_integer().
+-- 
+1.8.1.4
+

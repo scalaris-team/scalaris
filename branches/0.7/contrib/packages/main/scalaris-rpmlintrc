@@ -1,0 +1,5 @@
+addFilter("non-standard-uid.*scalaris")
+addFilter("non-standard-gid.*scalaris")
+addFilter("file-contains-current-date.*/usr/share/doc/packages/scalaris/erlang/.*\.html")
+addFilter("file-contains-date-and-time.*/usr/share/doc/packages/scalaris/erlang/.*\.html")
+addFilter("zero-length.*/etc/scalaris/scalaris.local.cfg")

@@ -1,0 +1,353 @@
+#!/bin/bash
+
+#  Copyright 2007-2011 Zuse Institute Berlin
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+# inspired by the start script of ant
+
+OTP_VERSION=1.5.9
+JAKARTA_COMMONS_VERSION=1.2
+ERL=@ERL@
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+datarootdir=@datarootdir@
+
+# Extract launch and scalaris arguments, (see details below).
+scalaris_exec_args=
+no_config=false
+scalaris_exec_debug=false
+show_help=false
+no_erl=false
+jmvopts=""
+ERLANG_HOSTNAME=${ERLANG_HOSTNAME-""}
+
+until [ -z "$1" ]; do
+  case $1 in
+    "--noconfig")
+      no_config=true
+      shift;;
+    "--noerl")
+      no_erl=true
+      shift;;
+    "--execdebug")
+      scalaris_exec_debug=true
+      shift;;
+    "-h" | "--help" | "-help")
+      show_help=true
+      scalaris_exec_args="$scalaris_exec_args --help"
+      shift;;
+    "--jvmopts")
+      shift
+      jmvopts="$jmvopts $1"
+      shift;;
+    *)
+      scalaris_exec_args="$scalaris_exec_args \"$1\""
+      shift;;
+  esac
+done
+
+# activate no_config if called in the source tree:
+ABSPATH="$(cd "${0%/*}" 2>/dev/null; echo "$PWD"/"${0##*/}")"
+DIRNAME=`dirname $ABSPATH`
+# is this a svn checkout or an (rpm/deb/manual) installation?
+if [ "$DIRNAME" != "@bindir@" -a "$DIRNAME" != "/bin" ]; then
+  no_config=true
+fi
+
+get_cookie() {
+  if [ -z "$SCALARIS_JAPI_COOKIE" ]; then
+    echo -n "$SCALARIS_JAPI_COOKIE"
+    return
+  else
+    if $no_config ; then
+      echo -n ""
+    else
+      # system config
+      . @sysconfdir@/scalaris/scalarisctl.conf
+
+      # load user scalaris configuration (overrides system config)
+      if [ -f "$HOME/.scalaris/scalarisctl.conf" ] ; then
+        . $HOME/.scalaris/scalarisctl.conf
+      fi
+
+      echo -n "${cookie:-"chocolate chip cookie"}"
+    fi
+  fi
+}
+
+# Source default scalaris configuration?
+if $no_config ; then
+  rpm_mode=false
+else
+  # load system-wide scalaris configuration (ONLY if SCALARIS_JAVA_HOME has NOT been set)
+  # otherwise assume that the configuration has already been set
+  if [ -z "$SCALARIS_JAVA_HOME" -o "$SCALARIS_JAVA_HOME" = "@datarootdir@/java/scalaris" ]; then
+      if [ -f "@sysconfdir@/scalaris/scalaris-java.conf" ] ; then
+          . @sysconfdir@/scalaris/scalaris-java.conf
+      fi
+  fi
+
+  # load user scalaris configuration
+  if [ -f "$HOME/.scalaris/scalaris-java.conf" ] ; then
+    . $HOME/.scalaris/scalaris-java.conf
+  fi
+
+  # provide default configuration values
+  if [ -z "$rpm_mode" ] ; then
+    rpm_mode=false
+  fi
+fi
+
+# Setup Java environment in rpm mode
+if $rpm_mode ; then
+  if [ -f @JAVAFUNCTIONS@ ] ; then
+    . @JAVAFUNCTIONS@
+    set_jvm
+    set_javacmd
+  fi
+fi
+
+get_hostname() {
+    # Uses the OS hostname from "hostname -f" for the Erlang long node name.
+    if [ -z "$ERLANG_HOSTNAME" ] ; then
+        ERLANG_HOSTNAME="`get_sys_hostname`"
+    fi
+    # Alternative using the hostname that erlang chooses if set up to start with a long node
+    # name and falls back to "hostname -f" if this is not possible:
+    # NOTE: In this case, the Java-API (if used as a library) is not always able
+    #       to guess the host name that Erlang expects and connections may fail.
+    #       Therefore, the convenience node spec "<node>@localhost" may not be used.
+#     if [ -z "$ERLANG_HOSTNAME" ] ; then
+#         ERLANG_HOSTNAME="`get_erlang_hostname`"
+#         if [ -z "$ERLANG_HOSTNAME" ] ; then
+#             # could not start erlang with long node name (no FQDN?)
+#             ERLANG_HOSTNAME="`get_sys_hostname`"
+#         fi
+#     fi
+}
+
+get_erlang_hostname() {
+    MY_HOSTNAME_ERL="`$ERL -name foo$$ -noinput -eval 'N=erlang:atom_to_list(node()),io:format("~s", [string:sub_string(N, string:chr(N, $@)+1)]), halt(0).' 2>/dev/null`"
+    if [ $? -ne 0 ] ; then
+        MY_HOSTNAME_ERL=
+    fi
+    echo "$MY_HOSTNAME_ERL"
+}
+
+get_sys_hostname() {
+    hostname -f
+}
+
+# Get local host name from erlang
+if ! $no_erl; then
+  get_hostname
+fi
+
+# OS specific support.  $var _must_ be set to either true or false.
+cygwin=false;
+darwin=false;
+case "`uname`" in
+  CYGWIN*) cygwin=true ;;
+  Darwin*) darwin=true
+           if [ -z "$JAVA_HOME" ] ; then
+             JAVA_HOME=/System/Library/Frameworks/JavaVM.framework/Home
+           fi
+           ;;
+esac
+
+if [ -z "$SCALARIS_JAVA_HOME" -o ! -d "$SCALARIS_JAVA_HOME" ] ; then
+  ## resolve links - $0 may be a link to scalaris's home
+  PRG="$0"
+  progname=`basename "$0"`
+
+  # need this for relative symlinks
+  while [ -h "$PRG" ] ; do
+    ls=`ls -ld "$PRG"`
+    link=`expr "$ls" : '.*-> \(.*\)$'`
+    if expr "$link" : '/.*' > /dev/null; then
+    PRG="$link"
+    else
+    PRG=`dirname "$PRG"`"/$link"
+    fi
+  done
+
+  SCALARIS_JAVA_HOME=`dirname "$PRG"`
+
+  # make it fully qualified
+  SCALARIS_JAVA_HOME=`cd "$SCALARIS_JAVA_HOME" && pwd`
+fi
+
+# For Cygwin, ensure paths are in UNIX format before anything is touched
+if $cygwin ; then
+  [ -n "$SCALARIS_JAVA_HOME" ] &&
+    SCALARIS_JAVA_HOME=`cygpath --unix "$SCALARIS_JAVA_HOME"`
+  [ -n "$JAVA_HOME" ] &&
+    JAVA_HOME=`cygpath --unix "$JAVA_HOME"`
+fi
+
+if [ -z "$JAVACMD" ] ; then
+  if [ -n "$JAVA_HOME"  ] ; then
+    # IBM's JDK on AIX uses strange locations for the executables
+    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+      JAVACMD="$JAVA_HOME/jre/sh/java"
+    elif [ -x "$JAVA_HOME/jre/bin/java" ] ; then
+      JAVACMD="$JAVA_HOME/jre/bin/java"
+    else
+      JAVACMD="$JAVA_HOME/bin/java"
+    fi
+  else
+    JAVACMD=`which java 2> /dev/null `
+    if [ -z "$JAVACMD" ] ; then
+        JAVACMD=java
+    fi
+  fi
+fi
+
+if [ ! -x "$JAVACMD" ] ; then
+  echo "Error: JAVA_HOME is not defined correctly."
+  echo "  We cannot execute $JAVACMD"
+  exit 1
+fi
+
+# include our Scalaris jar files (we know where they are and do not need to
+# rely on tools like build-classpath which may include the wrong library,
+# i.e. not the installed one)
+if [ -z "$LOCALCLASSPATH" ] ; then
+  LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-$JAKARTA_COMMONS_VERSION.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-$OTP_VERSION.jar
+else
+  LOCALCLASSPATH=$SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-$JAKARTA_COMMONS_VERSION.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-$OTP_VERSION.jar:$LOCALCLASSPATH
+fi
+
+# Build local classpath manually in non-rpm mode or
+# use the Jpackage helper in rpm mode with basic and default jars
+# specified in the scalaris-java.conf configuration. A user should
+# request optional jars and their dependencies via the OPT_JAR_LIST
+# variable
+if $rpm_mode && [ -x "@BUILDCLASSPATH@" ] ; then
+  # If the user requested to try to add some other jars to the classpath
+  if [ -n "$OPT_JAR_LIST" ] ; then
+    _OPTCLASSPATH="$(@BUILDCLASSPATH@ $OPT_JAR_LIST 2> /dev/null)"
+    if [ -n "$_OPTCLASSPATH" ] ; then 
+      LOCALCLASSPATH="$LOCALCLASSPATH:$_OPTCLASSPATH"
+    fi
+  fi
+
+  # Explicitly add javac path to classpath, assume JAVA_HOME set
+  # properly in rpm mode
+  if [ -f "$JAVA_HOME/lib/tools.jar" ] ; then
+    LOCALCLASSPATH="$LOCALCLASSPATH:$JAVA_HOME/lib/tools.jar"
+  fi
+  if [ -f "$JAVA_HOME/lib/classes.zip" ] ; then
+    LOCALCLASSPATH="$LOCALCLASSPATH:$JAVA_HOME/lib/classes.zip"
+  fi
+
+  # if CLASSPATH_OVERRIDE env var is set, LOCALCLASSPATH will be
+  # user CLASSPATH first and scalaris-found jars after.
+  # In that case, the user CLASSPATH will override scalaris-found jars
+  #
+  # if CLASSPATH_OVERRIDE is not set, we'll have the normal behaviour
+  # with scalaris-found jars first and user CLASSPATH after
+  if [ -n "$CLASSPATH" ] ; then
+    # merge local and specified classpath 
+    if [ -z "$LOCALCLASSPATH" ] ; then 
+      LOCALCLASSPATH="$CLASSPATH"
+    elif [ -n "$CLASSPATH_OVERRIDE" ] ; then
+      LOCALCLASSPATH="$CLASSPATH:$LOCALCLASSPATH"
+    else
+      LOCALCLASSPATH="$LOCALCLASSPATH:$CLASSPATH"
+    fi
+
+    # remove class path from launcher -cp option
+    CLASSPATH=""
+  fi
+fi
+
+# For Cygwin, switch paths to appropriate format before running java
+# For PATHs convert to unix format first, then to windows format to ensure
+# both formats are supported. Probably this will fail on directories with ;
+# in the name in the path. Let's assume that paths containing ; are more
+# rare than windows style paths on cygwin.
+if $cygwin; then
+  if [ "$OS" = "Windows_NT" ] && cygpath -m .>/dev/null 2>/dev/null ; then
+    format=mixed
+  else
+    format=windows
+  fi
+  SCALARIS_JAVA_HOME=`cygpath --$format "$SCALARIS_JAVA_HOME"`
+  JAVA_HOME=`cygpath --$format "$JAVA_HOME"`
+  LCP_TEMP=`cygpath --path --unix "$LOCALCLASSPATH"`
+  LOCALCLASSPATH=`cygpath --path --$format "$LCP_TEMP"`
+  if [ -n "$CLASSPATH" ] ; then
+    CP_TEMP=`cygpath --path --unix "$CLASSPATH"`
+    CLASSPATH=`cygpath --path --$format "$CP_TEMP"`
+  fi
+  CYGHOME=`cygpath --$format "$HOME"`
+fi
+
+# Show script help if requested
+if $show_help ; then
+  echo $0 '[script options] [options]'
+  echo 'Script Options:'
+  echo '  --help, -h             print this message and scalaris help'
+  echo '  --noconfig             suppress sourcing of config files in $HOME/.scalaris/'
+  echo '                         and @sysconfdir@/scalaris/'
+  echo '  --execdebug            print scalaris exec line generated by this'
+  echo '                         launch script'
+  echo '  --noerl                do not ask erlang for its (local) host name'
+  echo '  '
+fi
+# add a second backslash to variables terminated by a backslash under cygwin
+if $cygwin; then
+  case "$SCALARIS_JAVA_HOME" in
+    *\\ )
+    SCALARIS_JAVA_HOME="$SCALARIS_JAVA_HOME\\"
+    ;;
+  esac
+  case "$CYGHOME" in
+    *\\ )
+    CYGHOME="$CYGHOME\\"
+    ;;
+  esac
+  case "$LOCALCLASSPATH" in
+    *\\ )
+    LOCALCLASSPATH="$LOCALCLASSPATH\\"
+    ;;
+  esac
+  case "$CLASSPATH" in
+    *\\ )
+    CLASSPATH="$CLASSPATH\\"
+    ;;
+  esac
+fi
+
+scalaris_java_config=
+if [ -n "$SCALARIS_JAVA_CONFIG" ]; then
+  scalaris_java_config="-Dscalaris.java.config=\"$SCALARIS_JAVA_CONFIG\""
+fi
+
+# Execute scalaris using eval/exec to preserve spaces in paths,
+# java options, and scalaris args
+scalaris_exec_command="exec \"$JAVACMD\" $SCALARIS_OPTS\
+  -classpath \"$LOCALCLASSPATH\"\
+  $jmvopts\
+  -Dscalaris.java.home=\"$SCALARIS_JAVA_HOME\"\
+  -Dscalaris.erlang.nodename=\"$ERLANG_HOSTNAME\"\
+  -Dscalaris.cookie=\"`get_cookie`\"\
+  -Dscalaris.node=\"$SCALARIS_JAPI_NODE\"\
+  $scalaris_java_config de.zib.scalaris.Main $SCALARIS_ARGS $scalaris_exec_args"
+if $scalaris_exec_debug ; then
+    echo $scalaris_exec_command
+fi
+eval $scalaris_exec_command
