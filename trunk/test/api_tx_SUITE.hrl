@@ -383,4 +383,4 @@ random_write_read2(Count) ->
     random_write_read2(Count -1).
 
 random_write_read(_) ->
-    random_write_read2(10000).
+    random_write_read2(adapt_tx_runs(10000)).

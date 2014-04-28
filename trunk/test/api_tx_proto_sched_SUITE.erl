@@ -98,3 +98,9 @@ init_per_testcase(TestCase, Config) ->
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
+
+%% @doc Reduces the number of tx calls so that the time taken by test methods
+%%      with proto_sched does not increase too much.
+-spec adapt_tx_runs(N::pos_integer()) -> pos_integer().
+adapt_tx_runs(N) ->
+    erlang:max(N div 10, 1).

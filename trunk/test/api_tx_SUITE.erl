@@ -99,6 +99,9 @@ end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
 
+-spec adapt_tx_runs(N::pos_integer()) -> pos_integer().
+adapt_tx_runs(N) -> N.
+
 %% @doc Test for api_tx:write taking at least 2s after stopping a ring
 %%      and starting a new one.
 write_test_race_mult_rings(Config) ->
