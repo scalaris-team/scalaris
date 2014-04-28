@@ -2735,10 +2735,16 @@ test_succ_ord_id(_Config) ->
     ?assert(nodelist:succ_ord_id(?KEY(5), ?KEY(5), ?KEY(6))),
     ?assert(nodelist:succ_ord_id(?KEY(5), ?KEY(5), ?KEY(4))),
 
-    ?assert(nodelist:succ_ord_id(?RT:n(), ?KEY(4), ?KEY(5))),
-    ?assert(nodelist:succ_ord_id(?RT:n(), ?MINUS_INFINITY, ?KEY(5))),
-    ?assert(nodelist:succ_ord_id(?KEY(4), ?RT:n(), ?KEY(5)) =:= false),
-    ?assert(nodelist:succ_ord_id(?MINUS_INFINITY, ?RT:n(), ?KEY(5)) =:= false),
+    ?assert(nodelist:succ_ord_id(?KEY(8), ?KEY(4), ?KEY(5))),
+    ?assert(nodelist:succ_ord_id(?KEY(8), ?MINUS_INFINITY, ?KEY(5))),
+    ?assert(nodelist:succ_ord_id(?KEY(4), ?KEY(8), ?KEY(5)) =:= false),
+    ?assert(nodelist:succ_ord_id(?MINUS_INFINITY, ?KEY(8), ?KEY(5)) =:= false),
+
+    ?assert(nodelist:succ_ord_id(?KEY(4), ?KEY(5), ?MINUS_INFINITY)),
+    ?assert(nodelist:succ_ord_id(?KEY(5), ?KEY(4), ?MINUS_INFINITY) =:= false),
+    ?assert(nodelist:succ_ord_id(?KEY(5), ?MINUS_INFINITY, ?MINUS_INFINITY) =:= false),
+    ?assert(nodelist:succ_ord_id(?MINUS_INFINITY, ?KEY(5), ?MINUS_INFINITY)),
+    ?assert(nodelist:succ_ord_id(?MINUS_INFINITY, ?MINUS_INFINITY, ?MINUS_INFINITY)),
 
     ?assert(nodelist:succ_ord_id(?KEY(4), ?KEY(8), ?KEY(4))),
     ?assert(nodelist:succ_ord_id(?KEY(8), ?KEY(4), ?KEY(4)) =:= false).
