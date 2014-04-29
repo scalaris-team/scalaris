@@ -1,9 +1,10 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.7.0+svn"
+SCALARIS_VERSION="0.7.0"
 date=`date +"%Y%m%d"`
 name="scalaris" # folder base name (without version)
-url="http://scalaris.googlecode.com/svn/trunk/"
+#url="http://scalaris.googlecode.com/svn/trunk/"
+url="http://scalaris.googlecode.com/svn/tags/${SCALARIS_VERSION}/"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
@@ -27,7 +28,7 @@ if [ ${result} -eq 0 ]; then
   echo " ${revision}"
   # not safe in other languages than English:
   # revision=`svn info ${name} | grep "Revision:" | cut -d ' ' -f 4`
-  pkg_version="${SCALARIS_VERSION}${revision}"
+  pkg_version="${SCALARIS_VERSION}"
 fi
 
 if [ ${result} -eq 0 ]; then
@@ -56,7 +57,6 @@ if [ ${result} -eq 0 ]; then
       -e "s/scalaris\\.diff\\.tar\\.gz/scalaris-${pkg_version}\\.diff\\.tar\\.gz/g" \
       < ${sourcefolder}/scalaris.dsc               > ./scalaris.dsc && \
   sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
-      -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
       < ${sourcefolder}/debian.changelog           > ./debian.changelog && \
   cp  ${sourcefolder}/debian.compat                  ./debian.compat && \
   cp  ${sourcefolder}/debian.control                 ./debian.control && \

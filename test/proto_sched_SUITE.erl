@@ -47,7 +47,6 @@ groups() ->
         basic_cleanup_DOWN_interplay,
         basic_cleanup_send_interplay,
         basic_thread_yield_outside_proto_sched,
-        basic_slow_msg_handler,
         basic_bench_increment%,
 %%        basic_start_bench_and_kill_it
       ]},
@@ -394,17 +393,6 @@ basic_thread_yield_outside_proto_sched(_Config) ->
     %% a thread_yield outside a proto_sched is prohibited.
     ?expect_exception(proto_sched:thread_yield(),
                       throw, 'yield_outside_thread_start_thread_end').
-
-basic_slow_msg_handler(_Config) ->
-    %% keep exec token longer than a second. This should raise a
-    %% warning from proto_sched (some output).
-    proto_sched:thread_num(1),
-    proto_sched:thread_begin(),
-    timer:sleep(2000),
-    proto_sched:thread_end(),
-    proto_sched:cleanup(),
-    ok.
-
 
 basic_bench_increment(_Config) ->
     %% let run a short bench:increment with proto_sched
