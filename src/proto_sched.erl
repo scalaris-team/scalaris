@@ -739,37 +739,51 @@ on({check_slow_handler_action}, State) ->
     %% amount of time the response is pending
     %% current function of the process delivered to (when local)
     [ case TState#state.status of
-          {delivered, GPid, _Ref, StartTime} ->
+          {delivered, _GPid, _Ref, StartTime} ->
               Delta = timer:now_diff(os:timestamp(), StartTime) div 1000000,
               case 1 =< Delta of
-                  true ->
-                      LPid = comm:make_local(GPid),
-                      log:log("proto_sched: Msg takes longer than ~p s to process:~n"
-                              "TraceId: ~p~n"
-                              "Process: ~p (~p)~n"
-                              "DeliMsg: ~10000.0p~n"
-                              "Msg No:  ~p~n"
-                              "StackTr: ~p~n",
-                              [ Delta,
-                                TId,
-                                GPid, pid_groups:group_and_name_of(LPid),
-                                hd(TState#state.delivered_msgs),
-                                TState#state.num_delivered_msgs,
-                                try erlang:process_info(LPid,
-                                                        current_stacktrace)
-                                catch error:badarg ->
-                                        %% older erlang version
-                                        %% -> fall back to current function
-                                        erlang:process_info(LPid,
-                                                            current_function)
-                                end
-                              ]);
-                  _ -> ok
+                  true -> report_slow_handler(TId, TState);
+                  _ ->    ok
               end;
           _ -> ok
       end
       || {TId, TState} <- State ],
     State.
+
+-spec report_slow_handler(trace_id(), state_t()) -> ok.
+report_slow_handler(Tid, Entry) ->
+    {delivered, GPid, _Ref, StartTime} = Entry#state.status,
+    Delta = (timer:now_diff(os:timestamp(), StartTime) div 100000)/10,
+    {PidGrpName, StackTrace} =
+        case comm:is_local(GPid) of
+            true ->
+                LPid = comm:make_local(GPid),
+                {comm:make_local(LPid),
+                 try erlang:process_info(LPid,
+                                         current_stacktrace)
+                 catch error:badarg ->
+                         %% older erlang version
+                         %% -> fall back to current function
+                         catch(erlang:process_info(LPid,
+                                                   current_function))
+                 end};
+            _ ->
+                {not_local, no_stackstrace}
+        end,
+    log:log("proto_sched: Msg takes longer than ~p s to process:~n"
+            "TraceId: ~p~n"
+            "Process: ~p (~p)~n"
+            "DeliMsg: ~10000.0p~n"
+            "Msg No:  ~p~n"
+            "StackTr: ~p~n",
+            [ Delta,
+              Tid,
+              GPid, PidGrpName,
+              hd(Entry#state.delivered_msgs),
+              Entry#state.num_delivered_msgs,
+              StackTrace
+            ]),
+    ok.
 
 passed_state_new(TraceId, Logger) ->
     {TraceId, Logger}.
