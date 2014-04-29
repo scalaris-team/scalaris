@@ -3,7 +3,8 @@
 SCALARIS_VERSION="0.7.0"
 date=`date +"%Y%m%d"`
 name="scalaris" # folder base name (without version)
-url="http://scalaris.googlecode.com/svn/trunk/"
+#url="http://scalaris.googlecode.com/svn/trunk/"
+url="http://scalaris.googlecode.com/svn/tags/${SCALARIS_VERSION}/"
 deletefolder=0 # set to 1 to delete the folder the repository is checked out to
 
 #####
