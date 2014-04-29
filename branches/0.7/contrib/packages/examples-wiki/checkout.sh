@@ -71,7 +71,6 @@ if [ ${result} -eq 0 ]; then
       -e "s/scalaris-examples-wiki\\.diff\\.tar\\.gz/scalaris-examples-wiki-${pkg_version}\\.diff\\.tar\\.gz/g" \
       < ${sourcefolder}/scalaris-examples-wiki.dsc  > ./scalaris-examples-wiki.dsc && \
   sed -e "0,/(.*-.*)/s//(${pkg_version}-1)/" \
-      -e "0,/ -- Nico Kruber <kruber@zib.de>  .*/s// -- Nico Kruber <kruber@zib.de>  `LANG=C date -R`/" \
       < ${sourcefolder}/debian.changelog            > ./debian.changelog && \
   cp  ${sourcefolder}/debian.compat                   ./debian.compat && \
   cp  ${sourcefolder}/debian.control                  ./debian.control && \
