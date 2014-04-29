@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+
+# stop before remove
+if [ "$1" = "remove" -o "$1" = "deconfigure" ]; then
+  echo "Stopping Scalaris service..."
+  if which invoke-rc.d >/dev/null 2>&1; then
+    invoke-rc.d scalaris stop
+  else
+    /etc/init.d/scalaris stop
+  fi
+fi
+
+exit 0

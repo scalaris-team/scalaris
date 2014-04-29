@@ -1,0 +1,218 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <link rel='shortcut icon' type='image/x-icon' href='/favicon.ico' />
+<erl>
+out(Arg) ->
+    {header, {cache_control, "no-cache"}}.
+</erl>
+    <title>Scalaris Management Interface</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  <!--[if lte IE 5.5999]>
+    <style type="text/css">@import url(ie55-.css);</style>
+  <![endif]-->
+  <!--[if lte IE 8]>
+    <script language="javascript" type="text/javascript" src="flot/excanvas.min.js"></script>
+  <![endif]-->
+    <script language="javascript" type="text/javascript" src="flot/jquery.min.js"></script>
+    <script language="javascript" type="text/javascript" src="flot/jquery.flot.min.js"></script>
+    <script language="javascript" type="text/javascript" src="flot/jquery.flot.pie.min.js"></script>
+    <script language="javascript" type="text/javascript" src="flot/jquery.colorhelpers.min.js"></script>
+    <script language="javascript" type="text/javascript" src="flot/jquery.flot.navigate.min.js"></script>
+    <script language="javascript" type="text/javascript" src="flot/jquery.flot.errorbars.min.js"></script>
+  </head>
+  <body>
+
+    <div class="menubar">
+      <div class="nothighlighted">
+	    <h2>Scalaris</h2>
+	  </div>
+   	  <div class="nothighlighted">
+	    <a class="menua" href="index.yaws">Home</a>
+	  </div>
+      <div class="nothighlighted">
+        <a class="menua" href="ring.yaws">Ring</a>
+      </div>
+      
+<erl>
+out(Arg) ->
+    case whereis(mgmt_server) of
+        undefined -> {html, ""};
+        _ ->
+            {html,
+"      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
+      </div>
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
+      </div>" ++ 
+    case config:read(dc_clustering_enable) of
+        true -> "
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"dc.yaws\">Datacenter Clusters Map</a>
+      </div>
+";
+        _ -> ""
+    end ++ "
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"bench.yaws\">Benchmarks</a>
+      </div>
+"}
+    end.
+</erl>
+
+      <div class="nothighlighted">
+        <a class="menua" href="gossip.yaws">Gossip values</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_client.yaws">Client Monitor</a>
+      </div>
+      <div class="highlighted">
+        <a class="menua" href="monitor_ring.yaws">Ring Monitor</a>
+      </div>
+	  <div class="nothighlighted">
+	    <a class="menua" href="documentation.yaws">Docu</a>
+	  </div>
+      <div class="nothighlighted">
+        <a class="menua" href="debug.yaws">Debug</a>
+      </div>
+      <div class="nothighlightedlast">
+        <a class="menua" href="logger.yaws">Message Stats</a>
+      </div>
+    </div><div class="middle">
+      <div class="middleleft">
+<h2>Ring Monitor</h2>
+
+<erl>
+out(A) ->
+    {ehtml, webhelpers:getMonitorRingData()}.
+</erl>
+
+<script type="text/javascript">
+function showTooltip(x, y, contents) {
+ $('<div id="tooltip">' + contents + '</div>').css( {
+  position: 'absolute',
+  display: 'none',
+  top: y + 5,
+  left: x + 5,
+  border: '1px solid #fdd',
+  padding: '2px',
+  'background-color': '#fee',
+  opacity: 0.80
+ }).appendTo("body").fadeIn(200);
+}
+$(function() {
+ function msFormatter(v, axis) {
+  return v.toFixed(axis.tickDecimals) +"ms";
+ }
+ var series = {
+  lines: { show: true, lineWidth: 0.5 },
+  points: { show: true, radius: 1 }
+ };
+ var xaxes = [ { mode: 'time' } ];
+ var legend = {
+  show: true,
+  position: 'sw',
+  noColumns: 6,
+  margin: [0, -50]
+ };
+ var grid = { hoverable: true };
+ var asym_yerrbars = { 
+  errorbars: "y", 
+  yerr: {show: false, asymmetric: true, upperCap: "-", lowerCap: "-"}
+ };
+ $.plot($("#rr_lat"),
+        [ {data: rr_avg_min_max_ms_data, label: "Avg (ms)", points: asym_yerrbars},
+          {data: rr_stddev_ms_data, label: "Stddev (ms)"}
+        ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [ { min: 0, tickFormatter: msFormatter } ],
+  legend: legend,
+  grid: grid
+ });
+ $("#rr_lat").bind("plothover", plotHover);
+ $.plot($("#lh_count"),
+        [ {data: lh_avg_min_max_count_data, label: "Avg", points: asym_yerrbars},
+          {data: lh_stddev_count_data, label: "Stddev"}
+        ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [ { min: 0 } ],
+  legend: legend,
+  grid: grid
+ });
+ $("#lh_count").bind("plothover", plotHover);
+ $.plot($("#tx_count"), [ {data: tx_count_per_s_data, label: "Count / s"} ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [ { min: 0 } ],
+  legend: legend,
+  grid: grid
+ });
+ $("#tx_count").bind("plothover", plotHover);
+ var asym_yerrbars = { 
+  errorbars: "y", 
+  yerr: {show: false, asymmetric: true, upperCap: "-", lowerCap: "-"}
+ };
+ $.plot($("#tx_lat"),
+        [ {data: tx_avg_min_max_ms_data, label: "Avg (ms)", points: asym_yerrbars},
+          {data: tx_stddev_ms_data, label: "Stddev (ms)"}
+        ], {
+  series: series,
+  xaxes: xaxes,
+  yaxes: [ { min: 0, tickFormatter: msFormatter } ],
+  legend: legend,
+  grid: grid
+ });
+ $("#tx_lat").bind("plothover", plotHover);
+ var previousPoint = null;
+ function plotHover(event, pos, obj) {
+  if (!obj) {
+   $("#tooltip").remove();
+   previousPoint = null;
+   return;
+  }
+  if (previousPoint != obj.datapoint) {
+   previousPoint = obj.datapoint;
+   $("#tooltip").remove();
+   var x = obj.datapoint[0].toFixed(2),
+       y = obj.datapoint[1].toFixed(2),
+       ymin = (obj.datapoint[1] - obj.datapoint[2]).toFixed(2),
+       ymax = (obj.datapoint[1] + obj.datapoint[3]).toFixed(2);
+   var xDate = new Date();
+   xDate.setTime(x)
+   showTooltip(obj.pageX, obj.pageY,
+               xDate.toUTCString() + ": <br />" + obj.series.label + " = " + y + ", min: " + ymin + ", max: " + ymax);
+  }
+ }
+});
+</script>
+<p>Count (api_tx:req_list/2)</p>
+<div id="tx_count" style="width: 800px; height: 300px; margin-bottom:50px"></div>
+<p>Latency (api_tx:req_list/2)</p>
+<div id="tx_lat" style="width: 800px; height: 300px; margin-bottom:50px"></div>
+<p>Latency read-read-commit (monitor_perf:run_bench/2)</p>
+<div id="rr_lat" style="width: 800px; height: 300px; margin-bottom:50px"></div>
+<p>Lookup Hop Count</p>
+<div id="lh_count" style="width: 800px; height: 300px; margin-bottom:50px"></div>
+
+<hr />
+<p>Last update:
+<erl>
+ out(Arg) ->
+    {Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
+</erl></p>
+</div>
+<br class="br_class">&nbsp;
+</div>
+<div class="bottom">
+</div>
+</body>
+</html>

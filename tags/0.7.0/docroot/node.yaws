@@ -1,0 +1,178 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <link rel='shortcut icon' type='image/x-icon' href='/favicon.ico' />
+<erl>
+out(Arg) ->
+    {header, {cache_control, "no-cache"}}.
+</erl>
+    <title>Scalaris Management Interface</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  <!--[if lte IE 5.5999]>
+    <style type="text/css">@import url(ie55-.css);</style>
+  <![endif]-->
+  </head>
+  <body>
+
+<erl>
+get_yaws_info_for_node(Pid) ->
+  comm:send(Pid, {get_yaws_info, comm:this()}),
+  receive
+    {get_yaws_info_response, IP, Port, Group} ->
+      {IP, Port, Group}
+  after 1000 -> timeout end.
+
+get_yaws_url_for_node(Pid) ->
+  case get_yaws_info_for_node(Pid) of
+    {IP, Port, Group} ->
+      {I0, I1, I2, I3} = IP,
+      io_lib:format("http://~w.~w.~w.~w:~w/node.yaws?group=~s", [I0, I1, I2, I3, Port, Group]);
+    timeout ->
+      "unknown"
+  end.
+
+get_node_details(Group) ->
+  Pid = pid_groups:pid_of(Group, dht_node),
+  comm:send_local(Pid, {get_node_details, comm:this()}),
+  receive
+    {get_node_details_response, Details} ->
+      Details
+  after
+    1000 ->
+      timeout
+  end.
+
+render_node(Node) ->
+  Id = node:id(Node),
+  Pid = node:pidX(Node),
+  URL = get_yaws_url_for_node(Pid),
+  {a, [{href, URL}], {p, [], io_lib:format("~.16B", [Id])}}.
+
+get_ring_info(NodeDetails) ->
+  {ehtml, {fieldset, [{style, "border: 1px black solid"}],
+  [{legend, [{style, "border: 1px black solid; margin-left: 1em; padding: 0.2em 0.8em"}], "Chord Ring"},
+   {table, [], [
+{tr, [], [{th, [], "Predecessor"}, {th, [], "Self"}, {th, [], "Successor"}]},
+{tr, [], [{td, [], render_node(node_details:get(NodeDetails, pred))},
+          {td, [], render_node(node_details:get(NodeDetails, node))},
+          {td, [], render_node(node_details:get(NodeDetails, succ))}]}
+]}]}}.
+
+out(A) ->
+  case lists:keyfind("group", 1, yaws_api:parse_query(A)) of
+    {"group", Group} ->
+      NodeDetails = get_node_details(Group),
+      get_ring_info(NodeDetails);
+    false ->
+      {ehtml, {pre, [], "no node provided"}}
+  end.
+</erl>
+
+<fieldset style="border: 1px black solid">
+
+<legend style="border: 1px black solid; margin-left: 1em; padding: 0.2em 0.8em ">Node</legend>
+
+<erl>
+get_web_debug_info(Group) ->
+  Pid = pid_groups:pid_of(Group, dht_node),
+  util:debug_info(Pid).
+
+out(A) ->
+  case lists:keyfind("group", 1, yaws_api:parse_query(A)) of
+    {"group", Group} ->
+      Info = get_web_debug_info(Group),
+      {ehtml, {pre, [], io_lib:format("~p", [Info])}};
+    false ->
+      {ehtml, {pre, [], "no node provided"}}
+  end.
+</erl>
+</fieldset>
+
+<fieldset style="border: 1px black solid">
+<legend style="border: 1px black solid; margin-left: 1em; padding: 0.2em 0.8em ">Routing Table</legend>
+<erl>
+get_state(Group, Which) ->
+  Pid = pid_groups:pid_of(Group, dht_node),
+  comm:send_local(Pid, {get_state, comm:this(), Which}),
+  receive
+    {get_state_response, State} ->
+      State
+  after
+    1000 ->
+      timeout
+  end.
+
+get_yaws_info_for_node(Pid) ->
+  comm:send(Pid, {get_yaws_info, comm:this()}),
+  receive
+    {get_yaws_info_response, IP, Port, Group} ->
+      {IP, Port, Group}
+  after 1000 -> timeout end.
+
+get_yaws_url_for_node(Pid) ->
+  case get_yaws_info_for_node(Pid) of
+    {IP, Port, Group} ->
+      {I0, I1, I2, I3} = IP,
+      io_lib:format("http://~w.~w.~w.~w:~w/node.yaws?group=~s", [I0, I1, I2, I3, Port, Group]);
+    timeout ->
+      "unknown"
+  end.
+
+render_node(Node) ->
+  Id = node:id(Node),
+  Pid = node:pidX(Node),
+  URL = get_yaws_url_for_node(Pid),
+  {a, [{href, URL}], {p, [], io_lib:format("~.16B", [Id])}}.
+
+make_table(RT) ->
+   {Rows, _} = lists:foldl(fun({_, Node}, {Rows, Idx}) ->
+     {
+       [{tr, [], [{td, [], io_lib:format("~p", [Idx])},
+                 {td, [], render_node(Node)}]} | Rows],
+       Idx + 1
+     } end, {[], 0}, RT),
+   Head = {tr, [], [{th, [], "Index"}, {th, [], "Node"}]},
+   {table, [], [Head | Rows]}.
+
+out(A) ->
+  case lists:keyfind("group", 1, yaws_api:parse_query(A)) of
+    {"group", Group} ->
+      Info = gb_trees:to_list(get_state(Group, rt)),
+      Table = make_table(Info),
+      {ehtml, Table};
+%{pre, [], io_lib:format("~p", [Info])}
+    false ->
+      {ehtml, {pre, [], "no node provided"}}
+  end.
+</erl>
+</fieldset>
+
+
+<h3>Args</h3>
+<p>
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    case IsPost of
+      true ->
+        {ehtml, {pre, [], io_lib:format("GET:~p~nPOST:~p", [yaws_api:parse_query(A), yaws_api:parse_post(A)])}};
+      false ->
+        {ehtml, {pre, [], io_lib:format("GET:~p", [yaws_api:parse_query(A)])}}
+    end.
+</erl>
+</p>
+
+<hr />
+<p>Last update:
+<erl>
+ out(Arg) ->
+    {Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
+</erl></p>
+</body>
+</html>

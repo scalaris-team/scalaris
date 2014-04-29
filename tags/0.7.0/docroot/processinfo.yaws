@@ -1,0 +1,12 @@
+<erl>
+out(A) ->
+    {_, Group} = lists:keyfind("group", 1, yaws_api:parse_query(A)),
+    {_, Id} = lists:keyfind("id", 1, yaws_api:parse_query(A)),
+    if Group =:= undefined -> 
+	       {ehtml, {pre, [], ""}}; 
+	   Id =:= undefined ->
+      	   {ehtml, {pre, [], ""}};
+	   true ->
+	       {html, json2:encode(pid_groups:get_web_debug_info(Group, Id))}
+    end.
+</erl>
