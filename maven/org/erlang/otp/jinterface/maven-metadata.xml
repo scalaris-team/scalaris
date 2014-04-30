@@ -3,11 +3,12 @@
   <groupId>org.erlang.otp</groupId>
   <artifactId>jinterface</artifactId>
   <versioning>
-    <release>1.5.8</release>
+    <release>1.5.9</release>
     <versions>
       <version>1.5.6-custom</version>
       <version>1.5.8</version>
+      <version>1.5.9</version>
     </versions>
-    <lastUpdated>20131011171158</lastUpdated>
+    <lastUpdated>20140430134203</lastUpdated>
   </versioning>
 </metadata>
