@@ -394,7 +394,6 @@ public class Benchmark {
             final Transaction tx_init = new Transaction(conn);
             tx_init.write(key, 0);
             tx_init.commit();
-            tx_init.closeConnection();
         }
 
         protected void operation(final Transaction tx, final int j) throws Exception {
@@ -531,7 +530,6 @@ public class Benchmark {
             for (int i = 0; i < keys.length; ++i) {
                 results.processWriteAt(i);
             }
-            tx_init.closeConnection();
         }
 
         protected void operation(final Transaction tx, final int j) throws Exception {
@@ -697,7 +695,6 @@ public class Benchmark {
             reqs.addOp(new WriteOp(key + '_' + j, valueInit)).addCommit();
             final Transaction.ResultList results = tx_init.req_list(reqs);
             results.processWriteAt(0);
-            tx_init.closeConnection();
         }
 
         protected void operation(final Transaction tx, final int j) throws Exception {
@@ -931,9 +928,9 @@ public class Benchmark {
         @Override
         final public void run() {
             Thread.currentThread().setName("BenchRunnable-" + key);
+            Connection conn = null;
             try {
-                final Connection conn = ConnectionFactory.getInstance()
-                        .createConnection();
+                conn = ConnectionFactory.getInstance().createConnection();
                 for (int retry = 0; (retry < 3) && !stop; ++retry) {
                     try {
                         pre_init(conn);
@@ -954,6 +951,10 @@ public class Benchmark {
                 }
             } catch (final Exception e) {
                 // e.printStackTrace();
+            } finally {
+                if (conn != null) {
+                    conn.close();
+                }
             }
         }
 
