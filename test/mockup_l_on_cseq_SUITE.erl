@@ -37,7 +37,7 @@ groups() ->
 
 all() ->
     [
-     %{group, merge_tests},
+     {group, merge_tests},
      {group, split_tests}
      ].
 
