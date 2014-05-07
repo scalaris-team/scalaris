@@ -31,8 +31,8 @@
 -export([create_two_adjacent_leases/0]).
 -export([create_lease/2]).
 
-%
--export([get_renewal_counter/0]).
+% public api
+-export([get_renewal_counter/0, get_lease_list/0]).
 
 -record(mock_state, {
           renewal_enabled      = ?required(mock_state, renewal_enabled     ) :: boolean(),
@@ -57,7 +57,7 @@ create_two_adjacent_leases() ->
     ct:pal("mock leases~n~w~n~w~n", [L1, L2]),
     {L1, L2}.
 
--spec create_lease(?RT:key(), ?RT:key()) -> {l_on_cseq:lease_t(), l_on_cseq:lease_t()}.
+-spec create_lease(?RT:key(), ?RT:key()) -> l_on_cseq:lease_t().
 create_lease(From, To) ->
     L = l_on_cseq:unittest_create_lease_with_range(From, To),
     Range = node:mk_interval_between_ids(From, To),
@@ -88,6 +88,14 @@ get_renewal_counter() ->
              Counter
     end.
 
+-spec get_lease_list() -> lease_list:lease_list().
+get_lease_list() ->
+    comm:send_local(get_mock_pid(), {get_lease_list, self()}),
+    receive
+        {get_lease_list_response, List} ->
+             List
+    end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -102,6 +110,13 @@ on({get_renewal_counter, Pid},
                      get_renewal_counter(MockState)}),
     {State, MockState};
 
+% get lease list
+on({get_lease_list, Pid}, {State, MockState}) ->
+    comm:send_local(Pid,
+                    {get_lease_list_response,
+                     dht_node_state:get(State, lease_list)}),
+    {State, MockState};
+
 % intercept renews
 on({l_on_cseq, renew, _OldLease, _Mode} = Msg,
    {State, MockState}) ->
@@ -109,7 +124,18 @@ on({l_on_cseq, renew, _OldLease, _Mode} = Msg,
 
 % Lease management messages (see l_on_cseq.erl)
 on(Msg, {State, MockState}) when l_on_cseq =:= element(1, Msg) ->
-    {l_on_cseq:on(Msg, State), MockState}.
+    case l_on_cseq:on(Msg, State) of
+        {'$gen_component', [{post_op, NextMsg}], NewState} ->
+            %LeaseList = dht_node_state:get(NewState, lease_list),
+            %PassiveLeases = lease_list:get_passive_leases(LeaseList),
+            %ct:pal("msg ~w passive leases ~w", [Msg, PassiveLeases]),
+            gen_component:post_op(NextMsg, {NewState, MockState});
+        NewState ->
+            %LeaseList = dht_node_state:get(NewState, lease_list),
+            %PassiveLeases = lease_list:get_passive_leases(LeaseList),
+            %ct:pal("msg ~w~n passive leases ~w", [Msg, PassiveLeases]),
+            {NewState, MockState}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
