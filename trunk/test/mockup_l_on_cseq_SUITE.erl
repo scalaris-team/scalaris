@@ -29,17 +29,23 @@
 groups() ->
     [{merge_tests, [sequence], [
                                 test_merge
+                               ]},
+     {split_tests, [sequence], [
+                                test_split
                                ]}
     ].
 
 all() ->
     [
-     {group, merge_tests}
+     %{group, merge_tests},
+     {group, split_tests}
      ].
 
 suite() -> [ {timetrap, {seconds, 90}} ].
 
 group(merge_tests) ->
+    [{timetrap, {seconds, 400}}];
+group(split_tests) ->
     [{timetrap, {seconds, 400}}];
 group(_) ->
     suite().
@@ -106,4 +112,50 @@ test_merge(_Config) ->
                                                                  l_on_cseq:get_range(L2)));
         {fail, not_found} -> ?assert(false)
     end,
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% split unit tests
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+test_split(_Config) ->
+    L = mockup_l_on_cseq:create_lease(0, 16),
+    % join group
+    Pid = pid_groups:find_a(mockup_l_on_cseq),
+    pid_groups:join(pid_groups:group_of(Pid)),
+    % do split
+    Keep = second,
+    Range = l_on_cseq:get_range(L),
+    [R1, R2] = intervals:split(Range, 2),
+    % evil, but l_on_cseq:lease_merge sends to a real dht_node
+    comm:send_local(Pid, {l_on_cseq, split, L, R1, R2, Keep, self(), empty}),
+    {L1, L2} = receive
+                   {split, success, NewL1, NewL2} ->
+                       {NewL1, NewL2}
+               end,
+    % check L1
+    case l_on_cseq:read(l_on_cseq:get_id(L1)) of
+        {ok, L1_} ->
+            ?assert(l_on_cseq:get_range(L1_) =:= R1),
+            ?assert(l_on_cseq:get_aux(L1_) =:= empty),
+            true;
+        {fail, not_found} ->
+            ?assert(false)
+    end,
+    % check L2
+    case l_on_cseq:read(l_on_cseq:get_id(L2)) of
+        {ok, L2_} ->
+            ?assert(l_on_cseq:get_range(L2_) =:= R2),
+            ?assert(l_on_cseq:get_aux(L2_) =:= empty),
+            true;
+        {fail, not_found} ->
+            ?assert(false)
+    end,
+    LeaseList = mockup_l_on_cseq:get_lease_list(),
+    ActiveLease = lease_list:get_active_lease(LeaseList),
+    [PassiveLease] = lease_list:get_passive_leases(LeaseList),
+    ?assert(l_on_cseq:get_id(ActiveLease) =:= l_on_cseq:get_id(L2)),
+    ?assert(l_on_cseq:get_id(PassiveLease) =:= l_on_cseq:get_id(L1)),
     true.
