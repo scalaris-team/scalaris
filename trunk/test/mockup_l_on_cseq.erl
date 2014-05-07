@@ -34,13 +34,6 @@
 % public api
 -export([get_renewal_counter/0, get_lease_list/0]).
 
--record(mock_state, {
-          renewal_enabled      = ?required(mock_state, renewal_enabled     ) :: boolean(),
-          renewal_counter      = ?required(mock_state, renewal_counter     ) :: non_neg_integer()
-         }).
-
--type mock_state_t() :: #mock_state{}.
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % public API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -90,9 +83,9 @@ get_renewal_counter() ->
 
 -spec get_lease_list() -> lease_list:lease_list().
 get_lease_list() ->
-    comm:send_local(get_mock_pid(), {get_lease_list, self()}),
+    comm:send_local(get_mock_pid(), {get, lease_list, self()}),
     receive
-        {get_lease_list_response, List} ->
+        {get_response, List} ->
              List
     end.
 
@@ -100,60 +93,54 @@ get_lease_list() ->
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec on(comm:message(), {dht_node_state:state(), mock_state_t()}) ->
-                {dht_node_state:state(), mock_state_t()} | kill.
+-spec on(comm:message(), dht_node_state:state()) ->
+                dht_node_state:state() | kill.
 % get renewal counter
-on({get_renewal_counter, Pid},
-   {State, MockState}) ->
+on({get_renewal_counter, Pid}, State) ->
     comm:send_local(Pid,
                     {get_renewal_counter_response,
-                     get_renewal_counter(MockState)}),
-    {State, MockState};
+                     erlang:get(renewal_counter)}),
+    State;
 
-% get lease list
-on({get_lease_list, Pid}, {State, MockState}) ->
+% get from dht_node_state
+on({get, Key, Pid}, State) ->
     comm:send_local(Pid,
-                    {get_lease_list_response,
-                     dht_node_state:get(State, lease_list)}),
-    {State, MockState};
+                    {get_response,
+                     dht_node_state:get(State, Key)}),
+    State;
 
-% intercept renews
-on({l_on_cseq, renew, _OldLease, _Mode} = Msg,
-   {State, MockState}) ->
-    {l_on_cseq:on(Msg, State), increment_renewal_counter(MockState)};
-
-% Lease management messages (see l_on_cseq.erl)
-on(Msg, {State, MockState}) when l_on_cseq =:= element(1, Msg) ->
-    case l_on_cseq:on(Msg, State) of
-        {'$gen_component', [{post_op, NextMsg}], NewState} ->
-            %LeaseList = dht_node_state:get(NewState, lease_list),
-            %PassiveLeases = lease_list:get_passive_leases(LeaseList),
-            %ct:pal("msg ~w passive leases ~w", [Msg, PassiveLeases]),
-            gen_component:post_op(NextMsg, {NewState, MockState});
-        NewState ->
-            %LeaseList = dht_node_state:get(NewState, lease_list),
-            %PassiveLeases = lease_list:get_passive_leases(LeaseList),
-            %ct:pal("msg ~w~n passive leases ~w", [Msg, PassiveLeases]),
-            {NewState, MockState}
+% intercept l_on_cseq messages
+on(Msg, State) when element(1, Msg) =:= l_on_cseq ->
+    Intercept = erlang:get(message_filter),
+    if
+        Intercept ->
+            intercept_message(Msg, State);
+        true ->
+            case Msg of
+                % intercept renew
+                {l_on_cseq, renew, _OldLease, _Mode} ->
+                    increment_renewal_counter(),
+                    l_on_cseq:on(Msg, State);
+                _ ->
+                    l_on_cseq:on(Msg, State)
+            end
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec init({}) -> {dht_node_state:state(), mock_state_t()}.
+-spec init({}) -> dht_node_state:state().
 init({}) ->
     DHTNodeGrp = pid_groups:group_with(dht_node),
     pid_groups:join_as(DHTNodeGrp, ?MODULE),
     ct:log("mock_l_on_cseq running on ~w~n", [self()]),
-    {dht_node_state:new(rt_external_rt, rm_loop_state, dht_db), new_mock_state()}.
+    erlang:put(message_filter, fun(_Msg) -> false end),
+    erlang:put(renewal_counter, 0),
+    dht_node_state:new(rt_external_rt, rm_loop_state, dht_db).
 
 -spec start_link() -> {ok, pid()}.
 start_link() ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, {}, [{wait_for_init}]).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% mock_state
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper
@@ -163,15 +150,13 @@ start_link() ->
 get_mock_pid() ->
     pid_groups:find_a(?MODULE).
 
--spec new_mock_state() -> mock_state_t().
-new_mock_state() ->
-    #mock_state{renewal_enabled = true,
-                renewal_counter = 0}.
+-spec increment_renewal_counter() -> ok.
+increment_renewal_counter() ->
+    erlang:put(erlang:get(renewal_counter) + 1).
 
--spec increment_renewal_counter(mock_state_t()) -> mock_state_t().
-increment_renewal_counter(#mock_state{renewal_counter=Counter} = MockState) ->
-    MockState#mock_state{renewal_counter = Counter+1}.
-
--spec get_renewal_counter(mock_state_t()) -> non_neg_integer().
-get_renewal_counter(#mock_state{renewal_counter=Counter}) ->
-    Counter.
+-spec intercept_message(comm:message(), dht_node_state:state()) ->
+                dht_node_state:state().
+intercept_message(Msg, State) ->
+    Owner = erlang:get(owner),
+    comm:send_local(Owner, {intercepted_message, Msg}),
+    State.
