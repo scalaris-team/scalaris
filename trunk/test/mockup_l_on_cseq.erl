@@ -32,7 +32,8 @@
 -export([create_lease/2]).
 
 % public api
--export([get_renewal_counter/0, get_lease_list/0]).
+-export([get_renewal_counter/0, get_lease_list/0,
+         set_message_filter/2, reset_message_filter/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % public API
@@ -89,6 +90,23 @@ get_lease_list() ->
              List
     end.
 
+-spec set_message_filter(F::fun((comm:message()) -> boolean()),
+                         Owner::comm:mypid()) -> ok.
+set_message_filter(F, Owner) ->
+    comm:send_local(get_mock_pid(), {set_message_filter, F, Owner, self()}),
+    receive
+        {set_message_filter_response} ->
+             ok
+    end.
+
+-spec reset_message_filter() -> ok.
+reset_message_filter() ->
+    comm:send_local(get_mock_pid(), {reset_message_filter, self()}),
+    receive
+        {reset_message_filter_response} ->
+             ok
+    end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -102,6 +120,18 @@ on({get_renewal_counter, Pid}, State) ->
                      erlang:get(renewal_counter)}),
     State;
 
+on({set_message_filter, F, Owner, Pid}, State) ->
+    erlang:put(message_filter, F),
+    erlang:put(owner, Owner),
+    comm:send_local(Pid, {set_message_filter_response}),
+    State;
+
+on({reset_message_filter, Pid}, State) ->
+    erlang:put(message_filter, fun(_Msg) -> false end),
+    erlang:put(owner, undefined),
+    comm:send_local(Pid, {reset_message_filter_response}),
+    State;
+
 % get from dht_node_state
 on({get, Key, Pid}, State) ->
     comm:send_local(Pid,
@@ -111,7 +141,8 @@ on({get, Key, Pid}, State) ->
 
 % intercept l_on_cseq messages
 on(Msg, State) when element(1, Msg) =:= l_on_cseq ->
-    Intercept = erlang:get(message_filter),
+    Filter = erlang:get(message_filter),
+    Intercept = Filter(Msg),
     if
         Intercept ->
             intercept_message(Msg, State);
