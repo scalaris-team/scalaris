@@ -343,7 +343,7 @@ perform_transfer([]) ->
 perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other]) ->
     ?TRACE("~p: Reassigning ~p (light: ~p) and ~p (heavy: ~p)~n", [?MODULE, lb_info:get_node(LightNode), lb_info:get_load(LightNode), lb_info:get_node(HeavyNode), lb_info:get_load(HeavyNode)]),
     case lb_info:neighbors(HeavyNode, LightNode) of
-        true -> 
+        true ->
             lb_active:balance_nodes(HeavyNode, LightNode, []);
         false -> %% send message to succ of LightNode to get his load
             LightNodeSucc = lb_info:get_succ(LightNode),

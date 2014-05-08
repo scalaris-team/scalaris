@@ -261,8 +261,8 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         load         -> db_dht:get_load(DB)
                         %% and the prbr kv entries:
                             + prbr:get_load(PRBRState);
-        load2        -> lb_active:get_load_metric();
-        load3        -> lb_active:get_request_metric();
+        load2        -> lb_stats:get_load_metric();
+        load3        -> lb_stats:get_request_metric();
         prbr_kv_db   -> PRBRState;
         txid_db1     -> TxIdDB1;
         txid_db2     -> TxIdDB2;

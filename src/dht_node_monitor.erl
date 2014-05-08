@@ -40,11 +40,11 @@ on({lookup_hops, Hops}, {OldLookupHops, OldDBOps}) ->
     {NewLookupHops, OldDBOps};
 
 on({db_op_init, Id}, {OldLookupHops, _OldDBOps}) ->
-    NewDBOps = lb_active:init_db_rrd(Id),
+    NewDBOps = lb_stats:init_db_rrd(Id),
     {OldLookupHops, NewDBOps};
 
 on({db_op, Key}, {OldLookupHops, OldDBOps}) ->
-    NewDBOps = lb_active:update_db_rrd(Key, OldDBOps),
+    NewDBOps = lb_stats:update_db_rrd(Key, OldDBOps),
     {OldLookupHops, NewDBOps}.
 
 %% @doc initialisation
