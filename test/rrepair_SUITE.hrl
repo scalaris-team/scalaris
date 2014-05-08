@@ -509,7 +509,7 @@ waitForSyncRoundEnd(NodeKeys, RcvReqCompleteMsg) ->
            {get_state, comm:this(), [open_sessions, open_recon, open_resolve]}},
     util:wait_for(fun() -> wait_for_sync_round_end2(Req, NodeKeys) end, 100).
 
--spec wait_for_sync_round_end2(Req::comm:message(), [?RT:key()]) -> ok.
+-spec wait_for_sync_round_end2(Req::comm:message(), [?RT:key()]) -> boolean().
 wait_for_sync_round_end2(_Req, []) -> true;
 wait_for_sync_round_end2(Req, [Key | Keys]) ->
     api_dht_raw:unreliable_lookup(Key, Req),
