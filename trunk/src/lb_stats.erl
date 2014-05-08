@@ -47,7 +47,7 @@
 % items, cpu, mem, db_reads, db_writes, db_requests,
 % transactions, tx_latency, net_throughput, net_latency
 %% available metrics
--define(LOAD_METRICS, [items, cpu, mem, db_reads, db_writes]).
+-define(LOAD_METRICS, [items, cpu, mem, reductions, db_reads, db_writes]).
 -define(REQUEST_METRICS, [db_reads, db_writes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -59,13 +59,13 @@ init() ->
             _ = application:start(sasl),   %% required by os_mon.
             _ = application:start(os_mon), %% for monitoring cpu and memory usage.
             _ = cpu_sup:util(), %% throw away first util value
+            InitialReductions = get_reductions(),
+            set_last_reductions(InitialReductions),
             Resolution = config:read(lb_active_monitor_resolution),
-            %LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
-            %monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
-            %monitor:client_monitor_set_value(lb_active, mem5min, LongTerm),
-            ShortTerm = rrd:create(Resolution * 1000, 5, gauge),
-            monitor:client_monitor_set_value(lb_active, cpu, ShortTerm),
-            monitor:client_monitor_set_value(lb_active, mem, ShortTerm),
+            RRD = rrd:create(Resolution * 1000, 5, gauge),
+            monitor:client_monitor_set_value(lb_active, cpu, RRD),
+            monitor:client_monitor_set_value(lb_active, mem, RRD),
+            monitor:monitor_set_value(lb_active, reductions, RRD),
             trigger();
         _ ->
             ok
@@ -85,11 +85,10 @@ trigger_routine() ->
                {total_memory, TotalMemory}] ->
                   FreeMemory / TotalMemory * 100
           end,
+    Reductions = get_reductions() - get_last_reductions(),
     monitor:client_monitor_set_value(lb_active, cpu, fun(Old) -> rrd:add_now(CPU, Old) end),
-    %monitor:client_monitor_set_value(lb_active, cpu5min, fun(Old) -> rrd:add_now(CPU, Old) end),
-    monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end)
-    %monitor:client_monitor_set_value(lb_active, mem5min, fun(Old) -> rrd:add_now(MEM, Old) end),
-    .
+    monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end),
+    monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add_now(Reductions, Old) end).
 
 -compile({inline, [init_db_rrd/1]}).
 %% @doc Called by dht node process to initialize the db monitors
@@ -170,6 +169,7 @@ get_load_metric(Metric) ->
 get_load_metric(Metric, Mode) ->
     case Metric of
         cpu          -> get_vm_metric(cpu, Mode);
+        reductions   -> get_dht_metric(reductions, Mode);
         mem          -> get_vm_metric(mem, Mode);
         items        -> items;
         _            -> throw(metric_not_available)
@@ -290,11 +290,31 @@ get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
             end
     end.
 
+%% @doc get the reductions of all processes in the pid group
+-spec get_reductions() -> integer().
+get_reductions() ->
+    MyGroupPids = pid_groups:my_members(),
+    AllReductions =
+        [begin
+             {reductions, N} = erlang:process_info(Pid, reductions),
+             N
+         end || Pid <- MyGroupPids],
+    lists:sum(AllReductions).
+
+-spec set_last_reductions(integer()) -> ok.
+set_last_reductions(Reductions) ->
+    erlang:put(reductions, Reductions),
+    ok.
+
+-spec get_last_reductions() -> integer().
+get_last_reductions() ->
+    erlang:get(reductions).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec collect_stats() -> boolean().
 collect_stats() ->
-    Metrics = [cpu, mem], %% TODO
+    Metrics = [cpu, mem, reductions],
     lists:member(config:read(lb_active_load_metric), Metrics).
 
 -spec trigger() -> ok.
