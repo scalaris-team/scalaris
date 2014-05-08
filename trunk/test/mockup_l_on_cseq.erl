@@ -152,7 +152,7 @@ get_mock_pid() ->
 
 -spec increment_renewal_counter() -> ok.
 increment_renewal_counter() ->
-    erlang:put(erlang:get(renewal_counter) + 1).
+    erlang:put(renewal_counter, erlang:get(renewal_counter) + 1).
 
 -spec intercept_message(comm:message(), dht_node_state:state()) ->
                 dht_node_state:state().
