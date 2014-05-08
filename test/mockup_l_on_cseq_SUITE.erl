@@ -72,7 +72,7 @@ init_per_testcase(TestCase, Config) ->
             Ids = ?RT:get_replica_keys(?RT:hash_key("0")),
             unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
                                                                {leases, true}]}]),
-            mockup_l_on_cseq:start_link(),
+            {ok, _} = mockup_l_on_cseq:start_link(),
             Config
     end.
 
