@@ -121,7 +121,8 @@ test_merge(_Config) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 test_split(_Config) ->
-    L = mockup_l_on_cseq:create_lease(0, 16),
+    L = mockup_l_on_cseq:create_lease(rt_SUITE:number_to_key(0),
+                                      rt_SUITE:number_to_key(16)),
     % join group
     Pid = pid_groups:find_a(mockup_l_on_cseq),
     pid_groups:join(pid_groups:group_of(Pid)),
