@@ -22,8 +22,8 @@
 
 -include("scalaris.hrl").
 
-%%-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format("lb_stats: " ++ X, Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("lb_stats: " ++ X, Y)).
 
 -export([get_request_histogram_split_key/3]).
 
@@ -70,6 +70,7 @@ init() ->
             ok
     end.
 
+-spec trigger_routine() -> ok.
 trigger_routine() ->
     trigger(),
     CPU = cpu_sup:util(),
