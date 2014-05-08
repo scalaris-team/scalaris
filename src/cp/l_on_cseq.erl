@@ -152,7 +152,7 @@ delta() -> 10.
 lease_renew(Lease, Mode) ->
     lease_renew(pid_groups:get_my(dht_node), Lease, Mode).
 
--spec lease_renew(comm:mypid(), lease_t(), active | passive) -> ok.
+-spec lease_renew(comm:erl_local_pid(), lease_t(), active | passive) -> ok.
 lease_renew(Pid, Lease, Mode) ->
     comm:send_local(Pid,
                     {l_on_cseq, renew, Lease, Mode}),
