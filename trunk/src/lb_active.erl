@@ -1,5 +1,5 @@
 %  @copyright 2014 Zuse Institute Berlin
-
+%
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
 %   You may obtain a copy of the License at
@@ -33,15 +33,12 @@
 -export([on_inactive/2, on/2]).
 %% for calls from the dht node
 -export([handle_dht_msg/2]).
-%% for db monitoring
--export([init_db_rrd/1, update_db_rrd/2, update_db_monitor/2]).
-%% Metrics
--export([get_load_metric/0, get_request_metric/0]).
 % Load Balancing
 -export([balance_nodes/3, balance_nodes/4, balance_noop/1]).
+-export([get_last_db_monitor_init/1]).
 
 -ifdef(with_export_type_support).
--export_type([dht_message/0]).
+-export_type([dht_message/0, state/0]).
 -endif.
 
 -record(lb_op, {id = ?required(id, lb_op)                           :: uid:global_uid(),
@@ -85,19 +82,13 @@
 
 -type module_state() :: tuple().
 
--type state() :: module_state().
+-record(my_state, {last_balance = os:timestamp() :: erlang:timestamp(),
+                   last_db_monitor_reset = os:timestamp() :: erlang:timestamp(),
+                   pending_op = nil :: lb_op() | nil}).
 
--type load_metric() :: items | cpu | mem.
--type request_metric() :: db_reads | db_writes.
-%-type balance_metric() :: items | requests | none.
-%-type metrics() :: [atom()]. %% TODO
+-type my_state() :: #my_state{}.
 
-%% possible metrics
-% items, cpu, mem, db_reads, db_writes, db_requests,
-% transactions, tx_latency, net_throughput, net_latency
-%% available metrics
--define(LOAD_METRICS, [items, cpu, mem, db_reads, db_writes]).
--define(REQUEST_METRICS, [db_reads, db_writes]).
+-opaque state() :: {my_state(), module_state()}.
 
 %% list of active load balancing modules available
 -define(MODULES, [lb_active_karger, lb_active_directories]).
@@ -114,17 +105,8 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialization of monitoring values
 -spec init([]) -> state().
 init([]) ->
-    set_time_last_balance(),
-    set_last_db_monitor_init(),
-    case collect_stats() of
-        true ->
-            _ = application:start(sasl),   %% required by os_mon.
-            _ = application:start(os_mon), %% for monitoring cpu and memory usage.
-            trigger(collect_stats);
-        _ -> ok
-    end,
-    init_stats(),
-    trigger(lb_trigger),
+    lb_stats:init(),
+    trigger(),
     %% keep the node id in state, currently needed to normalize histogram
     rm_loop:subscribe(
        self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_slide_filter/3,
@@ -136,20 +118,21 @@ init([]) ->
     DhtNode = pid_groups:get_my(dht_node),
     comm:send_local(DhtNode, {lb_active, reset_db_monitors}),
     comm:send_local(self(), {reset_monitors}),
-    {}.
+
+    {_MyState = #my_state{}, _ModuleState = {}}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Startup message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Handles all messages until enough monitor data has been collected.
 -spec on_inactive(message_inactive(), state()) -> state().
-on_inactive({lb_trigger}, State) ->
-    trigger(lb_trigger),
-    case monitor_vals_appeared() of
+on_inactive({lb_trigger}, {MyState, _ModuleState} = State) ->
+    trigger(),
+    case lb_stats:monitor_vals_appeared(MyState) of
         true ->
             InitState = call_module(init, []),
             ?TRACE("All monitor data appeared. Activating active load balancing~n", []),
             %% change handler and initialize module
-            gen_component:change_handler(InitState, fun on/2);
+            gen_component:change_handler({MyState, InitState}, fun on/2);
         _    ->
             State
     end;
@@ -170,28 +153,14 @@ on_inactive(Msg, State) ->
 %% @doc On handler after initialization
 -spec on(message(), state()) -> state().
 on({collect_stats}, State) ->
-    trigger(collect_stats),
-    CPU = cpu_sup:util(),
-    MEM = case memsup:get_system_memory_data() of
-              [{system_total_memory, _Total},
-               {free_swap, _FreeSwap},
-               {total_swap, _TotalSwap},
-               {cached_memory, _CachedMemory},
-               {buffered_memory, _BufferedMemory},
-               {free_memory, FreeMemory},
-               {total_memory, TotalMemory}] ->
-                  FreeMemory / TotalMemory * 100
-          end,
-    monitor:client_monitor_set_value(lb_active, cpu, fun(Old) -> rrd:add_now(CPU, Old) end),
-    %monitor:client_monitor_set_value(lb_active, cpu5min, fun(Old) -> rrd:add_now(CPU, Old) end),
-    monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end),
-    %monitor:client_monitor_set_value(lb_active, mem5min, fun(Old) -> rrd:add_now(MEM, Old) end),
+    lb_stats:trigger_routine(),
     State;
 
-on({lb_trigger} = Msg, State) ->
+on({lb_trigger} = Msg, {MyState, ModuleState}) ->
     %% module can decide whether to trigger
     %% trigger(lb_trigger),
-    call_module(handle_msg, [Msg, State]);
+    ModuleState2 = call_module(handle_msg, [Msg, ModuleState]),
+    {MyState, ModuleState2};
 
 %% Gossip response before balancing takes place
 on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
@@ -218,115 +187,129 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     State;
 
 %% lb_op received from dht_node and to be executed
-on({balance_phase1, Op}, State) ->
-    case op_pending() of
-        true  -> ?TRACE("Pending op. Won't jump or slide. Discarding op ~p~n", [Op]);
-        false ->
-            case old_data(Op) of
-                true -> ?TRACE("Old data. Discarding op ~p~n", [Op]);
-                false ->
-                    set_pending_op(Op),
-                    case Op#lb_op.type of
-                        jump ->
-                            %% tell the succ of the light node in case of a jump
-                            LightNodeSuccPid = node:pidX(Op#lb_op.light_node_succ),
-                            comm:send(LightNodeSuccPid, {balance_phase2a, Op, comm:this()}, [{group_member, lb_active}]);
-                        _ -> 
-                            %% set pending op at other node
-                            LightNodePid = node:pidX(Op#lb_op.light_node),
-                            comm:send(LightNodePid, {balance_phase2b, Op, comm:this()}, [{group_member, lb_active}])
-                    end
-            end
-    end,
-    State;
+on({balance_phase1, Op}, {MyState, ModuleState} = State) ->
+    OpPending = op_pending(MyState),
+    OldData = old_data(Op, MyState),
+    if
+        OpPending ->
+            ?TRACE("Phase1: Pending op. Won't jump or slide. Discarding op ~p~n", [Op]),
+            State;
+        OldData ->
+            ?TRACE("Phase1: Old data in lb_op. Won't jump or slide. Discarding op ~p~n", [Op]),
+            State;
+        true ->
+            MyState2 = set_pending_op(Op, MyState),
+            case Op#lb_op.type of
+                jump ->
+                    %% tell the succ of the light node in case of a jump
+                    LightNodeSuccPid = node:pidX(Op#lb_op.light_node_succ),
+                    comm:send(LightNodeSuccPid, {balance_phase2a, Op, comm:this()}, [{group_member, lb_active}]);
+                _ ->
+                    %% set pending op at other node
+                    LightNodePid = node:pidX(Op#lb_op.light_node),
+                    comm:send(LightNodePid, {balance_phase2b, Op, comm:this()}, [{group_member, lb_active}])
+            end,
+            {MyState2, ModuleState}
+    end;
 
 %% Received by the succ of the light node which takes the light nodes' load
 %% in case of a jump.
-on({balance_phase2a, Op, ReplyPid}, State) ->
-    case op_pending() of
-        true -> ?TRACE("Pending op in phase2a. Discarding op ~p and replying~n", [Op]),
-                comm:send(ReplyPid, {balance_failed, Op});
-        false ->
-            case old_data(Op) of
-                true -> ?TRACE("Old data. Discarding op ~p~n", [Op]),
-                        comm:send(ReplyPid, {balance_failed, Op});
-                false ->
-                    set_pending_op(Op),
-                    LightNodePid = node:pidX(Op#lb_op.light_node),
-                    comm:send(LightNodePid, {balance_phase2b, Op, ReplyPid}, [{group_member, lb_active}])
-            end
-    end,
-    State;
+on({balance_phase2a, Op, ReplyPid}, {MyState, ModuleState} = State) ->
+    OpPending = op_pending(MyState),
+    OldData = old_data(Op, MyState),
+    if
+        OpPending ->
+            ?TRACE("Phase2a: Pending op. Discarding op ~p and replying~n", [Op]),
+            comm:send(ReplyPid, {balance_failed, Op}),
+            State;
+        OldData ->
+            ?TRACE("Phase2a: Old data in lb_op. Won't jump or slide. Discarding op ~p~n", [Op]),
+            State;
+        true ->
+            MyState2 = set_pending_op(Op, MyState),
+            LightNodePid = node:pidX(Op#lb_op.light_node),
+            comm:send(LightNodePid, {balance_phase2b, Op, ReplyPid}, [{group_member, lb_active}]),
+            {MyState2, ModuleState}
+    end;
 
 %% The light node which receives load from the heavy node and initiates the lb op.
-on({balance_phase2b, Op, ReplyPid}, State) ->
-    case op_pending() of
-        true -> ?TRACE("Pending op in phase2b. Discarding op ~p and replying~n", [Op]),
-                comm:send(ReplyPid, {balance_failed, Op});
-        false ->
-            case old_data(Op) of
-                true -> ?TRACE("Old data. Discarding op ~p~n", [Op]),
-                        comm:send(ReplyPid, {balance_failed, Op#lb_op.id});
-                false ->
-                    set_pending_op(Op),
-                    OpId = Op#lb_op.id,
-                    _Pid = node:pidX(Op#lb_op.light_node),
-                    TargetKey = Op#lb_op.target,
-                    set_pending_op(Op),
-                    ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
-                    MyDHT = pid_groups:get_my(dht_node),
-                    ?DBG_ASSERT(_Pid =:= comm:make_global(MyDHT)),
-                    case Op#lb_op.type of
-                        jump ->
-                            comm:send_local(MyDHT, {move, start_jump, TargetKey, {jump, OpId}, comm:this()});
-                        slide_pred ->
-                            comm:send_local(MyDHT, {move, start_slide, pred, TargetKey, {slide_pred, OpId}, comm:this()});
-                        slide_succ ->
-                            comm:send_local(MyDHT, {move, start_slide, succ, TargetKey, {slide_succ, OpId}, comm:this()})
-                    end
-            end
-    end,
-    State;
+on({balance_phase2b, Op, ReplyPid}, {MyState, ModuleState} = State) ->
+    OpPending = op_pending(MyState),
+    OldData = old_data(Op, MyState),
+    if
+        OpPending ->
+            ?TRACE("Phase2b: Pending op. Discarding op ~p and replying~n", [Op]),
+            comm:send(ReplyPid, {balance_failed, Op}),
+            State;
+        OldData ->
+            ?TRACE("Phase2b: Old data in lb_op. Won't jump or slide. Discarding op ~p~n", [Op]),
+            State;
+        true ->
+            OpId = Op#lb_op.id,
+            _Pid = node:pidX(Op#lb_op.light_node),
+            TargetKey = Op#lb_op.target,
+            MyState2 = set_pending_op(Op, MyState),
+            ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
+            MyDHT = pid_groups:get_my(dht_node),
+            ?DBG_ASSERT(_Pid =:= comm:make_global(MyDHT)),
+            case Op#lb_op.type of
+                jump ->
+                    comm:send_local(MyDHT, {move, start_jump, TargetKey, {jump, OpId}, comm:this()});
+                slide_pred ->
+                    comm:send_local(MyDHT, {move, start_slide, pred, TargetKey, {slide_pred, OpId}, comm:this()});
+                slide_succ ->
+                    comm:send_local(MyDHT, {move, start_slide, succ, TargetKey, {slide_succ, OpId}, comm:this()})
+            end,
+            {MyState2, ModuleState}
+    end;
 
-on({balance_failed, OpId}, State) ->
-    case get_pending_op() of
-        undefined -> ?TRACE("Received balance_failed but OpId ~p was not pending~n", [OpId]);
+on({balance_failed, OpId}, {MyState, ModuleState} = State) ->
+    case get_pending_op(MyState) of
+        nil ->
+            ?TRACE("Received balance_failed but OpId ~p was not pending~n", [OpId]),
+            State;
         Op when Op#lb_op.id =:= OpId ->
             ?TRACE("Clearing pending op because of balance_failed ~p~n", [OpId]),
-            set_pending_op(undefined);
+            MyState2 = set_pending_op(nil, MyState),
+            {MyState2, ModuleState};
         Op ->
-            ?TRACE("Received balance_failed answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
-    end,
-    State;
+            ?TRACE("Received balance_failed answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id]),
+            State
+    end;
 
 %% success does not imply the slide or jump was successfull. however,
 %% slide or jump failures should very rarly occur because of the locking
 %% and stale data detection.
-on({balance_success, OpId}, State) ->
-    case get_pending_op() of
-        undefined -> ?TRACE("Received answer but OpId ~p was not pending~n", [OpId]);
+on({balance_success, OpId}, {MyState, ModuleState} = State) ->
+    case get_pending_op(MyState) of
+        nil ->
+            ?TRACE("Received answer but OpId ~p was not pending~n", [OpId]),
+            State;
         Op when Op#lb_op.id =:= OpId ->
             ?TRACE("Clearing pending op ~p~n", [OpId]),
             comm:send_local(self(), {reset_monitors}),
-            set_pending_op(undefined),
-            set_time_last_balance();
+            MyState2 = set_pending_op(nil, MyState),
+            MyState3 = set_time_last_balance(MyState2),
+            {MyState3, ModuleState};
         Op ->
-            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
-    end,
-    State;
+            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id]),
+            State
+    end;
 
 %% received reply at the sliding/jumping node
-on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
+on({move, result, {_JumpOrSlide, OpId}, _Status}, {MyState, ModuleState} = State) ->
     ?TRACE("~p status with id ~p: ~p~n", [_JumpOrSlide, OpId, _Status]),
-    case get_pending_op() of
-        undefined -> ?TRACE("Received answer but OpId ~p was not pending~n", [OpId]);
+    case get_pending_op(MyState) of
+        nil ->
+            ?TRACE("Received answer but OpId ~p was not pending~n", [OpId]),
+            State;
         Op when Op#lb_op.id =:= OpId ->
             ?TRACE("Clearing pending op and replying to other node ~p~n", [OpId]),
             HeavyNodePid = node:pidX(Op#lb_op.heavy_node),
             comm:send(HeavyNodePid, {balance_success, OpId}, [{group_member, lb_active}]),
             comm:send_local(self(), {reset_monitors}),
-            set_pending_op(undefined),
-            set_time_last_balance(),
+            MyState2 = set_pending_op(nil, MyState),
+            MyState3 = set_time_last_balance(MyState2),
             case Op#lb_op.type of
                 jump ->
                     %% also reply to light node succ in case of jump
@@ -335,35 +318,43 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, State) ->
                     comm:send(LightNodeSuccPid, {balance_success, OpId}, [{group_member, lb_active}]);
                 _ ->
                     ok
-            end;
+            end,
+            {MyState3, ModuleState};
         Op ->
-            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id])
-    end,
-    State;
+            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id]),
+            State
+    end;
 
-on({reset_monitors}, State) ->
-    init_stats(),
-    erlang:erase(metric_available),
+on({reset_monitors}, {MyState, ModuleState}) ->
+    lb_stats:init(),
     ?TRACE("Reseting monitors ~n", []),
-    gen_component:change_handler(State, fun on_inactive/2);
+    MyState2 = set_last_db_monitor_init(MyState),
+    gen_component:change_handler({MyState2, ModuleState}, fun on_inactive/2);
 
-on({web_debug_info, Requestor}, State) ->
+on({web_debug_info, Requestor}, {MyState, ModuleState} = State) ->
     KVList =
         [{"active module", webhelpers:safe_html_string("~p", [get_lb_module()])},
          {"load metric", webhelpers:safe_html_string("~p", [config:read(lb_active_load_metric)])},
-         {"load metric value:", webhelpers:safe_html_string("~p", [get_load_metric()])},
+         {"load metric value:", webhelpers:safe_html_string("~p", [lb_stats:get_load_metric()])},
          {"request metric", webhelpers:safe_html_string("~p", [config:read(lb_active_request_metric)])},
-         {"request metric value", webhelpers:safe_html_string("~p", [get_request_metric()])},
+         {"request metric value", webhelpers:safe_html_string("~p", [lb_stats:get_request_metric()])},
          {"balance with", webhelpers:safe_html_string("~p", [config:read(lb_active_balance_metric)])},
-         {"last balance:", webhelpers:safe_html_string("~p", [get_time_last_balance()])},
-         {"pending op:",   webhelpers:safe_html_string("~p", [get_pending_op()])}
+         {"last balance:", webhelpers:safe_html_string("~p", [get_time_last_balance(MyState)])},
+         {"pending op:",   webhelpers:safe_html_string("~p", [get_pending_op(MyState)])},
+         {"last db monitor init:", webhelpers:safe_html_string("~p", [get_last_db_monitor_init(MyState)])}
         ],
-    Return = KVList ++ call_module(get_web_debug_kv, [State]),
+    case get_lb_module() of
+        none ->
+            Return = KVList;
+        _ ->
+            Return = KVList ++ call_module(get_web_debug_kv, [ModuleState])
+    end,
     comm:send_local(Requestor, {web_debug_info_reply, Return}),
     State;
 
-on(Msg, State) ->
-    call_module(handle_msg, [Msg, State]).
+on(Msg, {MyState, ModuleState}) ->
+    ModuleState2 = call_module(handle_msg, [Msg, ModuleState]),
+    {MyState, ModuleState2}.
 
 %%%%%%%%%%%%%%%%%%%%%%% Load Balancing %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -402,7 +393,7 @@ balance_noop(Options) ->
 -spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
 
 handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
-    case monitor_db() of
+    case lb_stats:monitor_db() of
         true ->
             MyPredId = dht_node_state:get(DhtState, pred_id),
             DhtNodeMonitor = dht_node_state:get(DhtState, monitor_proc),
@@ -453,7 +444,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                         none ->
                             dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction);
                         requests ->
-                            case get_request_histogram_split_key(TargetLoad, Direction, lb_info:get_time(HeavyNode)) of
+                            case lb_stats:get_request_histogram_split_key(TargetLoad, Direction, lb_info:get_time(HeavyNode)) of
                                 %% TODO fall back in a more clever way / abort lb request
                                 failed ->
                                     ?TRACE("get_request_histogram failed~n", []),
@@ -529,226 +520,6 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
 handle_dht_msg(Msg, DhtState) ->
     call_module(handle_dht_msg, [Msg, DhtState]).
 
-%%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--compile({inline, [init_db_rrd/1]}).
-%% @doc Called by dht node process to initialize the db monitors
--spec init_db_rrd(Id::?RT:key()) -> rrd:rrd().
-init_db_rrd(Id) ->
-    Type = config:read(lb_active_db_monitor),
-    History = config:read(lb_active_monitor_history),
-    HistogramSize = config:read(lb_active_histogram_size),
-    HistogramType = {histogram_rt, HistogramSize, Id},
-    MonitorResSecs = config:read(lb_active_monitor_resolution) div 1000,
-    {MegaSecs, Secs, _Microsecs} = os:timestamp(),
-    %% synchronize the start time for all monitors to a divisible of the monitor interval
-    StartTime = {MegaSecs, Secs - Secs rem MonitorResSecs + MonitorResSecs, 0},
-    RRD  = rrd:create(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
-    Monitor = pid_groups:get_my(monitor),
-    monitor:clear_rrds(Monitor, [{lb_active, Type}]),
-    monitor:monitor_set_value(lb_active, Type, RRD),
-    RRD.
-
--compile({inline, [update_db_monitor/2]}).
-%% @doc Updates the local rrd for reads or writes and checks for reporting
--spec update_db_monitor(Type::db_reads | db_writes, Value::?RT:key()) -> ok.
-update_db_monitor(Type, Value) ->
-    case monitor_db() andalso config:read(lb_active_db_monitor) =:= Type of
-        true ->
-            DhtNodeMonitor = pid_groups:get_my(dht_node_monitor),
-            comm:send_local(DhtNodeMonitor, {db_op, Value});
-        _ -> ok
-    end.
-
--compile({inline, [update_db_rrd/2]}).
-%% @doc Updates the local rrd for reads or writes and checks for reporting
--spec update_db_rrd(Value::?RT:key(), RRD::rrd:rrd()) -> rrd:rrd().
-update_db_rrd(Key, OldRRD) ->
-    Type = config:read(lb_active_db_monitor),
-    NewRRD = rrd:add_now(Key, OldRRD),
-    monitor:check_report(lb_active, Type, OldRRD, NewRRD),
-    NewRRD.
-
--spec init_stats() -> ok.
-init_stats() ->
-    case collect_stats() of
-        true ->
-            Resolution = config:read(lb_active_monitor_resolution),
-            %LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
-            %monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
-            %monitor:client_monitor_set_value(lb_active, mem5min, LongTerm),
-            ShortTerm = rrd:create(Resolution * 1000, 5, gauge),
-            monitor:client_monitor_set_value(lb_active, cpu, ShortTerm),
-            monitor:client_monitor_set_value(lb_active, mem, ShortTerm);
-        _ ->
-            ok
-    end.
-
-%% @doc initially checks if enough metric data has been collected
--spec monitor_vals_appeared() -> boolean().
-monitor_vals_appeared() ->
-    Metric = config:read(lb_active_load_metric),
-    case erlang:get(metric_available) of
-        true -> true;
-        _ ->
-            case collect_phase() andalso get_load_metric(Metric, strict) =:= unknown of
-                true ->
-                    false;
-                _ ->
-                    erlang:put(metric_available, true),
-                    true
-            end
-    end.
-
-%% @doc checks if the load balancing is in the data collection phase
--spec collect_phase() -> boolean().
-collect_phase() ->
-    History = config:read(lb_active_monitor_history),
-    Resolution = config:read(lb_active_monitor_resolution),
-    CollectPhase = History * Resolution,
-    LastInit = get_last_db_monitor_init(),
-    timer:now_diff(os:timestamp(), LastInit) div 1000 =< CollectPhase.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
--spec get_load_metric() -> number().
-get_load_metric() ->
-    Metric = config:read(lb_active_load_metric),
-    Value = case get_load_metric(Metric) of
-                unknown -> 0.0;
-                items -> 0.0;
-                Val -> util:round(Val, 2)
-            end,
-    %io:format("Load: ~p~n", [Value]),
-    Value.
-
--spec get_load_metric(load_metric()) -> unknown | items | number(). %% TODO unknwon shouldn't happen here, in theory it can
-get_load_metric(Metric) ->
-    get_load_metric(Metric, normal).
-
--spec get_load_metric(load_metric(), normal | strict) -> unknown | items | number().
-get_load_metric(Metric, Mode) ->
-    case Metric of
-        cpu          -> get_vm_metric(cpu, Mode);
-        mem          -> get_vm_metric(mem, Mode);
-        items        -> items;
-        _            -> throw(metric_not_available)
-    end.
-
--spec get_request_metric() -> number().
-get_request_metric() ->
-    Metric = config:read(lb_active_request_metric),
-    Value = case get_request_metric(Metric) of
-                unknown -> 0;
-                Val -> util:round(Val, 2)
-            end,
-    %io:format("Requests: ~p~n", [Value]),
-    Value.
-
--spec get_request_metric(request_metric()) -> unknown | number().
-get_request_metric(Metric) ->
-    get_request_metric(Metric, normal).
-
--spec get_request_metric(request_metric(), normal | strict) -> unknown | number().
-get_request_metric(Metric, Mode) ->
-    case Metric of
-        db_reads -> get_dht_metric(db_reads, Mode);
-        db_writes -> get_dht_metric(db_writes, Mode)
-        %db_requests  -> get_request_metric(db_reads, Mode) +
-        %                get_request_metric(db_writes, Mode); %% TODO
-    end.
-
--spec get_vm_metric(load_metric(), normal | strict) -> unknown | number().
-get_vm_metric(Metric, Mode) ->
-    ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-    get_metric(ClientMonitorPid, Metric, Mode).
-
--spec get_dht_metric(load_metric() | request_metric(), normal | strict) -> unknown | number().
-get_dht_metric(Metric, Mode) ->
-    MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, Metric, Mode).
-
--spec get_metric(pid(), load_metric() | request_metric(), normal | strict) -> unknown | number().
-get_metric(MonitorPid, Metric, Mode) ->
-    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, Metric}]),
-    case RRD of
-        undefined ->
-            unknown;
-        RRD ->
-            History = config:read(lb_active_monitor_history),
-            SlotLength = rrd:get_slot_length(RRD),
-            {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-            Vals = [begin
-                        %% get stable value off an old slot
-                        Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs - Offset*SlotLength}),
-                        get_value_type(Value, rrd:get_type(RRD))
-                    end || Offset <- lists:seq(1, History)],
-            %io:format("~p Vals: ~p~n", [Metric, Vals]),
-            case Mode of
-                strict -> ?IIF(lists:member(unknown, Vals), unknown, avg_weighted(Vals));
-                _ -> avg_weighted(Vals)
-            end
-    end.
-
--spec get_value_type(RRD::rrd:data_type(), Type::rrd:timeseries_type()) -> unknown | number().
-get_value_type(undefined, _Type) ->
-    unknown;
-get_value_type(Value, _Type) when is_number(Value) ->
-    Value;
-get_value_type(Value, {histogram, _Size}) ->
-    histogram:get_num_inserts(Value);
-get_value_type(Value, {histogram_rt, _Size, _BaseKey}) ->
-    histogram_rt:get_num_inserts(Value).
-
-%% @doc returns the weighted average of a list using decreasing weight
--spec avg_weighted([number()]) -> number().
-avg_weighted([]) ->
-    0;
-avg_weighted(List) ->
-    avg_weighted(List, _Weight=length(List), _Normalize=0, _Sum=0).
-
-%% @doc returns the weighted average of a list using decreasing weight
--spec avg_weighted([], Weight::0, Normalize::pos_integer(), Sum::number()) -> unknown | float();
-                  ([number()| unknown,...], Weight::pos_integer(), Normalize::non_neg_integer(), Sum::number()) -> unknown | float().
-avg_weighted([], 0, 0, _Sum) ->
-    unknown;
-avg_weighted([], 0, N, Sum) ->
-    Sum/N;
-avg_weighted([unknown | Other], Weight, N, Sum) ->
-    avg_weighted(Other, Weight - 1, N + Weight, Sum);
-avg_weighted([Element | Other], Weight, N, Sum) ->
-    avg_weighted(Other, Weight - 1, N + Weight, Sum + Weight * Element).
-
--spec get_request_histogram_split_key(TargetLoad::pos_integer(),
-                                      Direction::forward | backward,
-                                      erlang:timestamp())
-        -> {?RT:key(), TakenLoad::non_neg_integer()} | failed.
-get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
-    MonitorPid = pid_groups:get_my(monitor),
-    RequestMetric = config:read(lb_active_request_metric),
-    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, RequestMetric}]),
-    case RRD of
-        undefined ->
-            log:log(warn, "No request histogram available because no rrd is available."),
-            failed;
-        RRD ->
-            case rrd:get_value(RRD, Time) of
-                undefined ->
-                    log:log(warn, "No request histogram available. Time slot not found."),
-                    failed;
-                Histogram ->
-                    ?TRACE("Got histogram to compute split key: ~p~n", [Histogram]),
-                    {Status, Key, TakenLoad} =
-                        case Direction of
-                            forward -> histogram_rt:foldl_until(TargetLoad, Histogram);
-                            backward -> histogram_rt:foldr_until(TargetLoad, Histogram)
-                        end,
-                    case {Status, Direction} of
-                        {fail, _} -> failed;
-                        {ok, _} -> {Key, TakenLoad}
-                    end
-            end
-    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -757,7 +528,7 @@ get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
 is_enabled() ->
     config:read(lb_active).
 
--spec call_module(atom(), list()) -> module_state().
+-spec call_module(atom(), list()) -> module_state() | dht_node_state:state().
 call_module(Fun, Args) ->
     case get_lb_module() of
         none ->
@@ -770,65 +541,55 @@ call_module(Fun, Args) ->
 get_lb_module() ->
     config:read(lb_active_module).
 
--spec collect_stats() -> boolean().
-collect_stats() ->
-    Metrics = [cpu, mem], %% TODO
-    lists:member(config:read(lb_active_load_metric), Metrics).
+-spec get_pending_op(my_state()) -> nil | lb_op().
+get_pending_op(MyState) ->
+    MyState#my_state.pending_op.
 
--compile({inline, [monitor_db/0]}).
--spec monitor_db() -> boolean().
-monitor_db() ->
-    is_enabled() andalso config:read(lb_active_db_monitor) =/= none.
+-spec set_pending_op(nil | lb_op(), my_state()) -> my_state().
+set_pending_op(Op, MyState) ->
+    MyState#my_state{pending_op = Op}.
 
--spec get_pending_op() -> undefined | lb_op().
-get_pending_op() ->
-    erlang:get(pending_op).
-
--spec set_pending_op(undefined | lb_op()) -> ok.
-set_pending_op(Op) ->
-    erlang:put(pending_op, Op),
-    ok.
-
--spec op_pending() -> boolean().
-op_pending() ->
-    case erlang:get(pending_op) of
-        undefined -> false;
-        OtherOp ->
-            case old_op(OtherOp) of
+-spec op_pending(my_state()) -> boolean().
+op_pending(MyState) ->
+    case MyState#my_state.pending_op of
+        nil -> false;
+        Op ->
+            case old_op(Op) of
                 false -> true;
-                true -> %% remove old op
-                    ?TRACE("Removing old op ~p~n", [OtherOp]),
-                    erlang:erase(pending_op),
+                true ->
+                    ?TRACE("Ignoring old op ~p~n", [Op]),
                     false
             end
     end.
 
+%% @doc Checks if an lb_op has been pending for a long time
 -spec old_op(lb_op()) -> boolean().
 old_op(Op) ->
     Threshold = config:read(lb_active_wait_for_pending_ops),
     timer:now_diff(os:timestamp(), Op#lb_op.time) div 1000 > Threshold.
 
--spec old_data(lb_op()) -> boolean().
-old_data(Op) ->
-    LastBalanceTime = erlang:get(time_last_balance),
+%% @doc Checks if an lb_op contains old data
+-spec old_data(lb_op(), my_state()) -> boolean().
+old_data(Op, MyState) ->
+    LastBalanceTime = get_time_last_balance(MyState),
     DataTime = Op#lb_op.data_time,
     timer:now_diff(LastBalanceTime, DataTime) > 0.
 
--spec get_time_last_balance() -> erlang:timestamp().
-get_time_last_balance() ->
-    erlang:get(time_last_balance).
+-spec set_last_db_monitor_init(my_state()) -> my_state().
+set_last_db_monitor_init(MyState) ->
+    MyState#my_state{last_db_monitor_reset = os:timestamp()}.
 
--spec set_time_last_balance() -> ok.
-set_time_last_balance() ->
-    erlang:put(time_last_balance, os:timestamp()), ok.
+-spec get_last_db_monitor_init(my_state()) -> erlang:timestamp().
+get_last_db_monitor_init(MyState) ->
+    MyState#my_state.last_db_monitor_reset.
 
--spec set_last_db_monitor_init() -> ok.
-set_last_db_monitor_init() ->
-    erlang:put(last_db_monitor_init, os:timestamp()), ok.
+-spec get_time_last_balance(my_state()) -> erlang:timestamp().
+get_time_last_balance(MyState) ->
+    MyState#my_state.last_balance.
 
--spec get_last_db_monitor_init() -> erlang:timestamp().
-get_last_db_monitor_init() ->
-    erlang:get(last_db_monitor_init).
+-spec set_time_last_balance(my_state()) -> my_state().
+set_time_last_balance(MyState) ->
+    MyState#my_state{last_balance = os:timestamp()}.
 
 -spec gossip_available(options()) -> boolean().
 gossip_available(Options) ->
@@ -840,14 +601,10 @@ gossip_available(Options) ->
 is_simulation(Options) ->
     proplists:is_defined(simulate, Options).
 
--spec trigger(atom()) -> ok.
-trigger(Trigger) ->
-    Interval =
-        case Trigger of
-            lb_trigger -> config:read(lb_active_interval);
-            collect_stats -> config:read(lb_active_monitor_interval)
-        end,
-    msg_delay:send_trigger(Interval div 1000, {Trigger}).
+-spec trigger() -> ok.
+trigger() ->
+    Interval = config:read(lb_active_interval) div 1000,
+    msg_delay:send_trigger(Interval, {lb_trigger}).
 
 -spec check_for_gossip_modules() -> boolean().
 check_for_gossip_modules() ->
@@ -875,34 +632,14 @@ check_config() ->
     config:cfg_is_integer(lb_active_interval) and
     config:cfg_is_greater_than(lb_active_interval, 0) and
 
-    config:cfg_is_in(lb_active_load_metric, ?LOAD_METRICS) and
-
-    config:cfg_is_in(lb_active_request_metric, ?REQUEST_METRICS) and
-
-    config:cfg_is_in(lb_active_balance_metric, [items, requests, none]) and
-
     config:cfg_is_bool(lb_active_use_gossip) and
     config:cfg_is_greater_than(lb_active_gossip_stddev_threshold, 0) and
-
-    config:cfg_is_integer(lb_active_histogram_size) and
-    config:cfg_is_greater_than(lb_active_histogram_size, 0) and
-
-    config:cfg_is_integer(lb_active_monitor_resolution) and
-    config:cfg_is_greater_than(lb_active_monitor_resolution, 0) and
-
-    config:cfg_is_integer(lb_active_monitor_interval) and
-    config:cfg_is_greater_than(lb_active_monitor_interval, 0) and
-
-    config:cfg_is_less_than(lb_active_monitor_interval, config:read(lb_active_monitor_resolution)) and
-
-    config:cfg_is_integer(lb_active_monitor_history) and
-    config:cfg_is_greater_than(lb_active_monitor_history, 0) and
-
-    config:cfg_is_in(lb_active_db_monitor, [none, db_reads, db_writes]) and
 
     config:cfg_is_integer(lb_active_wait_for_pending_ops) and
     config:cfg_is_greater_than(lb_active_wait_for_pending_ops, 0) and
 
     check_for_gossip_modules() and
+
+    lb_stats:check_config() and
 
     check_module_config().

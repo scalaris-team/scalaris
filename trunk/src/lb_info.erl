@@ -53,9 +53,9 @@ new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
     Load = case config:read(lb_active_load_metric) of
                items -> Items;
-               _ -> lb_active:get_load_metric()
+               _ -> lb_stats:get_load_metric()
            end,
-    Requests = lb_active:get_request_metric(),
+    Requests = lb_stats:get_request_metric(),
     #lb_info{load  = Load,
              reqs  = Requests,
              items = Items,

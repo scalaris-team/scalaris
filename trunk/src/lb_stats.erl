@@ -1,0 +1,331 @@
+%  @copyright 2014 Zuse Institute Berlin
+%
+%   Licensed under the Apache License, Version 2.0 (the "License");
+%   you may not use this file except in compliance with the License.
+%   You may obtain a copy of the License at
+%
+%       http://www.apache.org/licenses/LICENSE-2.0
+%
+%   Unless required by applicable law or agreed to in writing, software
+%   distributed under the License is distributed on an "AS IS" BASIS,
+%   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%   See the License for the specific language governing permissions and
+%   limitations under the License.
+
+%% @author Maximilian Michels <michels@zib.de>
+%% @doc Active load balancing stats module which implements collecting
+%%      and accessing stats for the lb_active module.
+%% @version $Id$
+-module(lb_stats).
+-author('michels@zib.de').
+-vsn('$Id$').
+
+-include("scalaris.hrl").
+
+%%-define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("lb_stats: " ++ X, Y)).
+
+-export([get_request_histogram_split_key/3]).
+
+%% for db monitoring
+-export([init/0, init_db_rrd/1, update_db_rrd/2, update_db_monitor/2]).
+-export([monitor_db/0, monitor_vals_appeared/1]).
+%% Metrics
+-export([get_load_metric/0, get_request_metric/0]).
+
+-export([trigger_routine/0]).
+
+-export([check_config/0]).
+
+
+-type load_metric() :: items | cpu | mem | reductions | db_reads | db_writes.
+-type request_metric() :: db_reads | db_writes.
+%-type balance_metric() :: items | requests | none.
+%-type metrics() :: [atom()]. %% TODO
+
+%% possible metrics
+% items, cpu, mem, db_reads, db_writes, db_requests,
+% transactions, tx_latency, net_throughput, net_latency
+%% available metrics
+-define(LOAD_METRICS, [items, cpu, mem, db_reads, db_writes]).
+-define(REQUEST_METRICS, [db_reads, db_writes]).
+
+%%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec init() -> ok.
+init() ->
+    case collect_stats() of
+        true ->
+            _ = application:start(sasl),   %% required by os_mon.
+            _ = application:start(os_mon), %% for monitoring cpu and memory usage.
+            Resolution = config:read(lb_active_monitor_resolution),
+            %LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
+            %monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
+            %monitor:client_monitor_set_value(lb_active, mem5min, LongTerm),
+            ShortTerm = rrd:create(Resolution * 1000, 5, gauge),
+            monitor:client_monitor_set_value(lb_active, cpu, ShortTerm),
+            monitor:client_monitor_set_value(lb_active, mem, ShortTerm),
+            trigger();
+        _ ->
+            ok
+    end.
+
+trigger_routine() ->
+    trigger(),
+    CPU = cpu_sup:util(),
+    MEM = case memsup:get_system_memory_data() of
+              [{system_total_memory, _Total},
+               {free_swap, _FreeSwap},
+               {total_swap, _TotalSwap},
+               {cached_memory, _CachedMemory},
+               {buffered_memory, _BufferedMemory},
+               {free_memory, FreeMemory},
+               {total_memory, TotalMemory}] ->
+                  FreeMemory / TotalMemory * 100
+          end,
+    monitor:client_monitor_set_value(lb_active, cpu, fun(Old) -> rrd:add_now(CPU, Old) end),
+    %monitor:client_monitor_set_value(lb_active, cpu5min, fun(Old) -> rrd:add_now(CPU, Old) end),
+    monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end)
+    %monitor:client_monitor_set_value(lb_active, mem5min, fun(Old) -> rrd:add_now(MEM, Old) end),
+    .
+
+-compile({inline, [init_db_rrd/1]}).
+%% @doc Called by dht node process to initialize the db monitors
+-spec init_db_rrd(Id::?RT:key()) -> rrd:rrd().
+init_db_rrd(Id) ->
+    Type = config:read(lb_active_db_monitor),
+    History = config:read(lb_active_monitor_history),
+    HistogramSize = config:read(lb_active_histogram_size),
+    HistogramType = {histogram_rt, HistogramSize, Id},
+    MonitorResSecs = config:read(lb_active_monitor_resolution) div 1000,
+    {MegaSecs, Secs, _Microsecs} = os:timestamp(),
+    %% synchronize the start time for all monitors to a divisible of the monitor interval
+    StartTime = {MegaSecs, Secs - Secs rem MonitorResSecs + MonitorResSecs, 0},
+    RRD  = rrd:create(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
+    Monitor = pid_groups:get_my(monitor),
+    monitor:clear_rrds(Monitor, [{lb_active, Type}]),
+    monitor:monitor_set_value(lb_active, Type, RRD),
+    RRD.
+
+-compile({inline, [update_db_monitor/2]}).
+%% @doc Updates the local rrd for reads or writes and checks for reporting
+-spec update_db_monitor(Type::db_reads | db_writes, Value::?RT:key()) -> ok.
+update_db_monitor(Type, Value) ->
+    case monitor_db() andalso config:read(lb_active_db_monitor) =:= Type of
+        true ->
+            DhtNodeMonitor = pid_groups:get_my(dht_node_monitor),
+            comm:send_local(DhtNodeMonitor, {db_op, Value});
+        _ -> ok
+    end.
+
+-compile({inline, [update_db_rrd/2]}).
+%% @doc Updates the local rrd for reads or writes and checks for reporting
+-spec update_db_rrd(Value::?RT:key(), RRD::rrd:rrd()) -> rrd:rrd().
+update_db_rrd(Key, OldRRD) ->
+    Type = config:read(lb_active_db_monitor),
+    NewRRD = rrd:add_now(Key, OldRRD),
+    monitor:check_report(lb_active, Type, OldRRD, NewRRD),
+    NewRRD.
+
+%% @doc initially checks if enough metric data has been collected
+-spec monitor_vals_appeared(lb_active:my_state()) -> boolean().
+monitor_vals_appeared(MyState) ->
+    Metric = config:read(lb_active_load_metric),
+    case collect_phase(MyState) andalso get_load_metric(Metric, strict) =:= unknown of
+        true ->
+            false;
+        _ ->
+            true
+    end.
+
+%% @doc checks if the load balancing is in the data collection phase
+-spec collect_phase(lb_active:my_state()) -> boolean().
+collect_phase(MyState) ->
+    History = config:read(lb_active_monitor_history),
+    Resolution = config:read(lb_active_monitor_resolution),
+    CollectPhase = History * Resolution,
+    LastInit = lb_active:get_last_db_monitor_init(MyState),
+    timer:now_diff(os:timestamp(), LastInit) div 1000 =< CollectPhase.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec get_load_metric() -> number().
+get_load_metric() ->
+    Metric = config:read(lb_active_load_metric),
+    Value = case get_load_metric(Metric) of
+                unknown -> 0.0;
+                items -> 0.0;
+                Val -> util:round(Val, 2)
+            end,
+    %io:format("Load: ~p~n", [Value]),
+    Value.
+
+-spec get_load_metric(load_metric()) -> unknown | items | number().
+get_load_metric(Metric) ->
+    get_load_metric(Metric, normal).
+
+-spec get_load_metric(load_metric(), normal | strict) -> unknown | items | number().
+get_load_metric(Metric, Mode) ->
+    case Metric of
+        cpu          -> get_vm_metric(cpu, Mode);
+        mem          -> get_vm_metric(mem, Mode);
+        items        -> items;
+        _            -> throw(metric_not_available)
+    end.
+
+-spec get_request_metric() -> number().
+get_request_metric() ->
+    Metric = config:read(lb_active_request_metric),
+    Value = case get_request_metric(Metric) of
+                unknown -> 0;
+                Val -> util:round(Val, 2)
+            end,
+    %io:format("Requests: ~p~n", [Value]),
+    Value.
+
+-spec get_request_metric(request_metric()) -> unknown | number().
+get_request_metric(Metric) ->
+    get_request_metric(Metric, normal).
+
+-spec get_request_metric(request_metric(), normal | strict) -> unknown | number().
+get_request_metric(Metric, Mode) ->
+    case Metric of
+        db_reads -> get_dht_metric(db_reads, Mode);
+        db_writes -> get_dht_metric(db_writes, Mode)
+        %db_requests  -> get_request_metric(db_reads, Mode) +
+        %                get_request_metric(db_writes, Mode); %% TODO
+    end.
+
+-spec get_vm_metric(load_metric(), normal | strict) -> unknown | number().
+get_vm_metric(Metric, Mode) ->
+    ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
+    get_metric(ClientMonitorPid, Metric, Mode).
+
+-spec get_dht_metric(load_metric() | request_metric(), normal | strict) -> unknown | number().
+get_dht_metric(Metric, Mode) ->
+    MonitorPid = pid_groups:get_my(monitor),
+    get_metric(MonitorPid, Metric, Mode).
+
+-spec get_metric(pid(), load_metric() | request_metric(), normal | strict) -> unknown | number().
+get_metric(MonitorPid, Metric, Mode) ->
+    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, Metric}]),
+    case RRD of
+        undefined ->
+            unknown;
+        RRD ->
+            History = config:read(lb_active_monitor_history),
+            SlotLength = rrd:get_slot_length(RRD),
+            {MegaSecs, Secs, MicroSecs} = os:timestamp(),
+            Vals = [begin
+                        %% get stable value off an old slot
+                        Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs - Offset*SlotLength}),
+                        get_value_type(Value, rrd:get_type(RRD))
+                    end || Offset <- lists:seq(1, History)],
+            %io:format("~p Vals: ~p~n", [Metric, Vals]),
+            case Mode of
+                strict -> ?IIF(lists:member(unknown, Vals), unknown, avg_weighted(Vals));
+                _ -> avg_weighted(Vals)
+            end
+    end.
+
+-spec get_value_type(RRD::rrd:data_type(), Type::rrd:timeseries_type()) -> unknown | number().
+get_value_type(undefined, _Type) ->
+    unknown;
+get_value_type(Value, _Type) when is_number(Value) ->
+    Value;
+get_value_type(Value, {histogram, _Size}) ->
+    histogram:get_num_inserts(Value);
+get_value_type(Value, {histogram_rt, _Size, _BaseKey}) ->
+    histogram_rt:get_num_inserts(Value).
+
+%% @doc returns the weighted average of a list using decreasing weight
+-spec avg_weighted([number()]) -> number().
+avg_weighted([]) ->
+    0;
+avg_weighted(List) ->
+    avg_weighted(List, _Weight=length(List), _Normalize=0, _Sum=0).
+
+%% @doc returns the weighted average of a list using decreasing weight
+-spec avg_weighted([], Weight::0, Normalize::pos_integer(), Sum::number()) -> unknown | float();
+                  ([number()| unknown,...], Weight::pos_integer(), Normalize::non_neg_integer(), Sum::number()) -> unknown | float().
+avg_weighted([], 0, 0, _Sum) ->
+    unknown;
+avg_weighted([], 0, N, Sum) ->
+    Sum/N;
+avg_weighted([unknown | Other], Weight, N, Sum) ->
+    avg_weighted(Other, Weight - 1, N + Weight, Sum);
+avg_weighted([Element | Other], Weight, N, Sum) ->
+    avg_weighted(Other, Weight - 1, N + Weight, Sum + Weight * Element).
+
+-spec get_request_histogram_split_key(TargetLoad::pos_integer(),
+                                      Direction::forward | backward,
+                                      erlang:timestamp())
+        -> {?RT:key(), TakenLoad::non_neg_integer()} | failed.
+get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
+    MonitorPid = pid_groups:get_my(monitor),
+    RequestMetric = config:read(lb_active_request_metric),
+    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, RequestMetric}]),
+    case RRD of
+        undefined ->
+            log:log(warn, "No request histogram available because no rrd is available."),
+            failed;
+        RRD ->
+            case rrd:get_value(RRD, Time) of
+                undefined ->
+                    log:log(warn, "No request histogram available. Time slot not found."),
+                    failed;
+                Histogram ->
+                    ?TRACE("Got histogram to compute split key: ~p~n", [Histogram]),
+                    {Status, Key, TakenLoad} =
+                        case Direction of
+                            forward -> histogram_rt:foldl_until(TargetLoad, Histogram);
+                            backward -> histogram_rt:foldr_until(TargetLoad, Histogram)
+                        end,
+                    case {Status, Direction} of
+                        {fail, _} -> failed;
+                        {ok, _} -> {Key, TakenLoad}
+                    end
+            end
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec collect_stats() -> boolean().
+collect_stats() ->
+    Metrics = [cpu, mem], %% TODO
+    lists:member(config:read(lb_active_load_metric), Metrics).
+
+-spec trigger() -> ok.
+trigger() ->
+    Interval = config:read(lb_active_monitor_interval) div 1000,
+    msg_delay:send_trigger(Interval, {collect_stats}).
+
+-compile({inline, [monitor_db/0]}).
+-spec monitor_db() -> boolean().
+monitor_db() ->
+    config:read(lb_active_db_monitor) =/= none.
+
+%% @doc config check registered in config.erl
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_is_in(lb_active_load_metric, ?LOAD_METRICS) and
+
+    config:cfg_is_in(lb_active_request_metric, ?REQUEST_METRICS) and
+
+    config:cfg_is_in(lb_active_balance_metric, [items, requests, none]) and
+
+    config:cfg_is_integer(lb_active_histogram_size) and
+    config:cfg_is_greater_than(lb_active_histogram_size, 0) and
+
+    config:cfg_is_integer(lb_active_monitor_resolution) and
+    config:cfg_is_greater_than(lb_active_monitor_resolution, 0) and
+
+    config:cfg_is_integer(lb_active_monitor_interval) and
+    config:cfg_is_greater_than(lb_active_monitor_interval, 0) and
+
+    config:cfg_is_less_than(lb_active_monitor_interval, config:read(lb_active_monitor_resolution)) and
+
+    config:cfg_is_integer(lb_active_monitor_history) and
+    config:cfg_is_greater_than(lb_active_monitor_history, 0) and
+
+    config:cfg_is_in(lb_active_db_monitor, [none, db_reads, db_writes]).
