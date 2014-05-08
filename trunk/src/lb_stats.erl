@@ -175,12 +175,12 @@ get_load_metric(Metric, Mode) ->
         _            -> throw(metric_not_available)
     end.
 
--spec get_request_metric() -> number().
+-spec get_request_metric() -> integer().
 get_request_metric() ->
     Metric = config:read(lb_active_request_metric),
     Value = case get_request_metric(Metric) of
                 unknown -> 0;
-                Val -> util:round(Val, 2)
+                Val -> erlang:round(Val)
             end,
     %io:format("Requests: ~p~n", [Value]),
     Value.
