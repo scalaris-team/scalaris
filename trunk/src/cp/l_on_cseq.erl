@@ -469,13 +469,23 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch}, L2, ReplyTo}, State) -
     update_lease(Id, Self, ContentCheck, L1, New, State),
     State;
 
-on({l_on_cseq, merge_reply_step1, L2, _ReplyTo,
-    {qwrite_deny, _ReqId, Round, L1, Reason}}, State) ->
+on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
+    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, Reason}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step1 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
-    %State;
-    lease_list:update_next_round(l_on_cseq:get_id(L1), Round, State);
+    case Reason of
+        unexpected_timeout ->
+            % retry
+            NextState = lease_list:update_next_round(l_on_cseq:get_id(L1),
+                                                     Round, State),
+            gen_component:post_op({l_on_cseq, merge, L1, L2, ReplyTo}, NextState);
+        timeout_is_not_newer_than_current_lease ->
+            % retry
+            NextState = lease_list:update_next_round(l_on_cseq:get_id(L1),
+                                                     Round, State),
+            gen_component:post_op({l_on_cseq, merge, L1, L2, ReplyTo}, NextState)
+    end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
