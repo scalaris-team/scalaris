@@ -141,6 +141,7 @@ add_3_rm_3_data(Config, Incremental) ->
     unittest_helper:make_ring(1, [{config, [{move_max_transport_entries, 25},
                                             {move_use_incremental_slides, Incremental},
                                             {log_path, PrivDir},
+                                            {monitor_perf_interval, 0},
                                             {rrepair_after_crash, false}
                                            | join_parameters_list()]}]),
 
