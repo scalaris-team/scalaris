@@ -58,6 +58,7 @@ init() ->
         true ->
             _ = application:start(sasl),   %% required by os_mon.
             _ = application:start(os_mon), %% for monitoring cpu and memory usage.
+            _ = cpu_sup:util(), %% throw away first util value
             Resolution = config:read(lb_active_monitor_resolution),
             %LongTerm  = rrd:create(60 * 5 * 1000000, 5, {timing, '%'}),
             %monitor:client_monitor_set_value(lb_active, cpu5min, LongTerm),
