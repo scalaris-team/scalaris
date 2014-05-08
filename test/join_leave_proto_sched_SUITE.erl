@@ -24,33 +24,7 @@
 -compile(export_all).
 
 %% start proto scheduler for this suite
-%% start proto scheduler for this suite
--define(proto_sched(Action),
-        fun() -> %% use fun to have fresh, locally scoped variables
-                case Action of
-                    start ->
-                        %% ct:pal("Starting proto scheduler"),
-                        proto_sched:thread_num(1),
-                        proto_sched:thread_begin();
-                    stop ->
-                        %% is a ring running?
-                        case erlang:whereis(pid_groups) =:= undefined
-                            orelse pid_groups:find_a(proto_sched) =:= failed of
-                            true -> ok;
-                            false ->
-                                %% then finalize proto_sched run:
-                                %% try to call thread_end(): if this
-                                %% process was running the proto_sched
-                                %% thats fine, otherwise thread_end()
-                                %% will raise an exception
-                                proto_sched:thread_end(),
-                                proto_sched:wait_for_end(),
-                                ct:pal("Proto scheduler stats: ~.2p",
-                                       [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]),
-                                proto_sched:cleanup()
-                        end
-                end
-        end()).
+-define(proto_sched(Action), proto_sched_fun(Action)).
 
 suite() -> [ {timetrap, {seconds, 60}} ].
 
@@ -80,3 +54,26 @@ all() ->
         test_cases().
 
 -include("join_leave_SUITE.hrl").
+
+-spec proto_sched_fun(start | stop) -> ok.
+proto_sched_fun(start) ->
+    %% ct:pal("Starting proto scheduler"),
+    proto_sched:thread_num(1),
+    proto_sched:thread_begin();
+proto_sched_fun(stop) ->
+    %% is a ring running?
+    case erlang:whereis(pid_groups) =:= undefined
+             orelse pid_groups:find_a(proto_sched) =:= failed of
+        true -> ok;
+        false ->
+            %% then finalize proto_sched run:
+            %% try to call thread_end(): if this
+            %% process was running the proto_sched
+            %% thats fine, otherwise thread_end()
+            %% will raise an exception
+            proto_sched:thread_end(),
+            proto_sched:wait_for_end(),
+            ct:pal("Proto scheduler stats: ~.2p",
+                   [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]),
+            proto_sched:cleanup()
+    end.

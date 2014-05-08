@@ -16,8 +16,6 @@
 %% @doc    Unit tests for the map reduce protocol.
 %% @end
 %% @version $Id$
--author('fajerski@zib.de').
--vsn('$Id$').
 
 -include("scalaris.hrl").
 -include("unittest.hrl").
