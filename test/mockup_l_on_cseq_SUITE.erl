@@ -28,7 +28,11 @@
 
 groups() ->
     [{merge_tests, [sequence], [
-                                test_merge
+                                test_merge,
+                                test_merge_with_renewal_before_step1,
+                                test_merge_with_renewal_after_step1,
+                                test_merge_with_renewal_after_step2,
+                                test_merge_with_renewal_after_step3
                                ]},
      {split_tests, [sequence], [
                                 test_split
@@ -114,6 +118,19 @@ test_merge(_Config) ->
     end,
     true.
 
+test_merge_with_renewal_before_step1(_Config) ->
+    test_merge_with_renewal_at(_Config, merge, first).
+
+test_merge_with_renewal_after_step1(_Config) ->
+    test_merge_with_renewal_at(_Config, merge_reply_step1, second).
+
+test_merge_with_renewal_after_step2(_Config) ->
+    test_merge_with_renewal_at(_Config, merge_reply_step2, first).
+
+test_merge_with_renewal_after_step3(_Config) ->
+    test_merge_with_renewal_at(_Config, merge_reply_step3, second).
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % split unit tests
@@ -160,3 +177,84 @@ test_split(_Config) ->
     ?assert(l_on_cseq:get_id(ActiveLease) =:= l_on_cseq:get_id(L2)),
     ?assert(l_on_cseq:get_id(PassiveLease) =:= l_on_cseq:get_id(L1)),
     true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% merge unittest helper
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+test_merge_with_renewal_at(_Config, Step, FirstOrSecond) ->
+    {L1, L2} = mockup_l_on_cseq:create_two_adjacent_leases(),
+    % join group
+    Pid = pid_groups:find_a(mockup_l_on_cseq),
+    pid_groups:join(pid_groups:group_of(Pid)),
+    % prepare message filter
+    mockup_l_on_cseq:set_message_filter(fun (Msg) ->
+                                            element(2, Msg) =:= Step
+                                        end,
+                                        self()),
+    % do merge
+    % evil, but l_on_cseq:lease_merge sends to a real dht_node
+    comm:send_local(Pid, {l_on_cseq, merge, L1, L2, self()}),
+    % wait for message_filter
+    %ct:pal("waiting for message filter", []),
+    receive
+        {intercepted_message, Msg} ->
+            mockup_l_on_cseq:reset_message_filter(),
+            case FirstOrSecond of
+                first ->
+                    synchronous_renew(L1, passive);
+                second ->
+                    synchronous_renew(L2, active)
+            end,
+            comm:send_local(Pid, Msg);
+        X -> ct:pal("unknown message ~w", [X])
+    end,
+    % wait for finish
+    ct:pal("waiting for merge success ~w", [self()]),
+    receive
+        {merge, success, _L2, _L1} -> ok
+    end,
+    % no renews during merge!
+    ?assert(1 =:= mockup_l_on_cseq:get_renewal_counter()),
+    % check L1
+    case l_on_cseq:read(l_on_cseq:get_id(L1)) of
+        {ok, L1_} -> ?assert(l_on_cseq:get_aux(L1_) =:= {invalid,merge,stopped});
+        {fail, not_found} -> ?assert(false)
+    end,
+    % check L2
+    case l_on_cseq:read(l_on_cseq:get_id(L2)) of
+        {ok, L2_} ->
+            ?assert(l_on_cseq:get_range(L2_) =:= intervals:union(l_on_cseq:get_range(L1),
+                                                                 l_on_cseq:get_range(L2)));
+        {fail, not_found} -> ?assert(false)
+    end,
+    true.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% helper
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% trigger lease renewal and wait until the renew happened
+synchronous_renew(Lease, Mode) ->
+    Pid = pid_groups:find_a(mockup_l_on_cseq),
+    {ok, Current} = l_on_cseq:read(l_on_cseq:get_id(Lease)),
+    ct:pal("sync. renew ~w ~w~n~w", [l_on_cseq:get_id(Lease), Mode, Current]),
+    mockup_l_on_cseq:set_message_filter(fun (Msg) ->
+                                            element(2, Msg) =:= renew_reply
+                                        end,
+                                        self()),
+    %comm:send_local(Pid,
+    %                {l_on_cseq, renew, Lease, Mode}),
+
+    l_on_cseq:lease_renew(Pid, Current, Mode),
+    receive
+        {intercepted_message, Msg} ->
+            mockup_l_on_cseq:reset_message_filter(),
+            comm:send_local(Pid, Msg)
+    end,
+    ct:pal("sync. renew after~n~w", [l_on_cseq:read(l_on_cseq:get_id(Lease))]).
+
