@@ -67,14 +67,14 @@ prop_merge_keys(BaseKey, Key1, Key2) ->
     H2 = histogram_rt:add(Key1, H),
     H3 = histogram_rt:add(Key2, H2),
     %% check results
-    case Key1 =:= Key2 of
-        true -> SplitKey = Key1;
-        false ->
-            case succ_ord_key(Key1, Key2, BaseKey) of
-                true -> SplitKey = ?RT:get_split_key(Key1, Key2, {1,2});
-                false -> SplitKey = ?RT:get_split_key(Key2, Key1, {1,2})
-            end
-    end,
+    SplitKey =
+        if Key1 =:= Key2 -> Key1;
+           true ->
+               case succ_ord_key(Key1, Key2, BaseKey) of
+                   true  -> ?RT:get_split_key(Key1, Key2, {1,2});
+                   false -> ?RT:get_split_key(Key2, Key1, {1,2})
+               end
+        end,
     %ct:pal("Key1: ~p (Range: ~p) Key2: ~p (Range: ~p) BaseKey: ~p SplitKey: ~p Result: ~p, Raw: ~p", [Key1, ?RT:get_range(Key1, BaseKey), Key2, ?RT:get_range(Key2, BaseKey), BaseKey, SplitKey, histogram_rt:get_data(H3), histogram:get_data(element(1, H3))]),
     ?compare(fun(Actual, Expected) -> check_result(Actual, Expected, BaseKey) end, histogram_rt:get_data(H3), [{SplitKey, 2}]),
     true.
@@ -83,11 +83,9 @@ merge_keys(_Config) ->
     tester:test(?MODULE, prop_merge_keys, 3, 250, [{threads, 2}]).
 
 check_result(Actual, Expected, BaseKey) ->
-    case ?RT of
-        rt_chord ->
-            ?equals(Actual, Expected);
-        _ ->
-            check_elements(Actual, Expected, BaseKey)
+    case rt_SUITE:default_rt_has_chord_keys() of
+        true  -> ?equals(Actual, Expected);
+        false -> check_elements(Actual, Expected, BaseKey)
     end.
 
 check_elements([], [], _BaseKey) ->
