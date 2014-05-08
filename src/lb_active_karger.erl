@@ -28,8 +28,8 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
-%-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format("lb_active_karger: " ++ X,Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("lb_active_karger: " ++ X,Y)).
 
 -behavior(lb_active_beh).
 

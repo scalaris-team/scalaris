@@ -24,8 +24,8 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
-%%-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format("lb_active: " ++ X, Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format("lb_active: " ++ X, Y)).
 
 %% startup
 -export([start_link/1, init/1, check_config/0, is_enabled/0]).
@@ -143,9 +143,12 @@ on_inactive({collect_stats} = Msg, State) ->
 on_inactive({reset_monitors} = Msg, State) ->
     on(Msg, State);
 
-on_inactive(Msg, State) ->
+on_inactive({web_debug_info, _Pid} = Msg, State) ->
+    on(Msg, State);
+
+on_inactive(_Msg, State) ->
     %% at the moment, we simply ignore lb messages.
-    ?TRACE("Unknown message ~p~n. Ignoring.", [Msg]),
+    ?TRACE("Unknown message ~p~n. Ignoring.", [_Msg]),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -272,8 +275,8 @@ on({balance_failed, OpId}, {MyState, ModuleState} = State) ->
             ?TRACE("Clearing pending op because of balance_failed ~p~n", [OpId]),
             MyState2 = set_pending_op(nil, MyState),
             {MyState2, ModuleState};
-        Op ->
-            ?TRACE("Received balance_failed answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id]),
+        _Op ->
+            ?TRACE("Received balance_failed answer but OpId ~p didn't match pending id ~p~n", [OpId, _Op#lb_op.id]),
             State
     end;
 
@@ -291,8 +294,8 @@ on({balance_success, OpId}, {MyState, ModuleState} = State) ->
             MyState2 = set_pending_op(nil, MyState),
             MyState3 = set_time_last_balance(MyState2),
             {MyState3, ModuleState};
-        Op ->
-            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id]),
+        _Op ->
+            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, _Op#lb_op.id]),
             State
     end;
 
@@ -320,8 +323,8 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, {MyState, ModuleState} = State
                     ok
             end,
             {MyState3, ModuleState};
-        Op ->
-            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, Op#lb_op.id]),
+        _Op ->
+            ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, _Op#lb_op.id]),
             State
     end;
 

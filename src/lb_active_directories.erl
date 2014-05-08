@@ -40,10 +40,10 @@
 
 %% Defines the number of directories
 %% e.g. 1 implies a central directory
--define(NUM_DIRECTORIES, 1).
+-define(NUM_DIRECTORIES, 2).
 
-%-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X,Y)).
 
 -type directory_name() :: string().
 
@@ -161,8 +161,8 @@ handle_msg({get_state_response, MyRange}, State) ->
     ?TRACE("~p: I am responsible for ~p~n", [self(), MyDirectories]),
     State#state{my_dirs = MyDirectories};
 
-handle_msg(Msg, State) ->
-    ?TRACE("Unknown message: ~p~n", [Msg]),
+handle_msg(_Msg, State) ->
+    ?TRACE("Unknown message: ~p~n", [_Msg]),
     State.
 
 %%%%%%%%%%%%%%%%%% DHT Node interaction %%%%%%%%%%%%%%%%%%%%%%%
@@ -183,8 +183,8 @@ handle_dht_msg({lb_active, before_jump, HeavyNode, LightNode}, DhtState) ->
     lb_active:balance_nodes(HeavyNode, LightNode, LightNodeSucc, []),
     DhtState;
 
-handle_dht_msg(Msg, DhtState) ->
-    ?TRACE("Unknown message: ~p~n", [Msg]),
+handle_dht_msg(_Msg, DhtState) ->
+    ?TRACE("Unknown message: ~p~n", [_Msg]),
     DhtState.
 
 %%%%%%%%%%%%%%%%% Directory Management %%%%%%%%%%%%%%%
@@ -389,9 +389,8 @@ get_web_debug_kv(State) ->
 
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(lb_active_directories_publish_interval) andalso
-    config:cfg_is_greater_than(lb_active_directories_publish_interval, 1000) andalso
-    config:cfg_is_integer(lb_active_directories_directory_interval) andalso
-    config:cfg_is_greater_than(lb_active_directories_directory_interval, 1000) andalso
-    % emergency treshold
-    true.
+    config:cfg_is_integer(lb_active_directories_publish_interval) and
+    config:cfg_is_greater_than(lb_active_directories_publish_interval, 1000) and
+
+    config:cfg_is_integer(lb_active_directories_directory_interval) and
+    config:cfg_is_greater_than(lb_active_directories_directory_interval, 1000).
