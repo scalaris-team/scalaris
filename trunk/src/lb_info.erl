@@ -13,7 +13,9 @@
 %   limitations under the License.
 
 %% @author Maximilian Michels <michels@zib.de>
-%% @doc For active load balancing: lb_info contains information about a node
+%% @doc For active load balancing:
+%%          - contains information about a node
+%%          - provides functions to evaluate an lb operation
 %% @version $Id$
 -module(lb_info).
 -author('michels@zib.de').
