@@ -261,7 +261,7 @@ on({l_on_cseq, split_and_change_owner, _Lease, NewOwner, ReplyPid, SplitResult},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}, Mode},
    State) ->
-    log:pal("on renew ~w (~w)~n", [Old, Mode]),
+    %log:pal("on renew ~w (~w)~n", [Old, Mode]),
     New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
     ContentCheck = generic_content_check(Old, New, renew),
 %% @todo New passed for debugging only:
@@ -500,7 +500,8 @@ on({l_on_cseq, merge_reply_step1, L2 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
 
 
 on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L2, Reason}}, State) ->
+    {qwrite_deny, _ReqId, Round, L2,
+     {content_check_failed, Reason}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step2 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
@@ -524,6 +525,7 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
 on({l_on_cseq, merge_reply_step2, L1 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
     % @todo if success update lease in State
+    %log:pal("merge step3~n~w~n~w", [L1, L2]),
     New = L1#lease{epoch   = OldEpoch + 1,
                    version = 0,
                    aux     = {invalid, merge, stopped},
@@ -536,7 +538,7 @@ on({l_on_cseq, merge_reply_step2, L1 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
                                               merge_reply_step2);
 
 on({l_on_cseq, merge_reply_step3, L2, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L1, Reason}}, State) ->
+    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, Reason}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
@@ -582,7 +584,7 @@ on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
                                               merge_reply_step3);
 
 on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L2, Reason}}, State) ->
+    {qwrite_deny, _ReqId, Round, L2, {content_check_failed, Reason}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
