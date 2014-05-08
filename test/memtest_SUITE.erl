@@ -334,13 +334,13 @@ create_ring_100(Config) ->
 add_remove_nodes_50(_Config) ->
     config:write(vivaldi_latency_timeout, 500),
     {[TmpNode], []} = api_vm:add_nodes(1), % loads all code needed for joins
-    api_vm:shutdown_nodes_by_name([TmpNode]), % loads all code needed for graceful leaves
+    {[TmpNode], []} = api_vm:shutdown_nodes_by_name([TmpNode]), % loads all code needed for graceful leaves
     garbage_collect_all(),
     OldProcesses = unittest_helper:get_processes(),
     PrevMemInfo = get_meminfo(),
     {NewNodes, []} = api_vm:add_nodes(50),
     unittest_helper:wait_for_stable_ring_deep(),
-    api_vm:shutdown_nodes_by_name(NewNodes),
+    _ = api_vm:shutdown_nodes_by_name(NewNodes),
     timer:sleep(1000), % wait for vivaldi_latency timeouts
     unittest_helper:wait_for_stable_ring_deep(),
     garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
@@ -360,13 +360,13 @@ add_remove_nodes_50(_Config) ->
 add_kill_nodes_50(_Config) ->
     config:write(vivaldi_latency_timeout, 500),
     {[TmpNode], []} = api_vm:add_nodes(1), % loads all code needed for joins
-    api_vm:kill_nodes_by_name([TmpNode]), % loads all code needed for killing nodes
+    {[TmpNode], []} = api_vm:kill_nodes_by_name([TmpNode]), % loads all code needed for killing nodes
     garbage_collect_all(),
     OldProcesses = unittest_helper:get_processes(),
     PrevMemInfo = get_meminfo(),
     {NewNodes, []} = api_vm:add_nodes(50),
     unittest_helper:wait_for_stable_ring_deep(),
-    api_vm:kill_nodes_by_name(NewNodes),
+    _ = api_vm:kill_nodes_by_name(NewNodes),
     timer:sleep(1000), % wait for vivaldi_latency timeouts
     unittest_helper:wait_for_stable_ring_deep(),
     garbage_collect_all_and_check(10, PrevMemInfo, 0, 0),
