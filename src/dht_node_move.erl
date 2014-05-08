@@ -1104,10 +1104,9 @@ finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
                     {delete_node, SupDhtNode, SupDhtNodeId}),
     %% Get additional nodes for bootstrapping
     %% If the only known host jumps, it can't bootstrap itself.
-    NodeDetails = dht_node_state:details(State),
-    PredList = node_details:get(NodeDetails, predlist),
-    SuccList = node_details:get(NodeDetails, succlist),
-    BootstrapNodes = [node:pidX(Node) || Node <- PredList ++ SuccList],
+    Neighborhood = dht_node_state:get(State, neighbors),
+    OtherNodes = tl(nodelist:to_list(Neighborhood)),
+    BootstrapNodes = [node:pidX(Node) || Node <- OtherNodes],
     Options = [{{dht_node, id}, NewId}, {bootstrap_nodes, BootstrapNodes}],
     NewOptions =
         case config:read(lb_active_and_psv) of
