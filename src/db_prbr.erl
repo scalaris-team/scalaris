@@ -1,4 +1,4 @@
-% @copyright 2013 Zuse Institute Berlin,
+% @copyright 2013-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@
 -export([new/0]).
 -export([close/1]).
 -export([get_load/1, get_load/2]).
+-export([tab2list/1]).
 
 %% raw whole db entry operations
 -export([get/2]).
@@ -119,6 +120,14 @@ get_load({DB, _Subscr, _Snap}, Interval) ->
                 end
             end, 0).
 
+-spec tab2list(db()) -> [entry()].
+tab2list({DB, _Subscr, _Snap}) ->
+    case ?DB of
+        db_ets ->
+            ets:tab2list(DB);
+        _ ->
+            throw({tab2list_not_supported_by_DB_type, ?DB})
+    end.
 
 %%%%%%
 %%% raw whole db entry operations
