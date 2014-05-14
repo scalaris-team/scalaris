@@ -49,6 +49,9 @@
 
 %% let fetch the number of DB entries
 -export([get_load/1]).
+%% let fetch the DB entries (for debugging and crash-recovery)
+-export([tab2list/1]).     %% without prbr own data
+-export([tab2list_raw/1]). %% with prbr own data
 
 -ifdef(with_export_type_support).
 -export_type([message/0]).
@@ -175,6 +178,14 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
                 msg_write_deny(Proposer, Cons, Key, NewerRound)
         end,
+    TableName;
+
+on({prbr, tab2list, _DB, Client}, TableName) ->
+    comm:send_local(Client, tab2list(TableName)),
+    TableName;
+
+on({prbr, tab2list_raw, _DB, Client}, TableName) ->
+    comm:send_local(Client, tab2list_raw(TableName)),
     TableName.
 
 -spec get_entry(any(), state()) -> entry().
@@ -202,6 +213,17 @@ smallest_round(Pid) -> {0, Pid}.
 
 -spec get_load(state()) -> non_neg_integer().
 get_load(State) -> ?PDB:get_load(State).
+
+-spec tab2list(state()) -> [{any(),any()}].
+tab2list(State) ->
+    %% without prbr own data
+    Entries = tab2list_raw(State),
+    [ {element(1,X), element(4,X)} || X <- Entries].
+
+-spec tab2list_raw(state()) -> [entry()].
+tab2list_raw(State) ->
+    %% with prbr own data
+    ?PDB:tab2list(State).
 
 %% operations for abstract data type entry()
 
