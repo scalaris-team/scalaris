@@ -434,8 +434,8 @@ getRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Items"}}},
                   {td, [], io_lib:format("~p", [statistics:get_total_load(load, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load, RealRing))])}
                  ]
                 },
                 %% load
@@ -443,8 +443,8 @@ getRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Load"}}},
                   {td, [], io_lib:format("-", [])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load2, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load2, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load2, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load2, RealRing))])}
                  ]
                 },
                 %% requests
@@ -452,8 +452,8 @@ getRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Requests"}}},
                   {td, [], io_lib:format("~p", [statistics:get_total_load(load3, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load3, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load3, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load3, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load3, RealRing))])}
                  ]
                 }
                ]
@@ -560,8 +560,8 @@ getIndexedRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Items"}}},
                   {td, [], io_lib:format("~p", [statistics:get_total_load(load, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load, RealRing))])}
                  ]
                 },
                 %% load
@@ -569,8 +569,8 @@ getIndexedRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Load"}}},
                   {td, [], io_lib:format("-", [])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load2, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load2, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load2, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load2, RealRing))])}
                  ]
                 },
                 %% requests
@@ -578,8 +578,8 @@ getIndexedRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Requests"}}},
                   {td, [], io_lib:format("~p", [statistics:get_total_load(load3, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load3, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load3, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load3, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load3, RealRing))])}
                  ]
                 }
                ]
