@@ -123,7 +123,7 @@ handle_msg({post_load, LoadInfo}, State) ->
     ?TRACE("Posting load ~p~n", [LoadInfo]),
     Directory = get_random_directory(),
     DirKey = Directory#directory.name,
-    post_load_to_directory(LoadInfo, DirKey),
+    post_load_to_directory(LoadInfo, DirKey, 0),
     %% TODO Emergency Threshold has been already checked at the node overloaded...
 %%     EmergencyThreshold = State#state.threshold_emergency,
 %%     case lb_info:get_load(LoadInfo) > EmergencyThreshold of
@@ -161,7 +161,7 @@ handle_msg({get_state_response, MyRange}, State) ->
     Directories = get_all_directory_keys(),
     MyDirectories = [int_to_str(Dir) || Dir <- Directories, intervals:in(Dir, MyRange)],
     ?TRACE("~p: I am responsible for ~p~n", [self(), MyDirectories]),
-    State#state{my_dirs = MyDirectories};
+    State#state{my_dirs = MyDirectories, schedule = []};
 
 handle_msg(_Msg, State) ->
     ?TRACE("Unknown message: ~p~n", [_Msg]),
@@ -224,17 +224,15 @@ directory_routine(DirKey, Type, Schedule) ->
                     periodic ->
                         %% clear directory only for periodic
                         %NewDirectory = dir_clear_load(Directory),
-                        clear_directory(Directory),
+                        clear_directory(Directory, 0),
                         %% TODO calculate threshold according to metric
                         %% From paper:
                         %(1 + AvgUtil) / 2;
                         %% Karger style:
-                        {0.75 * AvgUtil, 1.25 * AvgUtil}
+                        {0.5 * AvgUtil, 1.5 * AvgUtil}
 %%                     emergency ->
 %%                         %% from paper:
 %%                         %1.0
-%%                         %% Gossip: max value
-%%                         AvgUtil * 10 %% TODO
                 end,
             ?TRACE("Threshold: ~p~n", [{LowerBound, UpperBound}]),
             LightNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) =< LowerBound end, Pool),
@@ -278,25 +276,31 @@ get_random_directory() ->
         _    -> RandDir2
     end.
 
--spec post_load_to_directory(lb_info:lb_info(), directory_name()) -> ok.
-post_load_to_directory(Load, DirKey) ->
+-spec post_load_to_directory(lb_info:lb_info(), directory_name(), non_neg_integer()) -> ok.
+post_load_to_directory(Load, DirKey, Retries) ->
     {TLog, Dir} = get_directory(DirKey),
     DirNew = dir_add_load(Load, Dir),
     case set_directory(TLog, DirNew) of
         ok -> ok;
-        failed -> 
-            wait_randomly(),
-            post_load_to_directory(Load, DirKey)
+        failed ->
+            if Retries < 5 ->
+                    wait_randomly(),
+                    post_load_to_directory(Load, DirKey, Retries + 1);
+               true -> ok
+            end
     end.
 
--spec clear_directory(directory()) -> ok.
-clear_directory(Directory) ->
+-spec clear_directory(directory(), non_neg_integer()) -> ok.
+clear_directory(Directory, Retries) ->
     DirNew = dir_clear_load(Directory),
     case set_directory(api_tx:new_tlog(), DirNew) of
         ok -> ok;
         failed ->
-            wait_randomly(),
-            clear_directory(Directory)
+            if Retries < 5 ->
+                    wait_randomly(),
+                    clear_directory(Directory, Retries + 1);
+               true -> ok
+            end
     end.
 
 -spec get_directory(directory_name()) -> {tx_tlog:tlog(), directory()}.
