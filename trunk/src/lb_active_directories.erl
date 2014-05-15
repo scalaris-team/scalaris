@@ -109,7 +109,9 @@ handle_msg({publish_trigger}, State) ->
       _ ->
           % get && perform transfer() without overloading
           Schedule = State#state.schedule,
-          perform_transfer(Schedule),
+          %% transfer (balance) up to MaxTransfer nodes
+          MaxTransfer = config:read(lb_active_directories_max_transfer),
+          perform_transfer(Schedule, 0, MaxTransfer),
           % post_load()
           % request dht load to post it in the directory afterwards
           request_dht_load(),
@@ -343,10 +345,12 @@ dir_is_empty(Directory) ->
 
 %%%%%%%%%%%%%% Reassignments %%%%%%%%%%%%%%%%%%%%%
 
--spec perform_transfer(schedule()) -> ok.
-perform_transfer([]) ->
+-spec perform_transfer(schedule(), non_neg_integer(), pos_integer()) -> ok.
+perform_transfer([], _, _) ->
     ok;
-perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other]) ->
+perform_transfer(_, MaxTransfer, MaxTransfer) ->
+    ok;
+perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other], Transferred, MaxTransfer) ->
     ?TRACE("~p: Reassigning ~p (light: ~p) and ~p (heavy: ~p)~n", [?MODULE, lb_info:get_node(LightNode), lb_info:get_load(LightNode), lb_info:get_node(HeavyNode), lb_info:get_load(HeavyNode)]),
     case lb_info:neighbors(HeavyNode, LightNode) of
         true ->
@@ -355,7 +359,7 @@ perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other]) ->
             LightNodeSucc = lb_info:get_succ(LightNode),
             comm:send(node:pidX(LightNodeSucc), {lb_active, before_jump, HeavyNode, LightNode})
     end,
-    perform_transfer(Other).
+    perform_transfer(Other, Transferred + 1, MaxTransfer).
 
 %%%%%%%%%%%%
 %% Helpers
@@ -398,4 +402,7 @@ check_config() ->
     config:cfg_is_greater_than(lb_active_directories_publish_interval, 1000) and
 
     config:cfg_is_integer(lb_active_directories_directory_interval) and
-    config:cfg_is_greater_than(lb_active_directories_directory_interval, 1000).
+    config:cfg_is_greater_than(lb_active_directories_directory_interval, 1000) and
+
+    config:cfg_is_integer(lb_active_directories_max_transfer) and
+    config:cfg_is_greater_than(lb_active_directories_max_transfer, 0).
