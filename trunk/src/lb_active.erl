@@ -447,7 +447,8 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                         items ->
                             {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
                         requests ->
-                            case lb_stats:get_request_histogram_split_key(TargetLoadRequests, Direction, lb_info:get_time(HeavyNode)) of
+                            case lb_stats:get_request_histogram_split_key(TargetLoadRequests, Direction,
+                                                                          lb_info:get_time(HeavyNode), lb_info:get_items(HeavyNode)) of
                                 %% TODO fall back in a more clever way / abort lb request
                                 failed ->
                                     log:log(warn, "get_request_histogram failed. falling back to item balancing.~n", []),
