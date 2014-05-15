@@ -26,7 +26,7 @@
 %-define(TRACE(X,Y), io:format("lb_stats: " ++ X, Y)).
 
 %% get split key based on the request histogram
--export([get_request_histogram_split_key/3]).
+-export([get_request_histogram_split_key/4]).
 
 %% for db monitoring
 -export([init/0, init_db_rrd/1, update_db_rrd/2, update_db_monitor/2]).
@@ -257,9 +257,10 @@ avg_weighted([Element | Other], Weight, N, Sum) ->
 %% @doc returns a split key from the request histogram at a given time (if available)
 -spec get_request_histogram_split_key(TargetLoad::pos_integer(),
                                       Direction::forward | backward,
-                                      erlang:timestamp())
+                                      Time::erlang:timestamp(),
+                                      Keys::non_neg_integer())
         -> {?RT:key(), TakenLoad::non_neg_integer()} | failed.
-get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
+get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time, Keys) ->
     MonitorPid = pid_groups:get_my(monitor),
     RequestMetric = config:read(lb_active_request_metric),
     [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, RequestMetric}]),
@@ -274,14 +275,22 @@ get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time) ->
                     failed;
                 Histogram ->
                     ?TRACE("Got histogram to compute split key: ~p~n", [Histogram]),
-                    {Status, Key, TakenLoad} =
-                        case Direction of
-                            forward -> histogram_rt:foldl_until(TargetLoad, Histogram);
-                            backward -> histogram_rt:foldr_until(TargetLoad, Histogram)
-                        end,
-                    case {Status, Direction} of
-                        {fail, _} -> failed;
-                        {ok, _} -> {Key, TakenLoad}
+                    % check if enough requests have been inserted into the histogram
+                    EntriesAvailable = histogram_rt:get_num_inserts(Histogram),
+                    Confidence = config:read(lb_active_request_confidence),
+                    if Keys =:= 0 orelse EntriesAvailable / Keys < Confidence ->
+                           ?TRACE("Confidence too low (below ~p) for request balancing~n", [Confidence]),
+                           failed;
+                       true ->
+                           {Status, Key, TakenLoad} =
+                               case Direction of
+                                   forward -> histogram_rt:foldl_until(TargetLoad, Histogram);
+                                   backward -> histogram_rt:foldr_until(TargetLoad, Histogram)
+                               end,
+                           case {Status, Direction} of
+                               {fail, _} -> failed;
+                               {ok, _} -> {Key, TakenLoad}
+                           end
                     end
             end
     end.
@@ -350,5 +359,8 @@ check_config() ->
 
     config:cfg_is_integer(lb_active_monitor_history) and
     config:cfg_is_greater_than(lb_active_monitor_history, 0) and
+
+    config:cfg_is_float(lb_active_request_confidence) and
+    config:cfg_is_greater_than(lb_active_request_confidence, 0.0) and
 
     config:cfg_is_in(lb_active_db_monitor, [none, db_reads, db_writes]).
