@@ -49,7 +49,7 @@
 
 -type(my_message() ::
            %% trigger messages
-           {lb_trigger} |
+           {trigger} |
            %% random node from cyclon
            {cy_cache, [node:node_type()]} |
            %% load response from dht node
@@ -76,7 +76,7 @@
 %% @doc Initialization of module called by lb_active
 -spec init() -> state().
 init() ->
-    %msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
+    trigger(),
     Epsilon = config:read(lb_active_karger_epsilon),
     #state{epsilon = Epsilon}.
 
@@ -85,8 +85,8 @@ init() ->
 %%%%%%%%%%%%%%%
 
 -spec handle_msg(my_message(), state()) -> state().
-handle_msg({lb_trigger}, State) ->
-    msg_delay:send_trigger(get_base_interval(), {lb_trigger}),
+handle_msg({trigger}, State) ->
+    trigger(),
     %% Request N random nodes from cyclon
     NumNodes = config:read(lb_active_karger_rnd_nodes),
     cyclon:get_subset_rand(NumNodes),
@@ -274,14 +274,15 @@ balance_adjacent(HeavyNode, LightNode, Options) ->
 			comm:send(node:pidX(LightNodeSucc), {lb_active, phase2, HeavyNode, LightNode, Options})
 	end.
 
+-spec trigger() -> ok.
+trigger() ->
+    Interval = config:read(lb_active_interval) div 1000,
+    msg_delay:send_trigger(Interval, {trigger}).
+
 %% @doc Key/Value List for web debug
 -spec get_web_debug_kv(state()) -> [{string(), string()}].
 get_web_debug_kv(State) ->
     [{"state", webhelpers:html_pre("~p", [State])}].
-
--spec get_base_interval() -> pos_integer().
-get_base_interval() ->
-    config:read(lb_active_interval) div 1000.
 
 -spec check_config() -> boolean().
 check_config() ->
