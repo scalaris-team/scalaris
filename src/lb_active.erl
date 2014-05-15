@@ -527,7 +527,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
     end,
     DhtState;
 
-handle_dht_msg(Msg, DhtState) ->
+handle_dht_msg(Msg, DhtState) when element(1,Msg) =:= lb_active ->
     call_module(handle_dht_msg, [Msg, DhtState]).
 
 
