@@ -28,9 +28,9 @@
 %-define(TRACE(X,Y), io:format("lb_active: " ++ X, Y)).
 
 %% startup
--export([start_link/1, init/1, check_config/0, is_enabled/0]).
+-export([start_link/1, check_config/0, is_enabled/0]).
 %% gen_component
--export([on_inactive/2, on/2]).
+-export([init/1, on/2]).
 %% for calls from the dht node
 -export([handle_dht_msg/2]).
 % Load Balancing
@@ -57,10 +57,6 @@
 -type lb_op() :: #lb_op{}.
 
 -type options() :: [tuple()].
-
--type message_inactive() :: {collect_stats} |
-                            {lb_active_trigger} |
-                            {reset_monitors}.
 
 -type message() :: {collect_stats} |
                    {lb_active_trigger} |
@@ -98,7 +94,7 @@
 %% @doc Start this process as a gen component and register it in the dht node group
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
-    gen_component:start_link(?MODULE, fun on_inactive/2, [],
+    gen_component:start_link(?MODULE, fun on/2, [],
                              [{pid_groups_join_as, DHTNodeGroup, lb_active}]).
 
 
@@ -119,37 +115,9 @@ init([]) ->
     comm:send_local(DhtNode, {lb_active, reset_db_monitors}),
     comm:send_local(self(), {reset_monitors}),
 
-    {_MyState = #my_state{}, _ModuleState = {}}.
+    ModuleInitState = call_module(init, []),
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Startup message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%% @doc Handles all messages until enough monitor data has been collected.
--spec on_inactive(message_inactive(), state()) -> state().
-on_inactive({lb_active_trigger}, {MyState, _ModuleState} = State) ->
-    trigger(),
-    case lb_stats:monitor_vals_appeared(MyState) of
-        true ->
-            ModuleInitState = call_module(init, []),
-            ?TRACE("All monitor data appeared. Activating active load balancing~n", []),
-            %% change handler and initialize module
-            gen_component:change_handler({MyState, ModuleInitState}, fun on/2);
-        _    ->
-            State
-    end;
-
-on_inactive({collect_stats} = Msg, State) ->
-    on(Msg, State);
-
-on_inactive({reset_monitors}, State) ->
-    State;
-
-on_inactive({web_debug_info, _Pid} = Msg, State) ->
-    on(Msg, State);
-
-on_inactive(_Msg, State) ->
-    %% TODO at the moment, we simply ignore lb messages.
-    ?TRACE("Unknown message ~p~n. Ignoring.~n", [_Msg]),
-    State.
+    {_MyState = #my_state{}, _ModuleState = ModuleInitState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -328,7 +296,7 @@ on({reset_monitors}, {MyState, ModuleState}) ->
     lb_stats:init(),
     ?TRACE("Reseting monitors ~n", []),
     MyState2 = set_last_db_monitor_init(MyState),
-    gen_component:change_handler({MyState2, ModuleState}, fun on_inactive/2);
+    {MyState2, ModuleState};
 
 on({web_debug_info, Requestor}, {MyState, ModuleState} = State) ->
     KVList =

@@ -30,7 +30,7 @@
 
 %% for db monitoring
 -export([init/0, init_db_rrd/1, update_db_rrd/2, update_db_monitor/2]).
--export([monitor_db/0, monitor_vals_appeared/1]).
+-export([monitor_db/0]).
 %% Metrics
 -export([get_load_metric/0, get_request_metric/0, default_value/1]).
 %% Triggered by lb_active
@@ -131,26 +131,6 @@ update_db_rrd(Key, OldRRD) ->
     NewRRD = rrd:add_now(Key, OldRRD),
     monitor:check_report(lb_active, Type, OldRRD, NewRRD),
     NewRRD.
-
-%% @doc initially checks if enough metric data has been collected
--spec monitor_vals_appeared(lb_active:my_state()) -> boolean().
-monitor_vals_appeared(MyState) ->
-    Metric = config:read(lb_active_load_metric),
-    case collect_phase(MyState) andalso get_load_metric(Metric) =:= unknown of
-        true ->
-            false;
-        _ ->
-            true
-    end.
-
-%% @doc checks if the load balancing is in the data collection phase
--spec collect_phase(lb_active:my_state()) -> boolean().
-collect_phase(MyState) ->
-    History = config:read(lb_active_monitor_history),
-    Resolution = config:read(lb_active_monitor_resolution),
-    CollectPhase = History * Resolution,
-    LastInit = lb_active:get_last_db_monitor_init(MyState),
-    timer:now_diff(os:timestamp(), LastInit) div 1000 =< CollectPhase.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
