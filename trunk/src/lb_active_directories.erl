@@ -215,6 +215,7 @@ directory_routine(DirKey, Type, Schedule) ->
     %% TODO Some preference should be given to neighboring
     %%      nodes to avoid too many jumps.
     {_TLog, Directory} = get_directory(DirKey),
+    clear_directory(Directory, 0),
     case dir_is_empty(Directory) of
         true -> Schedule;
         false ->
@@ -250,7 +251,7 @@ find_matches(LightNodes, HeavyNodes, Result) ->
             {HeavyNode, HeavyNodes2} = gb_sets:take_largest(HeavyNodes),
             find_matches(LightNodes2, HeavyNodes2, [#reassign{light = LightNode, heavy = HeavyNode} | Result]);
         false ->
-            %% TODO we want to have the heaviest load first, this could be more efficient...
+            %% return the result with the best match first
             lists:reverse(Result)
     end.
 
