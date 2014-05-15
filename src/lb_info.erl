@@ -24,7 +24,7 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--export([new/1]).
+-export([new/1, is_valid/1]).
 -export([get_load/1, get_reqs/1, get_node/1, get_succ/1, get_items/1, get_time/1]).
 -export([is_succ/2, neighbors/2, get_target_load/3, get_target_load/4]).
 %% without dht size
@@ -37,7 +37,7 @@
 -export_type([lb_info/0]).
 -endif.
 
--type load() :: number().
+-type load() :: unknown | number().
 
 -record(lb_info, {load  = unknown                   :: unknown | load(),
                   reqs  = unknown                   :: unknown | load(),
@@ -55,8 +55,11 @@ new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
     Requests = lb_stats:get_request_metric(),
     SystemLoad = lb_stats:get_load_metric(),
-    %% TODO coefficients
-    Load = (1 * Items + 1 * Requests) * 1 * SystemLoad,
+    Load = try %% TODO coefficients
+               (Items + Requests) * SystemLoad
+           catch
+               error:badarith -> unknown
+           end,
     #lb_info{load  = Load,
              reqs  = Requests,
              items = Items,
@@ -88,6 +91,12 @@ is_succ(Succ, Node) ->
 -spec neighbors(Node1::lb_info(), Node2::lb_info()) -> boolean().
 neighbors(Node1, Node2) ->
     is_succ(Node1, Node2) orelse is_succ(Node2, Node1).
+
+-spec is_valid(Info::lb_info()) -> boolean().
+is_valid(Info) ->
+    is_number(get_load(Info)) andalso
+        is_number(get_reqs(Info))  andalso
+        is_number(get_items(Info)).
 
 %% @doc The number of db entries the heavy node will give to the light node
 -spec get_target_load(items | requests, Op::slide | jump, HeavyNode::lb_info(), LightNode::lb_info()) -> non_neg_integer().

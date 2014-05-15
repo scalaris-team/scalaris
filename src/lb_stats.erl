@@ -31,23 +31,26 @@
 -export([init/0, init_db_rrd/1, update_db_rrd/2, update_db_monitor/2]).
 -export([monitor_db/0, monitor_vals_appeared/1]).
 %% Metrics
--export([get_load_metric/0, get_request_metric/0]).
-
+-export([get_load_metric/0, get_request_metric/0, default_value/1]).
+%% Triggered by lb_active
 -export([trigger_routine/0]).
-
+%% config checked by lb_active
 -export([check_config/0]).
 
+-ifdef(with_export_type_support).
+-export_type([load/0]).
+-endif.
+
+-type load() :: number().
 
 -type load_metric() :: items | cpu | mem | reductions | db_reads | db_writes.
 -type request_metric() :: db_reads | db_writes.
-%-type balance_metric() :: items | requests | none.
-%-type metrics() :: [atom()]. %% TODO
 
 %% possible metrics
 % items, cpu, mem, db_reads, db_writes, db_requests,
 % transactions, tx_latency, net_throughput, net_latency
 %% available metrics
--define(LOAD_METRICS, [items, cpu, mem, reductions, db_reads, db_writes]).
+-define(LOAD_METRICS, [cpu, mem, reductions, db_reads, db_writes]).
 -define(REQUEST_METRICS, [db_reads, db_writes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -132,7 +135,7 @@ update_db_rrd(Key, OldRRD) ->
 -spec monitor_vals_appeared(lb_active:my_state()) -> boolean().
 monitor_vals_appeared(MyState) ->
     Metric = config:read(lb_active_load_metric),
-    case collect_phase(MyState) andalso get_load_metric(Metric, strict) =:= unknown of
+    case collect_phase(MyState) andalso get_load_metric(Metric) =:= unknown of
         true ->
             false;
         _ ->
@@ -150,30 +153,26 @@ collect_phase(MyState) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec get_load_metric() -> number().
+-spec get_load_metric() -> unknown | load().
 get_load_metric() ->
     Metric = config:read(lb_active_load_metric),
     Value = case get_load_metric(Metric) of
-                unknown -> 0.0;
-                items -> 0.0;
-                Val -> util:round(Val, 2)
+                items -> items;
+                Val when is_number(Val) ->
+                    util:round(Val, 2);
+                Val -> Val
             end,
     %io:format("Load: ~p~n", [Value]),
     Value.
 
--spec get_load_metric(load_metric()) -> unknown | items | number().
+-spec get_load_metric(load_metric()) -> unknown | load().
 get_load_metric(Metric) ->
-    get_load_metric(Metric, normal).
-
--spec get_load_metric(load_metric(), normal | strict) -> unknown | items | number().
-get_load_metric(Metric, Mode) ->
     case Metric of
-        cpu          -> get_vm_metric(cpu, Mode);
-        reductions   -> get_dht_metric(reductions, Mode);
-        mem          -> get_vm_metric(mem, Mode);
-        items        -> items;
-        db_reads     -> get_dht_metric(db_reads, Mode);
-        db_writes    -> get_dht_metric(db_writes, Mode);
+        cpu          -> get_vm_metric(cpu);
+        reductions   -> get_dht_metric(reductions);
+        mem          -> get_vm_metric(mem);
+        db_reads     -> get_dht_metric(db_reads);
+        db_writes    -> get_dht_metric(db_writes);
         _            -> throw(metric_not_available)
     end.
 
@@ -187,31 +186,27 @@ get_request_metric() ->
     %io:format("Requests: ~p~n", [Value]),
     Value.
 
--spec get_request_metric(request_metric()) -> unknown | number().
+-spec get_request_metric(request_metric()) -> unknown | load().
 get_request_metric(Metric) ->
-    get_request_metric(Metric, normal).
-
--spec get_request_metric(request_metric(), normal | strict) -> unknown | number().
-get_request_metric(Metric, Mode) ->
     case Metric of
-        db_reads -> get_dht_metric(db_reads, Mode);
-        db_writes -> get_dht_metric(db_writes, Mode)
+        db_reads -> get_dht_metric(db_reads);
+        db_writes -> get_dht_metric(db_writes)
         %db_requests  -> get_request_metric(db_reads, Mode) +
         %                get_request_metric(db_writes, Mode); %% TODO
     end.
 
--spec get_vm_metric(load_metric(), normal | strict) -> unknown | number().
-get_vm_metric(Metric, Mode) ->
+-spec get_vm_metric(load_metric()) -> unknown | load().
+get_vm_metric(Metric) ->
     ClientMonitorPid = pid_groups:pid_of("clients_group", monitor),
-    get_metric(ClientMonitorPid, Metric, Mode).
+    get_metric(ClientMonitorPid, Metric).
 
--spec get_dht_metric(load_metric() | request_metric(), normal | strict) -> unknown | number().
-get_dht_metric(Metric, Mode) ->
+-spec get_dht_metric(load_metric() | request_metric()) -> unknown | load().
+get_dht_metric(Metric) ->
     MonitorPid = pid_groups:get_my(monitor),
-    get_metric(MonitorPid, Metric, Mode).
+    get_metric(MonitorPid, Metric).
 
--spec get_metric(pid(), load_metric() | request_metric(), normal | strict) -> unknown | number().
-get_metric(MonitorPid, Metric, Mode) ->
+-spec get_metric(pid(), load_metric() | request_metric()) -> unknown | load().
+get_metric(MonitorPid, Metric) ->
     [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, Metric}]),
     case RRD of
         undefined ->
@@ -224,12 +219,9 @@ get_metric(MonitorPid, Metric, Mode) ->
                         %% get stable value off an old slot
                         Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs - Offset*SlotLength}),
                         get_value_type(Value, rrd:get_type(RRD))
-                    end || Offset <- lists:seq(1, History)],
+                    end || Offset <- lists:seq(2, History)],
             %io:format("~p Vals: ~p~n", [Metric, Vals]),
-            case Mode of
-                strict -> ?IIF(lists:member(unknown, Vals), unknown, avg_weighted(Vals));
-                _ -> avg_weighted(Vals)
-            end
+            ?IIF(lists:member(unknown, Vals), unknown, avg_weighted(Vals))
     end.
 
 -spec get_value_type(RRD::rrd:data_type(), Type::rrd:timeseries_type()) -> unknown | number().
@@ -313,6 +305,11 @@ get_last_reductions() ->
     erlang:get(reductions).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%% Util %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Sets a default value if the value is unknown
+-spec default_value(Val::unknown | number()) -> number().
+default_value(Val) ->
+    ?IIF(Val =:= unknown, 0, Val).
 
 -spec collect_stats() -> boolean().
 collect_stats() ->
