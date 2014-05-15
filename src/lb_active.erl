@@ -59,11 +59,11 @@
 -type options() :: [tuple()].
 
 -type message_inactive() :: {collect_stats} |
-                            {lb_trigger} |
+                            {lb_active_trigger} |
                             {reset_monitors}.
 
 -type message() :: {collect_stats} |
-                   {lb_trigger} |
+                   {lb_active_trigger} |
                    {reset_monitors} |
                    {gossip_reply, LightNode::lb_info:lb_info(), HeavyNode::lb_info:lb_info(), LightNodeSucc::lb_info:lb_info(),
                     Options::options(), {gossip_get_values_best_response, LoadInfo::gossip_load:load_info()}} |
@@ -125,14 +125,14 @@ init([]) ->
 
 %% @doc Handles all messages until enough monitor data has been collected.
 -spec on_inactive(message_inactive(), state()) -> state().
-on_inactive({lb_trigger}, {MyState, _ModuleState} = State) ->
+on_inactive({lb_active_trigger}, {MyState, _ModuleState} = State) ->
     trigger(),
     case lb_stats:monitor_vals_appeared(MyState) of
         true ->
-            InitState = call_module(init, []),
+            ModuleInitState = call_module(init, []),
             ?TRACE("All monitor data appeared. Activating active load balancing~n", []),
             %% change handler and initialize module
-            gen_component:change_handler({MyState, InitState}, fun on/2);
+            gen_component:change_handler({MyState, ModuleInitState}, fun on/2);
         _    ->
             State
     end;
@@ -140,8 +140,8 @@ on_inactive({lb_trigger}, {MyState, _ModuleState} = State) ->
 on_inactive({collect_stats} = Msg, State) ->
     on(Msg, State);
 
-on_inactive({reset_monitors} = Msg, State) ->
-    on(Msg, State);
+on_inactive({reset_monitors}, State) ->
+    State;
 
 on_inactive({web_debug_info, _Pid} = Msg, State) ->
     on(Msg, State);
@@ -159,11 +159,11 @@ on({collect_stats}, State) ->
     lb_stats:trigger_routine(),
     State;
 
-on({lb_trigger} = Msg, {MyState, ModuleState}) ->
-    %% module can decide whether to trigger
-    %% trigger(lb_trigger),
-    ModuleState2 = call_module(handle_msg, [Msg, ModuleState]),
-    {MyState, ModuleState2};
+on({lb_active_trigger}, State) ->
+    %% triggers maintenance tasks in inactive mode
+    trigger(),
+    %% module has its own trigger
+    State;
 
 %% Gossip response before balancing takes place
 on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
@@ -616,7 +616,7 @@ is_simulation(Options) ->
 -spec trigger() -> ok.
 trigger() ->
     Interval = config:read(lb_active_interval) div 1000,
-    msg_delay:send_trigger(Interval, {lb_trigger}).
+    msg_delay:send_trigger(Interval, {lb_active_trigger}).
 
 -spec check_for_gossip_modules() -> boolean().
 check_for_gossip_modules() ->

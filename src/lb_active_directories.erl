@@ -375,7 +375,6 @@ wait_randomly() ->
 
 -spec trigger(trigger()) -> ok.
 trigger(Trigger) ->
-    %Interval = config:read(lb_active_interval),
     Interval =
         case Trigger of
             publish_trigger -> config:read(lb_active_directories_publish_interval);
