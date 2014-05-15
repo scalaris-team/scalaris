@@ -147,8 +147,8 @@ on_inactive({web_debug_info, _Pid} = Msg, State) ->
     on(Msg, State);
 
 on_inactive(_Msg, State) ->
-    %% at the moment, we simply ignore lb messages.
-    ?TRACE("Unknown message ~p~n. Ignoring.", [_Msg]),
+    %% TODO at the moment, we simply ignore lb messages.
+    ?TRACE("Unknown message ~p~n. Ignoring.~n", [_Msg]),
     State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -171,17 +171,13 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     %% check the load balancing configuration by using
     %% the standard deviation from the gossip process.
     Size = gossip_load:load_info_get(size, LoadInfo),
-    Metrics =
-        case config:read(lb_active_balance_metric) of
-            items ->
-                [{avg, gossip_load:load_info_get(avgLoad, LoadInfo)},
-                 {stddev, gossip_load:load_info_get(stddev, LoadInfo)}];
-            requests ->
-                GossipModule = lb_active_gossip_request_metric,
-                [{avg, gossip_load:load_info_other_get(avgLoad, GossipModule, LoadInfo)},
-                 {stddev, gossip_load:load_info_other_get(stddev, GossipModule, LoadInfo)}];
-            _ -> [] %% TODO
-        end,
+    GossipModule = lb_active_gossip_request_metric,
+    Metrics =   [{avgItems, gossip_load:load_info_get(avgLoad, LoadInfo)},
+                 {stddevItems, gossip_load:load_info_get(stddev, LoadInfo)}]
+                ++
+                [{avgRequests, gossip_load:load_info_other_get(avgLoad, GossipModule, LoadInfo)},
+                 {stddevRequests, gossip_load:load_info_other_get(stddev, GossipModule, LoadInfo)}],
+
     OptionsNew = [{dht_size, Size} | Metrics ++ Options],
 
     HeavyPid = node:pidX(lb_info:get_node(HeavyNode)),
@@ -350,7 +346,8 @@ on({web_debug_info, Requestor}, {MyState, ModuleState} = State) ->
         none ->
             Return = KVList;
         _ ->
-            Return = KVList ++ call_module(get_web_debug_kv, [ModuleState])
+            Seperator = {"module", ""},
+            Return = KVList ++ [Seperator | call_module(get_web_debug_kv, [ModuleState])]
     end,
     comm:send_local(Requestor, {web_debug_info_reply, Return}),
     State;
@@ -387,7 +384,7 @@ balance_noop(Options) ->
         ReqId ->
             ReplyTo = proplists:get_value(reply_to, Options),
             Id = proplists:get_value(id, Options),
-            comm:send(ReplyTo, {simulation_result, Id, ReqId, 0})
+            comm:send(ReplyTo, {simulation_result, Id, ReqId, {nil, 0}})
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%% Calls from dht_node %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -421,15 +418,20 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                     false -> jump
                 end,
 
-                ProposedTargetLoad = lb_info:get_target_load(JumpOrSlide, MyNode, LightNode),
+                ProposedTargetLoadItems = lb_info:get_target_load(items, JumpOrSlide, MyNode, LightNode),
+                ProposedTargetLoadRequests = lb_info:get_target_load(requests, JumpOrSlide, MyNode, LightNode),
 
-                TargetLoad =
+                {TargetLoadItems, TargetLoadRequests} =
                     case gossip_available(Options) of
-                        true -> Avg = proplists:get_value(avg, Options),
+                        true -> AvgItems = proplists:get_value(avgItems, Options),
+                                AvgRequests = proplists:get_value(avgRequests, Options),
                                 %% don't take away more items than the average
-                                ?IIF(ProposedTargetLoad > Avg,
-                                     trunc(Avg), ProposedTargetLoad);
-                        false -> ProposedTargetLoad
+                                {?IIF(ProposedTargetLoadItems > AvgItems,
+                                     trunc(AvgItems), ProposedTargetLoadItems),
+                                 ?IIF(ProposedTargetLoadRequests > AvgRequests,
+                                     trunc(AvgRequests), ProposedTargetLoadRequests)
+                                };
+                        false -> {ProposedTargetLoadItems, ProposedTargetLoadRequests}
                     end,
 
                 {From, To, Direction} =
@@ -440,23 +442,22 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                             {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
                     end,
 
-                {SplitKey, TakenLoad} =
+                {Metric, {SplitKey, TakenLoad}} =
                     case config:read(lb_active_balance_metric) of %% TODO getter
                         items ->
-                            dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction);
-                        none ->
-                            dht_node_state:get_split_key(DhtState, From, To, TargetLoad, Direction);
+                            {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
                         requests ->
-                            case lb_stats:get_request_histogram_split_key(TargetLoad, Direction, lb_info:get_time(HeavyNode)) of
+                            case lb_stats:get_request_histogram_split_key(TargetLoadRequests, Direction, lb_info:get_time(HeavyNode)) of
                                 %% TODO fall back in a more clever way / abort lb request
                                 failed ->
-                                    ?TRACE("get_request_histogram failed~n", []),
-                                    dht_node_state:get_split_key(DhtState, From, To, 1, Direction);
-                                Val -> Val
+                                    log:log(warn, "get_request_histogram failed. falling back to item balancing.~n", []),
+                                    {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
+                                Val -> {requests, Val}
                             end
                     end,
 
-                ?TRACE("SplitKey: ~p TargetLoad: ~p TakenLoad: ~p~n", [SplitKey, TargetLoad, TakenLoad]),
+                ?TRACE("SplitKey: ~p TargetLoadItems: ~p TargetLoadRequests: ~p TakenLoad: ~p Metric: ~p~n",
+                       [SplitKey, TargetLoadItems, TargetLoadRequests, TakenLoad, Metric]),
 
             case is_simulation(Options) of
 
@@ -464,34 +465,39 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                     ReqId = proplists:get_value(simulate, Options),
                     LoadChange =
                         case JumpOrSlide of
-                            slide -> lb_info:get_load_change_slide(TakenLoad, HeavyNode, LightNode);
-                            jump  -> lb_info:get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc)
+                            slide -> lb_info:get_load_change_slide(Metric, TakenLoad, HeavyNode, LightNode);
+                            jump  -> lb_info:get_load_change_jump(Metric, TakenLoad, HeavyNode, LightNode, LightNodeSucc)
                         end,
                     ReplyTo = proplists:get_value(reply_to, Options),
                     Id = proplists:get_value(id, Options),
-                    comm:send(ReplyTo, {simulation_result, Id, ReqId, LoadChange});
+                    comm:send(ReplyTo, {simulation_result, Id, ReqId, {Metric, LoadChange}});
 
                 false -> %% perform balancing
                     StdDevTest =
                         case gossip_available(Options) of
-                            %% gossip information available
                             true ->
                                 S = config:read(lb_active_gossip_stddev_threshold),
                                 DhtSize = proplists:get_value(dht_size, Options),
-                                StdDev = proplists:get_value(stddev, Options),
+                                StdDev =
+                                    if Metric =:= items ->
+                                           proplists:get_value(stddevItems, Options);
+                                       Metric =:= requests ->
+                                           proplists:get_value(stddevRequests, Options)
+                                    end,
                                 Variance = StdDev * StdDev,
                                 VarianceChange =
                                     case JumpOrSlide of
-                                        slide -> lb_info:get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode);
-                                        jump -> lb_info:get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc)
+                                        slide -> lb_info:get_load_change_slide(Metric, TakenLoad, DhtSize, HeavyNode, LightNode);
+                                        jump -> lb_info:get_load_change_jump(Metric, TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc)
                                     end,
                                 VarianceNew = Variance + VarianceChange,
                                 StdDevNew = ?IIF(VarianceNew >= 0, math:sqrt(VarianceNew), StdDev),
-                                ?TRACE("New StdDev: ~p Old StdDev: ~p~n", [StdDevNew, StdDev]),
+                                ?TRACE("New StdDev: ~p Old StdDev: ~p Metric: ~p~n", [StdDevNew, StdDev, Metric]),
                                 StdDevNew < StdDev * (1 - S / DhtSize);
                             %% gossip not available, skipping this test
                             false -> true
                         end,
+
                     case StdDevTest andalso TakenLoad > 0 of
                         false -> ?TRACE("No balancing: stddev was not reduced enough.~n", []);
                         true ->
@@ -512,6 +518,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                                         heavy_node = lb_info:get_node(HeavyNode),
                                         target = SplitKey,
                                         data_time = OldestDataTime},
+
                             LBModule = pid_groups:get_my(?MODULE),
                             comm:send_local(LBModule, {balance_phase1, Op})
                     end
@@ -597,8 +604,10 @@ set_time_last_balance(MyState) ->
 -spec gossip_available(options()) -> boolean().
 gossip_available(Options) ->
     proplists:is_defined(dht_size, Options) andalso
-        proplists:is_defined(avg, Options) andalso
-        proplists:is_defined(stddev, Options).
+        proplists:is_defined(avgItems, Options) andalso
+        proplists:is_defined(stddevItems, Options) andalso
+        proplists:is_defined(avgRequests, Options) andalso
+        proplists:is_defined(stddevRequests, Options).
 
 -spec is_simulation(options()) -> boolean().
 is_simulation(Options) ->
