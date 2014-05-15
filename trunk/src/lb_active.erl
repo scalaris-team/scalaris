@@ -308,14 +308,12 @@ on({web_debug_info, Requestor}, {MyState, ModuleState} = State) ->
          {"balance with", webhelpers:safe_html_string("~p", [config:read(lb_active_balance_metric)])},
          {"last balance:", webhelpers:safe_html_string("~p", [get_time_last_balance(MyState)])},
          {"pending op:",   webhelpers:safe_html_string("~p", [get_pending_op(MyState)])},
-         {"last db monitor init:", webhelpers:safe_html_string("~p", [get_last_db_monitor_init(MyState)])}
+         {"last db monitor init:", webhelpers:safe_html_string("~p", [get_last_db_monitor_init(MyState)])},
+         {"module", webhelpers:safe_html_string("~p", [get_lb_module()])}
         ],
-    case get_lb_module() of
-        none ->
-            Return = KVList;
-        _ ->
-            Seperator = {"module", ""},
-            Return = KVList ++ [Seperator | call_module(get_web_debug_kv, [ModuleState])]
+    case call_module(get_web_debug_kv, [ModuleState]) of
+        [H|T] -> Return = KVList ++ [H|T];
+        _ -> Return = KVList
     end,
     comm:send_local(Requestor, {web_debug_info_reply, Return}),
     State;
@@ -507,7 +505,7 @@ handle_dht_msg(Msg, DhtState) when element(1,Msg) =:= lb_active ->
 is_enabled() ->
     config:read(lb_active).
 
--spec call_module(atom(), list()) -> module_state() | dht_node_state:state().
+-spec call_module(atom(), list()) -> term().
 call_module(Fun, Args) ->
     case get_lb_module() of
         none ->

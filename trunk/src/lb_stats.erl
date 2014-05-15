@@ -44,14 +44,14 @@
 
 -type load() :: number().
 
--type load_metric() :: items | cpu | mem | reductions | db_reads | db_writes.
+-type load_metric() :: cpu | mem | reductions.
 -type request_metric() :: db_reads | db_writes.
 
 %% possible metrics
 % items, cpu, mem, db_reads, db_writes, db_requests,
 % transactions, tx_latency, net_throughput, net_latency
 %% available metrics
--define(LOAD_METRICS, [cpu, mem, reductions, db_reads, db_writes]).
+-define(LOAD_METRICS, [cpu, mem, reductions]).
 -define(REQUEST_METRICS, [db_reads, db_writes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -138,7 +138,6 @@ update_db_rrd(Key, OldRRD) ->
 get_load_metric() ->
     Metric = config:read(lb_active_load_metric),
     Value = case get_load_metric(Metric) of
-                items -> items;
                 Val when is_number(Val) ->
                     util:round(Val, 2);
                 Val -> Val
@@ -152,8 +151,6 @@ get_load_metric(Metric) ->
         cpu          -> get_vm_metric(cpu);
         reductions   -> get_dht_metric(reductions);
         mem          -> get_vm_metric(mem);
-        db_reads     -> get_dht_metric(db_reads);
-        db_writes    -> get_dht_metric(db_writes);
         _            -> throw(metric_not_available)
     end.
 
