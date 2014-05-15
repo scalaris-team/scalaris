@@ -303,7 +303,7 @@ get_reductions() ->
         [begin
              {reductions, N} = erlang:process_info(Pid, reductions),
              N
-         end || Pid <- MyGroupPids],
+         end || Pid <- MyGroupPids, Pid =/= self()],
     lists:sum(AllReductions).
 
 -spec set_last_reductions(integer()) -> ok.
