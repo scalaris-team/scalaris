@@ -195,7 +195,7 @@ handle_msg({pick_best_candidate, Id}, State) ->
                     BestPid = node:pidX(BestCandidate),
                     Epsilon = State#state.epsilon,
                     MyLBInfo = State#state.my_lb_info,
-                    ?TRACE("Sending out decision in round ~p: LoadChange: ~p LBInfo: ~p~n", [Id, _BestLoadChange, MyLBInfo]),
+                    ?TRACE("Sending out decision in round ~p: BestCandidate: ~p LBInfo: ~p~n", [Id, BestCandidate, MyLBInfo]),
                     Options = [{id, Id}, {epsilon, Epsilon}],
                     comm:send(BestPid, {lb_active, phase1, MyLBInfo, Options})
             end,
