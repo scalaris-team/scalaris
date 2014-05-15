@@ -120,13 +120,14 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
     %% and calculate the load changes before going to the 
     %% next phase.
     MyLBInfo = lb_info:new(NodeDetails),
+    IsValid = lb_info:is_valid(MyLBInfo),
     Id = randoms:getRandomInt(), %%uid:get_global_uid(),
     Options = [{id, Id}, {epsilon, Epsilon}],
     case RandomNodes of
-        [RndNode] ->
+        [RndNode] when IsValid ->
             comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, Options}, [{?quiet}]),
             State#state{rnd_node = []};
-        RndNodes ->
+        RndNodes when IsValid ->
             ReqIds =
                 [begin
                       ReqId = randoms:getRandomInt(),
@@ -138,7 +139,9 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
                  end || RndNode <- RndNodes],
             Timeout = config:read(lb_active_karger_simulation_timeout) div 1000,
             msg_delay:send_local(Timeout, self(), {pick_best_candidate, Id}),
-            State#state{round_id = Id, my_lb_info = MyLBInfo, req_ids = ReqIds}
+            State#state{round_id = Id, my_lb_info = MyLBInfo, req_ids = ReqIds};
+        _ ->
+            State
     end;
 
 %% collect all the load change responses and save the best candidate
@@ -214,10 +217,11 @@ handle_msg({pick_best_candidate, Id}, State) ->
 handle_dht_msg({lb_active, phase1, NodeX, Options}, DhtState) ->
     Epsilon = proplists:get_value(epsilon, Options),
 	MyLBInfo = lb_info:new(dht_node_state:details(DhtState)),
+    IsValid = lb_info:is_valid(MyLBInfo),
 	MyLoad = lb_info:get_load(MyLBInfo),
 	LoadX = lb_info:get_load(NodeX),
 	case MyLoad =/= 0 orelse LoadX =/= 0 of
-		true ->
+		true when IsValid ->
 			if
                 % first check if load balancing is necessary
 				MyLoad =< Epsilon * LoadX ->
@@ -242,15 +246,17 @@ handle_dht_msg({lb_active, phase1, NodeX, Options}, DhtState) ->
 handle_dht_msg({lb_active, phase2, HeavyNode, LightNode, Options}, DhtState) ->
 	?TRACE("In phase 2~n", []),
 	MyLBInfo = lb_info:new(dht_node_state:details(DhtState)),
+    IsValid = lb_info:is_valid(MyLBInfo),
 	MyLoad = lb_info:get_load(MyLBInfo),
 	LoadHeavyNode = lb_info:get_load(HeavyNode),
 	case MyLoad > LoadHeavyNode of
-		true ->
+		true when IsValid ->
             % slide
             lb_active:balance_nodes(HeavyNode, LightNode, Options);
-		_ ->
+		false when IsValid ->
             % jump
-            lb_active:balance_nodes(HeavyNode, LightNode, MyLBInfo, Options)
+            lb_active:balance_nodes(HeavyNode, LightNode, MyLBInfo, Options);
+        _ -> ok
 	end,
 	DhtState.
 

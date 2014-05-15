@@ -172,7 +172,10 @@ handle_msg(_Msg, State) ->
 handle_dht_msg({lb_active, request_load, ReplyPid}, DhtState) ->
     NodeDetails = dht_node_state:details(DhtState),
     LoadInfo = lb_info:new(NodeDetails),
-    comm:send_local(ReplyPid, {post_load, LoadInfo}),
+    case lb_info:is_valid(LoadInfo) of
+        true -> comm:send_local(ReplyPid, {post_load, LoadInfo});
+        _ -> ok
+    end,
     DhtState;
 
 %% This handler is for requesting load information from the succ of
@@ -180,7 +183,10 @@ handle_dht_msg({lb_active, request_load, ReplyPid}, DhtState) ->
 handle_dht_msg({lb_active, before_jump, HeavyNode, LightNode}, DhtState) ->
     NodeDetails = dht_node_state:details(DhtState),
     LightNodeSucc = lb_info:new(NodeDetails),
-    lb_active:balance_nodes(HeavyNode, LightNode, LightNodeSucc, []),
+    case lb_info:is_valid(LightNodeSucc) of
+        true -> lb_active:balance_nodes(HeavyNode, LightNode, LightNodeSucc, []);
+        _ -> ok
+    end,
     DhtState;
 
 handle_dht_msg(_Msg, DhtState) ->
