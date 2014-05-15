@@ -172,6 +172,8 @@ get_load_metric(Metric, Mode) ->
         reductions   -> get_dht_metric(reductions, Mode);
         mem          -> get_vm_metric(mem, Mode);
         items        -> items;
+        db_reads     -> get_dht_metric(db_reads, Mode);
+        db_writes    -> get_dht_metric(db_writes, Mode);
         _            -> throw(metric_not_available)
     end.
 
@@ -334,7 +336,7 @@ check_config() ->
 
     config:cfg_is_in(lb_active_request_metric, ?REQUEST_METRICS) and
 
-    config:cfg_is_in(lb_active_balance_metric, [items, requests, none]) and
+    config:cfg_is_in(lb_active_balance_metric, [items, requests]) and
 
     config:cfg_is_integer(lb_active_histogram_size) and
     config:cfg_is_greater_than(lb_active_histogram_size, 0) and

@@ -39,8 +39,8 @@
 
 -record(state, {epsilon          = ?required(state, epsilon) :: float(),
                 rnd_node         = []                        :: [node:node_type()],
-                best_candidate   = nil                       :: {LoadChange::non_neg_integer(), node:node_type()} | nil,
-                round_id         = nil                       :: nil | non_neg_integer(),
+                best_candidate   = []                        :: [{items | requests, {LoadChange::non_neg_integer(), node:node_type()}}],
+                round_id         = nil                       :: non_neg_integer() | nil,
                 my_lb_info       = nil                       :: lb_info:lb_info() | nil,
                 req_ids          = []                        :: [{integer(), node:node_type()}]
                }).
@@ -55,7 +55,10 @@
            %% load response from dht node
            {my_dht_response, DhtNode :: comm:mypid(), {get_state_response, Load :: number()}} |
            %% Result from slide or jump
-           dht_node_move:result_message()).
+           dht_node_move:result_message() |
+           %% simulation
+           {simulation_result, Id::integer(), ReqId::integer(), {items | requests, LoadChange::non_neg_integer()}} |
+           {pick_best_candidate, Id::integer()}).
 
 -type options() :: [{epsilon, float()} | {id, integer()} | {simulate} | {reply_to, comm:mypid()}].
 
@@ -64,6 +67,7 @@
 		   {lb_active, phase1, NodeX :: lb_info:lb_info(), options()} |
 		   %% phase2
 		   {lb_active, phase2, HeavyNode :: lb_info:lb_info(), LightNode :: lb_info:lb_info()}.
+
 
 %%%%%%%%%%%%%%%
 %%  Startup   %
@@ -129,7 +133,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
                       ?TRACE("Sending out simulate request with ReqId ~p to ~.0p~n", [ReqId, node:pidX(RndNode)]),
                       OptionsNew = [{simulate, ReqId}, {reply_to, comm:this()}] ++ Options,
                       comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, OptionsNew},
-                                [{?quiet}]), %% TODO failure detector here?
+                                [{?quiet}]),
                       {ReqId, RndNode}
                  end || RndNode <- RndNodes],
             Timeout = config:read(lb_active_karger_simulation_timeout) div 1000,
@@ -138,15 +142,10 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
     end;
 
 %% collect all the load change responses and save the best candidate
-handle_msg({simulation_result, Id, ThisReqId, LoadChange}, State) ->
+handle_msg({simulation_result, Id, ThisReqId, {Metric, LoadChange}}, State) ->
     ?TRACE("Received load change ~p in round ~p~n", [LoadChange, Id]),
     case State#state.round_id of
         Id ->
-            BestLoadChange =
-                case State#state.best_candidate of
-                    {LoadChangeBest, _BestLBInfo} -> LoadChangeBest;
-                    nil -> 0
-                end,
             ReqIds = State#state.req_ids,
             ReqIdsNew = proplists:delete(ThisReqId, ReqIds),
             case ReqIdsNew of
@@ -154,9 +153,17 @@ handle_msg({simulation_result, Id, ThisReqId, LoadChange}, State) ->
                 _  -> ok
             end,
             NodeX = proplists:get_value(ThisReqId, ReqIds),
+
+            Best = State#state.best_candidate,
+            {BestLoadChange, _Node} = proplists:get_value(Metric, Best, {0, nil}),
+
             case LoadChange < BestLoadChange of
-                    true  -> State#state{req_ids = ReqIdsNew, best_candidate = {LoadChange, NodeX}};
-                    false -> State#state{req_ids = ReqIdsNew}
+                    true  ->
+                        NewBest = lists:keystore(Metric, 1, Best, {Metric, {LoadChange, NodeX}}),
+                        State#state{req_ids = ReqIdsNew,
+                                    best_candidate = NewBest};
+                    _ ->
+                        State#state{req_ids = ReqIdsNew}
             end;
         _ ->
            ?TRACE("Discarding old round with Id ~p~n", [Id]),
@@ -169,17 +176,27 @@ handle_msg({pick_best_candidate, Id}, State) ->
     ?TRACE("Deciding in round ~p~n",[Id]),
     case State#state.round_id of
         Id ->
-            case State#state.best_candidate of
-                {_BestLoadChange, BestCandidate} ->
+            Best = State#state.best_candidate,
+            BestCandidate =
+                case proplists:get_value(requests, Best) of
+                    {_LoadChange, Node} -> Node;
+                    _ ->
+                        case proplists:get_value(items, Best) of
+                            {_LoadChange, Node} -> Node;
+                            _ -> nil
+                        end
+                end,
+            case BestCandidate of
+                nil -> ?TRACE("No best candidate in Round ~p~n", [Id]);
+                BestCandidate ->
                     BestPid = node:pidX(BestCandidate),
                     Epsilon = State#state.epsilon,
                     MyLBInfo = State#state.my_lb_info,
                     ?TRACE("Sending out decision in round ~p: LoadChange: ~p LBInfo: ~p~n", [Id, _BestLoadChange, MyLBInfo]),
                     Options = [{id, Id}, {epsilon, Epsilon}],
-                    comm:send(BestPid, {lb_active, phase1, MyLBInfo, Options});
-                _ -> ?TRACE("No best candidate in Round ~p~n", [Id])
+                    comm:send(BestPid, {lb_active, phase1, MyLBInfo, Options})
             end,
-            State#state{best_candidate = nil, round_id = nil};
+            State#state{best_candidate = [], round_id = nil};
         _ ->
             ?TRACE("Old decision message for round ~p~n", [Id]),
             State
