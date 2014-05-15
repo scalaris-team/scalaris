@@ -220,36 +220,24 @@ directory_routine(DirKey, Type, Schedule) ->
         true -> Schedule;
         false ->
             Pool = Directory#directory.pool,
-            AvgUtil = gb_sets:fold(fun(El, Acc) -> Acc + lb_info:get_load(El) end, 0, Pool) / gb_sets:size(Pool),
-            {LowerBound, UpperBound} = case Type of
-                    periodic ->
-                        %% clear directory only for periodic
-                        %NewDirectory = dir_clear_load(Directory),
-                        clear_directory(Directory, 0),
-                        %% TODO calculate threshold according to metric
-                        %% From paper:
-                        %(1 + AvgUtil) / 2;
-                        %% Karger style:
-                        {0.5 * AvgUtil, 1.5 * AvgUtil}
-%%                     emergency ->
-%%                         %% from paper:
-%%                         %1.0
-                end,
-            ?TRACE("Threshold: ~p~n", [{LowerBound, UpperBound}]),
-            LightNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) =< LowerBound end, Pool),
-            HeavyNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) >= UpperBound end, Pool),
-            ScheduleNew = find_matches(LightNodes, HeavyNodes, []),
+            ScheduleNew = find_matches(Pool, []),
             ?TRACE("New schedule: ~p~n", [ScheduleNew]),
             ScheduleNew
     end.
 
--spec find_matches(gb_sets:set(lb_info:lb_info()), gb_sets:set(lb_info:lb_info()), schedule()) -> schedule().
-find_matches(LightNodes, HeavyNodes, Result) ->
-    case gb_sets:size(LightNodes) > 0 andalso gb_sets:size(HeavyNodes) > 0 of
+-spec find_matches(gb_sets:set(lb_info:lb_info()), schedule()) -> schedule().
+find_matches(Nodes, Result) ->
+    case gb_sets:size(Nodes) >= 2 of
         true ->
-            {LightNode, LightNodes2} = gb_sets:take_smallest(LightNodes),
-            {HeavyNode, HeavyNodes2} = gb_sets:take_largest(HeavyNodes),
-            find_matches(LightNodes2, HeavyNodes2, [#reassign{light = LightNode, heavy = HeavyNode} | Result]);
+            {LightNode, NodesNew} = gb_sets:take_smallest(Nodes),
+            {HeavyNode, NodesNew2} = gb_sets:take_largest(NodesNew),
+            Epsilon = 0.24,
+            case lb_info:get_load(LightNode) =< Epsilon * lb_info:get_load(HeavyNode) of
+                true ->
+                    find_matches(NodesNew2, [#reassign{light = LightNode, heavy = HeavyNode} | Result]);
+                _ ->
+                    find_matches(NodesNew2, Result)
+            end;
         false ->
             %% return the result with the best match first
             lists:reverse(Result)
