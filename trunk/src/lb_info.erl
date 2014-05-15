@@ -49,15 +49,14 @@
 
 -opaque lb_info() :: #lb_info{}.
 
-%% Convert node details to lb_info
+%% @doc Creates a new record to hold essential load balancing values
 -spec new(NodeDetails::node_details:node_details()) -> lb_info().
 new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
-    Load = case config:read(lb_active_load_metric) of
-               items -> Items;
-               _ -> lb_stats:get_load_metric()
-           end,
     Requests = lb_stats:get_request_metric(),
+    SystemLoad = lb_stats:get_load_metric(),
+    %% TODO coefficients
+    Load = (1 * Items + 1 * Requests) * 1 * SystemLoad,
     #lb_info{load  = Load,
              reqs  = Requests,
              items = Items,
