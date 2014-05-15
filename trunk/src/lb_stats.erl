@@ -25,6 +25,7 @@
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), io:format("lb_stats: " ++ X, Y)).
 
+%% get split key based on the request histogram
 -export([get_request_histogram_split_key/3]).
 
 %% for db monitoring
@@ -253,6 +254,7 @@ avg_weighted([unknown | Other], Weight, N, Sum) ->
 avg_weighted([Element | Other], Weight, N, Sum) ->
     avg_weighted(Other, Weight - 1, N + Weight, Sum + Weight * Element).
 
+%% @doc returns a split key from the request histogram at a given time (if available)
 -spec get_request_histogram_split_key(TargetLoad::pos_integer(),
                                       Direction::forward | backward,
                                       erlang:timestamp())
