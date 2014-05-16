@@ -102,7 +102,6 @@ start_link(DHTNodeGroup) ->
 -spec init([]) -> state().
 init([]) ->
     lb_stats:init(),
-    trigger(),
     %% keep the node id in state, currently needed to normalize histogram
     rm_loop:subscribe(
        self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_slide_filter/3,
@@ -125,12 +124,6 @@ init([]) ->
 -spec on(message(), state()) -> state().
 on({collect_stats}, State) ->
     lb_stats:trigger_routine(),
-    State;
-
-on({lb_active_trigger}, State) ->
-    %% triggers maintenance tasks in inactive mode
-    trigger(),
-    %% module has its own trigger
     State;
 
 %% Gossip response before balancing takes place
@@ -580,11 +573,6 @@ gossip_available(Options) ->
 is_simulation(Options) ->
     proplists:is_defined(simulate, Options).
 
--spec trigger() -> ok.
-trigger() ->
-    Interval = config:read(lb_active_interval) div 1000,
-    msg_delay:send_trigger(Interval, {lb_active_trigger}).
-
 -spec check_for_gossip_modules() -> boolean().
 check_for_gossip_modules() ->
     RequiredModule = lb_active_gossip_request_metric,
@@ -603,13 +591,9 @@ check_module_config() ->
 %% @doc config check registered in config.erl
 -spec check_config() -> boolean().
 check_config() ->
-
     config:cfg_is_bool(lb_active) and
 
     config:cfg_is_in(lb_active_module, [none | ?MODULES]) and
-
-    config:cfg_is_integer(lb_active_interval) and
-    config:cfg_is_greater_than(lb_active_interval, 0) and
 
     config:cfg_is_bool(lb_active_use_gossip) and
     config:cfg_is_greater_than(lb_active_gossip_stddev_threshold, 0) and

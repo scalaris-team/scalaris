@@ -49,7 +49,7 @@
 
 -type(my_message() ::
            %% trigger messages
-           {trigger} |
+           {lb_active_karger_trigger} |
            %% random node from cyclon
            {cy_cache, [node:node_type()]} |
            %% load response from dht node
@@ -85,7 +85,7 @@ init() ->
 %%%%%%%%%%%%%%%
 
 -spec handle_msg(my_message(), state()) -> state().
-handle_msg({trigger}, State) ->
+handle_msg({lb_active_karger_trigger}, State) ->
     trigger(),
     %% Request N random nodes from cyclon
     NumNodes = config:read(lb_active_karger_rnd_nodes),
@@ -282,8 +282,8 @@ balance_adjacent(HeavyNode, LightNode, Options) ->
 
 -spec trigger() -> ok.
 trigger() ->
-    Interval = config:read(lb_active_interval) div 1000,
-    msg_delay:send_trigger(Interval, {trigger}).
+    Interval = config:read(lb_active_karger_interval) div 1000,
+    msg_delay:send_trigger(Interval, {lb_active_karger_trigger}).
 
 %% @doc Key/Value List for web debug
 -spec get_web_debug_kv(state()) -> [{string(), string()}].
@@ -292,6 +292,9 @@ get_web_debug_kv(State) ->
 
 -spec check_config() -> boolean().
 check_config() ->
+    config:cfg_is_integer(lb_active_karger_interval) and
+    config:cfg_is_greater_than(lb_active_karger_interval, 0) and
+
     config:cfg_is_float(lb_active_karger_epsilon) and
     config:cfg_is_greater_than(lb_active_karger_epsilon, 0.0) and
     config:cfg_is_less_than(lb_active_karger_epsilon, 0.25) and
