@@ -216,6 +216,7 @@ on({report_rrd, Process, Key, OldValue, _NewValue}, {Table, _ApiTxReqList} = Sta
     TableIndex = {Process, Key},
     MyData = case ets:lookup(Table, TableIndex) of
                  [{TableIndex, X}] -> X;
+                 [] when Process =:= lb_active -> OldValue;
                  [] ->
                      SlotLength = rrd:get_slot_length(OldValue),
                      OldTime = rrd:get_current_time(OldValue),
