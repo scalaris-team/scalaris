@@ -598,11 +598,11 @@ ENABLERUBYINSTALL
 BUILDCLASSPATH
 JAVAFUNCTIONS
 HAVE_YAWS_SENDFILE
-EDOCMACROS
-CTHOOKS_FLAGS
-DIALYZER_FLAGS
 EMAKEFILECOMPILECOMPAT
+DIALYZER_FLAGS
+EDOCMACROS
 EMAKEFILEDEFINES
+CTHOOKS_FLAGS
 ERLANG_TOKE_FLAGS
 ERLANG_LIB_VER_toke
 ERLANG_LIB_DIR_toke
@@ -1811,6 +1811,10 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
+EMAKEFILEDEFINES=
+EDOCMACROS=
+DIALYZER_FLAGS=
+
 ###########################################################
 #
 # check tokyo cabinet and toke
@@ -2059,15 +2063,12 @@ fi
 #
 ###########################################################
 
-ENABLE_DEBUG=
-ENABLE_DEBUG_EDOC=
-ENABLE_DEBUG_DIALYZER=
 # Check whether --enable-debug was given.
 if test "${enable_debug+set}" = set; then :
   enableval=$enable_debug; if test "no" != "$enableval"; then :
-  ENABLE_DEBUG=", {d, enable_debug}"
-                      ENABLE_DEBUG_EDOC=", {enable_debug, true}"
-                      ENABLE_DEBUG_DIALYZER=" -Denable_debug"
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, enable_debug}"
+                      EDOCMACROS="${EDOCMACROS}, {enable_debug, true}"
+                      DIALYZER_FLAGS="${DIALYZER_FLAGS} -Denable_debug"
 fi
 fi
 
@@ -2495,9 +2496,8 @@ fi
 
 
 
-ERLANG_NATIVE_FLAGS=
 if test "x$COMPILE_NATIVE" != xno; then :
-  ERLANG_NATIVE_FLAGS=", native"
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, native"
 fi
 
 # required libs:
@@ -3548,15 +3548,12 @@ ERLANG_LIB_DIR_hanoidb=$ac_cv_erlang_lib_dir_hanoidb
 ERLANG_LIB_VER_hanoidb=$ac_cv_erlang_lib_ver_hanoidb
 
 if test "$ac_cv_erlang_lib_dir_hanoidb" = "not found"; then :
-  HAVEHANOIDB=""
-                     HAVEHANOIDB_EDOC=""
-                     HAVEHANOIDB_DIALYZER=""
-                     { $as_echo "$as_me:${as_lineno-$LINENO}: erlang-hanoidb not found - you won't be able to use the db_hanoidb back-end (if configured in scalaris.hrl)" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: erlang-hanoidb not found - you won't be able to use the db_hanoidb back-end (if configured in scalaris.hrl)" >&5
 $as_echo "$as_me: erlang-hanoidb not found - you won't be able to use the db_hanoidb back-end (if configured in scalaris.hrl)" >&6;}
 else
-  HAVEHANOIDB=", {d, have_hanoidb}"
-                     HAVEHANOIDB_EDOC=", {have_hanoidb, true}"
-                     HAVEHANOIDB_DIALYZER=" -Dhave_hanoidb"
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_hanoidb}"
+                     EDOCMACROS="${EDOCMACROS}, {have_hanoidb, true}"
+                     DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_hanoidb"
 fi
 
 
@@ -3908,11 +3905,7 @@ ERLANG_LIB_DIR_toke=$ac_cv_erlang_lib_dir_toke
 ERLANG_LIB_VER_toke=$ac_cv_erlang_lib_ver_toke
 
 if test "$ac_cv_erlang_lib_dir_toke" = "not found"; then :
-  HAVETOKE=""
-               HAVETOKE_EDOC=""
-               HAVETOKE_DIALYZER=""
-               ERLANG_TOKE_MESSAGE="toke erlang library not found"
-
+  ERLANG_TOKE_MESSAGE="toke erlang library not found"
 else
   as_ac_File=`$as_echo "ac_cv_file_$ERLANG_LIB_DIR_toke/priv/libtoke.so" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ERLANG_LIB_DIR_toke/priv/libtoke.so" >&5
@@ -3932,17 +3925,13 @@ eval ac_res=\$$as_ac_File
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_ac_File"\" = x"yes"; then :
-  HAVETOKE=", {d, have_toke}"
-                 HAVETOKE_EDOC=", {have_toke, true}"
-                 HAVETOKE_DIALYZER=" -Dhave_toke"
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_toke}"
+                 EDOCMACROS="${EDOCMACROS}, {have_toke, true}"
+                 DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_toke"
                  ERLANG_TOKE_FLAGS="-pa $ERLANG_LIB_DIR_toke/ebin"
 
 else
-  HAVETOKE=""
-                 HAVETOKE_EDOC=""
-                 HAVETOKE_DIALYZER=""
-                 ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
-
+  ERLANG_TOKE_MESSAGE="toke library libtoke.so not found"
 fi
 
 
@@ -3983,10 +3972,13 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  GBTREESISBUILTIN=""; GBTREESISBUILTIN_EDOC=""; GBTREESISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is a built-in type" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is a built-in type" >&5
 $as_echo "$as_me: gb_tree() is a built-in type" >&6;}
 else
-  GBTREESISBUILTIN=", {d, types_not_builtin}"; GBTREESISBUILTIN_EDOC=", {types_not_builtin, true}"; GBTREESISBUILTIN_DIALYZER=" -Dtypes_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is not built-in" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, types_not_builtin}"
+        EDOCMACROS="${EDOCMACROS}, {types_not_builtin, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dtypes_not_builtin"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: gb_tree() is not built-in" >&5
 $as_echo "$as_me: gb_tree() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -4010,10 +4002,13 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  TERMISBUILTIN=""; TERMISBUILTIN_EDOC=""; TERMISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: term() is a built-in type" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: term() is a built-in type" >&5
 $as_echo "$as_me: term() is a built-in type" >&6;}
 else
-  TERMISBUILTIN=", {d, term_not_builtin}"; TERMISBUILTIN_EDOC=", {term_not_builtin, true}"; TERMISBUILTIN_DIALYZER=" -Dterm_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: term() is not built-in" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, term_not_builtin}"
+        EDOCMACROS="${EDOCMACROS}, {term_not_builtin, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dterm_not_builtin"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: term() is not built-in" >&5
 $as_echo "$as_me: term() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -4037,10 +4032,13 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  NODEISBUILTIN=""; NODEISBUILTIN_EDOC=""; NODEISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: node() is a built-in type" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: node() is a built-in type" >&5
 $as_echo "$as_me: node() is a built-in type" >&6;}
 else
-  NODEISBUILTIN=", {d, node_not_builtin}"; NODEISBUILTIN_EDOC=", {node_not_builtin, true}"; NODEISBUILTIN_DIALYZER=" -Dnode_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: node() is not built-in" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, node_not_builtin}"
+        EDOCMACROS="${EDOCMACROS}, {node_not_builtin, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dnode_not_builtin"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: node() is not built-in" >&5
 $as_echo "$as_me: node() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -4064,10 +4062,13 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  MODULEISBUILTIN=""; MODULEISBUILTIN_EDOC=""; MODULEISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: module() is a built-in type" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: module() is a built-in type" >&5
 $as_echo "$as_me: module() is a built-in type" >&6;}
 else
-  MODULEISBUILTIN=", {d, module_not_builtin}"; MODULEISBUILTIN_EDOC=", {module_not_builtin, true}"; MODULEISBUILTIN_DIALYZER=" -Dmodule_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: module() is not built-in" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, module_not_builtin}"
+        EDOCMACROS="${EDOCMACROS}, {module_not_builtin, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dmodule_not_builtin"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: module() is not built-in" >&5
 $as_echo "$as_me: module() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -4091,10 +4092,13 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  BOOLEANISBUILTIN=""; BOOLEANISBUILTIN_EDOC=""; BOOLEANISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is a built-in type" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is a built-in type" >&5
 $as_echo "$as_me: boolean() is a built-in type" >&6;}
 else
-  BOOLEANISBUILTIN=", {d, boolean_not_builtin}"; BOOLEANISBUILTIN_EDOC=", {boolean_not_builtin, true}"; BOOLEANISBUILTIN_DIALYZER=" -Dboolean_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is not built-in" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, boolean_not_builtin}"
+        EDOCMACROS="${EDOCMACROS}, {boolean_not_builtin, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dboolean_not_builtin"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: boolean() is not built-in" >&5
 $as_echo "$as_me: boolean() is not built-in" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -4118,92 +4122,14 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  TIDISBUILTIN=""; TIDISBUILTIN_EDOC=""; TIDISBUILTIN_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is a built-in type" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is a built-in type" >&5
 $as_echo "$as_me: tid() is a built-in type" >&6;}
 else
-  TIDISBUILTIN=", {d, tid_not_builtin}"; TIDISBUILTIN_EDOC=", {tid_not_builtin, true}"; TIDISBUILTIN_DIALYZER=" -Dtid_not_builtin"; { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is not built-in" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, tid_not_builtin}"
+        EDOCMACROS="${EDOCMACROS}, {tid_not_builtin, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dtid_not_builtin"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: tid() is not built-in" >&5
 $as_echo "$as_me: tid() is not built-in" >&6;}
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--type(mytype()::gb_trees:tree(boolean(), boolean())).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  GBTREE2=""; GBTREE2_EDOC=""; GBTREE2_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_trees:tree/2 is available" >&5
-$as_echo "$as_me: gb_trees:tree/2 is available" >&6;}
-else
-  GBTREE2=", {d, gbtree2_not_available}"; GBTREE2_EDOC=", {gbtree2_not_available, true}"; GBTREE2_DIALYZER=" -Dgbtree2_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_trees:tree/2 is not available" >&5
-$as_echo "$as_me: gb_trees:tree/2 is not available" >&6;}
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--type(mytype()::gb_sets:set(boolean())).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  GBSET1=""; GBSET1_EDOC=""; GBSET1_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_sets:set/1 is available" >&5
-$as_echo "$as_me: gb_sets:set/1 is available" >&6;}
-else
-  GBSET1=", {d, gbset1_not_available}"; GBSET1_EDOC=", {gbset1_not_available, true}"; GBSET1_DIALYZER=" -Dgbset1_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: gb_sets:set/1 is not available" >&5
-$as_echo "$as_me: gb_sets:set/1 is not available" >&6;}
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--type(mytype()::dict:dict(boolean(), boolean())).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  DICT2=""; DICT2_EDOC=""; DICT2_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: dict:dict/2 is available" >&5
-$as_echo "$as_me: dict:dict/2 is available" >&6;}
-else
-  DICT2=", {d, dictdict2_not_available}"; DICT2_EDOC=", {dictdict2_not_available, true}"; DICT2_DIALYZER=" -Ddictdict2_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: dict:dict/2 is not available" >&5
-$as_echo "$as_me: dict:dict/2 is not available" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
@@ -4226,65 +4152,14 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  ETSTID=""; ETSTID_EDOC=""; ETSTID_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: ets:tid/0 is available" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: ets:tid/0 is available" >&5
 $as_echo "$as_me: ets:tid/0 is available" >&6;}
 else
-  ETSTID=", {d, etstid_not_available}"; ETSTID_EDOC=", {etstid_not_available, true}"; ETSTID_DIALYZER=" -Detstid_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: ets:tid/0 is not available" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, etstid_not_available}"
+        EDOCMACROS="${EDOCMACROS}, {etstid_not_available, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Detstid_not_available"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: ets:tid/0 is not available" >&5
 $as_echo "$as_me: ets:tid/0 is not available" >&6;}
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--type(mytype()::queue:queue(boolean())).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  QUEUE1=""; QUEUE1_EDOC=""; QUEUE1_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: queue:queue/1 is available" >&5
-$as_echo "$as_me: queue:queue/1 is available" >&6;}
-else
-  QUEUE1=", {d, queuequeue1_not_available}"; QUEUE1_EDOC=", {queuequeue1_not_available, true}"; QUEUE1_DIALYZER=" -Dqueuequeue1_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: queue:queue/1 is not available" >&5
-$as_echo "$as_me: queue:queue/1 is not available" >&6;}
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--type(mytype()::array:array(boolean())).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  ARRAY1=""; ARRAY1_EDOC=""; ARRAY1_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: array:array/1 is available" >&5
-$as_echo "$as_me: array:array/1 is available" >&6;}
-else
-  ARRAY1=", {d, arrayarray1_not_available}"; ARRAY1_EDOC=", {arrayarray1_not_available, true}"; ARRAY1_DIALYZER=" -Darrayarray1_not_available"; { $as_echo "$as_me:${as_lineno-$LINENO}: array:array/1 is not available" >&5
-$as_echo "$as_me: array:array/1 is not available" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
@@ -4307,10 +4182,16 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  RECURSIVETYPESALLOWED=""; RECURSIVETYPESALLOWED_EDOC=""; RECURSIVETYPESALLOWED_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are supported" >&5
+  RECURSIVETYPESALLOWED=""
+        RECURSIVETYPESALLOWED_EDOC=""
+        RECURSIVETYPESALLOWED_DIALYZER=""
+        { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are supported" >&5
 $as_echo "$as_me: recursive types are supported" >&6;}
 else
-  RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"; RECURSIVETYPESALLOWED_EDOC=", {recursive_types_are_not_allowed, true}"; RECURSIVETYPESALLOWED_DIALYZER=" -Drecursive_types_are_not_allowed"; { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are not supported" >&5
+  RECURSIVETYPESALLOWED=", {d, recursive_types_are_not_allowed}"
+        RECURSIVETYPESALLOWED_EDOC=", {recursive_types_are_not_allowed, true}"
+        RECURSIVETYPESALLOWED_DIALYZER=" -Drecursive_types_are_not_allowed"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: recursive types are not supported" >&5
 $as_echo "$as_me: recursive types are not supported" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -4334,16 +4215,30 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  TYPEFORWARDDECLARATIONS=""; TYPEFORWARDDECLARATIONS_EDOC=""; TYPEFORWARDDECLARATIONS_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are supported" >&5
+  TYPEFORWARDDECLARATIONS=""
+        TYPEFORWARDDECLARATIONS_EDOC=""
+        TYPEFORWARDDECLARATIONS_DIALYZER=""
+        { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are supported" >&5
 $as_echo "$as_me: type forward declarations are supported" >&6;}
 else
-  TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"; TYPEFORWARDDECLARATIONS_EDOC=", {type_forward_declarations_are_not_allowed, true}"; TYPEFORWARDDECLARATIONS_DIALYZER=" -Dtype_forward_declarations_are_not_allowed"; { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are not supported" >&5
+  TYPEFORWARDDECLARATIONS=", {d, type_forward_declarations_are_not_allowed}"
+        TYPEFORWARDDECLARATIONS_EDOC=", {type_forward_declarations_are_not_allowed, true}"
+        TYPEFORWARDDECLARATIONS_DIALYZER=" -Dtype_forward_declarations_are_not_allowed"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: type forward declarations are not supported" >&5
 $as_echo "$as_me: type forward declarations are not supported" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
 
+
+if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: forward declarations or recursive types are not allowed" >&5
+$as_echo "$as_me: forward declarations or recursive types are not allowed" >&6;}
+   FORWARDORRECURSIVE=", {d, forward_or_recursive_types_are_not_allowed}"
+   FORWARDORRECURSIVE_EDOC=", {forward_or_recursive_types_are_not_allowed, true}"
+   FORWARDORRECURSIVE_DIALYZER=" -Dforward_or_recursive_types_are_not_allowed"
+fi
 
 if test "$cross_compiling" = yes; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
@@ -4361,24 +4256,19 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  EXPORTTYPESUPPORT=", {d, with_export_type_support}"; EXPORTTYPESUPPORT_EDOC=", {with_export_type_support, true}"; EXPORTTYPESUPPORT_DIALYZER=" -Dwith_export_type_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is supported" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_export_type_support}"
+        EDOCMACROS="${EDOCMACROS}, {with_export_type_support, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dwith_export_type_support"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is supported" >&5
 $as_echo "$as_me: export_type is supported" >&6;}
 else
-  EXPORTTYPESUPPORT=""; EXPORTTYPESUPPORT_EDOC=""; EXPORTTYPESUPPORT_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is not supported" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: export_type is not supported" >&5
 $as_echo "$as_me: export_type is not supported" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
 
-
-if test "x$RECURSIVETYPESALLOWED" != x -o "x$TYPEFORWARDDECLARATIONS" != x; then
-   { $as_echo "$as_me:${as_lineno-$LINENO}: forward declarations or recursive types are not allowed" >&5
-$as_echo "$as_me: forward declarations or recursive types are not allowed" >&6;}
-   FORWARDORRECURSIVE=", {d, forward_or_recursive_types_are_not_allowed}"
-   FORWARDORRECURSIVE_EDOC=", {forward_or_recursive_types_are_not_allowed, true}"
-   FORWARDORRECURSIVE_DIALYZER=" -Dforward_or_recursive_types_are_not_allowed"
-fi
 
 crypto_start=`"${ERL}" -noshell -eval 'io:format("~p~n", [crypto:start()]), erlang:halt().' | tail -1`
 if test "${crypto_start}" = "ok"; then :
@@ -4393,41 +4283,15 @@ fi
 
 crypto_hash=`"${ERL}" -noshell -eval 'code:load_file(crypto), io:format("~p~n", [erlang:function_exported(crypto,hash,2)]), erlang:halt().' | tail -1`
 if test "${crypto_hash}" = "true"; then :
-  CRYPTOHASHSUPPORT=", {d, with_crypto_hash}"; CRYPTOHASHSUPPORT_EDOC=", {with_crypto_hash, true}"; CRYPTOHASHSUPPORT_DIALYZER=" -Dwith_crypto_hash"; { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:hash/2 is available and usable" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, with_crypto_hash}"
+       EDOCMACROS="${EDOCMACROS}, {with_crypto_hash, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dwith_crypto_hash"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:hash/2 is available and usable" >&5
 $as_echo "$as_me: crypto:hash/2 is available and usable" >&6;}
 else
-  CRYPTOHASHSUPPORT=""; CRYPTOHASHSUPPORT_EDOC=""; CRYPTOHASHSUPPORT_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1" >&5
 $as_echo "$as_me: crypto:hash/2 is not available or not usable, falling back to crypto:md5/1 and crypto:sha1/1" >&6;}
 fi
-
-if test "$cross_compiling" = yes; then :
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "cannot run test program while cross compiling
-See \`config.log' for more details" "$LINENO" 5; }
-else
-  cat > conftest.$ac_ext <<_ACEOF
--module(conftest).
--export([start/0]).
--type(mytype()::{ok, arity()}).
-start() ->
-ok
-.
-
-_ACEOF
-if ac_fn_erl_try_run "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: arity() is available" >&5
-$as_echo "$as_me: arity() is available" >&6;}
-else
-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
-as_fn_error $? "the type arity() is not available; you are probably using Erlang < R13 which is not supported anymore
-See \`config.log' for more details" "$LINENO" 5; }
-fi
-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-  conftest.$ac_objext conftest.beam conftest.$ac_ext
-fi
-
 
 erlang_timestamp_avail=`"${ERL}" -noshell -eval \
   '{ok, {_Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}} =
@@ -4436,12 +4300,11 @@ erlang_timestamp_avail=`"${ERL}" -noshell -eval \
                       (_) -> false end, AbstractCode),
    io:format("~p~n", [Res]), erlang:halt().' | tail -1`
 if test "${erlang_timestamp_avail}" = "true"; then :
-  HAVE_ERLANG_TIMESTAMP=", {d, have_erlang_timestamp}";
-        { $as_echo "$as_me:${as_lineno-$LINENO}: erlang:timestamp() type is available" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_erlang_timestamp}"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: erlang:timestamp() type is available" >&5
 $as_echo "$as_me: erlang:timestamp() type is available" >&6;}
 else
-  HAVE_ERLANG_TIMESTAMP="";
-        { $as_echo "$as_me:${as_lineno-$LINENO}: the type erlang:timestamp() is not available" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: the type erlang:timestamp() is not available" >&5
 $as_echo "$as_me: the type erlang:timestamp() is not available" >&6;}
 fi
 
@@ -4456,21 +4319,31 @@ fi
 
 ct_line=`"${ERL}" -noshell -eval 'code:load_file(ct_line), io:format("~p~n", [erlang:function_exported(ct_line,parse_transform,2)]), erlang:halt().' | tail -1`
 if test "${ct_line}" = "true"; then :
-  CTLINESUPPORT=", {d, have_ctline_support}"; CTLINESUPPORT_EDOC=", {have_ctline_support, true}"; CTLINESUPPORT_DIALYZER=" -Dhave_ctline_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is available" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_ctline_support}"
+       EDOCMACROS="${EDOCMACROS}, {have_ctline_support, true}"
+       DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_ctline_support"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is available" >&5
 $as_echo "$as_me: ct_line is available" >&6;}
 else
-  CTLINESUPPORT=""; CTLINESUPPORT_EDOC=""; CTLINESUPPORT_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is not available" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: ct_line is not available" >&5
 $as_echo "$as_me: ct_line is not available" >&6;}
 fi
 
 "${ERL}" -noshell -s ct_run script_start -s erlang halt --help | grep "ct_hooks" 2>/dev/null 1>/dev/null
 if test $? -eq 0 ; then :
-  CTHOOKS_FLAGS="-ct_hooks scalaris_cth"; CTHOOKS_EMAKEFILE=", {d, have_cthooks_support}"; CTHOOKS_EDOC=", {have_cthooks_support, true}"; CTHOOKS_DIALYZER=" -Dhave_cthooks_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_hooks is available" >&5
+  CTHOOKS_FLAGS="-ct_hooks scalaris_cth"
+        EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_cthooks_support}"
+        EDOCMACROS="${EDOCMACROS}, {have_cthooks_support, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_cthooks_support"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: ct_hooks is available" >&5
 $as_echo "$as_me: ct_hooks is available" >&6;}
 else
-  CTHOOKS_FLAGS=""; CTHOOKS_EMAKEFILE=""; CTHOOKS_EDOC=""; CTHOOKS_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: ct_hooks is not available" >&5
+  CTHOOKS_FLAGS=""
+        { $as_echo "$as_me:${as_lineno-$LINENO}: ct_hooks is not available" >&5
 $as_echo "$as_me: ct_hooks is not available" >&6;}
 fi
+
+
 
 if test "$cross_compiling" = yes; then :
   { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
@@ -4488,10 +4361,13 @@ ok
 
 _ACEOF
 if ac_fn_erl_try_run "$LINENO"; then :
-  CALLBACKSUPPORT=", {d, have_callback_support}"; CALLBACKSUPPORT_EDOC=", {have_callback_support, true}"; CALLBACKSUPPORT_DIALYZER=" -Dhave_callback_support"; { $as_echo "$as_me:${as_lineno-$LINENO}: -callback is available" >&5
+  EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, have_callback_support}"
+        EDOCMACROS="${EDOCMACROS}, {have_callback_support, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dhave_callback_support"
+        { $as_echo "$as_me:${as_lineno-$LINENO}: -callback is available" >&5
 $as_echo "$as_me: -callback is available" >&6;}
 else
-  CALLBACKSUPPORT=""; CALLBACKSUPPORT_EDOC=""; CALLBACKSUPPORT_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: -callback is not available" >&5
+  { $as_echo "$as_me:${as_lineno-$LINENO}: -callback is not available" >&5
 $as_echo "$as_me: -callback is not available" >&6;}
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
@@ -4524,15 +4400,21 @@ $as_echo "$as_me: found file:sendfile/5" >&6;}
 fi
 
 if test "$HAVE_ERL_SENDFILE" = true; then :
-  HAVE_YAWS_SENDFILE=""; HAVE_YAWS_SENDFILE_DIALYZER=""; { $as_echo "$as_me:${as_lineno-$LINENO}: file:sendfile/5 is available for yaws" >&5
+  HAVE_YAWS_SENDFILE=""
+       HAVE_YAWS_SENDFILE_DIALYZER=""
+       { $as_echo "$as_me:${as_lineno-$LINENO}: file:sendfile/5 is available for yaws" >&5
 $as_echo "$as_me: file:sendfile/5 is available for yaws" >&6;}
 fi
 if test "$HAVE_ERL_SENDFILE" = false -a "$HAVE_YAWS_SENDFILE" = true; then :
-  HAVE_YAWS_SENDFILE=", {d, 'HAVE_YAWS_SENDFILE'}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DHAVE_YAWS_SENDFILE"; { $as_echo "$as_me:${as_lineno-$LINENO}: using yaws_sendfile for yaws" >&5
+  HAVE_YAWS_SENDFILE=", {d, 'HAVE_YAWS_SENDFILE'}"
+       HAVE_YAWS_SENDFILE_DIALYZER=" -DHAVE_YAWS_SENDFILE"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: using yaws_sendfile for yaws" >&5
 $as_echo "$as_me: using yaws_sendfile for yaws" >&6;}
 fi
 if test "$HAVE_ERL_SENDFILE" = false -a "$HAVE_YAWS_SENDFILE" = false; then :
-  HAVE_YAWS_SENDFILE=", {d, 'NO_FILE_SENDFILE'}"; HAVE_YAWS_SENDFILE_DIALYZER=" -DNO_FILE_SENDFILE"; { $as_echo "$as_me:${as_lineno-$LINENO}: no send_file suitable for yaws, using fallback" >&5
+  HAVE_YAWS_SENDFILE=", {d, 'NO_FILE_SENDFILE'}"
+       HAVE_YAWS_SENDFILE_DIALYZER=" -DNO_FILE_SENDFILE"
+       { $as_echo "$as_me:${as_lineno-$LINENO}: no send_file suitable for yaws, using fallback" >&5
 $as_echo "$as_me: no send_file suitable for yaws, using fallback" >&6;}
 fi
 
@@ -4542,11 +4424,9 @@ fi
 #
 ###########################################################
 
-EMAKEFILEDEFINES="${ENABLE_DEBUG}${HAVEHANOIDB}${HAVETOKE}${GBTREESISBUILTIN}${TERMISBUILTIN}${NODEISBUILTIN}${MODULEISBUILTIN}${BOOLEANISBUILTIN}${TIDISBUILTIN}${GBTREE2}${GBSET1}${DICT2}${ETSTID}${QUEUE1}${ARRAY1}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}${EXPORTTYPESUPPORT}${HAVE_ERLANG_TIMESTAMP}${CTLINESUPPORT}${CTHOOKS_EMAKEFILE}${CALLBACKSUPPORT}${CRYPTOHASHSUPPORT}${ERLANG_NATIVE_FLAGS}"
-EDOCMACROS="${ENABLE_DEBUG_EDOC}${HAVEHANOIDB_EDOC}${HAVETOKE_EDOC}${GBTREESISBUILTIN_EDOC}${TERMISBUILTIN_EDOC}${NODEISBUILTIN_EDOC}${MODULEISBUILTIN_EDOC}${BOOLEANISBUILTIN_EDOC}${TIDISBUILTIN_EDOC}${GBTREE2_EDOC}${GBSET1_EDOC}${DICT2_EDOC}${ETSTID_EDOC}${QUEUE1_EDOC}${ARRAY1_EDOC}${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}${EXPORTTYPESUPPORT_EDOC}${CTLINESUPPORT_EDOC}${CTHOOKS_EDOC}${CALLBACKSUPPORT_EDOC}${CRYPTOHASHSUPPORT_EDOC}"
-EDOCMACROS="${EDOCMACROS#, }"
-DIALYZER_FLAGS="${ENABLE_DEBUG_DIALYZER}${HAVEHANOIDB_DIALYZER}${HAVETOKE_DIALYZER}${GBTREESISBUILTIN_DIALYZER}${TERMISBUILTIN_DIALYZER}${NODEISBUILTIN_DIALYZER}${MODULEISBUILTIN_DIALYZER}${BOOLEANISBUILTIN_DIALYZER}${TIDISBUILTIN_DIALYZER}${GBTREE2_DIALYZER}${GBSET1_DIALYZER}${DICT2_DIALYZER}${ETSTID_DIALYZER}${QUEUE1_DIALYZER}${ARRAY1_DIALYZER}${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${EXPORTTYPESUPPORT_DIALYZER}${HAVE_YAWS_SENDFILE_DIALYZER}${CTLINESUPPORT_DIALYZER}${CTHOOKS_DIALYZER}${CALLBACKSUPPORT_DIALYZER}${CRYPTOHASHSUPPORT_DIALYZER}"
-
+EMAKEFILEDEFINES="${EMAKEFILEDEFINES}${RECURSIVETYPESALLOWED}${TYPEFORWARDDECLARATIONS}${FORWARDORRECURSIVE}"
+EDOCMACROS="${EDOCMACROS#, }${RECURSIVETYPESALLOWED_EDOC}${TYPEFORWARDDECLARATIONS_EDOC}${FORWARDORRECURSIVE_EDOC}"
+DIALYZER_FLAGS="${DIALYZER_FLAGS## }${RECURSIVETYPESALLOWED_DIALYZER}${TYPEFORWARDDECLARATIONS_DIALYZER}${FORWARDORRECURSIVE_DIALYZER}${HAVE_YAWS_SENDFILE_DIALYZER}"
 
 
 
