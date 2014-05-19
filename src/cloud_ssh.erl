@@ -188,7 +188,7 @@ get_scalaris_service() ->
         end,
     {format("~s/~s", [Path, ?scalaris_start]), format("~s/~s", [Path, ?scalaris_stop])}.
 
--spec get_additional_services() -> list(tuple(string(),string())).
+-spec get_additional_services() -> [{string(),string()}].
 get_additional_services() ->
     case config:read(cloud_ssh_services) of
         failed -> [];
