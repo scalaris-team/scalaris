@@ -44,7 +44,7 @@
 -define(scalaris_stop, "bin/./scalarisctl -n node1 gstop").
 
 -type status() :: active | inactive.
--type host() :: tuple(string(), status()).
+-type host() :: {string(), status()}.
 -type hostlist() :: list(host()).
 
 %%%%%%%%%%%%%%%%%%%%%
@@ -179,7 +179,7 @@ save_hosts(TLog, Hosts) ->
         _ -> failed
     end.
 
--spec get_scalaris_service() ->  tuple(string(), string()).
+-spec get_scalaris_service() -> {string(), string()}.
 get_scalaris_service() ->
     Path =
         case config:read(cloud_ssh_path) of
