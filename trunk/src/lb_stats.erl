@@ -26,7 +26,7 @@
 %-define(TRACE(X,Y), io:format("lb_stats: " ++ X, Y)).
 
 %% get split key based on the request histogram
--export([get_request_histogram_split_key/4]).
+-export([get_request_histogram_split_key/3]).
 
 %% for db monitoring
 -export([init/0, init_db_rrd/1, update_db_rrd/2, update_db_monitor/2]).
@@ -234,41 +234,50 @@ avg_weighted([Element | Other], Weight, N, Sum) ->
 %% @doc returns a split key from the request histogram at a given time (if available)
 -spec get_request_histogram_split_key(TargetLoad::pos_integer(),
                                       Direction::forward | backward,
-                                      Time::erlang:timestamp(),
-                                      Keys::non_neg_integer())
+                                      Items::non_neg_integer())
         -> {?RT:key(), TakenLoad::non_neg_integer()} | failed.
-get_request_histogram_split_key(TargetLoad, Direction, {_, _, _} = Time, Keys) ->
+get_request_histogram_split_key(TargetLoad, Direction, Items) ->
     MonitorPid = pid_groups:get_my(monitor),
     RequestMetric = config:read(lb_active_request_metric),
     [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, RequestMetric}]),
     case RRD of
         undefined ->
-            log:log(warn, "No request histogram available because no rrd is available."),
+            log:log(warn, "No request histogram available because rrd is undefined."),
             failed;
         RRD ->
-            case rrd:get_value(RRD, Time) of
-                undefined ->
-                    log:log(warn, "No request histogram available. Time slot not found."),
-                    failed;
-                Histogram ->
-                    ?TRACE("Got histogram to compute split key: ~p~n", [Histogram]),
-                    % check if enough requests have been inserted into the histogram
-                    EntriesAvailable = histogram_rt:get_num_inserts(Histogram),
-                    Confidence = config:read(lb_active_request_confidence),
-                    if Keys =:= 0 orelse EntriesAvailable / Keys < Confidence ->
-                           ?TRACE("Confidence too low (below ~p) for request balancing~n", [Confidence]),
-                           failed;
-                       true ->
-                           {Status, Key, TakenLoad} =
-                               case Direction of
-                                   forward -> histogram_rt:foldl_until(TargetLoad, Histogram);
-                                   backward -> histogram_rt:foldr_until(TargetLoad, Histogram)
-                               end,
-                           case {Status, Direction} of
-                               {fail, _} -> failed;
-                               {ok, _} -> {Key, TakenLoad}
-                           end
-                    end
+            AllValues = rrd:get_all_values(asc, RRD),
+            NumValues = rrd:get_count(RRD),
+            AllDefined = lists:all(fun(El) -> El =/= undefined end, AllValues),
+            if AllDefined ->
+                   ?TRACE("Got ~p histograms to compute split key~n", [NumValues]),
+                   %% merge all histograms with weight (the older the lower the weight)
+                   {AllHists, _} = lists:foldl(
+                                     fun(Hist, {AccHist, Weight}) ->
+                                             io:format("Weight: ~p~n", [Weight]),
+                                             {histogram_rt:merge_weighted(AccHist, Hist, Weight), Weight + 1}
+                                     end, {hd(AllValues), 2}, tl(AllValues)),
+                   %% normalize afterwards
+                   Histogram = histogram_rt:normalize_count(NumValues, AllHists),
+                   % check if enough requests have been inserted into the histogram
+                   EntriesAvailable = histogram_rt:get_num_inserts(Histogram),
+                   Confidence = config:read(lb_active_request_confidence),
+                   if Items =:= 0 orelse EntriesAvailable / Items < Confidence ->
+                          ?TRACE("Confidence too low (below ~p) for request balancing~n", [Confidence]),
+                          failed;
+                      true ->
+                          {Status, Key, TakenLoad} =
+                              case Direction of
+                                  forward -> histogram_rt:foldl_until(TargetLoad, Histogram);
+                                  backward -> histogram_rt:foldr_until(TargetLoad, Histogram)
+                              end,
+                          case {Status, Direction} of
+                              {fail, _} -> failed;
+                              {ok, _} -> {Key, TakenLoad}
+                          end
+                   end;
+               true ->
+                   log:log(warn, "Not enough request histograms available. Not enough data collected."),
+                   failed
             end
     end.
 
