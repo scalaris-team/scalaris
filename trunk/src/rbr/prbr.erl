@@ -49,9 +49,6 @@
 
 %% let fetch the number of DB entries
 -export([get_load/1]).
-%% let fetch the DB entries (for debugging and crash-recovery)
--export([tab2list/1]).     %% without prbr own data
--export([tab2list_raw/1]). %% with prbr own data
 
 -ifdef(with_export_type_support).
 -export_type([message/0]).
@@ -180,12 +177,12 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
         end,
     TableName;
 
-on({prbr, tab2list, _DB, Client}, TableName) ->
-    comm:send_local(Client, tab2list(TableName)),
+on({prbr, tab2list, DB, Client}, TableName) ->
+    comm:send_local(Client, {DB, tab2list(TableName)}),
     TableName;
 
-on({prbr, tab2list_raw, _DB, Client}, TableName) ->
-    comm:send_local(Client, tab2list_raw(TableName)),
+on({prbr, tab2list_raw, DB, Client}, TableName) ->
+    comm:send_local(Client, {DB, tab2list_raw(TableName)}),
     TableName.
 
 -spec get_entry(any(), state()) -> entry().
