@@ -231,6 +231,14 @@ AC_RUN_IFELSE(
         AC_MSG_NOTICE([gb_tree() is not built-in])])
 
 AC_RUN_IFELSE(
+       [AC_LANG_PROGRAM([-type(mytype()::reference()).], [ok])],
+       [AC_MSG_NOTICE([reference() is a built-in type])],
+       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, reference_not_builtin}"
+        EDOCMACROS="${EDOCMACROS}, {reference_not_builtin, true}"
+        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dreference_not_builtin"
+        AC_MSG_NOTICE([reference() is not built-in])])
+
+AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::term()).], [ok])],
        [AC_MSG_NOTICE([term() is a built-in type])],
        [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, term_not_builtin}"
