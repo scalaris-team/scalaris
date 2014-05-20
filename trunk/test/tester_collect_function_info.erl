@@ -396,8 +396,8 @@ parse_type_({type, _Line, bitstring, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, bitstring}, ParseState};
 parse_type_({type, _Line, maybe_improper_list, L}, _Module, ParseState) when is_list(L) ->
     {{builtin_type, maybe_improper_list}, ParseState};
-parse_type_({user_type, _Line, TypeName, L}, Module, ParseState) ->
-    parse_type_({type, _Line, TypeName, L}, Module, ParseState);
+parse_type_({user_type, Line, TypeName, L}, Module, ParseState) ->
+    parse_type_({type, Line, TypeName, L}, Module, ParseState);
 parse_type_({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
     %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
     case tester_parse_state:is_known_type(Module, TypeName, ParseState) of
