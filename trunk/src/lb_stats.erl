@@ -139,21 +139,17 @@ update_db_rrd(Key, OldRRD) ->
 get_load_metric() ->
     Metric = config:read(lb_active_load_metric),
     Value = case get_load_metric(Metric) of
-                Val when is_number(Val) ->
-                    util:round(Val, 2);
-                Val -> Val
+                unknown -> unknown;
+                Val     -> util:round(Val, 2)
             end,
     %io:format("Load: ~p~n", [Value]),
     Value.
 
 -spec get_load_metric(load_metric()) -> unknown | load().
-get_load_metric(Metric) ->
-    case Metric of
-        cpu          -> get_vm_metric(cpu);
-        reductions   -> get_dht_metric(reductions);
-        mem          -> get_vm_metric(mem);
-        _            -> throw(metric_not_available)
-    end.
+get_load_metric(cpu)        -> get_vm_metric(cpu);
+get_load_metric(reductions) -> get_dht_metric(reductions);
+get_load_metric(mem)        -> get_vm_metric(mem);
+get_load_metric(_)          -> throw(metric_not_available).
 
 -spec get_request_metric() -> integer().
 get_request_metric() ->
@@ -299,8 +295,8 @@ get_last_reductions() ->
 
 %% @doc Sets a default value if the value is unknown
 -spec default_value(Val::unknown | number()) -> number().
-default_value(Val) ->
-    ?IIF(Val =:= unknown, 0, Val).
+default_value(unknown) -> 0;
+default_value(Val)     -> Val.
 
 -spec collect_stats() -> boolean().
 collect_stats() ->
