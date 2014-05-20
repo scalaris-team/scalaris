@@ -190,14 +190,9 @@ get_metric(MonitorPid, Metric) ->
         undefined ->
             unknown;
         RRD ->
-            History = config:read(lb_active_monitor_history),
-            SlotLength = rrd:get_slot_length(RRD),
-            {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-            Vals = [begin
-                        %% get stable value off an old slot
-                        Value = rrd:get_value(RRD, {MegaSecs, Secs, MicroSecs - Offset*SlotLength}),
-                        get_value_type(Value, rrd:get_type(RRD))
-                    end || Offset <- lists:seq(2, History)],
+            RRDVals = rrd:get_all_values(desc, RRD),
+            Type = rrd:get_type(RRD),
+            Vals = lists:map(fun(Val) -> get_value_type(Val, Type) end, RRDVals),
             %io:format("~p Vals: ~p~n", [Metric, Vals]),
             ?IIF(lists:member(unknown, Vals), unknown, avg_weighted(Vals))
     end.
@@ -207,8 +202,6 @@ get_value_type(undefined, _Type) ->
     unknown;
 get_value_type(Value, _Type) when is_number(Value) ->
     Value;
-get_value_type(Value, {histogram, _Size}) ->
-    histogram:get_num_inserts(Value);
 get_value_type(Value, {histogram_rt, _Size, _BaseKey}) ->
     histogram_rt:get_num_inserts(Value).
 
