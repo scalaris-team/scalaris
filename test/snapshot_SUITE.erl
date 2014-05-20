@@ -453,10 +453,10 @@ test_spam_transactions_and_snapshots_on_fully_joined(_) ->
 
     ct:pal("spaming transactions..."),
     SpamPid1 = erlang:spawn(fun() ->
-                    [do_transaction_a(X) || X <- lists:seq(1, 100)]
+                    [do_transaction_a(X) || X <- lists:seq(1, 50)]
           end),
     SpamPid2 = erlang:spawn(fun() ->
-                    [do_transaction_b(X) || X <- lists:seq(1, 100)]
+                    [do_transaction_b(X) || X <- lists:seq(1, 50)]
           end),
 
     ct:pal("spaming snapshots..."),
@@ -467,6 +467,7 @@ test_spam_transactions_and_snapshots_on_fully_joined(_) ->
     util:wait_for_process_to_die(SpamPid1),
     util:wait_for_process_to_die(SpamPid2),
 
+    ct:pal("getting one last snapshot..."),
     % get a final snapshot and print it
     Snap = api_tx:get_system_snapshot(),
     ?equals_pattern(Snap, [{_, _, _}, {_, _, _}]),
