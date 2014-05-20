@@ -45,7 +45,7 @@ end_per_suite(Config) ->
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         rbr_concurrency_kv ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Size = randoms:rand_uniform(3, 14),
@@ -54,7 +54,7 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:check_ring_size_fully_joined(Size),
             Config;
         rbr_concurrency_leases ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Size = 1, %% larger rings not supported by leases yet,
@@ -65,7 +65,7 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:check_ring_size_fully_joined(Size),
             Config;
         rbr_consistency ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring_with_ids(?RT:get_replica_keys(rt_SUITE:number_to_key(0)),
@@ -75,7 +75,7 @@ init_per_testcase(TestCase, Config) ->
 
             Config;
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Size = randoms:rand_uniform(1, 9),
