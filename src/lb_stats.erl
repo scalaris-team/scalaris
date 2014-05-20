@@ -264,9 +264,9 @@ get_request_histogram_split_key(TargetLoad, Direction, Items) ->
                                   forward -> histogram_rt:foldl_until(TargetLoad, Histogram);
                                   backward -> histogram_rt:foldr_until(TargetLoad, Histogram)
                               end,
-                          case {Status, Direction} of
-                              {fail, _} -> failed;
-                              {ok, _} -> {Key, TakenLoad}
+                          case Status of
+                              fail -> failed;
+                              ok -> {Key, TakenLoad}
                           end
                    end;
                true ->
