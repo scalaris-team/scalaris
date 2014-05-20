@@ -66,7 +66,8 @@ init() ->
             InitialReductions = get_reductions(),
             set_last_reductions(InitialReductions),
             Resolution = config:read(lb_active_monitor_resolution),
-            RRD = rrd:create(Resolution * 1000, 5, gauge),
+            % only store newest value in rrd, monitor stores more values
+            RRD = rrd:create(Resolution * 1000, 1, gauge),
             monitor:client_monitor_set_value(lb_active, cpu, RRD),
             monitor:client_monitor_set_value(lb_active, mem, RRD),
             monitor:monitor_set_value(lb_active, reductions, RRD),
@@ -99,14 +100,14 @@ trigger_routine() ->
 -spec init_db_rrd(Id::?RT:key()) -> rrd:rrd().
 init_db_rrd(Id) ->
     Type = config:read(lb_active_db_monitor),
-    History = config:read(lb_active_monitor_history),
     HistogramSize = config:read(lb_active_histogram_size),
     HistogramType = {histogram_rt, HistogramSize, Id},
     MonitorResSecs = config:read(lb_active_monitor_resolution) div 1000,
     {MegaSecs, Secs, _Microsecs} = os:timestamp(),
     %% synchronize the start time for all monitors to a divisible of the monitor interval
     StartTime = {MegaSecs, Secs - Secs rem MonitorResSecs + MonitorResSecs, 0},
-    RRD  = rrd:create(MonitorResSecs*1000000, History + 1, HistogramType, StartTime),
+    % only store newest value in rrd, monitor stores more values
+    RRD  = rrd:create(MonitorResSecs*1000000, 1, HistogramType, StartTime),
     Monitor = pid_groups:get_my(monitor),
     monitor:clear_rrds(Monitor, [{lb_active, Type}]),
     monitor:monitor_set_value(lb_active, Type, RRD),

@@ -216,11 +216,10 @@ on({report_rrd, Process, Key, OldValue, _NewValue}, {Table, _ApiTxReqList} = Sta
     TableIndex = {Process, Key},
     MyData = case ets:lookup(Table, TableIndex) of
                  [{TableIndex, X}] -> X;
-                 [] when Process =:= lb_active -> OldValue;
                  [] ->
                      SlotLength = rrd:get_slot_length(OldValue),
                      OldTime = rrd:get_current_time(OldValue),
-                     rrd:create(SlotLength, get_timeslots_to_keep(),
+                     rrd:create(SlotLength, get_timeslots_to_keep(Process),
                                 rrd:get_type(OldValue),
                                 erlang:max(OldTime, OldTime - SlotLength))
              end,
@@ -375,8 +374,10 @@ check_config() ->
     config:cfg_is_integer(monitor_timeslots_to_keep) and
     config:cfg_is_greater_than(monitor_timeslots_to_keep, 0).
 
--spec get_timeslots_to_keep() -> pos_integer().
-get_timeslots_to_keep() ->
+-spec get_timeslots_to_keep(Process::atom()) -> pos_integer().
+get_timeslots_to_keep(lb_active) ->
+    config:read(lb_active_monitor_history);
+get_timeslots_to_keep(_Process) ->
     config:read(monitor_timeslots_to_keep).
 
 -spec get_check_timeslots_interval() -> 10.
