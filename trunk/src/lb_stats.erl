@@ -276,7 +276,7 @@ get_request_histogram_split_key(TargetLoad, Direction, Items) ->
     end.
 
 %% @doc get the reductions of all processes in the pid group
--spec get_reductions() -> integer().
+-spec get_reductions() -> non_neg_integer().
 get_reductions() ->
     MyGroupPids = pid_groups:my_members(),
     AllReductions =
@@ -286,12 +286,12 @@ get_reductions() ->
          end || Pid <- MyGroupPids, Pid =/= self()],
     lists:sum(AllReductions).
 
--spec set_last_reductions(integer()) -> ok.
+-spec set_last_reductions(non_neg_integer()) -> ok.
 set_last_reductions(Reductions) ->
     erlang:put(reductions, Reductions),
     ok.
 
--spec get_last_reductions() -> integer().
+-spec get_last_reductions() -> non_neg_integer().
 get_last_reductions() ->
     erlang:get(reductions).
 
