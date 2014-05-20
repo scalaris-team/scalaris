@@ -123,6 +123,7 @@ prop_foldl(Data, Interval, MaxNum) ->
     true.
 
 tester_foldl(_Config) ->
+    prop_foldl([{0.0}, {0}, {0.0}], {'(', {'*'}, {0}, ']'}, 4),
     tester:test(?MODULE, prop_foldl, 3, rw_suite_runs(10000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -175,8 +176,13 @@ write_scrubbed_to_db(DB, Data) ->
 
 scrub_data(Data) ->
     %% Entries should be unique
-    SortFun = fun(A, B) -> (element(1, A) < element(1, B)) orelse
-                           (element(1, A) ?EQ element(1, B)) end,
+    SortFun = fun(A, B) -> ((element(1, A) < element(1, B)) orelse
+                            (element(1, A) ?EQ element(1, B)))
+                           orelse
+                           (is_integer(element(1, A))
+                            andalso is_float(element(1, B))
+                            andalso element(1, A) == element(1, B))
+              end,
     lists:usort(SortFun, Data).
 
 check_db(DB, ExpData, Note) ->
