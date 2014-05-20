@@ -77,6 +77,11 @@ end_per_group(without_ring, Config) ->
 end_per_group(_GroupName, Config) ->
     Config.
 
+init_per_testcase(TestCase, Config) ->
+    %% stop ring from previous test case (it may have run into a timeout)
+    unittest_helper:stop_ring(),
+    Config.
+
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_ring(),
     Config.
