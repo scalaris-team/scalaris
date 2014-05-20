@@ -346,10 +346,13 @@ get_value(DB, InternalTime) when is_integer(InternalTime) ->
 -spec get_value_by_offset(DB::rrd(), SlotOffset::non_neg_integer()) -> undefined | data_type().
 get_value_by_offset(DB, 0) ->
     array:get(DB#rrd.current_index, DB#rrd.data); % minor optimization
-get_value_by_offset(DB, SlotOffset) ->
+get_value_by_offset(DB, SlotOffset) when SlotOffset < DB#rrd.count ->
     Count = DB#rrd.count,
-    Index = ((DB#rrd.current_index - SlotOffset) rem Count + Count) rem Count,
-    array:get(Index, DB#rrd.data).
+    Index = (DB#rrd.current_index + Count - SlotOffset) rem Count,
+    array:get(Index, DB#rrd.data);
+get_value_by_offset(DB, SlotOffset) when SlotOffset >= DB#rrd.count ->
+    % rare use case
+    get_value_by_offset(DB, SlotOffset rem DB#rrd.count).
 
 %% @doc Gets all values as list from newest to oldest (desc) or from
 %%      oldest to newest (asc). Values may be undefined.
