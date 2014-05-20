@@ -347,7 +347,8 @@ get_value(DB, InternalTime) when is_integer(InternalTime) ->
 get_value_by_offset(DB, 0) ->
     array:get(DB#rrd.current_index, DB#rrd.data); % minor optimization
 get_value_by_offset(DB, SlotOffset) ->
-    Index = (DB#rrd.current_index + SlotOffset) rem DB#rrd.count,
+    Count = DB#rrd.count,
+    Index = ((DB#rrd.current_index - SlotOffset) rem Count + Count) rem Count,
     array:get(Index, DB#rrd.data).
 
 %% @doc Gets all values as list from newest to oldest (desc) or from
