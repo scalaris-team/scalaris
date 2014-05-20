@@ -96,9 +96,7 @@ merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
 %% @doc Merges Hist2 into Hist1 and applies a weight to the Count of Hist2
 -spec merge_weighted(Hist1::histogram(), Hist2::histogram(), Weight::pos_integer()) -> histogram().
 merge_weighted(Hist1, #histogram{data = Hist2Data} = Hist2, Weight) ->
-    WeightedData = lists:map(fun({Value, Count}) ->
-                                     {Value, Count * Weight}
-                             end, Hist2Data),
+    WeightedData = lists:keymap(fun(Count) -> Count * Weight end, 2, Hist2Data),
     WeightedHist2 = Hist2#histogram{data = WeightedData},
     merge(Hist1, WeightedHist2).
 
@@ -106,9 +104,7 @@ merge_weighted(Hist1, #histogram{data = Hist2Data} = Hist2, Weight) ->
 -spec normalize_count(N::pos_integer(), Histogram::histogram()) -> histogram().
 normalize_count(N, Histogram) ->
     Data = histogram:get_data(Histogram),
-    DataNew = lists:map(fun({Value, Count}) ->
-                                {Value, Count div N}
-                        end, Data),
+    DataNew = lists:keymap(fun(Count) -> Count div N end, 2, Data),
     DataNew2 = lists:filter(fun({_Value, Count}) ->
                                     Count > 0
                             end, DataNew),
