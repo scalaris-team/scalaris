@@ -32,26 +32,28 @@
 
 all() ->
     [
-     session_ttl,
+     {group, session_ttl},
      {group, repair}
     ].
 
 groups() ->
     [
-     {repair, [sequence], [
-                           {upd_trivial,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
-                           {upd_bloom,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
-                           {upd_merkle,   [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
-                           {upd_art,      [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
-                           {regen_trivial,[{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
-                           {regen_bloom,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
-                           {regen_merkle, [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
-                           {regen_art,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
-                           {mixed_trivial,[{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
-                           {mixed_bloom,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
-                           {mixed_merkle, [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
-                           {mixed_art,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()}
-                          ]}
+     {session_ttl,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], [session_ttl]},
+     {repair, [sequence],
+      [
+       {upd_trivial,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {upd_bloom,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {upd_merkle,   [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {upd_art,      [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {regen_trivial,[{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
+       {regen_bloom,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
+       {regen_merkle, [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
+       {regen_art,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default() ++ regen_special()},
+       {mixed_trivial,[{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {mixed_bloom,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {mixed_merkle, [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
+       {mixed_art,    [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()}
+      ]}
     ].
 
 suite() -> [ {timetrap, {seconds, 20}} ].
