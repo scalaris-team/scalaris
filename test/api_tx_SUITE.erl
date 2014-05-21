@@ -81,10 +81,6 @@ end_per_suite(Config) ->
     _ = unittest_helper:end_per_suite(Config),
     ok.
 
-init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
-
-end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
-
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         write_test_race_mult_rings -> %% this case creates its own ring
