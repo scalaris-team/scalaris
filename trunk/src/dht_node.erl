@@ -71,7 +71,7 @@
       {dump} |
       {web_debug_info, Requestor::comm:erl_local_pid()} |
       {get_dht_nodes_response, KnownHosts::[comm:mypid()]} |
-      {unittest_get_bounds_and_data, SourcePid::comm:mypid()}).
+      {unittest_get_bounds_and_data, SourcePid::comm:mypid(), full | kv}).
 
 % accepted messages of dht_node processes
 -type message() ::
@@ -404,10 +404,23 @@ on({web_debug_info, Requestor}, State) ->
     comm:send_local(Requestor, {web_debug_info_reply, KVList3}),
     State;
 
-on({unittest_get_bounds_and_data, SourcePid}, State) ->
+on({unittest_get_bounds_and_data, SourcePid, Type}, State) ->
     MyRange = dht_node_state:get(State, my_range),
     MyBounds = intervals:get_bounds(MyRange),
-    Data = db_dht:get_data(dht_node_state:get(State, db)),
+    DB = dht_node_state:get(State, db),
+    Data =
+        case Type of
+            kv ->
+                element(
+                  2,
+                  db_dht:get_chunk(
+                    DB, ?MINUS_INFINITY, intervals:all(),
+                    fun(_) -> true end,
+                    fun(E) -> {db_entry:get_key(E), db_entry:get_version(E)} end,
+                    all));
+            full ->
+                db_dht:get_data(DB)
+        end,
     Pred = dht_node_state:get(State, pred),
     Succ = dht_node_state:get(State, succ),
     comm:send(SourcePid, {unittest_get_bounds_and_data_response, MyBounds, Data, Pred, Succ}),

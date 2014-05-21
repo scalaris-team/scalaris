@@ -63,7 +63,6 @@ init_per_suite(Config) ->
     Config2.
 
 end_per_suite(Config) ->
-    erlang:erase(?DBSizeKey),
     tester:unregister_type_checker({typedef, intervals, interval}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval}),
     tester:unregister_type_checker({typedef, intervals, non_empty_interval}),
@@ -221,14 +220,16 @@ dest(Config) ->
     _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
                                                    {fprob, 50},
                                                    {distribution, uniform}]),
+    RingData = unittest_helper:get_ring_data(kv),
+    {DBKeys, _DBKeysNum, _Outdated} = create_full_db(RingData, [], 0, 0),
     %chose node pair
     SKey = ?RT:get_random_node_id(),
     CKey = util:randomelem(lists:delete(SKey, ?RT:get_replica_keys(SKey))),
     %measure initial sync degree
-    SO = count_outdated(SKey),
-    SM = count_dbsize(SKey),
-    CO = count_outdated(CKey),
-    CM = count_dbsize(CKey),
+    SO = count_outdated(RingData, SKey),
+    SM = count_dbsize(RingData, SKey),
+    CO = count_outdated(RingData, CKey),
+    CM = count_dbsize(RingData, CKey),
     %server starts sync
     ?proto_sched(start),
     api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair,
@@ -236,10 +237,12 @@ dest(Config) ->
     waitForSyncRoundEnd([SKey, CKey], true),
     ?proto_sched(stop),
     %measure sync degree
-    SONew = count_outdated(SKey),
-    SMNew = count_dbsize(SKey),
-    CONew = count_outdated(CKey),
-    CMNew = count_dbsize(CKey),
+    RingDataNew = unittest_helper:get_ring_data(kv),
+    SONew = count_outdated(RingDataNew, SKey),
+    SMNew = count_dbsize(RingDataNew, SKey),
+    CONew = count_outdated(RingDataNew, CKey),
+    CMNew = count_dbsize(RingDataNew, CKey),
+    remove_full_db(DBKeys),
     ct:pal("SYNC RUN << ~p / ~p >>~nServerKey=~p~nClientKey=~p~n"
            "Server Outdated=[~p -> ~p] DBSize=[~p -> ~p] - Upd=~p ; Regen=~p~n"
            "Client Outdated=[~p -> ~p] DBSize=[~p -> ~p] - Upd=~p ; Regen=~p",
@@ -269,8 +272,9 @@ dest_empty_node(Config) ->
     IKey = util:randomelem([X || X <- KeyGrp, not intervals:in(X, Q1)]),
     CKey = hd([Y || Y <- KeyGrp, intervals:in(Y, Q1)]),
     %measure initial sync degree
-    IM = count_dbsize(IKey),
-    CM = count_dbsize(CKey),
+    RingData = unittest_helper:get_ring_data(kv),
+    IM = count_dbsize(RingData, IKey),
+    CM = count_dbsize(RingData, CKey),
     %server starts sync
     ?proto_sched(start),
     api_dht_raw:unreliable_lookup(IKey, {?send_to_group_member, rrepair,
@@ -278,8 +282,9 @@ dest_empty_node(Config) ->
     waitForSyncRoundEnd([IKey, CKey], true),
     ?proto_sched(stop),
     %measure sync degree
-    IMNew = count_dbsize(IKey),
-    CMNew = count_dbsize(CKey),
+    RingDataNew = unittest_helper:get_ring_data(kv),
+    IMNew = count_dbsize(RingDataNew, IKey),
+    CMNew = count_dbsize(RingDataNew, CKey),
     ct:pal("SYNC RUN << ~p >>~nServerKey=~p~nClientKey=~p~n"
            "Server DBSize=[~p -> ~p] - Regen=~p~n"
            "Client DBSize=[~p -> ~p] - Regen=~p",
@@ -395,7 +400,6 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) 
                  end
              end || NodePid <- pid_groups:find_all(dht_node)],
     ct:pal(">>Nodes: ~.2p", [Nodes]),
-    erlang:put(?DBSizeKey, ?REP_FACTOR * DBSize),
     _ = db_generator:fill_ring(random, DBSize, DBParams),
     InitDBStat = get_db_status(),
     print_status(0, InitDBStat),
@@ -406,9 +410,13 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) 
                                startSyncRound(NodeKeys),
                                waitForSyncRoundEnd(NodeKeys, false),
                                ?proto_sched(stop),
-                               print_status(I, get_db_status())
+                               if I =/= Rounds ->
+                                      print_status(I, get_db_status());
+                                  true -> ok
+                               end
                        end),
     EndStat = get_db_status(),
+    print_status(Rounds, EndStat),
     ?compare_w_note(CompFun, sync_degree(InitDBStat), sync_degree(EndStat),
                     io_lib:format("CompFun: ~p", [CompFun])),
     unittest_helper:stop_ring(),
@@ -418,25 +426,74 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) 
 print_status(R, {_, _, M, O}) ->
     ct:pal(">>SYNC RUN [Round ~p] Missing=[~p] Outdated=[~p]", [R, M, O]).
 
--spec count_outdated(?RT:key()) -> non_neg_integer().
-count_outdated(Key) ->
-    Req = {rr_stats, {count_old_replicas, comm:this(), intervals:all()}},
-    api_dht_raw:unreliable_lookup(Key, {?send_to_group_member, rrepair, Req}),
-    receive
-        {count_old_replicas_reply, Old} -> Old
-    end.
+-spec create_full_db(RingData::unittest_helper:ring_data({?RT:key(), db_dht:version()}),
+                     Keys, KeysNum, Outdated)
+        -> {Keys, KeysNum, Outdated}
+          when is_subtype(Keys, [?RT:key()]),
+               is_subtype(KeysNum, non_neg_integer()),
+               is_subtype(Outdated, non_neg_integer()).
+create_full_db([{_Pid, _I, DB, _Pred, _Succ, ok} | Rest], Keys, KeysNum, Outdated) ->
+    {Keys2, KeysNum2, Outdated2} = create_full_db2(DB, Keys, KeysNum, Outdated),
+    create_full_db(Rest, Keys2, KeysNum2, Outdated2);
+create_full_db([{exception, _Level, _Reason, _Stacktrace} | Rest], Keys, KeysNum, Outdated) ->
+    create_full_db(Rest, Keys, KeysNum, Outdated);
+create_full_db([], Keys, KeysNum, Outdated) ->
+    {Keys, KeysNum, Outdated}.
 
--spec count_outdated() -> non_neg_integer().
-count_outdated() ->
-    Req = {rr_stats, {count_old_replicas, comm:this(), intervals:all()}},
-    lists:foldl(
-      fun(Node, Acc) ->
-              comm:send(Node, {?send_to_group_member, rrepair, Req}),
-              receive
-                  {count_old_replicas_reply, Old} -> Acc + Old
-              end
-      end,
-      0, get_node_list()).
+-spec create_full_db2(DB::db_dht:db_as_list(), Keys, KeysNum, Outdated)
+        -> {Keys, KeysNum, Outdated}
+          when is_subtype(Keys, [?RT:key()]),
+               is_subtype(KeysNum, non_neg_integer()),
+               is_subtype(Outdated, non_neg_integer()).
+create_full_db2([H | TL], Keys, KeysNum, Outdated) ->
+    Key = rr_recon:map_key_to_quadrant(element(1, H), 1),
+    Version = element(2, H),
+    DictKey = {'$test_full_db', Key},
+    case erlang:get(DictKey) of
+        Version ->
+            % note: Key already in Keys
+            create_full_db2(TL, Keys, KeysNum, Outdated);
+        undefined ->
+            _ = erlang:put(DictKey, Version),
+            create_full_db2(TL, [Key | Keys], KeysNum + 1, Outdated);
+        VOld when VOld < Version ->
+            _ = erlang:put(DictKey, Version),
+            % note: Key already in Keys
+            create_full_db2(TL, Keys, KeysNum, Outdated + 1);
+        _VOld -> %when VOld > Version ->
+            % note: Key already in Keys
+            create_full_db2(TL, Keys, KeysNum, Outdated + 1)
+    end;
+create_full_db2([], Keys, KeysNum, Outdated) ->
+    {Keys, KeysNum, Outdated}.
+
+-spec remove_full_db([?RT:key()]) -> ok.
+remove_full_db(Keys) ->
+    lists:foreach(fun(Key) -> erlang:erase({'$test_full_db', Key}) end, Keys),
+    ok.
+
+%% @doc Counts outdated items on the node responsible for the given key.
+%%      PreCond: full DB in process dictionary - see create_full_db/2!
+-spec count_outdated(RingData::unittest_helper:ring_data({?RT:key(), db_dht:version()}),
+                     Node::?RT:key()) -> non_neg_integer().
+count_outdated(RingData, NodeKey) ->
+    N = lists:filter(fun({_Pid, {LBr, LK, RK, RBr}, _DB, _Pred, _Succ, ok}) ->
+                             intervals:in(NodeKey, intervals:new(LBr, LK, RK, RBr))
+                     end, RingData),
+    case N of
+        [{_Pid, _I, DB, _Pred, _Succ, ok}] ->
+            lists:foldl(
+              fun(E, Acc) ->
+                      Key = rr_recon:map_key_to_quadrant(element(1, E), 1),
+                      MyVersion = element(2, E),
+                      UpdVersion = erlang:get({'$test_full_db', Key}),
+                      ?DBG_ASSERT(UpdVersion =/= undefined),
+                      if UpdVersion > MyVersion -> Acc + 1;
+                         true -> Acc
+                      end
+              end, 0, DB);
+        _ -> 0
+    end.
 
 -spec get_node_list() -> [comm:mypid()].
 get_node_list() ->
@@ -445,13 +502,14 @@ get_node_list() ->
         {get_list_response, N} -> N
     end.
 
-% @doc counts db size on node responsible for key
--spec count_dbsize(?RT:key()) -> non_neg_integer().
-count_dbsize(Key) ->
-    RingData = unittest_helper:get_ring_data(),
-    N = lists:filter(fun({_Pid, {LBr, LK, RK, RBr}, _DB, _Pred, _Succ, ok}) ->
-                             intervals:in(Key, intervals:new(LBr, LK, RK, RBr))
-                     end, RingData),
+%% @doc Counts db size on the node responsible for the given key.
+-spec count_dbsize(RingData::unittest_helper:ring_data({?RT:key(), db_dht:version()}),
+                   Node::?RT:key()) -> non_neg_integer().
+count_dbsize(RingData, NodeKey) ->
+    N = lists:filter(
+          fun({_Pid, {LBr, LK, RK, RBr}, _DB, _Pred, _Succ, ok}) ->
+                  intervals:in(NodeKey, intervals:new(LBr, LK, RK, RBr))
+          end, RingData),
     case N of
         [{_Pid, _I, DB, _Pred, _Succ, ok}] -> length(DB);
         _ -> 0
@@ -459,10 +517,18 @@ count_dbsize(Key) ->
 
 -spec get_db_status() -> db_generator:db_status().
 get_db_status() ->
-    DBSize = erlang:get(?DBSizeKey),
-    Ring = statistics:get_ring_details(),
-    Stored = statistics:get_total_load(load, Ring),
-    {DBSize, Stored, DBSize - Stored, count_outdated()}.
+    RingData = unittest_helper:get_ring_data(),
+    Stored =
+        lists:foldl(
+          fun({_Pid, _I, DB, _Pred, _Succ, ok}, Acc) ->
+                  length(DB) + Acc;
+             ({exception, _Level, _Reason, _Stacktrace}, Acc) ->
+                  Acc
+          end, 0, RingData),
+    {DBKeys, DBKeysNum, Outdated} = create_full_db(RingData, [], 0, 0),
+    DBSize = ?REP_FACTOR * DBKeysNum,
+    remove_full_db(DBKeys),
+    {DBSize, Stored, DBSize - Stored, Outdated}.
 
 -spec get_symmetric_keys(pos_integer()) -> [?RT:key()].
 get_symmetric_keys(NodeCount) ->
