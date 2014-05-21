@@ -38,7 +38,7 @@
 -export([lease_takeover_after/3]).
 -export([lease_split/5]).
 -export([lease_merge/3]).
--export([lease_send_lease_to_node/2]).
+-export([lease_send_lease_to_node/3]).
 -export([lease_split_and_change_owner/6]).
 -export([disable_lease/2]).
 
@@ -57,10 +57,10 @@
          new_timeout/0, set_timeout/1, get_timeout/1, get_pretty_timeout/1,
          get_id/1,
          get_owner/1, set_owner/2,
-         get_aux/1, set_aux/2,
+         get_aux/1, set_aux/2, is_live_aux_field/1,
          get_range/1, set_range/2,
          split_range/1,
-         is_valid/1,
+         is_valid/1, has_timed_out/1,
          invalid_lease/0]).
 
 -export([add_first_lease_to_db/2]).
@@ -195,10 +195,10 @@ lease_merge(Lease1, Lease2, ReplyTo) ->
                     {l_on_cseq, merge, Lease1, Lease2, ReplyTo}),
     ok.
 
--spec lease_send_lease_to_node(Pid::comm:mypid(), Lease::lease_t()) -> ok.
-lease_send_lease_to_node(Pid, Lease) ->
+-spec lease_send_lease_to_node(Pid::comm:mypid(), Lease::lease_t(), active | passive) -> ok.
+lease_send_lease_to_node(Pid, Lease, Mode) ->
     % @todo precondition: Pid is a dht_node
-    comm:send(Pid, {l_on_cseq, send_lease_to_node, Lease}),
+    comm:send(Pid, {l_on_cseq, send_lease_to_node, Lease, Mode}),
     ok.
 
 -spec lease_split_and_change_owner(lease_t(),
@@ -324,11 +324,11 @@ on({l_on_cseq, renew_reply,
                     renew_and_update_round(Value, Round, Mode, State)
     end;
 
-on({l_on_cseq, send_lease_to_node, Lease}, State) ->
+on({l_on_cseq, send_lease_to_node, Lease, Mode}, State) ->
     % @todo do we need any checks?
     % @todo do i need to notify rm about the new range?
     log:log("send_lease_to_node ~p ~p~n", [self(), Lease]),
-    lease_list:update_lease_in_dht_node_state(Lease, State, active, received_lease);
+    lease_list:update_lease_in_dht_node_state(Lease, State, Mode, received_lease);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1245,6 +1245,14 @@ set_range(L, Range) -> L#lease{range=Range}.
 -spec is_valid(lease_t()) -> boolean().
 is_valid(L) ->
     os:timestamp() <  L#lease.timeout.
+
+-spec has_timed_out(lease_t()) -> boolean().
+has_timed_out(L) ->
+    not is_valid(L).
+
+-spec is_live_aux_field(lease_t()) -> boolean().
+is_live_aux_field(L) ->
+    {invalid, merge, stopped} =/= get_aux(L).
 
 -spec invalid_lease() -> lease_t().
 invalid_lease() ->
