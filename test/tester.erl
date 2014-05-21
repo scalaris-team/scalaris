@@ -21,7 +21,6 @@
 -vsn('$Id$').
 
 -export([test/4, test/5, test_log/4,
-         test_with_scheduler/3, test_with_scheduler/4,
          register_type_checker/3, unregister_type_checker/1,
          register_value_creator/4, unregister_value_creator/1]).
 
@@ -58,27 +57,6 @@ test_log(Module, Func, Arity, Iterations) ->
     io:format(""),
     _ = run(Module, Func, Arity, Iterations, ParseState, [], 1),
     ok.
-
-% @doc options are white_list and seed
--spec test_with_scheduler(list(module()), fun(), list()) -> any().
-test_with_scheduler(Modules, F, Options) ->
-    test_with_scheduler(Modules, F, Options, 1).
-
--spec test_with_scheduler(list(module()), fun(), list(), number()) -> any().
-test_with_scheduler(Modules, F, Options, Repetitions) ->
-    _InstrumentRes = [tester_scheduler:instrument_module(Module) || Module <- Modules],
-    Processes = unittest_helper:get_processes(),
-    Res = repeat(fun () ->
-                         {ok, Pid} = tester_scheduler:start(Options),
-                         (catch register(usscheduler, Pid)),
-                         Res = (catch F()),
-                         unittest_helper:kill_new_processes(Processes, [{?quiet}]),
-                         (catch exit(Pid)),
-                         (catch unregister(usscheduler)),
-                         Res
-                 end, Repetitions),
-    _DeleteRes = [code:delete(Module) || Module <- Modules],
-    Res.
 
 repeat(F, 1) ->
     F();

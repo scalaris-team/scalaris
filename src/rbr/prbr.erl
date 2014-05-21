@@ -85,7 +85,7 @@
 %% same key, it has to be unique for each request.
 -type r_with_id() :: {non_neg_integer(), any()}.
 %% for example
-%% -type r_with_id() :: {pos_integer(), comm:mypid_plain()}.
+%% -type r_with_id() :: {pos_integer(), comm:mypid()}.
 %% -type r_with_id() :: {pos_integer(), {dht_node_id(), lease_epoch()}}.
 
 %% improvements to usual paxos:
