@@ -305,7 +305,8 @@ parts(Config) ->
                       MaxWait::integer()) -> boolean().
 wait_until_true(DestKey, Request, ConFun, MaxWait) ->
     api_dht_raw:unreliable_lookup(DestKey, Request),
-    Result = receive {get_state_response, R} -> ConFun(R) end,
+    trace_mpath:thread_yield(),
+    Result = receive ?SCALARIS_RECV({get_state_response, R}, ConFun(R)) end,
     if Result -> true;
        not Result andalso MaxWait > 0 ->
            erlang:yield(),
@@ -339,10 +340,12 @@ session_ttl(Config) ->
     CName = receive {get_pid_group_response, Key} -> Key end,
 
     %server starts sync
+    ?proto_sched(start),
     api_dht_raw:unreliable_lookup(SKey, {?send_to_group_member, rrepair,
                                               {request_sync, Method, CKey}}),
     Req = {?send_to_group_member, rrepair, {get_state, comm:this(), open_sessions}},
     SessionOpened = wait_until_true(SKey, Req, fun(X) -> length(X) =/= 0 end, TTL),
+    ?proto_sched(stop),
 
     %check timeout
     api_vm:kill_node(CName),
