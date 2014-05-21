@@ -136,7 +136,7 @@ tester_type_check_l_on_cseq(_Config) ->
              {lease_takeover_after, 3}, %% sends messages
              {lease_split, 5}, %% sends messages
              {lease_merge, 3}, %% sends messages
-             {lease_send_lease_to_node, 2}, %% sends messages
+             {lease_send_lease_to_node, 3}, %% sends messages
              {lease_split_and_change_owner, 6}, %% sends messages
              {id, 1}, %% todo
              {split_range, 1}, %% todo
