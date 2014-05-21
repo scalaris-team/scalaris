@@ -58,12 +58,6 @@ test_log(Module, Func, Arity, Iterations) ->
     _ = run(Module, Func, Arity, Iterations, ParseState, [], 1),
     ok.
 
-repeat(F, 1) ->
-    F();
-repeat(F, Repetitions) ->
-    _Res = F(),
-    repeat(F, Repetitions - 1).
-
 -spec pseudo_proc_fun() -> no_return().
 pseudo_proc_fun() ->
     receive
