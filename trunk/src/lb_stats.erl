@@ -90,7 +90,9 @@ trigger_routine() ->
                {total_memory, TotalMemory}] ->
                   FreeMemory / TotalMemory * 100
           end,
-    Reductions = get_reductions() - get_last_reductions(),
+    TotalReductions = get_reductions(),
+    Reductions = TotalReductions - get_last_reductions(),
+    set_last_reductions(TotalReductions),
     monitor:client_monitor_set_value(lb_active, cpu, fun(Old) -> rrd:add_now(CPU, Old) end),
     monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end),
     monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add_now(Reductions, Old) end).
@@ -243,7 +245,6 @@ get_request_histogram_split_key(TargetLoad, Direction, Items) ->
                    %% merge all histograms with weight (the older the lower the weight)
                    {AllHists, _} = lists:foldl(
                                      fun(Hist, {AccHist, Weight}) ->
-                                             io:format("Weight: ~p~n", [Weight]),
                                              {histogram_rt:merge_weighted(AccHist, Hist, Weight), Weight + 1}
                                      end, {hd(AllValues), 2}, tl(AllValues)),
                    %% normalize afterwards
@@ -313,7 +314,7 @@ trigger() ->
 monitor_db() ->
     lb_active:is_enabled() andalso config:read(lb_active_db_monitor) =/= none.
 
-%% @doc config check registered in config.erl
+%% @doc config check by lb_active module
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_in(lb_active_load_metric, ?LOAD_METRICS) and
