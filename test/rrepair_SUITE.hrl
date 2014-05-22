@@ -426,7 +426,7 @@ start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) 
 print_status(R, {_, _, M, O}) ->
     ct:pal(">>SYNC RUN [Round ~p] Missing=[~p] Outdated=[~p]", [R, M, O]).
 
--spec create_full_db(RingData::unittest_helper:ring_data({?RT:key(), db_dht:version()}),
+-spec create_full_db(RingData::unittest_helper:ring_data([{?RT:key(), db_dht:version()}]),
                      Keys, KeysNum, Outdated)
         -> {Keys, KeysNum, Outdated}
           when is_subtype(Keys, [?RT:key()]),
@@ -474,7 +474,7 @@ remove_full_db(Keys) ->
 
 %% @doc Counts outdated items on the node responsible for the given key.
 %%      PreCond: full DB in process dictionary - see create_full_db/2!
--spec count_outdated(RingData::unittest_helper:ring_data({?RT:key(), db_dht:version()}),
+-spec count_outdated(RingData::unittest_helper:ring_data([{?RT:key(), db_dht:version()}]),
                      Node::?RT:key()) -> non_neg_integer().
 count_outdated(RingData, NodeKey) ->
     N = lists:filter(fun({_Pid, {LBr, LK, RK, RBr}, _DB, _Pred, _Succ, ok}) ->
@@ -503,7 +503,7 @@ get_node_list() ->
     end.
 
 %% @doc Counts db size on the node responsible for the given key.
--spec count_dbsize(RingData::unittest_helper:ring_data({?RT:key(), db_dht:version()}),
+-spec count_dbsize(RingData::unittest_helper:ring_data([{?RT:key(), db_dht:version()}]),
                    Node::?RT:key()) -> non_neg_integer().
 count_dbsize(RingData, NodeKey) ->
     N = lists:filter(
