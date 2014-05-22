@@ -68,8 +68,7 @@ init_per_testcase(Testcase, Config) ->
     
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 %% Helper function to retrieve the vivaldi coordinate and centroid information of a node
 get_vivaldi_and_centroids(Vivaldi, Clustering) ->

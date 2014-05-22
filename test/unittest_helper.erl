@@ -519,10 +519,10 @@ init_per_suite(Config) ->
 %%      of processes which are now running but haven't been running before.
 %%      Thus allows a clean start of succeeding test suites.
 %%      Prints information about the processes that have been killed.
--spec end_per_suite(Config) -> Config when is_subtype(Config, kv_opts()).
+-spec end_per_suite(Config::kv_opts()) -> ok.
 -ifdef(have_cthooks_support).
-end_per_suite(Config) ->
-    Config.
+end_per_suite(_Config) ->
+    ok.
 -else.
 end_per_suite(Config) ->
     ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
@@ -534,7 +534,7 @@ end_per_suite(Config) ->
     error_logger:tty(true),
     {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
     kill_new_processes(OldProcesses),
-    Config.
+    ok.
 -endif.
 
 -type ct_group_props() ::

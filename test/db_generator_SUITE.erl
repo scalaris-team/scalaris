@@ -52,8 +52,7 @@ end_per_suite(Config) ->
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
     tester:unregister_type_checker({typedef, intervals, interval}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval}),
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
