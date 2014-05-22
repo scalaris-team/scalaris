@@ -673,7 +673,8 @@ tester_type_check_util(_Config) ->
            [ {get_round_trip_helper, 2}, %% needs gen_component pids
              {dump_extract_from_list,2}, %% wrong spec
              {dumpXNoSort,2}, %% needs fun
-             {default_dumpX_val_fun,2} %% spec too wide (must be tuple sometimes)
+             {default_dumpX_val_fun,2}, %% spec too wide (must be tuple sometimes),
+             {rr_count_old_replicas_data, 1} %% needs dht_node pid
            ]},
           %% {fix_queue, [], []}, %% queue as builtin type not supported yet
 
