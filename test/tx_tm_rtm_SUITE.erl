@@ -38,51 +38,30 @@ all() ->
 suite() -> [{timetrap, {seconds, 120}}].
 
 init_per_suite(Config) ->
-    Config2 = unittest_helper:init_per_suite(Config),
-    {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config2),
-    unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key("0")) end, [{config, [{log_path, PrivDir}]}]),
-    Config2.
+    unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
+    unittest_helper:stop_ring(),
     unittest_helper:end_per_suite(Config).
 
 init_per_testcase(TestCase, Config) ->
-    _ = case TestCase of
-            tm_crash ->
-                %% stop ring from previous test case (may ran into a timeout)
-                unittest_helper:stop_ring(),
-                {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-                unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-                unittest_helper:wait_for_stable_ring(),
-                unittest_helper:wait_for_stable_ring_deep();
-            tp_crash ->
-                %% stop ring from previous test case (may ran into a timeout)
-                unittest_helper:stop_ring(),
-                {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-                unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-                unittest_helper:wait_for_stable_ring(),
-                unittest_helper:wait_for_stable_ring_deep();
-            all_tp_crash ->
-                %% stop ring from previous test case (may ran into a timeout)
-                unittest_helper:stop_ring(),
-                {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-                unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
-                unittest_helper:wait_for_stable_ring(),
-                unittest_helper:wait_for_stable_ring_deep();
-            _ -> ok
-        end,
+    %% stop ring from previous test case (may have run into a timeout)
+    unittest_helper:stop_ring(),
+    case lists:member(TestCase, [tm_crash, tp_crash, all_tp_crash]) of
+        true ->
+            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+            unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:wait_for_stable_ring(),
+            unittest_helper:wait_for_stable_ring_deep();
+        false ->
+            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+            unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key("0")) end, [{config, [{log_path, PrivDir}]}]),
+            ok
+    end,
     Config.
 
-end_per_testcase(TestCase, Config) ->
-    _ = case TestCase of
-            tm_crash ->
-                unittest_helper:stop_ring();
-            tp_crash ->
-                unittest_helper:stop_ring();
-            all_tp_crash ->
-                unittest_helper:stop_ring();
-            _ -> ok
-        end,
+end_per_testcase(_TestCase, Config) ->
+    unittest_helper:stop_ring(),
     Config.
 
 causes() -> [readlock, writelock, versiondec, versioninc, none].
@@ -324,8 +303,8 @@ tm_crash(_) ->
     %% ct:pal("Barriers set~n"),
 
     %% TM only will perform the tx_tm_rtm_commit, that lead to the BP
-    %% bp_step blocks. Do it asynchronously. (We don't know which TM
-    %% got the request.
+    %% bp_step blocks. Do it asynchronously (we don't know which TM
+    %% got the request).
     Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- TMs ],
 
     %% report all tx_tms as failed after the commit has started...
@@ -343,11 +322,6 @@ tm_crash(_) ->
 
     _ = [ erlang:exit(Pid, kill) || Pid <- Pids ],
 
-    %% would need asynchronous cleanup, but the ring is stopped
-    %% anyway, so we skip the cleanup here.
-    _ = [ gen_component:bp_del_async(X, tm_crash) || X <- TMs ],
-
-    _ = [ gen_component:bp_cont(X) || X <- TMs ],
     ok.
 
 tp_crash(_) ->
@@ -379,8 +353,7 @@ tp_crash(_) ->
 
     %%[ erlang:exit(Pid, kill) || Pid <- Pids ],
 
-    gen_component:bp_del(Proposer, tp_crash),
-    gen_component:bp_cont(Proposer).
+    ok.
 
 all_tp_crash(_) ->
     ct:pal("Starting all_tp_crash, simulated by holding the dht_node_proposers~n"),
@@ -397,8 +370,8 @@ all_tp_crash(_) ->
     %% ct:pal("Barriers set~n"),
 
     %% TM only performs the tx_tm_rtm_commit that lead to the BP
-    %% bp_step blocks. Do it asynchronously. (We don't know which TM
-    %% got the request.
+    %% bp_step blocks. Do it asynchronously (we don't know which TM
+    %% got the request).
     %% Pids = [ spawn(fun () -> gen_component:bp_step(X) end) || X <- Proposers ],
     %% report the one tp as failed
     _ = [ comm:send_local(fd, {report_graceful_leave, comm:make_global(Proposer)})
