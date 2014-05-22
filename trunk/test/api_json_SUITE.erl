@@ -33,8 +33,7 @@ init_per_suite(Config) ->
     Config2.
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 get_node_info(_Config) ->
      {struct, [{status, "ok"}, {value, {struct, Value}}]} = api_json:handler(get_node_info, []),

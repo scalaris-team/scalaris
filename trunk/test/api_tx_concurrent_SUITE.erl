@@ -37,8 +37,7 @@ init_per_suite(Config) ->
     Config2.
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 inc(Key) ->
     {TLog1, [ReadResult]} = api_tx:req_list([{read, Key}]),

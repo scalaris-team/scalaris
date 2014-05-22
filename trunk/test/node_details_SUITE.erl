@@ -51,8 +51,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 -spec safe_compare(NodeDetails::node_details:node_details(),
                    Tag::node_details:node_details_name(),

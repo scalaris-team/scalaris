@@ -37,8 +37,7 @@ init_per_suite(Config) ->
     Config2.
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 tester_count(_Config) ->
     tester:test(?MODULE, count, 0, 1000),
