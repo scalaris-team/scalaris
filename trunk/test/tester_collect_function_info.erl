@@ -476,10 +476,11 @@ substitute_constraints({ann_type,Line,[Left,Right]}, Substitutions) ->
     Left2 = substitute_constraints(Left, Substitutions),
     Right2 = substitute_constraints(Right, Substitutions),
     {ann_type,Line,[Left2,Right2]};
-substitute_constraints({remote_type,Line,[Left,Right,[]]}, Substitutions) ->
+substitute_constraints({remote_type,Line,[Left,Right,L]}, Substitutions) ->
     Left2 = substitute_constraints(Left, Substitutions),
     Right2 = substitute_constraints(Right, Substitutions),
-    {remote_type,Line,[Left2,Right2,[]]};
+    L2 = [ substitute_constraints(Element, Substitutions) || Element <- L],
+    {remote_type,Line,[Left2,Right2,L2]};
 substitute_constraints(any, _Substitutions) ->
     any;
 
