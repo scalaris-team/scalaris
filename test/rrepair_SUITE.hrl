@@ -517,7 +517,7 @@ count_dbsize(RingData, NodeKey) ->
 
 -spec get_db_status() -> db_generator:db_status().
 get_db_status() ->
-    RingData = unittest_helper:get_ring_data(),
+    RingData = unittest_helper:get_ring_data(kv),
     Stored =
         lists:foldl(
           fun({_Pid, _I, DB, _Pred, _Succ, ok}, Acc) ->
