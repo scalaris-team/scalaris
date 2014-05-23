@@ -50,12 +50,21 @@ init_per_testcase(TestCase, Config) ->
     case lists:member(TestCase, [tm_crash, tp_crash, all_tp_crash]) of
         true ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_ring(
+              4,
+              [{config,
+                [{monitor_perf_interval, 0},  % deactivate monitor_perf,
+                 {log_path, PrivDir}]}]),
             unittest_helper:wait_for_stable_ring(),
             unittest_helper:wait_for_stable_ring_deep();
         false ->
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            unittest_helper:make_ring_with_ids(fun() -> ?RT:get_replica_keys(?RT:hash_key("0")) end, [{config, [{log_path, PrivDir}]}]),
+            unittest_helper:make_ring_with_ids(
+              fun() ->
+                      ?RT:get_replica_keys(?RT:hash_key("0")) end,
+              [{config,
+                [{monitor_perf_interval, 0},  % deactivate monitor_perf
+                 {log_path, PrivDir}]}]),
             ok
     end,
     Config.
@@ -192,16 +201,16 @@ calc_w_outcome(Key, PreOps) ->
        (1 =:= NumVersionInc) -> ok_or_abort; % Inc+2xAny => OK, RL|WL+2xAny => ABORT, None+2xAny => OK
        (1 =:= NumReadlock andalso NumNone =:= 3) -> {ok};
        (1 =:= NumWritelock andalso NumNone =:= 3) -> {ok};
-       (1 =:= NumVersionDec andalso NumNone =:= 2) -> ok_or_abort; % Dec+2xNone => OK, RL|WL+2xNone => ABORT 
+       (1 =:= NumVersionDec andalso NumNone =:= 2) -> ok_or_abort; % Dec+2xNone => OK, RL|WL+2xNone => ABORT
        (1 =:= NumVersionDec andalso NumNone =:= 3) -> {ok};
-       
+
        (2 =< NumVersionInc) -> {ok};
        (2 =:= NumVersionDec andalso NumNone =:= 1) -> {ok};
        (2 =:= NumVersionDec andalso NumNone =:= 2) -> {ok};
 
        % RL|WL+2xDec => ABORT, 3xDec => OK
        (3 =:= NumVersionDec andalso 0 =:= NumNone) -> ok_or_abort;
-       
+
        % RMaj with 3xDec + Validate on 3xDec => OK, RMaj with 3xDec, Validate on 2xDec+None => ABORT
        (3 =:= NumVersionDec andalso 1 =:= NumNone) -> ok_or_abort;
 
@@ -253,7 +262,7 @@ calc_wmc_outcome(Key, PreOps) ->
        % therefore if 4th in Maj => ABORT, else OK.
        % However, the current code waits for 3 prepared or 2 abort decisions
        % and only the latter can occur!
-       ((NumNone + NumVersionDec) =:= 3) -> {ok}; 
+       ((NumNone + NumVersionDec) =:= 3) -> {ok};
 
        (NumVersionInc >= 2) -> {fail, abort, [Key]};
        (NumReadlock >= 2) -> {fail, abort, [Key]};
@@ -386,12 +395,4 @@ all_tp_crash(_) ->
     ct:pal("Res: ~p~n", [Res]),
 
     %%[ erlang:exit(Pid, kill) || Pid <- Pids ],
-
-    ct:pal("Removing breakpoints.~n"),
-    _ = [ gen_component:bp_del_async(Proposer, all_tp_crash)
-          ||  Proposer <- Proposers],
-    ct:pal("Continue breakpoints.~n"),
-    _ = [ gen_component:bp_cont(Proposer)
-          || Proposer <- Proposers],
-    ct:pal("Done.~n"),
     ok.
