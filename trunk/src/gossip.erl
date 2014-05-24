@@ -151,7 +151,7 @@
 -export([init/1, on_inactive/2, on_active/2]).
 
 %API
--export([start_link/1, activate/1, deactivate/0, start_gossip_task/2, stop_gossip_task/1, remove_all_tombstones/0, check_config/0]).
+-export([start_link/1, activate/1, start_gossip_task/2, stop_gossip_task/1, remove_all_tombstones/0, check_config/0]).
 
 % interaction with the ring maintenance:
 -export([rm_filter_slide_msg/3, rm_send_activation_msg/5, rm_my_range_changed/3, rm_send_new_range/5]).
@@ -303,14 +303,6 @@ activate(MyRange) ->
                               fun gossip:rm_filter_slide_msg/3,
                               fun gossip:rm_send_activation_msg/5, 1)
     end.
-
-
-
-%% @doc Deactivates all gossip processes.
--spec deactivate() -> ok.
-deactivate() ->
-    Msg = {?send_to_group_member, gossip, {deactivate_gossip}},
-    bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
 
 
 %% @doc Globally starts a gossip task identified by CBModule. <br/>
@@ -557,25 +549,6 @@ on_active({bulkowner, deliver, _Id, _Range, Msg, _Parents}, State) ->
 on_active({remove_all_tombstones}, State) ->
     lists:foldl(fun(CBModule, StateIn) -> state_remove({cb_status, CBModule}, StateIn) end,
                 State, get_tombstones(State));
-
-
-%% received through deactivate_gossip()/bulkowner
-on_active({deactivate_gossip}, State) ->
-    log:log(warn, "[ Gossip ] deactivating gossip framwork"),
-    rm_loop:unsubscribe(self(), ?MODULE),
-
-    % stop all gossip tasks
-    lists:foreach(fun (CBModule) -> handle_msg({stop_gossip_task, CBModule}, State) end,
-        state_get(cb_modules, State)),
-
-    % cleanup state
-    state_set(status, uninit, State),
-    state_set(cb_modules, [], State),
-    % TODO: also remove (some) queued messages? (must not remove client requests!)
-    ?PDB:delete(range, State),
-
-    gen_component:change_handler(State, fun ?MODULE:on_inactive/2);
-
 
 
 %% for debugging
