@@ -217,7 +217,7 @@ send_local(Pid, Msg) ->
 
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()) after the given delay in milliseconds.
--spec send_local_after(Delay::non_neg_integer(), erl_local_pid(), message() | group_message()) -> reference().
+-spec send_local_after(Delay::0..4294967295, erl_local_pid(), message() | group_message()) -> reference().
 send_local_after(Delay, Pid, Msg) ->
     {RealPid, RealMsg} = unpack_cookie(Pid, Msg),
     case erlang:get(trace_mpath) of
