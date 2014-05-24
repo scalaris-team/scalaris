@@ -152,9 +152,7 @@ tester_type_check_gossip(_Config) ->
     tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
     tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
     tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
-    tester:register_type_checker({typedef, gossip, state}, gossip, is_state),
     tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram),
-    tester:register_value_creator({typedef, gossip, state}, gossip, tester_create_state, 9),
     tester:register_value_creator({typedef, gossip_load, round}, gossip_load, tester_create_round, 1),
     tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 11),
     tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
@@ -164,33 +162,22 @@ tester_type_check_gossip(_Config) ->
     Modules = [ {gossip,
             % excluded (exported functions)
             [   {start_link, 1}, % would start a lot of processes
-                {init, 1}, % does not return fully filled state (as checked by type checker)
                 {start_gossip_task, 2}, % spec to wide
                 {stop_gossip_task, 1}, % would prohibit subsequent tests
-                {activate, 1}, % sends messages
-                {deactivate, 0}, % would prohibit subsequent tests
                 {on_inactive, 2}, % too much interaction / spec to wide
-                {on_active, 2}, % too much interaction / spec to wide
-                {rm_send_activation_msg, 5}, % sends messages
-                {rm_send_new_range, 5} % sends messages
+                {on_active, 2} % too much interaction / spec to wide
             ],
             % excluded (private functions)
-            [   {do_trigger_action, 2}, % needs state in process dictionary
+            [   {do_trigger_action, 2}, % spec to wide
                 {handle_msg, 2}, % spec to wide, sends messages
                 {start_p2p_exchange, 4}, % would need valid peer
                 {init_gossip_task, 3}, % test via feeder
                 {cb_call, 3}, % unbounded_fun?
                 {cb_call, 5}, % spec to wide, sends messages
                 {select_reply_data, 7}, % would need to valid load_data
-                {request_random_node, 1}, % sends messages
-                {request_random_node_delayed, 2}, % sends messages
                 {check_round, 3}, % would need valid callback state
                 {is_end_of_round, 2}, % would need valid callback state
-                {state_get, 2}, % needs state in process dictionary
-                {state_get, 3}, % needs state in process dictionary
-                {state_take, 2}, % needs state in process dictionary
-                {state_update, 3}, % tester can not create a value of type fun()
-                {state_update, 4} % tester can not create a value of type fun()
+                {state_update, 3} % tester can not create a value of type fun()
             ]},
           {gossip_load,
             % excluded (exported functions)
@@ -217,8 +204,6 @@ tester_type_check_gossip(_Config) ->
     tester:unregister_value_creator({typedef, intervals, interval}),
     tester:unregister_value_creator({typedef, intervals, simple_interval}),
     tester:unregister_value_creator({typedef, intervals, continuous_interval}),
-    tester:unregister_type_checker({typedef, gossip, state}),
-    tester:unregister_value_creator({typedef, gossip, state}),
     tester:unregister_value_creator({typedef, gossip_load, round}),
     tester:unregister_value_creator({typedef, gossip_load, state}),
     tester:unregister_value_creator({typedef, gossip_load, load_data_list}),
