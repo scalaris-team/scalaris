@@ -151,13 +151,13 @@
 -export([init/1, on_inactive/2, on_active/2]).
 
 %API
--export([start_link/1, activate/1, start_gossip_task/2, stop_gossip_task/1, remove_all_tombstones/0, check_config/0]).
+-export([start_link/1, activate/1, remove_all_tombstones/0, check_config/0]).
 
 % interaction with the ring maintenance:
 -export([rm_filter_slide_msg/3, rm_send_activation_msg/5, rm_my_range_changed/3, rm_send_new_range/5]).
 
-% testing
--export([tester_create_cb_module_names/1]).
+% testing and debugging
+-export([start_gossip_task/2, stop_gossip_task/1, tester_create_cb_module_names/1]).
 
 %% -define(PDB, pdb_ets). % easier debugging because state accesible from outside the process
 -define(PDB_OPTIONS, [set]).
@@ -303,30 +303,6 @@ activate(MyRange) ->
                               fun gossip:rm_filter_slide_msg/3,
                               fun gossip:rm_send_activation_msg/5, 1)
     end.
-
-
-%% @doc Globally starts a gossip task identified by CBModule. <br/>
-%%      Args is passed to the init function of the callback module. <br/>
-%%      CBModule is either the name of a callback module or an name-instance_id
-%%      tuple.
--spec start_gossip_task(GossipTask, Args) -> ok when
-    is_subtype(GossipTask, cb_module_name() | cb_module()),
-    is_subtype(Args, list()).
-start_gossip_task(ModuleName, Args) when is_atom(ModuleName) ->
-    Id = uid:get_global_uid(),
-    start_gossip_task({ModuleName, Id}, Args);
-
-start_gossip_task({ModuleName, Id}, Args) when is_atom(ModuleName) ->
-    Msg = {?send_to_group_member, gossip,
-                {start_gossip_task, {ModuleName, Id}, Args}},
-    bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
-
-
-%% @doc Globally stop a gossip task.
--spec stop_gossip_task(CBModule::cb_module()) -> ok.
-stop_gossip_task(CBModule) ->
-    Msg = {?send_to_group_member, gossip, {stop_gossip_task, CBModule}},
-    bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
 
 
 %% @doc Globally removes all tombstones from previously stopped callback modules.
@@ -1374,10 +1350,61 @@ to_string(State) when is_record(State, state) ->
     lists:flatten(Str).
 
 
+%% @doc Check the config of the gossip module. <br/>
+%%      Calls the check_config functions of all callback modules.
+-spec check_config() -> boolean().
+check_config() ->
+    lists:foldl(fun({Module, _Args}, Acc) -> Acc andalso Module:check_config() end, true, ?CBMODULES).
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% For Testing
+%% Testing and Debugging
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%% @doc Globally starts a gossip task identified by CBModule. <br/>
+%%      Args is passed to the init function of the callback module. <br/>
+%%      CBModule is either the name of a callback module or an name-instance_id
+%%      tuple.
+-spec start_gossip_task(GossipTask, Args) -> ok when
+    is_subtype(GossipTask, cb_module_name() | cb_module()),
+    is_subtype(Args, list()).
+start_gossip_task(ModuleName, Args) when is_atom(ModuleName) ->
+    Id = uid:get_global_uid(),
+    start_gossip_task({ModuleName, Id}, Args);
+
+start_gossip_task({ModuleName, Id}, Args) when is_atom(ModuleName) ->
+    Msg = {?send_to_group_member, gossip,
+                {start_gossip_task, {ModuleName, Id}, Args}},
+    bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
+
+
+%% @doc Globally stop a gossip task.
+-spec stop_gossip_task(CBModule::cb_module()) -> ok.
+stop_gossip_task(CBModule) ->
+    Msg = {?send_to_group_member, gossip, {stop_gossip_task, CBModule}},
+    bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg).
+
+
+%% hack to be able to suppress warnings when testing via config:write()
+-spec warn() -> log:log_level().
+warn() ->
+    case config:read(gossip_log_level_warn) of
+        failed -> warn;
+        Level -> Level
+    end.
+
+
+%% hack to be able to suppress warnings when testing via config:write()
+-compile({nowarn_unused_function, {error, 0}}).
+-spec error() -> log:log_level().
+error() ->
+    case config:read(gossip_log_level_error) of
+        failed -> warn;
+        Level -> Level
+    end.
+
 
 %% @doc Value creater for type_check_SUITE.
 -spec tester_create_cb_module_names(1) -> cb_module_name().
@@ -1395,26 +1422,4 @@ init_gossip_task_feeder(CBModule, NoOfBuckets, State) ->
     {CBModule, [NoOfBuckets], State}.
 
 
-%% hack to be able to suppress warnings when testing via config:write()
--spec warn() -> log:log_level().
-warn() ->
-    case config:read(gossip_log_level_warn) of
-        failed -> warn;
-        Level -> Level
-    end.
-
-%% hack to be able to suppress warnings when testing via config:write()
--compile({nowarn_unused_function, {error, 0}}).
--spec error() -> log:log_level().
-error() ->
-    case config:read(gossip_log_level_error) of
-        failed -> warn;
-        Level -> Level
-    end.
-
-%% @doc Check the config of the gossip module. <br/>
-%%      Calls the check_config functions of all callback modules.
--spec check_config() -> boolean().
-check_config() ->
-    lists:foldl(fun({Module, _Args}, Acc) -> Acc andalso Module:check_config() end, true, ?CBMODULES).
 
