@@ -82,8 +82,7 @@
 
 -callback max_cycles_per_round() -> pos_integer().
 
--callback round_has_converged(State::cb_state()) ->
-    {true|false, cb_state()}.
+-callback round_has_converged(State::cb_state()) -> {boolean(), cb_state()}.
 
 -callback notify_change(notify_keyword(), new_leader_msg(), State::cb_state()) -> cb_return().
 
