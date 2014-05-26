@@ -1122,7 +1122,7 @@ finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
     %% start join
     comm:send_local(self(), {join, start}),
     IdVersion = node:id_version(dht_node_state:get(State1, node)),
-    dht_node_join:join_as_other(NewId, IdVersion+1, Options);
+    dht_node_join:join_as_other(NewId, IdVersion+1, NewOptions);
 finish_delta_ack2B(State, SlideOp, {none}) ->
     finish_slide_and_continue_with_next_op(State, SlideOp);
 finish_delta_ack2B(State, SlideOp, {abort, NewSlideId, Reason}) ->
