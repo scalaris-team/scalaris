@@ -34,7 +34,7 @@
 %% Metrics
 -export([get_load_metric/0, get_request_metric/0, default_value/1]).
 %% Triggered by lb_active
--export([trigger_routine/0]).
+-export([trigger/0, trigger_routine/0]).
 %% config checked by lb_active
 -export([check_config/0]).
 
@@ -70,8 +70,7 @@ init() ->
             RRD = rrd:create(Resolution * 1000, 1, gauge),
             monitor:client_monitor_set_value(lb_active, cpu, RRD),
             monitor:client_monitor_set_value(lb_active, mem, RRD),
-            monitor:monitor_set_value(lb_active, reductions, RRD),
-            trigger();
+            monitor:monitor_set_value(lb_active, reductions, RRD);
         _ ->
             ok
     end.
@@ -307,7 +306,7 @@ collect_stats() ->
 -spec trigger() -> ok.
 trigger() ->
     Interval = config:read(lb_active_monitor_interval) div 1000,
-    msg_delay:send_trigger(Interval, {collect_stats}).
+    msg_delay:send_trigger(Interval, {lb_stats_trigger}).
 
 -compile({inline, [monitor_db/0]}).
 -spec monitor_db() -> boolean().
