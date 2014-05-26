@@ -1086,7 +1086,7 @@ rm_send_new_range(Pid, ?MODULE, _OldNeighbors, NewNeighbors, _Reason) ->
 %%              callback module, </li>
 %           <li>`{cycle, CBModule}', the cycle counter for the given callback module, </li>
 %%          <li>`{exch_data, CBModule}', a tuple of the data to exchange and the peer to
-%%                  exchange the data with.
+%%                  exchange the data with. </li>
 %%          <li>`{round, CBModule}', the round of the given callback module, </li>
 %%          <li>`{reply_peer, Ref}', the peer to send the p2p_exch_reply to, </li>
 %%          <li>`{trigger_group, TriggerInterval}', the trigger group (i.e. a list
