@@ -64,7 +64,7 @@
 
 -type(option() :: {tag, atom()}).
 
--type job_description() :: {[erl_fun() | js_fun() ,...], [option()]}.
+-type job_description() :: {[fun_term(),...], [option()]}.
 
 -type(fun_term() :: erl_fun() | js_fun()).
 
