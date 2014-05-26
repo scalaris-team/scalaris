@@ -38,7 +38,9 @@
 
 -include("scalaris.hrl").
 
--type(message() :: {mr_master, mr_state:jobid(), snapshot,
+-type(message() :: {mr_master, init, Client::comm:mypid(), mr_state:jobid(),
+                    JobSpec::mr_state:job_description()} |
+                   {mr_master, mr_state:jobid(), snapshot,
                     snapshot_leader:result_message(),
                     mr_state:job_description(), comm:mypid()} |
                    {mr_master, mr_state:jobid(), phase_completed, Round::non_neg_integer(), Range::intervals:interval()} |
@@ -61,6 +63,21 @@ dispatch_snapshot(JobId) ->
                                                   Reply}).
 
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state().
+on({mr_master, init, Client, JobId, Job}, State) ->
+    %% this is the inital message
+    %% it creates a JobId and starts the master process,
+    %% which in turn starts the worker supervisor on all nodes.
+    ?TRACE("mr_master: ~p~n received init message from ~p~n starting job ~p~n",
+           [comm:this(), Client, Job]),
+    case validate_job(Job) of
+        ok ->
+            init_job(State, JobId, Job, Client);
+        {error, Reason} ->
+            comm:send(Client, {mr_results, {error, Reason}, intervals:all(),
+                               JobId}),
+            State
+    end;
+
 on({mr_master, JobId, snapshot, {global_snapshot_done, Data}}, State) ->
     MasterState = dht_node_state:get_mr_master_state(State, JobId),
     Job = mr_master_state:get(job, MasterState),
@@ -158,3 +175,46 @@ filter_data(Data, {tag, FilterTag}) ->
                    db_dht:version()}]) -> mr_state:data_list().
 filter_data(Data) ->
     [{?RT:hash_key(K), K, V} || {_HashedKey, {K, V}, _Version} <- Data].
+
+-spec validate_job(mr_state:job_description()) -> ok | {error, term()}.
+validate_job({Phases, _Options}) ->
+    validate_phases(Phases).
+
+-spec validate_phases([mr_state:fun_term()]) -> ok | {error, term()}.
+validate_phases([]) -> ok;
+validate_phases([H | T]) ->
+    case validate_phase(H) of
+        ok ->
+            validate_phases(T);
+        Error ->
+            Error
+    end.
+
+-spec validate_phase(mr_state:fun_term()) -> ok | {error, term()}.
+validate_phase(Phase) ->
+    MoR = element(1, Phase),
+    FunTag = element(2, Phase),
+    Fun = element(3, Phase),
+    case MoR == map orelse MoR == reduce of
+        true ->
+            case FunTag of
+                erlanon ->
+                    case is_function(Fun, 1) of
+                        true ->
+                            ok;
+                        false ->
+                            {error ,{badfun, "Fun should be a fun"}}
+                    end;
+                jsanon ->
+                    case is_binary(Fun) of
+                        true ->
+                            ok;
+                        false ->
+                            {error ,{badfun, "Fun should be a binary"}}
+                    end;
+                Tag ->
+                    {error, {bad_tag, {Tag, Fun}}}
+            end;
+        false ->
+            {error, {bad_phase, "phase must be either map or reduce"}}
+    end.

@@ -41,9 +41,7 @@
                         {mr, next_phase_data, mr_state:jobid(), comm:mypid(),
                          mr_state:data()}).
 
--type(message() :: {mr, init, Client::comm:mypid(), mr_state:jobid(),
-                    JobSpec::mr_state:job_description()} |
-                   {bulk_distribute, uid:global_uid(), intervals:interval(),
+-type(message() :: {bulk_distribute, uid:global_uid(), intervals:interval(),
                     bulk_message(), Parents::[comm:mypid(),...]} |
                    {mr, phase_results, mr_state:jobid(), comm:message(),
                     intervals:interval()} |
@@ -54,21 +52,6 @@
                    {mr, terminate_job, mr_state:jobid()}).
 
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state().
-on({mr, init, Client, JobId, Job}, State) ->
-    %% this is the inital message
-    %% it creates a JobId and starts the master process,
-    %% which in turn starts the worker supervisor on all nodes.
-    ?TRACE("mr: ~p~n received init message from ~p~n starting job ~p~n",
-           [comm:this(), Client, Job]),
-    case validate_job(Job) of
-        ok ->
-            mr_master:init_job(State, JobId, Job, Client);
-        {error, Reason} ->
-            comm:send(Client, {mr_results, {error, Reason}, intervals:all(),
-                               JobId}),
-            State
-    end;
-
 on({bulk_distribute, _Id, Interval,
     {mr, job, JobId, MasterId, Client, Job, InitalData}, _Parents}, State) ->
     %% this message starts the worker supervisor and adds a job specific state
@@ -261,46 +244,3 @@ send_to_master(State, Msg) ->
 send_to_client(State, Msg) ->
     Client = mr_state:get(State, client),
     comm:send(Client, Msg).
-
--spec validate_job(mr_state:job_description()) -> ok | {error, term()}.
-validate_job({Phases, _Options}) ->
-    validate_phases(Phases).
-
--spec validate_phases([mr_state:fun_term()]) -> ok | {error, term()}.
-validate_phases([]) -> ok;
-validate_phases([H | T]) ->
-    case validate_phase(H) of
-        ok ->
-            validate_phases(T);
-        Error ->
-            Error
-    end.
-
--spec validate_phase(mr_state:fun_term()) -> ok | {error, term()}.
-validate_phase(Phase) ->
-    MoR = element(1, Phase),
-    FunTag = element(2, Phase),
-    Fun = element(3, Phase),
-    case MoR == map orelse MoR == reduce of
-        true ->
-            case FunTag of
-                erlanon ->
-                    case is_function(Fun, 1) of
-                        true ->
-                            ok;
-                        false ->
-                            {error ,{badfun, "Fun should be a fun"}}
-                    end;
-                jsanon ->
-                    case is_binary(Fun) of
-                        true ->
-                            ok;
-                        false ->
-                            {error ,{badfun, "Fun should be a binary"}}
-                    end;
-                Tag ->
-                    {error, {bad_tag, {Tag, Fun}}}
-            end;
-        false ->
-            {error, {bad_phase, "phase must be either map or reduce"}}
-    end.

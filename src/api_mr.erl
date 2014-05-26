@@ -67,7 +67,7 @@
 -spec start_job(mr_state:job_description()) -> [any()].
 start_job(Job) ->
     Id = randoms:getRandomString(),
-    api_dht_raw:unreliable_lookup(api_dht:hash_key(Id), {mr, init, comm:this(), Id, Job}),
+    api_dht_raw:unreliable_lookup(api_dht:hash_key(Id), {mr_master, init, comm:this(), Id, Job}),
     wait_for_results([], intervals:empty(), Id).
 
 -spec wait_for_results([any()], intervals:interval(), mr_state:jobid()) -> [any()].
