@@ -58,7 +58,7 @@
 
 -type options() :: [tuple()].
 
--type message() :: {collect_stats} |
+-type message() :: {lb_stats_trigger} |
                    {lb_active_trigger} |
                    {reset_monitors} |
                    {gossip_reply, LightNode::lb_info:lb_info(), HeavyNode::lb_info:lb_info(), LightNodeSucc::lb_info:lb_info(),
@@ -102,6 +102,7 @@ start_link(DHTNodeGroup) ->
 -spec init([]) -> state().
 init([]) ->
     lb_stats:init(),
+    lb_stats:trigger(),
     %% keep the node id in state, currently needed to normalize histogram
     rm_loop:subscribe(
        self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_slide_filter/3,
@@ -122,7 +123,7 @@ init([]) ->
 
 %% @doc On handler after initialization
 -spec on(message(), state()) -> state().
-on({collect_stats}, State) ->
+on({lb_stats_trigger}, State) ->
     lb_stats:trigger_routine(),
     State;
 
