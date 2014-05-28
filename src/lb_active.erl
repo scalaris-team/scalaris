@@ -181,10 +181,11 @@ on({balance_phase2a, Op, ReplyPid}, {MyState, ModuleState} = State) ->
     if
         OpPending ->
             ?TRACE("Phase2a: Pending op. Discarding op ~p and replying~n", [Op]),
-            comm:send(ReplyPid, {balance_failed, Op}),
+            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
             State;
         OldData ->
             ?TRACE("Phase2a: Old data in lb_op. Won't jump or slide. Discarding op ~p~n", [Op]),
+            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
             State;
         true ->
             MyState2 = set_pending_op(Op, MyState),
@@ -200,10 +201,11 @@ on({balance_phase2b, Op, ReplyPid}, {MyState, ModuleState} = State) ->
     if
         OpPending ->
             ?TRACE("Phase2b: Pending op. Discarding op ~p and replying~n", [Op]),
-            comm:send(ReplyPid, {balance_failed, Op}),
+            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
             State;
         OldData ->
             ?TRACE("Phase2b: Old data in lb_op. Won't jump or slide. Discarding op ~p~n", [Op]),
+            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
             State;
         true ->
             OpId = Op#lb_op.id,
