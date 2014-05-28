@@ -445,6 +445,12 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId, TargetId, N
                             rm_loop:notify_new_succ(node:pidX(Pred), Me),
                             rm_loop:notify_new_pred(node:pidX(Succ), Me),
 
+                            JoinOptions = get_join_options(JoinState),
+                            case proplists:get_value(notify, JoinOptions) of
+                                {Pid, Msg} -> comm:send(Pid, Msg);
+                                _ -> ok
+                            end,
+
                             finish_join_and_slide(Me, Pred, Succ, db_dht:new(),
                                                   QueuedMessages, MoveId, NextOp)
                     end

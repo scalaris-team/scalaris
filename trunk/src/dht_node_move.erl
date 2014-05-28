@@ -907,8 +907,11 @@ finish_slide(State, SlideOp) ->
     Pid = node:pidX(slide_op:get_node(SlideOp)),
     MoveFullId = slide_op:get_id(SlideOp),
     fd:unsubscribe([Pid], {move, MoveFullId}),
-    notify_source_pid(slide_op:get_source_pid(SlideOp),
-                      {move, result, slide_op:get_tag(SlideOp), ok}),
+    case slide_op:is_jump(SlideOp) of
+        true -> ok; %% notify later when join at other node is complete
+        _ -> notify_source_pid(slide_op:get_source_pid(SlideOp),
+                               {move, result, slide_op:get_tag(SlideOp), ok})
+    end,
     PredOrSucc = slide_op:get_predORsucc(SlideOp),
     rm_loop:notify_slide_finished(PredOrSucc),
     dht_node_state:set_slide(State, PredOrSucc, null).
@@ -1097,13 +1100,19 @@ finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
     fd:report_graceful_leave(),
     State1 = finish_slide(State, SlideOp),
 
+    %% Rejoin at NewId but keep processes
     SupDhtNodeId = erlang:get(my_sup_dht_node_id),
     %% Get additional nodes for bootstrapping
     %% If the only known host jumps, it can't bootstrap itself.
     Neighborhood = dht_node_state:get(State, neighbors),
     OtherNodes = tl(nodelist:to_list(Neighborhood)),
     BootstrapNodes = [node:pidX(Node) || Node <- OtherNodes],
+    %% reply after join is complete
+    NotifyPid = slide_op:get_source_pid(SlideOp),
+    NotifyTag = slide_op:get_tag(SlideOp),
+    NotifyMsg = {move, result, NotifyTag, ok},
     Options = [{{dht_node, id}, NewId}, {my_sup_dht_node_id, SupDhtNodeId},
+               {notify, {NotifyPid, NotifyMsg}},
                {bootstrap_nodes, BootstrapNodes}],
     NewOptions =
         case config:read(lb_active_and_psv) of
