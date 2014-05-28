@@ -40,7 +40,7 @@ groups() ->
     [
      {basic,  [parallel], [
                            get_symmetric_keys_test,
-                           tester_quadrant_intervals,
+                           check_quadrant_intervals,
                            tester_map_key_to_interval,
                            tester_map_key_to_quadrant,
                            tester_map_interval,
@@ -81,8 +81,7 @@ get_symmetric_keys_test(Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_quadrant_intervals() -> true.
-prop_quadrant_intervals() ->
+check_quadrant_intervals(_) ->
     Quadrants = rr_recon:quadrant_intervals(),
     ?equals(lists:foldl(fun intervals:union/2, intervals:empty(), Quadrants),
             intervals:all()),
@@ -95,9 +94,6 @@ prop_quadrant_intervals() ->
                          Q1 =/= Q2,
                          not intervals:is_empty(intervals:intersection(Q1, Q2))],
             []).
-
-tester_quadrant_intervals(_) ->
-    tester:test(?MODULE, prop_quadrant_intervals, 0, 100, [{threads, 4}]).
 
 -spec prop_map_key_to_interval(?RT:key(), intervals:interval()) -> boolean().
 prop_map_key_to_interval(Key, I) ->
