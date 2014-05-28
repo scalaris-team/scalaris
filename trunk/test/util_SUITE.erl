@@ -139,7 +139,7 @@ repeat_p_accumulate(_) ->
 %% @doc Checks that all intended items are deleted using util:minus_all/2.
 %%      Note: this is kindof redundant to prop_minus_all_sort/2 but a cleaner
 %%      approach avoiding a re-implementation of util:minus_all/2.
--spec prop_minus_all(List::[T], Excluded::[T]) -> boolean().
+-spec prop_minus_all(List::[T], Excluded::[T]) -> true.
 prop_minus_all(List, Excluded) ->
     Result = util:minus_all(List, Excluded),
     _ = [begin
@@ -151,12 +151,12 @@ prop_minus_all(List, Excluded) ->
     true.
 
 %% @doc Checks that the order of items stays the same using util:minus_all/2.
--spec prop_minus_all_sort(List::[T], Excluded::[T]) -> boolean().
+-spec prop_minus_all_sort(List::[T], Excluded::[T]) -> true.
 prop_minus_all_sort(List, Excluded) ->
     Result = util:minus_all(List, Excluded),
     prop_minus_all_sort_helper(Result, List, Excluded).
 
--spec prop_minus_all_sort_helper(Result::[T], List::[T], Excluded::[T]) -> boolean().
+-spec prop_minus_all_sort_helper(Result::[T], List::[T], Excluded::[T]) -> true.
 prop_minus_all_sort_helper([], [], _) ->
     true;
 prop_minus_all_sort_helper([_|_], [], _) ->
@@ -179,17 +179,17 @@ tester_minus_all_sort(_Config) ->
 %% @doc Checks that all intended items are deleted once using util:minus_first/2.
 %%      Note: this is kindof redundant to prop_minus_first_sort/2 but a cleaner
 %%      approach avoiding a re-implementation of util:minus_first/2.
--spec prop_minus_first(List::[T], Excluded::[T]) -> boolean().
+-spec prop_minus_first(List::[T], Excluded::[T]) -> true.
 prop_minus_first(List, Excluded) ->
     ?equals(util:minus_first(List, Excluded), lists:foldl(fun lists:delete/2, List, Excluded)).
 
 %% @doc Checks that the order of items stays the same using util:minus_first/2.
--spec prop_minus_first_sort(List::[T], Excluded::[T]) -> boolean().
+-spec prop_minus_first_sort(List::[T], Excluded::[T]) -> true.
 prop_minus_first_sort(List, Excluded) ->
     Result = util:minus_first(List, Excluded),
     prop_minus_first_sort_helper(Result, List, Excluded).
 
--spec prop_minus_first_sort_helper(Result::[T], List::[T], Excluded::[T]) -> boolean().
+-spec prop_minus_first_sort_helper(Result::[T], List::[T], Excluded::[T]) -> true.
 prop_minus_first_sort_helper([], [], _) ->
     true;
 prop_minus_first_sort_helper([_|_], [], _) ->
