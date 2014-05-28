@@ -65,7 +65,7 @@ test2(_) ->
            [N, P, Vals, lists:sum(Vals), EV]),
     ?assert(EV > 2.85) andalso ?assert(EV < 2.87).
 
--spec prop_sum_test(1..100000, 1..1000000, 1..1000000) -> boolean().
+-spec prop_sum_test(1..100000, 1..1000000, 1..1000000) -> true.
 prop_sum_test(N, P1, P1) ->
     prop_sum_test(N, P1 - 1, P1);
 prop_sum_test(N0, P1, P2) ->
@@ -95,7 +95,7 @@ tester_sum_test(_) ->
     tester:test(?MODULE, prop_sum_test, 3, 100, [{threads, 4}]),
     tester:unregister_value_creator({typedef, random_bias, generator}).
 
--spec prop_value_count(1..100000) -> boolean().
+-spec prop_value_count(1..100000) -> true.
 prop_value_count(Count) ->
     R = random_bias:binomial(Count, 0.3),
     Values = gen_values(R, []),

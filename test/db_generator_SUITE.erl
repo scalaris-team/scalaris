@@ -81,7 +81,7 @@ prop_get_db3_(Interval, ItemCount, Distribution) ->
              ?equals(length(Result), ItemCount)).
 
 -spec prop_get_db4(I::intervals:continuous_interval(), ItemCount::1..1000,
-                   db_generator:db_distribution(), Options::[db_generator:option()]) -> boolean().
+                   db_generator:db_distribution(), Options::[db_generator:option()]) -> true.
 prop_get_db4(Interval, ItemCount0, Distribution0 = {non_uniform, RanGen}, Options) ->
     ItemCount = erlang:min(ItemCount0, random_bias:numbers_left(RanGen)),
     prop_get_db4_(Interval, ItemCount, db_generator:feeder_fix_rangen(Distribution0, ItemCount), Options);
@@ -90,7 +90,7 @@ prop_get_db4(Interval, ItemCount, Distribution, Options) ->
 
 
 -spec prop_get_db4_(I::intervals:continuous_interval(), ItemCount::1..1000,
-                    db_generator:db_distribution(), Options::[db_generator:option()]) -> boolean().
+                    db_generator:db_distribution(), Options::[db_generator:option()]) -> true.
 prop_get_db4_(Interval, ItemCount, Distribution, Options) ->
     Result = db_generator:get_db(Interval, ItemCount, Distribution, Options),
     case proplists:get_value(output, Options, list_key) of

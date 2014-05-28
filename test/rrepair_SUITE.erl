@@ -95,7 +95,7 @@ check_quadrant_intervals(_) ->
                          not intervals:is_empty(intervals:intersection(Q1, Q2))],
             []).
 
--spec prop_map_key_to_interval(?RT:key(), intervals:interval()) -> boolean().
+-spec prop_map_key_to_interval(?RT:key(), intervals:interval()) -> true.
 prop_map_key_to_interval(Key, I) ->
     Mapped = rr_recon:map_key_to_interval(Key, I),
     RGrp = ?RT:get_replica_keys(Key),
@@ -127,7 +127,7 @@ tester_map_key_to_interval(_) ->
     prop_map_key_to_interval(Q2, intervals:union(intervals:new(Q1), intervals:new(Q3))),
     tester:test(?MODULE, prop_map_key_to_interval, 2, 1000, [{threads, 4}]).
 
--spec prop_map_key_to_quadrant(?RT:key(), Quadrant::1..4) -> boolean().
+-spec prop_map_key_to_quadrant(?RT:key(), Quadrant::1..4) -> true.
 prop_map_key_to_quadrant(Key, Quadrant) ->
     ?equals(rr_recon:map_key_to_quadrant(Key, Quadrant),
             rr_recon:map_key_to_interval(Key, lists:nth(Quadrant, rr_recon:quadrant_intervals()))).
@@ -138,7 +138,7 @@ tester_map_key_to_quadrant(_) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec prop_map_interval(A::intervals:continuous_interval(),
-                             B::intervals:continuous_interval()) -> boolean().
+                        B::intervals:continuous_interval()) -> true.
 prop_map_interval(A, B) ->
     Quadrants = rr_recon:quadrant_intervals(),
     % need a B that is in a single quadrant - just use the first one to get
@@ -200,7 +200,7 @@ tester_find_sync_interval(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_merkle_compress_hashlist(Nodes::[merkle_tree:mt_node()], SigSize::1..160) -> boolean().
+-spec prop_merkle_compress_hashlist(Nodes::[merkle_tree:mt_node()], SigSize::1..160) -> true.
 prop_merkle_compress_hashlist(Nodes0, SigSize) ->
     % fix node list which may contain nil hashes:
     % let it crash if the format of a merkle tree node changes
@@ -224,7 +224,7 @@ tester_merkle_compress_hashlist(_) ->
     tester:test(?MODULE, prop_merkle_compress_hashlist, 2, 1000, [{threads, 4}]).
 
 %% -spec prop_merkle_compress_cmp_result(CmpRes::[rr_recon:merkle_cmp_result()],
-%%                                       SigSize::1..160) -> boolean().
+%%                                       SigSize::1..160) -> true.
 %% prop_merkle_compress_cmp_result(CmpRes, SigSize) ->
 %%     {Flags, HashesBin} =
 %%         rr_recon:merkle_compress_cmp_result(CmpRes, <<>>, <<>>, SigSize),
