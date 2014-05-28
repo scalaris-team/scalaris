@@ -1110,19 +1110,8 @@ finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
             true -> Options;
             _    -> [{skip_psv_lb} | Options]
         end,
-    %% clean up
-    rt_loop:deactivate(),
-    cyclon:deactivate(),
-    vivaldi:deactivate(),
-    dc_clustering:deactivate(),
-    gossip:deactivate(),
-    dht_node_reregister:deactivate(),
-    service_per_vm:deregister_dht_node(self()),
-    dn_cache:unsubscribe(),
-    %% start join
-    comm:send_local(self(), {join, start}),
-    IdVersion = node:id_version(dht_node_state:get(State1, node)),
-    dht_node_join:join_as_other(NewId, IdVersion+1, NewOptions);
+    comm:send_local(self(), {rejoin, NewId, NewOptions}),
+    State1;
 finish_delta_ack2B(State, SlideOp, {none}) ->
     finish_slide_and_continue_with_next_op(State, SlideOp);
 finish_delta_ack2B(State, SlideOp, {abort, NewSlideId, Reason}) ->
