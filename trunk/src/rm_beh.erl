@@ -51,6 +51,8 @@
 -callback remove_succ(State::state(), OldSucc::node:node_type(),
                       SuccsSucc::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
+-callback remove_node(State::state(), NodePid::comm:mypid())
+        -> {ChangeReason::rm_loop:reason(), state()}.
 -callback update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 -callback contact_new_nodes(NewNodes::[node:node_type()]) -> ok.

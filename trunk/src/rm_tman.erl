@@ -268,6 +268,17 @@ remove_succ(State, OldSucc, SuccsSucc) ->
     {{graceful_leave, succ, OldSucc},
      update_nodes(State, [SuccsSucc], [OldSucc], null)}.
 
+%% @doc Removes the given node as a result from a graceful leave only!
+-spec remove_node(State::state(), NodePid::comm:mypid())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+remove_node(State, NodePid) ->
+    {Neighborhood, RandViewSize, Cache, Churn} =
+        update_nodes(State, [], [NodePid], null),
+    % try to find a replacement in the cache:
+    NewNeighborhood = trigger_update(Neighborhood, [], Cache),
+    {{graceful_leave, other, NodePid},
+     {NewNeighborhood, RandViewSize, Cache, Churn}}.
+
 -spec update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->

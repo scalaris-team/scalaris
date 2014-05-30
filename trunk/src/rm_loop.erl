@@ -58,6 +58,7 @@
 
 -type reason() :: {slide_finished, pred | succ | none} | % a slide finished
                   {graceful_leave, pred | succ, Node::node:node_type()} | % the given node is about to leave
+                  {graceful_leave, other, NodePid::comm:mypid()} | % the given node is about to leave
                   {node_crashed, Node::comm:mypid()} | % the given node crashed
                   {add_subscriber} | % a subscriber was added
                   {node_discovery} | % a new/changed node was discovered
@@ -89,6 +90,7 @@
     {rm, leave} |
     {rm, pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {rm, succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
+    {rm, node_left, Node::node:node_type()} |
     {rm, update_id, NewId::?RT:key()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {rm, subscribe, Pid::pid(), Tag::any(), subscriber_filter_fun(), subscriber_exec_fun(), MaxCalls::pos_integer() | inf} |
@@ -285,6 +287,11 @@ on({rm, succ_left, OldSucc, SuccsSucc}, State) ->
     RMFun = fun(RM_State) -> ?RM:remove_succ(RM_State, OldSucc, SuccsSucc) end,
     update_state(State, RMFun);
 
+% only from graceful leave
+on({rm, node_left, NodePid}, State) ->
+    RMFun = fun(RM_State) -> ?RM:remove_node(RM_State, NodePid) end,
+    update_state(State, RMFun);
+
 on({rm, update_id, NewId}, State) ->
     Neighborhood = ?RM:get_neighbors(element(1, State)),
     OldMe = nodelist:node(Neighborhood),
@@ -316,6 +323,13 @@ on({rm, leave}, {RM_State, _HasLeft, SubscrTable}) ->
     Succ = nodelist:succ(Neighborhood),
     comm:send(node:pidX(Succ), {rm, pred_left, Me, Pred}, ?SEND_OPTIONS),
     comm:send(node:pidX(Pred), {rm, succ_left, Me, Succ}, ?SEND_OPTIONS),
+    % notify other nodes to remove this node (independent of the fd since node
+    % jumps now re-use node IDs)
+    MyPid = node:pidX(Me),
+    _ = [begin
+             NPid = node:pidX(N),
+             comm:send(NPid, {rm, node_left, MyPid})
+         end || N <- tl(nodelist:to_list(Neighborhood)), N =/= Pred, N =/= Succ],
     comm:send_local(self(), {move, node_leave}), % msg to dht_node
     ?RM:leave(RM_State),
     {RM_State, true, SubscrTable};
