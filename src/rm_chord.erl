@@ -169,6 +169,14 @@ remove_succ({OldNeighborhood}, OldSucc, SuccsSucc) ->
     NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, predListLength(), succListLength()),
     {{graceful_leave, succ, OldSucc}, {NewNbh2}}.
 
+%% @doc Removes the given node as a result from a graceful leave only!
+-spec remove_node(State::state(), NodePid::comm:mypid())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+remove_node({OldNeighborhood}, NodePid) ->
+    % TODO: find replacement?
+    NewNbh1 = nodelist:remove(NodePid, OldNeighborhood),
+    {{graceful_leave, other, NodePid}, {NewNbh1}}.
+
 -spec update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({OldNeighborhood}, NewMe) ->
