@@ -169,11 +169,10 @@ add_cyclon_cache(NewCache, {Neighborhood, RandViewSize, _Cache, Churn}) ->
             true  -> RandViewSize + 1;
             false -> RandViewSize
         end,
-    MyRndView = get_RndView(RandViewSizeNew, NewCache),
     OtherNeighborhood =
         nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
                                  get_pred_list_length(), get_succ_list_length()),
-    NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighborhood),
+    NewNeighborhood = trigger_update(Neighborhood, [], OtherNeighborhood),
     {{node_discovery}, {NewNeighborhood, RandViewSizeNew, NewCache, Churn}}.
 
 -spec trigger_action(State::state())
