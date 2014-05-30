@@ -49,14 +49,11 @@ end.
 -spec lookup_aux_chord(State::dht_node_state:state(), Key::intervals:key(),
                        Hops::non_neg_integer(), Msg::comm:message()) -> ok.
 lookup_aux_chord(State, Key, Hops, Msg) ->
-    Neighbors = dht_node_state:get(State, neighbors),
     WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
-    case intervals:in(Key, nodelist:succ_range(Neighbors)) of
-        true -> % found node -> terminate
-            P = node:pidX(nodelist:succ(Neighbors)),
+    case ?RT:next_hop(State, Key) of
+        {succ, P} -> % found node -> terminate
             comm:send(P, {?lookup_fin, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}]);
-        _ ->
-            P = ?RT:next_hop(State, Key),
+        {other, P} ->
             comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
     end.
 
@@ -79,7 +76,7 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
         false ->
             WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
             %log:log("lookup_aux_leases route ~p~n", [self()]),
-            P = ?RT:next_hop(State, Key),
+            P = element(2, ?RT:next_hop(State, Key)),
             %log:log("lookup_aux_leases route ~p -> ~p~n", [self(), P]),
             comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
     end.

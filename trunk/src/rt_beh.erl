@@ -37,7 +37,7 @@
 -callback init(nodelist:neighborhood()) -> rt().
 -callback hash_key(client_key() | binary()) -> key().
 -callback get_random_node_id() -> key().
--callback next_hop(dht_node_state:state(), key()) -> comm:mypid().
+-callback next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
 
 -callback init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 -callback update(OldRT::rt(), OldNeighbors::nodelist:neighborhood(),

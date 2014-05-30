@@ -535,11 +535,12 @@ empty_ext(_Neighbors) -> {unknown, gb_trees:empty()}.
 
 %% userdevguide-begin rt_frtchord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop_node(dht_node_state:state(), key()) -> node:node_type().
+-spec next_hop_node(dht_node_state:state(), key()) -> {succ | other, node:node_type()}.
 next_hop_node(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
-        true -> nodelist:succ(Neighbors);
+        true ->
+            {succ, nodelist:succ(Neighbors)};
         _ -> ExtRT = dht_node_state:get(State, rt),
              RT = external_rt_get_tree(ExtRT),
              RTSize = get_size(ExtRT),
@@ -550,16 +551,18 @@ next_hop_node(State, Id) ->
                      {_Key, N} = gb_trees:largest(RT),
                      N
              end,
-             case RTSize < config:read(rt_size_use_neighbors) of
-                 false -> NodeRT;
-                 _     -> % check neighborhood:
-                     nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
-             end
+             Node = case RTSize < config:read(rt_size_use_neighbors) of
+                        false -> NodeRT;
+                        _     -> % check neighborhood:
+                            nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
+                    end,
+             {other, Node}
     end.
 
--spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
+-spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
 next_hop(State, Id) ->
-    node:pidX(next_hop_node(State, Id)).
+    {Tag, Node} = next_hop_node(State, Id),
+    {Tag, node:pidX(Node)}.
 %% userdevguide-end rt_frtchord:next_hop
 
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
@@ -1086,7 +1089,7 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
             MyId = dht_node_state:get(State, node_id),
             SenderId = node:id(Issuer),
             SenderPid = node:pidX(Issuer),
-            NextHop = next_hop_node(State, Key),
+            NextHop = element(2, next_hop_node(State, Key)),
             SendMsg = case external_rt_get_ring_size(dht_node_state:get(State, rt)) of
                 unknown -> true;
                 RingSize ->
