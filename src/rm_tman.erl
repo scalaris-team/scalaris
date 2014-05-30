@@ -65,7 +65,9 @@ init(Me, Pred, Succ) ->
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     % ask cyclon once (a repeating trigger is already started in init_first/0)
     cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 3, {rm, once, '_'})),
-    {Neighborhood, config:read(cyclon_cache_size), [], true}.
+    % start by using all available nodes reported by cyclon
+    RandViewSize = config:read(cyclon_cache_size),
+    {Neighborhood, RandViewSize, [], true}.
 
 -spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
 unittest_create_state(Neighbors) ->
@@ -94,18 +96,22 @@ handle_custom_message({rm, {cy_cache, NewCache}}, State) ->
 % got shuffle request
 handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
    {Neighborhood, RandViewSize, Cache, Churn}) ->
+    % use only a subset of the cyclon cache in order not to fill the send buffer
+    % with potentially non-existing nodes (in contrast, the nodes from our
+    % neighbourhood are more likely to still exist!)
     MyRndView = get_RndView(RandViewSize, Cache),
     MyView = lists:append(MyRndView, nodelist:to_list(Neighborhood)),
     OtherNode = nodelist:node(OtherNeighbors),
     OtherNodeId = node:id(OtherNode),
     OtherLastPredId = node:id(lists:last(nodelist:preds(OtherNeighbors))),
     OtherLastSuccId = node:id(lists:last(nodelist:succs(OtherNeighbors))),
-    % note: the buffer message, esp. OtherNode, might already be outdated
-    % and our own view may contain a newer version of the node
+    % update outdated node ids:
     {[OtherNodeUpd], MyViewUpd} = nodelist:lupdate_ids([OtherNode], MyView),
     NeighborsToSendTmp = nodelist:mk_neighborhood(MyViewUpd, OtherNodeUpd,
                                                   get_pred_list_length(),
                                                   get_succ_list_length()),
+    % only send nodes in between the range of the other node's neighborhood
+    % but at least a given number
     NeighborsToSend =
         nodelist:filter_min_length(
           NeighborsToSendTmp,
@@ -145,8 +151,9 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
 
 handle_custom_message(_, _State) -> unknown_event.
 
-%% @doc Integrates a non-empty cyclon cache into the own random view (empty
-%%      cyclon caches are ignored) and updates the random view size accordingly.
+%% @doc Integrates a non-empty cyclon cache into the own random view and
+%%      neighborhood structures and updates the random view size accordingly.
+%%      Ignores empty cyclon caches.
 -spec add_cyclon_cache(Cache::[node:node_type()], state())
         -> {ChangeReason::{unknown} | {node_discovery}, state()}.
 add_cyclon_cache([], State) ->
@@ -170,13 +177,15 @@ add_cyclon_cache(NewCache, {Neighborhood, RandViewSize, _Cache, Churn}) ->
         -> {ChangeReason::rm_loop:reason(), state()}.
 trigger_action({Neighborhood, RandViewSize, Cache, Churn} = State) ->
     % Trigger an update of the Random view
+    % use only a subset of the cyclon cache in order not to fill the send buffer
+    % with potentially non-existing nodes (in contrast, the nodes from our
+    % neighbourhood are more likely to still exist!)
     % Test for being alone:
     case nodelist:has_real_pred(Neighborhood) andalso
              nodelist:has_real_succ(Neighborhood) of
         false -> % our node is the only node in the system
-            % no need to set a new trigger - we will be actively called by
-            % any new node and set the trigger then (see handling of
-            % notify_new_succ and notify_new_pred)
+            % nothing to do here - we will be actively called by any new node
+            % (see handling of notify_new_succ and notify_new_pred)
             {{unknown}, State};
         _ -> % there is another node in the system
             RndView = get_RndView(RandViewSize, Cache),
@@ -341,6 +350,9 @@ has_churn(OldNeighborhood, NewNeighborhood) ->
 
 %% @doc Triggers the integration of new nodes from OtherNeighborhood and
 %%      RndView into our Neighborhood by contacting every useful node.
+%%      NOTE: nodes from OtherNeighborhood and RndView compete for the actual
+%%            number of contacted nodes, so the (potentially more outdated)
+%%            random view should be limited
 %%      NOTE: no node is (directly) added by this function, the returned
 %%            neighborhood may contain updated node IDs though!
 -spec trigger_update(OldNeighborhood::nodelist:neighborhood(),
@@ -371,10 +383,8 @@ trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
 
 %% @doc Adds and removes the given nodes from the rm_tman state.
 %%      Note: Sets the new RandViewSize to 0 if NodesToRemove is not empty and
-%%      the new neighborhood is different to the old one. If either churn
-%%      occurred or was already determined, min_interval if chosen for the next
-%%      interval, otherwise max_interval. If the successor or predecessor
-%%      changes, the trigger will be called immediately.
+%%      the new neighborhood is different to the old one. If the successor or
+%%      predecessor changes, the trigger action will be called immediately.
 -spec update_nodes(State::state(),
                    NodesToAdd::[node:node_type()],
                    NodesToRemove::[node:node_type() | comm:mypid() | pid()],
@@ -419,10 +429,6 @@ update_nodes({OldNeighborhood, RandViewSize, OldCache, _Churn},
                                          get_succ_list_length()),
 
     NewChurn = has_churn(OldNeighborhood, NewNeighborhood),
-%%    NewInterval = case Churn orelse NewChurn of
-%%                      true -> min_interval; % increase ring maintenance frequenc%%y
-%%                      _    -> max_interval
-%%                  end,
     NewRandViewSize = case NewChurn andalso NodesToRemove =/= [] of
                           true -> 0;
                           _    -> RandViewSize
