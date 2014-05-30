@@ -103,13 +103,16 @@ handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, Request
     MyView = lists:append(MyRndView, nodelist:to_list(Neighborhood)),
     OtherNode = nodelist:node(OtherNeighbors),
     OtherNodeId = node:id(OtherNode),
-    OtherLastPredId = node:id(lists:last(nodelist:preds(OtherNeighbors))),
-    OtherLastSuccId = node:id(lists:last(nodelist:succs(OtherNeighbors))),
     % update outdated node ids:
-    {[OtherNodeUpd], MyViewUpd} = nodelist:lupdate_ids([OtherNode], MyView),
+    {[OtherNodeUpd], MyViewUpd0} = nodelist:lupdate_ids([OtherNode], MyView),
+    % do not send nodes already known to the other node:
+    {MyViewUpd, _, _OnlyInOther} =
+        util:split_unique(MyViewUpd0, nodelist:to_list(OtherNeighbors)),
     NeighborsToSendTmp = nodelist:mk_neighborhood(MyViewUpd, OtherNodeUpd,
                                                   get_pred_list_length(),
                                                   get_succ_list_length()),
+    OtherLastPredId = node:id(lists:last(nodelist:preds(OtherNeighbors))),
+    OtherLastSuccId = node:id(lists:last(nodelist:succs(OtherNeighbors))),
     % only send nodes in between the range of the other node's neighborhood
     % but at least a given number
     NeighborsToSend =
