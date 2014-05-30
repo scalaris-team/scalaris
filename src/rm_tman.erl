@@ -96,49 +96,59 @@ handle_custom_message({rm, {cy_cache, NewCache}}, State) ->
 % got shuffle request
 handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, RequestSuccsMinCount},
    {Neighborhood, RandViewSize, Cache, Churn}) ->
+    OtherNodes = nodelist:to_list(OtherNeighbors),
+    CacheUpd = element(1, nodelist:lupdate_ids(Cache, OtherNodes)),
     % use only a subset of the cyclon cache in order not to fill the send buffer
     % with potentially non-existing nodes (in contrast, the nodes from our
     % neighbourhood are more likely to still exist!)
-    MyRndView = get_RndView(RandViewSize, Cache),
-    MyView = lists:append(MyRndView, nodelist:to_list(Neighborhood)),
-    OtherNode = nodelist:node(OtherNeighbors),
-    % update outdated node ids:
-    {[OtherNodeUpd], MyViewUpd0} = nodelist:lupdate_ids([OtherNode], MyView),
+    MyRndView = get_RndView(RandViewSize, CacheUpd),
+    % note: we can not use the result from the util:split_unique/2 call below
+    %       since we also need to (re-)integrate nodes which are in our cyclon
+    %       cache but came inside the other nodes's neighbourhood
+    %       -> instead integrate the whole other view and use the updated own
+    %          neighbourhood
+    NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNodes),
+
+    MyNodes = nodelist:to_list(NewNeighborhood),
     % do not send nodes already known to the other node:
-    {MyViewUpd, _, _OnlyInOther} =
-        util:split_unique(MyViewUpd0, nodelist:to_list(OtherNeighbors)),
-    NeighborsToSendTmp = nodelist:mk_neighborhood(MyViewUpd, OtherNodeUpd,
+    {MyViewUpd, _, _} = util:split_unique(
+                          lists:append(MyRndView, MyNodes), OtherNodes),
+    OtherNode = nodelist:node(OtherNeighbors),
+    NeighborsToSendTmp = nodelist:mk_neighborhood(MyViewUpd, OtherNode,
                                                   get_pred_list_length(),
                                                   get_succ_list_length()),
     % only send nodes in between the range of the other node's neighborhood
     % but at least a given number
-    OtherNodeId = node:id(OtherNode),
+    OtherNodeUpdId = node:id(OtherNode),
     OtherLastPredId = node:id(lists:last(nodelist:preds(OtherNeighbors))),
     OtherLastSuccId = node:id(lists:last(nodelist:succs(OtherNeighbors))),
     OtherRange = intervals:union(
-                   intervals:new('(', OtherNodeId, OtherLastSuccId, ')'),
-                   intervals:new('(', OtherLastPredId, OtherNodeId, ')')),
+                   intervals:new('(', OtherNodeUpdId, OtherLastSuccId, ')'),
+                   intervals:new('(', OtherLastPredId, OtherNodeUpdId, ')')),
     NeighborsToSend =
         nodelist:filter_min_length(
           NeighborsToSendTmp,
           fun(N) -> intervals:in(node:id(N), OtherRange) end,
           RequestPredsMinCount, RequestSuccsMinCount),
-    comm:send(node:pidX(nodelist:node(OtherNeighbors)),
+    comm:send(node:pidX(OtherNode),
               {rm, buffer_response, NeighborsToSend}, ?SEND_OPTIONS),
-    NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
-    {{node_discovery}, {NewNeighborhood, RandViewSize, Cache, Churn}};
+    {{node_discovery}, {NewNeighborhood, RandViewSize, CacheUpd, Churn}};
 
 handle_custom_message({rm, buffer_response, OtherNeighbors},
    {Neighborhood, RandViewSize, Cache, Churn}) ->
-    MyRndView = get_RndView(RandViewSize, Cache),
-    NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNeighbors),
+    % similar to "{rm, buffer,...}" handling above:
+    OtherNodes = nodelist:to_list(OtherNeighbors),
+    CacheUpd = element(1, nodelist:lupdate_ids(Cache, OtherNodes)),
+    MyRndView = get_RndView(RandViewSize, CacheUpd),
+    NewNeighborhood = trigger_update(Neighborhood, MyRndView, OtherNodes),
+
     % increase RandViewSize (no error detected):
     NewRandViewSize =
         case RandViewSize < config:read(cyclon_cache_size) of
             true ->  RandViewSize + 1;
             false -> RandViewSize
         end,
-    {{node_discovery}, {NewNeighborhood, NewRandViewSize, Cache, Churn}};
+    {{node_discovery}, {NewNeighborhood, NewRandViewSize, CacheUpd, Churn}};
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
@@ -169,10 +179,7 @@ add_cyclon_cache(NewCache, {Neighborhood, RandViewSize, _Cache, Churn}) ->
             true  -> RandViewSize + 1;
             false -> RandViewSize
         end,
-    OtherNeighborhood =
-        nodelist:mk_neighborhood(NewCache, nodelist:node(Neighborhood),
-                                 get_pred_list_length(), get_succ_list_length()),
-    NewNeighborhood = trigger_update(Neighborhood, [], OtherNeighborhood),
+    NewNeighborhood = trigger_update(Neighborhood, [], NewCache),
     {{node_discovery}, {NewNeighborhood, RandViewSizeNew, NewCache, Churn}}.
 
 -spec trigger_action(State::state())
@@ -218,7 +225,7 @@ trigger_action({Neighborhood, RandViewSize, Cache, Churn} = State) ->
           {ChangeReason::rm_loop:reason(), state()}.
 new_pred(State, NewPred) ->
     % if we do not want to trust notify_new_pred messages to provide an alive node, use this instead:
-%%     trigger_update(OldNeighborhood, [], nodelist:new_neighborhood(nodelist:node(OldNeighborhood), NewPred)),
+%%     trigger_update(OldNeighborhood, [], [NewPred]),
     % we trust NewPred to be alive -> integrate node:
     {{unknown}, update_nodes(State, [NewPred], [], null)}.
 
@@ -359,19 +366,14 @@ has_churn(OldNeighborhood, NewNeighborhood) ->
 %%            neighborhood may contain updated node IDs though!
 -spec trigger_update(OldNeighborhood::nodelist:neighborhood(),
                      RndView::[node:node_type()],
-                     OtherNeighborhood::nodelist:neighborhood())
+                     OtherNodes::[node:node_type()])
         -> NewNeighborhood::nodelist:neighborhood().
-trigger_update(OldNeighborhood, MyRndView, OtherNeighborhood) ->
+trigger_update(OldNeighborhood, MyRndView, OtherNodes) ->
     % update node ids with information from the other node's neighborhood
-    OldNeighborhood2 =
-        nodelist:update_ids(OldNeighborhood,
-                            nodelist:to_list(OtherNeighborhood)),
-    PredL = get_pred_list_length(),
-    SuccL = get_succ_list_length(),
-    NewNeighborhood1 =
-        nodelist:add_nodes(OldNeighborhood2, MyRndView, PredL, SuccL),
+    OldNeighborhood2 = nodelist:update_ids(OldNeighborhood, OtherNodes),
     NewNeighborhood2 =
-        nodelist:merge(NewNeighborhood1, OtherNeighborhood, PredL, SuccL),
+        nodelist:add_nodes(OldNeighborhood2, lists:append(MyRndView, OtherNodes),
+                           get_pred_list_length(), get_succ_list_length()),
 
     OldView = nodelist:to_list(OldNeighborhood2),
     NewView = nodelist:to_list(NewNeighborhood2),
