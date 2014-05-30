@@ -426,7 +426,7 @@ update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun, CrashedPid)
     ?TRACE_STATE(_OldState, NewState),
     NewState.
 
-% @doc Check if change of failuredetector is necessary.
+% @doc Subscribe all PIDs in the neighborhood with the failuredetector.
 -spec set_failuredetector(Neighborhood::nodelist:neighborhood()) -> ok.
 set_failuredetector(Neighborhood) ->
     [_ | View] = nodelist:to_list(Neighborhood),
