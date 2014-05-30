@@ -447,6 +447,8 @@ export_rt_to_dht_node(RT, Neighbors) ->
     Id = nodelist:nodeid(Neighbors),
     Pred = nodelist:pred(Neighbors),
     Succ = nodelist:succ(Neighbors),
+    % always include the pred and succ in the external representation
+    % note: we are subscribed at the RM for changes to these nodes
     Tree = gb_trees:enter(node:id(Succ), Succ,
                           gb_trees:enter(node:id(Pred), Pred, gb_trees:empty())),
     util:gb_trees_foldl(fun (_K, V, Acc) ->
