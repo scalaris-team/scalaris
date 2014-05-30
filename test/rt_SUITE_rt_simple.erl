@@ -31,7 +31,7 @@ create_rt(_RT_Keys, [Succ | _DHTNodes] = _Nodes) ->
     node:new(Succ, number_to_key(1), 0).
 
 check_next_hop(State, Succ, N, _NodeExp) ->
-    ?equals_w_note(?RT:next_hop(State, number_to_key(N)), Succ, io_lib:format("~B", [N])).
+    ?equals_w_note(element(2, ?RT:next_hop(State, number_to_key(N))), Succ, io_lib:format("~B", [N])).
 
 -spec check_split_key_half(Begin::?RT:key(), End::?RT:key() | ?PLUS_INFINITY_TYPE, SplitKey::?RT:key()) -> true.
 check_split_key_half(Begin, End, SplitKey) ->

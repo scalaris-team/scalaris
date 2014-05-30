@@ -412,11 +412,12 @@ empty_ext(_Neighbors) -> gb_trees:empty().
 %%      proper next hop.
 %%      Note, that this code will be called from the dht_node process and
 %%      it will thus have an external_rt!
--spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
+-spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
 next_hop(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
-        true -> node:pidX(nodelist:succ(Neighbors));
+        true ->
+            {succ, node:pidX(nodelist:succ(Neighbors))};
         _ ->
             % check routing table:
             RT = dht_node_state:get(State, rt),
@@ -437,7 +438,7 @@ next_hop(State, Id) ->
                         % check neighborhood:
                         nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
                 end,
-            node:pidX(FinalNode)
+            {other, node:pidX(FinalNode)}
     end.
 %% userdevguide-end rt_chord:next_hop
 

@@ -244,8 +244,13 @@ empty_ext(Neighbors) -> empty(Neighbors).
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
-next_hop(State, _Key) -> node:pidX(dht_node_state:get(State, succ)).
+-spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
+next_hop(State, Key) ->
+    Neighbors = dht_node_state:get(State, neighbors),
+    case intervals:in(Key, nodelist:succ_range(Neighbors)) of
+        true -> {succ,  node:pidX(nodelist:succ(Neighbors))};
+        _    -> {other, node:pidX(nodelist:succ(Neighbors))}
+    end.
 %% userdevguide-end rt_simple:next_hop
 
 %% userdevguide-begin rt_simple:export_rt_to_dht_node
