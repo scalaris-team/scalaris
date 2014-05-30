@@ -226,17 +226,15 @@ stabilize(Neighbors, RT, Index, Node) ->
              NewNeighbors::nodelist:neighborhood())
         -> {ok | trigger_rebuild, rt()}.
 update(OldRT, OldNeighbors, NewNeighbors) ->
-    OldPred = nodelist:pred(OldNeighbors),
     NewPred = nodelist:pred(NewNeighbors),
     OldSucc = nodelist:succ(OldNeighbors),
     NewSucc = nodelist:succ(NewNeighbors),
     NewNodeId = nodelist:nodeid(NewNeighbors),
-    % if only the ID of a succ or pred changed but both are still the same
-    % process, only re-build if the new node ID is not between Pred and Succ
-    % any more (which should not happen since this must come from a slide!)
-    % if not rebuild, update the node IDs though
-    case node:same_process(OldPred, NewPred) andalso
-             node:same_process(OldSucc, NewSucc) andalso
+    % only re-build if a new successor occurs or the new node ID is not between
+    % Pred and Succ any more (which should not happen since this must come from
+    % a slide!)
+    % -> if not rebuilding, update the node IDs though
+    case node:same_process(OldSucc, NewSucc) andalso
              intervals:in(NewNodeId, node:mk_interval_between_nodes(NewPred, NewSucc)) of
         true ->
             NewRT = gb_trees:map(
