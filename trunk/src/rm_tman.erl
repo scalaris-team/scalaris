@@ -102,7 +102,6 @@ handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, Request
     MyRndView = get_RndView(RandViewSize, Cache),
     MyView = lists:append(MyRndView, nodelist:to_list(Neighborhood)),
     OtherNode = nodelist:node(OtherNeighbors),
-    OtherNodeId = node:id(OtherNode),
     % update outdated node ids:
     {[OtherNodeUpd], MyViewUpd0} = nodelist:lupdate_ids([OtherNode], MyView),
     % do not send nodes already known to the other node:
@@ -111,17 +110,18 @@ handle_custom_message({rm, buffer, OtherNeighbors, RequestPredsMinCount, Request
     NeighborsToSendTmp = nodelist:mk_neighborhood(MyViewUpd, OtherNodeUpd,
                                                   get_pred_list_length(),
                                                   get_succ_list_length()),
-    OtherLastPredId = node:id(lists:last(nodelist:preds(OtherNeighbors))),
-    OtherLastSuccId = node:id(lists:last(nodelist:succs(OtherNeighbors))),
     % only send nodes in between the range of the other node's neighborhood
     % but at least a given number
+    OtherNodeId = node:id(OtherNode),
+    OtherLastPredId = node:id(lists:last(nodelist:preds(OtherNeighbors))),
+    OtherLastSuccId = node:id(lists:last(nodelist:succs(OtherNeighbors))),
+    OtherRange = intervals:union(
+                   intervals:new('(', OtherNodeId, OtherLastSuccId, ')'),
+                   intervals:new('(', OtherLastPredId, OtherNodeId, ')')),
     NeighborsToSend =
         nodelist:filter_min_length(
           NeighborsToSendTmp,
-          fun(N) ->
-                  intervals:in(node:id(N), intervals:new('(', OtherNodeId, OtherLastSuccId, ')')) orelse
-                      intervals:in(node:id(N), intervals:new('(', OtherLastPredId, OtherNodeId, ')'))
-          end,
+          fun(N) -> intervals:in(node:id(N), OtherRange) end,
           RequestPredsMinCount, RequestSuccsMinCount),
     comm:send(node:pidX(nodelist:node(OtherNeighbors)),
               {rm, buffer_response, NeighborsToSend}, ?SEND_OPTIONS),
