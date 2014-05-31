@@ -237,8 +237,7 @@
     send_error() |
     {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(),
         Msg::comm:message(), Parents::[comm:mypid(),...]} |
-    {remove_all_tombstones}
-.
+    {remove_all_tombstones}.
 
 -type cb_message() ::
     {selected_data, CBModule::cb_module(), PData::gossip_beh:exch_data()} |
@@ -256,8 +255,7 @@
     {get_values_best, CBModule::cb_module(), SourcePid::comm:mypid()} |
     {get_values_all, CBModule::cb_module(), SourcePid::comm:mypid()} |
     {stop_gossip_task, CBModule::cb_module()} |
-    {no_msg}
-.
+    {no_msg}.
 
 -type message() :: bh_message() | cb_message().
 
@@ -361,10 +359,8 @@ on_inactive({activate_gossip, MyRange}=Msg, State) ->
         true -> {is_leader, MyRange};
         false -> {no_leader, MyRange}
     end,
-    List = [leader, Msg1],
-
     State3 = lists:foldl(fun(CBModule, StateIn) ->
-                                 {ok, NewState} = cb_call(notify_change, List, Msg, CBModule, StateIn),
+                                 NewState = cb_notify_change(leader, Msg1, CBModule, StateIn),
                                  NewState
                          end, State2, state_get(cb_modules, State2)),
 
@@ -467,14 +463,14 @@ on_active({trigger_action, TriggerInterval}=_Msg, State) ->
 
 
 %% received through the rm on key range changes
-on_active({update_range, NewRange}=FullMsg, State) ->
+on_active({update_range, NewRange}, State) ->
     State1 = state_set(range, NewRange, State),
     Msg = case is_leader(NewRange) of
         true -> {is_leader, NewRange};
         false -> {no_leader, NewRange}
     end,
     Fun = fun (CBModule, StateIn) ->
-                {ok, StateOut} = cb_call(notify_change, [leader, Msg], FullMsg, CBModule, StateIn),
+                StateOut = cb_notify_change(leader, Msg, CBModule, StateIn),
                 StateOut
           end,
     CBModules = state_get(cb_modules, State1),
@@ -482,10 +478,10 @@ on_active({update_range, NewRange}=FullMsg, State) ->
 
 
 %% request for debug info
-on_active({web_debug_info, Requestor}=Msg, State) ->
+on_active({web_debug_info, Requestor}, State) ->
     CBModules = state_get(cb_modules, State),
     Fun = fun(CBModule, {KVListIn, StateIn}) ->
-            {KVListCBModule, NewState} = cb_call(web_debug_info, [], Msg, CBModule, StateIn),
+            {KVListCBModule, NewState} = cb_web_debug_info(CBModule, StateIn),
             {KVListIn ++ [{"",""}] ++ KVListCBModule, NewState}
           end,
     {KVListCBModule, State1} = lists:foldr(Fun, {[], State}, CBModules),
@@ -511,11 +507,11 @@ on_active({send_error, _Pid, Msg, Reason}=ErrorMsg, State) ->
             State;
         {p2p_exch, CBModule, _SourcePid, PData, Round} ->
             log:log(warn(), "[ Gossip ] p2p_exch failed because of ~w", [Reason]),
-            {ok, NewState1} = cb_call(notify_change, [exch_failure, {p2p_exch, PData, Round}], ErrorMsg, CBModule, State),
+            NewState1 = cb_notify_change(exch_failure, {p2p_exch, PData, Round}, CBModule, State),
             NewState1;
         {p2p_exch_reply, CBModule, _SourcePid, QData, Round} ->
             log:log(warn(), "[ Gossip ] p2p_exch_reply failed because of ~w", [Reason]),
-            {ok, NewState1} = cb_call(notify_change, [exch_failure, {p2p_exch_reply, QData, Round}], ErrorMsg, CBModule, State),
+            NewState1 = cb_notify_change(exch_failure, {p2p_exch_reply, QData, Round}, CBModule, State),
             NewState1;
         _ ->
             log:log(?SHOW, "[ Gossip ] Failed to deliever the Msg ~w because ~w", [Msg, Reason]),
@@ -598,21 +594,21 @@ handle_msg({p2p_exch, CBModule, SourcePid, PData, OtherRound}=Msg, State) ->
     State1 = state_set({reply_peer, Ref=uid:get_pids_uid()}, SourcePid, State),
     case check_round(OtherRound, CBModule, State1) of
         {ok, State2} ->
-            select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State2);
+            cb_select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State2);
         {start_new_round, State2} -> % self is leader
             ?TRACE_ROUND("[ Gossip ] Starting a new round in p2p_exch", []),
-            {ok, State3} = cb_call(notify_change, [new_round, state_get({round, CBModule}, State2)], Msg, CBModule, State2),
-            State4 = select_reply_data(PData, Ref, old_round, OtherRound, Msg, CBModule, State3),
+            State3 = cb_notify_change(new_round, state_get({round, CBModule}, State2), CBModule, State2),
+            State4 = cb_select_reply_data(PData, Ref, old_round, OtherRound, Msg, CBModule, State3),
             comm:send(SourcePid, {new_round, CBModule, state_get({round, CBModule}, State4)}),
             State4;
         {enter_new_round, State2} ->
             ?TRACE_ROUND("[ Gossip ] Entering a new round in p2p_exch", []),
-            {ok, State3} = cb_call(notify_change, [new_round, state_get({round, CBModule}, State2)], Msg, CBModule, State2),
-            State4 = select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State3),
+            State3 = cb_notify_change(new_round, state_get({round, CBModule}, State2), CBModule, State2),
+            State4 = cb_select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State3),
             State4;
         {propagate_new_round, State2} -> % i.e. MyRound > OtherRound
             ?TRACE_ROUND("[ Gossip ] propagate round in p2p_exch", []),
-            State3 = select_reply_data(PData, Ref, old_round, OtherRound, Msg, CBModule, State2),
+            State3 = cb_select_reply_data(PData, Ref, old_round, OtherRound, Msg, CBModule, State2),
             comm:send(SourcePid, {new_round, CBModule, state_get({round, CBModule}, State3)}),
             State3
     end;
@@ -633,24 +629,21 @@ handle_msg({p2p_exch_reply, CBModule, SourcePid, QData, OtherRound}=Msg, State) 
     log:log(debug, "[ Gossip ] p2p_exch_reply, CBModule: ~w, QData ~w", [CBModule, QData]),
     case check_round(OtherRound, CBModule, State) of
         {ok, State1} ->
-            {_, State2} = cb_call(integrate_data, [QData, current_round, OtherRound], Msg, CBModule, State1),
-            State2;
+            cb_integrate_data(QData, current_round, OtherRound, Msg, CBModule, State1);
         {start_new_round, State1} -> % self is leader
             ?TRACE_ROUND("[ Gossip ] Starting a new round p2p_exch_reply", []),
-            {ok, State2} = cb_call(notify_change, [new_round, state_get({round, CBModule}, State1)], Msg, CBModule, State1),
-            {_, State3} = cb_call(integrate_data, [QData, old_round, OtherRound], Msg, CBModule, State2),
+            State2 = cb_notify_change(new_round, state_get({round, CBModule}, State1), CBModule, State1),
+            State3 = cb_integrate_data(QData, old_round, OtherRound, Msg, CBModule, State2),
             comm:send(SourcePid, {new_round, CBModule, state_get({round, CBModule}, State3)}),
             State3;
         {enter_new_round, State1} ->
             ?TRACE_ROUND("[ Gossip ] Entering a new round p2p_exch_reply", []),
-            {ok, State2} = cb_call(notify_change, [new_round, state_get({round, CBModule}, State1)], Msg, CBModule, State1),
-            {_, State3} = cb_call(integrate_data, [QData, current_round, OtherRound], Msg, CBModule, State2),
-            State3;
+            State2 = cb_notify_change(new_round, state_get({round, CBModule}, State1), CBModule, State1),
+            cb_integrate_data(QData, current_round, OtherRound, Msg, CBModule, State2);
         {propagate_new_round, State1} -> % i.e. MyRound > OtherRound
             ?TRACE_ROUND("[ Gossip ] propagate round in p2p_exch_reply", []),
             comm:send(SourcePid, {new_round, CBModule, state_get({round, CBModule}, State1)}),
-            {_, State2} = cb_call(integrate_data, [QData, old_round, OtherRound], Msg, CBModule, State1),
-            State2
+            cb_integrate_data(QData, old_round, OtherRound, Msg, CBModule, State1)
     end;
 
 
@@ -668,17 +661,17 @@ handle_msg({integrated_data, _CBModule, old_round}, State) ->
 %% pass messages for callback modules to the respective callback module
 %% messages to callback modules need to have the form {cb_reply, CBModule, Msg}.
 %% Use envelopes if necessary.
-handle_msg({cb_reply, CBModule, Msg}=FullMsg, State) ->
-    {ok, State1} = cb_call(handle_msg, [Msg], FullMsg, CBModule, State),
-    State1;
+handle_msg({cb_reply, CBModule, Msg}, State) ->
+    cb_handle_msg(Msg, CBModule, State);
+
 
 % round propagation message
-handle_msg({new_round, CBModule, NewRound}=Msg, State) ->
+handle_msg({new_round, CBModule, NewRound}, State) ->
     MyRound = state_get({round, CBModule}, State),
     if
         MyRound < NewRound ->
             ?TRACE_ROUND("[ Gossip ] Entering new round via round propagation message", []),
-            {ok, State1} = cb_call(notify_change, [new_round, NewRound], Msg, CBModule, State),
+            State1 = cb_notify_change(new_round, NewRound, CBModule, State),
             State2 = state_set({round, CBModule}, NewRound, State1),
             state_set({cycle, CBModule}, 0, State2);
         MyRound =:= NewRound -> % i.e. the round propagation msg was already received
@@ -692,16 +685,16 @@ handle_msg({new_round, CBModule, NewRound}=Msg, State) ->
 
 %% passes a get_values_best request to the callback module
 %% received from webhelpers and lb_psv_gossip
-handle_msg({get_values_best, CBModule, SourcePid}=Msg, State) ->
-    {BestValues, State1} = cb_call(get_values_best, [], Msg, CBModule, State),
+handle_msg({get_values_best, CBModule, SourcePid}, State) ->
+    {BestValues, State1} = cb_get_values_best(CBModule, State),
     comm:send_local(SourcePid, {gossip_get_values_best_response, BestValues}),
     State1;
 
 
 %% passes a get_values_all (all: current, previous and best values) request to
 %% the callback module
-handle_msg({get_values_all, CBModule, SourcePid}=Msg, State) ->
-    {{Prev, Current, Best}, State1} = cb_call(get_values_all, [], Msg, CBModule, State),
+handle_msg({get_values_all, CBModule, SourcePid}, State) ->
+    {{Prev, Current, Best}, State1} = cb_get_values_all(CBModule, State),
     comm:send_local(SourcePid,
         {gossip_get_values_all_response, Prev, Current, Best}),
     State1;
@@ -710,10 +703,10 @@ handle_msg({get_values_all, CBModule, SourcePid}=Msg, State) ->
 %% Received through stop_gossip_task/bulkowner
 %% Stops gossip tasks and cleans state of all garbage
 %% sets tombstone to handle possible subsequent request for already stopped tasks
-handle_msg({stop_gossip_task, CBModule}=Msg, State) ->
+handle_msg({stop_gossip_task, CBModule}, State) ->
     log:log(?SHOW, "[ Gossip ] Stopping ~w", [CBModule]),
     % shutdown callback module
-    {ok, State1} = cb_call(shutdown, [], Msg, CBModule, State),
+    State1 = cb_shutdown(CBModule, State),
 
     % delete callback module dependent entries from state
     State2 = state_remove_cb(CBModule, State1),
@@ -780,7 +773,6 @@ handle_trigger(TriggerInterval, State) ->
 
 -spec do_trigger_action(CBModule::cb_module(), State::state()) -> state().
 do_trigger_action(CBModule, State) ->
-    Msg = {trigger_action, CBModule},
     case state_get({trigger_lock, CBModule}, State) of
         free ->
             log:log(debug, "[ Gossip ] Module ~w got triggered", [CBModule]),
@@ -794,13 +786,13 @@ do_trigger_action(CBModule, State) ->
             State2 = state_set({exch_data, CBModule}, {undefined, undefined}, State1),
 
             %% request node (by the cb module or the bh module)
-            State3 = case cb_call(select_node, [], Msg, CBModule, State2) of
+            State3 = case cb_select_node(CBModule, State2) of
                 {true, NewState} -> NewState;
                 {false, NewState} -> request_random_node(CBModule), NewState
             end,
 
             %% request data
-            {ok, State4} = cb_call(select_data, [], Msg, CBModule, State3),
+            State4 = cb_select_data(CBModule, State3),
             State4;
         locked -> State % ignore trigger when within prepare-request phase
     end.
@@ -838,6 +830,7 @@ start_p2p_exchange(Peers, PData, CBModule, State)  ->
 %% Interacting with the Callback Modules
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
 %% called when activating gossip module
 -spec init_gossip_tasks(State::state()) -> state().
 init_gossip_tasks(State) ->
@@ -853,7 +846,7 @@ init_gossip_tasks(State) ->
 init_gossip_task(CBModule, Args, State) ->
 
     % initialize CBModule
-    {ok, CBState} = cb_call(init, [CBModule|Args], CBModule),
+    CBState = cb_init([CBModule|Args], CBModule),
     State1 = state_set({cb_state, CBModule}, CBState, State),
     State2 = lists:foldl(fun({Key, Value}, StateIn) -> state_set({Key, CBModule}, Value, StateIn) end,
                          State1,
@@ -868,7 +861,7 @@ init_gossip_task(CBModule, Args, State) ->
         false -> {no_leader, MyRange}
     end,
 
-    {ok, State3} = cb_call(notify_change, [leader, LeaderMsg], {no_msg}, CBModule, State2),
+    State3 = cb_notify_change(leader, LeaderMsg, CBModule, State2),
 
     % configure and add trigger
     TriggerInterval = cb_config(trigger_interval, CBModule) div 1000,
@@ -889,76 +882,182 @@ init_gossip_task(CBModule, Args, State) ->
     state_update(cb_modules, fun(CBModules) -> [CBModule|CBModules] end, State5).
 
 
--spec cb_config(FunName, CBModule) -> non_neg_integer() | pos_integer() when
+%% @doc Calls the config function FunName of the callback module.
+%%      Allowed config functions are:
+%%      <ul>
+%%          <li> fanout: the number of peers contacted per cycle </li>
+%%          <li> min_cycles_per_round: The minimum number of cycles per round </li>
+%%          <li> man_cycles_per_round: The maximum number of cycles per round </li>
+%%          <li> trigger_interval: The time interval in ms after which a new cycle
+%%                  is triggered </li>
+%%      </ul>
+-spec cb_config(FunName, CBModule) -> non_neg_integer() when
     is_subtype(FunName, fanout | min_cycles_per_round | max_cycles_per_round | trigger_interval),
     is_subtype(CBModule, cb_module()).
-cb_config(FunName, CBModule) ->
-    cb_call(FunName, [], CBModule).
-
--spec cb_call(FunName, Args, CBModule) -> Return when
-    is_subtype(FunName, init | fanout | min_cycles_per_round | max_cycles_per_round | trigger_interval),
-    is_subtype(Args, list()),
-    is_subtype(CBModule, cb_module()),
-    is_subtype(Return, non_neg_integer() | pos_integer() | {ok, any()}).
-cb_call(FunName, Args, CBModule) ->
-    {CBModuleName, _Id} = CBModule,
-    apply(CBModuleName, FunName, Args).
+cb_config(FunName, {ModuleName, _Id}) ->
+    apply(ModuleName, FunName, []).
 
 
-%% call to a callback module
-%% wraps some common functionaly of all calls to callback modules, like inserting
-%% the respective callback module's state and unpacking the ModuleName/InstanceId tuple
--spec cb_call(cb_fun_name(), list(), message(), cb_module(), state()) -> {Return, state()} when
-      is_subtype(Return, ok | discard_msg | send_back | boolean() |
-                    {any(), any(), any()}| [{Key::string(), Value::any()}]).
-cb_call(FunName, Args, Msg, CBModule={ModuleName, _InstanceId}, State) when is_atom(ModuleName) ->
-    ClientState = state_get({cb_state, CBModule}, State),
-    Args1 = Args ++ [ClientState],
-    ReturnTuple = apply(ModuleName, FunName, Args1),
-    case ReturnTuple of
-        {ok, ReturnedClientState} ->
-            log:log(debug, "[ Gossip ] cb_call: ReturnTuple: ~w, ReturendCBState ~w",
-                    [ReturnTuple, ReturnedClientState]),
-            {ok, state_set({cb_state, CBModule}, ReturnedClientState, State)};
-        {retry, ReturnedClientState} ->
-            State1 = msg_queue_add(Msg, State),
-            {discard_msg, state_set({cb_state, CBModule}, ReturnedClientState, State1)};
-        {discard_msg, ReturnedClientState} ->
-            {discard_msg, state_set({cb_state, CBModule}, ReturnedClientState, State)};
-        {send_back, ReturnedClientState} ->
-            case Msg of
-                {p2p_exch,_,SourcePid,_,_} ->
-                    comm:send(SourcePid, {send_error, comm:this(), Msg, message_rejected});
-                {p2p_exch_reply,_,SourcePid,_,_} ->
-                    comm:send(SourcePid, {send_error, comm:this(), Msg, message_rejected});
-                _Other ->
-                    log:log(error, "send_back on non backsendable msg")
-            end,
-            {send_back, state_set({cb_state, CBModule}, ReturnedClientState, State)};
-        {ReturnValue, ReturnedClientState} ->
-            log:log(debug, "[ Gossip ] cb_call: ReturnTuple: ~w, ReturnValue: ~w ReturendCBState: ~w",
-                [ReturnTuple, ReturnValue, ReturnedClientState]),
-            {ReturnValue, state_set({cb_state, CBModule}, ReturnedClientState, State)}
-    end.
+%% @doc Called upon startup and calls CBModule:init().
+%%      It calls the init function with the given arguments. It is usually used
+%%      to initialise the state of the callback module.
+-spec cb_init(Args::list(), cb_module()) -> CBState::any().
+cb_init(Args, {ModuleName, _Id}) ->
+    {ok, CBState} = apply(ModuleName, init, Args), CBState.
 
 
-%% special function for calls to CBModule:select_reply_data
-%% removes the reply_peer from the state of the gossip module
-%% This is necessary if the callback module will not send an selected_reply_data
-%% message (because the message is dscarded or sent back directly)
--spec select_reply_data(PData::gossip_beh:exch_data(), Ref::pos_integer(),
+%% @doc Called at the beginning of every cycle and calls CBModule:select_node().
+%%      Should return true, if the peer selection is to be done by behaviour module,
+%%      false otherwise. If false is returned, the behaviour module expects a
+%%      selected_peer message.
+-spec cb_select_node(cb_module(), state()) -> {boolean(), state()}.
+cb_select_node(CBModule, State) ->
+    cb_call(select_node, [], CBModule, State).
+
+
+%% @doc Called at the beginning of a cycle and calls CBModule:select_data().
+%%      The callback module has to select the exchange data to be sent to the
+%%      peer. The exchange data has to be sent back to the gossip module as a
+%%      message of the form {selected_data, Instance, ExchangeData}.
+-spec cb_select_data(cb_module(), state()) -> state().
+cb_select_data(CBModule, State) ->
+    {ok, State1} = cb_call(select_data, [], CBModule, State), State1.
+
+
+%% @doc Called upon a p2p_exch message and calls CBModule::select_reply_data().
+%%      Passes the PData from a p2p_exch request to the callback module. The callback
+%%      module has to select the exchange data to be sent to the peer. The Ref is
+%%      used by the behaviour module to identify the request.
+%%      The RoundStatus and Round information can be used for special handling
+%%      of messages from previous rounds.
+%%      The selected reply data is to be sent back to the behaviour module as a
+%%      message of the form {selected_reply_data, Instance, QData, Ref, Round}.
+%%      On certain return values, the reply_peer is removed from the state of the
+%%      gossip module. This is necessary if the callback module will not send an
+%%      selected_reply_data message (because the message is dscarded or sent back directly).
+-spec cb_select_reply_data(PData::gossip_beh:exch_data(), Ref::pos_integer(),
     RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(),
     Msg::message(), CBModule::cb_module(), State::state()) -> state().
-select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
-    case cb_call(select_reply_data, [PData, Ref, RoundStatus, Round], Msg, CBModule, State) of
+cb_select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
+    case cb_call(select_reply_data, [PData, Ref, RoundStatus, Round], CBModule, State) of
         {ok, State1} -> State1;
         {discard_msg, State1} ->
             {_Peer, State2} = take_reply_peer(Ref, State1),
             State2;
+        {retry, State1} ->
+            {_Peer, State2} = take_reply_peer(Ref, State1),
+            msg_queue_add(Msg, State2);
         {send_back, State1} ->
+            {p2p_exch, _, SourcePid, _, _} = Msg,
+            comm:send(SourcePid, {send_error, comm:this(), Msg, message_rejected}),
             {_Peer, State2} = take_reply_peer(Ref, State1),
             State2
     end.
+
+
+%% @doc Called by the upon a p2p_exch message and calls CBModule:integrate_data().
+%%      Passes the QData from a p2p_exch_reply to the callback module. Upon finishing
+%%      the processing of the data, a message of the form
+%%      {integrated_ data, Instance, RoundStatus} is to be sent to the gossip module.
+-spec cb_integrate_data(QData::gossip_beh:exch_data(), RoundStatus::gossip_beh:round_status(),
+                        OtherRound::non_neg_integer(), message(), cb_module(), state()) -> state().
+cb_integrate_data(QData, RoundStatus, OtherRound, Msg, CBModule, State) ->
+    {RetVal, State1} = cb_call(integrate_data, [QData, RoundStatus, OtherRound], CBModule, State),
+    if RetVal =:= retry ->
+           msg_queue_add(Msg, State1);
+       RetVal =:= send_back ->
+            {p2p_exch_reply,_,SourcePid,_,_} = Msg,
+            comm:send(SourcePid, {send_error, comm:this(), Msg, message_rejected}),
+            State1;
+       RetVal =:= ok orelse RetVal =:= discard_msg ->
+            State1
+    end.
+
+
+%% @doc Called upon messages of the form {cb_reply, CBModule, Msg} and calls
+%%      CBModule:handle_msg().
+%%      Passes the message Msg to the callback module, used to handle messages
+%%      for the callback module.
+-spec cb_handle_msg(comm:message(), cb_module(), state()) -> state().
+cb_handle_msg(Msg, CBModule, State) ->
+    {ok, State1} = cb_call(handle_msg, [Msg], CBModule, State), State1.
+
+
+%% @doc Called upon {get_values_best} messages and calls CBModule:get_values_best().
+%%      The callback module has to return the "best" values. What the "best" values
+%%      are depends on the gossip algorithm in question, but in general it refers
+%%      to the idea of properly converged values in a gossip based aggregation
+%%      protocol. The data type of BaseValues depends on the concrete callback module.
+-spec cb_get_values_best(cb_module(), state()) -> {BestValues::any(), state()}.
+cb_get_values_best(CBModule, State) ->
+    cb_call(get_values_best, [], CBModule, State).
+
+
+%% @doc Called upon {get_values_all} messages and calls CBModule:get_values_all.
+%%      The callback module has to return "all" values. What "all" values are
+%%      depends on the gossip algorithm in question, but in general it refers to
+%%      the idea that a callback module might keep values from multiple rounds.
+%%      The data type of AllValues depends on the concrete callback module.
+-spec cb_get_values_all(cb_module(), state()) ->
+    {{Previous::Values, Current::Values, Best::Values}, state()}.
+cb_get_values_all(CBModule, State) ->
+    cb_call(get_values_all, [], CBModule, State).
+
+
+%% @doc Called upon {web_debug_info} messages and calls CBModule:web_debug_info().
+%%      The callback module has to return debugging infos, to be displayed in the
+%%      Scalaris Web Debug Interface.
+-spec cb_web_debug_info(cb_module(), state()) ->
+    {[{Key::string(), Value::any()}], state()}.
+cb_web_debug_info(CBModule, State) ->
+    cb_call(web_debug_info, [], CBModule, State).
+
+
+%% @doc Called upon every p2p_exch/p2p_exch_reply message and calls
+%%      CBmodule:round_has_converged().
+%%      The callback module should return true if the current round has converged
+%%      to a stable value, false otherwise (refers to gossip based aggregation
+%%      protocols implementing a convergence criterion).
+-spec cb_round_has_converged(cb_module(), state()) -> {boolean(), state()}.
+cb_round_has_converged(CBModule, State) ->
+    cb_call(round_has_converged, [], CBModule, State).
+
+
+%% @doc Called to notify the callback module about certain state changes indepent
+%%      of the standard message loop.
+%%      Used to notify a callback module about
+%%      <ul>
+%%          <li> 'new_round': the starting of a new round </li>
+%%          <li> 'leader': changes in the key range of the node. The MsgTag indicates
+%%                  whether the node is a leader or not, the NewRange is the new
+%%                  key range of the node </li>
+%%          <li> 'exch_failure': a failed message delivery, including exchange
+%%                  Data and Round from the original message </li>
+%%      </ul>
+-spec cb_notify_change(Tag::new_round, Round::non_neg_integer(), cb_module(), state()) -> state();
+    (Tag::leader, {is_leader|no_leader, intervals:interval()}, cb_module(), state()) -> state();
+    (Tag::exch_failure, {MsgTag::atom(), Data::any(), Round::non_neg_integer()}, cb_module(), state()) -> state().
+cb_notify_change(Tag, Notification, CBModule, State) ->
+    {ok, State1} = cb_call(notify_change, [Tag,Notification], CBModule, State),
+    State1.
+
+
+%% @doc Called upon stop_gossip_task(CBModule) and calls CBModule:shutdown().
+%%      It should be the opposite of init() and do any necessary clean up.
+-spec cb_shutdown(cb_module(), state()) -> state().
+cb_shutdown(CBModule, State) ->
+    {ok, State1} = cb_call(shutdown, [], CBModule, State), State1.
+
+
+%% @doc Helper function for the cb_* functions.
+%%      Adds the state of the respective callback module to the Args, calls the
+%%      given function and repacks the returned client state.
+-spec cb_call(cb_fun_name(), list(), cb_module(), state()) -> {ReturnValue::any(), state()}.
+cb_call(FunName, Args, CBModule={ModuleName, _InstanceId}, State) when is_atom(ModuleName) ->
+    Args1 = Args ++ [state_get({cb_state, CBModule}, State)],
+    {ReturnValue, ReturnedCBState} = apply(ModuleName, FunName, Args1),
+    {ReturnValue, state_set({cb_state, CBModule}, ReturnedCBState, State)}.
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1024,7 +1123,7 @@ check_round(OtherRound, CBModule, State) ->
 is_end_of_round(CBModule, State) ->
     Cycles = state_get({cycle, CBModule}, State),
     ?TRACE_ROUND("[ Gossip ] check_end_of_round. Cycles: ~w", [Cycles]),
-    {RoundHasConverged, State1} = cb_call(round_has_converged, [], {no_msg}, CBModule, State),
+    {RoundHasConverged, State1} = cb_round_has_converged(CBModule, State),
     IsEndOfRound = Cycles >= cb_config(min_cycles_per_round, CBModule) andalso
         (   ( Cycles >= cb_config(max_cycles_per_round, CBModule)) orelse
         ( RoundHasConverged ) ),
@@ -1428,6 +1527,3 @@ init_gossip_task_feeder(CBModule, NoOfBuckets, State) ->
     %%       integer NoOfBuckets parameter
     %%       (other modules may have different parameters)
     {CBModule, [NoOfBuckets], State}.
-
-
-
