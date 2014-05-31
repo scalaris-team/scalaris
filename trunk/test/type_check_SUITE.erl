@@ -172,9 +172,17 @@ tester_type_check_gossip(_Config) ->
                 {handle_msg, 2}, % spec to wide, sends messages
                 {start_p2p_exchange, 4}, % would need valid peer
                 {init_gossip_task, 3}, % test via feeder
-                {cb_call, 3}, % unbounded_fun?
-                {cb_call, 5}, % spec to wide, sends messages
-                {select_reply_data, 7}, % would need to valid load_data
+                {cb_init, 2}, % spec to wide (Args)
+                {cb_select_data, 2}, % would need valid callback state
+                {cb_select_reply_data, 7}, % would need valid callback state
+                {cb_integrate_data, 6}, % would need valid callback state
+                {cb_handle_msg, 3}, % spec to wide (Msg)
+                {cb_get_values_best, 2}, % would need valid callback state
+                {cb_get_values_all, 2}, % would need valid callback state
+                {cb_web_debug_info, 2}, % would need valid callback state
+                {cb_round_has_converged, 2}, % would need valid callback state
+                {cb_notify_change, 4}, % would need valid callback state
+                {cb_call, 4}, % spec to wide
                 {check_round, 3}, % would need valid callback state
                 {is_end_of_round, 2}, % would need valid callback state
                 {state_update, 3} % tester can not create a value of type fun()
