@@ -285,7 +285,7 @@ on({del_watching_of_via_fd, Subscriber, Pid}, State) ->
 
 on({crashed, WatchedPid, _Warn} = Msg, State) ->
     ?TRACE("FD: crashed message via fd for watched pid ~p~n", [WatchedPid]),
-    forward_to_hbs(WatchedPid, Msg),
+    forward_to_hbs(WatchedPid, Msg, false),
     State;
 
 %% on({web_debug_info, _Requestor}, State) ->
@@ -317,16 +317,9 @@ on({crashed, WatchedPid, _Warn} = Msg, State) ->
 
 on({report_graceful_leave, Pid}, State) ->
     ?TRACE("FD: report_graceful_leave ~p~n", [Pid]),
-    % don't use forward_to_hbs/2 here since we don't want new hbd processes
-    % to be created!
-    FDPid = comm:get(fd, Pid),
-    case pdb:get(FDPid, fd_hbs) of
-        undefined -> ok;
-        Entry ->
-            HBSPid = element(2, Entry),
-            Msg = {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down},
-            comm:send_local(HBSPid, Msg)
-    end,
+    Msg = {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down},
+    % don't create new hbs processes!
+    forward_to_hbs(Pid, Msg, false),
     State.
 
 %%% Internal functions
@@ -347,15 +340,27 @@ start_and_register_hbs(FDPid) ->
     pdb:set({FDPid, NewHBS}, fd_hbs),
     NewHBS.
 
+%% @doc Forwards the given message to the registered HBS or creates a new HBS.
 -spec forward_to_hbs(comm:mypid(), comm:message()) -> ok.
 forward_to_hbs(Pid, Msg) ->
+    forward_to_hbs(Pid, Msg, true).
+
+%% @doc Forwards the given message to the registered hbs or either creates a
+%%      new hbs (if Create is true) or ignores the message (Create is false).
+-spec forward_to_hbs(comm:mypid(), comm:message(), Create::boolean()) -> ok.
+forward_to_hbs(Pid, Msg, Create) ->
     FDPid = comm:get(fd, Pid),
-    HBSPid = case pdb:get(FDPid, fd_hbs) of
-                 undefined -> % synchronously create new hb process
-                     start_and_register_hbs(FDPid);
-                 Entry -> element(2, Entry)
-             end,
-    comm:send_local(HBSPid, Msg).
+    case pdb:get(FDPid, fd_hbs) of
+        undefined when Create ->
+            % synchronously create new hb process
+            HBSPid = start_and_register_hbs(FDPid),
+            comm:send_local(HBSPid, Msg);
+        undefined ->
+            ok;
+        Entry ->
+            HBSPid = element(2, Entry),
+            comm:send_local(HBSPid, Msg)
+    end.
 
 %% @doc show subscriptions
 -spec subscriptions() -> ok.
