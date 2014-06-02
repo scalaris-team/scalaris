@@ -39,9 +39,10 @@
 -ifdef(have_callback_support).
 
 -type aggregates() :: any().
--type new_leader_msg() :: {is_leader|no_leader, NewRange::intervals:interval()}.
 -type round() :: non_neg_integer().
--type notify_keyword() :: new_round | leader | exch_failure.
+-type notify_tag() :: new_round | leader | exch_failure.
+-type notify_msg() :: {is_leader|no_leader, NewRange::intervals:interval()} |
+        {new_round, round()} | {MsgTag::p2p_exch | p2p_exch_reply, exch_data(), round()}.
 
 % Startup & Shutdown
 
@@ -83,7 +84,7 @@
 
 -callback round_has_converged(State::cb_state()) -> {boolean(), cb_state()}.
 
--callback notify_change(notify_keyword(), new_leader_msg(), State::cb_state()) ->
+-callback notify_change(notify_tag(), notify_msg(), State::cb_state()) ->
     {ok, cb_state()}.
 
 % Result extraction
