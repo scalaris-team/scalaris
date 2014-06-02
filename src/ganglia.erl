@@ -89,6 +89,10 @@ on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
 %% @doc handler for messages from failure detector
 %%     if a node crashes before sending out the load data
 %%     we ignore its load information
+on({crash, PID, jump, Cookie}, State) ->
+    % subscribe again (subscription was removed at fd)
+    fd:subscribe(PID, Cookie),
+    State;
 on({crash, _PID, _Reason, {ganglia, AggId}}, State) ->
     ?TRACE("Node failed~n",[]),
     CurAggId = get_agg_id(State),
