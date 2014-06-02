@@ -78,9 +78,9 @@
 
 -callback trigger_interval() -> pos_integer().
 
--callback min_cycles_per_round() -> non_neg_integer().
+-callback min_cycles_per_round() -> non_neg_integer() | infinity.
 
--callback max_cycles_per_round() -> pos_integer().
+-callback max_cycles_per_round() -> pos_integer() | infinity.
 
 -callback round_has_converged(State::cb_state()) -> {boolean(), cb_state()}.
 
