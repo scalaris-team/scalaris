@@ -222,7 +222,7 @@ on({periodic_alive_check}, State) ->
                            + failureDetectorInterval() div 3))},
       ?SEND_OPTIONS ++ [{shepherd, shepherd_new(0)}]),
     NewState = case 0 < timer:now_diff(Now, CrashedAfter) of
-                   true -> report_crash(State);
+                   true -> report_connection_crash(State);
                    false -> State
     end,
     %% trigger next timeout
@@ -253,11 +253,42 @@ on({send_retry, {send_error, Target, Message, _Reason} = Err, Count}, State) ->
             log:log(warn, "[ FD ] Sending ~.0p failed 3 times. "
                     "Report target ~.0p as crashed.~n", [Message, Target]),
             %% report whole node as crashed, when not reachable via tcp:
-            report_crash(State)
+            report_connection_crash(State)
     end;
 
-on({crashed, WatchedPid, Warn}, State) ->
+on({crashed, WatchedPid, Reason}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
+    report_crashed_remote_pid(State, WatchedPid, Reason, warn);
+
+on({report_crash, LocalPid, Reason}, State) ->
+    ?TRACE("fd_hbs crash reported ~.0p, ~.0p with reason ~.0p~n",
+           [WatchedPid, pid_groups:group_and_name_of(WatchedPid), Reason]),
+    % only allowed by self-monitoring hbs!
+    ?DBG_ASSERT(comm:make_local(state_get_rem_hbs(State)) =:= self()),
+    report_crashed_remote_pid(State, comm:make_global(LocalPid), Reason, nowarn);
+
+on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
+    ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n",
+           [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
+    %% send crash report to remote end.
+    GlobalPid = comm:make_global(WatchedPid),
+    comm:send(state_get_rem_hbs(State),
+              {crashed, GlobalPid, 'DOWN'}, ?SEND_OPTIONS),
+    %% delete WatchedPid and MonRef locally (MonRef is already
+    %% invalid, as Pid crashed)
+    _S1 = state_del_monitor(State, GlobalPid).
+
+%% @doc Checks existence and validity of config parameters for this module.
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_is_integer(failure_detector_interval) and
+    config:cfg_is_greater_than(failure_detector_interval, 0).
+
+%% @doc Reports a crashed connection to local subscribers.
+%% @private
+-spec report_crashed_remote_pid(state(), WatchedPid::comm:mypid(),
+                                Reason::fd:reason(), warn | nowarn) -> state().
+report_crashed_remote_pid(State, WatchedPid, Reason, Warn) ->
     %% inform all local subscribers
     Subscriptions = state_get_subscriptions(State, WatchedPid),
     %% only there because of delayed demonitoring?
@@ -284,11 +315,11 @@ on({crashed, WatchedPid, Warn}, State) ->
               {_, '$fd_nil'} ->
                   log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
                             [comm:this(), X, pid_groups:group_and_name_of(X)]),
-                  comm:send_local(X, {crash, WatchedPid});
+                  comm:send_local(X, {crash, WatchedPid, Reason});
               _ ->
                   log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p with ~.0p~n",
                             [comm:this(), X, pid_groups:group_and_name_of(X), Cookie]),
-                  comm:send_local(X, {crash, WatchedPid, Cookie})
+                  comm:send_local(X, {crash, WatchedPid, Reason, Cookie})
           end
           || {X, Cookie} <- Subscriptions ],
     %% delete from remote_pids
@@ -300,36 +331,12 @@ on({crashed, WatchedPid, Warn}, State) ->
                             state_del_entry(StAgg, {Sub, WatchedPid, Cook}),
                         Res
                 end,
-                S1, Subscriptions);
+                S1, Subscriptions).
 
-on({'DOWN', _Monref, process, WatchedPid, unittest_down}, State) ->
-    ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n", [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
-    %% send crash report to remote end.
-    comm:send(state_get_rem_hbs(State),
-              {crashed, comm:make_global(WatchedPid), nowarn}, ?SEND_OPTIONS),
-    %% delete WatchedPid and MonRef locally (MonRef is already
-    %% invalid, as Pid crashed)
-    _S1 = state_del_monitor(State, comm:make_global(WatchedPid));
-
-on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
-    ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n", [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
-    %% send crash report to remote end.
-    comm:send(state_get_rem_hbs(State),
-              {crashed, comm:make_global(WatchedPid), warn}, ?SEND_OPTIONS),
-    %% delete WatchedPid and MonRef locally (MonRef is already
-    %% invalid, as Pid crashed)
-    _S1 = state_del_monitor(State, comm:make_global(WatchedPid)).
-
-%% @doc Checks existence and validity of config parameters for this module.
--spec check_config() -> boolean().
-check_config() ->
-    config:cfg_is_integer(failure_detector_interval) and
-    config:cfg_is_greater_than(failure_detector_interval, 0).
-
-%% @doc Reports the crash to local subscribers.
+%% @doc Reports a crashed connection to local subscribers.
 %% @private
--spec report_crash(state()) -> kill.
-report_crash(State) ->
+-spec report_connection_crash(state()) -> kill.
+report_connection_crash(State) ->
     RemPids = state_get_rem_pids(State),
     case RemPids of
         [] ->
@@ -344,7 +351,7 @@ report_crash(State) ->
     comm:send_local(FD, {hbs_finished, state_get_rem_hbs(State)}),
     erlang:unlink(FD),
     _ = try
-            lists:foldl(fun(X, S) -> on({crashed, X, warn}, S) end,
+            lists:foldl(fun(X, S) -> on({crashed, X, noconnection}, S) end,
                         State, [ rempid_get_rempid(RemPidEntry)
                                  || RemPidEntry <- state_get_rem_pids(State)])
         catch _:_ -> ignore_exception

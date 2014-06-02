@@ -84,8 +84,8 @@
     misc_message() |
     snapshot_message() |
     {zombie, Node::node:node_type()} |
-    {crash, DeadPid::comm:mypid()} |
-    {crash, DeadPid::comm:mypid(), Cookie::tuple()} |
+    {crash, DeadPid::comm:mypid(), Reason::fd:reason()} |
+    {crash, DeadPid::comm:mypid(), Reason::fd:reason(), Cookie::tuple()} |
     {leave, SourcePid::comm:erl_local_pid() | null}.
 
 %% @doc message handler
@@ -436,11 +436,12 @@ on({get_dht_nodes_response, _KnownHosts}, State) ->
     State;
 
 % failure detector, dead node cache
-on({crash, DeadPid, Cookie}, State) when is_tuple(Cookie) andalso element(1, Cookie) =:= move->
-    dht_node_move:crashed_node(State, DeadPid, Cookie);
-on({crash, DeadPid}, State) ->
+on({crash, DeadPid, Reason, Cookie}, State) when is_tuple(Cookie) andalso
+                                                     element(1, Cookie) =:= move->
+    dht_node_move:crashed_node(State, DeadPid, Reason, Cookie);
+on({crash, DeadPid, Reason}, State) ->
     RMState = dht_node_state:get(State, rm_state),
-    RMState1 = rm_loop:crashed_node(RMState, DeadPid),
+    RMState1 = rm_loop:crashed_node(RMState, DeadPid, Reason),
     % TODO: integrate crash handler for join
     dht_node_state:set_rm(State, RMState1);
 

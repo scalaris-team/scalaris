@@ -283,7 +283,7 @@ reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(
                 send_error ->
                     comm:send(node:pidX(Succ), {move, {send_error, comm:this(), Msg, unittest}, MoveId});
                 crash ->
-                    comm:send(node:pidX(Succ), {crash, comm:this(), {move, MoveId}});
+                    comm:send(node:pidX(Succ), {crash, comm:this(), 'DOWN', {move, MoveId}});
                 abort ->
                     dht_node_join:reject_join_response(Succ, Pred, MoveId, CandId)
             end;
@@ -304,7 +304,7 @@ reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(
                 abort ->
                     dht_node_join:reject_join_response(Succ, Pred, MoveId, CandId);
                 crash ->
-                    comm:send(node:pidX(Succ), {crash, comm:this(), {move, MoveId}})
+                    comm:send(node:pidX(Succ), {crash, comm:this(), 'DOWN', {move, MoveId}})
             end;
         _ -> ok
     end,

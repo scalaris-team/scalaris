@@ -42,7 +42,7 @@
          notify_slide_finished/1,
          propose_new_neighbors/1,
          % received at dht_node, (also) handled here:
-         crashed_node/2, zombie_node/2,
+         crashed_node/3, zombie_node/2,
          % node/neighborhood change subscriptions:
          subscribe/5, unsubscribe/2,
          subscribe_dneighbor_change_filter/3,
@@ -365,9 +365,9 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
     end.
 
 % failure detector reported dead node
--spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
-crashed_node(State, DeadPid) ->
-    RMFun = fun(RM_State) -> ?RM:crashed_node(RM_State, DeadPid) end,
+-spec crashed_node(State::state(), DeadPid::comm:mypid(), Reason::fd:reason()) -> state().
+crashed_node(State, DeadPid, Reason) ->
+    RMFun = fun(RM_State) -> ?RM:crashed_node(RM_State, DeadPid, Reason) end,
     NewState = update_state(State, RMFun, DeadPid),
     case config:read(rrepair_after_crash) of
         true ->

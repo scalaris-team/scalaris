@@ -96,8 +96,8 @@ init_stabilize(Neighbors, RT) ->
 
 %% userdevguide-begin rt_chord:filter_dead_node
 %% @doc Removes dead nodes from the routing table.
--spec filter_dead_node(rt(), comm:mypid()) -> rt().
-filter_dead_node(RT, DeadPid) ->
+-spec filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
+filter_dead_node(RT, DeadPid, _Reason) ->
     DeadIndices = [Index || {Index, Node}  <- gb_trees:to_list(RT),
                             node:same_process(Node, DeadPid)],
     lists:foldl(fun(Index, Tree) -> gb_trees:delete(Index, Tree) end,

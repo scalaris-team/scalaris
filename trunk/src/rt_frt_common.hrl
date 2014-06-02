@@ -225,8 +225,8 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 %% userdevguide-begin rt_frtchord:filter_dead_node
 %% @doc Removes dead nodes from the routing table (rely on periodic
 %%      stabilization here).
--spec filter_dead_node(rt(), comm:mypid()) -> rt().
-filter_dead_node(RT, DeadPid) ->
+-spec filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
+filter_dead_node(RT, DeadPid, _Reason) ->
     % find the node id of DeadPid and delete it from the RT
     case [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid] of
         [Node] -> entry_delete(node:id(Node), RT);

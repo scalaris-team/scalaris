@@ -184,7 +184,7 @@ pause_node(DhtNodeSupPid) ->
              false -> ok
          end || Pid <- DhtNodeSupChilds],
 
-    _ = [ comm:send_local(fd, {report_graceful_leave, comm:make_global(Pid)})
+    _ = [ comm:send_local(fd, {report_crash, Pid, 'DOWN'})
           || Pid <- DhtNodeSupChilds],
 
     pid_groups:hide(GroupName),

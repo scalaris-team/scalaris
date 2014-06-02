@@ -89,8 +89,8 @@ update(_OldRT, _OldNeighbors, NewNeighbors) ->
 %% userdevguide-begin rt_simple:filter_dead_node
 %% @doc Removes dead nodes from the routing table (rely on periodic
 %%      stabilization here).
--spec filter_dead_node(rt(), comm:mypid()) -> rt().
-filter_dead_node(RT, _DeadPid) -> RT.
+-spec filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
+filter_dead_node(RT, _DeadPid, _Reason) -> RT.
 %% userdevguide-end rt_simple:filter_dead_node
 
 %% userdevguide-begin rt_simple:to_pid_list

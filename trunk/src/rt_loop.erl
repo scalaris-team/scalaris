@@ -50,7 +50,7 @@
     {trigger_rt} | %% just for periodic wake up
     {periodic_rt_rebuild} | %% actually initiate a rt rebuild
     {update_rt, OldNeighbors::nodelist:neighborhood(), NewNeighbors::nodelist:neighborhood()} |
-    {crash, DeadPid::comm:mypid()} |
+    {crash, DeadPid::comm:mypid(), Reason::fd:reason()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {dump, Pid::comm:erl_local_pid()} |
     ?RT:custom_message()).
@@ -172,8 +172,8 @@ on_active({periodic_rt_rebuild}, {Neighbors, OldRT}) ->
 %% userdevguide-end rt_loop:trigger
 
 % failure detector reported dead node
-on_active({crash, DeadPid}, {Neighbors, OldRT}) ->
-    NewRT = ?RT:filter_dead_node(OldRT, DeadPid),
+on_active({crash, DeadPid, Reason}, {Neighbors, OldRT}) ->
+    NewRT = ?RT:filter_dead_node(OldRT, DeadPid, Reason),
     ?RT:check(OldRT, NewRT, Neighbors, false),
     new_state(Neighbors, NewRT);
 
