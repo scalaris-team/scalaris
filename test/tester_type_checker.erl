@@ -192,6 +192,7 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             check_union(Value, Type, CheckStack, ParseState);
         _ ->
             ct:pal("Type checker: unsupported type: ~p", [Type]),
+            ?DBG_ASSERT2(false, "unknown type"),
             {false, [{type_checker_unsupported_type, Type} | CheckStack]}
     end.
 
