@@ -401,7 +401,7 @@ select_reply_data(PData, Ref, RoundStatus, Round, {PrevState, CurState}) ->
 %%          messages from previous rounds <br/>
 %%      State: the state of the gossip_load module <br/>
 %%      Upon finishing the processing of the data, a message of the form
-%%      {integrated_§data, Instance, RoundStatus} is to be sent to the gossip module.
+%%      {integrated_data, Instance, RoundStatus} is to be sent to the gossip module.
 -spec integrate_data(QData::data(), RoundStatus::gossip_beh:round_status(),
     Round::round(), FullState::full_state()) ->
     {discard_msg | ok | retry | send_back, full_state()}.
