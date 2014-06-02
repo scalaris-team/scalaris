@@ -619,14 +619,14 @@ on({update_snapno, SnapNo}, State) ->
     state_set_local_snapno(State, SnapNo);
 
 %% failure detector events
-on({crash, Pid, _Cookie}, State) ->
+on({crash, Pid, Reason, _Cookie}, State) ->
     %% in tx_tm and rtm processes! (rtms subscribe to the tm for running tx)
-    on({crash, Pid}, State);
-on({crash, Pid}, State) ->
+    on({crash, Pid, Reason}, State);
+on({crash, Pid, Reason}, State) ->
     ?TRACE_RTM_MGMT("tx_tm_rtm:on({crash,...}) of Pid ~p~n", [Pid]),
     %% in tx_tm and rtm processes! (rtms subscribe to the tm for running tx)
-    handle_crash(Pid, State, on);
-%% on({crash, _Pid, _Cookie},
+    handle_crash(Pid, Reason, State, on);
+%% on({crash, _Pid, _Reason, _Cookie},
 %%    {_RTMs, _TableName, _Role, _LAcceptor, _GLLearner} = State) ->
 %%     ?TRACE("tx_tm_rtm:on:crash of ~p in Transaction ~p~n", [_Pid, binary_to_term(_Cookie)]),
 %%     %% @todo should we take over, if the TM failed?
@@ -775,11 +775,11 @@ on_init({?register_TP, {Tid, _ItemId, _PaxosID, _TP}} = Msg, State) ->
         false ->
             on(Msg, State)
     end;
-on_init({crash, Pid, _Cookie}, State) ->
-    on_init({crash, Pid}, State);
-on_init({crash, Pid}, State) ->
+on_init({crash, Pid, Reason, _Cookie}, State) ->
+    on_init({crash, Pid, Reason}, State);
+on_init({crash, Pid, Reason}, State) ->
     %% only in tx_tm
-    handle_crash(Pid, State, on_init).
+    handle_crash(Pid, Reason, State, on_init).
 
 %% functions for periodic RTM updates
 -spec rtm_update_trigger(rtms()) -> ok.
@@ -1156,12 +1156,12 @@ get_failed_keys(TxState, State) ->
                   length(Result), '=/=', NumAbort}),
     Result.
 
--spec handle_crash(pid(), state(), on | on_init)
+-spec handle_crash(pid(), Reason::fd:reason(), state(), on | on_init)
                   -> state() |
                      {'$gen_component',
                       [{on_handler, fun((comm:message(), state()) -> state())}],
                       state()}.
-handle_crash(Pid, State, Handler) ->
+handle_crash(Pid, _Reason, State, Handler) ->
     %% tm: update rtms
     %% rtm: take over tx
 

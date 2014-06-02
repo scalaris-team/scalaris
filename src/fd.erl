@@ -26,7 +26,7 @@
 -include("scalaris.hrl").
 
 -ifdef(with_export_type_support).
--export_type([cookie/0]).
+-export_type([cookie/0, reason/0]).
 -endif.
 
 -export([subscribe/1, subscribe/2, subscribe_refcount/2, subscribe_pid/2,
@@ -34,7 +34,7 @@
 -export([unsubscribe/1, unsubscribe/2, unsubscribe_refcount/2,
          unsubscribe_pid/2, unsubscribe_pid/3]).
 -export([update_subscriptions/2, update_subscriptions_pid/3]).
--export([report_graceful_leave/0]).
+-export([report_my_crash/1]).
 %% gen_server & gen_component callbacks
 -export([start_link/1, init/1, on/2]).
 
@@ -42,6 +42,7 @@
 -export([subscriptions/0]).
 
 -type cookie() :: {pid(), '$fd_nil'} | any().
+-type reason() :: 'DOWN' | noconnection | term().
 -type state() :: ok.
 
 -define(SEND_OPTIONS, [{channel, prio}]).
@@ -210,15 +211,15 @@ update_subscriptions(OldPids, NewPids) ->
 
 %% @doc Reports the calling process' group as being shut down due to a graceful
 %%      leave operation.
--spec report_graceful_leave() -> ok.
-report_graceful_leave() ->
+-spec report_my_crash(Reason::reason()) -> ok.
+report_my_crash(Reason) ->
     case pid_groups:get_my(sup_dht_node) of
         failed ->
-            log:log(error, "[ FD ] call to report_graceful_leave() from ~p "
-                           "outside a valid dht_node group!", [self()]);
+            log:log(error, "[ FD ] call to report_my_crash(~p) from ~p "
+                           "outside a valid dht_node group!", [Reason, self()]);
         DhtNodeSupPid ->
             FD = my_fd_pid(),
-            _ = [ comm:send_local(FD, {report_graceful_leave, comm:make_global(X)})
+            _ = [ comm:send_local(FD, {report_crash, X, Reason})
                     || X <- sup:sup_get_all_children(DhtNodeSupPid)],
             ok
     end.
@@ -315,11 +316,12 @@ on({crashed, WatchedPid, _Warn} = Msg, State) ->
 %%     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
 %%     State;
 
-on({report_graceful_leave, Pid}, State) ->
-    ?TRACE("FD: report_graceful_leave ~p~n", [Pid]),
-    Msg = {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down},
+on({report_crash, LocalPid, Reason}, State) ->
+    ?TRACE("FD: report_crash ~p with reason ~p~n", [Pid, Reason]),
+    ?DBG_ASSERT(is_pid(LocalPid)),
+    Msg = {report_crash, LocalPid, Reason},
     % don't create new hbs processes!
-    forward_to_hbs(Pid, Msg, false),
+    forward_to_hbs(comm:make_global(LocalPid), Msg, false),
     State.
 
 %%% Internal functions

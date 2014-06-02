@@ -246,7 +246,7 @@ collect(Length, L, Print) ->
              ?IIF(Print, io:format("BS: ~p @ ~p~n",[WallClockTime, X]), ok),
              collect(Length - 1, [{WallClockTime, MinTime, MeanTime, MaxTime, Variance, Aborts} | L], Print)
           end);
-        ?SCALARIS_RECV({crash, Pid}, %% ->
+        ?SCALARIS_RECV({crash, Pid, _Reason}, %% ->
            begin
                ?IIF(Print, io:format("ignoring ~p, because it crashed", [Pid]), ok),
                collect(Length - 1, L, Print)

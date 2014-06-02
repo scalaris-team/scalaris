@@ -41,7 +41,7 @@
                    {ganglia_periodic} |
                    {ganglia_dht_load_aggregation, DHTNode :: pid(), AggId :: non_neg_integer(), message()} |
                    {ganglia_vivaldi_confidence, pid(), message()} |
-                   {crash, PID :: pid(), {ganglia, AggId :: non_neg_integer()}}.
+                   {crash, PID::comm:mypid(), Reason::fd:reason(), {ganglia, AggId::non_neg_integer()}}.
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
@@ -89,7 +89,7 @@ on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
 %% @doc handler for messages from failure detector
 %%     if a node crashes before sending out the load data
 %%     we ignore its load information
-on({crash, _PID, {ganglia, AggId}}, State) ->
+on({crash, _PID, _Reason, {ganglia, AggId}}, State) ->
     ?TRACE("Node failed~n",[]),
     CurAggId = get_agg_id(State),
     if

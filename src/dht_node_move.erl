@@ -44,7 +44,7 @@
 -export([process_move_msg/2, send_trigger/0,
          make_slide/5,
          make_slide_leave/2, make_jump/4,
-         crashed_node/3,
+         crashed_node/4,
          check_config/0]).
 % for dht_node_join:
 -export([send/3, send_no_slide/3,
@@ -1086,7 +1086,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg) ->
           TargetId::?RT:key(), Tag::any(), SourcePid::comm:mypid() | null})
         -> dht_node_state:state().
 finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
-    fd:report_graceful_leave(),
+    fd:report_my_crash('DOWN'),
     State1 = finish_slide(State, SlideOp),
     SupDhtNodeId = erlang:get(my_sup_dht_node_id),
     SupDhtNode = pid_groups:get_my(sup_dht_node),
@@ -1097,7 +1097,7 @@ finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
     State1;
 finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
     NewId = slide_op:get_jump_target_id(SlideOp),
-    fd:report_graceful_leave(),
+    fd:report_my_crash(jump),
     State1 = finish_slide(State, SlideOp),
 
     %% Rejoin at NewId but keep processes
@@ -1485,9 +1485,11 @@ abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, Notify
     end.
 
 % failure detector reported dead node
--spec crashed_node(State::dht_node_state:state(), DeadPid::comm:mypid(), Cookie::{move, MoveFullId::slide_op:id()}) -> dht_node_state:state().
-crashed_node(MyState, _DeadPid, {move, MoveFullId} = _Cookie) ->
-    ?TRACE1({crash, _DeadPid, _Cookie}, MyState),
+-spec crashed_node(State::dht_node_state:state(), DeadPid::comm:mypid(),
+                   Reason::fd:reason(), Cookie::{move, MoveFullId::slide_op:id()})
+        -> dht_node_state:state().
+crashed_node(MyState, _DeadPid, _Reason, {move, MoveFullId} = _Cookie) ->
+    ?TRACE1({crash, _DeadPid, _Reason, _Cookie}, MyState),
     WorkerFun =
         fun(SlideOp, State) ->
                 abort_slide(State, SlideOp, target_down, false)

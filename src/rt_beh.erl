@@ -43,7 +43,7 @@
 -callback update(OldRT::rt(), OldNeighbors::nodelist:neighborhood(),
                  NewNeighbors::nodelist:neighborhood())
         -> {trigger_rebuild, rt()} | {ok, rt()}.
--callback filter_dead_node(rt(), comm:mypid()) -> rt().
+-callback filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
 
 -callback to_pid_list(rt()) -> [comm:mypid()].
 -callback get_size(rt() | external_rt()) -> non_neg_integer().
@@ -90,7 +90,7 @@ behaviour_info(callbacks) ->
      % adapt RT to changed neighborhood
      {update, 3},
      % dead nodes filtering
-     {filter_dead_node, 2},
+     {filter_dead_node, 3},
      % statistics
      {to_pid_list, 1}, {get_size, 1},
      % gets all (replicated) keys for a given (hashed) key

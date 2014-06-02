@@ -23,7 +23,7 @@
 
 -export([init_first/0, init/3, trigger_action/1, handle_custom_message/2,
          trigger_interval/0,
-         zombie_node/2, crashed_node/2,
+         zombie_node/2, crashed_node/3,
          new_pred/2, new_succ/2,
          leave/1, remove_pred/3, remove_succ/3, remove_node/2,
          update_node/2, contact_new_nodes/1,
