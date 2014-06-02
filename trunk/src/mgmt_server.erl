@@ -81,6 +81,10 @@ node_list(UseShepherd) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec on(message(), state()) -> state().
+on({crash, PID, jump}, Nodes) ->
+    % subscribe again (subscription was removed at fd)
+    fd:subscribe(PID),
+    Nodes;
 on({crash, PID, _Reason}, Nodes) ->
     case gb_trees:lookup(PID, Nodes) of
         {value, Node} -> dn_cache:add_zombie_candidate(Node),
