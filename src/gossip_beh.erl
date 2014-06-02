@@ -43,11 +43,12 @@
 -type round() :: non_neg_integer().
 -type notify_keyword() :: new_round | leader | exch_failure.
 
-% Startup
+% Startup & Shutdown
 
 -callback init(Instance::instance()) -> {ok, cb_state()}.
 -callback init(Instance::instance(), Arg1::any()) -> {ok, cb_state()}.
 -callback init(Instance::instance(), Arg1::any(), Arg2::any()) -> {ok, cb_state()}.
+-callback shutdown(State::cb_state()) -> {ok, shutdown}.
 
 % Gossiping Message Loop
 
@@ -101,6 +102,7 @@
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
   [ {init, 1}, {init, 2}, {init, 3},
+    {shutdown, 1},
     {select_node, 1},
     {select_data, 1},
     {select_reply_data, 5},
