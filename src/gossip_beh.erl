@@ -26,15 +26,13 @@
 -endif.
 
 -ifdef(with_export_type_support).
--export_type([exch_data/0, round_status/0, cb_return/0, instance/0]).
+-export_type([exch_data/0, round_status/0, instance/0]).
 -endif.
 
 %% cb: callback
 -type cb_state() :: any().
 -type instance() :: {CBModule::module(), InstanceId:: atom() | uid:global_uid()}.
 -type exch_data() :: any().
--type cb_return() :: {discard_msg | boolean() | ok | retry | send_back,
-                      cb_state()}.
 -type round_status() :: 'current_round' | 'old_round'.
 
 % Erlang version >= R15B
@@ -47,30 +45,30 @@
 
 % Startup
 
--callback init(Instance::instance()) -> cb_return().
--callback init(Instance::instance(), Arg1::any()) -> cb_return().
--callback init(Instance::instance(), Arg1::any(), Arg2::any()) -> cb_return().
+-callback init(Instance::instance()) -> {ok, cb_state()}.
+-callback init(Instance::instance(), Arg1::any()) -> {ok, cb_state()}.
+-callback init(Instance::instance(), Arg1::any(), Arg2::any()) -> {ok, cb_state()}.
 
 % Gossiping Message Loop
 
--callback select_node(State::cb_state()) -> {true|false, cb_state()}.
+-callback select_node(State::cb_state()) -> {boolean(), cb_state()}.
 
 -callback select_data(State::cb_state()) ->
     % has to initiate {selected_data, CBModule::module(), PData::exch_data()}
-    cb_return().
+    {ok, cb_state()}.
 
 -callback select_reply_data(PData::exch_data(), Ref::pos_integer(),
     RoundStatus::round_status(), Round::round(), State::cb_state()) ->
     % has to initiate {selected_reply_data, CBModule::module(), QData::exch_data()}
-    cb_return().
+    {ok | discard_msg | retry | send_back, cb_state()}.
 
 -callback integrate_data(Data::exch_data(), RoundStatus::round_status(),
     Round::round(), State::cb_state()) ->
     % has to initiate {integrated_data, CBModule::module()}
-    cb_return().
+    {ok | discard_msg | retry | send_back, cb_state()}.
 
 -callback handle_msg(Message::comm:message(), State::cb_state()) ->
-    cb_return().
+    {ok, cb_state()}.
 
 % Config and Misc
 
@@ -84,7 +82,8 @@
 
 -callback round_has_converged(State::cb_state()) -> {boolean(), cb_state()}.
 
--callback notify_change(notify_keyword(), new_leader_msg(), State::cb_state()) -> cb_return().
+-callback notify_change(notify_keyword(), new_leader_msg(), State::cb_state()) ->
+    {ok, cb_state()}.
 
 % Result extraction
 
