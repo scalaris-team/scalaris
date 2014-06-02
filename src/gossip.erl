@@ -109,7 +109,7 @@
 %%      processes the received data and signals to the behaviour module the
 %%      completion with an integrated_data message. On a conceptual level, a full
 %%      cycle is finished at this point and the behaviour module counts cycles
-%%      by counting the \inline$integrated_§data$ messages. Due to the uncertainties
+%%      by counting the integrated_data messages. Due to the uncertainties
 %%      of message delays and local clock drift it should be clear however, that
 %%      this can only be an approximation. For instance, a new cycle could have
 %%      been started before the reply to the current request has been received
@@ -302,10 +302,12 @@ activate(MyRange) ->
                               fun gossip:rm_send_activation_msg/5, 1)
     end.
 
+
 -spec deactivate() -> ok.
 deactivate() ->
     GossipPid = pid_groups:get_my(gossip),
     comm:send_local(GossipPid, {deactivate_gossip}).
+
 
 %% @doc Globally removes all tombstones from previously stopped callback modules.
 -spec remove_all_tombstones() -> ok.
@@ -425,13 +427,13 @@ on_inactive(_Msg, State) ->
 %% @doc Message handler during the normal operation of the gossip module.
 %% @end
 
-%% This message is received from self() from init_gossip_task or through
-%% start_gossip_task()/bulkowner
 -spec on_active(Msg::message(), State::state()) -> state().
 on_active({deactivate_gossip}, _State) ->
     rm_loop:unsubscribe(self(), ?MODULE),
     gen_component:change_handler(#state{}, fun ?MODULE:on_inactive/2);
 
+%% This message is received from self() from init_gossip_task or through
+%% start_gossip_task()/bulkowner
 on_active({start_gossip_task, CBModule, Args}, State) ->
     CBModules = state_get(cb_modules, State),
     State1 = case lists:member(CBModule, CBModules) of
