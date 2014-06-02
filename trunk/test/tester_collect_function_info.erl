@@ -411,7 +411,6 @@ parse_type_({ann_type,_Line,[Left,Right]}, _Module, ParseState) ->
     {{ann_type, [Left, Right]}, ParseState};
 parse_type_(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
-    ?DBG_ASSERT2(false, "unknown type found"),
     {unkown, ParseState}.
 
 -spec parse_type_list/3 :: (list(type_spec()), module(), tester_parse_state:state()) ->
