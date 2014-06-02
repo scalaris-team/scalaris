@@ -1108,18 +1108,23 @@ finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
     OtherNodes = tl(nodelist:to_list(Neighborhood)),
     BootstrapNodes = [node:pidX(Node) || Node <- OtherNodes],
     %% reply after join is complete
-    NotifyPid = slide_op:get_source_pid(SlideOp),
-    NotifyTag = slide_op:get_tag(SlideOp),
-    NotifyMsg = {move, result, NotifyTag, ok},
-    Options = [{{dht_node, id}, NewId}, {my_sup_dht_node_id, SupDhtNodeId},
-               {notify, {NotifyPid, NotifyMsg}},
-               {bootstrap_nodes, BootstrapNodes}],
-    NewOptions =
-        case config:read(lb_active_and_psv) of
-            true -> Options;
-            _    -> [{skip_psv_lb} | Options]
+    JumpTag = slide_op:get_tag(SlideOp),
+    JumpOptions =
+        case slide_op:get_source_pid(SlideOp) of
+            null -> [];
+            Pid ->
+                Msg = {move, result, JumpTag, ok},
+                [{notify, Pid, Msg}]
         end,
-    comm:send_local(self(), {rejoin, NewId, NewOptions}),
+    JoinOptions = [{{dht_node, id}, NewId}, {my_sup_dht_node_id, SupDhtNodeId},
+                   {jump, JumpTag, JumpOptions},
+                   {bootstrap_nodes, BootstrapNodes}],
+    JoinOptions2 =
+        case config:read(lb_active_and_psv) of
+            true -> JoinOptions;
+            _    -> [{skip_psv_lb} | JoinOptions]
+        end,
+    comm:send_local(self(), {rejoin, NewId, JoinOptions2}),
     State1;
 finish_delta_ack2B(State, SlideOp, {none}) ->
     finish_slide_and_continue_with_next_op(State, SlideOp);
