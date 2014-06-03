@@ -459,16 +459,7 @@ on({local_snapshot_is_done}, State) ->
     snapshot:on_local_snapshot_is_done(State);
 
 on({rejoin, Id, Options}, State) ->
-    %% clean up
-    rt_loop:deactivate(),
-    cyclon:deactivate(),
-    vivaldi:deactivate(),
-    dc_clustering:deactivate(),
-    gossip:deactivate(),
-    dht_node_reregister:deactivate(),
-    service_per_vm:deregister_dht_node(comm:this()),
-    dn_cache:unsubscribe(),
-    %% start join
+    %% start new join
     comm:send_local(self(), {join, start}),
     IdVersion = node:id_version(dht_node_state:get(State, node)),
     dht_node_join:join_as_other(Id, IdVersion+1, Options).
