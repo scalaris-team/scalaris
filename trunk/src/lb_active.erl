@@ -28,7 +28,7 @@
 %-define(TRACE(X,Y), io:format("lb_active: " ++ X, Y)).
 
 %% startup
--export([start_link/1, check_config/0, is_enabled/0]).
+-export([start_link/1, check_config/0, is_enabled/0, check_gossip_modules/2]).
 %% gen_component
 -export([init/1, on/2]).
 %% for calls from the dht node
@@ -576,13 +576,13 @@ gossip_available(Options) ->
 is_simulation(Options) ->
     proplists:is_defined(simulate, Options).
 
--spec check_for_gossip_modules() -> boolean().
-check_for_gossip_modules() ->
-    RequiredModule = lb_active_gossip_request_metric,
+-spec check_gossip_modules(atom(), atom()) -> boolean().
+check_gossip_modules(RequiredModule, DependencyKey) ->
     Fun = fun(Value) -> lists:member(RequiredModule, Value) end,
-    Msg = io_lib:format("~p required when lb_active_use_gossip enabled.~n", [RequiredModule]),
-    not config:read(lb_active) orelse not config:read(lb_active_use_gossip) orelse
-        config:cfg_test_and_error(gossip_load_additional_modules, Fun, Msg).
+    Dependency = config:read(DependencyKey),
+    Msg = io_lib:format("~p required when ~p =:= ~p.",
+                        [RequiredModule, DependencyKey, Dependency]),
+    config:cfg_test_and_error(gossip_load_additional_modules, Fun, Msg).
 
 -spec check_module_config() -> boolean().
 check_module_config() ->
@@ -604,7 +604,8 @@ check_config() ->
     config:cfg_is_integer(lb_active_wait_for_pending_ops) and
     config:cfg_is_greater_than(lb_active_wait_for_pending_ops, 0) and
 
-    check_for_gossip_modules() and
+    (config:read(lb_active_use_gossip) =:= false orelse
+         check_gossip_modules(lb_active_gossip_request_metric, lb_active_use_gossip)) and
 
     lb_stats:check_config() and
 

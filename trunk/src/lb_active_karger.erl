@@ -295,9 +295,15 @@ check_config() ->
     config:cfg_is_integer(lb_active_karger_interval) and
     config:cfg_is_greater_than(lb_active_karger_interval, 0) and
 
-    config:cfg_is_float(lb_active_karger_epsilon) and
-    config:cfg_is_greater_than(lb_active_karger_epsilon, 0.0) and
-    config:cfg_is_less_than(lb_active_karger_epsilon, 0.25) and
+    (config:read(lb_active_karger_epsilon) =/= self_tuning orelse
+     lb_active:check_gossip_modules(lb_active_gossip_load_metric, lb_active_karger_epsilon)
+    ) and
+
+    (config:read(lb_active_karger_epsilon) =:= self_tuning orelse
+     config:cfg_is_float(lb_active_karger_epsilon) and
+     config:cfg_is_greater_than(lb_active_karger_epsilon, 0.0) and
+     config:cfg_is_less_than(lb_active_karger_epsilon, 0.25)
+    ) and
 
     config:cfg_is_integer(lb_active_karger_rnd_nodes) and
     config:cfg_is_greater_than_equal(lb_active_karger_rnd_nodes, 1) and
