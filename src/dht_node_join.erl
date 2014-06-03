@@ -944,10 +944,11 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages, IsJump) ->
     % wait for the ring maintenance to initialize and tell us its table ID
     rt_loop:activate(Neighbors),
     if IsJump -> ok;
-       true -> cyclon:activate()
+       true ->
+           cyclon:activate(),
+           vivaldi:activate(),
+           dc_clustering:activate()
     end,
-    vivaldi:activate(),
-    dc_clustering:activate(),
     gossip:activate(nodelist:node_range(Neighbors)),
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
