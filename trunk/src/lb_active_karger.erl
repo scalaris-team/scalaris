@@ -104,16 +104,34 @@ handle_msg({cy_cache, []}, State) ->
 %% Got a random node via cyclon
 handle_msg({cy_cache, RandomNodes}, State) ->
     ?TRACE("Got random node~n", []),
-    MyDhtNode = pid_groups:get_my(dht_node),
-    Envelope = comm:reply_as(comm:this(), 2, {my_dht_response, '_'}),
-    comm:send_local(MyDhtNode, {get_node_details, Envelope}),
+    case config:read(lb_active_karger_epsilon) of
+        self_tuning -> request_my_gossip_values();
+        _ -> request_my_node_details()
+    end,
     State#state{rnd_node = RandomNodes};
+
+%% Process gossip values from gossip process to determine epsilon
+%% in case lb_active_karger_epsilon is set to self_tuning.
+handle_msg({gossip_get_values_best_response, LoadInfo}, State) ->
+    Module = lb_active_gossip_load_metric,
+    Avg = gossip_load:load_info_other_get(avgLoad, Module, LoadInfo),
+    Stddev = gossip_load:load_info_other_get(stddev, Module, LoadInfo),
+    Max = gossip_load:load_info_other_get(maxLoad, Module, LoadInfo),
+    Epsilon =
+        try
+            lb_info:bound(0.01, Avg / erlang:max(Avg + Stddev, Max - Stddev), 0.24)
+        catch
+            error:badarith -> 0.24
+        end,
+    request_my_node_details(),
+    State#state{epsilon = Epsilon};
 
 %% Got load from my node
 handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) ->
 	?TRACE("Received node details for own node~n", []),
 	RandomNodes = State#state.rnd_node,
 	Epsilon = State#state.epsilon,
+    ?TRACE("Epsilon: ~p~n", [Epsilon]),
     %% If we deal only with one random node, we don't have
     %% any choice but to go to the next phase.
     %% Otherwise, we ask all random nodes for their load 
@@ -133,8 +151,7 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
                       ReqId = randoms:getRandomInt(),
                       ?TRACE("Sending out simulate request with ReqId ~p to ~.0p~n", [ReqId, node:pidX(RndNode)]),
                       OptionsNew = [{simulate, ReqId}, {reply_to, comm:this()}] ++ Options,
-                      comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, OptionsNew},
-                                [{?quiet}]),
+                      comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, OptionsNew}, [{?quiet}]),
                       {ReqId, RndNode}
                  end || RndNode <- RndNodes],
             Timeout = config:read(lb_active_karger_simulation_timeout) div 1000,
@@ -279,6 +296,17 @@ balance_adjacent(HeavyNode, LightNode, Options) ->
             LightNodeSucc = lb_info:get_succ(LightNode),
 			comm:send(node:pidX(LightNodeSucc), {lb_active, phase2, HeavyNode, LightNode, Options})
 	end.
+
+-spec request_my_node_details() -> ok.
+request_my_node_details() ->
+    MyDhtNode = pid_groups:get_my(dht_node),
+    Envelope = comm:reply_as(comm:this(), 2, {my_dht_response, '_'}),
+    comm:send_local(MyDhtNode, {get_node_details, Envelope}).
+
+-spec request_my_gossip_values() -> ok.
+request_my_gossip_values() ->
+    MyGossip = pid_groups:get_my(gossip),
+    comm:send_local(MyGossip, {get_values_best, {gossip_load, default}, self()}).
 
 -spec trigger() -> ok.
 trigger() ->
