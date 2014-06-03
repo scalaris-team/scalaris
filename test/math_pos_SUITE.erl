@@ -30,7 +30,7 @@ all() ->
      tester_make_same_length,
      tester_plus_symm, tester_plus_valid,
      tester_minus, tester_minus_valid,
-     prop_divide_valid, prop_multiply_valid].
+     tester_divide_valid, tester_multiply_valid, tester_multiply_decimals].
 
 suite() ->
     [
@@ -93,7 +93,37 @@ multiply(_Config) ->
     ?equals(math_pos:multiply([0,4], 3, 10), [1,2]),
     ?equals(math_pos:multiply([0,5], 3, 10), [1,5]),
     ?equals(math_pos:multiply([0,6], 3, 10), [1,8]),
-    ?equals(math_pos:multiply([0,7], 3, 10), [2,1]).
+    ?equals(math_pos:multiply([0,7], 3, 10), [2,1]),
+    
+    ?equals(math_pos:multiply(  [1], 15, 10),   [5]),
+    ?equals(math_pos:multiply(  [2], 15, 10),   [0]),
+    ?equals(math_pos:multiply(  [3], 15, 10),   [5]),
+    ?equals(math_pos:multiply(  [4], 15, 10),   [0]),
+    ?equals(math_pos:multiply(  [5], 15, 10),   [5]),
+    ?equals(math_pos:multiply(  [6], 15, 10),   [0]),
+    ?equals(math_pos:multiply(  [7], 15, 10),   [5]),
+    ?equals(math_pos:multiply([0,1], 15, 10), [1,5]),
+    ?equals(math_pos:multiply([0,2], 15, 10), [3,0]),
+    ?equals(math_pos:multiply([0,3], 15, 10), [4,5]),
+    ?equals(math_pos:multiply([0,4], 15, 10), [6,0]),
+    ?equals(math_pos:multiply([0,5], 15, 10), [7,5]),
+    ?equals(math_pos:multiply([0,6], 15, 10), [9,0]),
+    ?equals(math_pos:multiply([0,7], 15, 10), [0,5]),
+    
+    ?equals(math_pos:multiply(  [1], 15, 10, enlarge),   [1,5]),
+    ?equals(math_pos:multiply(  [2], 15, 10, enlarge),   [3,0]),
+    ?equals(math_pos:multiply(  [3], 15, 10, enlarge),   [4,5]),
+    ?equals(math_pos:multiply(  [4], 15, 10, enlarge),   [6,0]),
+    ?equals(math_pos:multiply(  [5], 15, 10, enlarge),   [7,5]),
+    ?equals(math_pos:multiply(  [6], 15, 10, enlarge),   [9,0]),
+    ?equals(math_pos:multiply(  [7], 15, 10, enlarge), [1,0,5]),
+    ?equals(math_pos:multiply([0,1], 15, 10, enlarge),   [1,5]),
+    ?equals(math_pos:multiply([0,2], 15, 10, enlarge),   [3,0]),
+    ?equals(math_pos:multiply([0,3], 15, 10, enlarge),   [4,5]),
+    ?equals(math_pos:multiply([0,4], 15, 10, enlarge),   [6,0]),
+    ?equals(math_pos:multiply([0,5], 15, 10, enlarge),   [7,5]),
+    ?equals(math_pos:multiply([0,6], 15, 10, enlarge),   [9,0]),
+    ?equals(math_pos:multiply([0,7], 15, 10, enlarge), [1,0,5]).
 
 -spec divide(Config::[tuple()]) -> true.
 divide(_Config) ->
@@ -278,15 +308,15 @@ prop_divide_valid3(A, Div) ->
     Base = lists:max(A) + 1,
     prop_divide_valid_base(A, Div, Base).
 
--spec prop_divide_valid(Config::[tuple()]) -> ok.
-prop_divide_valid(_Config) ->
+-spec tester_divide_valid(Config::[tuple()]) -> ok.
+tester_divide_valid(_Config) ->
     tester:test(?MODULE, prop_divide_valid1, 2, 10000, [{threads, 2}]),
     tester:test(?MODULE, prop_divide_valid2, 2, 10000, [{threads, 2}]),
     tester:test(?MODULE, prop_divide_valid3, 2, 10000, [{threads, 2}]).
 
 %% multiply
 
--spec prop_multiply_valid_base(X, Fac::non_neg_integer(), Base::pos_integer()) -> true when is_subtype(X, list(non_neg_integer())).
+-spec prop_multiply_valid_base(A::[non_neg_integer()], Fac::non_neg_integer(), Base::pos_integer()) -> true.
 prop_multiply_valid_base(A, Fac, Base) ->
     A_prod = math_pos:multiply(A, Fac, Base),
     ?equals(erlang:length(A_prod), erlang:length(A)),
@@ -306,10 +336,25 @@ prop_multiply_valid2(A, Fac) -> prop_multiply_valid_base(A, Fac, 16#10ffff + 1).
 -spec prop_multiply_valid3(A::nonempty_string(), Fac::non_neg_integer()) -> true.
 prop_multiply_valid3(A, Fac) ->
     A_max = lists:max(A), Base = A_max + 1,
-    prop_multiply_valid_base(A, erlang:min(Fac, A_max), Base).
+    prop_multiply_valid_base(A, Fac, Base).
 
--spec prop_multiply_valid(Config::[tuple()]) -> ok.
-prop_multiply_valid(_Config) ->
+-spec tester_multiply_valid(Config::[tuple()]) -> ok.
+tester_multiply_valid(_Config) ->
     tester:test(?MODULE, prop_multiply_valid1, 2, 10000, [{threads, 2}]),
     tester:test(?MODULE, prop_multiply_valid2, 2, 10000, [{threads, 2}]),
     tester:test(?MODULE, prop_multiply_valid3, 2, 10000, [{threads, 2}]).
+
+-spec prop_multiply_decimals(A::non_neg_integer(), Fac::0..100000) -> true.
+prop_multiply_decimals(A, Fac) ->
+    APos = decimal_to_pos(A),
+    ?equals(pos_to_decimal(math_pos:multiply(APos, Fac, 10, enlarge)), A * Fac).
+
+-spec tester_multiply_decimals(Config::[tuple()]) -> ok.
+tester_multiply_decimals(_Config) ->
+    tester:test(?MODULE, prop_multiply_decimals, 2, 10000, [{threads, 2}]).
+
+decimal_to_pos(X) -> [A - 48 || A <- lists:flatten(io_lib:format("~B", [X]))].
+
+pos_to_decimal(X) -> element(2, lists:foldr(fun(A, {Fac, Res}) ->
+                                                    {Fac * 10, Res + A * Fac}
+                                            end, {1, 0}, X)).
