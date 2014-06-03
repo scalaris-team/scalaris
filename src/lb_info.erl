@@ -32,6 +32,8 @@
 %% with dht size available
 -export([get_load_change_slide/5, get_load_change_jump/6]).
 -export([get_oldest_data_time/1]).
+% util
+-export([bound/3]).
 
 -ifdef(with_export_type_support).
 -export_type([lb_info/0]).
