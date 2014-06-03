@@ -101,7 +101,6 @@ multiply_rev1([], _Factor, _Carry, Prod, _Base, cutoff) ->
 
 %% @doc A / Divisor (with rounding to nearest integer not larger than the
 %%      result in the last component). Divisor must be a positive integer.
-% TODO: implement other divisions
 -spec divide(A::position_var(), Divisor::pos_integer(), Base::pos_integer()) -> position_var().
 divide(A = [_|_], Divisor, Base) when is_integer(Divisor) andalso Divisor > 1 ->
     lists:reverse(divide_torev(A, Divisor, 0, [], Base));
@@ -112,13 +111,8 @@ divide([], _Divisor, _Base) -> [].
         Product_rev::position_var(), _Base) -> position_var().
 divide_torev([D1 | DR], Divisor, Carry, Product_rev, Base) ->
     Diff0 = Carry * Base + D1,
-    Diff1 = Diff0 / Divisor,
-    Diff2 = util:floor(Diff1),
-    NewCarry = case Diff1 == Diff2 of
-                   true -> 0;
-                   _    -> % tolerate minor mis-calculations by rounding:
-                           erlang:round((Diff1 - Diff2) * Divisor)
-               end,
+    Diff2 = Diff0 div Divisor,
+    NewCarry = Diff0 rem Divisor,
     divide_torev(DR, Divisor, NewCarry, [Diff2 | Product_rev], Base);
 divide_torev([], _Divisor, _Carry, Product_rev, _Base) -> Product_rev.
 

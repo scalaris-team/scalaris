@@ -30,7 +30,8 @@ all() ->
      tester_make_same_length,
      tester_plus_symm, tester_plus_valid,
      tester_minus, tester_minus_valid,
-     tester_divide_valid, tester_multiply_valid, tester_multiply_decimals].
+     tester_divide_valid, tester_divide_decimals,
+     tester_multiply_valid, tester_multiply_decimals].
 
 suite() ->
     [
@@ -314,6 +315,15 @@ tester_divide_valid(_Config) ->
     tester:test(?MODULE, prop_divide_valid2, 2, 10000, [{threads, 2}]),
     tester:test(?MODULE, prop_divide_valid3, 2, 10000, [{threads, 2}]).
 
+-spec prop_divide_decimals(A::non_neg_integer(), Div::pos_integer()) -> true.
+prop_divide_decimals(A, Div) ->
+    APos = decimal_to_pos(A),
+    ?equals(pos_to_decimal(math_pos:divide(APos, Div, 10)), A div Div).
+
+-spec tester_divide_decimals(Config::[tuple()]) -> ok.
+tester_divide_decimals(_Config) ->
+    tester:test(?MODULE, prop_divide_decimals, 2, 10000, [{threads, 2}]).
+
 %% multiply
 
 -spec prop_multiply_valid_base(A::[non_neg_integer()], Fac::non_neg_integer(), Base::pos_integer()) -> true.
@@ -352,6 +362,8 @@ prop_multiply_decimals(A, Fac) ->
 -spec tester_multiply_decimals(Config::[tuple()]) -> ok.
 tester_multiply_decimals(_Config) ->
     tester:test(?MODULE, prop_multiply_decimals, 2, 10000, [{threads, 2}]).
+
+%% helpers
 
 decimal_to_pos(X) -> [A - 48 || A <- lists:flatten(io_lib:format("~B", [X]))].
 
