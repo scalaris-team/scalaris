@@ -380,47 +380,47 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                     false -> jump
                 end,
 
-                ProposedTargetLoadItems = lb_info:get_target_load(items, JumpOrSlide, MyNode, LightNode),
-                ProposedTargetLoadRequests = lb_info:get_target_load(requests, JumpOrSlide, MyNode, LightNode),
+            ProposedTargetLoadItems = lb_info:get_target_load(items, JumpOrSlide, MyNode, LightNode),
+            ProposedTargetLoadRequests = lb_info:get_target_load(requests, JumpOrSlide, MyNode, LightNode),
 
-                {TargetLoadItems, TargetLoadRequests} =
-                    case gossip_available(Options) of
-                        true -> AvgItems = proplists:get_value(avgItems, Options),
-                                AvgRequests = proplists:get_value(avgRequests, Options),
-                                %% don't take away more items than the average
-                                {?IIF(ProposedTargetLoadItems > AvgItems,
-                                     trunc(AvgItems), ProposedTargetLoadItems),
-                                 ?IIF(ProposedTargetLoadRequests > AvgRequests,
-                                     trunc(AvgRequests), ProposedTargetLoadRequests)
-                                };
-                        false -> {ProposedTargetLoadItems, ProposedTargetLoadRequests}
-                    end,
+            {TargetLoadItems, TargetLoadRequests} =
+                case gossip_available(Options) of
+                    true -> AvgItems = proplists:get_value(avgItems, Options),
+                            AvgRequests = proplists:get_value(avgRequests, Options),
+                            %% don't take away more items than the average
+                            {?IIF(ProposedTargetLoadItems > AvgItems,
+                                  trunc(AvgItems), ProposedTargetLoadItems),
+                             ?IIF(ProposedTargetLoadRequests > AvgRequests,
+                                  trunc(AvgRequests), ProposedTargetLoadRequests)
+                            };
+                    false -> {ProposedTargetLoadItems, ProposedTargetLoadRequests}
+                end,
 
-                {From, To, Direction} =
-                    case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
-                        true  -> %% Jump or heavy node is succ of light node
-                            {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward};
-                        false -> %% Light node is succ of heavy node
-                            {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
-                    end,
+            {From, To, Direction} =
+                case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
+                    true  -> %% Jump or heavy node is succ of light node
+                        {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward};
+                    false -> %% Light node is succ of heavy node
+                        {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
+                end,
 
-                {Metric, {SplitKey, TakenLoad}} =
-                    case config:read(lb_active_balance_metric) of %% TODO getter
-                        items ->
-                            {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
-                        requests ->
-                            case lb_stats:get_request_histogram_split_key(TargetLoadRequests, Direction,
-                                                                          lb_info:get_items(HeavyNode)) of
-                                %% TODO fall back in a more clever way / abort lb request
-                                failed ->
-                                    log:log(warn, "get_request_histogram failed. falling back to item balancing.~n", []),
-                                    {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
-                                Val -> {requests, Val}
-                            end
-                    end,
+            {Metric, {SplitKey, TakenLoad}} =
+                case config:read(lb_active_balance_metric) of %% TODO getter
+                    items ->
+                        {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
+                    requests ->
+                        case lb_stats:get_request_histogram_split_key(TargetLoadRequests, Direction,
+                                                                      lb_info:get_items(HeavyNode)) of
+                            %% TODO fall back in a more clever way / abort lb request
+                            failed ->
+                                log:log(warn, "get_request_histogram failed. falling back to item balancing.~n", []),
+                                {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
+                            Val -> {requests, Val}
+                        end
+                end,
 
-                ?TRACE("SplitKey: ~p TargetLoadItems: ~p TargetLoadRequests: ~p TakenLoad: ~p Metric: ~p~n",
-                       [SplitKey, TargetLoadItems, TargetLoadRequests, TakenLoad, Metric]),
+            ?TRACE("SplitKey: ~p TargetLoadItems: ~p TargetLoadRequests: ~p TakenLoad: ~p Metric: ~p~n",
+                   [SplitKey, TargetLoadItems, TargetLoadRequests, TakenLoad, Metric]),
 
             case is_simulation(Options) of
 
