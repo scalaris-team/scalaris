@@ -64,9 +64,9 @@
 
 -type(option() :: {tag, atom()}).
 
--type job_description() :: {[fun_term(),...], [option()]}.
-
 -type(fun_term() :: erl_fun() | js_fun()).
+
+-type job_description() :: {[fun_term(),...], [option()]}.
 
 -type(data_list() :: [{?RT:key(), string(), term()}]).
 %% data in ets table has the same format
