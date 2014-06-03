@@ -22,6 +22,12 @@
 %% maybe_improper_list() without further specifying its element type.
 %% See ?RT:hash_key/1
 %% -type client_key() :: unicode:chardata().
--type client_key() :: string().
+
+% invalid characters (from https://en.wikipedia.org/wiki/Unicode_plane):
+% * The High Surrogates (U+D800U+DBFF) and Low Surrogate (U+DC00U+DFFF) codes
+%   are reserved for encoding non-BMP characters in UTF-16 by using a pair of
+%   16-bit codes
+-type unicode_char() :: 0..16#D7FF | 16#E000..16#10ffff.
+-type client_key() :: [unicode_char()].
 -type client_value() :: any().
 -type client_version() :: non_neg_integer(). %%?DB:version().
