@@ -155,7 +155,7 @@ prop_get_split_key_half(Begin, End_) ->
         
         end,
     ?equals_w_note(intervals:in(SplitKey, I), true,
-                   io_lib:format("SplitKey: ~.0p", [SplitKey])),
+                   {"SplitKey", SplitKey}),
 
     call_helper_fun(check_split_key_half, [Begin, End, SplitKey]).
 
@@ -189,7 +189,7 @@ prop_get_split_key(Begin, End_, SplitFracA, SplitFracB) ->
                 
                 end,
             ?equals_w_note(intervals:in(SplitKey, I), true,
-                           io_lib:format("SplitKey: ~.0p", [SplitKey])),
+                           {"SplitKey", SplitKey}),
             call_helper_fun(check_split_key, [Begin, End, SplitKey, SplitFraction])
     end,
     true.
