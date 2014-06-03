@@ -47,7 +47,7 @@
          crashed_node/4,
          check_config/0]).
 % for dht_node_join:
--export([send/3, send_no_slide/3,
+-export([send/3, send_no_slide/3, notify_source_pid/2,
          check_setup_slide_not_found/5, exec_setup_slide_not_found/10,
          use_incremental_slides/0, get_max_transport_entries/0]).
 
@@ -1109,15 +1109,10 @@ finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
     BootstrapNodes = [node:pidX(Node) || Node <- OtherNodes],
     %% reply after join is complete
     JumpTag = slide_op:get_tag(SlideOp),
-    JumpOptions =
-        case slide_op:get_source_pid(SlideOp) of
-            null -> [];
-            Pid ->
-                Msg = {move, result, JumpTag, ok},
-                [{notify, Pid, Msg}]
-        end,
+    SourcePid = slide_op:get_source_pid(SlideOp),
+    Msg = {move, result, JumpTag, ok},
     JoinOptions = [{{dht_node, id}, NewId}, {my_sup_dht_node_id, SupDhtNodeId},
-                   {jump, JumpTag, JumpOptions},
+                   {jump, JumpTag, SourcePid, Msg},
                    {bootstrap_nodes, BootstrapNodes}],
     JoinOptions2 =
         case config:read(lb_active_and_psv) of
