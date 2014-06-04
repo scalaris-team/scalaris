@@ -53,10 +53,13 @@ prop_add_keys(BaseKey, Size, Values0) ->
                               end, Values),
     %ct:pal("BaseKey: ~p SortedValues: ~p Result: ~p", [BaseKey, SortedValues, histogram_rt:get_data(H2)]),
     Result = lists:map(fun(Value) -> {Value, 1} end, SortedValues),
-    ?compare(fun(Actual, Expected) -> check_result(Actual, Expected, BaseKey) end, histogram_rt:get_data(H2), Result),
+    ?compare(fun(Actual, Expected) ->
+                     check_result(Actual, Expected, BaseKey)
+             end, histogram_rt:get_data(H2), Result),
     true.
 
 add_keys(_Config) ->
+    prop_add_keys(?RT:hash_key("0"), 17, [?RT:hash_key("0")]),
     tester:test(?MODULE, prop_add_keys, 3, 250, [{threads, 2}]).
 
 -spec prop_merge_keys(BaseKey::?RT:key(), Key1::?RT:key(), Key2::?RT:key()) -> true.
@@ -75,7 +78,9 @@ prop_merge_keys(BaseKey, Key1, Key2) ->
                end
         end,
     %ct:pal("Key1: ~p (Range: ~p) Key2: ~p (Range: ~p) BaseKey: ~p SplitKey: ~p Result: ~p, Raw: ~p", [Key1, ?RT:get_range(Key1, BaseKey), Key2, ?RT:get_range(Key2, BaseKey), BaseKey, SplitKey, histogram_rt:get_data(H3), histogram:get_data(element(1, H3))]),
-    ?compare(fun(Actual, Expected) -> check_result(Actual, Expected, BaseKey) end, histogram_rt:get_data(H3), [{SplitKey, 2}]),
+    ?compare(fun(Actual, Expected) ->
+                     check_result(Actual, Expected, BaseKey)
+             end, histogram_rt:get_data(H3), [{SplitKey, 2}]),
     true.
 
 merge_keys(_Config) ->
@@ -91,13 +96,14 @@ check_elements([], [], _BaseKey) ->
     true;
 check_elements([{El1, Count1} | Rest], [{El2, Count2} | Rest2], BaseKey) ->
     %ct:pal("El: ~p, El2:~p", [El1, El2]),
-    case succ_ord_key(El1, El2, BaseKey) of
+    case nodelist:succ_ord_id(El1, El2, BaseKey) of
         true -> Range = ?RT:get_range(El1, El2);
         false -> Range = ?RT:get_range(El2, El1)
     end,
     %ct:pal("Range: ~p", [Range]),
     %ct:pal("Check: ~p", [Range < ?EPSILON orelse El1 =:= El2]),
-    ?assert(Range < ?EPSILON orelse El1 =:= El2),
+    ?assert_w_note(Range < ?EPSILON orelse El1 =:= El2,
+                   {Range, '>=', ?EPSILON, ';', El1, '=/=', El2}),
     ?equals(Count1, Count2),
     check_elements(Rest, Rest2, BaseKey).
 
