@@ -111,20 +111,20 @@ multiply(_Config) ->
     ?equals(math_pos:multiply([0,6], 15, 10), [9,0]),
     ?equals(math_pos:multiply([0,7], 15, 10), [0,5]),
     
-    ?equals(math_pos:multiply(  [1], 15, 10, enlarge),   [1,5]),
-    ?equals(math_pos:multiply(  [2], 15, 10, enlarge),   [3,0]),
-    ?equals(math_pos:multiply(  [3], 15, 10, enlarge),   [4,5]),
-    ?equals(math_pos:multiply(  [4], 15, 10, enlarge),   [6,0]),
-    ?equals(math_pos:multiply(  [5], 15, 10, enlarge),   [7,5]),
-    ?equals(math_pos:multiply(  [6], 15, 10, enlarge),   [9,0]),
-    ?equals(math_pos:multiply(  [7], 15, 10, enlarge), [1,0,5]),
-    ?equals(math_pos:multiply([0,1], 15, 10, enlarge),   [1,5]),
-    ?equals(math_pos:multiply([0,2], 15, 10, enlarge),   [3,0]),
-    ?equals(math_pos:multiply([0,3], 15, 10, enlarge),   [4,5]),
-    ?equals(math_pos:multiply([0,4], 15, 10, enlarge),   [6,0]),
-    ?equals(math_pos:multiply([0,5], 15, 10, enlarge),   [7,5]),
-    ?equals(math_pos:multiply([0,6], 15, 10, enlarge),   [9,0]),
-    ?equals(math_pos:multiply([0,7], 15, 10, enlarge), [1,0,5]).
+    ?equals(math_pos:multiply(  [1], 15, 10, enlarge),   {[1,5],1}),
+    ?equals(math_pos:multiply(  [2], 15, 10, enlarge),   {[3,0],1}),
+    ?equals(math_pos:multiply(  [3], 15, 10, enlarge),   {[4,5],1}),
+    ?equals(math_pos:multiply(  [4], 15, 10, enlarge),   {[6,0],1}),
+    ?equals(math_pos:multiply(  [5], 15, 10, enlarge),   {[7,5],1}),
+    ?equals(math_pos:multiply(  [6], 15, 10, enlarge),   {[9,0],1}),
+    ?equals(math_pos:multiply(  [7], 15, 10, enlarge), {[1,0,5],2}),
+    ?equals(math_pos:multiply([0,1], 15, 10, enlarge),   {[1,5],0}),
+    ?equals(math_pos:multiply([0,2], 15, 10, enlarge),   {[3,0],0}),
+    ?equals(math_pos:multiply([0,3], 15, 10, enlarge),   {[4,5],0}),
+    ?equals(math_pos:multiply([0,4], 15, 10, enlarge),   {[6,0],0}),
+    ?equals(math_pos:multiply([0,5], 15, 10, enlarge),   {[7,5],0}),
+    ?equals(math_pos:multiply([0,6], 15, 10, enlarge),   {[9,0],0}),
+    ?equals(math_pos:multiply([0,7], 15, 10, enlarge), {[1,0,5],1}).
 
 -spec divide(Config::[tuple()]) -> true.
 divide(_Config) ->
@@ -357,7 +357,9 @@ tester_multiply_valid(_Config) ->
 -spec prop_multiply_decimals(A::non_neg_integer(), Fac::0..100000) -> true.
 prop_multiply_decimals(A, Fac) ->
     APos = decimal_to_pos(A),
-    ?equals(pos_to_decimal(math_pos:multiply(APos, Fac, 10, enlarge)), A * Fac).
+    {ProdPos, Added} = math_pos:multiply(APos, Fac, 10, enlarge),
+    ?equals(pos_to_decimal(ProdPos), A * Fac),
+    ?equals(Added, length(ProdPos) - length(APos)).
 
 -spec tester_multiply_decimals(Config::[tuple()]) -> ok.
 tester_multiply_decimals(_Config) ->
