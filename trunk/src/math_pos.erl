@@ -129,6 +129,7 @@ divide_torev([], _Divisor, _Carry, Product_rev, _Base) -> Product_rev.
 %% @doc Bring two lists to the same length by appending or prepending zeros.
 -spec make_same_length(A::position_var(), B::position_var(), AddTo::front | back)
         -> {A::position_var(), B::position_var(),
+            ALen::non_neg_integer(), BLen::non_neg_integer(),
             AddedToA::non_neg_integer(), AddedToB::non_neg_integer()}.
 make_same_length(A, B, AddTo) ->
     make_same_length(A, B, AddTo, 0).
@@ -136,6 +137,7 @@ make_same_length(A, B, AddTo) ->
 %% @doc Bring two lists to the same length by appending or prepending at least MinAdd zeros.
 -spec make_same_length(A::position_var(), B::position_var(), AddTo::front | back, MinAdd::non_neg_integer())
         -> {A::position_var(), B::position_var(),
+            ALen::non_neg_integer(), BLen::non_neg_integer(),
             AddedToA::non_neg_integer(), AddedToB::non_neg_integer()}.
 make_same_length(A, B, AddTo, MinAdd) ->
     A_l = erlang:length(A), B_l = erlang:length(B),
@@ -144,10 +146,10 @@ make_same_length(A, B, AddTo, MinAdd) ->
     AddToA = lists:duplicate(AddToALength, 0),
     AddToB = lists:duplicate(AddToBLength, 0),
     case AddTo of
-        back -> {lists:append(A, AddToA), lists:append(B, AddToB),
-                 AddToALength, AddToBLength};
+        back  -> {lists:append(A, AddToA), lists:append(B, AddToB),
+                  A_l, B_l, AddToALength, AddToBLength};
         front -> {lists:append(AddToA, A), lists:append(AddToB, B),
-                 AddToALength, AddToBLength}
+                  A_l, B_l, AddToALength, AddToBLength}
     end.
 
 %% @doc Remove leading or trailing 0's.

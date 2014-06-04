@@ -166,8 +166,12 @@ divide(_Config) ->
 
 -spec prop_make_same_length(A::string(), B::string(), front | back) -> true.
 prop_make_same_length(A, B, Pos) ->
-    {A1, B1, A1Added, B1Added} = math_pos:make_same_length(A, B, Pos),
-    ?equals(erlang:length(A1), erlang:length(B1)),
+    {A1, B1, ALen, BLen, A1Added, B1Added} = math_pos:make_same_length(A, B, Pos),
+    ?equals(ALen, erlang:length(A)),
+    ?equals(BLen, erlang:length(B)),
+    A1Len = erlang:length(A1),
+    ?equals(A1Len, erlang:length(B1)),
+    ?equals(ALen + A1Added, A1Len),
     ?equals(math_pos:remove_zeros(A1, Pos, all), math_pos:remove_zeros(A, Pos, all)),
     ?equals(math_pos:remove_zeros(B1, Pos, all), math_pos:remove_zeros(B, Pos, all)),
     ?equals(math_pos:remove_zeros(A1, Pos, A1Added), A),
@@ -181,7 +185,7 @@ tester_make_same_length(_Config) ->
 
 -spec prop_plus_valid_base(X, X, Pos::front | back, Base::pos_integer()) -> true when is_subtype(X, list(non_neg_integer())).
 prop_plus_valid_base(A_, B_, Pos, Base) ->
-    {A, B, _, _} = math_pos:make_same_length(A_, B_, Pos),
+    {A, B, _, _, _, _} = math_pos:make_same_length(A_, B_, Pos),
     A_plus_B = math_pos:plus(A, B, Base),
     ?equals(erlang:length(A_plus_B), erlang:length(A)),
     case lists:all(fun(E) -> E >= 0 andalso E < Base end, A_plus_B) of
@@ -210,7 +214,7 @@ tester_plus_valid(_Config) ->
 
 -spec prop_plus_symm_base(X, X, Pos::front | back, Base::pos_integer()) -> true when is_subtype(X, list(non_neg_integer())).
 prop_plus_symm_base(A_, B_, Pos, Base) ->
-    {A, B, _, _} = math_pos:make_same_length(A_, B_, Pos),
+    {A, B, _, _, _, _} = math_pos:make_same_length(A_, B_, Pos),
     ?equals(math_pos:plus(A, B, Base), math_pos:plus(B, A, Base)).
 
 -spec prop_plus_symm1(A::[0..9], B::[0..9]) -> true.
@@ -234,7 +238,7 @@ tester_plus_symm(_Config) ->
 
 -spec prop_minus_valid_base(X, X, Pos::front | back, Base::pos_integer()) -> true when is_subtype(X, list(non_neg_integer())).
 prop_minus_valid_base(A_, B_, Pos, Base) ->
-    {A, B, _, _} = math_pos:make_same_length(A_, B_, Pos),
+    {A, B, _, _, _, _} = math_pos:make_same_length(A_, B_, Pos),
     A_minus_B = math_pos:minus(A, B, Base),
     ?equals(erlang:length(A_minus_B), erlang:length(A)),
     case lists:all(fun(E) -> E >= 0 andalso E < Base end, A_minus_B) of
@@ -264,7 +268,7 @@ tester_minus_valid(_Config) ->
 
 -spec prop_minus_base(X, X, Pos::front | back, Base::pos_integer()) -> true when is_subtype(X, list(non_neg_integer())).
 prop_minus_base(A_, B_, Pos, Base) ->
-    {A, B, _, _} = math_pos:make_same_length(A_, B_, Pos),
+    {A, B, _, _, _, _} = math_pos:make_same_length(A_, B_, Pos),
     A_B = math_pos:minus(A, B, Base),
     ?equals(math_pos:plus(A_B, B, Base), A).
 
