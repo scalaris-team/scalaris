@@ -69,36 +69,45 @@ minus_rev([], [], _Carry, Diff, _Base) -> Diff.
 -spec multiply(A::position_var(), Factor::non_neg_integer(), Base::pos_integer())
         -> position_var().
 multiply(A, Factor, Base) ->
-    multiply(A, Factor, Base, cutoff).
+    element(1, multiply(A, Factor, Base, cutoff)).
 
 %% @doc A * Factor, if Factor is a non-negative integer.
 -spec multiply(A::position_var(), Factor::non_neg_integer(), Base::pos_integer(),
-               Cut::cutoff | enlarge) -> position_var().
-multiply(A = [_|_], 0, _Base, _Cut) -> lists:duplicate(erlang:length(A), 0);
-multiply(A = [_|_], 1, _Base, _Cut) -> A;
+               Cut::cutoff) -> {Prod::position_var(), Added::0};
+              (A::position_var(), Factor::non_neg_integer(), Base::pos_integer(),
+               Cut::enlarge) -> {Prod::position_var(), Added::non_neg_integer()}.
+multiply(A = [_|_], 0, _Base, _Cut) ->
+    {lists:duplicate(erlang:length(A), 0), 0};
+multiply(A = [_|_], 1, _Base, _Cut) ->
+    {A, 0};
 multiply(A = [_|_], Factor, Base, Cut) when is_integer(Factor) andalso Factor > 0 ->
-    multiply_rev1(lists:reverse(A), Factor, 0, [], Base, Cut);
-multiply([], _Factor, _Base, _Cut) -> [].
+    multiply_rev1(lists:reverse(A), Factor, 0, [], Base, Cut, 0);
+multiply([], _Factor, _Base, _Cut) ->
+    {[], 0}.
 
 -spec multiply_rev1(A_rev::position_var(), Factor::non_neg_integer(),
                     Carry::non_neg_integer(), Prod::position_var(),
-                    Base::pos_integer(), Cut::cutoff | enlarge)
-    -> Prod::position_var().
-multiply_rev1([A1 | A_rev_Rest], Factor, Carry, Prod, Base, Cut) ->
+                    Base::pos_integer(), Cut::cutoff,
+                    Added::0) -> {Prod::position_var(), Added::0};
+                   (A_rev::position_var(), Factor::non_neg_integer(),
+                    Carry::non_neg_integer(), Prod::position_var(),
+                    Base::pos_integer(), Cut::enlarge,
+                    Added::non_neg_integer()) -> {Prod::position_var(), Added::non_neg_integer()}.
+multiply_rev1([A1 | A_rev_Rest], Factor, Carry, Prod, Base, Cut, Added) ->
     P1_new1 = A1 * Factor + Carry,
     NewCarry = P1_new1 div Base,
     P1_new = P1_new1 - NewCarry * Base,
-    multiply_rev1(A_rev_Rest, Factor, NewCarry, [P1_new | Prod], Base, Cut);
-multiply_rev1([], _Factor, 0, Prod, _Base, enlarge) ->
-    Prod;
-multiply_rev1([], Factor, Carry, Prod, Base, enlarge = Cut) ->
+    multiply_rev1(A_rev_Rest, Factor, NewCarry, [P1_new | Prod], Base, Cut, Added);
+multiply_rev1([], _Factor, 0, Prod, _Base, enlarge, Added) ->
+    {Prod, Added};
+multiply_rev1([], Factor, Carry, Prod, Base, enlarge = Cut, Added) ->
     % enlarge list length to fit the result
     NewCarry = Carry div Base,
     P1_new = Carry - NewCarry * Base,
-    multiply_rev1([], Factor, NewCarry, [P1_new | Prod], Base, Cut);
-multiply_rev1([], _Factor, _Carry, Prod, _Base, cutoff) ->
+    multiply_rev1([], Factor, NewCarry, [P1_new | Prod], Base, Cut, Added + 1);
+multiply_rev1([], _Factor, _Carry, Prod, _Base, cutoff, 0) ->
     % forget first carry (don't change length of lists)
-    Prod.
+    {Prod, 0}.
 
 %% @doc A / Divisor (with rounding to nearest integer not larger than the
 %%      result in the last component). Divisor must be a positive integer.
