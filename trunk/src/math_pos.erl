@@ -27,7 +27,8 @@
 
 -export([plus/3, minus/3, divide/3,
          multiply/3, multiply/4,
-         make_same_length/3, make_same_length/4, remove_zeros/3]).
+         make_same_length/3, make_same_length/4, remove_zeros/3,
+         from_decimal/2, to_decimal/2]).
 
 %% @doc A + B
 -spec plus(A::position_var(), B::position_var(), Base::pos_integer()) -> position_var().
@@ -152,3 +153,24 @@ remove_zeros_front([0 | R], all) -> remove_zeros_front(R, all);
 remove_zeros_front([0 | R], C) -> remove_zeros_front(R, C - 1);
 remove_zeros_front([_|_] = A, _) -> A;
 remove_zeros_front([], _) -> [].
+
+%% @doc Converts a (decimal, non-negative) integer to a position var with the
+%%      given Base.
+-spec from_decimal(X::non_neg_integer(), Base::pos_integer()) -> position_var().
+from_decimal(X, Base) ->
+    from_decimal_(X, Base, []).
+
+from_decimal_(X, Base, Acc) when X < Base ->
+    lists:reverse(Acc, [X]);
+from_decimal_(X, Base, Acc) ->
+    from_decimal_(X div Base, Base, [X rem Base | Acc]).
+
+%% @doc Converts a position var with the given Base to a (decimal, non-negative)
+%%      integer.
+-spec to_decimal(X::position_var(), Base::pos_integer()) -> non_neg_integer().
+to_decimal([], _Base) ->
+    0;
+to_decimal(X, Base) ->
+    element(2, lists:foldr(fun(A, {Fac, Result}) ->
+                                   {Fac * Base, Result + A * Fac}
+                           end, {1, 0}, X)).
