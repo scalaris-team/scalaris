@@ -28,7 +28,8 @@
 
 all() ->
     [tester_client_key_to_binary, tester_hash_key,
-     next_hop, next_hop2, tester_get_split_key, tester_get_split_key_half,
+     next_hop, next_hop2,
+     tester_get_split_key, tester_get_split_key_half,
      additional_tests].
 
 suite() ->
@@ -160,6 +161,7 @@ prop_get_split_key_half(Begin, End_) ->
     call_helper_fun(check_split_key_half, [Begin, End, SplitKey]).
 
 tester_get_split_key_half(_Config) ->
+    prop_get_split_key_half(?MINUS_INFINITY, plus_infinity),
     tester:test(?MODULE, prop_get_split_key_half, 2, 10000, [{threads, 2}]).
 
 -spec prop_get_split_key(Begin::?RT:key(), End::?RT:key() | plus_infinity, SplitFracA::1..100, SplitFracB::0..100) -> true.
