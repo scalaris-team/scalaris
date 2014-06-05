@@ -204,8 +204,13 @@ leave(_State) -> ok.
 % failure detector reported dead node
 -spec crashed_node(State::state(), DeadPid::comm:mypid(), Reason::fd:reason())
         -> {ChangeReason::rm_loop:reason(), state()}.
-crashed_node({OldNeighborhood}, DeadPid, _Reason) ->
+crashed_node({OldNeighborhood}, DeadPid, Reason) when Reason =:= jump orelse Reason =:= leave ->
     NewNeighborhood = nodelist:remove(DeadPid, OldNeighborhood),
+    {{node_crashed, DeadPid}, {NewNeighborhood}};
+crashed_node({OldNeighborhood}, DeadPid, _Reason) ->
+    FilterFun = fun(N) -> not node:same_process(N, DeadPid) end,
+    NewNeighborhood =
+        nodelist:filter(OldNeighborhood, FilterFun, fun dn_cache:add_zombie_candidate/1),
     {{node_crashed, DeadPid}, {NewNeighborhood}}.
 
 % dead-node-cache reported dead node to be alive again
