@@ -36,24 +36,25 @@
 \item Have a look at strace -f -p PID of beam process
 \item Get message statistics via the Web-interface
 \item enable/disable tracing for certain modules
+\item Trace messages using the trace_mpath module
 %% \item enable gen-component profiling and read the collected data using
-%% 
+%%
 %%    \code{lists:reverse(lists:keysort(2,ets:tab2list(profiling))).}
-%% 
+%%
 %%    (Has the limitation that it measures using absolute time, maybe the data
 %%    is more ok, when using -smp disable? ...)
 \item Use etop and look at the total memory size and atoms generated
 \item send processes sleep or kill messages to test certain behaviour (see
   \erlmodule{gen\_component}.erl)
-\item use \code{mgmt_server:number_of_nodes(). flush().}
-\item use \code{admin_checkring(). flush().}
+\item use \code{admin:number_of_nodes().}
+\item use \code{admin:check_ring().}
 \end{itemize}
 
 %% \section{General Erlang server loop}
-%% 
+%%
 %% Servers in Erlang often use the following structure to maintain a state
 %% while processing received messages:
-%% 
+%%
 %% \lstset{language=erlang}
 %% \begin{lstlisting}
 %% loop(State) ->
@@ -63,7 +64,7 @@
 %%       loop(State1)
 %%   end.
 %% \end{lstlisting}
-%% 
+%%
 %% The server runs an endless loop, that waits for a message, processes it and
 %% calls itself using tail-recursion in each branch. The loop works on a
 %% \code{State}, which can be modified when a message is handled.
