@@ -85,6 +85,9 @@ on({crash, PID, jump}, Nodes) ->
     % subscribe again (subscription was removed at fd)
     fd:subscribe(PID),
     Nodes;
+on({crash, PID, leave}, Nodes) ->
+    % graceful leave - do not add as zombie candidate!
+    gb_trees:delete_any(PID, Nodes);
 on({crash, PID, _Reason}, Nodes) ->
     case gb_trees:lookup(PID, Nodes) of
         {value, Node} -> dn_cache:add_zombie_candidate(Node),

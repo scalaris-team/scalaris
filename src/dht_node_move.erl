@@ -1086,7 +1086,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg) ->
           TargetId::?RT:key(), Tag::any(), SourcePid::comm:mypid() | null})
         -> dht_node_state:state().
 finish_delta_ack2B(State, SlideOp, {finish_leave}) ->
-    fd:report_my_crash('DOWN'),
+    fd:report_my_crash(leave),
     State1 = finish_slide(State, SlideOp),
     SupDhtNodeId = erlang:get(my_sup_dht_node_id),
     SupDhtNode = pid_groups:get_my(sup_dht_node),

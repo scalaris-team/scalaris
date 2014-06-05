@@ -308,6 +308,10 @@ leave(_State) -> ok.
 % failure detector reported dead node
 -spec crashed_node(State::state(), DeadPid::comm:mypid(), Reason::fd:reason())
         -> {ChangeReason::rm_loop:reason(), state()}.
+crashed_node(State, DeadPid, Reason) when Reason =:= jump orelse Reason =:= leave ->
+    % graceful leave - do not add as zombie candidate!
+    {{node_crashed, DeadPid},
+     update_nodes(State, [], [DeadPid], null)};
 crashed_node(State, DeadPid, _Reason) ->
     {{node_crashed, DeadPid},
      update_nodes(State, [], [DeadPid], fun dn_cache:add_zombie_candidate/1)}.
