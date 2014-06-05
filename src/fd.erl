@@ -219,9 +219,9 @@ report_my_crash(Reason) ->
                            "outside a valid dht_node group!", [Reason, self()]);
         DhtNodeSupPid ->
             FD = my_fd_pid(),
-            _ = [ comm:send_local(FD, {report_crash, X, Reason})
-                    || X <- sup:sup_get_all_children(DhtNodeSupPid)],
-            ok
+            comm:send_local(FD, {report_crash,
+                                 sup:sup_get_all_children(DhtNodeSupPid),
+                                 Reason})
     end.
 
 %% gen_component functions
@@ -316,12 +316,14 @@ on({crashed, WatchedPid, _Warn} = Msg, State) ->
 %%     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
 %%     State;
 
-on({report_crash, LocalPid, Reason}, State) ->
-    ?TRACE("FD: report_crash ~p with reason ~p~n", [Pid, Reason]),
-    ?DBG_ASSERT(is_pid(LocalPid)),
-    Msg = {report_crash, LocalPid, Reason},
+on({report_crash, [], _Reason}, State) ->
+    State;
+on({report_crash, [_|_] = LocalPids, Reason}, State) ->
+    ?TRACE("FD: report_crash ~p with reason ~p~n", [LocalPids, Reason]),
+    ?DBG_ASSERT([] =:= [X || X <- LocalPids, not is_pid(X)]),
+    Msg = {report_crash, LocalPids, Reason},
     % don't create new hbs processes!
-    forward_to_hbs(comm:make_global(LocalPid), Msg, false),
+    forward_to_hbs(comm:make_global(hd(LocalPids)), Msg, false),
     State.
 
 %%% Internal functions

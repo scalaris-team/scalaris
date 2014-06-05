@@ -260,12 +260,16 @@ on({crashed, WatchedPid, Reason}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
     report_crashed_remote_pid(State, WatchedPid, Reason, warn);
 
-on({report_crash, LocalPid, Reason}, State) ->
+on({report_crash, LocalPids, Reason}, State) ->
     ?TRACE("fd_hbs crash reported ~.0p, ~.0p with reason ~.0p~n",
            [WatchedPid, pid_groups:group_and_name_of(WatchedPid), Reason]),
     % only allowed by self-monitoring hbs!
     ?DBG_ASSERT(comm:make_local(state_get_rem_hbs(State)) =:= self()),
-    report_crashed_remote_pid(State, comm:make_global(LocalPid), Reason, nowarn);
+    lists:foldl(
+      fun(LocalPid, StateX) ->
+              report_crashed_remote_pid(StateX, comm:make_global(LocalPid),
+                                        Reason, nowarn)
+      end, State, LocalPids);
 
 on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
     ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n",
