@@ -47,7 +47,7 @@
 
 \section{Monitoring Statistics (\texttt{monitor}, \texttt{rrd})}
 \erlmoduleindex{monitor}
-\svnrev{r2546}
+\svnrev{r6684}
 
 The \erlmodule{monitor} module offers several methods to gather meaningful
 statistics using the \code{rrd()} data type defined in \erlmodule{rrd}.
@@ -76,6 +76,10 @@ are supported:
   (approximated) histogram of the data,
   \item \code{event}: records each event (including its time stamp) inside a time slot in a list
   (this should be rarely used as the amount of data stored may be very big).
+  \item \code{histogram, N}: records values in an approximative histogram of size N
+  \item \code{histogram_rt, N, BaseKey}: histogram of size N which
+    operates on the key space of the DHT. BaseKey is the key with the
+    largest distance to all keys in the histogram.
 \end{itemize}
 
 The \erlmodule{monitor} offers functions to conveniently store and retrieve
@@ -144,8 +148,10 @@ for the client processes as it reports to the monitor in the
 All other processes should use \erlfun{monitor}{monitor\_set\_value}{/3} with
 the same semantics.
 
-\section{Writing Unittests}
+\section{Writing Unit Tests}
 
-\subsection{Plain unittests}
+\subsection{Plain Unit Tests}
 
-\subsection{Randomized Testing using \texttt{tester.erl}}
+\subsection{Randomized Testing Using \texttt{tester.erl}}
+
+\subsection{Randomized Testing Using \texttt{proto_sched.erl}}
