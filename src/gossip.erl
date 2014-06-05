@@ -151,7 +151,7 @@
 -export([init/1, on_inactive/2, on_active/2]).
 
 %API
--export([start_link/1, activate/1, deactivate/0, remove_all_tombstones/0, check_config/0]).
+-export([start_link/1, activate/1, remove_all_tombstones/0, check_config/0]).
 
 % interaction with the ring maintenance:
 -export([rm_filter_slide_msg/3, rm_send_activation_msg/5, rm_my_range_changed/3, rm_send_new_range/5]).
@@ -301,12 +301,6 @@ activate(MyRange) ->
                               fun gossip:rm_filter_slide_msg/3,
                               fun gossip:rm_send_activation_msg/5, 1)
     end.
-
-
--spec deactivate() -> ok.
-deactivate() ->
-    GossipPid = pid_groups:get_my(gossip),
-    comm:send_local(GossipPid, {deactivate_gossip}).
 
 
 %% @doc Globally removes all tombstones from previously stopped callback modules.
