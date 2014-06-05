@@ -22,15 +22,17 @@
 
 -export([publish/2, subscribe/2, unsubscribe/2, get_subscribers/1]).
 
+-include("client_types.hrl").
+
 %% @doc Publishes an event under a given topic.
--spec publish(string(), string()) -> {ok}.
+-spec publish(client_key(), string()) -> {ok}.
 publish(Topic, Content) ->
     Subscribers = get_subscribers(Topic),
     _ = [ pubsub_publish:publish(X, Topic, Content) || X <- Subscribers ],
     {ok}.
 
 %% @doc Subscribes a URL for a topic.
--spec subscribe(string(), string()) -> api_tx:commit_result().
+-spec subscribe(client_key(), string()) -> api_tx:commit_result().
 subscribe(Topic, URL) ->
     {TLog, Res} = api_tx:read(api_tx:new_tlog(), Topic),
     {_TLog2, [_, CommitRes]} =
@@ -43,7 +45,7 @@ subscribe(Topic, URL) ->
     CommitRes.
 
 %% @doc Unsubscribes a URL from a topic.
--spec unsubscribe(string(), string()) -> api_tx:commit_result() | {fail, not_found}.
+-spec unsubscribe(client_key(), string()) -> api_tx:commit_result() | {fail, not_found}.
 unsubscribe(Topic, URL) ->
     {TLog, Res} = api_tx:read(api_tx:new_tlog(), Topic),
     case Res of
@@ -60,7 +62,7 @@ unsubscribe(Topic, URL) ->
     end.
 
 %% @doc Queries the subscribers of a query.
--spec get_subscribers(Topic::string()) -> [string()].
+-spec get_subscribers(Topic::client_key()) -> [string()].
 get_subscribers(Topic) ->
     {Res, Value} = api_tx:read(Topic),
     case Res of
