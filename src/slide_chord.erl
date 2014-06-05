@@ -90,12 +90,8 @@ change_my_id(State, SlideOp, ReplyPid) ->
             rm_loop:leave(),
             % de-activate processes not needed anymore:
             dht_node_reregister:deactivate(),
-            % note: do not deactivate vivaldi or dc_clustering -
+            % note: do not deactivate gossip, vivaldi or dc_clustering -
             % their values are still valid and still count!
-            %% TODO Gossip should not be deactivated
-            gossip:deactivate(),
-            %   dc_clustering:deactivate(),
-            %   vivaldi:deactivate(),
             dn_cache:unsubscribe(),
             rt_loop:deactivate(),
             service_per_vm:deregister_dht_node(comm:this()),
