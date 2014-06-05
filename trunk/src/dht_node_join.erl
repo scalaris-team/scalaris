@@ -947,9 +947,9 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages, IsJump) ->
        true ->
            cyclon:activate(),
            vivaldi:activate(),
-           dc_clustering:activate()
+           dc_clustering:activate(),
+           gossip:activate(nodelist:node_range(Neighbors))
     end,
-    gossip:activate(nodelist:node_range(Neighbors)),
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
     NewRT_ext = ?RT:empty_ext(Neighbors),
