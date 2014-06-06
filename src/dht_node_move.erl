@@ -48,7 +48,7 @@
          check_config/0]).
 % for dht_node_join:
 -export([send/3, send_no_slide/3, notify_source_pid/2,
-         check_setup_slide_not_found/5, exec_setup_slide_not_found/10,
+         check_setup_slide_not_found/5, exec_setup_slide_not_found/11,
          use_incremental_slides/0, get_max_transport_entries/0]).
 
 -ifdef(with_export_type_support).
@@ -461,7 +461,7 @@ setup_slide(State, Type, MoveFullId, MyNode, TargetNode, TargetId, Tag,
                         State, Type, MyNode, TargetNode, TargetId),
             exec_setup_slide_not_found(
               Command, State, MoveFullId, TargetNode, TargetId, Tag,
-              MaxTransportEntries, SourcePid, MsgTag, NextOp);
+              MaxTransportEntries, SourcePid, MsgTag, NextOp, false);
         {wrong_neighbor, _PredOrSucc, SlideOp} -> % wrong pred or succ
             abort_slide(State, SlideOp, wrong_pred_succ_node, true)
     end.
@@ -554,17 +554,22 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
         OtherMaxTransportEntries::unknown | pos_integer(),
         SourcePid::comm:mypid() | null,
         MsgTag::nomsg | slide | delta_ack,
-        NextOp::slide_op:next_op()) -> dht_node_state:state().
-exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
-                           TargetId, Tag, OtherMTE, SourcePid, MsgTag, NextOp) ->
+        NextOp::slide_op:next_op(),
+        FdSubscribed::boolean()) -> dht_node_state:state().
+exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag,
+                           OtherMTE, SourcePid, MsgTag, NextOp, FdSubscribed) ->
     Neighbors = dht_node_state:get(State, neighbors),
     % note: NewType (inside the command) may be different than the initially planned type
     case Command of
         {abort, Reason, OrigType} ->
+            ?IIF(FdSubscribed,
+                 fd:unsubscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+                 ok),
             abort_slide(State, TargetNode, MoveFullId, null, SourcePid, Tag,
                         OrigType, Reason, MsgTag =/= nomsg);
         {ok, {join, 'send'} = NewType} -> % similar to {slide, pred, 'send'}
-            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+            ?IIF(FdSubscribed, ok,
+                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),
             SlideOp =
                 if UseIncrSlides orelse OtherMTE =/= unknown->
@@ -588,7 +593,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     abort_slide(State1, SlideOp1, Reason, MsgTag =/= nomsg)
             end;
         {ok, {slide, pred, 'send'} = NewType} ->
-            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+            ?IIF(FdSubscribed, ok,
+                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),
             case MsgTag of
                 nomsg -> % first inform other node:
@@ -614,7 +620,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     prepare_send_data1(State, SlideOp)
             end;
         {ok, {join, 'rcv'}} -> % similar to {slide, succ, 'rcv'}
-            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+            ?IIF(FdSubscribed, ok,
+                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
             SlideOp = slide_op:new_receiving_slide_join(MoveFullId, TargetId, join, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
             SlideOp1 = slide_op:set_setup_at_other(SlideOp), % we received a join_response before
@@ -627,7 +634,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     abort_slide(State1, SlideOp3, Reason, true)
             end;
         {ok, {jump, 'send'} = NewType} -> % similar to {ok, {slide, succ, 'send'}}
-            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+            ?IIF(FdSubscribed, ok,
+                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),            
             LeaveTargetId = node:id(nodelist:pred(Neighbors)),
             CurTargetId =
@@ -645,7 +653,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     prepare_send_data1(State, SlideOp)
             end;
         {ok, {leave, 'send'} = NewType} -> % similar to {ok, {slide, succ, 'send'}}
-            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+            ?IIF(FdSubscribed, ok,
+                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),
             % the successor may have send a wrong (final) target ID - use the correct one here
             RealTargetId = node:id(nodelist:pred(Neighbors)),
@@ -664,7 +673,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     prepare_send_data1(State, SlideOp)
             end;
         {ok, {slide, succ, 'send'} = NewType} ->
-            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+            ?IIF(FdSubscribed, ok,
+                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
             UseIncrSlides = use_incremental_slides(),
             case MsgTag of
                 nomsg -> % first inform other node:
@@ -691,7 +701,8 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
         {ok, NewType} when NewType =:= {slide, pred, 'rcv'} orelse
                                NewType =:= {leave, 'rcv'} orelse
                                NewType =:= {slide, succ, 'rcv'} ->
-            fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+            ?IIF(FdSubscribed, ok,
+                 fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
             SlideOp = slide_op:new_slide(MoveFullId, NewType, TargetId, Tag,
                                          SourcePid, OtherMTE, NextOp, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
@@ -705,6 +716,9 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode,
                     abort_slide(State1, SlideOp1, Reason, MsgTag =/= nomsg)
             end;
         {ok, move_done} ->
+            ?IIF(FdSubscribed,
+                 fd:unsubscribe([node:pidX(TargetNode)], {move, MoveFullId}),
+                 ok),
             notify_source_pid(SourcePid, {move, result, Tag, ok}),
             case MsgTag of
                 nomsg -> ok;
@@ -951,6 +965,7 @@ finish_delta2(State, SlideOp, EmbeddedMsg) ->
             abort_slide(State1, SlideOp1, Reason, true)
     end.
 
+%% @doc Finish after receiving delta and continue with the (incremental) slide.
 -spec finish_delta2B(State1::dht_node_state:state(), SlideOp1::slide_op:slide_op(),
                      Type1::slide_op:type(), NewTargetId::?RT:key())
         -> dht_node_state:state().
@@ -1192,7 +1207,7 @@ finish_delta_ack2B(State, SlideOp, {MyNextOpType, NewSlideId, MyNode,
             exec_setup_slide_not_found(
               Command, State1, NewSlideId, TargetNode, TargetId,
               Tag, slide_op:get_other_max_entries(SlideOp), SourcePid,
-              delta_ack, {none})
+              delta_ack, {none}, false)
     end.
 
 %% @doc Checks if a slide operation with the given MoveFullId exists and
@@ -1410,8 +1425,6 @@ recreate_existing_slide(OldSlideOp, State, TargetId, OtherMTE, MsgTag, NextOp) -
     PredOrSucc = slide_op:get_predORsucc(OldSlideOp),
     MoveFullId = slide_op:get_id(OldSlideOp),
     % simply re-create the slide (TargetId or NextOp have changed)
-    % note: fd:subscribe/2 will be called by exec_setup_slide_not_found
-    fd:unsubscribe([node:pidX(slide_op:get_node(OldSlideOp))], {move, MoveFullId}),
     State1 = dht_node_state:set_slide(State, PredOrSucc, null), % just in case
     % note: msg_fwd are stored in the slide and do not require additional removal
     State2 = dht_node_state:rm_db_range(State1, MoveFullId),
@@ -1419,7 +1432,7 @@ recreate_existing_slide(OldSlideOp, State, TargetId, OtherMTE, MsgTag, NextOp) -
     exec_setup_slide_not_found(
       Command, State2, MoveFullId, slide_op:get_node(OldSlideOp), TargetId,
       slide_op:get_tag(OldSlideOp), OtherMTE, slide_op:get_source_pid(OldSlideOp),
-      MsgTag, NextOp).
+      MsgTag, NextOp, true).
 
 %% @doc Aborts the given slide operation. Assume the SlideOp has already been
 %%      set in the dht_node and resets the according slide in its state to
