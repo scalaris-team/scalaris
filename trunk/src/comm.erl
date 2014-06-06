@@ -210,6 +210,7 @@ send_local(Pid, Msg) ->
                     true ->
                         LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
                                            Logger, self(), RealPid, RealMsg),
+                        ?SEND_LOCAL_CHECK_PID(RealPid, LogEpidemicMsg),
                         RealPid ! LogEpidemicMsg
                 end
         end,
