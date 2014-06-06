@@ -162,6 +162,11 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
             {{unknown}, State}
     end;
 
+handle_custom_message({rm, {update_node, Node}},
+                      {Neighborhood, RandViewSize, Cache, Churn}) ->
+    NewNeighborhood = nodelist:update_ids(Neighborhood, [Node]),
+    {{unknown}, {NewNeighborhood, RandViewSize, Cache, Churn}};
+
 handle_custom_message(_, _State) -> unknown_event.
 
 %% @doc Integrates a non-empty cyclon cache into the own random view and
@@ -184,7 +189,7 @@ add_cyclon_cache(NewCache, {Neighborhood, RandViewSize, _Cache, Churn}) ->
 
 -spec trigger_action(State::state())
         -> {ChangeReason::rm_loop:reason(), state()}.
-trigger_action({Neighborhood, RandViewSize, Cache, Churn} = State) ->
+trigger_action({Neighborhood, RandViewSize, Cache, _Churn} = State) ->
     % Trigger an update of the Random view
     % use only a subset of the cyclon cache in order not to fill the send buffer
     % with potentially non-existing nodes (in contrast, the nodes from our
@@ -218,7 +223,7 @@ trigger_action({Neighborhood, RandViewSize, Cache, Churn} = State) ->
                 true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
                 _    -> ok
             end,
-            {{unknown}, {Neighborhood, RandViewSize, Cache, Churn}}
+            {{unknown}, State}
     end.
 
 -spec new_pred(State::state(), NewPred::node:node_type()) ->
@@ -283,8 +288,16 @@ remove_node(State, NodePid) ->
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
     NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
-    % inform neighbors
-    trigger_action({NewNeighborhood, RandViewSize, Cache, Churn}).
+    % only send pred and succ the new node
+    Message = {rm, {update_node, NewMe}},
+    RndView = get_RndView(RandViewSize, Cache),
+    {Pred, Succ} = get_safe_pred_succ(NewNeighborhood, RndView),
+    comm:send(node:pidX(Succ), Message, ?SEND_OPTIONS),
+    case Pred =/= Succ of
+        true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
+        _    -> ok
+    end,
+    {{unknown}, {NewNeighborhood, RandViewSize, Cache, Churn}}.
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes([_|_] = NewNodes) ->

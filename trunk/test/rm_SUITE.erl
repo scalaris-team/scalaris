@@ -87,7 +87,7 @@ change_id_and_check(OldId, NewId) ->
                         fun(Pid, Tag, OldNeighbors, NewNeighbors, _Reason) ->
                                 comm:send_local(Pid, {rm_changed, Tag, OldNeighbors, NewNeighbors})
                         end, inf}),
-    comm:send(DhtNode, {rm, update_id, NewId}),
+    comm:send(DhtNode, {rm, update_my_id, NewId}),
     comm:send(DhtNode, {rm, unsubscribe, self(), rm_SUITE}),
     
     % check that the new ID has been set:
