@@ -570,7 +570,7 @@ process_join_msg({join, join_request, NewPred, CandId, MaxTransportEntries} = _M
             MoveFullId = uid:get_global_uid(),
             State1 = dht_node_move:exec_setup_slide_not_found(
                        Command, State, MoveFullId, NewPred, TargetId, join,
-                       MaxTransportEntries, null, nomsg, {none}),
+                       MaxTransportEntries, null, nomsg, {none}, false),
             % set up slide, now send join_response:
             MyOldPred = dht_node_state:get(State1, pred),
             % no need to tell the ring maintenance -> the other node will trigger an update
@@ -977,7 +977,7 @@ finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId, NextOp, IsJump
     State = finish_join(Me, Pred, Succ, DB, QueuedMessages, IsJump),
     State1 = dht_node_move:exec_setup_slide_not_found(
                {ok, {join, 'rcv'}}, State, MoveId, Succ, node:id(Me), join,
-               unknown, null, nomsg, NextOp),
+               unknown, null, nomsg, NextOp, false),
     gen_component:change_handler(State1, fun dht_node:on/2).
 %% userdevguide-end dht_node_join:finish_join
 
