@@ -30,7 +30,7 @@
                    state_get_last_pong/1, state_set_last_pong/2,
                    state_get_crashed_after/1, state_set_crashed_after/2,
                    state_get_table/1,
-                   state_get_monitors/1, state_set_monitors/2
+                   state_get_monitor_tab/1%, state_set_monitor_tab/2
                   ]}).
 
 -compile({inline, [rempid_get_rempid/1,
@@ -68,9 +68,9 @@
        [rempid()],  %% subscribed rem. pids + ref counting
        erlang_timestamp(),  %% local time of last pong arrival
        erlang_timestamp(),  %% remote is crashed if no pong arrives until this
-       pdb:tableid(),       %% ets table name
+       LocalSubscriberTab::pdb:tableid(),
        %% locally erlang:monitored() pids for a remote hbs:
-       [{comm:mypid(), reference()}]
+       MonitorTab::pdb:tableid()
      }).
 
 -define(SEND_OPTIONS, [{channel, prio}]).
@@ -89,7 +89,8 @@ start_link(ServiceGroup, RemotePid) ->
 -spec init(pid() | comm:mypid()) -> state().
 init(RemotePid) ->
     ?TRACE("fd_hbs init: RemotePid ~p~n", [RemotePid]),
-    TableName = pdb:new(?MODULE, [set]), %% debugging: ++ [protected]),
+    LocalSubscriberTab = pdb:new(?MODULE, [set]), %% debugging: ++ [protected]),
+    MonitorTab = pdb:new(?MODULE, [set]), %% debugging: ++ [protected]),
     RemoteFDPid = comm:get(fd, RemotePid),
     comm:send(RemoteFDPid,
               {subscribe_heartbeats, comm:this(), RemotePid},
@@ -105,7 +106,7 @@ init(RemotePid) ->
               _RemotePids = [],
               _LastPong = Now,
               _CrashedAfter = util:time_plus_ms(Now, delayfactor() * failureDetectorInterval()),
-              TableName).
+              LocalSubscriberTab, MonitorTab).
 
 -spec on(comm:message(), state()) -> state() | kill.
 on({add_subscriber, Subscriber, WatchedPid, Cookie} = _Msg, State) ->
@@ -382,10 +383,12 @@ trigger_delayed_del_watching(RemPidEntry) ->
     E1 = rempid_set_last_modified(RemPidEntry, Time),
     rempid_set_pending_demonitor(E1, true).
 
--spec state_new(comm:mypid(), [rempid()],
-                erlang_timestamp(), erlang_timestamp(), pdb:tableid()) -> state().
-state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter, Table) ->
-    {RemoteHBS, RemotePids, LastPong, CrashedAfter, Table, []}.
+-spec state_new(RemoteHBS::comm:mypid(), RemotePids::[rempid()],
+                LastPong::erlang_timestamp(), CrashedAfter::erlang_timestamp(),
+                LocalSubscriberTab::pdb:tableid(),
+                MonitorTab::pdb:tableid()) -> state().
+state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter, LocalSubscriberTab, MonitorTab) ->
+    {RemoteHBS, RemotePids, LastPong, CrashedAfter, LocalSubscriberTab, MonitorTab}.
 
 -spec state_get_rem_hbs(state())    -> comm:mypid().
 state_get_rem_hbs(State)            -> element(1, State).
@@ -405,10 +408,10 @@ state_get_crashed_after(State)      -> element(4, State).
 state_set_crashed_after(State, Val) -> setelement(4, State, Val).
 -spec state_get_table(state()) -> pdb:tableid().
 state_get_table(State)              -> element(5, State).
--spec state_get_monitors(state())   -> [{comm:mypid(), reference()}].
-state_get_monitors(State)           -> element(6, State).
--spec state_set_monitors(state(), [{comm:mypid(), reference()}]) -> state().
-state_set_monitors(State, Val)      -> setelement(6, State, Val).
+-spec state_get_monitor_tab(state())-> pdb:tableid().
+state_get_monitor_tab(State)        -> element(6, State).
+%% -spec state_set_monitor_tab(state(), pdb:tableid()) -> state().
+%% state_set_monitor_tab(State, Val)   -> setelement(6, State, Val).
 
 -spec state_add_entry(state(), {pid(), comm:mypid(), fd:cookie()}) -> state().
 state_add_entry(State, {Subscriber, WatchedPid, Cookie}) ->
@@ -550,19 +553,34 @@ state_del_watched_pid(State, WatchedPid, Subscriber) ->
 
 -spec state_add_monitor(state(), comm:mypid()) -> state().
 state_add_monitor(State, WatchedPid) ->
+    Table = state_get_monitor_tab(State),
+    CountKey = {'$monitor_count', WatchedPid},
+    X = case pdb:get(CountKey, Table) of
+            undefined                        -> 1;
+            {CountKey, I} when is_integer(I) -> I + 1
+        end,
+    pdb:set({CountKey, X}, Table),
     MonRef = erlang:monitor(process, comm:make_local(comm:get_plain_pid(WatchedPid))),
-    state_set_monitors(
-      State, [{WatchedPid, MonRef} | state_get_monitors(State)]).
+    pdb:set({{'$monitor', WatchedPid}, MonRef}, Table),
+    State.
 
 -spec state_del_monitor(state(), comm:mypid()) -> state().
 state_del_monitor(State, WatchedPid) ->
-    Monitors = state_get_monitors(State),
-    case lists:keytake(WatchedPid, 1, Monitors) of
-        {value, {WatchedPid, MonRef}, RestMonitors} ->
-            erlang:demonitor(MonRef),
-            state_set_monitors(State, RestMonitors);
-        false -> State
-    end.
+    Table = state_get_monitor_tab(State),
+    CountKey = {'$monitor_count', WatchedPid},
+    case pdb:take(CountKey, Table) of
+        undefined -> ok;
+        {CountKey, 1} ->
+            MonKey = {'$monitor', WatchedPid},
+            case pdb:take(MonKey, Table) of
+                undefined -> ok;
+                {MonKey, MonRef} when is_reference(MonRef) ->
+                    erlang:demonitor(MonRef)
+            end;
+        {CountKey, X} when is_integer(X) andalso X > 1 ->
+            pdb:set({CountKey, X - 1}, Table)
+    end,
+    State.
 
 -spec rempid_new(comm:mypid()) -> rempid().
 rempid_new(Pid) ->
