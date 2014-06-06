@@ -172,7 +172,7 @@ on({add_watching_of, WatchedPid} = _Msg, State) ->
 on({del_watching_of, WatchedPid} = _Msg, State) ->
     ?TRACE("fd_hbs del_watching_of ~.0p~n", [_Msg]),
     %% request from remote fd_hbs: no longer watch a pid locally
-    state_del_monitor(State, WatchedPid);
+    element(2, state_del_monitor(State, WatchedPid));
 
 on({update_remote_hbs_to, Pid}, State) ->
     ?TRACE("fd_hbs update_remote_hbs_to ~p~n", [Pid]),
@@ -261,28 +261,32 @@ on({crashed, WatchedPid, Reason}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
     report_crashed_remote_pid(State, WatchedPid, Reason, warn);
 
-on({report_crashed, WatchedPid, Reason}, State) ->
-    ?TRACE("fd_hbs report crashed ~p~n", [WatchedPid]),
-    report_crashed_remote_pid(State, WatchedPid, Reason, nowarn);
+on({report_crashed, WatchedPids, Reason}, State) ->
+    ?TRACE("fd_hbs report crashed ~p~n", [WatchedPids]),
+    lists:foldl(fun(WatchedPid, StateX) ->
+                        report_crashed_remote_pid(StateX, WatchedPid, Reason,
+                                                  nowarn)
+                end, State, WatchedPids);
 
 on({report_crash, LocalPids, Reason}, State) when is_list(LocalPids) ->
     ?TRACE("fd_hbs crash reported ~.0p, ~.0p with reason ~.0p~n",
            [WatchedPid, pid_groups:group_and_name_of(WatchedPid), Reason]),
     % similar to 'DOWN' report below
-    lists:foldl(
-      fun(LocalPid, StateX) ->
-              GlobalPid = comm:make_global(LocalPid),
-              case state_has_monitor(StateX, GlobalPid) of
-                  true ->
-                      %% send crash report to remote end.
-                      comm:send(state_get_rem_hbs(State),
-                                {report_crashed, GlobalPid, Reason},
-                                ?SEND_OPTIONS),
-                      %% delete WatchedPid and MonRef locally
-                      state_del_monitor(State, GlobalPid);
-                  false -> StateX
-              end
-      end, State, LocalPids);
+    {WatchedPids, State1} =
+        lists:foldl(
+          fun(LocalPid, {WatchedPidsX, StateX}) ->
+                  GlobalPid = comm:make_global(LocalPid),
+                  %% delete WatchedPid and MonRef locally (if existing)
+                  case state_del_monitor(StateX, GlobalPid) of
+                      {true, StateX1} -> {[GlobalPid | WatchedPidsX], StateX1};
+                      {false, StateX1} -> {WatchedPidsX, StateX1}
+                  end
+          end, {[], State}, LocalPids),
+    %% send crash report to remote end.
+    comm:send(state_get_rem_hbs(State),
+              {report_crashed, WatchedPids, Reason},
+              ?SEND_OPTIONS),
+    State1;
 
 on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
     ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n",
@@ -293,7 +297,7 @@ on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
               {crashed, GlobalPid, 'DOWN'}, ?SEND_OPTIONS),
     %% delete WatchedPid and MonRef locally (MonRef is already
     %% invalid, as Pid crashed)
-    _S1 = state_del_monitor(State, GlobalPid).
+    _S1 = element(2, state_del_monitor(State, GlobalPid)).
 
 %% @doc Checks existence and validity of config parameters for this module.
 -spec check_config() -> boolean().
@@ -563,11 +567,6 @@ state_del_watched_pid(State, WatchedPid, Subscriber) ->
                  State
     end.
 
--spec state_has_monitor(state(), comm:mypid()) -> boolean().
-state_has_monitor(State, WatchedPid) ->
-    Table = state_get_monitor_tab(State),
-    pdb:get({'$monitor', WatchedPid}, Table) =/= undefined.
-
 -spec state_add_monitor(state(), comm:mypid()) -> state().
 state_add_monitor(State, WatchedPid) ->
     Table = state_get_monitor_tab(State),
@@ -581,23 +580,23 @@ state_add_monitor(State, WatchedPid) ->
     pdb:set({{'$monitor', WatchedPid}, MonRef}, Table),
     State.
 
--spec state_del_monitor(state(), comm:mypid()) -> state().
+-spec state_del_monitor(state(), comm:mypid()) -> {Found::boolean(), state()}.
 state_del_monitor(State, WatchedPid) ->
     Table = state_get_monitor_tab(State),
     CountKey = {'$monitor_count', WatchedPid},
-    case pdb:take(CountKey, Table) of
-        undefined -> ok;
-        {CountKey, 1} ->
-            MonKey = {'$monitor', WatchedPid},
-            case pdb:take(MonKey, Table) of
-                undefined -> ok;
-                {MonKey, MonRef} when is_reference(MonRef) ->
-                    erlang:demonitor(MonRef)
-            end;
-        {CountKey, X} when is_integer(X) andalso X > 1 ->
-            pdb:set({CountKey, X - 1}, Table)
-    end,
-    State.
+    Found = case pdb:take(CountKey, Table) of
+                undefined ->
+                    false;
+                {CountKey, 1} ->
+                    MonKey = {'$monitor', WatchedPid},
+                    {MonKey, MonRef} = pdb:take(MonKey, Table),
+                    erlang:demonitor(MonRef),
+                    true;
+                {CountKey, X} when is_integer(X) andalso X > 1 ->
+                    pdb:set({CountKey, X - 1}, Table),
+                    true
+            end,
+    {Found, State}.
 
 -spec rempid_new(comm:mypid()) -> rempid().
 rempid_new(Pid) ->
