@@ -400,6 +400,7 @@ tester_type_check_rrepair(_Config) ->
     tester:register_value_creator({typedef, merkle_tree, hash_fun}, merkle_tree, tester_create_hash_fun, 1),
     tester:register_value_creator({typedef, merkle_tree, inner_hash_fun}, merkle_tree, tester_create_inner_hash_fun, 1),
     tester:register_value_creator({typedef, hfs_lhsp, hfs_fun}, hfs_lhsp, tester_create_hfs_fun, 1),
+    tester:register_value_creator({typedef, hfs_lhsp, hfs}, hfs_lhsp, tester_create_hfs, 1),
     Modules =
         [ {rr_recon_stats, [], []},
           {db_generator,
@@ -499,6 +500,7 @@ tester_type_check_rrepair(_Config) ->
     tester:unregister_type_checker({typedef, intervals, interval}),
     tester:unregister_type_checker({typedef, intervals, continuous_interval}),
     tester:unregister_type_checker({typedef, intervals, non_empty_interval}),
+    tester:unregister_value_creator({typedef, hfs_lhsp, hfs}),
     tester:unregister_value_creator({typedef, hfs_lhsp, hfs_fun}),
     true.
 
