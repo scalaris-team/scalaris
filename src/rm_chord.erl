@@ -122,6 +122,10 @@ handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
     contact_new_nodes(NewNodes),
     {{unknown}, State};
 
+handle_custom_message({rm, {update_node, Node}}, {OldNeighborhood}) ->
+    NewNeighborhood = nodelist:update_ids(OldNeighborhood, [Node]),
+    {{unknown}, {NewNeighborhood}};
+
 handle_custom_message(_, _State) -> unknown_event.
 
 -spec trigger_action(State::state())
@@ -181,8 +185,16 @@ remove_node({OldNeighborhood}, NodePid) ->
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({OldNeighborhood}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
-    % inform neighbors
-    trigger_action({NewNeighborhood}).
+    % only send pred and succ the new node
+    Message = {rm, {update_node, NewMe}},
+    Pred = nodelist:pred(NewNeighborhood),
+    Succ = nodelist:succ(NewNeighborhood),
+    comm:send(node:pidX(Succ), Message, ?SEND_OPTIONS),
+    case Pred =/= Succ of
+        true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
+        _    -> ok
+    end,
+    {{unknown}, {NewNeighborhood}}.
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes(NewNodes) ->

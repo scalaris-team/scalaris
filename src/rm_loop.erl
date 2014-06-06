@@ -91,7 +91,7 @@
     {rm, pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {rm, succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
     {rm, node_left, Node::node:node_type()} |
-    {rm, update_id, NewId::?RT:key()} |
+    {rm, update_my_id, NewId::?RT:key()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {rm, subscribe, Pid::pid(), Tag::any(), subscriber_filter_fun(), subscriber_exec_fun(), MaxCalls::pos_integer() | inf} |
     {rm, unsubscribe, Pid::pid(), Tag::any()}).
@@ -165,7 +165,7 @@ propose_new_neighbors(NewNodes) ->
 update_id(NewId) ->
     %TODO: do not send message, include directly
     Pid = pid_groups:get_my(dht_node),
-    comm:send_local(Pid, {rm, update_id, NewId}).
+    comm:send_local(Pid, {rm, update_my_id, NewId}).
 
 %% @doc Filter function for subscriptions that returns true if a
 %%      direct neighbor, i.e. pred, succ or base node, changed.
@@ -292,7 +292,7 @@ on({rm, node_left, NodePid}, State) ->
     RMFun = fun(RM_State) -> ?RM:remove_node(RM_State, NodePid) end,
     update_state(State, RMFun);
 
-on({rm, update_id, NewId}, State) ->
+on({rm, update_my_id, NewId}, State) ->
     Neighborhood = ?RM:get_neighbors(element(1, State)),
     OldMe = nodelist:node(Neighborhood),
     case node:id(OldMe) of
