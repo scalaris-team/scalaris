@@ -369,7 +369,9 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
 crashed_node(State, DeadPid, Reason) ->
     RMFun = fun(RM_State) -> ?RM:crashed_node(RM_State, DeadPid, Reason) end,
     NewState = update_state(State, RMFun, DeadPid),
-    case config:read(rrepair_after_crash) of
+    % only do rrepair for non-slide failures (otherwise the data was already transferred)
+    case config:read(rrepair_after_crash) andalso
+             not lists:member(Reason, [leave, jump]) of
         true ->
             OldPred = nodelist:pred(?RM:get_neighbors(element(1, State))),
             NewNeighb = ?RM:get_neighbors(element(1, NewState)),
