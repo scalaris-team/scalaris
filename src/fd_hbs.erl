@@ -261,15 +261,27 @@ on({crashed, WatchedPid, Reason}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
     report_crashed_remote_pid(State, WatchedPid, Reason, warn);
 
-on({report_crash, LocalPids, Reason}, State) ->
+on({report_crashed, WatchedPid, Reason}, State) ->
+    ?TRACE("fd_hbs report crashed ~p~n", [WatchedPid]),
+    report_crashed_remote_pid(State, WatchedPid, Reason, nowarn);
+
+on({report_crash, LocalPids, Reason}, State) when is_list(LocalPids) ->
     ?TRACE("fd_hbs crash reported ~.0p, ~.0p with reason ~.0p~n",
            [WatchedPid, pid_groups:group_and_name_of(WatchedPid), Reason]),
-    % only allowed by self-monitoring hbs!
-    ?DBG_ASSERT(comm:make_local(state_get_rem_hbs(State)) =:= self()),
+    % similar to 'DOWN' report below
     lists:foldl(
       fun(LocalPid, StateX) ->
-              report_crashed_remote_pid(StateX, comm:make_global(LocalPid),
-                                        Reason, nowarn)
+              GlobalPid = comm:make_global(LocalPid),
+              case state_has_monitor(StateX, GlobalPid) of
+                  true ->
+                      %% send crash report to remote end.
+                      comm:send(state_get_rem_hbs(State),
+                                {report_crashed, GlobalPid, Reason},
+                                ?SEND_OPTIONS),
+                      %% delete WatchedPid and MonRef locally
+                      state_del_monitor(State, GlobalPid);
+                  false -> StateX
+              end
       end, State, LocalPids);
 
 on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
@@ -550,6 +562,11 @@ state_del_watched_pid(State, WatchedPid, Subscriber) ->
                          WatchedPid]),
                  State
     end.
+
+-spec state_has_monitor(state(), comm:mypid()) -> boolean().
+state_has_monitor(State, WatchedPid) ->
+    Table = state_get_monitor_tab(State),
+    pdb:get({'$monitor', WatchedPid}, Table) =/= undefined.
 
 -spec state_add_monitor(state(), comm:mypid()) -> state().
 state_add_monitor(State, WatchedPid) ->
