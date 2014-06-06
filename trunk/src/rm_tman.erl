@@ -428,6 +428,8 @@ update_nodes({OldNeighborhood, RandViewSize, OldCache, _Churn},
              NodesToAdd, NodesToRemove, RemoveNodeEvalFun) ->
     % keep all nodes that are not in NodesToRemove
     % note: NodesToRemove should have 0 or 1 element in most cases
+    OldPredPid = node:pidX(nodelist:pred(OldNeighborhood)),
+    OldSuccPid = node:pidX(nodelist:succ(OldNeighborhood)),
     case NodesToRemove of
         [] ->
             Nbh1 = OldNeighborhood,
@@ -465,11 +467,12 @@ update_nodes({OldNeighborhood, RandViewSize, OldCache, _Churn},
                           true -> 0;
                           _    -> RandViewSize
                       end,
+    NewPredPid = node:pidX(nodelist:pred(NewNeighborhood)),
+    NewSuccPid = node:pidX(nodelist:succ(NewNeighborhood)),
     NewState = {NewNeighborhood, NewRandViewSize, NewCache, NewChurn},
-    case nodelist:pred(OldNeighborhood) =/= nodelist:pred(NewNeighborhood) orelse
-        nodelist:succ(OldNeighborhood) =/= nodelist:succ(NewNeighborhood) of
-        true -> element(2, trigger_action(NewState));
-        _    -> NewState
+    if OldPredPid =/= NewPredPid orelse OldSuccPid =/= NewSuccPid ->
+           element(2, trigger_action(NewState));
+       true -> NewState
     end.
 
 -spec trigger_interval() -> pos_integer().
