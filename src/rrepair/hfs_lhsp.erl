@@ -46,7 +46,7 @@
 
 % for tester:
 -export([new_feeder/2, apply_val_feeder/3,
-         tester_create_hfs_fun/1]).
+         tester_create_hfs_fun/1, tester_create_hfs/1]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % API functions
@@ -119,3 +119,7 @@ hash_value(Val, HashFun) ->
 -spec tester_create_hfs_fun(1..2) -> hfs_fun().
 tester_create_hfs_fun(1) -> fun erlang:adler32/1;
 tester_create_hfs_fun(2) -> fun erlang:md5/1.
+
+-spec tester_create_hfs({hfs_lhsp, Hf_count::1..100, H1_fun::hfs_fun(), H2_fun::hfs_fun()}) -> hfs().
+tester_create_hfs({hfs_lhsp, Hf_count, H1_fun, H2_fun}) ->
+    {hfs_lhsp, Hf_count, H1_fun, H2_fun}.
