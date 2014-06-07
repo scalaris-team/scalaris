@@ -118,13 +118,14 @@
     }).
 
 -type load_data_uninit() :: #load_data{}.
+-type load_data_skipped() :: {load_data, atom(), skip}.
 -type load_data() :: {load_data, Name::atom(), Avg::avg(), Avg2::avg(),
                       Min::non_neg_integer(), Max::non_neg_integer(),
                       Histogram::histogram()}.
 
 %% -type load_data_list() :: [ load_data_uninit() | load_data(), ...].
--type load_data_list() :: [load_data(), ...].
--type load_data_list2() :: [load_data_uninit() | load_data(), ...].
+-type load_data_list() :: [load_data() | load_data_skipped(), ...].
+-type load_data_list2() :: [load_data_uninit() | load_data_skipped() | load_data(), ...].
 
 -type data() :: {load_data_list(), ring_data()}.
 
@@ -337,7 +338,8 @@ select_data({PrevState, CurState}) ->
         uninit ->
             request_node_details(CurState), CurState;
         init ->
-            {Data, NewCurState1} = prepare_data(CurState),
+            Metrics = skipped_metrics(state_get(load_data_list, CurState), []),
+            {Data, NewCurState1} = prepare_data(Metrics, CurState),
             Pid = pid_groups:get_my(gossip),
             comm:send_local(Pid, {selected_data, state_get(instance, NewCurState1), Data}),
             NewCurState1
@@ -368,12 +370,12 @@ select_reply_data(PData, Ref, RoundStatus, Round, {PrevState, CurState}) ->
                 [state_get(instance, CurState)]),
             {send_back, {PrevState, CurState}};
         init when RoundStatus =:= current_round ->
-            {Data1, CurState1} = prepare_data(CurState),
+            Metrics = skipped_metrics(state_get(load_data_list, CurState), element(1, PData)),
+            {Data1, CurState1} = prepare_data(Metrics, CurState),
+            Data2 = replace_skipped(element(1, PData), Data1, Metrics),
             Pid = pid_groups:get_my(gossip),
-            comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState1), Data1, Ref, Round}),
-
+            comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState1), Data2, Ref, Round}),
             {_Data2, CurState2} = merge_load_data(PData, CurState1),
-
             %% log:log(debug, "[ ~w ] Data after select_reply_data: ~w", [state_get(instance, CurState), get_load_info(CurState)]),
             {ok, {PrevState, CurState2}};
         init when RoundStatus =:= old_round ->
@@ -386,13 +388,16 @@ select_reply_data(PData, Ref, RoundStatus, Round, {PrevState, CurState}) ->
                     {discard_msg, {PrevState, CurState}};
                 false ->
                     log:log(?SHOW, "[ ~w ] select_reply_data in old_round", [?MODULE]),
-                    {Data1, PrevState1} = prepare_data(PrevState),
+                    Metrics = skipped_metrics(state_get(load_data_list, PrevState), element(1, PData)),
+                    {Data1, PrevState1} = prepare_data(Metrics, PrevState),
+                    Data2 = replace_skipped(element(1, PData), Data1, Metrics),
                     Pid = pid_groups:get_my(gossip),
-                    comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState), Data1, Ref, Round}),
+                    comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState), Data2, Ref, Round}),
                     {_Data2, PrevState2} = merge_load_data(PData, PrevState1),
                     {ok, {PrevState2, CurState}}
             end
     end.
+
 
 %% @doc Integrate the reply data. <br/>
 %%      Called by the behaviour module upon a p2p_exch message. <br/>
@@ -434,15 +439,19 @@ handle_msg({get_node_details_response, NodeDetails}, {PrevState, CurState}) ->
         [ begin
               Module = data_get(name, LoadData),
               Load = Module:get_load(NodeDetails),
-              log:log(?SHOW, "[ ~w ] Load: ~w", [state_get(instance, CurState), Load]),
-              LoadData1 = data_set(avg, {float(Load), 1.0}, LoadData),
-              LoadData2 = data_set(min, Load, LoadData1),
-              LoadData3 = data_set(max, Load, LoadData2),
-              LoadData4 = data_set(avg2, {float(Load*Load), 1.0}, LoadData3),
-              % histogram
-              Histo = init_histo(Module, NodeDetails, CurState),
-              log:log(?SHOW,"[ ~w ] Histo: ~s", [state_get(instance, CurState), to_string(Histo)]),
-              _LoadData5 = data_set(histo, Histo, LoadData4)
+              case Load of
+                  unknown -> {load_data, Module, skip};
+                  Load ->
+                      log:log(?SHOW, "[ ~w ] Load: ~w", [state_get(instance, CurState), Load]),
+                      LoadData1 = data_set(avg, {float(Load), 1.0}, LoadData),
+                      LoadData2 = data_set(min, Load, LoadData1),
+                      LoadData3 = data_set(max, Load, LoadData2),
+                      LoadData4 = data_set(avg2, {float(Load*Load), 1.0}, LoadData3),
+                      % histogram
+                      Histo = init_histo(Module, NodeDetails, CurState),
+                      log:log(?SHOW,"[ ~w ] Histo: ~s", [state_get(instance, CurState), to_string(Histo)]),
+                      _LoadData5 = data_set(histo, Histo, LoadData4)
+              end
           end
         || LoadData <- state_get(load_data_list, CurState)],
 
@@ -459,7 +468,8 @@ handle_msg({get_node_details_response, NodeDetails}, {PrevState, CurState}) ->
     RingData2 = data_set(avg_kr, AvgKr, RingData1),
     CurState2 = state_set(ring_data, RingData2, CurState1),
 
-    {NewData, CurState3} = prepare_data(CurState2),
+    Metrics = skipped_metrics(state_get(load_data_list, CurState2), []),
+    {NewData, CurState3} = prepare_data(Metrics, CurState2),
     CurState4 = state_set(status, init, CurState3),
 
     % send PData to BHModule
@@ -677,9 +687,9 @@ integrate_data_init(QData, RoundStatus, {PrevState, CurState}) ->
             %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [state_get(instance, State), _ValuesAll]),
             %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [state_get(instance, State), _PrevLoadInfo]),
             _LoadInfo = get_load_info(CurState),
-            _Histo = data_get(histo, get_default_load_data(_NewLoad)),
-            log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
-                [state_get(instance, CurState), to_string(_LoadInfo), to_string(_Histo)]),
+            %% _Histo = data_get(histo, get_default_load_data(_NewLoad)),
+            %% log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
+                %% [state_get(instance, CurState), to_string(_LoadInfo), to_string(_Histo)]),
             {PrevState, NewState1};
         old_round ->
              case discard_old_rounds() of
@@ -763,15 +773,20 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, CurStat
     end,
     RingConverged = lists:all(Fun, [size_inv, avg_kr]),
 
+    Modules = skipped_metrics(NewLoadList, []),
     %% Load convergence
     LoadModulesConverged =
         [begin
-             ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
-             OldValue = calc_current_estimate(data_get(AvgType, OldLoad)),
-             NewValue = calc_current_estimate(data_get(AvgType, NewLoad)),
-             log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
-                     [state_get(instance, CurState), AvgType, OldValue, NewValue]),
-             _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
+             case lists:member(data_get(name, NewLoad), Modules) of
+                 true -> true;
+                 false ->
+                     ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
+                     OldValue = calc_current_estimate(data_get(AvgType, OldLoad)),
+                     NewValue = calc_current_estimate(data_get(AvgType, NewLoad)),
+                     log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
+                             [state_get(instance, CurState), AvgType, OldValue, NewValue]),
+                     _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
+             end
          end
          || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList),
             AvgType            <- [avg, avg2]
@@ -782,27 +797,35 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, CurStat
     HaveConverged1 = RingConverged andalso LoadConverged,
     log:log(debug, "Averages have converged: ~w", [HaveConverged1]),
 
-    HistoModulesConverged =
-        [ begin
-              ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
-              % Combine the avg values of the buckets of two histograms into one tuple list
-              Combine = fun ({Interval, AvgOld}, {Interval, AvgNew}) -> {AvgOld, AvgNew} end,
-              CompList = lists:zipwith(Combine,
-                                       data_get(histo, OldLoad), data_get(histo, NewLoad)),
+    %% TODO: Fix convergence counting for histograms with skipped values
+    %% (atm, all histogrames are ignored in regard to convergence counting)
 
-              % check that all the buckets of histogram have changed less than epsilon percent
-              Fun1 = fun({OldAvg, NewAvg}) ->
-                             OldEstimate = calc_current_estimate(OldAvg),
-                             NewEstimate = calc_current_estimate(NewAvg),
-                             _HasConverged = calc_change(OldEstimate, NewEstimate) < AvgChangeEpsilon
-                     end,
-              _HaveConverged2 = lists:all(Fun1, CompList)
-          end
-          || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList)
-        ],
-
-    HaveConverged2 = lists:all(fun(X) -> X end, HistoModulesConverged),
-    log:log(debug, "Histogram has converged: ~w", [HaveConverged2]),
+    %% HistoModulesConverged =
+    %%     [ begin
+    %%         case lists:member(data_get(name, NewLoad), Modules) of
+    %%              true -> true;
+    %%              false ->
+    %%                   ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
+    %%                   % Combine the avg values of the buckets of two histograms into one tuple list
+    %%                   Combine = fun ({Interval, AvgOld}, {Interval, AvgNew}) -> {AvgOld, AvgNew} end,
+    %%                   CompList = lists:zipwith(Combine,
+    %%                                            data_get(histo, OldLoad), data_get(histo, NewLoad)),
+    %%
+    %%                   % check that all the buckets of histogram have changed less than epsilon percent
+    %%                   Fun1 = fun({OldAvg, NewAvg}) ->
+    %%                                  OldEstimate = calc_current_estimate(OldAvg),
+    %%                                  NewEstimate = calc_current_estimate(NewAvg),
+    %%                                  _HasConverged = calc_change(OldEstimate, NewEstimate) < AvgChangeEpsilon
+    %%                          end,
+    %%                   _HaveConverged2 = lists:all(Fun1, CompList)
+    %%         end
+    %%       end
+    %%       || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList)
+    %%     ],
+    %%
+    %% HaveConverged2 = lists:all(fun(X) -> X end, HistoModulesConverged),
+    HaveConverged2 = true,
+    %% log:log(debug, "Histogram has converged: ~w", [self(), HaveConverged2]),
 
     HaveConverged = HaveConverged1 andalso HaveConverged2,
     case HaveConverged of
@@ -963,11 +986,14 @@ get_default_load_data(LoadDataList) ->
              (size_inv, ring_data()) -> avg();
              (avg_kr, ring_data()) -> avg_kr().
 data_get(_Key, unknown) -> unknown;
+data_get(name, {load_data, Name, skip}) ->
+    Name;
+data_get(_Key, {load_data, _Module, skip}) -> unknown;
 data_get(_Key, []) ->
     [];
 data_get(Key, [LoadData | Other]) ->
     [data_get(Key, LoadData) | data_get(Key, Other)];
-data_get(name, #load_data{name = Name}) ->
+data_get(name, LoadData=#load_data{name = Name}) when is_record(LoadData, load_data) ->
     Name;
 data_get(avg, #load_data{avg = Avg}) ->
     Avg;
@@ -989,6 +1015,7 @@ data_get(avg_kr, #ring_data{avg_kr = AvgKr}) ->
                           (Key::size_inv | avg_kr,
                            unknown | ring_data()) -> float() | unknown.
 get_current_estimate(_Key, unknown) -> unknown;
+get_current_estimate(_Key, {load_data, _Module, skip}) -> unknown;
 get_current_estimate(avg, #load_data{avg=Avg}) ->
     calc_current_estimate(Avg);
 get_current_estimate(avg2, #load_data{avg2=Avg2}) ->
@@ -1032,19 +1059,23 @@ data_set(Key, Value, RingData) when is_record(RingData, ring_data) ->
 
 %% @doc Prepares a load_data record for sending it to a peer and updates the
 %%      load_data of self accordingly.
--spec prepare_data(State::state()) -> {{load_data_list(), ring_data()}, state()}.
-prepare_data(State) ->
+-spec prepare_data([atom()], state()) -> {{load_data_list(), ring_data()}, state()}.
+prepare_data(SkippedModules, State) ->
     % Averages
     Fun = fun (AvgType, MyData) -> divide2(AvgType, MyData) end,
     LoadDataNew =
         [begin
-             LoadData2 = lists:foldl(Fun, LoadData, [avg, avg2]),
+             case lists:member(data_get(name, LoadData), SkippedModules) of
+                  true -> LoadData;
+                  false ->
+                     LoadData2 = lists:foldl(Fun, LoadData, [avg, avg2]),
 
-             % Min and Max
-             do_nothing,
+                     % Min and Max
+                     do_nothing,
 
-             % Histogram
-             _LoadData3 = divide2(LoadData2)
+                     % Histogram
+                     _LoadData3 = divide2(LoadData2)
+             end
          end
     || LoadData <- state_get(load_data_list, State)],
 
@@ -1092,33 +1123,38 @@ merge_load_data(OtherData, State) ->
 merge_load_data(Update, {OtherLoadList, OtherRing}, State) ->
 
     MyLoadList = state_get(load_data_list, State),
+    Skipped = skipped_metrics(MyLoadList, OtherLoadList),
     LoadDataListNew =
         [begin
-             ?ASSERT(data_get(name, MyLoad1) =:= data_get(name, OtherLoad)),
-             % Averages load
-             Fun = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherLoad) end,
-             MyLoad2 = lists:foldl(Fun, MyLoad1, [avg, avg2]),
+             case lists:member(data_get(name, MyLoad1), Skipped) andalso
+                    lists:member(data_get(name, OtherLoad), Skipped) of
+                  true -> MyLoad1;
+                  false ->
+                     ?ASSERT(data_get(name, MyLoad1) =:= data_get(name, OtherLoad)),
+                     % Averages load
+                     Fun = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherLoad) end,
+                     MyLoad2 = lists:foldl(Fun, MyLoad1, [avg, avg2]),
 
-             % Min
-             MyMin = data_get(min, MyLoad2),
-             OtherMin = data_get(min, OtherLoad),
-             MyLoad3 =
-                 if  MyMin =< OtherMin -> data_set(min, MyMin, MyLoad2);
-                     MyMin > OtherMin -> data_set(min, OtherMin, MyLoad2)
-                 end,
+                     % Min
+                     MyMin = data_get(min, MyLoad2),
+                     OtherMin = data_get(min, OtherLoad),
+                     MyLoad3 =
+                         if  MyMin =< OtherMin -> data_set(min, MyMin, MyLoad2);
+                             MyMin > OtherMin -> data_set(min, OtherMin, MyLoad2)
+                         end,
 
-             % Max
-             MyMax = data_get(max, MyLoad3),
-             OtherMax = data_get(max, OtherLoad),
-             MyLoad4 =
-                 if  MyMax =< OtherMax -> data_set(max, OtherMax, MyLoad3);
-                     MyMax > OtherMax -> data_set(max, MyMax, MyLoad3)
-                 end,
+                     % Max
+                     MyMax = data_get(max, MyLoad3),
+                     OtherMax = data_get(max, OtherLoad),
+                     MyLoad4 =
+                         if  MyMax =< OtherMax -> data_set(max, OtherMax, MyLoad3);
+                             MyMax > OtherMax -> data_set(max, MyMax, MyLoad3)
+                         end,
 
-             % Histogram
-             _MyLoad5 = merge_histo(MyLoad4, OtherLoad)
-         end
-         || {MyLoad1, OtherLoad} <- lists:zip(MyLoadList, OtherLoadList)],
+                     % Histogram
+                     _MyLoad5 = merge_histo(MyLoad4, OtherLoad)
+             end
+         end || {MyLoad1, OtherLoad} <- lists:zip(MyLoadList, OtherLoadList)],
 
     State1 = state_set(load_data_list, LoadDataListNew, State),
 
@@ -1171,6 +1207,32 @@ previous_or_current(PrevState, CurState) when is_record(PrevState, state) andals
     case has_converged(convergence_count_best_values(), CurState) of
         false -> PrevState;
         true -> CurState
+    end.
+
+
+-spec skipped_metrics(My::[load_data()|load_data_skipped()],
+                      Other::[load_data()|load_data_skipped()]) -> list(atom()).
+skipped_metrics(MyData, OtherData) ->
+    FilterSkippedModules = fun ({load_data, Module, skip}) -> {true, Module};
+                               (_) -> false
+                           end,
+    Modules1 = lists:filtermap(FilterSkippedModules, MyData),
+    Modules2 = lists:filtermap(FilterSkippedModules, OtherData),
+    sets:to_list(sets:union(sets:from_list(Modules1), sets:from_list(Modules2))).
+
+
+-spec replace_skipped(Other::load_data_list(), Data::data(),
+                      SkippedMetrics::[atom()]) -> data().
+replace_skipped(_, Data, []) ->
+    Data;
+
+replace_skipped(OtherDatas, Data, [Metric|Rest]) ->
+    case lists:keyfind(Metric, 2, OtherDatas) of
+        {load_data, Metric, skip} ->
+            replace_skipped(OtherDatas, Data, Rest);
+        OtherLoadData ->
+            NewLoadData = lists:keyreplace(Metric, 2, element(1,Data), OtherLoadData),
+            replace_skipped(OtherDatas, {NewLoadData, element(2, Data)}, Rest)
     end.
 
 
@@ -1371,8 +1433,10 @@ calc_initial_avg_kr(MyRange) ->
 
 
 %% @doc Extracts and calculates the standard deviation from the load_data record
--spec calc_stddev(unknown | load_data()) -> unknown | float().
+-spec calc_stddev(unknown | load_data() | load_data_skipped()) -> unknown | float().
 calc_stddev(unknown) -> unknown;
+
+calc_stddev({load_data, _Module, skip}) -> unknown;
 
 calc_stddev(Data) when is_record(Data, load_data) ->
     Avg = get_current_estimate(avg, Data),

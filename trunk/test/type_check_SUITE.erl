@@ -197,6 +197,7 @@ tester_type_check_gossip(_Config) ->
             ],
             % excluded (private functions)
             [  {state_update, 3}, % cannot create funs
+               {replace_skipped, 3},
                {init_histo, 3}, % needs DHTNodeState state
                {merge_histo, 2}, % tested via feeder
                {merge_bucket, 2}, % tested via feeder

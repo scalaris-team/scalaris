@@ -22,7 +22,7 @@
 
 -spec get_load(node_details:node_details()) -> gossip_load_beh:load().
 get_load(_NodeDetails) ->
-    lb_stats:default_value(lb_stats:get_load_metric()).
+    lb_stats:get_load_metric().
 
 -spec init_histo(node_details:node_details(), NumberOfBuckets::pos_integer())
                     -> gossip_load:histogram().
