@@ -810,7 +810,9 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
               PidLocal1 = comm:make_local(node:pidX(Node1)),
               PidLocal2 = comm:make_local(node:pidX(Node2)),
               ?proto_sched(start),
-              ct:pal("Beginning ~p, ~p", [Tag1, Tag2]),
+              ct:pal("Beginning ~p (~s with ~s), ~p (~s with ~s)",
+                     [Tag1, Slide1#slideconf.node, Direction1,
+                      Tag2, Slide2#slideconf.node, Direction2]),
               %% We use breakpoints to assure simultaneous slides.
               %% As these don't work with the proto scheduler, we test the timing of the slides using
               %% a callback function instead. The function sends out messages begin_of_slide and
