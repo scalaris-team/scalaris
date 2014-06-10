@@ -1461,7 +1461,9 @@ abort_slide(State, SlideOp, Reason, NotifyNode) ->
     % nodes sending data to their predecessor:
     RMSubscrTag = {move, slide_op:get_id(SlideOp)},
     rm_loop:unsubscribe(self(), RMSubscrTag),
-    State2 = dht_node_state:rm_db_range(State, slide_op:get_id(SlideOp)),
+    State1 = dht_node_state:rm_db_range(State, slide_op:get_id(SlideOp)),
+    SlideMod = get_slide_mod(),
+    State2 = SlideMod:abort_slide(State1, SlideOp, Reason),
     % set a 'null' slide_op if there was an old one with the given ID
     Type = slide_op:get_type(SlideOp),
     PredOrSucc = slide_op:get_predORsucc(Type),

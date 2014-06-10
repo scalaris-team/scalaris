@@ -35,7 +35,8 @@
          update_rcv_data1/3, update_rcv_data2/3,
          prepare_send_delta1/3, prepare_send_delta2/3,
          finish_delta1/3, finish_delta2/3,
-         finish_delta_ack1/3, finish_delta_ack2/4]).
+         finish_delta_ack1/3, finish_delta_ack2/4,
+         abort_slide/3]).
 
 -export([rm_exec/5]).
 
@@ -281,6 +282,29 @@ finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
 finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
     {ok, State, SlideOp, NextOpMsg}.
+
+%% @doc Executed when aborting the given slide operation (assumes the SlideOp
+%%      has already been set up).
+-spec abort_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+        Reason::dht_node_move:abort_reason()) -> dht_node_state:state().
+abort_slide(State, SlideOp, Reason) ->
+    % try to change ID back (if not the first receiving join slide)
+    case slide_op:get_sendORreceive(SlideOp) of
+        'rcv' when Reason =:= target_down ->
+            % if ID already changed, keep it; as well as the already incorporated data
+            State;
+        _ ->
+            MyId = dht_node_state:get(State, node_id),
+            Phase = slide_op:get_phase(SlideOp),
+            case slide_op:get_my_old_id(SlideOp) of
+                null -> State;
+                MyId -> State;
+                _ when Phase =:= wait_for_delta_ack -> State;
+                MyOldId ->
+                    rm_loop:update_id(MyOldId),
+                    State
+            end
+    end.
 
 -spec rm_exec(pid(), term(),
               OldNeighbors::nodelist:neighborhood(),
