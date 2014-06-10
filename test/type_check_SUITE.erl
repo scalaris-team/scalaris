@@ -69,8 +69,8 @@ tester_type_check_api(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
     %% [{modulename, [excludelist = {fun, arity}]}]
-    tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
-    tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
+    tester:register_type_checker({typedef, rdht_tx, encoded_value, []}, rdht_tx, is_encoded_value),
+    tester:register_value_creator({typedef, rdht_tx, encoded_value, []}, rdht_tx, encode_value, 1),
     Modules =
         [ {api_dht, [], []},
           {api_dht_raw,
@@ -94,8 +94,8 @@ tester_type_check_api(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_type_checker({typedef, rdht_tx, encoded_value}),
-    tester:unregister_value_creator({typedef, rdht_tx, encoded_value}),
+    tester:unregister_type_checker({typedef, rdht_tx, encoded_value, []}),
+    tester:unregister_value_creator({typedef, rdht_tx, encoded_value, []}),
     true.
 
 tester_type_check_config(_Config) ->
@@ -146,19 +146,19 @@ tester_type_check_gossip(_Config) ->
     config:write(no_print_ring_data, true),
     config:write(gossip_log_level_warn, debug),
     config:write(gossip_log_level_error, debug),
-    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
-    tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
-    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
-    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
-    tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
-    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
-    tester:register_type_checker({typedef, gossip_load, histogram}, gossip_load, is_histogram),
-    tester:register_value_creator({typedef, gossip_load, round}, gossip_load, tester_create_round, 1),
-    tester:register_value_creator({typedef, gossip_load, state}, gossip_load, tester_create_state, 11),
-    tester:register_value_creator({typedef, gossip_load, histogram}, gossip_load, tester_create_histogram, 1),
-    tester:register_value_creator({typedef, gossip_load, histogram_size}, gossip_load, tester_create_histogram_size, 1),
-    tester:register_value_creator({typedef, gossip_load, load_data_list}, gossip_load, tester_create_load_data_list, 1),
-    tester:register_value_creator({typedef, gossip, cb_module_name}, gossip, tester_create_cb_module_names, 1),
+    tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, simple_interval, []}, intervals, is_well_formed_simple),
+    tester:register_type_checker({typedef, intervals, continuous_interval, []}, intervals, is_continuous),
+    tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, simple_interval, []}, intervals, tester_create_simple_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
+    tester:register_type_checker({typedef, gossip_load, histogram, []}, gossip_load, is_histogram),
+    tester:register_value_creator({typedef, gossip_load, round, []}, gossip_load, tester_create_round, 1),
+    tester:register_value_creator({typedef, gossip_load, state, []}, gossip_load, tester_create_state, 11),
+    tester:register_value_creator({typedef, gossip_load, histogram, []}, gossip_load, tester_create_histogram, 1),
+    tester:register_value_creator({typedef, gossip_load, histogram_size, []}, gossip_load, tester_create_histogram_size, 1),
+    tester:register_value_creator({typedef, gossip_load, load_data_list, []}, gossip_load, tester_create_load_data_list, 1),
+    tester:register_value_creator({typedef, gossip, cb_module_name, []}, gossip, tester_create_cb_module_names, 1),
     Modules = [ {gossip,
             % excluded (exported functions)
             [   {start_link, 1}, % would start a lot of processes
@@ -207,35 +207,35 @@ tester_type_check_gossip(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_type_checker({typedef, intervals, interval}),
-    tester:unregister_type_checker({typedef, intervals, simple_interval}),
-    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
-    tester:unregister_value_creator({typedef, intervals, interval}),
-    tester:unregister_value_creator({typedef, intervals, simple_interval}),
-    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
-    tester:unregister_value_creator({typedef, gossip_load, round}),
-    tester:unregister_value_creator({typedef, gossip_load, state}),
-    tester:unregister_value_creator({typedef, gossip_load, load_data_list}),
-    tester:unregister_value_creator({typedef, gossip_load, histogram}),
-    tester:unregister_value_creator({typedef, gossip_load, histogram_size}),
-    tester:unregister_type_checker({typedef, gossip_load, histogram}),
-    tester:unregister_value_creator({typedef, gossip, cb_module_name}),
+    tester:unregister_type_checker({typedef, intervals, interval, []}),
+    tester:unregister_type_checker({typedef, intervals, simple_interval, []}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
+    tester:unregister_value_creator({typedef, intervals, interval, []}),
+    tester:unregister_value_creator({typedef, intervals, simple_interval, []}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
+    tester:unregister_value_creator({typedef, gossip_load, round, []}),
+    tester:unregister_value_creator({typedef, gossip_load, state, []}),
+    tester:unregister_value_creator({typedef, gossip_load, load_data_list, []}),
+    tester:unregister_value_creator({typedef, gossip_load, histogram, []}),
+    tester:unregister_value_creator({typedef, gossip_load, histogram_size, []}),
+    tester:unregister_type_checker({typedef, gossip_load, histogram, []}),
+    tester:unregister_value_creator({typedef, gossip, cb_module_name, []}),
     true.
 
 
 tester_type_check_math(_Config) ->
     Count = 250,
     config:write(no_print_ring_data, true),
-    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
-    tester:register_type_checker({typedef, intervals, simple_interval}, intervals, is_well_formed_simple),
-    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
-    tester:register_type_checker({typedef, prime, prime_list}, prime, tester_is_prime_list),
-    tester:register_type_checker({typedef, prime, prime}, prime, is_prime),
-    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
-    tester:register_value_creator({typedef, intervals, simple_interval}, intervals, tester_create_simple_interval, 1),
-    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
-    tester:register_value_creator({typedef, prime, prime_list}, prime, tester_create_prime_list, 1),
-    tester:register_value_creator({typedef, prime, rev_prime_list}, prime, tester_create_rev_prime_list, 1),
+    tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, simple_interval, []}, intervals, is_well_formed_simple),
+    tester:register_type_checker({typedef, intervals, continuous_interval, []}, intervals, is_continuous),
+    tester:register_type_checker({typedef, prime, prime_list, []}, prime, tester_is_prime_list),
+    tester:register_type_checker({typedef, prime, prime, []}, prime, is_prime),
+    tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, simple_interval, []}, intervals, tester_create_simple_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
+    tester:register_value_creator({typedef, prime, prime_list, []}, prime, tester_create_prime_list, 1),
+    tester:register_value_creator({typedef, prime, rev_prime_list, []}, prime, tester_create_rev_prime_list, 1),
     Modules =
         [ {intervals,
            [ {get_bounds, 1}, %% throws exception on []
@@ -279,16 +279,16 @@ tester_type_check_math(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_type_checker({typedef, intervals, interval}),
-    tester:unregister_type_checker({typedef, intervals, simple_interval}),
-    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
-    tester:unregister_type_checker({typedef, prime, prime_list}),
-    tester:unregister_type_checker({typedef, prime, prime}),
-    tester:unregister_value_creator({typedef, intervals, interval}),
-    tester:unregister_value_creator({typedef, intervals, simple_interval}),
-    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
-    tester:unregister_value_creator({typedef, prime, prime_list}),
-    tester:unregister_value_creator({typedef, prime, rev_prime_list}),
+    tester:unregister_type_checker({typedef, intervals, interval, []}),
+    tester:unregister_type_checker({typedef, intervals, simple_interval, []}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
+    tester:unregister_type_checker({typedef, prime, prime_list, []}),
+    tester:unregister_type_checker({typedef, prime, prime, []}),
+    tester:unregister_value_creator({typedef, intervals, interval, []}),
+    tester:unregister_value_creator({typedef, intervals, simple_interval, []}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
+    tester:unregister_value_creator({typedef, prime, prime_list, []}),
+    tester:unregister_value_creator({typedef, prime, rev_prime_list, []}),
     true.
 
 tester_type_check_node(_Config) ->
@@ -390,18 +390,18 @@ tester_type_check_paxos(_Config) ->
 tester_type_check_rrepair(_Config) ->
     Count = 250,
     config:write(no_print_ring_data, true),
-    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
-    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
-    tester:register_type_checker({typedef, intervals, non_empty_interval}, intervals, is_non_empty),
-    tester:register_value_creator({typedef, random_bias, generator},
+    tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, continuous_interval, []}, intervals, is_continuous),
+    tester:register_type_checker({typedef, intervals, non_empty_interval, []}, intervals, is_non_empty),
+    tester:register_value_creator({typedef, random_bias, generator, []},
                                   random_bias, tester_create_generator, 3),
-    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
-    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
-    tester:register_value_creator({typedef, intervals, non_empty_interval}, intervals, tester_create_non_empty_interval, 2),
-    tester:register_value_creator({typedef, merkle_tree, hash_fun}, merkle_tree, tester_create_hash_fun, 1),
-    tester:register_value_creator({typedef, merkle_tree, inner_hash_fun}, merkle_tree, tester_create_inner_hash_fun, 1),
-    tester:register_value_creator({typedef, hfs_lhsp, hfs_fun}, hfs_lhsp, tester_create_hfs_fun, 1),
-    tester:register_value_creator({typedef, hfs_lhsp, hfs}, hfs_lhsp, tester_create_hfs, 1),
+    tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
+    tester:register_value_creator({typedef, intervals, non_empty_interval, []}, intervals, tester_create_non_empty_interval, 2),
+    tester:register_value_creator({typedef, merkle_tree, hash_fun, []}, merkle_tree, tester_create_hash_fun, 1),
+    tester:register_value_creator({typedef, merkle_tree, inner_hash_fun, []}, merkle_tree, tester_create_inner_hash_fun, 1),
+    tester:register_value_creator({typedef, hfs_lhsp, hfs_fun, []}, hfs_lhsp, tester_create_hfs_fun, 1),
+    tester:register_value_creator({typedef, hfs_lhsp, hfs, []}, hfs_lhsp, tester_create_hfs, 1),
     Modules =
         [ {rr_recon_stats, [], []},
           {db_generator,
@@ -492,24 +492,24 @@ tester_type_check_rrepair(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_value_creator({typedef, merkle_tree, hash_fun}),
-    tester:unregister_value_creator({typedef, merkle_tree, inner_hash_fun}),
-    tester:unregister_value_creator({typedef, random_bias, generator}),
-    tester:unregister_value_creator({typedef, intervals, interval}),
-    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
-    tester:unregister_value_creator({typedef, intervals, non_empty_interval}),
-    tester:unregister_type_checker({typedef, intervals, interval}),
-    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
-    tester:unregister_type_checker({typedef, intervals, non_empty_interval}),
-    tester:unregister_value_creator({typedef, hfs_lhsp, hfs}),
-    tester:unregister_value_creator({typedef, hfs_lhsp, hfs_fun}),
+    tester:unregister_value_creator({typedef, merkle_tree, hash_fun, []}),
+    tester:unregister_value_creator({typedef, merkle_tree, inner_hash_fun, []}),
+    tester:unregister_value_creator({typedef, random_bias, generator, []}),
+    tester:unregister_value_creator({typedef, intervals, interval, []}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
+    tester:unregister_value_creator({typedef, intervals, non_empty_interval, []}),
+    tester:unregister_type_checker({typedef, intervals, interval, []}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
+    tester:unregister_type_checker({typedef, intervals, non_empty_interval, []}),
+    tester:unregister_value_creator({typedef, hfs_lhsp, hfs_fun, []}),
+    tester:unregister_value_creator({typedef, hfs_lhsp, hfs, []}),
     true.
 
 tester_type_check_tx(_Config) ->
     Count = 250,
     config:write(no_print_ring_data, true),
-    tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
-    tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
+    tester:register_type_checker({typedef, rdht_tx, encoded_value, []}, rdht_tx, is_encoded_value),
+    tester:register_value_creator({typedef, rdht_tx, encoded_value, []}, rdht_tx, encode_value, 1),
     Modules =
         [ {tx_op_beh,[], []},
           {tx_tlog,
@@ -549,15 +549,15 @@ tester_type_check_tx(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_type_checker({typedef, rdht_tx, encoded_value}),
-    tester:unregister_value_creator({typedef, rdht_tx, encoded_value}),
+    tester:unregister_type_checker({typedef, rdht_tx, encoded_value, []}),
+    tester:unregister_value_creator({typedef, rdht_tx, encoded_value, []}),
     true.
 
 tester_type_check_rdht_tx(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
-    tester:register_type_checker({typedef, rdht_tx, encoded_value}, rdht_tx, is_encoded_value),
-    tester:register_value_creator({typedef, rdht_tx, encoded_value}, rdht_tx, encode_value, 1),
+    tester:register_type_checker({typedef, rdht_tx, encoded_value, []}, rdht_tx, is_encoded_value),
+    tester:register_value_creator({typedef, rdht_tx, encoded_value, []}, rdht_tx, encode_value, 1),
     Modules =
         [ {rdht_tx,
            [ {decode_value, 1} ], %% not every binary is an erlterm
@@ -605,16 +605,16 @@ tester_type_check_rdht_tx(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_type_checker({typedef, rdht_tx, encoded_value}),
-    tester:unregister_value_creator({typedef, rdht_tx, encoded_value}),
+    tester:unregister_type_checker({typedef, rdht_tx, encoded_value, []}),
+    tester:unregister_value_creator({typedef, rdht_tx, encoded_value, []}),
     true.
 
 tester_type_check_histogram(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
-    tester:register_type_checker({typedef, histogram, histogram}, histogram, tester_is_valid_histogram),
-    tester:register_value_creator({typedef, histogram, histogram}, histogram, tester_create_histogram, 2),
-    tester:register_value_creator({typedef, histogram_rt, histogram}, histogram_rt, tester_create_histogram, 2),
+    tester:register_type_checker({typedef, histogram, histogram, []}, histogram, tester_is_valid_histogram),
+    tester:register_value_creator({typedef, histogram, histogram, []}, histogram, tester_create_histogram, 2),
+    tester:register_value_creator({typedef, histogram_rt, histogram, []}, histogram_rt, tester_create_histogram, 2),
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {histogram,
@@ -631,9 +631,9 @@ tester_type_check_histogram(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_type_checker({typedef, histogram, histogram}),
-    tester:unregister_value_creator({typedef, histogram, histogram}),
-    tester:unregister_value_creator({typedef, histogram_rt, histogram}),
+    tester:unregister_type_checker({typedef, histogram, histogram, []}),
+    tester:unregister_value_creator({typedef, histogram, histogram, []}),
+    tester:unregister_value_creator({typedef, histogram_rt, histogram, []}),
     true.
 
 tester_type_check_util(_Config) ->
@@ -784,9 +784,9 @@ tester_type_check_util(_Config) ->
 tester_type_check_mr(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
-    tester:register_type_checker({typedef, mr_state, fun_term}, mr_state,
+    tester:register_type_checker({typedef, mr_state, fun_term, []}, mr_state,
                                  tester_is_valid_funterm),
-    tester:register_value_creator({typedef, mr_state, fun_term}, mr_state,
+    tester:register_value_creator({typedef, mr_state, fun_term, []}, mr_state,
                                   tester_create_valid_funterm, 2),
     Modules =
         [ {mr_state,
@@ -808,6 +808,6 @@ tester_type_check_mr(_Config) ->
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    tester:unregister_type_checker({typedef, mr_state, fun_term}),
-    tester:unregister_value_creator({typedef, mr_state, fun_term}),
+    tester:unregister_type_checker({typedef, mr_state, fun_term, []}),
+    tester:unregister_value_creator({typedef, mr_state, fun_term, []}),
     true.

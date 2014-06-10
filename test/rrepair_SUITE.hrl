@@ -54,21 +54,21 @@ regen_special() ->
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
-    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
-    tester:register_type_checker({typedef, intervals, non_empty_interval}, intervals, is_non_empty),
-    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
-    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
-    tester:register_value_creator({typedef, intervals, non_empty_interval}, intervals, tester_create_non_empty_interval, 2),
+    tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, continuous_interval, []}, intervals, is_continuous),
+    tester:register_type_checker({typedef, intervals, non_empty_interval, []}, intervals, is_non_empty),
+    tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
+    tester:register_value_creator({typedef, intervals, non_empty_interval, []}, intervals, tester_create_non_empty_interval, 2),
     Config2.
 
 end_per_suite(Config) ->
-    tester:unregister_type_checker({typedef, intervals, interval}),
-    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
-    tester:unregister_type_checker({typedef, intervals, non_empty_interval}),
-    tester:unregister_value_creator({typedef, intervals, interval}),
-    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
-    tester:unregister_value_creator({typedef, intervals, non_empty_interval}),
+    tester:unregister_type_checker({typedef, intervals, interval, []}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
+    tester:unregister_type_checker({typedef, intervals, non_empty_interval, []}),
+    tester:unregister_value_creator({typedef, intervals, interval, []}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
+    tester:unregister_value_creator({typedef, intervals, non_empty_interval, []}),
     unittest_helper:end_per_suite(Config).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

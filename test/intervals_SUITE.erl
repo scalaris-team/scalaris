@@ -26,8 +26,12 @@
 -include("unittest.hrl").
 -include("scalaris.hrl").
 
-all() ->
-    [new, is_empty, intersection, tc1, normalize, is_left_right_of,
+groups() ->
+    [{hand_written_tests, [sequence], [
+                                       new, is_empty, intersection, tc1, 
+                                       normalize, is_left_right_of]},
+
+     {tester_tests, [sequence], [
      tester_empty_well_formed, tester_empty, tester_empty_continuous,
      tester_all_well_formed, tester_all_continuous, tester_all,
      tester_new1_well_formed, tester_new1, tester_new1_continuous,
@@ -50,8 +54,13 @@ all() ->
      tester_get_bounds_continuous, tester_get_bounds, tester_get_elements,
      tester_mk_from_node_ids_well_formed, tester_mk_from_node_ids, tester_mk_from_node_ids_continuous,
      tester_mk_from_nodes,
-     tester_split_is_continuous, tester_split_is_well_formed, tester_split, split_bounds
-     ].
+     tester_split_is_continuous, tester_split_is_well_formed, tester_split, split_bounds]}].
+
+all() ->
+    [
+     {group, tester_tests},
+     {group, hand_written_tests}
+].
 
 suite() ->
     [
@@ -61,19 +70,23 @@ suite() ->
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
     Config3 = unittest_helper:start_minimal_procs(Config2, [], true),
-    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
-    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
-    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
-    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, continuous_interval, []}, intervals, is_continuous),
+    tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
     Config3.
 
 end_per_suite(Config) ->
-    tester:unregister_type_checker({typedef, intervals, interval}),
-    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
-    tester:unregister_value_creator({typedef, intervals, interval}),
-    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
+    tester:unregister_type_checker({typedef, intervals, interval, []}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
+    tester:unregister_value_creator({typedef, intervals, interval, []}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
     unittest_helper:stop_minimal_procs(Config),
     unittest_helper:end_per_suite(Config).
+
+init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 new(_Config) ->
     ?assert(intervals:is_well_formed(intervals:new('[', ?RT:hash_key("a"), ?RT:hash_key("b"), ']'))),
