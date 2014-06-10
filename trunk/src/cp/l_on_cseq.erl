@@ -1224,10 +1224,10 @@ get_pretty_timeout(L) ->
 -spec get_id(lease_t()) -> ?RT:key().
 get_id(#lease{id=Id}) -> Id.
 
--spec get_owner(lease_t()) -> comm:mypid() | nil.
+-spec get_owner(lease_t()) -> comm:mypid_plain() | nil.
 get_owner(#lease{owner=Owner}) -> Owner.
 
--spec set_owner(lease_t(), comm:mypid()) -> lease_t().
+-spec set_owner(lease_t(), comm:mypid_plain() | nil) -> lease_t().
 set_owner(L, NewOwner) -> L#lease{owner=NewOwner}.
 
 -spec get_aux(lease_t()) -> lease_aux().
