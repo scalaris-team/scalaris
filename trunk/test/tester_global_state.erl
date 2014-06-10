@@ -108,7 +108,8 @@ delete(Key) ->
                     ets:delete(?MODULE, Key);
                 _ ->
                     %% unregister non registered object
-                    ct:pal("Stacktrace: ~p", [util:get_stacktrace()]),
+                    ct:pal("you tried to unregister ~w which is not registered~nStacktrace: ~p", 
+                           [Key, util:get_stacktrace()]),
                     throw({tester_global_state_delete_unregistered_object, Key})
             end
         end
