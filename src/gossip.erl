@@ -1263,7 +1263,7 @@ state_get({trigger_lock, CBModule}, State=#state{trigger_locks=TriggerLocks}) wh
 
 
 %% @doc Helper for state_get, extracts a value to the given (secondary) key from the given Tuplelist
--spec state_get_helper(pos_integer() | cb_module() , [{cb_module()|pos_integer(), ValueType}]) -> ValueType.
+-spec state_get_helper(pos_integer() | cb_module() , [{cb_module()|pos_integer(), ValueType::any()}]) -> ValueType::any().
 state_get_helper(Key, TupleList) when is_list(TupleList) ->
     case lists:keyfind(Key, 1, TupleList) of
         {Key, Value} -> Value;
@@ -1396,7 +1396,7 @@ msg_queue_send(State) ->
 
 %% provide some debug information for the gossip moudle (to be added to the
 %% information of a the callback modules)
--spec web_debug_info(State::state()) -> [{_,_}, ...].
+-spec web_debug_info(State::state()) -> [{any(), any()}, ...].
 web_debug_info(State) ->
     CBModules = state_get(cb_modules, State),
     Tombstones = get_tombstones(State),

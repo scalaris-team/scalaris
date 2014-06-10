@@ -304,7 +304,7 @@ do_throw(Exception) ->
 %% @doc Extracts a given ItemInfo from an ItemList or returns 'undefined' if
 %%      there is no such item.
 -spec extract_from_list_may_not_exist
-        ([{Item::term(), Info}], ItemInfo::term()) -> Info | undefined.
+        ([{Item::term(), Info::any()}], ItemInfo::term()) -> Info::any() | undefined.
 extract_from_list_may_not_exist(List, Key) ->
     case lists:keyfind(Key, 1, List) of
         false -> undefined;
@@ -312,7 +312,8 @@ extract_from_list_may_not_exist(List, Key) ->
     end.
 
 %% @doc minus_all(M,N) : { x | x in M and x notin N}
--spec minus_all(List::[T], Excluded::[T]) -> [T].
+-spec minus_all(List::[T], Excluded::[T]) -> [T]
+    when is_subtype(T, any()).
 minus_all([_|_] = L, [Excluded]) ->
     [E || E <- L, E =/= Excluded];
 minus_all([_|_] = L, ExcludeList) ->
@@ -324,7 +325,8 @@ minus_all([], _ExcludeList) ->
 %% @doc Deletes the first occurrence of each element in Excluded from List.
 %%      Similar to lists:foldl(fun lists:delete/2, NewValue1, ToDel) but more
 %%      performant for out case.
--spec minus_first(List::[T], Excluded::[T]) -> [T].
+-spec minus_first(List::[T], Excluded::[T]) -> [T]
+    when is_subtype(T, any()).
 minus_first([_|_] = L, [Excluded]) ->
     lists:delete(Excluded, L);
 minus_first([_|_] = L, ExcludeList) ->
@@ -333,7 +335,8 @@ minus_first([], _ExcludeList) ->
     [].
 
 %% @doc Removes every item in Excluded only once from List.
--spec minus_first2(List::[T], Excluded::[T], Result::[T]) -> [T].
+-spec minus_first2(List::[T], Excluded::[T], Result::[T]) -> [T]
+    when is_subtype(T, any()).
 minus_first2([H | T], [_|_] = Excluded, Result) ->
     case delete_if_exists(Excluded, H, []) of
         {true,  Excluded2} -> minus_first2(T, Excluded2, Result);
@@ -345,12 +348,14 @@ minus_first2(L, [], Result) ->
     lists:reverse(Result, L).
 
 %% @doc Removes Del from List if it is found. Stops on first occurrence.
--spec delete_if_exists(Del::T, List::[T]) -> {Found::boolean(), [T]}.
+-spec delete_if_exists(Del::T, List::[T]) -> {Found::boolean(), [T]}
+  when is_subtype(T, any()).
 delete_if_exists(Del, List) ->
     delete_if_exists(List, Del, []).
 
 %% @doc Removes Del from List if it is found. Stops on first occurrence.
--spec delete_if_exists(List::[T], Del::T, Result::[T]) -> {Found::boolean(), [T]}.
+-spec delete_if_exists(List::[T], Del::T, Result::[T]) -> {Found::boolean(), [T]} 
+    when is_subtype(T, any()).
 delete_if_exists([Del | T], Del, Result) ->
     {true, lists:reverse(Result, T)};
 delete_if_exists([H | T], Del, Result) ->
@@ -379,14 +384,16 @@ sleep_for_ever() ->
 
 %% @doc Returns a random element from the given (non-empty!) list according to
 %%      a uniform distribution.
--spec randomelem(List::[X,...]) -> X.
+-spec randomelem(List::[X,...]) -> X
+    when is_subtype(X, any()).
 randomelem([X]) -> X;
 randomelem(List) ->
     element(1, randomelem_and_length(List)).
 
 %% @doc Returns a random element from the given (non-empty!) list according to
 %%      a uniform distribution (also returns the list's length).
--spec randomelem_and_length(List::[X,...]) -> {X, Length::pos_integer()}.
+-spec randomelem_and_length(List::[X,...]) -> {X, Length::pos_integer()}
+    when is_subtype(X, any()).
 randomelem_and_length([X]) -> {X, 1};
 randomelem_and_length(List) ->
     Length = length(List) + 1,
@@ -395,7 +402,8 @@ randomelem_and_length(List) ->
 
 %% @doc Removes a random element from the (non-empty!) list and returns the
 %%      resulting list and the removed element.
--spec pop_randomelem(List::[X,...]) -> {NewList::[X], PoppedElement::X}.
+-spec pop_randomelem(List::[X,...]) -> {NewList::[X], PoppedElement::X}
+    when is_subtype(X, any()).
 pop_randomelem([X]) -> {[], X};
 pop_randomelem(List) ->
     pop_randomelem(List, length(List)).
@@ -404,7 +412,8 @@ pop_randomelem(List) ->
 %%      list and returns the resulting list and the removed element.
 %%      If Size is 0, the first element will be popped.
 %%      Size must not exceed the length of the list!
--spec pop_randomelem(List::[X,...], Size::non_neg_integer()) -> {NewList::[X], PoppedElement::X}.
+-spec pop_randomelem(List::[X,...], Size::non_neg_integer()) -> {NewList::[X], PoppedElement::X}
+    when is_subtype(X, any()).
 pop_randomelem([X | TL], 0) -> {TL, X};
 pop_randomelem([X | TL], 1) -> {TL, X};
 pop_randomelem(List, Size) ->
@@ -412,7 +421,8 @@ pop_randomelem(List, Size) ->
     {lists:append(Leading, T), H}.
 
 %% @doc Returns a random subset of Size elements from the given list.
--spec random_subset(Size::pos_integer(), [T]) -> [T].
+-spec random_subset(Size::pos_integer(), [T]) -> [T]
+    when is_subtype(T, any()).
 random_subset(0, _List) ->
     % having this special case here prevents unnecessary calls to erlang:length()
     [];
@@ -422,7 +432,8 @@ random_subset(Size, List) ->
     shuffle_helper(List, [], Size, ListSize).
 
 %% @doc Fisher-Yates shuffling for lists.
--spec shuffle([T]) -> [T].
+-spec shuffle([T]) -> [T]
+    when is_subtype(T, any()).
 shuffle([]) -> [];
 shuffle([X]) -> [X];
 shuffle(List) ->
@@ -431,7 +442,8 @@ shuffle(List) ->
 
 %% @doc Fisher-Yates shuffling for lists helper function: creates a shuffled
 %%      list of length ShuffleSize.
--spec shuffle_helper(List::[T], AccResult::[T], ShuffleSize::non_neg_integer(), ListSize::non_neg_integer()) -> [T].
+-spec shuffle_helper(List::[T], AccResult::[T], ShuffleSize::non_neg_integer(), ListSize::non_neg_integer()) -> [T]
+    when is_subtype(T, any()).
 shuffle_helper([_|_] = _List, Acc, 0, _ListSize) ->
     Acc;
 shuffle_helper([_|_] = List, Acc, Size, ListSize) ->
@@ -445,13 +457,17 @@ shuffle_helper([], Acc, _Size, _ListSize) ->
 %%      we implement a more flexible binary search here despite gb_tree being
 %%      defined as opaque.
 -spec gb_trees_largest_smaller_than(Key, gb_trees:tree(Key, Value))
-        -> {value, Key, Value} | nil.
+        -> {value, Key, Value} | nil
+    when is_subtype(Key, any()),
+         is_subtype(Value, any()).
 gb_trees_largest_smaller_than(_Key, {0, _Tree}) ->
     nil;
 gb_trees_largest_smaller_than(MyKey, {_Size, InnerTree}) ->
     gb_trees_largest_smaller_than_iter(MyKey, InnerTree, true).
 
--spec gb_trees_largest_smaller_than_iter(Key, {Key, Value, Smaller::term(), Bigger::term()}, RightTree::boolean()) -> {value, Key, Value} | nil.
+-spec gb_trees_largest_smaller_than_iter(Key, {Key, Value, Smaller::term(), Bigger::term()}, RightTree::boolean()) -> {value, Key, Value} | nil
+    when is_subtype(Key, any()),
+         is_subtype(Value, any()).
 gb_trees_largest_smaller_than_iter(SearchKey, {Key, Value, _Smaller, nil},
                                    true) when Key < SearchKey ->
     % we reached the right end of the whole tree
@@ -470,7 +486,10 @@ gb_trees_largest_smaller_than_iter(_SearchKey, nil, _RightTree) ->
     nil.
 
 %% @doc Foldl over gb_trees.
--spec gb_trees_foldl(fun((Key, Value, Acc) -> Acc), Acc, gb_trees:tree(Key, Value)) -> Acc.
+-spec gb_trees_foldl(fun((Key, Value, Acc) -> Acc), Acc, gb_trees:tree(Key, Value)) -> Acc
+    when is_subtype(Acc, any()),
+         is_subtype(Key, any()),
+         is_subtype(Value, any()).
 gb_trees_foldl(F, Acc, GBTree) ->
     gb_trees_foldl_iter(F, Acc, gb_trees:next(gb_trees:iterator(GBTree))).
 
@@ -516,7 +535,8 @@ zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
 
 %% @doc Sorts like erlang:'=&lt;'/2 but also defines the order of integers/floats
 %%      representing the same value.
--spec '=:<'(T, T) -> boolean().
+-spec '=:<'(T, T) -> boolean()
+                     when is_subtype(T, any()).
 '=:<'(T1, T2) ->
     case (T1 == T2) andalso (T1 =/= T2) of
         true when erlang:is_number(T1) andalso erlang:is_number(T2) ->
@@ -540,11 +560,13 @@ zipfoldl(_ZipFun, _FoldFun, [], [], AccIn) ->
 
 %% @doc Splits off N elements from List. If List is not large enough, the whole
 %%      list is returned.
--spec safe_split(non_neg_integer(), [T]) -> {FirstN::[T], Rest::[T]}.
+-spec safe_split(non_neg_integer(), [T]) -> {FirstN::[T], Rest::[T]}
+    when is_subtype(T, any()).
 safe_split(N, List) when is_integer(N), N >= 0, is_list(List) ->
     safe_split(N, List, []).
 
--spec safe_split(non_neg_integer(), [T], [T]) -> {FirstN::[T], Rest::[T]}.
+-spec safe_split(non_neg_integer(), [T], [T]) -> {FirstN::[T], Rest::[T]}
+    when is_subtype(T, any()).
 safe_split(0, L, R) ->
     {lists:reverse(R, []), L};
 safe_split(N, [H | T], R) ->
@@ -555,7 +577,8 @@ safe_split(_N, [], R) ->
 %% @doc Splits L1 into a list of elements that are not contained in L2, a list
 %%      of elements that both lists share and a list of elements unique to L2.
 %%      Returned lists are sorted and contain no duplicates.
--spec split_unique(L1::[X], L2::[X]) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+-spec split_unique(L1::[X], L2::[X]) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}
+    when is_subtype(X, any()).
 split_unique(L1, L2) ->
     split_unique(L1, L2, fun erlang:'=<'/2).
 
@@ -566,7 +589,8 @@ split_unique(L1, L2) ->
 %%      Lte(A, B) should return true if A compares less than or equal to B in
 %%      the ordering, false otherwise.
 %%      Returned lists are sorted according to Lte and contain no duplicates.
--spec split_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+-spec split_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}
+    when is_subtype(X, any()).
 split_unique(L1, L2, Lte) ->
     split_unique(L1, L2, Lte, fun(E1, _E2) -> E1 end).
 
@@ -578,7 +602,8 @@ split_unique(L1, L2, Lte) ->
 %%      Lte(A, B) should return true if A compares less than or equal to B in
 %%      the ordering, false otherwise.
 %%      Returned lists are sorted according to Lte and contain no duplicates.
--spec split_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X)) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+-spec split_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X)) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}
+    when is_subtype(X, any()).
 split_unique(L1, L2, Lte, EqSelect) ->
     L1Sorted = lists:usort(Lte, L1),
     L2Sorted = lists:usort(Lte, L2),
@@ -587,7 +612,8 @@ split_unique(L1, L2, Lte, EqSelect) ->
 %% @doc Splits L1 into a list of elements that are not contained in L2, a list
 %%      of elements that both lists share and a list of elements unique to L2.
 %%      Both lists must be sorted. Returned lists are sorted as well.
--spec ssplit_unique(L1::[X], L2::[X]) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+-spec ssplit_unique(L1::[X], L2::[X]) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}
+    when is_subtype(X, any()).
 ssplit_unique(L1, L2) ->
     ssplit_unique(L1, L2, fun erlang:'=<'/2).
 
@@ -599,7 +625,8 @@ ssplit_unique(L1, L2) ->
 %%      true if A compares less than or equal to B in the ordering, false
 %%      otherwise.
 %%      Returned lists are sorted according to Lte.
--spec ssplit_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+-spec ssplit_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}
+    when is_subtype(X, any()).
 ssplit_unique(L1, L2, Lte) ->
     ssplit_unique(L1, L2, Lte, fun(E1, _E2) -> E1 end).
 
@@ -611,12 +638,14 @@ ssplit_unique(L1, L2, Lte) ->
 %%      Both lists must be sorted according to Lte. Lte(A, B) should return true
 %%      if A compares less than or equal to B in the ordering, false otherwise.
 %%      Returned lists are sorted according to Lte.
--spec ssplit_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X)) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+-spec ssplit_unique(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X)) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}
+    when is_subtype(X, any()).
 ssplit_unique(L1, L2, Lte, EqSelect) ->
     ssplit_unique_helper(L1, L2, Lte, EqSelect, {[], [], []}).
 
 %% @doc Helper function for ssplit_unique/4.
--spec ssplit_unique_helper(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X), {UniqueOldL1::[X], SharedOld::[X], UniqueOldL2::[X]}) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}.
+-spec ssplit_unique_helper(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> X), {UniqueOldL1::[X], SharedOld::[X], UniqueOldL2::[X]}) -> {UniqueL1::[X], Shared::[X], UniqueL2::[X]}
+    when is_subtype(X, any()).
 ssplit_unique_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, {UniqueL1, Shared, UniqueL2}) ->
     LteH1H2 = Lte(H1, H2),
     LteH2H1 = Lte(H2, H1),
@@ -645,30 +674,35 @@ ssplit_unique_helper([], L2 = [H2 | T2], Lte, EqSelect, {UniqueL1, Shared, Uniqu
     end.
 
 %% @doc Merges two unique sorted lists into a single list.
--spec smerge2(L1::[X], L2::[X]) -> MergedList::[X].
+-spec smerge2(L1::[X], L2::[X]) -> MergedList::[X]
+    when is_subtype(X, any()).
 smerge2(L1, L2) ->
     smerge2(L1, L2, fun erlang:'=<'/2).
 
 %% @doc Merges two unique Lte-sorted lists into a single list.
--spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> MergedList::[X].
+-spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean())) -> MergedList::[X]
+    when is_subtype(X, any()).
 smerge2(L1, L2, Lte) ->
     smerge2(L1, L2, Lte, fun(E1, _E2) -> [E1] end).
 
 %% @doc Merges two unique Lte-sorted lists into a single list.
--spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X])) -> MergedList::[X].
+-spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X])) -> MergedList::[X]
+    when is_subtype(X, any()).
 smerge2(L1, L2, Lte, EqSelect) ->
     smerge2(L1, L2, Lte, EqSelect, fun(X) -> [X] end, fun(X) -> [X] end).
 
 %% @doc Merges two unique Lte-sorted lists into a single list.
 -spec smerge2(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()), EqSelect::fun((X, X) -> [X]),
-              FirstExist::fun((X) -> [X]), SecondExist::fun((X) -> [X])) -> MergedList::[X].
+              FirstExist::fun((X) -> [X]), SecondExist::fun((X) -> [X])) -> MergedList::[X]
+    when is_subtype(X, any()).
 smerge2(L1, L2, Lte, EqSelect, FirstExist, SecondExist) ->
     smerge2_helper(L1, L2, Lte, EqSelect, FirstExist, SecondExist, []).
 
 %% @doc Helper function for merge2/4.
 -spec smerge2_helper(L1::[X], L2::[X], Lte::fun((X, X) -> boolean()),
         EqSelect::fun((X, X) -> [X]), FirstExist::fun((X) -> [X]),
-        SecondExist::fun((X) -> [X]), OldMergedList::[X]) -> MergedList::[X].
+        SecondExist::fun((X) -> [X]), OldMergedList::[X]) -> MergedList::[X]
+    when is_subtype(X, any()).
 smerge2_helper(L1 = [H1 | T1], L2 = [H2 | T2], Lte, EqSelect, FirstExist, SecondExist, ML) ->
     LteH1H2 = Lte(H1, H2),
     LteH2H1 = Lte(H2, H1),
@@ -719,7 +753,8 @@ make_filename(Name) ->
 
 %% @doc Get an application environment variable for the 'scalaris' application.
 %%      If the variable is undefined, Default is returned.
--spec app_get_env(Var::atom(), Default::T) -> T.
+-spec app_get_env(Var::atom(), Default::T) -> T
+    when is_subtype(T, any()).
 app_get_env(Var, Default) ->
     case application:get_env(scalaris, Var) of
         {ok, Val} -> Val;
@@ -841,7 +876,9 @@ map_with_nr_feeder(2, List, StartNr) ->
 %% @doc Similar to lists:map/2 but also passes the current number to the fun:
 %%      <tt>[a, b, c,...]</tt> maps to
 %%      <tt>[fun(a, StartNr), fun(b, StartNr+1), fun(c, StartNr+2),...]</tt>
--spec map_with_nr(fun((A, integer()) -> B), List::[A], StartNr::integer()) -> [B].
+-spec map_with_nr(fun((A, integer()) -> B), List::[A], StartNr::integer()) -> [B]
+     when is_subtype(A, any()),
+          is_subtype(B, any()).
 map_with_nr(F, [H | T], Nr) ->
     [F(H, Nr) | map_with_nr(F, T, Nr + 1)];
 map_with_nr(F, [], _Nr) when is_function(F, 2) -> [].
@@ -849,7 +886,8 @@ map_with_nr(F, [], _Nr) when is_function(F, 2) -> [].
 -type try_catch_result() :: ok | throw | error | exit.
 
 %% @doc Helper for par_map/2.
--spec par_map_recv(Id::term(), {try_catch_result(), [B]}) -> {try_catch_result(), [B]}.
+-spec par_map_recv(Id::term(), {try_catch_result(), [B]}) -> {try_catch_result(), [B]}
+    when is_subtype(B, any()).
 par_map_recv(E, {ErrorX, ListX}) ->
     trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({parallel_result, E, {ok, ResultY}},
@@ -866,7 +904,9 @@ par_map_feeder(2, List) ->
 
 %% @doc Parallel version of lists:map/2. Spawns a new process for each element
 %%      in the list!
--spec par_map(Fun::fun((A) -> B), List::[A]) -> [B].
+-spec par_map(Fun::fun((A) -> B), List::[A]) -> [B]
+     when is_subtype(A, any()),
+          is_subtype(B, any()).
 par_map(Fun, [E]) -> [Fun(E)];
 par_map(Fun, [_|_] = List) ->
     _ = [erlang:spawn(?MODULE, parallel_run, [self(), Fun, [E], true, E]) || E <- List],
@@ -878,7 +918,8 @@ par_map(Fun, []) when is_function(Fun, 1)-> [].
 
 %% @doc Helper for par_map/3.
 -spec par_map_recv2(ListElem::term(), {try_catch_result(), [B], Id::non_neg_integer()})
-        -> {try_catch_result(), [B], Id::non_neg_integer()}.
+        -> {try_catch_result(), [B], Id::non_neg_integer()}
+     when is_subtype(B, any()).
 par_map_recv2(_E, {ErrorX, ListX, Id}) ->
     trace_mpath:thread_yield(),
     receive ?SCALARIS_RECV({parallel_result, Id, {ok, ResultY}},
@@ -894,7 +935,9 @@ par_map_feeder(FunNr, List, MaxThreads) ->
 
 %% @doc Parallel version of lists:map/2 with the possibility to limit the
 %%      maximum number of processes being spawned.
--spec par_map(Fun::fun((A) -> B), List::[A], MaxThreads::pos_integer()) -> [B].
+-spec par_map(Fun::fun((A) -> B), List::[A], MaxThreads::pos_integer()) -> [B]
+     when is_subtype(A, any()),
+          is_subtype(B, any()).
 par_map(Fun, [E], _MaxThreads) -> [Fun(E)];
 par_map(Fun, [_|_] = List, 1) -> lists:map(Fun, List);
 par_map(Fun, [_|_] = List, MaxThreads) ->
@@ -926,7 +969,8 @@ lists_take_iter(Elem, [H|T], Acc) ->
 %% @doc Splits the given list into several partitions, returning a list of parts
 %%      of the original list. Both the parts and their contents are reversed
 %%      compared to the original list!
--spec lists_split([A], Partitions::pos_integer()) -> [[A]].
+-spec lists_split([A], Partitions::pos_integer()) -> [[A]]
+     when is_subtype(A, any()).
 lists_split([X], _Partitions) -> [[X]];
 lists_split([_|_] = List, 1) -> [lists:reverse(List)];
 lists_split([_|_] = List, Partitions) ->
@@ -938,7 +982,8 @@ lists_split([_|_] = List, Partitions) ->
 lists_split([], _Partitions) -> [].
 
 %% @doc Helper for lists_split/2.
--spec lists_split([A], BlockSize::pos_integer(), CurBlockSize::non_neg_integer(), [A], [[A]]) -> [[A]].
+-spec lists_split([A], BlockSize::pos_integer(), CurBlockSize::non_neg_integer(), [A], [[A]]) -> [[A]]
+     when is_subtype(A, any()).
 lists_split([_|_] = List, BlockSize, BlockSize, CurBlock, Result) ->
     lists_split(List, BlockSize, 0, [], [CurBlock | Result]);
 lists_split([H | T], BlockSize, CurBlockSize, CurBlock, Result) ->
@@ -961,7 +1006,8 @@ lists_partition3_feeder(will_fill_pred, List) ->
     {fun(I) -> abs(I rem 3) + 1 end, List}.
 
 -spec lists_partition3(Pred::fun((Elem :: T) -> 1..3), List::[T])
-    -> {Pred1::[T], Pred2::[T], Pred3::[T]}.
+    -> {Pred1::[T], Pred2::[T], Pred3::[T]}
+     when is_subtype(T, any()).
 lists_partition3(Pred, L) ->
     lists_partition3(Pred, L, [], [], []).
 
@@ -974,7 +1020,8 @@ lists_partition3_feeder(will_fill_pred, List, As, Bs, Cs) ->
 
 -spec lists_partition3(Pred::fun((Elem :: T) -> 1..3), List::[T],
                       Acc1::[T], Acc2::[T], Acc3::[T])
-                     ->  {Pred1::[T], Pred2::[T], Pred3::[T]}.
+                     ->  {Pred1::[T], Pred2::[T], Pred3::[T]}
+     when is_subtype(T, any()).
 lists_partition3(Pred, [H | T], As, Bs, Cs) ->
     case Pred(H) of
         1 -> lists_partition3(Pred, T, [H | As], Bs, Cs);
@@ -1017,7 +1064,8 @@ lists_prepend_reversed(L, To) -> lists:foldl(fun(El, Acc) -> [El | Acc] end, To,
 %%      Examples:
 %%       * first 10: sublist(L, 1, 10) | sublist(L, 10, -10) (reverse order)
 %%       * last 10 : sublist(L, -10, 10) | sublist(L, -1, -10) (reverse order)
--spec sublist(List::[X,...], Start::pos_integer() | neg_integer(), Length::integer()) -> {[X], Length::non_neg_integer()}.
+-spec sublist(List::[X,...], Start::pos_integer() | neg_integer(), Length::integer()) -> {[X], Length::non_neg_integer()}
+     when is_subtype(X, any()).
 sublist(List, Start, Length) ->
     ListLen = length(List),
     NewStart = if Start > ListLen andalso Length >= 0  -> 0;
@@ -1031,14 +1079,16 @@ sublist(List, Start, Length) ->
 
 -compile({nowarn_unused_function, {sublist__feeder, 4}}).
 -spec sublist__feeder(List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer())
-        -> {List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer()}.
+        -> {List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer()}
+     when is_subtype(X, any()).
 sublist__feeder(List, _, Start, Length) ->
     ListLength = length(List),
     {List, ListLength, erlang:min(Start, ListLength), Length}.
 
 %% @doc Helper for sublist/3.
 %%      Pre: ListLength =:= length(List), 0 =&lt; Start =&lt; ListLength
--spec sublist_(List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer()) -> {[X], Length::non_neg_integer()}.
+-spec sublist_(List::[X,...], ListLength::non_neg_integer(), Start::non_neg_integer(), Length::integer()) -> {[X], Length::non_neg_integer()}
+     when is_subtype(X, any()).
 sublist_(_List, ListLength, 0, _Length) ->
     {[], ListLength};
 sublist_(List, ListLength, Start, Length) when Length >= 0 ->
@@ -1050,12 +1100,14 @@ sublist_(List, ListLength, Start, Length) when Length < 0 ->
 
 %% @doc If Element is in List, its index is returned (1..length(List) as in lists:nth/2),
 %%      otherwise 'not_found'.
--spec lists_index_of(Element::T, List::[T]) -> pos_integer() | not_found.
+-spec lists_index_of(Element::T, List::[T]) -> pos_integer() | not_found
+     when is_subtype(T, any()).
 lists_index_of(Element, List) when is_list(List) ->
     lists_index_of_(Element, List, 1).
 
 %% @doc Helper for lists_index_of/2
--spec lists_index_of_(Element::T, List::[T], pos_integer()) -> pos_integer() | not_found.
+-spec lists_index_of_(Element::T, List::[T], pos_integer()) -> pos_integer() | not_found
+     when is_subtype(T, any()).
 lists_index_of_(_E, [], _N)      -> not_found;
 lists_index_of_(E, [E | _TL], N) -> N;
 lists_index_of_(E, [_H | TL], N) -> lists_index_of_(E, TL, N + 1).
@@ -1157,11 +1209,15 @@ collect_while(GatherFun, Count) ->
         false         -> []
     end.
 
--spec list_set_nth([A], pos_integer(), B) -> [A | B].
+-spec list_set_nth([A], pos_integer(), B) -> [A | B]
+     when is_subtype(A, any()),
+          is_subtype(B, any()).
 list_set_nth(L, Pos, Val) ->
     list_set_nth(L, Pos, Val, 1).
 
--spec list_set_nth([A], pos_integer(), B, pos_integer()) -> [A | B].
+-spec list_set_nth([A], pos_integer(), B, pos_integer()) -> [A | B]
+     when is_subtype(A, any()),
+          is_subtype(B, any()).
 list_set_nth([_H | T], Pos, Val, Pos) ->
     [Val | T];
 list_set_nth([H | T], Pos, Val, Cur) ->
@@ -1300,7 +1356,9 @@ extint2atom(X) when is_integer(X) ->
     end.
 -endif.
 
--spec sets_map(Fun::fun((V) -> X), Set::sets:set(V)) -> [X].
+-spec sets_map(Fun::fun((V) -> X), Set::sets:set(V)) -> [X]
+     when is_subtype(V, any()),
+          is_subtype(X, any()).
 sets_map(Fun, Set) ->
     lists:reverse(sets:fold(fun (El, Acc) ->
                 [Fun(El) | Acc]

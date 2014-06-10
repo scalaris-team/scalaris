@@ -414,7 +414,7 @@ cc_commit_write({_RL, WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
 
 
 -spec wf_val_unset_wl
-       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0, _}) -> prbr_bottom;
+       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0, value()}) -> prbr_bottom;
        (db_entry(), UI :: none, {txid_on_cseq:txid(), version(), value()}) -> db_entry().
 wf_val_unset_wl(prbr_bottom, _UI = none, {_TxId, _Vers, _Val}) -> prbr_bottom;
 wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
@@ -566,7 +566,7 @@ cc_abort_write({_RL, WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
     cc_return_val(cc_abort_write, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
 -spec wf_unset_wl
-       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0, _}) -> prbr_bottom;
+       (prbr_bottom, UI :: none, {txid_on_cseq:txid(), 0, value()}) -> prbr_bottom;
        (db_entry(), UI :: none, {txid_on_cseq:txid(), version(), value()}) -> db_entry().
 wf_unset_wl(prbr_bottom, _UI = none, {_TxId, _Vers, _Val}) -> prbr_bottom;
 wf_unset_wl(DBEntry, _UI = none, {TxId, _TLogVers, _Val}) ->
