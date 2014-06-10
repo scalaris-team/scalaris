@@ -32,15 +32,17 @@ all()   -> [simple_create,
             timestamp,
             add_nonexisting_timeslots,
             reduce_timeslots,
-            {group, tester_group}
+            {group, tester_tests}
            ].
 
 groups() ->
-    TesterGroup =
-        [tester_empty_rrd,
-         tester_counter_rrd,
-         tester_gauge_rrd],
-    [{tester_group, [], TesterGroup}].
+    [{tester_tests, [], 
+      [
+       tester_empty_rrd,
+       tester_counter_rrd,
+       tester_gauge_rrd]
+     }
+    ].
 
 suite() -> [ {timetrap, {seconds, 40}} ].
 

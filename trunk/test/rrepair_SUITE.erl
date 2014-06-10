@@ -32,21 +32,24 @@
 all() ->
     [
      {group, basic},
+     {group, tester_tests},
      session_ttl,
      {group, repair}
     ].
 
 groups() ->
     [
-     {basic,  [parallel], [
-                           get_symmetric_keys_test,
-                           check_quadrant_intervals,
+     {tester_tests, [parallel], [
                            tester_map_key_to_interval,
                            tester_map_key_to_quadrant,
                            tester_map_interval,
                            tester_find_sync_interval,
                            tester_merkle_compress_hashlist%,
 %%                            tester_merkle_compress_cmp_result
+                                ]},
+     {basic,  [parallel], [
+                           get_symmetric_keys_test,
+                           check_quadrant_intervals
                           ]},
      {repair, [sequence], [
                            {upd_trivial,  [sequence], repair_default()},
