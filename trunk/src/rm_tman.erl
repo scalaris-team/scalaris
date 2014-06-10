@@ -164,8 +164,39 @@ handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
 
 handle_custom_message({rm, {update_node, Node}},
                       {Neighborhood, RandViewSize, Cache, Churn}) ->
-    NewNeighborhood = nodelist:update_ids(Neighborhood, [Node]),
-    {{unknown}, {NewNeighborhood, RandViewSize, Cache, Churn}};
+    NewNeighborhood1 = nodelist:update_ids(Neighborhood, [Node]),
+    % message from pred or succ
+    % -> update any out-dated nodes between old and new ID of the given node to
+    %    prevent wrong pred/succ changed:
+    NodePid = node:pidX(Node),
+    OldPred = nodelist:pred(Neighborhood),
+    OldPredPid = node:pidX(OldPred),
+    I = case OldPredPid =:= NodePid andalso
+                 OldPredPid =/= node:pidX(nodelist:pred(NewNeighborhood1)) of
+            true ->
+                node:mk_interval_between_nodes(Node, OldPred);
+            _ ->
+                OldSucc = nodelist:succ(Neighborhood),
+                OldSuccPid = node:pidX(OldSucc),
+                case OldSuccPid =:= NodePid andalso
+                         OldSuccPid =/= node:pidX(nodelist:succ(NewNeighborhood1)) of
+                    true ->
+                        node:mk_interval_between_nodes(OldSucc, Node);
+                    _ ->
+                        intervals:empty()
+                end
+        end,
+    % now remove all potentially out-dated nodes and try to re-add them with
+    % updated information
+    NewNeighborhood2 =
+        case intervals:is_empty(I) of
+            true -> NewNeighborhood1;
+            false ->
+                nodelist:filter(NewNeighborhood1,
+                                fun(N) -> not intervals:in(node:id(N), I) end,
+                                fun(N) -> contact_new_nodes([N]) end)
+        end,
+    {{unknown}, {NewNeighborhood2, RandViewSize, Cache, Churn}};
 
 handle_custom_message(_, _State) -> unknown_event.
 
