@@ -499,7 +499,7 @@ slide_get_data_start_record(State, MovingInterval) ->
 -spec slide_add_data(state(),slide_data()) -> state().
 slide_add_data(State, {{Data, SnapData}, PRBRData}) ->
     T1DB = db_dht:add_data(get(State, db), Data),
-    ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~pPRBR: ~n~pMR: ~n~p",
+    ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData:~n~p~nPRBR:~n~p",
            [?MODULE, comm:this(), Data, SnapData, PRBRData]),
     T2State =
         case SnapData of
