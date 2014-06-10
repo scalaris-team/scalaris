@@ -898,7 +898,7 @@ state_set(KeyValueTupleList, State) when is_record(State, state) andalso is_list
     Fun = fun ({Key, Value}, OldState) -> state_set(Key, Value, OldState) end,
     lists:foldl(Fun, State, KeyValueTupleList).
 
--spec state_get (_, unknown) -> unknown;
+-spec state_get (any(), unknown) -> unknown;
                 (status, state()) -> status();
                 (instance, state()) -> instance();
                 (load_data_list, state()) -> load_data_list();
@@ -976,7 +976,7 @@ get_default_load_data(LoadDataList) ->
 %%        <li>avg_kr = average key range (distance between nodes in the address space),</li>
 %%      </ul>
 %%      See type spec for details on which keys are allowed on which records.
--spec data_get(_, unknown) -> unknown;
+-spec data_get(any(), unknown) -> unknown;
              (name, load_data()) -> atom();
              (avg, load_data()) -> avg();
              (avg2, load_data()) -> avg();
