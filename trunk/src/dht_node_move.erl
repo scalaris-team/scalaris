@@ -804,7 +804,8 @@ prepare_send_data2(State, SlideOp, EmbeddedMsg) ->
 -spec update_rcv_data1(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
                        Data::dht_node_state:slide_data(), TargetId::?RT:key(),
                        NextOp::slide_op:next_op()) -> dht_node_state:state().
-update_rcv_data1(State, SlideOp, Data, TargetId, NextOp) ->
+update_rcv_data1(State, SlideOp0, Data, TargetId, NextOp) ->
+    SlideOp = slide_op:set_setup_at_other(SlideOp0),
     MoveFullId = slide_op:get_id(SlideOp),
     PredOrSucc = slide_op:get_predORsucc(SlideOp),
     State1 = update_target_on_existing_slide(
@@ -1242,7 +1243,11 @@ safe_operation(WorkerFun, State, MoveFullId, WorkPhases, MoveMsgTag) ->
                      dht_node_state:get(State, slide_pred),
                      dht_node_state:get(State, slide_succ)]),
             State;
-        {wrong_neighbor, PredOrSucc, SlideOp} -> % wrong pred or succ
+        {wrong_neighbor, PredOrSucc, SlideOp0} -> % wrong pred or succ
+            SlideOp = case MoveMsgTag of
+                          data -> slide_op:set_setup_at_other(SlideOp0);
+                          _    -> SlideOp0
+                      end,
             case WorkPhases =:= all orelse lists:member(slide_op:get_phase(SlideOp), WorkPhases) of
                 true ->
                     log:log(warn,"[ dht_node_move ~.0p ] ~.0p received but ~s "
