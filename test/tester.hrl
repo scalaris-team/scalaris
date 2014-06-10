@@ -59,8 +59,10 @@
 
 -type(type_name() ::
       {'fun', Module :: module(), FunName :: atom(), FunArity :: byte()}
-      | {type, Module :: module(), TypeName :: atom()}
+      | {type, Module :: module(), TypeName :: atom(), Arity::arity()}
       | {record, Module :: module(), TypeName :: atom()}).
+
+-type(var_list() :: list(atom())).
 
 -ifdef(forward_or_recursive_types_are_not_allowed).
 -type(record_field_type() ::
@@ -100,6 +102,7 @@
     | nil
     | {atom, atom()}
     | {integer, integer()}
+    | {var, Atom}
     | {builtin_type, builtin_type()}
     | {builtin_type, array_array, ValueType::any()}
     | {builtin_type, dict_dict, KeyType::any(), ValueType::any()}
@@ -151,6 +154,7 @@
     | nil
     | {atom, atom()}
     | {integer, integer()}
+    | {var, atom()}
     | {builtin_type, builtin_type()}
     | {builtin_type, array_array, ValueType::type_spec()}
     | {builtin_type, dict_dict, KeyType::type_spec(), ValueType::type_spec()}

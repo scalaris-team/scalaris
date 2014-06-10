@@ -60,8 +60,8 @@ collect_unknown_type_infos(ParseState, OldUnknownTypes) ->
             error;
         false ->
             ParseState2 = tester_parse_state:reset_unknown_types(ParseState),
-            ParseState3 = lists:foldl(fun({type, Module, TypeName}, InnerParseState) ->
-                                              collect_type_info(Module, TypeName,
+            ParseState3 = lists:foldl(fun({type, Module, TypeName, Arity}, InnerParseState) ->
+                                              collect_type_info(Module, TypeName, Arity,
                                                                 InnerParseState)
                                       end, ParseState2, UnknownTypes),
             case tester_parse_state:has_unknown_types(ParseState3) of
@@ -70,11 +70,11 @@ collect_unknown_type_infos(ParseState, OldUnknownTypes) ->
             end
     end.
 
--spec collect_type_info/3 :: (module(), atom(), tester_parse_state:state()) ->
+-spec collect_type_info(module(), atom(), arity(), tester_parse_state:state()) ->
     tester_parse_state:state().
-collect_type_info(Module, Type, ParseState) ->
+collect_type_info(Module, Type, Arity, ParseState) ->
     erlang:put(module, Module),
-    case tester_parse_state:is_known_type(Module, Type, ParseState) of
+    case tester_parse_state:is_known_type(Module, Type, Arity, ParseState) of
         true ->
             ParseState;
         false ->
@@ -89,24 +89,23 @@ collect_type_info(Module, Type, ParseState) ->
 
 -spec parse_chunk/3 :: (any(), module(), tester_parse_state:state()) ->
     tester_parse_state:state().
-parse_chunk({attribute, _Line, type, {{record, TypeName}, ATypeSpec, _List}},
+parse_chunk({attribute, _Line, type, {{record, TypeName}, ATypeSpec, List}},
             Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
-    tester_parse_state:add_type_spec({record, Module, TypeName}, TheTypeSpec,
+    tester_parse_state:add_type_spec({record, Module, TypeName}, TheTypeSpec, List,
                                      NewParseState);
-parse_chunk({attribute, _Line, type, {TypeName, ATypeSpec, _List}},
+parse_chunk({attribute, _Line, type, {TypeName, ATypeSpec, List}},
             Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
-    tester_parse_state:add_type_spec({type, Module, TypeName}, TheTypeSpec,
+    tester_parse_state:add_type_spec({type, Module, TypeName, length(List)}, TheTypeSpec, List,
                                      NewParseState);
-parse_chunk({attribute, _Line, opaque, {TypeName, ATypeSpec, _List}},
+parse_chunk({attribute, _Line, opaque, {TypeName, ATypeSpec, List}},
             Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(ATypeSpec, Module, ParseState),
-    tester_parse_state:add_type_spec({type, Module, TypeName}, TheTypeSpec,
+    tester_parse_state:add_type_spec({type, Module, TypeName, length(List)}, TheTypeSpec, List,
                                      NewParseState);
 parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
             Module, ParseState) ->
-    %ct:pal("~w:~w ~w ~w", [Module, _Line, FunName, AFunSpec]),
     FunSpec = case AFunSpec of
                   [{type, _,bounded_fun, [_TypeFun, ConstraintType]}] ->
                       try
@@ -125,10 +124,10 @@ parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
               end,
     {TheFunSpec, NewParseState} = parse_type({union_fun, FunSpec}, Module, ParseState),
     tester_parse_state:add_type_spec({'fun', Module, FunName, FunArity},
-                                     TheFunSpec, NewParseState);
+                                     TheFunSpec, [], NewParseState);
 parse_chunk({attribute, _Line, record, {TypeName, TypeList}}, Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(TypeList, Module, ParseState),
-    tester_parse_state:add_type_spec({record, Module, TypeName}, TheTypeSpec,
+    tester_parse_state:add_type_spec({record, Module, TypeName}, TheTypeSpec, [],
                                      NewParseState);
 parse_chunk({attribute, _Line, _AttributeName, _AttributeValue}, _Module,
             ParseState) ->
@@ -171,7 +170,7 @@ parse_type_({type, _Line, product, Types}, Module, ParseState) ->
     {TypeList, ParseState2} = parse_type_list(Types, Module, ParseState),
     {{product, TypeList}, ParseState2};
 parse_type_({type, _Line, tuple, any}, _Module, ParseState) ->
-    {{tuple, {typedef, tester, test_any}}, ParseState};
+    {{tuple, {typedef, tester, test_any, []}}, ParseState};
 parse_type_({type, _Line, tuple, Types}, Module, ParseState) ->
     {TypeList, ParseState2} = parse_type_list(Types, Module, ParseState),
     {{tuple, TypeList}, ParseState2};
@@ -182,7 +181,7 @@ parse_type_({type, _Line, nonempty_list, [Type]}, Module, ParseState) ->
     {ListType, ParseState2} = parse_type(Type, Module, ParseState),
     {{nonempty_list, ListType}, ParseState2};
 parse_type_({type, _Line, list, []}, _Module, ParseState) ->
-    {{list, {typedef, tester, test_any}}, ParseState};
+    {{list, {typedef, tester, test_any, []}}, ParseState};
 parse_type_({type, _Line, range, [Begin, End]}, Module, ParseState) ->
     {BeginType, ParseState2} = parse_type(Begin, Module, ParseState),
     {EndType, ParseState3} = parse_type(End, Module, ParseState2),
@@ -213,7 +212,7 @@ parse_type_({type, _Line, number, []}, _Module, ParseState) ->
 parse_type_({type, _Line, boolean, []}, _Module, ParseState) ->
     {bool, ParseState};
 parse_type_({type, _Line, any, []}, _Module, ParseState) ->
-    {{typedef, tester, test_any}, ParseState};
+    {{typedef, tester, test_any, []}, ParseState};
 parse_type_({type, _Line, atom, []}, _Module, ParseState) ->
     {atom, ParseState};
 parse_type_({type, _Line, arity, []}, _Module, ParseState) ->
@@ -239,7 +238,7 @@ parse_type_({type, _Line, no_return, []}, _Module, ParseState) ->
 parse_type_({type, _Line, reference, []}, _Module, ParseState) ->
     {reference, ParseState};
 parse_type_({type, _Line, term, []}, _Module, ParseState) ->
-    {{typedef, tester, test_any}, ParseState};
+    {{typedef, tester, test_any, []}, ParseState};
 parse_type_({ann_type, _Line, [{var, _Line2, _Varname}, Type]}, Module, ParseState) ->
     parse_type(Type, Module, ParseState);
 parse_type_({atom, _Line, Atom}, _Module, ParseState) ->
@@ -249,19 +248,19 @@ parse_type_({op, _Line1,'-',{integer,_Line2,Value}}, _Module, ParseState) ->
 parse_type_({integer, _Line, Value}, _Module, ParseState) ->
     {{integer, Value}, ParseState};
 parse_type_({type, _Line, array, []}, _Module, ParseState) ->
-    {{builtin_type, array_array, {typedef, tester, test_any}}, ParseState};
+    {{builtin_type, array_array, {typedef, tester, test_any, []}}, ParseState};
 parse_type_({type, _Line, dict, []}, _Module, ParseState) ->
-    {{builtin_type, dict_dict, {typedef, tester, test_any},
-      {typedef, tester, test_any}}, ParseState};
+    {{builtin_type, dict_dict, {typedef, tester, test_any, []},
+      {typedef, tester, test_any, []}}, ParseState};
 parse_type_({type, _Line, queue, []}, _Module, ParseState) ->
-    {{builtin_type, queue_queue, {typedef, tester, test_any}}, ParseState};
+    {{builtin_type, queue_queue, {typedef, tester, test_any, []}}, ParseState};
 parse_type_({type, _Line, gb_set, []}, _Module, ParseState) ->
-    {{builtin_type, gb_sets_set, {typedef, tester, test_any}}, ParseState};
+    {{builtin_type, gb_sets_set, {typedef, tester, test_any, []}}, ParseState};
 parse_type_({type, _Line, gb_tree, []}, _Module, ParseState) ->
-    {{builtin_type, gb_trees_tree, {typedef, tester, test_any},
-      {typedef, tester, test_any}}, ParseState};
+    {{builtin_type, gb_trees_tree, {typedef, tester, test_any, []},
+      {typedef, tester, test_any, []}}, ParseState};
 parse_type_({type, _Line, set, []}, _Module, ParseState) ->
-    {{builtin_type, set_set, {typedef, tester, test_any}}, ParseState};
+    {{builtin_type, set_set, {typedef, tester, test_any, []}}, ParseState};
 parse_type_({type, _Line, module, []}, _Module, ParseState) ->
     {{builtin_type, module}, ParseState};
 parse_type_({type, _Line, iodata, []}, _Module, ParseState) ->
@@ -316,14 +315,14 @@ parse_type_({remote_type, _Line, [{atom, _Line2, sets},
     {Value, ParseState2}   = parse_type(ValueType, Module, ParseState),
     {{builtin_type, set_set, Value}, ParseState2};
 parse_type_({remote_type, _Line, [{atom, _Line2, TypeModule},
-                                 {atom, _Line3, TypeName}, []]},
+                                 {atom, _Line3, TypeName}, L]},
            _Module, ParseState) ->
-    case tester_parse_state:is_known_type(TypeModule, TypeName, ParseState) of
+    case tester_parse_state:is_known_type(TypeModule, TypeName, length(L), ParseState) of
         true ->
-            {{typedef, TypeModule, TypeName}, ParseState};
+            {{typedef, TypeModule, TypeName, L}, ParseState};
         false ->
-            {{typedef, TypeModule, TypeName},
-             tester_parse_state:add_unknown_type(TypeModule, TypeName, ParseState)}
+            {{typedef, TypeModule, TypeName, L},
+             tester_parse_state:add_unknown_type(TypeModule, TypeName, length(L), ParseState)}
     end;
 % why is this here? function() is no official type
 parse_type_({type, _Line, 'function', []}, _Module, ParseState) ->
@@ -373,7 +372,7 @@ parse_type_(TypeSpecs, Module, ParseState) when is_list(TypeSpecs) ->
             unknown
     end;
 parse_type_({var, _Line, Atom}, _Module, ParseState) when is_atom(Atom) ->
-    {{tuple, {typedef, tester, test_any}}, ParseState};
+    {{var, Atom}, ParseState};
 parse_type_({type, _Line, constraint, _Constraint}, _Module, ParseState) ->
     {{constraint, nyi}, ParseState};
 parse_type_({type, _, bounded_fun, [FunType, ConstraintList]}, Module, ParseState) ->
@@ -398,14 +397,14 @@ parse_type_({type, _Line, maybe_improper_list, L}, _Module, ParseState) when is_
     {{builtin_type, maybe_improper_list}, ParseState};
 parse_type_({user_type, Line, TypeName, L}, Module, ParseState) ->
     parse_type_({type, Line, TypeName, L}, Module, ParseState);
-parse_type_({type, _Line, TypeName, L}, Module, ParseState) when is_list(L) ->
-    %ct:pal("type1 ~p:~p~n", [Module, TypeName]),
-    case tester_parse_state:is_known_type(Module, TypeName, ParseState) of
+parse_type_({type, _Line, TypeName, L}, Module, ParseState) ->
+    %ct:pal("type1 ~p:~p~n~w~n", [Module, TypeName, L]),
+    case tester_parse_state:is_known_type(Module, TypeName, length(L), ParseState) of
         true ->
-            {{typedef, Module, TypeName}, ParseState};
+            {{typedef, Module, TypeName, L}, ParseState};
         false ->
-            {{typedef, Module, TypeName},
-             tester_parse_state:add_unknown_type(Module, TypeName, ParseState)}
+            {{typedef, Module, TypeName, L},
+             tester_parse_state:add_unknown_type(Module, TypeName, length(L), ParseState)}
     end;
 parse_type_({ann_type,_Line,[Left,Right]}, _Module, ParseState) ->
     {{ann_type, [Left, Right]}, ParseState};
