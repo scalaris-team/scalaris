@@ -478,36 +478,31 @@ init(Options) ->
     rm_loop:init_first(),
     dht_node_move:send_trigger(),
 
-    Id = case {is_first(Options), config:read(leases)} of
-             {true, true} ->
-                 msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
-                 l_on_cseq:id(intervals:all());
-             {true, _} ->
-                 % get my ID (if set, otherwise chose a random ID):
-                 case lists:keyfind({dht_node, id}, 1, Options) of
-                     {{dht_node, id}, IdX} -> IdX;
-                     _ -> ?RT:get_random_node_id()
-                 end;
-             {false, true} ->
-                 msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
-                 % get my ID (if set, otherwise chose a random ID):
-                 case lists:keyfind({dht_node, id}, 1, Options) of
-                     {{dht_node, id}, IdX} -> IdX;
-                     _ -> ?RT:get_random_node_id()
-                 end;
-             {false, _} ->
-                 case lists:keyfind({dht_node, id}, 1, Options) of
-                     {{dht_node, id}, IdX} -> IdX;
-                     _ -> ?RT:get_random_node_id()
-                 end
-         end,
-    case is_first(Options) of
-        true ->
+    case {is_first(Options), config:read(leases)} of
+        {true, true} ->
+            msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
+            Id = l_on_cseq:id(intervals:all()),
             TmpState = dht_node_join:join_as_first(Id, 0, Options),
             %% we have to inject the first lease by hand, as otherwise
             %% no routing will work.
             l_on_cseq:add_first_lease_to_db(Id, TmpState);
-        _    -> dht_node_join:join_as_other(Id, 0, Options)
+        {false, true} ->
+            msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
+            % get my ID (if set, otherwise chose a random ID):
+            Id = case lists:keyfind({dht_node, id}, 1, Options) of
+                     {{dht_node, id}, IdX} -> IdX;
+                     _ -> ?RT:get_random_node_id()
+                 end,
+            dht_node_join:join_as_other(Id, 0, Options);
+        {IsFirst, _} ->
+            % get my ID (if set, otherwise chose a random ID):
+            Id = case lists:keyfind({dht_node, id}, 1, Options) of
+                     {{dht_node, id}, IdX} -> IdX;
+                     _ -> ?RT:get_random_node_id()
+                 end,
+            if IsFirst -> dht_node_join:join_as_first(Id, 0, Options);
+               true    -> dht_node_join:join_as_other(Id, 0, Options)
+            end
     end.
 %% userdevguide-end dht_node:start
 
