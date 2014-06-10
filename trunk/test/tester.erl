@@ -105,7 +105,7 @@ run(Module, Func, Arity, Iterations, ParseState, Options, Thread) ->
                     util:get_linetrace()}
             end;
         false ->
-            FeederFunType = {union_fun, []},
+            FeederFunType = {var_type, [], {union_fun, []}},
             % get spec from tested-fun
             {value, FunType} = tester_parse_state:lookup_type({'fun', Module,
                                                                Func, Arity},
@@ -134,24 +134,25 @@ run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, TypeInfos, O
             Error
     end.
 
-get_arg_and_result_type({union_fun, FunTypes} = _FunType,
-                        {union_fun, FeederFunTypes} = _FeederFunType, Options) ->
-    {'fun', ArgType, ResultType} = case proplists:get_bool(with_feeder, Options) of
+get_arg_and_result_type({var_type, [], {union_fun, FunTypes}} = _FunType,
+                        {var_type, [], {union_fun, FeederFunTypes}} = _FeederFunType, Options) ->
+    case proplists:get_bool(with_feeder, Options) of
                                         true ->
-                                            util:randomelem(FeederFunTypes);
+                                            {var_fun, [], util:randomelem(FeederFunTypes)};
                                        false ->
-                                           util:randomelem(FunTypes)
-                                    end,
-    {ArgType, ResultType}.
+                                           {var_fun, [], util:randomelem(FunTypes)}
+                                    end.
 
 run_test_ttt(Module, Func,
-             {union_fun, FunTypes} = FunType,
-             {union_fun, _FeederFunTypes} = FeederFunType,
+             {var_type, [], {union_fun, FunTypes}} = FunType,
+             {var_type, [], {union_fun, _FeederFunTypes}} = FeederFunType,
              TypeInfos, Options, Thread) ->
-    {ArgType, ResultType} = get_arg_and_result_type(FunType, FeederFunType, Options),
+    Fun = get_arg_and_result_type(FunType, FeederFunType, Options),
+    {var_fun, VarList, {'fun', ArgType, ResultType}} = Fun,
     Size = 30,
     GenArgs = try
-               {ok, tester_value_creator:create_value(ArgType, Size, TypeInfos)}
+               {ok, tester_value_creator:create_value({var_type, VarList, ArgType},
+                                                      Size, TypeInfos)}
            catch
                Error:{error, Reason} ->
                    print_error(Reason),
@@ -263,7 +264,6 @@ run_test(Module, Func, Arity, Iterations, ParseState, Threads, Options) ->
                        tester_global_state:reset_last_call(Thread)
                end) || Thread <- lists:seq(1, Threads)],
     Results = [receive {result, Result, ThreadPid} -> {Result, ThreadPid} end || _ <- lists:seq(1, Threads)],
-    %ct:pal("~w~n", [Results]),
     _ = [fun ({Result, ThreadPid}) ->
                  case Result of
                      {fail, ResultValue, ResultType, Error, _Module, _Func, Args, Term,

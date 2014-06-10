@@ -27,22 +27,22 @@
 
 -spec create_value(type_spec(), non_neg_integer(), tester_parse_state:state())
         -> {value, term()} | failed.
-create_value({typedef, comm, reg_name}, _Size, _ParseState) ->
+create_value({typedef, comm, reg_name, []}, _Size, _ParseState) ->
     ?ASSERT2(is_pid(whereis(tester_pseudo_proc)), process__tester_pseudo_proc__must_exist),
     {value, tester_pseudo_proc};
-create_value({typedef, comm, erl_local_pid_with_reply_as} = Type, Size, ParseState) ->
+create_value({typedef, comm, erl_local_pid_with_reply_as, []} = Type, Size, ParseState) ->
     {Pid, e, _WrongPos, Env} =
         tester_value_creator:create_value_wo_scalaris(Type, Size, ParseState),
     Pos = tester_value_creator:create_value_wo_scalaris(
             {range, {integer, 2}, {integer, tuple_size(Env)}}, Size, ParseState),
     {value, {Pid, e, Pos, setelement(Pos, Env, '_')}};
-create_value({typedef, comm, mypid_with_reply_as} = Type, Size, ParseState) ->
+create_value({typedef, comm, mypid_with_reply_as, []} = Type, Size, ParseState) ->
     {Pid, e, _WrongPos, Env} =
         tester_value_creator:create_value_wo_scalaris(Type, Size, ParseState),
     Pos = tester_value_creator:create_value_wo_scalaris(
             {range, {integer, 2}, {integer, tuple_size(Env)}}, Size, ParseState),
     {value, {Pid, e, Pos, setelement(Pos, Env, '_')}};
-create_value({typedef, comm, mypid_plain}, _Size, _ParseState) ->
+create_value({typedef, comm, mypid_plain, []}, _Size, _ParseState) ->
     ?ASSERT2(is_pid(whereis(tester_pseudo_proc)), process__tester_pseudo_proc__must_exist),
     case crypto:rand_uniform(0, 2) of
         0 -> {value, comm:make_global(whereis(tester_pseudo_proc))};

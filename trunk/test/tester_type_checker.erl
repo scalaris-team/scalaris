@@ -72,7 +72,7 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
         arity ->
             inner_check(Value, byte, CheckStack, ParseState);
         atom ->
-            check_basic_type(Value, Type, CheckStack, ParseState,
+            check_basic_type(Value, atom, CheckStack, ParseState,
                              fun erlang:is_atom/1, no_atom);
         {atom, _Atom} ->
             check_atom(Value, Type, CheckStack, ParseState);
@@ -186,10 +186,13 @@ inner_check_(Value, Type, CheckStack, ParseState) ->
             check_tuple(Value, Type, CheckStack, ParseState);
         {tuple, Tuple} when is_tuple(Tuple) ->
             inner_check(Value, Tuple, CheckStack, ParseState);
-        {typedef, _Module, _TypeName} ->
+        {typedef, _Module, _TypeName, []} ->
             check_typedef(Value, Type, CheckStack, ParseState);
         {union, _Union} ->
             check_union(Value, Type, CheckStack, ParseState);
+        {var_type, [], InnerType} ->
+            % @todo add substitution
+            inner_check_(Value, InnerType, CheckStack, ParseState);            
         _ ->
             ct:pal("Type checker: unsupported type: ~p", [Type]),
             ?DBG_ASSERT2(false, "unknown type"),
@@ -216,15 +219,16 @@ check_basic_type_with_prop(Value, Type, CheckStack, ParseState,
         {false, _} = R -> R
     end.
 
-check_typedef(_Value, {typedef, tester, test_any}, _, _) ->
+check_typedef(_Value, {typedef, tester, test_any, []}, _, _) ->
     true;
-check_typedef(Value, {typedef, Module, TypeName} = T,
+check_typedef(Value, {typedef, Module, TypeName, []} = T,
               CheckStack, ParseState) ->
-    case tester_parse_state:lookup_type({type, Module, TypeName}, ParseState) of
+    case tester_parse_state:lookup_type({type, Module, TypeName, length([])}, ParseState) of
         none ->
+            ct:pal("error in check_typedef ~w:~w", [Module, TypeName]),
             {false, [{tester_lookup_type_failed,
                       {Module, TypeName}} | CheckStack]};
-        {value, InnerType} ->
+        {value, {var_type, [], InnerType}} ->
             case inner_check(Value, InnerType,
                              CheckStack, ParseState) of
                 {false, ErrStack} ->
@@ -250,9 +254,10 @@ check_range(Value, {range, {integer, Min}, {integer, Max}} = T,
 check_record(Value, {record, Module, TypeName} = T, CheckStack, ParseState) ->
     case tester_parse_state:lookup_type(T, ParseState) of
         none ->
+            ct:pal("error in check_record"),
             {false, [{tester_lookup_type_failed,
                       {Module, TypeName}} | CheckStack]};
-        {value, {record, FieldList} = _InnerType} ->
+        {value, {var_type, [], {record, FieldList} = _InnerType}} ->
             %% check record name here (add it as record field in front)
             case inner_check(Value, {record,
                         [ {typed_record_field, tag, {atom, TypeName}}
