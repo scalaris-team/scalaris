@@ -30,7 +30,8 @@
          is_slide/1,
          is_join/1, is_join/2, is_leave/1, is_leave/2, is_jump/1, is_jump/2,
          is_incremental/1,
-         get_id/1, get_node/1, get_interval/1, get_target_id/1, get_jump_target_id/1,
+         get_id/1, get_node/1, get_interval/1,
+         get_my_old_id/1, get_target_id/1, get_jump_target_id/1,
          get_source_pid/1, get_tag/1, get_sendORreceive/1, get_type/1,
          get_predORsucc/1,
          get_time_last_send/1, get_time_next_warn/1,
@@ -81,6 +82,7 @@
          id                = ?required(slide_op, id)        :: id(),
          node              = ?required(slide_op, node)      :: node:node_type(), % the node, data is sent to/received from
          interval          = ?required(slide_op, interval)  :: intervals:interval(), % send/receive data in this range
+         my_old_id         = ?required(slide_op, my_old_id) :: ?RT:key() | null, % ID before changing the own ID (null in case of receiving joins)
          target_id         = ?required(slide_op, target_id) :: ?RT:key(), % ID to move the predecessor of the two participating nodes to
          jump_target_id    = null                           :: ?RT:key() | null, % ID to jump to in case of a jump operation which is preceeded by a slide to leave
          tag               = ?required(slide_op, tag)       :: any(),
@@ -120,6 +122,7 @@ new_slide(MoveId, Type, CurTargetId, Tag, SourcePid, OtherMTE, NextOp, Neighbors
               id = MoveId,
               node = TargetNode,
               interval = Interval,
+              my_old_id = nodelist:nodeid(Neighbors),
               target_id = CurTargetId,
               tag = Tag,
               source_pid = SourcePid,
@@ -175,6 +178,7 @@ new_receiving_slide_join(MoveId, TargetId, Tag, Neighbors) ->
               id = MoveId,
               node = TargetNode,
               interval = IntervalToReceive,
+              my_old_id = null,
               target_id = TargetId,
               tag = Tag,
               source_pid = null}.
@@ -217,6 +221,7 @@ new_sending_slide_join(MoveId, JoiningNode, JoiningNodeId, Tag, Neighbors) ->
                       id = MoveId,
                       node = JoiningNode,
                       interval = IntervalToSend,
+                      my_old_id = nodelist:nodeid(Neighbors),
                       target_id = JoiningNodeId,
                       tag = Tag,
                       source_pid = null}
@@ -239,6 +244,7 @@ new_sending_slide_leave(MoveId, CurTargetId, Tag, SourcePid, Neighbors) ->
               id = MoveId,
               node = TargetNode,
               interval = Interval,
+              my_old_id = nodelist:nodeid(Neighbors),
               target_id = CurTargetId,
               tag = Tag,
               source_pid = SourcePid,
@@ -264,6 +270,7 @@ new_sending_slide_jump(MoveId, CurTargetId, JumpTargetId, SourcePid, Tag, Neighb
               id = MoveId,
               node = TargetNode,
               interval = Interval,
+              my_old_id = nodelist:nodeid(Neighbors),
               target_id = CurTargetId,
               jump_target_id = JumpTargetId,
               tag = Tag,
@@ -322,6 +329,11 @@ get_node(#slide_op{node=Node}) -> Node.
 %% @doc Returns the interval of data to receive or send.
 -spec get_interval(SlideOp::slide_op()) -> intervals:interval().
 get_interval(#slide_op{interval=Interval}) -> Interval.
+
+%% @doc Returns the old ID before any changes, i.e. at the start of the slide
+%%      (null in case of receiving joins).
+-spec get_my_old_id(SlideOp::slide_op()) -> ?RT:key() | null.
+get_my_old_id(#slide_op{my_old_id=MyOldId}) -> MyOldId.
 
 %% @doc Returns the target id a node participating in a receiving or sending
 %%      slide operation moves to (note: this may be the other node).

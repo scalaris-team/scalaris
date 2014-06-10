@@ -34,7 +34,8 @@
          update_rcv_data1/3, update_rcv_data2/3,
          prepare_send_delta1/3, prepare_send_delta2/3,
          finish_delta1/3, finish_delta2/3,
-         finish_delta_ack1/3, finish_delta_ack2/4]).
+         finish_delta_ack1/3, finish_delta_ack2/4,
+         abort_slide/3]).
 
 % for tester
 -export([tester_create_dht_node_state/0]).
@@ -212,6 +213,15 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
             % @todo
             error
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Executed when aborting the given slide operation (assumes the SlideOp
+%%      has already been set up).
+-spec abort_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+        Reason::dht_node_move:abort_reason()) -> dht_node_state:state().
+abort_slide(State, _SlideOp, _Reason) ->
+    State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

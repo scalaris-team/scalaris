@@ -84,6 +84,9 @@
         -> {ok, dht_node_state:state(), slide_op:slide_op(), NextOpMsg} |
            {abort, AbortReason::dht_node_move:abort_reason(), dht_node_state:state(), slide_op:slide_op()}
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
+-callback abort_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                      Reason::dht_node_move:abort_reason())
+        -> dht_node_state:state().
 -else.
 -spec behaviour_info(atom()) -> [{atom(), arity()}] | undefined.
 behaviour_info(callbacks) ->
@@ -99,7 +102,8 @@ behaviour_info(callbacks) ->
      {finish_delta1, 3},
      {finish_delta2, 3},
      {finish_delta_ack1, 3},
-     {finish_delta_ack2, 4}
+     {finish_delta_ack2, 4},
+     {abort_slide, 3}
     ];
 behaviour_info(_Other) ->
     undefined.
