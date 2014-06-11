@@ -238,7 +238,7 @@ unittest_lease_update(Old, New, Mode) ->
           )
     end.
 
--spec unittest_clear_lease_list(Pid::comm:mypid()) -> ok.
+-spec unittest_clear_lease_list(Pid::comm:erl_local_pid()) -> ok.
 unittest_clear_lease_list(Pid) ->
     comm:send_local(Pid,
                     {l_on_cseq, unittest_clear_lease_list, comm:this()}),
