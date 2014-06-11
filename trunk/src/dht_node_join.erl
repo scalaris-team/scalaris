@@ -505,18 +505,20 @@ process_join_state({web_debug_info, Requestor} = _Msg,
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-process_join_state({?lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _QueuedMessages} = State) ->
+process_join_state({?lookup_aux, Key, Hops, Msg} = FullMsg,
+                   {join, JoinState, _QueuedMessages} = State) ->
     case get_connections(JoinState) of
         [] ->
             _ = comm:send_local_after(100, self(), FullMsg),
             ok;
         [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:
-            Self = comm:reply_as(self(), 3, {join, send_failed, '_', []}),
+            Self = comm:reply_as(self(), 2, {join, '_', []}),
             comm:send(Pid, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
-process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, Hops, Msg}, _Reason}, FailedPids}, {join, JoinState, _QueuedMessages} = State) ->
+process_join_state({join, {send_error, Target, {?lookup_aux, Key, Hops, Msg}, _Reason},
+                    FailedPids}, {join, JoinState, _QueuedMessages} = State) ->
     Connections = get_connections(JoinState),
     case lists:dropwhile(fun({_, Pid}) -> lists:member(Pid, FailedPids) end, Connections) of
         [] ->
@@ -524,7 +526,7 @@ process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, H
             ok;
         [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:
-            Self = comm:reply_as(self(), 3, {join, send_failed, '_', [Target | FailedPids]}),
+            Self = comm:reply_as(self(), 2, {join, '_', [Target | FailedPids]}),
             comm:send(Pid, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
@@ -618,6 +620,8 @@ process_join_msg({join, known_hosts_timeout, _JoinId} = _Msg, State) ->
 process_join_msg({join, get_number_of_samples_timeout, _Conn, _JoinId} = _Msg, State) ->
     State;
 process_join_msg({join, join_request_timeout, _Timeouts, _CandId, _JoinId} = _Msg, State) ->
+    State;
+process_join_msg({join, {send_error, _Target, _Msg, _Reason}, _FailedPids}, State) ->
     State;
 % messages send by the passive load balancing module
 % -> forward to the module
