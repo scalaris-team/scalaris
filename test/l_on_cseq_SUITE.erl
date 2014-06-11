@@ -140,6 +140,7 @@ tester_type_check_l_on_cseq(_Config) ->
              {id, 1}, %% todo
              {split_range, 1}, %% todo
              {unittest_lease_update, 3}, %% only for unittests
+             {unittest_clear_lease_list, 1}, %% only for unittests
              {disable_lease, 2}, %% requires dht_node_state
              {on, 2}, %% cannot create dht_node_state (reference for bulkowner)
              {get_pretty_timeout, 1}, %% cannot create valid timestamps
