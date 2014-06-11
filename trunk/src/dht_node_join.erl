@@ -646,11 +646,11 @@ call_lb_psv(LbPsv, Function, Parameters)
 -spec get_known_nodes(JoinUUId::pos_integer()) -> ok.
 get_known_nodes(JoinUUId) ->
     KnownHosts = config:read(known_hosts),
-    % contact all known VMs
+    % contact a subset of at most 10 random known VMs
     _ = [begin
             ?TRACE_SEND(Host, {get_dht_nodes, comm:this()}),
             comm:send(Host, {get_dht_nodes, comm:this()})
-         end || Host <- KnownHosts],
+         end || Host <- util:random_subset(10, KnownHosts)],
     % also try to get some nodes from the current erlang VM:
     OwnServicePerVm = pid_groups:find_a(service_per_vm),
     ?TRACE_SEND(OwnServicePerVm, {get_dht_nodes, comm:this()}),
