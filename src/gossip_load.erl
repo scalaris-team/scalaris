@@ -1215,7 +1215,7 @@ previous_or_current(PrevState, CurState) when is_record(PrevState, state) andals
 skipped_metrics(MyData, OtherData) ->
     Modules1 = [Module || {load_data, Module, skip} <- MyData],
     Modules2 = [Module || {load_data, Module, skip} <- OtherData],
-    sets:to_list(sets:union(sets:from_list(Modules1), sets:from_list(Modules2))).
+    lists:usort(lists:append(Modules1, Modules2)).
 
 
 -spec replace_skipped(Other::load_data_list(), Data::data(),
