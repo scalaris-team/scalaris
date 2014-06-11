@@ -102,7 +102,7 @@
     | nil
     | {atom, atom()}
     | {integer, integer()}
-    | {var, Atom}
+    | {var, atom()}
     | {builtin_type, builtin_type()}
     | {builtin_type, array_array, ValueType::any()}
     | {builtin_type, dict_dict, KeyType::any(), ValueType::any()}
