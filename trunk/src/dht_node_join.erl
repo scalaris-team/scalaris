@@ -530,6 +530,20 @@ process_join_state({join, {send_error, Target, {?lookup_aux, Key, Hops, Msg}, _R
             comm:send(Pid, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
+process_join_state({join, {send_error, Target, {get_dht_nodes, _This}, _Reason},
+                    FailedPids}, State) ->
+    KnownHosts = config:read(known_hosts),
+    NextHost = case lists:dropwhile(fun(Pid) ->
+                                            lists:member(Pid, FailedPids)
+                                    end, KnownHosts) of
+                   [] -> util:randomelem(KnownHosts);
+                   [X | _] -> X
+               end,
+    % integrate the list of processes for which the send previously failed:
+    Self = comm:reply_as(self(), 2, {join, '_', [Target | FailedPids]}),
+    ?TRACE_SEND(NextHost, {get_dht_nodes, comm:this()}),
+    comm:send(NextHost, {get_dht_nodes, comm:this()}, [{shepherd, Self}]),
+    State;
 
 % do not queue rm_trigger to prevent its infection with msg_queue:send/1
 process_join_state({rm, trigger} = _Msg, State) ->
@@ -650,11 +664,12 @@ call_lb_psv(LbPsv, Function, Parameters)
 -spec get_known_nodes(JoinUUId::pos_integer()) -> ok.
 get_known_nodes(JoinUUId) ->
     KnownHosts = config:read(known_hosts),
-    % contact a subset of at most 10 random known VMs
+    % contact a subset of at most 3 random known VMs
+    Self = comm:reply_as(self(), 2, {join, '_', []}),
     _ = [begin
             ?TRACE_SEND(Host, {get_dht_nodes, comm:this()}),
-            comm:send(Host, {get_dht_nodes, comm:this()})
-         end || Host <- util:random_subset(10, KnownHosts)],
+            comm:send(Host, {get_dht_nodes, comm:this()}, [{shepherd, Self}])
+         end || Host <- util:random_subset(3, KnownHosts)],
     % also try to get some nodes from the current erlang VM:
     OwnServicePerVm = pid_groups:find_a(service_per_vm),
     ?TRACE_SEND(OwnServicePerVm, {get_dht_nodes, comm:this()}),
