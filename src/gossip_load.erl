@@ -1213,11 +1213,8 @@ previous_or_current(PrevState, CurState) when is_record(PrevState, state) andals
 -spec skipped_metrics(My::[load_data()|load_data_skipped()],
                       Other::[load_data()|load_data_skipped()]) -> list(atom()).
 skipped_metrics(MyData, OtherData) ->
-    FilterSkippedModules = fun ({load_data, Module, skip}) -> {true, Module};
-                               (_) -> false
-                           end,
-    Modules1 = lists:filtermap(FilterSkippedModules, MyData),
-    Modules2 = lists:filtermap(FilterSkippedModules, OtherData),
+    Modules1 = [Module || {load_data, Module, skip} <- MyData],
+    Modules2 = [Module || {load_data, Module, skip} <- OtherData],
     sets:to_list(sets:union(sets:from_list(Modules1), sets:from_list(Modules2))).
 
 
