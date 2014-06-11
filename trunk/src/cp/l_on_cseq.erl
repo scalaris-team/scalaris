@@ -48,6 +48,7 @@
 -export([unittest_lease_update/3]).
 -export([unittest_create_lease/1]).
 -export([unittest_create_lease_with_range/2]).
+-export([unittest_clear_lease_list/1]).
 
 -export([get_db_for_id/1]).
 
@@ -85,7 +86,7 @@
 -record(lease, {
           id      = ?required(lease, id     ) :: lease_id(),
           epoch   = ?required(lease, epoch  ) :: non_neg_integer(),
-          owner   = ?required(lease, owner  ) :: comm:mypid() | nil,
+          owner   = ?required(lease, owner  ) :: comm:mypid_plain() | nil,
           range   = ?required(lease, range  ) :: intervals:interval(),
           aux     = ?required(lease, aux    ) :: lease_aux(),
           version = ?required(lease, version) :: non_neg_integer(),
@@ -237,6 +238,18 @@ unittest_lease_update(Old, New, Mode) ->
           )
     end.
 
+-spec unittest_clear_lease_list(Pid::comm:mypid()) -> ok.
+unittest_clear_lease_list(Pid) ->
+    comm:send_local(Pid,
+                    {l_on_cseq, unittest_clear_lease_list, comm:this()}),
+    trace_mpath:thread_yield(),
+    receive
+        ?SCALARIS_RECV(
+            {l_on_cseq, unittest_clear_lease_list_success}, %% ->
+            ok
+          )
+    end.
+    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % gen_component
@@ -262,11 +275,18 @@ on({l_on_cseq, split_and_change_owner, _Lease, NewOwner, ReplyPid, SplitResult},
 on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}, Mode},
    State) ->
     %log:pal("on renew ~w (~w)~n", [Old, Mode]),
-    New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
+    Self = comm:this(),
+    New = case get_aux(Old) of
+              % change owner to self -> remove aux
+              {change_owner, Self} ->
+                  Old#lease{aux=empty,version=OldVersion+1, timeout=new_timeout()};
+              _ ->
+                  Old#lease{version=OldVersion+1, timeout=new_timeout()}
+          end,
     ContentCheck = generic_content_check(Old, New, renew),
 %% @todo New passed for debugging only:
-    Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New, Mode}),
-    update_lease(Id, Self, ContentCheck, Old, New, State),
+    ReplyTo = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New, Mode}),
+    update_lease(Id, ReplyTo, ContentCheck, Old, New, State),
     State;
 
 on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode}, State) ->
@@ -360,6 +380,14 @@ on({l_on_cseq, unittest_update_reply,
    comm:send_local(Caller, {l_on_cseq, unittest_update_failed, Old, New}),
    State;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% clear lease list (only for unit tests)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, unittest_clear_lease_list, Pid}, State) ->
+  comm:send(Pid, {l_on_cseq, unittest_clear_lease_list_success}),
+    dht_node_state:set_lease_list(State, lease_list:empty());
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
