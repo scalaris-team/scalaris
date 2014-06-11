@@ -52,11 +52,11 @@
 -export([init_and_wait_for_valid_pid/0]).
 
 -ifdef(with_export_type_support).
--export_type([message/0, group_message/0, msg_tag/0, mypid/0,
-              erl_local_pid/0, erl_local_pid_with_reply_as/0,
+-export_type([message/0, group_message/0, msg_tag/0,
+              mypid/0, mypid_plain/0,
+              erl_local_pid/0, erl_local_pid_plain/0,
+              erl_local_pid_with_reply_as/0,
               send_options/0, channel/0]).
-% for comm_layer
--export_type([erl_local_pid_plain/0]).
 -endif.
 
 -type msg_tag() :: atom() | byte(). %% byte() in case of compact external atoms. See include/atom_ext.hrl
