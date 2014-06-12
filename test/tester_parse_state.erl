@@ -41,7 +41,7 @@
 
          reset_unknown_types/1,
 
-         is_known_type/4, lookup_type/2,
+         is_known_type/4, lookup_type/2, lookup_fun_type/2,
          
          % compact state
          finalize/1]).
@@ -236,6 +236,11 @@ add_string(String, #parse_state{non_empty_strings=Strings} = ParseState) ->
 
 -spec lookup_type(type_name(), state()) -> {value, type_spec()} | none.
 lookup_type(Type, #parse_state{type_infos=TypeInfos}) ->
+    gb_trees:lookup(Type, TypeInfos).
+
+-spec lookup_fun_type(type_name(), state()) -> 
+                             {value, {var_type, [], {union_fun, [test_fun_type(),...]}}} | none.
+lookup_fun_type(Type, #parse_state{type_infos=TypeInfos}) ->
     gb_trees:lookup(Type, TypeInfos).
 
 %% @doc Compact the state for use during value creation. Do this after having

@@ -18,6 +18,8 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
+-type(test_fun_type() :: {'fun', type_spec(), type_spec()}).
+
 -type(test_any() ::
    % | none()
    % | no_return()
@@ -102,7 +104,9 @@
     | nil
     | {atom, atom()}
     | {integer, integer()}
+    | {typedef, module(), atom(), []}
     | {var, atom()}
+    | {var_type, list(atom()), type_spec()}
     | {builtin_type, builtin_type()}
     | {builtin_type, array_array, ValueType::any()}
     | {builtin_type, dict_dict, KeyType::any(), ValueType::any()}
@@ -154,7 +158,9 @@
     | nil
     | {atom, atom()}
     | {integer, integer()}
+    | {typedef, module(), atom(), []}
     | {var, atom()}
+    | {var_type, list(atom()), type_spec()}
     | {builtin_type, builtin_type()}
     | {builtin_type, array_array, ValueType::type_spec()}
     | {builtin_type, dict_dict, KeyType::type_spec(), ValueType::type_spec()}
