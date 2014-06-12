@@ -29,7 +29,7 @@
 % accepted messages of an initialized rm_chord process in addition to rm_loop
 -type(custom_message() ::
     {rm, get_succlist, Source_Pid::comm:mypid()} |
-    {rm, {get_node_details_response, NodeDetails::node_details:node_details()}, from_succ | from_node} |
+    {rm, {rm, node_info_response, NodeDetails::node_details:node_details()}, from_succ | from_node} |
     {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
 
 -define(SEND_OPTIONS, [{channel, prio}, {?quiet}]).
@@ -77,17 +77,17 @@ handle_custom_message({rm, get_succlist, Source_Pid}, {Neighborhood} = State) ->
     {{unknown}, State};
 
 % got node_details from our successor
-handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_succ}, State)  ->
+handle_custom_message({rm, {rm, node_info_response, NodeDetails}, from_succ}, State)  ->
     SuccsPred = node_details:get(NodeDetails, pred),
+    ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_', from_node}),
     comm:send(node:pidX(SuccsPred),
-              {get_node_details,
-               comm:reply_as(comm:this(), 2, {rm, '_', from_node}), [node, is_leaving]},
+              {rm, node_info, ThisWithCookie, [node, is_leaving]},
               ?SEND_OPTIONS),
     {{unknown}, State};
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
-handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_node},
+handle_custom_message({rm, {rm, node_info_response, NodeDetails}, from_node},
    {OldNeighborhood} = State)  ->
     case node_details:get(NodeDetails, is_leaving) of
         false ->
@@ -133,10 +133,11 @@ handle_custom_message(_, _State) -> unknown_event.
 trigger_action({Neighborhood} = State) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
-        true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
-                          {get_node_details,
-                           comm:reply_as(comm:this(), 2, {rm, '_', from_succ}), [pred]},
-                          ?SEND_OPTIONS);
+        true ->
+            ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_', from_succ}),
+            comm:send(node:pidX(nodelist:succ(Neighborhood)),
+                      {rm, node_info, ThisWithCookie, [pred]},
+                      ?SEND_OPTIONS);
         _    -> ok
     end,
     {{unknown}, State}.
@@ -203,7 +204,7 @@ contact_new_nodes(NewNodes) ->
     case comm:is_valid(ThisWithCookie) of
         true ->
             _ = [begin
-                     Msg = {get_node_details, ThisWithCookie, [node, is_leaving]},
+                     Msg = {rm, node_info, ThisWithCookie, [node, is_leaving]},
                      comm:send(node:pidX(Node), Msg, ?SEND_OPTIONS)
                  end || Node <- NewNodes],
             ok;
