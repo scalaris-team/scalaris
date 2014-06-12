@@ -229,10 +229,6 @@ convergence_count_new_round() ->
 convergence_epsilon() ->
     config:read(gossip_load_convergence_epsilon).
 
--spec discard_old_rounds() -> boolean().
-discard_old_rounds() ->
-    config:read(gossip_load_discard_old_rounds).
-
 -spec no_of_buckets() -> histogram_size().
 no_of_buckets() ->
     config:read(gossip_load_number_of_buckets).
@@ -250,8 +246,6 @@ check_config() ->
 
     config:cfg_is_float(gossip_load_convergence_epsilon) and
     config:cfg_is_in_range(gossip_load_convergence_epsilon, 0.0, 100.0) and
-
-    config:cfg_is_bool(gossip_load_discard_old_rounds) and
 
     config:cfg_is_integer(gossip_load_convergence_count_best_values) and
     config:cfg_is_greater_than(gossip_load_convergence_count_best_values, 0) and
@@ -379,23 +373,14 @@ select_reply_data(PData, Ref, RoundStatus, Round, {PrevState, CurState}) ->
             %% log:log(debug, "[ ~w ] Data after select_reply_data: ~w", [state_get(instance, CurState), get_load_info(CurState)]),
             {ok, {PrevState, CurState2}};
         init when RoundStatus =:= old_round ->
-            case discard_old_rounds() of
-                true ->
-                    log:log(?SHOW, "[ ~w ] select_reply_data in old_round", [?MODULE]),
-                    % This only happens when entering a new round, i.e. the values have
-                    % already converged. Consequently, discarding messages does
-                    % not cause mass loss.
-                    {discard_msg, {PrevState, CurState}};
-                false ->
-                    log:log(?SHOW, "[ ~w ] select_reply_data in old_round", [?MODULE]),
-                    Metrics = skipped_metrics(state_get(load_data_list, PrevState), element(1, PData)),
-                    {Data1, PrevState1} = prepare_data(Metrics, PrevState),
-                    Data2 = replace_skipped(element(1, PData), Data1, Metrics),
-                    Pid = pid_groups:get_my(gossip),
-                    comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState), Data2, Ref, Round}),
-                    {_Data2, PrevState2} = merge_load_data(PData, PrevState1),
-                    {ok, {PrevState2, CurState}}
-            end
+            log:log(?SHOW, "[ ~w ] select_reply_data in old_round", [?MODULE]),
+            Metrics = skipped_metrics(state_get(load_data_list, PrevState), element(1, PData)),
+            {Data1, PrevState1} = prepare_data(Metrics, PrevState),
+            Data2 = replace_skipped(element(1, PData), Data1, Metrics),
+            Pid = pid_groups:get_my(gossip),
+            comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState), Data2, Ref, Round}),
+            {_Data2, PrevState2} = merge_load_data(PData, PrevState1),
+            {ok, {PrevState2, CurState}}
     end.
 
 
@@ -692,18 +677,9 @@ integrate_data_init(QData, RoundStatus, {PrevState, CurState}) ->
                 %% [state_get(instance, CurState), to_string(_LoadInfo), to_string(_Histo)]),
             {PrevState, NewState1};
         old_round ->
-             case discard_old_rounds() of
-                true ->
-                    log:log(debug, "[ ~w ] integrate_data in old_round", [?MODULE]),
-                    % This only happens when entering a new round, i.e. the values have
-                    % already converged. Consequently, discarding messages does
-                    % not cause mass loss.
-                    {PrevState, CurState};
-                false ->
-                    log:log(?SHOW, "[ ~w ] integrate_data in old_round", [?MODULE]),
-                    {_Data, NewPrevState1} = merge_load_data(QData, PrevState),
-                    {NewPrevState1, CurState}
-            end
+            log:log(?SHOW, "[ ~w ] integrate_data in old_round", [?MODULE]),
+            {_Data, NewPrevState1} = merge_load_data(QData, PrevState),
+            {NewPrevState1, CurState}
     end,
     Pid = pid_groups:get_my(gossip),
     comm:send_local(Pid, {integrated_data, state_get(instance, CurState1), RoundStatus}),
