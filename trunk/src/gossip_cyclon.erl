@@ -26,7 +26,7 @@
 
 % gossip_beh
 -export([init/1, init/2, init/3, check_config/0, trigger_interval/0, fanout/0,
-        select_node/1, select_data/1, select_reply_data/5, integrate_data/4,
+        select_node/1, select_data/1, select_reply_data/4, integrate_data/3,
         handle_msg/2, notify_change/3, min_cycles_per_round/0, max_cycles_per_round/0,
         round_has_converged/1, get_values_best/1, get_values_all/1, web_debug_info/1,
         shutdown/1]).
@@ -135,10 +135,9 @@ select_data(State) ->
 %%      PData: exchange data from the p2p_exch request <br/>
 %%      Ref: used by the gossip module to identify the request <br/>
 %%      RoundStatus / Round: ignored, as cyclon does not implement round handling
--spec select_reply_data(PData::data(), Ref::pos_integer(),
-    RoundStatus::gossip_beh:round_status(), Round::round(),
+-spec select_reply_data(PData::data(), Ref::pos_integer(), Round::round(),
     State::state()) -> {discard_msg | ok | retry | send_back, state()}.
-select_reply_data(_PData, _Ref, _RoundStatus, _Round, State) ->
+select_reply_data(_PData, _Ref, _Round, State) ->
     {ok, State}.
 
 
@@ -148,10 +147,9 @@ select_reply_data(_PData, _Ref, _RoundStatus, _Round, State) ->
 %%      RoundStatus / Round: ignored, as cyclon does not implement round handling
 %%      Upon finishing the processing of the data, a message of the form
 %%      {integrated_data, Instance, RoundStatus} is to be sent to the gossip module.
--spec integrate_data(QData::data(), RoundStatus::gossip_beh:round_status(),
-    Round::round(), State::state()) ->
+-spec integrate_data(QData::data(), Round::round(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
-integrate_data(_QData, _RoundStatus, _Round, State) ->
+integrate_data(_QData, _Round, State) ->
     {ok, State}.
 
 

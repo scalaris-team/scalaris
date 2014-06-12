@@ -53,7 +53,7 @@
 
 % gossip_beh
 -export([init/1, init/2, init/3, check_config/0, trigger_interval/0, fanout/0,
-        select_node/1, select_data/1, select_reply_data/5, integrate_data/4,
+        select_node/1, select_data/1, select_reply_data/4, integrate_data/3,
         handle_msg/2, notify_change/3, min_cycles_per_round/0, max_cycles_per_round/0,
         round_has_converged/1, get_values_best/1, get_values_all/1, web_debug_info/1,
         shutdown/1]).
@@ -348,39 +348,38 @@ select_data({PrevState, CurState}) ->
 %%      RoundStatus / Round: round information used for special handling of
 %%          messages from previous rounds <br/>
 %%      State: the state of the gossip_load module
--spec select_reply_data(PData::data(), Ref::pos_integer(),
-    RoundStatus::gossip_beh:round_status(), Round::round(),
+-spec select_reply_data(PData::data(), Ref::pos_integer(), Round::round(),
     FullState::full_state()) -> {discard_msg | ok | retry | send_back, full_state()}.
-select_reply_data(PData, Ref, RoundStatus, Round, {PrevState, CurState}) ->
+select_reply_data(PData, Ref, Round, {PrevState, CurState}) ->
 
-    IsValidRound = is_valid_round(RoundStatus, Round, PrevState, CurState),
+    CurRound = state_get(round, CurState),
+    PrevRound = state_get(round, PrevState),
+
+    SelectReplyDataHelper =
+        fun (State) ->
+                Metrics = skipped_metrics(state_get(load_data_list, State), element(1, PData)),
+                {Data1, State1} = prepare_data(Metrics, State),
+                Data2 = replace_skipped(element(1, PData), Data1, Metrics),
+                Pid = pid_groups:get_my(gossip),
+                comm:send_local(Pid, {selected_reply_data, state_get(instance, State1), Data2, Ref, Round}),
+                {_Data2, State2} = merge_load_data(PData, State1),
+                State2
+        end,
 
     case state_get(status, CurState) of
         uninit ->
             log:log(?SHOW, "[ ~w ] select_reply_data in uninit", [?MODULE]),
             {retry,{PrevState, CurState}};
-        init when not IsValidRound ->
+        init when Round =:= CurRound ->
+            CurState1 = SelectReplyDataHelper(CurState),
+            {ok, {PrevState, CurState1}};
+        init when Round =:= PrevRound ->
+            PrevState1 = SelectReplyDataHelper(PrevState),
+            {ok, {PrevState1, CurState}};
+        _ ->
             log:log(warn(), "[ ~w ] Discarded data in select_reply_data. Reason: invalid round.",
                 [state_get(instance, CurState)]),
-            {send_back, {PrevState, CurState}};
-        init when RoundStatus =:= current_round ->
-            Metrics = skipped_metrics(state_get(load_data_list, CurState), element(1, PData)),
-            {Data1, CurState1} = prepare_data(Metrics, CurState),
-            Data2 = replace_skipped(element(1, PData), Data1, Metrics),
-            Pid = pid_groups:get_my(gossip),
-            comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState1), Data2, Ref, Round}),
-            {_Data2, CurState2} = merge_load_data(PData, CurState1),
-            %% log:log(debug, "[ ~w ] Data after select_reply_data: ~w", [state_get(instance, CurState), get_load_info(CurState)]),
-            {ok, {PrevState, CurState2}};
-        init when RoundStatus =:= old_round ->
-            log:log(?SHOW, "[ ~w ] select_reply_data in old_round", [?MODULE]),
-            Metrics = skipped_metrics(state_get(load_data_list, PrevState), element(1, PData)),
-            {Data1, PrevState1} = prepare_data(Metrics, PrevState),
-            Data2 = replace_skipped(element(1, PData), Data1, Metrics),
-            Pid = pid_groups:get_my(gossip),
-            comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState), Data2, Ref, Round}),
-            {_Data2, PrevState2} = merge_load_data(PData, PrevState1),
-            {ok, {PrevState2, CurState}}
+            {send_back, {PrevState, CurState}}
     end.
 
 
@@ -392,23 +391,33 @@ select_reply_data(PData, Ref, RoundStatus, Round, {PrevState, CurState}) ->
 %%      State: the state of the gossip_load module <br/>
 %%      Upon finishing the processing of the data, a message of the form
 %%      {integrated_data, Instance, RoundStatus} is to be sent to the gossip module.
--spec integrate_data(QData::data(), RoundStatus::gossip_beh:round_status(),
-    Round::round(), FullState::full_state()) ->
+-spec integrate_data(QData::data(), Round::round(), FullState::full_state()) ->
     {discard_msg | ok | retry | send_back, full_state()}.
-integrate_data(QData, RoundStatus, Round, {PrevState, CurState}=FullState) ->
+integrate_data(QData, Round, {PrevState, CurState}=FullState) ->
     log:log(debug, "[ ~w ] Reply-Data: ~w~n", [state_get(instance, CurState), QData]),
 
-    IsValidRound = is_valid_round(RoundStatus, Round, PrevState, CurState),
+    CurRound = state_get(round, CurState),
+    PrevRound = state_get(round, PrevState),
+
+    IntegrateDataInit =
+        fun (RoundStatus, State) ->
+            {{_NewLoad, _NewRing}, State1} = merge_load_data(QData, State),
+            Pid = pid_groups:get_my(gossip),
+            comm:send_local(Pid, {integrated_data, state_get(instance, State1), RoundStatus}),
+            State1
+        end,
 
     case state_get(status, CurState) of
-        _ when not IsValidRound ->
-            log:log(warn(), "[ ~w ] Discarded data in integrate_data. Reason: invalid round. ", [?MODULE]),
-            {send_back, FullState};
         uninit ->
             log:log(?SHOW, "[ ~w ] integrate_data in uninit", [?MODULE]),
             {retry, FullState};
-        init ->
-            integrate_data_init(QData, RoundStatus, FullState)
+        init when Round =:= CurRound ->
+            {ok, {PrevState, IntegrateDataInit(cur_round, CurState)}};
+        init when Round =:= PrevRound ->
+            {ok, {IntegrateDataInit(prev_round, PrevState), CurState}};
+        _ ->
+            log:log(warn(), "[ ~w ] Discarded data in integrate_data. Reason: invalid round. ", [?MODULE]),
+            {send_back, FullState}
     end.
 
 
@@ -656,34 +665,6 @@ is_valid_round(RoundStatus, RoundFromMessage, PrevState, CurState) ->
                    [state_get(instance, CurState), RoundStatus, RoundFromState, RoundFromMessage]),
            false
     end.
-
-
--spec integrate_data_init(QData::data(), RoundStatus::gossip_beh:round_status(),
-        {PrevState::state(), CurState::state()}) -> {ok, full_state()}.
-integrate_data_init(QData, RoundStatus, {PrevState, CurState}) ->
-    {PrevState1, CurState1} = case RoundStatus of
-        current_round ->
-            {{_NewLoad, _NewRing}, NewState1} = merge_load_data(QData, CurState),
-            %% _PrevState = state_get(prev_state, State),
-            %% _PrevLoadInfo = get_load_info(_PrevState),
-            %% _ValuesBest = get_values_best(State),
-            %% _ValuesAll = get_values_all(State),
-            %% log:log(debug, "[ ~w ] Values best: ~n\t~w", [state_get(instance, State), _ValuesBest]),
-            %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [state_get(instance, State), _ValuesAll]),
-            %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [state_get(instance, State), _PrevLoadInfo]),
-            _LoadInfo = get_load_info(CurState),
-            %% _Histo = data_get(histo, get_default_load_data(_NewLoad)),
-            %% log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
-                %% [state_get(instance, CurState), to_string(_LoadInfo), to_string(_Histo)]),
-            {PrevState, NewState1};
-        old_round ->
-            log:log(?SHOW, "[ ~w ] integrate_data in old_round", [?MODULE]),
-            {_Data, NewPrevState1} = merge_load_data(QData, PrevState),
-            {NewPrevState1, CurState}
-    end,
-    Pid = pid_groups:get_my(gossip),
-    comm:send_local(Pid, {integrated_data, state_get(instance, CurState1), RoundStatus}),
-    {ok, {PrevState1, CurState1}}.
 
 
 -spec new_round(NewRound, State, State) -> {ok, FullState} when

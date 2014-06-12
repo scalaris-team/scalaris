@@ -590,21 +590,21 @@ handle_msg({p2p_exch, CBModule, SourcePid, PData, OtherRound}=Msg, State) ->
     State1 = state_set({reply_peer, Ref=uid:get_pids_uid()}, SourcePid, State),
     case check_round(OtherRound, CBModule, State1) of
         {ok, State2} ->
-            cb_select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State2);
+            cb_select_reply_data(PData, Ref, OtherRound, Msg, CBModule, State2);
         {start_new_round, State2} -> % self is leader
             ?TRACE_ROUND("[ Gossip ] Starting a new round in p2p_exch", []),
             State3 = cb_notify_change(new_round, state_get({round, CBModule}, State2), CBModule, State2),
-            State4 = cb_select_reply_data(PData, Ref, old_round, OtherRound, Msg, CBModule, State3),
+            State4 = cb_select_reply_data(PData, Ref, OtherRound, Msg, CBModule, State3),
             comm:send(SourcePid, {new_round, CBModule, state_get({round, CBModule}, State4)}),
             State4;
         {enter_new_round, State2} ->
             ?TRACE_ROUND("[ Gossip ] Entering a new round in p2p_exch", []),
             State3 = cb_notify_change(new_round, state_get({round, CBModule}, State2), CBModule, State2),
-            State4 = cb_select_reply_data(PData, Ref, current_round, OtherRound, Msg, CBModule, State3),
+            State4 = cb_select_reply_data(PData, Ref, OtherRound, Msg, CBModule, State3),
             State4;
         {propagate_new_round, State2} -> % i.e. MyRound > OtherRound
             ?TRACE_ROUND("[ Gossip ] propagate round in p2p_exch", []),
-            State3 = cb_select_reply_data(PData, Ref, old_round, OtherRound, Msg, CBModule, State2),
+            State3 = cb_select_reply_data(PData, Ref, OtherRound, Msg, CBModule, State2),
             comm:send(SourcePid, {new_round, CBModule, state_get({round, CBModule}, State3)}),
             State3
     end;
@@ -625,32 +625,32 @@ handle_msg({p2p_exch_reply, CBModule, SourcePid, QData, OtherRound}=Msg, State) 
     log:log(debug, "[ Gossip ] p2p_exch_reply, CBModule: ~w, QData ~w", [CBModule, QData]),
     case check_round(OtherRound, CBModule, State) of
         {ok, State1} ->
-            cb_integrate_data(QData, current_round, OtherRound, Msg, CBModule, State1);
+            cb_integrate_data(QData, OtherRound, Msg, CBModule, State1);
         {start_new_round, State1} -> % self is leader
             ?TRACE_ROUND("[ Gossip ] Starting a new round p2p_exch_reply", []),
             State2 = cb_notify_change(new_round, state_get({round, CBModule}, State1), CBModule, State1),
-            State3 = cb_integrate_data(QData, old_round, OtherRound, Msg, CBModule, State2),
+            State3 = cb_integrate_data(QData, OtherRound, Msg, CBModule, State2),
             comm:send(SourcePid, {new_round, CBModule, state_get({round, CBModule}, State3)}),
             State3;
         {enter_new_round, State1} ->
             ?TRACE_ROUND("[ Gossip ] Entering a new round p2p_exch_reply", []),
             State2 = cb_notify_change(new_round, state_get({round, CBModule}, State1), CBModule, State1),
-            cb_integrate_data(QData, current_round, OtherRound, Msg, CBModule, State2);
+            cb_integrate_data(QData, OtherRound, Msg, CBModule, State2);
         {propagate_new_round, State1} -> % i.e. MyRound > OtherRound
             ?TRACE_ROUND("[ Gossip ] propagate round in p2p_exch_reply", []),
             comm:send(SourcePid, {new_round, CBModule, state_get({round, CBModule}, State1)}),
-            cb_integrate_data(QData, old_round, OtherRound, Msg, CBModule, State1)
+            cb_integrate_data(QData, OtherRound, Msg, CBModule, State1)
     end;
 
 
 %% This message is a reply from a callback module to CBModule:integrate_data()
 %% Markes the end of a cycle
-handle_msg({integrated_data, CBModule, current_round}, State) ->
+handle_msg({integrated_data, CBModule, cur_round}, State) ->
     state_update({cycle, CBModule}, fun (X) -> X+1 end, State);
 
 
 % finishing an old round should not affect cycle counter of current round
-handle_msg({integrated_data, _CBModule, old_round}, State) ->
+handle_msg({integrated_data, _CBModule, prev_round}, State) ->
     State;
 
 
@@ -932,10 +932,9 @@ cb_select_data(CBModule, State) ->
 %%      gossip module. This is necessary if the callback module will not send an
 %%      selected_reply_data message (because the message is dscarded or sent back directly).
 -spec cb_select_reply_data(PData::gossip_beh:exch_data(), Ref::pos_integer(),
-    RoundStatus::gossip_beh:round_status(), Round::non_neg_integer(),
-    Msg::message(), CBModule::cb_module(), State::state()) -> state().
-cb_select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
-    case cb_call(select_reply_data, [PData, Ref, RoundStatus, Round], CBModule, State) of
+    Round::non_neg_integer(), Msg::message(), CBModule::cb_module(), State::state()) -> state().
+cb_select_reply_data(PData, Ref, Round, Msg, CBModule, State) ->
+    case cb_call(select_reply_data, [PData, Ref, Round], CBModule, State) of
         {ok, State1} -> State1;
         {discard_msg, State1} ->
             {_Peer, State2} = take_reply_peer(Ref, State1),
@@ -955,10 +954,10 @@ cb_select_reply_data(PData, Ref, RoundStatus, Round, Msg, CBModule, State) ->
 %%      Passes the QData from a p2p_exch_reply to the callback module. Upon finishing
 %%      the processing of the data, a message of the form
 %%      {integrated_ data, Instance, RoundStatus} is to be sent to the gossip module.
--spec cb_integrate_data(QData::gossip_beh:exch_data(), RoundStatus::gossip_beh:round_status(),
-                        OtherRound::non_neg_integer(), message(), cb_module(), state()) -> state().
-cb_integrate_data(QData, RoundStatus, OtherRound, Msg, CBModule, State) ->
-    {RetVal, State1} = cb_call(integrate_data, [QData, RoundStatus, OtherRound], CBModule, State),
+-spec cb_integrate_data(QData::gossip_beh:exch_data(), OtherRound::non_neg_integer(),
+                        message(), cb_module(), state()) -> state().
+cb_integrate_data(QData, OtherRound, Msg, CBModule, State) ->
+    {RetVal, State1} = cb_call(integrate_data, [QData, OtherRound], CBModule, State),
     if RetVal =:= retry ->
            msg_queue_add(Msg, State1);
        RetVal =:= send_back ->
