@@ -107,21 +107,22 @@ lookup_fin_chord(State, Key, Hops, Msg) ->
                     %gen_component:post_op(Unwrap, State);
                     deliver(State, Msg, false, Hops);
                 false ->
-                    % it is possible that we received the message due to a
-                    % forward while sliding and before the other node removed
-                    % the forward -> do not warn then
+                    % do not warn if
+                    % a) received lookup_fin due to a msg_fwd while sliding and
+                    %    before the other node removed the message forward or
+                    % b) our pred is not be aware of our ID change yet (after
+                    %    moving data to our successor) yet
                     SlidePred = dht_node_state:get(State, slide_pred),
                     SlideSucc = dht_node_state:get(State, slide_succ),
                     Neighbors = dht_node_state:get(State, neighbors),
-                    case ((slide_op:is_slide(SlidePred) andalso
-                               slide_op:get_sendORreceive(SlidePred) =:= 'send' andalso
-                               intervals:in(Key, slide_op:get_interval(SlidePred)))
-                              orelse
-                              (slide_op:is_slide(SlideSucc) andalso
-                                   slide_op:get_sendORreceive(SlideSucc) =:= 'send' andalso
-                                   intervals:in(Key, slide_op:get_interval(SlideSucc)))
-                              orelse
-                              intervals:in(Key, nodelist:succ_range(Neighbors))) of
+                    InSlideIntervalFun =
+                        fun(SlideOp) ->
+                                slide_op:is_slide(SlideOp) andalso
+                                    slide_op:get_sendORreceive(SlideOp) =:= 'send' andalso
+                                    intervals:in(Key, slide_op:get_interval(SlideOp))
+                        end,
+                    case lists:any(InSlideIntervalFun, [SlidePred, SlideSucc]) orelse
+                             intervals:in(Key, nodelist:succ_range(Neighbors)) of
                         true -> ok;
                         false ->
                             DBRange = dht_node_state:get(State, db_range),
