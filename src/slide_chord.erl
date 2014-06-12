@@ -188,16 +188,19 @@ send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid) ->
     case dht_node_state:get(State, pred_id) of
         ExpPredId ->
             send_continue_msg(ReplyPid);
-        _ ->
+        OldPredId ->
             OldPred = slide_op:get_node(SlideOp),
             rm_loop:subscribe(
               ReplyPid, {move, slide_op:get_id(SlideOp)},
-              fun(RMOldN, RMNewN, _Reason) ->
+              fun(_RMOldN, RMNewN, _Reason) ->
                       RMNewPred = nodelist:pred(RMNewN),
-                      RMOldPred = nodelist:pred(RMOldN),
-                      RMOldPred =/= RMNewPred orelse
-                          node:id(RMNewPred) =:= ExpPredId orelse
-                          RMNewPred =/= OldPred
+                      % new pred pid or same pid but (updated) ID
+                      PredChanged = RMNewPred =/= OldPred,
+                      ?ASSERT2(not (node:pidX(RMNewPred) =:= node:pidX(OldPred)) orelse
+                                   node:id(RMNewPred) =:= ExpPredId,
+                               {"unexpected pred ID change", OldPredId,
+                                node:id(RMNewPred), ExpPredId}),
+                      PredChanged
               end,
               fun ?MODULE:rm_exec/5,
               1)
