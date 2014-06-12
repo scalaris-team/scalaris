@@ -707,14 +707,23 @@ generate_slide_variation(SlideConf) ->
 
 -spec select_from_nodes(Selector::node_type(), Nodes::node_tuple()) -> node:node_type().
 select_from_nodes(Selector, Nodes) ->
-    N =
-        case Selector of
-            predspred -> 1;
-            pred -> 2;
-            node -> 3;
-            succ -> 4
-        end,
+    N = selector_to_idx(Selector),
     element(N, Nodes).
+
+-spec select_from_nodes(Node::node_type(), Direction::pred | succ, Nodes::node_tuple()) -> node:node_type().
+select_from_nodes(Node, Direction, Nodes) ->
+    NIdx = selector_to_idx(Node),
+    Idx = case Direction of
+              pred -> NIdx - 1;
+              succ -> NIdx + 1
+          end,
+    element(Idx, Nodes).
+
+-spec selector_to_idx(node_type()) -> 1..4.
+selector_to_idx(predspred) -> 1;
+selector_to_idx(pred) -> 2;
+selector_to_idx(node) -> 3;
+selector_to_idx(succ) -> 4.
 
 get_node_details(DhtNode) ->
     comm:send(comm:make_global(DhtNode), {get_node_details, comm:this(), [node, pred, succ]}),
@@ -810,9 +819,13 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
               PidLocal1 = comm:make_local(node:pidX(Node1)),
               PidLocal2 = comm:make_local(node:pidX(Node2)),
               ?proto_sched(start),
-              ct:pal("Beginning ~p (~s with ~s), ~p (~s with ~s)",
-                     [Tag1, Slide1#slideconf.node, Direction1,
-                      Tag2, Slide2#slideconf.node, Direction2]),
+              ct:pal("Beginning~n"
+                    " ~p~n  ~s (~p) with~n  ~s (~p)~n  to ~p,~n"
+                    " ~p~n  ~s (~p) with~n  ~s (~p)~n  to ~p",
+                     [Tag1, Slide1#slideconf.node, Node1, Direction1,
+                      select_from_nodes(Slide1#slideconf.node, Direction1, Nodes), TargetId1,
+                      Tag2, Slide2#slideconf.node, Node2, Direction2,
+                      select_from_nodes(Slide2#slideconf.node, Direction2, Nodes), TargetId2]),
               %% We use breakpoints to assure simultaneous slides.
               %% As these don't work with the proto scheduler, we test the timing of the slides using
               %% a callback function instead. The function sends out messages begin_of_slide and
