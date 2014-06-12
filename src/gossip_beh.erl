@@ -59,13 +59,11 @@
     % has to initiate {selected_data, CBModule::module(), PData::exch_data()}
     {ok, cb_state()}.
 
--callback select_reply_data(PData::exch_data(), Ref::pos_integer(),
-    RoundStatus::round_status(), Round::round(), State::cb_state()) ->
+-callback select_reply_data(PData::exch_data(), Ref::pos_integer(), Round::round(), State::cb_state()) ->
     % has to initiate {selected_reply_data, CBModule::module(), QData::exch_data()}
     {ok | discard_msg | retry | send_back, cb_state()}.
 
--callback integrate_data(Data::exch_data(), RoundStatus::round_status(),
-    Round::round(), State::cb_state()) ->
+-callback integrate_data(Data::exch_data(), Round::round(), State::cb_state()) ->
     % has to initiate {integrated_data, CBModule::module()}
     {ok | discard_msg | retry | send_back, cb_state()}.
 
@@ -106,8 +104,8 @@ behaviour_info(callbacks) ->
     {shutdown, 1},
     {select_node, 1},
     {select_data, 1},
-    {select_reply_data, 5},
-    {integrate_data, 4},
+    {select_reply_data, 4},
+    {integrate_data, 3},
     {handle_msg, 2},
     {trigger_interval, 0},
     {fanout, 0},
