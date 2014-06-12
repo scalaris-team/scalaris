@@ -87,6 +87,7 @@
     {rm, notify_new_succ, NewSucc::node:node_type()} |
     {rm, notify_slide_finished, SlideType::pred | succ} |
     {rm, propose_new_neighbors, NewNodes::[node:node_type(),...]} |
+    {rm, node_info, SourcePid::comm:mypid(), Which::[is_leaving | succlist | succ | predlist | pred | node,...]} |
     {rm, leave} |
     {rm, pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {rm, succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
@@ -315,6 +316,25 @@ on({rm, update_my_id, NewId}, State) ->
                     update_state(State, fun(RM_State) -> {{update_id_failed}, RM_State} end)
             end
     end;
+
+on({rm, node_info, SourcePid, Which}, {RM_State, HasLeft, _SubscrTable} = State) ->
+    Neighborhood = ?RM:get_neighbors(RM_State),
+    ExtractValuesFun =
+        fun(Elem, NodeDetails) ->
+                Value =
+                    case Elem of
+                        is_leaving  -> HasLeft;
+                        succlist    -> nodelist:succs(Neighborhood);
+                        succ        -> nodelist:succ(Neighborhood);
+                        predlist    -> nodelist:preds(Neighborhood);
+                        pred        -> nodelist:pred(Neighborhood);
+                        node        -> nodelist:node(Neighborhood)
+                    end,
+                node_details:set(NodeDetails, Elem, Value)
+        end,
+    NodeDetails = lists:foldl(ExtractValuesFun, node_details:new(), Which),
+    comm:send(SourcePid, {rm, node_info_response, NodeDetails}, ?SEND_OPTIONS),
+    State;
 
 on({rm, leave}, {RM_State, _HasLeft, SubscrTable}) ->
     Neighborhood = ?RM:get_neighbors(RM_State),

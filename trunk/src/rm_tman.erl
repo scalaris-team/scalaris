@@ -35,7 +35,7 @@
 -type(custom_message() ::
     {rm, once, {cy_cache, Cache::[node:node_type()]}} |
     {rm, {cy_cache, Cache::[node:node_type()]}} |
-    {rm, {get_node_details_response, NodeDetails::node_details:node_details()}} |
+    {rm, node_info_response, NodeDetails::node_details:node_details()} |
     {rm, buffer, OtherNeighbors::nodelist:neighborhood(), RequestPredsMinCount::non_neg_integer(), RequestSuccsMinCount::non_neg_integer()} |
     {rm, buffer_response, OtherNeighbors::nodelist:neighborhood()}).
 
@@ -152,11 +152,11 @@ handle_custom_message({rm, buffer_response, OtherNeighbors},
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
-handle_custom_message({rm, {get_node_details_response, NodeDetails}}, State) ->
+handle_custom_message({rm, node_info_response, NodeDetails}, State) ->
     case node_details:get(NodeDetails, is_leaving) of
         false ->
-            NewState =
-                update_nodes(State, [node_details:get(NodeDetails, node)], [], null),
+            Node = node_details:get(NodeDetails, node),
+            NewState = update_nodes(State, [Node], [], null),
             {{node_discovery}, NewState};
         true ->
             {{unknown}, State}
@@ -333,12 +333,13 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes([_|_] = NewNodes) ->
     % TODO: add a local cache of contacted nodes in order not to contact them again
-    ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_'}),
-    case comm:is_valid(ThisWithCookie) of
+    This = comm:this(),
+    case comm:is_valid(This) of
         true ->
             _ = [begin
-                     Msg = {get_node_details, ThisWithCookie, [node, is_leaving]},
-                     comm:send(node:pidX(Node), Msg, ?SEND_OPTIONS)
+                     Pid = node:pidX(Node),
+                     comm:send(Pid, {rm, node_info, This, [node, is_leaving]},
+                               ?SEND_OPTIONS)
                  end || Node <- NewNodes],
             ok;
         false -> ok
