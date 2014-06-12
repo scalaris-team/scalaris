@@ -85,14 +85,14 @@ run(Module, Func, Arity, Iterations, ParseState, Options, Thread) ->
     case proplists:get_bool(with_feeder, Options) of
         true ->
             % get spec from feeder
-            case tester_parse_state:lookup_type({'fun', Module,
-                                                 FeederFun, Arity},
-                                                ParseState) of
+            case tester_parse_state:lookup_fun_type({'fun', Module,
+                                                     FeederFun, Arity},
+                                                    ParseState) of
                 {value, FeederFunType} ->
                     % get spec from tested-fun
-                    {value, FunType} = tester_parse_state:lookup_type({'fun', Module,
-                                                                       Func, Arity},
-                                                                      ParseState),
+                    {value, FunType} = tester_parse_state:lookup_fun_type({'fun', Module,
+                                                                           Func, Arity},
+                                                                          ParseState),
                     run_helper(Module, Func, Arity, Iterations, FunType,
                                FeederFunType, ParseState, Options, Thread);
                 none ->
@@ -107,20 +107,19 @@ run(Module, Func, Arity, Iterations, ParseState, Options, Thread) ->
         false ->
             FeederFunType = {var_type, [], {union_fun, []}},
             % get spec from tested-fun
-            {value, FunType} = tester_parse_state:lookup_type({'fun', Module,
-                                                               Func, Arity},
-                                                              ParseState),
+            {value, FunType} = tester_parse_state:lookup_fun_type({'fun', Module,
+                                                                   Func, Arity},
+                                                                  ParseState),
             run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType,
                        ParseState, Options, Thread)
     end.
 
 -spec run_helper/9 :: (Module::module(), Fun::atom(), Arity::non_neg_integer(),
                        Iterations::non_neg_integer(),
-                       FunType | {union_fun, [FunType,...]},
-                       FeederFunType | {union_fun, [FeederFunType,...]},
+                       Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                       FeederFun::{var_type, [], {union_fun, [test_fun_type()]}},
                        tester_parse_state:state(), test_options(),
-                       Thread::non_neg_integer()) -> any()
-        when is_subtype(FunType, {'fun', type_spec(), type_spec()}).
+                       Thread::non_neg_integer()) -> any().
 run_helper(_Module, _Func, _Arity, 0, _FunType, _FeederFunType, _TypeInfos, _Options, _Thread) ->
     ok;
 run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, TypeInfos, Options, Thread) ->
@@ -134,6 +133,10 @@ run_helper(Module, Func, Arity, Iterations, FunType, FeederFunType, TypeInfos, O
             Error
     end.
 
+-spec get_arg_and_result_type/3 :: (Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                                    FeederFun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                                    test_options()) -> 
+                                           {var_fun, [], test_fun_type()}.
 get_arg_and_result_type({var_type, [], {union_fun, FunTypes}} = _FunType,
                         {var_type, [], {union_fun, FeederFunTypes}} = _FeederFunType, Options) ->
     case proplists:get_bool(with_feeder, Options) of
@@ -143,6 +146,12 @@ get_arg_and_result_type({var_type, [], {union_fun, FunTypes}} = _FunType,
                                            {var_fun, [], util:randomelem(FunTypes)}
                                     end.
 
+
+-spec run_test_ttt/7 :: (Module::module(), Fun::atom(),
+                       Fun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                       FeederFun::{var_type, [], {union_fun, [test_fun_type(),...]}},
+                       tester_parse_state:state(), test_options(),
+                       Thread::non_neg_integer()) -> any().
 run_test_ttt(Module, Func,
              {var_type, [], {union_fun, FunTypes}} = FunType,
              {var_type, [], {union_fun, _FeederFunTypes}} = FeederFunType,
