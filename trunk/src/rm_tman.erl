@@ -174,14 +174,16 @@ handle_custom_message({rm, {update_node, Node}},
     I = case OldPredPid =:= NodePid andalso
                  OldPredPid =/= node:pidX(nodelist:pred(NewNeighborhood1)) of
             true ->
-                node:mk_interval_between_nodes(Node, OldPred);
+                MyNodeId = nodelist:nodeid(NewNeighborhood1),
+                intervals:new('(', node:id(Node), MyNodeId, ')');
             _ ->
                 OldSucc = nodelist:succ(Neighborhood),
                 OldSuccPid = node:pidX(OldSucc),
                 case OldSuccPid =:= NodePid andalso
                          OldSuccPid =/= node:pidX(nodelist:succ(NewNeighborhood1)) of
                     true ->
-                        node:mk_interval_between_nodes(OldSucc, Node);
+                        MyNodeId = nodelist:nodeid(NewNeighborhood1),
+                        intervals:new('(', MyNodeId, node:id(Node), ')');
                     _ ->
                         intervals:empty()
                 end
