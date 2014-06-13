@@ -515,27 +515,27 @@ notify_change(leader, {MsgTag, NewRange}, {PrevState, CurState}) when MsgTag =:=
     {ok, {PrevState, CurState1}};
 
 
-notify_change(exch_failure, {_MsgTag, Data, Round}, {PrevState, CurState}) ->
-    RoundFromState = state_get(round, CurState),
-    RoundStatus = if Round =:= RoundFromState -> current_round;
-        Round =/= RoundFromState -> old_round
-    end,
-    IsValidRound = is_valid_round(RoundStatus, Round, PrevState, CurState),
-    FullState1 = case Data of
-        _ when not IsValidRound ->
-            log:log(?SHOW, " [ ~w ] exch_failure in invalid round", [?MODULE]),
-            {PrevState, CurState};
-        undefined ->
-            {PrevState, CurState};
-        Data when RoundStatus =:= current_round ->
-            log:log(debug, " [ ~w ] exch_failure in valid current round", [?MODULE]),
-            {_NewData, CurState1} = merge_failed_exch_data(Data, CurState),
-            {PrevState, CurState1};
-        Data when RoundStatus =:= old_round ->
-            log:log(debug, " [ ~w ] exch_failure in valid old round", [?MODULE]),
-            {_NewData, PrevState1} = merge_failed_exch_data(Data, PrevState),
-            {PrevState1, CurState}
-    end,
+notify_change(exch_failure, {_MsgTag, Data, Round}, {PrevState, CurState} = FullState) ->
+    CurRound = state_get(round, CurState),
+    PrevRound = state_get(round, PrevState),
+    FullState1 =
+        case {Data, Round} of
+            {CurRound, undefined} ->
+                FullState;
+            {CurRound, _} ->
+                log:log(debug, " [ ~w ] exch_failure in valid current round", [?MODULE]),
+                {_NewData, CurState1} = merge_failed_exch_data(Data, CurState),
+                {PrevState, CurState1};
+            {PrevRound, undefined} ->
+                FullState;
+            {PrevRound, _} ->
+                log:log(debug, " [ ~w ] exch_failure in valid old round", [?MODULE]),
+                {_NewData, PrevState1} = merge_failed_exch_data(Data, PrevState),
+                {PrevState1, CurState};
+            _ ->
+                log:log(warn(), " [ ~w ] exch_failure in invalid round", [?MODULE]),
+                FullState
+        end,
     {ok, FullState1}.
 
 
@@ -547,8 +547,7 @@ notify_change(exch_failure, {_MsgTag, Data, Round}, {PrevState, CurState}) ->
 -spec get_values_best(FullState::full_state()) -> {load_info(), full_state()}.
 get_values_best({PrevState, CurState}=FullState) ->
     BestState = previous_or_current(PrevState, CurState),
-    LoadInfo = get_load_info(BestState),
-    {LoadInfo, FullState}.
+    {get_load_info(BestState), FullState}.
 
 
 %% @doc Returns all aggregation results. <br/>
@@ -559,14 +558,13 @@ get_values_best({PrevState, CurState}=FullState) ->
 -spec get_values_all(FullState::full_state()) ->
     { {PreviousInfo::load_info(), CurrentInfo::load_info(), BestInfo::load_info()},
         full_state() }.
-get_values_all({unknown, CurState}=FullState) ->
+get_values_all({unknown, CurState} = FullState) ->
     CurInfo = get_load_info(CurState),
-    InfosAll = [#load_info{},  CurInfo, CurInfo],
-    {list_to_tuple(InfosAll), FullState};
-get_values_all({PrevState, CurState}=FullState) ->
+    {{#load_info{}, CurInfo, CurInfo}, FullState};
+get_values_all({PrevState, CurState} = FullState) ->
     BestState = previous_or_current(PrevState, CurState),
-    InfosAll = lists:map(fun get_load_info/1, [PrevState, CurState, BestState]),
-    {list_to_tuple(InfosAll), FullState}.
+    {{get_load_info(PrevState), get_load_info(CurState),
+      get_load_info(BestState)}, FullState}.
 
 
 %% @doc Returns a key-value list of debug infos for the Web Interface. <br/>
@@ -580,9 +578,10 @@ web_debug_info({PrevState, CurState}=FullState) ->
     PreviousRingData = state_get(ring_data, PrevState),
     CurrentRingData = state_get(ring_data, CurState),
     BestState = previous_or_current(PrevState, CurState),
-    Best = if BestState =:= CurState -> current_data;
-              BestState =:= PrevState -> previous_data
-        end,
+    Best = case BestState of
+               CurState -> current_data;
+               PrevState -> previous_data
+           end,
     KeyValueList =
         [{to_string(state_get(instance, CurState)), ""},
          {"best",                Best},
@@ -649,26 +648,9 @@ request_node_details(State) ->
     EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, state_get(instance, State), '_'}),
     comm:send_local(DHT_Node, {get_node_details, EnvPid, [load, load2, load3, db, my_range]}).
 
--spec is_valid_round(RoundStatus::gossip_beh:round_status(), RoundFromMessage::round(),
-    PrevState::state(), CurState::state()) -> boolean().
-is_valid_round(RoundStatus, RoundFromMessage, PrevState, CurState) ->
-    RoundFromState = case RoundStatus of
-        current_round -> state_get(round, CurState);
-        old_round -> state_get(round, PrevState)
-    end,
 
-    if RoundFromState =:= RoundFromMessage -> true;
-       true ->
-            log:log(warn(), "[ ~w ] Invalid ~w. RoundFromState: ~w, RoundFromMessage: ~w",
-                   [state_get(instance, CurState), RoundStatus, RoundFromState, RoundFromMessage]),
-           false
-    end.
-
-
--spec new_round(NewRound, State, State) -> {ok, FullState} when
-    is_subtype(NewRound, round()),
-    is_subtype(State, state()),
-    is_subtype(FullState, full_state()).
+-spec new_round(NewRound::round(), PrevState::state(), CurState::state())
+        -> {ok, FullState::full_state()}.
 new_round(NewRound, PrevState, CurState) ->
     % Only replace prev round with current round if current has converged.
     % Cases in which current round has not converged: e.g. late joining, sleeped/paused.
@@ -700,14 +682,15 @@ has_converged(TargetConvergenceCount, CurState) ->
 
 -spec finish_request(CurState::state()) -> state().
 finish_request(CurState) ->
-    LoadDataList = state_get(load_data_list, CurState),
-    Histo = data_get(histo, get_default_load_data(LoadDataList)),
     case state_get(leader, CurState) of
         true ->
+            LoadDataList = state_get(load_data_list, CurState),
+            Histo = data_get(histo, get_default_load_data(LoadDataList)),
             Requestor = state_get(requestor, CurState),
             comm:send(Requestor, {histogram, Histo}),
             gossip:stop_gossip_task(state_get(instance, CurState));
-        false -> do_nothing
+        false ->
+            do_nothing
     end,
     CurState.
 
@@ -1023,7 +1006,7 @@ prepare_data(MoreSkippedModules, State) ->
                      LoadData2 = divide2(avg2, LoadData1),
 
                      % Min and Max
-                     do_nothing,
+                     % do_nothing,
 
                      % Histogram
                      _LoadData3 = divide2(LoadData2)
