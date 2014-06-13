@@ -1509,18 +1509,12 @@ is_histogram(Histogram) ->
 %%      is_histogram().
 -spec compare(histogram(), histogram()) -> boolean().
 compare([], []) -> true;
-
 compare([], _List) -> false;
-
 compare(_List, []) -> false;
-
-compare([H1|List1], [H2|List2]) when is_tuple(H1) andalso is_tuple(H2) ->
-        {BucketInterval1, _Avg1} = H1,
-        {BucketInterval2, _Avg2} = H2,
-        case BucketInterval1 =:= BucketInterval2 of
-            true -> compare(List1, List2);
-            false -> false
-        end.
+compare([{BucketInterval, _Avg1} | List1], [{BucketInterval, _Avg2} | List2]) ->
+    compare(List1, List2);
+compare([_|_], [_|_]) ->
+    false.
 
 
 %% @doc For testing: ensure, that only buckets with identical keys are feeded to
