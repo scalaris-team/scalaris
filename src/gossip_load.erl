@@ -332,8 +332,7 @@ select_data({PrevState, CurState}) ->
         uninit ->
             request_node_details(CurState), CurState;
         init ->
-            Metrics = skipped_metrics(state_get(load_data_list, CurState), []),
-            {Data, NewCurState1} = prepare_data(Metrics, CurState),
+            {Data, NewCurState1} = prepare_data([], CurState),
             Pid = pid_groups:get_my(gossip),
             comm:send_local(Pid, {selected_data, state_get(instance, NewCurState1), Data}),
             NewCurState1
@@ -357,9 +356,11 @@ select_reply_data(PData, Ref, Round, {PrevState, CurState}) ->
 
     SelectReplyDataHelper =
         fun (State) ->
-                Metrics = skipped_metrics(state_get(load_data_list, State), element(1, PData)),
-                {Data1, State1} = prepare_data(Metrics, State),
-                Data2 = replace_skipped(element(1, PData), Data1, Metrics),
+                PLoadList = element(1, PData),
+                PSkipped = [Module || {load_data, Module, skip} <- PLoadList],
+                {Data1, State1} = prepare_data(PSkipped, State),
+                Data2 = {replace_skipped(PLoadList, element(1, Data1)),
+                         element(2, Data1)},
                 Pid = pid_groups:get_my(gossip),
                 comm:send_local(Pid, {selected_reply_data, state_get(instance, State1), Data2, Ref, Round}),
                 {_Data2, State2} = merge_load_data(PData, State1),
@@ -460,8 +461,7 @@ handle_msg({get_node_details_response, NodeDetails}, {PrevState, CurState}) ->
     RingData2 = data_set(avg_kr, AvgKr, RingData1),
     CurState2 = state_set(ring_data, RingData2, CurState1),
 
-    Metrics = skipped_metrics(state_get(load_data_list, CurState2), []),
-    {NewData, CurState3} = prepare_data(Metrics, CurState2),
+    {NewData, CurState3} = prepare_data([], CurState2),
     CurState4 = state_set(status, init, CurState3),
 
     % send PData to BHModule
@@ -1006,12 +1006,17 @@ data_set(Key, Value, RingData) when is_record(RingData, ring_data) ->
     end.
 
 %% @doc Prepares a load_data record for sending it to a peer and updates the
-%%      load_data of self accordingly.
--spec prepare_data([atom()], state()) -> {{load_data_list(), ring_data()}, state()}.
-prepare_data(SkippedModules, State) ->
+%%      load_data of self accordingly. Skips load data skipped in the given
+%%      state or from the MoreSkippedModules list.
+-spec prepare_data(MoreSkippedModules::[atom()], state())
+        -> {{load_data_list(), ring_data()}, state()}.
+prepare_data(MoreSkippedModules, State) ->
     LoadDataNew =
         [begin
-             case lists:member(data_get(name, LoadData), SkippedModules) of
+             LoadName = data_get(name, LoadData),
+             LoadSkipped = {load_data, LoadName, skip},
+             case LoadData =:= LoadSkipped orelse
+                      lists:member(LoadName, MoreSkippedModules) of
                   true -> LoadData;
                   false ->
                      LoadData1 = divide2(avg, LoadData),
@@ -1150,27 +1155,18 @@ previous_or_current(PrevState, CurState) when is_record(PrevState, state) andals
     end.
 
 
--spec skipped_metrics(My::[load_data()|load_data_skipped()],
-                      Other::[load_data()|load_data_skipped()]) -> list(atom()).
-skipped_metrics(MyData, OtherData) ->
-    Modules1 = [Module || {load_data, Module, skip} <- MyData],
-    Modules2 = [Module || {load_data, Module, skip} <- OtherData],
-    lists:usort(lists:append(Modules1, Modules2)).
-
-
--spec replace_skipped(Other::load_data_list(), Data::data(),
-                      SkippedMetrics::[atom()]) -> data().
-replace_skipped(_, Data, []) ->
-    Data;
-
-replace_skipped(OtherDatas, Data, [Metric|Rest]) ->
-    case lists:keyfind(Metric, 2, OtherDatas) of
-        {load_data, Metric, skip} ->
-            replace_skipped(OtherDatas, Data, Rest);
-        OtherLoadData ->
-            NewLoadData = lists:keyreplace(Metric, 2, element(1,Data), OtherLoadData),
-            replace_skipped(OtherDatas, {NewLoadData, element(2, Data)}, Rest)
-    end.
+%% @doc Replaces skipped metrics in My load list with non-skipped values from
+%%      the other load list if possible.
+-spec replace_skipped(Other::LoadDataList, My::LoadDataList) -> LoadDataList
+        when is_subtype(LoadDataList, [load_data() | load_data_skipped()]).
+replace_skipped([], []) ->
+    [];
+replace_skipped([H | OtherL], [{load_data, Metric, skip} | MyL]) ->
+    ?ASSERT(Metric =:= data_get(name, H)),
+    [H | replace_skipped(OtherL, MyL)];
+replace_skipped([_OtherH | OtherL], [MyH | MyL]) ->
+    ?ASSERT(data_get(name, _OtherH) =:= data_get(name, MyH)),
+    [MyH | replace_skipped(OtherL, MyL)].
 
 
 %%---------------------------- Histogram ---------------------------%%
