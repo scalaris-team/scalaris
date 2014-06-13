@@ -597,15 +597,15 @@ web_debug_info({PrevState, CurState}=FullState) ->
             lists:flatten(
           [ begin
                 [
-                 {"prev_name",           data_get(name, LoadDataModule)},
-                 {"prev_avg",            get_current_estimate(avg, LoadDataModule)},
-                 {"prev_min",            data_get(min, LoadDataModule)},
-                 {"prev_max",            data_get(max, LoadDataModule)},
-                 {"prev_stddev",         calc_stddev(LoadDataModule)},
-                 {"prev_histo",          to_string(data_get(histo, LoadDataModule))}
+                 {"prev_name",           data_get(name, LoadData)},
+                 {"prev_avg",            get_current_estimate(avg, LoadData)},
+                 {"prev_min",            data_get(min, LoadData)},
+                 {"prev_max",            data_get(max, LoadData)},
+                 {"prev_stddev",         calc_stddev(LoadData)},
+                 {"prev_histo",          to_string(data_get(histo, LoadData))}
                 ]
             end
-            || PreviousLoadData =/= unknown, LoadDataModule <- PreviousLoadData])
+            || PreviousLoadData =/= unknown, LoadData <- PreviousLoadData])
         ++
         [
          %% current round
@@ -619,15 +619,15 @@ web_debug_info({PrevState, CurState}=FullState) ->
             lists:flatten(
           [ begin
                 [
-                 {"cur_name",           data_get(name, LoadDataModule)},
-                 {"cur_avg",            get_current_estimate(avg, LoadDataModule)},
-                 {"cur_min",            data_get(min, LoadDataModule)},
-                 {"cur_max",            data_get(max, LoadDataModule)},
-                 {"cur_stddev",         calc_stddev(LoadDataModule)},
-                 {"cur_histo",          to_string(data_get(histo, LoadDataModule))}
+                 {"cur_name",           data_get(name, LoadData)},
+                 {"cur_avg",            get_current_estimate(avg, LoadData)},
+                 {"cur_min",            data_get(min, LoadData)},
+                 {"cur_max",            data_get(max, LoadData)},
+                 {"cur_stddev",         calc_stddev(LoadData)},
+                 {"cur_histo",          to_string(data_get(histo, LoadData))}
                 ]
             end
-            || LoadDataModule <- CurrentLoadData]),
+            || LoadData <- CurrentLoadData]),
     {KeyValueList, FullState}.
 
 
