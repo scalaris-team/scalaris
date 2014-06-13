@@ -887,7 +887,7 @@ ring_data_new() ->
     #ring_data{}.
 
 -spec get_default_load_data(unknown) -> unknown;
-                           (load_data_list()) -> load_data().
+                           (load_data_list()) -> load_data() | load_data_skipped().
 get_default_load_data(unknown) -> unknown;
 get_default_load_data(LoadDataList) ->
     %% name is the second element of record tuple
@@ -908,14 +908,15 @@ get_default_load_data(LoadDataList) ->
 %%      </ul>
 %%      See type spec for details on which keys are allowed on which records.
 -spec data_get(any(), unknown) -> unknown;
-             (name, load_data()) -> atom();
+             (name, load_data() | load_data_skipped()) -> atom();
              (avg, load_data()) -> avg();
              (avg2, load_data()) -> avg();
              (min, load_data()) -> min();
              (max, load_data()) -> max();
              (histo, load_data()) -> histogram();
              (size_inv, ring_data()) -> avg();
-             (avg_kr, ring_data()) -> avg_kr().
+             (avg_kr, ring_data()) -> avg_kr();
+             (avg | avg2 | min | max | histo | size_inv | avg_kr, load_data_skipped()) -> unknown.
 data_get(_Key, unknown) -> unknown;
 data_get(name, {load_data, Name, skip}) ->
     Name;
@@ -938,7 +939,7 @@ data_get(avg_kr, #ring_data{avg_kr = AvgKr}) ->
     AvgKr.
 
 -spec get_current_estimate(Key::avg | avg2,
-                           unknown | load_data()) -> float() | unknown;
+                           unknown | load_data() | load_data_skipped()) -> float() | unknown;
                           (Key::size_inv | avg_kr,
                            unknown | ring_data()) -> float() | unknown.
 get_current_estimate(_Key, unknown) -> unknown;
