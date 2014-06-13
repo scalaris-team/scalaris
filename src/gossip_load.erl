@@ -399,22 +399,20 @@ integrate_data(QData, Round, {PrevState, CurState}=FullState) ->
     CurRound = state_get(round, CurState),
     PrevRound = state_get(round, PrevState),
 
-    IntegrateDataInit =
-        fun (RoundStatus, State) ->
-            {{_NewLoad, _NewRing}, State1} = merge_load_data(QData, State),
-            Pid = pid_groups:get_my(gossip),
-            comm:send_local(Pid, {integrated_data, state_get(instance, State1), RoundStatus}),
-            State1
-        end,
-
     case state_get(status, CurState) of
         uninit ->
             log:log(?SHOW, "[ ~w ] integrate_data in uninit", [?MODULE]),
             {retry, FullState};
         init when Round =:= CurRound ->
-            {ok, {PrevState, IntegrateDataInit(cur_round, CurState)}};
+            CurState1 = element(2, merge_load_data(QData, CurState)),
+            comm:send_local(pid_groups:get_my(gossip),
+                            {integrated_data, state_get(instance, CurState1), cur_round}),
+            {ok, {PrevState, CurState1}};
         init when Round =:= PrevRound ->
-            {ok, {IntegrateDataInit(prev_round, PrevState), CurState}};
+            PrevState1 = element(2, merge_load_data(QData, PrevState)),
+            comm:send_local(pid_groups:get_my(gossip),
+                            {integrated_data, state_get(instance, PrevState1), prev_round}),
+            {ok, {PrevState1, CurState}};
         _ ->
             log:log(warn(), "[ ~w ] Discarded data in integrate_data. Reason: invalid round. ", [?MODULE]),
             {send_back, FullState}
