@@ -719,40 +719,35 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, CurStat
 
     % check whether all average based values changed less than epsilon percent
     AvgChangeEpsilon = convergence_epsilon(),
+    HasConvergedFun =
+        fun(AvgType, Old, New) ->
+                OldValue = calc_current_estimate(data_get(AvgType, Old)),
+                NewValue = calc_current_estimate(data_get(AvgType, New)),
+                log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
+                        [state_get(instance, CurState), AvgType, OldValue, NewValue]),
+                calc_change(OldValue, NewValue) < AvgChangeEpsilon
+        end,
 
     %% Ring convergence
-    Fun = fun(AvgType) ->
-            OldValue = calc_current_estimate(data_get(AvgType, OldRing)),
-            NewValue = calc_current_estimate(data_get(AvgType, NewRing)),
-            log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
-                [state_get(instance, CurState), AvgType, OldValue, NewValue]),
-            _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
-    end,
-    RingConverged = lists:all(Fun, [size_inv, avg_kr]),
+    HaveConverged1 = HasConvergedFun(size_inv, OldRing, NewRing) andalso
+                        HasConvergedFun(avg_kr, OldRing, NewRing),
 
-    Modules = skipped_metrics(NewLoadList, []),
     %% Load convergence
-    LoadModulesConverged =
-        [begin
-             case lists:member(data_get(name, NewLoad), Modules) of
-                 true -> true;
-                 false ->
-                     ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
-                     OldValue = calc_current_estimate(data_get(AvgType, OldLoad)),
-                     NewValue = calc_current_estimate(data_get(AvgType, NewLoad)),
-                     log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
-                             [state_get(instance, CurState), AvgType, OldValue, NewValue]),
-                     _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
-             end
-         end
-         || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList),
-            AvgType            <- [avg, avg2]
-        ],
+    HaveConverged2 =
+        HaveConverged1 andalso
+            lists:all(
+              fun({OldLoad, NewLoad, AvgType}) ->
+                      ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
+                      HasConvergedFun(AvgType, OldLoad, NewLoad)
+              end,
+              [{OldLoad, NewLoad, AvgType}
+               || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList),
+                  % =/= {load_data, _Name, skip}
+                  not (tuple_size(NewLoad) =:= 3 andalso element(3, NewLoad) =:= skip),
+                  AvgType            <- [avg, avg2]
+              ]),
 
-    LoadConverged = lists:all(fun(X) -> X end, LoadModulesConverged),
-
-    HaveConverged1 = RingConverged andalso LoadConverged,
-    log:log(debug, "Averages have converged: ~w", [HaveConverged1]),
+    log:log(debug, "Averages have converged: ~w", [HaveConverged2]),
 
     %% TODO: Fix convergence counting for histograms with skipped values
     %% (atm, all histogrames are ignored in regard to convergence counting)
@@ -780,16 +775,14 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, CurStat
     %%       || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList)
     %%     ],
     %%
-    %% HaveConverged2 = lists:all(fun(X) -> X end, HistoModulesConverged),
-    HaveConverged2 = true,
+    %% HaveConverged3 = HaveConverged2 andalso lists:all(fun(X) -> X end, HistoModulesConverged),
+    HaveConverged3 = HaveConverged2,
     %% log:log(debug, "Histogram has converged: ~w", [self(), HaveConverged2]),
 
-    HaveConverged = HaveConverged1 andalso HaveConverged2,
-    case HaveConverged of
-        true ->
-            state_update(convergence_count, fun inc/1, CurState);
-        false ->
-            state_set(convergence_count, 0, CurState)
+    if HaveConverged3 ->
+           state_update(convergence_count, fun inc/1, CurState);
+       true ->
+           state_set(convergence_count, 0, CurState)
     end.
 
 
