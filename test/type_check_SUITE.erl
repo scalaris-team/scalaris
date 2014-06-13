@@ -174,8 +174,8 @@ tester_type_check_gossip(_Config) ->
                 {init_gossip_task, 3}, % test via feeder
                 {cb_init, 2}, % spec to wide (Args)
                 {cb_select_data, 2}, % would need valid callback state
-                {cb_select_reply_data, 7}, % would need valid callback state
-                {cb_integrate_data, 6}, % would need valid callback state
+                {cb_select_reply_data, 6}, % would need valid callback state
+                {cb_integrate_data, 5}, % would need valid callback state
                 {cb_handle_msg, 3}, % spec to wide (Msg)
                 {cb_get_values_best, 2}, % would need valid callback state
                 {cb_get_values_all, 2}, % would need valid callback state
@@ -191,8 +191,8 @@ tester_type_check_gossip(_Config) ->
             % excluded (exported functions)
             [  {handle_msg, 2}, % would need valid dht_node_state, sends messages
                {select_data, 1}, % sends messages
-               {select_reply_data, 5}, % sends messages
-               {integrate_data, 4}, % sends messages
+               {select_reply_data, 4}, % sends messages
+               {integrate_data, 3}, % sends messages
                {request_histogram, 2} % tested via feeder
             ],
             % excluded (private functions)
@@ -201,7 +201,6 @@ tester_type_check_gossip(_Config) ->
                {init_histo, 3}, % needs DHTNodeState state
                {merge_histo, 2}, % tested via feeder
                {merge_bucket, 2}, % tested via feeder
-               {integrate_data_init, 3}, % sends messages
                {request_node_details, 1} % sends messages
             ]}
         ],
