@@ -920,10 +920,6 @@ data_get(_Key, unknown) -> unknown;
 data_get(name, {load_data, Name, skip}) ->
     Name;
 data_get(_Key, {load_data, _Module, skip}) -> unknown;
-data_get(_Key, []) ->
-    [];
-data_get(Key, [LoadData | Other]) ->
-    [data_get(Key, LoadData) | data_get(Key, Other)];
 data_get(name, LoadData=#load_data{name = Name}) when is_record(LoadData, load_data) ->
     Name;
 data_get(avg, #load_data{avg = Avg}) ->
