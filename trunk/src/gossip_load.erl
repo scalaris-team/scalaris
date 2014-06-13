@@ -1069,33 +1069,27 @@ merge_load_data(OtherData, State) ->
 merge_load_data(Update, {OtherLoadList, OtherRing}, State) ->
 
     MyLoadList = state_get(load_data_list, State),
-    Skipped = skipped_metrics(MyLoadList, OtherLoadList),
     LoadDataListNew =
         [begin
-             case lists:member(data_get(name, MyLoad1), Skipped) andalso
-                    lists:member(data_get(name, OtherLoad), Skipped) of
+             LoadName = data_get(name, MyLoad1),
+             ?ASSERT(LoadName =:= data_get(name, OtherLoad)),
+             LoadSkipped = {load_data, LoadName, skip},
+             case MyLoad1 =:= LoadSkipped orelse OtherLoad =:= LoadSkipped of
                   true -> MyLoad1;
                   false ->
-                     ?ASSERT(data_get(name, MyLoad1) =:= data_get(name, OtherLoad)),
                      % Averages load
                      MyLoad2 = merge_avg(avg, MyLoad1, OtherLoad),
                      MyLoad3 = merge_avg(avg2, MyLoad2, OtherLoad),
 
                      % Min
-                     MyMin = data_get(min, MyLoad2),
-                     OtherMin = data_get(min, OtherLoad),
-                     MyLoad4 =
-                         if  MyMin =< OtherMin -> data_set(min, MyMin, MyLoad3);
-                             MyMin > OtherMin -> data_set(min, OtherMin, MyLoad3)
-                         end,
+                     MyNewMin = erlang:min(data_get(min, MyLoad3),
+                                           data_get(min, OtherLoad)),
+                     MyLoad4 = data_set(min, MyNewMin, MyLoad3),
 
                      % Max
-                     MyMax = data_get(max, MyLoad3),
-                     OtherMax = data_get(max, OtherLoad),
-                     MyLoad5 =
-                         if  MyMax =< OtherMax -> data_set(max, OtherMax, MyLoad4);
-                             MyMax > OtherMax -> data_set(max, MyMax, MyLoad4)
-                         end,
+                     MyNewMax = erlang:max(data_get(max, MyLoad4),
+                                           data_get(max, OtherLoad)),
+                     MyLoad5 = data_set(max, MyNewMax, MyLoad4),
 
                      % Histogram
                      _MyLoad5 = merge_histo(MyLoad5, OtherLoad)
