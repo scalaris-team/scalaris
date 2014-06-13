@@ -1009,14 +1009,13 @@ data_set(Key, Value, RingData) when is_record(RingData, ring_data) ->
 %%      load_data of self accordingly.
 -spec prepare_data([atom()], state()) -> {{load_data_list(), ring_data()}, state()}.
 prepare_data(SkippedModules, State) ->
-    % Averages
-    Fun = fun (AvgType, MyData) -> divide2(AvgType, MyData) end,
     LoadDataNew =
         [begin
              case lists:member(data_get(name, LoadData), SkippedModules) of
                   true -> LoadData;
                   false ->
-                     LoadData2 = lists:foldl(Fun, LoadData, [avg, avg2]),
+                     LoadData1 = divide2(avg, LoadData),
+                     LoadData2 = divide2(avg2, LoadData1),
 
                      % Min and Max
                      do_nothing,
@@ -1024,14 +1023,13 @@ prepare_data(SkippedModules, State) ->
                      % Histogram
                      _LoadData3 = divide2(LoadData2)
              end
-         end
-    || LoadData <- state_get(load_data_list, State)],
+         end || LoadData <- state_get(load_data_list, State)],
 
     State1 = state_set(load_data_list, LoadDataNew, State),
 
     % Averages ring data
-    RingData1 = state_get(ring_data, State1),
-    RingData2 = lists:foldl(Fun, RingData1, [size_inv, avg_kr]),
+    RingData1 = divide2(size_inv, state_get(ring_data, State1)),
+    RingData2 = divide2(avg_kr, RingData1),
 
     State2 = state_set(ring_data, RingData2, State1),
 
@@ -1080,27 +1078,27 @@ merge_load_data(Update, {OtherLoadList, OtherRing}, State) ->
                   false ->
                      ?ASSERT(data_get(name, MyLoad1) =:= data_get(name, OtherLoad)),
                      % Averages load
-                     Fun = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherLoad) end,
-                     MyLoad2 = lists:foldl(Fun, MyLoad1, [avg, avg2]),
+                     MyLoad2 = merge_avg(avg, MyLoad1, OtherLoad),
+                     MyLoad3 = merge_avg(avg2, MyLoad2, OtherLoad),
 
                      % Min
                      MyMin = data_get(min, MyLoad2),
                      OtherMin = data_get(min, OtherLoad),
-                     MyLoad3 =
-                         if  MyMin =< OtherMin -> data_set(min, MyMin, MyLoad2);
-                             MyMin > OtherMin -> data_set(min, OtherMin, MyLoad2)
+                     MyLoad4 =
+                         if  MyMin =< OtherMin -> data_set(min, MyMin, MyLoad3);
+                             MyMin > OtherMin -> data_set(min, OtherMin, MyLoad3)
                          end,
 
                      % Max
                      MyMax = data_get(max, MyLoad3),
                      OtherMax = data_get(max, OtherLoad),
-                     MyLoad4 =
-                         if  MyMax =< OtherMax -> data_set(max, OtherMax, MyLoad3);
-                             MyMax > OtherMax -> data_set(max, MyMax, MyLoad3)
+                     MyLoad5 =
+                         if  MyMax =< OtherMax -> data_set(max, OtherMax, MyLoad4);
+                             MyMax > OtherMax -> data_set(max, MyMax, MyLoad4)
                          end,
 
                      % Histogram
-                     _MyLoad5 = merge_histo(MyLoad4, OtherLoad)
+                     _MyLoad5 = merge_histo(MyLoad5, OtherLoad)
              end
          end || {MyLoad1, OtherLoad} <- lists:zip(MyLoadList, OtherLoadList)],
 
@@ -1108,11 +1106,11 @@ merge_load_data(Update, {OtherLoadList, OtherRing}, State) ->
 
     %% Averages ring
     MyRing1 = state_get(ring_data, State1),
-    Fun2 = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherRing) end,
-    MyRing2 = lists:foldl(Fun2, MyRing1, [size_inv, avg_kr]),
-    State2 = state_set(ring_data, MyRing2, State1),
+    MyRing2 = merge_avg(size_inv, MyRing1, OtherRing),
+    MyRing3 = merge_avg(avg_kr, MyRing2, OtherRing),
+    State2 = state_set(ring_data, MyRing3, State1),
 
-    NewData = {LoadDataListNew, MyRing2},
+    NewData = {LoadDataListNew, MyRing3},
     State4 = case Update of
         update ->
             State3 = state_update(merged, fun inc/1, State2),
