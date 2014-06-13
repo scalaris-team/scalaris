@@ -18,8 +18,6 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--type(test_fun_type() :: {'fun', type_spec(), type_spec()}).
-
 -type(test_any() ::
    % | none()
    % | no_return()
@@ -175,3 +173,5 @@
     | record_field_type()
      ).
 -endif.
+
+-type(test_fun_type() :: {'fun', type_spec(), type_spec()}).
