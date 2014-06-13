@@ -1213,11 +1213,8 @@ merge_bucket({Key, {Value1, Weight1}}, {Key, {Value2, Weight2}}) ->
 get_load_info(State) ->
     LoadDataList = state_get(load_data_list, State),
     %% select default load data for output
-    {DefaultLoadData, OtherLoadData} =
-        case lists:keytake(?DEFAULT_MODULE, 2, LoadDataList) of
-            false -> throw(default_load_module_not_available);
-            {value, LoadData, Other} -> {LoadData, Other}
-        end,
+    {value, DefaultLoadData, OtherLoadData} =
+        lists:keytake(?DEFAULT_MODULE, 2, LoadDataList),
     RingData = state_get(ring_data, State),
     OtherLoadInfo = [#load_info_other {
                                        name   = data_get(name, LoadData),
