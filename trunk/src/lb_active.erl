@@ -428,9 +428,12 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
             ?TRACE("SplitKey: ~p TargetLoadItems: ~p TargetLoadRequests: ~p TakenLoad: ~p Metric: ~p~n",
                    [SplitKey, TargetLoadItems, TargetLoadRequests, TakenLoad, Metric]),
 
-            case is_simulation(Options) of
+            IsSimulation = is_simulation(Options),
+            InMyRange = intervals:in(SplitKey, dht_node_state:get(DhtState, my_range)),
+            NotMyId = SplitKey =/= dht_node_state:get(DhtState, node_id),
 
-                true -> %% compute result of simulation and reply
+            if
+               IsSimulation -> %% compute result of simulation and reply
                     ReqId = proplists:get_value(simulate, Options),
                     LoadChange =
                         case JumpOrSlide of
@@ -441,7 +444,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                     Id = proplists:get_value(id, Options),
                     comm:send(ReplyTo, {simulation_result, Id, ReqId, {Metric, LoadChange}});
 
-                false -> %% perform balancing
+                InMyRange andalso NotMyId -> %% perform balancing
                     StdDevTest =
                         case gossip_available(Options) of
                             true ->
@@ -490,7 +493,8 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
 
                             LBModule = pid_groups:get_my(?MODULE),
                             comm:send_local(LBModule, {balance_phase1, Op})
-                    end
+                    end;
+                true -> ?TRACE("Invalid target chosen: ~p InMyRange: ~p NotMyId: ~p~n", [SplitKey, InMyRange, NotMyId])
             end
 
     end,
