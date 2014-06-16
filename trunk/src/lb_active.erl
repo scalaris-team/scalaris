@@ -98,26 +98,32 @@ start_link(DHTNodeGroup) ->
                              [{pid_groups_join_as, DHTNodeGroup, lb_active}]).
 
 
-%% @doc Initialization of monitoring values
+%% @doc Initialization of core module and lb_stats
 -spec init([]) -> state().
 init([]) ->
+    %% subscribe to ring maintenance for reseting and configuring monitors
+    rm_loop:subscribe(
+       self(), ?MODULE, fun rm_filter/3,
+       fun(_Pid, _Tag, _Old, _New, _Reason) -> reset_monitors() end, inf),
+    reset_monitors(),
+
     lb_stats:init(),
     lb_stats:trigger(),
-    %% keep the node id in state, currently needed to normalize histogram
-    rm_loop:subscribe(
-       self(), ?MODULE, fun rm_loop:subscribe_dneighbor_change_slide_filter/3,
-       fun(Pid, _Tag, _Old, _New, _Reason) ->
-           %% send reset message to dht node and lb_active process
-           comm:send_local(self(), {lb_active, reset_db_monitors}),
-           comm:send_local(Pid, {reset_monitors})
-       end, inf),
-    DhtNode = pid_groups:get_my(dht_node),
-    comm:send_local(DhtNode, {lb_active, reset_db_monitors}),
-    comm:send_local(self(), {reset_monitors}),
-
     ModuleInitState = call_module(init, []),
-
     {_MyState = #my_state{}, _ModuleState = ModuleInitState}.
+
+-spec rm_filter(nodelist:neighborhood(), nodelist:neighorhood(), rm_loop:reason()) -> boolean().
+rm_filter(OldNeighbors, NewNeighbors, _Reason) ->
+  nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors) orelse
+        nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors).
+
+-spec reset_monitors() -> ok.
+reset_monitors() ->
+    DhtNode = pid_groups:get_my(dht_node),
+    LbActive = pid_groups:get_my(lb_active),
+    %% send reset message to dht node and lb_active process
+    comm:send_local(DhtNode, {lb_active, reset_db_monitors}),
+    comm:send_local(LbActive, {reset_monitors}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Main message handler %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
