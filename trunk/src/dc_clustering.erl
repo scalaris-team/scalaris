@@ -75,7 +75,7 @@ activate() ->
             ignore
     end.
 
-%% @doc Deactivates the cyclon process.
+%% @doc Deactivates the clustering process.
 -spec deactivate() -> ok | ignore.
 deactivate() ->
     case config:read(dc_clustering_enable) of
