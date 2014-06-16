@@ -127,6 +127,7 @@ select_node(State) ->
 %%      of the form {selected_data, Instance, ExchangeData}.
 -spec select_data(State::state()) -> {ok, state()}.
 select_data(State) ->
+    %% cy_shuffle <=> gossip_trigger -> select_data()
     {ok, State}.
 
 
@@ -138,11 +139,12 @@ select_data(State) ->
 -spec select_reply_data(PData::data(), Ref::pos_integer(), Round::round(),
     State::state()) -> {discard_msg | ok | retry | send_back, state()}.
 select_reply_data(_PData, _Ref, _Round, State) ->
+    %% cy_subset msg <=> p2p_exch msg -> seleft_reply_data()
     {ok, State}.
 
 
 %% @doc Integrate the reply data. <br/>
-%%      Called by the behaviour module upon a p2p_exch message. <br/>
+%%      Called by the behaviour module upon a p2p_exch_reply message. <br/>
 %%      QData: the reply data from the peer <br/>
 %%      RoundStatus / Round: ignored, as cyclon does not implement round handling
 %%      Upon finishing the processing of the data, a message of the form
@@ -150,11 +152,36 @@ select_reply_data(_PData, _Ref, _Round, State) ->
 -spec integrate_data(QData::data(), Round::round(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
 integrate_data(_QData, _Round, State) ->
+    %% cy_subset_response msg <=> p2p_exch_reply msg -> integrate_data()
     {ok, State}.
 
 
 %% @doc Handle messages
 -spec handle_msg(Msg::comm:message(), State::state()) -> {ok, state()}.
+handle_msg({rm_changed, _NewNode}, State) ->
+    %% replaces the reference to self's dht node with NewNode
+    {ok, State};
+handle_msg({get_ages, _Pid}, State) ->
+    %% msg from admin:print_ages()
+    {ok, State};
+handle_msg({get_subset_rand, _N, _Pid}, State) ->
+    %% msg from get_subset_random() (api)
+    %% also directly requested from api_vm:get_other_vms() (change?)
+    {ok, State};
+handle_msg({get_node_details_response, _NodeDetails}, State) ->
+    %% Response to a get_node_details message from self (via request_node_details()).
+    %% The node details are used to possibly update Me and the succ and pred are
+    %% possibly used to populate the cache.
+    %% request_node_details() is called upon on_inactive({activate_cyclon, ..})
+    %% and check_state() (i.e. in on_active({cy_shuffle})).
+    {ok, State};
+handle_msg({get_dht_nodes_response, _Nodes}, State) ->
+    %% Response to get_dht_nodes message from service_per_vm. Contains a list of
+    %% registered dht nodes from service_per_vm. Initiated in
+    %% handle_msg({get_node_details_response, _NodeDetails} if the cache is empty.
+    %% Tries to get a cyclon cache from one of the received nodes if cache is
+    %% still empty.
+    {ok, State};
 handle_msg(_Msg, State) ->
     {ok, State}.
 
@@ -170,6 +197,7 @@ round_has_converged(State) ->
 %%      of them are ignored, as cyclon doesn't use / implements this features.
 -spec notify_change(_, _, State::state()) -> {ok, state()}.
 notify_change(_, _, State) ->
+    %% Possible to use key range changes for rm_check() / rm_send_changes() ???
     {ok, State}.
 
 
@@ -177,6 +205,7 @@ notify_change(_, _, State) ->
 %%      Called by the gossip module upon {get_values_best} messages.
 -spec get_values_best(State::state()) -> {ok, state()}.
 get_values_best(State) ->
+    %% use to implement get_subset_rand() api functions??
     {ok, State}.
 
 
@@ -192,6 +221,7 @@ get_values_all(State) ->
 -spec web_debug_info(state()) ->
     {KeyValueList::[{Key::string(), Value::any()},...], state()}.
 web_debug_info(State) ->
+    %% web_debug_info (msg)
     {[{"Key", "Value"}], State}.
 
 
