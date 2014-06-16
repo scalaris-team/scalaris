@@ -385,7 +385,7 @@ select_reply_data(PData, Ref, Round, {PrevState, CurState}) ->
 
 
 %% @doc Integrate the reply data. <br/>
-%%      Called by the behaviour module upon a p2p_exch message. <br/>
+%%      Called by the behaviour module upon a p2p_exch_reply message. <br/>
 %%      QData: the reply data from the peer <br/>
 %%      RoundStatus / Round: round information used for special handling of
 %%          messages from previous rounds <br/>
