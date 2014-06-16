@@ -354,34 +354,37 @@ select_reply_data(PData, Ref, Round, {PrevState, CurState}) ->
     CurRound = state_get(round, CurState),
     PrevRound = state_get(round, PrevState),
 
-    SelectReplyDataHelper =
-        fun (State) ->
-                PLoadList = element(1, PData),
-                PSkipped = [Module || {load_data, Module, skip} <- PLoadList],
-                {Data1, State1} = prepare_data(PSkipped, State),
-                Data2 = {replace_skipped(PLoadList, element(1, Data1)),
-                         element(2, Data1)},
-                Pid = pid_groups:get_my(gossip),
-                comm:send_local(Pid, {selected_reply_data, state_get(instance, State1), Data2, Ref, Round}),
-                {_Data2, State2} = merge_load_data(PData, State1),
-                State2
-        end,
-
     case state_get(status, CurState) of
         uninit ->
             log:log(?SHOW, "[ ~w ] select_reply_data in uninit", [?MODULE]),
             {retry,{PrevState, CurState}};
         init when Round =:= CurRound ->
-            CurState1 = SelectReplyDataHelper(CurState),
+            CurState1 = select_reply_data_helper(PData, Ref, Round, CurState),
             {ok, {PrevState, CurState1}};
         init when Round =:= PrevRound ->
-            PrevState1 = SelectReplyDataHelper(PrevState),
+            PrevState1 = select_reply_data_helper(PData, Ref, Round, PrevState),
             {ok, {PrevState1, CurState}};
         _ ->
             log:log(warn(), "[ ~w ] Discarded data in select_reply_data. Reason: invalid round.",
                 [state_get(instance, CurState)]),
             {send_back, {PrevState, CurState}}
     end.
+
+
+%% @doc Helper for select_reply_data()
+-spec select_reply_data_helper(PData::data(), Ref::pos_integer(), round(),
+                               state()) -> state().
+select_reply_data_helper(PData, Ref, Round, State) ->
+    PLoadList = element(1, PData),
+    PSkipped = [Module || {load_data, Module, skip} <- PLoadList],
+    {Data1, State1} = prepare_data(PSkipped, State),
+    Data2 = {replace_skipped(PLoadList, element(1, Data1)),
+             element(2, Data1)},
+    Pid = pid_groups:get_my(gossip),
+    comm:send_local(Pid, {selected_reply_data, state_get(instance, State1),
+                          Data2, Ref, Round}),
+    {_Data2, State2} = merge_load_data(PData, State1),
+    State2.
 
 
 %% @doc Integrate the reply data. <br/>
