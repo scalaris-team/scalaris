@@ -71,7 +71,7 @@ activate() ->
     Pid = pid_groups:get_my(vivaldi),
     comm:send_local(Pid, {activate_vivaldi}).
 
-%% @doc Deactivates the cyclon process.
+%% @doc Deactivates the vivaldi process.
 -spec deactivate() -> ok.
 deactivate() ->
     Pid = pid_groups:get_my(vivaldi),
