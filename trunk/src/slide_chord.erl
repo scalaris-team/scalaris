@@ -196,7 +196,8 @@ send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid) ->
                       RMNewPred = nodelist:pred(RMNewN),
                       % new pred pid or same pid but (updated) ID
                       PredChanged = RMNewPred =/= OldPred,
-                      ?ASSERT2(not (node:pidX(RMNewPred) =:= node:pidX(OldPred)) orelse
+                      ?ASSERT2(not (PredChanged andalso
+                                        node:pidX(RMNewPred) =:= node:pidX(OldPred)) orelse
                                    node:id(RMNewPred) =:= ExpPredId,
                                {"unexpected pred ID change", OldPredId,
                                 node:id(RMNewPred), ExpPredId}),
