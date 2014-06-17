@@ -225,6 +225,8 @@ create_value_({typedef, Module, TypeName, TypeList}, Size, ParseState) ->
     %ct:pal("typedef~n~w~n~w~n", [TypeName, TypeList]),
     %ct:pal("~w", [{type, Module, TypeName, length(TypeList)}]),
     case tester_parse_state:lookup_type({type, Module, TypeName, length(TypeList)}, ParseState) of
+        {value, {var_type, [], TypeSpec}} ->
+            create_value(TypeSpec, Size, ParseState);
         {value, {var_type, VarList, TypeSpec}} ->
             Subs = tester_variable_substitutions:substitutions_from_list(VarList, TypeList),
             RealTypeSpec = tester_variable_substitutions:substitute(TypeSpec, Subs),
