@@ -200,11 +200,11 @@ on({balance_phase2b, Op, ReplyPid}, {MyState, ModuleState} = State) ->
     if
         OpPending orelse OldData ->
             ?TRACE("Phase2b: Pending op: ~p Old data: ~p. Discarding op ~p and replying~n", [OpPending, OldData, Op]),
+            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
             if Op#lb_op.type =:= jump ->
                    LightNodeSucc = lb_info:get_node(Op#lb_op.light_node_succ),
                    comm:send(node:pidX(LightNodeSucc), {balance_failed, Op#lb_op.id});
-               true ->
-                   comm:send(ReplyPid, {balance_failed, Op#lb_op.id})
+               true -> ok
             end,
             State;
         true ->
