@@ -179,13 +179,13 @@ update_node({[Node], Node, [Node], _NodeIntv, _SuccIntv}, NewBaseNode) ->
 update_node({[Pred], _Node, [Pred] = Neighbors, _NodeIntv, _SuccIntv}, NewBaseNode) ->
     case node:id(NewBaseNode) =:= node:id(Pred) of
         false -> add_intervals(Neighbors, NewBaseNode, Neighbors);
-        _     -> throw('cannot update base node - not within (id(Pred), id(Succ))')
+        _     -> throw(new_node_not_in_pred_succ_interval)
     end;
 update_node({[Pred | _] = Preds, _Node, [Succ | _] = Succs, _NodeIntv, _SuccIntv}, NewBaseNode) ->
     case intervals:in(node:id(NewBaseNode),
                       intervals:new('(', node:id(Pred), node:id(Succ), ')')) of
         true -> add_intervals(Preds, NewBaseNode, Succs);
-        _    -> throw('cannot update base node - not within (id(Pred), id(Succ))')
+        _    -> throw(new_node_not_in_pred_succ_interval)
     end.
 
 %% @doc Returns the neighborhood's predecessor list.

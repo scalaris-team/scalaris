@@ -307,7 +307,7 @@ on({rm, update_my_id, NewId}, State) ->
                     update_state(State, RMFun)
                 end
             catch
-                throw:Reason ->
+                throw:(Reason = new_node_not_in_pred_succ_interval) ->
                     log:log(error, "[ RM ] can't update dht node ~w with id ~w (pred=~w, succ=~w): ~.0p",
                             [nodelist:node(Neighborhood), NewId,
                              nodelist:pred(Neighborhood),
