@@ -221,14 +221,22 @@ create_value_({tuple, {typedef, tester, test_any, []}}, Size, ParseState) ->
     erlang:list_to_tuple(Values);
 %%create_value({typedef, tester, test_any}, Size, TypeInfo) ->
     %% @todo
-create_value_({typedef, Module, TypeName, L}, Size, ParseState) ->
-    case tester_parse_state:lookup_type({type, Module, TypeName, length(L)}, ParseState) of
-        {value, {var_type, [], TypeSpec}} ->
-            create_value(TypeSpec, Size, ParseState);
+create_value_({typedef, Module, TypeName, TypeList}, Size, ParseState) ->
+    %ct:pal("typedef~n~w~n~w~n", [TypeName, TypeList]),
+    %ct:pal("~w", [{type, Module, TypeName, length(TypeList)}]),
+    case tester_parse_state:lookup_type({type, Module, TypeName, length(TypeList)}, ParseState) of
+        {value, {var_type, VarList, TypeSpec}} ->
+            Subs = tester_variable_substitutions:substitutions_from_list(VarList, TypeList),
+            RealTypeSpec = tester_variable_substitutions:substitute(TypeSpec, Subs),
+            %ct:pal("type before sub~n~w~n", [TypeSpec]),
+            %ct:pal("type after sub~n~w~n", [RealTypeSpec]),
+            create_value(RealTypeSpec, Size, ParseState);
         none ->
-            ?ct_fail("error: unknown type ~p:~p~n~w~n", [Module, TypeName, L])
+            ?ct_fail("error: unknown type ~p:~p~n~w~n", [Module, TypeName, TypeList])
     end;
 create_value_({typed_record_field, _Name, Type}, Size, ParseState) ->
+    create_value(Type, Size, ParseState);
+create_value_({type, _Line, Type, []}, Size, ParseState) ->
     create_value(Type, Size, ParseState);
 create_value_({union, Types}, Size, ParseState) ->
     Length = length(Types),

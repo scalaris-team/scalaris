@@ -110,7 +110,7 @@ parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
                   [{type, _,bounded_fun, [_TypeFun, ConstraintType]}] ->
                       try
                           Substitutions = parse_constraints(ConstraintType, gb_trees:empty()),
-                          substitute_constraints(AFunSpec, Substitutions)
+                          tester_variable_substitutions:substitute(AFunSpec, Substitutions)
                       catch
                           {subst_error, Description} ->
                               ct:pal("substitution error ~w in ~w:~w ~w", [Description, Module, FunName, AFunSpec]),
@@ -447,52 +447,6 @@ parse_constraints([ConstraintType | Rest], Substitutions) ->
             parse_constraints(Rest, Substitutions)
     end.
 
-substitute_constraints(FunSpecs, Substitutions) when is_list(FunSpecs)->
-    [substitute_constraints(FunSpec, Substitutions) ||  FunSpec <- FunSpecs];
-% type variable
-substitute_constraints({var,_Line,VarName}, Substitutions) ->
-    case gb_trees:lookup(VarName, Substitutions) of
-        {value, Substitution} -> Substitution;
-        none -> {var,_Line,VarName}
-    end;
-
-substitute_constraints({type, _Line,bounded_fun, [FunType, _Constraints]}, Substitutions) ->
-    substitute_constraints(FunType, Substitutions);
-
-% generic types
-substitute_constraints({type, Line,TypeType, Types}, Substitutions) ->
-    Types2 = substitute_constraints(Types, Substitutions),
-    {type,Line,TypeType,Types2};
-
-% user types
-substitute_constraints({user_type, Line, TypeType, Types}, Substitutions) ->
-    Types2 = substitute_constraints(Types, Substitutions),
-    {type,Line,TypeType,Types2};
-
-% special types
-substitute_constraints({ann_type,Line,[Left,Right]}, Substitutions) ->
-    Left2 = substitute_constraints(Left, Substitutions),
-    Right2 = substitute_constraints(Right, Substitutions),
-    {ann_type,Line,[Left2,Right2]};
-substitute_constraints({remote_type,Line,[Left,Right,L]}, Substitutions) ->
-    Left2 = substitute_constraints(Left, Substitutions),
-    Right2 = substitute_constraints(Right, Substitutions),
-    L2 = [ substitute_constraints(Element, Substitutions) || Element <- L],
-    {remote_type,Line,[Left2,Right2,L2]};
-substitute_constraints(any, _Substitutions) ->
-    any;
-
-% value types
-substitute_constraints({atom,Line,Value}, _Substitutions) ->
-    {atom,Line,Value};
-substitute_constraints({integer,Line,Value}, _Substitutions) ->
-    {integer,Line,Value};
-
-substitute_constraints(Unknown, Substitutions) ->
-    ct:pal("Unknown: ~w", [Unknown]),
-    ct:pal("~w", [Substitutions]),
-    throw({subst_error, unknown_expression}),
-    exit(foobar).
 
 % type equality minus line number
 equal_types(Left, Right)  when is_list(Left) andalso is_list(Right) ->
