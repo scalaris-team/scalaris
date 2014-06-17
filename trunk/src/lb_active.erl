@@ -43,11 +43,11 @@
 
 -record(lb_op, {id = ?required(id, lb_op)                           :: uid:global_uid(),
                 type = ?required(type, lb_op)                       :: slide_pred | slide_succ | jump,
+                %% sheds load
+                heavy_node = ?required(heavy, lb_op)                :: node:node_type(),
                 %% receives load
                 light_node = ?required(light, lb_op)                :: node:node_type(),
                 light_node_succ = ?required(light_node_succ, lb_op) :: node:node_type(),
-                %% sheds load
-                heavy_node = ?required(heavy, lb_op)                :: node:node_type(),
                 target = ?required(target, lb_op)                   :: ?RT:key(),
                 %% time of the oldest data used for the decision for this lb_op
                 data_time = ?required(data_time, lb_op)             :: erlang:timestamp(),
@@ -158,11 +158,8 @@ on({balance_phase1, Op}, {MyState, ModuleState} = State) ->
     OpPending = op_pending(MyState),
     OldData = old_data(Op, MyState),
     if
-        OpPending ->
-            ?TRACE("Phase1: Pending op. Won't jump or slide. Discarding op ~p~n", [Op]),
-            State;
-        OldData ->
-            ?TRACE("Phase1: Old data in lb_op. Won't jump or slide. Discarding op ~p~n", [Op]),
+        OpPending orelse OldData ->
+            ?TRACE("Phase1: Pending op. ~p. OldData: ~p. Won't jump or slide. Discarding op ~p~n", [OpPending, OldData, Op]),
             State;
         true ->
             MyState2 = set_pending_op(Op, MyState),
@@ -185,12 +182,8 @@ on({balance_phase2a, Op, ReplyPid}, {MyState, ModuleState} = State) ->
     OpPending = op_pending(MyState),
     OldData = old_data(Op, MyState),
     if
-        OpPending ->
-            ?TRACE("Phase2a: Pending op. Discarding op ~p and replying~n", [Op]),
-            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
-            State;
-        OldData ->
-            ?TRACE("Phase2a: Old data in lb_op. Won't jump or slide. Discarding op ~p~n", [Op]),
+        OpPending orelse OldData ->
+            ?TRACE("Phase2b: Pending op: ~p Old data: ~p. Discarding op ~p and replying~n", [OpPending, OldData, Op]),
             comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
             State;
         true ->
@@ -205,13 +198,14 @@ on({balance_phase2b, Op, ReplyPid}, {MyState, ModuleState} = State) ->
     OpPending = op_pending(MyState),
     OldData = old_data(Op, MyState),
     if
-        OpPending ->
-            ?TRACE("Phase2b: Pending op. Discarding op ~p and replying~n", [Op]),
-            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
-            State;
-        OldData ->
-            ?TRACE("Phase2b: Old data in lb_op. Won't jump or slide. Discarding op ~p~n", [Op]),
-            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
+        OpPending orelse OldData ->
+            ?TRACE("Phase2b: Pending op: ~p Old data: ~p. Discarding op ~p and replying~n", [OpPending, OldData, Op]),
+            if Op#lb_op.type =:= jump ->
+                   LightNodeSucc = lb_info:get_node(Op#lb_op.light_node_succ),
+                   comm:send(node:pidX(LightNodeSucc), {balance_failed, Op#lb_op.id});
+               true ->
+                   comm:send(ReplyPid, {balance_failed, Op#lb_op.id})
+            end,
             State;
         true ->
             OpId = Op#lb_op.id,
