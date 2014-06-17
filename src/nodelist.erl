@@ -173,18 +173,24 @@ node_range(Neighborhood) -> element(4, Neighborhood).
 
 %% @doc Updates the base node of the neighborhood if its ID is still between
 %%      the ID of the predecessor and successor. Otherwise throws an exception.
+%%      Note: pred and/or succ could change due to (outdated) other preds/succs.
 -spec update_node(neighborhood(), NewBaseNode::node:node_type()) -> neighborhood().
 update_node({[Node], Node, [Node], _NodeIntv, _SuccIntv}, NewBaseNode) ->
     add_intervals([NewBaseNode], NewBaseNode, [NewBaseNode]);
-update_node({[Pred], _Node, [Pred] = Neighbors, _NodeIntv, _SuccIntv}, NewBaseNode) ->
+update_node({[Pred] = Neighbors, _Node, Neighbors, _NodeIntv, _SuccIntv}, NewBaseNode) ->
     case node:id(NewBaseNode) =:= node:id(Pred) of
         false -> add_intervals(Neighbors, NewBaseNode, Neighbors);
         _     -> throw(new_node_not_in_pred_succ_interval)
     end;
 update_node({[Pred | _] = Preds, _Node, [Succ | _] = Succs, _NodeIntv, _SuccIntv}, NewBaseNode) ->
-    case intervals:in(node:id(NewBaseNode),
-                      intervals:new('(', node:id(Pred), node:id(Succ), ')')) of
-        true -> add_intervals(Preds, NewBaseNode, Succs);
+    PredSuccInt = intervals:new('(', node:id(Pred), node:id(Succ), ')'),
+    case intervals:in(node:id(NewBaseNode), PredSuccInt) of
+        true -> % sort preds, succs
+                SuccOrd = fun(N1, N2) -> succ_ord_node(N1, N2, NewBaseNode) end,
+                PredOrd = fun(N1, N2) -> succ_ord_node(N2, N1, NewBaseNode) end,
+                SuccsSorted = lists:usort(SuccOrd, Succs),
+                PredsSorted = lists:usort(PredOrd, Preds),
+                add_intervals(PredsSorted, NewBaseNode, SuccsSorted);
         _    -> throw(new_node_not_in_pred_succ_interval)
     end.
 
