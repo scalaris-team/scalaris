@@ -320,17 +320,31 @@ remove_node(State, NodePid) ->
 -spec update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
-    NewNeighborhood = nodelist:update_node(Neighborhood, NewMe),
+    NewNeighborhood1 = nodelist:update_node(Neighborhood, NewMe),
+    % -> update any out-dated nodes between old and new ID to prevent wrong
+    %    pred/succ changed:
+    OldId = nodelist:nodeid(Neighborhood),
+    NewId = node:id(NewMe),
+    I = case intervals:in(node:id(NewMe), nodelist:node_range(Neighborhood)) of
+            true  -> intervals:new('(', NewId, OldId, ')');
+            false -> ?ASSERT(intervals:in(node:id(NewMe), nodelist:succ_range(Neighborhood))),
+                     intervals:new('(', OldId, NewId, ')')
+        end,
+    NewNeighborhood2 =
+        nodelist:filter(NewNeighborhood1,
+                        fun(N) -> not intervals:in(node:id(N), I) end,
+                        fun(N) -> contact_new_nodes([N]) end),
+    
     % only send pred and succ the new node
     Message = {rm, {update_node, NewMe}},
     RndView = get_RndView(RandViewSize, Cache),
-    {Pred, Succ} = get_safe_pred_succ(NewNeighborhood, RndView),
+    {Pred, Succ} = get_safe_pred_succ(NewNeighborhood2, RndView),
     comm:send(node:pidX(Succ), Message, ?SEND_OPTIONS),
     case Pred =/= Succ of
         true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
         _    -> ok
     end,
-    {{unknown}, {NewNeighborhood, RandViewSize, Cache, Churn}}.
+    {{unknown}, {NewNeighborhood2, RandViewSize, Cache, Churn}}.
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes([_|_] = NewNodes) ->
