@@ -248,10 +248,7 @@ replace(MyCache, _MyCacheSize, ReceivedCache, SendCache, TargetSize) ->
 %%      already has!
 -spec add_node(Node::node:node_type(), Age::age(), Cache::cache()) -> NewCache::cache().
 add_node(Node, Age, Cache) ->
-    case contains_node(Node, Cache) of
-        true  -> [{Node, Age} | remove_node(Node, Cache)];
-        false -> [{Node, Age} | Cache]
-    end.
+    [{Node, Age} | remove_node(Node, Cache)].
 
 %% @doc Removes any element with the given Node from the Cache.
 -spec remove_node(Node::node:node_type(), Cache::cache()) -> NewCache::cache().
