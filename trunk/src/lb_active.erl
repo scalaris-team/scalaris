@@ -64,8 +64,8 @@
                    {gossip_reply, LightNode::lb_info:lb_info(), HeavyNode::lb_info:lb_info(), LightNodeSucc::lb_info:lb_info(),
                     Options::options(), {gossip_get_values_best_response, LoadInfo::gossip_load:load_info()}} |
                    {balance_phase1, Op::lb_op()} |
-                   {balance_phase2a, Op::lb_op(), Pid::comm:mypid()} |
-                   {balance_phase2b, Op::lb_op(), Pid::comm:mypid()} |
+                   {balance_phase2a, Op::lb_op()} |
+                   {balance_phase2b, Op::lb_op()} |
                    {balance_failed, OpId::uid:global_uid()} |
                    {balance_success, OpId::uid:global_uid()} |
                    {move, result, Tag::{jump | slide_pred | slide_succ, OpId::uid:global_uid()}, Result::ok | dht_node_move:abort_reason()} |
@@ -88,6 +88,9 @@
 
 %% list of active load balancing modules available
 -define(MODULES, [lb_active_karger, lb_active_directories]).
+
+%% options for sending messages directly to the lb_active process
+-define(lb, [{group_member, ?MODULE}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Initialization %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -159,61 +162,62 @@ on({balance_phase1, Op}, {MyState, ModuleState} = State) ->
     OldData = old_data(Op, MyState),
     if
         OpPending orelse OldData ->
-            ?TRACE("Phase1: Pending op. ~p. OldData: ~p. Won't jump or slide. Discarding op ~p~n", [OpPending, OldData, Op]),
+            ?TRACE("Phase1: Pending op: ~p. Old data: ~p. Discarding op ~p.~n", [OpPending, OldData, Op#lb_op.id]),
             State;
         true ->
             MyState2 = set_pending_op(Op, MyState),
-            case Op#lb_op.type of
-                jump ->
+            if Op#lb_op.type =:= jump ->
                     %% tell the succ of the light node in case of a jump
                     LightNodeSuccPid = node:pidX(Op#lb_op.light_node_succ),
-                    comm:send(LightNodeSuccPid, {balance_phase2a, Op, comm:this()}, [{group_member, lb_active}]);
-                _ ->
+                    comm:send(LightNodeSuccPid, {balance_phase2a, Op}, ?lb);
+                true ->
                     %% set pending op at other node
                     LightNodePid = node:pidX(Op#lb_op.light_node),
-                    comm:send(LightNodePid, {balance_phase2b, Op, comm:this()}, [{group_member, lb_active}])
+                    comm:send(LightNodePid, {balance_phase2b, Op}, ?lb)
             end,
             {MyState2, ModuleState}
     end;
 
 %% Received by the succ of the light node which takes the light nodes' load
 %% in case of a jump.
-on({balance_phase2a, Op, ReplyPid}, {MyState, ModuleState} = State) ->
+on({balance_phase2a, Op}, {MyState, ModuleState} = State) ->
     OpPending = op_pending(MyState),
     OldData = old_data(Op, MyState),
     if
         OpPending orelse OldData ->
-            ?TRACE("Phase2b: Pending op: ~p Old data: ~p. Discarding op ~p and replying~n", [OpPending, OldData, Op]),
-            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
+            ?TRACE("Phase2a: Pending op: ~p. Old data: ~p. Discarding op ~p.~n", [OpPending, OldData, Op#lb_op.id]),
+            HeavyNodePid = node:pidX(Op#lb_op.heavy_node),
+            comm:send(HeavyNodePid, {balance_failed, Op#lb_op.id}, ?lb),
             State;
         true ->
             MyState2 = set_pending_op(Op, MyState),
             LightNodePid = node:pidX(Op#lb_op.light_node),
-            comm:send(LightNodePid, {balance_phase2b, Op, ReplyPid}, [{group_member, lb_active}]),
+            comm:send(LightNodePid, {balance_phase2b, Op}, ?lb),
             {MyState2, ModuleState}
     end;
 
 %% The light node which receives load from the heavy node and initiates the lb op.
-on({balance_phase2b, Op, ReplyPid}, {MyState, ModuleState} = State) ->
+on({balance_phase2b, Op}, {MyState, ModuleState} = State) ->
     OpPending = op_pending(MyState),
     OldData = old_data(Op, MyState),
     if
         OpPending orelse OldData ->
-            ?TRACE("Phase2b: Pending op: ~p Old data: ~p. Discarding op ~p and replying~n", [OpPending, OldData, Op]),
-            comm:send(ReplyPid, {balance_failed, Op#lb_op.id}),
+            ?TRACE("Phase2b: Pending op: ~p. Old data: ~p. Discarding op ~p.~n", [OpPending, OldData, Op#lb_op.id]),
+            HeavyNodePid = node:pidX(Op#lb_op.heavy_node),
+            comm:send(HeavyNodePid, {balance_failed, Op#lb_op.id}, ?lb),
             if Op#lb_op.type =:= jump ->
                    LightNodeSuccPid = node:pidX(Op#lb_op.light_node_succ),
-                   comm:send(LightNodeSuccPid, {balance_failed, Op#lb_op.id});
+                   comm:send(LightNodeSuccPid, {balance_failed, Op#lb_op.id}, ?lb);
                true -> ok
             end,
             State;
         true ->
             OpId = Op#lb_op.id,
-            _Pid = node:pidX(Op#lb_op.light_node),
             TargetKey = Op#lb_op.target,
             MyState2 = set_pending_op(Op, MyState),
             ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
             MyDHT = pid_groups:get_my(dht_node),
+            _Pid = node:pidX(Op#lb_op.light_node),
             ?DBG_ASSERT(_Pid =:= comm:make_global(MyDHT)),
             case Op#lb_op.type of
                 jump ->
