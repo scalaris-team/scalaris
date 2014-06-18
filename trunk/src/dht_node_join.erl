@@ -964,7 +964,7 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages, IsJump) ->
     rt_loop:activate(Neighbors),
     if IsJump -> ok;
        true ->
-           cyclon:activate(),
+           cyclon:activate(Neighbors),
            vivaldi:activate(),
            dc_clustering:activate(),
            gossip:activate(nodelist:node_range(Neighbors))
