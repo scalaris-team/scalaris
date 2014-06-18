@@ -190,14 +190,7 @@ handle_custom_message({rm, {update_node, Node}},
         end,
     % now remove all potentially out-dated nodes and try to re-add them with
     % updated information
-    NewNeighborhood2 =
-        case intervals:is_empty(I) of
-            true -> NewNeighborhood1;
-            false ->
-                nodelist:filter(NewNeighborhood1,
-                                fun(N) -> not intervals:in(node:id(N), I) end,
-                                fun(N) -> contact_new_nodes([N]) end)
-        end,
+    NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, null),
     {{unknown}, {NewNeighborhood2, RandViewSize, Cache, Churn}};
 
 handle_custom_message(_, _State) -> unknown_event.
@@ -284,12 +277,7 @@ remove_pred(State, OldPred, PredsPred) ->
     % -> try to re-add them with updated information though
     NewNeighborhood1 = element(1, State2),
     I = intervals:new('(', node:id(PredsPred), nodelist:nodeid(NewNeighborhood1), ')'),
-    NewNeighborhood2 =
-        nodelist:filter(
-          NewNeighborhood1,
-          % note: be resilient in case we have a more up-to-date PredsPred node info!
-          fun(N) -> (not intervals:in(node:id(N), I)) orelse node:same_process(N, PredsPred) end,
-          fun(N) -> contact_new_nodes([N]) end),
+    NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, PredsPred),
     State3 = setelement(1, State2, NewNeighborhood2),
     {{graceful_leave, pred, OldPred}, State3}.
 
@@ -298,10 +286,15 @@ remove_pred(State, OldPred, PredsPred) ->
                   SuccsSucc::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 remove_succ(State, OldSucc, SuccsSucc) ->
-    % in contrast to remove_pred/3, let rm repair a potentially wrong new succ
-    % on its own
-    {{graceful_leave, succ, OldSucc},
-     update_nodes(State, [SuccsSucc], [OldSucc], null)}.
+    % similar to remove_pred/3
+    State2 = update_nodes(State, [SuccsSucc], [OldSucc], null),
+    % remove any out-dated succs which seem to be the new successor
+    % -> try to re-add them with updated information though
+    NewNeighborhood1 = element(1, State2),
+    I = intervals:new('(', nodelist:nodeid(NewNeighborhood1), node:id(SuccsSucc), ')'),
+    NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, SuccsSucc),
+    State3 = setelement(1, State2, NewNeighborhood2),
+    {{graceful_leave, succ, OldSucc}, State3}.
 
 %% @doc Removes the given node as a result from a graceful leave only!
 -spec remove_node(State::state(), NodePid::comm:mypid())
@@ -327,10 +320,7 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
             false -> ?DBG_ASSERT(intervals:in(node:id(NewMe), nodelist:succ_range(Neighborhood))),
                      intervals:new('(', OldId, NewId, ')')
         end,
-    NewNeighborhood2 =
-        nodelist:filter(NewNeighborhood1,
-                        fun(N) -> not intervals:in(node:id(N), I) end,
-                        fun(N) -> contact_new_nodes([N]) end),
+    NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, null),
     
     % only send pred and succ the new node
     Message = {rm, {update_node, NewMe}},
@@ -342,6 +332,24 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
         _    -> ok
     end,
     {{unknown}, {NewNeighborhood2, RandViewSize, Cache, Churn}}.
+
+%% @doc Removes nodes all nodes from the given neighborhood which are in the
+%%      interval I but keep TolerateNode.
+-spec remove_neighbors_in_interval(Neighborhood::nodelist:neighborhood(),
+                                   I::intervals:interval(),
+                                   TolerateNode::node:node() | null)
+        -> NewNeighborhood::nodelist:neighborhood().
+remove_neighbors_in_interval(Neighborhood, I, TolerateNode) ->
+    case intervals:is_empty(I) of
+        false ->
+            nodelist:filter(
+              Neighborhood,
+              % note: be resilient in case we have a more up-to-date TolerateNode node info!
+              fun(N) -> (not intervals:in(node:id(N), I)) orelse
+                            node:same_process(N, TolerateNode) end,
+              fun(N) -> contact_new_nodes([N]) end);
+        true -> Neighborhood
+    end.
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes([_|_] = NewNodes) ->
