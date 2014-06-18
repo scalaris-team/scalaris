@@ -370,8 +370,8 @@ check_state({Cache, _Node, _Cycles} = _State) ->
 -spec rm_check(Neighbors, Neighbors, Reason) -> boolean() when
       is_subtype(Neighbors, nodelist:neighborhood()),
       is_subtype(Reason, rm_loop:reason()).
-rm_check(OldN, NewN, _Reason) ->
-    OldN =/= NewN.
+rm_check(OldNeighbors, NewNeighbors, _Reason) ->
+    nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors).
 
 %% @doc Sends changes to a subscribed cyclon process when the neighborhood
 %%      changes.
