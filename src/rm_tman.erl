@@ -228,16 +228,12 @@ trigger_action({Neighborhood, RandViewSize, Cache, _Churn} = State) ->
     % with potentially non-existing nodes (in contrast, the nodes from our
     % neighbourhood are more likely to still exist!)
     % Test for being alone:
-    case nodelist:has_real_pred(Neighborhood) andalso
-             nodelist:has_real_succ(Neighborhood) of
-        false -> % our node is the only node in the system
-            % nothing to do here - we will be actively called by any new node
-            % (see handling of notify_new_succ and notify_new_pred)
-            {{unknown}, State};
-        _ -> % there is another node in the system
-            RndView = get_RndView(RandViewSize, Cache),
+    Me = nodelist:node(Neighborhood),
+    RndView = get_RndView(RandViewSize, Cache),
+    {Pred, Succ} = get_safe_pred_succ(Neighborhood, RndView),
+    case node:same_process(Pred, Me) andalso node:same_process(Succ, Me) of
+        false -> % there is another node in the system
             %log:log(debug, " [RM | ~p ] RNDVIEW: ~p", [self(),RndView]),
-            {Pred, Succ} = get_safe_pred_succ(Neighborhood, RndView),
             %io:format("~p~n",[{Preds,Succs,RndView,Me}]),
             RequestPredsMinCount =
                 case nodelist:has_real_pred(Neighborhood) of
@@ -255,9 +251,13 @@ trigger_action({Neighborhood, RandViewSize, Cache, _Churn} = State) ->
             case Pred =/= Succ of
                 true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
                 _    -> ok
-            end,
-            {{unknown}, State}
-    end.
+            end;
+        _ -> % our node is the only node in the system
+            % nothing to do here - we will be actively called by any new node
+            % (see new_succ/2 and new_pred/2)
+            ok
+    end,
+    {{unknown}, State}.
 
 -spec new_pred(State::state(), NewPred::node:node_type()) ->
           {ChangeReason::rm_loop:reason(), state()}.
