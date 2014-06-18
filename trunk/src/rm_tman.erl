@@ -341,7 +341,7 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
 %%      interval I but keep TolerateNode.
 -spec remove_neighbors_in_interval(Neighborhood::nodelist:neighborhood(),
                                    I::intervals:interval(),
-                                   TolerateNode::node:node() | null)
+                                   TolerateNode::node:node_type() | null)
         -> NewNeighborhood::nodelist:neighborhood().
 remove_neighbors_in_interval(Neighborhood, I, TolerateNode) ->
     case intervals:is_empty(I) of
