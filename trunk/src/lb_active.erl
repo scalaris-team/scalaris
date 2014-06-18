@@ -115,7 +115,7 @@ init([]) ->
     ModuleInitState = call_module(init, []),
     {_MyState = #my_state{}, _ModuleState = ModuleInitState}.
 
--spec rm_filter(nodelist:neighborhood(), nodelist:neighorhood(), rm_loop:reason()) -> boolean().
+-spec rm_filter(nodelist:neighborhood(), nodelist:neighborhood(), rm_loop:reason()) -> boolean().
 rm_filter(OldNeighbors, NewNeighbors, _Reason) ->
   nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors) orelse
         nodelist:pred(OldNeighbors) =/= nodelist:pred(NewNeighbors).
