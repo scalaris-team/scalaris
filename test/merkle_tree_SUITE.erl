@@ -180,6 +180,7 @@ prop_tree_hash(L, R, ToAdd) ->
     I = unittest_helper:build_interval(L, R),
     DB1 = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
     DB1a = util:shuffle(DB1),
+    DB1Size = length(DB1),
     
     DB1Tree1 = merkle_tree:new(I, DB1, []),
     DB1Tree2 = merkle_tree:new(I, DB1, []),
@@ -193,7 +194,8 @@ prop_tree_hash(L, R, ToAdd) ->
     DB1aTree2b = merkle_tree:gen_hash(merkle_tree:insert_list(DB1a, merkle_tree:new(I, [{keep_bucket, true}]))),
     DB1aTree2c = merkle_tree:gen_hash(merkle_tree:insert_list(DB1a, merkle_tree:new(I, [{keep_bucket, true}])), true),
     
-    DB3Tree1 = build_tree(I, ToAdd + 1, uniform),
+    DB3Size = DB1Size + 1,
+    DB3Tree1 = build_tree(I, DB3Size, uniform),
     
     DB1RootHash1 = merkle_tree:get_hash(DB1Tree1),
     DB1RootHash2 = merkle_tree:get_hash(DB1Tree2),
@@ -223,11 +225,24 @@ prop_tree_hash(L, R, ToAdd) ->
     
     ?compare(fun erlang:'>'/2, DB1RootHash1, 0),
     ?compare(fun erlang:'>'/2, DB3RootHash1, 0),
-    ?compare(fun erlang:'=/='/2, DB3RootHash1, DB1RootHash1).
+
+    MTSize = merkle_tree:size_detail(DB3Tree1),
+    case element(3, MTSize) of
+        DB1Size ->
+            % could not split the interval any further to add one more item
+            % -> items should be equal and thus also the hashes
+            ?equals(DB3RootHash1, DB1RootHash1);
+        DB3Size ->
+            % there is one more item and thus the hashes should differ
+            ?compare(fun erlang:'=/='/2, DB3RootHash1, DB1RootHash1);
+        _ ->
+            ?ct_fail("DB1: ~B, DB3: ~B, Other: ~p", [DB1Size, DB3Size, MTSize])
+    end.
 
 tester_tree_hash(_) ->
     case rt_SUITE:default_rt_has_chord_keys() of
         true ->
+            prop_tree_hash(310893024101176788593096495898246585537, 310893024101176788593096495898246585538, 83),
             prop_tree_hash(310893024101176788593096495898246585537, 56222597632513189683777859800513757781, 83);
         _ -> ok
     end,
