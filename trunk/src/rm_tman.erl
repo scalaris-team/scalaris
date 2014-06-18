@@ -280,21 +280,18 @@ new_succ(State, NewSucc) ->
 remove_pred(State, OldPred, PredsPred) ->
     State2 = update_nodes(State, [PredsPred], [OldPred], null),
     % in order for incremental leaves to finish correctly, we must remove any
-    % out-dated PredsPred in our state here!
-    NewNeighborhood = element(1, State2),
-
-    MyNewPred = nodelist:pred(NewNeighborhood),
-    case node:same_process(MyNewPred, PredsPred) of
-        true ->
-            {{graceful_leave, pred, OldPred}, State2};
-        false ->
-            % assume the pred in my neighborhood is old
-            % (the previous pred must know better about his pred)
-            % -> just in case he was wrong, try to add it:
-            contact_new_nodes([MyNewPred]),
-            % try as long as MyNewPred is the same as PredsPred
-            remove_pred(State2, MyNewPred, PredsPred)
-    end.
+    % out-dated preds which seem to be the new predecessor in our state here!
+    % -> try to re-add them with updated information though
+    NewNeighborhood1 = element(1, State2),
+    I = intervals:new('(', node:id(PredsPred), nodelist:nodeid(NewNeighborhood1), ')'),
+    NewNeighborhood2 =
+        nodelist:filter(
+          NewNeighborhood1,
+          % note: be resilient in case we have a more up-to-date PredsPred node info!
+          fun(N) -> (not intervals:in(node:id(N), I)) orelse node:same_process(N, PredsPred) end,
+          fun(N) -> contact_new_nodes([N]) end),
+    State3 = setelement(1, State2, NewNeighborhood2),
+    {{graceful_leave, pred, OldPred}, State3}.
 
 %% @doc Removes the given successor as a result from a graceful leave only!
 -spec remove_succ(State::state(), OldSucc::node:node_type(),
