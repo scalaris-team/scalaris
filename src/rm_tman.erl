@@ -315,13 +315,17 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
     %    pred/succ changed:
     OldId = nodelist:nodeid(Neighborhood),
     NewId = node:id(NewMe),
-    I = case intervals:in(node:id(NewMe), nodelist:node_range(Neighborhood)) of
-            true  -> intervals:new('(', NewId, OldId, ')');
+    I = case intervals:in(NewId, nodelist:node_range(Neighborhood)) of
+            true  -> intervals:new('[', NewId, OldId, ')');
             false -> ?DBG_ASSERT(intervals:in(node:id(NewMe), nodelist:succ_range(Neighborhood))),
-                     intervals:new('(', OldId, NewId, ')')
+                     intervals:new('(', OldId, NewId, ']')
         end,
     NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, null),
     
+    ?DBG_ASSERT2(node:pidX(nodelist:pred(Neighborhood)) =:= node:pidX(nodelist:pred(NewNeighborhood2)),
+                 no_pred_change_allowed),
+    ?DBG_ASSERT2(node:pidX(nodelist:succ(Neighborhood)) =:= node:pidX(nodelist:succ(NewNeighborhood2)),
+                 no_succ_change_allowed),
     % only send pred and succ the new node
     Message = {rm, {update_node, NewMe}},
     RndView = get_RndView(RandViewSize, Cache),
