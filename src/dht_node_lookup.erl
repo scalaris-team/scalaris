@@ -133,9 +133,12 @@ lookup_fin_chord(State, Key, Hops, Msg) ->
                                             end
                                         end || {Interval, Id} <- DBRange],
                             log:log(warn,
-                                    "[ ~.0p ] Routing is damaged!! Trying again...~n  myrange:~p~n  db_range:~p~n  msgfwd:~p~n  Key:~p",
+                                    "[ ~.0p ] Routing is damaged!! Trying again...~n"
+                                    "  myrange:~p~n  db_range:~p~n  msgfwd:~p~n  Key:~p~n"
+                                    "  pred: ~.4p~n  node: ~.4p~n  succ: ~.4p",
                                     [self(), intervals:get_bounds(nodelist:node_range(Neighbors)),
-                                     DBRange2, MsgFwd, Key])
+                                     DBRange2, MsgFwd, Key, nodelist:pred(Neighbors),
+                                     nodelist:node(Neighbors), nodelist:succ(Neighbors)])
                     end,
                     lookup_aux(State, Key, Hops, Msg),
                     State
