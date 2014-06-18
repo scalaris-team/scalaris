@@ -327,7 +327,7 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
     NewId = node:id(NewMe),
     I = case intervals:in(node:id(NewMe), nodelist:node_range(Neighborhood)) of
             true  -> intervals:new('(', NewId, OldId, ')');
-            false -> ?ASSERT(intervals:in(node:id(NewMe), nodelist:succ_range(Neighborhood))),
+            false -> ?DBG_ASSERT(intervals:in(node:id(NewMe), nodelist:succ_range(Neighborhood))),
                      intervals:new('(', OldId, NewId, ')')
         end,
     NewNeighborhood2 =
