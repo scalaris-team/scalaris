@@ -34,7 +34,7 @@
 
 % functions gen_component and the config module use
 -export([init/1, on_inactive/2, on_active/2,
-         activate/0, deactivate/0,
+         activate/1, deactivate/0,
          rm_check/3,
          rm_send_changes/5,
          check_config/0]).
@@ -50,7 +50,7 @@
 %% Node: the scalaris node of this cyclon-task
 %% Cycles: the amount of shuffle-cycles
 -type(state_active() :: {RandomNodes::cyclon_cache:cache(),
-                         MyNode::node:node_type() | null,
+                         MyNode::node:node_type(),
                          Cycles::integer()}).
 -type(state_inactive() :: {inactive, QueuedMessages::msg_queue:msg_queue()}).
 %% -type(state() :: state_active() | state_inactive()).
@@ -76,10 +76,10 @@
 
 %% @doc Activates the cyclon process. If not activated, the cyclon process will
 %%      queue most messages without processing them.
--spec activate() -> ok.
-activate() ->
+-spec activate(Neighbors::nodelist:neighborhood()) -> ok.
+activate(Neighbors) ->
     Pid = pid_groups:get_my(cyclon),
-    comm:send_local(Pid, {activate_cyclon}).
+    comm:send_local(Pid, {activate_cyclon, Neighbors}).
 
 %% @doc Deactivates the cyclon process.
 -spec deactivate() -> ok.
@@ -160,19 +160,24 @@ init([]) ->
 %%      'activate_cyclon' message is received). Queues getter-messages for
 %%      faster startup of dependent processes.
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
-                 ({activate_cyclon}, state_inactive())
+                 ({activate_cyclon, Neighbors::nodelist:neighborhood()}, state_inactive())
         -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
-on_inactive({activate_cyclon}, {inactive, QueuedMessages}) ->
+on_inactive({activate_cyclon, Neighbors}, {inactive, QueuedMessages}) ->
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
     rm_loop:subscribe(self(), cyclon,
                       fun cyclon:rm_check/3,
                       fun cyclon:rm_send_changes/5, inf),
-    request_node_details([node, pred, succ]),
     comm:send_local(self(), {cy_shuffle}),
     msg_queue:send(QueuedMessages),
     monitor:proc_set_value(?MODULE, 'shuffle', rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
-    gen_component:change_handler({cyclon_cache:new(), null, 0},
-                                 fun ?MODULE:on_active/2);
+    Cache = case nodelist:has_real_pred(Neighbors) andalso
+                     nodelist:has_real_succ(Neighbors) of
+                true  -> cyclon_cache:new(nodelist:pred(Neighbors),
+                                          nodelist:succ(Neighbors));
+                false -> cyclon_cache:new()
+            end,
+    NewState = {Cache, nodelist:node(Neighbors), 0},
+    gen_component:change_handler(NewState, fun ?MODULE:on_active/2);
 
 on_inactive(Msg = {get_ages, _Pid}, {inactive, QueuedMessages}) ->
     {inactive, msg_queue:add(QueuedMessages, Msg)};
@@ -245,32 +250,33 @@ on_active({cy_subset_response, QSubset, PSubset}, {Cache, Node, Cycles}) ->
     NewCache = cyclon_cache:merge(Cache, Node, QSubset, PSubset, get_cache_size()),
     {NewCache, Node, Cycles};
 
-on_active({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles}) ->
-    Me = case node_details:contains(NodeDetails, node) of
-             true -> node_details:get(NodeDetails, node);
-             _    -> Node
-         end,
-    Cache =
-        case node_details:contains(NodeDetails, pred) andalso
-                 node_details:contains(NodeDetails, succ) andalso
-                 not node:same_process(node_details:get(NodeDetails, pred), Me) andalso
-                 (cyclon_cache:size(OldCache) =< 2) of
-            true -> cyclon_cache:new(node_details:get(NodeDetails, pred),
-                                     node_details:get(NodeDetails, succ));
-            _ -> OldCache
-        end,
-    case cyclon_cache:size(Cache) of
-        0 -> % try to get the cyclon cache from one of the known_hosts
-            case config:read(known_hosts) of
-                [] -> ok;
-                [_|_] = KnownHosts ->
-                    Pid = util:randomelem(KnownHosts),
-                    comm:send(Pid, {get_dht_nodes, comm:this()}, [{?quiet}])
+on_active({get_node_details_response, NodeDetails}, {OldCache, Node, Cycles} = State) ->
+    case cyclon_cache:size(OldCache) =< 2 of
+        true  ->
+            Pred = node_details:get(NodeDetails, pred),
+            Succ = node_details:get(NodeDetails, succ),
+            NewCache =
+                lists:foldl(
+                  fun(N, CacheX) ->
+                          case node:same_process(N, Node) of
+                              false -> cyclon_cache:add_node(N, 0, CacheX);
+                              true -> CacheX
+                          end
+                  end, OldCache, [Pred, Succ]),
+            case cyclon_cache:size(NewCache) of
+                0 -> % try to get the cyclon cache from one of the known_hosts
+                    case config:read(known_hosts) of
+                        [] -> ok;
+                        [_|_] = KnownHosts ->
+                            Pid = util:randomelem(KnownHosts),
+                            comm:send(Pid, {get_dht_nodes, comm:this()}, [{?quiet}])
+                    end;
+                _ -> ok
             end,
-            ok;
-        _ -> ok
-    end,
-    {Cache, Me, Cycles};
+            {NewCache, Node, Cycles};
+        false ->
+            State
+    end;
 
 on_active({get_dht_nodes_response, Nodes}, {Cache, _Me, _Cycles} = State) ->
     Size = cyclon_cache:size(Cache),
@@ -343,19 +349,14 @@ request_node_details(Details) ->
 %%      unknown, the local dht_node will be asked for these values and the check
 %%      will be re-scheduled after 1s.
 -spec check_state(state_active()) -> ok | fail.
-check_state({Cache, Node, _Cycles} = _State) ->
+check_state({Cache, _Node, _Cycles} = _State) ->
     % if the own node is unknown or the cache is empty (it should at least
     % contain the nodes predecessor and successor), request this information
     % from the local dht_node
-    NeedsInfo1 = case cyclon_cache:size(Cache) of
-                     0 -> [pred, succ];
-                     _ -> []
-                 end,
-    NeedsInfo2 = case node:is_valid(Node) of
-                     false -> [node];
-                     true  -> []
-                 end,
-    NeedsInfo = NeedsInfo1 ++ NeedsInfo2,
+    NeedsInfo = case cyclon_cache:size(Cache) of
+                    0 -> [pred, succ];
+                    _ -> []
+                end,
     case NeedsInfo of
         [_|_] -> request_node_details(NeedsInfo),
                  fail;
