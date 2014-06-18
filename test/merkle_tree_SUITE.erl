@@ -279,12 +279,12 @@ prop_size(L, R, ToAdd) ->
     I = unittest_helper:build_interval(L, R),
     Tree = build_tree(I, ToAdd, uniform),
     Size = merkle_tree:size(Tree),
-    {Inner, Leafs} = merkle_tree:size_detail(Tree),
+    {Inner, Leafs, Items} = merkle_tree:size_detail(Tree),
     ?equals_w_note(Size, Inner + Leafs,
                    io_lib:format("TreeSize~nItemsAdded: ~p
                                   Simple: ~p Nodes
-                                  InnerNodes: ~p   ;   Leafs: ~p",
-                                 [ToAdd, Size, Inner, Leafs])).
+                                  InnerNodes: ~B   ;   Leafs: ~B   ;   Items: ~B",
+                                 [ToAdd, Size, Inner, Leafs, Items])).
     
 tester_size(_) ->
   tester:test(?MODULE, prop_size, 3, 100, [{threads, 2}]).
@@ -295,7 +295,7 @@ tester_size(_) ->
 prop_iter(L, R, ToAdd) ->
     I = unittest_helper:build_interval(L, R),
     Tree = build_tree(I, ToAdd, uniform),
-    {Inner, Leafs} = merkle_tree:size_detail(Tree),
+    {Inner, Leafs, _Items} = merkle_tree:size_detail(Tree),
     Count = iterate(merkle_tree:iterator(Tree), fun(_, Acc) -> Acc + 1 end, 0),
     ?equals_w_note(Count, Inner + Leafs,
                    io_lib:format("Args: Interval=[~p, ~p] - ToAdd =~p~n",
@@ -311,9 +311,9 @@ prop_store_to_dot(L, R, ToAdd) ->
     ct:pal("PARAMS: L=~p ; R=~p ; ToAdd=~p", [L, R, ToAdd]),
     I = unittest_helper:build_interval(L, R),
     Tree = build_tree(I, ToAdd, uniform),
-    {Inner, Leafs} = merkle_tree:size_detail(Tree),
-    ct:pal("Tree Size Added =~p - Inner=~p ; Leafs=~p
-            Saved to ../MerkleTree.png", [ToAdd, Inner, Leafs]),
+    {Inner, Leafs, Items} = merkle_tree:size_detail(Tree),
+    ct:pal("Tree Size Added =~B - Inner=~B ; Leafs=~B ; Items=~B
+            Saved to ../MerkleTree.png", [ToAdd, Inner, Leafs, Items]),
     merkle_tree:store_graph(Tree, "MerkleTree"),
     true.
 

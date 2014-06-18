@@ -36,17 +36,17 @@
 -type status() :: wait | abort | finish.
 -record(rr_recon_stats,
         {
-         session_id         = null   :: rrepair:session_id() | null,
-         tree_size          = {0, 0} :: merkle_tree:mt_size(),
-         tree_nodesCompared = 0      :: non_neg_integer(),
-         tree_compareSkipped= 0      :: non_neg_integer(),
-         tree_leavesSynced  = 0      :: non_neg_integer(),
-         error_count        = 0      :: non_neg_integer(),
-         build_time         = 0      :: non_neg_integer(),      %in us
-         recon_time         = 0      :: non_neg_integer(),      %in us
-         resolve_started    = 0      :: non_neg_integer(),      %number of resolve requests send
-         await_rs_fb        = 0      :: non_neg_integer(),      %awaiting feedback response from a RS process not initiated by rr_resolve 
-         status             = wait   :: status()
+         session_id         = null    :: rrepair:session_id() | null,
+         tree_size          = {0,0,0} :: merkle_tree:mt_size(),
+         tree_nodesCompared = 0       :: non_neg_integer(),
+         tree_compareSkipped= 0       :: non_neg_integer(),
+         tree_leavesSynced  = 0       :: non_neg_integer(),
+         error_count        = 0       :: non_neg_integer(),
+         build_time         = 0       :: non_neg_integer(),      %in us
+         recon_time         = 0       :: non_neg_integer(),      %in us
+         resolve_started    = 0       :: non_neg_integer(),      %number of resolve requests send
+         await_rs_fb        = 0       :: non_neg_integer(),      %awaiting feedback response from a RS process not initiated by rr_resolve
+         status             = wait    :: status()
          }).
 -type stats() :: #rr_recon_stats{}.
 
@@ -84,9 +84,9 @@ inc([], Stats) ->
 inc([{K, V} | L], Stats) ->
     NS = case K of
              tree_size ->
-                 {OldI, OldF} = Stats#rr_recon_stats.tree_size,
-                 {IncI, IncF} = V,
-                 X = {OldI + IncI, OldF + IncF},
+                 {OldIn, OldLn, OldIt} = Stats#rr_recon_stats.tree_size,
+                 {IncIn, IncLn, IncIt} = V,
+                 X = {OldIn + IncIn, OldLn + IncLn, OldIt + IncIt},
                  Stats#rr_recon_stats{tree_size = X};
              tree_nodesCompared ->
                  X = V + Stats#rr_recon_stats.tree_nodesCompared,
