@@ -301,15 +301,11 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
     {ToSend1, ToReq1, OtherDBChunk1} =
         get_full_diff(DBList, OtherDBChunk, ToSend, ToReq, SigSize, VSize),
 
-    %if rest interval is non empty start another sync
-    SID = rr_recon_stats:get(session_id, Stats),
+    %if rest interval is non empty get another chunk
     SyncFinished = intervals:is_empty(RestI),
-    if not SyncFinished ->
-           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve);
-       true -> ok
-    end,
     Params1 = Params#trivial_recon_struct{db_chunk = OtherDBChunk1},
     if SyncFinished ->
+           SID = rr_recon_stats:get(session_id, Stats),
            ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p ; ToReq=~p",
                   [SID, length(ToSend1), length(ToReq1)]),
            NewStats =
@@ -351,6 +347,7 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                     State#rr_recon_state{stats = NewStats2, params = Params2,
                                          to_resolve = {[], []}});
        true ->
+           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve),
            State#rr_recon_state{params = Params1,
                                 to_resolve = {ToSend1, ToReq1}}
     end;
