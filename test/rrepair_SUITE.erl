@@ -33,12 +33,13 @@ all() ->
     [
      {group, basic},
      {group, tester_tests},
-     session_ttl,
+     {group, session_ttl},
      {group, repair}
     ].
 
 groups() ->
     [
+     {session_ttl,  [sequence], [session_ttl]},
      {tester_tests, [parallel], [
                            tester_map_key_to_interval,
                            tester_map_key_to_quadrant,
