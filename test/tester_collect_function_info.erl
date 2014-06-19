@@ -239,7 +239,10 @@ parse_type_({type, _Line, reference, []}, _Module, ParseState) ->
     {reference, ParseState};
 parse_type_({type, _Line, term, []}, _Module, ParseState) ->
     {{typedef, tester, test_any, []}, ParseState};
-parse_type_({ann_type, _Line, [{var, _Line2, _Varname}, Type]}, Module, ParseState) ->
+parse_type_({ann_type, _Line, [{var, _Varname}, Type]}, Module, ParseState) ->
+    parse_type(Type, Module, ParseState);
+    %why?
+parse_type_({ann_type, _Line, [{var, _Line, _Varname}, Type]}, Module, ParseState) ->
     parse_type(Type, Module, ParseState);
 parse_type_({atom, _Line, Atom}, _Module, ParseState) ->
     {{atom, Atom}, ParseState};
@@ -433,13 +436,13 @@ parse_constraints([ConstraintType | Rest], Substitutions) ->
                 {value,Val} ->
                     case equal_types(Val, Type) of
                         true ->
-                            NewSubstitutions = gb_trees:enter(Variable, Type, Substitutions),
+                            NewSubstitutions = gb_trees:enter({var, Variable}, Type, Substitutions),
                             parse_constraints(Rest, NewSubstitutions);
                         false ->
                             throw({parse_error, Val})
                     end;
                 none ->
-                    NewSubstitutions = gb_trees:insert(Variable, Type, Substitutions),
+                    NewSubstitutions = gb_trees:insert({var, Variable}, Type, Substitutions),
                     parse_constraints(Rest, NewSubstitutions)
             end;
         _ ->
