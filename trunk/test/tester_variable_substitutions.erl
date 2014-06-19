@@ -32,9 +32,9 @@ substitute(FunSpecs, Substitutions) when is_list(FunSpecs)->
     [substitute(FunSpec, Substitutions) ||  FunSpec <- FunSpecs];
 % type variable
 substitute({var,_Line,VarName}, Substitutions) ->
-    case gb_trees:lookup(VarName, Substitutions) of
+    case gb_trees:lookup({var,VarName}, Substitutions) of
         {value, Substitution} -> Substitution;
-        none -> {var,_Line,VarName}
+        none -> {var,VarName}
     end;
 substitute({var,VarName}, Substitutions) ->
     case gb_trees:lookup({var,VarName}, Substitutions) of
@@ -51,8 +51,13 @@ substitute({type, Line,TypeType, Types}, Substitutions) ->
     {type,Line,TypeType,Types2};
 
 substitute({tuple, Types}, Substitutions) ->
-    %Types2 = substitute(Types, Substitutions),
     {tuple, substitute(Types, Substitutions)};
+
+substitute({union, Types}, Substitutions) ->
+    {union, substitute(Types, Substitutions)};
+
+substitute({typedef, Module, Type, Params}, Substitutions) ->
+    {typedef, Module, Type, substitute(Params, Substitutions)};
 
 % user types
 substitute({user_type, Line, TypeType, Types}, Substitutions) ->
@@ -80,7 +85,7 @@ substitute({integer,Line,Value}, _Substitutions) ->
 
 substitute(Unknown, Substitutions) ->
     ct:pal("Unknown: ~w", [Unknown]),
-    ct:pal("~w", [Substitutions]),
+    ct:pal("~w", [gb_trees:to_list(Substitutions)]),
     throw({subst_error, unknown_expression}),
     exit(foobar).
 
