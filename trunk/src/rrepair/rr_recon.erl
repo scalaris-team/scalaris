@@ -300,6 +300,10 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
 
     {ToSend1, ToReq1, OtherDBChunk1} =
         get_full_diff(DBList, OtherDBChunk, ToSend, ToReq, SigSize, VSize),
+    ?DBG_ASSERT2(length(ToSend1) =:= length(lists:ukeysort(1, ToSend1)),
+                 {non_unique_send_list, ToSend, ToSend1}),
+    ?DBG_ASSERT2(length(ToReq1) =:= length(lists:usort(ToReq1)),
+                 {non_unique_req_list, ToReq1}),
 
     %if rest interval is non empty get another chunk
     SyncFinished = intervals:is_empty(RestI),
@@ -449,6 +453,8 @@ on({resolve_req, BinKeys, SigSize} = _Msg,
                 SID = rr_recon_stats:get(session_id, Stats),
                 ?TRACE("Resolve Trivial Session=~p ; ToSend=~p",
                        [SID, length(ReqKeys)]),
+                ?DBG_ASSERT2(length(ReqKeys) =:= length(lists:usort(ReqKeys)),
+                             {non_unique_send_list, ReqKeys}),
                 % note: the resolve request is counted at the initiator and
                 %       thus from_my_node must be set accordingly on this node!
                 send_local(OwnerL, {request_resolve, SID,
@@ -479,8 +485,13 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
                 SID = rr_recon_stats:get(session_id, Stats),
                 {ToSendKeys1, ToReq1, DBChunkTree1} =
                     get_part_diff(KVList, DBChunkTree, [], [], SigSize, VSize),
+
                 ?TRACE("Resolve Bloom Session=~p ; ToSend=~p ; ToReq=~p",
                        [SID, length(ToSendKeys1), length(ToReq1)]),
+                ?DBG_ASSERT2(length(ToSendKeys1) =:= length(lists:usort(ToSendKeys1)),
+                             {non_unique_send_list, ToSendKeys1}),
+                ?DBG_ASSERT2(length(ToReq1) =:= length(lists:usort(ToReq1)),
+                             {non_unique_req_list, ToReq1}),
                 
                 % note: the resolve request was counted at the initiator and
                 %       thus from_my_node must be 0 on this node!
@@ -1228,6 +1239,8 @@ merkle_resolve_leaves_noninit([], HashesReply, DestRRPid, Stats, OwnerL, ToSend,
     % resolve items from inner-leaf comparisons with leaf-hash matches as key_upd:
     KeyUpdResReqs =
         if ToSend =/= [] ->
+               ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
+                            {non_unique_send_list, ToSend}),
                send_local(OwnerL, {request_resolve, SID,
                                    {key_upd_send, DestRRPid, ToSend, []},
                                    [{from_my_node, 1},
@@ -1276,6 +1289,10 @@ merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
     %       thus from_my_node must be set accordingly on this node!
     KeyUpdResReqs =
         if ToSend =/= [] orelse ToReq =/= [] ->
+               ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
+                            {non_unique_send_list, ToSend}),
+               ?DBG_ASSERT2(length(ToReq) =:= length(lists:usort(ToReq)),
+                            {non_unique_req_list, ToReq}),
                send_local(OwnerL, {request_resolve, SID,
                                    {key_upd_send, DestRRPid, ToSend, ToReq},
                                    [{from_my_node, ?IIF(Initiator, 1, 0)},

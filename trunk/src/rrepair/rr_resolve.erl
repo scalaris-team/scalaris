@@ -210,6 +210,10 @@ on({get_entries_response, EntryList}, State =
     FBCount = if ReqKeys =/= [] -> 2;
                  true -> 1
               end,
+    ?DBG_ASSERT2(length(KvvList) =:= length(lists:ukeysort(1, KvvList)),
+                 {non_unique_send_list, KvvList}),
+    ?DBG_ASSERT2(length(ReqKeys) =:= length(lists:usort(ReqKeys)),
+                 {non_unique_req_list, ReqKeys}),
     ResStarted = send_request_resolve(Dest, {?key_upd, KvvList, ReqKeys}, SID,
                                       FromMyNode, FBDest, [], false) * FBCount,
 
