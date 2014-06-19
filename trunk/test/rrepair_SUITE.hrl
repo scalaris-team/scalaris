@@ -42,7 +42,8 @@ repair_default() ->
      simple,         % run one sync round
      multi_round,    % run multiple sync rounds with sync probability 1
      multi_round2,   % run multiple sync rounds with sync probability 0.4
-     parts           % get_chunk with limited items (leads to multiple get_chunk calls, in case of bloom also multiple bloom filters)
+     parts,          % get_chunk with limited items (leads to multiple get_chunk calls, in case of bloom also multiple bloom filters)
+     asymmetric_ring % rrepair in an asymmetric ring with a node covering more than a quadrant (no other checks - it just needs to run successfully)
     ].
 
 regen_special() ->
@@ -364,6 +365,33 @@ session_ttl(Config) ->
     end,
     ok.
 
+asymmetric_ring(Config) ->
+    %parameter
+    Method = proplists:get_value(ru_method, Config),
+    FType = proplists:get_value(ftype, Config),
+    DataCount = 1000,
+
+    RRConf = get_rep_upd_config(Method),
+
+    %build and fill ring
+    Key1 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {1,4}),
+    Key2 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {1,2}),
+    Key3 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {3,4}),
+    Key4 = ?RT:get_split_key(?MINUS_INFINITY, ?PLUS_INFINITY, {7,8}),
+    NodeKeys = [Key1, Key2, Key3, Key4],
+    build_ring(NodeKeys, Config, RRConf),
+
+    _ = db_generator:fill_ring(random, DataCount, [{ftype, FType},
+                                                   {fprob, 90},
+                                                   {distribution, uniform}]),
+    %chose node pair
+    ?proto_sched(start),
+    startSyncRound(NodeKeys),
+    waitForSyncRoundEnd(NodeKeys, false),
+    ?proto_sched(stop),
+    print_status(1, get_db_status()),
+    ok.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -381,8 +409,7 @@ session_ttl(Config) ->
     is_subtype(P1E,         float()),
     is_subtype(CompFun,     fun((T, T) -> boolean())).
 start_sync(Config, NodeCount, DBSize, DBParams, Rounds, P1E, RRConfig, CompFun) ->
-    NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
-    build_symmetric_ring(NodeCount, Config, [RRConfig, {rr_recon_p1e, P1E}]),
+    NodeKeys = build_symmetric_ring(NodeCount, Config, [RRConfig, {rr_recon_p1e, P1E}]),
     Nodes = [begin
                  comm:send_local(NodePid, {get_node_details, comm:this(), [node]}),
                  trace_mpath:thread_yield(),
@@ -534,18 +561,22 @@ get_symmetric_keys(NodeCount) ->
     [element(2, intervals:get_bounds(I)) || I <- intervals:split(intervals:all(), NodeCount)].
 
 build_symmetric_ring(NodeCount, Config, RRConfig) ->
+    NodeKeys = lists:sort(get_symmetric_keys(NodeCount)),
+    build_ring(NodeKeys, Config, RRConfig).
+
+build_ring(NodeKeys, Config, RRConfig) ->
     {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
     % stop ring from previous test case (it may have run into a timeout)
     unittest_helper:stop_ring(),
     %Build ring with NodeCount symmetric nodes
     unittest_helper:make_ring_with_ids(
-      fun() -> get_symmetric_keys(NodeCount) end,
+      NodeKeys,
       [{config, lists:flatten([{log_path, PrivDir}, RRConfig])}]),
     % wait for all nodes to finish their join
-    unittest_helper:check_ring_size_fully_joined(NodeCount),
+    unittest_helper:check_ring_size_fully_joined(length(NodeKeys)),
 %%     % wait a bit for the rm-processes to settle
 %%     timer:sleep(500),
-    ok.
+    NodeKeys.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Analysis
