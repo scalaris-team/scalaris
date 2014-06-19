@@ -509,8 +509,8 @@ make_unique_kvv([_|_] = KVV) ->
 %%      entry for every replica key of the KVV list.
 %%      Note: Assumes, KVs at the same node have the same version and sets
 %%            an (arbitrary) version from these for each replica group.
--spec make_other_kv_tree([Tpl]) -> [Tpl]
-        when is_subtype(Tpl, {?RT:key(), Val::term(), Version::db_dht:version() | -1}).
+-spec make_other_kv_tree([{?RT:key(), Val::term(), db_dht:version()}])
+        -> gb_trees:tree(?RT:key(), db_dht:version()).
 make_other_kv_tree(KVV) ->
     lists:foldl(
       fun({KeyX, _ValX, VersionX}, TreeX) ->
