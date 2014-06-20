@@ -241,7 +241,6 @@ parse_type_({type, _Line, term, []}, _Module, ParseState) ->
     {{typedef, tester, test_any, []}, ParseState};
 parse_type_({ann_type, _Line, [{var, _Varname}, Type]}, Module, ParseState) ->
     parse_type(Type, Module, ParseState);
-    %why?
 parse_type_({ann_type, _Line, [{var, _Line, _Varname}, Type]}, Module, ParseState) ->
     parse_type(Type, Module, ParseState);
 parse_type_({atom, _Line, Atom}, _Module, ParseState) ->
@@ -432,7 +431,7 @@ parse_constraints([], Substitutions) ->
 parse_constraints([ConstraintType | Rest], Substitutions) ->
     case ConstraintType of
         {type,_,constraint,[{atom,_,is_subtype},[{var,_,Variable},Type]]} ->
-            case gb_trees:lookup(Variable, Substitutions) of
+            case gb_trees:lookup({var, Variable}, Substitutions) of
                 {value,Val} ->
                     case equal_types(Val, Type) of
                         true ->
