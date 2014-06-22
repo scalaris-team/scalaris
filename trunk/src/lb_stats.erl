@@ -22,15 +22,14 @@
 
 -include("scalaris.hrl").
 
--define(TRACE(X,Y), ok).
-%-define(TRACE(X,Y), io:format("lb_stats: " ++ X, Y)).
+%-define(TRACE(X,Y), ok).
+-define(TRACE(X,Y), io:format("lb_stats: " ++ X, Y)).
 
 %% get split key based on the request histogram
 -export([get_request_histogram_split_key/3]).
 
 %% for db monitoring
--export([init/0, init_db_rrd/1, update_db_rrd/2, update_db_monitor/2]).
--export([monitor_db/0]).
+-export([init/0, init_db_histogram/1, update_db_histogram/2, update_db_monitor/2]).
 %% Metrics
 -export([get_load_metric/0, get_request_metric/0, default_value/1]).
 %% Triggered by lb_active
@@ -45,14 +44,14 @@
 -type load() :: number().
 
 -type load_metric() :: cpu | mem | reductions.
--type request_metric() :: db_reads | db_writes.
+-type request_metric() :: db_reads | db_writes | db_reads_writes.
 
 %% possible metrics
 % items, cpu, mem, db_reads, db_writes, db_requests,
 % transactions, tx_latency, net_throughput, net_latency
 %% available metrics
 -define(LOAD_METRICS, [cpu, mem, reductions]).
--define(REQUEST_METRICS, [db_reads, db_writes]).
+-define(REQUEST_METRICS, [db_reads, db_writes, db_all]).
 
 %%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -98,13 +97,25 @@ trigger_routine() ->
     monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end),
     monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add_now(ReductionsPerSec, Old) end).
 
--compile({inline, [init_db_rrd/1]}).
+-compile({inline, [update_db_monitor/2]}).
+%% @doc Updates the local rrd for reads or writes and checks for reporting
+-spec update_db_monitor(Type::read | write, Key::?RT:key()) -> ok.
+update_db_monitor(Type, Key) ->
+    case lb_active:is_enabled() andalso
+             (config:read(lb_active_request_metric) =:= Type orelse
+                  config:read(lb_active_request_metric) =:= db_all) of
+        true ->
+            DhtNodeMonitor = pid_groups:get_my(dht_node_monitor),
+            comm:send_local(DhtNodeMonitor, {db_op, Key});
+        _ -> ok
+    end.
+
+-compile({inline, [init_db_histogram/1]}).
 %% @doc Called by dht node process to initialize the db monitors
--spec init_db_rrd(Id::?RT:key()) -> rrd:rrd().
-init_db_rrd(Id) ->
-    Type = config:read(lb_active_db_monitor),
+-spec init_db_histogram(PredId::?RT:key()) -> rrd:rrd().
+init_db_histogram(PredId) ->
     HistogramSize = config:read(lb_active_histogram_size),
-    HistogramType = {histogram_rt, HistogramSize, Id},
+    HistogramType = {histogram_rt, HistogramSize, PredId},
     MonitorResSecs = config:read(lb_active_monitor_resolution) div 1000,
     {MegaSecs, Secs, _Microsecs} = os:timestamp(),
     %% synchronize the start time for all monitors to a divisible of the monitor interval
@@ -112,29 +123,23 @@ init_db_rrd(Id) ->
     % only store newest value in rrd, monitor stores more values
     RRD  = rrd:create(MonitorResSecs*1000000, 1, HistogramType, StartTime),
     Monitor = pid_groups:get_my(monitor),
-    monitor:clear_rrds(Monitor, [{lb_active, Type}]),
-    monitor:monitor_set_value(lb_active, Type, RRD),
+    monitor:clear_rrds(Monitor, [{lb_active, db_histogram}]),
+    monitor:monitor_set_value(lb_active, db_histogram, RRD),
     RRD.
 
--compile({inline, [update_db_monitor/2]}).
+-compile({inline, [update_db_histogram/2]}).
 %% @doc Updates the local rrd for reads or writes and checks for reporting
--spec update_db_monitor(Type::db_reads | db_writes, Value::?RT:key()) -> ok.
-update_db_monitor(Type, Value) ->
-    case monitor_db() andalso config:read(lb_active_db_monitor) =:= Type of
-        true ->
-            DhtNodeMonitor = pid_groups:get_my(dht_node_monitor),
-            comm:send_local(DhtNodeMonitor, {db_op, Value});
-        _ -> ok
-    end.
-
--compile({inline, [update_db_rrd/2]}).
-%% @doc Updates the local rrd for reads or writes and checks for reporting
--spec update_db_rrd(Value::?RT:key(), RRD::rrd:rrd()) -> rrd:rrd().
-update_db_rrd(Key, OldRRD) ->
-    Type = config:read(lb_active_db_monitor),
-    NewRRD = rrd:add_now(Key, OldRRD),
-    monitor:check_report(lb_active, Type, OldRRD, NewRRD),
-    NewRRD.
+-spec update_db_histogram(Key::?RT:key(), OldHistogram::rrd:rrd()) -> rrd:rrd().
+update_db_histogram(Key, OldHistogram) ->
+    NewHistogram = %% only update the histogram if necessary
+        case config:read(lb_active_balance) of
+            requests ->
+                NewHist = rrd:add_now(Key, OldHistogram),
+                monitor:check_report(lb_active, db_histogram, OldHistogram, NewHist),
+                NewHist;
+            _ -> OldHistogram
+        end,
+    NewHistogram.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%     Metrics       %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -156,22 +161,12 @@ get_load_metric(_)          -> throw(metric_not_available).
 
 -spec get_request_metric() -> integer().
 get_request_metric() ->
-    Metric = config:read(lb_active_request_metric),
-    Value = case get_request_metric(Metric) of
+    Value = case get_dht_metric(db_histogram) of
                 unknown -> 0;
                 Val -> erlang:round(Val)
             end,
     %io:format("Requests: ~p~n", [Value]),
     Value.
-
--spec get_request_metric(request_metric()) -> unknown | load().
-get_request_metric(Metric) ->
-    case Metric of
-        db_reads -> get_dht_metric(db_reads);
-        db_writes -> get_dht_metric(db_writes)
-        %db_requests  -> get_request_metric(db_reads, Mode) +
-        %                get_request_metric(db_writes, Mode); %% TODO
-    end.
 
 -spec get_vm_metric(load_metric()) -> unknown | load().
 get_vm_metric(Metric) ->
@@ -302,18 +297,13 @@ default_value(Val)     -> Val.
 
 -spec collect_stats() -> boolean().
 collect_stats() ->
-    Metrics = [cpu, mem, reductions],
-    lists:member(config:read(lb_active_load_metric), Metrics).
+    lists:member(config:read(lb_active_load_metric), ?LOAD_METRICS).
 
 -spec trigger() -> ok.
 trigger() ->
     Interval = config:read(lb_active_monitor_interval) div 1000,
     msg_delay:send_trigger(Interval, {lb_stats_trigger}).
 
--compile({inline, [monitor_db/0]}).
--spec monitor_db() -> boolean().
-monitor_db() ->
-    lb_active:is_enabled() andalso config:read(lb_active_db_monitor) =/= none.
 
 %% @doc config check by lb_active module
 -spec check_config() -> boolean().
@@ -321,8 +311,6 @@ check_config() ->
     config:cfg_is_in(lb_active_load_metric, ?LOAD_METRICS) and
 
     config:cfg_is_in(lb_active_request_metric, ?REQUEST_METRICS) and
-
-    config:cfg_is_in(lb_active_balance_metric, [items, requests]) and
 
     config:cfg_is_integer(lb_active_histogram_size) and
     config:cfg_is_greater_than(lb_active_histogram_size, 0) and
@@ -339,6 +327,4 @@ check_config() ->
     config:cfg_is_greater_than(lb_active_monitor_history, 0) and
 
     config:cfg_is_float(lb_active_request_confidence) and
-    config:cfg_is_greater_than(lb_active_request_confidence, 0.0) and
-
-    config:cfg_is_in(lb_active_db_monitor, [none, db_reads, db_writes]).
+    config:cfg_is_greater_than(lb_active_request_confidence, 0.0).

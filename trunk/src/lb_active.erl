@@ -305,7 +305,7 @@ on({web_debug_info, Requestor}, {MyState, ModuleState} = State) ->
          {"load metric value:", webhelpers:safe_html_string("~p", [lb_stats:get_load_metric()])},
          {"request metric", webhelpers:safe_html_string("~p", [config:read(lb_active_request_metric)])},
          {"request metric value", webhelpers:safe_html_string("~p", [lb_stats:get_request_metric()])},
-         {"balance with", webhelpers:safe_html_string("~p", [config:read(lb_active_balance_metric)])},
+         {"balance with", webhelpers:safe_html_string("~p", [config:read(lb_active_balance)])},
          {"last balance:", webhelpers:safe_html_string("~p", [get_time_last_balance(MyState)])},
          {"pending op:",   webhelpers:safe_html_string("~p", [get_pending_op(MyState)])},
          {"last db monitor init:", webhelpers:safe_html_string("~p", [get_last_db_monitor_init(MyState)])},
@@ -359,12 +359,12 @@ balance_noop(Options) ->
 -spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
 
 handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
-    case lb_stats:monitor_db() of
-        true ->
+    case config:read(lb_active_balance) of
+        requests ->
             MyPredId = dht_node_state:get(DhtState, pred_id),
             DhtNodeMonitor = dht_node_state:get(DhtState, monitor_proc),
-            comm:send_local(DhtNodeMonitor, {db_op_init, MyPredId});
-        false -> ok
+            comm:send_local(DhtNodeMonitor, {db_histogram_init, MyPredId});
+        _ -> ok
     end,
     DhtState;
 
@@ -410,7 +410,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                 end,
 
             {Metric, {SplitKey, TakenLoad}} =
-                case config:read(lb_active_balance_metric) of %% TODO getter
+                case config:read(lb_active_balance) of %% TODO getter
                     items ->
                         {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
                     requests ->
@@ -606,6 +606,8 @@ check_config() ->
     config:cfg_is_bool(lb_active) and
 
     config:cfg_is_in(lb_active_module, [none | ?MODULES]) and
+
+    config:cfg_is_in(lb_active_balance, [items, requests]) and
 
     config:cfg_is_bool(lb_active_use_gossip) and
     config:cfg_is_greater_than(lb_active_gossip_stddev_threshold, 0) and
