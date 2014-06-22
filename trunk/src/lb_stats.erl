@@ -64,9 +64,12 @@ init() ->
             _ = cpu_sup:util(), %% throw away first util value
             {InitialReductions, Timestamp} = get_reductions(),
             set_last_reductions(InitialReductions, Timestamp),
-            Resolution = config:read(lb_active_monitor_resolution),
+            ResolutionSecs = config:read(lb_active_monitor_resolution) div 1000,
+            {MegaSecs, Secs, _Microsecs} = os:timestamp(),
+            %% synchronize the start time for all monitors to a divisible of the monitor interval
+            StartTime = {MegaSecs, Secs - Secs rem ResolutionSecs + ResolutionSecs, 0},
             % only store newest value in rrd, monitor stores more values
-            RRD = rrd:create(Resolution * 1000, 1, gauge),
+            RRD = rrd:create(ResolutionSecs * 1000000, 1, gauge, StartTime),
             monitor:client_monitor_set_value(lb_active, cpu, RRD),
             monitor:client_monitor_set_value(lb_active, mem, RRD),
             monitor:monitor_set_value(lb_active, reductions, RRD);
@@ -93,9 +96,9 @@ trigger_routine() ->
     TimeDiff = timer:now_diff(NewTimestamp, OldTimestamp) div 1000000,
     ReductionsPerSec = (NewReductions - OldReductions) div TimeDiff,
     set_last_reductions(NewReductions, NewTimestamp),
-    monitor:client_monitor_set_value(lb_active, cpu, fun(Old) -> rrd:add_now(CPU, Old) end),
-    monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end),
-    monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add_now(ReductionsPerSec, Old) end).
+    monitor:client_monitor_set_value(lb_active, cpu, fun(Old) -> rrd:add(NewTimestamp, CPU, Old) end),
+    monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add(NewTimestamp, MEM, Old) end),
+    monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add(NewTimestamp, ReductionsPerSec, Old) end).
 
 -compile({inline, [update_db_monitor/2]}).
 %% @doc Updates the local rrd for reads or writes and checks for reporting
