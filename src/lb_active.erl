@@ -27,6 +27,9 @@
 -define(TRACE(X,Y), ok).
 %-define(TRACE(X,Y), io:format("lb_active: " ++ X, Y)).
 
+% debug expressions turned off
+-define(DEBUG(E), ok).
+
 %% startup
 -export([start_link/1, check_config/0, is_enabled/0, check_gossip_modules/2]).
 %% gen_component
@@ -266,6 +269,7 @@ on({balance_success, OpId}, {MyState, ModuleState} = State) ->
 %% received reply at the sliding/jumping node
 on({move, result, {_JumpOrSlide, OpId}, _Status}, {MyState, ModuleState} = State) ->
     ?TRACE("~p status with id ~p: ~p~n", [_JumpOrSlide, OpId, _Status]),
+    ?DEBUG(lb_logger:report_success(_JumpOrSlide, _Status)),
     case get_pending_op(MyState) of
         nil ->
             ?TRACE("Received answer but OpId ~p was not pending~n", [OpId]),
@@ -489,6 +493,7 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                                         heavy_node = lb_info:get_node(HeavyNode),
                                         target = SplitKey,
                                         data_time = OldestDataTime},
+                            ?DEBUG(lb_logger:report_op(Type, Metric)),
 
                             LBModule = pid_groups:get_my(?MODULE),
                             comm:send_local(LBModule, {balance_phase1, Op})
