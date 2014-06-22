@@ -63,8 +63,8 @@ init() ->
             _ = application:start(sasl),   %% required by os_mon.
             _ = application:start(os_mon), %% for monitoring cpu and memory usage.
             _ = cpu_sup:util(), %% throw away first util value
-            InitialReductions = get_reductions(),
-            set_last_reductions(InitialReductions),
+            {InitialReductions, Timestamp} = get_reductions(),
+            set_last_reductions(InitialReductions, Timestamp),
             Resolution = config:read(lb_active_monitor_resolution),
             % only store newest value in rrd, monitor stores more values
             RRD = rrd:create(Resolution * 1000, 1, gauge),
@@ -89,12 +89,14 @@ trigger_routine() ->
                {total_memory, TotalMemory}] ->
                   FreeMemory / TotalMemory * 100
           end,
-    TotalReductions = get_reductions(),
-    Reductions = TotalReductions - get_last_reductions(),
-    set_last_reductions(TotalReductions),
+    {NewReductions, NewTimestamp} = get_reductions(),
+    {OldReductions, OldTimestamp} = get_last_reductions(),
+    TimeDiff = timer:now_diff(NewTimestamp, OldTimestamp) div 1000000,
+    ReductionsPerSec = (NewReductions - OldReductions) div TimeDiff,
+    set_last_reductions(NewReductions, NewTimestamp),
     monitor:client_monitor_set_value(lb_active, cpu, fun(Old) -> rrd:add_now(CPU, Old) end),
     monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add_now(MEM, Old) end),
-    monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add_now(Reductions, Old) end).
+    monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add_now(ReductionsPerSec, Old) end).
 
 -compile({inline, [init_db_rrd/1]}).
 %% @doc Called by dht node process to initialize the db monitors
@@ -272,7 +274,7 @@ get_request_histogram_split_key(TargetLoad, Direction, Items) ->
     end.
 
 %% @doc get the reductions of all processes in the pid group
--spec get_reductions() -> non_neg_integer().
+-spec get_reductions() -> {non_neg_integer(), erlang:timestamp()}.
 get_reductions() ->
     MyGroupPids = pid_groups:my_members(),
     AllReductions =
@@ -280,14 +282,14 @@ get_reductions() ->
              {reductions, N} = erlang:process_info(Pid, reductions),
              N
          end || Pid <- MyGroupPids, Pid =/= self()],
-    lists:sum(AllReductions).
+    {lists:sum(AllReductions), os:timestamp()}.
 
--spec set_last_reductions(non_neg_integer()) -> ok.
-set_last_reductions(Reductions) ->
-    erlang:put(reductions, Reductions),
+-spec set_last_reductions(non_neg_integer(), erlang:timestamp()) -> ok.
+set_last_reductions(Reductions, Timestamp) ->
+    erlang:put(reductions, {Reductions, Timestamp}),
     ok.
 
--spec get_last_reductions() -> non_neg_integer().
+-spec get_last_reductions() -> {non_neg_integer(), erlang:timestamp()}.
 get_last_reductions() ->
     erlang:get(reductions).
 
