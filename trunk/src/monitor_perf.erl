@@ -36,7 +36,7 @@
          perf_tx   = ?required(state, perf_tx)   :: rrd:rrd()
         }).
 
--type state() :: {AllNodes::#state{}, CollectingAtLeader::#state{}, BenchPid::pid(), IgnoreBenchTimeout::boolean()}.
+-type state() :: {AllNodes::#state{}, CollectingAtLeader::#state{}, BenchPid::pid() | ok, IgnoreBenchTimeout::boolean()}.
 -type message() ::
     {bench} |
     {bench_result, Time::erlang_timestamp(), TimeInMs::non_neg_integer()} |
@@ -343,18 +343,19 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init(null) -> state().
 init(null) ->
-    case get_bench_interval() of
-        0 -> ok;
-        I -> FirstDelay = randoms:rand_uniform(1, I + 1),
-             msg_delay:send_trigger(FirstDelay, {bench}),
-             msg_delay:send_trigger(get_gather_interval(), {propagate}),
-             msg_delay:send_trigger(10, {collect_system_stats})
-    end,
-    init_bench(),
+    BenchPid =
+        case get_bench_interval() of
+            0 -> ok;
+            I -> FirstDelay = randoms:rand_uniform(1, I + 1),
+                 msg_delay:send_trigger(FirstDelay, {bench}),
+                 msg_delay:send_trigger(get_gather_interval(), {propagate}),
+                 init_bench(),
+                 Self = self(),
+                 erlang:spawn(fun() -> bench_service(Self) end)
+        end,
     init_system_stats(),
+    msg_delay:send_trigger(10, {collect_system_stats}),
     Now = os:timestamp(),
-    Self = self(),
-    BenchPid = erlang:spawn(fun() -> bench_service(Self) end),
     State = #state{id = uid:get_global_uid(),
                    perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
                    perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now),
