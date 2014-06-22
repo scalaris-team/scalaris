@@ -374,7 +374,8 @@ handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
 handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options}, DhtState) ->
     %% check if we are the correct node
     case lb_info:get_node(HeavyNode) =/= dht_node_state:get(DhtState, node) of
-        true -> ?TRACE("I was mistaken for the HeavyNode. Doing nothing~n", []), ok;
+        true -> ?TRACE("I was mistaken for the HeavyNode. Doing nothing~n", []),
+                balance_noop(Options);
         false ->
             %% get our load info again to have the newest data available
             MyNode = lb_info:new(dht_node_state:details(DhtState)),
