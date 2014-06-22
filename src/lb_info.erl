@@ -57,7 +57,7 @@ new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
     Requests = lb_stats:get_request_metric(),
     SystemLoad = lb_stats:get_load_metric(),
-    Load = try %% TODO coefficients
+    Load = try
                (Items + Requests) * SystemLoad
            catch
                error:badarith -> unknown
