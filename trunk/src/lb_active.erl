@@ -39,6 +39,7 @@
 % Load Balancing
 -export([balance_nodes/3, balance_nodes/4, balance_noop/1]).
 -export([get_last_db_monitor_init/1]).
+-export([requests_balance/0]).
 
 -ifdef(with_export_type_support).
 -export_type([dht_message/0, state/0]).
@@ -62,7 +63,6 @@
 -type options() :: [tuple()].
 
 -type message() :: {lb_stats_trigger} |
-                   {lb_active_trigger} |
                    {reset_monitors} |
                    {gossip_reply, LightNode::lb_info:lb_info(), HeavyNode::lb_info:lb_info(), LightNodeSucc::lb_info:lb_info(),
                     Options::options(), {gossip_get_values_best_response, LoadInfo::gossip_load:load_info()}} |
@@ -83,7 +83,8 @@
 
 -record(my_state, {last_balance = os:timestamp() :: erlang:timestamp(),
                    last_db_monitor_reset = os:timestamp() :: erlang:timestamp(),
-                   pending_op = nil :: lb_op() | nil}).
+                   pending_op = nil :: lb_op() | nil
+                  }).
 
 -type my_state() :: #my_state{}.
 
@@ -112,7 +113,6 @@ init([]) ->
        self(), ?MODULE, fun rm_filter/3,
        fun(_Pid, _Tag, _Old, _New, _Reason) -> reset_monitors() end, inf),
     reset_monitors(),
-
     lb_stats:init(),
     lb_stats:trigger(),
     ModuleInitState = call_module(init, []),
@@ -363,8 +363,8 @@ balance_noop(Options) ->
 -spec handle_dht_msg(dht_message(), dht_node_state:state()) -> dht_node_state:state().
 
 handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
-    case config:read(lb_active_balance) of
-        requests ->
+    case requests_balance() of
+        true ->
             MyPredId = dht_node_state:get(DhtState, pred_id),
             DhtNodeMonitor = dht_node_state:get(DhtState, monitor_proc),
             comm:send_local(DhtNodeMonitor, {db_histogram_init, MyPredId});
@@ -414,10 +414,10 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                 end,
 
             {Metric, {SplitKey, TakenLoad}} =
-                case config:read(lb_active_balance) of %% TODO getter
-                    items ->
+                case requests_balance() of
+                    false ->
                         {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
-                    requests ->
+                    true ->
                         case lb_stats:get_request_histogram_split_key(TargetLoadRequests, Direction,
                                                                       lb_info:get_items(HeavyNode)) of
                             %% TODO fall back in a more clever way / abort lb request
@@ -514,6 +514,11 @@ handle_dht_msg(Msg, DhtState) when element(1,Msg) =:= lb_active ->
 -spec is_enabled() -> boolean().
 is_enabled() ->
     config:read(lb_active).
+
+-compile({inline, [requests_balance/0]}).
+-spec requests_balance() -> boolean().
+requests_balance() ->
+    config:read(lb_active_balance) =:= requests.
 
 -spec call_module(atom(), list()) -> term().
 call_module(Fun, Args) ->

@@ -44,7 +44,7 @@
 -type load() :: number().
 
 -type load_metric() :: cpu | mem | reductions.
--type request_metric() :: db_reads | db_writes | db_reads_writes.
+-type request_metric() :: db_ops.
 
 %% possible metrics
 % items, cpu, mem, db_reads, db_writes, db_requests,
@@ -53,8 +53,7 @@
 -define(LOAD_METRICS, [cpu, mem, reductions]).
 -define(REQUEST_METRICS, [db_reads, db_writes, db_all]).
 
-%%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%%%%%%%%%%%%%%%%%%%%%%%% Monitoring values %%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec init() -> ok.
 init() ->
     case collect_stats() of
@@ -164,12 +163,13 @@ get_load_metric(_)          -> throw(metric_not_available).
 
 -spec get_request_metric() -> integer().
 get_request_metric() ->
-    Value = case get_dht_metric(db_histogram) of
-                unknown -> 0;
-                Val -> erlang:round(Val)
-            end,
-    %io:format("Requests: ~p~n", [Value]),
-    Value.
+    case lb_active:requests_balance() of
+        true -> case get_dht_metric(db_ops) of
+                    unknown -> 0;
+                    Val -> erlang:round(Val)
+                end;
+        _ -> 0
+    end.
 
 -spec get_vm_metric(load_metric()) -> unknown | load().
 get_vm_metric(Metric) ->
