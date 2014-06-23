@@ -32,13 +32,13 @@
 
 all() ->
     [
-     {group, session_ttl},
+     {group, gsession_ttl},
      {group, repair}
     ].
 
 groups() ->
     [
-     {session_ttl,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], [session_ttl]},
+     {gsession_ttl,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], [session_ttl]},
      {repair, [sequence],
       [
        {upd_trivial,  [{repeat_until_any_fail, ?NUM_EXECUTIONS}], repair_default()},
