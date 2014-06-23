@@ -606,7 +606,7 @@ get_ring_data(Type) ->
                                       {succ, comm:make_local(node:pidX(Succ))}, ok}
                              % we are in a separate process, any message in the
                              % message box should not influence the calling process
-                                 after 500 -> {DhtNode, empty, [], {pred, null}, {succ, null}, timeout}
+                                 after 750 -> {DhtNode, empty, [], {pred, null}, {succ, null}, timeout}
                              end
                          end || DhtNode <- DHTNodes]),
                   Self ! {data, Data}
