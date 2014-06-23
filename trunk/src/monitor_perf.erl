@@ -112,7 +112,9 @@ init_system_stats() ->
     monitor:client_monitor_set_value(
       ?MODULE, 'send_count', rrd:create(15 * 1000000, 1, gauge)),
     monitor:client_monitor_set_value(
-      ?MODULE, 'send_bytes', rrd:create(15 * 1000000, 1, gauge)).
+      ?MODULE, 'send_bytes', rrd:create(15 * 1000000, 1, gauge)),
+
+    collect_system_stats().
 
 -spec collect_system_stats() -> ok.
 collect_system_stats() ->
