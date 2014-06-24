@@ -1162,8 +1162,9 @@ merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply) ->
     % TODO: make extra version binary for better compression (?)
     % TODO: use formulae of compress_kv_list_p1e/4 for the version size (?) - have to have the same info on the other node!
     Bucket = merkle_tree:get_bucket(LeafNode),
-    BucketSize = length(Bucket),
+    BucketSize = merkle_tree:get_item_count(Bucket),
     ?DBG_ASSERT(BucketSize < 255),
+    ?DBG_ASSERT(BucketSize =:= length(Bucket)),
     HashesReply1 = <<HashesReply/bitstring, BucketSize:8>>,
 
     % note: we can reach the best compression if values and versions align to
