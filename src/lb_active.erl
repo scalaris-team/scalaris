@@ -387,126 +387,125 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
        Sliding ->
            ?TRACE("Currently performing a slide operation.~n", []),
            balance_noop(Options);
-        true ->
-            %% get our load info again to have the newest data available
-            MyNode = lb_info:new(dht_node_state:details(DhtState)),
-            JumpOrSlide = %case lb_info:neighbors(MyNode, LightNode) of
-                case LightNodeSucc =:= nil of
-                    true  -> slide;
-                    false -> jump
-                end,
+       true ->
+           %% get our load info again to have the newest data available
+           MyNode = lb_info:new(dht_node_state:details(DhtState)),
+           JumpOrSlide = %case lb_info:neighbors(MyNode, LightNode) of
+               case LightNodeSucc =:= nil of
+                   true  -> slide;
+                   false -> jump
+               end,
 
-            ProposedTargetLoadItems = lb_info:get_target_load(items, JumpOrSlide, MyNode, LightNode),
-            ProposedTargetLoadRequests = lb_info:get_target_load(requests, JumpOrSlide, MyNode, LightNode),
+           ProposedTargetLoadItems = lb_info:get_target_load(items, JumpOrSlide, MyNode, LightNode),
+           ProposedTargetLoadRequests = lb_info:get_target_load(requests, JumpOrSlide, MyNode, LightNode),
 
-            {TargetLoadItems, TargetLoadRequests} =
-                case gossip_available(Options) of
-                    true -> AvgItems = proplists:get_value(avgItems, Options),
-                            AvgRequests = proplists:get_value(avgRequests, Options),
-                            %% don't take away more items than the average
-                            {?IIF(ProposedTargetLoadItems > AvgItems,
-                                  trunc(AvgItems), ProposedTargetLoadItems),
-                             ?IIF(ProposedTargetLoadRequests > AvgRequests,
-                                  trunc(AvgRequests), ProposedTargetLoadRequests)
-                            };
-                    false -> {ProposedTargetLoadItems, ProposedTargetLoadRequests}
-                end,
+           {TargetLoadItems, TargetLoadRequests} =
+               case gossip_available(Options) of
+                   true -> AvgItems = proplists:get_value(avgItems, Options),
+                           AvgRequests = proplists:get_value(avgRequests, Options),
+                           %% don't take away more items than the average
+                           {?IIF(ProposedTargetLoadItems > AvgItems,
+                                 trunc(AvgItems), ProposedTargetLoadItems),
+                            ?IIF(ProposedTargetLoadRequests > AvgRequests,
+                                 trunc(AvgRequests), ProposedTargetLoadRequests)
+                           };
+                   false -> {ProposedTargetLoadItems, ProposedTargetLoadRequests}
+               end,
 
-            {From, To, Direction} =
-                case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
-                    true  -> %% Jump or heavy node is succ of light node
-                        {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward};
-                    false -> %% Light node is succ of heavy node
-                        {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
-                end,
+           {From, To, Direction} =
+               case JumpOrSlide =:= jump orelse lb_info:is_succ(MyNode, LightNode) of
+                   true  -> %% Jump or heavy node is succ of light node
+                       {dht_node_state:get(DhtState, pred_id), dht_node_state:get(DhtState, node_id), forward};
+                   false -> %% Light node is succ of heavy node
+                       {dht_node_state:get(DhtState, node_id), dht_node_state:get(DhtState, pred_id), backward}
+               end,
 
-            {Metric, {SplitKey, TakenLoad}} =
-                case requests_balance() of
-                    false ->
-                        {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
-                    true ->
-                        case lb_stats:get_request_histogram_split_key(TargetLoadRequests, Direction,
-                                                                      lb_info:get_items(HeavyNode)) of
-                            %% TODO fall back in a more clever way / abort lb request
-                            failed ->
-                                log:log(warn, "get_request_histogram failed. falling back to item balancing.~n", []),
-                                {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
-                            Val -> {requests, Val}
-                        end
-                end,
+           {Metric, {SplitKey, TakenLoad}} =
+               case requests_balance() of
+                   false ->
+                       {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
+                   true ->
+                       case lb_stats:get_request_histogram_split_key(TargetLoadRequests, Direction,
+                                                                     lb_info:get_items(HeavyNode)) of
+                           %% TODO fall back in a more clever way / abort lb request
+                           failed ->
+                               log:log(warn, "get_request_histogram failed. falling back to item balancing.~n", []),
+                               {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
+                           Val -> {requests, Val}
+                       end
+               end,
 
-            ?TRACE("SplitKey: ~p TargetLoadItems: ~p TargetLoadRequests: ~p TakenLoad: ~p Metric: ~p~n",
-                   [SplitKey, TargetLoadItems, TargetLoadRequests, TakenLoad, Metric]),
+           ?TRACE("SplitKey: ~p TargetLoadItems: ~p TargetLoadRequests: ~p TakenLoad: ~p Metric: ~p~n",
+                  [SplitKey, TargetLoadItems, TargetLoadRequests, TakenLoad, Metric]),
 
-            IsSimulation = is_simulation(Options),
-            InMyRange = intervals:in(SplitKey, dht_node_state:get(DhtState, my_range)),
-            NotMyId = SplitKey =/= dht_node_state:get(DhtState, node_id),
+           IsSimulation = is_simulation(Options),
+           InMyRange = intervals:in(SplitKey, dht_node_state:get(DhtState, my_range)),
+           NotMyId = SplitKey =/= dht_node_state:get(DhtState, node_id),
 
-            if
-               IsSimulation -> %% compute result of simulation and reply
-                    ReqId = proplists:get_value(simulate, Options),
-                    LoadChange =
-                        case JumpOrSlide of
-                            slide -> lb_info:get_load_change_slide(Metric, TakenLoad, HeavyNode, LightNode);
-                            jump  -> lb_info:get_load_change_jump(Metric, TakenLoad, HeavyNode, LightNode, LightNodeSucc)
-                        end,
-                    ReplyTo = proplists:get_value(reply_to, Options),
-                    Id = proplists:get_value(id, Options),
-                    comm:send(ReplyTo, {simulation_result, Id, ReqId, {Metric, LoadChange}});
+           if IsSimulation -> %% compute result of simulation and reply
+                   ReqId = proplists:get_value(simulate, Options),
+                   LoadChange =
+                       case JumpOrSlide of
+                           slide -> lb_info:get_load_change_slide(Metric, TakenLoad, HeavyNode, LightNode);
+                           jump  -> lb_info:get_load_change_jump(Metric, TakenLoad, HeavyNode, LightNode, LightNodeSucc)
+                       end,
+                   ReplyTo = proplists:get_value(reply_to, Options),
+                   Id = proplists:get_value(id, Options),
+                   comm:send(ReplyTo, {simulation_result, Id, ReqId, {Metric, LoadChange}});
 
-                InMyRange andalso NotMyId -> %% perform balancing
-                    StdDevTest =
-                        case gossip_available(Options) of
-                            true ->
-                                S = config:read(lb_active_gossip_stddev_threshold),
-                                DhtSize = proplists:get_value(dht_size, Options),
-                                StdDev =
-                                    if Metric =:= items ->
-                                           proplists:get_value(stddevItems, Options);
-                                       Metric =:= requests ->
-                                           proplists:get_value(stddevRequests, Options)
-                                    end,
-                                Variance = StdDev * StdDev,
-                                VarianceChange =
-                                    case JumpOrSlide of
-                                        slide -> lb_info:get_load_change_slide(Metric, TakenLoad, DhtSize, HeavyNode, LightNode);
-                                        jump -> lb_info:get_load_change_jump(Metric, TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc)
-                                    end,
-                                VarianceNew = Variance + VarianceChange,
-                                StdDevNew = ?IIF(VarianceNew >= 0, math:sqrt(VarianceNew), StdDev),
-                                ?TRACE("New StdDev: ~p Old StdDev: ~p Metric: ~p~n", [StdDevNew, StdDev, Metric]),
-                                StdDevNew < StdDev * (1 - S / DhtSize);
-                            %% gossip not available, skipping this test
-                            false -> true
-                        end,
+               InMyRange andalso NotMyId -> %% perform balancing
+                   StdDevTest =
+                       case gossip_available(Options) of
+                           true ->
+                               S = config:read(lb_active_gossip_stddev_threshold),
+                               DhtSize = proplists:get_value(dht_size, Options),
+                               StdDev =
+                                   if Metric =:= items ->
+                                          proplists:get_value(stddevItems, Options);
+                                      Metric =:= requests ->
+                                          proplists:get_value(stddevRequests, Options)
+                                   end,
+                               Variance = StdDev * StdDev,
+                               VarianceChange =
+                                   case JumpOrSlide of
+                                       slide -> lb_info:get_load_change_slide(Metric, TakenLoad, DhtSize, HeavyNode, LightNode);
+                                       jump -> lb_info:get_load_change_jump(Metric, TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc)
+                                   end,
+                               VarianceNew = Variance + VarianceChange,
+                               StdDevNew = ?IIF(VarianceNew >= 0, math:sqrt(VarianceNew), StdDev),
+                               ?TRACE("New StdDev: ~p Old StdDev: ~p Metric: ~p~n", [StdDevNew, StdDev, Metric]),
+                               StdDevNew < StdDev * (1 - S / DhtSize);
+                           %% gossip not available, skipping this test
+                           false -> true
+                       end,
 
-                    case StdDevTest andalso TakenLoad > 0 of
-                        false -> ?TRACE("No balancing: stddev was not reduced enough.~n", []);
-                        true ->
-                            ?TRACE("Sending out lb op.~n", []),
-                            OpId = uid:get_global_uid(),
-                            Type =  if  JumpOrSlide =:= jump -> jump;
-                                        Direction =:= forward -> slide_succ;
-                                        Direction =:= backward -> slide_pred
-                                    end,
-                            OldestDataTime = if Type =:= jump ->
-                                                    lb_info:get_oldest_data_time([LightNode, HeavyNode, LightNodeSucc]);
-                                                true ->
-                                                    lb_info:get_oldest_data_time([LightNode, HeavyNode])
-                                             end,
-                            Op = #lb_op{id = OpId, type = Type,
-                                        light_node = lb_info:get_node(LightNode),
-                                        light_node_succ = lb_info:get_succ(LightNode),
-                                        heavy_node = lb_info:get_node(HeavyNode),
-                                        target = SplitKey,
-                                        data_time = OldestDataTime},
-                            ?DEBUG(lb_logger:report_op(Type, Metric)),
+                   case StdDevTest andalso TakenLoad > 0 of
+                       false -> ?TRACE("No balancing: stddev was not reduced enough.~n", []);
+                       true ->
+                           ?TRACE("Sending out lb op.~n", []),
+                           OpId = uid:get_global_uid(),
+                           Type =  if  JumpOrSlide =:= jump -> jump;
+                                       Direction =:= forward -> slide_succ;
+                                       Direction =:= backward -> slide_pred
+                                   end,
+                           OldestDataTime = if Type =:= jump ->
+                                                   lb_info:get_oldest_data_time([LightNode, HeavyNode, LightNodeSucc]);
+                                               true ->
+                                                   lb_info:get_oldest_data_time([LightNode, HeavyNode])
+                                            end,
+                           Op = #lb_op{id = OpId, type = Type,
+                                       light_node = lb_info:get_node(LightNode),
+                                       light_node_succ = lb_info:get_succ(LightNode),
+                                       heavy_node = lb_info:get_node(HeavyNode),
+                                       target = SplitKey,
+                                       data_time = OldestDataTime},
+                           ?DEBUG(lb_logger:report_op(Type, Metric)),
 
-                            LBModule = pid_groups:get_my(?MODULE),
-                            comm:send_local(LBModule, {balance_phase1, Op})
-                    end;
-                true -> ?TRACE("Invalid target chosen: ~p InMyRange: ~p NotMyId: ~p~n", [SplitKey, InMyRange, NotMyId])
-            end
+                           LBModule = pid_groups:get_my(?MODULE),
+                           comm:send_local(LBModule, {balance_phase1, Op})
+                   end;
+               true -> ?TRACE("Invalid target chosen: ~p InMyRange: ~p NotMyId: ~p~n", [SplitKey, InMyRange, NotMyId])
+           end
 
     end,
     DhtState;
