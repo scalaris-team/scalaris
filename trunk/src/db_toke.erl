@@ -250,18 +250,20 @@ foldr_helper({DB, _FileName}, Fun, Acc, Interval, MaxNum) ->
 -spec get_all_keys(pid(), db_backend_beh:interval(), -1 | non_neg_integer()) ->
     [key()].
 get_all_keys(DB, Interval, MaxNum) ->
-    {_Rest, Keys} = toke_drv:fold(fun(_Key, _Entry, {0, _} = AccIn) ->
-                              AccIn;
-                         (Key, _Entry, {Max, KeyAcc} = AccIn) ->
-                          DeCoded = ?OUT(Key),
-                          case is_in(Interval, DeCoded) of
+    Keys = toke_drv:fold(fun(Key, _Entry, AccIn) ->
+                              [?OUT(Key) | AccIn]
+                         end, [], DB),
+    {_, In} = lists:foldl(fun(_, {0, _} = AccIn) ->
+                                  AccIn;
+                             (Key, {Max, KeyAcc} = AccIn) ->
+                          case is_in(Interval, Key) of
                               true ->
-                                  {Max - 1, [DeCoded | KeyAcc]};
+                                  {Max - 1, [Key | KeyAcc]};
                               _ ->
                                   AccIn
                           end
-                  end, {MaxNum, []}, DB),
-    Keys.
+                end, {MaxNum, []}, lists:sort(Keys)),
+    In.
 
 
 is_in({Key}, OtherKey) -> Key =:= OtherKey;
