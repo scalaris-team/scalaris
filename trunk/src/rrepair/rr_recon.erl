@@ -29,7 +29,7 @@
 -export([map_key_to_interval/2, map_key_to_quadrant/2, map_interval/2,
          quadrant_intervals/0]).
 -export([get_chunk_kv/1, get_chunk_kvv/1, get_chunk_filter/1]).
-%-export([compress_kv_list/4, calc_signature_size_1_to_n/3, calc_signature_size_n_pair/3]).
+%-export([compress_kv_list/4, calc_signature_size_1_to_n/3, calc_signature_size_nm_pair/4]).
 
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
@@ -386,8 +386,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   {BuildTime, {DBChunk, SigSize, VSize}} =
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
-                                        NewKVList, bloom:item_count(BF),
-                                        FullDiffSize, get_p1e())
+                                        NewKVList, FullDiffSize,
+                                        bloom:item_count(BF), get_p1e())
                               end),
                   
                   send(DestReconPid,
@@ -787,16 +787,23 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Calculates the minimum number of bits needed to have a hash collision
-%%      probability of P1E, given we compare N hashes pairwise with each other.
--spec calc_signature_size_n_pair(N::non_neg_integer(), P1E::float(),
-                                 MaxSize::signature_size())
+%%      probability of P1E, given we compare N hashes with M other hashes
+%%      pairwise with each other (hashes in M being part of hashes in N or the
+%%      other way around, depending on which is greater).
+-spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
+                                  P1E::float(), MaxSize::signature_size())
         -> SigSize::signature_size().
-calc_signature_size_n_pair(0, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(0, _, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_n_pair(1, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(_, 0, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_n_pair(N, P1E, MaxSize) when P1E > 0 ->
-    erlang:min(MaxSize, erlang:max(1, util:ceil(util:log2(N * (N - 1) / P1E) - 1))).
+calc_signature_size_nm_pair(1, 1, P1E, _MaxSize) when P1E > 0 ->
+    1;
+calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso M =< N ->
+    erlang:min(MaxSize,
+               erlang:max(1, util:ceil(util:log2((2*N*M - M*M - M) / P1E) - 1)));
+calc_signature_size_nm_pair(N, M, P1E, MaxSize) when M > N ->
+    calc_signature_size_nm_pair(M, N, P1E, MaxSize).
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
@@ -1592,12 +1599,17 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Creates a compressed key-value list comparing every item in Items
+%%      (at most ItemCount) with OtherItemCount other items and expecting at
+%%      most min(ItemCount, OtherItemCount) version comparisons.
+%%      Sets the bit sizes to have an error below P1E.
 -spec compress_kv_list_p1e(Items::db_chunk_kv(), ItemCount::non_neg_integer(),
-                           VCompareCount::non_neg_integer(), P1E::float())
+                           OtherItemCount::non_neg_integer(), P1E::float())
         -> {DBChunk::bitstring(), SigSize::signature_size(), VSize::signature_size()}.
-compress_kv_list_p1e(DBItems, ItemCount, VCompareCount, P1E) ->
+compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
+    VCompareCount = erlang:min(ItemCount, OtherItemCount),
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize0 = calc_signature_size_n_pair(ItemCount, P1E, 128),
+    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E, 128),
     % note: we have n one-to-one comparisons, assuming the probability of a
     %       failure in a single one-to-one comparison is p, the overall
     %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)

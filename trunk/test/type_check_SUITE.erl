@@ -442,7 +442,7 @@ tester_type_check_rrepair(_Config) ->
              {begin_sync, 3}, %% tries to send messages
              {shutdown, 2}, %% tries to send messages
              {calc_signature_size_1_to_n, 3}, %% needs float > 0
-             {calc_signature_size_n_pair, 3}, %% needs float > 0
+             {calc_signature_size_nm_pair, 4}, %% needs float > 0
              {compress_kv_list_p1e, 4}, %% needs float > 0, =< 1
              {decompress_kv_list, 4}, %% needs a special binary to correspond to a number of bits
              {decompress_k_list, 3}, %% needs a special binary to correspond to a number of bits
