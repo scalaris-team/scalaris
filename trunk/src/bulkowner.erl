@@ -70,12 +70,12 @@ issue_send_reply(Id, Target, Msg, Parents) ->
     comm:send_local(DHTNode, {bulkowner, reply, Id, Target, Msg, Parents}).
 
 -spec issue_bulk_distribute(ID::uid:global_uid(), atom(), pos_integer(),
-                           comm:message(), [{string(), term()}] | {ets, ets:tab()}) -> ok.
+                           comm:message(), [{?RT:key(), string(), term()}] | {ets, ets:tab()}) -> ok.
 issue_bulk_distribute(Id, Proc, Pos, Msg, Data) ->
     issue_bulk_distribute(Id, Proc, Pos, Msg, Data, intervals:all()).
 
 -spec issue_bulk_distribute(ID::uid:global_uid(), atom(), pos_integer(),
-                           comm:message(), [{string(), term()}] | {ets, ets:tab()},
+                           comm:message(), [{?RT:key(), string(), term()}] | {ets, ets:tab()},
                            intervals:interval()) -> ok.
 issue_bulk_distribute(Id, Proc, Pos, Msg, Data, Interval) ->
     DHTNode = pid_groups:find_a(dht_node),
@@ -340,8 +340,8 @@ handle_delivery(Msg, _MyRange, _Id, _Parents, State) ->
             [pid_groups:pid_to_name(self()), Msg]),
     State.
 
--spec get_range_data({ets, db_ets:db()} | [{nonempty_string(), term()},...],
-                     intervals:interval()) -> [{nonempty_string(), term()}].
+-spec get_range_data({ets, db_ets:db()} | [{?RT:key(), nonempty_string(), term()},...],
+                     intervals:interval()) -> [{?RT:key(), nonempty_string(), term()}].
 get_range_data({ets, ETS}, Range) ->
     lists:foldl(fun(Interval, Acc1) ->
                     db_ets:foldl(ETS,
