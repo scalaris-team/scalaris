@@ -378,10 +378,16 @@ handle_dht_msg({lb_active, reset_db_monitors}, DhtState) ->
 %% the jump or slide message to the LightNode.
 handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options}, DhtState) ->
     %% check if we are the correct node
-    case lb_info:get_node(HeavyNode) =/= dht_node_state:get(DhtState, node) of
-        true -> ?TRACE("I was mistaken for the HeavyNode. Doing nothing~n", []),
-                balance_noop(Options);
-        false ->
+    IncorrectNode = lb_info:get_node(HeavyNode) =/= dht_node_state:get(DhtState, node),
+    Sliding = slide_op:is_slide(dht_node_state:get(DhtState, slide_pred)) orelse
+                  slide_op:is_slide(dht_node_state:get(DhtState, slide_succ)),
+    if IncorrectNode ->
+           ?TRACE("I was mistaken for the HeavyNode. Doing nothing~n", []),
+           balance_noop(Options);
+       Sliding ->
+           ?TRACE("Currently performing a slide operation.~n", []),
+           balance_noop(Options);
+        true ->
             %% get our load info again to have the newest data available
             MyNode = lb_info:new(dht_node_state:details(DhtState)),
             JumpOrSlide = %case lb_info:neighbors(MyNode, LightNode) of
