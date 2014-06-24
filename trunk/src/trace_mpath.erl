@@ -164,10 +164,14 @@ infected() ->
 -spec clear_infection() -> ok.
 clear_infection() ->
     case erlang:erase(trace_mpath) of
-        undefined -> ok;
-        PState    -> erlang:put(trace_mpath_bak, PState),
-                     ok
-    end.
+        undefined ->
+            %% remove _bak entry as otherwise an old _bak may be
+            %% restored in restore_infection
+            erlang:erase(trace_mpath_bak);
+        PState    ->
+            erlang:put(trace_mpath_bak, PState)
+    end,
+    ok.
 
 -spec restore_infection() -> ok.
 restore_infection() ->
