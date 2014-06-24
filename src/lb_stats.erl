@@ -101,7 +101,7 @@ trigger_routine() ->
 
 -compile({inline, [update_db_monitor/2]}).
 %% @doc Updates the local rrd for reads or writes and checks for reporting
--spec update_db_monitor(Type::read | write, Key::?RT:key()) -> ok.
+-spec update_db_monitor(Type::db_reads | db_writes, Key::?RT:key()) -> ok.
 update_db_monitor(Type, Key) ->
     case lb_active:is_enabled() andalso
              (config:read(lb_active_request_metric) =:= Type orelse
