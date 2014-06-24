@@ -63,7 +63,7 @@ prop_get(Data) ->
             fun(Entry, AccIn) ->
                 [?TEST_DB:get(DB1, element(1, Entry)) | AccIn]
             end, [], ScrubbedData),
-    ?equals_w_note(lists:sort(ScrubbedData), lists:sort(GetData), "check_db_put1"),
+    compare_lists(ScrubbedData, GetData, "check_db_put1"),
     check_db(DB1, GetData, "check_db_put1"),
     ?TEST_DB:?CLOSE(DB1),
     true.
@@ -116,14 +116,17 @@ prop_foldl(Data, Interval, MaxNum) ->
     %% we expect all data from fold to be in reversed order because of list
     %% accumulation. we need to reverse ScrubbedData, ExpInInterval and
     %% ExpInIntervalCounted.
-    ?equals_w_note(lists:reverse(ScrubbedData), AllFold, "test_foldl1"),
-    ?equals_w_note(lists:reverse(ExpInInterval), IntervalFold, "test_foldl2"),
-    ?equals_w_note(lists:reverse(ExpInIntervalCounted), IntervalCountFold, "test_foldl3"),
+    compare_lists(ScrubbedData, AllFold, "test_foldl1"),
+    compare_lists(ExpInInterval, IntervalFold, "test_foldl2"),
+    compare_lists(ExpInIntervalCounted, IntervalCountFold, "test_foldl3"),
     ?TEST_DB:?CLOSE(DB1),
     true.
 
 tester_foldl(_Config) ->
     prop_foldl([{0.0}, {0}, {0.0}], {'(', {'*'}, {0}, ']'}, 4),
+    prop_foldl([{foo}, {"bar"}, {42},{-1},{{"foobar"}},{{{0.3820862051907793}}},{0.39125416350624936}], all, 2),
+    prop_foldl([{42},{-1},{{{0.3820862051907793}}},{0.39125416350624936}], all, 2),
+    prop_foldl([{{42,-5,{0,{},{-1,{{},[5],42},[[[]]]}}}},{[5]},{0.0}], all, 3),
     tester:test(?MODULE, prop_foldl, 3, rw_suite_runs(10000), [{threads, 2}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -154,9 +157,9 @@ prop_foldr(Data, Interval, MaxNum) ->
                             MaxNum),
     %% ct:pal("ExpInInterval: ~p~nIntervalFold: ~p~nInterval: ~p~n", [ExpInInterval,
     %%                                                  IntervalFold, Interval]),
-    ?equals_w_note(ScrubbedData, AllFold, "test_foldr1"),
-    ?equals_w_note(ExpInInterval, IntervalFold, "test_foldr2"),
-    ?equals_w_note(ExpInIntervalCounted, IntervalCountFold, "test_foldr3"),
+    compare_lists(ScrubbedData, AllFold, "test_foldr1"),
+    compare_lists(ExpInInterval, IntervalFold, "test_foldr2"),
+    compare_lists(ExpInIntervalCounted, IntervalCountFold, "test_foldr3"),
     ?TEST_DB:?CLOSE(DB1),
     true.
 
@@ -171,7 +174,7 @@ write_scrubbed_to_db(DB, Data) ->
     DB1 = lists:foldl(
             fun(Entry, DBAcc) ->
                 ?TEST_DB:put(DBAcc, Entry)
-            end, DB, ScrubbedData),
+            end, DB, Data),
     {DB1, ScrubbedData}.
 
 scrub_data(Data) ->
@@ -183,12 +186,17 @@ scrub_data(Data) ->
                             andalso is_float(element(1, B))
                             andalso element(1, A) == element(1, B))
               end,
-    lists:usort(SortFun, Data).
+    lists:usort(SortFun, lists:reverse(Data)).
 
 check_db(DB, ExpData, Note) ->
     InDb = ?TEST_DB:foldl(DB, fun(K, AIn) -> [?TEST_DB:get(DB, K) | AIn] end, []),
-    ?equals_w_note(lists:sort(InDb), lists:sort(ExpData), Note),
+    compare_lists(InDb, ExpData, Note),
     ?equals_w_note(?TEST_DB:get_load(DB), length(ExpData), Note).
+
+compare_lists(List1, List2, Note) ->
+    ?equals_w_note(length(List1), length(List2), "length of lists " ++ Note),
+    ?equals_w_note(scrub_data(List1), scrub_data(List2), "content of lists " ++
+                   Note).
 
 is_in({Key}, OtherKey) -> Key ?EQ OtherKey;
 is_in(all, _Key) -> true;
