@@ -218,7 +218,8 @@ on({balance_phase2b, Op}, {MyState, ModuleState} = State) ->
             OpId = Op#lb_op.id,
             TargetKey = Op#lb_op.target,
             MyState2 = set_pending_op(Op, MyState),
-            ?TRACE("Type: ~p Heavy: ~p Light: ~p Target: ~p~n", [Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, TargetKey]),
+            ?TRACE("OpId: ~p Type: ~p Heavy: ~p Light: ~p LightNodeSucc: ~p Target: ~p~n",
+                   [Op#lb_op.id, Op#lb_op.type, Op#lb_op.heavy_node, Op#lb_op.light_node, Op#lb_op.light_node_succ, TargetKey]),
             MyDHT = pid_groups:get_my(dht_node),
             _Pid = node:pidX(Op#lb_op.light_node),
             ?DBG_ASSERT(_Pid =:= comm:make_global(MyDHT)),
@@ -279,8 +280,6 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, {MyState, ModuleState} = State
             HeavyNodePid = node:pidX(Op#lb_op.heavy_node),
             comm:send(HeavyNodePid, {balance_success, OpId}, ?lb),
             comm:send_local(self(), {reset_monitors}),
-            MyState2 = set_pending_op(nil, MyState),
-            MyState3 = set_time_last_balance(MyState2),
             case Op#lb_op.type of
                 jump ->
                     %% also reply to light node succ in case of jump
@@ -290,6 +289,8 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, {MyState, ModuleState} = State
                 _ ->
                     ok
             end,
+            MyState2 = set_pending_op(nil, MyState),
+            MyState3 = set_time_last_balance(MyState2),
             {MyState3, ModuleState};
         _Op ->
             ?TRACE("Received answer but OpId ~p didn't match pending id ~p~n", [OpId, _Op#lb_op.id]),
