@@ -703,9 +703,9 @@ on({do_cleanup, TraceId, CallerPid}, State) ->
             State
     end;
 
-on({'DOWN', Ref, process, Pid, Reason}, State) ->
+on({'DOWN', Ref, process, Pid, _Reason}, State) ->
     ?TRACE("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
-           [Ref, Pid, Reason]),
+           [Ref, Pid, _Reason]),
     %% search for trace with status delivered, Pid and Ref
     StateTail = lists:dropwhile(fun({_TraceId, X}) ->
                                         case X#state.status of

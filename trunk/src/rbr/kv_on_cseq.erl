@@ -472,7 +472,7 @@ abort_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
 cc_abort_read(no_value_yet, _WF, _Val = {_TxId, _TLogVers}) ->
     %% we do not see a readlock, so it was not acquired
     {false, none};
-cc_abort_read({_WL = no_write_lock, _Vers}, _WF, _Val = {TxId, _TLogVers}) ->
+cc_abort_read({_WL = no_write_lock, _Vers}, _WF, _Val = {_TxId, _TLogVers}) ->
     %% we can get the write_filter value...
     %% we do not see a readlock, so it was not acquired
     {false, none};
@@ -484,7 +484,7 @@ cc_abort_read({RL, _Vers}, _WF, _Val = {TxId, _TLogVers}) when is_list(RL) ->
                  %% RL is already gone or was not acquired, so we do not
                  %% need to update the entry
     end;
-cc_abort_read({_WL, _Vers}, _WF, _Val = {TxId, _TLogVers}) ->
+cc_abort_read({_WL, _Vers}, _WF, _Val = {_TxId, _TLogVers}) ->
     %% we can get the write_filter value...
     %% we do not see a readlock, so it was not acquired
     {false, none};
