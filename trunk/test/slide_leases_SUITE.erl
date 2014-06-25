@@ -1,4 +1,4 @@
-%% @copyright 2012-2013 Zuse Institute Berlin
+%% @copyright 2012-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -90,6 +90,8 @@ end_per_testcase(_TestCase, Config) ->
 tester_type_check_slide_leases(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
+    tester:register_value_creator({typedef, prbr, write_filter, []},
+                                  prbr, tester_create_write_filter, 1),
     %tester:register_value_creator({typedef, dht_node_state, state}, slide_leases, tester_create_dht_node_state, 0),
     %tester:register_value_creator({typedef, dht_node_state, state}, slide_leases, tester_create_slide_ops, 0),
     %% [{modulename, [excludelist = {fun, arity}]}]
@@ -118,7 +120,9 @@ tester_type_check_slide_leases(_Config) ->
     pid_groups:join(pid_groups:group_with(dht_node)),
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
-    %tester:unregister_value_creator( TODO ),
+
+    tester:unregister_value_creator({typedef, prbr, write_filter, []}),
+    %% tester:unregister_value_creator( TODO ),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

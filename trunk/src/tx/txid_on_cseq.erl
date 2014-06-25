@@ -1,4 +1,4 @@
-% @copyright 2012-2013 Zuse Institute Berlin,
+% @copyright 2012-2014 Zuse Institute Berlin,
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -68,10 +68,10 @@ new(Key, InvolvedKeys, ReplyTo) ->
     RBRCseqPid = comm:make_global(pid_groups:find_a(DB)),
     rbrcseq:qwrite_fast(DB, ReplyTo, Key,
                         fun txid_on_cseq:is_valid_new/3, Value,
-                        prbr:smallest_round(RBRCseqPid), prbr_bottom).
+                        pr:smallest_round(RBRCseqPid), prbr_bottom).
 
 -spec decide(txid(), commit | abort, comm:erl_local_pid(),
-             prbr:r_with_id(), any()) -> ok.
+             pr:pr(), any()) -> ok.
 decide(Key, Decision, ReplyTo, Round, OldVal) ->
     DB = get_db_for_id(Key),
     rbrcseq:qwrite_fast(DB, ReplyTo, Key,
@@ -112,13 +112,14 @@ is_valid_decide(ExistingEntry, _WriteFilter, Decision) ->
     end.
 
 -spec is_valid_delete(prbr_bottom | txid_entry(),
-                      prbr:write_filter(), New::txid_entry()) ->
+                      prbr:write_filter(), New::prbr_bottom %% =:= txid_entry()
+                                                ) ->
                                {boolean(), null}.
 is_valid_delete(prbr_bottom, _WriteFilter, prbr_bottom) ->
-    {true, null};
-is_valid_delete(ExistingEntry, _WriteFilter, ExistingEntry) ->
-    %% recreating same entry is ok (write through may happened)
-    {false, null};
+    {false, null}; %% not necessary to delete deleted entry
+%%is_valid_delete(ExistingEntry, _WriteFilter, ExistingEntry) ->
+%%    %% deleting same entry is ok (write through may happened)
+%%    {false, null};
 is_valid_delete(ExistingEntry, _WriteFilter, prbr_bottom) ->
     case status(ExistingEntry) of
         open -> {false, null};

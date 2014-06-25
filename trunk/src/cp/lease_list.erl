@@ -27,7 +27,7 @@
 
 -type active_lease_t() :: l_on_cseq:lease_t() | empty.
 
--type next_round_map() :: [{l_on_cseq:lease_id(), prbr:r_with_id()}].
+-type next_round_map() :: [{l_on_cseq:lease_id(), pr:pr()}].
 
 -record(lease_list_t, {
           active         = ?required(lease_list_t, active )        :: active_lease_t(),
@@ -85,7 +85,7 @@ get_passive_leases(#lease_list_t{passive=Passive}) ->
     Passive.
 
 -spec get_next_round(l_on_cseq:lease_id(), dht_node_state:state()) ->
-                            prbr:r_with_id() | failed.
+                            pr:pr() | failed.
 get_next_round(Id, State) ->
     #lease_list_t{next_round_map=NextRounds} = dht_node_state:get(State, lease_list),
     case lists:keyfind(Id, 1, NextRounds) of
@@ -95,7 +95,7 @@ get_next_round(Id, State) ->
             failed
     end.
 
--spec update_next_round(l_on_cseq:lease_id(), prbr:r_with_id(), dht_node_state:state()) ->
+-spec update_next_round(l_on_cseq:lease_id(), pr:pr(), dht_node_state:state()) ->
                             dht_node_state:state().
 update_next_round(Id, NextRound, State) ->
     LeaseList = dht_node_state:get(State, lease_list),
