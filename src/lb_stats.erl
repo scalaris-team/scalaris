@@ -93,11 +93,14 @@ trigger_routine() ->
     {NewReductions, NewTimestamp} = get_reductions(),
     {OldReductions, OldTimestamp} = get_last_reductions(),
     TimeDiff = timer:now_diff(NewTimestamp, OldTimestamp) div 1000000,
-    ReductionsPerSec = (NewReductions - OldReductions) div TimeDiff,
-    set_last_reductions(NewReductions, NewTimestamp),
+    if TimeDiff > 0 -> % let at least one second pass
+           ReductionsPerSec = (NewReductions - OldReductions) div TimeDiff,
+           set_last_reductions(NewReductions, NewTimestamp),
+           monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add(NewTimestamp, ReductionsPerSec, Old) end);
+       true -> ok
+    end,
     monitor:client_monitor_set_value(lb_active, cpu, fun(Old) -> rrd:add(NewTimestamp, CPU, Old) end),
-    monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add(NewTimestamp, MEM, Old) end),
-    monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add(NewTimestamp, ReductionsPerSec, Old) end).
+    monitor:client_monitor_set_value(lb_active, mem, fun(Old) -> rrd:add(NewTimestamp, MEM, Old) end).
 
 -compile({inline, [update_db_monitor/2]}).
 %% @doc Updates the local rrd for reads or writes and checks for reporting
