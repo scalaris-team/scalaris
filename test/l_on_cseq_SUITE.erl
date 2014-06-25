@@ -1,4 +1,4 @@
-%% @copyright 2012-2013 Zuse Institute Berlin
+%% @copyright 2012-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -124,6 +124,9 @@ end_per_testcase(_TestCase, Config) ->
 tester_type_check_l_on_cseq(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
+    tester:register_value_creator({typedef, prbr, write_filter, []},
+                                  prbr, tester_create_write_filter, 1),
+
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {l_on_cseq,
@@ -178,6 +181,7 @@ tester_type_check_l_on_cseq(_Config) ->
     pid_groups:join(pid_groups:group_with(dht_node)),
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_value_creator({typedef, prbr, write_filter, []}),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -40,6 +40,12 @@
 -export([abort_read/5, abort_read_feeder/5]).
 -export([abort_write/5, abort_write_feeder/5]).
 
+%% for selection among differing values in quorums with same paxos
+%% round (as they can occur in this data type, as we allow partial
+%% operations as setting or unlocking write locks (on maybe outdated
+%% replicas).
+-export([max/2]).
+
 %% filters and checks for rbr_cseq operations
 %% consistency
 %% -export([is_valid_next_req/3]).
@@ -238,7 +244,8 @@ cc_set_wl({RL, WL, Vers}, _WF, _Val = {TxId, TLogVers}) ->
     Checks =
         [ { TLogVers =:= Vers,  {cc_set_wl_version_mismatch, TLogVers, Vers} },
           { no_write_lock =:= WL
-            orelse TxId =:= WL, {cc_set_wl_txid_mismatch, WL, TxId} },
+            %%orelse TxId =:= WL %% do not rewrite TxId
+          , {cc_set_wl_txid_mismatch, WL, TxId} },
           { [] =:= RL,          {cc_set_wl_readlock_not_empty, RL} } ],
     cc_return_val(cc_set_wl, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
 
@@ -261,18 +268,18 @@ wf_set_wl(DBEntry, _UI = none, {TxId, _Vers}) ->
 %% functions for commit_read
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 -spec commit_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
-                         prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
+                         pr:pr(), {txid_on_cseq:txid(), version()}) ->
                                 {tx_tlog:tlog_entry(),
                                  ?RT:key(),
                                  comm:erl_local_pid(),
-                                 prbr:r_with_id(),
+                                 pr:pr(),
                                  {txid_on_cseq:txid(), version()}}.
 commit_read_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
     {TLogEntry, TxId, Pid, Round, OldVal}.
 
 %% @doc Releases the read lock of a given entry, if it was set.
 -spec commit_read(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
-                  prbr:r_with_id(), any()) -> ok.
+                  pr:pr(), any()) -> ok.
 commit_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
     HashedKey = case is_list(Key) of
@@ -325,10 +332,10 @@ wf_unset_rl(DBEntry, _UI = none, {TxId, _TLogVers}) ->
 %% functions for commit_write
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 -spec commit_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
-                          prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
+                          pr:pr(), {txid_on_cseq:txid(), version()}) ->
                                  {tx_tlog:tlog_entry_write(), ?RT:key(),
                                   comm:erl_local_pid(),
-                                  prbr:r_with_id(),
+                                  pr:pr(),
                                   {txid_on_cseq:txid(), version()}}.
 commit_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
     {_, Val} = tx_tlog:get_entry_value(TLogEntry),
@@ -339,7 +346,7 @@ commit_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
 %%      set, and writes the new value.
 %% erlang shell test call: api_tx:write("a", 1).
 -spec commit_write(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
-                   prbr:r_with_id(), any()) -> ok.
+                   pr:pr(), any()) -> ok.
 commit_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
     HashedKey = case is_list(Key) of
@@ -387,7 +394,9 @@ cc_commit_write({WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
     %% then we do not want to write again (let the cc fail).
     Checks =
         [ {  %% we release the lock
-             (Vers =:= TLogVers andalso WL =:= TxId)
+             %% (Vers =:= TLogVers andalso
+             (WL =:= TxId)
+             orelse (Vers =< TLogVers) %% updated outdated replicas
              %% we were interrupted during the release lock and
              %% another process made a write through? But then the
              %% register is free to be used for further ops... and any
@@ -405,9 +414,17 @@ cc_commit_write({_RL, WL, Vers}, _WF, _Val = {TxId, TLogVers, _NewVal}) ->
     %% set_lock.
 
     %% As we are in the case of fast_write, we can expect the
-    %% writelock to be in place and the version to match.
+    %% writelock to be in place. The version usually matches, but
+    %% could be outdated, when the write part of the setting of the
+    %% write_lock was successful on a quorum which included an
+    %% outdated replica (there, we cannot guarantee anything on the
+    %% value). But we will write our own value anyway and habe
+    %% exclusive write access, so until we get a quorum updated with
+    %% the right value, no one else will substatially interfere.
+    %% But what is when decided abort? How to rollback if the values
+    %% are no longer consistent across the replicas holding the WL?
     Checks =
-        [ { Vers =:= TLogVers,  {cc_commit_write_tlog_version_to_small,
+        [ { Vers =< TLogVers,  {cc_commit_write_tlog_version_to_small,
                                  TLogVers, Vers} },
           { WL =:= TxId, {cc_commit_write_lock_is_not_txid, WL, TxId} } ],
     cc_return_val(cc_commit_write, Checks, _UI_if_ok = none, ?LOG_CC_FAILS).
@@ -431,18 +448,18 @@ wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
 %% functions for abort_read
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 -spec abort_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
-                         prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
+                         pr:pr(), {txid_on_cseq:txid(), version()}) ->
                                 {tx_tlog:tlog_entry(),
                                  ?RT:key(),
                                  comm:erl_local_pid(),
-                                 prbr:r_with_id(),
+                                 pr:pr(),
                                  {txid_on_cseq:txid(), version()}}.
 abort_read_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
     {TLogEntry, TxId, Pid, Round, OldVal}.
 
 %% @doc Releases the read lock of a given entry, if it was set.
 -spec abort_read(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
-                  prbr:r_with_id(), any()) -> ok.
+                  pr:pr(), any()) -> ok.
 abort_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
     HashedKey = case is_list(Key) of
@@ -503,10 +520,10 @@ cc_abort_read({RL, _WL, _Vers}, _WF, _Val = {TxId, _TLogVers}) ->
 %% functions for abort_write
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 -spec abort_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
-                          prbr:r_with_id(), {txid_on_cseq:txid(), version()}) ->
+                          pr:pr(), {txid_on_cseq:txid(), version()}) ->
                                  {tx_tlog:tlog_entry_write(), ?RT:key(),
                                   comm:erl_local_pid(),
-                                  prbr:r_with_id(),
+                                  pr:pr(),
                                   {txid_on_cseq:txid(), version()}}.
 abort_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
     {_, Val} = tx_tlog:get_entry_value(TLogEntry),
@@ -516,7 +533,7 @@ abort_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
 %% @doc Releases the write lock of a given entry, if it was set.
 %% erlang shell test call: api_tx:write("a", 1).
 -spec abort_write(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
-                   prbr:r_with_id(), any()) -> ok.
+                   pr:pr(), any()) -> ok.
 abort_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
     HashedKey = case is_list(Key) of
@@ -642,3 +659,29 @@ set_vers(Entry, Vers) -> setelement(3, Entry, Vers).
 val(Entry) -> element(4, Entry).
 -spec set_val(db_entry(), value()) -> db_entry().
 set_val(Entry, Val) -> setelement(4, Entry, Val).
+
+-spec max(db_entry(), db_entry()) -> db_entry().
+max({_ValA, VersA} = A, {_ValB, VersB} = B) ->
+    %% partial entries A and B produced by read filter rf_val_vers
+    log:log("A (~p) > B (~p)?", [A,B]),
+    case VersA > VersB of
+        true ->
+            A;
+        false ->
+            %% do we have further to distinguish on same version
+            %% values whether locks are set or not?
+            %% @TODO Think about it...
+            B
+    end;
+
+max(A, B) ->
+    log:log("A (~p) > B (~p)?", [A,B]),
+    case vers(A) > vers(B) of
+        true ->
+            A;
+        false ->
+            %% do we have further to distinguish on same version
+            %% values whether locks are set or not?
+            %% @TODO Further think about it...
+            B
+    end.
