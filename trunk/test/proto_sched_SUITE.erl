@@ -106,10 +106,15 @@ end_per_testcase(_TestCase, Config) ->
 basic_empty_sched(_Config) ->
     %% an empty thread should be a valid run
     proto_sched:thread_num(1),
+    ?ASSERT(not proto_sched:infected()),
     proto_sched:thread_begin(),
+    ?ASSERT(proto_sched:infected()),
     proto_sched:thread_end(),
+    ?ASSERT(not proto_sched:infected()),
     proto_sched:wait_for_end(),
+    ?ASSERT(not proto_sched:infected()),
     log:log("~.0p", [proto_sched:get_infos()]),
+    ?ASSERT(not proto_sched:infected()),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -445,6 +450,7 @@ kv_on_cseq_read(_I) ->
     proto_sched:thread_begin(_I),
     kv_on_cseq:read("a"),
     proto_sched:thread_end(_I),
+    ?ASSERT(not proto_sched:infected()),
     proto_sched:wait_for_end(_I),
     _Infos = proto_sched:get_infos(_I),
     log:log("~.0p", [proto_sched:get_infos(_I)]),
