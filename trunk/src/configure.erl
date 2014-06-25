@@ -24,6 +24,7 @@
          show_config/0]).
 
 -spec is_enable_debug() -> boolean().
+%% return true if './configure --enable-debug' was used.
 -ifdef(enable_debug).
 is_enable_debug() -> true.
 -else.

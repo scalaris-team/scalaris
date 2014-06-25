@@ -1,4 +1,4 @@
-%  @copyright 2010-2013 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -245,7 +245,8 @@ create_value_({union, Types}, Size, ParseState) ->
     create_value(lists:nth(crypto:rand_uniform(1, Length + 1), Types),
                  Size, ParseState);
 create_value_(Unknown , _Size, _ParseState) ->
-    ct:pal("Cannot create type ~.0p~n", [Unknown]),
+    ct:pal("Cannot create type (you could register a custom value creator):~n"
+           "~.0p~n", [Unknown]),
     throw(function_clause).
 
 %% @doc creates a record value
