@@ -207,7 +207,7 @@ manage_directories([DirKey | Other], Schedule) ->
     manage_directories(Other, Schedule ++ DirSchedule).
 
 -spec directory_routine(directory_name(), periodic | emergency, schedule()) -> schedule().
-directory_routine(DirKey, Type, Schedule) ->
+directory_routine(DirKey, _Type, Schedule) ->
     %% Because of the lack of virtual servers/nodes, the load
     %% balancing is differs from the paper here. We try to
     %% balance the most loaded node with the least loaded

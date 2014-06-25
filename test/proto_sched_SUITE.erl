@@ -345,7 +345,7 @@ basic_cleanup_DOWN_interplay(_Config) ->
     %% 'DOWN' reports, so it had to be separated in a separate record field
     proto_sched:thread_num(1),
     Parent = self(),
-    Child =
+    _Child =
         spawn(fun() ->
                       proto_sched:thread_begin(),
                       ?TRACE("Sending parent", []),
@@ -370,7 +370,7 @@ basic_cleanup_send_interplay(_Config) ->
     %% 'DOWN' reports, so it had to be separated in a separate record field
     proto_sched:thread_num(1),
     Parent = self(),
-    Child =
+    _Child =
         spawn(fun() ->
                       proto_sched:thread_begin(),
                       ?TRACE("Sending parent", []),

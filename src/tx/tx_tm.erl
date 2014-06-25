@@ -392,7 +392,7 @@ on({tx_tm_lock_get_done, TxId, Key,
     end;
 
 on({tx_tm_lock_get_done, TxId, Key,
-    {qwrite_deny, _ReqId, NextRound, WrittenVal, Reason}}, State) ->
+    {qwrite_deny, _ReqId, NextRound, WrittenVal, _Reason}}, State) ->
     %% a lock was not acquirable -> abort the tx
     case get_entry(TxId, State) of
         undefined ->

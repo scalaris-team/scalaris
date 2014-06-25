@@ -169,8 +169,8 @@ on({mr, terminate_job, JobId, _DeliveryInterval}, State) ->
                 State
         end;
 
-on(Msg, State) ->
-    ?TRACE("~p mr: unknown message ~p~n", [comm:this(), Msg]),
+on(_Msg, State) ->
+    ?TRACE("~p mr: unknown message ~p~n", [comm:this(), _Msg]),
     State.
 
 -spec work_on_phase(mr_state:jobid(), mr_state:state(), pos_integer()) ->
