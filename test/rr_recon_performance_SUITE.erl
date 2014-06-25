@@ -140,7 +140,7 @@ merkle_tree(_) ->
     DB = db_generator:get_db(I, ToAdd, uniform, [{output, list_keytpl}]),
     
     TestTree = merkle_tree:new(I, DB, []),
-    {Inner, Leafs} = merkle_tree:size_detail(TestTree),
+    {Inner, Leafs, _Items} = merkle_tree:size_detail(TestTree),
     
     BuildT = measure_util:time_avg(
            fun() -> merkle_tree:bulk_build(I, DB, []) end,
