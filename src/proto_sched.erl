@@ -297,10 +297,13 @@ get_infos() -> get_infos(default).
 -spec get_infos(trace_id()) -> [tuple()].
 get_infos(TraceId) ->
     LoggerPid = pid_groups:find_a(proto_sched),
+    clear_infection(),
     comm:send_local(LoggerPid, {get_infos, comm:this(), TraceId}),
     receive
         ?SCALARIS_RECV({get_infos_reply, Infos}, Infos)
-    end.
+    end,
+    restore_infection(),
+    Infos.
 
 -spec infected() -> boolean().
 infected() ->
@@ -703,8 +706,6 @@ on({do_cleanup, TraceId, CallerPid}, State) ->
 on({'DOWN', Ref, process, Pid, Reason}, State) ->
     ?TRACE("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
            [Ref, Pid, Reason]),
-    log:log("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
-            [Ref, Pid, Reason]),
     %% search for trace with status delivered, Pid and Ref
     StateTail = lists:dropwhile(fun({_TraceId, X}) ->
                                         case X#state.status of
@@ -716,6 +717,8 @@ on({'DOWN', Ref, process, Pid, Reason}, State) ->
     case StateTail of
         [] -> State; %% outdated 'DOWN' message - ok
         [TraceEntry | _] ->
+            %% log:log("proto_sched:on({'DOWN', ~p, process, ~p, ~p}).",
+            %%         [Ref, Pid, Reason]),
             %% the process we delivered to has died, so we generate us a
             %% gc_on_done message ourselves.
             %% use post_op to avoid concurrency with send_error
