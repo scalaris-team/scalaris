@@ -272,32 +272,23 @@ commit(TLog) ->
             Client = comm:this(),
             ClientsId = {?commit_client_id, uid:get_global_uid()},
             ?TRACE("rdht_tx:commit(Client ~p, ~p, TLog ~p)~n", [Client, ClientsId, TLog]),
-%%%% OLD TX
-%           case pid_groups:find_a(tx_tm) of
             case pid_groups:find_a(tx_tm_new) of
                 failed ->
                     Msg = io_lib:format("No tx_tm_new found.~n", []),
-%%%% OLD TX
-%               tx_tm_rtm:msg_commit_reply(Client, ClientsId, {abort, Msg});
                     tx_tm:msg_commit_reply(Client, ClientsId, {abort, Msg});
                 TM ->
-%%%% OLD TX
-%               tx_tm_rtm:commit(TM, Client, ClientsId, TLog)
                     tx_tm:commit(TM, Client, ClientsId, TLog)
             end,
             _Result =
                 begin
                     trace_mpath:thread_yield(),
+                    %% log:log("Got execution right and finished commit ~p", [self()]),
                     receive
                     ?SCALARIS_RECV(
-%%%% OLD TX
-%                  {tx_tm_rtm_commit_reply, ClientsId, commit}, %% ->
                        {tx_tm_commit_reply, ClientsId, commit}, %% ->
                          {ok}  %% commit / abort;
                       );
                     ?SCALARIS_RECV(
-%%%% OLD TX
-%                  {tx_tm_rtm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
                        {tx_tm_commit_reply, ClientsId, {abort, FailedKeys}}, %% ->
                          {fail, abort, FailedKeys} %% commit / abort;
                        )
@@ -375,13 +366,14 @@ receive_answer() ->
 -ifdef(TXNEW).
 receive_old_answers() ->
     % note: do not yield trace_mpath thread with "after 0"!
-    receive
-%%%% OLD TX
-%   ?SCALARIS_RECV({tx_tm_rtm_commit_reply, _, _}, receive_old_answers());
-        ?SCALARIS_RECV({tx_tm_commit_reply, _, _}, receive_old_answers());
-        ?SCALARIS_RECV({_Op, _RdhtId, _RdhtTlog}, receive_old_answers())
-    after 0 -> ok
-    end.
+%%    receive
+%%%%%% OLD TX
+%%%   ?SCALARIS_RECV({tx_tm_rtm_commit_reply, _, _}, receive_old_answers());
+%%        ?SCALARIS_RECV({tx_tm_commit_reply, _, _}, receive_old_answers());
+%%        ?SCALARIS_RECV({_Op, _RdhtId, _RdhtTlog}, receive_old_answers())
+%%    after 0 -> ok
+%%    end.
+    ok.
 -else.
 receive_old_answers() ->
     % note: do not yield trace_mpath thread with "after 0"!
