@@ -34,11 +34,18 @@ groups() ->
     [%% implementation in api_tx_SUITE.hrl
      %% (shared with api_tx_proto_sched_SUITE.erl)
      {proto_sched_ready, [sequence],
-      proto_sched_ready_tests()}
+      proto_sched_ready_tests()},
+     {only_in_proto_sched,
+      %% [sequence, {repeat_until_any_fail, forever}],
+      %% [sequence, {repeat_until_any_fail, 500}],
+      [sequence],
+      [concurrent_2]}
     ].
 
 
-all()   -> [ {group, proto_sched_ready} ].
+all()   -> [ {group, proto_sched_ready},
+             {group, only_in_proto_sched}
+           ].
 
 suite() -> [ {timetrap, {seconds, 200}} ].
 
@@ -101,3 +108,122 @@ proto_sched_fun(stop) ->
 -spec adapt_tx_runs(N::pos_integer()) -> pos_integer().
 adapt_tx_runs(N) ->
     erlang:max(N div 10, 1).
+
+concurrent_2(_Config) ->
+    %% let two increments run concurrently
+
+    %% initialize a key
+    api_tx:write("a", 0),
+
+    Iterations = 6,
+    Threads = 2,
+    log:log("Concurrency test begins"),
+    proto_sched:thread_num(Threads),
+    case tx_tm:is_txnew_enabled() of
+        true ->
+            proto_sched:register_callback(
+              fun api_tx_proto_sched_SUITE:rbr_invariant/3);
+        _ -> ok
+    end,
+    F = fun(_X, 0) -> {ok};
+           (X, Count) ->
+                {TLog, {ok, Val}} = api_tx:read(api_tx:new_tlog(), "a"),
+                case Val >= (Iterations - Count) of
+                    false ->
+                        %% I performed (Iterations - Count)
+                        %% increments, so the counter should be at
+                        %% least that high
+                        log:log("Oops? Missing value"),
+                        %% log:log("~p", [proto_sched:get_infos()])
+                        ?DBG_ASSERT2(Val >= (Iterations - Count),
+                                     {'missing increment'});
+                    true -> ok
+                end,
+                {[], [{ok}, CommitRes]} =
+                    api_tx:req_list(TLog, [{write, "a", Val+1}, {commit}]),
+                case CommitRes of
+                    {ok} ->
+                        X(X, Count-1);
+                    _ ->
+                        log:log("Retry ~p, Val ~p, StillTodo ~p, CommitRes ~p",
+                                [self(), Val, Count, CommitRes]),
+                        X(X, Count)
+                end
+        end,
+    [ spawn(fun() ->
+                    proto_sched:thread_begin(),
+                    Res = F(F, Iterations),
+                    log:log("Res~p ~p", [X, Res]),
+                    proto_sched:thread_end()
+            end) || X <- lists:seq(1,Threads)],
+    proto_sched:wait_for_end(),
+    proto_sched:cleanup(),
+    ?equals_w_note(api_tx:read("a"), {ok, Threads*Iterations},
+                   wrong_result),
+    ok.
+
+%% callback function for proto_sched
+rbr_invariant(_From, _To, _Msg) ->
+    %% we are a callback function, which is not infected!
+    %% we are executed in the context of proto_sched and are allowed
+    %% to use receive, etc, as where the callback is called, no
+    %% other important things happen...
+    %% as the proto_sched mainly receives {log_send,...} events, we do
+    %% not pick messages from its inbox, that we do not want to pick
+    %% when using receive.
+
+    %% get the key
+    HashedKey = api_dht:hash_key("a"),
+    Replicas = api_dht_raw:get_replica_keys(HashedKey),
+
+    %% retrieve all replicas: we simply retrieve the whole ring and
+    %% filter for the interesting keys
+    DHTNodes = pid_groups:find_all(dht_node),
+
+    RingData = [ begin
+                     N ! {prbr, tab2list_raw, kv, self()},
+                     receive
+                         {kv, List} -> List
+                     end
+                 end
+                 || N <- DHTNodes ],
+    FlatRingData = lists:flatten(RingData),
+
+    MyEntries = [ begin
+                      Entry = lists:keyfind(X, 1, FlatRingData),
+                      setelement(1, Entry, named_replicas(element(1, Entry)))
+                  end || X <- Replicas ],
+
+    %% print all replicas in a structured way
+%    log:log("~10000.0p~n      ~10000.0p~n      ~10000.0p~n      ~10000.0p", MyEntries),
+    case erlang:get(entries) of
+        MyEntries -> ok;
+        [A,B,C,D] ->
+            %% print all changed replicas in a structured way
+            [NA, NB, NC, ND] = MyEntries,
+            X = [NA =:= A, NB =:= B, NC =:= C, ND =:= D],
+            Format = lists:flatten([ "~n~10000.0p" || Y <- X, Y =:= false]),
+            log:log(Format,
+                    [ element(2, Y) || Y <- lists:zip(X, MyEntries),
+                                       element(1, Y) =:= false]);
+        _ ->
+            %% print all replicas in a structured way
+            log:log("~n~10000.0p"
+                    "~n~10000.0p"
+                    "~n~10000.0p"
+                    "~n~10000.0p",
+                    MyEntries)
+    end,
+
+    erlang:put(entries, MyEntries),
+
+    %% anaylse the replicas
+    ok.
+
+
+named_replicas(16955237001963240173058271559858726497) ->  r0;
+named_replicas(102025828732197856038901923417800779361) -> r1;
+named_replicas(187096420462432471904745575275742832225) -> r2;
+named_replicas(272167012192667087770589227133684885089) -> r3.
+
+
