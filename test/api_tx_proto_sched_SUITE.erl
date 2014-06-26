@@ -191,11 +191,10 @@ rbr_invariant(_From, _To, _Msg) ->
 
     MyEntries = [ begin
                       Entry = lists:keyfind(X, 1, FlatRingData),
-                      setelement(1, Entry, named_replicas(element(1, Entry)))
-                  end || X <- Replicas ],
+                      setelement(1, Entry, ShortName)
+                  end || {X, ShortName} <- lists:zip(Replicas, [r0, r1, r2, r3]) ],
 
     %% print all replicas in a structured way
-%    log:log("~10000.0p~n      ~10000.0p~n      ~10000.0p~n      ~10000.0p", MyEntries),
     case erlang:get(entries) of
         MyEntries -> ok;
         [A,B,C,D] ->
@@ -207,23 +206,13 @@ rbr_invariant(_From, _To, _Msg) ->
                     [ element(2, Y) || Y <- lists:zip(X, MyEntries),
                                        element(1, Y) =:= false]);
         _ ->
-            %% print all replicas in a structured way
-            log:log("~n~10000.0p"
-                    "~n~10000.0p"
-                    "~n~10000.0p"
-                    "~n~10000.0p",
-                    MyEntries)
+            %% print all replicas (more or less than 4?)
+            log:log("~n~10000.0p", [MyEntries])
     end,
 
     erlang:put(entries, MyEntries),
 
     %% anaylse the replicas
     ok.
-
-
-named_replicas(16955237001963240173058271559858726497) ->  r0;
-named_replicas(102025828732197856038901923417800779361) -> r1;
-named_replicas(187096420462432471904745575275742832225) -> r2;
-named_replicas(272167012192667087770589227133684885089) -> r3.
 
 
