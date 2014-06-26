@@ -238,8 +238,6 @@ create_value_({typedef, Module, TypeName, TypeList}, Size, ParseState) ->
     end;
 create_value_({typed_record_field, _Name, Type}, Size, ParseState) ->
     create_value(Type, Size, ParseState);
-create_value_({type, _Line, Type, []}, Size, ParseState) ->
-    create_value(Type, Size, ParseState);
 create_value_({union, Types}, Size, ParseState) ->
     Length = length(Types),
     create_value(lists:nth(crypto:rand_uniform(1, Length + 1), Types),

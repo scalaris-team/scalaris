@@ -1379,7 +1379,7 @@ format_utc_timestamp({_,_,Micro} = TS) ->
                   [Day,Mstr,Year,Hour,Minute,Second,Micro])).
 
 -spec update_lease(lease_id(), comm:erl_local_pid(),
-                   ContentCheck::fun((any(), any(), any()) -> {boolean(), atom()}),
+                   ContentCheck::fun((term(), term(), term()) -> {boolean(), atom()}),
                    Old::lease_t(), New::lease_t(), dht_node_state:state()) -> ok.
 update_lease(Id, Self, ContentCheck, Old, New, State) ->
     DB = get_db_for_id(Id),

@@ -102,7 +102,7 @@
     | nil
     | {atom, atom()}
     | {integer, integer()}
-    | {typedef, module(), atom(), []}
+    | {typedef, module(), atom(), list({var, integer(), atom()})}
     | {var, atom()}
     | {var_type, list(atom()), type_spec()}
     | {builtin_type, builtin_type()}

@@ -27,7 +27,7 @@
 
 -type fun_spec() :: any().
 
--spec substitute(fun_spec(), gb_tree()) -> fun_spec().
+-spec substitute(fun_spec(), gb_trees:tree({var, atom()}, term())) -> fun_spec().
 substitute(FunSpecs, Substitutions) when is_list(FunSpecs)->
     [substitute(FunSpec, Substitutions) ||  FunSpec <- FunSpecs];
 % type variable
@@ -95,6 +95,8 @@ substitute(Unknown, Substitutions) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+-spec substitutions_from_list(list({var, integer(), atom()}), list(term())) 
+                             -> gb_trees:tree({var, atom()}, term()).
 substitutions_from_list(VarList, TypeList) ->
     Tree = gb_trees:empty(),
     substitutions_from_list_(VarList, TypeList, Tree).
