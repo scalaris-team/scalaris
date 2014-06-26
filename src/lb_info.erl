@@ -154,8 +154,8 @@ get_load_change_jump(Metric, TakenLoad, DhtSize, HeavyNode, LightNode, LightNode
         get_load_change_diff(DhtSize, MetricFun(HeavyNode), MetricFun(HeavyNode) - TakenLoad).
 
 -spec get_load_change_diff(pos_integer(), non_neg_integer(), non_neg_integer()) -> load().
-get_load_change_diff(DhtSize, OldItemLoad, NewItemLoad) ->
-    NewItemLoad * NewItemLoad / DhtSize - OldItemLoad * OldItemLoad / DhtSize.
+get_load_change_diff(DhtSize, OldLoad, NewLoad) ->
+    NewLoad * NewLoad / DhtSize - OldLoad * OldLoad / DhtSize.
 
 -spec get_metric_fun(Metric::items | requests) -> fun((lb_info()) -> load()).
 get_metric_fun(items)    -> fun get_items/1;

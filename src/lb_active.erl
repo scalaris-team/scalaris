@@ -403,10 +403,11 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                case gossip_available(Options) of
                    true -> AvgItems = proplists:get_value(avgItems, Options),
                            AvgRequests = proplists:get_value(avgRequests, Options),
-                           %% don't take away more items than the average
-                           {?IIF(ProposedTargetLoadItems > AvgItems,
+                           %% don't make the heavy node light, only take as many items/requests
+                           %% as needed to reach the average load
+                           {?IIF(lb_info:get_items(MyNode) - ProposedTargetLoadItems < AvgItems,
                                  trunc(AvgItems), ProposedTargetLoadItems),
-                            ?IIF(ProposedTargetLoadRequests > AvgRequests,
+                            ?IIF(lb_info:get_reqs(MyNode) - ProposedTargetLoadRequests < AvgRequests,
                                  trunc(AvgRequests), ProposedTargetLoadRequests)
                            };
                    false -> {ProposedTargetLoadItems, ProposedTargetLoadRequests}
