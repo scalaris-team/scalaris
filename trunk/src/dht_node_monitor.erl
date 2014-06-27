@@ -56,7 +56,7 @@ on({db_op, Key}, {OldLookupHops, OldDBOps, OldDBHistogram}) ->
 init(_Options) ->
     % 1m monitoring interval, only keep newest
     LookupHops = rrd:create(60 * 1000000, 1, {timing, count}),
-    DBOps = rrd:create(10 * 1000000, 1, counter),
+    DBOps = rrd:create(config:read(lb_active_monitor_resolution) * 1000, 1, counter),
     %% initialized by dht_node with handler db_op_init
     DBHistogram = uninit,
     {LookupHops, DBOps, DBHistogram}.
