@@ -403,14 +403,14 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                case gossip_available(Options) of
                    true -> AvgItems = proplists:get_value(avgItems, Options),
                            AvgRequests = proplists:get_value(avgRequests, Options),
-                           %% don't make the heavy node light, only take as many items/requests
-                           %% as needed to reach the average load
-                           {?IIF(lb_info:get_items(MyNode) - ProposedTargetLoadItems < AvgItems,
+                           %% don't take away more than the average to avoid making the light node heavy
+                           {?IIF(ProposedTargetLoadItems > AvgItems,
                                  trunc(AvgItems), ProposedTargetLoadItems),
-                            ?IIF(lb_info:get_reqs(MyNode) - ProposedTargetLoadRequests < AvgRequests,
+                            ?IIF(ProposedTargetLoadRequests > AvgRequests,
                                  trunc(AvgRequests), ProposedTargetLoadRequests)
                            };
-                   false -> {ProposedTargetLoadItems, ProposedTargetLoadRequests}
+                   false -> AvgItems = 0, AvgRequests = 0,
+                            {ProposedTargetLoadItems, ProposedTargetLoadRequests}
                end,
 
            {From, To, Direction} =
@@ -460,12 +460,14 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                            true ->
                                S = config:read(lb_active_gossip_stddev_threshold),
                                DhtSize = proplists:get_value(dht_size, Options),
-                               StdDev =
-                                   if Metric =:= items ->
-                                          proplists:get_value(stddevItems, Options);
-                                      Metric =:= requests ->
-                                          proplists:get_value(stddevRequests, Options)
-                                   end,
+                               case Metric of
+                                   items ->
+                                       Avg = AvgItems,
+                                       StdDev = proplists:get_value(stddevItems, Options);
+                                   requests ->
+                                       Avg = AvgRequests,
+                                       StdDev = proplists:get_value(stddevRequests, Options)
+                               end,
                                Variance = StdDev * StdDev,
                                VarianceChange =
                                    case JumpOrSlide of
@@ -474,8 +476,10 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                                    end,
                                VarianceNew = Variance + VarianceChange,
                                StdDevNew = ?IIF(VarianceNew >= 0, math:sqrt(VarianceNew), StdDev),
-                               ?TRACE("New StdDev: ~p Old StdDev: ~p Metric: ~p~n", [StdDevNew, StdDev, Metric]),
-                               StdDevNew < StdDev * (1 - S / DhtSize);
+                               ?TRACE("New StdDev: ~p Old StdDev: ~p DhtSize: ~p Metric: ~p~n", [StdDevNew, StdDev, DhtSize, Metric]),
+                               %% Check for decrease in stddev but also take into account systems with a large stddev where moving the
+                               %% the average load will reduce the stddev only gradually.
+                               StdDevNew < StdDev * (1 - S / DhtSize) orelse TakenLoad >= 0.9 * Avg;
                            %% gossip not available, skipping this test
                            false -> true
                        end,
