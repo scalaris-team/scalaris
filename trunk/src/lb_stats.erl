@@ -221,9 +221,15 @@ avg_weighted([], 0, 0, _Sum) ->
 avg_weighted([], 0, N, Sum) ->
     Sum/N;
 avg_weighted([unknown | Other], Weight, N, Sum) ->
-    avg_weighted(Other, Weight - 1, N + Weight, Sum);
+    avg_weighted(Other, Weight - 1, N, Sum);
 avg_weighted([Element | Other], Weight, N, Sum) ->
-    avg_weighted(Other, Weight - 1, N + Weight, Sum + Weight * Element).
+    %% linear weight
+    CurrentWeight = Weight,
+    %% quadratic weight
+    %CurrentWeight = Weight * Weight,
+    %% exponential weight
+    %CurrentWeight = util:pow(2, Weight),
+    avg_weighted(Other, Weight - 1, N + CurrentWeight, Sum + CurrentWeight * Element).
 
 %% @doc returns a split key from the request histogram at a given time (if available)
 -spec get_request_histogram_split_key(TargetLoad::pos_integer(),
