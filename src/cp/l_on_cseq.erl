@@ -49,6 +49,7 @@
 -export([unittest_create_lease/1]).
 -export([unittest_create_lease_with_range/2]).
 -export([unittest_clear_lease_list/1]).
+-export([unittest_get_delta/0]).
 
 -export([get_db_for_id/1]).
 
@@ -142,6 +143,8 @@
 -spec delta() -> pos_integer().
 delta() -> 10.
 
+-spec unittest_get_delta() -> pos_integer().
+unittest_get_delta() -> delta().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
