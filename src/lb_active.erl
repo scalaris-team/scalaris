@@ -258,7 +258,6 @@ on({balance_success, OpId}, {MyState, ModuleState} = State) ->
             State;
         Op when Op#lb_op.id =:= OpId ->
             ?TRACE("Clearing pending op ~p~n", [OpId]),
-            comm:send_local(self(), {reset_monitors}),
             MyState2 = set_pending_op(nil, MyState),
             MyState3 = set_time_last_balance(MyState2),
             {MyState3, ModuleState};
@@ -279,7 +278,6 @@ on({move, result, {_JumpOrSlide, OpId}, _Status}, {MyState, ModuleState} = State
             ?TRACE("Clearing pending op and replying to other node ~p~n", [OpId]),
             HeavyNodePid = node:pidX(Op#lb_op.heavy_node),
             comm:send(HeavyNodePid, {balance_success, OpId}, ?lb),
-            comm:send_local(self(), {reset_monitors}),
             case Op#lb_op.type of
                 jump ->
                     %% also reply to light node succ in case of jump
