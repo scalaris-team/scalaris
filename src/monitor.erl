@@ -376,7 +376,7 @@ check_config() ->
 
 -spec get_timeslots_to_keep(Process::atom()) -> pos_integer().
 get_timeslots_to_keep(lb_active) ->
-    config:read(lb_active_monitor_history);
+    config:read(lb_active_monitor_history_max);
 get_timeslots_to_keep(_Process) ->
     config:read(monitor_timeslots_to_keep).
 

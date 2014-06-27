@@ -44,7 +44,7 @@
 -type load() :: number().
 
 -type load_metric() :: cpu | mem | reductions.
--type request_metric() :: db_ops.
+-type request_metric() :: db_histogram.
 
 %% possible metrics
 % items, cpu, mem, db_reads, db_writes, db_requests,
@@ -155,7 +155,6 @@ get_load_metric() ->
                 unknown -> unknown;
                 Val     -> util:round(Val, 2)
             end,
-    %io:format("Load: ~p~n", [Value]),
     Value.
 
 -spec get_load_metric(load_metric()) -> unknown | load().
@@ -167,7 +166,7 @@ get_load_metric(_)          -> throw(metric_not_available).
 -spec get_request_metric() -> integer().
 get_request_metric() ->
     case lb_active:requests_balance() of
-        true -> case get_dht_metric(db_ops) of
+        true -> case get_dht_metric(db_histogram) of
                     unknown -> 0;
                     Val -> erlang:round(Val)
                 end;
@@ -191,11 +190,21 @@ get_metric(MonitorPid, Metric) ->
         undefined ->
             unknown;
         RRD ->
-            RRDVals = rrd:get_all_values(desc, RRD),
-            Type = rrd:get_type(RRD),
-            Vals = lists:map(fun(Val) -> get_value_type(Val, Type) end, RRDVals),
-            %io:format("~p Vals: ~p~n", [Metric, Vals]),
-            ?IIF(lists:member(unknown, Vals), unknown, avg_weighted(Vals))
+            RRDVals = rrd:get_all_values(asc, RRD),
+            NumValues = rrd:get_count(RRD),
+            NumDefined = lists:foldl(fun(El, Acc) ->
+                                             if El =:= undefined -> 0;
+                                                true -> Acc + 1
+                                             end
+                                     end, 0, RRDVals),
+            NumNeeded = config:read(lb_active_monitor_history_min),
+            if NumDefined >= NumNeeded ->
+                   DefinedVals = lists:sublist(RRDVals, NumValues - NumDefined + 1, NumDefined),
+                   Type = rrd:get_type(RRD),
+                   UnpackedVals = lists:map(fun(Val) -> get_value_type(Val, Type) end, DefinedVals),
+                   avg_weighted(UnpackedVals);
+               true -> unknown
+            end
     end.
 
 -spec get_value_type(RRD::rrd:data_type(), Type::rrd:timeseries_type()) -> unknown | number().
@@ -206,22 +215,17 @@ get_value_type(Value, _Type) when is_number(Value) ->
 get_value_type(Value, {histogram_rt, _Size, _BaseKey}) ->
     histogram_rt:get_num_inserts(Value).
 
-%% @doc returns the weighted average of a list using decreasing weight
+%% @doc returns the weighted average of a list using an increasing weight
 -spec avg_weighted([number()]) -> number().
 avg_weighted([]) ->
     0;
 avg_weighted(List) ->
-    avg_weighted(List, _Weight=length(List), _Normalize=0, _Sum=0).
+    avg_weighted(List, _Weight=1, _Normalize=0, _Sum=0).
 
-%% @doc returns the weighted average of a list using decreasing weight
--spec avg_weighted([], Weight::0, Normalize::pos_integer(), Sum::number()) -> unknown | float();
-                  ([number()| unknown,...], Weight::pos_integer(), Normalize::non_neg_integer(), Sum::number()) -> unknown | float().
-avg_weighted([], 0, 0, _Sum) ->
-    unknown;
-avg_weighted([], 0, N, Sum) ->
+%% @doc returns the weighted average of a list using increasing weight
+-spec avg_weighted([number(),...], Weight::pos_integer(), Normalize::non_neg_integer(), Sum::number()) -> float().
+avg_weighted([], _Weight, N, Sum) ->
     Sum/N;
-avg_weighted([unknown | Other], Weight, N, Sum) ->
-    avg_weighted(Other, Weight - 1, N, Sum);
 avg_weighted([Element | Other], Weight, N, Sum) ->
     %% linear weight
     CurrentWeight = Weight,
@@ -229,7 +233,7 @@ avg_weighted([Element | Other], Weight, N, Sum) ->
     %CurrentWeight = Weight * Weight,
     %% exponential weight
     %CurrentWeight = util:pow(2, Weight),
-    avg_weighted(Other, Weight - 1, N + CurrentWeight, Sum + CurrentWeight * Element).
+    avg_weighted(Other, Weight + 1, N + CurrentWeight, Sum + CurrentWeight * Element).
 
 %% @doc returns a split key from the request histogram at a given time (if available)
 -spec get_request_histogram_split_key(TargetLoad::pos_integer(),
@@ -238,25 +242,32 @@ avg_weighted([Element | Other], Weight, N, Sum) ->
         -> {?RT:key(), TakenLoad::non_neg_integer()} | failed.
 get_request_histogram_split_key(TargetLoad, Direction, Items) ->
     MonitorPid = pid_groups:get_my(monitor),
-    RequestMetric = config:read(lb_active_request_metric),
-    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, RequestMetric}]),
+    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, db_histogram}]),
     case RRD of
         undefined ->
-            log:log(warn, "No request histogram available because rrd is undefined."),
+            ?TRACE("No request histogram available because rrd is undefined.~n", []),
             failed;
         RRD ->
+            %% values from oldest to newest
             AllValues = rrd:get_all_values(asc, RRD),
-            NumValues = rrd:get_count(RRD),
-            AllDefined = lists:all(fun(El) -> El =/= undefined end, AllValues),
-            if AllDefined ->
-                   ?TRACE("Got ~p histograms to compute split key~n", [NumValues]),
+            NumAll = rrd:get_count(RRD),
+            NumNeeded = config:read(lb_active_monitor_history_min),
+            %% check if we have enough recent values
+            NumDefined = lists:foldl(fun(El, Acc) ->
+                                             if El =:= undefined -> 0;
+                                                true -> Acc + 1
+                                             end
+                                     end, 0, AllValues),
+            if NumDefined >= NumNeeded ->
+                   ?TRACE("Got ~p histograms to compute split key~n", [NumDefined]),
                    %% merge all histograms with weight (the older the lower the weight)
+                   Values = lists:sublist(AllValues, NumAll - NumDefined + 1, NumDefined),
                    {AllHists, _} = lists:foldl(
                                      fun(Hist, {AccHist, Weight}) ->
                                              {histogram_rt:merge_weighted(AccHist, Hist, Weight), Weight + 1}
-                                     end, {hd(AllValues), 2}, tl(AllValues)),
+                                     end, {hd(Values), 2}, tl(Values)),
                    %% normalize afterwards
-                   Histogram = histogram_rt:normalize_count(NumValues, AllHists),
+                   Histogram = histogram_rt:normalize_count((NumDefined*(NumDefined+1)) div 2, AllHists),
                    % check if enough requests have been inserted into the histogram
                    EntriesAvailable = histogram_rt:get_num_inserts(Histogram),
                    Confidence = config:read(lb_active_request_confidence),
@@ -275,7 +286,7 @@ get_request_histogram_split_key(TargetLoad, Direction, Items) ->
                           end
                    end;
                true ->
-                   log:log(warn, "Not enough request histograms available. Not enough data collected."),
+                   ?TRACE("Not enough request histograms available: ~p~n", [NumDefined]),
                    failed
             end
     end.
@@ -335,8 +346,11 @@ check_config() ->
 
     config:cfg_is_less_than(lb_active_monitor_interval, config:read(lb_active_monitor_resolution)) and
 
-    config:cfg_is_integer(lb_active_monitor_history) and
-    config:cfg_is_greater_than(lb_active_monitor_history, 0) and
+    config:cfg_is_integer(lb_active_monitor_history_min) and
+    config:cfg_is_greater_than(lb_active_monitor_history_min, 0) and
+
+    config:cfg_is_integer(lb_active_monitor_history_max) and
+    config:cfg_is_greater_than_equal(lb_active_monitor_history_max, config:read(lb_active_monitor_history_min)) and
 
     config:cfg_is_float(lb_active_request_confidence) and
     config:cfg_is_greater_than(lb_active_request_confidence, 0.0).
