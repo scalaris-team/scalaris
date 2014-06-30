@@ -93,12 +93,18 @@
 %% Join messages (see dht_node_join.erl)
 %% userdevguide-begin dht_node:join_message
 on(Msg, State) when join =:= element(1, Msg) ->
-    dht_node_join:process_join_msg(Msg, State);
+    lb_stats:set_ignore_db_requests(true),
+    NewState = dht_node_join:process_join_msg(Msg, State),
+    lb_stats:set_ignore_db_requests(false),
+    NewState;
 %% userdevguide-end dht_node:join_message
 
 % Move messages (see dht_node_move.erl)
 on(Msg, State) when move =:= element(1, Msg) ->
-    dht_node_move:process_move_msg(Msg, State);
+    lb_stats:set_ignore_db_requests(true),
+    NewState = dht_node_move:process_move_msg(Msg, State),
+    lb_stats:set_ignore_db_requests(false),
+    NewState;
 
 % Lease management messages (see l_on_cseq.erl)
 on(Msg, State) when l_on_cseq =:= element(1, Msg) ->
