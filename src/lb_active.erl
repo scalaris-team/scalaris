@@ -426,10 +426,13 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                    true ->
                        case lb_stats:get_request_histogram_split_key(TargetLoadRequests, Direction,
                                                                      lb_info:get_items(HeavyNode)) of
-                           %% TODO fall back in a more clever way / abort lb request
                            failed ->
-                               log:log(warn, "get_request_histogram failed. falling back to item balancing.~n", []),
-                               {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
+                               case config:read(lb_active_fall_back_to_items) of
+                                   true ->
+                                        log:log(warn, "get_request_histogram failed. falling back to item balancing.~n", []),
+                                        {items, dht_node_state:get_split_key(DhtState, From, To, TargetLoadItems, Direction)};
+                                   _ -> {requests, {nil, 0}}
+                               end;
                            Val -> {requests, Val}
                        end
                end,
@@ -627,6 +630,8 @@ check_config() ->
     config:cfg_is_in(lb_active_module, [none | ?MODULES]) and
 
     config:cfg_is_in(lb_active_balance, [items, requests]) and
+
+    config:cfg_is_bool(lb_active_fall_back_to_items) and
 
     config:cfg_is_bool(lb_active_use_gossip) and
     config:cfg_is_greater_than(lb_active_gossip_stddev_threshold, 0) and
