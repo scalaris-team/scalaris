@@ -168,12 +168,12 @@ get_data(State) ->
 %%      an empty entry will be returned.
 -spec get_entry(db(), Key::?RT:key()) -> db_entry:entry().
 get_entry({KVStore, _Subscr, _Snap}, Key) ->
+    %% report read to process rrd and check for report to monitor
+    lb_stats:update_db_monitor(db_reads, Key),
     case ?DB:get(KVStore, Key) of
         {} ->
             db_entry:new(Key);
         Entry ->
-            %% report read to process rrd and check for report to monitor
-            lb_stats:update_db_monitor(db_reads, Key),
             Entry
     end.
 
@@ -184,12 +184,12 @@ set_entry(DB, Entry) ->
 -spec set_entry(db(), Entry::db_entry:entry(), non_neg_integer(),
                  non_neg_integer()) -> db().
 set_entry(State, Entry, TLogSnapNo, OwnSnapNo) ->
+    %% report write to process rrd and check for report to monitor
+    lb_stats:update_db_monitor(db_writes, db_entry:get_key(Entry)),
     case db_entry:is_null(Entry) of
         true ->
             delete_entry(State, Entry);
         _ ->
-            %% report write to process rrd and check for report to monitor
-            lb_stats:update_db_monitor(db_writes, db_entry:get_key(Entry)),
             %% do lockcounting and copy-on-write logic
             OldEntry = get_entry(State, db_entry:get_key(Entry)),
             {KVStore, Subscr, Snap} = snaps(State, OldEntry, Entry, TLogSnapNo, OwnSnapNo),
