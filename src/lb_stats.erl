@@ -30,6 +30,7 @@
 
 %% for db monitoring
 -export([init/0, init_db_histogram/1, update_db_histogram/2, update_db_monitor/2]).
+-export([set_ignore_db_requests/1, get_ignore_db_requests/0]).
 %% Metrics
 -export([get_load_metric/0, get_request_metric/0, default_value/1]).
 %% Triggered by lb_active
@@ -106,7 +107,7 @@ trigger_routine() ->
 %% @doc Updates the local rrd for reads or writes and checks for reporting
 -spec update_db_monitor(Type::db_reads | db_writes, Key::?RT:key()) -> ok.
 update_db_monitor(Type, Key) ->
-    case lb_active:is_enabled() andalso
+    case lb_active:is_enabled() andalso not get_ignore_db_requests() andalso
              (config:read(lb_active_request_metric) =:= Type orelse
                   config:read(lb_active_request_metric) =:= db_all) of
         true ->
@@ -317,6 +318,15 @@ get_last_reductions() ->
 -spec default_value(Val::unknown | number()) -> number().
 default_value(unknown) -> 0;
 default_value(Val)     -> Val.
+
+-compile({inline, [set_ignore_db_requests/1, get_ignore_db_requests/0]}).
+%% @doc Sets an indicator for lb_stats to stop monitoring requests during slides
+-spec set_ignore_db_requests(boolean()) -> ok.
+set_ignore_db_requests(Bool) -> erlang:put(ignore_db_requests, Bool), ok.
+
+%% @doc Flag for the dht_node process to check if the current message is a slide message
+-spec get_ignore_db_requests() -> boolean().
+get_ignore_db_requests() -> erlang:get(ignore_db_requests) =:= true.
 
 -spec collect_stats() -> boolean().
 collect_stats() ->
