@@ -78,12 +78,20 @@ collect_type_info(Module, Type, Arity, ParseState) ->
         true ->
             ParseState;
         false ->
-            {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
-                = beam_lib:chunks(code:where_is_file(atom_to_list(Module) ++ ".beam"),
-                                  [abstract_code]),
-            lists:foldl(fun (Chunk, InnerParseState) ->
-                                parse_chunk(Chunk, Module, InnerParseState)
-                        end, ParseState, AbstractCode)
+            case code:where_is_file(atom_to_list(Module) ++ ".beam") of
+                non_existing ->
+                    ct:pal("Error: File \"~w\" not found while trying to collect type info for ~w:~w/~w.",
+                           [Module, Module, Type, Arity]),
+                    ?ct_fail("File \"~w\" not found while trying to collect type info for ~w:~w/~w.",
+                           [Module, Module, Type, Arity]),
+                    error;
+                FileName ->
+                    {ok, {Module, [{abstract_code, {_AbstVersion, AbstractCode}}]}}
+                    = beam_lib:chunks(FileName, [abstract_code]),
+                    lists:foldl(fun (Chunk, InnerParseState) ->
+                                        parse_chunk(Chunk, Module, InnerParseState)
+                                end, ParseState, AbstractCode)
+            end
     end.
 
 
