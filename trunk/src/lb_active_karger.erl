@@ -146,11 +146,12 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
             comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, Options}, [{?quiet}]),
             State#state{rnd_node = []};
         RndNodes when IsValid ->
+            This = comm:this(),
             ReqIds =
                 [begin
                       ReqId = randoms:getRandomInt(),
                       ?TRACE("Sending out simulate request with ReqId ~p to ~.0p~n", [ReqId, node:pidX(RndNode)]),
-                      OptionsNew = [{simulate, ReqId}, {reply_to, comm:this()}] ++ Options,
+                      OptionsNew = [{simulate, ReqId}, {reply_to, This} | Options],
                       comm:send(node:pidX(RndNode), {lb_active, phase1, MyLBInfo, OptionsNew}, [{?quiet}]),
                       {ReqId, RndNode}
                  end || RndNode <- RndNodes],
@@ -167,23 +168,23 @@ handle_msg({simulation_result, Id, ThisReqId, {Metric, LoadChange}}, State) ->
     case State#state.round_id of
         Id ->
             ReqIds = State#state.req_ids,
-            ReqIdsNew = proplists:delete(ThisReqId, ReqIds),
+            ReqIdsNew = lists:keydelete(ThisReqId, 1, ReqIds),
             case ReqIdsNew of
                 [] -> comm:send_local(self(), {pick_best_candidate, Id});
                 _  -> ok
             end,
-            NodeX = proplists:get_value(ThisReqId, ReqIds),
+            {value, {ThisReqId, NodeX}} = lists:keysearch(ThisReqId, 1, ReqIds),
 
             Best = State#state.best_candidate,
             {BestLoadChange, _Node} = proplists:get_value(Metric, Best, {0, nil}),
 
             case LoadChange < BestLoadChange of
-                    true  ->
-                        NewBest = lists:keystore(Metric, 1, Best, {Metric, {LoadChange, NodeX}}),
-                        State#state{req_ids = ReqIdsNew,
-                                    best_candidate = NewBest};
-                    _ ->
-                        State#state{req_ids = ReqIdsNew}
+                true  ->
+                    NewBest = lists:keystore(Metric, 1, Best, {Metric, {LoadChange, NodeX}}),
+                    State#state{req_ids = ReqIdsNew,
+                                best_candidate = NewBest};
+                _ ->
+                    State#state{req_ids = ReqIdsNew}
             end;
         _ ->
            ?TRACE("Discarding old round with Id ~p~n", [Id]),
@@ -198,11 +199,11 @@ handle_msg({pick_best_candidate, Id}, State) ->
         Id ->
             Best = State#state.best_candidate,
             BestCandidate =
-                case proplists:get_value(requests, Best) of
-                    {_LoadChange, Node} -> Node;
+                case lists:keysearch(requests, 1, Best) of
+                    {value, {requests, {_LoadChange, Node}}} -> Node;
                     _ ->
-                        case proplists:get_value(items, Best) of
-                            {_LoadChange, Node} -> Node;
+                        case lists:keysearch(items, 1, Best) of
+                            {value, {requests, {_LoadChange, Node}}} -> Node;
                             _ -> nil
                         end
                 end,
@@ -232,28 +233,27 @@ handle_msg({pick_best_candidate, Id}, State) ->
 %% assuming the two nodes are neighbors. If not we'll contact
 %% the light node's successor for more load information.
 handle_dht_msg({lb_active, phase1, NodeX, Options}, DhtState) ->
-    Epsilon = proplists:get_value(epsilon, Options),
+    {value, {epsilon, Epsilon}} = lists:keysearch(epsilon, 1, Options),
 	MyLBInfo = lb_info:new(dht_node_state:details(DhtState)),
     IsValid = lb_info:is_valid(MyLBInfo),
 	MyLoad = lb_info:get_load(MyLBInfo),
 	LoadX = lb_info:get_load(NodeX),
-	case MyLoad =/= 0 orelse LoadX =/= 0 of
-		true when IsValid ->
-			if
-                % first check if load balancing is necessary
-				MyLoad =< Epsilon * LoadX ->
-					?TRACE("My node is light~n", []),
-					balance_adjacent(NodeX, MyLBInfo, Options);
-				LoadX =< Epsilon * MyLoad ->
-					?TRACE("My node is heavy~n", []),
-					balance_adjacent(MyLBInfo, NodeX, Options);
-				true ->
-					%% no balancing
-					?TRACE("Won't balance~n", []),
-                    lb_active:balance_noop(Options)
-			end;
-		_ -> lb_active:balance_noop(Options)
-	end,
+    if IsValid andalso (MyLoad =/= 0 orelse LoadX =/= 0) ->
+           if
+               % first check if load balancing is necessary
+               MyLoad =< Epsilon * LoadX ->
+                   ?TRACE("My node is light~n", []),
+                   balance_adjacent(NodeX, MyLBInfo, Options);
+               LoadX =< Epsilon * MyLoad ->
+                   ?TRACE("My node is heavy~n", []),
+                   balance_adjacent(MyLBInfo, NodeX, Options);
+               true ->
+                   %% no balancing
+                   ?TRACE("Won't balance~n", []),
+                   lb_active:balance_noop(Options)
+           end;
+       true -> lb_active:balance_noop(Options)
+    end,
 	DhtState;
 
 %% Second phase: We are LightNode's successor. We might hold
@@ -265,16 +265,15 @@ handle_dht_msg({lb_active, phase2, HeavyNode, LightNode, Options}, DhtState) ->
 	MyLBInfo = lb_info:new(dht_node_state:details(DhtState)),
     IsValid = lb_info:is_valid(MyLBInfo),
 	MyLoad = lb_info:get_load(MyLBInfo),
-	LoadHeavyNode = lb_info:get_load(HeavyNode),
-	case MyLoad > LoadHeavyNode of
-		true when IsValid ->
-            % slide
-            lb_active:balance_nodes(HeavyNode, LightNode, Options);
-		false when IsValid ->
-            % jump
-            lb_active:balance_nodes(HeavyNode, LightNode, MyLBInfo, Options);
-        _ -> ok
-	end,
+    LoadHeavyNode = lb_info:get_load(HeavyNode),
+    if IsValid andalso MyLoad > LoadHeavyNode ->
+           % slide
+           lb_active:balance_nodes(HeavyNode, LightNode, Options);
+       IsValid ->
+           % jump
+           lb_active:balance_nodes(HeavyNode, LightNode, MyLBInfo, Options);
+       true -> ok
+    end,
 	DhtState.
 
 %%%%%%%%%%%%%%%%%%%%
