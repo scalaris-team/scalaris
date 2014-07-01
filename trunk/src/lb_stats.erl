@@ -80,7 +80,7 @@ init() ->
 -spec trigger_routine() -> ok.
 trigger_routine() ->
     trigger(),
-    CPU = cpu_sup:util(),
+    CPU = erlang:round(cpu_sup:util()),
     [{system_total_memory, _Total},
      {free_swap, _FreeSwap},
      {total_swap, _TotalSwap},
@@ -152,7 +152,7 @@ get_load_metric() ->
     Metric = config:read(lb_active_load_metric),
     Value = case get_load_metric(Metric) of
                 unknown -> unknown;
-                Val     -> util:round(Val, 2)
+                Val     -> erlang:round(Val)
             end,
     Value.
 
