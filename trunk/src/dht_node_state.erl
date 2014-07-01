@@ -191,7 +191,7 @@ new(RT, RMState, DB) ->
          (state(), tx_tp_db) -> any();
          (state(), proposer) -> pid();
          (state(), load) -> integer();
-         (state(), load2) -> lb_stats:load();
+         (state(), load2) -> unknown | lb_stats:load();
          (state(), load3) -> lb_stats:load();
          (state(), slide_pred) -> slide_op:slide_op() | null;
          (state(), slide_succ) -> slide_op:slide_op() | null;
@@ -261,7 +261,7 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         load         -> db_dht:get_load(DB)
                         %% and the prbr kv entries:
                             + prbr:get_load(PRBRState);
-        load2        -> lb_stats:default_value(lb_stats:get_load_metric());
+        load2        -> lb_stats:get_load_metric();
         load3        -> lb_stats:get_request_metric();
         prbr_kv_db   -> PRBRState;
         txid_db1     -> TxIdDB1;

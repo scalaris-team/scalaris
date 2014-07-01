@@ -33,8 +33,8 @@
 -endif.
 
 -type(load() :: integer()).
--type(load2() :: number()).
--type(load3() :: number()).
+-type(load2() :: lb_stats:load()).
+-type(load3() :: lb_stats:load()).
 -type(hostname() :: string()).
 -type(rt_size() :: integer()).
 -type(message_log() :: any()).

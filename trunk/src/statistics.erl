@@ -69,7 +69,10 @@ get_load_std_deviation(Which, Ring) ->
 
 -spec get_load(Which::load(), ring_element()) -> node_details:load().
 get_load(Which, {ok, Details}) ->
-    node_details:get(Details, Which);
+    case node_details:get(Details, Which) of
+        unknown -> 0;
+        Val -> Val
+    end;
 get_load(_Which, {failed, _}) ->
     0.
 
