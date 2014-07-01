@@ -203,7 +203,7 @@ handle_msg({pick_best_candidate, Id}, State) ->
                     {value, {requests, {_LoadChange, Node}}} -> Node;
                     _ ->
                         case lists:keysearch(items, 1, Best) of
-                            {value, {requests, {_LoadChange, Node}}} -> Node;
+                            {value, {items, {_LoadChange, Node}}} -> Node;
                             _ -> nil
                         end
                 end,
