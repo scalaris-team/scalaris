@@ -55,15 +55,18 @@
 -spec new(NodeDetails::node_details:node_details()) -> lb_info().
 new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
-    Requests = lb_stats:get_request_metric(),
-    SystemLoad = lb_stats:get_load_metric(),
-    Load = try
-               case config:read(lb_active_balance) of
-                   items -> Items;
-                   requests -> (erlang:round(math:sqrt(Items)) + Requests) * SystemLoad
-               end
-           catch
-               error:badarith -> unknown
+    %% lb_stats:get_load_metric(), can be unknown
+    SystemLoad = node_details:get(NodeDetails, load2),
+    %% lb_stats:get_request_metric()
+    Requests = node_details:get(NodeDetails, load3),
+    Load = case config:read(lb_active_balance) of
+               items -> Items;
+               requests ->
+                   try
+                       (erlang:round(math:sqrt(Items)) + Requests) * SystemLoad
+                   catch
+                       error:badarith -> unknown
+                   end
            end,
     #lb_info{load  = Load,
              reqs  = Requests,
