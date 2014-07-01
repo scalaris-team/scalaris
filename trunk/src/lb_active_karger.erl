@@ -173,7 +173,7 @@ handle_msg({simulation_result, Id, ThisReqId, {Metric, LoadChange}}, State) ->
                 [] -> comm:send_local(self(), {pick_best_candidate, Id});
                 _  -> ok
             end,
-            {value, {ThisReqId, NodeX}} = lists:keysearch(ThisReqId, 1, ReqIds),
+            {ThisReqId, NodeX} = lists:keyfind(ThisReqId, 1, ReqIds),
 
             Best = State#state.best_candidate,
             {BestLoadChange, _Node} = proplists:get_value(Metric, Best, {0, nil}),
@@ -199,11 +199,11 @@ handle_msg({pick_best_candidate, Id}, State) ->
         Id ->
             Best = State#state.best_candidate,
             BestCandidate =
-                case lists:keysearch(requests, 1, Best) of
-                    {value, {requests, {_LoadChange, Node}}} -> Node;
+                case lists:keyfind(requests, 1, Best) of
+                    {requests, {_LoadChange, Node}} -> Node;
                     _ ->
-                        case lists:keysearch(items, 1, Best) of
-                            {value, {items, {_LoadChange, Node}}} -> Node;
+                        case lists:keyfind(items, 1, Best) of
+                            {items, {_LoadChange, Node}} -> Node;
                             _ -> nil
                         end
                 end,
@@ -233,7 +233,7 @@ handle_msg({pick_best_candidate, Id}, State) ->
 %% assuming the two nodes are neighbors. If not we'll contact
 %% the light node's successor for more load information.
 handle_dht_msg({lb_active, phase1, NodeX, Options}, DhtState) ->
-    {value, {epsilon, Epsilon}} = lists:keysearch(epsilon, 1, Options),
+    {epsilon, Epsilon} = lists:keyfind(epsilon, 1, Options),
 	MyLBInfo = lb_info:new(dht_node_state:details(DhtState)),
     IsValid = lb_info:is_valid(MyLBInfo),
 	MyLoad = lb_info:get_load(MyLBInfo),
