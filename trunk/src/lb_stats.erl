@@ -81,16 +81,14 @@ init() ->
 trigger_routine() ->
     trigger(),
     CPU = cpu_sup:util(),
-    MEM = case memsup:get_system_memory_data() of
-              [{system_total_memory, _Total},
-               {free_swap, _FreeSwap},
-               {total_swap, _TotalSwap},
-               {cached_memory, _CachedMemory},
-               {buffered_memory, _BufferedMemory},
-               {free_memory, FreeMemory},
-               {total_memory, TotalMemory}] ->
-                  FreeMemory / TotalMemory * 100
-          end,
+    [{system_total_memory, _Total},
+     {free_swap, _FreeSwap},
+     {total_swap, _TotalSwap},
+     {cached_memory, _CachedMemory},
+     {buffered_memory, _BufferedMemory},
+     {free_memory, FreeMemory},
+     {total_memory, TotalMemory}] = memsup:get_system_memory_data(),
+    MEM = FreeMemory / TotalMemory * 100,
     {NewReductions, NewTimestamp} = get_reductions(),
     {OldReductions, OldTimestamp} = get_last_reductions(),
     TimeDiff = timer:now_diff(NewTimestamp, OldTimestamp) div 1000000,
@@ -186,20 +184,18 @@ get_dht_metric(Metric) ->
 
 -spec get_metric(pid(), load_metric() | request_metric()) -> unknown | load().
 get_metric(MonitorPid, Metric) ->
-    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, Metric}]),
-    case RRD of
-        undefined ->
+    case monitor:get_rrds(MonitorPid, [{lb_active, Metric}]) of
+        [{_Process, _Key, undefined}] ->
             unknown;
-        RRD ->
+        [{_Process, _Key, RRD}] ->
             RRDVals = rrd:get_all_values(asc, RRD),
-            NumValues = rrd:get_count(RRD),
-            NumDefined = lists:foldl(fun(El, Acc) ->
-                                             if El =:= undefined -> 0;
-                                                true -> Acc + 1
-                                             end
+            % max number of consecutive non-undefined values at the end of RRDVals
+            NumDefined = lists:foldl(fun(undefined, _Acc) -> 0;
+                                        (_, Acc)          -> Acc + 1
                                      end, 0, RRDVals),
             NumNeeded = config:read(lb_active_monitor_history_min),
             if NumDefined >= NumNeeded ->
+                   NumValues = rrd:get_count(RRD),
                    DefinedVals = lists:sublist(RRDVals, NumValues - NumDefined + 1, NumDefined),
                    Type = rrd:get_type(RRD),
                    UnpackedVals = lists:map(fun(Val) -> get_value_type(Val, Type) end, DefinedVals),
@@ -243,15 +239,13 @@ avg_weighted([Element | Other], Weight, N, Sum) ->
         -> {?RT:key(), TakenLoad::non_neg_integer()} | failed.
 get_request_histogram_split_key(TargetLoad, Direction, Items) ->
     MonitorPid = pid_groups:get_my(monitor),
-    [{_Process, _Key, RRD}] = monitor:get_rrds(MonitorPid, [{lb_active, db_histogram}]),
-    case RRD of
-        undefined ->
+    case monitor:get_rrds(MonitorPid, [{lb_active, db_histogram}]) of
+        [{_Process, _Key, undefined}] ->
             ?TRACE("No request histogram available because rrd is undefined.~n", []),
             failed;
-        RRD ->
+        [{_Process, _Key, RRD}] ->
             %% values from oldest to newest
             AllValues = rrd:get_all_values(asc, RRD),
-            NumAll = rrd:get_count(RRD),
             NumNeeded = config:read(lb_active_monitor_history_min),
             %% check if we have enough recent values
             NumDefined = lists:foldl(fun(El, Acc) ->
@@ -262,6 +256,7 @@ get_request_histogram_split_key(TargetLoad, Direction, Items) ->
             if NumDefined >= NumNeeded ->
                    ?TRACE("Got ~p histograms to compute split key~n", [NumDefined]),
                    %% merge all histograms with weight (the older the lower the weight)
+                   NumAll = rrd:get_count(RRD),
                    Values = lists:sublist(AllValues, NumAll - NumDefined + 1, NumDefined),
                    {AllHists, _} = lists:foldl(
                                      fun(Hist, {AccHist, Weight}) ->
