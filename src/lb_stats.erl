@@ -358,4 +358,4 @@ check_config() ->
     config:cfg_is_greater_than_equal(lb_active_monitor_history_max, config:read(lb_active_monitor_history_min)) and
 
     config:cfg_is_float(lb_active_request_confidence) and
-    config:cfg_is_greater_than(lb_active_request_confidence, 0.0).
+    config:cfg_is_greater_than_equal(lb_active_request_confidence, 0.0).
