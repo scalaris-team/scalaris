@@ -58,7 +58,10 @@ new(NodeDetails) ->
     Requests = lb_stats:get_request_metric(),
     SystemLoad = lb_stats:get_load_metric(),
     Load = try
-               (Items + Requests) * SystemLoad
+               case config:read(lb_active_balance) of
+                   items -> Items;
+                   requests -> (erlang:round(math:sqrt(Items)) + Requests) * SystemLoad
+               end
            catch
                error:badarith -> unknown
            end,
