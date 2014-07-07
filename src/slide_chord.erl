@@ -120,12 +120,12 @@ change_my_id(State, SlideOp, ReplyPid) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_data1(State, SlideOp, ReplyPid) ->
     case slide_op:get_predORsucc(SlideOp) of
-        'succ' -> change_my_id(State, SlideOp, ReplyPid);
-        'pred' -> State1 = dht_node_state:add_db_range(
-                             State, slide_op:get_interval(SlideOp),
-                             slide_op:get_id(SlideOp)),
-                  send_continue_msg(ReplyPid),
-                  {ok, State1, SlideOp}
+        succ -> change_my_id(State, SlideOp, ReplyPid);
+        pred -> State1 = dht_node_state:add_db_range(
+                           State, slide_op:get_interval(SlideOp),
+                           slide_op:get_id(SlideOp)),
+                send_continue_msg(ReplyPid),
+                {ok, State1, SlideOp}
     end.
 
 %% @doc Cleans up after prepare_send_data1/3 once the RM is up-to-date, (no-op here).
@@ -151,9 +151,9 @@ prepare_send_data2(State, SlideOp, {abort}) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 update_rcv_data1(State, SlideOp, ReplyPid) ->
     case slide_op:get_predORsucc(SlideOp) of
-        'succ' -> change_my_id(State, SlideOp, ReplyPid);
-        'pred' -> send_continue_msg(ReplyPid),
-                  {ok, State, SlideOp}
+        succ -> change_my_id(State, SlideOp, ReplyPid);
+        pred -> send_continue_msg(ReplyPid),
+                {ok, State, SlideOp}
     end.
 
 %% @doc Cleans up after update_rcv_data1/3 once the RM is up-to-date, (no-op here).
