@@ -292,22 +292,28 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
 -spec abort_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
         Reason::dht_node_move:abort_reason()) -> dht_node_state:state().
 abort_slide(State, SlideOp, Reason) ->
-    % try to change ID back (if not the first receiving join slide)
-    case slide_op:get_sendORreceive(SlideOp) of
-        'rcv' when Reason =:= target_down ->
-            % if ID already changed, keep it; as well as the already incorporated data
-            State;
-        _ ->
-            MyId = dht_node_state:get(State, node_id),
-            Phase = slide_op:get_phase(SlideOp),
-            case slide_op:get_my_old_id(SlideOp) of
-                null -> State;
-                MyId -> State;
-                _ when Phase =:= wait_for_delta_ack -> State;
-                MyOldId ->
-                    rm_loop:update_id(MyOldId),
-                    State
-            end
+    case slide_op:get_predORsucc(SlideOp) of
+        succ ->
+            % try to change ID back (if not the first receiving join slide)
+            case slide_op:get_sendORreceive(SlideOp) of
+                'rcv' when Reason =:= target_down ->
+                    % if ID already changed, keep it; as well as the already incorporated data
+                    State;
+                _ ->
+                    MyId = dht_node_state:get(State, node_id),
+                    Phase = slide_op:get_phase(SlideOp),
+                    case slide_op:get_my_old_id(SlideOp) of
+                        null -> State;
+                        MyId -> State;
+                        _ when Phase =:= wait_for_delta_ack -> State;
+                        MyOldId ->
+                            rm_loop:update_id(MyOldId),
+                            State
+                    end
+            end;
+        pred ->
+            % nothing we can do on this side
+            State
     end.
 
 -spec rm_exec(pid(), term(),
