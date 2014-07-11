@@ -1138,7 +1138,10 @@ finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
             true -> JoinOptions;
             _    -> [{skip_psv_lb} | JoinOptions]
         end,
-    comm:send_local(self(), {rejoin, NewId, JoinOptions2}),
+    %% Request move state of rm before rejoining
+    ReplyMsg = {rejoin, NewId, JoinOptions2, '_'},
+    ReplyPid = comm:reply_as(self(), 4, ReplyMsg),
+    comm:send_local(self(), {rm, get_move_state, ReplyPid}),
     State1;
 finish_delta_ack2B(State, SlideOp, {none}) ->
     finish_slide_and_continue_with_next_op(State, SlideOp);

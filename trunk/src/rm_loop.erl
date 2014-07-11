@@ -35,7 +35,7 @@
 %%         end).
 -define(TRACE_STATE(OldState, NewState), ok).
 
--export([send_trigger/0, init_first/0, init/3, on/2,
+-export([send_trigger/0, init_first/0, init/4, on/2,
          leave/0, update_id/1,
          get_neighbors/1, has_left/1, is_responsible/2,
          notify_new_pred/2, notify_new_succ/2,
@@ -95,7 +95,8 @@
     {rm, update_my_id, NewId::?RT:key()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {rm, subscribe, Pid::pid(), Tag::any(), subscriber_filter_fun(), subscriber_exec_fun(), MaxCalls::pos_integer() | inf} |
-    {rm, unsubscribe, Pid::pid(), Tag::any()}).
+    {rm, unsubscribe, Pid::pid(), Tag::any()} |
+    {rm, get_move_state, Pid::pid()}).
 
 -define(SEND_OPTIONS, [{channel, prio}]).
 
@@ -225,13 +226,15 @@ init_first() ->
 
 %% @doc Initializes the rm_loop state.
 -spec init(Me::node:node_type(), Pred::node:node_type(),
-           Succ::node:node_type()) -> state().
-init(Me, Pred, Succ) ->
+           Succ::node:node_type(), OldSubscrTable::null | tid()) -> state().
+init(Me, Pred, Succ, OldSubscrTable) ->
     % do not wait for the first trigger to arrive here
     % -> execute trigger action immediately
     comm:send_local(self(), {rm, trigger_action}),
     % create the ets table storing the subscriptions
-    SubscrTable = ets:new(rm_subscribers, [ordered_set, private]),
+    if OldSubscrTable =/= null -> SubscrTable = OldSubscrTable;
+       true -> SubscrTable = ets:new(rm_subscribers, [ordered_set, private])
+    end,
     dn_cache:subscribe(),
     RM_State = ?RM:init(Me, Pred, Succ),
     set_failuredetector(?RM:get_neighbors(RM_State)),
@@ -353,6 +356,12 @@ on({rm, leave}, {RM_State, _HasLeft, SubscrTable}) ->
     comm:send_local(self(), {move, node_leave}), % msg to dht_node
     ?RM:leave(RM_State),
     {RM_State, true, SubscrTable};
+
+%% requests the move state of the rm, e.g. before rejoining the ring
+on({rm, get_move_state, Pid}, {_RM_State, _HasLeft, SubscrTable} = State) ->
+    MoveState = [{subscr_table, SubscrTable}],
+    comm:send_local(Pid, {get_move_state_response, MoveState}),
+    State;
 
 %% add Pid to the node change subscriber list
 on({rm, subscribe, Pid, Tag, FilterFun, ExecFun, MaxCalls}, {RM_State, _HasLeft, SubscrTable} = State) ->
