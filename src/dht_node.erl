@@ -86,7 +86,9 @@
     {zombie, Node::node:node_type()} |
     {crash, DeadPid::comm:mypid(), Reason::fd:reason()} |
     {crash, DeadPid::comm:mypid(), Reason::fd:reason(), Cookie::tuple()} |
-    {leave, SourcePid::comm:erl_local_pid() | null}.
+    {leave, SourcePid::comm:erl_local_pid() | null} |
+    {rejoin, IdVersion::non_neg_integer(), JoinOptions::[tuple()],
+      {get_move_state_response, MoveState::[tuple()]}}.
 
 %% @doc message handler
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state() | kill.
@@ -464,11 +466,12 @@ on({do_snapshot, SnapNumber, Leader}, State) ->
 on({local_snapshot_is_done}, State) ->
     snapshot:on_local_snapshot_is_done(State);
 
-on({rejoin, Id, Options}, State) ->
+on({rejoin, Id, Options, {get_move_state_response, MoveState}}, State) ->
     %% start new join
     comm:send_local(self(), {join, start}),
+    JoinOptions = [{move_state, MoveState} | Options],
     IdVersion = node:id_version(dht_node_state:get(State, node)),
-    dht_node_join:join_as_other(Id, IdVersion+1, Options).
+    dht_node_join:join_as_other(Id, IdVersion+1, JoinOptions).
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop

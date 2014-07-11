@@ -114,7 +114,7 @@ join_as_first(Id, IdVersion, _Options) ->
             [self(), Id, IdVersion]),
     Me = node:new(comm:this(), Id, IdVersion),
     % join complete, State is the first "State"
-    finish_join(Me, Me, Me, db_dht:new(), msg_queue:new(), false).
+    finish_join(Me, Me, Me, db_dht:new(), msg_queue:new(), []).
 %% userdevguide-end dht_node_join:join_as_first
 
 %% userdevguide-begin dht_node_join:join_as_other
@@ -446,10 +446,11 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId, TargetId, N
                             rm_loop:notify_new_pred(node:pidX(Succ), Me),
 
                             JoinOptions = get_join_options(JoinState),
-                            IsJump = notify_jump(JoinOptions),
+                            notify_jump(JoinOptions),
+                            MoveState = proplists:get_value(move_state, JoinOptions, []),
 
                             finish_join_and_slide(Me, Pred, Succ, db_dht:new(),
-                                                  QueuedMessages, MoveId, NextOp, IsJump)
+                                                  QueuedMessages, MoveId, NextOp, MoveState)
                     end
             end
     end,
@@ -941,13 +942,12 @@ try_next_candidate(JoinState) ->
     contact_best_candidate(JoinState1).
 
 %% @doc Notify the source pid in case of a jump
--spec notify_jump(JoinOptions::[tuple()]) -> boolean().
+-spec notify_jump(JoinOptions::[tuple()]) -> ok.
 notify_jump(JoinOptions) ->
     case lists:keyfind(jump, 1, JoinOptions) of
         {jump, _Tag, SourcePid, NotifyMsg} ->
-            dht_node_move:notify_source_pid(SourcePid, NotifyMsg),
-            true;
-        _ -> false
+            dht_node_move:notify_source_pid(SourcePid, NotifyMsg);
+        _ -> ok
     end.
 
 %% userdevguide-begin dht_node_join:finish_join
@@ -955,19 +955,21 @@ notify_jump(JoinOptions) ->
 -spec finish_join(Me::node:node_type(), Pred::node:node_type(),
                   Succ::node:node_type(), DB::db_dht:db(),
                   QueuedMessages::msg_queue:msg_queue(),
-                  IsJump::boolean())
+                  MoveState::[tuple()])
         -> dht_node_state:state().
-finish_join(Me, Pred, Succ, DB, QueuedMessages, IsJump) ->
-    RMState = rm_loop:init(Me, Pred, Succ),
+finish_join(Me, Pred, Succ, DB, QueuedMessages, MoveState) ->
+    %% get old subscribtion tabel if available
+    OldSubscrTable = proplists:get_value(subscr_table, MoveState, null),
+    RMState = rm_loop:init(Me, Pred, Succ, OldSubscrTable),
     Neighbors = rm_loop:get_neighbors(RMState),
     % wait for the ring maintenance to initialize and tell us its table ID
     rt_loop:activate(Neighbors),
-    if IsJump -> ok;
-       true ->
+    if MoveState =:= [] ->
            cyclon:activate(Neighbors),
            vivaldi:activate(),
            dc_clustering:activate(),
-           gossip:activate(nodelist:node_range(Neighbors))
+           gossip:activate(nodelist:node_range(Neighbors));
+       true -> ok
     end,
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
@@ -989,11 +991,11 @@ reject_join_response(Succ, _Pred, MoveId, _CandId) ->
                             Succ::node:node_type(), DB::db_dht:db(),
                             QueuedMessages::msg_queue:msg_queue(),
                             MoveId::slide_op:id(), NextOp::slide_op:next_op(),
-                            IsJump::boolean())
+                            MoveState::[tuple()])
         -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}],
             State::dht_node_state:state()}.
-finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId, NextOp, IsJump) ->
-    State = finish_join(Me, Pred, Succ, DB, QueuedMessages, IsJump),
+finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId, NextOp, MoveState) ->
+    State = finish_join(Me, Pred, Succ, DB, QueuedMessages, MoveState),
     State1 = dht_node_move:exec_setup_slide_not_found(
                {ok, {join, 'rcv'}}, State, MoveId, Succ, node:id(Me), join,
                unknown, null, nomsg, NextOp, false),
