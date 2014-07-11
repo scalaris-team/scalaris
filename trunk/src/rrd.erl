@@ -449,11 +449,13 @@ histogram_update_fun(_Time, undefined, New, Size) ->
 histogram_update_fun(_Time, Hist, New, _Size) ->
     histogram:add(New, Hist).
 
--spec histogram_rt_update_fun(Time::internal_time(), Old::histogram_type() | undefined, NewV::number(), Size::non_neg_integer(), BaseKey::histogram_rt:base_key())
+-spec histogram_rt_update_fun(Time::internal_time(), Old::histogram_type() | undefined, NewV::no_op | number(), Size::non_neg_integer(), BaseKey::histogram_rt:base_key())
         -> histogram_rt:histogram().
-histogram_rt_update_fun(_Time, undefined, New, Size, BaseKey) ->
+histogram_rt_update_fun(Time, undefined, New, Size, BaseKey) ->
     Hist = histogram_rt:create(Size, BaseKey),
-    histogram_rt:add(New, Hist);
+    histogram_rt_update_fun(Time, Hist, New, Size, BaseKey);
+histogram_rt_update_fun(_Time, Hist, no_op, _Size, _BaseKey) ->
+    Hist;
 histogram_rt_update_fun(_Time, Hist, New, _Size, _BaseKey) ->
     histogram_rt:add(New, Hist).
 

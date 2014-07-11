@@ -45,9 +45,20 @@ on({db_histogram_init, Id}, {OldLookupHops, OldDBOps, _OldDBHistogram}) ->
     NewDBHistogram = lb_stats:init_db_histogram(Id),
     {OldLookupHops, OldDBOps, NewDBHistogram};
 
+on({db_report}, {OldLookupHops, OldDBOps, OldDBHistogram}) ->
+    case lb_active:requests_balance() of
+        true ->
+            NewDBHistogram = rrd:add_now(no_op, OldDBHistogram),
+            monitor:check_report(lb_active, db_histogram, OldDBHistogram, NewDBHistogram);
+        _ ->
+            NewDBHistogram = OldDBHistogram
+    end,
+    NewDBOps = rrd:add_now(0, OldDBOps),
+    monitor:check_report(lb_active, db_ops, OldDBOps, NewDBOps),
+    {OldLookupHops, NewDBOps, NewDBHistogram};
+
 on({db_op, Key}, {OldLookupHops, OldDBOps, OldDBHistogram}) ->
     NewDBOps = rrd:add_now(1, OldDBOps),
-    monitor:check_report(lb_active, db_ops, OldDBOps, NewDBOps),
     NewDBHistogram = lb_stats:update_db_histogram(Key, OldDBHistogram),
     {OldLookupHops, NewDBOps, NewDBHistogram}.
 

@@ -146,17 +146,17 @@ on({gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options,
     %% the standard deviation from the gossip process.
     Size = gossip_load:load_info_get(size, LoadInfo),
     GossipModule = lb_active_gossip_request_metric,
-    Metrics =   [{avgItems, gossip_load:load_info_get(avgLoad, LoadInfo)},
-                 {stddevItems, gossip_load:load_info_get(stddev, LoadInfo)}]
-                ++
-                [{avgRequests, gossip_load:load_info_other_get(avgLoad, GossipModule, LoadInfo)},
-                 {stddevRequests, gossip_load:load_info_other_get(stddev, GossipModule, LoadInfo)}],
-
-    OptionsNew = [{dht_size, Size} | Metrics ++ Options],
-
-    HeavyPid = node:pidX(lb_info:get_node(HeavyNode)),
-    comm:send(HeavyPid, {lb_active, balance, HeavyNode, LightNode, LightNodeSucc, OptionsNew}),
-
+    ItemMetrics = [{avgItems, gossip_load:load_info_get(avgLoad, LoadInfo)},
+                   {stddevItems, gossip_load:load_info_get(stddev, LoadInfo)}],
+    RequestMetrics = [{avgRequests, gossip_load:load_info_other_get(avgLoad, GossipModule, LoadInfo)},
+                      {stddevRequests, gossip_load:load_info_other_get(stddev, GossipModule, LoadInfo)}],
+    GossipMetrics = [{dht_size, Size} | ItemMetrics ++ RequestMetrics],
+    case requests_balance() andalso lists:keyfind(unknown, 2, RequestMetrics) =/= false of
+        true -> ok;
+        _ -> OptionsNew = GossipMetrics ++ Options,
+             HeavyPid = node:pidX(lb_info:get_node(HeavyNode)),
+             comm:send(HeavyPid, {lb_active, balance, HeavyNode, LightNode, LightNodeSucc, OptionsNew})
+    end,
     State;
 
 %% lb_op received from dht_node and to be executed
@@ -394,6 +394,8 @@ handle_dht_msg({lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options
                    false -> jump
                end,
 
+           ?TRACE("Load Heavy: ~p Load Light: ~p~n", [lb_info:get_load(MyNode), lb_info:get_load(LightNode)]),
+           ?TRACE("Requests Heavy: ~p Requests Light: ~p~n", [lb_info:get_reqs(MyNode), lb_info:get_reqs(LightNode)]),
            ProposedTargetLoadItems = lb_info:get_target_load(items, JumpOrSlide, MyNode, LightNode),
            ProposedTargetLoadRequests = lb_info:get_target_load(requests, JumpOrSlide, MyNode, LightNode),
 

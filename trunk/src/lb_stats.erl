@@ -95,6 +95,8 @@ trigger_routine() ->
     if TimeDiff > 0 -> % let at least one second pass
            ReductionsPerSec = (NewReductions - OldReductions) div TimeDiff,
            set_last_reductions(NewReductions, NewTimestamp),
+           DhtNodeMonitor = pid_groups:get_my(dht_node_monitor),
+           comm:send_local(DhtNodeMonitor, {db_report}),
            monitor:monitor_set_value(lb_active, reductions, fun(Old) -> rrd:add(NewTimestamp, ReductionsPerSec, Old) end);
        true -> ok
     end,
@@ -164,12 +166,9 @@ get_load_metric(_)          -> throw(metric_not_available).
 
 -spec get_request_metric() -> integer().
 get_request_metric() ->
-    case lb_active:requests_balance() of
-        true -> case get_dht_metric(db_histogram) of
-                    unknown -> 0;
-                    Val -> erlang:round(Val)
-                end;
-        _ -> 0
+    case get_dht_metric(db_histogram) of
+        unknown -> unknown;
+        Val -> erlang:round(Val)
     end.
 
 -spec get_vm_metric(load_metric()) -> unknown | load().
