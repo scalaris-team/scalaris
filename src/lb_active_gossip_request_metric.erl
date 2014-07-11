@@ -39,6 +39,6 @@ get_load_for_interval(BucketInterval, MyRange) ->
     case intervals:is_empty(Intersection) of
         true -> unknown;
         false ->
-            Load = lb_stats:get_request_metric(),
+            Load = lb_stats:default_value(lb_stats:get_request_metric()),
             {float(Load), 1.0}
     end.

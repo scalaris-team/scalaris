@@ -57,15 +57,19 @@ new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
     %% lb_stats:get_load_metric(), can be unknown
     SystemLoad = node_details:get(NodeDetails, load2),
-    %% lb_stats:get_request_metric()
+    %% lb_stats:get_request_metric(), can be unknown
     Requests = node_details:get(NodeDetails, load3),
     Load = case config:read(lb_active_balance) of
                items -> Items;
                requests ->
-                   try
-                       (erlang:round(math:sqrt(Items)) + Requests) * SystemLoad
-                   catch
-                       error:badarith -> unknown
+                   case config:read(lb_active_fall_back_to_items) of
+                       true ->
+                           try
+                               (erlang:round(math:sqrt(Items)) + Requests) * SystemLoad
+                           catch
+                               error:badarith -> unknown
+                           end;
+                       _ -> Requests
                    end
            end,
     #lb_info{load  = Load,
@@ -101,10 +105,7 @@ neighbors(Node1, Node2) ->
     is_succ(Node1, Node2) orelse is_succ(Node2, Node1).
 
 -spec is_valid(Info::lb_info()) -> boolean().
-is_valid(Info) ->
-    is_number(get_load(Info)) andalso
-        is_number(get_reqs(Info))  andalso
-        is_number(get_items(Info)).
+is_valid(Info) -> is_number(get_load(Info)).
 
 %% @doc The number of db entries the heavy node will give to the light node
 -spec get_target_load(items | requests, Op::slide | jump, HeavyNode::lb_info(), LightNode::lb_info()) -> non_neg_integer().
@@ -116,6 +117,8 @@ get_target_load(requests, JumpOrSlide, HeavyNode, LightNode) ->
 %% @doc The number of db entries the heavy node will give to the light node (weighted)
 -spec get_target_load(Op::slide | jump, HeavyNode::load(), LightNode::load())
                     -> non_neg_integer().
+get_target_load(_Op, unknown, _LightNode) -> 0;
+get_target_load(_Op, _HeavyNode, unknown) -> 0;
 get_target_load(slide, HeavyNode, LightNode) ->
     TotalItems = HeavyNode + LightNode,
     AvgItems = trunc(TotalItems) div 2,
