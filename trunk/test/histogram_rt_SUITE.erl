@@ -40,7 +40,7 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     unittest_helper:end_per_suite(Config).
 
--define(EPSILON, 0.1).
+-define(EPSILON, 1.0e-8 * ?RT:n()).
 
 -spec prop_add_keys(BaseKey::?RT:key(), Size::1..50, Values::[?RT:key(),...]) -> true.
 prop_add_keys(BaseKey, Size, Values0) ->
