@@ -384,9 +384,15 @@ on({tx_tm_lock_get_done, TxId, Key,
                     %% all locks acquired? -> proceed to next step
                     Round = tx_state_txid_next_write_token(NewTxState),
                     OldVal = tx_state_txid_written_value(NewTxState),
-%%                    io:format("decide commit~n"),
-                    gen_component:post_op(
-                      {tx_tm_write_decision, TxId, commit, Round, OldVal}, State);
+                    case tx_state_failed_locks(NewTxState) of
+                        [] ->
+                            %% io:format("decide commit~n"),
+                            gen_component:post_op(
+                              {tx_tm_write_decision, TxId, commit, Round, OldVal}, State);
+                        _ ->
+                            gen_component:post_op(
+                              {tx_tm_write_decision, TxId, abort, Round, OldVal}, State)
+                    end;
                 _ -> State
             end
     end;
@@ -412,7 +418,7 @@ on({tx_tm_lock_get_done, TxId, Key,
                     %% all locks acquired? -> proceed to next step
                     Round = tx_state_txid_next_write_token(NewTxState),
                     OldVal = tx_state_txid_written_value(NewTxState),
-%%                    io:format("decide abort~n"),
+                    %%log:log("decide abort~n"),
                     gen_component:post_op(
                       {tx_tm_write_decision, TxId, abort, Round, OldVal}, State);
                 _ -> State
