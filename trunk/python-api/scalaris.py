@@ -1,4 +1,4 @@
-# Copyright 2011-2012 Zuse Institute Berlin
+# Copyright 2011-2014 Zuse Institute Berlin
 #
 #    Licensed under the Apache License, Version 2.0 (the "License");
 #    you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ class JSONConnection(object):
     """
     Abstracts connections to scalaris using JSON
     """
-    
+
     def __init__(self, url = DEFAULT_URL, timeout = socket.getdefaulttimeout()):
         """
         Creates a JSON connection to the given URL using the given TCP timeout
@@ -106,7 +106,7 @@ class JSONConnection(object):
             return bytearray(base64.b64decode(value['value'].encode('ascii')))
         else:
             return value['value']
-        
+
     # result: {'status': 'ok'} or
     #         {'status': 'fail', 'reason': 'timeout'}
     @staticmethod
@@ -117,7 +117,7 @@ class JSONConnection(object):
         """
         if result == {'status': 'fail', 'reason': 'timeout'}:
             raise TimeoutError(result)
-    
+
     # result: {'status': 'ok', 'value': xxx} or
     #         {'status': 'fail', 'reason': 'timeout' or 'not_found'}
     @staticmethod
@@ -136,7 +136,7 @@ class JSONConnection(object):
                 elif result['reason'] == 'not_found':
                     raise NotFoundError(result)
         raise UnknownError(result)
-        
+
     # result: {'status': 'ok'} or
     #         {'status': 'fail', 'reason': 'timeout'}
     @staticmethod
@@ -151,7 +151,7 @@ class JSONConnection(object):
             elif result == {'status': 'fail', 'reason': 'timeout'}:
                 raise TimeoutError(result)
         raise UnknownError(result)
-        
+
     # result: {'status': 'ok'} or
     #         {'status': 'fail', 'reason': 'abort', 'keys': <list>} or
     #         {'status': 'fail', 'reason': 'timeout'}
@@ -170,7 +170,7 @@ class JSONConnection(object):
                 elif len(result) == 3 and result['reason'] == 'abort' and 'keys' in result:
                     raise AbortError(result, result['keys'])
         raise UnknownError(result)
-        
+
     # results: {'status': 'ok'} or
     #          {'status': 'fail', 'reason': 'timeout' or 'not_a_list'} or
     @staticmethod
@@ -189,7 +189,7 @@ class JSONConnection(object):
                     elif result['reason'] == 'not_a_list':
                         raise NotAListError(result)
         raise UnknownError(result)
-        
+
     # results: {'status': 'ok'} or
     #          {'status': 'fail', 'reason': 'timeout' or 'not_a_number'} or
     @staticmethod
@@ -208,7 +208,7 @@ class JSONConnection(object):
                     elif result['reason'] == 'not_a_number':
                         raise NotANumberError(result)
         raise UnknownError(result)
-        
+
     # results: {'status': 'ok'} or
     #          {'status': 'fail', 'reason': 'timeout' or 'not_found'} or
     #          {'status': 'fail', 'reason': 'key_changed', 'value': xxx}
@@ -230,7 +230,7 @@ class JSONConnection(object):
                 elif result['reason'] == 'key_changed' and 'value' in result and len(result) == 3:
                     raise KeyChangedError(result, JSONConnection.decode_value(result['value']))
         raise UnknownError(result)
-    
+
     # results: {'status': 'ok'}
     @staticmethod
     def process_result_publish(result):
@@ -241,7 +241,7 @@ class JSONConnection(object):
         if result == {'status': 'ok'}:
             return None
         raise UnknownError(result)
-    
+
     # results: {'status': 'ok'} or
     #          {'status': 'fail', 'reason': 'timeout' or 'abort'}
     @staticmethod
@@ -251,7 +251,7 @@ class JSONConnection(object):
         Raises the appropriate exception if the operation failed.
         """
         JSONConnection.process_result_commit(result)
-    
+
     # results: {'status': 'ok'} or
     #          {'status': 'fail', 'reason': 'abort', 'keys': <list>} or
     #          {'status': 'fail', 'reason': 'timeout' or 'not_found'}
@@ -273,7 +273,7 @@ class JSONConnection(object):
                 elif len(result) == 3 and result['reason'] == 'abort' and 'keys' in result:
                     raise AbortError(result, result['keys'])
         raise UnknownError(result)
-    
+
     # results: [urls=str()]
     @staticmethod
     def process_result_get_subscribers(result):
@@ -302,7 +302,7 @@ class JSONConnection(object):
             elif result['failure'] == 'timeout':
                 return ('timeout', result['ok'], result['results'])
         raise UnknownError(result)
-    
+
     # results: ['ok' or 'locks_set' or 'undef']
     @staticmethod
     def create_delete_result(result):
@@ -352,7 +352,7 @@ class JSONConnection(object):
         if not isinstance(result, list):
             raise UnknownError(result)
         return result
-    
+
     # results: {'status': 'ok', 'value': xxx}
     @staticmethod
     def process_result_vm_get_version(result):
@@ -364,7 +364,7 @@ class JSONConnection(object):
             if result['status'] == 'ok':
                 return result['value']
         raise UnknownError(result)
-    
+
     # value: {'scalaris_version': xxx,
     #         'erlang_version': xxx,
     #         'mem_total': xxx,
@@ -399,7 +399,7 @@ class JSONConnection(object):
                 except:
                     pass
         raise UnknownError(result)
-    
+
     # results: {'status': 'ok', 'value': xxx}
     @staticmethod
     def process_result_vm_get_number_of_nodes(result):
@@ -414,7 +414,7 @@ class JSONConnection(object):
                 except:
                     pass
         raise UnknownError(result)
-    
+
     # results: {'status': 'ok', 'value': [xxx]}
     @staticmethod
     def process_result_vm_get_nodes(result):
@@ -426,7 +426,7 @@ class JSONConnection(object):
             if result['status'] == 'ok' and isinstance(result['value'], list):
                 return result['value']
         raise UnknownError(result)
-        
+
     # results: {'status': 'ok', 'ok': [xxx], 'failed': [xxx]}
     @staticmethod
     def process_result_vm_add_nodes(result):
@@ -438,7 +438,7 @@ class JSONConnection(object):
             if result['status'] == 'ok' and isinstance(result['ok'], list) and isinstance(result['failed'], list):
                 return (result['ok'], result['failed'])
         raise UnknownError(result)
-        
+
     # results: {'status': 'ok' | 'not_found'}
     @staticmethod
     def process_result_vm_delete_node(result):
@@ -451,7 +451,7 @@ class JSONConnection(object):
         if result == {'status': 'not_found'}:
             return False
         raise UnknownError(result)
-    
+
     # results: {'status': 'ok', 'ok': [xxx]}
     @staticmethod
     def process_result_vm_delete_nodes(result):
@@ -463,7 +463,7 @@ class JSONConnection(object):
            result['status'] == 'ok' and isinstance(result['ok'], list):
             return result['ok']
         raise UnknownError(result)
-    
+
     # results: {'status': 'ok', 'ok': [xxx], 'not_found': [xxx]}
     @staticmethod
     def process_result_vm_delete_nodes_by_name(result):
@@ -475,7 +475,7 @@ class JSONConnection(object):
             if result['status'] == 'ok' and isinstance(result['ok'], list) and isinstance(result['not_found'], list):
                 return (result['ok'], result['not_found'])
         raise UnknownError(result)
-        
+
     # results: {'status': 'ok'}
     @staticmethod
     def process_result_vm_delete_vm(result):
@@ -486,7 +486,7 @@ class JSONConnection(object):
         if result == {'status': 'ok'}:
             return None
         raise UnknownError(result)
-    
+
     # VM: {'erlang_node': xxx,
     #      'ip': xxx,
     #      'port': xxx,
@@ -523,7 +523,7 @@ class JSONConnection(object):
             else:
                 return False
         raise UnknownError(result)
-    
+
     # <reason>: 'resp_timeout' | 'autoscale_false'
     # results: {'status': 'ok', 'value' : <number>} or
     #          {'status': 'error', 'reason': <reason>}
@@ -532,14 +532,14 @@ class JSONConnection(object):
         if isinstance(result, dict) and 'status' in result:
             if result['status'] == 'ok' and 'value' in result and isinstance(result['value'], int):
                 return result['value']
-            
+
             if result['status'] == 'error' and 'reason' in result:
                 if result['reason'] == 'resp_timeout':
                     raise TimeoutError(result)
                 elif result['reason'] == 'autoscale_false':
                     raise ConfigError(result)
         raise UnknownError(result)
-    
+
     # <reason>: 'locked' | 'resp_timeout' | 'autoscale_false'
     # results: {'status' : 'ok'} or
     #          {'status': 'error', 'reason': <reason>}
@@ -548,7 +548,7 @@ class JSONConnection(object):
         if isinstance(result, dict) and 'status' in result:
             if result['status'] == 'ok':
                 return result['status']
-            
+
             if result['status'] == 'error':
                 if result['reason'] == 'locked':
                     raise LockError(result)
@@ -556,9 +556,9 @@ class JSONConnection(object):
                     raise TimeoutError(result)
                 elif result['reason'] == 'autoscale_false':
                     raise ConfigError(result)
-        
+
         return UnknownError(result)
-        
+
     # <reason>: 'not_locked' | 'resp_timeout' | 'autoscale_false'
     # results: {'status' : 'ok'} or
     #          {'status': 'error', 'reason': <reason>}
@@ -567,7 +567,7 @@ class JSONConnection(object):
         if isinstance(result, dict) and 'status' in result:
             if result['status'] == 'ok':
                 return result['status']
-            
+
             if result['status'] == 'error':
                 if result['reason'] == 'not_locked':
                     raise LockError(result)
@@ -575,9 +575,9 @@ class JSONConnection(object):
                     raise TimeoutError(result)
                 elif result['reason'] == 'autoscale_false':
                     raise ConfigError(result)
-        
+
         return UnknownError(result)
-    
+
     # result: 'ok'
     @staticmethod
     def process_result_nop(result):
@@ -587,7 +587,7 @@ class JSONConnection(object):
         """
         if result != 'ok':
             raise UnknownError(result)
-    
+
     @staticmethod
     def new_req_list_t(other = None):
         """
@@ -595,7 +595,7 @@ class JSONConnection(object):
         the Transaction class.
         """
         return _JSONReqListTransaction(other)
-    
+
     @staticmethod
     def new_req_list_tso(other = None):
         """
@@ -603,7 +603,7 @@ class JSONConnection(object):
         the TransactionSingleOp class.
         """
         return _JSONReqListTransactionSingleOp(other)
-    
+
     def close(self):
         self._conn.close()
 
@@ -615,7 +615,7 @@ class AbortError(ScalarisError):
     Exception that is thrown if a the commit of a write operation on a scalaris
     ring fails.
     """
-    
+
     def __init__(self, raw_result, failed_keys):
         self.raw_result = raw_result
         self.failed_keys = failed_keys
@@ -627,7 +627,7 @@ class ConnectionError(ScalarisError):
     Exception that is thrown if an operation on a scalaris ring fails because
     a connection does not exist or has been disconnected.
     """
-    
+
     def __init__(self, raw_result, response = None, error = None):
         self.raw_result = raw_result
         self.response = response
@@ -647,7 +647,7 @@ class KeyChangedError(ScalarisError):
     Exception that is thrown if a test_and_set operation on a scalaris ring
     fails because the old value did not match the expected value.
     """
-    
+
     def __init__(self, raw_result, old_value):
         self.raw_result = raw_result
         self.old_value = old_value
@@ -659,7 +659,7 @@ class NodeNotFoundError(ScalarisError):
     Exception that is thrown if a delete operation on a scalaris ring fails
     because no scalaris node was found.
     """
-    
+
     def __init__(self, raw_result):
         self.raw_result = raw_result
     def __str__(self):
@@ -670,7 +670,7 @@ class NotFoundError(ScalarisError):
     Exception that is thrown if a read operation on a scalaris ring fails
     because the key did not exist before.
     """
-    
+
     def __init__(self, raw_result):
         self.raw_result = raw_result
     def __str__(self):
@@ -681,7 +681,7 @@ class NotAListError(ScalarisError):
     Exception that is thrown if a add_del_on_list operation on a scalaris ring
     fails because the participating values are not lists.
     """
-    
+
     def __init__(self, raw_result):
         self.raw_result = raw_result
     def __str__(self):
@@ -692,7 +692,7 @@ class NotANumberError(ScalarisError):
     Exception that is thrown if a add_del_on_list operation on a scalaris ring
     fails because the participating values are not numbers.
     """
-    
+
     def __init__(self, raw_result):
         self.raw_result = raw_result
     def __str__(self):
@@ -703,7 +703,7 @@ class TimeoutError(ScalarisError):
     Exception that is thrown if a read or write operation on a scalaris ring
     fails due to a timeout.
     """
-    
+
     def __init__(self, raw_result):
         self.raw_result = raw_result
     def __str__(self):
@@ -735,7 +735,7 @@ class UnknownError(ScalarisError):
     Generic exception that is thrown during operations on a scalaris ring, e.g.
     if an unknown result has been returned.
     """
-    
+
     def __init__(self, raw_result):
         self.raw_result = raw_result
     def __str__(self):
@@ -754,7 +754,7 @@ class ConnectionPool(object):
     """
     Implements a simple (thread-safe) connection pool for Scalaris connections.
     """
-    
+
     def __init__(self, max_connections):
         """
         Create a new connection pool with the given maximum number of connections.
@@ -763,14 +763,14 @@ class ConnectionPool(object):
         self._available_conns = []
         self._checked_out_sema = threading.BoundedSemaphore(value=max_connections)
         self._wait_cond = threading.Condition()
-    
+
     def _new_connection(self):
         """
         Creates a new connection for the pool. Override this to use some other
         connection class than JSONConnection.
         """
         return JSONConnection()
-    
+
     def _get_connection(self):
         """
         Gets a connection from the pool. Creates a new connection if necessary.
@@ -786,7 +786,7 @@ class ConnectionPool(object):
             except IndexError:
                 conn = self._new_connection()
         return conn
-    
+
     def get_connection(self, timeout = None):
         """
         Tries to get a valid connection from the pool waiting at most
@@ -811,7 +811,7 @@ class ConnectionPool(object):
                 end = datetime.now()
                 if end - start > timeout:
                     return None
-    
+
     def release_connection(self, connection):
         """
         Puts the given connection back into the pool.
@@ -819,7 +819,7 @@ class ConnectionPool(object):
         self._available_conns.append(connection)
         self._checked_out_sema.release()
         self._wait_cond.notify_all()
-    
+
     def close_all(self):
         """
         Close all connections to scalaris.
@@ -832,7 +832,7 @@ class TransactionSingleOp(object):
     """
     Single write or read operations on scalaris.
     """
-    
+
     def __init__(self, conn = None):
         """
         Create a new object using the given connection
@@ -840,13 +840,13 @@ class TransactionSingleOp(object):
         if conn is None:
             conn = JSONConnection()
         self._conn = conn
-    
+
     def new_req_list(self, other = None):
         """
         Returns a new ReqList object allowing multiple parallel requests.
         """
         return self._conn.new_req_list_tso(other)
-    
+
     def req_list(self, reqlist):
         """
         Issues multiple parallel requests to scalaris; each will be committed.
@@ -862,7 +862,7 @@ class TransactionSingleOp(object):
         result = self._conn.callp('/api/tx.yaws', 'req_list_commit_each', [reqlist.get_requests()])
         result = self._conn.process_result_req_list_tso(result)
         return result
-    
+
     def process_result_read(self, result):
         """
         Processes a result element from the list returned by req_list() which
@@ -932,7 +932,7 @@ class TransactionSingleOp(object):
         result = self._conn.callp('/api/tx.yaws', 'write', [key, value])
         self._conn.check_fail_abort(result)
         self._conn.process_result_write(result)
-    
+
     def add_del_on_list(self, key, to_add, to_remove):
         """
         Changes the list stored at the given key, i.e. first adds all items in
@@ -943,7 +943,7 @@ class TransactionSingleOp(object):
         result = self._conn.callp('/api/tx.yaws', 'add_del_on_list', [key, to_add, to_remove])
         self._conn.check_fail_abort(result)
         self._conn.process_result_add_del_on_list(result)
-    
+
     def add_on_nr(self, key, to_add):
         """
         Changes the number stored at the given key, i.e. adds some value.
@@ -952,7 +952,7 @@ class TransactionSingleOp(object):
         result = self._conn.callp('/api/tx.yaws', 'add_on_nr', [key, to_add])
         self._conn.check_fail_abort(result)
         self._conn.process_result_add_on_nr(result)
-    
+
     def test_and_set(self, key, old_value, new_value):
         """
         Atomic test and set, i.e. if the old value at key is old_value, then
@@ -971,7 +971,7 @@ class TransactionSingleOp(object):
         value = self._conn.encode_value(value)
         result = self._conn.callp('/api/tx.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
-    
+
     def close_connection(self):
         """
         Close the connection to scalaris
@@ -983,7 +983,7 @@ class Transaction(object):
     """
     Write or read operations on scalaris inside a transaction.
     """
-    
+
     def __init__(self, conn = None):
         """
         Create a new object using the given connection
@@ -992,13 +992,13 @@ class Transaction(object):
             conn = JSONConnection()
         self._conn = conn
         self._tlog = None
-    
+
     def new_req_list(self, other = None):
         """
         Returns a new ReqList object allowing multiple parallel requests.
         """
         return self._conn.new_req_list_t(other)
-    
+
     def req_list(self, reqlist):
         """
         Issues multiple parallel requests to scalaris.
@@ -1022,7 +1022,7 @@ class Transaction(object):
             # transaction was successful: reset transaction log
             self._tlog = None
         return result
-    
+
     def process_result_read(self, result):
         """
         Processes a result element from the list returned by req_list() which
@@ -1079,7 +1079,7 @@ class Transaction(object):
         operation.
         """
         return self._conn.process_result_commit(result)
-    
+
     def commit(self):
         """
         Issues a commit operation to scalaris validating the previously
@@ -1089,13 +1089,13 @@ class Transaction(object):
         self._process_result_commit(result)
         # reset tlog (minor optimization which is not done in req_list):
         self._tlog = None
-    
+
     def abort(self):
         """
         Aborts all previously created operations inside the transaction.
         """
         self._tlog = None
-    
+
     def read(self, key):
         """
         Issues a read operation to scalaris, adds it to the current
@@ -1105,7 +1105,7 @@ class Transaction(object):
         """
         result = self.req_list(self.new_req_list().add_read(key))[0]
         return self.process_result_read(result)
-    
+
     def write(self, key, value):
         """
         Issues a write operation to scalaris and adds it to the current
@@ -1113,7 +1113,7 @@ class Transaction(object):
         """
         result = self.req_list(self.new_req_list().add_write(key, value))[0]
         self.process_result_write(result)
-    
+
     def add_del_on_list(self, key, to_add, to_remove):
         """
         Issues a add_del_on_list operation to scalaris and adds it to the
@@ -1125,7 +1125,7 @@ class Transaction(object):
         """
         result = self.req_list(self.new_req_list().add_add_del_on_list(key, to_add, to_remove))[0]
         self.process_result_add_del_on_list(result)
-    
+
     def add_on_nr(self, key, to_add):
         """
         Issues a add_on_nr operation to scalaris and adds it to the
@@ -1135,7 +1135,7 @@ class Transaction(object):
         """
         result = self.req_list(self.new_req_list().add_add_on_nr(key, to_add))[0]
         self.process_result_add_on_nr(result)
-    
+
     def test_and_set(self, key, old_value, new_value):
         """
         Issues a test_and_set operation to scalaris and adds it to the
@@ -1153,7 +1153,7 @@ class Transaction(object):
         value = self._conn.encode_value(value)
         result = self._conn.callp('/api/tx.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
-    
+
     def close_connection(self):
         """
         Close the connection to scalaris
@@ -1165,7 +1165,7 @@ class _JSONReqList(object):
     """
     Generic request list.
     """
-    
+
     def __init__(self, other = None):
         """
         Create a new object using a JSON connection.
@@ -1174,7 +1174,7 @@ class _JSONReqList(object):
         self._is_commit = False
         if other is not None:
             self.extend(other)
-    
+
     def add_read(self, key):
         """
         Adds a read operation to the request list.
@@ -1183,7 +1183,7 @@ class _JSONReqList(object):
             raise RuntimeError("No further request supported after a commit!")
         self._requests.append({'read': key})
         return self
-    
+
     def add_write(self, key, value):
         """
         Adds a write operation to the request list.
@@ -1192,7 +1192,7 @@ class _JSONReqList(object):
             raise RuntimeError("No further request supported after a commit!")
         self._requests.append({'write': {key: JSONConnection.encode_value(value)}})
         return self
-    
+
     def add_add_del_on_list(self, key, to_add, to_remove):
         """
         Adds a add_del_on_list operation to the request list.
@@ -1201,7 +1201,7 @@ class _JSONReqList(object):
             raise RuntimeError("No further request supported after a commit!")
         self._requests.append({'add_del_on_list': {'key': key, 'add': to_add, 'del': to_remove}})
         return self
-    
+
     def add_add_on_nr(self, key, to_add):
         """
         Adds a add_on_nr operation to the request list.
@@ -1210,7 +1210,7 @@ class _JSONReqList(object):
             raise RuntimeError("No further request supported after a commit!")
         self._requests.append({'add_on_nr': {key: to_add}})
         return self
-    
+
     def add_test_and_set(self, key, old_value, new_value):
         """
         Adds a test_and_set operation to the request list.
@@ -1219,7 +1219,7 @@ class _JSONReqList(object):
             raise RuntimeError("No further request supported after a commit!")
         self._requests.append({'test_and_set': {'key': key, 'old': old_value, 'new': new_value}})
         return self
-    
+
     def add_commit(self):
         """
         Adds a commit operation to the request list.
@@ -1229,7 +1229,7 @@ class _JSONReqList(object):
         self._requests.append({'commit': ''})
         self._is_commit = True
         return self
-    
+
     def get_requests(self):
         """
         Gets the collected requests.
@@ -1265,7 +1265,7 @@ class _JSONReqListTransaction(_JSONReqList):
     """
     Request list for use with Transaction.req_list().
     """
-    
+
     def __init__(self, other = None):
         _JSONReqList.__init__(self, other)
 
@@ -1274,10 +1274,10 @@ class _JSONReqListTransactionSingleOp(_JSONReqList):
     Request list for use with TransactionSingleOp.req_list() which does not
     support commits.
     """
-    
+
     def __init__(self, other = None):
         _JSONReqList.__init__(self, other)
-    
+
     def add_commit(self):
         """
         Adds a commit operation to the request list.
@@ -1288,7 +1288,7 @@ class PubSub(object):
     """
     Publish and subscribe methods accessing scalaris' pubsub system
     """
-    
+
     def __init__(self, conn = None):
         """
         Create a new object using the given connection.
@@ -1341,7 +1341,7 @@ class PubSub(object):
         value = self._conn.encode_value(value)
         result = self._conn.callp('/api/pubsub.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
-    
+
     def close_connection(self):
         """
         Close the connection to scalaris
@@ -1353,7 +1353,7 @@ class ReplicatedDHT(object):
     """
     Non-transactional operations on the replicated DHT of scalaris
     """
-    
+
     def __init__(self, conn = None):
         """
         Create a new object using the given connection.
@@ -1367,7 +1367,7 @@ class ReplicatedDHT(object):
     def delete(self, key, timeout = 2000):
         """
         Tries to delete the value at the given key.
-        
+
         WARNING: This function can lead to inconsistent data (e.g. deleted items
         can re-appear). Also when re-creating an item the version before the
         delete can re-appear.
@@ -1385,7 +1385,7 @@ class ReplicatedDHT(object):
     def get_last_delete_result(self):
         """
         Returns the result of the last call to delete().
-        
+
         NOTE: This function traverses the result list returned by scalaris and
         therefore takes some time to process. It is advised to store the returned
         result object once generated.
@@ -1399,7 +1399,7 @@ class ReplicatedDHT(object):
         value = self._conn.encode_value(value)
         result = self._conn.callp('/api/rdht.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
-    
+
     def close_connection(self):
         """
         Close the connection to scalaris
@@ -1411,7 +1411,7 @@ class ScalarisVM(object):
     """
     Provides methods to interact with a specific Scalaris (Erlang) VM.
     """
-    
+
     class GetInfoResult(object):
         def __init__(self, scalarisVersion, erlangVersion, memTotal, uptime,
                      erlangNode, ip, port, yawsPort):
@@ -1423,7 +1423,7 @@ class ScalarisVM(object):
             self.ip = ip
             self.port = port
             self.yawsPort = yawsPort
-    
+
     def __init__(self, conn = None):
         """
         Create a new object using the given connection.
@@ -1540,19 +1540,19 @@ class ScalarisVM(object):
         value = self._conn.encode_value(value)
         result = self._conn.callp('/api/pubsub.yaws', 'nop', [value])
         self._conn.process_result_nop(result)
-    
+
     def close_connection(self):
         """
         Close the connection to scalaris
         (it will automatically be re-opened on the next request).
         """
         self._conn.close()
-        
+
 class Autoscale(object):
     """
     Provides methods to interact with autoscale API.
     """
-    
+
     api = '/api/autoscale.yaws'
 
     """
@@ -1562,13 +1562,13 @@ class Autoscale(object):
         if conn is None:
             conn = JSONConnection()
         self._conn = conn
-        
+
     def process_result_check_config(self, result):
         return self._conn.process_result_autoscale_check_config(result)
-    
+
     def process_result_pull_scale_req(self, result):
         return self._conn.process_result_autoscale_pull_scale_req(result)
-        
+
     def process_result_lock_scale_req(self, result):
         return self._conn.process_result_autoscale_lock_scale_req(result)
 
