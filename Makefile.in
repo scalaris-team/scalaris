@@ -67,9 +67,40 @@ PYTHON3SITELIBDIR=$(DESTDIR)@PYTHON3SITELIBDIR@
 SOURCEPATHS_ERL=src/* src/*/* include/* test/* contrib/log4erl/src/* contrib/yaws/src/*
 
 # libraries needed to build a plt suitable for the dialyzer target
-DIALYZER_PLT_LIBS=$(ERL_LIB_DIR)/common_test-*/ebin $(ERL_LIB_DIR)/compiler-*/ebin $(ERL_LIB_DIR)/crypto-*/ebin $(ERL_LIB_DIR)/debugger-*/ebin $(ERL_LIB_DIR)/edoc-*/ebin $(ERL_LIB_DIR)/erts-*/ebin $(ERL_LIB_DIR)/et-*/ebin $(ERL_LIB_DIR)/gs-*/ebin $(ERL_LIB_DIR)/hipe-*/ebin $(ERL_LIB_DIR)/inets-*/ebin $(ERL_LIB_DIR)/kernel-*/ebin $(ERL_LIB_DIR)/mnesia-*/ebin $(ERL_LIB_DIR)/observer-*/ebin $(ERL_LIB_DIR)/os_mon-*/ebin $(ERL_LIB_DIR)/public_key-*/ebin/ $(ERL_LIB_DIR)/runtime_tools-*/ebin $(ERL_LIB_DIR)/sasl-*/ebin $(ERL_LIB_DIR)/snmp-*/ebin $(ERL_LIB_DIR)/ssh-*/ebin $(ERL_LIB_DIR)/ssl-*/ebin $(ERL_LIB_DIR)/stdlib-*/ebin $(ERL_LIB_DIR)/syntax_tools-*/ebin $(ERL_LIB_DIR)/test_server-*/ebin/ $(ERL_LIB_DIR)/tools-*/ebin $(ERL_LIB_DIR)/webtool-*/ebin $(ERL_LIB_DIR)/wx-*/ebin $(ERL_LIB_DIR)/xmerl-*/ebin contrib/log4erl/ebin contrib/yaws/ebin
+# (only add them if they are available (via wildcard call which
+# results in nothing when no match exists))
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/common_test-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/compiler-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/crypto-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/debugger-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/edoc-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/erts-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/et-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/gs-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/hipe-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/inets-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/kernel-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/mnesia-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/observer-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/os_mon-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/public_key-*/ebin/)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/runtime_tools-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/sasl-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/snmp-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/ssh-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/ssl-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/stdlib-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/syntax_tools-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/test_server-*/ebin/)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/tools-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/webtool-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/wx-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/xmerl-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard contrib/log4erl/ebin)
+DIALYZER_PLT_LIBS += $(wildcard contrib/yaws/ebin)
+
 #DIALYZER_PLT_LIBS=$(DIALYZER_PLT_LIBS) $(ERL_LIB_DIR)/gs-*/contribs/ebin $(ERL_LIB_DIR)/wx-*/examples/*
-DIALYZER_FLAGS ?= 
+DIALYZER_FLAGS ?=
 
 SCALARIS_CT_NAME ?= ct@127.0.0.1
 # for java-test and java-bench:
@@ -100,7 +131,7 @@ contrib/log4erl/src/log4erl_parser.erl: contrib/log4erl/src/log4erl_parser.yrl
 contrib/log4erl/src/log4erl_lex.erl: contrib/log4erl/src/log4erl_lex.xrl
 	cd contrib/log4erl/src && $(ERL) -noinput -noshell -s leex file log4erl_lex.xrl -s init stop
 
-test-all: all_TESTS java-test python-test ruby-test interop-test 
+test-all: all_TESTS java-test python-test ruby-test interop-test
 
 test: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
@@ -594,7 +625,7 @@ install-java: java
 	install -m 644 -t $(ETCDIR) \
 	           java-api/scalaris-java.conf.sample
 	install -m 644 -t $(ETCDIR) \
-	           java-api/scalaris.properties 
+	           java-api/scalaris.properties
 	install -d $(BINDIR)
 	install -m 755 -t $(BINDIR) \
 	           java-api/scalaris
