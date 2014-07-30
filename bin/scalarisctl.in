@@ -194,6 +194,19 @@ checkinstallation() {
     MSG_SUCCESS="\x1b[1;32mSUCCESS\x1b[0m" #green
     MSG_NOTINSTALLED="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
     MSG_DONE="DONE"
+    # checking for $HOME
+    if [ "x$HOME" = "x" ]; then
+        echo -e "$MSG_FAILED"
+        echo "ERROR: \$HOME is not set"
+        echo "We were trying to read: \$HOME"
+        exit 1
+    fi
+    if [ ! -d $HOME ]; then
+        echo -e "$MSG_FAILED"
+        echo "ERROR: \$HOME does not point to a valid directory"
+        echo "We were trying to read: \$HOME"
+        exit 1
+    fi
     $ERL -noinput -eval 'halt(0).'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
