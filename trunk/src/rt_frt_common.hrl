@@ -280,6 +280,13 @@ get_range(Begin, End) -> rt_chord:get_range(Begin, End).
 get_split_key(Begin, End, SplitFraction) ->
     rt_chord:get_split_key(Begin, End, SplitFraction).
 
+%% @doc Splits the range between Begin and End into up to Parts equal parts and
+%%      returning the according split keys.
+-spec get_split_keys(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                     Parts::pos_integer()) -> [key()].
+get_split_keys(Begin, End, Parts) ->
+    rt_chord:get_split_keys(Begin, End, Parts).
+
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and
 %%      calculates a random key in this range. Fails with an exception if there
 %%      is no key.
