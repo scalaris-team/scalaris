@@ -147,6 +147,25 @@ get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
 get_split_key(Begin, End, {Num, Denom}) ->
     normalize(Begin + trunc(get_range(Begin, End) * Num) div Denom).
 
+%% @doc Splits the range between Begin and End into up to Parts equal parts and
+%%      returning the according split keys.
+-spec get_split_keys(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                     Parts::pos_integer()) -> [key()].
+get_split_keys(Begin, End, Parts) ->
+    lists:reverse(get_split_keys_helper(Begin, End, Parts, [])).
+
+-spec get_split_keys_helper(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                            Parts::pos_integer(), Acc::[key()]) -> [key()].
+get_split_keys_helper(_Begin, _End, 1, Acc) ->
+    Acc;
+get_split_keys_helper(Begin, End, Parts, Acc) ->
+    SplitKey = get_split_key(Begin, End, {1, Parts}),
+    if SplitKey =:= Begin ->
+           get_split_keys_helper(Begin, End, Parts - 1, Acc);
+       true ->
+           get_split_keys_helper(SplitKey, End, Parts - 1, [SplitKey | Acc])
+    end.
+
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and
 %%      calculates a random key in this range. Fails with an exception if there
 %%      is no key.
