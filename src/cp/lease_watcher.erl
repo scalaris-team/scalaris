@@ -73,7 +73,7 @@ on({leases, _Segment, {_DB, List}}, State) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec filter([{?RT:key(), l_on_cseq:lease_t()}]) -> [l_on_cseq:lease_t()].
+-spec filter([{?RT:key(), l_on_cseq:lease_t()}]) -> [{?RT:key(), l_on_cseq:lease_t()}].
 filter(Leases) ->
     F = fun({Id, L}) ->
                 LeaseId = l_on_cseq:get_id(L),
