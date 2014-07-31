@@ -181,7 +181,7 @@ get_cookie() {
 
       # load user scalaris configuration (overrides system config)
       if [ -f "$HOME/.scalaris/scalarisctl.conf" ] ; then
-        . $HOME/.scalaris/scalarisctl.conf
+        . "$HOME/.scalaris/scalarisctl.conf"
       fi
     fi
     echo -n ${cookie:-"chocolate chip cookie"}
@@ -201,7 +201,7 @@ checkinstallation() {
         echo "We were trying to read: \$HOME"
         exit 1
     fi
-    if [ ! -d $HOME ]; then
+    if [ ! -d "$HOME" ]; then
         echo -e "$MSG_FAILED"
         echo "ERROR: \$HOME does not point to a valid directory"
         echo "We were trying to read: \$HOME"
