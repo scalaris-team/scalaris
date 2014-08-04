@@ -444,17 +444,40 @@ on_active({start_gossip_task, CBModule, Args}, State) ->
 on_active({gossip_trigger, TriggerInterval}=_Msg, State) ->
     ?TRACE_TRIGGER("[ Gossip ]:~w", [_Msg]),
     State1 = handle_trigger(TriggerInterval, State),
-    gen_component:post_op({trigger_action, TriggerInterval}, State1);
-
-
-on_active({trigger_action, TriggerInterval}=_Msg, State) ->
-    State1 = msg_queue_send(State),
     case state_get({trigger_group, TriggerInterval}, State) of
         false ->
             State1; %% trigger group does not exist, do nothing (e.g. during startup)
         CBModules ->
-            lists:foldl(fun (CBModule, StateIn) -> do_trigger_action(CBModule, StateIn) end,
-                            State1, CBModules)
+            [ comm:send_local(self(), {trigger_action, CBModule}) || CBModule <- CBModules ],
+            State1
+    end;
+
+
+on_active({trigger_action, CBModule}=_Msg, State) ->
+    State1 = msg_queue_send(State),
+
+    case state_get({trigger_lock, CBModule}, State1) of
+        free ->
+            log:log(debug, "[ Gossip ] Module ~w got triggered", [CBModule]),
+            log:log(?SHOW, "[ Gossip ] Cycle: ~w, Round: ~w",
+                    [state_get({cycle, CBModule}, State1), state_get({round, CBModule}, State1)]),
+
+            %% set cycle status to active
+            State2 = state_set({trigger_lock, CBModule}, locked, State1),
+
+            %% reset exch_data
+            State3 = state_set({exch_data, CBModule}, {undefined, undefined}, State2),
+
+            %% request node (by the cb module or the bh module)
+            State4 = case cb_select_node(CBModule, State3) of
+                {true, NewState} -> NewState;
+                {false, NewState} -> request_random_node(CBModule), NewState
+            end,
+
+            %% request data
+            State5 = cb_select_data(CBModule, State4),
+            State5;
+        locked -> State1 % ignore trigger when within prepare-request phase
     end;
 
 
@@ -765,32 +788,6 @@ handle_trigger(TriggerInterval, State) ->
                                 msg_delay:send_trigger(NewTriggerInterval, {gossip_trigger, NewTriggerInterval})
                           end, NewTriggerIntervals),
             state_set(trigger_add, [], State1)
-    end.
-
--spec do_trigger_action(CBModule::cb_module(), State::state()) -> state().
-do_trigger_action(CBModule, State) ->
-    case state_get({trigger_lock, CBModule}, State) of
-        free ->
-            log:log(debug, "[ Gossip ] Module ~w got triggered", [CBModule]),
-            log:log(?SHOW, "[ Gossip ] Cycle: ~w, Round: ~w",
-                    [state_get({cycle, CBModule}, State), state_get({round, CBModule}, State)]),
-
-            %% set cycle status to active
-            State1 = state_set({trigger_lock, CBModule}, locked, State),
-
-            %% reset exch_data
-            State2 = state_set({exch_data, CBModule}, {undefined, undefined}, State1),
-
-            %% request node (by the cb module or the bh module)
-            State3 = case cb_select_node(CBModule, State2) of
-                {true, NewState} -> NewState;
-                {false, NewState} -> request_random_node(CBModule), NewState
-            end,
-
-            %% request data
-            State4 = cb_select_data(CBModule, State3),
-            State4;
-        locked -> State % ignore trigger when within prepare-request phase
     end.
 
 
