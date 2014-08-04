@@ -38,17 +38,17 @@
 -export([get_subset_rand/1, get_subset_rand_next_interval/1, get_subset_rand_next_interval/2]).
 
 %% for testing
--export([select_data_feeder/1]).
-
+-export([select_data_feeder/1, is_state/1]).
 -ifdef(with_export_type_support).
+-export_type([data/0, state/0]).
 -endif.
 
 -define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process},
                                                                       {?quiet}, {channel, prio}, {no_keep_alive}])).
 
-%% -define(TRACE_DEBUG(FormatString, Data), ok).
--define(TRACE_DEBUG(FormatString, Data),
-        log:pal("[ Cyclon ~.0p ] " ++ FormatString, [ comm:this() | Data])).
+-define(TRACE_DEBUG(FormatString, Data), ok).
+%% -define(TRACE_DEBUG(FormatString, Data),
+%%         log:pal("[ Cyclon ~.0p ] " ++ FormatString, [ comm:this() | Data])).
 
 %% print cache at the beginnig of every cycle in a dot friednly format
 -define(PRINT_CACHE_FOR_DOT(MyNode, Cache), ok).
@@ -503,4 +503,9 @@ select_data_feeder(State) ->
 request_node_details_feeder(Details) ->
     {lists:filter(fun(Detail) -> Detail =/= new_key end, Details)}.
 
+-spec is_state(state()) -> boolean().
+is_state(_State={_Cache=[_Entry={_Node, _Age}], _Node}) ->
+    true;
 
+is_state(_State) ->
+    false.
