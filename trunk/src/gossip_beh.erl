@@ -55,7 +55,7 @@
 
 -callback select_data(State::cb_state()) ->
     % has to initiate {selected_data, CBModule::module(), PData::exch_data()}
-    {ok | retry, cb_state()}.
+    {ok | discard_msg, cb_state()}.
 
 -callback select_reply_data(PData::exch_data(), Ref::pos_integer(), Round::round(), State::cb_state()) ->
     % has to initiate {selected_reply_data, CBModule::module(), QData::exch_data()}
