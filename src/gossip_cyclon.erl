@@ -60,7 +60,7 @@
 %% Type Definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type data() :: any().
+-type data() :: cyclon_cache:cache() | {cyclon_cache:cache(), cyclon_cache:cache()}.
 -type round() :: non_neg_integer().
 
 -type state() :: {Nodes::cyclon_cache:cache(), %% the cache of random nodes
@@ -260,7 +260,12 @@ integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
 
 
 %% @doc Handle messages
--spec handle_msg(Msg::comm:message(), State::state()) -> {ok, state()}.
+-spec handle_msg(Message, State::state()) -> {ok, state()} when
+      is_subtype(Message, {rm_changed, NewNode::node:node_type()} |
+                          {get_ages, SourcePid::comm:erl_local_pid()} |
+                          {get_subset_rand, N::pos_integer(), SourcePid::comm:erl_local_pid()} |
+                          {get_node_details_response, node_details:node_details()} |
+                          {get_dht_nodes_response, Nodes::[comm:mypid()]}).
 
 %% replaces the reference to self's dht node with NewNode
 handle_msg({rm_changed, NewNode}, {Cache, _Node}) ->
@@ -343,7 +348,7 @@ handle_msg({get_dht_nodes_response, Nodes}, {Cache, _Node}=State) ->
 
 
 %% @doc Always returns false, as cyclon does not implement rounds.
--spec round_has_converged(State::state()) -> {boolean(), state()}.
+-spec round_has_converged(State::state()) -> {false, state()}.
 round_has_converged(State) ->
     {false, State}.
 
@@ -456,6 +461,8 @@ request_node_details(Details) ->
 %%      results if all nodes are started in the same Erlang VM.
 %%      (Cycles are counted in the gossip module as well for real, the basic cycle
 %%      counting performed here only works if this function only called once every cycle).
+%%      TODO the fun in 450 only throws a 'has no local return' dialyzer warning
+%%              if the PRINT_CACHE_FOR_DOT macro is set to ok
 -compile({nowarn_unused_function, {print_cache_dot, 2}}).
 -spec print_cache_dot(node:nodetype(), data()) -> ok.
 print_cache_dot(MyNode, Cache) ->
