@@ -188,7 +188,8 @@ tester_type_check_gossip(_Config) ->
             ]},
           {gossip_load,
             % excluded (exported functions)
-            [  {handle_msg, 2}, % would need valid dht_node_state, sends messages
+            [  {init,1}, % tested via feeder
+               {handle_msg, 2}, % would need valid dht_node_state, sends messages
                {select_data, 1}, % sends messages
                {select_reply_data, 4}, % sends messages
                {integrate_data, 3}, % sends messages
