@@ -98,7 +98,7 @@ print_table_info(Table) ->
     print_table_info(Table, "").
 
 %% @doc Prints information about the given ets table ID and compares it with
-%%      the total Erlang VM memory stats (prefixes the message with Status). 
+%%      the total Erlang VM memory stats (prefixes the message with Status).
 print_table_info(Table, Status) ->
     Memory = ets:info(Table, memory),
     ContentSize = lists:sum([byte_size(element(2,X)) || X <- ets:tab2list(Table), is_binary(element(2, X))]),
@@ -124,7 +124,7 @@ get_meminfo() ->
 check_memory_inc_bool(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
     % assume an entry for an item uses 4 * 1k memory for ets (excluding the binary size)
     EntryEtsSize = 4 * 1000,
-    
+
     % NOTE: use stronger bounds than check_memory_inc/4 as other processes may increase the memory use again
     % we do not create additional atoms!
     NewMemInfo#mem_info.atom_used =:= PrevMemInfo#mem_info.atom_used andalso
@@ -152,27 +152,27 @@ check_memory_inc(PrevMemInfo, NewMemInfo, NewItems, AddedSize) ->
 check_memory_inc_(PrevMemInfo, NewMemInfo, NewItems, AddedSize, CheckAtoms) ->
     % assume an entry for an item uses 4 * 1k memory for ets (excluding the binary size)
     EntryEtsSize = 4 * 1000,
-    
+
     % we do not create additional atoms!
     ?IIF(CheckAtoms,
          ?equals(NewMemInfo#mem_info.atom_used, PrevMemInfo#mem_info.atom_used),
          ok),
-    
+
     % tolerate 250k binary memory overhead for running maintenance processes and binary messages
     ?equals_pattern_w_note(NewMemInfo#mem_info.binary, X when X =< PrevMemInfo#mem_info.binary + AddedSize + 250000,
-                           io_lib:format("PrevBinSize: ~B, AddedSize: ~B, NewBinSize: ~B, Diff: ~B",
+                           lists:flatten(io_lib:format("PrevBinSize: ~B, AddedSize: ~B, NewBinSize: ~B, Diff: ~B",
                                          [PrevMemInfo#mem_info.binary, NewMemInfo#mem_info.binary, AddedSize,
-                                          NewMemInfo#mem_info.binary - AddedSize - PrevMemInfo#mem_info.binary])),
-    
+                                          NewMemInfo#mem_info.binary - AddedSize - PrevMemInfo#mem_info.binary]))),
+
     % tolerate 250k processes_used memory overhead for running maintenance processes like RT rebuild etc.
     ?equals_pattern_w_note(NewMemInfo#mem_info.processes_used, X when X =< PrevMemInfo#mem_info.processes_used + 250000,
-                           io_lib:format("PrevProcUSize: ~B, NewProcUSize: ~B, Diff: ~B",
+                           lists:flatten(io_lib:format("PrevProcUSize: ~B, NewProcUSize: ~B, Diff: ~B",
                                          [PrevMemInfo#mem_info.processes_used, NewMemInfo#mem_info.processes_used,
-                                          NewMemInfo#mem_info.processes_used - PrevMemInfo#mem_info.processes_used])),
+                                          NewMemInfo#mem_info.processes_used - PrevMemInfo#mem_info.processes_used]))),
     ?equals_pattern_w_note(NewMemInfo#mem_info.ets, X when X =< PrevMemInfo#mem_info.ets + 250000 + (EntryEtsSize * NewItems),
-                           io_lib:format("PrevEtsSize: ~B, NewEtsSize: ~B, Diff: ~B",
+                           lists:flatten(io_lib:format("PrevEtsSize: ~B, NewEtsSize: ~B, Diff: ~B",
                                          [PrevMemInfo#mem_info.ets, NewMemInfo#mem_info.ets,
-                                          NewMemInfo#mem_info.ets - PrevMemInfo#mem_info.ets])),
+                                          NewMemInfo#mem_info.ets - PrevMemInfo#mem_info.ets]))),
     ok.
 
 %% @doc If debugging is disabled, execute check_memory_inc/4 with atom_used
@@ -391,7 +391,7 @@ garbage_collect_all() ->
 garbage_collect_all_and_check(0, _MemInfo, _NewItems, _AddedSize) -> ok;
 garbage_collect_all_and_check(Retries, MemInfo, NewItems, AddedSize) when Retries > 0 ->
     garbage_collect_all_and_check_(1, Retries + 1, MemInfo, NewItems, AddedSize).
-    
+
 garbage_collect_all_and_check_(Max, Max, _MemInfo, _NewItems, _AddedSize) -> ok;
 garbage_collect_all_and_check_(N, Max, MemInfo, NewItems, AddedSize) when N < Max ->
     garbage_collect_all(),
