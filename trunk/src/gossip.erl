@@ -360,7 +360,7 @@ on_inactive({activate_gossip, Neighbors}=Msg, State) ->
                                  NewState
                          end, State2, state_get(cb_modules, State2)),
 
-    State4 = init_gossip_tasks(State3),
+    State4 = init_gossip_tasks(Neighbors, State3),
     State5 = msg_queue_send(State4),
 
     % change handler to on_active
@@ -828,10 +828,10 @@ start_p2p_exchange(Peers, PData, CBModule, State)  ->
 
 
 %% called when activating gossip module
--spec init_gossip_tasks(State::state()) -> state().
-init_gossip_tasks(State) ->
+-spec init_gossip_tasks(nodelist:neighborhood(), state()) -> state().
+init_gossip_tasks(Neighbors, State) ->
     Init = fun (CBModule, StateIn) ->
-            _StateOut = init_gossip_task(CBModule, [], StateIn)
+            _StateOut = init_gossip_task(CBModule, [{neighbors, Neighbors}], StateIn)
           end,
     lists:foldl(Init, State, ?CBMODULES).
 
