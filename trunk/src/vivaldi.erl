@@ -181,6 +181,7 @@ on_active({vivaldi_trigger}, State) ->
 on_active({trigger_once}, State) ->
     %io:format("{start_vivaldi_shuffle}: ~p~n", [get_local_cyclon_pid()]),
     cyclon:get_subset_rand(1),
+    %% gossip_cyclon:get_subset_rand(1),
     State;
 
 % ignore empty node list from cyclon

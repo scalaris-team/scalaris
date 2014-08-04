@@ -160,6 +160,9 @@ get_other_vms(MaxVMs) when is_integer(MaxVMs) andalso MaxVMs > 0 ->
                GlobalPid = comm:make_global(Pid),
                comm:send(GlobalPid, {get_subset_rand, MaxVMs, self()},
                          [{group_member, cyclon}]),
+               %% comm:send(GlobalPid,
+               %%           {cb_msg, {gossip_cyclon, default}, {get_subset_rand, MaxVMs, self()}},
+               %%           [{group_member, gossip}]),
                trace_mpath:thread_yield(),
                receive
                    ?SCALARIS_RECV({cy_cache, Cache}, %% ->
@@ -179,7 +182,7 @@ get_other_vms(MaxVMs) when is_integer(MaxVMs) andalso MaxVMs > 0 ->
 shutdown_vm() ->
     NodesToShutdown = number_of_nodes(),
     Ok = shutdown_nodes(NodesToShutdown),
-    Rest = erlang:max(0, NodesToShutdown - length(Ok)), 
+    Rest = erlang:max(0, NodesToShutdown - length(Ok)),
     util:wait_for(fun() -> number_of_nodes() =:= Rest end),
     if Rest =:= 0 -> kill_vm();
        true       -> no_partner_found
