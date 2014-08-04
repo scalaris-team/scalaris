@@ -79,10 +79,10 @@ trigger_interval() -> % in ms
     config:read(gossip_cyclon_interval).
 
 
-%% @doc The fanout (number of peers contacted per cycle).
+%% @doc The fanout (in cyclon always 1).
 -spec fanout() -> pos_integer().
 fanout() ->
-    config:read(gossip_cyclon_fanout).
+    1.
 
 
 %% @doc The minimum number of cycles per round.
@@ -103,14 +103,15 @@ max_cycles_per_round() ->
 %%      of the cache are exchanged.
 -spec shuffle_length() -> pos_integer().
 shuffle_length() ->
-    config:read(cyclon_shuffle_length).
+    config:read(gossip_cyclon_shuffle_length).
 
 
 %% @doc Gets the cyclon_cache_size parameter that defines how many entries a
 %%      cache should at most have.
 -spec cache_size() -> pos_integer().
 cache_size() ->
-    config:read(cyclon_cache_size).
+    config:read(gossip_cyclon_cache_size).
+
 
 %% @doc Cycon doesn't need instantiabilty, so {gossip_cyclon, default} is always
 %%      used.
@@ -119,9 +120,20 @@ cache_size() ->
 instance() ->
     {gossip_cyclon, default}.
 
+
 -spec check_config() -> boolean().
 check_config() ->
-    true.
+    config:cfg_is_integer(gossip_cyclon_interval) and
+    config:cfg_is_greater_than(gossip_cyclon_interval, 0) and
+
+    config:cfg_is_integer(gossip_cyclon_cache_size) and
+    config:cfg_is_greater_than(gossip_cyclon_cache_size, 2) and
+
+    config:cfg_is_integer(gossip_cyclon_shuffle_length) and
+    config:cfg_is_greater_than_equal(gossip_cyclon_shuffle_length, 1) and
+    config:cfg_is_less_than_equal(gossip_cyclon_shuffle_length,
+                                  config:read(gossip_cyclon_cache_size)).
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
