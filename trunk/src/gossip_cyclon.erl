@@ -219,19 +219,21 @@ integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
 
 %% @doc Handle messages
 -spec handle_msg(Msg::comm:message(), State::state()) -> {ok, state()}.
-handle_msg({rm_changed, _NewNode}, State) ->
-    %% replaces the reference to self's dht node with NewNode
-    {ok, State};
+
+%% replaces the reference to self's dht node with NewNode
+handle_msg({rm_changed, NewNode}, {Cache, Node}) ->
+    {ok, Cache, NewNode};
+
 handle_msg({get_ages, _Pid}, State) ->
     ?TRACE_DEBUG("get_ages", []),
     %% msg from admin:print_ages()
     {ok, State};
+
 handle_msg({get_subset_rand, _N, _Pid}, State) ->
     ?TRACE_DEBUG("get_subset_rand", []),
     %% msg from get_subset_random() (api)
     %% also directly requested from api_vm:get_other_vms() (change?)
     {ok, State};
-
 
 %% Response to a get_node_details message from self (via request_node_details()).
 %% The node details are used to possibly update Me and the succ and pred are
@@ -280,8 +282,6 @@ handle_msg({get_dht_nodes_response, _Nodes}, State) ->
     %% handle_msg({get_node_details_response, _NodeDetails} if the cache is empty.
     %% Tries to get a cyclon cache from one of the received nodes if cache is
     %% still empty.
-    {ok, State};
-handle_msg(_Msg, State) ->
     {ok, State}.
 
 
@@ -342,6 +342,7 @@ shutdown(_State) ->
 rm_check(OldNeighbors, NewNeighbors, _Reason) ->
     nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors).
 
+
 %% @doc Sends changes to a subscribed cyclon process when the neighborhood
 %%      changes.
 -spec rm_send_changes(Pid::pid(), Tag::cyclon,
@@ -349,6 +350,7 @@ rm_check(OldNeighbors, NewNeighbors, _Reason) ->
         NewNeighbors::nodelist:neighborhood(),
         Reason::rm_loop:reason()) -> ok.
 rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors, _Reason) ->
+    ?TRACE_DEBUG("rm_send_changes", []),
     comm:send_local(Pid, {cb_reply, {gossip_cyclon, default}, {rm_changed, nodelist:node(NewNeighbors)}}).
 
 
