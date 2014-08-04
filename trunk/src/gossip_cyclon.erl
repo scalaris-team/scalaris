@@ -158,23 +158,21 @@ select_node(State) ->
 -spec select_data(State::state()) -> {ok, state()}.
 select_data({Cache, Node}=State) ->
     ?TRACE_DEBUG("select_data", []),
-    NewCache =
-        case check_state(State) of
-            fail ->
-                Cache;
-            _    ->
-                monitor:proc_set_value(?MODULE, 'shuffle',
-                                           fun(Old) -> rrd:add_now(1, Old) end),
-                Cache1 = cyclon_cache:inc_age(Cache),
-                {Cache2, NodeQ} = cyclon_cache:pop_oldest_node(Cache1),
-                Subset = cyclon_cache:get_random_subset(shuffle_length() - 1, Cache2),
-                ForSend = cyclon_cache:add_node(Node, 0, Subset),
-                Pid = pid_groups:get_my(gossip),
-                comm:send_local(Pid, {selected_peer, instance(), {cy_cache, [NodeQ]}}),
-                comm:send_local(Pid, {selected_data, instance(), ForSend}),
-                Cache2
-        end,
-    {ok, {NewCache, Node}}.
+    case check_state(State) of
+        fail ->
+            {retry, State};
+        _    ->
+            monitor:proc_set_value(?MODULE, 'shuffle',
+                                   fun(Old) -> rrd:add_now(1, Old) end),
+            Cache1 = cyclon_cache:inc_age(Cache),
+            {Cache2, NodeQ} = cyclon_cache:pop_oldest_node(Cache1),
+            Subset = cyclon_cache:get_random_subset(shuffle_length() - 1, Cache2),
+            ForSend = cyclon_cache:add_node(Node, 0, Subset),
+            Pid = pid_groups:get_my(gossip),
+            comm:send_local(Pid, {selected_peer, instance(), {cy_cache, [NodeQ]}}),
+            comm:send_local(Pid, {selected_data, instance(), ForSend}),
+            {ok, {Cache2, Node}}
+    end.
 
 
 %% @doc Process the data from the requestor (P) and select reply data (at Q). <br/>
@@ -209,7 +207,7 @@ integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
     Cache1 = cyclon_cache:merge(Cache, Node, QSubset, PSubset, cache_size()),
     Pid = pid_groups:get_my(gossip),
     comm:send_local(Pid, {integrated_data, instance(), cur_round}),
-    ?TRACE_DEBUG("integrate_data. NewCache: ~w", [Cache]),
+    %% ?TRACE_DEBUG("integrate_data. NewCache: ~w", [Cache]),
     {ok, {Cache1, Node}}.
 
 
@@ -237,6 +235,7 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
     ?TRACE_DEBUG("get_node_details_response", []),
     case cyclon_cache:size(OldCache) =< 2 of
         true  ->
+            ?TRACE_DEBUG("get_node_details_response: true", []),
             Pred = node_details:get(NodeDetails, pred),
             Succ = node_details:get(NodeDetails, succ),
             NewCache =
@@ -252,15 +251,18 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
                     case config:read(known_hosts) of
                         [] -> ok;
                         [_|_] = KnownHosts ->
+                            ?TRACE_DEBUG("get_node_details_response: request known-hosts", []),
                             Pid = util:randomelem(KnownHosts),
                             EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, {gossip_cyclon, default}, '_'}),
                             comm:send(Pid, {get_dht_nodes, EnvPid}, [{?quiet}])
                     end;
                 _ ->
+                    ?TRACE_DEBUG("get_node_details_response: ok", []),
                     ok
             end,
             {ok, {NewCache, Node}};
         false ->
+            ?TRACE_DEBUG("get_node_details_response: false", []),
             {ok, State}
     end;
 
@@ -378,4 +380,3 @@ request_node_details(Details) ->
             comm:send_local(DHT_Node, {get_node_details, EnvPid, Details});
         false -> ok
     end.
-
