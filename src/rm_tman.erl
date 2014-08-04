@@ -337,7 +337,7 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
     end,
     {{unknown}, {NewNeighborhood2, RandViewSize, Cache, Churn}}.
 
-%% @doc Removes nodes all nodes from the given neighborhood which are in the
+%% @doc Removes all nodes from the given neighborhood which are in the
 %%      interval I but keep TolerateNode.
 -spec remove_neighbors_in_interval(Neighborhood::nodelist:neighborhood(),
                                    I::intervals:interval(),
