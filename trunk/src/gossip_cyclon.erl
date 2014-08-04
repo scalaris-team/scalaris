@@ -157,7 +157,7 @@ select_node(State) ->
 %%      cyclon module.
 -spec select_data(State::state()) -> {ok, state()}.
 select_data({Cache, Node}=State) ->
-    ?TRACE_DEBUG("select__data", []),
+    ?TRACE_DEBUG("select_data", []),
     NewCache =
         case check_state(State) of
             fail ->
@@ -169,7 +169,6 @@ select_data({Cache, Node}=State) ->
                 {Cache2, NodeQ} = cyclon_cache:pop_oldest_node(Cache1),
                 Subset = cyclon_cache:get_random_subset(shuffle_length() - 1, Cache2),
                 ForSend = cyclon_cache:add_node(Node, 0, Subset),
-                %io:format("~p",[length(ForSend)]),
                 Pid = pid_groups:get_my(gossip),
                 comm:send_local(Pid, {selected_peer, instance(), {cy_cache, [NodeQ]}}),
                 comm:send_local(Pid, {selected_data, instance(), ForSend}),
@@ -178,17 +177,23 @@ select_data({Cache, Node}=State) ->
     {ok, {NewCache, Node}}.
 
 
-%% @doc Process the data from the requestor and select reply data. <br/>
+%% @doc Process the data from the requestor (P) and select reply data (at Q). <br/>
 %%      Called by the behaviour module upon a p2p_exch message. <br/>
 %%      PData: exchange data from the p2p_exch request <br/>
 %%      Ref: used by the gossip module to identify the request <br/>
 %%      RoundStatus / Round: ignored, as cyclon does not implement round handling
--spec select_reply_data(PData::data(), Ref::pos_integer(), Round::round(),
+%%      p2p_exch msg -> seleft_reply_data() is equivalent to cy_subset msg in the
+%%      old cyclon module.
+-spec select_reply_data(PSubset::data(), Ref::pos_integer(), Round::round(),
     State::state()) -> {discard_msg | ok | retry | send_back, state()}.
-select_reply_data(_PData, _Ref, _Round, State) ->
+select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
     ?TRACE_DEBUG("select_reply_data", []),
-    %% cy_subset msg <=> p2p_exch msg -> seleft_reply_data()
-    {ok, State}.
+    % this is received at node Q -> integrate results of node P
+    QSubset = cyclon_cache:get_random_subset(shuffle_length(), Cache),
+    Pid = pid_groups:get_my(gossip),
+    comm:send_local(Pid, {selected_reply_data, instance(), {QSubset, PSubset}, Ref, Round}),
+    NewCache = cyclon_cache:merge(Cache, Node, PSubset, QSubset, cache_size()),
+    {ok, {NewCache, Node}}.
 
 
 %% @doc Integrate the reply data. <br/>
