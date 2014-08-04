@@ -55,8 +55,7 @@ get_neighbors({Neighbors, _RandViewSize, _Cache, _Churn}) ->
 %% @doc Initializes the cyclon cache retrieval "trigger" (un-infected).
 -spec init_first() -> ok.
 init_first() ->
-    cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
-    %% gossip_cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
+    gossip_cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
     ok.
 
 %% @doc Initialises the state when rm_loop receives an init_rm message.
@@ -65,8 +64,7 @@ init_first() ->
 init(Me, Pred, Succ) ->
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     % ask cyclon once (a repeating trigger is already started in init_first/0)
-    cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 3, {rm, once, '_'})),
-    %% gossip_cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 3, {rm, once, '_'})),
+    gossip_cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 3, {rm, once, '_'})),
     % start by using all available nodes reported by cyclon
     RandViewSize = config:read(cyclon_cache_size),
     {Neighborhood, RandViewSize, [], true}.
@@ -91,8 +89,7 @@ handle_custom_message({rm, {cy_cache, NewCache}}, State) ->
     NewState = add_cyclon_cache(NewCache, State),
     NewRandViewSize = element(2, element(2, NewState)),
     % trigger new cyclon cache request
-    cyclon:get_subset_rand_next_interval(NewRandViewSize,
-    %% gossip_cyclon:get_subset_rand_next_interval(NewRandViewSize,
+    gossip_cyclon:get_subset_rand_next_interval(NewRandViewSize,
                                          comm:reply_as(self(), 2, {rm, '_'})),
     NewState;
 

@@ -89,8 +89,7 @@ handle_msg({lb_active_karger_trigger}, State) ->
     trigger(),
     %% Request N random nodes from cyclon
     NumNodes = config:read(lb_active_karger_rnd_nodes),
-    cyclon:get_subset_rand(NumNodes),
-    %% gossip_cyclon:get_subset_rand(NumNodes),
+    gossip_cyclon:get_subset_rand(NumNodes),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

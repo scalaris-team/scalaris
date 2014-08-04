@@ -197,8 +197,7 @@ on_active({dc_trigger}, State) ->
 
 on_active({start_clustering_shuffle}, State) ->
     % start new clustering shuffle -> gossip communication
-    cyclon:get_subset_rand(1),
-    %% gossip_cyclon:get_subset_rand(1),
+    gossip_cyclon:get_subset_rand(1),
     State;
 
 on_active({dc_reset_trigger}, State) ->
