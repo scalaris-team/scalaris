@@ -968,7 +968,7 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages, MoveState) ->
            cyclon:activate(Neighbors),
            vivaldi:activate(),
            dc_clustering:activate(),
-           gossip:activate(nodelist:node_range(Neighbors));
+           gossip:activate(Neighbors);
        true -> ok
     end,
     dht_node_reregister:activate(),
