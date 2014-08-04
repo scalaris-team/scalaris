@@ -61,7 +61,7 @@
 %% for testing
 -export([tester_create_round/1, tester_create_state/11, tester_create_histogram/1,
          tester_create_load_data_list/1, is_histogram/1,
-         tester_create_histogram_size/1]).
+         tester_create_histogram_size/1, init_feeder/1]).
 
 -ifdef(with_export_type_support).
 -export_type([state/0, histogram/0, histogram_size/0, bucket/0]). %% for config gossip_load_*.erl
@@ -1509,6 +1509,17 @@ compare([{BucketInterval, _Avg1} | List1], [{BucketInterval, _Avg2} | List2]) ->
 compare([_|_], [_|_]) ->
     false.
 
+
+-spec init_feeder({NoOfBuckets::non_neg_integer(), Requestor::comm:mypid(),
+                   Random1::boolean(), Random2::boolean()}) -> {[proplists:property()]}.
+init_feeder({NoOfBuckets, Requestor, Random1, Random2}) ->
+    Prop1 = if Random1 -> [{no_of_buckets, NoOfBuckets}];
+               not Random1 -> []
+            end,
+    Prop2 = if Random2 -> [{requestor, Requestor}];
+               not Random2 -> []
+            end,
+    {lists:append([Prop1, Prop2, [{instance, {gossip_load,default}}]])}.
 
 %% @doc For testing: ensure, that only buckets with identical keys are feeded to
 %%      merge_bucket().
