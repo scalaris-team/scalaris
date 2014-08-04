@@ -43,6 +43,8 @@
 -ifdef(with_export_type_support).
 -endif.
 
+-define(SEND_TO_GROUP_MEMBER(Pid, Process, Msg), comm:send(Pid, Msg, [{group_member, Process},
+                                                                      {?quiet}, {channel, prio}, {no_keep_alive}])).
 
 %% -define(TRACE_DEBUG(FormatString, Data), ok).
 -define(TRACE_DEBUG(FormatString, Data),
@@ -306,15 +308,26 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
             {ok, State}
     end;
 
-
-handle_msg({get_dht_nodes_response, _Nodes}, State) ->
+%% Response to get_dht_nodes message from service_per_vm. Contains a list of
+%% registered dht nodes from service_per_vm. Initiated in
+%% handle_msg({get_node_details_response, _NodeDetails} if the cache is empty.
+%% Tries to get a cyclon cache from one of the received nodes if cache is
+%% still empty.
+%% This happens (i.a.?) when only one node is present. In this case the
+%% get_node_details and the get_dht_nodes request are repeated every cycle
+%% (TODO is this the intended behaviour?)
+handle_msg({get_dht_nodes_response, Nodes}, {Cache, _Node}=State) ->
     ?TRACE_DEBUG("get_dht_nodes_response", []),
-    %% Response to get_dht_nodes message from service_per_vm. Contains a list of
-    %% registered dht nodes from service_per_vm. Initiated in
-    %% handle_msg({get_node_details_response, _NodeDetails} if the cache is empty.
-    %% Tries to get a cyclon cache from one of the received nodes if cache is
-    %% still empty.
-    {ok, State}.
+    Size = cyclon_cache:size(Cache),
+    case Nodes of
+        [] ->
+            {ok, State};
+        [_|_] when Size > 0 ->
+            {ok, State};
+        [Pid | _] ->
+            ?SEND_TO_GROUP_MEMBER(Pid, gossip, {p2p_exch, instance(), comm:this(), Cache, 0}),
+            {ok, State}
+    end.
 
 
 %% @doc Always returns false, as cyclon does not implement rounds.
