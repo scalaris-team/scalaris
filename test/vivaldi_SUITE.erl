@@ -72,7 +72,7 @@ test_init(Config) ->
     Config.
 
 test_on_trigger(Config) ->
-    pid_groups:join_as(atom_to_list(?MODULE), cyclon),
+    pid_groups:join_as(atom_to_list(?MODULE), gossip),
     Coordinate = [1.0, 1.0],
     Confidence = 1.0,
     InitialState = {Coordinate, Confidence},
@@ -82,7 +82,7 @@ test_on_trigger(Config) ->
     Self = self(),
     ?equals(Coordinate, NewCoordinate),
     ?equals(Confidence, NewConfidence),
-    ?expect_message({get_subset_rand, 1, Self}),
+    ?expect_message({cb_msg, {gossip_cyclon, default}, {get_subset_rand, 1, Self}}),
     ?expect_no_message(),
     Config.
 
