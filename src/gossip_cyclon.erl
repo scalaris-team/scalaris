@@ -192,8 +192,8 @@ select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
     QSubset = cyclon_cache:get_random_subset(shuffle_length(), Cache),
     Pid = pid_groups:get_my(gossip),
     comm:send_local(Pid, {selected_reply_data, instance(), {QSubset, PSubset}, Ref, Round}),
-    NewCache = cyclon_cache:merge(Cache, Node, PSubset, QSubset, cache_size()),
-    {ok, {NewCache, Node}}.
+    Cache1 = cyclon_cache:merge(Cache, Node, PSubset, QSubset, cache_size()),
+    {ok, {Cache1, Node}}.
 
 
 %% @doc Integrate the reply data. <br/>
@@ -249,9 +249,11 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
                         [] -> ok;
                         [_|_] = KnownHosts ->
                             Pid = util:randomelem(KnownHosts),
-                            comm:send(Pid, {get_dht_nodes, comm:this()}, [{?quiet}])
+                            EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, {gossip_cyclon, default}, '_'}),
+                            comm:send(Pid, {get_dht_nodes, EnvPid}, [{?quiet}])
                     end;
-                _ -> ok
+                _ ->
+                    ok
             end,
             {ok, {NewCache, Node}};
         false ->
