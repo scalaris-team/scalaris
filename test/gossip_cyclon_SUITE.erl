@@ -94,7 +94,7 @@ age_inc(State) ->
                               OldAge =:= Age - 1
                       end, NewCache) andalso
             length(Cache1) =:= length(NewCache) + 1;
-        {retry, State2} ->
+        {discard_msg, State2} ->
             ?equals(State2, State1)
     end.
 
@@ -126,7 +126,7 @@ pop_oldest(State) ->
             {Oldest, _Age} = lists:last(lists:keysort(2, Cache2)),
             {selected_peer,{gossip_cyclon,default},{cy_cache,[SendNode]}} = element(6, SendEvent),
             Oldest =:= SendNode;
-        {retry, State2} ->
+        {discard_msg, State2} ->
             {Cache2, MyNode} =:= State2
     end,
     trace_mpath:cleanup(test_pop_oldest),
@@ -174,7 +174,7 @@ select_data(State) ->
             [SendEvent] = trace_mpath:get_trace(test_select_data),
             {selected_data,{gossip_cyclon,default},Subset} = element(6, SendEvent),
             is_subset(Subset, [{MyNode, 0}|Cache1]);
-        {retry, State2} ->
+        {discard_msg, State2} ->
             {Cache1, MyNode} =:= State2
     end,
     trace_mpath:cleanup(test_select_data),

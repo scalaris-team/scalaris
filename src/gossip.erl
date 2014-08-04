@@ -936,14 +936,16 @@ cb_select_node(CBModule, State) ->
 %%      The callback module has to select the exchange data to be sent to the
 %%      peer. The exchange data has to be sent back to the gossip module as a
 %%      message of the form {selected_data, Instance, ExchangeData}.
+%%      If 'discard_msg' is returned, the current trigger is ignored.
+%%      (Note: Storing the trigger in the message queue would lead to self-accelerating
+%%      recursion of storing and triggering)
 -spec cb_select_data(cb_module(), state()) -> state().
 cb_select_data(CBModule, State) ->
     case cb_call(select_data, [], CBModule, State) of
         {ok, State1} ->
             State1;
-        {retry, State1} ->
-            State2 = state_set({trigger_lock, CBModule}, free, State1),
-            msg_queue_add({trigger_action, CBModule}, State2)
+        {discard_msg, State1} ->
+            state_set({trigger_lock, CBModule}, free, State1)
     end.
 
 

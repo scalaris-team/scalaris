@@ -204,11 +204,11 @@ select_node(State) ->
 %%      {selected_data, Instance, ExchangeData}.
 %%      gossip_trigger -> select_data() is equivalent to cy_shuffle in the old
 %%      cyclon module.
--spec select_data(State::state()) -> {ok | retry, state()}.
+-spec select_data(State::state()) -> {ok | discard_msg, state()}.
 select_data({Cache, Node}=State) ->
     case check_state(State) of
         fail ->
-            {retry, State};
+            {discard_msg, State};
         _    ->
             ?PRINT_CACHE_FOR_DOT(Node, Cache),
             monitor:proc_set_value(?MODULE, 'shuffle',
