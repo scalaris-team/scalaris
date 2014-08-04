@@ -196,8 +196,7 @@
 -define(TRACE_ROUND(FormatString, Data), ok).
 %% -define(TRACE_ROUND(FormatString, Data), log:pal(FormatString, Data)).
 
--define(CBMODULES, [{gossip_load, default}]). % callback modules as list
-%% -define(CBMODULES, [{gossip_load, default}, {gossip_cyclon, default}]). % callback modules as list
+-define(CBMODULES, [{gossip_load, default}, {gossip_cyclon, default}]). % callback modules as list
 
 % for developement, should be disabled for production
 -define(FIRST_TRIGGER_DELAY, 0). % delay in s for first trigger
@@ -1088,12 +1087,10 @@ cb_call(FunName, Args, CBModule={ModuleName, _InstanceId}, State) when is_atom(M
 %%      on_active({selected_peer, CBModule, {cy_cache, Cache}}, State) will handle the response
 -spec request_random_node(CBModule::cb_module()) -> ok.
 request_random_node(CBModule) ->
-    CyclonPid = pid_groups:get_my(cyclon),
     EnvPid = comm:reply_as(self(), 3, {selected_peer, CBModule, '_'}),
     Fanout = cb_config(fanout, CBModule),
-    comm:send_local(CyclonPid, {get_subset_rand, Fanout, EnvPid}).
-    %% comm:send_local(self(), {cb_msg, {gossip_cyclon, default},
-    %%                          {get_subset_rand, Fanout, EnvPid}}).
+    comm:send_local(self(), {cb_msg, {gossip_cyclon, default},
+                             {get_subset_rand, Fanout, EnvPid}}).
 
 
 %% Used for rerequesting peers from cyclon when cyclon returned an empty list,
@@ -1102,12 +1099,10 @@ request_random_node(CBModule) ->
 -spec request_random_node_delayed(Delay::0..4294967295, CBModule::cb_module()) ->
     reference().
 request_random_node_delayed(Delay, CBModule) ->
-    CyclonPid = pid_groups:get_my(cyclon),
     EnvPid = comm:reply_as(self(), 3, {selected_peer, CBModule, '_'}),
     Fanout = cb_config(fanout, CBModule),
-    comm:send_local_after(Delay, CyclonPid, {get_subset_rand, Fanout, EnvPid}).
-    %% comm:send_local_after(Delay, self(), {cb_msg, {gossip_cyclon, default},
-    %%                                       {get_subset_rand, Fanout, EnvPid}}).
+    comm:send_local_after(Delay, self(), {cb_msg, {gossip_cyclon, default},
+                                          {get_subset_rand, Fanout, EnvPid}}).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

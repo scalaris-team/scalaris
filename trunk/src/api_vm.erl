@@ -158,11 +158,9 @@ get_other_vms(MaxVMs) when is_integer(MaxVMs) andalso MaxVMs > 0 ->
         lists:append(
           [begin
                GlobalPid = comm:make_global(Pid),
-               comm:send(GlobalPid, {get_subset_rand, MaxVMs, self()},
-                         [{group_member, cyclon}]),
-               %% comm:send(GlobalPid,
-               %%           {cb_msg, {gossip_cyclon, default}, {get_subset_rand, MaxVMs, self()}},
-               %%           [{group_member, gossip}]),
+               comm:send(GlobalPid,
+                         {cb_msg, {gossip_cyclon, default}, {get_subset_rand, MaxVMs, self()}},
+                         [{group_member, gossip}]),
                trace_mpath:thread_yield(),
                receive
                    ?SCALARIS_RECV({cy_cache, Cache}, %% ->
