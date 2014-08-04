@@ -133,7 +133,7 @@ check_config() ->
 -spec get_subset_rand(N::pos_integer()) -> ok.
 get_subset_rand(N) ->
     Pid = pid_groups:get_my(gossip),
-    comm:send_local(Pid, {cb_reply, instance(), {get_subset_rand, N, self()}}).
+    comm:send_local(Pid, {cb_msg, instance(), {get_subset_rand, N, self()}}).
 
 
 %% @doc Same as get_subset_rand/1, but the request is delayed with a delay equal
@@ -149,7 +149,7 @@ get_subset_rand_next_interval(N) ->
 get_subset_rand_next_interval(N, SourcePid) ->
     Pid = pid_groups:get_my(gossip),
     comm:send_local_after(trigger_interval(), Pid,
-                          {cb_reply, instance(), {get_subset_rand, N, SourcePid}}).
+                          {cb_msg, instance(), {get_subset_rand, N, SourcePid}}).
 
 
 
@@ -255,7 +255,7 @@ handle_msg({rm_changed, NewNode}, {Cache, _Node}) ->
 
 %% msg from admin:print_ages()
 %% request needs to be sent to the gossip module in the following form:
-%% {cb_reply, {gossip_cyclon, default}, {get_ages, Pid}}
+%% {cb_msg, {gossip_cyclon, default}, {get_ages, Pid}}
 handle_msg({get_ages, Pid}, {Cache, Node}) ->
     ?TRACE_DEBUG("get_ages", []),
     comm:send_local(Pid, {cy_ages, cyclon_cache:get_ages(Cache)}),
@@ -293,7 +293,7 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
                         [_|_] = KnownHosts ->
                             %% ?TRACE_DEBUG("get_node_details_response: request known-hosts", []),
                             Pid = util:randomelem(KnownHosts),
-                            EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, {gossip_cyclon, default}, '_'}),
+                            EnvPid = comm:reply_as(comm:this(), 3, {cb_msg, {gossip_cyclon, default}, '_'}),
                             comm:send(Pid, {get_dht_nodes, EnvPid}, [{?quiet}])
                     end;
                 _ ->
@@ -383,7 +383,7 @@ rm_check(OldNeighbors, NewNeighbors, _Reason) ->
         Reason::rm_loop:reason()) -> ok.
 rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors, _Reason) ->
     ?TRACE_DEBUG("rm_send_changes", []),
-    comm:send_local(Pid, {cb_reply, {gossip_cyclon, default}, {rm_changed, nodelist:node(NewNeighbors)}}).
+    comm:send_local(Pid, {cb_msg, {gossip_cyclon, default}, {rm_changed, nodelist:node(NewNeighbors)}}).
 
 
 %% @doc Checks the current state. If the cache is empty or the current node is
@@ -414,7 +414,7 @@ check_state({Cache, _Node} = _State) ->
 request_node_details(Details) ->
     DHT_Node = pid_groups:get_my(dht_node),
     This = comm:this(),
-    EnvPid = comm:reply_as(This, 3, {cb_reply, {gossip_cyclon, default}, '_'}),
+    EnvPid = comm:reply_as(This, 3, {cb_msg, {gossip_cyclon, default}, '_'}),
     case comm:is_valid(This) of
         true ->
             comm:send_local(DHT_Node, {get_node_details, EnvPid, Details});
