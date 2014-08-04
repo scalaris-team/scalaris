@@ -655,10 +655,14 @@ handle_msg({p2p_exch, CBModule, SourcePid, PData, OtherRound}=Msg, State) ->
 
 %% This message is a reply from a callback module to CBModule:select_reply_data()
 handle_msg({selected_reply_data, CBModule, QData, Ref, Round}, State)->
-    {Peer, State1} = take_reply_peer(Ref, State),
-    log:log(debug, "[ Gossip ] selected_reply_data. CBModule: ~w, QData ~w, Peer: ~w",
-        [CBModule, QData, Peer]),
-    comm:send(Peer, {p2p_exch_reply, CBModule, comm:this(), QData, Round}, [{shepherd, self()}]),
+    case take_reply_peer(Ref, State) of
+        {none, State1} ->
+            log:log(warn(), "[ Gossip ] Got 'selected_reply_data', but no matching reply peer stored in State.");
+        {Peer, State1} ->
+            comm:send(Peer, {p2p_exch_reply, CBModule, comm:this(), QData, Round}, [{shepherd, self()}])
+    end,
+    log:log(debug, "[ Gossip ] selected_reply_data. CBModule: ~w, QData ~w",
+        [CBModule, QData]),
     State1;
 
 
