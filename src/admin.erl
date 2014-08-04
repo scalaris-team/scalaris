@@ -398,12 +398,14 @@ nodes() ->
 -spec print_ages() -> ok.
 print_ages() ->
     mgmt_server:node_list(),
-    _ = begin 
+    _ = begin
             trace_mpath:thread_yield(),
             receive
                 ?SCALARIS_RECV(
                    {get_list_response, List}, %% ->
                    [ comm:send(Node, {get_ages, self()}, [{group_member, cyclon}]) || Node <- List ]
+                   %% [ comm:send(Node, {cb_reply, {gossip_cyclon, default}, {get_ages, self()}},
+                   %%             [{group_member, gossip}]) || Node <- List ]
                   )
                 end
         end,

@@ -221,14 +221,17 @@ integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
 -spec handle_msg(Msg::comm:message(), State::state()) -> {ok, state()}.
 
 %% replaces the reference to self's dht node with NewNode
-handle_msg({rm_changed, NewNode}, {Cache, Node}) ->
+handle_msg({rm_changed, NewNode}, {Cache, _Node}) ->
     ?TRACE_DEBUG("rm_changed", []),
     {ok, Cache, NewNode};
 
-handle_msg({get_ages, _Pid}, State) ->
+%% msg from admin:print_ages()
+%% request needs to be sent to the gossip module in the following form:
+%% {cb_reply, {gossip_cyclon, default}, {get_ages, Pid}}
+handle_msg({get_ages, Pid}, {Cache, Node}) ->
     ?TRACE_DEBUG("get_ages", []),
-    %% msg from admin:print_ages()
-    {ok, State};
+    comm:send_local(Pid, {cy_ages, cyclon_cache:get_ages(Cache)}),
+    {ok, {Cache, Node}};
 
 handle_msg({get_subset_rand, _N, _Pid}, State) ->
     ?TRACE_DEBUG("get_subset_rand", []),
