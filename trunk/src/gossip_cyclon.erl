@@ -45,6 +45,11 @@
 -define(TRACE_DEBUG(FormatString, Data),
         log:pal("[ Cyclon ~.0p ] " ++ FormatString, [ comm:this() | Data])).
 
+%% print cache at the beginnig of every cycle in a dot friednly format
+%% -define(PRINT_CACHE_FOR_DOT(MyNode, Cache), ok).
+-define(PRINT_CACHE_FOR_DOT(MyNode, Cache), print_cache_dot(MyNode, Cache)).
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Type Definitions
@@ -162,6 +167,7 @@ select_data({Cache, Node}=State) ->
         fail ->
             {retry, State};
         _    ->
+            ?PRINT_CACHE_FOR_DOT(Node, Cache),
             monitor:proc_set_value(?MODULE, 'shuffle',
                                    fun(Old) -> rrd:add_now(1, Old) end),
             Cache1 = cyclon_cache:inc_age(Cache),
@@ -380,3 +386,25 @@ request_node_details(Details) ->
             comm:send_local(DHT_Node, {get_node_details, EnvPid, Details});
         false -> ok
     end.
+
+
+%% @doc Print the cache in a dot compatible format.
+%%      Format: Self -> Reference1; Self -> Reference2 ; ...
+%%      Prints references to nodes as local pids, so this produces meaningful
+%%      results if all nodes are started in the same Erlang VM.
+%%      (Cycles are counted in the gossip module as well for real, the basic cycle
+%%      counting performed here only works if this function only called once every cycle).
+-compile({nowarn_unused_function, {print_cache_dot, 2}}).
+-spec print_cache_dot(node:nodetype(), data()) -> ok.
+print_cache_dot(MyNode, Cache) ->
+    Cycle = case get(cycles) of
+        undefined -> put(cycles, 1), 0;
+        Cycle1 -> put(cycles, Cycle1+1), Cycle1
+    end,
+    MyPid = comm:make_local(node:pidX(MyNode)),
+    Graph = lists:foldl(
+                    fun({Node, _Age}, AccIn) ->
+                        AccIn ++ io_lib:format("~w -> ~w; ", [MyPid, comm:make_local(node:pidX(Node))])
+                    end, io_lib:format("[Cycle: ~w] ", [Cycle]), Cache),
+    log:pal(lists:flatten(Graph)).
+
