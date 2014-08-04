@@ -168,8 +168,7 @@ tester_type_check_gossip(_Config) ->
                 {on_active, 2} % too much interaction / spec to wide
             ],
             % excluded (private functions)
-            [   {do_trigger_action, 2}, % spec to wide
-                {handle_msg, 2}, % spec to wide, sends messages
+            [   {handle_msg, 2}, % spec to wide, sends messages
                 {start_p2p_exchange, 4}, % would need valid peer
                 {init_gossip_task, 3}, % test via feeder
                 {cb_init, 2}, % spec to wide (Args)
