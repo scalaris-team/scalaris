@@ -36,7 +36,7 @@
          prepare_send_delta1/3, prepare_send_delta2/3,
          finish_delta1/3, finish_delta2/3,
          finish_delta_ack1/3, finish_delta_ack2/4,
-         abort_slide/3]).
+         abort_slide/4]).
 
 -export([rm_exec/5]).
 
@@ -290,31 +290,51 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
 %% @doc Executed when aborting the given slide operation (assumes the SlideOp
 %%      has already been set up).
 -spec abort_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
-        Reason::dht_node_move:abort_reason()) -> dht_node_state:state().
-abort_slide(State, SlideOp, Reason) ->
+                  Reason::dht_node_move:abort_reason(), MoveMsgTag::atom())
+        -> dht_node_state:state().
+abort_slide(State, SlideOp, Reason, MoveMsgTag) ->
+    case slide_op:get_phase(SlideOp) of
+        {wait_for_continue, Phase} -> ok;
+        Phase -> ok
+    end,
+    SendOrRcv = slide_op:get_sendORreceive(SlideOp),
+
+    % revert ID change?
     case slide_op:get_predORsucc(SlideOp) of
         succ ->
             % try to change ID back (if not the first receiving join slide)
-            case slide_op:get_sendORreceive(SlideOp) of
+            case SendOrRcv of
                 'rcv' when Reason =:= target_down ->
                     % if ID already changed, keep it; as well as the already incorporated data
-                    State;
+                    ok;
                 _ ->
                     MyId = dht_node_state:get(State, node_id),
-                    Phase = slide_op:get_phase(SlideOp),
                     case slide_op:get_my_old_id(SlideOp) of
-                        null -> State;
-                        MyId -> State;
-                        _ when Phase =:= wait_for_delta_ack -> State;
+                        null -> ok;
+                        MyId -> ok;
+                        _ when Phase =:= wait_for_delta_ack -> ok;
                         MyOldId ->
                             log:log(warn, "[ dht_node_move ~.0p ] trying to revert ID change from ~p to ~p~n",
                                     [MyOldId, MyId]),
                             rm_loop:update_id(MyOldId),
-                            State
+                            ok
                     end
             end;
         pred ->
             % nothing we can do on this side
+            ok
+    end,
+
+    % remove incomplete/useless data?
+    case SendOrRcv of
+        'rcv' when Reason =:= target_down ->
+            % nothing to do
+            State;
+        'rcv' when (Phase =/= wait_for_delta orelse MoveMsgTag =/= delta_ack) ->
+            % remove incomplete data (note: this function will be called again
+            % as part of dht_node_move:abort_slide/4 but without deleting items!)
+            dht_node_state:slide_stop_record(State, slide_op:get_interval(SlideOp), true);
+        _ ->
             State
     end.
 
