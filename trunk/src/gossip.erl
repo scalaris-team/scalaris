@@ -842,7 +842,7 @@ init_gossip_tasks(State) ->
 init_gossip_task(CBModule, Args, State) ->
 
     % initialize CBModule
-    CBState = cb_init([CBModule|Args], CBModule),
+    CBState = cb_init([{instance, CBModule} | Args], CBModule),
     State1 = state_set({cb_state, CBModule}, CBState, State),
     State2 = lists:foldl(fun({Key, Value}, StateIn) -> state_set({Key, CBModule}, Value, StateIn) end,
                          State1,
@@ -897,9 +897,9 @@ cb_config(FunName, {ModuleName, _Id}) ->
 %% @doc Called upon startup and calls CBModule:init().
 %%      It calls the init function with the given arguments. It is usually used
 %%      to initialise the state of the callback module.
--spec cb_init(Args::list(), cb_module()) -> CBState::any().
+-spec cb_init(Args::list(proplists:property()), cb_module()) -> CBState::any().
 cb_init(Args, {ModuleName, _Id}) ->
-    {ok, CBState} = apply(ModuleName, init, Args), CBState.
+    {ok, CBState} = apply(ModuleName, init, [Args]), CBState.
 
 
 %% @doc Called at the beginning of every cycle and calls CBModule:select_node().
@@ -1471,7 +1471,7 @@ check_config() ->
 %%      tuple.
 -spec start_gossip_task(GossipTask, Args) -> ok when
     is_subtype(GossipTask, cb_module_name() | cb_module()),
-    is_subtype(Args, list()).
+    is_subtype(Args, list(proplists:property())).
 start_gossip_task(ModuleName, Args) when is_atom(ModuleName) ->
     Id = uid:get_global_uid(),
     start_gossip_task({ModuleName, Id}, Args);
