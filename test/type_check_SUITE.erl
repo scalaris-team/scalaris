@@ -159,7 +159,7 @@ tester_type_check_gossip(_Config) ->
     tester:register_value_creator({typedef, gossip_load, histogram_size, []}, gossip_load, tester_create_histogram_size, 1),
     tester:register_value_creator({typedef, gossip_load, load_data_list, []}, gossip_load, tester_create_load_data_list, 1),
     tester:register_value_creator({typedef, gossip, cb_module_name, []}, gossip, tester_create_cb_module_names, 1),
-    tester:register_type_checker({typedef, gossip_cyclon, state, []}, gossip_cyclon, is_state),
+    %% tester:register_type_checker({typedef, gossip_cyclon, state, []}, gossip_cyclon, is_state),
     Modules = [
                {gossip,
             % excluded (exported functions)
@@ -238,7 +238,7 @@ tester_type_check_gossip(_Config) ->
     tester:unregister_value_creator({typedef, gossip_load, histogram_size, []}),
     tester:unregister_type_checker({typedef, gossip_load, histogram, []}),
     tester:unregister_value_creator({typedef, gossip, cb_module_name, []}),
-    tester:unregister_type_checker({typedef, gossip_cyclon, state, []}),
+    %% tester:unregister_type_checker({typedef, gossip_cyclon, state, []}),
     true.
 
 
