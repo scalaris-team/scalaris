@@ -130,7 +130,26 @@
 %%      in the behaviour module's state.
 %%
 %%
-%%         Used abbreviations:
+%%      == Messages to the Callback Modules (cb_msg) ==
+%%
+%%      Messages which shall be passed directly to a callback module need to have
+%%      the form {cb_msg, CModule, Msg}, where CBModule is of type cb_module() and
+%%      Msg is any message the respective callback module handles.
+%%
+%%      Messages in this form are unpacked by the gossip module and only the Msg
+%%      is send to the given CMModule.
+%%
+%%      If a callback module wants to receive a response from another process, it
+%%      should pack its Pid with an envelope of the form
+%%          {PidOfRequestor, e, 3, {cb_msg, CBModule, '_'}}
+%%      with a call to
+%%          EnvPid = comm:reply_as(PidOfRequestor, 3, {cb_msg, CBModule, '_'})
+%%      and use the EnvPid as SourcePid when sending the request, e.g.
+%%          comm:send(Pid, {get_dht_nodes, EnvPid}, [{?quiet}])
+%%
+%%
+%%      == Used abbreviations ==
+%%
 %%         <ul>
 %%            <li> cb: callback module (a module implementing the
 %%                     gossip_beh.erl behaviour)
@@ -178,6 +197,7 @@
 %% -define(TRACE_ROUND(FormatString, Data), log:pal(FormatString, Data)).
 
 -define(CBMODULES, [{gossip_load, default}]). % callback modules as list
+%% -define(CBMODULES, [{gossip_load, default}, {gossip_cyclon, default}]). % callback modules as list
 
 % for developement, should be disabled for production
 -define(FIRST_TRIGGER_DELAY, 0). % delay in s for first trigger
@@ -251,7 +271,7 @@
         QData::gossip_beh:exch_data(), OtherRound::non_neg_integer()} |
     {integrated_data, CBModule::cb_module(), current_round} |
     {new_round, CBModule::cb_module(), NewRound::non_neg_integer()} |
-    {cb_reply, CBModule::cb_module(), Msg::comm:message()} |
+    {cb_msg, CBModule::cb_module(), Msg::comm:message()} |
     {get_values_best, CBModule::cb_module(), SourcePid::comm:mypid()} |
     {get_values_all, CBModule::cb_module(), SourcePid::comm:mypid()} |
     {stop_gossip_task, CBModule::cb_module()} |
@@ -425,6 +445,7 @@ on_inactive(_Msg, State) ->
 on_active({deactivate_gossip}, _State) ->
     rm_loop:unsubscribe(self(), ?MODULE),
     gen_component:change_handler(#state{}, fun ?MODULE:on_inactive/2);
+
 
 %% This message is received from self() from init_gossip_task or through
 %% start_gossip_task()/bulkowner
@@ -678,9 +699,9 @@ handle_msg({integrated_data, _CBModule, prev_round}, State) ->
 
 
 %% pass messages for callback modules to the respective callback module
-%% messages to callback modules need to have the form {cb_reply, CBModule, Msg}.
+%% messages to callback modules need to have the form {cb_msg, CBModule, Msg}.
 %% Use envelopes if necessary.
-handle_msg({cb_reply, CBModule, Msg}, State) ->
+handle_msg({cb_msg, CBModule, Msg}, State) ->
     cb_handle_msg(Msg, CBModule, State);
 
 
@@ -973,7 +994,7 @@ cb_integrate_data(QData, OtherRound, Msg, CBModule, State) ->
     end.
 
 
-%% @doc Called upon messages of the form {cb_reply, CBModule, Msg} and calls
+%% @doc Called upon messages of the form {cb_msg, CBModule, Msg} and calls
 %%      CBModule:handle_msg().
 %%      Passes the message Msg to the callback module, used to handle messages
 %%      for the callback module.
