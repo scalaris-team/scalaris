@@ -307,6 +307,8 @@ abort_slide(State, SlideOp, Reason) ->
                         MyId -> State;
                         _ when Phase =:= wait_for_delta_ack -> State;
                         MyOldId ->
+                            log:log(warn, "[ dht_node_move ~.0p ] trying to revert ID change from ~p to ~p~n",
+                                    [MyOldId, MyId]),
                             rm_loop:update_id(MyOldId),
                             State
                     end
