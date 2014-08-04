@@ -403,9 +403,8 @@ print_ages() ->
             receive
                 ?SCALARIS_RECV(
                    {get_list_response, List}, %% ->
-                   [ comm:send(Node, {get_ages, self()}, [{group_member, cyclon}]) || Node <- List ]
-                   %% [ comm:send(Node, {cb_msg, {gossip_cyclon, default}, {get_ages, self()}},
-                   %%             [{group_member, gossip}]) || Node <- List ]
+                   [ comm:send(Node, {cb_msg, {gossip_cyclon, default}, {get_ages, self()}},
+                               [{group_member, gossip}]) || Node <- List ]
                   )
                 end
         end,
