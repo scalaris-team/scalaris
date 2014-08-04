@@ -218,14 +218,42 @@ handle_msg({get_subset_rand, _N, _Pid}, State) ->
     %% msg from get_subset_random() (api)
     %% also directly requested from api_vm:get_other_vms() (change?)
     {ok, State};
-handle_msg({get_node_details_response, _NodeDetails}, State) ->
+
+
+%% Response to a get_node_details message from self (via request_node_details()).
+%% The node details are used to possibly update Me and the succ and pred are
+%% possibly used to populate the cache.
+%% Request_node_details() is called in check_state() (i.e. in on_active({cy_shuffle})).
+handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
     ?TRACE_DEBUG("get_node_details_response", []),
-    %% Response to a get_node_details message from self (via request_node_details()).
-    %% The node details are used to possibly update Me and the succ and pred are
-    %% possibly used to populate the cache.
-    %% request_node_details() is called in check_state()
-    %% (i.e. in on_active({cy_shuffle})).
-    {ok, State};
+    case cyclon_cache:size(OldCache) =< 2 of
+        true  ->
+            Pred = node_details:get(NodeDetails, pred),
+            Succ = node_details:get(NodeDetails, succ),
+            NewCache =
+                lists:foldl(
+                  fun(N, CacheX) ->
+                          case node:same_process(N, Node) of
+                              false -> cyclon_cache:add_node(N, 0, CacheX);
+                              true -> CacheX
+                          end
+                  end, OldCache, [Pred, Succ]),
+            case cyclon_cache:size(NewCache) of
+                0 -> % try to get the cyclon cache from one of the known_hosts
+                    case config:read(known_hosts) of
+                        [] -> ok;
+                        [_|_] = KnownHosts ->
+                            Pid = util:randomelem(KnownHosts),
+                            comm:send(Pid, {get_dht_nodes, comm:this()}, [{?quiet}])
+                    end;
+                _ -> ok
+            end,
+            {ok, {NewCache, Node}};
+        false ->
+            {ok, State}
+    end;
+
+
 handle_msg({get_dht_nodes_response, _Nodes}, State) ->
     ?TRACE_DEBUG("get_dht_nodes_response", []),
     %% Response to get_dht_nodes message from service_per_vm. Contains a list of
@@ -285,7 +313,6 @@ shutdown(_State) ->
     {ok, shutdown}.
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -304,6 +331,7 @@ rm_check(OldNeighbors, NewNeighbors, _Reason) ->
         Reason::rm_loop:reason()) -> ok.
 rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors, _Reason) ->
     comm:send_local(Pid, {cb_reply, {gossip_cyclon, default}, {rm_changed, nodelist:node(NewNeighbors)}}).
+
 
 %% @doc Checks the current state. If the cache is empty or the current node is
 %%      unknown, the local dht_node will be asked for these values and the check
