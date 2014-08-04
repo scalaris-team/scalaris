@@ -34,6 +34,9 @@
 -export([rm_check/3,
          rm_send_changes/5]).
 
+% API
+-export([get_subset_rand/1, get_subset_rand_next_interval/1, get_subset_rand_next_interval/2]).
+
 %% for testing
 -export([]).
 
@@ -122,6 +125,32 @@ check_config() ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Sends a (local) message to the gossip module of the requesting process'
+%%      group asking for a random subset of the stored nodes.
+%%      The response in the form {cy_cache, [Node]} will be send (local) to the
+%%      requesting process.
+-spec get_subset_rand(N::pos_integer()) -> ok.
+get_subset_rand(N) ->
+    Pid = pid_groups:get_my(gossip),
+    comm:send_local(Pid, {cb_reply, instance(), {get_subset_rand, N, self()}}).
+
+
+%% @doc Same as get_subset_rand/1, but the request is delayed with a delay equal
+%%      to the gossip_cyclon_interval config parameter.
+-spec get_subset_rand_next_interval(N::pos_integer()) -> reference().
+get_subset_rand_next_interval(N) ->
+    get_subset_rand_next_interval(N, self()).
+
+
+%% @doc Same as get_subset_rand_next_interval/1 but sends the reply back to the
+%%      given Pid.
+-spec get_subset_rand_next_interval(N::pos_integer(), Pid::comm:erl_local_pid()) -> reference().
+get_subset_rand_next_interval(N, SourcePid) ->
+    Pid = pid_groups:get_my(gossip),
+    comm:send_local_after(trigger_interval(), Pid,
+                          {cb_reply, instance(), {get_subset_rand, N, SourcePid}}).
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -213,7 +242,6 @@ integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
     Cache1 = cyclon_cache:merge(Cache, Node, QSubset, PSubset, cache_size()),
     Pid = pid_groups:get_my(gossip),
     comm:send_local(Pid, {integrated_data, instance(), cur_round}),
-    %% ?TRACE_DEBUG("integrate_data. NewCache: ~w", [Cache]),
     {ok, {Cache1, Node}}.
 
 
@@ -233,11 +261,11 @@ handle_msg({get_ages, Pid}, {Cache, Node}) ->
     comm:send_local(Pid, {cy_ages, cyclon_cache:get_ages(Cache)}),
     {ok, {Cache, Node}};
 
-handle_msg({get_subset_rand, _N, _Pid}, State) ->
-    ?TRACE_DEBUG("get_subset_rand", []),
-    %% msg from get_subset_random() (api)
-    %% also directly requested from api_vm:get_other_vms() (change?)
-    {ok, State};
+%% msg from get_subset_random() (api)
+%% also directly requested from api_vm:get_other_vms() (change?)
+handle_msg({get_subset_rand, N, Pid}, {Cache, Node}) ->
+    comm:send_local(Pid, {cy_cache, cyclon_cache:get_random_nodes(N, Cache)}),
+    {ok, {Cache, Node}};
 
 %% Response to a get_node_details message from self (via request_node_details()).
 %% The node details are used to possibly update Me and the succ and pred are
