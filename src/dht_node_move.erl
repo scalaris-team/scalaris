@@ -94,7 +94,11 @@
     {move, delta, ChangedData::dht_node_state:slide_delta(), MoveFullId::slide_op:id()} |
     {move, delta_ack, MoveFullId::slide_op:id(), next_op_msg()} |
     {move, rm_db_range, MoveFullId::slide_op:id()} |
-    {move, done, MoveFullId::slide_op:id()}
+    {move, done, MoveFullId::slide_op:id()} |
+    {move, continue, MoveFullId::slide_op:id(),
+     Operation::prepare_send_data2 | update_rcv_data2 | prepare_send_delta2 |
+         finish_delta2 | {finish_delta_ack2, NextOpMsg::next_op_msg()},
+     EmbeddedMsg::comm:message()}
 .
 
 -ifdef(forward_or_recursive_types_are_not_allowed).
