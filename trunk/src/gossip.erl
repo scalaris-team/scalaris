@@ -228,7 +228,7 @@
 -endif.
 
 -type bh_message() ::
-    {activate_gossip, Range::intervals:interval()} |
+    {activate_gossip, Neighbors::nodelist:neighborhood()} |
     {start_gossip_task, CBModule::cb_module(), Args::list()} |
     {gossip_trigger, TriggerInterval::pos_integer()} |
     {trigger_action, TriggerInterval::pos_integer()} |
@@ -287,14 +287,14 @@ init([]) ->
 %%      Called by dht_node_join. Activates process (when only node of the system)
 %%      or subscribes to the rm to activate on slide_finished messages. <br/>
 %%      Result of the activation is to switch to the on_active handler.
--spec activate(Range::intervals:interval()) -> ok.
-activate(MyRange) ->
-    case MyRange =:= intervals:all() of
+-spec activate(Neighbors::nodelist:neighborhood()) -> ok.
+activate(Neighbors) ->
+    case nodelist:node_range(Neighbors) =:= intervals:all() of
         true ->
             % We're the first node covering the whole ring range.
             % Start gossip right away because it's needed for passive
             % load balancing when new nodes join the ring.
-            comm:send_local(pid_groups:get_my(gossip), {activate_gossip, MyRange});
+            comm:send_local(pid_groups:get_my(gossip), {activate_gossip, Neighbors});
         _    ->
             % subscribe to ring maintenance (rm) for {slide_finished, succ} or {slide_finished, pred}
             rm_loop:subscribe(self(), ?MODULE,
@@ -327,9 +327,8 @@ rm_filter_slide_msg(_OldNeighbors, _NewNeighbors, Reason) ->
                              is_subtype(Reason, rm_loop:reason()).
 rm_send_activation_msg(_Pid, ?MODULE, _OldNeighbours, NewNeighbours, _Reason) ->
     %% io:format("Pid: ~w. Self: ~w. PidGossip: ~w~n", [Pid, self(), Pid2]),
-    MyRange = nodelist:node_range(NewNeighbours),
     Pid = pid_groups:get_my(gossip),
-    comm:send_local(Pid, {activate_gossip, MyRange}).
+    comm:send_local(Pid, {activate_gossip, NewNeighbours}).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -341,7 +340,8 @@ rm_send_activation_msg(_Pid, ?MODULE, _OldNeighbours, NewNeighbours, _Reason) ->
 
 %% @doc Message handler during the startup of the gossip module.
 -spec on_inactive(Msg::message(), State::state()) -> state().
-on_inactive({activate_gossip, MyRange}=Msg, State) ->
+on_inactive({activate_gossip, Neighbors}=Msg, State) ->
+    MyRange = nodelist:node_range(Neighbors),
     State1 = state_set(status, init, State),
 
     % subscribe to ring maintenance (rm)
