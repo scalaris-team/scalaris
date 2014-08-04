@@ -1092,6 +1092,8 @@ request_random_node(CBModule) ->
     EnvPid = comm:reply_as(self(), 3, {selected_peer, CBModule, '_'}),
     Fanout = cb_config(fanout, CBModule),
     comm:send_local(CyclonPid, {get_subset_rand, Fanout, EnvPid}).
+    %% comm:send_local(self(), {cb_msg, {gossip_cyclon, default},
+    %%                          {get_subset_rand, Fanout, EnvPid}}).
 
 
 %% Used for rerequesting peers from cyclon when cyclon returned an empty list,
@@ -1104,6 +1106,8 @@ request_random_node_delayed(Delay, CBModule) ->
     EnvPid = comm:reply_as(self(), 3, {selected_peer, CBModule, '_'}),
     Fanout = cb_config(fanout, CBModule),
     comm:send_local_after(Delay, CyclonPid, {get_subset_rand, Fanout, EnvPid}).
+    %% comm:send_local_after(Delay, self(), {cb_msg, {gossip_cyclon, default},
+    %%                                       {get_subset_rand, Fanout, EnvPid}}).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

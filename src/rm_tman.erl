@@ -56,6 +56,7 @@ get_neighbors({Neighbors, _RandViewSize, _Cache, _Churn}) ->
 -spec init_first() -> ok.
 init_first() ->
     cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
+    %% gossip_cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 2, {rm, '_'})),
     ok.
 
 %% @doc Initialises the state when rm_loop receives an init_rm message.
@@ -65,6 +66,7 @@ init(Me, Pred, Succ) ->
     Neighborhood = nodelist:new_neighborhood(Pred, Me, Succ),
     % ask cyclon once (a repeating trigger is already started in init_first/0)
     cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 3, {rm, once, '_'})),
+    %% gossip_cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 3, {rm, once, '_'})),
     % start by using all available nodes reported by cyclon
     RandViewSize = config:read(cyclon_cache_size),
     {Neighborhood, RandViewSize, [], true}.
@@ -90,6 +92,7 @@ handle_custom_message({rm, {cy_cache, NewCache}}, State) ->
     NewRandViewSize = element(2, element(2, NewState)),
     % trigger new cyclon cache request
     cyclon:get_subset_rand_next_interval(NewRandViewSize,
+    %% gossip_cyclon:get_subset_rand_next_interval(NewRandViewSize,
                                          comm:reply_as(self(), 2, {rm, '_'})),
     NewState;
 
@@ -321,7 +324,7 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
                      intervals:new('(', OldId, NewId, ']')
         end,
     NewNeighborhood2 = remove_neighbors_in_interval(NewNeighborhood1, I, null),
-    
+
     ?DBG_ASSERT2(node:pidX(nodelist:pred(Neighborhood)) =:= node:pidX(nodelist:pred(NewNeighborhood2)),
                  no_pred_change_allowed),
     ?DBG_ASSERT2(node:pidX(nodelist:succ(Neighborhood)) =:= node:pidX(nodelist:succ(NewNeighborhood2)),

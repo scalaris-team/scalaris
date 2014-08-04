@@ -90,6 +90,7 @@ handle_msg({lb_active_karger_trigger}, State) ->
     %% Request N random nodes from cyclon
     NumNodes = config:read(lb_active_karger_rnd_nodes),
     cyclon:get_subset_rand(NumNodes),
+    %% gossip_cyclon:get_subset_rand(NumNodes),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -134,8 +135,8 @@ handle_msg({my_dht_response, {get_node_details_response, NodeDetails}}, State) -
     ?TRACE("Epsilon: ~p~n", [Epsilon]),
     %% If we deal only with one random node, we don't have
     %% any choice but to go to the next phase.
-    %% Otherwise, we ask all random nodes for their load 
-    %% and calculate the load changes before going to the 
+    %% Otherwise, we ask all random nodes for their load
+    %% and calculate the load changes before going to the
     %% next phase.
     MyLBInfo = lb_info:new(NodeDetails),
     IsValid = lb_info:is_valid(MyLBInfo),
