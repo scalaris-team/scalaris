@@ -46,8 +46,6 @@
         log:pal("[ Cyclon ~.0p ] " ++ FormatString, [ comm:this() | Data])).
 
 
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Type Definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -89,6 +87,27 @@ min_cycles_per_round() ->
 -spec max_cycles_per_round() -> infinity.
 max_cycles_per_round() ->
     infinity.
+
+
+%% @doc Gets the cyclon_shuffle_length parameter that defines how many entries
+%%      of the cache are exchanged.
+-spec shuffle_length() -> pos_integer().
+shuffle_length() ->
+    config:read(cyclon_shuffle_length).
+
+
+%% @doc Gets the cyclon_cache_size parameter that defines how many entries a
+%%      cache should at most have.
+-spec cache_size() -> pos_integer().
+cache_size() ->
+    config:read(cyclon_cache_size).
+
+%% @doc Cycon doesn't need instantiabilty, so {gossip_cyclon, default} is always
+%%      used.
+-spec instance() -> {gossip_cyclon, default}.
+-compile({inline, [instance/0]}).
+instance() ->
+    {gossip_cyclon, default}.
 
 -spec check_config() -> boolean().
 check_config() ->
@@ -134,10 +153,29 @@ select_node(State) ->
 %%      Called by the gossip module at the beginning of every cycle. <br/>
 %%      The selected exchange data is sent back to the gossip module as a message
 %%      of the form {selected_data, Instance, ExchangeData}.
+%%      gossip_trigger -> select_data() is equivalent to cy_shuffle in the old
+%%      cyclon module.
 -spec select_data(State::state()) -> {ok, state()}.
-select_data(State) ->
-    %% cy_shuffle <=> gossip_trigger -> select_data()
-    {ok, State}.
+select_data({Cache, Node}=State) ->
+    ?TRACE_DEBUG("select__data", []),
+    NewCache =
+        case check_state(State) of
+            fail ->
+                Cache;
+            _    ->
+                monitor:proc_set_value(?MODULE, 'shuffle',
+                                           fun(Old) -> rrd:add_now(1, Old) end),
+                Cache1 = cyclon_cache:inc_age(Cache),
+                {Cache2, NodeQ} = cyclon_cache:pop_oldest_node(Cache1),
+                Subset = cyclon_cache:get_random_subset(shuffle_length() - 1, Cache2),
+                ForSend = cyclon_cache:add_node(Node, 0, Subset),
+                %io:format("~p",[length(ForSend)]),
+                Pid = pid_groups:get_my(gossip),
+                comm:send_local(Pid, {selected_peer, instance(), {cy_cache, [NodeQ]}}),
+                comm:send_local(Pid, {selected_data, instance(), ForSend}),
+                Cache2
+        end,
+    {ok, {NewCache, Node}}.
 
 
 %% @doc Process the data from the requestor and select reply data. <br/>
@@ -148,6 +186,7 @@ select_data(State) ->
 -spec select_reply_data(PData::data(), Ref::pos_integer(), Round::round(),
     State::state()) -> {discard_msg | ok | retry | send_back, state()}.
 select_reply_data(_PData, _Ref, _Round, State) ->
+    ?TRACE_DEBUG("select_reply_data", []),
     %% cy_subset msg <=> p2p_exch msg -> seleft_reply_data()
     {ok, State}.
 
@@ -171,13 +210,16 @@ handle_msg({rm_changed, _NewNode}, State) ->
     %% replaces the reference to self's dht node with NewNode
     {ok, State};
 handle_msg({get_ages, _Pid}, State) ->
+    ?TRACE_DEBUG("get_ages", []),
     %% msg from admin:print_ages()
     {ok, State};
 handle_msg({get_subset_rand, _N, _Pid}, State) ->
+    ?TRACE_DEBUG("get_subset_rand", []),
     %% msg from get_subset_random() (api)
     %% also directly requested from api_vm:get_other_vms() (change?)
     {ok, State};
 handle_msg({get_node_details_response, _NodeDetails}, State) ->
+    ?TRACE_DEBUG("get_node_details_response", []),
     %% Response to a get_node_details message from self (via request_node_details()).
     %% The node details are used to possibly update Me and the succ and pred are
     %% possibly used to populate the cache.
@@ -185,6 +227,7 @@ handle_msg({get_node_details_response, _NodeDetails}, State) ->
     %% (i.e. in on_active({cy_shuffle})).
     {ok, State};
 handle_msg({get_dht_nodes_response, _Nodes}, State) ->
+    ?TRACE_DEBUG("get_dht_nodes_response", []),
     %% Response to get_dht_nodes message from service_per_vm. Contains a list of
     %% registered dht nodes from service_per_vm. Initiated in
     %% handle_msg({get_node_details_response, _NodeDetails} if the cache is empty.
@@ -262,4 +305,38 @@ rm_check(OldNeighbors, NewNeighbors, _Reason) ->
 rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors, _Reason) ->
     comm:send_local(Pid, {cb_reply, {gossip_cyclon, default}, {rm_changed, nodelist:node(NewNeighbors)}}).
 
+%% @doc Checks the current state. If the cache is empty or the current node is
+%%      unknown, the local dht_node will be asked for these values and the check
+%%      will be re-scheduled after 1s.
+-spec check_state(state()) -> ok | fail.
+check_state({Cache, _Node} = _State) ->
+    % if the own node is unknown or the cache is empty (it should at least
+    % contain the nodes predecessor and successor), request this information
+    % from the local dht_node
+    NeedsInfo = case cyclon_cache:size(Cache) of
+                    0 -> [pred, succ];
+                    _ -> []
+                end,
+    case NeedsInfo of
+        [_|_] -> request_node_details(NeedsInfo),
+                 fail;
+        []    -> ok
+    end.
+
+
+%% @doc Sends the local node's dht_node a request to tell us some information
+%%      about itself.
+%%      The node will respond with a {get_node_details_response, NodeDetails}
+%%      message, which will be envoloped and passed to this module through the
+%%      gossip module.
+-spec request_node_details([node_details:node_details_name()]) -> ok.
+request_node_details(Details) ->
+    DHT_Node = pid_groups:get_my(dht_node),
+    This = comm:this(),
+    EnvPid = comm:reply_as(This, 3, {cb_reply, {gossip_cyclon, default}, '_'}),
+    case comm:is_valid(This) of
+        true ->
+            comm:send_local(DHT_Node, {get_node_details, EnvPid, Details});
+        false -> ok
+    end.
 
