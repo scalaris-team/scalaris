@@ -66,7 +66,7 @@ init(Me, Pred, Succ) ->
     % ask cyclon once (a repeating trigger is already started in init_first/0)
     gossip_cyclon:get_subset_rand_next_interval(1, comm:reply_as(self(), 3, {rm, once, '_'})),
     % start by using all available nodes reported by cyclon
-    RandViewSize = config:read(cyclon_cache_size),
+    RandViewSize = config:read(gossip_cyclon_cache_size),
     {Neighborhood, RandViewSize, [], true}.
 
 -spec unittest_create_state(Neighbors::nodelist:neighborhood()) -> state().
@@ -144,7 +144,7 @@ handle_custom_message({rm, buffer_response, OtherNeighbors},
 
     % increase RandViewSize (no error detected):
     NewRandViewSize =
-        case RandViewSize < config:read(cyclon_cache_size) of
+        case RandViewSize < config:read(gossip_cyclon_cache_size) of
             true ->  RandViewSize + 1;
             false -> RandViewSize
         end,
@@ -206,7 +206,7 @@ add_cyclon_cache([], State) ->
 add_cyclon_cache(NewCache, {Neighborhood, RandViewSize, _Cache, Churn}) ->
     % increase RandViewSize (no error detected):
     RandViewSizeNew =
-        case (RandViewSize < config:read(cyclon_cache_size)) of
+        case (RandViewSize < config:read(gossip_cyclon_cache_size)) of
             true  -> RandViewSize + 1;
             false -> RandViewSize
         end,
@@ -403,8 +403,8 @@ check_config() ->
     config:cfg_is_integer(stabilization_interval_base) and
     config:cfg_is_greater_than(stabilization_interval_base, 0) and
 
-    config:cfg_is_integer(cyclon_cache_size) and
-    config:cfg_is_greater_than(cyclon_cache_size, 2) and
+    config:cfg_is_integer(gossip_cyclon_cache_size) and
+    config:cfg_is_greater_than(gossip_cyclon_cache_size, 2) and
 
     config:cfg_is_integer(succ_list_length) and
     config:cfg_is_greater_than_equal(succ_list_length, 1) and
