@@ -86,8 +86,7 @@ start_link() ->
 init(ChildSpecs) ->
     {ok, {{one_for_all, 10, 1}, ChildSpecs}}.
 
-%% @doc Checks whether config parameters of the cyclon process exist and are
-%%      valid.
+%% @doc Checks whether yaws config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_string(docroot) and

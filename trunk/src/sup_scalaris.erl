@@ -216,8 +216,7 @@ start_first_services() ->
     _ = inets:start(),
     util:if_verbose("~p start first services done.~n", [?MODULE]).
 
-%% @doc Checks whether config parameters of the cyclon process exist and are
-%%      valid.
+%% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_string(log_path) and
