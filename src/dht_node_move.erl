@@ -174,7 +174,8 @@ process_move_msg({move, node_leave} = _Msg, State) ->
     SlideOp = dht_node_state:get(State, slide_succ),
     % only handle node_update in wait_for_continue phase
     case slide_op:is_slide(SlideOp) andalso slide_op:is_leave(SlideOp) andalso
-             slide_op:get_phase(SlideOp) =:= wait_for_continue andalso
+             (is_tuple(Phase = slide_op:get_phase(SlideOp)) andalso
+                  element(1, Phase) =:= wait_for_continue) andalso
              slide_op:get_sendORreceive(SlideOp) =:= 'send' of
         true ->
             prepare_send_data2(State, SlideOp, {continue});
@@ -303,24 +304,37 @@ process_move_msg({move, check_for_timeouts} = _Msg, MyState) ->
 
 process_move_msg({move, continue, MoveFullId, Operation, EmbeddedMsg} = _Msg, MyState) ->
     ?TRACE1(_Msg, MyState),
-    WorkerFun = fun(SlideOp, State) ->
-                        % although Operation matches the function name, verify
-                        % validity here and call functions manually to avoid
-                        % having to export them
-                        case Operation of
-                            prepare_send_data2 ->
-                                prepare_send_data2(State, SlideOp, EmbeddedMsg);
-                            update_rcv_data2 ->
-                                update_rcv_data2(State, SlideOp, EmbeddedMsg);
-                            prepare_send_delta2 ->
-                                prepare_send_delta2(State, SlideOp, EmbeddedMsg);
-                            finish_delta2 ->
-                                finish_delta2(State, SlideOp, EmbeddedMsg);
-                            {finish_delta_ack2, NextOpMsg} ->
+    case Operation of
+        % although Operation matches the function name, verify
+        % validity here and call functions manually to avoid
+        % having to export them
+        prepare_send_data2 ->
+            WorkerFun = fun(SlideOp, State) ->
+                                prepare_send_data2(State, SlideOp, EmbeddedMsg)
+                        end,
+            Phase = wait_for_other;
+        update_rcv_data2 ->
+            WorkerFun = fun(SlideOp, State) ->
+                                update_rcv_data2(State, SlideOp, EmbeddedMsg)
+                        end,
+            Phase = wait_for_data;
+        prepare_send_delta2 ->
+            WorkerFun = fun(SlideOp, State) ->
+                                prepare_send_delta2(State, SlideOp, EmbeddedMsg)
+                        end,
+            Phase = wait_for_data_ack;
+        finish_delta2 ->
+            WorkerFun = fun(SlideOp, State) ->
+                                finish_delta2(State, SlideOp, EmbeddedMsg)
+                        end,
+            Phase = wait_for_delta;
+        {finish_delta_ack2, NextOpMsg} ->
+            WorkerFun = fun(SlideOp, State) ->
                                 finish_delta_ack2(State, SlideOp, NextOpMsg, EmbeddedMsg)
-                        end
-                end,
-    safe_operation(WorkerFun, MyState, MoveFullId, [wait_for_continue], continue,
+                        end,
+            Phase = wait_for_delta_ack
+    end,
+    safe_operation(WorkerFun, MyState, MoveFullId, [{wait_for_continue, Phase}], continue,
                    Operation =:= finish_delta2 orelse
                        (is_tuple(Operation) andalso element(1, Operation) =:= finish_delta_ack2)).
 
@@ -766,7 +780,7 @@ prepare_send_data1(State, SlideOp) ->
     MoveFullId = slide_op:get_id(SlideOp),
     SlideOp1 = slide_op:set_setup_at_other(SlideOp),
     ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, prepare_send_data2, '_'}),
-    SlideOp2 = slide_op:set_phase(SlideOp1, wait_for_continue),
+    SlideOp2 = slide_op:set_phase(SlideOp1, {wait_for_continue, wait_for_other}),
     SlideMod = get_slide_mod(),
     case SlideMod:prepare_send_data1(State, SlideOp2, ReplyPid) of
         {ok, State1, SlideOp3} ->
@@ -821,7 +835,7 @@ update_rcv_data1(State, SlideOp0, Data, TargetId, NextOp) ->
         {PredOrSucc, SlideOp1} ->
             MoveFullId = slide_op:get_id(SlideOp1),
             ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, update_rcv_data2, '_'}),
-            SlideOp2 = slide_op:set_phase(SlideOp1, wait_for_continue),
+            SlideOp2 = slide_op:set_phase(SlideOp1, {wait_for_continue, wait_for_data}),
             State2 = dht_node_state:slide_add_data(State1, Data),
             SlideMod = get_slide_mod(),
             case SlideMod:update_rcv_data1(State2, SlideOp2, ReplyPid) of
@@ -858,7 +872,7 @@ update_rcv_data2(State, SlideOp, EmbeddedMsg) ->
 prepare_send_delta1(State, OldSlideOp) ->
     MoveFullId = slide_op:get_id(OldSlideOp),
     ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, prepare_send_delta2, '_'}),
-    SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
+    SlideOp1 = slide_op:set_phase(OldSlideOp, {wait_for_continue, wait_for_data_ack}),
     SlideMod = get_slide_mod(),
     case SlideMod:prepare_send_delta1(State, SlideOp1, ReplyPid) of
         {ok, State1, SlideOp2} ->
@@ -906,7 +920,7 @@ prepare_send_delta2(State, SlideOp, EmbeddedMsg) ->
 finish_delta1(State, OldSlideOp, ChangedData) ->
     MoveFullId = slide_op:get_id(OldSlideOp),
     ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, finish_delta2, '_'}),
-    SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
+    SlideOp1 = slide_op:set_phase(OldSlideOp, {wait_for_continue, wait_for_delta}),
     State1 = dht_node_state:slide_add_delta(State, ChangedData),
     SlideMod = get_slide_mod(),
     case SlideMod:finish_delta1(State1, SlideOp1, ReplyPid) of
@@ -1066,7 +1080,7 @@ finish_slide_and_continue_with_next_op(State0, OldSlideOp) ->
 finish_delta_ack1(State, OldSlideOp, NextOpMsg) ->
     MoveFullId = slide_op:get_id(OldSlideOp),
     ReplyPid = comm:reply_as(self(), 5, {move, continue, MoveFullId, {finish_delta_ack2, NextOpMsg}, '_'}),
-    SlideOp1 = slide_op:set_phase(OldSlideOp, wait_for_continue),
+    SlideOp1 = slide_op:set_phase(OldSlideOp, {wait_for_continue, wait_for_delta_ack}),
     SlideMod = get_slide_mod(),
     case SlideMod:finish_delta_ack1(State, SlideOp1, ReplyPid) of
         {ok, State1, SlideOp2} ->

@@ -61,12 +61,14 @@
         {leave, 'send' | 'rcv'} |
         {jump, 'send' | 'rcv'}.
 
--type phase() ::
+-type phase_plain() ::
         null | % should only occur as an intermediate state, otherwise equal to "no slide op"
         wait_for_other | % a node initiated a slide but needs more info from its partner
         wait_for_data_ack | wait_for_delta_ack | % sending node
-        wait_for_data | wait_for_delta | % receiving node
-        wait_for_continue. % async (local) slide message to rm-specific implementation
+        wait_for_data | wait_for_delta. % receiving node
+-type phase() ::
+        phase_plain() |
+        {wait_for_continue, phase_plain()}. % async (local) slide message to rm-specific implementation
 
 -type next_op() ::
         {slide, continue, Id::?RT:key()} |
