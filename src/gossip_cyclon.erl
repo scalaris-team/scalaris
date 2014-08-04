@@ -197,15 +197,15 @@ select_node(State) ->
     {true, State}.
 
 
-%% @doc Select and prepare the cache to be sent to the peer. <br/>
+%% @doc Select and prepare the subset of the cache to be sent to the peer. <br/>
 %%      Called by the gossip module at the beginning of every cycle. <br/>
-%%      The selected exchange data is sent back to the gossip module as a message
-%%      of the form {selected_data, Instance, ExchangeData}.
+%%      The selected exchange data (i.e. the selected subset of the cache) is
+%%      sent back to the gossip module as a message of the form
+%%      {selected_data, Instance, ExchangeData}.
 %%      gossip_trigger -> select_data() is equivalent to cy_shuffle in the old
 %%      cyclon module.
 -spec select_data(State::state()) -> {ok | retry, state()}.
 select_data({Cache, Node}=State) ->
-    %% ?TRACE_DEBUG("select_data", []),
     case check_state(State) of
         fail ->
             {retry, State};
@@ -224,9 +224,10 @@ select_data({Cache, Node}=State) ->
     end.
 
 
-%% @doc Process the data from the requestor (P) and select reply data (at Q). <br/>
+%% @doc Process the subset from the requestor (P) and select a subset as reply
+%%      data (at Q). <br/>
 %%      Called by the behaviour module upon a p2p_exch message. <br/>
-%%      PData: exchange data from the p2p_exch request <br/>
+%%      PSubset: exchange data (subset) from the p2p_exch request <br/>
 %%      Ref: used by the gossip module to identify the request <br/>
 %%      RoundStatus / Round: ignored, as cyclon does not implement round handling
 %%      p2p_exch msg -> seleft_reply_data() is equivalent to cy_subset msg in the
@@ -234,7 +235,6 @@ select_data({Cache, Node}=State) ->
 -spec select_reply_data(PSubset::data(), Ref::pos_integer(), Round::round(),
     State::state()) -> {discard_msg | ok | retry | send_back, state()}.
 select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
-    %% ?TRACE_DEBUG("select_reply_data", []),
     % this is received at node Q -> integrate results of node P
     QSubset = cyclon_cache:get_random_subset(shuffle_length(), Cache),
     Pid = pid_groups:get_my(gossip),
@@ -243,16 +243,18 @@ select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
     {ok, {Cache1, Node}}.
 
 
-%% @doc Integrate the reply data. <br/>
+%% @doc Integrate the received subset (at node P). <br/>
 %%      Called by the behaviour module upon a p2p_exch_reply message. <br/>
-%%      QData: the reply data from the peer <br/>
+%%      QData: the subset from the peer (QSubset) and the subset wich was sent
+%%          in the request (PSubset) <br/>
 %%      RoundStatus / Round: ignored, as cyclon does not implement round handling
 %%      Upon finishing the processing of the data, a message of the form
 %%      {integrated_data, Instance, RoundStatus} is to be sent to the gossip module.
+%%      p2p_exch_reply msg -> integrate_data() is equivalent to the cy_subset_response
+%%      msg in the old cyclon module.
 -spec integrate_data(QData::{data(), data()}, Round::round(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
 integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
-    %% cy_subset_response msg <=> p2p_exch_reply msg -> integrate_data()
     Cache1 = cyclon_cache:merge(Cache, Node, QSubset, PSubset, cache_size()),
     Pid = pid_groups:get_my(gossip),
     comm:send_local(Pid, {integrated_data, instance(), cur_round}),
@@ -269,14 +271,12 @@ integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
 
 %% replaces the reference to self's dht node with NewNode
 handle_msg({rm_changed, NewNode}, {Cache, _Node}) ->
-    ?TRACE_DEBUG("rm_changed", []),
     {ok, {Cache, NewNode}};
 
 %% msg from admin:print_ages()
 %% request needs to be sent to the gossip module in the following form:
-%% {cb_msg, {gossip_cyclon, default}, {get_ages, Pid}}
+%% {cb_msg, instance(), {get_ages, Pid}}
 handle_msg({get_ages, Pid}, {Cache, Node}) ->
-    ?TRACE_DEBUG("get_ages", []),
     comm:send_local(Pid, {cy_ages, cyclon_cache:get_ages(Cache)}),
     {ok, {Cache, Node}};
 
@@ -291,10 +291,8 @@ handle_msg({get_subset_rand, N, Pid}, {Cache, Node}) ->
 %% possibly used to populate the cache.
 %% Request_node_details() is called in check_state() (i.e. in on_active({cy_shuffle})).
 handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
-    ?TRACE_DEBUG("get_node_details_response", []),
     case cyclon_cache:size(OldCache) =< 2 of
         true  ->
-            %% ?TRACE_DEBUG("get_node_details_response: true", []),
             Pred = node_details:get(NodeDetails, pred),
             Succ = node_details:get(NodeDetails, succ),
             NewCache =
@@ -310,18 +308,15 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
                     case config:read(known_hosts) of
                         [] -> ok;
                         [_|_] = KnownHosts ->
-                            %% ?TRACE_DEBUG("get_node_details_response: request known-hosts", []),
                             Pid = util:randomelem(KnownHosts),
-                            EnvPid = comm:reply_as(comm:this(), 3, {cb_msg, {gossip_cyclon, default}, '_'}),
+                            EnvPid = comm:reply_as(comm:this(), 3, {cb_msg, instance(), '_'}),
                             comm:send(Pid, {get_dht_nodes, EnvPid}, [{?quiet}])
                     end;
                 _ ->
-                    %% ?TRACE_DEBUG("get_node_details_response: ok", []),
                     ok
             end,
             {ok, {NewCache, Node}};
         false ->
-            %% ?TRACE_DEBUG("get_node_details_response: false", []),
             {ok, State}
     end;
 
@@ -334,7 +329,6 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
 %% get_node_details and the get_dht_nodes request are repeated every cycle
 %% (TODO is this the intended behaviour?)
 handle_msg({get_dht_nodes_response, Nodes}, {Cache, _Node}=State) ->
-    ?TRACE_DEBUG("get_dht_nodes_response", []),
     Size = cyclon_cache:size(Cache),
     case Nodes of
         [] ->
@@ -358,22 +352,24 @@ round_has_converged(State) ->
 %%      of them are ignored, as cyclon doesn't use / implements this features.
 -spec notify_change(any(), any(), State::state()) -> {ok, state()}.
 notify_change(_, _, State) ->
-    %% Possible to use key range changes for rm_check() / rm_send_changes() ???
     {ok, State}.
 
 
 %% @doc Returns the best result. <br/>
 %%      Called by the gossip module upon {get_values_best} messages.
+%%      Not implemented by gossip_cyclon, use get_subset_rand().
 -spec get_values_best(State::state()) -> {ok, state()}.
 get_values_best(State) ->
-    %% use to implement get_subset_rand() api functions??
+    log:log(info, "[ ~w ] get_values_best is not implemented, use get_subset_rand", [?MODULE]),
     {ok, State}.
 
 
 %% @doc Returns all results. <br/>
 %%      Called by the gossip module upon {get_values_all} messages.
+%%      Not implemented by gossip_cyclon, use get_subset_rand().
 -spec get_values_all(State::state()) -> {ok, state()}.
 get_values_all(State) ->
+    log:log(info, "[ ~w ] get_values_all is not implemented, use get_subset_rand", [?MODULE]),
     {ok, State}.
 
 
@@ -401,6 +397,7 @@ shutdown(_State) ->
 %% Miscellaneous
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Filter Function for subscribing to the rm loop
 -spec rm_check(Neighbors, Neighbors, Reason) -> boolean() when
       is_subtype(Neighbors, nodelist:neighborhood()),
       is_subtype(Reason, rm_loop:reason()).
@@ -408,15 +405,15 @@ rm_check(OldNeighbors, NewNeighbors, _Reason) ->
     nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors).
 
 
-%% @doc Sends changes to a subscribed cyclon process when the neighborhood
+%% @doc Exec Function for subscribing to the rm loop.
+%%      Sends changes to a subscribed cyclon process when the neighborhood
 %%      changes.
 -spec rm_send_changes(Pid::pid(), Tag::cyclon,
         OldNeighbors::nodelist:neighborhood(),
         NewNeighbors::nodelist:neighborhood(),
         Reason::rm_loop:reason()) -> ok.
 rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors, _Reason) ->
-    ?TRACE_DEBUG("rm_send_changes", []),
-    comm:send_local(Pid, {cb_msg, {gossip_cyclon, default}, {rm_changed, nodelist:node(NewNeighbors)}}).
+    comm:send_local(Pid, {cb_msg, instance(), {rm_changed, nodelist:node(NewNeighbors)}}).
 
 
 %% @doc Checks the current state. If the cache is empty or the current node is
@@ -424,9 +421,6 @@ rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors, _Reason) ->
 %%      will be re-scheduled after 1s.
 -spec check_state(state()) -> ok | fail.
 check_state({Cache, _Node} = _State) ->
-    % if the own node is unknown or the cache is empty (it should at least
-    % contain the nodes predecessor and successor), request this information
-    % from the local dht_node
     NeedsInfo = case cyclon_cache:size(Cache) of
                     0 -> [pred, succ];
                     _ -> []
@@ -447,7 +441,7 @@ check_state({Cache, _Node} = _State) ->
 request_node_details(Details) ->
     DHT_Node = pid_groups:get_my(dht_node),
     This = comm:this(),
-    EnvPid = comm:reply_as(This, 3, {cb_msg, {gossip_cyclon, default}, '_'}),
+    EnvPid = comm:reply_as(This, 3, {cb_msg, instance(), '_'}),
     case comm:is_valid(This) of
         true ->
             comm:send_local(DHT_Node, {get_node_details, EnvPid, Details});
