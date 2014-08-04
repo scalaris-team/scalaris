@@ -376,9 +376,12 @@ get_values_all(State) ->
 %%      Called by the gossip module upon {web_debug_info} messages.
 -spec web_debug_info(state()) ->
     {KeyValueList::[{Key::string(), Value::any()},...], state()}.
-web_debug_info(State) ->
-    %% web_debug_info (msg)
-    {[{"Key", "Value"}], State}.
+web_debug_info({Cache, _Node}=State) ->
+    KeyValueList =
+        [{"gossip_cyclon", ""},
+         {"cache_size", cyclon_cache:size(Cache)},
+         {"cache (age, node):", ""} | cyclon_cache:debug_format_by_age(Cache)],
+    {KeyValueList, State}.
 
 
 %% @doc Shut down the gossip_cyclon module. <br/>
