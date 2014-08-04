@@ -46,8 +46,8 @@
         log:pal("[ Cyclon ~.0p ] " ++ FormatString, [ comm:this() | Data])).
 
 %% print cache at the beginnig of every cycle in a dot friednly format
-%% -define(PRINT_CACHE_FOR_DOT(MyNode, Cache), ok).
--define(PRINT_CACHE_FOR_DOT(MyNode, Cache), print_cache_dot(MyNode, Cache)).
+-define(PRINT_CACHE_FOR_DOT(MyNode, Cache), ok).
+%% -define(PRINT_CACHE_FOR_DOT(MyNode, Cache), print_cache_dot(MyNode, Cache)).
 
 
 
@@ -162,7 +162,7 @@ select_node(State) ->
 %%      cyclon module.
 -spec select_data(State::state()) -> {ok, state()}.
 select_data({Cache, Node}=State) ->
-    ?TRACE_DEBUG("select_data", []),
+    %% ?TRACE_DEBUG("select_data", []),
     case check_state(State) of
         fail ->
             {retry, State};
@@ -191,7 +191,7 @@ select_data({Cache, Node}=State) ->
 -spec select_reply_data(PSubset::data(), Ref::pos_integer(), Round::round(),
     State::state()) -> {discard_msg | ok | retry | send_back, state()}.
 select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
-    ?TRACE_DEBUG("select_reply_data", []),
+    %% ?TRACE_DEBUG("select_reply_data", []),
     % this is received at node Q -> integrate results of node P
     QSubset = cyclon_cache:get_random_subset(shuffle_length(), Cache),
     Pid = pid_groups:get_my(gossip),
@@ -222,6 +222,7 @@ integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
 
 %% replaces the reference to self's dht node with NewNode
 handle_msg({rm_changed, NewNode}, {Cache, Node}) ->
+    ?TRACE_DEBUG("rm_changed", []),
     {ok, Cache, NewNode};
 
 handle_msg({get_ages, _Pid}, State) ->
@@ -243,7 +244,7 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
     ?TRACE_DEBUG("get_node_details_response", []),
     case cyclon_cache:size(OldCache) =< 2 of
         true  ->
-            ?TRACE_DEBUG("get_node_details_response: true", []),
+            %% ?TRACE_DEBUG("get_node_details_response: true", []),
             Pred = node_details:get(NodeDetails, pred),
             Succ = node_details:get(NodeDetails, succ),
             NewCache =
@@ -259,18 +260,18 @@ handle_msg({get_node_details_response, NodeDetails}, {OldCache, Node}=State) ->
                     case config:read(known_hosts) of
                         [] -> ok;
                         [_|_] = KnownHosts ->
-                            ?TRACE_DEBUG("get_node_details_response: request known-hosts", []),
+                            %% ?TRACE_DEBUG("get_node_details_response: request known-hosts", []),
                             Pid = util:randomelem(KnownHosts),
                             EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, {gossip_cyclon, default}, '_'}),
                             comm:send(Pid, {get_dht_nodes, EnvPid}, [{?quiet}])
                     end;
                 _ ->
-                    ?TRACE_DEBUG("get_node_details_response: ok", []),
+                    %% ?TRACE_DEBUG("get_node_details_response: ok", []),
                     ok
             end,
             {ok, {NewCache, Node}};
         false ->
-            ?TRACE_DEBUG("get_node_details_response: false", []),
+            %% ?TRACE_DEBUG("get_node_details_response: false", []),
             {ok, State}
     end;
 
