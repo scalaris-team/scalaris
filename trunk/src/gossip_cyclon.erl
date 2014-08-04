@@ -25,11 +25,14 @@
 -include("record_helpers.hrl").
 
 % gossip_beh
--export([init/1, init/2, init/3, check_config/0, trigger_interval/0, fanout/0,
+-export([init/1, check_config/0, trigger_interval/0, fanout/0,
         select_node/1, select_data/1, select_reply_data/4, integrate_data/3,
         handle_msg/2, notify_change/3, min_cycles_per_round/0, max_cycles_per_round/0,
         round_has_converged/1, get_values_best/1, get_values_all/1, web_debug_info/1,
         shutdown/1]).
+
+-export([rm_check/3,
+         rm_send_changes/5]).
 
 %% for testing
 -export([]).
@@ -38,15 +41,22 @@
 -endif.
 
 
+%% -define(TRACE_DEBUG(FormatString, Data), ok).
+-define(TRACE_DEBUG(FormatString, Data),
+        log:pal("[ Cyclon ~.0p ] " ++ FormatString, [ comm:this() | Data])).
+
+
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Type Definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type state() :: any().
 -type data() :: any().
 -type round() :: non_neg_integer().
--type instance() :: {Module :: gossip_cyclon, Id :: atom() | uid:global_uid()}.
 
+-type state() :: {Nodes::cyclon_cache:cache(), %% the cache of random nodes
+                  MyNode::node:node_type() | null}. %% the scalaris node of this module
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Config Functions
@@ -96,23 +106,22 @@ check_config() ->
 
 %% @doc Initiate the gossip_cyclon module. <br/>
 %%      Called by the gossip module upon startup. <br/>
-%%      Instance makes the module aware of its own instance id, which is saved
-%%      in the state of the module.
--spec init(Instance::instance()) -> {ok, state()}.
-init(_Instance) ->
-    {ok, state}.
-
-
-%% @doc Initiate the gossip_cyclon module. <br/>
--spec init(Instance::instance(), NoOfBuckets::non_neg_integer()) -> {ok, state()}.
-init(_Instance, _Arg1) ->
-    {ok, state}.
-
-
-%% @doc Initiate the gossip_cyclon module. <br/>
--spec init(Instance::instance(), any(), any()) -> {ok, state()}.
-init(_Instance, _Arg1, _Arg2) ->
-    {ok, state}.
+%%      The Instance information is ignored, {gossip_cyclon, default} is always used.
+-spec init(Args::[proplist:property()]) -> {ok, state()}.
+init(Args) ->
+    Neighbors = proplists:get_value(neighbors, Args),
+    log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
+    rm_loop:subscribe(self(), cyclon,
+                      fun gossip_cyclon:rm_check/3,
+                      fun gossip_cyclon:rm_send_changes/5, inf),
+    monitor:proc_set_value(?MODULE, 'shuffle', rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
+    Cache = case nodelist:has_real_pred(Neighbors) andalso
+                     nodelist:has_real_succ(Neighbors) of
+                true  -> cyclon_cache:new(nodelist:pred(Neighbors),
+                                          nodelist:succ(Neighbors));
+                false -> cyclon_cache:new()
+            end,
+    {ok, {Cache, nodelist:node(Neighbors)}}.
 
 
 %% @doc Returns true, i.e. peer selection is done by gossip_cyclon module.
@@ -172,8 +181,8 @@ handle_msg({get_node_details_response, _NodeDetails}, State) ->
     %% Response to a get_node_details message from self (via request_node_details()).
     %% The node details are used to possibly update Me and the succ and pred are
     %% possibly used to populate the cache.
-    %% request_node_details() is called upon on_inactive({activate_cyclon, ..})
-    %% and check_state() (i.e. in on_active({cy_shuffle})).
+    %% request_node_details() is called in check_state()
+    %% (i.e. in on_active({cy_shuffle})).
     {ok, State};
 handle_msg({get_dht_nodes_response, _Nodes}, State) ->
     %% Response to get_dht_nodes message from service_per_vm. Contains a list of
@@ -231,5 +240,26 @@ web_debug_info(State) ->
 shutdown(_State) ->
     % nothing to do
     {ok, shutdown}.
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Miscellaneous
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+-spec rm_check(Neighbors, Neighbors, Reason) -> boolean() when
+      is_subtype(Neighbors, nodelist:neighborhood()),
+      is_subtype(Reason, rm_loop:reason()).
+rm_check(OldNeighbors, NewNeighbors, _Reason) ->
+    nodelist:node(OldNeighbors) =/= nodelist:node(NewNeighbors).
+
+%% @doc Sends changes to a subscribed cyclon process when the neighborhood
+%%      changes.
+-spec rm_send_changes(Pid::pid(), Tag::cyclon,
+        OldNeighbors::nodelist:neighborhood(),
+        NewNeighbors::nodelist:neighborhood(),
+        Reason::rm_loop:reason()) -> ok.
+rm_send_changes(Pid, cyclon, _OldNeighbors, NewNeighbors, _Reason) ->
+    comm:send_local(Pid, {cb_reply, {gossip_cyclon, default}, {rm_changed, nodelist:node(NewNeighbors)}}).
 
 
