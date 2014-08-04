@@ -914,7 +914,14 @@ cb_select_node(CBModule, State) ->
 %%      message of the form {selected_data, Instance, ExchangeData}.
 -spec cb_select_data(cb_module(), state()) -> state().
 cb_select_data(CBModule, State) ->
-    {ok, State1} = cb_call(select_data, [], CBModule, State), State1.
+    case cb_call(select_data, [], CBModule, State) of
+        {ok, State1} ->
+            State1;
+        {retry, State1} ->
+            State2 = state_set({trigger_lock, CBModule}, free, State1),
+            msg_queue_add({trigger_action, CBModule}, State2)
+    end.
+
 
 
 %% @doc Called upon a p2p_exch message and calls CBModule::select_reply_data().
