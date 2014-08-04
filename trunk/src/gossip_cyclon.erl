@@ -38,7 +38,7 @@
 -export([get_subset_rand/1, get_subset_rand_next_interval/1, get_subset_rand_next_interval/2]).
 
 %% for testing
--export([select_data_feeder/1, is_state/1]).
+-export([select_data_feeder/1]).
 -ifdef(with_export_type_support).
 -export_type([data/0, state/0]).
 -endif.
@@ -497,9 +497,3 @@ select_data_feeder(State) ->
 request_node_details_feeder(Details) ->
     {lists:filter(fun(Detail) -> Detail =/= new_key end, Details)}.
 
--spec is_state(state()) -> boolean().
-is_state(_State={_Cache=[_Entry={_Node, _Age}], _Node}) ->
-    true;
-
-is_state(_State) ->
-    false.
