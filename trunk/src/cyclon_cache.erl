@@ -263,6 +263,6 @@ trim(Cache, TargetSize) ->
 
 %% @doc Returns a list of keys (ages) and string values (nodes) for debug output
 %%      used in the web interface.
--spec debug_format_by_age(Cache::cache()) -> KeyValueList::[{Age::age(), Node::string()}].
+-spec debug_format_by_age(Cache::cache()) -> KeyValueList::[{Age::string(), Node::string()}].
 debug_format_by_age(Cache) ->
-    [{Age, webhelpers:safe_html_string("~p", [Node])} || {Node, Age} <- Cache].
+    [{integer_to_list(Age), webhelpers:safe_html_string("~p", [Node])} || {Node, Age} <- Cache].

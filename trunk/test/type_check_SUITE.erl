@@ -170,6 +170,7 @@ tester_type_check_gossip(_Config) ->
             % excluded (private functions)
             [   {handle_msg, 2}, % spec to wide, sends messages
                 {start_p2p_exchange, 4}, % would need valid peer
+                {init_gossip_tasks, 2}, % Id-Version-Error in gossip_cyclon (see below)
                 {init_gossip_task, 3}, % test via feeder
                 {cb_init, 2}, % spec to wide (Args)
                 {cb_select_data, 2}, % would need valid callback state
@@ -202,6 +203,22 @@ tester_type_check_gossip(_Config) ->
                {merge_histo, 2}, % tested via feeder
                {merge_bucket, 2}, % tested via feeder
                {request_node_details, 1} % sends messages
+            ]},
+            {gossip_cyclon,
+            % excluded (exported functions)
+            [
+             %% Id-Version-Error 1:
+             %%     'got two nodes with same IDversion but different ID' in node:is_newer()
+             {init, 1}, % needs valid neighborhood / Id-Version-Error
+             {select_data, 1}, % tested via feeder
+             {select_reply_data, 4}, % Id-Version-Error
+             {integrate_data, 3}, % Id-Version-Error
+             {handle_msg, 2} % needs valid NodeDetails (in get_node_details_response)
+            ],
+            % excluded (private functions)
+            [
+             {request_node_details, 1}, % tested via feeder
+             {print_cache_dot, 2} % to much console output
             ]}
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)

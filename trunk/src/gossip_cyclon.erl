@@ -38,7 +38,7 @@
 -export([get_subset_rand/1, get_subset_rand_next_interval/1, get_subset_rand_next_interval/2]).
 
 %% for testing
--export([]).
+-export([select_data_feeder/1]).
 
 -ifdef(with_export_type_support).
 -endif.
@@ -60,7 +60,7 @@
 %% Type Definitions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--type data() :: cyclon_cache:cache() | {cyclon_cache:cache(), cyclon_cache:cache()}.
+-type data() :: cyclon_cache:cache().
 -type round() :: non_neg_integer().
 
 -type state() :: {Nodes::cyclon_cache:cache(), %% the cache of random nodes
@@ -203,7 +203,7 @@ select_node(State) ->
 %%      of the form {selected_data, Instance, ExchangeData}.
 %%      gossip_trigger -> select_data() is equivalent to cy_shuffle in the old
 %%      cyclon module.
--spec select_data(State::state()) -> {ok, state()}.
+-spec select_data(State::state()) -> {ok | retry, state()}.
 select_data({Cache, Node}=State) ->
     %% ?TRACE_DEBUG("select_data", []),
     case check_state(State) of
@@ -249,7 +249,7 @@ select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
 %%      RoundStatus / Round: ignored, as cyclon does not implement round handling
 %%      Upon finishing the processing of the data, a message of the form
 %%      {integrated_data, Instance, RoundStatus} is to be sent to the gossip module.
--spec integrate_data(QData::data(), Round::round(), State::state()) ->
+-spec integrate_data(QData::{data(), data()}, Round::round(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
 integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
     %% cy_subset_response msg <=> p2p_exch_reply msg -> integrate_data()
@@ -270,7 +270,7 @@ integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
 %% replaces the reference to self's dht node with NewNode
 handle_msg({rm_changed, NewNode}, {Cache, _Node}) ->
     ?TRACE_DEBUG("rm_changed", []),
-    {ok, Cache, NewNode};
+    {ok, {Cache, NewNode}};
 
 %% msg from admin:print_ages()
 %% request needs to be sent to the gossip module in the following form:
@@ -356,7 +356,7 @@ round_has_converged(State) ->
 %% @doc Notifies the gossip_load module about changes. <br/>
 %%      Changes can be new rounds, leadership changes or exchange failures. All
 %%      of them are ignored, as cyclon doesn't use / implements this features.
--spec notify_change(_, _, State::state()) -> {ok, state()}.
+-spec notify_change(any(), any(), State::state()) -> {ok, state()}.
 notify_change(_, _, State) ->
     %% Possible to use key range changes for rm_check() / rm_send_changes() ???
     {ok, State}.
@@ -380,11 +380,11 @@ get_values_all(State) ->
 %% @doc Returns a key-value list of debug infos for the Web Interface. <br/>
 %%      Called by the gossip module upon {web_debug_info} messages.
 -spec web_debug_info(state()) ->
-    {KeyValueList::[{Key::string(), Value::any()},...], state()}.
+    {KeyValueList::[{Key::string(), Value::string()},...], state()}.
 web_debug_info({Cache, _Node}=State) ->
     KeyValueList =
         [{"gossip_cyclon", ""},
-         {"cache_size", cyclon_cache:size(Cache)},
+         {"cache_size", integer_to_list(cyclon_cache:size(Cache))},
          {"cache (age, node):", ""} | cyclon_cache:debug_format_by_age(Cache)],
     {KeyValueList, State}.
 
@@ -455,16 +455,21 @@ request_node_details(Details) ->
     end.
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Debugging and Testing
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 %% @doc Print the cache in a dot compatible format.
 %%      Format: Self -> Reference1; Self -> Reference2 ; ...
 %%      Prints references to nodes as local pids, so this produces meaningful
 %%      results if all nodes are started in the same Erlang VM.
 %%      (Cycles are counted in the gossip module as well for real, the basic cycle
 %%      counting performed here only works if this function only called once every cycle).
-%%      TODO the fun in 450 only throws a 'has no local return' dialyzer warning
+%%      TODO the fun in foldl only throws a 'has no local return' dialyzer warning
 %%              if the PRINT_CACHE_FOR_DOT macro is set to ok
 -compile({nowarn_unused_function, {print_cache_dot, 2}}).
--spec print_cache_dot(node:nodetype(), data()) -> ok.
+-spec print_cache_dot(node:node_type(), data()) -> ok.
 print_cache_dot(MyNode, Cache) ->
     Cycle = case get(cycles) of
         undefined -> put(cycles, 1), 0;
@@ -476,4 +481,26 @@ print_cache_dot(MyNode, Cache) ->
                         AccIn ++ io_lib:format("~w -> ~w; ", [MyPid, comm:make_local(node:pidX(Node))])
                     end, io_lib:format("[Cycle: ~w] ", [Cycle]), Cache),
     log:pal(lists:flatten(Graph)).
+
+
+%% still fails
+%% -spec init_feeder(Neighbors::nodelist:neighborhood()) -> {[proplists:property()]}.
+%% init_feeder(Neighbors) ->
+%%     {[{neighbors, Neighbors}]}.
+
+
+-spec select_data_feeder(State::state()) -> {state()}.
+select_data_feeder(State) ->
+    monitor:proc_set_value(?MODULE, 'shuffle', rrd:create(60 * 1000000, 3, counter)), % 60s monitoring interval
+    {State}.
+
+
+%% node_details:node_details_name allows new_key, but
+%% dht_node:on({get_node_details, Pid, Which}, State) doesn't
+-compile({nowarn_unused_function, {request_node_details_feeder, 1}}).
+-spec request_node_details_feeder([node_details:node_details_name()]) ->
+    {[node_details:node_details_name()]}.
+request_node_details_feeder(Details) ->
+    {lists:filter(fun(Detail) -> Detail =/= new_key end, Details)}.
+
 
