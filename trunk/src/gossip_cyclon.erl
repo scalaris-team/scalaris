@@ -204,9 +204,13 @@ select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
 %%      {integrated_data, Instance, RoundStatus} is to be sent to the gossip module.
 -spec integrate_data(QData::data(), Round::round(), State::state()) ->
     {discard_msg | ok | retry | send_back, state()}.
-integrate_data(_QData, _Round, State) ->
+integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
     %% cy_subset_response msg <=> p2p_exch_reply msg -> integrate_data()
-    {ok, State}.
+    Cache1 = cyclon_cache:merge(Cache, Node, QSubset, PSubset, cache_size()),
+    Pid = pid_groups:get_my(gossip),
+    comm:send_local(Pid, {integrated_data, instance(), cur_round}),
+    ?TRACE_DEBUG("integrate_data. NewCache: ~w", [Cache]),
+    {ok, {Cache1, Node}}.
 
 
 %% @doc Handle messages
