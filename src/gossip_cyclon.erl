@@ -174,7 +174,7 @@ get_subset_rand_next_interval(N, SourcePid) ->
 %% @doc Initiate the gossip_cyclon module. <br/>
 %%      Called by the gossip module upon startup. <br/>
 %%      The Instance information is ignored, {gossip_cyclon, default} is always used.
--spec init(Args::[proplist:property()]) -> {ok, state()}.
+-spec init(Args::[proplists:property()]) -> {ok, state()}.
 init(Args) ->
     Neighbors = proplists:get_value(neighbors, Args),
     log:log(info, "[ Cyclon ~.0p ] activating...~n", [comm:this()]),
