@@ -52,7 +52,7 @@
 -export([request_histogram/2, load_info_get/2, load_info_other_get/3]).
 
 % gossip_beh
--export([init/1, init/2, init/3, check_config/0, trigger_interval/0, fanout/0,
+-export([init/1, check_config/0, trigger_interval/0, fanout/0,
         select_node/1, select_data/1, select_reply_data/4, integrate_data/3,
         handle_msg/2, notify_change/3, min_cycles_per_round/0, max_cycles_per_round/0,
         round_has_converged/1, get_values_best/1, get_values_all/1, web_debug_info/1,
@@ -273,7 +273,7 @@ check_config() ->
 %%      properly converged.
 -spec request_histogram(Size::histogram_size(), SourcePid::comm:mypid()) -> ok.
 request_histogram(Size, SourcePid) when Size >= 1 ->
-    gossip:start_gossip_task(?MODULE, [Size, SourcePid]).
+    gossip:start_gossip_task(?MODULE, [{no_of_buckets, Size}, {requestor, SourcePid}]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -281,26 +281,16 @@ request_histogram(Size, SourcePid) when Size >= 1 ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Initiate the gossip_load module. <br/>
-%%      Called by the gossip module upon startup. <br/>
-%%      Instance makes the module aware of its own instance id, which is saved
-%%      in the state of the module.
--spec init(Instance::instance()) -> {ok, full_state()}.
-init(Instance) ->
-    init(Instance, no_of_buckets(), none).
-
-%% @doc Initiate the gossip_load module. <br/>
-%%      Used by gossip:start_gossip_task().
-%%      NoOfBuckets defines the size of the histogram calculated.
--spec init(Instance::instance(), NoOfBuckets::non_neg_integer()) -> {ok, full_state()}.
-init(Instance, NoOfBuckets) ->
-    init(Instance, NoOfBuckets, none).
-
-%% @doc Initiate the gossip_load module. <br/>
-%%      Used for request_histogram/1 (called by the gossip module). <br/>
-%%      the calculated histogram will be sent to the requestor.
--spec init(Instance::instance(), NoOfBuckets::non_neg_integer(),
-           Requestor::comm:mypid() | none) -> {ok, full_state()}.
-init(Instance, NoOfBuckets, Requestor) ->
+%%      Instance (mandatory) makes the module aware of its own instance id, which
+%%      is saved in the state of the module.
+%%      NoOfBuckets (optional) defines the size of the histogram calculated.
+%%      Requestor (optinal) defines to whom the calculated histogram will be sent
+%%      (used for request_histogram/1, called through the gossip module).
+-spec init(Args::[proplists:property()]) -> {ok, full_state()}.
+init(Args) ->
+    Instance = proplists:get_value(instance, Args),
+    NoOfBuckets = proplists:get_value(no_of_buckets, Args, no_of_buckets()),
+    Requestor = proplists:get_value(requestor, Args, none),
     log:log(debug, "[ ~w ] CBModule initiated. NoOfBuckets: ~w, Requestor: ~w",
         [Instance, NoOfBuckets, Requestor]),
     CurState = #state{
