@@ -62,7 +62,6 @@ childs([{DHTNodeGroup, Options}]) ->
             true -> sup:worker_desc(autoscale, autoscale, start_link, [DHTNodeGroup]);
             _ -> []
         end,
-    Cyclon = sup:worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
     DBValCache =
         sup:worker_desc(dht_node_db_cache, dht_node_db_cache, start_link,
                              [DHTNodeGroup]),
@@ -128,7 +127,6 @@ childs([{DHTNodeGroup, Options}]) ->
                     DBValCache,
                     DeadNodeCache,
                     RoutingTable,
-                    Cyclon,
                     Vivaldi,
                     DC_Clustering,
                     Gossip,

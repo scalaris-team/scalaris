@@ -965,7 +965,6 @@ finish_join(Me, Pred, Succ, DB, QueuedMessages, MoveState) ->
     % wait for the ring maintenance to initialize and tell us its table ID
     rt_loop:activate(Neighbors),
     if MoveState =:= [] ->
-           cyclon:activate(Neighbors),
            vivaldi:activate(),
            dc_clustering:activate(),
            gossip:activate(Neighbors);
