@@ -233,7 +233,7 @@ select_data({Cache, Node}=State) ->
 %%      p2p_exch msg -> seleft_reply_data() is equivalent to cy_subset msg in the
 %%      old cyclon module.
 -spec select_reply_data(PSubset::data(), Ref::pos_integer(), Round::round(),
-    State::state()) -> {discard_msg | ok | retry | send_back, state()}.
+    State::state()) -> {ok, state()}.
 select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
     % this is received at node Q -> integrate results of node P
     QSubset = cyclon_cache:get_random_subset(shuffle_length(), Cache),
@@ -253,7 +253,7 @@ select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
 %%      p2p_exch_reply msg -> integrate_data() is equivalent to the cy_subset_response
 %%      msg in the old cyclon module.
 -spec integrate_data(QData::{data(), data()}, Round::round(), State::state()) ->
-    {discard_msg | ok | retry | send_back, state()}.
+    {ok, state()}.
 integrate_data({QSubset, PSubset}, _Round, {Cache, Node}) ->
     Cache1 = cyclon_cache:merge(Cache, Node, QSubset, PSubset, cache_size()),
     Pid = pid_groups:get_my(gossip),
