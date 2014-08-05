@@ -275,9 +275,8 @@ is_txnew_enabled() -> false.
 rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors, _Reason) ->
     OldId = node:id(nodelist:node(OldNeighbors)),
     NewId = node:id(nodelist:node(NewNeighbors)),
-    case OldId =/= NewId of
-        true  -> comm:send_local(Pid, {new_node_id, NewId});
-        false -> ok
+    if OldId =/= NewId -> comm:send_local(Pid, {new_node_id, NewId});
+       true            -> ok
     end.
 
 %% be startable via supervisor, use gen_component
