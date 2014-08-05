@@ -177,7 +177,7 @@ wf_set_vers_val(Entry, Version, WriteValue) ->
 %% functions for set_lock
 %% %%%%%%%%%%%%%%%%%%%%%%
 
--spec set_lock(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid()) -> ok.
+-spec set_lock(tx_tlog:tlog_entry(), txid(), comm:erl_local_pid()) -> ok.
 set_lock(TLogEntry, TxId, ReplyTo) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
     HashedKey = case is_list(Key) of
@@ -267,10 +267,10 @@ wf_set_wl(DBEntry, _UI = none, {TxId, _Vers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for commit_read
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
--spec commit_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
+-spec commit_read_feeder(tx_tlog:tlog_entry(), txid(), comm:erl_local_pid(),
                          pr:pr(), {txid_on_cseq:txid(), version()}) ->
                                 {tx_tlog:tlog_entry(),
-                                 ?RT:key(),
+                                 txid(),
                                  comm:erl_local_pid(),
                                  pr:pr(),
                                  {txid_on_cseq:txid(), version()}}.
@@ -278,7 +278,7 @@ commit_read_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
     {TLogEntry, TxId, Pid, Round, OldVal}.
 
 %% @doc Releases the read lock of a given entry, if it was set.
--spec commit_read(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
+-spec commit_read(tx_tlog:tlog_entry(), txid(), comm:erl_local_pid(),
                   pr:pr(), any()) -> ok.
 commit_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
@@ -331,9 +331,9 @@ wf_unset_rl(DBEntry, _UI = none, {TxId, _TLogVers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for commit_write
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
--spec commit_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
+-spec commit_write_feeder(tx_tlog:tlog_entry_write(), txid(), comm:erl_local_pid(),
                           pr:pr(), {txid_on_cseq:txid(), version()}) ->
-                                 {tx_tlog:tlog_entry_write(), ?RT:key(),
+                                 {tx_tlog:tlog_entry_write(), txid(),
                                   comm:erl_local_pid(),
                                   pr:pr(),
                                   {txid_on_cseq:txid(), version()}}.
@@ -345,7 +345,7 @@ commit_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
 %% @doc Releases the write lock of a given entry, if it was
 %%      set, and writes the new value.
 %% erlang shell test call: api_tx:write("a", 1).
--spec commit_write(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
+-spec commit_write(tx_tlog:tlog_entry_write(), txid(), comm:erl_local_pid(),
                    pr:pr(), any()) -> ok.
 commit_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
@@ -447,10 +447,10 @@ wf_val_unset_wl(DBEntry, _UI = none, {_TxId, TLogVers, Val}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for abort_read
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
--spec abort_read_feeder(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
+-spec abort_read_feeder(tx_tlog:tlog_entry(), txid(), comm:erl_local_pid(),
                          pr:pr(), {txid_on_cseq:txid(), version()}) ->
                                 {tx_tlog:tlog_entry(),
-                                 ?RT:key(),
+                                 txid(),
                                  comm:erl_local_pid(),
                                  pr:pr(),
                                  {txid_on_cseq:txid(), version()}}.
@@ -458,7 +458,7 @@ abort_read_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
     {TLogEntry, TxId, Pid, Round, OldVal}.
 
 %% @doc Releases the read lock of a given entry, if it was set.
--spec abort_read(tx_tlog:tlog_entry(), ?RT:key(), comm:erl_local_pid(),
+-spec abort_read(tx_tlog:tlog_entry(), txid(), comm:erl_local_pid(),
                   pr:pr(), any()) -> ok.
 abort_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
@@ -519,9 +519,9 @@ cc_abort_read({RL, _WL, _Vers}, _WF, _Val = {TxId, _TLogVers}) ->
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
 %% functions for abort_write
 %% %%%%%%%%%%%%%%%%%%%%%%%%%
--spec abort_write_feeder(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
+-spec abort_write_feeder(tx_tlog:tlog_entry_write(), txid(), comm:erl_local_pid(),
                           pr:pr(), {txid_on_cseq:txid(), version()}) ->
-                                 {tx_tlog:tlog_entry_write(), ?RT:key(),
+                                 {tx_tlog:tlog_entry_write(), txid(),
                                   comm:erl_local_pid(),
                                   pr:pr(),
                                   {txid_on_cseq:txid(), version()}}.
@@ -532,7 +532,7 @@ abort_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
 
 %% @doc Releases the write lock of a given entry, if it was set.
 %% erlang shell test call: api_tx:write("a", 1).
--spec abort_write(tx_tlog:tlog_entry_write(), ?RT:key(), comm:erl_local_pid(),
+-spec abort_write(tx_tlog:tlog_entry_write(), txid(), comm:erl_local_pid(),
                    pr:pr(), any()) -> ok.
 abort_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
@@ -634,13 +634,13 @@ new_entry() ->
 
 -spec readlock(db_entry()) -> readlock().
 readlock(Entry) -> element(1, Entry).
--spec set_readlock(db_entry(), ?RT:key()) -> db_entry().
+-spec set_readlock(db_entry(), txid()) -> db_entry().
 set_readlock(prbr_bottom, TxId) ->
     set_readlock(new_entry(), TxId);
 set_readlock(Entry, TxId) ->
     NewRL = [TxId | element(1, Entry)],
     setelement(1, Entry, NewRL).
--spec unset_readlock(db_entry(), ?RT:key()) -> db_entry().
+-spec unset_readlock(db_entry(), txid()) -> db_entry().
 unset_readlock(Entry, TxId) ->
     %% delete all occurrences of TxId
     NewRL = [ X || X <- element(1, Entry), X =/= TxId ],
@@ -660,7 +660,8 @@ val(Entry) -> element(4, Entry).
 -spec set_val(db_entry(), value()) -> db_entry().
 set_val(Entry, Val) -> setelement(4, Entry, Val).
 
--spec max(db_entry(), db_entry()) -> db_entry().
+-spec max(Entry, Entry) -> Entry
+        when is_subtype(Entry, db_entry() | {client_value(), version()}).
 max({_ValA, VersA} = A, {_ValB, VersB} = B) ->
     %% partial entries A and B produced by read filter rf_val_vers
     log:log("A (~p) > B (~p)?", [A,B]),
