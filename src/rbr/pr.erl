@@ -79,6 +79,6 @@ set_wf(R, WF) -> setelement(3, R, WF).
 %% write.  So, the smallest_round of the second client becomes invalid
 %% when the first one writes.  In consequence, at most one proposer
 %% can perform a successful fast_write with its smallest_round. Voila!
--spec smallest_round(comm:mypid()) -> pr:pr().
+-spec smallest_round(comm:mypid()) -> pr().
 smallest_round(Pid) -> new(0, Pid).
 
