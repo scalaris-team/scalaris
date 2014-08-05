@@ -668,8 +668,8 @@ val(Entry) -> element(4, Entry).
 -spec set_val(db_entry(), value()) -> db_entry().
 set_val(Entry, Val) -> setelement(4, Entry, Val).
 
--spec max(Entry, Entry) -> Entry
-        when is_subtype(Entry, db_entry() | {client_value(), version()}).
+-spec max(db_entry(), db_entry()) -> db_entry();
+         ({client_value(), version()}, {client_value(), version()}) -> {client_value(), version()}.
 max({_ValA, VersA} = A, {_ValB, VersB} = B) ->
     %% partial entries A and B produced by read filter rf_val_vers
     log:log("A (~p) > B (~p)?", [A,B]),
