@@ -188,6 +188,7 @@ init(Args) ->
                                           nodelist:succ(Neighbors));
                 false -> cyclon_cache:new()
             end,
+    check_state({Cache, nodelist:node(Neighbors)}),
     {ok, {Cache, nodelist:node(Neighbors)}}.
 
 
@@ -208,8 +209,10 @@ select_node(State) ->
 select_data({Cache, Node}=State) ->
     case check_state(State) of
         fail ->
+            ?TRACE_DEBUG("Cycle: ~w: select_data -> fail.", [get_cycle()]),
             {discard_msg, State};
         _    ->
+            ?TRACE_DEBUG("Cycle: ~w: select_data -> ok.", [get_cycle()]),
             ?PRINT_CACHE_FOR_DOT(Node, Cache),
             monitor:proc_set_value(?MODULE, 'shuffle',
                                    fun(Old) -> rrd:add_now(1, Old) end),
@@ -444,7 +447,8 @@ request_node_details(Details) ->
     EnvPid = comm:reply_as(This, 3, {cb_msg, instance(), '_'}),
     case comm:is_valid(This) of
         true ->
-            comm:send_local(DHT_Node, {get_node_details, EnvPid, Details});
+            comm:send_local_after(500, DHT_Node, {get_node_details, EnvPid, Details}),
+            ok;
         false -> ok
     end.
 
