@@ -458,23 +458,31 @@ request_node_details(Details) ->
 %%      Format: Self -> Reference1; Self -> Reference2 ; ...
 %%      Prints references to nodes as local pids, so this produces meaningful
 %%      results if all nodes are started in the same Erlang VM.
-%%      (Cycles are counted in the gossip module as well for real, the basic cycle
-%%      counting performed here only works if this function only called once every cycle).
 %%      TODO the fun in foldl only throws a 'has no local return' dialyzer warning
 %%              if the PRINT_CACHE_FOR_DOT macro is set to ok
 -compile({nowarn_unused_function, {print_cache_dot, 2}}).
 -spec print_cache_dot(node:node_type(), data()) -> ok.
 print_cache_dot(MyNode, Cache) ->
-    Cycle = case get(cycles) of
-        undefined -> put(cycles, 1), 0;
-        Cycle1 -> put(cycles, Cycle1+1), Cycle1
-    end,
+    Cycle = get_cycle(),
     MyPid = comm:make_local(node:pidX(MyNode)),
     Graph = lists:foldl(
                     fun({Node, _Age}, AccIn) ->
                         [AccIn, io_lib:format("~w -> ~w; ", [MyPid, comm:make_local(node:pidX(Node))])]
                     end, io_lib:format("[Cycle: ~w] ", [Cycle]), Cache),
     log:pal(lists:flatten(Graph)).
+
+
+%% @doc Simple cycle counting meachanism
+%%      This only works, if this function is called excactly once every cycle.
+%%      For debugging purposes only, the gossip module provides more
+%%      sophisticated cycle counting.
+-spec get_cycle() -> non_neg_integer().
+-compile({nowarn_unused_function, {get_cycle, 0}}).
+get_cycle() ->
+    case get(cycles) of
+        undefined -> put(cycles, 1), 0;
+        Cycle1 -> put(cycles, Cycle1+1), Cycle1
+    end.
 
 
 %% still fails
