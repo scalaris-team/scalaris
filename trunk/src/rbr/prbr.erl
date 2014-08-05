@@ -252,25 +252,23 @@ next_read_round(Entry, ProposerUID) ->
 writable(Entry, InRound) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
-    case (InRound >= LatestSeenRead)
-        andalso (InRound > LatestSeenWrite) of
-        true ->
-            T1Entry = entry_set_r_write(Entry, InRound),
-            %% prepare fast_paxos for this client:
-            NextWriteRound = next_read_round(T1Entry,
-                                             pr:get_id(InRound)),
-            %% assume this token was seen in a read already, so no one else
-            %% can interfere without paxos noticing it
-            T2Entry = entry_set_r_read(T1Entry, NextWriteRound),
-            {ok, T2Entry, NextWriteRound};
-        false ->
-            %% proposer may not have latest value for a clean content
-            %% check, and another proposer is concurrently active, so
-            %% we do not prepare a fast_paxos for this client, but let
-            %% the other proposer the chance to pass read and write
-            %% phase.  The denied proposer has to perform a read and write
-            %% phase on its own (including a new content check).
-            {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
+    if (InRound >= LatestSeenRead) andalso (InRound > LatestSeenWrite) ->
+           T1Entry = entry_set_r_write(Entry, InRound),
+           %% prepare fast_paxos for this client:
+           NextWriteRound = next_read_round(T1Entry,
+                                            pr:get_id(InRound)),
+           %% assume this token was seen in a read already, so no one else
+           %% can interfere without paxos noticing it
+           T2Entry = entry_set_r_read(T1Entry, NextWriteRound),
+           {ok, T2Entry, NextWriteRound};
+       true ->
+           %% proposer may not have latest value for a clean content
+           %% check, and another proposer is concurrently active, so
+           %% we do not prepare a fast_paxos for this client, but let
+           %% the other proposer the chance to pass read and write
+           %% phase.  The denied proposer has to perform a read and write
+           %% phase on its own (including a new content check).
+           {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
     end.
 
 %% @doc Checks whether config parameters exist and are valid.

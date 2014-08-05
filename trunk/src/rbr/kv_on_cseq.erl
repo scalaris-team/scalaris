@@ -180,9 +180,9 @@ wf_set_vers_val(Entry, Version, WriteValue) ->
 -spec set_lock(tx_tlog:tlog_entry(), txid(), comm:erl_local_pid()) -> ok.
 set_lock(TLogEntry, TxId, ReplyTo) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
-    HashedKey = case is_list(Key) of
-                    true -> ?RT:hash_key(Key);
-                    false -> Key
+    % TODO: this is potentially unsafe depending on the RT implementation!
+    HashedKey = if is_list(Key) -> ?RT:hash_key(Key);
+                   true         -> Key
                 end,
     case tx_tlog:get_entry_operation(TLogEntry) of
         ?read ->
@@ -282,9 +282,9 @@ commit_read_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
                   pr:pr(), any()) -> ok.
 commit_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
-    HashedKey = case is_list(Key) of
-                    true -> ?RT:hash_key(Key);
-                    false -> Key
+    % TODO: this is potentially unsafe depending on the RT implementation!
+    HashedKey = if is_list(Key) -> ?RT:hash_key(Key);
+                   true         -> Key
                 end,
     ReadFilter = fun rf_rl_vers/1,
     ContentCheck = fun cc_commit_read/3,
@@ -349,9 +349,9 @@ commit_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
                    pr:pr(), any()) -> ok.
 commit_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
-    HashedKey = case is_list(Key) of
-                    true -> ?RT:hash_key(Key);
-                    false -> Key
+    % TODO: this is potentially unsafe depending on the RT implementation!
+    HashedKey = if is_list(Key) -> ?RT:hash_key(Key);
+                   true         -> Key
                 end,
     ReadFilter = fun rf_wl_vers/1,
     ContentCheck = fun cc_commit_write/3,
@@ -462,9 +462,9 @@ abort_read_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
                   pr:pr(), any()) -> ok.
 abort_read(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
-    HashedKey = case is_list(Key) of
-                    true -> ?RT:hash_key(Key);
-                    false -> Key
+    % TODO: this is potentially unsafe depending on the RT implementation!
+    HashedKey = if is_list(Key) -> ?RT:hash_key(Key);
+                   true         -> Key
                 end,
     ReadFilter = fun rf_rl_vers/1,
     ContentCheck = fun cc_abort_read/3,
@@ -536,9 +536,9 @@ abort_write_feeder(TLogEntry, TxId, Pid, Round, OldVal) ->
                    pr:pr(), any()) -> ok.
 abort_write(TLogEntry, TxId, ReplyTo, NextRound, OldVal) ->
     Key = tx_tlog:get_entry_key(TLogEntry),
-    HashedKey = case is_list(Key) of
-                    true -> ?RT:hash_key(Key);
-                    false -> Key
+    % TODO: this is potentially unsafe depending on the RT implementation!
+    HashedKey = if is_list(Key) -> ?RT:hash_key(Key);
+                   true         -> Key
                 end,
     ReadFilter = fun rf_wl_vers/1,
     ContentCheck = fun cc_abort_write/3,
@@ -598,29 +598,37 @@ wf_unset_wl(DBEntry, _UI = none, {TxId, _TLogVers, _Val}) ->
 -spec cc_return_val(atom(), [{boolean(), tuple()|atom()}], UI :: any(), boolean()) ->
                            {true, UI :: any()} |
                            {false, any()}.
-cc_return_val(WhichCC, Checks, UI, Log) ->
+cc_return_val(WhichCC, Checks, UI, true) ->
+    %% copy cuntion from below to reduce overhead when not logging
+
+    %% log is defined as macro ?LOG_CC_FAILS. Unfortunately
+    %% dialyzer claims Log to be always false. But for
+    %% debugging purposes we can alter this for individual
+    %% content checks or enable logging for all of them by
+    %% redefining the macro. So it seems we have to live
+    %% with dialyzer's warning here.
     lists:foldl(
-      fun({Xbool, Xreason}, {Result, UI_or_Reasons}) ->
-              %% log is defined as macro ?LOG_CC_FAILS. Unfortunately
-              %% dialyzer claims Log to be always false. But for
-              %% debugging purposes we can alter this for individual
-              %% content checks or enable logging for all of them by
-              %% redefining the macro. So it seems we have to live
-              %% with dialyzer's warning here.
-              case Log andalso not Xbool of
-                  true -> log:log("~p cc failed: ~.0p~n", [WhichCC, Xreason]);
-                  false -> ok
-              end,
-              case {Xbool, Result} of
-                  {true, true} ->
-                      {true, UI};
-                  {true, false} ->
-                      {Result, UI_or_Reasons};
-                  {false, true} ->
-                      {false, [Xreason]};
-                  {false, false} ->
-                      {false, [Xreason | UI_or_Reasons]}
-              end
+      fun({true, _Xreason}, {true, _UI_or_Reasons}) ->
+              {true, UI};
+         ({true, _Xreason}, {false, UI_or_Reasons}) ->
+              {false, UI_or_Reasons};
+         ({false, Xreason}, {true, _UI_or_Reasons}) ->
+              log:log("~p cc failed: ~.0p~n", [WhichCC, Xreason]),
+              {false, [Xreason]};
+         ({false, Xreason}, {false, UI_or_Reasons}) ->
+              log:log("~p cc failed: ~.0p~n", [WhichCC, Xreason]),
+              {false, [Xreason | UI_or_Reasons]}
+      end, {true, UI}, Checks);
+cc_return_val(_WhichCC, Checks, UI, false) ->
+    lists:foldl(
+      fun({true, _Xreason}, {true, _UI_or_Reasons}) ->
+              {true, UI};
+         ({true, _Xreason}, {false, UI_or_Reasons}) ->
+              {false, UI_or_Reasons};
+         ({false, Xreason}, {true, _UI_or_Reasons}) ->
+              {false, [Xreason]};
+         ({false, Xreason}, {false, UI_or_Reasons}) ->
+              {false, [Xreason | UI_or_Reasons]}
       end, {true, UI}, Checks).
 
 
@@ -665,24 +673,22 @@ set_val(Entry, Val) -> setelement(4, Entry, Val).
 max({_ValA, VersA} = A, {_ValB, VersB} = B) ->
     %% partial entries A and B produced by read filter rf_val_vers
     log:log("A (~p) > B (~p)?", [A,B]),
-    case VersA > VersB of
-        true ->
-            A;
-        false ->
-            %% do we have further to distinguish on same version
-            %% values whether locks are set or not?
-            %% @TODO Think about it...
-            B
+    if VersA > VersB ->
+           A;
+       true ->
+           %% do we have further to distinguish on same version
+           %% values whether locks are set or not?
+           %% @TODO Think about it...
+           B
     end;
-
 max(A, B) ->
     log:log("A (~p) > B (~p)?", [A,B]),
-    case vers(A) > vers(B) of
-        true ->
-            A;
-        false ->
-            %% do we have further to distinguish on same version
-            %% values whether locks are set or not?
-            %% @TODO Further think about it...
-            B
+    VersA = vers(A), VersB = vers(B),
+    if VersA > VersB ->
+           A;
+       true ->
+           %% do we have further to distinguish on same version
+           %% values whether locks are set or not?
+           %% @TODO Further think about it...
+           B
     end.

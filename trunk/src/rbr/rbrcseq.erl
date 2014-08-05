@@ -279,18 +279,16 @@ on({qread_collect,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            {Done, NewEntry} =
-                add_read_reply(Entry, db_selector(State), MyRwithId,
-                               Val, SeenWriteRound, Cons),
-            case Done of
-                false ->
+            case add_read_reply(Entry, db_selector(State), MyRwithId,
+                               Val, SeenWriteRound, Cons) of
+                {false, NewEntry} ->
                     set_entry(NewEntry, tablename(State)),
                     State;
-                true ->
+                {true, NewEntry} ->
                     inform_client(qread_done, NewEntry),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
-                write_through ->
+                {write_through, NewEntry} ->
                     %% in case a consensus was started, but not yet finished,
                     %% we first have to finish it
 
@@ -407,10 +405,9 @@ on({qread_write_through_collect, ReqId,
         _ ->
             ?TRACE("rbrcseq:on qread_write_through_collect Client: ~p~n", [entry_client(Entry)]),
             %% log:pal("Collect reply ~p ~p~n", [ReqId, Round]),
-            {Done, NewEntry} = add_write_reply(Entry, Round, Cons),
-            case Done of
-                false -> set_entry(NewEntry, tablename(State));
-                true ->
+            case add_write_reply(Entry, Round, Cons) of
+                {false, NewEntry} -> set_entry(NewEntry, tablename(State));
+                {true, NewEntry} ->
                     ?TRACE("rbrcseq:on qread_write_through_collect infcl: ~p~n", [entry_client(Entry)]),
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
                     inform_client(qwrite_done, ReplyEntry),
@@ -595,10 +592,9 @@ on({qwrite_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            {Done, NewEntry} = add_write_reply(Entry, Round, Cons),
-            case Done of
-                false -> set_entry(NewEntry, tablename(State));
-                true ->
+            case add_write_reply(Entry, Round, Cons) of
+                {false, NewEntry} -> set_entry(NewEntry, tablename(State));
+                {true, NewEntry} ->
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
                     inform_client(qwrite_done, ReplyEntry),
                     ?PDB:delete(ReqId, tablename(State))
@@ -620,11 +616,10 @@ on({qwrite_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            {Done, NewEntry} = add_write_deny(Entry, NewerRound, Cons),
-            case Done of
-                false -> set_entry(NewEntry, TableName),
-                         State;
-                true ->
+            case add_write_deny(Entry, NewerRound, Cons) of
+                {false, NewEntry} -> set_entry(NewEntry, TableName),
+                                     State;
+                {true, NewEntry} ->
                     %% retry
                     %% log:pal("Concurrency detected, retrying~n"),
 
@@ -728,16 +723,16 @@ req_for_retrigger(Entry, IncDelay) ->
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
-    case erlang:tuple_size(Entry) of
-        13 when is_tuple(element(12, Entry)) -> %% write request
-            {qwrite, entry_client(Entry),
-             entry_key(Entry), entry_filters(Entry),
-             entry_val(Entry),
-             RetriggerDelay};
-        13 -> %% read request
-            {qread, entry_client(Entry),
-             entry_key(Entry), entry_filters(Entry),
-             RetriggerDelay}
+    ?ASSERT(erlang:tuple_size(Entry) =:= 13),
+    if is_tuple(element(12, Entry)) -> %% write request
+           {qwrite, entry_client(Entry),
+            entry_key(Entry), entry_filters(Entry),
+            entry_val(Entry),
+            RetriggerDelay};
+       true -> %% read request
+           {qread, entry_client(Entry),
+            entry_key(Entry), entry_filters(Entry),
+            RetriggerDelay}
     end.
 
 -spec retrigger(entry(), ?PDB:tableid(), incdelay|noincdelay) -> ok.
@@ -881,25 +876,21 @@ add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     MyRound = erlang:max(entry_my_round(E1), AssignedRound),
     E2 = entry_set_my_round(E1, MyRound),
     E3 = entry_inc_num_acks(E2),
+    E3NumAcks = entry_num_acks(E3),
     Done =
-%%         case entry_num_newest(E3) =:= entry_num_acks(E3) of
-%%             true ->
-%%                 case 3 =< entry_num_acks(E3) of
-%%                     true ->
-%%                         %% we have three acks
-%%                         true; %% done
-%%                     _ -> false
-%%                 end;
-%%             false -> write_through %% 1 or 2 outdated replicas, so write_through
+%%         case entry_num_newest(E3) of
+%%             E3NumAcks when 3 =< E3NumAcks -> %% we have three acks
+%%                 true; %% done
+%%             E3NumAcks -> false;
+%%             _ -> write_through %% 1 or 2 outdated replicas, so write_through
 %%         end,
-        case 3 =< entry_num_acks(E3) of
-            true ->
-                %% we have three acks
-                case entry_num_newest(E3) =:= entry_num_acks(E3) of
-                    true -> true; %% done
-                    _ -> write_through
-                end;
-            false -> false
+        if 3 =< E3NumAcks ->
+               %% we have three acks
+               case entry_num_newest(E3) of
+                   E3NumAcks -> true; %% done
+                   _ -> write_through
+               end;
+           true -> false
         end,
      {Done, E3}.
 
