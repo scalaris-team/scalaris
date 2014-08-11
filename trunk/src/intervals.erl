@@ -717,7 +717,9 @@ split(I, Parts) ->
         -> {left_bracket(), key(), ?PLUS_INFINITY_TYPE, ')', SplitKeys::[?RT:key()],
             InnerLBr::left_bracket(), InnerRBr::right_bracket(), Acc::[interval()]}.
 split2_feeder(LBr, LKey, RKey, RBr, SplitKeys, InnerLBr, InnerRBr, Acc) ->
-    {LBr, LKey, RKey, RBr, [X || X <- SplitKeys, X =/= LKey], InnerLBr, InnerRBr, Acc}.
+    {LBr, LKey, RKey, RBr,
+     util:shuffle(lists:usort([X || X <- SplitKeys, X =/= LKey])),
+     InnerLBr, InnerRBr, Acc}.
 
 -spec split2(left_bracket(), key(), key() | ?PLUS_INFINITY_TYPE,  %% then right_bracket is ')'
              right_bracket(), SplitKeys::[?RT:key()], InnerLBr::left_bracket(),
