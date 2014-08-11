@@ -864,8 +864,8 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
                   end,
               Result1 = ReceiveResultFun(),
               Result2 = ReceiveResultFun(),
-              ?proto_sched(stop),
               ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
+              ?proto_sched(stop),
               VerifyFun(Result1, Result2, slide_interleaving()),
               timer:sleep(10)
           end || Slide1 <- SlideVariations1, Slide2 <- SlideVariations2],
