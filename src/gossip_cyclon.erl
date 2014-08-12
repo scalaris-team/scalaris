@@ -113,7 +113,7 @@ cache_size() ->
     config:read(gossip_cyclon_cache_size).
 
 
-%% @doc Cycon doesn't need instantiabilty, so {gossip_cyclon, default} is always
+%% @doc Cyclon doesn't need instantiabilty, so {gossip_cyclon, default} is always
 %%      used.
 -spec instance() -> {gossip_cyclon, default}.
 -compile({inline, [instance/0]}).
@@ -236,7 +236,7 @@ select_data({Cache, Node}=State) ->
 %%      Called by the behaviour module upon a p2p_exch message. <br/>
 %%      PSubset: exchange data (subset) from the p2p_exch request <br/>
 %%      Ref: used by the gossip module to identify the request <br/>
-%%      RoundStatus / Round: ignored, as cyclon does not implement round handling
+%%      Round: ignored, as cyclon does not implement round handling
 %%      p2p_exch msg -> seleft_reply_data() is equivalent to cy_subset msg in the
 %%      old cyclon module.
 -spec select_reply_data(PSubset::data(), Ref::pos_integer(), Round::round(),
@@ -254,7 +254,7 @@ select_reply_data(PSubset, Ref, Round, {Cache, Node}) ->
 %%      Called by the behaviour module upon a p2p_exch_reply message. <br/>
 %%      QData: the subset from the peer (QSubset) and the subset wich was sent
 %%          in the request (PSubset) <br/>
-%%      RoundStatus / Round: ignored, as cyclon does not implement round handling
+%%      Round: ignored, as cyclon does not implement round handling
 %%      Upon finishing the processing of the data, a message of the form
 %%      {integrated_data, Instance, RoundStatus} is to be sent to the gossip module.
 %%      p2p_exch_reply msg -> integrate_data() is equivalent to the cy_subset_response
@@ -354,7 +354,7 @@ round_has_converged(State) ->
     {false, State}.
 
 
-%% @doc Notifies the gossip_load module about changes. <br/>
+%% @doc Notifies the module about changes. <br/>
 %%      Changes can be new rounds, leadership changes or exchange failures. All
 %%      of them are ignored, as cyclon doesn't use / implements this features.
 -spec notify_change(any(), any(), State::state()) -> {ok, state()}.
