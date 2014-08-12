@@ -304,8 +304,7 @@ request_my_node_details() ->
 
 -spec request_my_gossip_values() -> ok.
 request_my_gossip_values() ->
-    MyGossip = pid_groups:get_my(gossip),
-    comm:send_local(MyGossip, {get_values_best, {gossip_load, default}, self()}).
+    gossip_load:get_values_best([]).
 
 -spec trigger() -> ok.
 trigger() ->

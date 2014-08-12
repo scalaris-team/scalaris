@@ -681,7 +681,7 @@ renderIndexedRing({failed, Pid}) ->
 getGossip() ->
     GossipPids = pid_groups:find_all(gossip),
     [begin
-         comm:send_local(Pid, {get_values_best, {gossip_load, default}, self()}),
+         comm:send_local(Pid, {cb_msg, {gossip_load, default}, {gossip_get_values_best, self()}}),
          trace_mpath:thread_yield(),
          receive
              ?SCALARIS_RECV(
