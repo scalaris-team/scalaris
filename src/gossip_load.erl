@@ -49,14 +49,13 @@
 -include("record_helpers.hrl").
 
 % API
--export([request_histogram/2, load_info_get/2, load_info_other_get/3]).
+-export([get_values_best/1, request_histogram/2, load_info_get/2, load_info_other_get/3]).
 
 % gossip_beh
 -export([init/1, check_config/0, trigger_interval/0, fanout/0,
         select_node/1, select_data/1, select_reply_data/4, integrate_data/3,
         handle_msg/2, notify_change/3, min_cycles_per_round/0, max_cycles_per_round/0,
-        round_has_converged/1, get_values_best/1, get_values_all/1, web_debug_info/1,
-        shutdown/1]).
+        round_has_converged/1, web_debug_info/1, shutdown/1]).
 
 %% for testing
 -export([tester_create_round/1, tester_create_state/11, tester_create_histogram/1,
@@ -268,6 +267,38 @@ check_config() ->
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+%% @doc Sends a (local) message to the gossip module of the requesting process'
+%%      group asking for the best aggregation results.
+%%      The response in the form {gossip_get_values_best_response, BestValues}
+%%      will be send (local) to the requesting process.
+%%      BestValues are either the aggregation restult from the current or previous round,
+%%      depending on convergence_count_best_values.
+%%      If the option {instance, Instance} is present, the Instance is used.
+%%      Otherwise {gossip_load, default} is used as instance.
+%%      If the option {source_pid, SourcePid} is present, response is sent to
+%%      the SourcePid instead of the pid of the requesting process.
+%%      If the option {delay, Seconds} is present, the request is delayed for (at
+%%      least) Seconds seconds.
+%%      If the option {send_after, Milliseconds} is present, the request is delayed
+%%      for excatly Milliseconds milliseconds.
+-spec get_values_best(Options::[proplists:property()]) -> ok.
+get_values_best(Options) when is_list(Options) ->
+    Instance = proplists:get_value(instance, Options, {gossip_load, default}),
+    SourcePid = proplists:get_value(source_pid, Options, self()),
+    Delay = proplists:get_value(msg_delay, Options, 0),
+    SendAfter = proplists:get_value(send_after, Options, 0),
+    Pid = pid_groups:get_my(gossip),
+    Msg = {cb_msg, Instance, {gossip_get_values_best, SourcePid}},
+    if Delay =:= 0 andalso SendAfter =:= 0 ->
+           comm:send_local(Pid, Msg);
+       Delay =:= 0 andalso SendAfter =/= 0 ->
+           comm:send_local_after(SendAfter, Pid, Msg);
+       Delay =/= 0 ->
+           msg_delay:send_local(Delay, Pid, Msg)
+    end.
+
+
 %% @doc Request a histogram with Size number of Buckets. <br/>
 %%      The resulting histogram will be sent to SourceId, when all values have
 %%      properly converged.
@@ -460,7 +491,15 @@ handle_msg({get_node_details_response, NodeDetails}, {PrevState, CurState}) ->
     % send PData to BHModule
     Pid = pid_groups:get_my(gossip),
     comm:send_local(Pid, {selected_data, state_get(instance, CurState4), NewData}),
-    {ok, {PrevState, CurState4}}.
+    {ok, {PrevState, CurState4}};
+
+
+handle_msg({gossip_get_values_best, SourcePid}, {PrevState, CurState}) ->
+    BestState = previous_or_current(PrevState, CurState),
+    BestValues = get_load_info(BestState),
+    comm:send_local(SourcePid, {gossip_get_values_best_response, BestValues}),
+    {ok, {PrevState, CurState}}.
+
 
 %% @doc Checks if the current round has converged yet <br/>
 %%      Returns true if the round has converged, false otherwise.
@@ -531,33 +570,6 @@ notify_change(exch_failure, {_MsgTag, Data, Round}, {PrevState, CurState} = Full
         end,
     {ok, FullState1}.
 
-
-%% @doc Returns the best aggregation result. <br/>
-%%      Called by the gossip module upon {get_values_best} messages.
-%%      Returns either the aggregation restult from the current or previous round,
-%%      depending on convergence_count_best_values. <br/>
-%%      State: the state of the gossip_load module.
--spec get_values_best(FullState::full_state()) -> {load_info(), full_state()}.
-get_values_best({PrevState, CurState}=FullState) ->
-    BestState = previous_or_current(PrevState, CurState),
-    {get_load_info(BestState), FullState}.
-
-
-%% @doc Returns all aggregation results. <br/>
-%%      Called by the gossip module upon {get_values_all} messages.
-%%      Returns the aggregation restult from a) the previous, b) the current
-%%      and c) the best round (current or previous).
-%%      State: the state of the gossip_load module.
--spec get_values_all(FullState::full_state()) ->
-    { {PreviousInfo::load_info(), CurrentInfo::load_info(), BestInfo::load_info()},
-        full_state() }.
-get_values_all({unknown, CurState} = FullState) ->
-    CurInfo = get_load_info(CurState),
-    {{#load_info{}, CurInfo, CurInfo}, FullState};
-get_values_all({PrevState, CurState} = FullState) ->
-    BestState = previous_or_current(PrevState, CurState),
-    {{get_load_info(PrevState), get_load_info(CurState),
-      get_load_info(BestState)}, FullState}.
 
 
 %% @doc Returns a key-value list of debug infos for the Web Interface. <br/>

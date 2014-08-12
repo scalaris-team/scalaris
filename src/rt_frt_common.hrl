@@ -128,7 +128,7 @@ init(Neighbors) ->
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
 
     % request approximated ring size
-    comm:send_local(pid_groups:get_my(gossip), {get_values_best, {gossip_load, default}, self()}),
+    gossip_load:get_values_best([]),
 
     update_entries(Neighbors, add_source_entry(nodelist:node(Neighbors), #rt_t{})).
 
@@ -447,7 +447,7 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
 handle_custom_message({gossip_get_values_best_response, Vals}, State) ->
     RT = rt_loop:get_rt(State),
     NewRT = rt_set_ring_size(RT, gossip_load:load_info_get(size_kr, Vals)),
-    msg_delay:send_local(config:read(rt_frt_gossip_interval), pid_groups:get_my(gossip),{get_values_best, {gossip_load, default}, self()}),
+    gossip_load:get_values_best([{msg_delay, config:read(rt_frt_gossip_interval)}]),
     RTExt = export_rt_to_dht_node(NewRT, rt_loop:get_neighb(State)),
     comm:send_local(pid_groups:get_my(dht_node), {rt_update, RTExt}),
     rt_loop:set_rt(State, NewRT);

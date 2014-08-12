@@ -335,11 +335,10 @@ balance_nodes(HeavyNode, LightNode, Options) ->
 balance_nodes(HeavyNode, LightNode, LightNodeSucc, Options) ->
     case config:read(lb_active_use_gossip) of
         true -> %% Retrieve global info from gossip before balancing
-            GossipPid = pid_groups:get_my(gossip),
             LBActivePid = pid_groups:get_my(lb_active),
             Envelope = {gossip_reply, LightNode, HeavyNode, LightNodeSucc, Options, '_'},
             ReplyPid = comm:reply_as(LBActivePid, 6, Envelope),
-            comm:send_local(GossipPid, {get_values_best, {gossip_load, default}, ReplyPid});
+            gossip_load:get_values_best([{source_pid, ReplyPid}]);
         _ ->
             HeavyPid = node:pidX(lb_info:get_node(HeavyNode)),
             comm:send(HeavyPid, {lb_active, balance, HeavyNode, LightNode, LightNodeSucc, Options})
