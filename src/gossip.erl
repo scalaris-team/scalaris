@@ -214,10 +214,8 @@
 -type cb_status() :: unstarted | started | tombstone.
 -type exch_data() :: { ExchData :: undefined | any(), Peer :: undefined | comm:mypid()}.
 
--type cb_fun_name() :: get_values_all | get_values_best | handle_msg |
-                       integrate_data | notify_change | round_has_converged |
-                       select_data | select_node | select_reply_data |
-                       web_debug_info | shutdown.
+-type cb_fun_name() :: handle_msg | integrate_data | notify_change | round_has_converged |
+                       select_data | select_node | select_reply_data | web_debug_info | shutdown.
 
 % state record
 -record(state, {
@@ -271,8 +269,6 @@
     {integrated_data, CBModule::cb_module(), current_round} |
     {new_round, CBModule::cb_module(), NewRound::non_neg_integer()} |
     {cb_msg, CBModule::cb_module(), Msg::comm:message()} |
-    {get_values_best, CBModule::cb_module(), SourcePid::comm:mypid()} |
-    {get_values_all, CBModule::cb_module(), SourcePid::comm:mypid()} |
     {stop_gossip_task, CBModule::cb_module()} |
     {no_msg}.
 
@@ -406,14 +402,6 @@ on_inactive(print_state, State) ->
     State;
 
 
-on_inactive({get_values_best, _CBModule, _SourcePid}=Msg, State) ->
-    msg_queue_add(Msg, State);
-
-
-on_inactive({get_values_all, _CBModule, _SourcePid}=Msg, State) ->
-    msg_queue_add(Msg, State);
-
-
 on_inactive({web_debug_info, _Requestor}=Msg, State) ->
     msg_queue_add(Msg, State);
 
@@ -429,6 +417,9 @@ on_inactive({start_gossip_task, _CBModule, _Args}=Msg, State) ->
 on_inactive({remove_all_tombstones}=Msg, State) ->
     msg_queue_add(Msg, State);
 
+
+on_inactive({cb_msg, _CBModule, _msg}=Msg, State) ->
+    msg_queue_add(Msg, State);
 
 %% consume all other message (inluding: trigger messages)
 on_inactive(_Msg, State) ->
@@ -726,23 +717,6 @@ handle_msg({new_round, CBModule, NewRound}, State) ->
     end;
 
 
-%% passes a get_values_best request to the callback module
-%% received from webhelpers and lb_psv_gossip
-handle_msg({get_values_best, CBModule, SourcePid}, State) ->
-    {BestValues, State1} = cb_get_values_best(CBModule, State),
-    comm:send_local(SourcePid, {gossip_get_values_best_response, BestValues}),
-    State1;
-
-
-%% passes a get_values_all (all: current, previous and best values) request to
-%% the callback module
-handle_msg({get_values_all, CBModule, SourcePid}, State) ->
-    {{Prev, Current, Best}, State1} = cb_get_values_all(CBModule, State),
-    comm:send_local(SourcePid,
-        {gossip_get_values_all_response, Prev, Current, Best}),
-    State1;
-
-
 %% Received through stop_gossip_task/bulkowner
 %% Stops gossip tasks and cleans state of all garbage
 %% sets tombstone to handle possible subsequent request for already stopped tasks
@@ -1006,27 +980,6 @@ cb_integrate_data(QData, OtherRound, Msg, CBModule, State) ->
 -spec cb_handle_msg(comm:message(), cb_module(), state()) -> state().
 cb_handle_msg(Msg, CBModule, State) ->
     {ok, State1} = cb_call(handle_msg, [Msg], CBModule, State), State1.
-
-
-%% @doc Called upon {get_values_best} messages and calls CBModule:get_values_best().
-%%      The callback module has to return the "best" values. What the "best" values
-%%      are depends on the gossip algorithm in question, but in general it refers
-%%      to the idea of properly converged values in a gossip based aggregation
-%%      protocol. The data type of BaseValues depends on the concrete callback module.
--spec cb_get_values_best(cb_module(), state()) -> {BestValues::any(), state()}.
-cb_get_values_best(CBModule, State) ->
-    cb_call(get_values_best, [], CBModule, State).
-
-
-%% @doc Called upon {get_values_all} messages and calls CBModule:get_values_all.
-%%      The callback module has to return "all" values. What "all" values are
-%%      depends on the gossip algorithm in question, but in general it refers to
-%%      the idea that a callback module might keep values from multiple rounds.
-%%      The data type of AllValues depends on the concrete callback module.
--spec cb_get_values_all(cb_module(), state()) ->
-    {{Previous::Values, Current::Values, Best::Values}, state()}.
-cb_get_values_all(CBModule, State) ->
-    cb_call(get_values_all, [], CBModule, State).
 
 
 %% @doc Called upon {web_debug_info} messages and calls CBModule:web_debug_info().
