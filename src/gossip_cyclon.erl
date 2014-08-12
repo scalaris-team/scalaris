@@ -188,7 +188,11 @@ init(Args) ->
                                           nodelist:succ(Neighbors));
                 false -> cyclon_cache:new()
             end,
-    check_state({Cache, nodelist:node(Neighbors)}),
+
+    %% send two manual triggers to speed up startup performance
+    %% (setting up a 5 sec trigger (default for cyclon) takes ~6 s)
+    comm:send_local(pid_groups:get_my(gossip), {trigger_action, instance()}),
+    msg_delay:send_local(2, pid_groups:get_my(gossip), {trigger_action, instance()}),
     {ok, {Cache, nodelist:node(Neighbors)}}.
 
 
@@ -447,7 +451,7 @@ request_node_details(Details) ->
     EnvPid = comm:reply_as(This, 3, {cb_msg, instance(), '_'}),
     case comm:is_valid(This) of
         true ->
-            comm:send_local_after(500, DHT_Node, {get_node_details, EnvPid, Details}),
+            comm:send_local(DHT_Node, {get_node_details, EnvPid, Details}),
             ok;
         false -> ok
     end.
