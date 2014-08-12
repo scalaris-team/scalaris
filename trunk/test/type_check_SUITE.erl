@@ -179,8 +179,6 @@ tester_type_check_gossip(_Config) ->
                 {cb_select_reply_data, 6}, % would need valid callback state
                 {cb_integrate_data, 5}, % would need valid callback state
                 {cb_handle_msg, 3}, % spec to wide (Msg)
-                {cb_get_values_best, 2}, % would need valid callback state
-                {cb_get_values_all, 2}, % would need valid callback state
                 {cb_web_debug_info, 2}, % would need valid callback state
                 {cb_round_has_converged, 2}, % would need valid callback state
                 {cb_notify_change, 4}, % would need valid callback state

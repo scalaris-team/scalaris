@@ -28,8 +28,7 @@
 -export([init/1, check_config/0, trigger_interval/0, fanout/0,
         select_node/1, select_data/1, select_reply_data/4, integrate_data/3,
         handle_msg/2, notify_change/3, min_cycles_per_round/0, max_cycles_per_round/0,
-        round_has_converged/1, get_values_best/1, get_values_all/1, web_debug_info/1,
-        shutdown/1]).
+        round_has_converged/1, web_debug_info/1, shutdown/1]).
 
 -export([rm_check/3,
          rm_send_changes/5]).
@@ -359,24 +358,6 @@ round_has_converged(State) ->
 %%      of them are ignored, as cyclon doesn't use / implements this features.
 -spec notify_change(any(), any(), State::state()) -> {ok, state()}.
 notify_change(_, _, State) ->
-    {ok, State}.
-
-
-%% @doc Returns the best result. <br/>
-%%      Called by the gossip module upon {get_values_best} messages.
-%%      Not implemented by gossip_cyclon, use get_subset_rand().
--spec get_values_best(State::state()) -> {ok, state()}.
-get_values_best(State) ->
-    log:log(info, "[ ~w ] get_values_best is not implemented, use get_subset_rand", [?MODULE]),
-    {ok, State}.
-
-
-%% @doc Returns all results. <br/>
-%%      Called by the gossip module upon {get_values_all} messages.
-%%      Not implemented by gossip_cyclon, use get_subset_rand().
--spec get_values_all(State::state()) -> {ok, state()}.
-get_values_all(State) ->
-    log:log(info, "[ ~w ] get_values_all is not implemented, use get_subset_rand", [?MODULE]),
     {ok, State}.
 
 

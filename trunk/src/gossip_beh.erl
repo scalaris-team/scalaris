@@ -38,7 +38,6 @@
 % Erlang version >= R15B
 -ifdef(have_callback_support).
 
--type aggregates() :: any().
 -type round() :: non_neg_integer().
 -type notify_tag() :: new_round | leader | exch_failure.
 -type notify_msg() :: {is_leader|no_leader, NewRange::intervals:interval()} |
@@ -83,12 +82,6 @@
 -callback notify_change(notify_tag(), notify_msg(), State::cb_state()) ->
     {ok, cb_state()}.
 
-% Result extraction
-
--callback get_values_best(State::cb_state()) -> BestValues::aggregates().
-
--callback get_values_all(State::cb_state()) -> AllValues::aggregates().
-
 -callback web_debug_info(State::cb_state()) ->
     {KeyValueList::[{Key::string(), Value::any()},...], cb_state()}.
 
@@ -111,8 +104,6 @@ behaviour_info(callbacks) ->
     {max_cycles_per_round, 0},
     {round_has_converged, 1},
     {notify_change, 3},
-    {get_values_best, 1},
-    {get_values_all, 1},
     {web_debug_info,1},
     {check_config, 0}
   ];
