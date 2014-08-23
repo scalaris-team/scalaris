@@ -64,7 +64,7 @@ trigger_interval() -> % in ms
 %% @doc The fanout (number of peers contacted per cycle).
 -spec fanout() -> pos_integer().
 fanout() ->
-    config:read(gossip_vivaldi_fanout).
+    1.
 
 
 %% @doc The minimum number of cycles per round.
@@ -80,9 +80,24 @@ min_cycles_per_round() ->
 max_cycles_per_round() ->
     infinity.
 
+
+%%------------------- Private config functions ---------------------%%
+
+%% @doc The dimensions for the coordinate system.
+-spec vivaldi_dimensions() -> pos_integer().
+vivaldi_dimensions() ->
+    config:read(vivaldi_dimensions).
+
+
+%% @doc Checks whether config parameters of the vivaldi process exist and are
+%%      valid.
 -spec check_config() -> boolean().
 check_config() ->
-    true.
+    config:cfg_is_integer(gossip_vivaldi_interval) and
+    config:cfg_is_greater_than(gossip_vivaldi_interval, 0) and
+
+    config:cfg_is_integer(gossip_vivaldi_dimensions) and
+    config:cfg_is_greater_than_equal(gossip_vivaldi_dimensions, 2).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
