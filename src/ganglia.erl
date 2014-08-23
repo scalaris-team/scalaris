@@ -190,10 +190,10 @@ send_vivaldi_errors() ->
                         X -> X
                     end,
     lists:foreach(fun (Group) ->
-                          PID = pid_groups:pid_of(Group, vivaldi),
+                          PID = pid_groups:pid_of(Group, gossip),
                           Envelope = comm:reply_as(comm:this(), 3,
                                                    {ganglia_vivaldi_confidence, Group, '_'}),
-                          comm:send_local(PID, {get_coordinate, Envelope})
+                          comm:send_local(PID, {cb_msg, {gossip_vivaldi, default}, {get_coordinate, Envelope}})
                   end, DHTNodeGroups),
     ok.
 
