@@ -76,7 +76,7 @@ delete_key(Key, Timeout) ->
     util:tc(api_rdht, delete, [Key, Timeout]).
 
 %%%--------------------------Vivaldi-Map------------------------------
--spec getVivaldiMap() -> [{{comm:mypid(), node_details:hostname()}, vivaldi:network_coordinate()}].
+-spec getVivaldiMap() -> [{{comm:mypid(), node_details:hostname()}, gossip_vivaldi:network_coordinate()}].
 getVivaldiMap() ->
     Nodes = [{
                 node:pidX(node_details:get(Node, node))
@@ -87,12 +87,13 @@ getVivaldiMap() ->
     _ = [erlang:spawn(
            fun() ->
                    SourcePid = comm:reply_as(This, 2, {webhelpers, '_', Pid}),
-                   comm:send(Pid, {get_coordinate, SourcePid}, [{group_member, vivaldi}])
+                   comm:send(Pid, {cb_msg, {gossip_vivaldi, default}, {get_coordinate, SourcePid}}, [{group_member, gossip}])
            end) || Pid <- NodePids],
     lists:zip(Nodes, get_vivaldi(NodePids, [], 0))
     .
 
--spec get_vivaldi(Pids::[comm:mypid()], [vivaldi:network_coordinate()], TimeInMS::non_neg_integer()) -> [vivaldi:network_coordinate()].
+-spec get_vivaldi(Pids::[comm:mypid()], [gossip_vivaldi:network_coordinate()],
+                  TimeInMS::non_neg_integer()) -> [gossip_vivaldi:network_coordinate()].
 get_vivaldi([], Coords, _TimeInS) -> Coords;
 get_vivaldi(Pids, Coords, TimeInMS) ->
     Continue =
@@ -142,13 +143,13 @@ color(Pid) ->
     .
 
 % @doc Get a string representation for a vivaldi coordinate
--spec format_coordinate([vivaldi:network_coordinate(),...]) -> string().
+-spec format_coordinate([gossip_vivaldi:network_coordinate(),...]) -> string().
 format_coordinate([X,Y]) ->
     io_lib:format("[~p,~p]", [X,Y]).
 
 % @doc Format Nodes as returned by getVivaldiMap() into JSON.
 -spec format_nodes([{{comm:mypid(), node_details:hostname()}
-                     , vivaldi:network_coordinate()}]) -> string().
+                     , gossip_vivaldi:network_coordinate()}]) -> string().
 format_nodes(Nodes) ->
     % order nodes according to their datacenter (designated by color)
     NodesTree = lists:foldl(
@@ -176,7 +177,7 @@ format_nodes(Nodes) ->
                 NodeString ++ Sep ++ Acc
     end, "", NodesTree) ++ "]".
 %%%--------------------------DC Clustering------------------------------
--spec getDCClustersAndNodes() -> {[{comm:mypid(), vivaldi:network_coordinate()}],
+-spec getDCClustersAndNodes() -> {[{comm:mypid(), gossip_vivaldi:network_coordinate()}],
         dc_centroids:centroids(), non_neg_integer(), float()} | disabled.
 getDCClustersAndNodes() ->
     case config:read(dc_clustering_enable) of

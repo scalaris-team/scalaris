@@ -65,14 +65,14 @@ init_per_testcase(Testcase, Config) ->
     end,
 
     Config.
-    
+
 
 end_per_suite(Config) ->
     unittest_helper:end_per_suite(Config).
 
 %% Helper function to retrieve the vivaldi coordinate and centroid information of a node
-get_vivaldi_and_centroids(Vivaldi, Clustering) ->
-    comm:send_local(Vivaldi, {get_coordinate, comm:this()}),
+get_vivaldi_and_centroids(Gossip, Clustering) ->
+    comm:send_local(Gossip, {cb_msg, {gossip_vivaldi, default}, {get_coordinate, comm:this()}}),
     comm:send_local(Clustering, {query_clustering, comm:this()}),
 
     % get vivaldi coordinate first
@@ -94,9 +94,9 @@ single_node(_) ->
     %% get the node which forms the ring
     Clustering = pid_groups:find_a(dc_clustering),
     Group = pid_groups:group_of(Clustering),
-    Vivaldi = pid_groups:pid_of(Group, vivaldi),
+    Gossip = pid_groups:pid_of(Group, gossip),
 
-    {Coordinate, [{centroid, Center, Size}]} = get_vivaldi_and_centroids(Vivaldi, Clustering),
+    {Coordinate, [{centroid, Center, Size}]} = get_vivaldi_and_centroids(Gossip, Clustering),
     ?equals(Coordinate, Center),
     ?equals(1.0, Size),
     ok
@@ -105,9 +105,9 @@ single_node(_) ->
 two_nodes(_) ->
     Clustering = pid_groups:find_a(dc_clustering),
     Group = pid_groups:group_of(Clustering),
-    Vivaldi = pid_groups:pid_of(Group, vivaldi),
+    Gossip = pid_groups:pid_of(Group, gossip),
 
-    {_Coordinate, Centroids} = get_vivaldi_and_centroids(Vivaldi, Clustering),
+    {_Coordinate, Centroids} = get_vivaldi_and_centroids(Gossip, Clustering),
     ?assert(length(Centroids) > 0),
     ?assert(length(Centroids) < 3),
     ?equals(1.0, lists:foldl(fun(C, Acc) -> dc_centroids:get_relative_size(C) + Acc end,

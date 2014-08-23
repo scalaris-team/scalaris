@@ -102,8 +102,6 @@ childs([{DHTNodeGroup, Options}]) ->
     %%         util:sup_supervisor_desc(sup_mr, sup_mr, start_link, [DHTNodeGroup]);
     %%     _ -> []
     %% end,
-    Vivaldi =
-        sup:worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
     Monitor =
         sup:worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
     MonitorPerf =
@@ -127,7 +125,6 @@ childs([{DHTNodeGroup, Options}]) ->
                     DBValCache,
                     DeadNodeCache,
                     RoutingTable,
-                    Vivaldi,
                     DC_Clustering,
                     Gossip,
                     SnapshotLeader,

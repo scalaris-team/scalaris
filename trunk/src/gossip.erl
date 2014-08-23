@@ -196,7 +196,8 @@
 -define(TRACE_ROUND(FormatString, Data), ok).
 %% -define(TRACE_ROUND(FormatString, Data), log:pal(FormatString, Data)).
 
--define(CBMODULES, [{gossip_load, default}, {gossip_cyclon, default}]). % callback modules as list
+%% list of callback modules to be activated on startup
+-define(CBMODULES, [{gossip_load, default}, {gossip_cyclon, default}, {gossip_vivaldi, default}]).
 
 % for developement, should be disabled for production
 -define(FIRST_TRIGGER_DELAY, 0). % delay in s for first trigger

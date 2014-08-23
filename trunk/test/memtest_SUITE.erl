@@ -331,7 +331,7 @@ create_ring_100(Config) ->
     ok.
 
 add_remove_nodes_50(_Config) ->
-    config:write(vivaldi_latency_timeout, 500),
+    config:write(gossip_vivaldi_latency_timeout, 500),
     {[TmpNode], []} = api_vm:add_nodes(1), % loads all code needed for joins
     {[TmpNode], []} = api_vm:shutdown_nodes_by_name([TmpNode]), % loads all code needed for graceful leaves
     garbage_collect_all(),
@@ -357,7 +357,7 @@ add_remove_nodes_50(_Config) ->
     ok.
 
 add_kill_nodes_50(_Config) ->
-    config:write(vivaldi_latency_timeout, 500),
+    config:write(gossip_vivaldi_latency_timeout, 500),
     {[TmpNode], []} = api_vm:add_nodes(1), % loads all code needed for joins
     {[TmpNode], []} = api_vm:kill_nodes_by_name([TmpNode]), % loads all code needed for killing nodes
     garbage_collect_all(),

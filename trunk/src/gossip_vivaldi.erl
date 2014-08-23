@@ -41,6 +41,7 @@
 -export([]).
 
 -ifdef(with_export_type_support).
+-export_type([est_error/0, latency/0, network_coordinate/0]).
 -endif.
 
 
@@ -95,7 +96,7 @@ max_cycles_per_round() ->
 %% @doc The dimensions for the coordinate system.
 -spec vivaldi_dimensions() -> pos_integer().
 vivaldi_dimensions() ->
-    config:read(vivaldi_dimensions).
+    config:read(gossip_vivaldi_dimensions).
 
 
 %% @doc Vivaldi doesn't need instantiabilty, so {gossip_vivaldi, default} is
@@ -174,7 +175,7 @@ select_data(State={Coordinate, Confidence}) ->
 select_reply_data(PData, _Ref, _Round, State) ->
     {SourcePid, RemoteCoordinate, RemoteConfidence} = PData,
     %io:format("{shuffle, ~p, ~p}~n", [RemoteCoordinate, RemoteConfidence]),
-    _ = vivaldi_latency2:measure_latency(SourcePid, RemoteCoordinate, RemoteConfidence),
+    _ = vivaldi_latency:measure_latency(SourcePid, RemoteCoordinate, RemoteConfidence),
     {ok, State}.
 
 
