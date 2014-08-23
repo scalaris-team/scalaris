@@ -1387,6 +1387,7 @@ web_debug_info(State) ->
          {"msg_queue_len",      length(state_get(msg_queue, State))},
          {"status",             state_get(status, State)},
          {"registered modules", to_string(CBModules)},
+         {"cycles", to_string(state_get(cycles, State))},
          {"tombstones",         to_string(Tombstones)}
      ].
 
