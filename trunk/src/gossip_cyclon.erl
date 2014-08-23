@@ -191,7 +191,8 @@ init(Args) ->
     %% send two manual triggers to speed up startup performance
     %% (setting up a 5 sec trigger (default for cyclon) takes ~6 s)
     comm:send_local(pid_groups:get_my(gossip), {trigger_action, instance()}),
-    msg_delay:send_local(2, pid_groups:get_my(gossip), {trigger_action, instance()}),
+    Delay = trigger_interval() div (2*1000), % half a trigger interval in sec
+    msg_delay:send_local(Delay, pid_groups:get_my(gossip), {trigger_action, instance()}),
     {ok, {Cache, nodelist:node(Neighbors)}}.
 
 
