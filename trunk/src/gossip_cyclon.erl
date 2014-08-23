@@ -13,11 +13,31 @@
 %   See the License for the specific language governing permissions and
 %   limitations under the License.
 
+%% @author Christian Hennig <hennig@zib.de>
 %% @author Jens V. Fischer <jensvfischer@gmail.com>
-%% @doc Gossip based peer sampling.
+%% @doc Gossip based membership management using CYCLON.
+%%
+%% CYCLON provides an unstructured overlay which can be used to obtain the address
+%% of a random node from the entirety of all nodes. This is useful for instance for
+%% gossiping algorithms which need a random peers to communicate with.
+%%
+%% The basic idea is as follows: Every node maintains cache of known peers. At the
+%% beginning of every cycle a random peer is chosen from the cache and a random
+%% subset of the node’s neighbours is exchanged with that peer. The receiving
+%% peer uses the subset to update its own cache and also sends back a subset of
+%% its cache, which is merged with the cache of the initial peer.
+%% For details refer to the given paper.
 %% @end
+%%
+%% @reference S. Voulgaris, D. Gavidia, M. van Steen. CYCLON:
+%% Inexpensive Membership Management for Unstructured P2P Overlays.
+%% Journal of Network and Systems Management, Vol. 13, No. 2, June 2005.
+%%
 %% @version $Id$
+
 -module(gossip_cyclon).
+-author('hennig@zib.de').
+-author('jensvfischer@gmail.com').
 -behaviour(gossip_beh).
 -vsn('$Id$').
 
@@ -63,7 +83,7 @@
 -type round() :: non_neg_integer().
 
 -type state() :: {Nodes::cyclon_cache:cache(), %% the cache of random nodes
-                  MyNode::node:node_type() | null}. %% the scalaris node of this module
+                  MyNode::node:node_type() | null}. %% the scalaris node of this process
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Config Functions
