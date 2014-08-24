@@ -23,7 +23,7 @@
 %%
 %% The basic idea is as follows: Every node maintains cache of known peers. At the
 %% beginning of every cycle a random peer is chosen from the cache and a random
-%% subset of the node’s neighbours is exchanged with that peer. The receiving
+%% subset of the node's neighbours is exchanged with that peer. The receiving
 %% peer uses the subset to update its own cache and also sends back a subset of
 %% its cache, which is merged with the cache of the initial peer.
 %% For details refer to the given paper.
