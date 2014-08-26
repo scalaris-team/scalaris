@@ -69,15 +69,15 @@ fi
 
 ###########################################################
 #
-# check su, runuser availability for the init.d script
+# check sudo, runuser availability for the init.d script
 #
 ###########################################################
 
-AC_PATH_PROG(SU, su, "/bin/false")
+AC_PATH_PROG(SUDO, sudo, "/bin/false")
 AC_PATH_PROG(RUNUSER, runuser, "")
 
-if test "$ac_cv_path_SU" = "/bin/false" -a "$ac_cv_path_RUNUSER" = ""; then
-  AC_MSG_NOTICE([su or runuser not found - you won't be able to use our init.d script])
+if test "$ac_cv_path_SUDO" = "/bin/false" -a "$ac_cv_path_RUNUSER" = ""; then
+  AC_MSG_NOTICE([sudo or runuser not found - you won't be able to use our init.d script])
 fi
 
 ###########################################################
