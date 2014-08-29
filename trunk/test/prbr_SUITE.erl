@@ -318,6 +318,7 @@ tester_type_check_rbr(_Config) ->
            [ {inform_client, 2}, %% cannot create valid envelopes
              {get_entry, 2},     %% needs valid tid()
              {set_entry, 2},     %% needs valid tid()
+             {add_read_reply, 6},%% needs client_value matching db_type
              {add_write_reply, 3}%% needs valid entry()
            ]
           }
