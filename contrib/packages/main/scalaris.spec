@@ -32,12 +32,17 @@ Requires:       erlang-js
 BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
-%if 0%{?fedora_version} >= 12 || 0%{?rhel_version} >= 500 || 0%{?centos_version} >= 500
+%if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 BuildRequires:  util-linux >= 2.23
 Requires:       util-linux >= 2.23
 %else
+%if 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
+BuildRequires:  util-linux-ng >= 2.17
+Requires:       util-linux-ng >= 2.17
+%else
 BuildRequires:  sudo
 Requires:       sudo
+%endif
 %endif
 %endif
 
