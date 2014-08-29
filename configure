@@ -2010,7 +2010,7 @@ else
   ;;
   *)
   as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
-for as_dir in $PATH
+for as_dir in $PATH$PATH_SEPARATOR/usr/sbin
 do
   IFS=$as_save_IFS
   test -z "$as_dir" && as_dir=.
