@@ -34,18 +34,6 @@ Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %endif
 
-##########################################################################################
-## Mandrake, Mandriva
-##########################################################################################
-%if 0%{?mandriva_version} || 0%{?mdkversion}
-BuildRequires:  pkgconfig
-BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-parsetools, erlang-ssl, erlang-tools, erlang-xmerl, erlang-test_server
-Requires:       erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl
-Suggests:       %{name}-java, %{name}-doc
-Requires(pre):  shadow-utils
-Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
-%endif
-
 ###########################################################################################
 # SuSE, openSUSE
 ###########################################################################################
@@ -121,9 +109,6 @@ fi
 %if 0%{?fedora_version}
 /sbin/chkconfig --add scalaris
 %endif
-%if 0%{?mandriva_version}
-%_post_service scalaris
-%endif
 
 %preun
 %if 0%{?suse_version}
@@ -136,9 +121,6 @@ fi
     /sbin/chkconfig --del scalaris
   fi
 %endif
-%if 0%{?mandriva_version}
-%_preun_service scalaris
-%endif
 
 %postun
 %if 0%{?suse_version}
@@ -150,8 +132,6 @@ fi
 if [ "$1" -ge "1" ] ; then
   /sbin/service scalaris try-restart >/dev/null 2>&1 || :
 fi
-%endif
-%if 0%{?mandriva_version}
 %endif
 
 %clean

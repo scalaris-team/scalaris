@@ -45,18 +45,6 @@ BuildRequires:  python3-setuptools python-tools
 %endif
 %endif
 
-##########################################################################################
-## Mandrake, Mandriva
-##########################################################################################
-%if 0%{?mandriva_version} || 0%{?mdkversion}
-# note: erlang is still needed for configure
-BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
-BuildRequires:  pkgconfig
-%define with_python 1
-%define with_python_doc_html 0
-%define with_python_doc_pdf 0
-%endif
-
 ###########################################################################################
 # SuSE, openSUSE
 ###########################################################################################
@@ -131,10 +119,6 @@ BuildArch:  noarch
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %endif
-%if 0%{?mandriva_version} || 0%{?mdkversion}
-Requires(pre):  shadow-utils
-Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
-%endif
 %if 0%{?suse_version}
 Requires(pre):  pwdutils
 PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
@@ -146,14 +130,10 @@ Java Bindings and command line client for scalaris
 %package -n ruby-scalaris
 Summary:    Ruby-API and Ruby-client for scalaris
 Group:      Productivity/Databases/Clients
-%if 0%{?mandriva_version} || 0%{?mdkversion}
-Requires:   ruby >= 1.8
-%else
 %if 0%{?fedora_version} >= 19
 Requires:   ruby(release) >= 1.8
 %else
 Requires:   ruby(abi) >= 1.8
-%endif
 %endif
 Requires:   rubygems
 Requires:   rubygem-json >= 1.4.0
