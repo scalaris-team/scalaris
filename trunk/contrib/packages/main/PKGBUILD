@@ -7,7 +7,7 @@ pkgdesc="A scalable, transactional, distributed key-value store."
 arch=('i686' 'x86_64')
 url="http://code.google.com/p/scalaris/"
 license=('Apache')
-depends=('openssl' 'erlang>=R13B01')
+depends=('openssl' 'erlang>=R13B01' 'util-linux>=2.23')
 makedepends=('screen')
 optdepends=('tokyocabinet: storage on disk'
             'screen: scalaris daemon with screen')
