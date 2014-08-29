@@ -717,17 +717,17 @@ scalarisstart(){
     if [ "$user" != "" ]; then
       # For SELinux we need to use 'runuser' not 'sudo'
       if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
-        BASH_CMD="$RUNUSER $user -s bash -x -f +B -c"
+        BASH_CMD="$RUNUSER $user -c"
       else
-        BASH_CMD="$SUDO -u $user bash -x -f +B -c"
+        BASH_CMD="$SUDO -u $user bash -c"
       fi
     else
-      BASH_CMD="bash -x -f +B -c"
+      BASH_CMD="bash -c"
     fi
     if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
-        $SCREEN -S "scalaris_$NODE_NAME" -d -m $BASH_CMD "$START_CMD; sleep 365d"
+        $SCREEN -S "scalaris_$NODE_NAME" -d -m $BASH_CMD "set -xf +B; $START_CMD; sleep 365d"
     else
-        $BASH_CMD "$START_CMD"
+        $BASH_CMD "set -xf +B; $START_CMD"
     fi
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
