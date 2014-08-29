@@ -97,7 +97,6 @@ Available packages are listed in the following table:
 || Debian || 7.0 (Wheezy) || stable: [http://download.opensuse.org/repositories/home:/scalaris/Debian_7.0/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/Debian_7.0/] ||
 || Ubuntu || 10.04 (Lucid Lynx) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_10.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_10.04/] ||
 || Ubuntu || 12.04 (Precise Pangolin) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_12.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_12.04/] ||
-|| Ubuntu || 13.10 (Saucy Salamander) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_13.10/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_13.10/] ||
 || Ubuntu || 14.04 (Trusty Tahr) || stable: [http://download.opensuse.org/repositories/home:/scalaris/xUbuntu_14.04/]<br>unstable: [http://download.opensuse.org/repositories/home:/scalaris:/svn/xUbuntu_14.04/] ||
 
 For those distributions which provide a recent-enough Erlang version, we build the packages using their Erlang package and recommend using the same version that came with the distribution. In this case we do not provide Erlang packages in our repository.
