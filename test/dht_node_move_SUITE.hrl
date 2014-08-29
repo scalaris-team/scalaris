@@ -75,9 +75,13 @@ groups() ->
          test_slide_adjacent,
          test_slide_conflict
         ],
-    SlideIllegally =
+    SlideIllegallyTestCases =
         [
          test_slide_illegally
+        ],
+    JumpSlideTestCases =
+        [
+         tester_test_jump
         ],
     [
       {send_to_pred, Config, SendToPredTestCases},
@@ -86,7 +90,9 @@ groups() ->
       {send_to_succ_incremental, ConfigInc, SendToSuccTestCases},
       {send_to_both, Config, SendToBothTestCases},
       {send_to_both_incremental, ConfigInc2, SendToBothTestCases},
-      {slide_illegally, Config, SlideIllegally}
+      {slide_illegally, Config, SlideIllegallyTestCases},
+      {jump_slide, Config, JumpSlideTestCases},
+      {jump_slide_incremental, ConfigInc, JumpSlideTestCases}
     ]
       ++
 %%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
@@ -1012,10 +1018,42 @@ test_slide_illegally(_Config) ->
               ct:pal("Beginning ~p", [Tag]),
               ?proto_sched(start),
               comm:send(node:pidX(Node), {move, start_slide, Direction, TargetId, {slide, Direction, Tag}, comm:this()}),
-    trace_mpath:thread_yield(),
+              trace_mpath:thread_yield(),
               receive
                   ?SCALARIS_RECV({move, result, {slide, Direction, Tag}, target_id_not_in_range}, ok);
                   ?SCALARIS_RECV(X, ?ct_fail("Illegal Slide ~p", [X]))
               end,
               ?proto_sched(stop)
           end || DhtNode <- DhtNodes, Slide <- Slides].
+
+%% @doc lets the tester run prop_jump_slide with different keys
+tester_test_jump(_Config) ->
+    tester:test(?MODULE, prop_jump_slide, 1, _Iterations=100).
+
+%% @doc tests the jump operation.
+-spec prop_jump_slide(TargetKey::?RT:key()) -> true.
+prop_jump_slide(TargetKey) ->
+    DhtNodes = pid_groups:find_all(dht_node),
+    %% get a random node
+    JumpingNode = util:randomelem(DhtNodes),
+    ct:pal("Node ~p jumping to ~p", [JumpingNode, TargetKey]),
+    %% get neighborhood to check if jump will be a slide
+    comm:send_local(JumpingNode, {get_state, comm:this(), neighbors}),
+    Neighbors = fun() -> receive ?SCALARIS_RECV({get_state_response, Neighb}, Neighb) end end(),
+    case intervals:in(TargetKey, nodelist:node_range(Neighbors)) orelse
+         intervals:in(TargetKey, nodelist:succ_range(Neighbors)) of
+        true -> ct:pal("Jump will be converted to slide.");
+        _ -> ok
+    end,
+    ?proto_sched(start),
+    %% start jump
+    comm:send_local(JumpingNode, {move, start_jump, TargetKey, prop_jump_slide, comm:this()}),
+    trace_mpath:thread_yield(),
+    Result =
+        receive
+            ?SCALARIS_RECV({move, result, prop_jump_slide, Res}, Res)
+        end,
+    ?proto_sched(stop),
+    ct:pal("Result: ~p~n", [Result]),
+    ?assert(Result =:= ok),
+    true.
