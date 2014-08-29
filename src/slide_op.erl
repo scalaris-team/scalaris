@@ -21,7 +21,7 @@
 -vsn('$Id$').
 
 -export([new_slide/8, new_slide_i/8,
-         new_receiving_slide_join/4,
+         new_receiving_slide_join/5,
          new_sending_slide_join/4, new_sending_slide_join_i/5,
          new_sending_slide_leave/5,
          new_sending_slide_jump/6,
@@ -171,8 +171,8 @@ get_interval_tnode(PredOrSucc, SendOrReceive, TargetId, Neighbors) ->
 %%      dht_node_join.erl). MyKey is the joining node's new Id and will be used
 %%      as the target id of the slide operation.
 -spec new_receiving_slide_join(MoveId::uid:global_uid(), TargetId::?RT:key(),
-        Tag::any(), Neighbors::nodelist:neighborhood()) -> slide_op().
-new_receiving_slide_join(MoveId, TargetId, Tag, Neighbors) ->
+        Tag::any(), SourcePid::comm:mypid(), Neighbors::nodelist:neighborhood()) -> slide_op().
+new_receiving_slide_join(MoveId, TargetId, Tag, SourcePid, Neighbors) ->
     Pred = nodelist:pred(Neighbors),
     TargetNode = nodelist:succ(Neighbors),
     IntervalToReceive = node:mk_interval_between_ids(node:id(Pred), TargetId),
@@ -183,7 +183,7 @@ new_receiving_slide_join(MoveId, TargetId, Tag, Neighbors) ->
               my_old_id = null,
               target_id = TargetId,
               tag = Tag,
-              source_pid = null}.
+              source_pid = SourcePid}.
 
 %% @doc Sets up a new slide operation for a node which sends a joining node
 %%      some of its data.
