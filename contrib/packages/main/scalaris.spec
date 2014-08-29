@@ -32,6 +32,13 @@ Requires:       erlang-js
 BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
+%if 0%{?fedora_version} >= 12 || 0%{?rhel_version} >= 500 || 0%{?centos_version} >= 500
+BuildRequires:  util-linux >= 2.23
+Requires:       util-linux >= 2.23
+%else
+BuildRequires:  sudo
+Requires:       sudo
+%endif
 %endif
 
 ###########################################################################################
@@ -49,6 +56,13 @@ Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
 PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 Requires(pre):  %insserv_prereq
+%if 0%{?suse_version} >= 1310
+BuildRequires:  util-linux >= 2.23
+Requires:       util-linux >= 2.23
+%else
+BuildRequires:  sudo
+Requires:       sudo
+%endif
 %endif
 
 %description
