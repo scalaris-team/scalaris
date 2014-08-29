@@ -446,11 +446,9 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId, TargetId, N
                             rm_loop:notify_new_pred(node:pidX(Succ), Me),
 
                             JoinOptions = get_join_options(JoinState),
-                            notify_jump(JoinOptions),
-                            MoveState = proplists:get_value(move_state, JoinOptions, []),
 
                             finish_join_and_slide(Me, Pred, Succ, db_dht:new(),
-                                                  QueuedMessages, MoveId, NextOp, MoveState)
+                                                  QueuedMessages, MoveId, NextOp, JoinOptions)
                     end
             end
     end,
@@ -941,24 +939,16 @@ try_next_candidate(JoinState) ->
         end,
     contact_best_candidate(JoinState1).
 
-%% @doc Notify the source pid in case of a jump
--spec notify_jump(JoinOptions::[tuple()]) -> ok.
-notify_jump(JoinOptions) ->
-    case lists:keyfind(jump, 1, JoinOptions) of
-        {jump, _Tag, SourcePid, NotifyMsg} ->
-            dht_node_move:notify_source_pid(SourcePid, NotifyMsg);
-        _ -> ok
-    end.
-
 %% userdevguide-begin dht_node_join:finish_join
 %% @doc Finishes the join and sends all queued messages.
 -spec finish_join(Me::node:node_type(), Pred::node:node_type(),
                   Succ::node:node_type(), DB::db_dht:db(),
                   QueuedMessages::msg_queue:msg_queue(),
-                  MoveState::[tuple()])
+                  JoinOptions::[tuple()])
         -> dht_node_state:state().
-finish_join(Me, Pred, Succ, DB, QueuedMessages, MoveState) ->
-    %% get old subscribtion tabel if available
+finish_join(Me, Pred, Succ, DB, QueuedMessages, JoinOptions) ->
+    %% get old rt loop subscribtion table (if available)
+    MoveState = proplists:get_value(move_state, JoinOptions, []),
     OldSubscrTable = proplists:get_value(subscr_table, MoveState, null),
     RMState = rm_loop:init(Me, Pred, Succ, OldSubscrTable),
     Neighbors = rm_loop:get_neighbors(RMState),
@@ -989,14 +979,19 @@ reject_join_response(Succ, _Pred, MoveId, _CandId) ->
                             Succ::node:node_type(), DB::db_dht:db(),
                             QueuedMessages::msg_queue:msg_queue(),
                             MoveId::slide_op:id(), NextOp::slide_op:next_op(),
-                            MoveState::[tuple()])
+                            JoinOptions::[tuple()])
         -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}],
             State::dht_node_state:state()}.
-finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId, NextOp, MoveState) ->
-    State = finish_join(Me, Pred, Succ, DB, QueuedMessages, MoveState),
+finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId, NextOp, JoinOptions) ->
+    State = finish_join(Me, Pred, Succ, DB, QueuedMessages, JoinOptions),
+    {SourcePid, Tag} =
+        case lists:keyfind(jump, 1, JoinOptions) of
+            {jump, JumpTag, Pid} -> {Pid, JumpTag};
+            _ -> {null, join}
+        end,
     State1 = dht_node_move:exec_setup_slide_not_found(
-               {ok, {join, 'rcv'}}, State, MoveId, Succ, node:id(Me), join,
-               unknown, null, nomsg, NextOp, false),
+               {ok, {join, 'rcv'}}, State, MoveId, Succ, node:id(Me), Tag,
+               unknown, SourcePid, nomsg, NextOp, false),
     gen_component:change_handler(State1, fun dht_node:on/2).
 %% userdevguide-end dht_node_join:finish_join
 

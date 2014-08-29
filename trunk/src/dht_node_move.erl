@@ -643,7 +643,7 @@ exec_setup_slide_not_found(Command, State, MoveFullId, TargetNode, TargetId, Tag
         {ok, {join, 'rcv'}} -> % similar to {slide, succ, 'rcv'}
             ?IIF(FdSubscribed, ok,
                  fd:subscribe([node:pidX(TargetNode)], {move, MoveFullId})),
-            SlideOp = slide_op:new_receiving_slide_join(MoveFullId, TargetId, join, Neighbors),
+            SlideOp = slide_op:new_receiving_slide_join(MoveFullId, TargetId, Tag, SourcePid, Neighbors),
             % note: phase will be set by notify_other/2 and needs to remain null here
             SlideOp1 = slide_op:set_setup_at_other(SlideOp), % we received a join_response before
             SlideOp2 = slide_op:set_next_op(SlideOp1, NextOp),
@@ -1148,9 +1148,8 @@ finish_delta_ack2B(State, SlideOp, {finish_jump}) ->
     %% reply after join is complete
     JumpTag = slide_op:get_tag(SlideOp),
     SourcePid = slide_op:get_source_pid(SlideOp),
-    Msg = {move, result, JumpTag, ok},
     JoinOptions = [{{dht_node, id}, NewId}, {my_sup_dht_node_id, SupDhtNodeId},
-                   {jump, JumpTag, SourcePid, Msg},
+                   {jump, JumpTag, SourcePid},
                    {bootstrap_nodes, BootstrapNodes}],
     JoinOptions2 =
         case config:read(lb_active_and_psv) of
