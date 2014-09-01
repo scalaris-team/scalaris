@@ -14,6 +14,7 @@ optdepends=('tokyocabinet: storage on disk'
 backup=('etc/scalaris/initd.conf' 'etc/scalaris/scalaris.cfg' 'etc/scalaris/scalaris.local.cfg' 'etc/scalaris/scalarisctl.conf')
 source=($pkgname-$pkgver.tar.gz)
 md5sums=('f188e12f4cf893022a87a1b29971aa81')
+install=install
 
 build() {
   cd "$srcdir/$pkgname-$pkgver"
