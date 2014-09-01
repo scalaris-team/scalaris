@@ -19,8 +19,6 @@ datarootdir=@datarootdir@
 ERL=@ERL@
 EPMD=@EPMD@
 SCREEN=@SCREEN@
-SUDO=@SUDO@
-RUNUSER=@RUNUSER@
 
 # /bin
 BINDIR=@bindir@
@@ -66,7 +64,6 @@ DIST_ERL_PORT=""
 DAEMONIZE_SCREEN=0
 cmd=""
 NODES_PER_VM=""
-user=""
 
 usage(){
     echo "usage: scalarisctl [options] [services] <cmd>"
@@ -89,7 +86,6 @@ usage(){
     echo "                - (single) port distributed erlang listens on"
     echo "    --nodes-per-vm <number>"
     echo "                - number of Scalaris nodes to start inside the VM"
-    echo "    -u <user>   - run Scalaris as a different user"
     echo " services:"
     echo "    -m          - global Scalaris management server"
     echo "    -s          - Scalaris node (see also -f)"
@@ -713,21 +709,10 @@ scalarisstart(){
  -connect_all false -hidden -name $NODE_NAME\
  $SCALARIS_ADDITIONAL_PARAMETERS\
  -s scalaris `echo $erl_flags`"
-
-    if [ "$user" != "" ]; then
-      # For SELinux we need to use 'runuser' not 'sudo'
-      if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
-        BASH_CMD="$RUNUSER $user -s `which bash` -c"
-      else
-        BASH_CMD="$SUDO -u $user bash -c"
-      fi
-    else
-      BASH_CMD="bash -c"
-    fi
     if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
-        $SCREEN -S "scalaris_$NODE_NAME" -d -m $BASH_CMD "set -xf +B; $START_CMD; sleep 365d"
+        $SCREEN -S "scalaris_$NODE_NAME" -d -m bash -x -f +B -c "$START_CMD; sleep 365d"
     else
-        $BASH_CMD "set -xf +B; $START_CMD"
+        bash -x -f +B -c "$START_CMD"
     fi
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -841,7 +826,7 @@ until [ -z "$1" ]; do
       DBG_CHECK_RING_TIMEOUT=$1
       shift;;
     *)
-      if getopts "dhifqmsvn:p:y:k:e:c:u:" optionName; then
+      if getopts "dhifqmsvn:p:y:k:e:c:" optionName; then
         case "$optionName" in
             c) SCALARIS_COOKIE=$OPTARG;;
             e) erl_flags=$OPTARG;;
@@ -853,7 +838,6 @@ until [ -z "$1" ]; do
             k) join_at=$OPTARG;;
             n) NODE_NAME=$OPTARG;;
             p) port=$OPTARG;;
-            u) user=$OPTARG;;
             y) yaws_port=$OPTARG;;
             m) start_mgmt_server=1;;
             s) start_dht_node="dht_node";;
