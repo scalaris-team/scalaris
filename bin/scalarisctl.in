@@ -717,7 +717,7 @@ scalarisstart(){
     if [ "$user" != "" ]; then
       # For SELinux we need to use 'runuser' not 'sudo'
       if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
-        BASH_CMD="$RUNUSER $user -c"
+        BASH_CMD="$RUNUSER $user -s `which bash` -c"
       else
         BASH_CMD="$SUDO -u $user bash -c"
       fi
