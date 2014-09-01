@@ -61,13 +61,15 @@ Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
 PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 Requires(pre):  %insserv_prereq
-%if 0%{?suse_version} >= 1310
-BuildRequires:  util-linux >= 2.23
-Requires:       util-linux >= 2.23
-%else
+# TODO: re-activate when the util-linux package is patched for runuser to actually work
+# see https://bugzilla.novell.com/show_bug.cgi?id=892079
+#%if 0%{?suse_version} >= 1310
+#BuildRequires:  util-linux >= 2.23
+#Requires:       util-linux >= 2.23
+#%else
 BuildRequires:  sudo
 Requires:       sudo
-%endif
+#%endif
 %endif
 
 %description
