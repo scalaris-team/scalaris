@@ -73,7 +73,8 @@ if [ ${result} -eq 0 ]; then
   tarmd5sum=`md5sum ${tarfile} | cut -d' ' -f 1` && \
   sed -e "s/pkgver=.*/pkgver=${pkg_version}/g" \
       -e "s/md5sums=('.*')/md5sums=('${tarmd5sum}')/g" \
-      < ${sourcefolder}/PKGBUILD                   > ./PKGBUILD
+      < ${sourcefolder}/PKGBUILD                   > ./PKGBUILD && \
+  cp  ${sourcefolder}/install                        ./install
   result=$?
 fi
 
