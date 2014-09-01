@@ -691,6 +691,7 @@ ac_user_opts='
 enable_option_checking
 enable_toke
 with_browser
+enable_runuser
 enable_native
 enable_debug
 with_java_functions
@@ -1314,6 +1315,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-toke          disable support for tokyo cabinet through toke
   --enable-toke[=DIR]     enable support for tokyo cabinet through toke
+  --disable-runuser       disable support for runuser (use sudo instead)
   --enable-native         enable compilation to native code using HiPE
   --enable-debug          enable debugging mode
 
@@ -2001,7 +2003,15 @@ $as_echo "no" >&6; }
 fi
 
 
-# Extract the first word of "runuser", so it can be a program name with args.
+
+RUNUSER=""
+# Check whether --enable-runuser was given.
+if test "${enable_runuser+set}" = set; then :
+  enableval=$enable_runuser;
+fi
+
+if test "$enable_runuser" != "no"; then :
+  # Extract the first word of "runuser", so it can be a program name with args.
 set dummy runuser; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 $as_echo_n "checking for $ac_word... " >&6; }
@@ -2042,6 +2052,7 @@ $as_echo "no" >&6; }
 fi
 
 
+fi
 
 if test "$ac_cv_path_SUDO" = "/bin/false" -a "$ac_cv_path_RUNUSER" = ""; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: sudo or runuser not found - you won't be able to use our init.d script" >&5

@@ -76,7 +76,13 @@ fi
 ###########################################################
 
 AC_PATH_PROG(SUDO, sudo, "/bin/false")
-AC_PATH_PROG(RUNUSER, runuser, "", [$PATH$PATH_SEPARATOR/usr/sbin])
+
+RUNUSER=""
+AC_ARG_ENABLE([runuser],
+              AS_HELP_STRING([--disable-runuser],
+                 [disable support for runuser (use sudo instead)]))
+AS_IF([test "$enable_runuser" != "no"],
+      [AC_PATH_PROG(RUNUSER, runuser, "", [$PATH$PATH_SEPARATOR/usr/sbin])])
 
 if test "$ac_cv_path_SUDO" = "/bin/false" -a "$ac_cv_path_RUNUSER" = ""; then
   AC_MSG_NOTICE([sudo or runuser not found - you won't be able to use our init.d script])
