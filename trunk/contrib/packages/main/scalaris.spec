@@ -61,15 +61,13 @@ Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
 PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 Requires(pre):  %insserv_prereq
-# TODO: re-activate when the util-linux package is patched for runuser to actually work
-# see https://bugzilla.novell.com/show_bug.cgi?id=892079
-#%if 0%{?suse_version} >= 1310
-#BuildRequires:  util-linux >= 2.23
-#Requires:       util-linux >= 2.23
-#%else
+%if 0%{?suse_version} >= 1310
+BuildRequires:  util-linux >= 2.23
+Requires:       util-linux >= 2.23
+%else
 BuildRequires:  sudo
 Requires:       sudo
-#%endif
+%endif
 %endif
 
 %description
@@ -91,6 +89,8 @@ Documentation for Scalaris including its User-Dev-Guide.
 %setup -q -n %{name}-%{version}
 
 %build
+# TODO: re-enable runuser once the util-linux package is patched
+# see https://bugzilla.novell.com/show_bug.cgi?id=892079
 ./configure --prefix=%{_prefix} \
     --exec-prefix=%{_exec_prefix} \
     --bindir=%{_bindir} \
@@ -104,6 +104,9 @@ Documentation for Scalaris including its User-Dev-Guide.
     --sharedstatedir=%{_sharedstatedir} \
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
+%if 0%{?suse_version} >= 1310
+    --disable-runuser \
+%endif
     --docdir=%{_docdir}/scalaris
 make all
 make doc
