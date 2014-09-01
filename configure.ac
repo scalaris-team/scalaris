@@ -49,12 +49,14 @@ AC_ARG_WITH([browser],
                [absolute path of the browser to use for 'make test-vts'])],
             [if test -n "$withval"; then
                BROWSER="$withval"
+               AS_IF([test ! -x "$BROWSER"],
+                 [AC_MSG_WARN(["$BROWSER" was not found or is not executable ('make test-vts' will likely fail)])])
              fi],
             [AC_PATH_PROG([BROWSER], [xdg-open])])
 AC_SUBST(BROWSER)
 
-AS_IF([test ! -x "$BROWSER"],
-      [AC_MSG_WARN(["$BROWSER" was not found or is not executable ('make test-vts' will likely fail)])])
+AS_IF([test "$BROWSER" = ""],
+      [AC_MSG_WARN([xdg-open was not found ('make test-vts' will likely fail)])])
 
 ###########################################################
 #
