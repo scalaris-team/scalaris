@@ -1847,6 +1847,10 @@ BROWSER=
 if test "${with_browser+set}" = set; then :
   withval=$with_browser; if test -n "$withval"; then
                BROWSER="$withval"
+               if test ! -x "$BROWSER"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: \"$BROWSER\" was not found or is not executable ('make test-vts' will likely fail)" >&5
+$as_echo "$as_me: WARNING: \"$BROWSER\" was not found or is not executable ('make test-vts' will likely fail)" >&2;}
+fi
              fi
 else
   # Extract the first word of "xdg-open", so it can be a program name with args.
@@ -1893,9 +1897,9 @@ fi
 
 
 
-if test ! -x "$BROWSER"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: \"$BROWSER\" was not found or is not executable ('make test-vts' will likely fail)" >&5
-$as_echo "$as_me: WARNING: \"$BROWSER\" was not found or is not executable ('make test-vts' will likely fail)" >&2;}
+if test "$BROWSER" = ""; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: xdg-open was not found ('make test-vts' will likely fail)" >&5
+$as_echo "$as_me: WARNING: xdg-open was not found ('make test-vts' will likely fail)" >&2;}
 fi
 
 ###########################################################
