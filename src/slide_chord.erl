@@ -189,7 +189,7 @@ send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid) ->
         ExpPredId ->
             send_continue_msg(ReplyPid);
         _OldPredId ->
-            OldPred = slide_op:get_node(SlideOp),
+            OldPred = dht_node_state:get(State, pred),
             rm_loop:subscribe(
               ReplyPid, {move, slide_op:get_id(SlideOp)},
               fun(_RMOldN, RMNewN, _Reason) ->
