@@ -33,10 +33,14 @@ BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
+# https://fedoraproject.org/wiki/Packaging:Systemd?rd=Packaging:Guidelines:Systemd
+%define with_systemd 1
+BuildRequires:  systemd
 # provides runuser
 BuildRequires:  util-linux >= 2.23
 Requires:       util-linux >= 2.23
 %else
+%define with_systemd 0
 %if 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
 # provides runuser
 BuildRequires:  util-linux-ng >= 2.17
@@ -62,6 +66,9 @@ Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
 PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 Requires(pre):  %insserv_prereq
+# keep systemd disabled for now due to the runuser bug (see below)
+# https://en.opensuse.org/openSUSE:Systemd_packaging_guidelines
+%define with_systemd 0
 %if 0%{?suse_version} >= 1310
 # provides runuser
 BuildRequires:  util-linux >= 2.23
@@ -107,6 +114,9 @@ Documentation for Scalaris including its User-Dev-Guide.
     --infodir=%{_infodir} \
 %if 0%{?suse_version} >= 1310
     --disable-runuser \
+%endif
+%if 0%{?with_systemd}
+    --with-systemd=%{_unitdir} \
 %endif
     --docdir=%{_docdir}/scalaris
 make all
@@ -173,10 +183,15 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/scalaris
 %exclude %{_prefix}/lib/scalaris/docroot/doc
 %attr(-,scalaris,scalaris) %{_localstatedir}/log/scalaris
+%if 0%{?with_systemd}
+%{_unitdir}/scalaris.service
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris
+%else
 %{_sysconfdir}/init.d/scalaris
 %{_sbindir}/rcscalaris
-%attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/initd.conf
+%endif
+%attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
 %attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
