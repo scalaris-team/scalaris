@@ -33,6 +33,9 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 prefix = @prefix@
 exec_prefix = @exec_prefix@
 datarootdir = @datarootdir@
+bindir = @bindir@
+sysconfdir = @sysconfdir@
+localstatedir = @localstatedir@
 
 # /bin
 BINDIR = $(DESTDIR)@bindir@
@@ -42,6 +45,10 @@ SBINDIR = $(DESTDIR)@sbindir@
 ETCDIR = $(DESTDIR)@sysconfdir@/scalaris
 # /etc/init.d/
 INITDIR = $(DESTDIR)@sysconfdir@/init.d
+# /etc/conf.d
+SYSTEMD_CONFDIR = $(DESTDIR)@sysconfdir@/conf.d
+# /usr/lib/systemd/system
+SYSTEMD_UNITDIR = $(DESTDIR)@SYSTEMD_UNITDIR@
 # /lib/scalaris/
 SCALARISDIR = $(DESTDIR)@libdir@/scalaris
 # /lib/scalaris/ebin
@@ -633,7 +640,31 @@ install-java: java
 	install -m 744 -t $(INITDIR) \
 	           contrib/init.d/scalaris-monitor
 
-install-erlang: compile
+install-initd:
+	install -d $(ETCDIR)
+	install -m 644 -t $(ETCDIR) \
+	           contrib/init.d/initd.conf
+	install -d $(INITDIR)
+	install -m 744 -t $(INITDIR) \
+	           contrib/init.d/scalaris
+	install -d $(SBINDIR)
+	ln -sf @sysconfdir@/init.d/scalaris $(SBINDIR)/rcscalaris
+
+contrib/systemd/scalaris.service: contrib/systemd/scalaris.service.in Makefile
+	sed -e 's|@bindir[@]|$(bindir)|g' \
+	    -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
+	    -e 's|@localstatedir[@]|$(localstatedir)|g' \
+	    $${srcdir}$@.in > $@
+
+install-systemd: contrib/systemd/scalaris.service
+	install -d $(SYSTEMD_CONFDIR)
+	install -m 644 contrib/systemd/scalaris.conf \
+	           $(SYSTEMD_CONFDIR)/scalaris
+	install -d $(SYSTEMD_UNITDIR)
+	install -m 644 -t $(SYSTEMD_UNITDIR) \
+	           contrib/systemd/scalaris.service
+
+install-erlang: compile @INSTALL_INIT@
 	install -d $(BEAMDIR)
 	install -m 644 -t $(BEAMDIR) \
 	           ebin/*.beam
@@ -641,19 +672,13 @@ install-erlang: compile
 	install -m 644 -t $(ETCDIR) \
 	           bin/scalarisctl.conf \
 	           bin/scalaris.cfg \
-	           bin/scalaris.local.cfg.example \
-	           contrib/init.d/initd.conf
+	           bin/scalaris.local.cfg.example
 	if [ -f bin/scalaris.local.cfg ]; then \
 	  install -m 644 -t $(ETCDIR) \
 	           bin/scalaris.local.cfg; \
 	else \
 	  touch $(ETCDIR)/scalaris.local.cfg ; \
 	fi
-	install -d $(INITDIR)
-	install -m 744 -t $(INITDIR) \
-	           contrib/init.d/scalaris
-	install -d $(SBINDIR)
-	ln -sf @sysconfdir@/init.d/scalaris $(SBINDIR)/rcscalaris
 	install -d $(DOCROOTDIR) \
 	           $(DOCROOTDIR)/api \
 	           $(DOCROOTDIR)/flot \

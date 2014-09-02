@@ -644,6 +644,8 @@ ERLANG_ROOT_DIR
 ERL
 ERLCFLAGS
 ERLC
+SYSTEMD_UNITDIR
+INSTALL_INIT
 RUNUSER
 SUDO
 SCREEN
@@ -692,6 +694,7 @@ enable_option_checking
 enable_toke
 with_browser
 enable_runuser
+with_systemd
 enable_native
 enable_debug
 with_java_functions
@@ -1324,6 +1327,9 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-browser=BROWSER  absolute path of the browser to use for 'make
                           test-vts'
+  --with-systemd[=UNITDIR]
+                          use systemd, optionally specify the directory for
+                          systemd service files
   --with-java-functions=JAVAFUNCTIONS
                           use the given java-functions script for
                           java-api/scalaris (default is
@@ -2058,6 +2064,31 @@ if test "$ac_cv_path_SUDO" = "/bin/false" -a "$ac_cv_path_RUNUSER" = ""; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: sudo or runuser not found - you won't be able to use our init.d script" >&5
 $as_echo "$as_me: sudo or runuser not found - you won't be able to use our init.d script" >&6;}
 fi
+
+###########################################################
+#
+# check systemd support
+#
+###########################################################
+
+INSTALL_INIT=install-initd
+SYSTEMD_UNITDIR=
+
+# Check whether --with-systemd was given.
+if test "${with_systemd+set}" = set; then :
+  withval=$with_systemd; if test -d "$withval"; then
+               SYSTEMD_UNITDIR="$withval"
+               INSTALL_INIT="install-systemd"
+             else
+               if test "$withval" = "yes"; then
+                 SYSTEMD_UNITDIR="\${prefix}/lib/systemd/system/"
+                 INSTALL_INIT="install-systemd"
+               fi
+             fi
+fi
+
+
+
 
 ###########################################################
 #

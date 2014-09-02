@@ -90,6 +90,30 @@ fi
 
 ###########################################################
 #
+# check systemd support
+#
+###########################################################
+
+INSTALL_INIT=install-initd
+SYSTEMD_UNITDIR=
+AC_ARG_WITH([systemd],
+            [AS_HELP_STRING([--with-systemd[[=UNITDIR]]],
+                            [use systemd, optionally specify the directory for systemd service files])],
+            [if test -d "$withval"; then
+               SYSTEMD_UNITDIR="$withval"
+               INSTALL_INIT="install-systemd"
+             else
+               if test "$withval" = "yes"; then
+                 SYSTEMD_UNITDIR="\${prefix}/lib/systemd/system/"
+                 INSTALL_INIT="install-systemd"
+               fi
+             fi],
+            [])
+AC_SUBST(INSTALL_INIT)
+AC_SUBST(SYSTEMD_UNITDIR)
+
+###########################################################
+#
 # check whether to compile to native code using HiPE
 #
 ###########################################################
