@@ -34,8 +34,10 @@ Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 # https://fedoraproject.org/wiki/Packaging:Systemd?rd=Packaging:Guidelines:Systemd
-%define with_systemd 1
-BuildRequires:  systemd
+# disable systemd for now since SELinux prevents us from using our default port 14195
+# -> either change default to be in ephemeral_port_t range (starting at 32768) or adapt SELinux policy
+%define with_systemd 0
+#BuildRequires:  systemd
 # provides runuser
 BuildRequires:  util-linux >= 2.23
 Requires:       util-linux >= 2.23
