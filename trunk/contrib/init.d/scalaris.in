@@ -45,7 +45,7 @@ if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
     SU_CMD="$RUNUSER $SCALARIS_USER -s /bin/bash -c"
 else
     SU="$SUDO"
-    SU_CMD="$SUDO -u $SCALARIS_USER"
+    SU_CMD="$SUDO -u $SCALARIS_USER /bin/bash -c"
 fi
 
 start() {
