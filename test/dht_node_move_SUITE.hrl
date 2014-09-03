@@ -1036,11 +1036,19 @@ prop_jump_slide(TargetKey) ->
     DhtNodes = pid_groups:find_all(dht_node),
     %% get a random node
     JumpingNode = util:randomelem(DhtNodes),
-    perform_jump(JumpingNode, TargetKey),
+    %% check if we chose a valid key
+    InvalidTarget =
+        lists:any(fun(Node) ->
+                      %% get node information
+                      comm:send_local(Node, {get_state, comm:this(), node_id}),
+                      NodeId = fun() -> receive ?SCALARIS_RECV({get_state_response, Id}, Id) end end(),
+                      NodeId =:= TargetKey
+                  end, DhtNodes),
+    perform_jump(JumpingNode, TargetKey, InvalidTarget),
     true.
 
--spec perform_jump(JumpingNode::node:node_type(), ?RT:key()) -> ok.
-perform_jump(JumpingNode, TargetKey) ->
+-spec perform_jump(JumpingNode::node:node_type(), ?RT:key(), InvalidTarget::boolean()) -> ok.
+perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
     %% get neighborhood to check if jump will be a slide
     comm:send_local(JumpingNode, {get_state, comm:this(), neighbors}),
     Neighbors = fun() -> receive ?SCALARIS_RECV({get_state_response, Neighb}, Neighb) end end(),
@@ -1064,7 +1072,9 @@ perform_jump(JumpingNode, TargetKey) ->
     ct:pal("Result: ~p~n", [Result]),
     if Result =:= wrong_pred_succ_node ->
             ct:pal("Retrying because of wrong_pred_succ_node"),
-            perform_jump(JumpingNode, TargetKey);
+            perform_jump(JumpingNode, TargetKey, InvalidTarget);
+       InvalidTarget ->
+            ?assert(Result =/= ok);
        true ->
             ?assert(Result =:= ok)
     end.
