@@ -720,7 +720,7 @@ scalarisstart(){
         echo "  consider running scalarisctl checkinstallation"
         exit 1
     fi
-    popd > /dev/null
+    popd > /dev/null 2>&1 || true
 }
 
 scalarisstop(){
@@ -731,7 +731,7 @@ scalarisstop(){
         -noinput \
         -s scalaris cli -extra $NODE_NAME stop
     FAILED=$?
-    popd > /dev/null
+    popd > /dev/null 2>&1 || true
     return $FAILED
 }
 
@@ -743,7 +743,7 @@ scalariscall(){
         -noinput \
         -eval "$1"
     FAILED=$?
-    popd > /dev/null
+    popd > /dev/null 2>&1 || true
     return $FAILED
 }
 
