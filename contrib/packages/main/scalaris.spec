@@ -143,7 +143,7 @@ fi
 %if 0%{?suse_version}
 %fillup_and_insserv -f scalaris
 %endif
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 /sbin/chkconfig --add scalaris
 %endif
 
@@ -151,7 +151,7 @@ fi
 %if 0%{?suse_version}
 %stop_on_removal scalaris
 %endif
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 # 0 packages after uninstall -> pkg is about to be removed
   if [ "$1" = "0" ] ; then
     /sbin/service scalaris stop >/dev/null 2>&1
@@ -164,7 +164,7 @@ fi
 %restart_on_update scalaris
 %insserv_cleanup
 %endif
-%if 0%{?fedora_version}
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 # >=1 packages after uninstall -> pkg was updated -> restart
 if [ "$1" -ge "1" ] ; then
   /sbin/service scalaris try-restart >/dev/null 2>&1 || :
