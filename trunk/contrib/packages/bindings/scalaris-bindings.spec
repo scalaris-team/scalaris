@@ -130,7 +130,7 @@ Java Bindings and command line client for scalaris
 %package -n ruby-scalaris
 Summary:    Ruby-API and Ruby-client for scalaris
 Group:      Productivity/Databases/Clients
-%if 0%{?fedora_version} >= 19
+%if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 Requires:   ruby(release) >= 1.8
 %else
 Requires:   ruby(abi) >= 1.8
