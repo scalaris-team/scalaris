@@ -1057,6 +1057,12 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
         true -> ct:pal("Jump will be converted to slide.");
         _ -> ok
     end,
+    %% debug output in case of pending slide/jump operations
+    comm:send_local(JumpingNode, {get_node_details, comm:this(), [slide_pred, slide_succ]}),
+    SlideInfo = fun() -> receive ?SCALARIS_RECV({get_node_details_response, Details}, Details) end end(),
+    [{slide_pred, SlidePred}, {slide_succ, SlideSucc}] = SlideInfo,
+    ct:pal("SlidePred: ~p SlideSucc: ~p", [SlidePred, SlideSucc]),
+
     %% start jump
     ct:pal("Node ~p jumping to ~p", [JumpingNode, TargetKey]),
     ?proto_sched(start),
