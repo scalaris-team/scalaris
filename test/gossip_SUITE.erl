@@ -28,10 +28,14 @@
 
 -define(NO_OF_NODES, 5).
 
+
+groups() ->
+    unittest_helper:create_ct_groups([test_no_load, test_load],
+                                     [sequence, {repeat_until_any_ok, 3}]).
+
 all() ->
+    unittest_helper:create_ct_all([test_no_load, test_load]) ++
     [
-        test_no_load,
-        test_load,
         test_request_histogram1,
         test_request_histogram2
     ].
@@ -102,7 +106,7 @@ test_load(_Config) ->
 
     % get values from gossiping (after round finishes)
     % first round might be interrupted by node joins, thus wait two rounds
-    wait_n_rounds(2),
+    wait_n_rounds(1),
     send2gossip({cb_msg, {gossip_load, default}, {gossip_get_values_best, self()}}, 0),
 
     receive {gossip_get_values_best_response, LoadInfo} ->
