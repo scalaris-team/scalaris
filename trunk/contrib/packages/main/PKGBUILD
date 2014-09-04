@@ -11,7 +11,7 @@ depends=('openssl' 'erlang>=R13B01' 'util-linux>=2.23' 'systemd')
 makedepends=('screen')
 optdepends=('tokyocabinet: storage on disk'
             'screen: scalaris daemon with screen')
-backup=('etc/scalaris/initd.conf' 'etc/scalaris/initd-first.conf' 'etc/scalaris/scalaris.cfg' 'etc/scalaris/scalaris.local.cfg' 'etc/scalaris/scalarisctl.conf')
+backup=('etc/conf.d/scalaris' 'etc/conf.d/scalaris-first' 'etc/scalaris/scalaris.cfg' 'etc/scalaris/scalaris.local.cfg' 'etc/scalaris/scalarisctl.conf')
 source=($pkgname-$pkgver.tar.gz)
 md5sums=('f188e12f4cf893022a87a1b29971aa81')
 install=install
