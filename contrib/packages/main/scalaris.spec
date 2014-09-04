@@ -155,7 +155,7 @@ if grep -e '^cookie=\w\+' %{_sysconfdir}/scalaris/scalarisctl.conf > /dev/null 2
 fi
 
 %if 0%{?suse_version}
-%fillup_and_insserv -f scalaris
+%fillup_and_insserv -f scalaris scalaris-first
 %endif
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %if 0%{?with_systemd}
@@ -164,7 +164,7 @@ if [ "$1" -le 1 ] ; then # First install
   semanage port -a -t scalaris_port_t -p tcp 14194-14198
   semanage port -a -t scalaris_port_t -p tcp 8000-8004
 fi
-%systemd_post scalaris.service
+%systemd_post scalaris.service scalaris-first.service
 %else
 /sbin/chkconfig --add scalaris
 %endif
@@ -172,11 +172,11 @@ fi
 
 %preun
 %if 0%{?suse_version}
-%stop_on_removal scalaris
+%stop_on_removal scalaris scalaris-first
 %endif
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %if 0%{?with_systemd}
-%systemd_preun scalaris.service
+%systemd_preun scalaris.service scalaris-first.service
 %else
   if [ "$1" -eq 0 ] ; then  # final removal
     /sbin/service scalaris stop >/dev/null 2>&1
@@ -187,12 +187,12 @@ fi
 
 %postun
 %if 0%{?suse_version}
-%restart_on_update scalaris
+%restart_on_update scalaris scalaris-first
 %insserv_cleanup
 %endif
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %if 0%{?with_systemd}
-%systemd_postun_with_restart scalaris.service 
+%systemd_postun_with_restart scalaris.service scalaris-first.service
 if [ "$1" -eq 0 ]; then
   semanage port -d -t scalaris_port_t -p tcp 14194-14198 2>/dev/null || :
   semanage port -d -t scalaris_port_t -p tcp 8000-8004 2>/dev/null || :
@@ -221,14 +221,18 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,scalaris,scalaris) %{_localstatedir}/log/scalaris
 %if 0%{?with_systemd}
 %{_unitdir}/scalaris.service
+%{_unitdir}/scalaris-first.service
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris-first
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %attr(0600,root,root) %{_datadir}/selinux/packages/scalaris.pp
 %endif
 %else
 %{_sysconfdir}/init.d/scalaris
+%{_sysconfdir}/init.d/scalaris-first
 %{_sbindir}/rcscalaris
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/initd.conf
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/initd-first.conf
 %endif
 %attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg

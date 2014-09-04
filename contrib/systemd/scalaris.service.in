@@ -5,8 +5,8 @@ After=remote-fs.target
 
 [Service]
 EnvironmentFile=@sysconfdir@/conf.d/scalaris
-ExecStart=@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -e "-noshell" start
-ExecStop=@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -e "-noshell" gstop
+ExecStart=@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -e "-noshell" $SCALARIS_ADDITIONAL_PARAMETERS start
+ExecStop=@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -e "-noshell" $SCALARIS_ADDITIONAL_PARAMETERS gstop
 
 WorkingDirectory=@localstatedir@/log/scalaris
 
