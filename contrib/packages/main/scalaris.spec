@@ -235,7 +235,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/initd-first.conf
 %endif
 %attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
+%attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris.cfg
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
 %attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalarisctl.conf
