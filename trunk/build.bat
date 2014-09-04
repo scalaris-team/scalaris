@@ -10,10 +10,6 @@ call "%~dp0"\bin\find_erlang.bat
 ::(this is what autoconf on *nix would do)
 :: depending on your config, you might need to add one or more of the following options:
 ::  {d, have_toke}
-::  {d, term_not_builtin}
-::  {d, node_not_builtin}
-::  {d, module_not_builtin}
-::  {d, boolean_not_builtin}
 ::  {d, tid_not_builtin}
 ::  {d, recursive_types_are_not_allowed}
 ::  {d, type_forward_declarations_are_not_allowed}
