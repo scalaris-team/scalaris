@@ -430,11 +430,13 @@ integrate_data(QData, Round, {PrevState, CurState}=FullState) ->
             {retry, FullState};
         init when Round =:= CurRound ->
             CurState1 = element(2, merge_load_data(QData, CurState)),
+            log:log(info, "Load-Info: ~s", [to_string(get_load_info(CurState1))]),
             comm:send_local(pid_groups:get_my(gossip),
                             {integrated_data, state_get(instance, CurState1), cur_round}),
             {ok, {PrevState, CurState1}};
         init when Round =:= PrevRound ->
             PrevState1 = element(2, merge_load_data(QData, PrevState)),
+            log:log(info, "Load-Info: ~s", [to_string(get_load_info(PrevState1))]),
             comm:send_local(pid_groups:get_my(gossip),
                             {integrated_data, state_get(instance, PrevState1), prev_round}),
             {ok, {PrevState1, CurState}};
@@ -1348,8 +1350,7 @@ calc_initial_avg_kr(MyRange) ->
 
 
 %% @doc Extracts and calculates the standard deviation from the load_data record
--spec calc_stddev(unknown | load_data() | load_data_skipped()) -> unknown | float().
-calc_stddev(unknown) -> unknown;
+-spec calc_stddev(load_data() | load_data_skipped()) -> unknown | float().
 
 calc_stddev({load_data, _Module, skip}) -> unknown;
 
