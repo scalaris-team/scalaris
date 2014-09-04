@@ -47,13 +47,6 @@
 -type reference() :: erlang:reference().
 -endif.
 
--ifdef(types_not_builtin).
--type gb_set() :: gb_sets:gb_set().
--type queue() :: queue:queue().
--type gb_tree() :: gb_trees:gb_tree().
--type dict() :: dict:dictionary().
--endif.
-
 -ifdef(have_erlang_timestamp).
 -type erlang_timestamp() :: erlang:timestamp().
 -else.
