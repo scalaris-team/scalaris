@@ -34,10 +34,13 @@ Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 # https://fedoraproject.org/wiki/Packaging:Systemd?rd=Packaging:Guidelines:Systemd
-# disable systemd for now since SELinux prevents us from using our default port 14195
-# -> either change default to be in ephemeral_port_t range (starting at 32768) or adapt SELinux policy
-%define with_systemd 0
-#BuildRequires:  systemd
+%define with_systemd 1
+BuildRequires:  systemd
+BuildRequires:  selinux-policy-devel
+Requires:       policycoreutils, libselinux-utils
+Requires(post): selinux-policy-base, policycoreutils
+Requires(postun): policycoreutils
+
 # provides runuser
 BuildRequires:  util-linux >= 2.23
 Requires:       util-linux >= 2.23
@@ -128,6 +131,17 @@ make doc
 rm -rf $RPM_BUILD_ROOT
 make install DESTDIR=$RPM_BUILD_ROOT
 make install-doc DESTDIR=$RPM_BUILD_ROOT
+%if 0%{?with_systemd}
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+cd contrib/systemd
+sed -e "s|/var/lib/scalaris|${scalaris_home}|g" \
+    -i scalaris.fc
+make -f /usr/share/selinux/devel/Makefile
+install -d %{buildroot}%{_datadir}/selinux/packages
+install -m 644 scalaris.pp %{buildroot}%{_datadir}/selinux/packages/
+cd -
+%endif
+%endif
 
 %pre
 # note: use "-r" instead of "--system" for old systems like CentOS5, RHEL5
@@ -144,7 +158,16 @@ fi
 %fillup_and_insserv -f scalaris
 %endif
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+%if 0%{?with_systemd}
+semodule -i %{_datadir}/selinux/packages/scalaris.pp
+if [ "$1" -le 1 ] ; then # First install
+  semanage port -a -t scalaris_port_t -p tcp 14194-14198
+  semanage port -a -t scalaris_port_t -p tcp 8000-8004
+fi
+%systemd_post scalaris.service
+%else
 /sbin/chkconfig --add scalaris
+%endif
 %endif
 
 %preun
@@ -152,11 +175,14 @@ fi
 %stop_on_removal scalaris
 %endif
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
-# 0 packages after uninstall -> pkg is about to be removed
-  if [ "$1" = "0" ] ; then
+%if 0%{?with_systemd}
+%systemd_preun scalaris.service
+%else
+  if [ "$1" -eq 0 ] ; then  # final removal
     /sbin/service scalaris stop >/dev/null 2>&1
     /sbin/chkconfig --del scalaris
   fi
+%endif
 %endif
 
 %postun
@@ -165,10 +191,18 @@ fi
 %insserv_cleanup
 %endif
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
-# >=1 packages after uninstall -> pkg was updated -> restart
-if [ "$1" -ge "1" ] ; then
+%if 0%{?with_systemd}
+%systemd_postun_with_restart scalaris.service 
+if [ "$1" -eq 0 ]; then
+  semanage port -d -t scalaris_port_t -p tcp 14194-14198 2>/dev/null || :
+  semanage port -d -t scalaris_port_t -p tcp 8000-8004 2>/dev/null || :
+  semodule -r scalaris
+fi
+%else
+if [ "$1" -ge 1 ] ; then  # pkg was updated -> restart
   /sbin/service scalaris try-restart >/dev/null 2>&1 || :
 fi
+%endif
 %endif
 
 %clean
@@ -188,6 +222,9 @@ rm -rf $RPM_BUILD_ROOT
 %if 0%{?with_systemd}
 %{_unitdir}/scalaris.service
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+%attr(0600,root,root) %{_datadir}/selinux/packages/scalaris.pp
+%endif
 %else
 %{_sysconfdir}/init.d/scalaris
 %{_sbindir}/rcscalaris
