@@ -1,4 +1,4 @@
-module scalaris 0.7.0+svn;
+module scalaris 0.7.0_svn;
 
 require {
         attribute port_type;

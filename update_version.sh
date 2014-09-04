@@ -14,6 +14,7 @@
 #    limitations under the License.
 
 VERSION=`cat VERSION`
+VERSION_NOPLUS=`echo "${VERSION}" | tr + _`
 
 echo "Setting Scalaris version to ${VERSION}..."
 sed -e "s/-define(SCALARIS_VERSION, \".*\")\\./-define(SCALARIS_VERSION, \"${VERSION}\")./g" \
@@ -34,7 +35,7 @@ sed -e "0,/(.*-.*)/s//(${VERSION}-1)/" \
     -i contrib/packages/*/debian.changelog
 sed -e "0,/<version>.*<\/version>/s//<version>${VERSION}<\/version>/" \
     -i java-api/pom.xml
-sed -e "s/module scalaris .*;/module scalaris ${VERSION};/g" \
+sed -e "s/module scalaris .*;/module scalaris ${VERSION_NOPLUS};/g" \
     -i contrib/systemd/scalaris.te
 if [[ "$VERSION" == *svn* ]]; then
   RELEASE="unstable"
