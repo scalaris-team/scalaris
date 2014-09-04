@@ -158,7 +158,7 @@ test_request_histogram2(_Config) ->
 send2gossip(Msg, Delay) ->
     Group = pid_groups:group_with(gossip),
     Pid = pid_groups:pid_of(Group, gossip),
-    comm:send_local_after(Delay, Pid, Msg).
+    msg_delay:send_local(Delay, Pid, Msg).
 
 %% @doc Waits n rounds, pulling the web_debug_info every second.
 -spec wait_n_rounds(NoOfRounds::pos_integer()) -> ok.
@@ -180,7 +180,7 @@ wait_for_round(TargetRound) ->
 %% @doc Get the current round (with one second delay).
 -spec get_current_round() -> non_neg_integer().
 get_current_round() ->
-    send2gossip({web_debug_info, self()}, 1000),
+    send2gossip({web_debug_info, self()}, 1),
     receive {web_debug_info_reply, KeyValueList} ->
         case lists:keyfind("cur_round", 1, KeyValueList) of
             {"cur_round", Round} -> Round;

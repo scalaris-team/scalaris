@@ -171,17 +171,17 @@ get_subset_rand(N) ->
 
 %% @doc Same as get_subset_rand/1, but the request is delayed with a delay equal
 %%      to the gossip_cyclon_interval config parameter.
--spec get_subset_rand_next_interval(N::pos_integer()) -> reference().
+-spec get_subset_rand_next_interval(N::pos_integer()) -> ok.
 get_subset_rand_next_interval(N) ->
     get_subset_rand_next_interval(N, self()).
 
 
 %% @doc Same as get_subset_rand_next_interval/1 but sends the reply back to the
 %%      given Pid.
--spec get_subset_rand_next_interval(N::pos_integer(), Pid::comm:erl_local_pid()) -> reference().
+-spec get_subset_rand_next_interval(N::pos_integer(), Pid::comm:erl_local_pid()) -> ok.
 get_subset_rand_next_interval(N, SourcePid) ->
     Pid = pid_groups:get_my(gossip),
-    comm:send_local_after(trigger_interval(), Pid,
+    msg_delay:send_local(trigger_interval() div 1000, Pid,
                           {cb_msg, instance(), {get_subset_rand, N, SourcePid}}).
 
 
