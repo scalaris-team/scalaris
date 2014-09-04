@@ -653,7 +653,8 @@ contrib/init.d/scalaris-first: contrib/init.d/scalaris
 install-initd: contrib/init.d/scalaris-first
 	install -d $(ETCDIR)
 	install -m 644 -t $(ETCDIR) \
-	           contrib/init.d/initd.conf
+	           contrib/init.d/initd.conf \
+	           contrib/init.d/initd-first.conf
 	install -d $(INITDIR)
 	install -m 744 -t $(INITDIR) \
 	           contrib/init.d/scalaris \
