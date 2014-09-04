@@ -32,7 +32,8 @@ all() ->
      test_get_coordinate,
      test_select_node,
      test_select_data,
-     test_select_reply_data
+     test_select_reply_data,
+     test_update_coordinate
     ].
 
 
@@ -117,4 +118,28 @@ test_select_reply_data(_Config) ->
 
     config:write(gossip_vivaldi_count_measurements, 10),
     config:write(gossip_vivaldi_measurements_delay, 1000).
+
+
+test_update_coordinate(_Config) ->
+    tester:test(?MODULE, update_coordinate, 7, 250, []).
+
+
+-spec update_coordinate(Float, Float, Float, number(), Float, Float, Float) -> true when
+      is_subtype(Float, float()).
+update_coordinate(Coord1x, Coord1y, Conf1, Latency, Coord2x, Coord2y, Conf2) ->
+    Coord1 = [Coord1x, Coord1y], Coord2 = [Coord2x, Coord2y],
+    config:write(gossip_vivaldi_dimensions, 2),
+    pid_groups:join_as(atom_to_list(?MODULE), gossip),
+    Ret = gossip_vivaldi:handle_msg({update_vivaldi_coordinate,
+                                     Latency, {Coord1, Conf1}}, {Coord2, Conf2}),
+    ?expect_message({integrated_data, {gossip_vivaldi, default},  cur_round}),
+    case Latency == 0 orelse (Conf1 == 0 andalso Conf2 == 0) of
+        true when Coord1 =/= Coord2 ->
+            ?expect_exception(gossip_vivaldi:update_coordinate(Coord1, Conf1, Latency, Coord2, Conf2),
+                              error, badarith);
+        _ ->
+            NewState = gossip_vivaldi:update_coordinate(Coord1, Conf1, Latency, Coord2, Conf2),
+            ?equals(Ret, {ok, NewState})
+    end.
+
 

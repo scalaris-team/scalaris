@@ -38,7 +38,7 @@
         round_has_converged/1, web_debug_info/1, shutdown/1]).
 
 %% for testing
--export([]).
+-export([update_coordinate/5]).
 
 -ifdef(with_export_type_support).
 -export_type([est_error/0, latency/0, network_coordinate/0]).
