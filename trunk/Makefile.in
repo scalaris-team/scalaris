@@ -170,7 +170,7 @@ test-vts: compile
 	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ @CTHOOKS_FLAGS@
 
 test-clean:
-	-rm -rf ct_run.*@* ct.log ct_*_SUITE.log index.html all_runs.html variables-*@* \
+	-rm -rf ct_run.*@* ct.log ct-skipped.log ct_*_SUITE.log index.html all_runs.html variables-*@* \
             result_increment_10_1000.txt result_increment_1_10000.txt \
             result_read_10_10000.txt result_read_1_100000.txt \
             data/ct*@*
