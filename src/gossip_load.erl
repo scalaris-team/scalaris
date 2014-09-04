@@ -60,7 +60,7 @@
 %% for testing
 -export([tester_create_round/1, tester_create_state/11, tester_create_histogram/1,
          tester_create_load_data_list/1, is_histogram/1,
-         tester_create_histogram_size/1, init_feeder/1]).
+         tester_create_histogram_size/1, init_feeder/1, get_values_best_feeder/1]).
 
 -ifdef(with_export_type_support).
 -export_type([state/0, histogram/0, histogram_size/0, bucket/0]). %% for config gossip_load_*.erl
@@ -293,7 +293,7 @@ get_values_best(Options) when is_list(Options) ->
     if Delay =:= 0 andalso SendAfter =:= 0 ->
            comm:send_local(Pid, Msg);
        Delay =:= 0 andalso SendAfter =/= 0 ->
-           comm:send_local_after(SendAfter, Pid, Msg);
+           comm:send_local_after(SendAfter, Pid, Msg), ok;
        Delay =/= 0 ->
            msg_delay:send_local(Delay, Pid, Msg)
     end.
@@ -1533,6 +1533,19 @@ init_feeder({NoOfBuckets, Requestor, Random1, Random2}) ->
                not Random2 -> []
             end,
     {lists:append([Prop1, Prop2, [{instance, {gossip_load,default}}]])}.
+
+-spec get_values_best_feeder({Options::[proplists:property()], Secs::0..1, Millisecs::0..1000}) ->
+    {[proplists:property()]}.
+get_values_best_feeder({Options, Secs, Millisecs}) ->
+    Options1 = case proplists:get_value(send_after, Options) of
+        true ->
+            NewOptions1 = proplists:delete(send_after, Options),
+            [ {send_after, Millisecs} | NewOptions1 ];
+        _ ->
+            Options
+    end,
+    {Options1}.
+
 
 %% @doc For testing: ensure, that only buckets with identical keys are feeded to
 %%      merge_bucket().

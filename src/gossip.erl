@@ -1057,11 +1057,11 @@ request_random_node(CBModule) ->
 %% which is usually the case during startup.
 %% The delay prohibits bombarding the cyclon process with requests.
 -spec request_random_node_delayed(Delay::0..4294967295, CBModule::cb_module()) ->
-    reference().
+    ok.
 request_random_node_delayed(Delay, CBModule) ->
     EnvPid = comm:reply_as(self(), 3, {selected_peer, CBModule, '_'}),
     Fanout = cb_config(fanout, CBModule),
-    comm:send_local_after(Delay, self(), {cb_msg, {gossip_cyclon, default},
+    msg_delay:send_local(Delay div 1000, self(), {cb_msg, {gossip_cyclon, default},
                                           {get_subset_rand, Fanout, EnvPid}}).
 
 

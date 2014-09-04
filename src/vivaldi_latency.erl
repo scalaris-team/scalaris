@@ -64,7 +64,7 @@ on({ping_reply, {pong, gossip}, Count},
             comm:send_local(Owner, Msg),
             kill;
         false ->
-            _ = comm:send_local_after(config:read(gossip_vivaldi_measurements_delay),
+            _ = msg_delay:send_local(config:read(gossip_vivaldi_measurements_delay),
                                       self(), {start_ping}),
             {Owner, RemotePid, Token, unknown, Count, NewLatencies}
     end;
