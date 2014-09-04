@@ -619,6 +619,7 @@ install-docs: install-doc install-java-doc
 
 contrib/init.d/scalaris-first-monitor: contrib/init.d/scalaris-monitor
 	sed -e 's|initd.conf|initd-first.conf|g' \
+	    -e 's|Provides:          scalaris-monitor|Provides:          scalaris-first-monitor|g' \
 	    $${srcdir}$< > $@
 
 install-java: java contrib/init.d/scalaris-first-monitor
@@ -648,6 +649,7 @@ install-java: java contrib/init.d/scalaris-first-monitor
 contrib/init.d/scalaris-first: contrib/init.d/scalaris
 	sed -e 's|scalarisctl -n $${SCALARIS_NODE} -s -d --screen|scalarisctl -n $${SCALARIS_NODE} -m -f -s -d --screen|g' \
 	    -e 's|initd.conf|initd-first.conf|g' \
+	    -e 's|Provides:          scalaris|Provides:          scalaris-first|g' \
 	    $${srcdir}$< > $@
 
 install-initd: contrib/init.d/scalaris-first
@@ -666,6 +668,7 @@ contrib/systemd/scalaris.service: contrib/systemd/scalaris.service.in Makefile
 	sed -e 's|@bindir[@]|$(bindir)|g' \
 	    -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
 	    -e 's|@localstatedir[@]|$(localstatedir)|g' \
+	    -e 's|Description=Scalaris node|Description=Scalaris management server and first node|g' \
 	    $${srcdir}$@.in > $@
 
 contrib/systemd/scalaris-first.service: contrib/systemd/scalaris.service
