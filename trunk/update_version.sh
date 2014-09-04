@@ -34,6 +34,8 @@ sed -e "0,/(.*-.*)/s//(${VERSION}-1)/" \
     -i contrib/packages/*/debian.changelog
 sed -e "0,/<version>.*<\/version>/s//<version>${VERSION}<\/version>/" \
     -i java-api/pom.xml
+sed -e "s/module scalaris .*;/module scalaris ${VERSION};/g" \
+    -i contrib/systemd/scalaris.te
 if [[ "$VERSION" == *svn* ]]; then
   RELEASE="unstable"
 else
