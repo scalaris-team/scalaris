@@ -69,44 +69,38 @@ init_per_testcase(TestCase, Config) ->
 end_per_testcase(_TestCase, Config) ->
     unittest_helper:stop_minimal_procs(Config),
     unittest_helper:stop_ring(),
-    %% reset_config(),
     Config.
 
-test_get_coordinate(Config) ->
+test_get_coordinate(_Config) ->
     pid_groups:join_as(pid_groups:group_with(gossip), ?MODULE),
-    %% timer:sleep(30000),
-    %% pid_groups:join_as(atom_to_list(?MODULE), gossip),
     gossip_vivaldi:get_coordinate(),
-    ?expect_message({vivaldi_get_coordinate_response, _Coordinate, _Confidence}),
-    Config.
+    ?expect_message({vivaldi_get_coordinate_response, _Coordinate, _Confidence}).
 
 
-test_init(Config) ->
+test_init(_Config) ->
     pid_groups:join_as(atom_to_list(?MODULE), gossip),
     ?expect_no_message(),
     Ret = gossip_vivaldi:init([]),
     ?equals_pattern(Ret, {ok, {_RandomCoordinate, 1.0}}),
     ?expect_message({trigger_action, {gossip_vivaldi, default}}),
-    ?expect_no_message(),
-    Config.
+    ?expect_no_message().
 
 
-test_select_node(Config) ->
+test_select_node(_Config) ->
     Ret = gossip_vivaldi:select_node({[0.5, 0.5], 0.5}),
-    ?equals(Ret, {false, {[0.5, 0.5], 0.5}}),
-    Config.
+    ?equals(Ret, {false, {[0.5, 0.5], 0.5}}).
 
 
-test_select_data(Config) ->
+test_select_data(_Config) ->
     pid_groups:join_as(atom_to_list(?MODULE), gossip),
     Ret = gossip_vivaldi:select_data({[0.1, 0.1], 0.2}),
     ?equals(Ret, {ok, {[0.1, 0.1], 0.2}}),
     This = comm:this(),
     ?expect_message({selected_data, {gossip_vivaldi, default},
-                     {This, [0.1, 0.1], 0.2}}),
-    Config.
+                     {This, [0.1, 0.1], 0.2}}).
 
-test_select_reply_data(Config) ->
+
+test_select_reply_data(_Config) ->
     config:write(gossip_vivaldi_count_measurements, 1),
     config:write(gossip_vivaldi_measurements_delay, 0),
 
@@ -122,6 +116,5 @@ test_select_reply_data(Config) ->
                      {update_vivaldi_coordinate, _Latency, {[0.0, 0.0], 0.77}}}),
 
     config:write(gossip_vivaldi_count_measurements, 10),
-    config:write(gossip_vivaldi_measurements_delay, 1000),
-    Config.
+    config:write(gossip_vivaldi_measurements_delay, 1000).
 
