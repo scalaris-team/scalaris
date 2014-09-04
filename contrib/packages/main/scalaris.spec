@@ -134,7 +134,7 @@ make install-doc DESTDIR=$RPM_BUILD_ROOT
 %if 0%{?with_systemd}
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 cd contrib/systemd
-sed -e "s|/var/lib/scalaris|${scalaris_home}|g" \
+sed -e "s|/var/lib/scalaris|%{scalaris_home}|g" \
     -i scalaris.fc
 make -f /usr/share/selinux/devel/Makefile
 install -d %{buildroot}%{_datadir}/selinux/packages
