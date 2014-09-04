@@ -263,38 +263,6 @@ AC_RUN_IFELSE(
         AC_MSG_NOTICE([reference() is not built-in])])
 
 AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-type(mytype()::term()).], [ok])],
-       [AC_MSG_NOTICE([term() is a built-in type])],
-       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, term_not_builtin}"
-        EDOCMACROS="${EDOCMACROS}, {term_not_builtin, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dterm_not_builtin"
-        AC_MSG_NOTICE([term() is not built-in])])
-
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-type(mytype()::node()).], [ok])],
-       [AC_MSG_NOTICE([node() is a built-in type])],
-       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, node_not_builtin}"
-        EDOCMACROS="${EDOCMACROS}, {node_not_builtin, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dnode_not_builtin"
-        AC_MSG_NOTICE([node() is not built-in])])
-
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-type(mytype()::module()).], [ok])],
-       [AC_MSG_NOTICE([module() is a built-in type])],
-       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, module_not_builtin}"
-        EDOCMACROS="${EDOCMACROS}, {module_not_builtin, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dmodule_not_builtin"
-        AC_MSG_NOTICE([module() is not built-in])])
-
-AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-type(mytype()::boolean()).], [ok])],
-       [AC_MSG_NOTICE([boolean() is a built-in type])],
-       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, boolean_not_builtin}"
-        EDOCMACROS="${EDOCMACROS}, {boolean_not_builtin, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dboolean_not_builtin"
-        AC_MSG_NOTICE([boolean() is not built-in])])
-
-AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::tid()).], [ok])],
        [AC_MSG_NOTICE([tid() is a built-in type])],
        [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, tid_not_builtin}"

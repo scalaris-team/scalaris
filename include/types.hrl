@@ -18,22 +18,6 @@
 %% @end
 %% @version $Id$
 
--ifdef(term_not_builtin).
--type term() :: any().
--endif.
-
--ifdef(node_not_builtin).
--type node() :: erlang:node().
--endif.
-
--ifdef(module_not_builtin).
--type module() :: erlang:module().
--endif.
-
--ifdef(boolean_not_builtin).
--type boolean() :: bool().
--endif.
-
 -ifdef(tid_not_builtin).
 -type tid() :: ets:tid().
 -else.
