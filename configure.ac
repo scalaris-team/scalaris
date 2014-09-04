@@ -255,14 +255,6 @@ AS_IF([test "x$TOKEPREFIX" != xno],
 AC_SUBST([ERLANG_TOKE_FLAGS])
 
 AC_RUN_IFELSE(
-       [AC_LANG_PROGRAM([-type(mytype()::gb_tree()).], [ok])],
-       [AC_MSG_NOTICE([gb_tree() is a built-in type])],
-       [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, types_not_builtin}"
-        EDOCMACROS="${EDOCMACROS}, {types_not_builtin, true}"
-        DIALYZER_FLAGS="${DIALYZER_FLAGS} -Dtypes_not_builtin"
-        AC_MSG_NOTICE([gb_tree() is not built-in])])
-
-AC_RUN_IFELSE(
        [AC_LANG_PROGRAM([-type(mytype()::reference()).], [ok])],
        [AC_MSG_NOTICE([reference() is a built-in type])],
        [EMAKEFILEDEFINES="${EMAKEFILEDEFINES}, {d, reference_not_builtin}"
