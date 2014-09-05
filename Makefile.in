@@ -647,8 +647,7 @@ install-java: java contrib/init.d/scalaris-first-monitor
 	           contrib/init.d/scalaris-first-monitor
 
 contrib/init.d/scalaris-first: contrib/init.d/scalaris
-	sed -e 's|scalarisctl -n $${SCALARIS_NODE} -s -d --screen|scalarisctl -n $${SCALARIS_NODE} -m -f -s -d --screen|g' \
-	    -e 's|initd.conf|initd-first.conf|g' \
+	sed -e 's|initd.conf|initd-first.conf|g' \
 	    -e 's|Provides:          scalaris|Provides:          scalaris-first|g' \
 	    $${srcdir}$< > $@
 
