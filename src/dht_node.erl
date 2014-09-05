@@ -484,6 +484,8 @@ init(Options) ->
     % start trigger here to prevent infection when tracing e.g. node joins
     % (otherwise the trigger would be started at the end of the join and thus
     % be infected forever)
+    % NOTE: any trigger started here, needs an exception for queuing messages
+    %       in dht_node_join to prevent infection with msg_queue:send/1!
     rm_loop:init_first(),
     dht_node_move:send_trigger(),
 

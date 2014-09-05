@@ -550,6 +550,12 @@ process_join_state({rm, trigger} = _Msg, State) ->
     rm_loop:send_trigger(),
     State;
 
+% do not queue rm_trigger to prevent its infection with msg_queue:send/1
+process_join_state({move, check_for_timeouts} = _Msg, State) ->
+    ?TRACE_JOIN1(_Msg, element(2, State)),
+    dht_node_move:send_trigger(),
+    State;
+
 % Catch all other messages until the join procedure is complete
 process_join_state(Msg, {join, JoinState, QueuedMessages}) ->
     ?TRACE_JOIN1(Msg, JoinState),
