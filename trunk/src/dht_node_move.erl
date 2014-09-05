@@ -117,7 +117,7 @@
 
 -spec send_trigger() -> ok.
 send_trigger() ->
-    msg_delay:send_trigger(1, {move, check_for_timeouts}).
+    msg_delay:send_trigger(get_wait_for_reply_timeout() div 4, {move, check_for_timeouts}).
 
 %% @doc Processes move messages for the dht_node and implements the node move
 %%      protocol.
