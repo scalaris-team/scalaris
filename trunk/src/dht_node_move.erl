@@ -1535,6 +1535,8 @@ abort_slide(State, Node, SlideOpId, _Phase, SourcePid, Tag, Type, Reason, Notify
 -spec crashed_node(State::dht_node_state:state(), DeadPid::comm:mypid(),
                    Reason::fd:reason(), Cookie::{move, MoveFullId::slide_op:id()})
         -> dht_node_state:state().
+crashed_node(MyState, _DeadPid, jump, _Cookie) ->
+    MyState; % failure detectors are reused after jump
 crashed_node(MyState, _DeadPid, _Reason, {move, MoveFullId} = _Cookie) ->
     ?TRACE1({crash, _DeadPid, _Reason, _Cookie}, MyState),
     WorkerFun =
