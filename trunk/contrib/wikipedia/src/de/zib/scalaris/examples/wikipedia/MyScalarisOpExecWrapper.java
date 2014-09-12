@@ -119,6 +119,10 @@ public class MyScalarisOpExecWrapper {
             final APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;
             final String key2 = key + optimisation2.getWriteBucketString();
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
+        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE) {
+            final APPEND_INCREMENT_BUCKETS_WITH_WCACHE optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
+            final String key2 = key + optimisation2.getWriteBucketString(belongsTo);
+            executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
         } else {
             executor.addOp(new ScalarisIncrementOp1<T>(key, toAdd));
         }
