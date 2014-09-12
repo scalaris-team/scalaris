@@ -23,6 +23,6 @@ allow rabbitmq_beam_t scalaris_port_t:tcp_socket name_connect;
 allow rabbitmq_beam_t initrc_var_log_t:dir getattr;
 allow rabbitmq_beam_t var_t:dir read;
 allow rabbitmq_beam_t var_log_t:dir { getattr search read write };
-allow rabbitmq_beam_t var_log_t:file { getattr read write open };
+allow rabbitmq_beam_t var_log_t:file { getattr read write open create };
 allow rabbitmq_beam_t scalaris_file_t:dir { getattr search read write add_name };
 allow rabbitmq_beam_t scalaris_file_t:file { getattr read write open create };
