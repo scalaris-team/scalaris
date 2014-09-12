@@ -100,17 +100,20 @@ public class MyScalarisOpExecWrapper {
      * @param opType    the type of the operation
      * @param key       the key of the value to increment
      * @param toAdd     the value to increment by
+     * @param belongsTo the object this number belongs to, e.g. a page title to
+     *                  determine the partition the value gets added to or
+     *                  removed from
      * 
      * @param <T>       type of the value to add
      */
-    public <T extends Number> void addIncrement(final ScalarisOpType opType,
-            final String key, final T toAdd) {
+    public <T extends Number, U> void addIncrement(final ScalarisOpType opType,
+            final String key, final T toAdd, final U belongsTo) {
         final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(opType);
         if (optimisation instanceof APPEND_INCREMENT) {
             executor.addOp(new ScalarisIncrementOp2<T>(key, toAdd));
         } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
             final APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
-            final String key2 = key + optimisation2.getBucketString(toAdd);
+            final String key2 = key + optimisation2.getBucketString(belongsTo);
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
         } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) {
             final APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY) optimisation;

@@ -487,7 +487,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             //  PAGE LISTS UPDATE, step 1: append to / remove from old lists
             executor.addAppend(ScalarisOpType.SHORTREV_LIST, getRevListKey(title0, nsObject), new ShortRevision(newRev), null, null);
             if (articleCountChange != 0) {
-                executor.addIncrement(ScalarisOpType.ARTICLE_COUNT, getArticleCountKey(), articleCountChange);
+                executor.addIncrement(ScalarisOpType.ARTICLE_COUNT, getArticleCountKey(), articleCountChange, normTitleStr);
             }
 
             // write differences (categories, templates, backlinks)
@@ -553,7 +553,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
         MyScalarisOpExecWrapper executor = new MyScalarisOpExecWrapper(
                 executor0);
         
-        executor.addIncrement(ScalarisOpType.EDIT_STAT, getStatsPageEditsKey(), 1);
+        executor.addIncrement(ScalarisOpType.EDIT_STAT, getStatsPageEditsKey(), 1, getStatsPageEditsKey());
         try {
             executor.getExecutor().run();
         } catch (Exception e) {
