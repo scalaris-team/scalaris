@@ -159,11 +159,12 @@ fi
 %endif
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %if 0%{?with_systemd}
-semodule -i %{_datadir}/selinux/packages/scalaris.pp
+semodule -i %{_datadir}/selinux/packages/scalaris.pp || :
 if [ "$1" -le 1 ] ; then # First install
-  semanage port -a -t scalaris_port_t -p tcp 14194-14198
-  semanage port -a -t scalaris_port_t -p tcp 8000-8004
+  semanage port -a -t scalaris_port_t -p tcp 14194-14198 || :
+  semanage port -a -t scalaris_port_t -p tcp 8000-8004 || :
 fi
+/sbin/restorecon -R %{scalaris_home} || :
 %systemd_post scalaris.service scalaris-first.service
 %else
 /sbin/chkconfig --add scalaris
@@ -178,7 +179,7 @@ fi
 %if 0%{?with_systemd}
 %systemd_preun scalaris.service scalaris-first.service
 %else
-  if [ "$1" -eq 0 ] ; then  # final removal
+  if [ "$1" -eq 0 ] ; then # final removal
     /sbin/service scalaris stop >/dev/null 2>&1
     /sbin/chkconfig --del scalaris
   fi
@@ -193,10 +194,11 @@ fi
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %if 0%{?with_systemd}
 %systemd_postun_with_restart scalaris.service scalaris-first.service
-if [ "$1" -eq 0 ]; then
+if [ "$1" -eq 0 ]; then # final removal
   semanage port -d -t scalaris_port_t -p tcp 14194-14198 2>/dev/null || :
   semanage port -d -t scalaris_port_t -p tcp 8000-8004 2>/dev/null || :
-  semodule -r scalaris
+  semodule -r scalaris || :
+  /sbin/restorecon -R %{scalaris_home} || :
 fi
 %else
 if [ "$1" -ge 1 ] ; then  # pkg was updated -> restart
