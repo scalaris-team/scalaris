@@ -184,7 +184,7 @@ public class WikiDumpGetCategoryTreeHandler extends WikiDumpHandler {
             
             // templates:
             do {
-                final Set<String> pageTemplates_raw = wikiModel.getTemplates();
+                final Set<String> pageTemplates_raw = wikiModel.getTemplatesNoMagicWords();
                 ArrayList<NormalisedTitle> pageTemplates = new ArrayList<NormalisedTitle>(pageTemplates_raw.size());
                 for (String tpl_raw: pageTemplates_raw) {
                     NormalisedTitle template = new NormalisedTitle(

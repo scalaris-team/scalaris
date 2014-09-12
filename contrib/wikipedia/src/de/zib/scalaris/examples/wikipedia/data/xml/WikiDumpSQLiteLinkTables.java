@@ -284,7 +284,7 @@ public class WikiDumpSQLiteLinkTables implements WikiDump {
                                 MyWikiModel.normaliseName(cat_raw));
                         updateLinks2(page.getId(), category, stWriteCat, "categorylinks");
                     }
-                    for (String tpl_raw: wikiModel.getTemplates()) {
+                    for (String tpl_raw: wikiModel.getTemplatesNoMagicWords()) {
                         NormalisedTitle template = new NormalisedTitle(
                                 MyNamespace.TEMPLATE_NAMESPACE_KEY,
                                 MyWikiModel.normaliseName(tpl_raw));

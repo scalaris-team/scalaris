@@ -1979,7 +1979,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         wikiModel.setPageName(titleParts[1]);
         page.setPreview(wikiModel.renderPageWithCache(content));
         page.setIncludes(wikiModel.getIncludes());
-        page.setTemplates(wikiModel.getTemplates());
+        page.setTemplates(wikiModel.getTemplatesNoMagicWords());
         page.addStats(wikiModel.getStats());
         page.getInvolvedKeys().addAll(wikiModel.getInvolvedKeys());
         page.setPage(content);

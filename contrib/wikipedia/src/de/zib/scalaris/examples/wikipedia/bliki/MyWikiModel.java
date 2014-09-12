@@ -349,6 +349,38 @@ public class MyWikiModel extends WikiModel {
     protected boolean isMagicWord(String name) {
         return MyMagicWord.isMagicWord(name);
     }
+
+    /**
+     * Determines if a template name corresponds to a magic word using
+     * {@link #isMagicWord(String)} (also recognises magic
+     * words with parameters, e.g. <tt>TALKPAGENAME:Title</tt>).
+     * 
+     * @param name
+     *            the template name (without the template namespace)
+     * 
+     * @return whether the template is a magic word or not
+     */
+    public final boolean isMagicWordFull(String name) {
+        return isMagicWord(MyMagicWord.extractMagicWordPart(name));
+    }
+
+    /**
+     * Gets the names of all included pages in the template namespace (excluding
+     * magic words).
+     * 
+     * @return page names without the template namespace prefix
+     * @see #getTemplates()
+     */
+    public final Set<String> getTemplatesNoMagicWords() {
+        final Set<String> result = new HashSet<String>(templates.size());
+        // remove magic words:
+        for (String template : templates) {
+            if (!isMagicWordFull(template)) {
+                result.add(template);
+            }
+        }
+        return result;
+    }
     
     /**
      * Retrieves the contents of the given magic word using

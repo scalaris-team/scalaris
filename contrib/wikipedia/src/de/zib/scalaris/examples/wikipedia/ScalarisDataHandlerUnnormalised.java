@@ -397,7 +397,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             timeAtStart += (System.currentTimeMillis() - timeAtRenderStart);
             // note: no need to normalise the pages, we will do so during the write/read key generation
             oldCats = wikiModel.getCategories().keySet();
-            oldTpls = wikiModel.getTemplates();
+            oldTpls = wikiModel.getTemplatesNoMagicWords();
             if (Options.getInstance().WIKI_USE_BACKLINKS) {
                 oldLnks = wikiModel.getLinks();
             } else {
@@ -442,7 +442,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
                                 nsObject);
                     }
                 }, ScalarisOpType.CATEGORY_PAGE_LIST, ScalarisOpType.CATEGORY_PAGE_COUNT);
-        final Set<String> newTpls = wikiModel.getTemplates();
+        final Set<String> newTpls = wikiModel.getTemplatesNoMagicWords();
         Difference tplDiff = new Difference(oldTpls, newTpls,
                 new Difference.GetPageListKey() {
                     @Override
