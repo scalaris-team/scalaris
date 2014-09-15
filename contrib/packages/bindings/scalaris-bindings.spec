@@ -76,7 +76,7 @@ BuildRequires:  pkg-config
 %if 0%{?suse_version} > 1210
 BuildRequires:  python3-2to3
 %endif
-%if 0%{?suse_version} >= 1130 
+%if %{?suse_version} >= 1130 && %{?suse_version} <= 1310
 BuildRequires:  ruby(abi) >= 1.8
 %endif
 %endif
