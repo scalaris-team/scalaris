@@ -179,8 +179,11 @@
                Y
         ).
 
+-ifdef(enable_debug).
+-define(SCALARIS_RECV(X,Y), ?SCALARIS_RECV_DEBUG(X, Y)).
+-else.
 -define(SCALARIS_RECV(X,Y), ?SCALARIS_RECV_PRODUCTION(X, Y)).
-%-define(SCALARIS_RECV(X,Y), ?SCALARIS_RECV_DEBUG(X, Y)).
+-endif.
 
 -define(IIF(C, A, B), case C of
                           true -> A;
