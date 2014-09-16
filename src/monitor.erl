@@ -61,7 +61,6 @@
     {report_single, Process::atom(), Key::key(),
      NewValue_or_UpdateFun::term() | fun((Old::Value | undefined) -> New::Value)} |
     {check_timeslots} |
-    {get_rrds, [table_index(),...], SourcePid::comm:mypid()} |
     {web_debug_info, Requestor::comm:erl_local_pid()}.
 
 %% @doc Converts the given Key to avoid conflicts in erlang:put/get.
@@ -192,17 +191,26 @@ proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
 %% @doc Retrieve individual RRDs from monitor
 -spec get_rrds(MonitorPid::comm:erl_local_pid(), Keys::list(table_index())) -> list({atom(), key(), rrd:rrd() | undefined}).
 get_rrds(MonitorPid, Keys) ->
-    comm:send_local(MonitorPid, {get_rrds, Keys, comm:this()}),
-    trace_mpath:thread_yield(),
-    receive
-        ?SCALARIS_RECV(
-            {get_rrds_response, Response}, %% ->
-            Response
-          )
-    after
-        2000 ->
-            []
-    end.
+    %% we peek into the ets table of the monitor process
+    %% look-up ets tables which the monitor-pid owns
+    Table = case erlang:get(mygroup_monitors_table) of
+                undefined ->
+                    Tables = ets:all(),
+                    OwnedTables = [ X || X <- Tables,
+                                         MonitorPid =:= ets:info(X, owner) ],
+                    Tab = hd(OwnedTables),
+                    erlang:put(mygroup_monitors_table, Tab),
+                    Tab;
+                X -> X
+            end,
+
+    Res = [case get_rrd(Table, TableIndex) of
+         undefined when Process =:= api_tx andalso Key =:= 'req_list' ->
+             %% special case: always return an empty rrd for {api_tx, req_list}
+             {Process, Key, init_apitx_reqlist_rrd(os:timestamp())};
+         Value -> {Process, Key, Value}
+     end || {Process, Key} = TableIndex <- Keys],
+    Res.
 
 -spec clear_rrds(MonitorPid::comm:erl_local_pid(), Keys::list(table_index())) -> ok.
 clear_rrds(MonitorPid, Keys) ->
@@ -245,16 +253,6 @@ on({check_timeslots}, {_Table, OldApiTxReqList} = State) ->
     % manual check for {api_tx, req_list} necessary:
     NewApiTxReqList = rrd:check_timeslot_now(OldApiTxReqList),
     check_report(api_tx, 'req_list', OldApiTxReqList, NewApiTxReqList),
-    State;
-
-on({get_rrds, TableIndexes, SourcePid}, {Table, ApiTxReqList} = State) ->
-    MyData = [case get_rrd(Table, TableIndex) of
-                  undefined when Process =:= api_tx andalso Key =:= 'req_list' ->
-                      % special case: always return an empty rrd for {api_tx, req_list}
-                      {Process, Key, init_apitx_reqlist_rrd(rrd:get_current_time(ApiTxReqList))};
-                  Value -> {Process, Key, Value}
-              end || {Process, Key} = TableIndex <- TableIndexes],
-    comm:send(SourcePid, {get_rrds_response, MyData}),
     State;
 
 on({get_rrd_keys, SourcePid}, {Table, _} = State) ->
