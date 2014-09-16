@@ -61,7 +61,8 @@ init() ->
         true ->
             _ = application:start(sasl),   %% required by os_mon.
             _ = application:start(os_mon), %% for monitoring cpu and memory usage.
-            _ = cpu_sup:util(), %% throw away first util value
+            %% cpu_sup not available on all OSs
+            catch cpu_sup:util(), %% throw away first util value
             {InitialReductions, Timestamp} = get_reductions(),
             set_last_reductions(InitialReductions, Timestamp),
             ResolutionSecs = config:read(lb_active_monitor_resolution) div 1000,
@@ -80,14 +81,20 @@ init() ->
 -spec trigger_routine() -> ok.
 trigger_routine() ->
     trigger(),
-    CPU = erlang:round(cpu_sup:util()),
-    [{system_total_memory, _Total},
-     {free_swap, _FreeSwap},
-     {total_swap, _TotalSwap},
-     {cached_memory, _CachedMemory},
-     {buffered_memory, _BufferedMemory},
-     {free_memory, FreeMemory},
-     {total_memory, TotalMemory}] = memsup:get_system_memory_data(),
+    %% cpu_sup not available on all OSs
+    CPU = try
+              erlang:round(cpu_sup:util())
+          catch
+              _ -> 0
+              %% can we use the avg1 instead, somehow?
+              %% _ -> erlang:round(cpu_sup:avg1())
+          end,
+
+    %% actual keys memsup returns depends on the OS
+    MemInfo = memsup:get_system_memory_data(),
+    {free_memory, FreeMemory} = lists:keyfind(free_memory, 1, MemInfo),
+    {total_memory, TotalMemory} = lists:keyfind(total_memory, 1, MemInfo),
+
     MEM = FreeMemory / TotalMemory * 100,
     {NewReductions, NewTimestamp} = get_reductions(),
     {OldReductions, OldTimestamp} = get_last_reductions(),
@@ -188,7 +195,7 @@ get_metric(MonitorPid, Metric) ->
             unknown;
         [{_Process, _Key, RRD}] ->
             RRDVals = rrd:get_all_values(asc, RRD),
-            % max number of consecutive non-undefined values at the end of RRDVals
+            %% max number of consecutive non-undefined values at the end of RRDVals
             NumDefined = lists:foldl(fun(undefined, _Acc) -> 0;
                                         (_, Acc)          -> Acc + 1
                                      end, 0, RRDVals),
