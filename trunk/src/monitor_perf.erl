@@ -45,8 +45,6 @@
     {propagate} |
     {get_node_details_response, node_details:node_details()} |
     {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::uid:global_uid()}, Parents::[comm:mypid(),...]} |
-    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::uid:global_uid()}} |
-    {{get_rrds_response, [{Process::atom(), Key::monitor:key(), DB::rrd:rrd() | undefined}]}, {SourcePid::comm:mypid(), Id::uid:global_uid(), MyMonData::[{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
     {bulkowner, gather, Id::uid:global_uid(), Target::comm:mypid(), Msgs::[comm:message(),...], Parents::[comm:mypid()]} |
     {bulkowner, reply, Id::uid:global_uid(), {gather_stats_response, Id::uid:global_uid(), [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
     {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
@@ -92,26 +90,26 @@ bench_service_loop(Owner) ->
 -spec init_system_stats() -> ok.
 init_system_stats() ->
     % system stats in 10s intervals:
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'mem_total', rrd:create(15 * 1000000, 1, gauge)),
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'mem_processes', rrd:create(15 * 1000000, 1, gauge)),
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'mem_system', rrd:create(15 * 1000000, 1, gauge)),
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'mem_atom', rrd:create(15 * 1000000, 1, gauge)),
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'mem_binary', rrd:create(15 * 1000000, 1, gauge)),
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'mem_ets', rrd:create(15 * 1000000, 1, gauge)),
     
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'rcv_count', rrd:create(15 * 1000000, 1, gauge)),
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'rcv_bytes', rrd:create(15 * 1000000, 1, gauge)),
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'send_count', rrd:create(15 * 1000000, 1, gauge)),
-    monitor:client_monitor_set_value(
+    monitor:monitor_set_value(
       ?MODULE, 'send_bytes', rrd:create(15 * 1000000, 1, gauge)),
 
     collect_system_stats().
@@ -122,33 +120,35 @@ collect_system_stats() ->
      {atom, MemAtom}, {binary, MemBin}, {ets, MemEts}] =
         erlang:memory([total, processes, system, atom, binary, ets]),
     
-    monitor:client_monitor_set_value(?MODULE, 'mem_total',
+    monitor:monitor_set_value(?MODULE, 'mem_total',
                            fun(Old) -> rrd:add_now(MemTotal, Old) end),
-    monitor:client_monitor_set_value(?MODULE, 'mem_processes',
+    monitor:monitor_set_value(?MODULE, 'mem_processes',
                            fun(Old) -> rrd:add_now(MemProcs, Old) end),
-    monitor:client_monitor_set_value(?MODULE, 'mem_system',
+    monitor:monitor_set_value(?MODULE, 'mem_system',
                            fun(Old) -> rrd:add_now(MemSys, Old) end),
-    monitor:client_monitor_set_value(?MODULE, 'mem_atom',
+    monitor:monitor_set_value(?MODULE, 'mem_atom',
                            fun(Old) -> rrd:add_now(MemAtom, Old) end),
-    monitor:client_monitor_set_value(?MODULE, 'mem_binary',
+    monitor:monitor_set_value(?MODULE, 'mem_binary',
                            fun(Old) -> rrd:add_now(MemBin, Old) end),
-    monitor:client_monitor_set_value(?MODULE, 'mem_ets',
+    monitor:monitor_set_value(?MODULE, 'mem_ets',
                            fun(Old) -> rrd:add_now(MemEts, Old) end),
     
     {RcvCnt, RcvBytes, SendCnt, SendBytes} = comm_stats:get_stats(),
-    monitor:client_monitor_set_value(?MODULE, 'rcv_count',
+    monitor:monitor_set_value(?MODULE, 'rcv_count',
                            fun(Old) -> rrd:add_now(RcvCnt, Old) end),
-    monitor:client_monitor_set_value(?MODULE, 'rcv_bytes',
+    monitor:monitor_set_value(?MODULE, 'rcv_bytes',
                            fun(Old) -> rrd:add_now(RcvBytes, Old) end),
-    monitor:client_monitor_set_value(?MODULE, 'send_count',
+    monitor:monitor_set_value(?MODULE, 'send_count',
                            fun(Old) -> rrd:add_now(SendCnt, Old) end),
-    monitor:client_monitor_set_value(?MODULE, 'send_bytes',
+    monitor:monitor_set_value(?MODULE, 'send_bytes',
                            fun(Old) -> rrd:add_now(SendBytes, Old) end).
 
 %% @doc Message handler when the rm_loop module is fully initialized.
 -spec on(message(), state()) -> state().
 on({bench} = Msg, {AllNodes, Leader, BenchPid, _IgnBenchT} = _State) ->
     ?TRACE1(Msg, _State),
+    % periodic task to execute a mini-benchmark (in a separate process)
+    % (result will be send in a 'bench_result' message)
     case get_bench_interval() of
         0 -> ok;
         I -> msg_delay:send_trigger(I, {bench}),
@@ -161,6 +161,7 @@ on({bench} = Msg, {AllNodes, Leader, BenchPid, _IgnBenchT} = _State) ->
 on({bench_result, Time, TimeInMs} = _Msg,
    {AllNodes, Leader, BenchPid, _IgnBenchT} = _State) ->
     ?TRACE1(_Msg, _State),
+    % result from the mini-benchmark triggered by the {bench} message
     monitor:proc_set_value(?MODULE, 'read_read',
                            fun(Old) -> rrd:add(Time, TimeInMs, Old) end),
     % ignore the bench_timeout message that will follow
@@ -180,122 +181,147 @@ on({bench_timeout, Time, BenchPid} = _Msg,
     {AllNodes, Leader, NewBenchPid, false};
 
 on({bench_timeout, _Time, _BenchPid} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
+    %?TRACE1(_Msg, State),
     % old or ignored timeout message
     State;
 
 on({collect_system_stats} = _Msg, State) ->
     ?TRACE1(_Msg, State),
+    % collect system stats, e.g. memory info, and send to monitor
     msg_delay:send_trigger(10, {collect_system_stats}),
     collect_system_stats(),
     State;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% gather global performance data with bulkowner
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 on({propagate} = _Msg, State) ->
     ?TRACE1(_Msg, State),
+    % identify whether a DHT leader node is present in this VM
     msg_delay:send_trigger(get_gather_interval(), {propagate}),
-    DHT_Node = pid_groups:get_my(dht_node),
-    comm:send_local(DHT_Node, {get_node_details, comm:this(), [my_range]}),
+    Msg = {get_node_details, comm:this(), [my_range]},
+    _ = [comm:send_local(Pid, Msg) || Pid <- pid_groups:find_all(dht_node)],
     State;
 
 on({get_node_details_response, NodeDetails} = _Msg,
    {AllNodes, Leader, BenchPid, IgnBenchT} = State) ->
     ?TRACE1(_Msg, State),
+    % response to {propagate} from all local DHT nodes
+    % if any of them is a leader node, start propagation with bulkowner
     case is_leader(node_details:get(NodeDetails, my_range)) of
         false -> State;
         _ ->
             % start a new timeslot and gather stats...
             NewId = uid:get_global_uid(),
-            Msg = {?send_to_group_member, monitor_perf, {gather_stats, comm:this()}},
-            bulkowner:issue_bulk_owner(NewId, intervals:all(), Msg),
+            BMsg = {?send_to_registered_proc, monitor_perf, {gather_stats, comm:this()}},
+            bulkowner:issue_bulk_owner(NewId, intervals:all(), BMsg),
+            % create a new timeslot if required
             Leader1 = check_timeslots(Leader),
-            broadcast_values(Leader, Leader1),
+            % broadcast values from the previous timeslot if a new one was started
+            broadcast_previous_values(Leader, Leader1),
             {AllNodes, Leader1#state{id = NewId}, BenchPid, IgnBenchT}
     end;
 
-on({bulkowner, deliver, Id, Range, {gather_stats, SourcePid}, Parents} = _Msg, State) ->
+on({bulkowner, deliver, Id, _Range, {gather_stats, SourcePid}, Parents} = _Msg, State) ->
     ?TRACE1(_Msg, State),
-    This = comm:reply_as(comm:this(), 2, {collect, '_',
-                                          {SourcePid, Id, Range, Parents}}),
-    comm:send_local(pid_groups:get_my(monitor),
-                    {get_rrds, [{?MODULE, 'read_read'}, {dht_node, 'lookup_hops'}], This}),
-    State;
-
-on({collect, {get_rrds_response, DBs}, {SourcePid, Id, Range, Parents}} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
-    MyMonData = process_rrds(DBs),
-    This = comm:reply_as(comm:this(), 2,
-                         {collect, '_', {SourcePid, Id, Range, Parents, MyMonData}}),
-    comm:send_local(pid_groups:pid_of("clients_group", monitor),
-                    {get_rrds, [{api_tx, 'req_list'}], This}),
-    State;
-
-on({collect, {get_rrds_response, DBs}, {SourcePid, Id, _Range, Parents, MyMonData}} = _Msg, State) ->
-    ?TRACE1(_Msg, State),
-    AllData = lists:append([MyMonData, process_rrds(DBs)]),
-    case AllData of
+    % retrieve stats for gather_stats
+    MyMonitor = pid_groups:get_my(monitor), % "basic_services" group
+    [Val_RR] = monitor:get_rrds(MyMonitor, [{?MODULE, 'read_read'}]),
+    ClientMonitor = pid_groups:pid_of("clients_group", monitor),
+    [Val_TX] = monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]),
+    % no need to reduce the multiple LH values - the next gather handler will do that
+    DB_LH = [begin
+                 [Val_LH] = monitor:get_rrds(Monitor, [{dht_node, 'lookup_hops'}]),
+                 Val_LH
+             end || Monitor <- pid_groups:find_all(monitor),
+                    Monitor =/= MyMonitor,
+                    Monitor =/= ClientMonitor],
+    case process_rrds([Val_RR, Val_TX | DB_LH ]) of
         [] -> ok;
-        _  -> ReplyMsg = {?send_to_group_member, monitor_perf, {gather_stats_response, AllData}},
-              bulkowner:issue_send_reply(Id, SourcePid, ReplyMsg, Parents)
+        AllData ->
+            ReplyMsg = {?send_to_registered_proc, monitor_perf, {gather_stats_response, AllData}},
+            bulkowner:issue_send_reply(Id, SourcePid, ReplyMsg, Parents)
     end,
     State;
 
-on({bulkowner, gather, Id, Target, Msgs, Parents}, State) ->
+on({bulkowner, gather, Id, Target, Msgs, Parents} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
+    % gather replies from bulkowner_deliver with gather_stats
     {PerfRR, PerfLH, PerfTX} =
         lists:foldl(
-             fun({gather_stats_response, Data1},
-                 {PerfRR1, PerfLH1, PerfTX1}) ->
+             fun({gather_stats_response, Data1}, {PerfRR1, PerfLH1, PerfTX1}) ->
                      lists:foldl(
-                       fun(Data2, {PerfRR2, PerfLH2, PerfTX2}) ->
-                               case Data2 of
-                                   {?MODULE, 'read_read', PerfRR3} ->
-                                       {rrd:timing_with_hist_merge_fun(0, PerfRR2, PerfRR3), PerfLH2, PerfTX2};
-                                   {dht_node, 'lookup_hops', PerfLH3} ->
-                                       {PerfRR2, rrd:timing_with_hist_merge_fun(0, PerfLH2, PerfLH3), PerfTX2};
-                                   {api_tx, 'req_list', PerfTX3} ->
-                                       {PerfRR2, PerfLH2, rrd:timing_with_hist_merge_fun(0, PerfTX2, PerfTX3)}
-                               end
+                       fun({?MODULE, 'read_read', PerfRR3}, {PerfRR2, PerfLH2, PerfTX2}) ->
+                               {rrd:timing_with_hist_merge_fun(0, PerfRR2, PerfRR3), PerfLH2, PerfTX2};
+                          ({dht_node, 'lookup_hops', PerfLH3}, {PerfRR2, PerfLH2, PerfTX2}) ->
+                               {PerfRR2, rrd:timing_with_hist_merge_fun(0, PerfLH2, PerfLH3), PerfTX2};
+                          ({api_tx, 'req_list', PerfTX3}, {PerfRR2, PerfLH2, PerfTX2}) ->
+                               {PerfRR2, PerfLH2, rrd:timing_with_hist_merge_fun(0, PerfTX2, PerfTX3)}
                        end, {PerfRR1, PerfLH1, PerfTX1}, Data1)
              end, {undefined, undefined, undefined}, Msgs),
     
-    Msg = {?send_to_group_member, monitor_perf,
+    Msg = {?send_to_registered_proc, monitor_perf,
            {gather_stats_response, [{?MODULE, 'read_read', PerfRR},
                                     {dht_node, 'lookup_hops', PerfLH},
                                     {api_tx, 'req_list', PerfTX}]}},
-    bulkowner:send_reply(Id, Target, Msg, Parents, pid_groups:get_my(dht_node)),
+    bulkowner:send_reply(Id, Target, Msg, Parents, self()),
+    State;
+
+on({send_error, FailedTarget, {bulkowner, reply, Id, Target, BMsg, Parents}, _Reason} = _Msg, State) ->
+    ?TRACE1(_Msg, State),
+    % if sending the reply from bulkowner gather fails
+    bulkowner:send_reply_failed(Id, Target, BMsg, Parents, self(), FailedTarget),
     State;
 
 on({bulkowner, reply, Id, {gather_stats_response, DataL}} = _Msg,
    {AllNodes, Leader, BenchPid, IgnBenchT} = _State)
   when Id =:= Leader#state.id ->
     ?TRACE1(_Msg, _State),
+    % final aggregation of gather_stats at the leader
     Leader1 =
         lists:foldl(
-          fun(Data, A) ->
-                  case Data of
-                      {?MODULE, 'read_read', PerfRR} ->
-                          DB = A#state.perf_rr,
-                          T = rrd:get_current_time(DB),
-                          A#state{perf_rr = rrd:add_with(T, PerfRR, DB, fun rrd:timing_with_hist_merge_fun/3)};
-                      {dht_node, 'lookup_hops', PerfLH} ->
-                          DB = A#state.perf_lh,
-                          T = rrd:get_current_time(DB),
-                          A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun rrd:timing_with_hist_merge_fun/3)};
-                      {api_tx, 'req_list', PerfTX} ->
-                          DB = A#state.perf_tx,
-                          T = rrd:get_current_time(DB),
-                          A#state{perf_tx = rrd:add_with(T, PerfTX, DB, fun rrd:timing_with_hist_merge_fun/3)}
-                  end
+          fun({?MODULE, 'read_read', PerfRR}, A = #state{perf_rr = DB}) ->
+                  T = rrd:get_current_time(DB),
+                  A#state{perf_rr = rrd:add_with(T, PerfRR, DB, fun rrd:timing_with_hist_merge_fun/3)};
+             ({dht_node, 'lookup_hops', PerfLH}, A = #state{perf_lh = DB}) ->
+                  T = rrd:get_current_time(DB),
+                  A#state{perf_lh = rrd:add_with(T, PerfLH, DB, fun rrd:timing_with_hist_merge_fun/3)};
+             ({api_tx, 'req_list', PerfTX}, A = #state{perf_tx = DB}) ->
+                  T = rrd:get_current_time(DB),
+                  A#state{perf_tx = rrd:add_with(T, PerfTX, DB, fun rrd:timing_with_hist_merge_fun/3)}
           end, Leader, DataL),
     {AllNodes, Leader1, BenchPid, IgnBenchT};
 on({bulkowner, reply, _Id, {gather_stats_response, _Data}} = _Msg, State) ->
     ?TRACE1(_Msg, State),
+    % final aggregation of gather_stats when not the leader or old ID -> ignore
     State;
 
-on({bulkowner, deliver, _Id, _Range, {report_value, OtherState}, _Parents} = _Msg,
-   {AllNodes, Leader, BenchPid, IgnBenchT} = _State) ->
-    ?TRACE1(_Msg, _State),
-    AllNodes1 = integrate_values(AllNodes, OtherState),
-    {AllNodes1, Leader, BenchPid, IgnBenchT};
+on({bulkowner, deliver, Id, _Range, {report_value, _OtherState}, _Parents} = _Msg,
+   {AllNodes, _Leader, _BenchPid, _IgnBenchT} = State)
+  when Id =:= AllNodes#state.id ->
+    % duplicate message
+    State;
+
+on({bulkowner, deliver, Id, _Range, {report_value, OtherState}, _Parents} = _Msg,
+   {AllNodes, Leader, BenchPid, IgnBenchT} = State) ->
+    % if the leader has not changed, only accept newer GUIDs
+    % (there could be multiple deliver messages if more than one dht_node exist in this VM)
+    case (not uid:from_same_pid(Id, AllNodes#state.id)) orelse
+             uid:is_old_uid(AllNodes#state.id, Id) of
+        true ->
+            ?TRACE1(_Msg, State),
+            % integrate value send via broadcast from leader
+            AllNodes1 = integrate_values(AllNodes, OtherState),
+            {AllNodes1#state{id = Id}, Leader, BenchPid, IgnBenchT};
+        _ ->
+            % drop old or duplicate message
+            State
+    end;
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% misc.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 on({get_rrds, KeyList, SourcePid},
    {AllNodes, _Leader, _BenchPid, _IgnBenchT} = State) ->
@@ -340,7 +366,8 @@ on({web_debug_info, Requestor} = _Msg,
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(DHTNodeGroup) ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, null,
-                             [{pid_groups_join_as, DHTNodeGroup, monitor_perf}]).
+                             [{erlang_register, ?MODULE},
+                              {pid_groups_join_as, DHTNodeGroup, monitor_perf}]).
 
 %% @doc Initialises the module with an empty state.
 -spec init(null) -> state().
@@ -374,18 +401,21 @@ check_timeslots(State = #state{perf_rr = PerfRR, perf_lh = PerfLH, perf_tx = Per
                 perf_lh = rrd:check_timeslot_now(PerfLH),
                 perf_tx = rrd:check_timeslot_now(PerfTX)}.
 
--spec broadcast_values(OldState::#state{}, NewState::#state{}) -> ok.
-broadcast_values(OldState, NewState) ->
+-spec broadcast_previous_values(OldState::#state{}, NewState::#state{}) -> ok.
+broadcast_previous_values(OldState, NewState) ->
     % broadcast the latest value only if a new time slot was started
-    PerfRRNewSlot = rrd:get_slot_start(0, OldState#state.perf_rr) =/= rrd:get_slot_start(0, NewState#state.perf_rr),
-    PerfLHNewSlot = rrd:get_slot_start(0, OldState#state.perf_lh) =/= rrd:get_slot_start(0, NewState#state.perf_lh),
-    PerfTXNewSlot = rrd:get_slot_start(0, OldState#state.perf_tx) =/= rrd:get_slot_start(0, NewState#state.perf_tx),
-    case PerfRRNewSlot orelse PerfLHNewSlot orelse PerfTXNewSlot of
-        true -> % new slot -> broadcast latest values only:
-            SendState = reduce_timeslots(1, OldState),
-            Msg = {?send_to_group_member, monitor_perf, {report_value, SendState}},
-            bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg);
-        _ -> ok %nothing to do
+    PerfRRNewSlot = rrd:get_slot_start(0, OldState#state.perf_rr) =/=
+                        rrd:get_slot_start(0, NewState#state.perf_rr),
+    PerfLHNewSlot = rrd:get_slot_start(0, OldState#state.perf_lh) =/=
+                        rrd:get_slot_start(0, NewState#state.perf_lh),
+    PerfTXNewSlot = rrd:get_slot_start(0, OldState#state.perf_tx) =/=
+                        rrd:get_slot_start(0, NewState#state.perf_tx),
+    if PerfRRNewSlot orelse PerfLHNewSlot orelse PerfTXNewSlot ->
+           % new slot -> broadcast latest values only:
+           SendState = reduce_timeslots(1, OldState),
+           Msg = {?send_to_registered_proc, monitor_perf, {report_value, SendState}},
+           bulkowner:issue_bulk_owner(uid:get_global_uid(), intervals:all(), Msg);
+       true -> ok % nothing to do
     end.
 
 -spec reduce_timeslots(N::pos_integer(), State::#state{}) -> #state{}.

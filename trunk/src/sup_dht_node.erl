@@ -104,8 +104,6 @@ childs([{DHTNodeGroup, Options}]) ->
     %% end,
     Monitor =
         sup:worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
-    MonitorPerf =
-        sup:worker_desc(monitor_perf, monitor_perf, start_link, [DHTNodeGroup]),
     RepUpdate =
         case config:read(rrepair_enabled) of
             true -> sup:worker_desc(rrepair, rrepair, start_link, [DHTNodeGroup]);
@@ -131,7 +129,6 @@ childs([{DHTNodeGroup, Options}]) ->
                     SupWPool,
                     WPool,
                     SupDHTNodeCore_AND,
-                    MonitorPerf,
                     RepUpdate,
                     Autoscale,
                     RMLeases,
