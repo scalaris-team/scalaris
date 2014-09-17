@@ -469,6 +469,11 @@ handle_message({?send_to_group_member, Processname, Msg}, UState, _Handler) ->
     %% initiated via comm:send/3 with group_member
     comm:forward_to_group_member(Processname, Msg),
     UState;
+handle_message({?send_to_registered_proc, Processname, Msg}, UState, _Handler) ->
+    %% forward a message to a registered process
+    %% initiated via comm:send/3 with registered_proc
+    comm:forward_to_registered_proc(Processname, Msg),
+    UState;
 handle_message(Msg, UState, Handler) ->
     Handler(Msg, UState).
 

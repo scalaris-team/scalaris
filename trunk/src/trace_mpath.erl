@@ -516,6 +516,9 @@ get_msg_tag(Msg) ->
         ?send_to_group_member_atom ->
             {?send_to_group_member_atom, _PidName, EmbeddedMsg} = Msg,
             {send_to_group_member, get_msg_tag(EmbeddedMsg)};
+        ?send_to_registered_proc_atom ->
+            {?send_to_registered_proc_atom, _PidName, EmbeddedMsg} = Msg,
+            {send_to_registered_proc, get_msg_tag(EmbeddedMsg)};
         TagX when TagX =:= ?lookup_aux_atom orelse
                       TagX =:= ?lookup_fin_atom ->
             {TagX, _Key, _Hops, WrappedMsg} = Msg,

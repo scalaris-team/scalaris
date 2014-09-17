@@ -307,6 +307,8 @@ prettyprint_msg({?lookup_fin, Key, Hops, Msg}) ->
     {util:extint2atom(?lookup_fin), Key, Hops, prettyprint_msg(Msg)};
 prettyprint_msg({?send_to_group_member, ProcessName, Msg}) ->
     {util:extint2atom(?send_to_group_member), ProcessName, prettyprint_msg(Msg)};
+prettyprint_msg({?send_to_registered_proc, ProcessName, Msg}) ->
+    {util:extint2atom(?send_to_registered_proc), ProcessName, prettyprint_msg(Msg)};
 prettyprint_msg(Msg) ->
     setelement(1, Msg, util:extint2atom(element(1, Msg))).
     
