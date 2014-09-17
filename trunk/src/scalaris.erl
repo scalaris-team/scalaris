@@ -89,6 +89,8 @@ start(normal, []) ->
 
 -spec stop(any()) -> ok.
 stop(_State) ->
+    sup:sup_terminate(main_sup),
+    sup_scalaris:stop_first_services(),
     ok.
 
 %% functions called by Erlangs init module, triggered via command line
