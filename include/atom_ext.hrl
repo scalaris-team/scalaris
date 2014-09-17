@@ -49,6 +49,9 @@
 -define(quiet_atom, quiet).
 -define(quiet, ?int_or_atom(14, ?quiet_atom)).
 
+-define(send_to_registered_proc_atom, send_to_registered_proc).
+-define(send_to_registered_proc, ?int_or_atom(15, ?send_to_registered_proc_atom)).
+
 %% dht_node
 -define(get_key_with_id_reply_atom, get_key_with_id_reply).
 -define(get_key_with_id_reply, ?int_or_atom(21, ?get_key_with_id_reply_atom)).

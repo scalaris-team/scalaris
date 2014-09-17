@@ -1306,6 +1306,7 @@ extint2atom(X) when is_integer(X) ->
         ?lookup_fin -> ?lookup_fin_atom;
         %% comm
         ?send_to_group_member -> ?send_to_group_member_atom;
+        ?send_to_registered_proc -> ?send_to_registered_proc_atom;
         ?deliver -> ?deliver_atom;
         ?unpack_msg_bundle -> ?unpack_msg_bundle_atom;
         ?quiet -> ?quiet_atom;
