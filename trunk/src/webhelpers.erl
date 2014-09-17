@@ -883,18 +883,18 @@ get_diff_data([_TimeLast, ValueLast], [Cur = [TimeCur, ValueCur] | Rest])
 
 -spec getMonitorRingData() -> [html_type()].
 getMonitorRingData() ->
-    case whereis(monitor_perf) of
-        unknown ->
+    case pid_groups:pid_of("basic_services", monitor) of
+        failed ->
             Prefix = {p, [], "NOTE: no monitor_perf in this VM"},
             DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
         Monitor ->
             Prefix = [],
-            ReqKeys = [{monitor_perf, 'read_read'}, {dht_node, 'lookup_hops'}, {api_tx, 'req_list'}],
+            ReqKeys = [{monitor_perf, 'agg_read_read'}, {dht_node, 'agg_lookup_hops'}, {api_tx, 'agg_req_list'}],
             case statistics:getTimingMonitorStats(Monitor, ReqKeys, list) of
                 [] -> DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
-                [{monitor_perf, 'read_read', DataRR},
-                 {dht_node, 'lookup_hops', DataLH},
-                 {api_tx, 'req_list', DataTX}] -> ok
+                [{monitor_perf, 'agg_read_read', DataRR},
+                 {dht_node, 'agg_lookup_hops', DataLH},
+                 {api_tx, 'agg_req_list', DataTX}] -> ok
             end
     end,
     {_RRCountD, _RRCountPerSD, RRAvgMsD, RRMinMsD, RRMaxMsD, RRStddevMsD, _RRHistMsD} = DataRR,

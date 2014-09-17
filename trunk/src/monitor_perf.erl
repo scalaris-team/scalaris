@@ -47,8 +47,7 @@
     {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(), {gather_stats, SourcePid::comm:mypid(), Id::uid:global_uid()}, Parents::[comm:mypid(),...]} |
     {bulkowner, gather, Id::uid:global_uid(), Target::comm:mypid(), Msgs::[comm:message(),...], Parents::[comm:mypid()]} |
     {bulkowner, reply, Id::uid:global_uid(), {gather_stats_response, Id::uid:global_uid(), [{Process::atom(), Key::monitor:key(), Data::rrd:timing_type()}]}} |
-    {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]} |
-    {get_rrds, [{Process::atom(), Key::monitor:key()},...], SourcePid::comm:mypid()}.
+    {bulkowner, deliver, Id::uid:global_uid(), Range::intervals:interval(), {report_value, StatsOneRound::#state{}}, Parents::[comm:mypid(),...]}.
 
 %-define(TRACE(X,Y), log:pal(X,Y)).
 -define(TRACE(X,Y), ok).
@@ -312,7 +311,12 @@ on({bulkowner, deliver, Id, _Range, {report_value, OtherState}, _Parents} = _Msg
         true ->
             ?TRACE1(_Msg, State),
             % integrate value send via broadcast from leader
-            AllNodes1 = integrate_values(AllNodes, OtherState),
+            #state{perf_rr = Perf_RR, perf_lh = Perf_LH, perf_tx = Perf_TX} =
+                AllNodes1 = integrate_values(AllNodes, OtherState),
+            % send to the own monitor
+            monitor:monitor_set_value(?MODULE,  'agg_read_read', Perf_RR),
+            monitor:monitor_set_value(dht_node, 'agg_lookup_hops', Perf_LH),
+            monitor:monitor_set_value(api_tx,   'agg_req_list', Perf_TX),
             {AllNodes1#state{id = Id}, Leader, BenchPid, IgnBenchT};
         _ ->
             % drop old or duplicate message
@@ -322,23 +326,6 @@ on({bulkowner, deliver, Id, _Range, {report_value, OtherState}, _Parents} = _Msg
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% misc.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-on({get_rrds, KeyList, SourcePid},
-   {AllNodes, _Leader, _BenchPid, _IgnBenchT} = State) ->
-    MyData = [begin
-                  Value = case FullKey of
-                              {?MODULE, 'read_read'} ->
-                                  AllNodes#state.perf_rr;
-                              {dht_node, 'lookup_hops'} ->
-                                  AllNodes#state.perf_lh;
-                              {api_tx, 'req_list'} ->
-                                  AllNodes#state.perf_tx;
-                              _ -> undefined
-                          end,
-                  {Process, Key, Value}
-              end || {Process, Key} = FullKey <- KeyList],
-    comm:send(SourcePid, {get_rrds_response, MyData}),
-    State;
 
 on({web_debug_info, Requestor} = _Msg,
    {AllNodes, Leader, _BenchPid, _IgnBenchT} = State) ->
@@ -385,10 +372,14 @@ init(null) ->
     init_system_stats(),
     msg_delay:send_trigger(10, {collect_system_stats}),
     Now = os:timestamp(),
+    Perf_RR = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
+    Perf_LH = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now),
+    Perf_TX = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
     State = #state{id = uid:get_global_uid(),
-                   perf_rr = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now),
-                   perf_lh = rrd:create(get_gather_interval() * 1000000, 60, {timing, count}, Now),
-                   perf_tx = rrd:create(get_gather_interval() * 1000000, 60, {timing_with_hist, ms}, Now)},
+                   perf_rr = Perf_RR, perf_lh = Perf_LH, perf_tx = Perf_TX},
+    monitor:monitor_set_value(?MODULE,  'agg_read_read', Perf_RR),
+    monitor:monitor_set_value(dht_node, 'agg_lookup_hops', Perf_LH),
+    monitor:monitor_set_value(api_tx,   'agg_req_list', Perf_TX),
     {State, State, BenchPid, false}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
