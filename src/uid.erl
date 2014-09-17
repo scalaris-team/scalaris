@@ -69,14 +69,14 @@ is_my_old_uid(_Id) ->
     false.
 
 %% @doc Checks whether GUID1 is an old incarnation of GUID2.
--spec is_old_uid(GUID1::global_uid(), GUID2::global_uid()) -> boolean() | remote.
+-spec is_old_uid(GUID1::global_uid(), GUID2::global_uid()) -> boolean().
 is_old_uid({LocalUid1, Pid}, {LocalUid2, Pid}) when LocalUid1 < LocalUid2 ->
     true;
 is_old_uid(_GUID1, _GUID2) ->
     false.
 
 %% @doc Checks whether GUID1 is from the same process as GUID2.
--spec from_same_pid(GUID1::global_uid(), GUID2::global_uid()) -> boolean() | remote.
+-spec from_same_pid(GUID1::global_uid(), GUID2::global_uid()) -> boolean().
 from_same_pid({_LocalUid1, Pid}, {_LocalUid2, Pid}) ->
     true;
 from_same_pid(_GUID1, _GUID2) ->
