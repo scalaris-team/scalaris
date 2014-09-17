@@ -193,13 +193,13 @@ proc_report_to_my_monitor(Process, Key, OldValue, Value) ->
 get_rrds(MonitorPid, Keys) ->
     %% we peek into the ets table of the monitor process
     %% look-up ets tables which the monitor-pid owns
-    Table = case erlang:get(mygroup_monitors_table) of
+    Table = case erlang:get({monitor_table, MonitorPid}) of
                 undefined ->
                     Tables = ets:all(),
                     OwnedTables = [ X || X <- Tables,
                                          MonitorPid =:= ets:info(X, owner) ],
                     Tab = hd(OwnedTables),
-                    erlang:put(mygroup_monitors_table, Tab),
+                    erlang:put({monitor_table, MonitorPid}, Tab),
                     Tab;
                 X -> X
             end,
