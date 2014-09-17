@@ -82,7 +82,7 @@ issue_bulk_distribute(Id, Proc, Pos, Msg, Data, Interval) ->
     comm:send_local(DHTNode, {bulkowner, start, Id, Interval, {bulk_distribute, Proc,
                                                         Pos, Msg, Data}}).
 
--spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(),
+-spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message() | comm:group_message(),
                  Parents::[comm:mypid()], Shepherd::comm:erl_local_pid()) -> ok.
 send_reply(Id, Target, {?send_to_group_member, Proc, Msg}, [], Shepherd) ->
     comm:send(Target, {bulkowner, reply, Id, Msg}, [{shepherd, Shepherd}, {group_member, Proc}]);
