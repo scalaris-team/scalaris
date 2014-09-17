@@ -141,7 +141,7 @@ alarm_handler(lat_avg, Options) ->
     VmsToRemove = get_alarm_option(Options, vms_to_remove, 1),
     VmsToAdd    = get_alarm_option(Options, vms_to_add, 1),
 
-    Monitor = pid_groups:find_a(monitor_perf),
+    Monitor = whereis(monitor_perf),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, _StddevMsD, _HistMsD} =
         case statistics:getTimingMonitorStats(Monitor, [{api_tx, 'req_list'}], tuple) of
             []                           -> {[], [], [], [], [], [], []};

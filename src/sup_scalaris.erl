@@ -135,6 +135,8 @@ childs(Options) ->
     Logger = sup:worker_desc(logger, log, start_link),
     Monitor =
         sup:worker_desc(monitor, monitor, start_link, [ServiceGroup]),
+    MonitorPerf =
+        sup:worker_desc(monitor_perf, monitor_perf, start_link, [ServiceGroup]),
     Service =
         sup:worker_desc(service_per_vm, service_per_vm, start_link,
                              [ServiceGroup]),
@@ -188,7 +190,7 @@ childs(Options) ->
             false -> []; %% no dht node requested
             _ -> [DHTNode]
         end,
-    lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer, Ganglia]).
+    lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer, Ganglia, MonitorPerf]).
 
 -spec add_additional_nodes() -> ok.
 add_additional_nodes() ->

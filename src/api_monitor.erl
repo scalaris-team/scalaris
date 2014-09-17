@@ -38,7 +38,7 @@ get_node_info() ->
 
 -spec get_node_performance() -> list().
 get_node_performance() ->
-    Monitor = pid_groups:pid_of(pid_groups:group_with(dht_node), monitor),
+    Monitor = pid_groups:pid_of("basic_services", monitor),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
         case statistics:getTimingMonitorStats(Monitor, [{monitor_perf, 'read_read'}], tuple) of
             []                                  -> {[], [], [], [], [], [], []};
@@ -55,7 +55,7 @@ get_service_info() ->
 
 -spec get_service_performance() -> list().
 get_service_performance() ->
-    Monitor = pid_groups:find_a(monitor_perf),
+    Monitor = whereis(monitor_perf),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
         case statistics:getTimingMonitorStats(Monitor, [{monitor_perf, 'read_read'}], tuple) of
             []                                  -> {[], [], [], [], [], [], []};

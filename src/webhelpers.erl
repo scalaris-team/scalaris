@@ -813,9 +813,10 @@ getMonitorClientData() ->
                                           [Time, Avg, Avg - Min, Max - Avg]
                                   end, AvgMsD, MinMsD, MaxMsD),
 
+    VMMonitor = pid_groups:pid_of("basic_services", monitor),
     MemMonKeys = [{monitor_perf, X} || X <- [mem_total, mem_processes, mem_system,
                                              mem_atom, mem_binary, mem_ets]],
-    case statistics:getGaugeMonitorStats(ClientMonitor, MemMonKeys, list, 1024.0 * 1024.0) of
+    case statistics:getGaugeMonitorStats(VMMonitor, MemMonKeys, list, 1024.0 * 1024.0) of
         [] -> MemTotalD = MemProcD = MemSysD = MemAtomD = MemBinD = MemEtsD = [];
         [{monitor_perf, mem_total, MemTotalD},
          {monitor_perf, mem_processes, MemProcD},
@@ -828,7 +829,7 @@ getMonitorClientData() ->
     IOMonKeys = [{monitor_perf, X} || X <- [%rcv_count,
                                             rcv_bytes, %send_count,
                                             send_bytes]],
-    case statistics:getGaugeMonitorStats(ClientMonitor, IOMonKeys, list, 1) of
+    case statistics:getGaugeMonitorStats(VMMonitor, IOMonKeys, list, 1) of
         [] -> %RcvCntD0 = SendCntD0 =
             RcvBytesD0 = SendBytesD0 = [];
         [%{monitor_perf, rcv_count, RcvCntD0},
@@ -882,9 +883,8 @@ get_diff_data([_TimeLast, ValueLast], [Cur = [TimeCur, ValueCur] | Rest])
 
 -spec getMonitorRingData() -> [html_type()].
 getMonitorRingData() ->
-    Monitor = pid_groups:find_a(monitor_perf),
-    case Monitor of
-        failed ->
+    case whereis(monitor_perf) of
+        unknown ->
             Prefix = {p, [], "NOTE: no monitor_perf in this VM"},
             DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
         Monitor ->
