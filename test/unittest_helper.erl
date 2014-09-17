@@ -251,7 +251,7 @@ stop_ring(Pid) ->
             catch exit(Pid, kill),
             util:wait_for_process_to_die(Pid),
             stop_pid_groups(),
-            _ = inets:stop(),
+            sup_scalaris:stop_first_services(),
             ct:pal("unittest_helper:stop_ring done."),
             ok
         end
@@ -530,7 +530,6 @@ end_per_suite(Config) ->
     % the following might still be running in case there was no ring:
     error_logger:tty(false),
     randoms:stop(),
-    _ = inets:stop(),
     error_logger:tty(true),
     {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
     kill_new_processes(OldProcesses),

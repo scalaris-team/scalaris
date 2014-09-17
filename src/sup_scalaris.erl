@@ -33,6 +33,7 @@
 
 %% used in unittest_helper.erl
 -export([start_link/1]).
+-export([stop_first_services/0]).
 
 -spec start_link() -> {ok, Pid::pid()}
                          | {error, Error::{already_started, Pid::pid()}
@@ -216,7 +217,38 @@ start_first_services() ->
     end,
     util:if_verbose("~p start inets~n", [?MODULE]),
     _ = inets:start(),
+
+    %% for lb_stats and wpool
+    application:load(sasl),
+    application:set_env(sasl, sasl_error_logger, false),
+    application:start(sasl),
+
+    %% for lb_stats
+    application:load(os_mon),
+    case config:read(lb_active) of
+        true -> %% for lb_stats
+            application:set_env(os_mon, start_os_sup, false),
+            application:set_env(os_mon, start_disksup, false),
+            application:start(os_mon);
+        _ -> ok
+    end,
+    case config:read(wpool_js) of
+        true -> %% for wpool
+            application:start(erlang_js);
+        _ -> ok
+    end,
     util:if_verbose("~p start first services done.~n", [?MODULE]).
+
+%% stop the services we started outside the supervisor tree
+%% (those who materialized as processes)
+-spec stop_first_services() -> ok.
+stop_first_services() ->
+    %% config seems not available here, so we stop unconditionally
+    application:stop(erlang_js),
+    application:stop(os_mon),
+    application:stop(sasl),
+    _ = inets:stop(),
+    ok.
 
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().

@@ -59,8 +59,6 @@
 init() ->
     case collect_stats() of
         true ->
-            _ = application:start(sasl),   %% required by os_mon.
-            _ = application:start(os_mon), %% for monitoring cpu and memory usage.
             %% cpu_sup not available on all OSs
             catch cpu_sup:util(), %% throw away first util value
             {InitialReductions, Timestamp} = get_reductions(),
