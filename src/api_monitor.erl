@@ -55,11 +55,11 @@ get_service_info() ->
 
 -spec get_service_performance() -> list().
 get_service_performance() ->
-    Monitor = whereis(monitor_perf),
+    Monitor = pid_groups:pid_of("basic_services", monitor),
     {_CountD, _CountPerSD, AvgMsD, _MinMsD, _MaxMsD, StddevMsD, _HistMsD} =
-        case statistics:getTimingMonitorStats(Monitor, [{monitor_perf, 'read_read'}], tuple) of
+        case statistics:getTimingMonitorStats(Monitor, [{monitor_perf, 'agg_read_read'}], tuple) of
             []                                  -> {[], [], [], [], [], [], []};
-            [{monitor_perf, 'read_read', Data}] -> Data
+            [{monitor_perf, 'agg_read_read', Data}] -> Data
         end,
     [{latency_avg, AvgMsD},
      {latency_stddev, StddevMsD}].
