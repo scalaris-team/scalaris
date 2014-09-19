@@ -219,22 +219,24 @@ start_first_services() ->
     _ = inets:start(),
 
     %% for lb_stats and wpool
-    application:load(sasl),
+    _ = application:load(sasl),
     application:set_env(sasl, sasl_error_logger, false),
-    application:start(sasl),
+    _ = application:start(sasl),
 
     %% for lb_stats
-    application:load(os_mon),
+    _ = application:load(os_mon),
     case config:read(lb_active) of
         true -> %% for lb_stats
             application:set_env(os_mon, start_os_sup, false),
             application:set_env(os_mon, start_disksup, false),
-            application:start(os_mon);
+            _ = application:start(os_mon),
+            ok;
         _ -> ok
     end,
     case config:read(wpool_js) of
         true -> %% for wpool
-            application:start(erlang_js);
+            _ = application:start(erlang_js),
+            ok;
         _ -> ok
     end,
     util:if_verbose("~p start first services done.~n", [?MODULE]).
@@ -244,9 +246,9 @@ start_first_services() ->
 -spec stop_first_services() -> ok.
 stop_first_services() ->
     %% config seems not available here, so we stop unconditionally
-    application:stop(erlang_js),
-    application:stop(os_mon),
-    application:stop(sasl),
+    _ = application:stop(erlang_js),
+    _ = application:stop(os_mon),
+    _ = application:stop(sasl),
     _ = inets:stop(),
     ok.
 
