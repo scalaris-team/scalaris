@@ -64,8 +64,8 @@ on({ping_reply, {pong, gossip}, Count},
             comm:send_local(Owner, Msg),
             kill;
         false ->
-            _ = msg_delay:send_local(config:read(gossip_vivaldi_measurements_delay),
-                                      self(), {start_ping}),
+            msg_delay:send_local(config:read(gossip_vivaldi_measurements_delay),
+                                 self(), {start_ping}),
             {Owner, RemotePid, Token, unknown, Count, NewLatencies}
     end;
 
@@ -99,7 +99,11 @@ init({Owner, RemotePid, Token}) ->
 
 -spec measure_latency(comm:mypid(), gossip_vivaldi:network_coordinate(), gossip_vivaldi:est_error()) -> {ok, pid()}.
 measure_latency(RemotePid, RemoteCoordinate, RemoteConfidence) ->
-    gen_component:start(?MODULE, fun ?MODULE:on/2, {self(), RemotePid, {RemoteCoordinate, RemoteConfidence}}, []).
+    PidName = lists:flatten(io_lib:format("~s_~p.~s", [?MODULE, RemotePid, randoms:getRandomString()])),
+    gen_component:start(?MODULE, fun ?MODULE:on/2,
+                        {self(), RemotePid, {RemoteCoordinate, RemoteConfidence}},
+                        [{pid_groups_join_as, pid_groups:my_groupname(),
+                          {short_lived, PidName}}]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper functions
