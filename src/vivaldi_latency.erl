@@ -33,7 +33,7 @@
     {Owner::comm:erl_local_pid(),
      RemotePid::comm:mypid(),
      Token::{gossip_vivaldi:network_coordinate(), gossip_vivaldi:est_error()},
-     Start::{MegaSecs::non_neg_integer(), Secs::non_neg_integer(), MicroSecs::non_neg_integer()} | unknown,
+     Start::erlang_timestamp() | unknown,
      Count::non_neg_integer(),
      Latencies::[gossip_vivaldi:latency()]}.
 
@@ -83,14 +83,16 @@ on({shutdown}, _State) ->
     log:log(info, "shutdown vivaldi_latency due to timeout", []),
     kill;
 
-on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
+on({'DOWN', _MonitorRef, process, Owner, _Info},
+   {Owner, _RemotePid, _Token, _Start, _Count, _Latencies}) ->
     log:log(info, "shutdown vivaldi_latency due to vivaldi shutting down", []),
     kill.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec init({pid(), comm:mypid(), {gossip_vivaldi:network_coordinate(), gossip_vivaldi:est_error()}}) -> state().
+-spec init({pid(), comm:mypid(), {gossip_vivaldi:network_coordinate(),
+                                  gossip_vivaldi:est_error()}}) -> state().
 init({Owner, RemotePid, Token}) ->
     msg_delay:send_local(config:read(gossip_vivaldi_latency_timeout) div 1000,
                          self(), {shutdown}),
@@ -98,7 +100,8 @@ init({Owner, RemotePid, Token}) ->
     erlang:monitor(process, Owner),
     {Owner, RemotePid, Token, unknown, 0, []}.
 
--spec measure_latency(comm:mypid(), gossip_vivaldi:network_coordinate(), gossip_vivaldi:est_error()) -> {ok, pid()}.
+-spec measure_latency(comm:mypid(), gossip_vivaldi:network_coordinate(),
+                      gossip_vivaldi:est_error()) -> {ok, pid()}.
 measure_latency(RemotePid, RemoteCoordinate, RemoteConfidence) ->
     PidName = lists:flatten(io_lib:format("~s_~p.~s", [?MODULE, RemotePid, randoms:getRandomString()])),
     gen_component:start(?MODULE, fun ?MODULE:on/2,
