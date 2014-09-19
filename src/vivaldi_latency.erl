@@ -92,7 +92,8 @@ on({'DOWN', _MonitorRef, process, Owner, _Info}, {Owner, _RemotePid, _Token, _St
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec init({pid(), comm:mypid(), {gossip_vivaldi:network_coordinate(), gossip_vivaldi:est_error()}}) -> state().
 init({Owner, RemotePid, Token}) ->
-    _ = comm:send_local_after(config:read(gossip_vivaldi_latency_timeout), self(), {shutdown}),
+    msg_delay:send_local(config:read(gossip_vivaldi_latency_timeout) div 1000,
+                         self(), {shutdown}),
     comm:send_local(self(), {start_ping}),
     erlang:monitor(process, Owner),
     {Owner, RemotePid, Token, unknown, 0, []}.
