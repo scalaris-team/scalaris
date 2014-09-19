@@ -666,6 +666,8 @@ tester_type_check_util(_Config) ->
              {is_local, 1}, %% cannot create correct envelopes
              {send, 2}, {send, 3}, %% cannot send msgs
              {send_local, 2}, {send_local_after, 3}, %% cannot send msgs
+             {forward_to_group_member, 2}, %% may forward arbitrary message to any process
+             {forward_to_registered_proc, 2}, %% may forward arbitrary message to any process
              {reply_as, 3} %% needs feeder for envelope
            ], []},
           {db_entry,
