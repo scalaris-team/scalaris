@@ -181,14 +181,14 @@ lookup_fin_leases(State, Key, Data, Msg) ->
 %% userdevguide-end dht_node_lookup:routing
 
 -spec lookup_aux_failed(dht_node_state:state(), Target::comm:mypid(),
-                        Msg::comm:message()) -> ok.
+                        Msg::{?lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}) -> ok.
 lookup_aux_failed(State, _Target, {?lookup_aux, Key, Hops, Msg} = _Message) ->
     %io:format("lookup_aux_failed(State, ~p, ~p)~n", [_Target, _Message]),
     _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
     State.
 
 -spec lookup_fin_failed(dht_node_state:state(), Target::comm:mypid(),
-                        Msg::comm:message()) -> ok.
+                        Msg::{?lookup_fin, Key::?RT:key(), Data::data(), Msg::comm:message()}) -> ok.
 lookup_fin_failed(State, _Target, {?lookup_fin, Key, Data, Msg} = _Message) ->
     %io:format("lookup_fin_failed(State, ~p, ~p)~n", [_Target, _Message]),
     _ = comm:send_local_after(100, self(), {?lookup_aux, Key, ?HOPS_FROM_DATA(Data) + 1, Msg}),
