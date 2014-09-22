@@ -122,7 +122,7 @@ handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
     contact_new_nodes(NewNodes),
     {{unknown}, State};
 
-handle_custom_message({rm, {update_node, Node}}, {OldNeighborhood}) ->
+handle_custom_message({rm, update_node, Node}, {OldNeighborhood}) ->
     NewNeighborhood = nodelist:update_ids(OldNeighborhood, [Node]),
     {{unknown}, {NewNeighborhood}};
 
@@ -187,7 +187,7 @@ remove_node({OldNeighborhood}, NodePid) ->
 update_node({OldNeighborhood}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
     % only send pred and succ the new node
-    Message = {rm, {update_node, NewMe}},
+    Message = {rm, update_node, NewMe},
     Pred = nodelist:pred(NewNeighborhood),
     Succ = nodelist:succ(NewNeighborhood),
     comm:send(node:pidX(Succ), Message, ?SEND_OPTIONS),
