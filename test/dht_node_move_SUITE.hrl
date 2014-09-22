@@ -1089,7 +1089,7 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
             %% and that it is different from ours
             comm:send_local(JumpingNode, {get_state, comm:this(), node_id}),
             MyId = fun() -> receive ?SCALARIS_RECV({get_state_response, Id}, Id) end end(),
-            ?assert(MyId =/= TargetKey);
+            ?compare(fun erlang:'=/='/2, MyId, TargetKey);
        true ->
             ?equals(Result, ok)
     end.
