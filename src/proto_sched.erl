@@ -281,6 +281,8 @@ register_callback(CallbackFun, TraceId) ->
 
 -spec info_shorten_messages(Infos, CharsPerMsg::pos_integer()) -> Infos
         when is_subtype(Infos, [tuple()]).
+info_shorten_messages([], _CharsPerMsg) ->
+    [];
 info_shorten_messages(Infos, CharsPerMsg) ->
     {value, {delivered_msgs, DeliveredMsgs}, RestInfos} =
         lists:keytake(delivered_msgs, 1, Infos),

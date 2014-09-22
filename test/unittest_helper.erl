@@ -36,6 +36,7 @@
          create_ct_all/1, create_ct_groups/2,
          init_per_group/2, end_per_group/2,
          get_ring_data/1, print_ring_data/0,
+         print_proto_sched_stats/0,
          macro_equals/5, macro_compare/7,
          macro_equals_failed/6,
          expect_no_message_timeout/1,
@@ -626,6 +627,11 @@ get_ring_data(Type) ->
 print_ring_data() ->
     DataAll = get_ring_data(full),
     ct:pal("Scalaris ring data:~n~.0p~n", [DataAll]).
+
+-spec print_proto_sched_stats() -> ok.
+print_proto_sched_stats() ->
+    ct:pal("Proto scheduler stats: ~.2p",
+           [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]).
 
 -spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(),
                    ExpectedStr::string(), Note::term()) -> true | no_return().
