@@ -53,7 +53,7 @@
 
 -type(lookup_message() ::
       {?lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
-      {?lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
+      {?lookup_fin, Key::?RT:key(), Data::dht_node_lookup:data(), Msg::comm:message()}).
 
 -type(snapshot_message() ::
       {do_snapshot, SnapNumber::non_neg_integer(), Leader::comm:mypid()} |
@@ -200,8 +200,8 @@ on({?lookup_aux, Key, Hops, Msg}, State) ->
     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
-on({?lookup_fin, Key, Hops, Msg}, State) ->
-    dht_node_lookup:lookup_fin(State, Key, Hops, Msg);
+on({?lookup_fin, Key, Data, Msg}, State) ->
+    dht_node_lookup:lookup_fin(State, Key, Data, Msg);
 
 on({send_error, Target, {?lookup_aux, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);

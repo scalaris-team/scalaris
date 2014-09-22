@@ -27,12 +27,27 @@
 
 -export([envelope/2]).
 
+-ifdef(with_export_type_support).
+-export_type([data/0]).
+-endif.
+
 -type enveloped_message() :: {pos_integer(), f, comm:message()}.
 
 -spec envelope(pos_integer(), comm:message()) -> enveloped_message().
 envelope(Nth, Msg) ->
     ?DBG_ASSERT('_' =:= element(Nth, Msg)),
     {Nth, f, Msg}.
+
+-ifdef(enable_debug).
+% add source information to debug routing damaged messages
+-define(HOPS_TO_DATA(Hops), {comm:this(), Hops}).
+-define(HOPS_FROM_DATA(Data), element(2, Data)).
+-type data() :: {Source::comm:mypid(), Hops::non_neg_integer()}.
+-else.
+-define(HOPS_TO_DATA(Hops), Hops).
+-define(HOPS_FROM_DATA(Data), Data).
+-type data() :: Hops::non_neg_integer().
+-endif.
 
 %% userdevguide-begin dht_node_lookup:routing
 %% @doc Find the node responsible for Key and send him the message Msg.
@@ -52,7 +67,7 @@ lookup_aux_chord(State, Key, Hops, Msg) ->
     WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
     case ?RT:next_hop(State, Key) of
         {succ, P} -> % found node -> terminate
-            comm:send(P, {?lookup_fin, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}]);
+            comm:send(P, {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), WrappedMsg}, [{shepherd, self()}]);
         {other, P} ->
             comm:send(P, {?lookup_aux, Key, Hops + 1, WrappedMsg}, [{shepherd, self()}])
     end.
@@ -67,12 +82,12 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
             DHTNode = pid_groups:find_a(dht_node),
             %log:log("aux -> fin: ~p ~p~n", [self(), DHTNode]),
             comm:send_local(DHTNode,
-                            {?lookup_fin, Key, Hops + 1, Msg});
+                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg});
         maybe ->
             DHTNode = pid_groups:find_a(dht_node),
             %log:log("aux -> fin: ~p ~p~n", [self(), DHTNode]),
             comm:send_local(DHTNode,
-                            {?lookup_fin, Key, Hops + 1, Msg});
+                            {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg});
         false ->
             WrappedMsg = ?RT:wrap_message(Key, Msg, State, Hops),
             %log:log("lookup_aux_leases route ~p~n", [self()]),
@@ -83,7 +98,7 @@ lookup_aux_leases(State, Key, Hops, Msg) ->
 
 %% @doc Find the node responsible for Key and send him the message Msg.
 -spec lookup_fin(State::dht_node_state:state(), Key::intervals:key(),
-                 Hops::non_neg_integer(), Msg::comm:message()) -> dht_node_state:state().
+                 Data::data(), Msg::comm:message()) -> dht_node_state:state().
 lookup_fin(State, Key, Hops, Msg) ->
     case config:read(leases) of
         true ->
@@ -93,10 +108,11 @@ lookup_fin(State, Key, Hops, Msg) ->
     end.
 
 -spec lookup_fin_chord(State::dht_node_state:state(), Key::intervals:key(),
-                 Hops::non_neg_integer(), Msg::comm:message()) -> dht_node_state:state().
-lookup_fin_chord(State, Key, Hops, Msg) ->
+                       Data::data(), Msg::comm:message()) -> dht_node_state:state().
+lookup_fin_chord(State, Key, Data, Msg) ->
     MsgFwd = dht_node_state:get(State, msg_fwd),
     FwdList = [P || {I, P} <- MsgFwd, intervals:in(Key, I)],
+    Hops = ?HOPS_FROM_DATA(Data),
     case FwdList of
         []    ->
             case dht_node_state:is_db_responsible__no_msg_fwd_check(Key, State) of
@@ -133,23 +149,24 @@ lookup_fin_chord(State, Key, Hops, Msg) ->
                                             end
                                         end || {Interval, Id} <- DBRange],
                             log:log(warn,
-                                    "[ ~.0p ] Routing is damaged!! Trying again...~n"
+                                    "[ ~.0p ] Routing is damaged (~p)!! Trying again...~n"
                                     "  myrange:~p~n  db_range:~p~n  msgfwd:~p~n  Key:~p~n"
                                     "  pred: ~.4p~n  node: ~.4p~n  succ: ~.4p",
-                                    [self(), intervals:get_bounds(nodelist:node_range(Neighbors)),
+                                    [self(), Data, intervals:get_bounds(nodelist:node_range(Neighbors)),
                                      DBRange2, MsgFwd, Key, nodelist:pred(Neighbors),
                                      nodelist:node(Neighbors), nodelist:succ(Neighbors)])
                     end,
                     lookup_aux(State, Key, Hops, Msg),
                     State
             end;
-        [Pid] -> comm:send(Pid, {?lookup_fin, Key, Hops + 1, Msg}),
+        [Pid] -> comm:send(Pid, {?lookup_fin, Key, ?HOPS_TO_DATA(Hops + 1), Msg}),
                  State
     end.
 
 -spec lookup_fin_leases(State::dht_node_state:state(), Key::intervals:key(),
-                 Hops::non_neg_integer(), Msg::comm:message()) -> dht_node_state:state().
-lookup_fin_leases(State, Key, Hops, Msg) ->
+                        Data::data(), Msg::comm:message()) -> dht_node_state:state().
+lookup_fin_leases(State, Key, Data, Msg) ->
+    Hops = ?HOPS_FROM_DATA(Data),
     case leases:is_responsible(State, Key) of
         true ->
             deliver(State, Msg, true, Hops);
@@ -172,9 +189,9 @@ lookup_aux_failed(State, _Target, {?lookup_aux, Key, Hops, Msg} = _Message) ->
 
 -spec lookup_fin_failed(dht_node_state:state(), Target::comm:mypid(),
                         Msg::comm:message()) -> ok.
-lookup_fin_failed(State, _Target, {?lookup_fin, Key, Hops, Msg} = _Message) ->
+lookup_fin_failed(State, _Target, {?lookup_fin, Key, Data, Msg} = _Message) ->
     %io:format("lookup_fin_failed(State, ~p, ~p)~n", [_Target, _Message]),
-    _ = comm:send_local_after(100, self(), {?lookup_aux, Key, Hops + 1, Msg}),
+    _ = comm:send_local_after(100, self(), {?lookup_aux, Key, ?HOPS_FROM_DATA(Data) + 1, Msg}),
     State.
 
 deliver(State, Msg, Consistency, Hops) ->
