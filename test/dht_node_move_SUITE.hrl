@@ -1083,9 +1083,9 @@ perform_jump(JumpingNode, TargetKey) ->
         receive
             ?SCALARIS_RECV({move, result, prop_jump_slide, Res}, Res)
         end,
+    ct:pal("Result: ~p~n", [Result]),
     ?proto_sched(stop),
     %% check result
-    ct:pal("Result: ~p~n", [Result]),
     if Result =:= wrong_pred_succ_node ->
             ct:pal("Retrying because of wrong_pred_succ_node"),
             perform_jump(JumpingNode, TargetKey);
