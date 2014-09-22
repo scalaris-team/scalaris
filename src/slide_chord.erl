@@ -121,9 +121,15 @@ change_my_id(State, SlideOp, ReplyPid) ->
 prepare_send_data1(State, SlideOp, ReplyPid) ->
     case slide_op:get_predORsucc(SlideOp) of
         succ -> change_my_id(State, SlideOp, ReplyPid);
-        pred -> State1 = dht_node_state:add_db_range(
-                           State, slide_op:get_interval(SlideOp),
-                           slide_op:get_id(SlideOp)),
+        pred -> State1 =
+                    case slide_op:get_type(SlideOp) of
+                        {join, 'send'} -> % already set
+                            State;
+                        _ ->
+                            dht_node_state:add_db_range(
+                              State, slide_op:get_interval(SlideOp),
+                              slide_op:get_id(SlideOp))
+                    end,
                 send_continue_msg(ReplyPid),
                 {ok, State1, SlideOp}
     end.
