@@ -56,8 +56,7 @@ proto_sched2_fun(setup, Arg) ->
     proto_sched:thread_num(Arg);
 proto_sched2_fun(cleanup, _Arg) ->
     proto_sched:wait_for_end(),
-    ct:pal("Proto scheduler stats: ~.2p",
-           [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]),
+    unittest_helper:print_proto_sched_stats(),
     proto_sched:cleanup().
 
 test_join(_Config) ->
