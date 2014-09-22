@@ -893,9 +893,14 @@ test_slide_adjacent(_Config) ->
                 unittest_helper:check_ring_load(440),
                 unittest_helper:check_ring_data(),
                 %% both slides should be successfull
-                ?assert(Result1 =:= ok andalso Result2 =:= ok
-                        orelse %% rarely, one slides fails because the neighbor information hasn't been updated yet
-                          (Result1 =:= wrong_pred_succ_node) xor (Result2 =:= wrong_pred_succ_node))
+                ?assert_w_note(
+                    Result1 =:= ok andalso Result2 =:= ok
+                        orelse
+                        %% rarely, one slide fails because the neighbour
+                        %% information hasn't been updated yet
+                          ((Result1 =:= wrong_pred_succ_node) xor
+                               (Result2 =:= wrong_pred_succ_node)),
+                    [{result1, Result1}, {result2, Result2}])
         end,
     Actions =
         [{
@@ -961,11 +966,14 @@ test_slide_conflict(_Config) ->
                 %% we test for interleaving as we cannot use breakpoints.
                 case Interleaved of
                     true ->
-                        ?assert(not(Result1 =:= ok andalso Result2 =:= ok));
+                        ?assert_w_note(Result1 =/= ok orelse Result2 =/= ok,
+                                       [{result1, Result1}, {result2, Result2}]);
                     false ->
                         Vals = [ok, ongoing_slide, target_id_not_in_range, wrong_pred_succ_node],
-                        ?assert(lists:member(Result1, Vals)),
-                        ?assert(lists:member(Result2, Vals))
+                        ?assert_w_note(lists:member(Result1, Vals),
+                                       {result1, Result1, 'not', Vals}),
+                        ?assert_w_note(lists:member(Result2, Vals),
+                                       {result2, Result2, 'not', Vals})
                 end
         end,
     Actions = [
@@ -1082,5 +1090,5 @@ perform_jump(JumpingNode, TargetKey) ->
             ct:pal("Retrying because of wrong_pred_succ_node"),
             perform_jump(JumpingNode, TargetKey);
        true ->
-            ?assert(Result =:= ok)
+            ?equals(Result, ok)
     end.
