@@ -747,7 +747,15 @@ get_node_details(DhtNode) ->
 -spec get_predspred_pred_node_succ(DhtNode::pid()) -> node_tuple().
 get_predspred_pred_node_succ(DhtNode) ->
     {Pred, Node, Succ} = get_node_details(DhtNode),
-    {PredsPred, _Pred2, _Node2} = get_node_details(node:pidX(Pred)),
+    {PredsPred, Pred2, Node2} = get_node_details(node:pidX(Pred)),
+    % the nodes' RM info must be correct after each slide and thus before the
+    % next one (which is when this function is called)
+    ?equals_w_note(Pred, Pred2, wrong_pred_info_in_node),
+    ?equals_w_note(Node2, Node, wrong_succ_info_in_pred),
+
+    % make sure, all pred/succ info is correct:
+    ?equals(admin:check_ring(), ok),
+
     {PredsPred, Pred, Node, Succ}.
 
 -spec set_breakpoint(Pid::pid(), gen_component:bp_name()) -> ok.
@@ -872,6 +880,8 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
               Result2 = ReceiveResultFun(),
               ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
               ?proto_sched(stop),
+              _ = get_predspred_pred_node_succ(DhtNode),
+              ct:pal("checked pred/succ info"),
               VerifyFun(Result1, Result2, slide_interleaving()),
               timer:sleep(10)
           end || Slide1 <- SlideVariations1, Slide2 <- SlideVariations2],
