@@ -162,7 +162,7 @@ handle_custom_message({rm, node_info_response, NodeDetails}, State) ->
             {{unknown}, State}
     end;
 
-handle_custom_message({rm, {update_node, Node}},
+handle_custom_message({rm, update_node, Node},
                       {Neighborhood, RandViewSize, Cache, Churn}) ->
     NewNeighborhood1 = nodelist:update_ids(Neighborhood, [Node]),
     % message from pred or succ
@@ -327,7 +327,7 @@ update_node({Neighborhood, RandViewSize, Cache, Churn}, NewMe) ->
     ?DBG_ASSERT2(node:pidX(nodelist:succ(Neighborhood)) =:= node:pidX(nodelist:succ(NewNeighborhood2)),
                  no_succ_change_allowed),
     % only send pred and succ the new node
-    Message = {rm, {update_node, NewMe}},
+    Message = {rm, update_node, NewMe},
     RndView = get_RndView(RandViewSize, Cache),
     {Pred, Succ} = get_safe_pred_succ(NewNeighborhood2, RndView),
     comm:send(node:pidX(Succ), Message, ?SEND_OPTIONS),
