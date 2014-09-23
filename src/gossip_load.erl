@@ -495,11 +495,23 @@ handle_msg({get_node_details_response, NodeDetails}, {PrevState, CurState}) ->
     comm:send_local(Pid, {selected_data, state_get(instance, CurState4), NewData}),
     {ok, {PrevState, CurState4}};
 
-
 handle_msg({gossip_get_values_best, SourcePid}, {PrevState, CurState}) ->
     BestState = previous_or_current(PrevState, CurState),
     BestValues = get_load_info(BestState),
     comm:send_local(SourcePid, {gossip_get_values_best_response, BestValues}),
+    {ok, {PrevState, CurState}};
+
+handle_msg({gossip_get_values_all, SourcePid}, {unknown, CurState}) ->
+    CurInfo = get_load_info(CurState),
+    AllValues = {#load_info{}, CurInfo, CurInfo},
+    comm:send_local(SourcePid, {gossip_get_values_all_response, AllValues}),
+    {ok, {unknown, CurState}};
+
+handle_msg({gossip_get_values_all, SourcePid}, {PrevState, CurState}) ->
+    BestState = previous_or_current(PrevState, CurState),
+    AllValues = {get_load_info(PrevState), get_load_info(CurState),
+                  get_load_info(BestState)},
+    comm:send_local(SourcePid, {gossip_get_values_all_response, AllValues}),
     {ok, {PrevState, CurState}}.
 
 
