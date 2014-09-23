@@ -28,14 +28,10 @@
 
 -define(NO_OF_NODES, 5).
 
-
-groups() ->
-    unittest_helper:create_ct_groups([test_no_load, test_load],
-                                     [sequence, {repeat_until_any_ok, 3}]).
-
 all() ->
-    unittest_helper:create_ct_all([test_no_load, test_load]) ++
     [
+        test_no_load,
+        test_load,
         test_request_histogram1,
         test_request_histogram2
     ].
@@ -58,8 +54,8 @@ end_per_group(Group, Config) ->
     unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
-    unittest_helper:make_ring(
-      ?NO_OF_NODES,
+    unittest_helper:make_ring_with_ids(
+      [?MINUS_INFINITY],
       [{config, [
                  {monitor_perf_interval, 0},  % deactivate monitor_perf
                  {gossip_load_interval, 100}, % truncated to 0, i.e. immediate delivery
@@ -69,6 +65,7 @@ init_per_testcase(_TestCase, Config) ->
                  {gossip_log_level_error, error}
                 ]
        }]),
+    api_vm:add_nodes(?NO_OF_NODES-1),
     unittest_helper:wait_for_stable_ring_deep(),
     Config.
 
@@ -85,14 +82,12 @@ test_no_load(_Config) ->
 
     % get values from gossiping (after round finishes)
     wait_n_rounds(1),
-    send2gossip({cb_msg, {gossip_load, default}, {gossip_get_values_best, self()}}, 0),
-    %% send2gossip({get_values_best, {gossip_load,default}, self()}, 0),
-    %% gossip_load:get_values_best([]),
+    send2gossip({cb_msg, {gossip_load, default}, {gossip_get_values_all, self()}}, 1),
 
     %                 {load_info, avg, stddev, size_ldr, size_kr, minLoad, maxLoad, merged}
     LoadInfoExpected ={load_info, 0.0, 0.0, 5.0, 5.0, 0, 0, whatever, []},
-    receive {gossip_get_values_best_response, LoadInfo} ->
-            ?compare(fun compare/2, LoadInfo, LoadInfoExpected)
+    receive {gossip_get_values_all_response, {PrevLoadInfo, _, _}} ->
+            ?compare(fun compare/2, PrevLoadInfo, LoadInfoExpected)
     end.
 
 
@@ -113,10 +108,10 @@ test_load(_Config) ->
     % get values from gossiping (after round finishes)
     % first round might be interrupted by node joins, thus wait two rounds
     wait_n_rounds(1),
-    send2gossip({cb_msg, {gossip_load, default}, {gossip_get_values_best, self()}}, 0),
+    send2gossip({cb_msg, {gossip_load, default}, {gossip_get_values_all, self()}}, 1),
 
-    receive {gossip_get_values_best_response, LoadInfo} ->
-                ?compare(fun compare/2, LoadInfo, LoadInfoExpected)
+    receive {gossip_get_values_all_response, {PrevLoadInfo, _, _}} ->
+                ?compare(fun compare/2, PrevLoadInfo, LoadInfoExpected)
     end.
 
 
