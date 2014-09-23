@@ -1544,7 +1544,14 @@ get_values_best_feeder({Options, Secs, Millisecs}) ->
         _ ->
             Options
     end,
-    {Options1}.
+    Options2 = case proplists:get_value(msg_delay, Options1) of
+        true ->
+            NewOptions2 = proplists:delete(msg_delay, Options),
+            [ {msg_delay, Secs} | NewOptions2 ];
+        _ ->
+            Options1
+    end,
+    {Options2}.
 
 
 %% @doc For testing: ensure, that only buckets with identical keys are feeded to
