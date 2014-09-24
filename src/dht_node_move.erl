@@ -557,8 +557,9 @@ check_setup_slide_not_found(State, Type, MyNode, TNode, TId) ->
             not NodesCorrect -> {abort, wrong_pred_succ_node, Type};
             HasLeft -> {abort, target_down, Type};
             true ->
-                case slide_op:is_leave(Type) of
-                    false -> {ok, move_done}; % MoveDone, i.e. target id already reached (noop)
+                % MoveDone, i.e. target id already reached (noop)
+                case slide_op:is_leave(Type) andalso not slide_op:is_jump(Type) of
+                    false -> {ok, move_done};
                     true  -> {abort, leave_no_partner_found, Type}
                 end
         end,
