@@ -183,11 +183,22 @@ delete_entry_at_key({DB, Subscr, {Snap, LiveLC, SnapLC}} = State,  Key, Reason) 
                 ValueFun::fun((entry()) -> V),
                 ChunkSize::pos_integer() | all)
         -> {intervals:interval(), [V]}.
-get_chunk(_State, _StartId, [], _FilterFun, _ValueFun, _ChunkSize) ->
-    {intervals:empty(), []};
-get_chunk(State, StartId, Interval, FilterFun, ValueFun, all) ->
+get_chunk(State, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
+    case intervals:is_empty(Interval) of
+        true -> {intervals:empty(), []};
+        false ->
+            get_chunk2(State, StartId, Interval, FilterFun, ValueFun, ChunkSize)
+    end.
+
+%% @doc Helper for get_chunk/6.
+-spec get_chunk2(DB::db(), StartId::?RT:key(), Interval::intervals:interval(),
+                FilterFun::fun((entry()) -> boolean()),
+                ValueFun::fun((entry()) -> V),
+                ChunkSize::pos_integer() | all)
+        -> {intervals:interval(), [V]}.
+get_chunk2(State, StartId, Interval, FilterFun, ValueFun, all) ->
     {_Next, Chunk} =
-        get_chunk(State, StartId, Interval, FilterFun, ValueFun, get_load(State)),
+        get_chunk2(State, StartId, Interval, FilterFun, ValueFun, get_load(State)),
     {intervals:empty(), Chunk};
 
 
@@ -196,7 +207,7 @@ get_chunk(State, StartId, Interval, FilterFun, ValueFun, all) ->
 %% repair and local use (for data slide)
 %%%%%%
 
-get_chunk({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
+get_chunk2({DB, _Subscr, _Snap}, StartId, Interval, FilterFun, ValueFun, ChunkSize) ->
     %% split intervals in a way so that the first simple interval of After
     %% either contains StartId or is the closest following after StartId
     ?TRACE_CHUNK("get_chunk:~nStartID: ~p~nInterval:~p~nChunksize: ~p~n",

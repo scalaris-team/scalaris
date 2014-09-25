@@ -215,13 +215,13 @@ get_component_state(Pid, Timeout) ->
 
 %% @doc change the handler for handling messages
 -spec change_handler(user_state(), Handler::handler())
-        -> {'$gen_component', [{on_handler, Handler::handler()}], user_state()}.
+        -> {'$gen_component', [{on_handler, Handler::handler()},...], user_state()}.
 change_handler(UState, Handler) when is_function(Handler, 2) ->
     {'$gen_component', [{on_handler, Handler}], UState}.
 
 %% @doc perform a post op, i.e. handle a message directly after another
 -spec post_op(comm:message(), user_state())
-        -> {'$gen_component', [{post_op, comm:message()}], user_state()}.
+        -> {'$gen_component', [{post_op, comm:message()},...], user_state()}.
 post_op(Msg, UState) ->
     {'$gen_component', [{post_op, Msg}], UState}.
 
