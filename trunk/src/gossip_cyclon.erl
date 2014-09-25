@@ -477,6 +477,7 @@ print_cache_dot(MyNode, Cache) ->
     MyPid = comm:make_local(node:pidX(MyNode)),
     Graph = lists:foldl(
                     fun({Node, _Age}, AccIn) ->
+                        % printing MyPid causes dialyzer to think that this method does not have a "local return"
                         [AccIn, io_lib:format("~w -> ~w; ", [MyPid, comm:make_local(node:pidX(Node))])]
                     end, io_lib:format("[Cycle: ~w] ", [Cycle]), Cache),
     log:pal(lists:flatten(Graph)).

@@ -69,7 +69,9 @@
                           sync_finished_remote. %client-side shutdown by merkle-tree recon initiator
 
 -type db_chunk_kv()    :: [{?RT:key(), db_dht:version()}].
+-type 'db_chunk_kv+'() :: [{?RT:key(), db_dht:version()},...].
 -type db_chunk_kvv()   :: [{?RT:key(), db_dht:version(), db_dht:value()}].
+-type 'db_chunk_kvv+'():: [{?RT:key(), db_dht:version(), db_dht:value()},...].
 
 -type signature_size() :: 1..160. % upper bound of 160 (SHA-1) to also limit testing
 -type kv_tree()        :: gb_trees:tree(KeyBin::bitstring(), VersionShort::non_neg_integer()).
@@ -833,22 +835,38 @@ decompress_kv_list(Bin, Tree, SigSize, VSize) ->
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
 -spec get_full_diff
-        (MyEntries::db_chunk_kvv(), MyIOtherKvTree::kv_tree(),
+        (MyEntries::[], MyIOtherKvTree::kv_tree(),
+         AccFBItems::FBItems, AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VSize::signature_size())
+        -> {FBItems::FBItems, ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}
+            when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
+        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kv_tree(),
          AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
          SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()};
-        (MyEntries::db_chunk_kv(), MyIOtherKvTree::kv_tree(),
+        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kv_tree(),
          AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
          SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
 get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
     get_full_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
                   util:pow(2, VSize)).
-    
--spec get_full_diff_(MyEntries::db_chunk_kvv(), MyIOtherKvTree::kv_tree(),
-                     AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
-                     SigSize::signature_size(), VMod::pos_integer())
--> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
+
+%% @doc Helper for get_full_diff/6.
+-spec get_full_diff_
+        (MyEntries::[], MyIOtherKvTree::kv_tree(),
+         AccFBItems::FBItems, AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VMod::pos_integer())
+        -> {FBItems::FBItems, ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}
+            when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
+        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kv_tree(),
+         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VMod::pos_integer())
+        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()};
+        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kv_tree(),
+         AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VMod::pos_integer())
+        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
 get_full_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
     {FBItems, ReqItems, MyIOtKvTree};
 get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->

@@ -95,7 +95,7 @@ init([]) ->
 %%      'activate_rt' message is received).
 -spec on_inactive(message(), state_inactive()) -> state_inactive();
                  ({activate_rt, Neighbors::nodelist:neighborhood()}, state_inactive())
-                    -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_active()}.
+                    -> {'$gen_component', [{on_handler, Handler::gen_component:handler()},...], State::state_active()}.
 on_inactive({activate_rt, Neighbors}, {inactive, QueuedMessages}) ->
     log:log(info, "[ RT ~.0p ] activating...~n", [comm:this()]),
     comm:send_local(self(), {periodic_rt_rebuild}),
@@ -128,9 +128,12 @@ on_inactive(_Msg, State) ->
     State.
 
 %% @doc Message handler when the module is fully initialized.
--spec on_active(message(), state_active()) -> state_active() | unknown_event;
+-spec on_active(message(), state_active())
+                  -> state_active() |
+                         {'$gen_component', [{post_op, Msg::{periodic_rt_rebuild}},...], state_active()} |
+                         unknown_event;
                ({deactivate_rt}, state_active())
-                  -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}], State::state_inactive()}.
+                  -> {'$gen_component', [{on_handler, Handler::gen_component:handler()},...], State::state_inactive()}.
 on_active({deactivate_rt}, {Neighbors, _OldRT})  ->
     log:log(info, "[ RT ~.0p ] deactivating...~n", [comm:this()]),
     rm_loop:unsubscribe(self(), ?MODULE),
@@ -148,11 +151,11 @@ on_active({update_rt, OldNeighbors, NewNeighbors}, {_Neighbors, OldRT}) ->
         {trigger_rebuild, NewRT} ->
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
             % trigger immediate rebuild
-            gen_component:post_op({periodic_rt_rebuild}, new_state(NewNeighbors, NewRT))
+            gen_component:post_op({periodic_rt_rebuild}, {NewNeighbors, NewRT})
         ;
         {ok, NewRT} ->
             ?RT:check(OldRT, NewRT, OldNeighbors, NewNeighbors, true),
-            new_state(NewNeighbors, NewRT)
+            {NewNeighbors, NewRT}
     end;
 %% userdevguide-end rt_loop:update_rt
 
@@ -168,14 +171,14 @@ on_active({periodic_rt_rebuild}, {Neighbors, OldRT}) ->
     % log:log(debug, "[ RT ] stabilize"),
     NewRT = ?RT:init_stabilize(Neighbors, OldRT),
     ?RT:check(OldRT, NewRT, Neighbors, true),
-    new_state(Neighbors, NewRT);
+    {Neighbors, NewRT};
 %% userdevguide-end rt_loop:trigger
 
 % failure detector reported dead node
 on_active({crash, DeadPid, Reason}, {Neighbors, OldRT}) ->
     NewRT = ?RT:filter_dead_node(OldRT, DeadPid, Reason),
     ?RT:check(OldRT, NewRT, Neighbors, false),
-    new_state(Neighbors, NewRT);
+    {Neighbors, NewRT};
 
 % debug_info for web interface
 on_active({web_debug_info, Requestor},
@@ -200,11 +203,6 @@ on_active(Message, State) ->
 
 % handling rt_loop's (opaque) state - these handlers should at least be used
 % outside this module:
-
--spec new_state(Neighbors::nodelist:neighborhood(), RTState::?RT:rt())
-               -> state_active().
-new_state(Neighbors, RT) ->
-    {Neighbors, RT}.
 
 -spec get_neighb(State::state_active()) -> nodelist:neighborhood().
 get_neighb({Neighbors, _RT}) ->
