@@ -65,6 +65,8 @@ substitute({user_type, Line, TypeType, Types}, Substitutions) ->
     {type,Line,TypeType,Types2};
 
 % special types
+substitute({ann_type,_Line,[{var, _Line2, _Name}, Type]}, Substitutions) ->
+    substitute(Type, Substitutions);
 substitute({ann_type,Line,[Left,Right]}, Substitutions) ->
     Left2 = substitute(Left, Substitutions),
     Right2 = substitute(Right, Substitutions),

@@ -114,11 +114,11 @@ parse_chunk({attribute, _Line, opaque, {TypeName, ATypeSpec, List}},
                                      NewParseState);
 parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
             Module, ParseState) ->
-    FunSpec = case AFunSpec of
-                  [{type, _,bounded_fun, [_TypeFun, ConstraintType]}] ->
+    FunSpec = [case TheFunSpec of
+                  {type, _,bounded_fun, [_TypeFun, ConstraintType]} ->
                       try
                           Substitutions = parse_constraints(ConstraintType, gb_trees:empty()),
-                          tester_variable_substitutions:substitute(AFunSpec, Substitutions)
+                          tester_variable_substitutions:substitute(TheFunSpec, Substitutions)
                       catch
                           {subst_error, Description} ->
                               ct:pal("substitution error ~w in ~w:~w ~w", [Description, Module, FunName, AFunSpec]),
@@ -128,11 +128,11 @@ parse_chunk({attribute, _Line, 'spec', {{FunName, FunArity}, AFunSpec}},
                               exit(foobar)
                       end;
                   _ ->
-                      AFunSpec
-              end,
-    {TheFunSpec, NewParseState} = parse_type({union_fun, FunSpec}, Module, ParseState),
+                      TheFunSpec
+              end || TheFunSpec <- AFunSpec],
+    {CleanFunSpec, NewParseState} = parse_type({union_fun, FunSpec}, Module, ParseState),
     tester_parse_state:add_type_spec({'fun', Module, FunName, FunArity},
-                                     TheFunSpec, [], NewParseState);
+                                     CleanFunSpec, [], NewParseState);
 parse_chunk({attribute, _Line, record, {TypeName, TypeList}}, Module, ParseState) ->
     {TheTypeSpec, NewParseState} = parse_type(TypeList, Module, ParseState),
     tester_parse_state:add_type_spec({record, Module, TypeName}, TheTypeSpec, [],
@@ -416,8 +416,8 @@ parse_type_({type, _Line, TypeName, L}, Module, ParseState) ->
             {{typedef, Module, TypeName, L},
              tester_parse_state:add_unknown_type(Module, TypeName, length(L), ParseState)}
     end;
-parse_type_({ann_type,_Line,[Left,Right]}, _Module, ParseState) ->
-    {{ann_type, [Left, Right]}, ParseState};
+%% parse_type_({ann_type,_Line,[Left,Right]}, _Module, ParseState) ->
+%%     {{ann_type, [Left, Right]}, ParseState};
 parse_type_(TypeSpec, Module, ParseState) ->
     ct:pal("unknown type ~p in module ~p~n", [TypeSpec, Module]),
     {unkown, ParseState}.
