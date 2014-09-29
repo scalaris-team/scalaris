@@ -36,18 +36,15 @@ Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 # https://fedoraproject.org/wiki/Packaging:Systemd?rd=Packaging:Guidelines:Systemd
 %define with_systemd 1
 BuildRequires:  systemd
+Requires:       systemd
 BuildRequires:  selinux-policy-devel
 Requires:       policycoreutils, libselinux-utils
 Requires(post): selinux-policy-base, policycoreutils
 Requires(postun): policycoreutils
-
-# provides runuser
-BuildRequires:  util-linux >= 2.23
-Requires:       util-linux >= 2.23
 %else
 %define with_systemd 0
 %if 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
-# provides runuser
+# provides runuser for the init.d script
 BuildRequires:  util-linux-ng >= 2.17
 Requires:       util-linux-ng >= 2.17
 %endif
@@ -71,13 +68,14 @@ Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
 PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 Requires(pre):  %insserv_prereq
-# keep systemd disabled for now due to the runuser bug (see below)
+# keep systemd disabled for openSUSE 13.1 due to the runuser bug (see below)
+%if 0%{?suse_version} > 1310
 # https://en.opensuse.org/openSUSE:Systemd_packaging_guidelines
+%define with_systemd 1
+BuildRequires:  systemd
+%{?systemd_requires}
+%else
 %define with_systemd 0
-%if 0%{?suse_version} >= 1310
-# provides runuser
-BuildRequires:  util-linux >= 2.23
-Requires:       util-linux >= 2.23
 %endif
 BuildRequires:  sudo
 Requires:       sudo
@@ -102,7 +100,7 @@ Documentation for Scalaris including its User-Dev-Guide.
 %setup -q -n %{name}-%{version}
 
 %build
-# TODO: re-enable runuser once the util-linux package is patched
+# NOTE: disable runuser on openSUSE 13.1 because of the following bug
 # see https://bugzilla.novell.com/show_bug.cgi?id=892079
 ./configure --prefix=%{_prefix} \
     --exec-prefix=%{_exec_prefix} \
@@ -117,7 +115,7 @@ Documentation for Scalaris including its User-Dev-Guide.
     --sharedstatedir=%{_sharedstatedir} \
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
-%if 0%{?suse_version} >= 1310
+%if 0%{?suse_version} == 1310
     --disable-runuser \
 %endif
 %if 0%{?with_systemd}
@@ -147,6 +145,13 @@ cd -
 # note: use "-r" instead of "--system" for old systems like CentOS5, RHEL5
 getent group %{scalaris_group} >/dev/null || groupadd -r %{scalaris_group}
 getent passwd %{scalaris_user} >/dev/null || mkdir -p %{scalaris_home} && useradd -r -g %{scalaris_group} -d %{scalaris_home} -M -s /sbin/nologin -c "user for scalaris" %{scalaris_user} && chown %{scalaris_user}:%{scalaris_group} %{scalaris_home}
+
+%if 0%{?suse_version}
+%if 0%{?with_systemd}
+%service_add_pre scalaris.service scalaris-first.service
+%endif
+%endif
+
 exit 0
 
 %post
@@ -155,8 +160,13 @@ if grep -e '^cookie=\w\+' %{_sysconfdir}/scalaris/scalarisctl.conf > /dev/null 2
 fi
 
 %if 0%{?suse_version}
+%if 0%{?with_systemd}
+%service_add_post scalaris.service scalaris-first.service
+%else
 %fillup_and_insserv -f scalaris scalaris-first
 %endif
+%endif
+
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %if 0%{?with_systemd}
 semodule -i %{_datadir}/selinux/packages/scalaris.pp || :
@@ -173,8 +183,13 @@ fi
 
 %preun
 %if 0%{?suse_version}
+%if 0%{?with_systemd}
+%service_del_preun scalaris.service scalaris-first.service
+%else
 %stop_on_removal scalaris scalaris-first
 %endif
+%endif
+
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %if 0%{?with_systemd}
 %systemd_preun scalaris.service scalaris-first.service
@@ -188,9 +203,14 @@ fi
 
 %postun
 %if 0%{?suse_version}
+%if 0%{?with_systemd}
+%service_del_postun scalaris.service scalaris-first.service
+%else
 %restart_on_update scalaris scalaris-first
 %insserv_cleanup
 %endif
+%endif
+
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 %if 0%{?with_systemd}
 %systemd_postun_with_restart scalaris.service scalaris-first.service
@@ -224,6 +244,7 @@ rm -rf $RPM_BUILD_ROOT
 %if 0%{?with_systemd}
 %{_unitdir}/scalaris.service
 %{_unitdir}/scalaris-first.service
+%dir %{_sysconfdir}/conf.d
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris-first
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
