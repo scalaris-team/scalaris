@@ -2,7 +2,43 @@ scalaris (0.7.1+svn-1) unstable; urgency=low
 
   * svn snapshot from trunk
 
- -- Nico Kruber <kruber@zib.de>  Mon, 28 Apr 2014 12:00:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Mon, 29 Sep 2014 17:00:00 +0200
+
+scalaris (0.7.1-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+    and the EIT ICT Labs project MCData
+  * Packaging:
+    - add support for new distribution versions
+    - support systemd and SELinux
+    - include daemon for monitoring Scalaris through JMX
+  * API:
+    - Java-API: integrate new OtpErlang library (1.5.10 from Erlang 17.3)
+  * Demonstrator "Wiki on Scalaris":
+    - fix storing template back-links for magic words
+    - fix ARTICLE_COUNT partitioning with hashes
+  * Business Logic:
+    - more robust (still experimental) support for active load balancing with
+      Karger and Ruhl's algorithm including more flexible "load" definitions
+    - rm_tman: less overhead by only sending unknown nodes to neighbours
+    - slide: better support for slide aborts
+    - node join: less overhead during joins, especially in setups with huge
+                 lists of known nodes
+    - cyclon: move to new gossip framework
+    - vivaldi: move to new gossip framework
+    - monitor: move performance monitor to the basic_services group
+               (once per VM)
+  * Infrastructure:
+    - several smaller performance optimisations
+    - support for Erlang R13B01 up to 17.3 and current otp master
+  * Tests:
+    - some new unit tests and higher test coverage
+  * Documentation:
+    - add rrepair sequence diagrams
+  * Bugs:
+    - fix numerous bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 29 Sep 2014 16:50:00 +0200
 
 scalaris (0.7.0-1) stable; urgency=low
 

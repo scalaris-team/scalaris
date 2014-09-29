@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Mon Sep 29 14:50:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.1
+  (partly supported by the EU project IES Cities http://iescities.eu/
+  and the EIT ICT Labs project MCData)
+  * Demonstrator "Wiki on Scalaris":
+    - fix storing template back-links for magic words
+    - fix ARTICLE_COUNT partitioning with hashes
+  * Bugs:
+    - fix numerous bugs
+
+-------------------------------------------------------------------
 Mon Apr 28 10:00:00 UTC 2014 - kruber@zib.de
 
 - Scalaris 0.7.0

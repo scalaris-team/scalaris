@@ -2,7 +2,19 @@ scalaris-bindings (0.7.1+svn-1) unstable; urgency=low
 
   * svn snapshot from trunk
 
- -- Nico Kruber <kruber@zib.de>  Mon, 28 Apr 2014 12:00:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Mon, 29 Sep 2014 17:00:00 +0200
+
+scalaris (0.7.1-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+    and the EIT ICT Labs project MCData
+  * Packaging:
+    - add support for new distribution versions
+    - include daemon for monitoring Scalaris through JMX
+  * API:
+    - Java-API: integrate new OtpErlang library (1.5.10 from Erlang 17.3)
+  * Bugs:
+    - fix numerous bugs
 
 scalaris-bindings (0.7.0-1) stable; urgency=low
 
