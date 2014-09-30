@@ -26,6 +26,7 @@
 % external API
 -export([create/1, add/2, add/3, get_data/1, get_size/1,
          get_num_elements/1, get_num_inserts/1, merge/2]).
+-export([merge_weighted/3, normalize_count/2]).
 
 % private API for unit tests:
 -export([find_smallest_interval/1, merge_interval/2,
@@ -91,6 +92,23 @@ merge(Hist1 = #histogram{size = 0}, _Hist2) -> Hist1;
 merge(Hist1 = #histogram{data = Hist1Data}, #histogram{data = Hist2Data}) ->
     NewData = lists:foldl(fun insert/2, Hist1Data, Hist2Data),
     resize(Hist1#histogram{data = NewData, data_size = length(NewData)}).
+
+%% @doc Merges Hist2 into Hist1 and applies a weight to the Count of Hist2
+-spec merge_weighted(Hist1::histogram(), Hist2::histogram(), Weight::pos_integer()) -> histogram().
+merge_weighted(Hist1, #histogram{data = Hist2Data} = Hist2, Weight) ->
+    WeightedData = lists:keymap(fun(Count) -> Count * Weight end, 2, Hist2Data),
+    WeightedHist2 = Hist2#histogram{data = WeightedData},
+    merge(Hist1, WeightedHist2).
+
+%% @doc Normalizes the Count by a normalization constant N
+-spec normalize_count(N::pos_integer(), Histogram::histogram()) -> histogram().
+normalize_count(N, Histogram) ->
+    Data = histogram:get_data(Histogram),
+    DataNew = lists:keymap(fun(Count) -> Count div N end, 2, Data),
+    DataNew2 = lists:filter(fun({_Value, Count}) ->
+                                    Count > 0
+                            end, DataNew),
+    resize(Histogram#histogram{data = DataNew2, data_size = length(DataNew2)}).
 
 %% @doc Traverses the histogram until TargetCount entries have been found
 %%      and returns the value at this position.

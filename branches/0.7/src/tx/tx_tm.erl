@@ -199,13 +199,13 @@
          any(),                    %% ClientsId,
          open | ?commit | ?abort,  %% status
          tx_tlog:tlog(),           %% tlog to be committed
-         prbr:r_with_id() | '_',   %% next txid write token for fast write
+         pr:pr() | '_',   %% next txid write token for fast write
          any(),                    %% last written txid value for fast write
          %% keys of locks to be confirmed.
          [?RT:key() | client_key() | binary()],
          %% keys, rounds, and oldvalues of commits to be confirmed,
          [{?RT:key() | client_key() | binary(),
-           prbr:r_with_id() | '_', %% for fast write, set on lock reply
+           pr:pr() | '_', %% for fast write, set on lock reply
            any() %% old value for fast write
           }],
          %% keys that failed to be locked,
@@ -275,9 +275,8 @@ is_txnew_enabled() -> false.
 rm_send_update(Pid, ?MODULE, OldNeighbors, NewNeighbors, _Reason) ->
     OldId = node:id(nodelist:node(OldNeighbors)),
     NewId = node:id(nodelist:node(NewNeighbors)),
-    case OldId =/= NewId of
-        true  -> comm:send_local(Pid, {new_node_id, NewId});
-        false -> ok
+    if OldId =/= NewId -> comm:send_local(Pid, {new_node_id, NewId});
+       true            -> ok
     end.
 
 %% be startable via supervisor, use gen_component
@@ -384,15 +383,21 @@ on({tx_tm_lock_get_done, TxId, Key,
                     %% all locks acquired? -> proceed to next step
                     Round = tx_state_txid_next_write_token(NewTxState),
                     OldVal = tx_state_txid_written_value(NewTxState),
-%%                    io:format("decide commit~n"),
-                    gen_component:post_op(
-                      {tx_tm_write_decision, TxId, commit, Round, OldVal}, State);
+                    case tx_state_failed_locks(NewTxState) of
+                        [] ->
+                            %% io:format("decide commit~n"),
+                            gen_component:post_op(
+                              {tx_tm_write_decision, TxId, commit, Round, OldVal}, State);
+                        _ ->
+                            gen_component:post_op(
+                              {tx_tm_write_decision, TxId, abort, Round, OldVal}, State)
+                    end;
                 _ -> State
             end
     end;
 
 on({tx_tm_lock_get_done, TxId, Key,
-    {qwrite_deny, _ReqId, NextRound, WrittenVal, Reason}}, State) ->
+    {qwrite_deny, _ReqId, NextRound, WrittenVal, _Reason}}, State) ->
     %% a lock was not acquirable -> abort the tx
     case get_entry(TxId, State) of
         undefined ->
@@ -412,7 +417,7 @@ on({tx_tm_lock_get_done, TxId, Key,
                     %% all locks acquired? -> proceed to next step
                     Round = tx_state_txid_next_write_token(NewTxState),
                     OldVal = tx_state_txid_written_value(NewTxState),
-%%                    io:format("decide abort~n"),
+                    %%log:log("decide abort~n"),
                     gen_component:post_op(
                       {tx_tm_write_decision, TxId, abort, Round, OldVal}, State);
                 _ -> State
@@ -622,11 +627,11 @@ tx_state_clients_id(TxState) -> element(?enum_clientid, TxState).
 -spec tx_state_tlog(tx_state()) -> tx_tlog:tlog().
 tx_state_tlog(TxState) -> element(?enum_tlog, TxState).
 
--spec tx_state_txid_next_write_token(tx_state()) -> prbr:r_with_id() | '_'.
+-spec tx_state_txid_next_write_token(tx_state()) -> pr:pr() | '_'.
 tx_state_txid_next_write_token(TxState) ->
     element(?enum_txid_round, TxState).
 
--spec tx_state_set_txid_next_write_token(tx_state(), prbr:r_with_id())
+-spec tx_state_set_txid_next_write_token(tx_state(), pr:pr())
                              -> tx_state().
 tx_state_set_txid_next_write_token(TxState, NextRound) ->
     setelement(?enum_txid_round, TxState, NextRound).
@@ -649,13 +654,13 @@ tx_state_set_open_locks(TxState, OpenLocks) ->
 
 -spec tx_state_open_commits(tx_state()) ->
                                    [{client_key() | binary() | ?RT:key(),
-                                     prbr:r_with_id() | '_',
+                                     pr:pr() | '_',
                                      any()}].
 tx_state_open_commits(TxState)    -> element(?enum_open_commits, TxState).
 
 -spec tx_state_set_open_commits(tx_state(),
                                 [{client_key() | binary() | ?RT:key(),
-                                  prbr:r_with_id(),
+                                  pr:pr(),
                                   any()}])
                              -> tx_state().
 tx_state_set_open_commits(TxState, FailedLocks) ->
@@ -663,7 +668,7 @@ tx_state_set_open_commits(TxState, FailedLocks) ->
 
 -spec tx_state_add_nextround_writtenval_for_commit(
         tx_state(), client_key() | binary() | ?RT:key(),
-        prbr:r_with_id(), any()) -> tx_state().
+        pr:pr(), any()) -> tx_state().
 tx_state_add_nextround_writtenval_for_commit(TxState, Key, NextRound, WrittenVal) ->
     OpenCommits = tx_state_open_commits(TxState),
     NewOpenCommits = lists:keyreplace(Key, 1, OpenCommits,

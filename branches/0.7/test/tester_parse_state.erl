@@ -25,11 +25,11 @@
          % add fun info to state
          find_fun_info/4,
 
-         get_type_infos/1, get_unknown_types/1, has_unknown_types/1,
+         get_unknown_types/1, has_unknown_types/1,
 
 
          % add types
-         add_type_spec/3, add_unknown_type/3,
+         add_type_spec/4, add_unknown_type/4,
 
          % add values
          add_atom/2, add_binary/2, add_float/2, add_integer/2, add_string/2,
@@ -41,7 +41,7 @@
 
          reset_unknown_types/1,
 
-         is_known_type/3, lookup_type/2,
+         is_known_type/4, lookup_type/2, lookup_fun_type/2,
          
          % compact state
          finalize/1]).
@@ -54,7 +54,7 @@
 -endif.
 
 -record(parse_state,
-        {type_infos        = gb_trees:empty() :: gb_trees:tree(type_name(), type_spec()),
+        {type_infos        = gb_trees:empty() :: gb_trees:tree(type_name(), {var_list(), type_spec()}),
          unknown_types     = gb_sets:new()    :: gb_sets:set(type_name()) | {Length::non_neg_integer(), [type_name()]},
          atoms             = gb_sets:new()    :: gb_sets:set(atom()) | {Length::non_neg_integer(), [atom()]},
          binaries          = gb_sets:new()    :: gb_sets:set(binary()) | {Length::non_neg_integer(), [binary()]},
@@ -106,11 +106,7 @@ find_fun_info(Module, Func, Arity, ParseState) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -spec new_parse_state() -> state().
 new_parse_state() ->
-    #parse_state{unknown_types = gb_sets:singleton({type, tester, test_any})}.
-
--spec get_type_infos(state()) -> gb_trees:tree(type_name(), type_spec()).
-get_type_infos(#parse_state{type_infos=TypeInfo}) ->
-    TypeInfo.
+    #parse_state{unknown_types = gb_sets:singleton({type, tester, test_any, 0})}.
 
 -spec has_unknown_types(state()) -> boolean().
 has_unknown_types(#parse_state{unknown_types=UnknownTypes}) ->
@@ -197,24 +193,24 @@ get_non_empty_strings(#parse_state{non_empty_strings=Strings}) ->
         _    -> Strings
     end.
 
--spec add_type_spec(type_name(), type_spec(), state()) -> state().
-add_type_spec(TypeName, TypeSpec, #parse_state{type_infos=TypeInfos} = ParseState) ->
-    NewTypeInfos = gb_trees:enter(TypeName, TypeSpec, TypeInfos),
+-spec add_type_spec(type_name(), type_spec(), var_list(), state()) -> state().
+add_type_spec(TypeName, TypeSpec, VarList, #parse_state{type_infos=TypeInfos} = ParseState) ->
+    NewTypeInfos = gb_trees:enter(TypeName, {var_type, VarList, TypeSpec}, TypeInfos),
     ParseState#parse_state{type_infos=NewTypeInfos}.
 
--spec add_unknown_type(module(), atom(), state()) -> state().
-add_unknown_type(TypeModule, TypeName, #parse_state{unknown_types=UnknownTypes} = ParseState) ->
+-spec add_unknown_type(module(), atom(), arity(), state()) -> state().
+add_unknown_type(TypeModule, TypeName, Arity, #parse_state{unknown_types=UnknownTypes} = ParseState) ->
     ParseState#parse_state{unknown_types=
-                           gb_sets:add_element({type, TypeModule, TypeName},
+                           gb_sets:add_element({type, TypeModule, TypeName, Arity},
                                                UnknownTypes)}.
 
 -spec reset_unknown_types(state()) -> state().
 reset_unknown_types(ParseState) ->
     ParseState#parse_state{unknown_types=gb_sets:new()}.
 
--spec is_known_type(module(), atom(), state()) -> boolean().
-is_known_type(TypeModule, TypeName, #parse_state{type_infos=TypeInfos}) ->
-    gb_trees:is_defined({type, TypeModule, TypeName}, TypeInfos).
+-spec is_known_type(module(), atom(), arity(), state()) -> boolean().
+is_known_type(TypeModule, TypeName, Arity, #parse_state{type_infos=TypeInfos}) ->
+    gb_trees:is_defined({type, TypeModule, TypeName, Arity}, TypeInfos).
 
 -spec add_atom(atom(), state()) -> state().
 add_atom(Atom, #parse_state{atoms=Atoms} = ParseState) ->
@@ -240,6 +236,11 @@ add_string(String, #parse_state{non_empty_strings=Strings} = ParseState) ->
 
 -spec lookup_type(type_name(), state()) -> {value, type_spec()} | none.
 lookup_type(Type, #parse_state{type_infos=TypeInfos}) ->
+    gb_trees:lookup(Type, TypeInfos).
+
+-spec lookup_fun_type(type_name(), state()) -> 
+                             {value, {var_type, [], {union_fun, [test_fun_type(),...]}}} | none.
+lookup_fun_type(Type, #parse_state{type_infos=TypeInfos}) ->
     gb_trees:lookup(Type, TypeInfos).
 
 %% @doc Compact the state for use during value creation. Do this after having

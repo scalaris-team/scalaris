@@ -84,6 +84,7 @@ state_reset_state(State) ->           setelement(10, State, 0).
         -> {InState, InAckRound, InAckValue, InAckRLast}
             when is_subtype(InState, proposer_state()),
                  is_subtype(InAckRound, non_neg_integer()),
+                 is_subtype(InAckValue, any()),
                  is_subtype(InAckRLast, non_neg_integer()).
 state_add_ack_msg_feeder(InState, InAckRound, InAckValue, InAckRLast) ->
     StateRound = state_get_round(InState),

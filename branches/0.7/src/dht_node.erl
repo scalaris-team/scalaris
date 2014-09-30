@@ -53,7 +53,7 @@
 
 -type(lookup_message() ::
       {?lookup_aux, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()} |
-      {?lookup_fin, Key::?RT:key(), Hops::pos_integer(), Msg::comm:message()}).
+      {?lookup_fin, Key::?RT:key(), Data::dht_node_lookup:data(), Msg::comm:message()}).
 
 -type(snapshot_message() ::
       {do_snapshot, SnapNumber::non_neg_integer(), Leader::comm:mypid()} |
@@ -71,7 +71,7 @@
       {dump} |
       {web_debug_info, Requestor::comm:erl_local_pid()} |
       {get_dht_nodes_response, KnownHosts::[comm:mypid()]} |
-      {unittest_get_bounds_and_data, SourcePid::comm:mypid()}).
+      {unittest_get_bounds_and_data, SourcePid::comm:mypid(), full | kv}).
 
 % accepted messages of dht_node processes
 -type message() ::
@@ -84,21 +84,29 @@
     misc_message() |
     snapshot_message() |
     {zombie, Node::node:node_type()} |
-    {crash, DeadPid::comm:mypid()} |
-    {crash, DeadPid::comm:mypid(), Cookie::tuple()} |
-    {leave, SourcePid::comm:erl_local_pid() | null}.
+    {crash, DeadPid::comm:mypid(), Reason::fd:reason()} |
+    {crash, DeadPid::comm:mypid(), Reason::fd:reason(), Cookie::tuple()} |
+    {leave, SourcePid::comm:erl_local_pid() | null} |
+    {rejoin, IdVersion::non_neg_integer(), JoinOptions::[tuple()],
+      {get_move_state_response, MoveState::[tuple()]}}.
 
 %% @doc message handler
 -spec on(message(), dht_node_state:state()) -> dht_node_state:state() | kill.
 %% Join messages (see dht_node_join.erl)
 %% userdevguide-begin dht_node:join_message
 on(Msg, State) when join =:= element(1, Msg) ->
-    dht_node_join:process_join_msg(Msg, State);
+    lb_stats:set_ignore_db_requests(true),
+    NewState = dht_node_join:process_join_msg(Msg, State),
+    lb_stats:set_ignore_db_requests(false),
+    NewState;
 %% userdevguide-end dht_node:join_message
 
 % Move messages (see dht_node_move.erl)
 on(Msg, State) when move =:= element(1, Msg) ->
-    dht_node_move:process_move_msg(Msg, State);
+    lb_stats:set_ignore_db_requests(true),
+    NewState = dht_node_move:process_move_msg(Msg, State),
+    lb_stats:set_ignore_db_requests(false),
+    NewState;
 
 % Lease management messages (see l_on_cseq.erl)
 on(Msg, State) when l_on_cseq =:= element(1, Msg) ->
@@ -192,8 +200,8 @@ on({?lookup_aux, Key, Hops, Msg}, State) ->
     dht_node_lookup:lookup_aux(State, Key, Hops, Msg),
     State;
 
-on({?lookup_fin, Key, Hops, Msg}, State) ->
-    dht_node_lookup:lookup_fin(State, Key, Hops, Msg);
+on({?lookup_fin, Key, Data, Msg}, State) ->
+    dht_node_lookup:lookup_fin(State, Key, Data, Msg);
 
 on({send_error, Target, {?lookup_aux, _, _, _} = Message, _Reason}, State) ->
     dht_node_lookup:lookup_aux_failed(State, Target, Message);
@@ -404,10 +412,23 @@ on({web_debug_info, Requestor}, State) ->
     comm:send_local(Requestor, {web_debug_info_reply, KVList3}),
     State;
 
-on({unittest_get_bounds_and_data, SourcePid}, State) ->
+on({unittest_get_bounds_and_data, SourcePid, Type}, State) ->
     MyRange = dht_node_state:get(State, my_range),
     MyBounds = intervals:get_bounds(MyRange),
-    Data = db_dht:get_data(dht_node_state:get(State, db)),
+    DB = dht_node_state:get(State, db),
+    Data =
+        case Type of
+            kv ->
+                element(
+                  2,
+                  db_dht:get_chunk(
+                    DB, ?MINUS_INFINITY, intervals:all(),
+                    fun(_) -> true end,
+                    fun(E) -> {db_entry:get_key(E), db_entry:get_version(E)} end,
+                    all));
+            full ->
+                db_dht:get_data(DB)
+        end,
     Pred = dht_node_state:get(State, pred),
     Succ = dht_node_state:get(State, succ),
     comm:send(SourcePid, {unittest_get_bounds_and_data_response, MyBounds, Data, Pred, Succ}),
@@ -423,11 +444,12 @@ on({get_dht_nodes_response, _KnownHosts}, State) ->
     State;
 
 % failure detector, dead node cache
-on({crash, DeadPid, Cookie}, State) when is_tuple(Cookie) andalso element(1, Cookie) =:= move->
-    dht_node_move:crashed_node(State, DeadPid, Cookie);
-on({crash, DeadPid}, State) ->
+on({crash, DeadPid, Reason, Cookie}, State) when is_tuple(Cookie) andalso
+                                                     element(1, Cookie) =:= move->
+    dht_node_move:crashed_node(State, DeadPid, Reason, Cookie);
+on({crash, DeadPid, Reason}, State) ->
     RMState = dht_node_state:get(State, rm_state),
-    RMState1 = rm_loop:crashed_node(RMState, DeadPid),
+    RMState1 = rm_loop:crashed_node(RMState, DeadPid, Reason),
     % TODO: integrate crash handler for join
     dht_node_state:set_rm(State, RMState1);
 
@@ -442,8 +464,14 @@ on({do_snapshot, SnapNumber, Leader}, State) ->
     snapshot:on_do_snapshot(SnapNumber, Leader, State);
 
 on({local_snapshot_is_done}, State) ->
-    snapshot:on_local_snapshot_is_done(State).
+    snapshot:on_local_snapshot_is_done(State);
 
+on({rejoin, Id, Options, {get_move_state_response, MoveState}}, State) ->
+    %% start new join
+    comm:send_local(self(), {join, start}),
+    JoinOptions = [{move_state, MoveState} | Options],
+    IdVersion = node:id_version(dht_node_state:get(State, node)),
+    dht_node_join:join_as_other(Id, IdVersion+1, JoinOptions).
 
 %% userdevguide-begin dht_node:start
 %% @doc joins this node in the ring and calls the main loop
@@ -456,39 +484,36 @@ init(Options) ->
     % start trigger here to prevent infection when tracing e.g. node joins
     % (otherwise the trigger would be started at the end of the join and thus
     % be infected forever)
+    % NOTE: any trigger started here, needs an exception for queuing messages
+    %       in dht_node_join to prevent infection with msg_queue:send/1!
     rm_loop:init_first(),
     dht_node_move:send_trigger(),
 
-    Id = case {is_first(Options), config:read(leases)} of
-             {true, true} ->
-                 msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
-                 l_on_cseq:id(intervals:all());
-             {true, _} ->
-                 % get my ID (if set, otherwise chose a random ID):
-                 case lists:keyfind({dht_node, id}, 1, Options) of
-                     {{dht_node, id}, IdX} -> IdX;
-                     _ -> ?RT:get_random_node_id()
-                 end;
-             {false, true} ->
-                 msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
-                 % get my ID (if set, otherwise chose a random ID):
-                 case lists:keyfind({dht_node, id}, 1, Options) of
-                     {{dht_node, id}, IdX} -> IdX;
-                     _ -> ?RT:get_random_node_id()
-                 end;
-             {false, _} ->
-                 case lists:keyfind({dht_node, id}, 1, Options) of
-                     {{dht_node, id}, IdX} -> IdX;
-                     _ -> ?RT:get_random_node_id()
-                 end
-         end,
-    case is_first(Options) of
-        true ->
+    case {is_first(Options), config:read(leases)} of
+        {true, true} ->
+            msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
+            Id = l_on_cseq:id(intervals:all()),
             TmpState = dht_node_join:join_as_first(Id, 0, Options),
             %% we have to inject the first lease by hand, as otherwise
             %% no routing will work.
             l_on_cseq:add_first_lease_to_db(Id, TmpState);
-        _    -> dht_node_join:join_as_other(Id, 0, Options)
+        {false, true} ->
+            msg_delay:send_trigger(1, {l_on_cseq, renew_leases}),
+            % get my ID (if set, otherwise chose a random ID):
+            Id = case lists:keyfind({dht_node, id}, 1, Options) of
+                     {{dht_node, id}, IdX} -> IdX;
+                     _ -> ?RT:get_random_node_id()
+                 end,
+            dht_node_join:join_as_other(Id, 0, Options);
+        {IsFirst, _} ->
+            % get my ID (if set, otherwise chose a random ID):
+            Id = case lists:keyfind({dht_node, id}, 1, Options) of
+                     {{dht_node, id}, IdX} -> IdX;
+                     _ -> ?RT:get_random_node_id()
+                 end,
+            if IsFirst -> dht_node_join:join_as_first(Id, 0, Options);
+               true    -> dht_node_join:join_as_other(Id, 0, Options)
+            end
     end.
 %% userdevguide-end dht_node:start
 

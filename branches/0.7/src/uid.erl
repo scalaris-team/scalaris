@@ -24,7 +24,9 @@
 -export_type([global_uid/0]).
 -endif.
 
--export([get_pids_uid/0, get_global_uid/0, is_my_old_uid/1]).
+-export([get_pids_uid/0, get_global_uid/0,
+         is_my_old_uid/1, is_old_uid/2,
+         from_same_pid/2]).
 
 -opaque global_uid() :: {pos_integer(), pid()}.
 
@@ -64,4 +66,18 @@ is_my_old_uid(Id) when is_integer(Id) ->
               end,
     Id =< LastUid;
 is_my_old_uid(_Id) ->
+    false.
+
+%% @doc Checks whether GUID1 is an old incarnation of GUID2.
+-spec is_old_uid(GUID1::global_uid(), GUID2::global_uid()) -> boolean().
+is_old_uid({LocalUid1, Pid}, {LocalUid2, Pid}) when LocalUid1 < LocalUid2 ->
+    true;
+is_old_uid(_GUID1, _GUID2) ->
+    false.
+
+%% @doc Checks whether GUID1 is from the same process as GUID2.
+-spec from_same_pid(GUID1::global_uid(), GUID2::global_uid()) -> boolean().
+from_same_pid({_LocalUid1, Pid}, {_LocalUid2, Pid}) ->
+    true;
+from_same_pid(_GUID1, _GUID2) ->
     false.

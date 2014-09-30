@@ -38,7 +38,7 @@
 -export([lease_takeover_after/3]).
 -export([lease_split/5]).
 -export([lease_merge/3]).
--export([lease_send_lease_to_node/2]).
+-export([lease_send_lease_to_node/3]).
 -export([lease_split_and_change_owner/6]).
 -export([disable_lease/2]).
 
@@ -48,6 +48,8 @@
 -export([unittest_lease_update/3]).
 -export([unittest_create_lease/1]).
 -export([unittest_create_lease_with_range/2]).
+-export([unittest_clear_lease_list/1]).
+-export([unittest_get_delta/0]).
 
 -export([get_db_for_id/1]).
 
@@ -57,10 +59,10 @@
          new_timeout/0, set_timeout/1, get_timeout/1, get_pretty_timeout/1,
          get_id/1,
          get_owner/1, set_owner/2,
-         get_aux/1, set_aux/2,
+         get_aux/1, set_aux/2, is_live_aux_field/1,
          get_range/1, set_range/2,
          split_range/1,
-         is_valid/1,
+         is_valid/1, has_timed_out/1,
          invalid_lease/0]).
 
 -export([add_first_lease_to_db/2]).
@@ -85,7 +87,7 @@
 -record(lease, {
           id      = ?required(lease, id     ) :: lease_id(),
           epoch   = ?required(lease, epoch  ) :: non_neg_integer(),
-          owner   = ?required(lease, owner  ) :: comm:mypid() | nil,
+          owner   = ?required(lease, owner  ) :: comm:mypid_plain() | nil,
           range   = ?required(lease, range  ) :: intervals:interval(),
           aux     = ?required(lease, aux    ) :: lease_aux(),
           version = ?required(lease, version) :: non_neg_integer(),
@@ -141,6 +143,8 @@
 -spec delta() -> pos_integer().
 delta() -> 10.
 
+-spec unittest_get_delta() -> pos_integer().
+unittest_get_delta() -> delta().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -152,7 +156,7 @@ delta() -> 10.
 lease_renew(Lease, Mode) ->
     lease_renew(pid_groups:get_my(dht_node), Lease, Mode).
 
--spec lease_renew(comm:mypid(), lease_t(), active | passive) -> ok.
+-spec lease_renew(comm:erl_local_pid(), lease_t(), active | passive) -> ok.
 lease_renew(Pid, Lease, Mode) ->
     comm:send_local(Pid,
                     {l_on_cseq, renew, Lease, Mode}),
@@ -195,10 +199,10 @@ lease_merge(Lease1, Lease2, ReplyTo) ->
                     {l_on_cseq, merge, Lease1, Lease2, ReplyTo}),
     ok.
 
--spec lease_send_lease_to_node(Pid::comm:mypid(), Lease::lease_t()) -> ok.
-lease_send_lease_to_node(Pid, Lease) ->
+-spec lease_send_lease_to_node(Pid::comm:mypid(), Lease::lease_t(), active | passive) -> ok.
+lease_send_lease_to_node(Pid, Lease, Mode) ->
     % @todo precondition: Pid is a dht_node
-    comm:send(Pid, {l_on_cseq, send_lease_to_node, Lease}),
+    comm:send(Pid, {l_on_cseq, send_lease_to_node, Lease, Mode}),
     ok.
 
 -spec lease_split_and_change_owner(lease_t(),
@@ -237,6 +241,18 @@ unittest_lease_update(Old, New, Mode) ->
           )
     end.
 
+-spec unittest_clear_lease_list(Pid::comm:erl_local_pid()) -> ok.
+unittest_clear_lease_list(Pid) ->
+    comm:send_local(Pid,
+                    {l_on_cseq, unittest_clear_lease_list, comm:this()}),
+    trace_mpath:thread_yield(),
+    receive
+        ?SCALARIS_RECV(
+            {l_on_cseq, unittest_clear_lease_list_success}, %% ->
+            ok
+          )
+    end.
+    
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % gen_component
@@ -261,12 +277,19 @@ on({l_on_cseq, split_and_change_owner, _Lease, NewOwner, ReplyPid, SplitResult},
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, renew, Old = #lease{id=Id,version=OldVersion}, Mode},
    State) ->
-    log:pal("on renew ~w (~w)~n", [Old, Mode]),
-    New = Old#lease{version=OldVersion+1, timeout=new_timeout()},
+    %log:pal("on renew ~w (~w)~n", [Old, Mode]),
+    Self = comm:this(),
+    New = case get_aux(Old) of
+              % change owner to self -> remove aux
+              {change_owner, Self} ->
+                  Old#lease{aux=empty,version=OldVersion+1, timeout=new_timeout()};
+              _ ->
+                  Old#lease{version=OldVersion+1, timeout=new_timeout()}
+          end,
     ContentCheck = generic_content_check(Old, New, renew),
 %% @todo New passed for debugging only:
-    Self = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New, Mode}),
-    update_lease(Id, Self, ContentCheck, Old, New, State),
+    ReplyTo = comm:reply_as(self(), 3, {l_on_cseq, renew_reply, '_', New, Mode}),
+    update_lease(Id, ReplyTo, ContentCheck, Old, New, State),
     State;
 
 on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode}, State) ->
@@ -324,11 +347,11 @@ on({l_on_cseq, renew_reply,
                     renew_and_update_round(Value, Round, Mode, State)
     end;
 
-on({l_on_cseq, send_lease_to_node, Lease}, State) ->
+on({l_on_cseq, send_lease_to_node, Lease, Mode}, State) ->
     % @todo do we need any checks?
     % @todo do i need to notify rm about the new range?
     log:log("send_lease_to_node ~p ~p~n", [self(), Lease]),
-    lease_list:update_lease_in_dht_node_state(Lease, State, active, received_lease);
+    lease_list:update_lease_in_dht_node_state(Lease, State, Mode, received_lease);
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -360,6 +383,14 @@ on({l_on_cseq, unittest_update_reply,
    comm:send_local(Caller, {l_on_cseq, unittest_update_failed, Old, New}),
    State;
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% clear lease list (only for unit tests)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+on({l_on_cseq, unittest_clear_lease_list, Pid}, State) ->
+  comm:send(Pid, {l_on_cseq, unittest_clear_lease_list_success}),
+    dht_node_state:set_lease_list(State, lease_list:empty());
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -469,13 +500,23 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch}, L2, ReplyTo}, State) -
     update_lease(Id, Self, ContentCheck, L1, New, State),
     State;
 
-on({l_on_cseq, merge_reply_step1, L2, _ReplyTo,
-    {qwrite_deny, _ReqId, Round, L1, Reason}}, State) ->
+on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
+    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, Reason}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step1 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
-    %State;
-    lease_list:update_next_round(l_on_cseq:get_id(L1), Round, State);
+    case Reason of
+        unexpected_timeout ->
+            % retry
+            NextState = lease_list:update_next_round(l_on_cseq:get_id(L1),
+                                                     Round, State),
+            gen_component:post_op({l_on_cseq, merge, L1, L2, ReplyTo}, NextState);
+        timeout_is_not_newer_than_current_lease ->
+            % retry
+            NextState = lease_list:update_next_round(l_on_cseq:get_id(L1),
+                                                     Round, State),
+            gen_component:post_op({l_on_cseq, merge, L1, L2, ReplyTo}, NextState)
+    end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -500,7 +541,8 @@ on({l_on_cseq, merge_reply_step1, L2 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
 
 
 on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L2, Reason}}, State) ->
+    {qwrite_deny, _ReqId, Round, L2,
+     {content_check_failed, Reason}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step2 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
@@ -524,6 +566,7 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
 on({l_on_cseq, merge_reply_step2, L1 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
     {qwrite_done, _ReqId, _Round, L2}}, State) ->
     % @todo if success update lease in State
+    %log:pal("merge step3~n~w~n~w", [L1, L2]),
     New = L1#lease{epoch   = OldEpoch + 1,
                    version = 0,
                    aux     = {invalid, merge, stopped},
@@ -536,7 +579,7 @@ on({l_on_cseq, merge_reply_step2, L1 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
                                               merge_reply_step2);
 
 on({l_on_cseq, merge_reply_step3, L2, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L1, Reason}}, State) ->
+    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, Reason}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
@@ -582,7 +625,7 @@ on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
                                               merge_reply_step3);
 
 on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L2, Reason}}, State) ->
+    {qwrite_deny, _ReqId, Round, L2, {content_check_failed, Reason}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
@@ -1212,10 +1255,10 @@ get_pretty_timeout(L) ->
 -spec get_id(lease_t()) -> ?RT:key().
 get_id(#lease{id=Id}) -> Id.
 
--spec get_owner(lease_t()) -> comm:mypid() | nil.
+-spec get_owner(lease_t()) -> comm:mypid_plain() | nil.
 get_owner(#lease{owner=Owner}) -> Owner.
 
--spec set_owner(lease_t(), comm:mypid()) -> lease_t().
+-spec set_owner(lease_t(), comm:mypid_plain() | nil) -> lease_t().
 set_owner(L, NewOwner) -> L#lease{owner=NewOwner}.
 
 -spec get_aux(lease_t()) -> lease_aux().
@@ -1233,6 +1276,14 @@ set_range(L, Range) -> L#lease{range=Range}.
 -spec is_valid(lease_t()) -> boolean().
 is_valid(L) ->
     os:timestamp() <  L#lease.timeout.
+
+-spec has_timed_out(lease_t()) -> boolean().
+has_timed_out(L) ->
+    not is_valid(L).
+
+-spec is_live_aux_field(lease_t()) -> boolean().
+is_live_aux_field(L) ->
+    {invalid, merge, stopped} =/= get_aux(L).
 
 -spec invalid_lease() -> lease_t().
 invalid_lease() ->
@@ -1331,7 +1382,7 @@ format_utc_timestamp({_,_,Micro} = TS) ->
                   [Day,Mstr,Year,Hour,Minute,Second,Micro])).
 
 -spec update_lease(lease_id(), comm:erl_local_pid(),
-                   ContentCheck::fun((any(), any(), any()) -> {boolean(), atom()}),
+                   ContentCheck::fun((term(), term(), term()) -> {boolean(), atom()}),
                    Old::lease_t(), New::lease_t(), dht_node_state:state()) -> ok.
 update_lease(Id, Self, ContentCheck, Old, New, State) ->
     DB = get_db_for_id(Id),
@@ -1343,7 +1394,7 @@ update_lease(Id, Self, ContentCheck, Old, New, State) ->
     end,
     ok.
 
--spec renew_and_update_round(lease_t(), prbr:r_with_id(), active | passive,
+-spec renew_and_update_round(lease_t(), pr:pr(), active | passive,
                        dht_node_state:state()) ->
                               dht_node_state:state().
 % triggers renew of lease and updates known round number for the lease

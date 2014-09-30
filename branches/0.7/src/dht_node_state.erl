@@ -191,8 +191,8 @@ new(RT, RMState, DB) ->
          (state(), tx_tp_db) -> any();
          (state(), proposer) -> pid();
          (state(), load) -> integer();
-         (state(), load2) -> number();
-         (state(), load3) -> number();
+         (state(), load2) -> unknown | lb_stats:load();
+         (state(), load3) -> lb_stats:load();
          (state(), slide_pred) -> slide_op:slide_op() | null;
          (state(), slide_succ) -> slide_op:slide_op() | null;
          (state(), snapshot_state) -> snapshot_state:snapshot_state() | null;
@@ -261,8 +261,8 @@ get(#state{rt=RT, rm_state=RMState, join_time=JoinTime,
         load         -> db_dht:get_load(DB)
                         %% and the prbr kv entries:
                             + prbr:get_load(PRBRState);
-        load2        -> lb_active:get_load_metric();
-        load3        -> lb_active:get_request_metric();
+        load2        -> lb_stats:get_load_metric();
+        load3        -> lb_stats:get_request_metric();
         prbr_kv_db   -> PRBRState;
         txid_db1     -> TxIdDB1;
         txid_db2     -> TxIdDB2;
@@ -405,6 +405,8 @@ delete_mr_master_state(#state{mr_master_state = MRMStateList} = State, JobId) ->
                    SlideId::slide_op:id()) -> state().
 add_db_range(State = #state{db_range=DBRange}, Interval, SlideId) ->
     ?DBG_ASSERT(not intervals:is_all(Interval)),
+    ?DBG_ASSERT2(intervals:is_subset(Interval, MyRange = get(State, my_range)),
+                 {new_interval, Interval, not_subset_of, MyRange}),
     ?TRACE("[ ~.0p ] add_db_range: ~.0p~n", [self(), Interval]),
     State#state{db_range = [{Interval, SlideId} | DBRange]}.
 
@@ -499,7 +501,7 @@ slide_get_data_start_record(State, MovingInterval) ->
 -spec slide_add_data(state(),slide_data()) -> state().
 slide_add_data(State, {{Data, SnapData}, PRBRData}) ->
     T1DB = db_dht:add_data(get(State, db), Data),
-    ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData: ~n~pPRBR: ~n~pMR: ~n~p",
+    ?TRACE("~p:slide_add_data: ~p~nMovingData:~n~p~nMovingSnapData:~n~p~nPRBR:~n~p",
            [?MODULE, comm:this(), Data, SnapData, PRBRData]),
     T2State =
         case SnapData of

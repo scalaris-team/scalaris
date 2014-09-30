@@ -39,13 +39,7 @@
 -export([noop_write_filter/3]). %% See rbrcseq for explanation.
 -export([new/2]).
 -export([set_entry/2]).
-
-%% let users retrieve their uid from an assigned round number.
--export([r_with_id_get_id/1]).
-
-%% let users retrieve their smallest possible round for fast_write on
-%% entry creation.
--export([smallest_round/1]).
+-export([tester_create_write_filter/1]).
 
 %% let fetch the number of DB entries
 -export([get_load/1]).
@@ -53,7 +47,6 @@
 -ifdef(with_export_type_support).
 -export_type([message/0]).
 -export_type([state/0]).
--export_type([r_with_id/0]).
 -export_type([read_filter/0]).
 -export_type([write_filter/0]).
 -endif.
@@ -79,14 +72,6 @@
          Proposer :: comm:mypid(), ?RT:key(), InRound,
          Value :: term(), PassedToUpdate :: term(), write_filter()}.
 
-%% r_with_id() has to be unique for this key system wide
-%% r_with_id() has to be comparable with < and =<
-%% if the caller process may handle more than one request at a time for the
-%% same key, it has to be unique for each request.
--type r_with_id() :: {non_neg_integer(), any()}.
-%% for example
-%% -type r_with_id() :: {pos_integer(), comm:mypid_plain()}.
-%% -type r_with_id() :: {pos_integer(), {dht_node_id(), lease_epoch()}}.
 
 %% improvements to usual paxos:
 
@@ -104,24 +89,24 @@
 
 %% so there are no longer any read denies, all reads succeed.
 -type entry() :: { any(), %% key
-                   r_with_id(), %% r_read
-                   r_with_id(), %% r_write
+                   pr:pr(), %% r_read
+                   pr:pr(), %% r_write
                    any()    %% value
                  }.
 
 %% Messages to expect from this module
 -spec msg_read_reply(comm:mypid(), Consistency::boolean(),
-                     r_with_id(), any(), r_with_id())
+                     pr:pr(), any(), pr:pr())
              -> ok.
 msg_read_reply(Client, Cons, YourRound, Val, LastWriteRound) ->
     comm:send(Client, {read_reply, Cons, YourRound, Val, LastWriteRound}).
 
 -spec msg_write_reply(comm:mypid(), Consistency::boolean(),
-                      any(), r_with_id(), r_with_id()) -> ok.
+                      any(), pr:pr(), pr:pr()) -> ok.
 msg_write_reply(Client, Cons, Key, UsedWriteRound, YourNextRoundForWrite) ->
     comm:send(Client, {write_reply, Cons, Key, UsedWriteRound, YourNextRoundForWrite}).
 
--spec msg_write_deny(comm:mypid(), Consistency::boolean(), any(), r_with_id())
+-spec msg_write_deny(comm:mypid(), Consistency::boolean(), any(), pr:pr())
                     -> ok.
 msg_write_deny(Client, Cons, Key, NewerRound) ->
     comm:send(Client, {write_deny, Cons, Key, NewerRound}).
@@ -142,13 +127,13 @@ on({prbr, read, _DB, Cons, Proposer, Key, ProposerUID, ReadFilter}, TableName) -
     KeyEntry = get_entry(Key, TableName),
 
     %% assign a valid next read round number
-    TheRound = next_read_round(KeyEntry, ProposerUID),
+    AssignedReadRound = next_read_round(KeyEntry, ProposerUID),
 %%    trace_mpath:log_info(self(), {list_to_atom(lists:flatten(io_lib:format("read:~p", [entry_val(KeyEntry)])))}),
-    msg_read_reply(Proposer, Cons, TheRound,
+    msg_read_reply(Proposer, Cons, AssignedReadRound,
                    ReadFilter(entry_val(KeyEntry)),
                    entry_r_write(KeyEntry)),
 
-    NewKeyEntry = entry_set_r_read(KeyEntry, TheRound),
+    NewKeyEntry = entry_set_r_read(KeyEntry, AssignedReadRound),
 %%    log:log("read~n"
 %%            "Key: ~p~n"
 %%            "Val: ~p", [Key, NewKeyEntry]),
@@ -162,19 +147,35 @@ on({prbr, write, _DB, Cons, Proposer, Key, InRound, Value, PassedToUpdate, Write
             {ok, NewKeyEntry, NextWriteRound} ->
                 NewVal = WriteFilter(entry_val(NewKeyEntry),
                                      PassedToUpdate, Value),
+%%                case kvx =/= _DB of
+%%                    true ->
 %%                log:log("write ok~n"
 %%                        "Key: ~p~n"
 %%                        "Ent: ~p~n"
-%%                        "Val: ~p", [Key, KeyEntry, NewVal]),
+%%                        "Val: ~p", [Key, KeyEntry, NewVal]);
+%%                    _ -> ok
+%%                end,
                 msg_write_reply(Proposer, Cons, Key, InRound, NextWriteRound),
                 set_entry(entry_set_val(NewKeyEntry, NewVal), TableName);
             {dropped, NewerRound} ->
+%%                case kvx =/= _DB of
+%%                    true ->
 %%                log:log("write deny~n"
 %%                        "Key: ~p~n"
-%%                        "Val: ~p", [Key, KeyEntry]),
+%%                        "Val: ~p", [Key, KeyEntry]);
+%%                    _ -> ok
+%%                end,
                 %% log:pal("Denied ~p ~p ~p~n", [Key, InRound, NewerRound]),
                 msg_write_deny(Proposer, Cons, Key, NewerRound)
         end,
+    TableName;
+
+on({prbr, tab2list, DB, Client}, TableName) ->
+    comm:send_local(Client, {DB, tab2list(TableName)}),
+    TableName;
+
+on({prbr, tab2list_raw, DB, Client}, TableName) ->
+    comm:send_local(Client, {DB, tab2list_raw(TableName)}),
     TableName.
 
 -spec get_entry(any(), state()) -> entry().
@@ -189,19 +190,19 @@ set_entry(NewEntry, TableName) ->
     _ = ?PDB:set(TableName, NewEntry),
     TableName.
 
-%% As the round number contains the client's pid, they are still
-%% unique.  Two clients using their smallest_round for a fast write
-%% concurrently are separated, because we do not use plain Paxos, but
-%% assign a succesful writer immediately the next round_number for a
-%% follow up fast_write by increasing our read_round already on the
-%% write.  So, the smallest_round of the second client becomes invalid
-%% when the first one writes.  In consequence, at most one proposer
-%% can perform a successful fast_write with its smallest_round. Voila!
--spec smallest_round(comm:mypid()) -> r_with_id().
-smallest_round(Pid) -> {0, Pid}.
-
 -spec get_load(state()) -> non_neg_integer().
 get_load(State) -> ?PDB:get_load(State).
+
+-spec tab2list(state()) -> [{any(),any()}].
+tab2list(State) ->
+    %% without prbr own data
+    Entries = tab2list_raw(State),
+    [ {element(1,X), element(4,X)} || X <- Entries].
+
+-spec tab2list_raw(state()) -> [entry()].
+tab2list_raw(State) ->
+    %% with prbr own data
+    ?PDB:tab2list(State).
 
 %% operations for abstract data type entry()
 
@@ -212,8 +213,10 @@ new(Key) ->
 -spec new(any(), any()) -> entry().
 new(Key, Val) ->
     {Key,
-     _R_Read = {0, '_'},  %% Note: atoms < pids, so this is a good default.
-     _R_Write = {0, '_'}, %% Note: atoms < pids, so this is a good default.
+     %% Note: atoms < pids, so this is a good default.
+     _R_Read = pr:new(0, '_'),
+     %% Note: atoms < pids, so this is a good default.
+     _R_Write = pr:new(0, '_'),
      _Value = Val}.
 
 
@@ -221,64 +224,57 @@ new(Key, Val) ->
 %% entry_key(Entry) -> element(1, Entry).
 %% -spec entry_set_key(entry(), any()) -> entry().
 %% entry_set_key(Entry, Key) -> setelement(2, Entry, Key).
--spec entry_r_read(entry()) -> r_with_id().
+-spec entry_r_read(entry()) -> pr:pr().
 entry_r_read(Entry) -> element(2, Entry).
--spec entry_set_r_read(entry(), r_with_id()) -> entry().
+-spec entry_set_r_read(entry(), pr:pr()) -> entry().
 entry_set_r_read(Entry, Round) -> setelement(2, Entry, Round).
--spec entry_r_write(entry()) -> r_with_id().
+-spec entry_r_write(entry()) -> pr:pr().
 entry_r_write(Entry) -> element(3, Entry).
--spec entry_set_r_write(entry(), r_with_id()) -> entry().
+-spec entry_set_r_write(entry(), pr:pr()) -> entry().
 entry_set_r_write(Entry, Round) -> setelement(3, Entry, Round).
 -spec entry_val(entry()) -> any().
 entry_val(Entry) -> element(4, Entry).
 -spec entry_set_val(entry(), any()) -> entry().
 entry_set_val(Entry, Value) -> setelement(4, Entry, Value).
 
--spec next_read_round(entry(), any()) -> r_with_id().
+-spec next_read_round(entry(), any()) -> pr:pr().
 next_read_round(Entry, ProposerUID) ->
-    LatestSeenRead = r_with_id_get_r(entry_r_read(Entry)),
-    LatestSeenWrite = r_with_id_get_r(entry_r_write(Entry)),
-    r_with_id_new(util:max(LatestSeenRead, LatestSeenWrite) + 1, ProposerUID).
+    LatestSeenRead = pr:get_r(entry_r_read(Entry)),
+    LatestSeenWrite = pr:get_r(entry_r_write(Entry)),
+    pr:new(util:max(LatestSeenRead, LatestSeenWrite) + 1, ProposerUID).
 
 
 
--spec writable(entry(), r_with_id()) -> {ok, entry(),
-                                         NextWriteRound :: r_with_id()} |
-                                        {dropped,
-                                         NewerSeenRound :: r_with_id()}.
+-spec writable(entry(), pr:pr()) -> {ok, entry(),
+                                     NextWriteRound :: pr:pr()} |
+                                    {dropped,
+                                     NewerSeenRound :: pr:pr()}.
 writable(Entry, InRound) ->
     LatestSeenRead = entry_r_read(Entry),
     LatestSeenWrite = entry_r_write(Entry),
-    case (InRound >= LatestSeenRead)
-        andalso (InRound > LatestSeenWrite) of
-        true ->
-            T1Entry = entry_set_r_write(Entry, InRound),
-            %% prepare fast_paxos for this client:
-            NextWriteRound = next_read_round(T1Entry,
-                                             r_with_id_get_id(InRound)),
-            %% assume this token was seen in a read already, so no one else
-            %% can interfere without paxos noticing it
-            T2Entry = entry_set_r_read(T1Entry, NextWriteRound),
-            {ok, T2Entry, NextWriteRound};
-        false ->
-            %% proposer may not have latest value for a clean content
-            %% check, and another proposer is concurrently active, so
-            %% we do not prepare a fast_paxos for this client, but let
-            %% the other proposer the chance to pass read and write
-            %% phase.  The denied proposer has to perform a read and write
-            %% phase on its own (including a new content check).
-            {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
+    if (InRound >= LatestSeenRead) andalso (InRound > LatestSeenWrite) ->
+           T1Entry = entry_set_r_write(Entry, InRound),
+           %% prepare fast_paxos for this client:
+           NextWriteRound = next_read_round(T1Entry,
+                                            pr:get_id(InRound)),
+           %% assume this token was seen in a read already, so no one else
+           %% can interfere without paxos noticing it
+           T2Entry = entry_set_r_read(T1Entry, NextWriteRound),
+           {ok, T2Entry, NextWriteRound};
+       true ->
+           %% proposer may not have latest value for a clean content
+           %% check, and another proposer is concurrently active, so
+           %% we do not prepare a fast_paxos for this client, but let
+           %% the other proposer the chance to pass read and write
+           %% phase.  The denied proposer has to perform a read and write
+           %% phase on its own (including a new content check).
+           {dropped, util:max(LatestSeenRead, LatestSeenWrite)}
     end.
 
 %% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> true.
 check_config() -> true.
 
--spec r_with_id_new(non_neg_integer(), any()) -> r_with_id().
-r_with_id_new(Counter, ProposerUID) -> {Counter, ProposerUID}.
+-spec tester_create_write_filter(0) -> write_filter().
+tester_create_write_filter(0) -> fun prbr:noop_write_filter/3.
 
--spec r_with_id_get_r(r_with_id()) -> non_neg_integer().
-r_with_id_get_r(RwId) -> element(1, RwId).
-
--spec r_with_id_get_id(r_with_id()) -> any().
-r_with_id_get_id(RwId) -> element(2, RwId).

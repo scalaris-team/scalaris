@@ -33,6 +33,7 @@
 
 %% used in unittest_helper.erl
 -export([start_link/1]).
+-export([stop_first_services/0]).
 
 -spec start_link() -> {ok, Pid::pid()}
                          | {error, Error::{already_started, Pid::pid()}
@@ -135,6 +136,8 @@ childs(Options) ->
     Logger = sup:worker_desc(logger, log, start_link),
     Monitor =
         sup:worker_desc(monitor, monitor, start_link, [ServiceGroup]),
+    MonitorPerf =
+        sup:worker_desc(monitor_perf, monitor_perf, start_link, [ServiceGroup]),
     Service =
         sup:worker_desc(service_per_vm, service_per_vm, start_link,
                              [ServiceGroup]),
@@ -163,10 +166,10 @@ childs(Options) ->
         end,
     %% order in the following list is the start order
     BasicServers = [TraceMPath,
-                    ProtoSched,
                     Logger,
                     ClientsDelayer,
                     BasicServicesDelayer,
+                    ProtoSched,
                     ClientsMonitor,
                     Top,
                     Monitor,
@@ -188,7 +191,7 @@ childs(Options) ->
             false -> []; %% no dht node requested
             _ -> [DHTNode]
         end,
-    lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer, Ganglia]).
+    lists:flatten([BasicServers, MgmtServers, Servers, DHTNodeServer, Ganglia, MonitorPerf]).
 
 -spec add_additional_nodes() -> ok.
 add_additional_nodes() ->
@@ -214,10 +217,42 @@ start_first_services() ->
     end,
     util:if_verbose("~p start inets~n", [?MODULE]),
     _ = inets:start(),
+
+    %% for lb_stats and wpool
+    _ = application:load(sasl),
+    application:set_env(sasl, sasl_error_logger, false),
+    _ = application:start(sasl),
+
+    %% for lb_stats
+    _ = application:load(os_mon),
+    case config:read(lb_active) of
+        true -> %% for lb_stats
+            application:set_env(os_mon, start_os_sup, false),
+            application:set_env(os_mon, start_disksup, false),
+            _ = application:start(os_mon),
+            ok;
+        _ -> ok
+    end,
+    case config:read(wpool_js) of
+        true -> %% for wpool
+            _ = application:start(erlang_js),
+            ok;
+        _ -> ok
+    end,
     util:if_verbose("~p start first services done.~n", [?MODULE]).
 
-%% @doc Checks whether config parameters of the cyclon process exist and are
-%%      valid.
+%% stop the services we started outside the supervisor tree
+%% (those who materialized as processes)
+-spec stop_first_services() -> ok.
+stop_first_services() ->
+    %% config seems not available here, so we stop unconditionally
+    _ = application:stop(erlang_js),
+    _ = application:stop(os_mon),
+    _ = application:stop(sasl),
+    _ = inets:stop(),
+    ok.
+
+%% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_string(log_path) and

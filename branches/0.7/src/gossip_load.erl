@@ -49,19 +49,18 @@
 -include("record_helpers.hrl").
 
 % API
--export([request_histogram/2, load_info_get/2, load_info_other_get/3]).
+-export([get_values_best/1, request_histogram/2, load_info_get/2, load_info_other_get/3]).
 
 % gossip_beh
--export([init/1, init/2, init/3, check_config/0, trigger_interval/0, fanout/0,
-        select_node/1, select_data/1, select_reply_data/5, integrate_data/4,
+-export([init/1, check_config/0, trigger_interval/0, fanout/0,
+        select_node/1, select_data/1, select_reply_data/4, integrate_data/3,
         handle_msg/2, notify_change/3, min_cycles_per_round/0, max_cycles_per_round/0,
-        round_has_converged/1, get_values_best/1, get_values_all/1, web_debug_info/1,
-        shutdown/1]).
+        round_has_converged/1, web_debug_info/1, shutdown/1]).
 
 %% for testing
 -export([tester_create_round/1, tester_create_state/11, tester_create_histogram/1,
          tester_create_load_data_list/1, is_histogram/1,
-         tester_create_histogram_size/1]).
+         tester_create_histogram_size/1, init_feeder/1, get_values_best_feeder/1]).
 
 -ifdef(with_export_type_support).
 -export_type([state/0, histogram/0, histogram_size/0, bucket/0]). %% for config gossip_load_*.erl
@@ -118,13 +117,14 @@
     }).
 
 -type load_data_uninit() :: #load_data{}.
+-type load_data_skipped() :: {load_data, atom(), skip}.
 -type load_data() :: {load_data, Name::atom(), Avg::avg(), Avg2::avg(),
                       Min::non_neg_integer(), Max::non_neg_integer(),
                       Histogram::histogram()}.
 
 %% -type load_data_list() :: [ load_data_uninit() | load_data(), ...].
--type load_data_list() :: [load_data(), ...].
--type load_data_list2() :: [load_data_uninit() | load_data(), ...].
+-type load_data_list() :: [load_data() | load_data_skipped(), ...].
+-type load_data_list2() :: [load_data_uninit() | load_data_skipped() | load_data(), ...].
 
 -type data() :: {load_data_list(), ring_data()}.
 
@@ -228,10 +228,6 @@ convergence_count_new_round() ->
 convergence_epsilon() ->
     config:read(gossip_load_convergence_epsilon).
 
--spec discard_old_rounds() -> boolean().
-discard_old_rounds() ->
-    config:read(gossip_load_discard_old_rounds).
-
 -spec no_of_buckets() -> histogram_size().
 no_of_buckets() ->
     config:read(gossip_load_number_of_buckets).
@@ -249,8 +245,6 @@ check_config() ->
 
     config:cfg_is_float(gossip_load_convergence_epsilon) and
     config:cfg_is_in_range(gossip_load_convergence_epsilon, 0.0, 100.0) and
-
-    config:cfg_is_bool(gossip_load_discard_old_rounds) and
 
     config:cfg_is_integer(gossip_load_convergence_count_best_values) and
     config:cfg_is_greater_than(gossip_load_convergence_count_best_values, 0) and
@@ -273,12 +267,44 @@ check_config() ->
 %% API
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+
+%% @doc Sends a (local) message to the gossip module of the requesting process'
+%%      group asking for the best aggregation results.
+%%      The response in the form {gossip_get_values_best_response, BestValues}
+%%      will be send (local) to the requesting process.
+%%      BestValues are either the aggregation restult from the current or previous round,
+%%      depending on convergence_count_best_values.
+%%      If the option {instance, Instance} is present, the Instance is used.
+%%      Otherwise {gossip_load, default} is used as instance.
+%%      If the option {source_pid, SourcePid} is present, response is sent to
+%%      the SourcePid instead of the pid of the requesting process.
+%%      If the option {delay, Seconds} is present, the request is delayed for (at
+%%      least) Seconds seconds.
+%%      If the option {send_after, Milliseconds} is present, the request is delayed
+%%      for excatly Milliseconds milliseconds.
+-spec get_values_best(Options::[proplists:property()]) -> ok.
+get_values_best(Options) when is_list(Options) ->
+    Instance = proplists:get_value(instance, Options, {gossip_load, default}),
+    SourcePid = proplists:get_value(source_pid, Options, self()),
+    Delay = proplists:get_value(msg_delay, Options, 0),
+    SendAfter = proplists:get_value(send_after, Options, 0),
+    Pid = pid_groups:get_my(gossip),
+    Msg = {cb_msg, Instance, {gossip_get_values_best, SourcePid}},
+    if Delay =:= 0 andalso SendAfter =:= 0 ->
+           comm:send_local(Pid, Msg);
+       Delay =:= 0 andalso SendAfter =/= 0 ->
+           comm:send_local_after(SendAfter, Pid, Msg), ok;
+       Delay =/= 0 ->
+           msg_delay:send_local(Delay, Pid, Msg)
+    end.
+
+
 %% @doc Request a histogram with Size number of Buckets. <br/>
 %%      The resulting histogram will be sent to SourceId, when all values have
 %%      properly converged.
 -spec request_histogram(Size::histogram_size(), SourcePid::comm:mypid()) -> ok.
 request_histogram(Size, SourcePid) when Size >= 1 ->
-    gossip:start_gossip_task(?MODULE, [Size, SourcePid]).
+    gossip:start_gossip_task(?MODULE, [{no_of_buckets, Size}, {requestor, SourcePid}]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -286,26 +312,16 @@ request_histogram(Size, SourcePid) when Size >= 1 ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Initiate the gossip_load module. <br/>
-%%      Called by the gossip module upon startup. <br/>
-%%      Instance makes the module aware of its own instance id, which is saved
-%%      in the state of the module.
--spec init(Instance::instance()) -> {ok, full_state()}.
-init(Instance) ->
-    init(Instance, no_of_buckets(), none).
-
-%% @doc Initiate the gossip_load module. <br/>
-%%      Used by gossip:start_gossip_task().
-%%      NoOfBuckets defines the size of the histogram calculated.
--spec init(Instance::instance(), NoOfBuckets::non_neg_integer()) -> {ok, full_state()}.
-init(Instance, NoOfBuckets) ->
-    init(Instance, NoOfBuckets, none).
-
-%% @doc Initiate the gossip_load module. <br/>
-%%      Used for request_histogram/1 (called by the gossip module). <br/>
-%%      the calculated histogram will be sent to the requestor.
--spec init(Instance::instance(), NoOfBuckets::non_neg_integer(),
-           Requestor::comm:mypid() | none) -> {ok, full_state()}.
-init(Instance, NoOfBuckets, Requestor) ->
+%%      Instance (mandatory) makes the module aware of its own instance id, which
+%%      is saved in the state of the module.
+%%      NoOfBuckets (optional) defines the size of the histogram calculated.
+%%      Requestor (optinal) defines to whom the calculated histogram will be sent
+%%      (used for request_histogram/1, called through the gossip module).
+-spec init(Args::[proplists:property()]) -> {ok, full_state()}.
+init(Args) ->
+    Instance = proplists:get_value(instance, Args),
+    NoOfBuckets = proplists:get_value(no_of_buckets, Args, no_of_buckets()),
+    Requestor = proplists:get_value(requestor, Args, none),
     log:log(debug, "[ ~w ] CBModule initiated. NoOfBuckets: ~w, Requestor: ~w",
         [Instance, NoOfBuckets, Requestor]),
     CurState = #state{
@@ -337,7 +353,7 @@ select_data({PrevState, CurState}) ->
         uninit ->
             request_node_details(CurState), CurState;
         init ->
-            {Data, NewCurState1} = prepare_data(CurState),
+            {Data, NewCurState1} = prepare_data([], CurState),
             Pid = pid_groups:get_my(gossip),
             comm:send_local(Pid, {selected_data, state_get(instance, NewCurState1), Data}),
             NewCurState1
@@ -352,73 +368,81 @@ select_data({PrevState, CurState}) ->
 %%      RoundStatus / Round: round information used for special handling of
 %%          messages from previous rounds <br/>
 %%      State: the state of the gossip_load module
--spec select_reply_data(PData::data(), Ref::pos_integer(),
-    RoundStatus::gossip_beh:round_status(), Round::round(),
+-spec select_reply_data(PData::data(), Ref::pos_integer(), Round::round(),
     FullState::full_state()) -> {discard_msg | ok | retry | send_back, full_state()}.
-select_reply_data(PData, Ref, RoundStatus, Round, {PrevState, CurState}) ->
+select_reply_data(PData, Ref, Round, {PrevState, CurState}) ->
 
-    IsValidRound = is_valid_round(RoundStatus, Round, PrevState, CurState),
+    CurRound = state_get(round, CurState),
+    PrevRound = state_get(round, PrevState),
 
     case state_get(status, CurState) of
         uninit ->
             log:log(?SHOW, "[ ~w ] select_reply_data in uninit", [?MODULE]),
             {retry,{PrevState, CurState}};
-        init when not IsValidRound ->
+        init when Round =:= CurRound ->
+            CurState1 = select_reply_data_helper(PData, Ref, Round, CurState),
+            {ok, {PrevState, CurState1}};
+        init when Round =:= PrevRound ->
+            PrevState1 = select_reply_data_helper(PData, Ref, Round, PrevState),
+            {ok, {PrevState1, CurState}};
+        _ ->
             log:log(warn(), "[ ~w ] Discarded data in select_reply_data. Reason: invalid round.",
                 [state_get(instance, CurState)]),
-            {send_back, {PrevState, CurState}};
-        init when RoundStatus =:= current_round ->
-            {Data1, CurState1} = prepare_data(CurState),
-            Pid = pid_groups:get_my(gossip),
-            comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState1), Data1, Ref, Round}),
-
-            {_Data2, CurState2} = merge_load_data(PData, CurState1),
-
-            %% log:log(debug, "[ ~w ] Data after select_reply_data: ~w", [state_get(instance, CurState), get_load_info(CurState)]),
-            {ok, {PrevState, CurState2}};
-        init when RoundStatus =:= old_round ->
-            case discard_old_rounds() of
-                true ->
-                    log:log(?SHOW, "[ ~w ] select_reply_data in old_round", [?MODULE]),
-                    % This only happens when entering a new round, i.e. the values have
-                    % already converged. Consequently, discarding messages does
-                    % not cause mass loss.
-                    {discard_msg, {PrevState, CurState}};
-                false ->
-                    log:log(?SHOW, "[ ~w ] select_reply_data in old_round", [?MODULE]),
-                    {Data1, PrevState1} = prepare_data(PrevState),
-                    Pid = pid_groups:get_my(gossip),
-                    comm:send_local(Pid, {selected_reply_data, state_get(instance, CurState), Data1, Ref, Round}),
-                    {_Data2, PrevState2} = merge_load_data(PData, PrevState1),
-                    {ok, {PrevState2, CurState}}
-            end
+            {send_back, {PrevState, CurState}}
     end.
 
+
+%% @doc Helper for select_reply_data()
+-spec select_reply_data_helper(PData::data(), Ref::pos_integer(), round(),
+                               state()) -> state().
+select_reply_data_helper(PData, Ref, Round, State) ->
+    PLoadList = element(1, PData),
+    PSkipped = [Module || {load_data, Module, skip} <- PLoadList],
+    {Data1, State1} = prepare_data(PSkipped, State),
+    Data2 = {replace_skipped(PLoadList, element(1, Data1)),
+             element(2, Data1)},
+    Pid = pid_groups:get_my(gossip),
+    comm:send_local(Pid, {selected_reply_data, state_get(instance, State1),
+                          Data2, Ref, Round}),
+    {_Data2, State2} = merge_load_data(PData, State1),
+    State2.
+
+
 %% @doc Integrate the reply data. <br/>
-%%      Called by the behaviour module upon a p2p_exch message. <br/>
+%%      Called by the behaviour module upon a p2p_exch_reply message. <br/>
 %%      QData: the reply data from the peer <br/>
 %%      RoundStatus / Round: round information used for special handling of
 %%          messages from previous rounds <br/>
 %%      State: the state of the gossip_load module <br/>
 %%      Upon finishing the processing of the data, a message of the form
-%%      {integrated_§data, Instance, RoundStatus} is to be sent to the gossip module.
--spec integrate_data(QData::data(), RoundStatus::gossip_beh:round_status(),
-    Round::round(), FullState::full_state()) ->
+%%      {integrated_data, Instance, RoundStatus} is to be sent to the gossip module.
+-spec integrate_data(QData::data(), Round::round(), FullState::full_state()) ->
     {discard_msg | ok | retry | send_back, full_state()}.
-integrate_data(QData, RoundStatus, Round, {PrevState, CurState}=FullState) ->
+integrate_data(QData, Round, {PrevState, CurState}=FullState) ->
     log:log(debug, "[ ~w ] Reply-Data: ~w~n", [state_get(instance, CurState), QData]),
 
-    IsValidRound = is_valid_round(RoundStatus, Round, PrevState, CurState),
+    CurRound = state_get(round, CurState),
+    PrevRound = state_get(round, PrevState),
 
     case state_get(status, CurState) of
-        _ when not IsValidRound ->
-            log:log(warn(), "[ ~w ] Discarded data in integrate_data. Reason: invalid round. ", [?MODULE]),
-            {send_back, FullState};
         uninit ->
             log:log(?SHOW, "[ ~w ] integrate_data in uninit", [?MODULE]),
             {retry, FullState};
-        init ->
-            integrate_data_init(QData, RoundStatus, FullState)
+        init when Round =:= CurRound ->
+            CurState1 = element(2, merge_load_data(QData, CurState)),
+            log:log(info, "Load-Info: ~s", [to_string(get_load_info(CurState1))]),
+            comm:send_local(pid_groups:get_my(gossip),
+                            {integrated_data, state_get(instance, CurState1), cur_round}),
+            {ok, {PrevState, CurState1}};
+        init when Round =:= PrevRound ->
+            PrevState1 = element(2, merge_load_data(QData, PrevState)),
+            log:log(info, "Load-Info: ~s", [to_string(get_load_info(PrevState1))]),
+            comm:send_local(pid_groups:get_my(gossip),
+                            {integrated_data, state_get(instance, PrevState1), prev_round}),
+            {ok, {PrevState1, CurState}};
+        _ ->
+            log:log(warn(), "[ ~w ] Discarded data in integrate_data. Reason: invalid round. ", [?MODULE]),
+            {send_back, FullState}
     end.
 
 
@@ -434,15 +458,19 @@ handle_msg({get_node_details_response, NodeDetails}, {PrevState, CurState}) ->
         [ begin
               Module = data_get(name, LoadData),
               Load = Module:get_load(NodeDetails),
-              log:log(?SHOW, "[ ~w ] Load: ~w", [state_get(instance, CurState), Load]),
-              LoadData1 = data_set(avg, {float(Load), 1.0}, LoadData),
-              LoadData2 = data_set(min, Load, LoadData1),
-              LoadData3 = data_set(max, Load, LoadData2),
-              LoadData4 = data_set(avg2, {float(Load*Load), 1.0}, LoadData3),
-              % histogram
-              Histo = init_histo(Module, NodeDetails, CurState),
-              log:log(?SHOW,"[ ~w ] Histo: ~s", [state_get(instance, CurState), to_string(Histo)]),
-              _LoadData5 = data_set(histo, Histo, LoadData4)
+              case Load of
+                  unknown -> {load_data, Module, skip};
+                  Load ->
+                      log:log(?SHOW, "[ ~w ] Load: ~w", [state_get(instance, CurState), Load]),
+                      LoadData1 = data_set(avg, {float(Load), 1.0}, LoadData),
+                      LoadData2 = data_set(min, Load, LoadData1),
+                      LoadData3 = data_set(max, Load, LoadData2),
+                      LoadData4 = data_set(avg2, {float(Load*Load), 1.0}, LoadData3),
+                      % histogram
+                      Histo = init_histo(Module, NodeDetails, CurState),
+                      log:log(?SHOW,"[ ~w ] Histo: ~s", [state_get(instance, CurState), to_string(Histo)]),
+                      _LoadData5 = data_set(histo, Histo, LoadData4)
+              end
           end
         || LoadData <- state_get(load_data_list, CurState)],
 
@@ -459,13 +487,33 @@ handle_msg({get_node_details_response, NodeDetails}, {PrevState, CurState}) ->
     RingData2 = data_set(avg_kr, AvgKr, RingData1),
     CurState2 = state_set(ring_data, RingData2, CurState1),
 
-    {NewData, CurState3} = prepare_data(CurState2),
+    {NewData, CurState3} = prepare_data([], CurState2),
     CurState4 = state_set(status, init, CurState3),
 
     % send PData to BHModule
     Pid = pid_groups:get_my(gossip),
     comm:send_local(Pid, {selected_data, state_get(instance, CurState4), NewData}),
-    {ok, {PrevState, CurState4}}.
+    {ok, {PrevState, CurState4}};
+
+handle_msg({gossip_get_values_best, SourcePid}, {PrevState, CurState}) ->
+    BestState = previous_or_current(PrevState, CurState),
+    BestValues = get_load_info(BestState),
+    comm:send_local(SourcePid, {gossip_get_values_best_response, BestValues}),
+    {ok, {PrevState, CurState}};
+
+handle_msg({gossip_get_values_all, SourcePid}, {unknown, CurState}) ->
+    CurInfo = get_load_info(CurState),
+    AllValues = {#load_info{}, CurInfo, CurInfo},
+    comm:send_local(SourcePid, {gossip_get_values_all_response, AllValues}),
+    {ok, {unknown, CurState}};
+
+handle_msg({gossip_get_values_all, SourcePid}, {PrevState, CurState}) ->
+    BestState = previous_or_current(PrevState, CurState),
+    AllValues = {get_load_info(PrevState), get_load_info(CurState),
+                  get_load_info(BestState)},
+    comm:send_local(SourcePid, {gossip_get_values_all_response, AllValues}),
+    {ok, {PrevState, CurState}}.
+
 
 %% @doc Checks if the current round has converged yet <br/>
 %%      Returns true if the round has converged, false otherwise.
@@ -513,58 +561,29 @@ notify_change(leader, {MsgTag, NewRange}, {PrevState, CurState}) when MsgTag =:=
     {ok, {PrevState, CurState1}};
 
 
-notify_change(exch_failure, {_MsgTag, Data, Round}, {PrevState, CurState}) ->
-    RoundFromState = state_get(round, CurState),
-    RoundStatus = if Round =:= RoundFromState -> current_round;
-        Round =/= RoundFromState -> old_round
-    end,
-    IsValidRound = is_valid_round(RoundStatus, Round, PrevState, CurState),
-    FullState1 = case Data of
-        _ when not IsValidRound ->
-            log:log(?SHOW, " [ ~w ] exch_failure in invalid round", [?MODULE]),
-            {PrevState, CurState};
-        undefined ->
-            {PrevState, CurState};
-        Data when RoundStatus =:= current_round ->
-            log:log(debug, " [ ~w ] exch_failure in valid current round", [?MODULE]),
-            {_NewData, CurState1} = merge_failed_exch_data(Data, CurState),
-            {PrevState, CurState1};
-        Data when RoundStatus =:= old_round ->
-            log:log(debug, " [ ~w ] exch_failure in valid old round", [?MODULE]),
-            {_NewData, PrevState1} = merge_failed_exch_data(Data, PrevState),
-            {PrevState1, CurState}
-    end,
+notify_change(exch_failure, {_MsgTag, Data, Round}, {PrevState, CurState} = FullState) ->
+    CurRound = state_get(round, CurState),
+    PrevRound = state_get(round, PrevState),
+    FullState1 =
+        case {Data, Round} of
+            {CurRound, undefined} ->
+                FullState;
+            {CurRound, _} ->
+                log:log(debug, " [ ~w ] exch_failure in valid current round", [?MODULE]),
+                {_NewData, CurState1} = merge_failed_exch_data(Data, CurState),
+                {PrevState, CurState1};
+            {PrevRound, undefined} ->
+                FullState;
+            {PrevRound, _} ->
+                log:log(debug, " [ ~w ] exch_failure in valid old round", [?MODULE]),
+                {_NewData, PrevState1} = merge_failed_exch_data(Data, PrevState),
+                {PrevState1, CurState};
+            _ ->
+                log:log(warn(), " [ ~w ] exch_failure in invalid round", [?MODULE]),
+                FullState
+        end,
     {ok, FullState1}.
 
-
-%% @doc Returns the best aggregation result. <br/>
-%%      Called by the gossip module upon {get_values_best} messages.
-%%      Returns either the aggregation restult from the current or previous round,
-%%      depending on convergence_count_best_values. <br/>
-%%      State: the state of the gossip_load module.
--spec get_values_best(FullState::full_state()) -> {load_info(), full_state()}.
-get_values_best({PrevState, CurState}=FullState) ->
-    BestState = previous_or_current(PrevState, CurState),
-    LoadInfo = get_load_info(BestState),
-    {LoadInfo, FullState}.
-
-
-%% @doc Returns all aggregation results. <br/>
-%%      Called by the gossip module upon {get_values_all} messages.
-%%      Returns the aggregation restult from a) the previous, b) the current
-%%      and c) the best round (current or previous).
-%%      State: the state of the gossip_load module.
--spec get_values_all(FullState::full_state()) ->
-    { {PreviousInfo::load_info(), CurrentInfo::load_info(), BestInfo::load_info()},
-        full_state() }.
-get_values_all({unknown, CurState}=FullState) ->
-    CurInfo = get_load_info(CurState),
-    InfosAll = [#load_info{},  CurInfo, CurInfo],
-    {list_to_tuple(InfosAll), FullState};
-get_values_all({PrevState, CurState}=FullState) ->
-    BestState = previous_or_current(PrevState, CurState),
-    InfosAll = lists:map(fun get_load_info/1, [PrevState, CurState, BestState]),
-    {list_to_tuple(InfosAll), FullState}.
 
 
 %% @doc Returns a key-value list of debug infos for the Web Interface. <br/>
@@ -578,9 +597,10 @@ web_debug_info({PrevState, CurState}=FullState) ->
     PreviousRingData = state_get(ring_data, PrevState),
     CurrentRingData = state_get(ring_data, CurState),
     BestState = previous_or_current(PrevState, CurState),
-    Best = if BestState =:= CurState -> current_data;
-              BestState =:= PrevState -> previous_data
-        end,
+    Best = case BestState of
+               CurState -> current_data;
+               PrevState -> previous_data
+           end,
     KeyValueList =
         [{to_string(state_get(instance, CurState)), ""},
          {"best",                Best},
@@ -596,15 +616,15 @@ web_debug_info({PrevState, CurState}=FullState) ->
             lists:flatten(
           [ begin
                 [
-                 {"prev_name",           data_get(name, LoadDataModule)},
-                 {"prev_avg",            get_current_estimate(avg, LoadDataModule)},
-                 {"prev_min",            data_get(min, LoadDataModule)},
-                 {"prev_max",            data_get(max, LoadDataModule)},
-                 {"prev_stddev",         calc_stddev(LoadDataModule)},
-                 {"prev_histo",          to_string(data_get(histo, LoadDataModule))}
+                 {"prev_name",           data_get(name, LoadData)},
+                 {"prev_avg",            get_current_estimate(avg, LoadData)},
+                 {"prev_min",            data_get(min, LoadData)},
+                 {"prev_max",            data_get(max, LoadData)},
+                 {"prev_stddev",         calc_stddev(LoadData)},
+                 {"prev_histo",          to_string(data_get(histo, LoadData))}
                 ]
             end
-            || PreviousLoadData =/= unknown, LoadDataModule <- PreviousLoadData])
+            || PreviousLoadData =/= unknown, LoadData <- PreviousLoadData])
         ++
         [
          %% current round
@@ -618,15 +638,15 @@ web_debug_info({PrevState, CurState}=FullState) ->
             lists:flatten(
           [ begin
                 [
-                 {"cur_name",           data_get(name, LoadDataModule)},
-                 {"cur_avg",            get_current_estimate(avg, LoadDataModule)},
-                 {"cur_min",            data_get(min, LoadDataModule)},
-                 {"cur_max",            data_get(max, LoadDataModule)},
-                 {"cur_stddev",         calc_stddev(LoadDataModule)},
-                 {"cur_histo",          to_string(data_get(histo, LoadDataModule))}
+                 {"cur_name",           data_get(name, LoadData)},
+                 {"cur_avg",            get_current_estimate(avg, LoadData)},
+                 {"cur_min",            data_get(min, LoadData)},
+                 {"cur_max",            data_get(max, LoadData)},
+                 {"cur_stddev",         calc_stddev(LoadData)},
+                 {"cur_histo",          to_string(data_get(histo, LoadData))}
                 ]
             end
-            || LoadDataModule <- CurrentLoadData]),
+            || LoadData <- CurrentLoadData]),
     {KeyValueList, FullState}.
 
 
@@ -644,66 +664,12 @@ shutdown(_FullState) ->
 request_node_details(State) ->
     % get state of dht node
     DHT_Node = pid_groups:get_my(dht_node),
-    EnvPid = comm:reply_as(comm:this(), 3, {cb_reply, state_get(instance, State), '_'}),
+    EnvPid = comm:reply_as(comm:this(), 3, {cb_msg, state_get(instance, State), '_'}),
     comm:send_local(DHT_Node, {get_node_details, EnvPid, [load, load2, load3, db, my_range]}).
 
--spec is_valid_round(RoundStatus::gossip_beh:round_status(), RoundFromMessage::round(),
-    PrevState::state(), CurState::state()) -> boolean().
-is_valid_round(RoundStatus, RoundFromMessage, PrevState, CurState) ->
-    RoundFromState = case RoundStatus of
-        current_round -> state_get(round, CurState);
-        old_round -> state_get(round, PrevState)
-    end,
 
-    if RoundFromState =:= RoundFromMessage -> true;
-       true ->
-            log:log(warn(), "[ ~w ] Invalid ~w. RoundFromState: ~w, RoundFromMessage: ~w",
-                   [state_get(instance, CurState), RoundStatus, RoundFromState, RoundFromMessage]),
-           false
-    end.
-
-
--spec integrate_data_init(QData::data(), RoundStatus::gossip_beh:round_status(),
-        {PrevState::state(), CurState::state()}) -> {ok, full_state()}.
-integrate_data_init(QData, RoundStatus, {PrevState, CurState}) ->
-    {PrevState1, CurState1} = case RoundStatus of
-        current_round ->
-            {{_NewLoad, _NewRing}, NewState1} = merge_load_data(QData, CurState),
-            %% _PrevState = state_get(prev_state, State),
-            %% _PrevLoadInfo = get_load_info(_PrevState),
-            %% _ValuesBest = get_values_best(State),
-            %% _ValuesAll = get_values_all(State),
-            %% log:log(debug, "[ ~w ] Values best: ~n\t~w", [state_get(instance, State), _ValuesBest]),
-            %% log:log(debug, "[ ~w ] Values all: ~n\t~w~n", [state_get(instance, State), _ValuesAll]),
-            %% log:log(debug, "[ ~w ] Values prev round: ~n\t~w", [state_get(instance, State), _PrevLoadInfo]),
-            _LoadInfo = get_load_info(CurState),
-            _Histo = data_get(histo, get_default_load_data(_NewLoad)),
-            log:log(?SHOW, "[ ~w ] Data at end of cycle: ~n\t~s~n\tHisto: ~s~n",
-                [state_get(instance, CurState), to_string(_LoadInfo), to_string(_Histo)]),
-            {PrevState, NewState1};
-        old_round ->
-             case discard_old_rounds() of
-                true ->
-                    log:log(debug, "[ ~w ] integrate_data in old_round", [?MODULE]),
-                    % This only happens when entering a new round, i.e. the values have
-                    % already converged. Consequently, discarding messages does
-                    % not cause mass loss.
-                    {PrevState, CurState};
-                false ->
-                    log:log(?SHOW, "[ ~w ] integrate_data in old_round", [?MODULE]),
-                    {_Data, NewPrevState1} = merge_load_data(QData, PrevState),
-                    {NewPrevState1, CurState}
-            end
-    end,
-    Pid = pid_groups:get_my(gossip),
-    comm:send_local(Pid, {integrated_data, state_get(instance, CurState1), RoundStatus}),
-    {ok, {PrevState1, CurState1}}.
-
-
--spec new_round(NewRound, State, State) -> {ok, FullState} when
-    is_subtype(NewRound, round()),
-    is_subtype(State, state()),
-    is_subtype(FullState, full_state()).
+-spec new_round(NewRound::round(), PrevState::state(), CurState::state())
+        -> {ok, FullState::full_state()}.
 new_round(NewRound, PrevState, CurState) ->
     % Only replace prev round with current round if current has converged.
     % Cases in which current round has not converged: e.g. late joining, sleeped/paused.
@@ -735,14 +701,15 @@ has_converged(TargetConvergenceCount, CurState) ->
 
 -spec finish_request(CurState::state()) -> state().
 finish_request(CurState) ->
-    LoadDataList = state_get(load_data_list, CurState),
-    Histo = data_get(histo, get_default_load_data(LoadDataList)),
     case state_get(leader, CurState) of
         true ->
+            LoadDataList = state_get(load_data_list, CurState),
+            Histo = data_get(histo, get_default_load_data(LoadDataList)),
             Requestor = state_get(requestor, CurState),
             comm:send(Requestor, {histogram, Histo}),
             gossip:stop_gossip_task(state_get(instance, CurState));
-        false -> do_nothing
+        false ->
+            do_nothing
     end,
     CurState.
 
@@ -752,64 +719,70 @@ update_convergence_count({OldLoadList, OldRing}, {NewLoadList, NewRing}, CurStat
 
     % check whether all average based values changed less than epsilon percent
     AvgChangeEpsilon = convergence_epsilon(),
+    HasConvergedFun =
+        fun(AvgType, Old, New) ->
+                OldValue = calc_current_estimate(data_get(AvgType, Old)),
+                NewValue = calc_current_estimate(data_get(AvgType, New)),
+                log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
+                        [state_get(instance, CurState), AvgType, OldValue, NewValue]),
+                calc_change(OldValue, NewValue) < AvgChangeEpsilon
+        end,
 
     %% Ring convergence
-    Fun = fun(AvgType) ->
-            OldValue = calc_current_estimate(data_get(AvgType, OldRing)),
-            NewValue = calc_current_estimate(data_get(AvgType, NewRing)),
-            log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
-                [state_get(instance, CurState), AvgType, OldValue, NewValue]),
-            _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
-    end,
-    RingConverged = lists:all(Fun, [size_inv, avg_kr]),
+    HaveConverged1 = HasConvergedFun(size_inv, OldRing, NewRing) andalso
+                        HasConvergedFun(avg_kr, OldRing, NewRing),
 
     %% Load convergence
-    LoadModulesConverged =
-        [begin
-             ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
-             OldValue = calc_current_estimate(data_get(AvgType, OldLoad)),
-             NewValue = calc_current_estimate(data_get(AvgType, NewLoad)),
-             log:log(debug, "[ ~w ] ~w: OldValue: ~w, New Value: ~w",
-                     [state_get(instance, CurState), AvgType, OldValue, NewValue]),
-             _HasConverged = calc_change(OldValue, NewValue) < AvgChangeEpsilon
-         end
-         || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList),
-            AvgType            <- [avg, avg2]
-        ],
+    HaveConverged2 =
+        HaveConverged1 andalso
+            lists:all(
+              fun({OldLoad, NewLoad, AvgType}) ->
+                      ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
+                      HasConvergedFun(AvgType, OldLoad, NewLoad)
+              end,
+              [{OldLoad, NewLoad, AvgType}
+               || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList),
+                  % =/= {load_data, _Name, skip}
+                  not (tuple_size(NewLoad) =:= 3 andalso element(3, NewLoad) =:= skip),
+                  AvgType            <- [avg, avg2]
+              ]),
 
-    LoadConverged = lists:all(fun(X) -> X end, LoadModulesConverged),
+    log:log(debug, "Averages have converged: ~w", [HaveConverged2]),
 
-    HaveConverged1 = RingConverged andalso LoadConverged,
-    log:log(debug, "Averages have converged: ~w", [HaveConverged1]),
+    %% TODO: Fix convergence counting for histograms with skipped values
+    %% (atm, all histogrames are ignored in regard to convergence counting)
 
-    HistoModulesConverged =
-        [ begin
-              ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
-              % Combine the avg values of the buckets of two histograms into one tuple list
-              Combine = fun ({Interval, AvgOld}, {Interval, AvgNew}) -> {AvgOld, AvgNew} end,
-              CompList = lists:zipwith(Combine,
-                                       data_get(histo, OldLoad), data_get(histo, NewLoad)),
+    %% HistoModulesConverged =
+    %%     [ begin
+    %%         case lists:member(data_get(name, NewLoad), Modules) of
+    %%              true -> true;
+    %%              false ->
+    %%                   ?ASSERT(data_get(name, OldLoad) =:= data_get(name, NewLoad)),
+    %%                   % Combine the avg values of the buckets of two histograms into one tuple list
+    %%                   Combine = fun ({Interval, AvgOld}, {Interval, AvgNew}) -> {AvgOld, AvgNew} end,
+    %%                   CompList = lists:zipwith(Combine,
+    %%                                            data_get(histo, OldLoad), data_get(histo, NewLoad)),
+    %%
+    %%                   % check that all the buckets of histogram have changed less than epsilon percent
+    %%                   Fun1 = fun({OldAvg, NewAvg}) ->
+    %%                                  OldEstimate = calc_current_estimate(OldAvg),
+    %%                                  NewEstimate = calc_current_estimate(NewAvg),
+    %%                                  _HasConverged = calc_change(OldEstimate, NewEstimate) < AvgChangeEpsilon
+    %%                          end,
+    %%                   _HaveConverged2 = lists:all(Fun1, CompList)
+    %%         end
+    %%       end
+    %%       || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList)
+    %%     ],
+    %%
+    %% HaveConverged3 = HaveConverged2 andalso lists:all(fun(X) -> X end, HistoModulesConverged),
+    HaveConverged3 = HaveConverged2,
+    %% log:log(debug, "Histogram has converged: ~w", [self(), HaveConverged2]),
 
-              % check that all the buckets of histogram have changed less than epsilon percent
-              Fun1 = fun({OldAvg, NewAvg}) ->
-                             OldEstimate = calc_current_estimate(OldAvg),
-                             NewEstimate = calc_current_estimate(NewAvg),
-                             _HasConverged = calc_change(OldEstimate, NewEstimate) < AvgChangeEpsilon
-                     end,
-              _HaveConverged2 = lists:all(Fun1, CompList)
-          end
-          || {OldLoad, NewLoad} <- lists:zip(OldLoadList, NewLoadList)
-        ],
-
-    HaveConverged2 = lists:all(fun(X) -> X end, HistoModulesConverged),
-    log:log(debug, "Histogram has converged: ~w", [HaveConverged2]),
-
-    HaveConverged = HaveConverged1 andalso HaveConverged2,
-    case HaveConverged of
-        true ->
-            state_update(convergence_count, fun inc/1, CurState);
-        false ->
-            state_set(convergence_count, 0, CurState)
+    if HaveConverged3 ->
+           state_update(convergence_count, fun inc/1, CurState);
+       true ->
+           state_set(convergence_count, 0, CurState)
     end.
 
 
@@ -875,7 +848,7 @@ state_set(KeyValueTupleList, State) when is_record(State, state) andalso is_list
     Fun = fun ({Key, Value}, OldState) -> state_set(Key, Value, OldState) end,
     lists:foldl(Fun, State, KeyValueTupleList).
 
--spec state_get (_, unknown) -> unknown;
+-spec state_get (any(), unknown) -> unknown;
                 (status, state()) -> status();
                 (instance, state()) -> instance();
                 (load_data_list, state()) -> load_data_list();
@@ -933,7 +906,7 @@ ring_data_new() ->
     #ring_data{}.
 
 -spec get_default_load_data(unknown) -> unknown;
-                           (load_data_list()) -> load_data().
+                           (load_data_list()) -> load_data() | load_data_skipped().
 get_default_load_data(unknown) -> unknown;
 get_default_load_data(LoadDataList) ->
     %% name is the second element of record tuple
@@ -953,21 +926,21 @@ get_default_load_data(LoadDataList) ->
 %%        <li>avg_kr = average key range (distance between nodes in the address space),</li>
 %%      </ul>
 %%      See type spec for details on which keys are allowed on which records.
--spec data_get(_, unknown) -> unknown;
-             (name, load_data()) -> atom();
+-spec data_get(any(), unknown) -> unknown;
+             (name, load_data() | load_data_skipped()) -> atom();
              (avg, load_data()) -> avg();
              (avg2, load_data()) -> avg();
              (min, load_data()) -> min();
              (max, load_data()) -> max();
              (histo, load_data()) -> histogram();
              (size_inv, ring_data()) -> avg();
-             (avg_kr, ring_data()) -> avg_kr().
+             (avg_kr, ring_data()) -> avg_kr();
+             (avg | avg2 | min | max | histo | size_inv | avg_kr, load_data_skipped()) -> unknown.
 data_get(_Key, unknown) -> unknown;
-data_get(_Key, []) ->
-    [];
-data_get(Key, [LoadData | Other]) ->
-    [data_get(Key, LoadData) | data_get(Key, Other)];
-data_get(name, #load_data{name = Name}) ->
+data_get(name, {load_data, Name, skip}) ->
+    Name;
+data_get(_Key, {load_data, _Module, skip}) -> unknown;
+data_get(name, LoadData=#load_data{name = Name}) when is_record(LoadData, load_data) ->
     Name;
 data_get(avg, #load_data{avg = Avg}) ->
     Avg;
@@ -985,10 +958,11 @@ data_get(avg_kr, #ring_data{avg_kr = AvgKr}) ->
     AvgKr.
 
 -spec get_current_estimate(Key::avg | avg2,
-                           unknown | load_data()) -> float() | unknown;
+                           unknown | load_data() | load_data_skipped()) -> float() | unknown;
                           (Key::size_inv | avg_kr,
                            unknown | ring_data()) -> float() | unknown.
 get_current_estimate(_Key, unknown) -> unknown;
+get_current_estimate(_Key, {load_data, _Module, skip}) -> unknown;
 get_current_estimate(avg, #load_data{avg=Avg}) ->
     calc_current_estimate(Avg);
 get_current_estimate(avg2, #load_data{avg2=Avg2}) ->
@@ -1031,28 +1005,35 @@ data_set(Key, Value, RingData) when is_record(RingData, ring_data) ->
     end.
 
 %% @doc Prepares a load_data record for sending it to a peer and updates the
-%%      load_data of self accordingly.
--spec prepare_data(State::state()) -> {{load_data_list(), ring_data()}, state()}.
-prepare_data(State) ->
-    % Averages
-    Fun = fun (AvgType, MyData) -> divide2(AvgType, MyData) end,
+%%      load_data of self accordingly. Skips load data skipped in the given
+%%      state or from the MoreSkippedModules list.
+-spec prepare_data(MoreSkippedModules::[atom()], state())
+        -> {{load_data_list(), ring_data()}, state()}.
+prepare_data(MoreSkippedModules, State) ->
     LoadDataNew =
         [begin
-             LoadData2 = lists:foldl(Fun, LoadData, [avg, avg2]),
+             LoadName = data_get(name, LoadData),
+             LoadSkipped = {load_data, LoadName, skip},
+             case LoadData =:= LoadSkipped orelse
+                      lists:member(LoadName, MoreSkippedModules) of
+                  true -> LoadData;
+                  false ->
+                     LoadData1 = divide2(avg, LoadData),
+                     LoadData2 = divide2(avg2, LoadData1),
 
-             % Min and Max
-             do_nothing,
+                     % Min and Max
+                     % do_nothing,
 
-             % Histogram
-             _LoadData3 = divide2(LoadData2)
-         end
-    || LoadData <- state_get(load_data_list, State)],
+                     % Histogram
+                     _LoadData3 = divide2(LoadData2)
+             end
+         end || LoadData <- state_get(load_data_list, State)],
 
     State1 = state_set(load_data_list, LoadDataNew, State),
 
     % Averages ring data
-    RingData1 = state_get(ring_data, State1),
-    RingData2 = lists:foldl(Fun, RingData1, [size_inv, avg_kr]),
+    RingData1 = divide2(size_inv, state_get(ring_data, State1)),
+    RingData2 = divide2(avg_kr, RingData1),
 
     State2 = state_set(ring_data, RingData2, State1),
 
@@ -1094,41 +1075,40 @@ merge_load_data(Update, {OtherLoadList, OtherRing}, State) ->
     MyLoadList = state_get(load_data_list, State),
     LoadDataListNew =
         [begin
-             ?ASSERT(data_get(name, MyLoad1) =:= data_get(name, OtherLoad)),
-             % Averages load
-             Fun = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherLoad) end,
-             MyLoad2 = lists:foldl(Fun, MyLoad1, [avg, avg2]),
+             LoadName = data_get(name, MyLoad1),
+             ?ASSERT(LoadName =:= data_get(name, OtherLoad)),
+             LoadSkipped = {load_data, LoadName, skip},
+             case MyLoad1 =:= LoadSkipped orelse OtherLoad =:= LoadSkipped of
+                  true -> MyLoad1;
+                  false ->
+                     % Averages load
+                     MyLoad2 = merge_avg(avg, MyLoad1, OtherLoad),
+                     MyLoad3 = merge_avg(avg2, MyLoad2, OtherLoad),
 
-             % Min
-             MyMin = data_get(min, MyLoad2),
-             OtherMin = data_get(min, OtherLoad),
-             MyLoad3 =
-                 if  MyMin =< OtherMin -> data_set(min, MyMin, MyLoad2);
-                     MyMin > OtherMin -> data_set(min, OtherMin, MyLoad2)
-                 end,
+                     % Min
+                     MyNewMin = erlang:min(data_get(min, MyLoad3),
+                                           data_get(min, OtherLoad)),
+                     MyLoad4 = data_set(min, MyNewMin, MyLoad3),
 
-             % Max
-             MyMax = data_get(max, MyLoad3),
-             OtherMax = data_get(max, OtherLoad),
-             MyLoad4 =
-                 if  MyMax =< OtherMax -> data_set(max, OtherMax, MyLoad3);
-                     MyMax > OtherMax -> data_set(max, MyMax, MyLoad3)
-                 end,
+                     % Max
+                     MyNewMax = erlang:max(data_get(max, MyLoad4),
+                                           data_get(max, OtherLoad)),
+                     MyLoad5 = data_set(max, MyNewMax, MyLoad4),
 
-             % Histogram
-             _MyLoad5 = merge_histo(MyLoad4, OtherLoad)
-         end
-         || {MyLoad1, OtherLoad} <- lists:zip(MyLoadList, OtherLoadList)],
+                     % Histogram
+                     _MyLoad5 = merge_histo(MyLoad5, OtherLoad)
+             end
+         end || {MyLoad1, OtherLoad} <- lists:zip(MyLoadList, OtherLoadList)],
 
     State1 = state_set(load_data_list, LoadDataListNew, State),
 
     %% Averages ring
     MyRing1 = state_get(ring_data, State1),
-    Fun2 = fun (AvgType, MyData) -> merge_avg(AvgType, MyData, OtherRing) end,
-    MyRing2 = lists:foldl(Fun2, MyRing1, [size_inv, avg_kr]),
-    State2 = state_set(ring_data, MyRing2, State1),
+    MyRing2 = merge_avg(size_inv, MyRing1, OtherRing),
+    MyRing3 = merge_avg(avg_kr, MyRing2, OtherRing),
+    State2 = state_set(ring_data, MyRing3, State1),
 
-    NewData = {LoadDataListNew, MyRing2},
+    NewData = {LoadDataListNew, MyRing3},
     State4 = case Update of
         update ->
             State3 = state_update(merged, fun inc/1, State2),
@@ -1172,6 +1152,20 @@ previous_or_current(PrevState, CurState) when is_record(PrevState, state) andals
         false -> PrevState;
         true -> CurState
     end.
+
+
+%% @doc Replaces skipped metrics in My load list with non-skipped values from
+%%      the other load list if possible.
+-spec replace_skipped(Other::LoadDataList, My::LoadDataList) -> LoadDataList
+        when is_subtype(LoadDataList, [load_data() | load_data_skipped()]).
+replace_skipped([], []) ->
+    [];
+replace_skipped([H | OtherL], [{load_data, Metric, skip} | MyL]) ->
+    ?ASSERT(Metric =:= data_get(name, H)),
+    [H | replace_skipped(OtherL, MyL)];
+replace_skipped([_OtherH | OtherL], [MyH | MyL]) ->
+    ?ASSERT(data_get(name, _OtherH) =:= data_get(name, MyH)),
+    [MyH | replace_skipped(OtherL, MyL)].
 
 
 %%---------------------------- Histogram ---------------------------%%
@@ -1235,11 +1229,8 @@ merge_bucket({Key, {Value1, Weight1}}, {Key, {Value2, Weight2}}) ->
 get_load_info(State) ->
     LoadDataList = state_get(load_data_list, State),
     %% select default load data for output
-    {DefaultLoadData, OtherLoadData} =
-        case lists:keytake(?DEFAULT_MODULE, 2, LoadDataList) of
-            false -> throw(default_load_module_not_available);
-            {value, LoadData, Other} -> {LoadData, Other}
-        end,
+    {value, DefaultLoadData, OtherLoadData} =
+        lists:keytake(?DEFAULT_MODULE, 2, LoadDataList),
     RingData = state_get(ring_data, State),
     OtherLoadInfo = [#load_info_other {
                                        name   = data_get(name, LoadData),
@@ -1371,8 +1362,9 @@ calc_initial_avg_kr(MyRange) ->
 
 
 %% @doc Extracts and calculates the standard deviation from the load_data record
--spec calc_stddev(unknown | load_data()) -> unknown | float().
-calc_stddev(unknown) -> unknown;
+-spec calc_stddev(load_data() | load_data_skipped()) -> unknown | float().
+
+calc_stddev({load_data, _Module, skip}) -> unknown;
 
 calc_stddev(Data) when is_record(Data, load_data) ->
     Avg = get_current_estimate(avg, Data),
@@ -1535,18 +1527,43 @@ is_histogram(Histogram) ->
 %%      is_histogram().
 -spec compare(histogram(), histogram()) -> boolean().
 compare([], []) -> true;
-
 compare([], _List) -> false;
-
 compare(_List, []) -> false;
+compare([{BucketInterval, _Avg1} | List1], [{BucketInterval, _Avg2} | List2]) ->
+    compare(List1, List2);
+compare([_|_], [_|_]) ->
+    false.
 
-compare([H1|List1], [H2|List2]) when is_tuple(H1) andalso is_tuple(H2) ->
-        {BucketInterval1, _Avg1} = H1,
-        {BucketInterval2, _Avg2} = H2,
-        case BucketInterval1 =:= BucketInterval2 of
-            true -> compare(List1, List2);
-            false -> false
-        end.
+
+-spec init_feeder({NoOfBuckets::non_neg_integer(), Requestor::comm:mypid(),
+                   Random1::boolean(), Random2::boolean()}) -> {[proplists:property()]}.
+init_feeder({NoOfBuckets, Requestor, Random1, Random2}) ->
+    Prop1 = if Random1 -> [{no_of_buckets, NoOfBuckets}];
+               not Random1 -> []
+            end,
+    Prop2 = if Random2 -> [{requestor, Requestor}];
+               not Random2 -> []
+            end,
+    {lists:append([Prop1, Prop2, [{instance, {gossip_load,default}}]])}.
+
+-spec get_values_best_feeder({Options::[proplists:property()], Secs::0..1, Millisecs::0..1000}) ->
+    {[proplists:property()]}.
+get_values_best_feeder({Options, Secs, Millisecs}) ->
+    Options1 = case proplists:get_value(send_after, Options) of
+        true ->
+            NewOptions1 = proplists:delete(send_after, Options),
+            [ {send_after, Millisecs} | NewOptions1 ];
+        _ ->
+            Options
+    end,
+    Options2 = case proplists:get_value(msg_delay, Options1) of
+        true ->
+            NewOptions2 = proplists:delete(msg_delay, Options),
+            [ {msg_delay, Secs} | NewOptions2 ];
+        _ ->
+            Options1
+    end,
+    {Options2}.
 
 
 %% @doc For testing: ensure, that only buckets with identical keys are feeded to

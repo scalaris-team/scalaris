@@ -181,7 +181,7 @@ get_cookie() {
 
       # load user scalaris configuration (overrides system config)
       if [ -f "$HOME/.scalaris/scalarisctl.conf" ] ; then
-        . $HOME/.scalaris/scalarisctl.conf
+        . "$HOME/.scalaris/scalarisctl.conf"
       fi
     fi
     echo -n ${cookie:-"chocolate chip cookie"}
@@ -194,6 +194,19 @@ checkinstallation() {
     MSG_SUCCESS="\x1b[1;32mSUCCESS\x1b[0m" #green
     MSG_NOTINSTALLED="\x1b[1;34mNOT INSTALLED\x1b[0m" #blue
     MSG_DONE="DONE"
+    # checking for $HOME
+    if [ "x$HOME" = "x" ]; then
+        echo -e "$MSG_FAILED"
+        echo "ERROR: \$HOME is not set"
+        echo "We were trying to read: \$HOME"
+        exit 1
+    fi
+    if [ ! -d "$HOME" ]; then
+        echo -e "$MSG_FAILED"
+        echo "ERROR: \$HOME does not point to a valid directory"
+        echo "We were trying to read: \$HOME"
+        exit 1
+    fi
     $ERL -noinput -eval 'halt(0).'
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
@@ -375,7 +388,7 @@ checkinstallation() {
         -eval "ok = application:start(erlang_js), {ok, JS} = js_driver:new(), ok = js:define(JS, <<\"var addOne = function(a){ return a + 1; }\">>), {ok,4} = js:call(JS, <<\"addOne\">>, [3]), halt(0)." 2>&1`
     FAILED=$?
     if [ $FAILED -ne 0 ]; then
-        echo -e "$MSG_FAILED"
+        echo -e "$MSG_ATTENTION"
         echo "$CHECKCONFIGMSG"
         echo "WARNING: unable to start the erlang_js application"
         echo " You won't be able to use JavaScript Map-Reduce jobs"
@@ -697,7 +710,7 @@ scalarisstart(){
  $SCALARIS_ADDITIONAL_PARAMETERS\
  -s scalaris `echo $erl_flags`"
     if [ $daemonize -ne 0 -a $DAEMONIZE_SCREEN -ne 0 ]; then
-        $SCREEN -S "scalaris_$NODE_NAME" -d -m /bin/bash -x -c +B "$START_CMD; sleep 365d"
+        $SCREEN -S "scalaris_$NODE_NAME" -d -m bash -x -f +B -c "$START_CMD; sleep 365d"
     else
         bash -x -f +B -c "$START_CMD"
     fi
@@ -707,7 +720,7 @@ scalarisstart(){
         echo "  consider running scalarisctl checkinstallation"
         exit 1
     fi
-    popd > /dev/null
+    popd > /dev/null 2>&1 || true
 }
 
 scalarisstop(){
@@ -718,7 +731,7 @@ scalarisstop(){
         -noinput \
         -s scalaris cli -extra $NODE_NAME stop
     FAILED=$?
-    popd > /dev/null
+    popd > /dev/null 2>&1 || true
     return $FAILED
 }
 
@@ -730,7 +743,7 @@ scalariscall(){
         -noinput \
         -eval "$1"
     FAILED=$?
-    popd > /dev/null
+    popd > /dev/null 2>&1 || true
     return $FAILED
 }
 

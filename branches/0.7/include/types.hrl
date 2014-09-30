@@ -18,22 +18,6 @@
 %% @end
 %% @version $Id$
 
--ifdef(term_not_builtin).
--type term() :: any().
--endif.
-
--ifdef(node_not_builtin).
--type node() :: erlang:node().
--endif.
-
--ifdef(module_not_builtin).
--type module() :: erlang:module().
--endif.
-
--ifdef(boolean_not_builtin).
--type boolean() :: bool().
--endif.
-
 -ifdef(tid_not_builtin).
 -type tid() :: ets:tid().
 -else.
@@ -43,12 +27,8 @@
 -endif.
 -endif.
 
--ifdef(types_not_builtin).
+-ifdef(reference_not_builtin).
 -type reference() :: erlang:reference().
--type gb_set() :: gb_sets:gb_set().
--type queue() :: queue:queue().
--type gb_tree() :: gb_trees:gb_tree().
--type dict() :: dict:dictionary().
 -endif.
 
 -ifdef(have_erlang_timestamp).

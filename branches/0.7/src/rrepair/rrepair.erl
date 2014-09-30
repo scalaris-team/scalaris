@@ -113,8 +113,6 @@
     {continue_resolve, rr_resolve:operation(), rr_resolve:options()} |
     % misc
     {web_debug_info, Requestor::comm:erl_local_pid()} |
-    % rr statistics
-    {rr_stats, rr_statistics:requests()} |
     % report
     {recon_progress_report, Sender::comm:mypid(), Initiator::boolean(),
      DestRR::comm:mypid(), DestRC::comm:mypid() | undefined, Stats::rr_recon_stats:stats()} |
@@ -254,13 +252,6 @@ on({continue_resolve, SessionID, Operation, Options}, State) ->
     % resolve_progress_report of the original request
     {ok, Pid} = rr_resolve:start(),
     comm:send_local(Pid, {start, Operation, [{session_id, SessionID} | Options]}),
-    State;
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-on({rr_stats, Msg}, State) ->
-    {ok, Pid} = rr_statistics:start(),
-    comm:send_local(Pid, Msg),
     State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

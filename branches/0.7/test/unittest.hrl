@@ -34,7 +34,8 @@
                     true -> ok;
                     _ ->
                         unittest_helper:print_ring_data()
-                end
+                end,
+                unittest_helper:print_proto_sched_stats()
         end,
         ct:fail(lists:flatten(io_lib:format(Format, Data)))).
 

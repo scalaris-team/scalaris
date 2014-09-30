@@ -35,14 +35,14 @@
 %%         end).
 -define(TRACE_STATE(OldState, NewState), ok).
 
--export([send_trigger/0, init_first/0, init/3, on/2,
+-export([send_trigger/0, init_first/0, init/4, on/2,
          leave/0, update_id/1,
          get_neighbors/1, has_left/1, is_responsible/2,
          notify_new_pred/2, notify_new_succ/2,
          notify_slide_finished/1,
          propose_new_neighbors/1,
          % received at dht_node, (also) handled here:
-         crashed_node/2, zombie_node/2,
+         crashed_node/3, zombie_node/2,
          % node/neighborhood change subscriptions:
          subscribe/5, unsubscribe/2,
          subscribe_dneighbor_change_filter/3,
@@ -58,6 +58,7 @@
 
 -type reason() :: {slide_finished, pred | succ | none} | % a slide finished
                   {graceful_leave, pred | succ, Node::node:node_type()} | % the given node is about to leave
+                  {graceful_leave, other, NodePid::comm:mypid()} | % the given node is about to leave
                   {node_crashed, Node::comm:mypid()} | % the given node crashed
                   {add_subscriber} | % a subscriber was added
                   {node_discovery} | % a new/changed node was discovered
@@ -86,13 +87,16 @@
     {rm, notify_new_succ, NewSucc::node:node_type()} |
     {rm, notify_slide_finished, SlideType::pred | succ} |
     {rm, propose_new_neighbors, NewNodes::[node:node_type(),...]} |
+    {rm, node_info, SourcePid::comm:mypid(), Which::[is_leaving | succlist | succ | predlist | pred | node,...]} |
     {rm, leave} |
     {rm, pred_left, OldPred::node:node_type(), PredsPred::node:node_type()} |
     {rm, succ_left, OldSucc::node:node_type(), SuccsSucc::node:node_type()} |
-    {rm, update_id, NewId::?RT:key()} |
+    {rm, node_left, Node::node:node_type()} |
+    {rm, update_my_id, NewId::?RT:key()} |
     {web_debug_info, Requestor::comm:erl_local_pid()} |
     {rm, subscribe, Pid::pid(), Tag::any(), subscriber_filter_fun(), subscriber_exec_fun(), MaxCalls::pos_integer() | inf} |
-    {rm, unsubscribe, Pid::pid(), Tag::any()}).
+    {rm, unsubscribe, Pid::pid(), Tag::any()} |
+    {rm, get_move_state, Pid::pid()}).
 
 -define(SEND_OPTIONS, [{channel, prio}]).
 
@@ -163,7 +167,7 @@ propose_new_neighbors(NewNodes) ->
 update_id(NewId) ->
     %TODO: do not send message, include directly
     Pid = pid_groups:get_my(dht_node),
-    comm:send_local(Pid, {rm, update_id, NewId}).
+    comm:send_local(Pid, {rm, update_my_id, NewId}).
 
 %% @doc Filter function for subscriptions that returns true if a
 %%      direct neighbor, i.e. pred, succ or base node, changed.
@@ -222,13 +226,15 @@ init_first() ->
 
 %% @doc Initializes the rm_loop state.
 -spec init(Me::node:node_type(), Pred::node:node_type(),
-           Succ::node:node_type()) -> state().
-init(Me, Pred, Succ) ->
+           Succ::node:node_type(), OldSubscrTable::null | tid()) -> state().
+init(Me, Pred, Succ, OldSubscrTable) ->
     % do not wait for the first trigger to arrive here
     % -> execute trigger action immediately
     comm:send_local(self(), {rm, trigger_action}),
     % create the ets table storing the subscriptions
-    SubscrTable = ets:new(rm_subscribers, [ordered_set, private]),
+    if OldSubscrTable =/= null -> SubscrTable = OldSubscrTable;
+       true -> SubscrTable = ets:new(rm_subscribers, [ordered_set, private])
+    end,
     dn_cache:subscribe(),
     RM_State = ?RM:init(Me, Pred, Succ),
     set_failuredetector(?RM:get_neighbors(RM_State)),
@@ -285,7 +291,12 @@ on({rm, succ_left, OldSucc, SuccsSucc}, State) ->
     RMFun = fun(RM_State) -> ?RM:remove_succ(RM_State, OldSucc, SuccsSucc) end,
     update_state(State, RMFun);
 
-on({rm, update_id, NewId}, State) ->
+% only from graceful leave
+on({rm, node_left, NodePid}, State) ->
+    RMFun = fun(RM_State) -> ?RM:remove_node(RM_State, NodePid) end,
+    update_state(State, RMFun);
+
+on({rm, update_my_id, NewId}, State) ->
     Neighborhood = ?RM:get_neighbors(element(1, State)),
     OldMe = nodelist:node(Neighborhood),
     case node:id(OldMe) of
@@ -299,7 +310,7 @@ on({rm, update_id, NewId}, State) ->
                     update_state(State, RMFun)
                 end
             catch
-                throw:Reason ->
+                throw:(Reason = new_node_not_in_pred_succ_interval) ->
                     log:log(error, "[ RM ] can't update dht node ~w with id ~w (pred=~w, succ=~w): ~.0p",
                             [nodelist:node(Neighborhood), NewId,
                              nodelist:pred(Neighborhood),
@@ -309,6 +320,25 @@ on({rm, update_id, NewId}, State) ->
             end
     end;
 
+on({rm, node_info, SourcePid, Which}, {RM_State, HasLeft, _SubscrTable} = State) ->
+    Neighborhood = ?RM:get_neighbors(RM_State),
+    ExtractValuesFun =
+        fun(Elem, NodeDetails) ->
+                Value =
+                    case Elem of
+                        is_leaving  -> HasLeft;
+                        succlist    -> nodelist:succs(Neighborhood);
+                        succ        -> nodelist:succ(Neighborhood);
+                        predlist    -> nodelist:preds(Neighborhood);
+                        pred        -> nodelist:pred(Neighborhood);
+                        node        -> nodelist:node(Neighborhood)
+                    end,
+                node_details:set(NodeDetails, Elem, Value)
+        end,
+    NodeDetails = lists:foldl(ExtractValuesFun, node_details:new(), Which),
+    comm:send(SourcePid, {rm, node_info_response, NodeDetails}, ?SEND_OPTIONS),
+    State;
+
 on({rm, leave}, {RM_State, _HasLeft, SubscrTable}) ->
     Neighborhood = ?RM:get_neighbors(RM_State),
     Me = nodelist:node(Neighborhood),
@@ -316,9 +346,22 @@ on({rm, leave}, {RM_State, _HasLeft, SubscrTable}) ->
     Succ = nodelist:succ(Neighborhood),
     comm:send(node:pidX(Succ), {rm, pred_left, Me, Pred}, ?SEND_OPTIONS),
     comm:send(node:pidX(Pred), {rm, succ_left, Me, Succ}, ?SEND_OPTIONS),
+    % notify other nodes to remove this node (independent of the fd since node
+    % jumps now re-use node IDs)
+    MyPid = node:pidX(Me),
+    _ = [begin
+             NPid = node:pidX(N),
+             comm:send(NPid, {rm, node_left, MyPid})
+         end || N <- tl(nodelist:to_list(Neighborhood)), N =/= Pred, N =/= Succ],
     comm:send_local(self(), {move, node_leave}), % msg to dht_node
     ?RM:leave(RM_State),
     {RM_State, true, SubscrTable};
+
+%% requests the move state of the rm, e.g. before rejoining the ring
+on({rm, get_move_state, Pid}, {_RM_State, _HasLeft, SubscrTable} = State) ->
+    MoveState = [{subscr_table, SubscrTable}],
+    comm:send_local(Pid, {get_move_state_response, MoveState}),
+    State;
 
 %% add Pid to the node change subscriber list
 on({rm, subscribe, Pid, Tag, FilterFun, ExecFun, MaxCalls}, {RM_State, _HasLeft, SubscrTable} = State) ->
@@ -351,11 +394,13 @@ on(Message, {RM_State, HasLeft, SubscrTable} = OldState) ->
     end.
 
 % failure detector reported dead node
--spec crashed_node(State::state(), DeadPid::comm:mypid()) -> state().
-crashed_node(State, DeadPid) ->
-    RMFun = fun(RM_State) -> ?RM:crashed_node(RM_State, DeadPid) end,
+-spec crashed_node(State::state(), DeadPid::comm:mypid(), Reason::fd:reason()) -> state().
+crashed_node(State, DeadPid, Reason) ->
+    RMFun = fun(RM_State) -> ?RM:crashed_node(RM_State, DeadPid, Reason) end,
     NewState = update_state(State, RMFun, DeadPid),
-    case config:read(rrepair_after_crash) of
+    % only do rrepair for non-slide failures (otherwise the data was already transferred)
+    case config:read(rrepair_after_crash) andalso
+             not lists:member(Reason, [leave, jump]) of
         true ->
             OldPred = nodelist:pred(?RM:get_neighbors(element(1, State))),
             NewNeighb = ?RM:get_neighbors(element(1, NewState)),
@@ -426,7 +471,7 @@ update_state({OldRM_State, HasLeft, SubscrTable} = _OldState, RMFun, CrashedPid)
     ?TRACE_STATE(_OldState, NewState),
     NewState.
 
-% @doc Check if change of failuredetector is necessary.
+% @doc Subscribe all PIDs in the neighborhood with the failuredetector.
 -spec set_failuredetector(Neighborhood::nodelist:neighborhood()) -> ok.
 set_failuredetector(Neighborhood) ->
     [_ | View] = nodelist:to_list(Neighborhood),

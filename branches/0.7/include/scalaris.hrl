@@ -19,7 +19,7 @@
 %% @version $Id$
 
 %% Version of Scalaris
--define(SCALARIS_VERSION, "0.7.0").
+-define(SCALARIS_VERSION, "0.7.1").
 
 %% userdevguide-begin scalaris:rt
 %%The RT macro determines which kind of routingtable is used. Uncomment the
@@ -179,8 +179,11 @@
                Y
         ).
 
+-ifdef(enable_debug).
+-define(SCALARIS_RECV(X,Y), ?SCALARIS_RECV_DEBUG(X, Y)).
+-else.
 -define(SCALARIS_RECV(X,Y), ?SCALARIS_RECV_PRODUCTION(X, Y)).
-%-define(SCALARIS_RECV(X,Y), ?SCALARIS_RECV_DEBUG(X, Y)).
+-endif.
 
 -define(IIF(C, A, B), case C of
                           true -> A;

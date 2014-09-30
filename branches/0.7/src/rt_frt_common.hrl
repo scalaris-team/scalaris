@@ -128,7 +128,7 @@ init(Neighbors) ->
     comm:send(node:pidX(nodelist:succ(Neighbors)), Msg),
 
     % request approximated ring size
-    comm:send_local(pid_groups:get_my(gossip), {get_values_best, {gossip_load, default}, self()}),
+    gossip_load:get_values_best([]),
 
     update_entries(Neighbors, add_source_entry(nodelist:node(Neighbors), #rt_t{})).
 
@@ -225,8 +225,8 @@ update(OldRT, OldNeighbors, NewNeighbors) ->
 %% userdevguide-begin rt_frtchord:filter_dead_node
 %% @doc Removes dead nodes from the routing table (rely on periodic
 %%      stabilization here).
--spec filter_dead_node(rt(), comm:mypid()) -> rt().
-filter_dead_node(RT, DeadPid) ->
+-spec filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
+filter_dead_node(RT, DeadPid, _Reason) ->
     % find the node id of DeadPid and delete it from the RT
     case [N || N <- internal_to_list(RT), node:pidX(N) =:= DeadPid] of
         [Node] -> entry_delete(node:id(Node), RT);
@@ -279,6 +279,13 @@ get_range(Begin, End) -> rt_chord:get_range(Begin, End).
                     SplitFraction::{Num::non_neg_integer(), Denom::pos_integer()}) -> key() | ?PLUS_INFINITY_TYPE.
 get_split_key(Begin, End, SplitFraction) ->
     rt_chord:get_split_key(Begin, End, SplitFraction).
+
+%% @doc Splits the range between Begin and End into up to Parts equal parts and
+%%      returning the according split keys.
+-spec get_split_keys(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                     Parts::pos_integer()) -> [key()].
+get_split_keys(Begin, End, Parts) ->
+    rt_chord:get_split_keys(Begin, End, Parts).
 
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and
 %%      calculates a random key in this range. Fails with an exception if there
@@ -440,7 +447,7 @@ handle_custom_message({rt_learn_node, NewNode}, State) ->
 handle_custom_message({gossip_get_values_best_response, Vals}, State) ->
     RT = rt_loop:get_rt(State),
     NewRT = rt_set_ring_size(RT, gossip_load:load_info_get(size_kr, Vals)),
-    msg_delay:send_local(config:read(rt_frt_gossip_interval), pid_groups:get_my(gossip),{get_values_best, {gossip_load, default}, self()}),
+    gossip_load:get_values_best([{msg_delay, config:read(rt_frt_gossip_interval)}]),
     RTExt = export_rt_to_dht_node(NewRT, rt_loop:get_neighb(State)),
     comm:send_local(pid_groups:get_my(dht_node), {rt_update, RTExt}),
     rt_loop:set_rt(State, NewRT);
@@ -535,11 +542,12 @@ empty_ext(_Neighbors) -> {unknown, gb_trees:empty()}.
 
 %% userdevguide-begin rt_frtchord:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop_node(dht_node_state:state(), key()) -> node:node_type().
+-spec next_hop_node(dht_node_state:state(), key()) -> {succ | other, node:node_type()}.
 next_hop_node(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
-        true -> nodelist:succ(Neighbors);
+        true ->
+            {succ, nodelist:succ(Neighbors)};
         _ -> ExtRT = dht_node_state:get(State, rt),
              RT = external_rt_get_tree(ExtRT),
              RTSize = get_size(ExtRT),
@@ -550,16 +558,18 @@ next_hop_node(State, Id) ->
                      {_Key, N} = gb_trees:largest(RT),
                      N
              end,
-             case RTSize < config:read(rt_size_use_neighbors) of
-                 false -> NodeRT;
-                 _     -> % check neighborhood:
-                     nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
-             end
+             Node = case RTSize < config:read(rt_size_use_neighbors) of
+                        false -> NodeRT;
+                        _     -> % check neighborhood:
+                            nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
+                    end,
+             {other, Node}
     end.
 
--spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
+-spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
 next_hop(State, Id) ->
-    node:pidX(next_hop_node(State, Id)).
+    {Tag, Node} = next_hop_node(State, Id),
+    {Tag, node:pidX(Node)}.
 %% userdevguide-end rt_frtchord:next_hop
 
 %% userdevguide-begin rt_frtchord:export_rt_to_dht_node
@@ -1086,7 +1096,7 @@ wrap_message(Key, {'$wrapped', Issuer, _} = Msg, State, 1) ->
             MyId = dht_node_state:get(State, node_id),
             SenderId = node:id(Issuer),
             SenderPid = node:pidX(Issuer),
-            NextHop = next_hop_node(State, Key),
+            NextHop = element(2, next_hop_node(State, Key)),
             SendMsg = case external_rt_get_ring_size(dht_node_state:get(State, rt)) of
                 unknown -> true;
                 RingSize ->

@@ -39,7 +39,7 @@
         , distance/2
     ]).
 
--type(coordinate() :: vivaldi:network_coordinate()).
+-type(coordinate() :: gossip_vivaldi:network_coordinate()).
 -type(relative_size() :: float()).
 
 -record(centroid,

@@ -175,13 +175,11 @@ ${ pageBean.preview }
                 <li><a href="wiki?title=<%= safeInclude %>" title="<%= include %>"><%= include %></a> (<a href="wiki?title=<%= safeInclude %>&amp;action=edit" title="<%= include %>">edit</a>) </li>
                 <% } %>
 				<% for (String template0 : pageBean.getTemplates()) {
-				    String magicWordPart = MyMagicWord.extractMagicWordPart(template0);
-				    if (!(MyScalarisMagicWord.isMagicWord(magicWordPart) || MySQLiteMagicWord.isMagicWord(magicWordPart))) {
-				        String template = pageBean.getWikiNamespace().getTemplate() + ":" + template0;
-				        String safeTemplate = StringEscapeUtils.escapeHtml(URLEncoder.encode(template, "UTF-8"));
+				    String template = pageBean.getWikiNamespace().getTemplate() + ":" + template0;
+				    String safeTemplate = StringEscapeUtils.escapeHtml(URLEncoder.encode(template, "UTF-8"));
 				    %>
                 <li><a href="wiki?title=<%= safeTemplate %>" title="<%= template %>"><%= template %></a> (<a href="wiki?title=<%= safeTemplate %>&amp;action=edit" title="<%= template %>">edit</a>) </li>
-                <% } } %>
+                <% } %>
 				</ul>
 				</div>
 				<% } %>

@@ -40,8 +40,8 @@
 
 % internal API for the monitor process
 -export([get_slot_start/2, reduce_timeslots/2, add_nonexisting_timeslots/2,
-         get_type/1, get_slot_length/1, get_current_time/1,
-         get_value/2, get_value_by_offset/2,
+         get_type/1, get_count/1, get_slot_length/1, get_current_time/1,
+         get_value/2, get_value_by_offset/2, get_all_values/2,
          add_with/4, timing_with_hist_merge_fun/3]).
 
 % misc
@@ -320,6 +320,9 @@ get_slot_length(DB) -> DB#rrd.slot_length.
 -spec get_type(DB::rrd()) -> timeseries_type().
 get_type(DB) -> DB#rrd.type.
 
+-spec get_count(DB::rrd()) -> pos_integer().
+get_count(DB) -> DB#rrd.count.
+
 -spec get_current_time(DB::rrd()) -> internal_time().
 get_current_time(DB) ->
     DB#rrd.current_time.
@@ -343,9 +346,21 @@ get_value(DB, InternalTime) when is_integer(InternalTime) ->
 -spec get_value_by_offset(DB::rrd(), SlotOffset::non_neg_integer()) -> undefined | data_type().
 get_value_by_offset(DB, 0) ->
     array:get(DB#rrd.current_index, DB#rrd.data); % minor optimization
-get_value_by_offset(DB, SlotOffset) ->
-    Index = (DB#rrd.current_index + SlotOffset) rem DB#rrd.count,
-    array:get(Index, DB#rrd.data).
+get_value_by_offset(DB, SlotOffset) when SlotOffset < DB#rrd.count ->
+    Count = DB#rrd.count,
+    Index = (DB#rrd.current_index + Count - SlotOffset) rem Count,
+    array:get(Index, DB#rrd.data);
+get_value_by_offset(DB, SlotOffset) when SlotOffset >= DB#rrd.count ->
+    % rare use case
+    get_value_by_offset(DB, SlotOffset rem DB#rrd.count).
+
+%% @doc Gets all values as list from newest to oldest (desc) or from
+%%      oldest to newest (asc). Values may be undefined.
+-spec get_all_values(asc | desc, DB::rrd()) -> [undefined | data_type()].
+get_all_values(desc, DB) ->
+    [get_value_by_offset(DB, Offset) || Offset <- lists:seq(0, DB#rrd.count-1)];
+get_all_values(asc, DB) ->
+    [get_value_by_offset(DB, Offset) || Offset <- lists:seq(DB#rrd.count-1, 0, -1)].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -434,11 +449,13 @@ histogram_update_fun(_Time, undefined, New, Size) ->
 histogram_update_fun(_Time, Hist, New, _Size) ->
     histogram:add(New, Hist).
 
--spec histogram_rt_update_fun(Time::internal_time(), Old::histogram_type() | undefined, NewV::number(), Size::non_neg_integer(), BaseKey::histogram_rt:base_key())
+-spec histogram_rt_update_fun(Time::internal_time(), Old::histogram_type() | undefined, NewV::no_op | number(), Size::non_neg_integer(), BaseKey::histogram_rt:base_key())
         -> histogram_rt:histogram().
-histogram_rt_update_fun(_Time, undefined, New, Size, BaseKey) ->
+histogram_rt_update_fun(Time, undefined, New, Size, BaseKey) ->
     Hist = histogram_rt:create(Size, BaseKey),
-    histogram_rt:add(New, Hist);
+    histogram_rt_update_fun(Time, Hist, New, Size, BaseKey);
+histogram_rt_update_fun(_Time, Hist, no_op, _Size, _BaseKey) ->
+    Hist;
 histogram_rt_update_fun(_Time, Hist, New, _Size, _BaseKey) ->
     histogram_rt:add(New, Hist).
 

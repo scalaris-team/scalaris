@@ -13,7 +13,9 @@
 %   limitations under the License.
 
 %% @author Maximilian Michels <michels@zib.de>
-%% @doc For active load balancing: lb_info contains information about a node
+%% @doc For active load balancing:
+%%          - contains information about a node
+%%          - provides functions to evaluate an lb operation
 %% @version $Id$
 -module(lb_info).
 -author('michels@zib.de').
@@ -22,20 +24,22 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--export([new/1]).
+-export([new/1, is_valid/1]).
 -export([get_load/1, get_reqs/1, get_node/1, get_succ/1, get_items/1, get_time/1]).
--export([is_succ/2, neighbors/2, get_target_load/3, get_target_load/5]).
+-export([is_succ/2, neighbors/2, get_target_load/3, get_target_load/4]).
 %% without dht size
--export([get_load_change_slide/3, get_load_change_jump/4]).
-%% with dht size available
 -export([get_load_change_slide/4, get_load_change_jump/5]).
+%% with dht size available
+-export([get_load_change_slide/5, get_load_change_jump/6]).
 -export([get_oldest_data_time/1]).
+% util
+-export([bound/3]).
 
 -ifdef(with_export_type_support).
 -export_type([lb_info/0]).
 -endif.
 
--type load() :: number().
+-type load() :: unknown | number().
 
 -record(lb_info, {load  = unknown                   :: unknown | load(),
                   reqs  = unknown                   :: unknown | load(),
@@ -47,15 +51,27 @@
 
 -opaque lb_info() :: #lb_info{}.
 
-%% Convert node details to lb_info
+%% @doc Creates a new record to hold essential load balancing values
 -spec new(NodeDetails::node_details:node_details()) -> lb_info().
 new(NodeDetails) ->
     Items = node_details:get(NodeDetails, load),
-    Load = case config:read(lb_active_load_metric) of
+    %% lb_stats:get_load_metric(), can be unknown
+    SystemLoad = node_details:get(NodeDetails, load2),
+    %% lb_stats:get_request_metric(), can be unknown
+    Requests = node_details:get(NodeDetails, load3),
+    Load = case config:read(lb_active_balance) of
                items -> Items;
-               _ -> lb_active:get_load_metric()
+               requests ->
+                   case config:read(lb_active_fall_back_to_items) of
+                       true ->
+                           try
+                               (erlang:round(math:sqrt(Items)) + Requests) * SystemLoad
+                           catch
+                               error:badarith -> unknown
+                           end;
+                       _ -> Requests
+                   end
            end,
-    Requests = lb_active:get_request_metric(),
     #lb_info{load  = Load,
              reqs  = Requests,
              items = Items,
@@ -88,67 +104,71 @@ is_succ(Succ, Node) ->
 neighbors(Node1, Node2) ->
     is_succ(Node1, Node2) orelse is_succ(Node2, Node1).
 
+-spec is_valid(Info::lb_info()) -> boolean().
+is_valid(Info) -> is_number(get_load(Info)).
+
 %% @doc The number of db entries the heavy node will give to the light node
--spec get_target_load(Op::slide | jump, HeavyNode::lb_info(), LightNode::lb_info()) -> non_neg_integer().
-get_target_load(JumpOrSlide, HeavyNode, LightNode) ->
-    case config:read(lb_active_balance_metric) of
-        items -> get_target_load(JumpOrSlide,
-                                 get_items(HeavyNode), 1,
-                                 get_items(LightNode), 1);
-        requests -> get_target_load(JumpOrSlide,
-                                    get_reqs(HeavyNode), 1,
-                                    get_reqs(LightNode), 1);
-        none -> get_target_load(JumpOrSlide,
-                                get_items(HeavyNode), get_load(HeavyNode),
-                                get_items(LightNode), get_load(LightNode))
-    end.
+-spec get_target_load(items | requests, Op::slide | jump, HeavyNode::lb_info(), LightNode::lb_info()) -> non_neg_integer().
+get_target_load(items, JumpOrSlide, HeavyNode, LightNode) ->
+    get_target_load(JumpOrSlide, get_items(HeavyNode), get_items(LightNode));
+get_target_load(requests, JumpOrSlide, HeavyNode, LightNode) ->
+    get_target_load(JumpOrSlide, get_reqs(HeavyNode), get_reqs(LightNode)).
 
 %% @doc The number of db entries the heavy node will give to the light node (weighted)
--spec get_target_load(Op::slide | jump, HeavyNode::load(), WeightHeavy::number(),
-                                        LightNode::load(), WeightLight::number())
+-spec get_target_load(Op::slide | jump, HeavyNode::load(), LightNode::load())
                     -> non_neg_integer().
-get_target_load(slide, HeavyNode, WeightHeavy, LightNode, WeightLight) ->
+get_target_load(_Op, unknown, _LightNode) -> 0;
+get_target_load(_Op, _HeavyNode, unknown) -> 0;
+get_target_load(slide, HeavyNode, LightNode) ->
     TotalItems = HeavyNode + LightNode,
     AvgItems = trunc(TotalItems) div 2,
-    Factor = try WeightLight / WeightHeavy catch error:badarith -> 1 end,
-    ItemsToShed = HeavyNode - trunc(Factor * AvgItems),
+    ItemsToShed = HeavyNode - AvgItems,
     bound(0, ItemsToShed, HeavyNode);
-get_target_load(jump, HeavyNode, WeightHeavy, _LightNode, WeightLight) ->
+get_target_load(jump, HeavyNode, _LightNode) ->
     AvgItems = trunc(HeavyNode) div 2,
-    Factor = try WeightLight / WeightHeavy catch error:badarith -> 1 end,
-    ItemsToShed = HeavyNode - trunc(Factor * AvgItems),
+    ItemsToShed = HeavyNode - AvgItems,
     bound(0, ItemsToShed, HeavyNode).
 
 %% @doc Calculates the change in Variance
 %% no dht size available
--spec get_load_change_slide(TakenLoad::non_neg_integer(), HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::number().
-get_load_change_slide(TakenLoad, HeavyNode, LightNode) -> 
-    get_load_change_slide(TakenLoad, 1, HeavyNode, LightNode).
+-spec get_load_change_slide(Metric::items | requests, TakenLoad::non_neg_integer(),
+                            HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::number().
+get_load_change_slide(Metric, TakenLoad, HeavyNode, LightNode) ->
+    get_load_change_slide(Metric, TakenLoad, 1, HeavyNode, LightNode).
 
 %% @doc Calculates the change in Variance
 %% dht size available
--spec get_load_change_slide(TakenLoad::non_neg_integer(), DhtSize::pos_integer(), HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::number().
-get_load_change_slide(TakenLoad, DhtSize, HeavyNode, LightNode) ->
-    get_load_change_diff(DhtSize, get_load(HeavyNode), get_load(HeavyNode) - TakenLoad) +
-        get_load_change_diff(DhtSize, get_load(LightNode), get_load(LightNode) + TakenLoad).
+-spec get_load_change_slide(Metric::items | requests, TakenLoad::non_neg_integer(), DhtSize::pos_integer(),
+                            HeavyNode::lb_info(), LightNode::lb_info()) -> LoadChange::number().
+get_load_change_slide(Metric, TakenLoad, DhtSize, HeavyNode, LightNode) ->
+    MetricFun = get_metric_fun(Metric),
+    get_load_change_diff(DhtSize, MetricFun(HeavyNode), MetricFun(HeavyNode) - TakenLoad) +
+        get_load_change_diff(DhtSize, MetricFun(LightNode), MetricFun(LightNode) + TakenLoad).
 
 %% @doc Calculates the change in Variance
 %% no dht size available
--spec get_load_change_jump(TakenLoad::non_neg_integer(), HeavyNOde::lb_info(), LightNode::lb_info(), LightNodeSucc::lb_info()) -> LoadChange::number().
-get_load_change_jump(TakenLoad, HeavyNode, LightNode, LightNodeSucc) ->
-    get_load_change_jump(TakenLoad, 1, HeavyNode, LightNode, LightNodeSucc).
+-spec get_load_change_jump(Metric::items | requests, TakenLoad::non_neg_integer(),
+                           HeavyNode::lb_info(), LightNode::lb_info(), LightNodeSucc::lb_info()) -> LoadChange::number().
+get_load_change_jump(Metric, TakenLoad, HeavyNode, LightNode, LightNodeSucc) ->
+    get_load_change_jump(Metric, TakenLoad, 1, HeavyNode, LightNode, LightNodeSucc).
 
 %% @doc Calculates the change in Variance
 %% dht size available
--spec get_load_change_jump(non_neg_integer(), pos_integer(), lb_info(), lb_info(), lb_info()) -> LoadChange::number().
-get_load_change_jump(TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc) ->
-    get_load_change_diff(DhtSize, get_load(LightNode), TakenLoad) +
-        get_load_change_diff(DhtSize, get_load(LightNodeSucc), get_load(LightNodeSucc) + get_load(LightNode)) +
-        get_load_change_diff(DhtSize, get_load(HeavyNode), get_load(HeavyNode) - TakenLoad).
+-spec get_load_change_jump(Metric::items | requests, TakenLoad::non_neg_integer(), DhtSize::pos_integer(),
+                           HeavyNode::lb_info(), LightNode::lb_info(), LightNodeSucc::lb_info()) -> LoadChange::number().
+get_load_change_jump(Metric, TakenLoad, DhtSize, HeavyNode, LightNode, LightNodeSucc) ->
+    MetricFun = get_metric_fun(Metric),
+    get_load_change_diff(DhtSize, MetricFun(LightNode), TakenLoad) +
+        get_load_change_diff(DhtSize, MetricFun(LightNodeSucc), MetricFun(LightNodeSucc) + MetricFun(LightNode)) +
+        get_load_change_diff(DhtSize, MetricFun(HeavyNode), MetricFun(HeavyNode) - TakenLoad).
 
--spec get_load_change_diff(pos_integer(), non_neg_integer(), non_neg_integer()) -> number().
-get_load_change_diff(DhtSize, OldItemLoad, NewItemLoad) ->
-    NewItemLoad * NewItemLoad / DhtSize - OldItemLoad * OldItemLoad / DhtSize.
+-spec get_load_change_diff(pos_integer(), non_neg_integer(), non_neg_integer()) -> load().
+get_load_change_diff(DhtSize, OldLoad, NewLoad) ->
+    NewLoad * NewLoad / DhtSize - OldLoad * OldLoad / DhtSize.
+
+-spec get_metric_fun(Metric::items | requests) -> fun((lb_info()) -> load()).
+get_metric_fun(items)    -> fun get_items/1;
+get_metric_fun(requests) -> fun get_reqs/1.
 
 -spec get_oldest_data_time([lb_info()]) -> OldestTime::erlang:timestamp().
 get_oldest_data_time([Node | Other]) ->

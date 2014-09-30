@@ -1,0 +1,5 @@
+NOTE:
+For a full SELinux policy, the typical Scalaris ports need to be added to the scalaris_port_t type:
+
+semanage port -a -t scalaris_port_t -p tcp 14194-14198
+semanage port -a -t scalaris_port_t -p tcp 8000-8004

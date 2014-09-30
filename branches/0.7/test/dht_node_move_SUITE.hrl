@@ -75,9 +75,13 @@ groups() ->
          test_slide_adjacent,
          test_slide_conflict
         ],
-    SlideIllegally =
+    SlideIllegallyTestCases =
         [
          test_slide_illegally
+        ],
+    JumpSlideTestCases =
+        [
+         tester_test_jump
         ],
     [
       {send_to_pred, Config, SendToPredTestCases},
@@ -86,7 +90,9 @@ groups() ->
       {send_to_succ_incremental, ConfigInc, SendToSuccTestCases},
       {send_to_both, Config, SendToBothTestCases},
       {send_to_both_incremental, ConfigInc2, SendToBothTestCases},
-      {slide_illegally, Config, SlideIllegally}
+      {slide_illegally, Config, SlideIllegallyTestCases},
+      {jump_slide, Config, JumpSlideTestCases},
+      {jump_slide_incremental, ConfigInc, JumpSlideTestCases}
     ]
       ++
 %%         unittest_helper:create_ct_groups(test_cases(), [{tester_symm4_slide_pred_send_load_timeouts_pred_incremental, [sequence, {repeat_until_any_fail, forever}]}]).
@@ -96,8 +102,7 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 init_per_group(Group, Config) ->
     unittest_helper:init_per_group(Group, Config).
@@ -708,14 +713,23 @@ generate_slide_variation(SlideConf) ->
 
 -spec select_from_nodes(Selector::node_type(), Nodes::node_tuple()) -> node:node_type().
 select_from_nodes(Selector, Nodes) ->
-    N =
-        case Selector of
-            predspred -> 1;
-            pred -> 2;
-            node -> 3;
-            succ -> 4
-        end,
+    N = selector_to_idx(Selector),
     element(N, Nodes).
+
+-spec select_from_nodes(Node::node_type(), Direction::pred | succ, Nodes::node_tuple()) -> node:node_type().
+select_from_nodes(Node, Direction, Nodes) ->
+    NIdx = selector_to_idx(Node),
+    Idx = case Direction of
+              pred -> NIdx - 1;
+              succ -> NIdx + 1
+          end,
+    element(Idx, Nodes).
+
+-spec selector_to_idx(node_type()) -> 1..4.
+selector_to_idx(predspred) -> 1;
+selector_to_idx(pred) -> 2;
+selector_to_idx(node) -> 3;
+selector_to_idx(succ) -> 4.
 
 get_node_details(DhtNode) ->
     comm:send(comm:make_global(DhtNode), {get_node_details, comm:this(), [node, pred, succ]}),
@@ -733,7 +747,15 @@ get_node_details(DhtNode) ->
 -spec get_predspred_pred_node_succ(DhtNode::pid()) -> node_tuple().
 get_predspred_pred_node_succ(DhtNode) ->
     {Pred, Node, Succ} = get_node_details(DhtNode),
-    {PredsPred, _Pred2, _Node2} = get_node_details(node:pidX(Pred)),
+    {PredsPred, Pred2, Node2} = get_node_details(node:pidX(Pred)),
+    % the nodes' RM info must be correct after each slide and thus before the
+    % next one (which is when this function is called)
+    ?equals_w_note(Pred, Pred2, wrong_pred_info_in_node),
+    ?equals_w_note(Node2, Node, wrong_succ_info_in_pred),
+
+    % make sure, all pred/succ info is correct:
+    ?equals(admin:check_ring(), ok),
+
     {PredsPred, Pred, Node, Succ}.
 
 -spec set_breakpoint(Pid::pid(), gen_component:bp_name()) -> ok.
@@ -811,7 +833,13 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
               PidLocal1 = comm:make_local(node:pidX(Node1)),
               PidLocal2 = comm:make_local(node:pidX(Node2)),
               ?proto_sched(start),
-              ct:pal("Beginning ~p, ~p", [Tag1, Tag2]),
+              ct:pal("Beginning~n"
+                    " ~p~n  ~s (~p) with~n  ~s (~p)~n  to ~p,~n"
+                    " ~p~n  ~s (~p) with~n  ~s (~p)~n  to ~p",
+                     [Tag1, Slide1#slideconf.node, Node1, Direction1,
+                      select_from_nodes(Slide1#slideconf.node, Direction1, Nodes), TargetId1,
+                      Tag2, Slide2#slideconf.node, Node2, Direction2,
+                      select_from_nodes(Slide2#slideconf.node, Direction2, Nodes), TargetId2]),
               %% We use breakpoints to assure simultaneous slides.
               %% As these don't work with the proto scheduler, we test the timing of the slides using
               %% a callback function instead. The function sends out messages begin_of_slide and
@@ -850,8 +878,10 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
                   end,
               Result1 = ReceiveResultFun(),
               Result2 = ReceiveResultFun(),
-              ?proto_sched(stop),
               ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
+              ?proto_sched(stop),
+              _ = get_predspred_pred_node_succ(DhtNode),
+              ct:pal("checked pred/succ info"),
               VerifyFun(Result1, Result2, slide_interleaving()),
               timer:sleep(10)
           end || Slide1 <- SlideVariations1, Slide2 <- SlideVariations2],
@@ -873,9 +903,14 @@ test_slide_adjacent(_Config) ->
                 unittest_helper:check_ring_load(440),
                 unittest_helper:check_ring_data(),
                 %% both slides should be successfull
-                ?assert(Result1 =:= ok andalso Result2 =:= ok
-                        orelse %% rarely, one slides fails because the neighbor information hasn't been updated yet
-                          (Result1 =:= wrong_pred_succ_node) xor (Result2 =:= wrong_pred_succ_node))
+                ?assert_w_note(
+                    Result1 =:= ok andalso Result2 =:= ok
+                        orelse
+                        %% rarely, one slide fails because the neighbour
+                        %% information hasn't been updated yet
+                          ((Result1 =:= wrong_pred_succ_node) xor
+                               (Result2 =:= wrong_pred_succ_node)),
+                    [{result1, Result1}, {result2, Result2}])
         end,
     Actions =
         [{
@@ -941,11 +976,14 @@ test_slide_conflict(_Config) ->
                 %% we test for interleaving as we cannot use breakpoints.
                 case Interleaved of
                     true ->
-                        ?assert(not(Result1 =:= ok andalso Result2 =:= ok));
+                        ?assert_w_note(Result1 =/= ok orelse Result2 =/= ok,
+                                       [{result1, Result1}, {result2, Result2}]);
                     false ->
                         Vals = [ok, ongoing_slide, target_id_not_in_range, wrong_pred_succ_node],
-                        ?assert(lists:member(Result1, Vals)),
-                        ?assert(lists:member(Result2, Vals))
+                        ?assert_w_note(lists:member(Result1, Vals),
+                                       {result1, Result1, 'not', Vals}),
+                        ?assert_w_note(lists:member(Result2, Vals),
+                                       {result2, Result2, 'not', Vals})
                 end
         end,
     Actions = [
@@ -998,10 +1036,80 @@ test_slide_illegally(_Config) ->
               ct:pal("Beginning ~p", [Tag]),
               ?proto_sched(start),
               comm:send(node:pidX(Node), {move, start_slide, Direction, TargetId, {slide, Direction, Tag}, comm:this()}),
-    trace_mpath:thread_yield(),
+              trace_mpath:thread_yield(),
               receive
                   ?SCALARIS_RECV({move, result, {slide, Direction, Tag}, target_id_not_in_range}, ok);
                   ?SCALARIS_RECV(X, ?ct_fail("Illegal Slide ~p", [X]))
               end,
               ?proto_sched(stop)
           end || DhtNode <- DhtNodes, Slide <- Slides].
+
+%% @doc lets the tester run prop_jump_slide with different keys
+tester_test_jump(_Config) ->
+    tester:test(?MODULE, prop_jump_slide, 1, _Iterations=100).
+
+%% @doc tests the jump operation.
+-spec prop_jump_slide(TargetKey::?RT:key()) -> true.
+prop_jump_slide(TargetKey) ->
+    DhtNodes = pid_groups:find_all(dht_node),
+    %% get a random node
+    JumpingNode = util:randomelem(DhtNodes),
+    %% check if we chose a valid key
+    InvalidTarget = key_taken_as_node_id(TargetKey),
+    perform_jump(JumpingNode, TargetKey, InvalidTarget),
+    true.
+
+-spec perform_jump(JumpingNode::comm:erl_local_pid(), ?RT:key(), InvalidTarget::boolean()) -> ok.
+perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
+    %% get neighborhood to check if jump will be a slide
+    comm:send_local(JumpingNode, {get_state, comm:this(), neighbors}),
+    Neighbors = fun() -> receive ?SCALARIS_RECV({get_state_response, Neighb}, Neighb) end end(),
+    case intervals:in(TargetKey, nodelist:node_range(Neighbors)) orelse
+         intervals:in(TargetKey, nodelist:succ_range(Neighbors)) of
+        true -> ct:pal("Jump will be converted to slide.");
+        _ -> ok
+    end,
+    %% debug output in case of pending slide/jump operations
+    comm:send_local(JumpingNode, {get_node_details, comm:this(), [slide_pred, slide_succ]}),
+    SlideInfo = fun() -> receive ?SCALARIS_RECV({get_node_details_response, Details}, Details) end end(),
+    [{slide_pred, SlidePred}, {slide_succ, SlideSucc}] = SlideInfo,
+    ct:pal("SlidePred: ~p SlideSucc: ~p", [SlidePred, SlideSucc]),
+
+    %% start jump
+    ct:pal("Node ~p jumping to ~p", [JumpingNode, TargetKey]),
+    ?proto_sched(start),
+    comm:send_local(JumpingNode, {move, start_jump, TargetKey, prop_jump_slide, comm:this()}),
+    timer:sleep(10),
+    trace_mpath:thread_yield(),
+    Result = fun() ->
+                receive
+                    ?SCALARIS_RECV({move, result, prop_jump_slide, Res}, Res)
+                end
+             end(),
+    ct:pal("Result: ~p~n", [Result]),
+    ?proto_sched(stop),
+    %% check result
+    if Result =:= wrong_pred_succ_node ->
+            ct:pal("Retrying because of wrong_pred_succ_node"),
+            perform_jump(JumpingNode, TargetKey, InvalidTarget);
+       InvalidTarget ->
+            ?equals(Result, ok),
+            %% check if the invalid target is really taken by another node
+            ?assert(key_taken_as_node_id(TargetKey)),
+            %% and that it is different from ours
+            comm:send_local(JumpingNode, {get_state, comm:this(), node_id}),
+            MyId = fun() -> receive ?SCALARIS_RECV({get_state_response, Id}, Id) end end(),
+            ?compare(fun erlang:'=/='/2, MyId, TargetKey);
+       true ->
+            ?equals(Result, ok)
+    end.
+
+-spec key_taken_as_node_id(?RT:key()) -> boolean().
+key_taken_as_node_id(Key) ->
+    DhtNodes = pid_groups:find_all(dht_node),
+    lists:any(fun(Node) ->
+                %% get node information
+                comm:send_local(Node, {get_state, comm:this(), node_id}),
+                NodeId = fun() -> receive ?SCALARIS_RECV({get_state_response, Id}, Id) end end(),
+                NodeId =:= Key
+              end, DhtNodes).

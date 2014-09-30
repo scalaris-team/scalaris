@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.7.0
+%define pkg_version 0.7.1
 %define scalaris_user scalaris
 %define scalaris_group scalaris
 %define scalaris_home /var/lib/scalaris
@@ -32,18 +32,25 @@ Requires:       erlang-js
 BuildRequires:  pkgconfig
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
+%if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
+# https://fedoraproject.org/wiki/Packaging:Systemd?rd=Packaging:Guidelines:Systemd
+%define with_systemd 1
+BuildRequires:  systemd
+Requires:       systemd
+BuildRequires:  selinux-policy-devel
+Requires:       policycoreutils, libselinux-utils
+Requires(post): selinux-policy-base, policycoreutils
+Requires(postun): policycoreutils
+%else
+%define with_systemd 0
+%if 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
+# provides runuser for the init.d script
+BuildRequires:  util-linux-ng >= 2.17
+Requires:       util-linux-ng >= 2.17
 %endif
-
-##########################################################################################
-## Mandrake, Mandriva
-##########################################################################################
-%if 0%{?mandriva_version} || 0%{?mdkversion}
-BuildRequires:  pkgconfig
-BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-parsetools, erlang-ssl, erlang-tools, erlang-xmerl, erlang-test_server
-Requires:       erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-inets, erlang-ssl, erlang-xmerl
-Suggests:       %{name}-java, %{name}-doc
-Requires(pre):  shadow-utils
-Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
+%endif
+BuildRequires:  sudo
+Requires:       sudo
 %endif
 
 ###########################################################################################
@@ -61,6 +68,17 @@ Suggests:       %{name}-java, %{name}-doc
 Requires(pre):  pwdutils
 PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 Requires(pre):  %insserv_prereq
+# keep systemd disabled for openSUSE 13.1 due to the runuser bug (see below)
+%if 0%{?suse_version} > 1310
+# https://en.opensuse.org/openSUSE:Systemd_packaging_guidelines
+%define with_systemd 1
+BuildRequires:  systemd
+%{?systemd_requires}
+%else
+%define with_systemd 0
+%endif
+BuildRequires:  sudo
+Requires:       sudo
 %endif
 
 %description
@@ -82,6 +100,8 @@ Documentation for Scalaris including its User-Dev-Guide.
 %setup -q -n %{name}-%{version}
 
 %build
+# NOTE: disable runuser on openSUSE 13.1 because of the following bug
+# see https://bugzilla.novell.com/show_bug.cgi?id=892079
 ./configure --prefix=%{_prefix} \
     --exec-prefix=%{_exec_prefix} \
     --bindir=%{_bindir} \
@@ -95,6 +115,12 @@ Documentation for Scalaris including its User-Dev-Guide.
     --sharedstatedir=%{_sharedstatedir} \
     --mandir=%{_mandir} \
     --infodir=%{_infodir} \
+%if 0%{?suse_version} == 1310
+    --disable-runuser \
+%endif
+%if 0%{?with_systemd}
+    --with-systemd=%{_unitdir} \
+%endif
     --docdir=%{_docdir}/scalaris
 make all
 make doc
@@ -103,11 +129,29 @@ make doc
 rm -rf $RPM_BUILD_ROOT
 make install DESTDIR=$RPM_BUILD_ROOT
 make install-doc DESTDIR=$RPM_BUILD_ROOT
+%if 0%{?with_systemd}
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+cd contrib/systemd
+sed -e "s|/var/lib/scalaris|%{scalaris_home}|g" \
+    -i scalaris.fc
+make -f /usr/share/selinux/devel/Makefile
+install -d %{buildroot}%{_datadir}/selinux/packages
+install -m 644 scalaris.pp %{buildroot}%{_datadir}/selinux/packages/
+cd -
+%endif
+%endif
 
 %pre
 # note: use "-r" instead of "--system" for old systems like CentOS5, RHEL5
 getent group %{scalaris_group} >/dev/null || groupadd -r %{scalaris_group}
 getent passwd %{scalaris_user} >/dev/null || mkdir -p %{scalaris_home} && useradd -r -g %{scalaris_group} -d %{scalaris_home} -M -s /sbin/nologin -c "user for scalaris" %{scalaris_user} && chown %{scalaris_user}:%{scalaris_group} %{scalaris_home}
+
+%if 0%{?suse_version}
+%if 0%{?with_systemd}
+%service_add_pre scalaris.service scalaris-first.service
+%endif
+%endif
+
 exit 0
 
 %post
@@ -116,42 +160,71 @@ if grep -e '^cookie=\w\+' %{_sysconfdir}/scalaris/scalarisctl.conf > /dev/null 2
 fi
 
 %if 0%{?suse_version}
-%fillup_and_insserv -f scalaris
+%if 0%{?with_systemd}
+%service_add_post scalaris.service scalaris-first.service
+%else
+%fillup_and_insserv -f scalaris scalaris-first
 %endif
-%if 0%{?fedora_version}
+%endif
+
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+%if 0%{?with_systemd}
+semodule -i %{_datadir}/selinux/packages/scalaris.pp || :
+if [ "$1" -le 1 ] ; then # First install
+  semanage port -a -t scalaris_port_t -p tcp 14194-14198 || :
+  semanage port -a -t scalaris_port_t -p tcp 8000-8004 || :
+fi
+/sbin/restorecon -R %{scalaris_home} || :
+%systemd_post scalaris.service scalaris-first.service
+%else
 /sbin/chkconfig --add scalaris
 %endif
-%if 0%{?mandriva_version}
-%_post_service scalaris
 %endif
 
 %preun
 %if 0%{?suse_version}
-%stop_on_removal scalaris
+%if 0%{?with_systemd}
+%service_del_preun scalaris.service scalaris-first.service
+%else
+%stop_on_removal scalaris scalaris-first
 %endif
-%if 0%{?fedora_version}
-# 0 packages after uninstall -> pkg is about to be removed
-  if [ "$1" = "0" ] ; then
+%endif
+
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+%if 0%{?with_systemd}
+%systemd_preun scalaris.service scalaris-first.service
+%else
+  if [ "$1" -eq 0 ] ; then # final removal
     /sbin/service scalaris stop >/dev/null 2>&1
     /sbin/chkconfig --del scalaris
   fi
 %endif
-%if 0%{?mandriva_version}
-%_preun_service scalaris
 %endif
 
 %postun
 %if 0%{?suse_version}
-%restart_on_update scalaris
+%if 0%{?with_systemd}
+%service_del_postun scalaris.service scalaris-first.service
+%else
+%restart_on_update scalaris scalaris-first
 %insserv_cleanup
 %endif
-%if 0%{?fedora_version}
-# >=1 packages after uninstall -> pkg was updated -> restart
-if [ "$1" -ge "1" ] ; then
+%endif
+
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+%if 0%{?with_systemd}
+%systemd_postun_with_restart scalaris.service scalaris-first.service
+if [ "$1" -eq 0 ]; then # final removal
+  semanage port -d -t scalaris_port_t -p tcp 14194-14198 2>/dev/null || :
+  semanage port -d -t scalaris_port_t -p tcp 8000-8004 2>/dev/null || :
+  semodule -r scalaris || :
+  /sbin/restorecon -R %{scalaris_home} || :
+fi
+%else
+if [ "$1" -ge 1 ] ; then  # pkg was updated -> restart
   /sbin/service scalaris try-restart >/dev/null 2>&1 || :
 fi
 %endif
-%if 0%{?mandriva_version}
 %endif
 
 %clean
@@ -168,11 +241,24 @@ rm -rf $RPM_BUILD_ROOT
 %{_prefix}/lib/scalaris
 %exclude %{_prefix}/lib/scalaris/docroot/doc
 %attr(-,scalaris,scalaris) %{_localstatedir}/log/scalaris
+%if 0%{?with_systemd}
+%{_unitdir}/scalaris.service
+%{_unitdir}/scalaris-first.service
+%dir %{_sysconfdir}/conf.d
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/conf.d/scalaris-first
+%if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
+%attr(0600,root,root) %{_datadir}/selinux/packages/scalaris.pp
+%endif
+%else
 %{_sysconfdir}/init.d/scalaris
+%{_sysconfdir}/init.d/scalaris-first
 %{_sbindir}/rcscalaris
-%attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/initd.conf
-%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.cfg
+%attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/initd-first.conf
+%endif
+%attr(-,scalaris,scalaris) %dir %{_sysconfdir}/scalaris
+%attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris.cfg
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalaris.local.cfg
 %attr(-,scalaris,scalaris) %config %{_sysconfdir}/scalaris/scalaris.local.cfg.example
 %attr(-,scalaris,scalaris) %config(noreplace) %{_sysconfdir}/scalaris/scalarisctl.conf

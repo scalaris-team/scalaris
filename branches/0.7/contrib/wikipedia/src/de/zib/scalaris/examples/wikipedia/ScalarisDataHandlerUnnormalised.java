@@ -397,7 +397,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             timeAtStart += (System.currentTimeMillis() - timeAtRenderStart);
             // note: no need to normalise the pages, we will do so during the write/read key generation
             oldCats = wikiModel.getCategories().keySet();
-            oldTpls = wikiModel.getTemplates();
+            oldTpls = wikiModel.getTemplatesNoMagicWords();
             if (Options.getInstance().WIKI_USE_BACKLINKS) {
                 oldLnks = wikiModel.getLinks();
             } else {
@@ -442,7 +442,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
                                 nsObject);
                     }
                 }, ScalarisOpType.CATEGORY_PAGE_LIST, ScalarisOpType.CATEGORY_PAGE_COUNT);
-        final Set<String> newTpls = wikiModel.getTemplates();
+        final Set<String> newTpls = wikiModel.getTemplatesNoMagicWords();
         Difference tplDiff = new Difference(oldTpls, newTpls,
                 new Difference.GetPageListKey() {
                     @Override
@@ -487,7 +487,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
             //  PAGE LISTS UPDATE, step 1: append to / remove from old lists
             executor.addAppend(ScalarisOpType.SHORTREV_LIST, getRevListKey(title0, nsObject), new ShortRevision(newRev), null, null);
             if (articleCountChange != 0) {
-                executor.addIncrement(ScalarisOpType.ARTICLE_COUNT, getArticleCountKey(), articleCountChange);
+                executor.addIncrement(ScalarisOpType.ARTICLE_COUNT, getArticleCountKey(), articleCountChange, normTitleStr);
             }
 
             // write differences (categories, templates, backlinks)
@@ -553,7 +553,7 @@ public class ScalarisDataHandlerUnnormalised extends ScalarisDataHandler {
         MyScalarisOpExecWrapper executor = new MyScalarisOpExecWrapper(
                 executor0);
         
-        executor.addIncrement(ScalarisOpType.EDIT_STAT, getStatsPageEditsKey(), 1);
+        executor.addIncrement(ScalarisOpType.EDIT_STAT, getStatsPageEditsKey(), 1, getStatsPageEditsKey());
         try {
             executor.getExecutor().run();
         } catch (Exception e) {

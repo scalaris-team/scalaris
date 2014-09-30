@@ -70,11 +70,11 @@ get(job, #state{job = X}) ->
 get(client, #state{client = X}) ->
     X.
 
--spec set(state(), [{id, ?RT:key()}]) -> state();
-         (state(), [{acked, intervals:interval()}]) -> state();
-         (state(), [{round, non_neg_integer()}]) -> state();
-         (state(), [{outstanding, outstanding()}]) -> state();
-         (state(), [{client, comm:mypid()}]) -> state().
+-spec set(state(), [{id, ?RT:key()} |
+                        {acked, intervals:interval()} |
+                        {round, non_neg_integer()} |
+                        {outstanding, outstanding()} |
+                        {client, comm:mypid()}]) -> state().
 set(State, []) ->
     State;
 set(State, [{id, Id} | T]) ->

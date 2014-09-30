@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.7.0
+%define pkg_version 0.7.1
 %define scalaris_user scalaris
 %define scalaris_group scalaris
 %define scalaris_home /var/lib/scalaris
@@ -24,7 +24,7 @@ BuildRequires:  ruby >= 1.8
 %if 0%{?fedora_version} || 0%{?rhel_version} || 0%{?centos_version}
 BuildRequires:  erlang-erts >= R13B01, erlang-kernel, erlang-stdlib, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl, erlang-os_mon
 BuildRequires:  pkgconfig
-%if 0%{?fedora_version} >= 19
+%if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 BuildRequires:  ruby(release) >= 1.8
 %else
 BuildRequires:  ruby(abi) >= 1.8
@@ -43,18 +43,6 @@ BuildRequires:  ruby(abi) >= 1.8
 %define with_python3 1
 BuildRequires:  python3-setuptools python-tools
 %endif
-%endif
-
-##########################################################################################
-## Mandrake, Mandriva
-##########################################################################################
-%if 0%{?mandriva_version} || 0%{?mdkversion}
-# note: erlang is still needed for configure
-BuildRequires:  erlang-base >= R13B01, erlang-compiler, erlang-crypto, erlang-edoc, erlang-inets, erlang-ssl, erlang-tools, erlang-xmerl
-BuildRequires:  pkgconfig
-%define with_python 1
-%define with_python_doc_html 0
-%define with_python_doc_pdf 0
 %endif
 
 ###########################################################################################
@@ -88,7 +76,7 @@ BuildRequires:  pkg-config
 %if 0%{?suse_version} > 1210
 BuildRequires:  python3-2to3
 %endif
-%if 0%{?suse_version} >= 1130 
+%if %{?suse_version} >= 1130 && %{?suse_version} <= 1310
 BuildRequires:  ruby(abi) >= 1.8
 %endif
 %endif
@@ -131,10 +119,6 @@ BuildArch:  noarch
 Requires(pre):  shadow-utils
 Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
 %endif
-%if 0%{?mandriva_version} || 0%{?mdkversion}
-Requires(pre):  shadow-utils
-Requires(pre):  /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
-%endif
 %if 0%{?suse_version}
 Requires(pre):  pwdutils
 PreReq:         /usr/sbin/groupadd /usr/sbin/useradd /bin/mkdir /bin/chown
@@ -146,14 +130,10 @@ Java Bindings and command line client for scalaris
 %package -n ruby-scalaris
 Summary:    Ruby-API and Ruby-client for scalaris
 Group:      Productivity/Databases/Clients
-%if 0%{?mandriva_version} || 0%{?mdkversion}
-Requires:   ruby >= 1.8
-%else
-%if 0%{?fedora_version} >= 19
+%if 0%{?fedora_version} >= 19 || 0%{?rhel_version} >= 700 || 0%{?centos_version} >= 700
 Requires:   ruby(release) >= 1.8
 %else
 Requires:   ruby(abi) >= 1.8
-%endif
 %endif
 Requires:   rubygems
 Requires:   rubygem-json >= 1.4.0
@@ -264,6 +244,7 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_docdir}/scalaris/
 %doc %{_docdir}/scalaris/java-api
 %{_sysconfdir}/init.d/scalaris-monitor
+%{_sysconfdir}/init.d/scalaris-first-monitor
 
 %files -n ruby-scalaris
 %defattr(-,root,root,-)

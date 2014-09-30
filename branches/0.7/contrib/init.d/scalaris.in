@@ -21,7 +21,7 @@ prefix=@prefix@
 exec_prefix=@exec_prefix@
 datarootdir=@datarootdir@
 SCREEN=@SCREEN@
-SU=@SU@
+SUDO=@SUDO@
 RUNUSER=@RUNUSER@
 
 # Source config.
@@ -37,15 +37,16 @@ PID_DS="@localstatedir@/run/scalaris_${SCALARIS_NODE}.pid"
 
 LOG_DS="@localstatedir@/log/scalaris/initd_${SCALARIS_NODE}.log"
 
-SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen"
+SCALARISCTL="@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -d --screen ${SCALARIS_ADDITIONAL_PARAMETERS}"
 
-# For SELinux we need to use 'runuser' not 'su'
+# For SELinux we need to use 'runuser' not 'sudo'
 if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
     SU="$RUNUSER"
+    SU_CMD="$RUNUSER $SCALARIS_USER -s /bin/bash -c"
 else
-    SU="$SU"
+    SU="$SUDO"
+    SU_CMD="$SUDO -u $SCALARIS_USER -H /bin/bash -c"
 fi
-SU_CMD="$SU $SCALARIS_USER -s /bin/bash -c"
 
 start() {
     if [ -f "$PID_DS" ]; then

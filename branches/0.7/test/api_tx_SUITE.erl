@@ -78,8 +78,7 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
@@ -88,7 +87,7 @@ init_per_testcase(TestCase, Config) ->
         tester_encode_decode -> %% this case does not need a ring
             Config;
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
@@ -298,14 +297,14 @@ cleanup_drop_read_op_on_key(HashedKey) ->
     receive {drop_read_op_on_key, HashedKey, done} -> cleanup_drop_read_op_on_key(HashedKey)
     after 0 -> ok end.
 
--spec prop_encode_decode(Value::client_value()) -> boolean().
+-spec prop_encode_decode(Value::client_value()) -> true.
 prop_encode_decode(Value) ->
     Value =:= rdht_tx:decode_value(rdht_tx:encode_value(Value)).
 
 tester_encode_decode(_Config) ->
     tester:test(?MODULE, prop_encode_decode, 1, 10000).
 
--spec prop_read_not_existing(Key::client_key()) -> boolean().
+-spec prop_read_not_existing(Key::client_key()) -> true.
 prop_read_not_existing(Key) ->
     case api_tx:read(Key) of
         {fail, not_found} -> true;

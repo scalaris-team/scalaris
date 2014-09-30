@@ -95,7 +95,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
     /**
      * Version of the "Wikipedia on Scalaris" example implementation.
      */
-    public static final String version = "0.7.0";
+    public static final String version = "0.7.1";
 
     protected SiteInfo siteinfo = null;
     protected MyNamespace namespace = null;
@@ -1979,7 +1979,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         wikiModel.setPageName(titleParts[1]);
         page.setPreview(wikiModel.renderPageWithCache(content));
         page.setIncludes(wikiModel.getIncludes());
-        page.setTemplates(wikiModel.getTemplates());
+        page.setTemplates(wikiModel.getTemplatesNoMagicWords());
         page.addStats(wikiModel.getStats());
         page.getInvolvedKeys().addAll(wikiModel.getInvolvedKeys());
         page.setPage(content);

@@ -154,11 +154,7 @@ on({get_state_response, MyI}, State =
 
     % send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
-    MyIOtherKvTree =
-        lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
-                            % assume, KVs at the same node have the same version
-                            gb_trees:enter(KeyX, VersionX, TreeX)
-                    end, gb_trees:empty(), MyIOtherKvvList),
+    MyIOtherKvTree = make_other_kv_tree(MyIOtherKvvList),
 
     % allow the garbage collection to clean up the ReqKeys here:
     % also update the KvvList
@@ -168,8 +164,9 @@ on({get_state_response, MyI}, State =
 
 on({get_entries_response, EntryList}, State =
        #rr_resolve_state{ operation = {?key_upd, MyIOtherKvvList, []},
-                          dhtNodePid = DhtPid, fb_send_kvv_req = FbReqKVV,
+                          dhtNodePid = DhtPid, fb_send_kvv_req = [],
                           stats = Stats}) ->
+    % note: EntryList may not be unique! - it is made unique in shutdown/2 though
     KvvList = [entry_to_kvv(E) || E <- EntryList],
     ToUpdate = start_update_key_entries(MyIOtherKvvList, comm:this(), DhtPid),
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p ; ToUpdate=~p - #Items: ~p",
@@ -179,7 +176,7 @@ on({get_entries_response, EntryList}, State =
     NewState =
         State#rr_resolve_state{operation = {?key_upd, [], []},
                                stats = Stats#resolve_stats{diff_size = ToUpdate},
-                               fb_send_kvv_req = lists:append(FbReqKVV, KvvList)},
+                               fb_send_kvv_req = KvvList},
 
     if ToUpdate =:= 0 ->
            % use the same options as above in get_state_response:
@@ -205,11 +202,15 @@ on({get_entries_response, EntryList}, State =
     SID = Stats#resolve_stats.session_id,
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
            [key_upd_send, SID, length(EntryList)]),
-    KvvList = [entry_to_kvv(E) || E <- EntryList],
+
+    % note: EntryList may not be unique!
+    KvvList = make_unique_kvv([entry_to_kvv(E) || E <- EntryList]),
     % note: if ReqKeys contains any entries, we will get 2 replies per resolve!
     FBCount = if ReqKeys =/= [] -> 2;
                  true -> 1
               end,
+    ?DBG_ASSERT2(length(ReqKeys) =:= length(lists:usort(ReqKeys)),
+                 {non_unique_req_list, ReqKeys}),
     ResStarted = send_request_resolve(Dest, {?key_upd, KvvList, ReqKeys}, SID,
                                       FromMyNode, FBDest, [], false) * FBCount,
 
@@ -226,6 +227,8 @@ on({get_state_response, MyI}, State =
        #rr_resolve_state{ operation = Op, dhtNodePid = DhtPid, stats = _Stats })
   when element(1, Op) =:= ?interval_upd;
        element(1, Op) =:= interval_upd_send ->
+    % map the given interval into MyI
+    % (rr_recon:map_interval/2 only works on quadrant sub-intervals):
     OpSIs = intervals:get_simple_intervals(element(2, Op)),
     ISec = lists:foldl(
              fun(Q, AccJ) ->
@@ -265,11 +268,8 @@ on({get_entries_response, EntryList}, State =
 
     % Send entries in sender interval but not in sent KvvList
     % convert keys KvvList to a gb_tree for faster access checks
-    MyIOtherKvTree =
-        lists:foldl(fun({KeyX, _ValX, VersionX}, TreeX) ->
-                            % assume, KVs at the same node have the same version
-                            gb_trees:enter(KeyX, VersionX, TreeX)
-                    end, gb_trees:empty(), MyIOtherKvvList),
+    MyIOtherKvTree = make_other_kv_tree(MyIOtherKvvList),
+    % note: EntryList may not be unique! - it is made unique in shutdown/2 though
     MissingOnOther = [entry_to_kvv(X) || X <- EntryList,
                                          not gb_trees:is_defined(db_entry:get_key(X), MyIOtherKvTree)],
 
@@ -293,7 +293,8 @@ on({get_entries_response, EntryList}, State =
     ?TRACE("GET ENTRIES - Operation=~p~n SessionId:~p - #Items: ~p",
            [interval_upd_send, SID, length(EntryList)]),
 
-    KvvList = [entry_to_kvv(E) || E <- EntryList],
+    % note: EntryList may not be unique!
+    KvvList = make_unique_kvv([entry_to_kvv(E) || E <- EntryList]),
     ResStarted = send_request_resolve(Dest, {?interval_upd, I, KvvList}, SID,
                                       FromMyNode, FBDest, [], false),
 
@@ -373,6 +374,7 @@ on({'DOWN', _MonitorRef, process, _Owner, _Info}, _State) ->
 %% @doc Maps the given tuple list (with keys as first elements) to the MyI
 %%      interval.
 %%      Precond: tuple list with unique keys
+%%      Note: mapped tuples are not unique if MyI covers multiple replicas!
 -spec map_kvv_list([Tpl], MyI::intervals:interval()) -> [Tpl]
         when is_subtype(Tpl, {?RT:key()} |
                              {?RT:key(), term()} |
@@ -384,6 +386,7 @@ map_kvv_list(TplList, MyI) ->
                                intervals:in(RKey, MyI)].
 
 %% @doc Maps the given (unique!) key list to the MyI interval.
+%%      Note: mapped keys are not unique if MyI covers multiple replicas!
 -spec map_key_list([?RT:key()], MyI::intervals:interval()) -> [?RT:key()].
 map_key_list(KeyList, MyI) ->
     ?DBG_ASSERT(length(KeyList) =:= length(lists:usort(KeyList))),
@@ -458,14 +461,18 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
             undefined ->
                 0;
             _ when not SendReqKeyReply ->
-                send_request_resolve(FBDest, {?key_upd, FbKVV, []},
+                FbKVV1 = make_unique_kvv(FbKVV),
+                send_request_resolve(FBDest, {?key_upd, FbKVV1, []},
                                      Stats#resolve_stats.session_id,
                                      FromMyNode, undefined, [], true);
             _ ->
-                send_request_resolve(FBDest, {?key_upd, FbKVV, []},
+                % feedback item lists may not be unique -> make them!
+                FbKVV1 = make_unique_kvv(FbKVV),
+                FbReqKVV1 = make_unique_kvv(FbReqKVV),
+                send_request_resolve(FBDest, {?key_upd, FbKVV1, []},
                                      Stats#resolve_stats.session_id,
                                      FromMyNode, undefined, [], true) +
-                    send_request_resolve(FBDest, {?key_upd, FbReqKVV, []},
+                    send_request_resolve(FBDest, {?key_upd, FbReqKVV1, []},
                                          Stats#resolve_stats.session_id,
                                          FromMyNode, comm:make_global(Owner),
                                          [], true)
@@ -484,6 +491,33 @@ shutdown(_Reason, #rr_resolve_state{ownerPid = Owner, send_stats = SendStats,
                               Stats1#resolve_stats{session_id = null}})
     end,
     kill.
+
+%% @doc Makes the given tuple list (with keys as first elements) unique, i.e.
+%%      there are no duplicate replicas of keys in the result tuple list.
+%%      Note: Assumes, KVs at the same node have the same version and chooses
+%%            an arbitrary key for each replica group.
+-spec make_unique_kvv([Tpl]) -> [Tpl]
+        when is_subtype(Tpl, {?RT:key()} |
+                             {?RT:key(), term()} |
+                             {?RT:key(), term(), term()}).
+make_unique_kvv([]) -> [];
+make_unique_kvv([_|_] = KVV) ->
+    MKVV = [{rr_recon:map_key_to_quadrant(element(1, Val), 1), Val} || Val <- KVV],
+    [Val || {_MappedKeyX, Val} <- lists:ukeysort(1, MKVV)].
+
+%% @doc Creates a Key-Version tree from another node's KVV list containing one
+%%      entry for every replica key of the KVV list.
+%%      Note: Assumes, KVs at the same node have the same version and sets
+%%            an (arbitrary) version from these for each replica group.
+-spec make_other_kv_tree([{?RT:key(), Val::term(), db_dht:version()}])
+        -> gb_trees:tree(?RT:key(), db_dht:version()).
+make_other_kv_tree(KVV) ->
+    lists:foldl(
+      fun({KeyX, _ValX, VersionX}, TreeX) ->
+              lists:foldl(fun(RKeyX, TreeY) ->
+                                  gb_trees:enter(RKeyX, VersionX, TreeY)
+                          end, TreeX, ?RT:get_replica_keys(KeyX))
+      end, gb_trees:empty(), KVV).
 
 -spec send_request_resolve(Dest::comm:mypid(), Op::operation(),
                            SID::rrepair:session_id() | null,

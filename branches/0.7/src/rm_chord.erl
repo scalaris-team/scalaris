@@ -29,7 +29,7 @@
 % accepted messages of an initialized rm_chord process in addition to rm_loop
 -type(custom_message() ::
     {rm, get_succlist, Source_Pid::comm:mypid()} |
-    {rm, {get_node_details_response, NodeDetails::node_details:node_details()}, from_succ | from_node} |
+    {rm, {rm, node_info_response, NodeDetails::node_details:node_details()}, from_succ | from_node} |
     {rm, get_succlist_response, Succ::node:node_type(), SuccsSuccList::nodelist:non_empty_snodelist()}).
 
 -define(SEND_OPTIONS, [{channel, prio}, {?quiet}]).
@@ -77,17 +77,17 @@ handle_custom_message({rm, get_succlist, Source_Pid}, {Neighborhood} = State) ->
     {{unknown}, State};
 
 % got node_details from our successor
-handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_succ}, State)  ->
+handle_custom_message({rm, {rm, node_info_response, NodeDetails}, from_succ}, State)  ->
     SuccsPred = node_details:get(NodeDetails, pred),
+    ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_', from_node}),
     comm:send(node:pidX(SuccsPred),
-              {get_node_details,
-               comm:reply_as(comm:this(), 2, {rm, '_', from_node}), [node, is_leaving]},
+              {rm, node_info, ThisWithCookie, [node, is_leaving]},
               ?SEND_OPTIONS),
     {{unknown}, State};
 
 % we asked another node we wanted to add for its node object -> now add it
 % (if it is not in the process of leaving the system)
-handle_custom_message({rm, {get_node_details_response, NodeDetails}, from_node},
+handle_custom_message({rm, {rm, node_info_response, NodeDetails}, from_node},
    {OldNeighborhood} = State)  ->
     case node_details:get(NodeDetails, is_leaving) of
         false ->
@@ -122,6 +122,10 @@ handle_custom_message({rm, get_succlist_response, Succ, SuccsSuccList},
     contact_new_nodes(NewNodes),
     {{unknown}, State};
 
+handle_custom_message({rm, update_node, Node}, {OldNeighborhood}) ->
+    NewNeighborhood = nodelist:update_ids(OldNeighborhood, [Node]),
+    {{unknown}, {NewNeighborhood}};
+
 handle_custom_message(_, _State) -> unknown_event.
 
 -spec trigger_action(State::state())
@@ -129,10 +133,11 @@ handle_custom_message(_, _State) -> unknown_event.
 trigger_action({Neighborhood} = State) ->
     % new stabilization interval
     case nodelist:has_real_succ(Neighborhood) of
-        true -> comm:send(node:pidX(nodelist:succ(Neighborhood)),
-                          {get_node_details,
-                           comm:reply_as(comm:this(), 2, {rm, '_', from_succ}), [pred]},
-                          ?SEND_OPTIONS);
+        true ->
+            ThisWithCookie = comm:reply_as(comm:this(), 2, {rm, '_', from_succ}),
+            comm:send(node:pidX(nodelist:succ(Neighborhood)),
+                      {rm, node_info, ThisWithCookie, [pred]},
+                      ?SEND_OPTIONS);
         _    -> ok
     end,
     {{unknown}, State}.
@@ -169,12 +174,28 @@ remove_succ({OldNeighborhood}, OldSucc, SuccsSucc) ->
     NewNbh2 = nodelist:add_node(NewNbh1, SuccsSucc, predListLength(), succListLength()),
     {{graceful_leave, succ, OldSucc}, {NewNbh2}}.
 
+%% @doc Removes the given node as a result from a graceful leave only!
+-spec remove_node(State::state(), NodePid::comm:mypid())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+remove_node({OldNeighborhood}, NodePid) ->
+    % TODO: find replacement?
+    NewNbh1 = nodelist:remove(NodePid, OldNeighborhood),
+    {{graceful_leave, other, NodePid}, {NewNbh1}}.
+
 -spec update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
 update_node({OldNeighborhood}, NewMe) ->
     NewNeighborhood = nodelist:update_node(OldNeighborhood, NewMe),
-    % inform neighbors
-    trigger_action({NewNeighborhood}).
+    % only send pred and succ the new node
+    Message = {rm, update_node, NewMe},
+    Pred = nodelist:pred(NewNeighborhood),
+    Succ = nodelist:succ(NewNeighborhood),
+    comm:send(node:pidX(Succ), Message, ?SEND_OPTIONS),
+    case Pred =/= Succ of
+        true -> comm:send(node:pidX(Pred), Message, ?SEND_OPTIONS);
+        _    -> ok
+    end,
+    {{unknown}, {NewNeighborhood}}.
 
 -spec contact_new_nodes(NewNodes::[node:node_type()]) -> ok.
 contact_new_nodes(NewNodes) ->
@@ -183,7 +204,7 @@ contact_new_nodes(NewNodes) ->
     case comm:is_valid(ThisWithCookie) of
         true ->
             _ = [begin
-                     Msg = {get_node_details, ThisWithCookie, [node, is_leaving]},
+                     Msg = {rm, node_info, ThisWithCookie, [node, is_leaving]},
                      comm:send(node:pidX(Node), Msg, ?SEND_OPTIONS)
                  end || Node <- NewNodes],
             ok;
@@ -194,10 +215,15 @@ contact_new_nodes(NewNodes) ->
 leave(_State) -> ok.
 
 % failure detector reported dead node
--spec crashed_node(State::state(), DeadPid::comm:mypid())
+-spec crashed_node(State::state(), DeadPid::comm:mypid(), Reason::fd:reason())
         -> {ChangeReason::rm_loop:reason(), state()}.
-crashed_node({OldNeighborhood}, DeadPid) ->
+crashed_node({OldNeighborhood}, DeadPid, Reason) when Reason =:= jump orelse Reason =:= leave ->
     NewNeighborhood = nodelist:remove(DeadPid, OldNeighborhood),
+    {{node_crashed, DeadPid}, {NewNeighborhood}};
+crashed_node({OldNeighborhood}, DeadPid, _Reason) ->
+    FilterFun = fun(N) -> not node:same_process(N, DeadPid) end,
+    NewNeighborhood =
+        nodelist:filter(OldNeighborhood, FilterFun, fun dn_cache:add_zombie_candidate/1),
     {{node_crashed, DeadPid}, {NewNeighborhood}}.
 
 % dead-node-cache reported dead node to be alive again

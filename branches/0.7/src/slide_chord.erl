@@ -35,7 +35,8 @@
          update_rcv_data1/3, update_rcv_data2/3,
          prepare_send_delta1/3, prepare_send_delta2/3,
          finish_delta1/3, finish_delta2/3,
-         finish_delta_ack1/3, finish_delta_ack2/4]).
+         finish_delta_ack1/3, finish_delta_ack2/4,
+         abort_slide/4]).
 
 -export([rm_exec/5]).
 
@@ -92,10 +93,7 @@ change_my_id(State, SlideOp, ReplyPid) ->
             dht_node_reregister:deactivate(),
             % note: do not deactivate gossip, vivaldi or dc_clustering -
             % their values are still valid and still count!
-%%             gossip:deactivate(),
-%%             dc_clustering:deactivate(),
-%%             vivaldi:deactivate(),
-            cyclon:deactivate(),
+            dn_cache:unsubscribe(),
             rt_loop:deactivate(),
             service_per_vm:deregister_dht_node(comm:this()),
             {ok, State1, SlideOp2};
@@ -122,12 +120,18 @@ change_my_id(State, SlideOp, ReplyPid) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 prepare_send_data1(State, SlideOp, ReplyPid) ->
     case slide_op:get_predORsucc(SlideOp) of
-        'succ' -> change_my_id(State, SlideOp, ReplyPid);
-        'pred' -> State1 = dht_node_state:add_db_range(
-                             State, slide_op:get_interval(SlideOp),
-                             slide_op:get_id(SlideOp)),
-                  send_continue_msg(ReplyPid),
-                  {ok, State1, SlideOp}
+        succ -> change_my_id(State, SlideOp, ReplyPid);
+        pred -> State1 =
+                    case slide_op:get_type(SlideOp) of
+                        {join, 'send'} -> % already set
+                            State;
+                        _ ->
+                            dht_node_state:add_db_range(
+                              State, slide_op:get_interval(SlideOp),
+                              slide_op:get_id(SlideOp))
+                    end,
+                send_continue_msg(ReplyPid),
+                {ok, State1, SlideOp}
     end.
 
 %% @doc Cleans up after prepare_send_data1/3 once the RM is up-to-date, (no-op here).
@@ -153,9 +157,9 @@ prepare_send_data2(State, SlideOp, {abort}) ->
         -> {ok, dht_node_state:state(), slide_op:slide_op()}.
 update_rcv_data1(State, SlideOp, ReplyPid) ->
     case slide_op:get_predORsucc(SlideOp) of
-        'succ' -> change_my_id(State, SlideOp, ReplyPid);
-        'pred' -> send_continue_msg(ReplyPid),
-                  {ok, State, SlideOp}
+        succ -> change_my_id(State, SlideOp, ReplyPid);
+        pred -> send_continue_msg(ReplyPid),
+                {ok, State, SlideOp}
     end.
 
 %% @doc Cleans up after update_rcv_data1/3 once the RM is up-to-date, (no-op here).
@@ -190,16 +194,20 @@ send_continue_msg_when_pred_ok(State, SlideOp, ReplyPid) ->
     case dht_node_state:get(State, pred_id) of
         ExpPredId ->
             send_continue_msg(ReplyPid);
-        _ ->
-            OldPred = slide_op:get_node(SlideOp),
+        _OldPredId ->
+            OldPred = dht_node_state:get(State, pred),
             rm_loop:subscribe(
               ReplyPid, {move, slide_op:get_id(SlideOp)},
-              fun(RMOldN, RMNewN, _Reason) ->
+              fun(_RMOldN, RMNewN, _Reason) ->
                       RMNewPred = nodelist:pred(RMNewN),
-                      RMOldPred = nodelist:pred(RMOldN),
-                      RMOldPred =/= RMNewPred orelse
-                          node:id(RMNewPred) =:= ExpPredId orelse
-                          RMNewPred =/= OldPred
+                      % new pred pid or same pid but (updated) ID
+                      PredChanged = RMNewPred =/= OldPred,
+                      ?DBG_ASSERT2(not (PredChanged andalso
+                                            node:pidX(RMNewPred) =:= node:pidX(OldPred)) orelse
+                                       node:id(RMNewPred) =:= ExpPredId,
+                                   {"unexpected pred ID change", _OldPredId,
+                                    node:id(RMNewPred), ExpPredId}),
+                      PredChanged
               end,
               fun ?MODULE:rm_exec/5,
               1)
@@ -284,6 +292,57 @@ finish_delta_ack1(State, OldSlideOp, ReplyPid) ->
         when is_subtype(NextOpMsg, dht_node_move:next_op_msg()).
 finish_delta_ack2(State, SlideOp, NextOpMsg, {continue}) ->
     {ok, State, SlideOp, NextOpMsg}.
+
+%% @doc Executed when aborting the given slide operation (assumes the SlideOp
+%%      has already been set up).
+-spec abort_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                  Reason::dht_node_move:abort_reason(), MoveMsgTag::atom())
+        -> dht_node_state:state().
+abort_slide(State, SlideOp, Reason, MoveMsgTag) ->
+    case slide_op:get_phase(SlideOp) of
+        {wait_for_continue, Phase} -> ok;
+        Phase -> ok
+    end,
+    SendOrRcv = slide_op:get_sendORreceive(SlideOp),
+
+    % revert ID change?
+    case slide_op:get_predORsucc(SlideOp) of
+        succ ->
+            % try to change ID back (if not the first receiving join slide)
+            case SendOrRcv of
+                'rcv' when Reason =:= target_down ->
+                    % if ID already changed, keep it; as well as the already incorporated data
+                    ok;
+                _ ->
+                    MyId = dht_node_state:get(State, node_id),
+                    case slide_op:get_my_old_id(SlideOp) of
+                        null -> ok;
+                        MyId -> ok;
+                        _ when Phase =:= wait_for_delta_ack -> ok;
+                        MyOldId ->
+                            log:log(warn, "[ dht_node_move ~.0p ] trying to revert ID change from ~p to ~p~n",
+                                    [comm:this(), MyOldId, MyId]),
+                            rm_loop:update_id(MyOldId),
+                            ok
+                    end
+            end;
+        pred ->
+            % nothing we can do on this side
+            ok
+    end,
+
+    % remove incomplete/useless data?
+    case SendOrRcv of
+        'rcv' when Reason =:= target_down ->
+            % nothing to do
+            State;
+        'rcv' when (Phase =/= wait_for_delta orelse MoveMsgTag =/= delta_ack) ->
+            % remove incomplete data (note: this function will be called again
+            % as part of dht_node_move:abort_slide/4 but without deleting items!)
+            dht_node_state:slide_stop_record(State, slide_op:get_interval(SlideOp), true);
+        _ ->
+            State
+    end.
 
 -spec rm_exec(pid(), term(),
               OldNeighbors::nodelist:neighborhood(),

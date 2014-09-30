@@ -28,27 +28,36 @@
 
 -include("db_backend_SUITE.hrl").
 
+groups() ->
+    [{tester_tests, [sequence], tests_avail()}].
+
 all() ->
-    tests_avail().
+    [
+     {group, tester_tests}
+    ].
 
 suite() -> [ {timetrap, {seconds, 15}} ].
 
 init_per_suite(Config) ->
     Config1 = unittest_helper:init_per_suite(Config),
-    tester:register_type_checker({typedef, db_backend_beh, key}, db_backend_beh, tester_is_valid_db_key),
-    tester:register_value_creator({typedef, db_backend_beh, key}, db_backend_beh, tester_create_db_key, 1),
+    tester:register_type_checker({typedef, db_backend_beh, key, []}, db_backend_beh, tester_is_valid_db_key),
+    tester:register_value_creator({typedef, db_backend_beh, key, []}, db_backend_beh, tester_create_db_key, 1),
 
-    tester:register_type_checker({typedef, db_backend_beh, entry}, db_backend_beh, tester_is_valid_db_entry),
-    tester:register_value_creator({typedef, db_backend_beh, entry}, db_backend_beh, tester_create_db_entry, 1),
+    tester:register_type_checker({typedef, db_backend_beh, entry, []}, db_backend_beh, tester_is_valid_db_entry),
+    tester:register_value_creator({typedef, db_backend_beh, entry, []}, db_backend_beh, tester_create_db_entry, 1),
     Config1.
 
 end_per_suite(Config) ->
-    tester:unregister_type_checker({typedef, db_backend_beh, key}),
-    tester:unregister_value_creator({typedef, db_backend_beh, key}),
+    tester:unregister_type_checker({typedef, db_backend_beh, key, []}),
+    tester:unregister_value_creator({typedef, db_backend_beh, key, []}),
 
-    tester:unregister_type_checker({typedef, db_backend_beh, entry}),
-    tester:unregister_value_creator({typedef, db_backend_beh, entry}),
+    tester:unregister_type_checker({typedef, db_backend_beh, entry, []}),
+    tester:unregister_value_creator({typedef, db_backend_beh, entry, []}),
     unittest_helper:end_per_suite(Config).
+
+init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 rw_suite_runs(N) ->
     erlang:min(N, 10000).

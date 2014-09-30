@@ -44,16 +44,6 @@
 -define(TRACE_BP_STEPS(X,Y), ok).
 %% userdevguide-end gen_component:trace_bp_steps
 
--ifdef(with_ct).
--define(SPAWNED(MODULE), tester_scheduler:gen_component_spawned(MODULE)).
--define(INITIALIZED(MODULE), tester_scheduler:gen_component_initialized(MODULE)).
--define(CALLING_RECEIVE(MODULE), tester_scheduler:gen_component_calling_receive(MODULE)).
--else.
--define(SPAWNED(MODULE), ok).
--define(INITIALIZED(MODULE), ok).
--define(CALLING_RECEIVE(MODULE), ok).
--endif.
-
 -ifndef(have_callback_support).
 -export([behaviour_info/1]).
 -endif.
@@ -225,13 +215,13 @@ get_component_state(Pid, Timeout) ->
 
 %% @doc change the handler for handling messages
 -spec change_handler(user_state(), Handler::handler())
-        -> {'$gen_component', [{on_handler, Handler::handler()}], user_state()}.
+        -> {'$gen_component', [{on_handler, Handler::handler()},...], user_state()}.
 change_handler(UState, Handler) when is_function(Handler, 2) ->
     {'$gen_component', [{on_handler, Handler}], UState}.
 
 %% @doc perform a post op, i.e. handle a message directly after another
 -spec post_op(comm:message(), user_state())
-        -> {'$gen_component', [{post_op, comm:message()}], user_state()}.
+        -> {'$gen_component', [{post_op, comm:message()},...], user_state()}.
 post_op(Msg, UState) ->
     {'$gen_component', [{post_op, Msg}], UState}.
 
@@ -362,7 +352,6 @@ start(Module, Handler, Args, Options) ->
 
 -spec start(module(), handler(), term(), [option()], pid()) -> no_return() | ok.
 start(Module, DefaultHandler, Args, Options, Supervisor) ->
-    %?SPAWNED(Module),
     % note: register globally first (disables the registered name from a
     %       potential DEBUG_REGISTER below)
     Registered =
@@ -447,12 +436,10 @@ start(Module, DefaultHandler, Args, Options, Supervisor) ->
                 true -> Supervisor ! {started, self()}, ok
             end
         end,
-    ?INITIALIZED(Module),
     loop(NewUState, GCState).
 
 -spec loop(user_state(), gc_state()) -> no_return() | ok.
 loop(UState, GCState) ->
-    ?CALLING_RECEIVE(Module),
     ?DBG_ASSERT2(not trace_mpath:infected(), {infected_in_loop, self()}),
     receive Msg ->
 %%            try
@@ -481,6 +468,11 @@ handle_message({?send_to_group_member, Processname, Msg}, UState, _Handler) ->
     %% forward a message to group member by its process name
     %% initiated via comm:send/3 with group_member
     comm:forward_to_group_member(Processname, Msg),
+    UState;
+handle_message({?send_to_registered_proc, Processname, Msg}, UState, _Handler) ->
+    %% forward a message to a registered process
+    %% initiated via comm:send/3 with registered_proc
+    comm:forward_to_registered_proc(Processname, Msg),
     UState;
 handle_message(Msg, UState, Handler) ->
     Handler(Msg, UState).

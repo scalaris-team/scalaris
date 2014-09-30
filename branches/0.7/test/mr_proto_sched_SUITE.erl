@@ -23,38 +23,8 @@
 -compile([export_all]).
 
 %% start proto scheduler for this suite
--define(proto_sched(Action),
-        fun() -> %% use fun to have fresh, locally scoped variables
-                case Action of
-                    stop ->
-                         %% is a ring running?
-                        case erlang:whereis(pid_groups) =:= undefined
-                            orelse pid_groups:find_a(proto_sched) =:= failed of
-                            true -> ok;
-                            false ->
-                                %% then finalize proto_sched run:
-                                %% try to call thread_end(): if this
-                                %% process was running the proto_sched
-                                %% thats fine, otherwise thread_end()
-                                %% will raise an exception
-                                proto_sched:thread_end()
-                        end;
-                    start ->
-                        proto_sched:thread_begin()
-                end
-        end()).
--define(proto_sched2(Action, Arg),
-        fun() ->
-                case Action of
-                    setup ->
-                        proto_sched:thread_num(Arg);
-                    cleanup ->
-                        proto_sched:wait_for_end(),
-                        ct:pal("Proto scheduler stats: ~.2p",
-                               [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]),
-                        proto_sched:cleanup()
-                end
-        end()).
+-define(proto_sched(Action), proto_sched_fun(Action)).
+-define(proto_sched2(Action, Arg), proto_sched2_fun(Action, Arg)).
 
 -include("mr_SUITE.hrl").
 
@@ -62,6 +32,32 @@ all() ->
 tests_avail() ++ [test_join, test_leave].
 
 suite() -> [ {timetrap, {seconds, 15}} ].
+
+-spec proto_sched_fun(start | stop) -> ok.
+proto_sched_fun(start) ->
+    proto_sched:thread_begin();
+proto_sched_fun(stop) ->
+    %% is a ring running?
+    case erlang:whereis(pid_groups) =:= undefined
+             orelse pid_groups:find_a(proto_sched) =:= failed of
+        true -> ok;
+        false ->
+            %% then finalize proto_sched run:
+            %% try to call thread_end(): if this
+            %% process was running the proto_sched
+            %% thats fine, otherwise thread_end()
+            %% will raise an exception
+            proto_sched:thread_end()
+    end.
+
+-spec proto_sched2_fun(setup, ThreadNum::pos_integer()) -> ok;
+                      (cleanup, PIDs::[pid() | atom()]) -> ok.
+proto_sched2_fun(setup, Arg) ->
+    proto_sched:thread_num(Arg);
+proto_sched2_fun(cleanup, _Arg) ->
+    proto_sched:wait_for_end(),
+    unittest_helper:print_proto_sched_stats(),
+    proto_sched:cleanup().
 
 test_join(_Config) ->
     ?proto_sched2(setup, 2),

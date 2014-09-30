@@ -26,7 +26,7 @@
 -include("scalaris.hrl").
 
 -ifdef(with_export_type_support).
--export_type([cookie/0]).
+-export_type([cookie/0, reason/0]).
 -endif.
 
 -export([subscribe/1, subscribe/2, subscribe_refcount/2, subscribe_pid/2,
@@ -34,7 +34,7 @@
 -export([unsubscribe/1, unsubscribe/2, unsubscribe_refcount/2,
          unsubscribe_pid/2, unsubscribe_pid/3]).
 -export([update_subscriptions/2, update_subscriptions_pid/3]).
--export([report_graceful_leave/0]).
+-export([report_my_crash/1]).
 %% gen_server & gen_component callbacks
 -export([start_link/1, init/1, on/2]).
 
@@ -42,7 +42,8 @@
 -export([subscriptions/0]).
 
 -type cookie() :: {pid(), '$fd_nil'} | any().
--type state() :: ok.
+-type reason() :: 'DOWN' | noconnection | term().
+-type state() :: [HBPid::pid()]. % a list of all hbs processes launched by this fd
 
 -define(SEND_OPTIONS, [{channel, prio}]).
 
@@ -210,17 +211,17 @@ update_subscriptions(OldPids, NewPids) ->
 
 %% @doc Reports the calling process' group as being shut down due to a graceful
 %%      leave operation.
--spec report_graceful_leave() -> ok.
-report_graceful_leave() ->
+-spec report_my_crash(Reason::reason()) -> ok.
+report_my_crash(Reason) ->
     case pid_groups:get_my(sup_dht_node) of
         failed ->
-            log:log(error, "[ FD ] call to report_graceful_leave() from ~p "
-                           "outside a valid dht_node group!", [self()]);
+            log:log(error, "[ FD ] call to report_my_crash(~p) from ~p "
+                           "outside a valid dht_node group!", [Reason, self()]);
         DhtNodeSupPid ->
             FD = my_fd_pid(),
-            _ = [ comm:send_local(FD, {report_graceful_leave, comm:make_global(X)})
-                    || X <- sup:sup_get_all_children(DhtNodeSupPid)],
-            ok
+            comm:send_local(FD, {report_crash,
+                                 sup:sup_get_all_children(DhtNodeSupPid),
+                                 Reason})
     end.
 
 %% gen_component functions
@@ -237,56 +238,51 @@ start_link(ServiceGroup) ->
 init([]) ->
     % local heartbeat processes
     _ = pdb:new(fd_hbs, [set]), %% for debugging ++ [protected, named_table]),
-    ok.
+    [].
 
 %% @private
 -spec on(comm:message(), state()) -> state().
 on({hbs_finished, RemoteWatchedPid}, State) ->
-    pdb:delete(comm:get(fd, RemoteWatchedPid), fd_hbs),
-    State;
+    RemFD = comm:get(fd, RemoteWatchedPid),
+    case pdb:take(RemFD, fd_hbs) of
+        undefined -> State;
+        {RemFD, HBPid} -> lists:delete(HBPid, State)
+    end;
 
 on({subscribe_heartbeats, Subscriber, TargetPid}, State) ->
     %% we establish the back-direction here, so we subscribe to the
     %% subscriber and add the TargetPid to the local monitoring.
     ?TRACE("FD: subscribe_heartbeats~n", []),
-    SubscriberFDPid = comm:get(fd, Subscriber),
-    HBPid = case pdb:get(SubscriberFDPid, fd_hbs) of
-                undefined -> start_and_register_hbs(SubscriberFDPid);
-                Res -> element(2, Res)
-            end,
-    comm:send_local(HBPid, {add_watching_of, TargetPid}),
+    {HBPid, NewState} = forward_to_hbs(State, Subscriber, {add_watching_of, TargetPid}),
     comm:send(Subscriber, {update_remote_hbs_to, comm:make_global(HBPid)}, ?SEND_OPTIONS),
-    State;
+    NewState;
 
 on({pong, RemHBSSubscriber, RemoteDelay}, State) ->
     ?TRACE("FD: pong, ~p~n", [RemHBSSubscriber]),
-    forward_to_hbs(RemHBSSubscriber, {pong_via_fd, RemHBSSubscriber, RemoteDelay}),
-    State;
+    element(2, forward_to_hbs(State, RemHBSSubscriber,
+                              {pong_via_fd, RemHBSSubscriber, RemoteDelay}));
 
 on({add_subscriber_via_fd, Subscriber, WatchedPid, Cookie}, State) ->
     ?TRACE("FD: subscribe ~p to ~p (cookie: ~p)~n", [Subscriber, WatchedPid, Cookie]),
-    forward_to_hbs(WatchedPid, {add_subscriber, Subscriber, WatchedPid, Cookie}),
-    State;
+    element(2, forward_to_hbs(State, WatchedPid,
+                              {add_subscriber, Subscriber, WatchedPid, Cookie}));
 
 on({del_subscriber_via_fd, Subscriber, WatchedPid, Cookie}, State) ->
     ?TRACE("FD: unsubscribe ~p to ~p (cookie: ~p)~n", [Subscriber, WatchedPid, Cookie]),
-    forward_to_hbs(WatchedPid, {del_subscriber, Subscriber, WatchedPid, Cookie}),
-    State;
+    element(2, forward_to_hbs(State, WatchedPid,
+                              {del_subscriber, Subscriber, WatchedPid, Cookie}));
 
 on({add_watching_of_via_fd, Subscriber, Pid}, State) ->
     ?TRACE("FD: add_watching_of ~p~n", [Pid]),
-    forward_to_hbs(Subscriber, {add_watching_of, Pid}),
-    State;
+    element(2, forward_to_hbs(State, Subscriber, {add_watching_of, Pid}));
 
 on({del_watching_of_via_fd, Subscriber, Pid}, State) ->
     ?TRACE("FD: del_watching_of ~p~n", [Pid]),
-    forward_to_hbs(Subscriber, {del_watching_of, Pid}),
-    State;
+    element(2, forward_to_hbs(State, Subscriber, {del_watching_of, Pid}));
 
 on({crashed, WatchedPid, _Warn} = Msg, State) ->
     ?TRACE("FD: crashed message via fd for watched pid ~p~n", [WatchedPid]),
-    forward_to_hbs(WatchedPid, Msg),
-    State;
+    element(2, forward_to_hbs(State, WatchedPid, Msg, false));
 
 %% on({web_debug_info, _Requestor}, State) ->
 %%     ?TRACE("FD: web_debug_info~n", []),
@@ -315,18 +311,14 @@ on({crashed, WatchedPid, _Warn} = Msg, State) ->
 %%     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
 %%     State;
 
-on({report_graceful_leave, Pid}, State) ->
-    ?TRACE("FD: report_graceful_leave ~p~n", [Pid]),
-    % don't use forward_to_hbs/2 here since we don't want new hbd processes
-    % to be created!
-    FDPid = comm:get(fd, Pid),
-    case pdb:get(FDPid, fd_hbs) of
-        undefined -> ok;
-        Entry ->
-            HBSPid = element(2, Entry),
-            Msg = {'DOWN', no_ref, process, comm:make_local(Pid), unittest_down},
-            comm:send_local(HBSPid, Msg)
-    end,
+on({report_crash, [], _Reason}, State) ->
+    State;
+on({report_crash, [_|_] = LocalPids, Reason}, State) ->
+    ?TRACE("FD: report_crash ~p with reason ~p~n", [LocalPids, Reason]),
+    ?DBG_ASSERT([] =:= [X || X <- LocalPids, not is_pid(X)]),
+    Msg = {report_crash, LocalPids, Reason},
+    % don't create new hbs processes!
+    _ = [comm:send_local(HBS, Msg) || HBS <- State],
     State.
 
 %%% Internal functions
@@ -339,23 +331,32 @@ my_fd_pid() ->
         PID -> PID
     end.
 
-%% @doc start a new hbs process inside the fd process context (ets owner)
-%%      precond: FDPid points to the fd process at the target node
--spec start_and_register_hbs(FDPid::comm:mypid()) -> pid().
-start_and_register_hbs(FDPid) ->
-    {ok, NewHBS} = fd_hbs:start_link(pid_groups:my_groupname(), FDPid),
-    pdb:set({FDPid, NewHBS}, fd_hbs),
-    NewHBS.
+%% @doc Forwards the given message to the registered HBS or creates a new HBS.
+-spec forward_to_hbs(state(), comm:mypid(), comm:message()) -> {HBPid::pid(), state()}.
+forward_to_hbs(State, Pid, Msg) ->
+    forward_to_hbs(State, Pid, Msg, true).
 
--spec forward_to_hbs(comm:mypid(), comm:message()) -> ok.
-forward_to_hbs(Pid, Msg) ->
+%% @doc Forwards the given message to the registered hbs or either creates a
+%%      new hbs inside the fd process context (if Create is true) or
+%%      ignores the message (Create is false).
+-spec forward_to_hbs(state(), comm:mypid(), comm:message(), Create::true) -> {HBPid::pid(), state()};
+                    (state(), comm:mypid(), comm:message(), Create::false) -> {HBPid::pid() | undefined, state()}.
+forward_to_hbs(State, Pid, Msg, Create) ->
     FDPid = comm:get(fd, Pid),
-    HBSPid = case pdb:get(FDPid, fd_hbs) of
-                 undefined -> % synchronously create new hb process
-                     start_and_register_hbs(FDPid);
-                 Entry -> element(2, Entry)
-             end,
-    comm:send_local(HBSPid, Msg).
+    case pdb:get(FDPid, fd_hbs) of
+        undefined when Create ->
+            % synchronously create new hb process
+            {ok, HBSPid} = fd_hbs:start_link(pid_groups:my_groupname(), FDPid),
+            pdb:set({FDPid, HBSPid}, fd_hbs),
+            comm:send_local(HBSPid, Msg),
+            {HBSPid, [HBSPid | State]};
+        undefined ->
+            {undefined, State};
+        Entry ->
+            HBSPid = element(2, Entry),
+            comm:send_local(HBSPid, Msg),
+            {HBSPid, State}
+    end.
 
 %% @doc show subscriptions
 -spec subscriptions() -> ok.

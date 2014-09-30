@@ -37,13 +37,13 @@
 -callback init(nodelist:neighborhood()) -> rt().
 -callback hash_key(client_key() | binary()) -> key().
 -callback get_random_node_id() -> key().
--callback next_hop(dht_node_state:state(), key()) -> comm:mypid().
+-callback next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
 
 -callback init_stabilize(nodelist:neighborhood(), rt()) -> rt().
 -callback update(OldRT::rt(), OldNeighbors::nodelist:neighborhood(),
                  NewNeighbors::nodelist:neighborhood())
         -> {trigger_rebuild, rt()} | {ok, rt()}.
--callback filter_dead_node(rt(), comm:mypid()) -> rt().
+-callback filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
 
 -callback to_pid_list(rt()) -> [comm:mypid()].
 -callback get_size(rt() | external_rt()) -> non_neg_integer().
@@ -55,6 +55,8 @@
 -callback get_split_key(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
                         SplitFraction::{Num::number(), Denom::pos_integer()})
         -> key() | ?PLUS_INFINITY_TYPE.
+-callback get_split_keys(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                         Parts::pos_integer()) -> [key()].
 -callback get_random_in_interval(intervals:simple_interval2()) -> key().
 
 -callback dump(RT::rt()) -> KeyValueList::[{Index::string(), Node::string()}].
@@ -90,7 +92,7 @@ behaviour_info(callbacks) ->
      % adapt RT to changed neighborhood
      {update, 3},
      % dead nodes filtering
-     {filter_dead_node, 2},
+     {filter_dead_node, 3},
      % statistics
      {to_pid_list, 1}, {get_size, 1},
      % gets all (replicated) keys for a given (hashed) key

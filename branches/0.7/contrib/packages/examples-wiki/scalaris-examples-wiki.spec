@@ -1,6 +1,6 @@
 # norootforbuild
 
-%define pkg_version 0.7.0
+%define pkg_version 0.7.1
 Name:           scalaris-examples-wiki
 Summary:        Wikipedia on Scalaris example
 Version:        %{pkg_version}
@@ -13,7 +13,7 @@ Source100:      checkout.sh
 BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-build
 BuildRequires:  ant
 BuildRequires:  java-devel >= 1.6.0
-BuildRequires:  scalaris-java >= 0.7.0
+BuildRequires:  scalaris-java >= 0.7.1
 
 ##########################################################################################
 ## Fedora, RHEL or CentOS
@@ -40,15 +40,6 @@ BuildRequires:  scalaris-java >= 0.7.0
 %else
 %define with_tomcat7 0
 %endif
-%endif
-
-##########################################################################################
-## Mandrake, Mandriva
-##########################################################################################
-%if 0%{?mandriva_version} || 0%{?mdkversion}
-%define with_tomcat5 1
-%define with_tomcat6 0
-%define with_tomcat7 0
 %endif
 
 ###########################################################################################
@@ -81,7 +72,7 @@ Wikipedia-like application.
 Summary:    Wikipedia on Scalaris example using tomcat5
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat5
-Requires:   scalaris-java >= 0.7.0
+Requires:   scalaris-java >= 0.7.1
 BuildArch:  noarch
 
 %description -n scalaris-examples-wiki-tomcat5
@@ -94,7 +85,7 @@ Wikipedia-like application.
 Summary:    Wikipedia on Scalaris example using tomcat6
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat6
-Requires:   scalaris-java >= 0.7.0
+Requires:   scalaris-java >= 0.7.1
 BuildArch:  noarch
 
 %description -n scalaris-examples-wiki-tomcat6
@@ -107,7 +98,7 @@ Wikipedia-like application.
 Summary:    Wikipedia on Scalaris example using tomcat7
 Group:      Productivity/Networking/Web/Servers
 Requires:   tomcat >= 7.0.0
-Requires:   scalaris-java >= 0.7.0
+Requires:   scalaris-java >= 0.7.1
 BuildArch:  noarch
 
 %description -n scalaris-examples-wiki-tomcat7

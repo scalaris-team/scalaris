@@ -80,7 +80,7 @@ new(Tree, Config0) ->
     CorrectionFactor = proplists:get_value(correction_factor, Config),
     InnerBfFpr = proplists:get_value(inner_bf_fpr, Config),
     LeafBfFpr = proplists:get_value(leaf_bf_fpr, Config),
-    {InnerCount, LeafCount} = merkle_tree:size_detail(Tree),
+    {InnerCount, LeafCount, _ItemCount} = merkle_tree:size_detail(Tree),
     InnerBF = bloom:new_fpr(InnerCount, InnerBfFpr),
     LeafBF = bloom:new_fpr(LeafCount, LeafBfFpr),
     {IBF, LBF} = fill_bloom(merkle_tree:iterator(Tree), InnerBF, LeafBF),

@@ -51,8 +51,7 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
@@ -185,8 +184,7 @@ pause_node(DhtNodeSupPid) ->
              false -> ok
          end || Pid <- DhtNodeSupChilds],
 
-    _ = [ comm:send_local(fd, {report_graceful_leave, comm:make_global(Pid)})
-          || Pid <- DhtNodeSupChilds],
+    comm:send_local(fd, {report_crash, DhtNodeSupChilds, 'DOWN'}),
 
     pid_groups:hide(GroupName),
     {GroupName, DhtNodeSupChilds}.

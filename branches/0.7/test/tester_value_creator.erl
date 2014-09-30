@@ -1,4 +1,4 @@
-%  @copyright 2010-2013 Zuse Institute Berlin
+%  @copyright 2010-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -35,9 +35,14 @@ integer_max() -> 5.
 %%      into account.
 -spec create_value(type_spec(), non_neg_integer(), tester_parse_state:state()) -> term().
 create_value(Type, Size, ParseState) ->
-    case tester_value_creator_scalaris:create_value(Type, Size, ParseState) of
+    FlatType = case Type of
+                   {var_type, [], InnerType} ->
+                       InnerType;
+                   _ -> Type
+               end,
+    case tester_value_creator_scalaris:create_value(FlatType, Size, ParseState) of
         failed ->
-            create_value_wo_scalaris(Type, Size, ParseState);
+            create_value_wo_scalaris(FlatType, Size, ParseState);
         {value, Value} ->
             Value
     end.
@@ -117,7 +122,7 @@ create_value_({builtin_type, gb_sets_set, ValueType}, Size, ParseState) ->
                end, T, L)
     end;
 create_value_({builtin_type, maybe_improper_list}, Size, ParseState) ->
-    create_value_({list, {typedef, tester, test_any}}, Size, ParseState);
+    create_value_({list, {typedef, tester, test_any, []}}, Size, ParseState);
 create_value_({builtin_type, module}, _Size, _ParseState) ->
     Values = [element(1, X) || X <- code:all_loaded()],
     lists:nth(crypto:rand_uniform(1, length(Values) + 1), Values);
@@ -195,7 +200,7 @@ create_value_({range, {integer, Low}, {integer, High}}, _Size, _ParseState) ->
     crypto:rand_uniform(Low, High + 1);
 create_value_({record, Module, TypeName}, Size, ParseState) ->
     case tester_parse_state:lookup_type({record, Module, TypeName}, ParseState) of
-        {value, RecordType} ->
+        {value, {var_type, [], RecordType}} ->
             create_record_value(TypeName, RecordType, Size, ParseState);
         none ->
             ?ct_fail("error: unknown record type: ~p:~p", [Module, TypeName])
@@ -211,17 +216,25 @@ create_value_({tuple, Types}, Size, ParseState) when is_list(Types) ->
             Values = [create_value(Type, NewSize, ParseState) || Type <- Types],
             erlang:list_to_tuple(Values)
     end;
-create_value_({tuple, {typedef, tester, test_any}}, Size, ParseState) ->
-    Values = create_value({list, {typedef, tester, test_any}}, Size, ParseState),
+create_value_({tuple, {typedef, tester, test_any, []}}, Size, ParseState) ->
+    Values = create_value({list, {typedef, tester, test_any, []}}, Size, ParseState),
     erlang:list_to_tuple(Values);
 %%create_value({typedef, tester, test_any}, Size, TypeInfo) ->
     %% @todo
-create_value_({typedef, Module, TypeName}, Size, ParseState) ->
-    case tester_parse_state:lookup_type({type, Module, TypeName}, ParseState) of
-        {value, TypeSpec} ->
+create_value_({typedef, Module, TypeName, TypeList}, Size, ParseState) ->
+    %ct:pal("typedef~n~w~n~w~n", [TypeName, TypeList]),
+    %ct:pal("~w", [{type, Module, TypeName, length(TypeList)}]),
+    case tester_parse_state:lookup_type({type, Module, TypeName, length(TypeList)}, ParseState) of
+        {value, {var_type, [], TypeSpec}} ->
             create_value(TypeSpec, Size, ParseState);
+        {value, {var_type, VarList, TypeSpec}} ->
+            Subs = tester_variable_substitutions:substitutions_from_list(VarList, TypeList),
+            RealTypeSpec = tester_variable_substitutions:substitute(TypeSpec, Subs),
+            %ct:pal("type before sub~n~w~n", [TypeSpec]),
+            %ct:pal("type after sub~n~w~n", [RealTypeSpec]),
+            create_value(RealTypeSpec, Size, ParseState);
         none ->
-            ?ct_fail("error: unknown type ~p:~p~n", [Module, TypeName])
+            ?ct_fail("error: unknown type ~p:~p~n~w~n", [Module, TypeName, TypeList])
     end;
 create_value_({typed_record_field, _Name, Type}, Size, ParseState) ->
     create_value(Type, Size, ParseState);
@@ -230,7 +243,8 @@ create_value_({union, Types}, Size, ParseState) ->
     create_value(lists:nth(crypto:rand_uniform(1, Length + 1), Types),
                  Size, ParseState);
 create_value_(Unknown , _Size, _ParseState) ->
-    ct:pal("Cannot create type ~.0p~n", [Unknown]),
+    ct:pal("Cannot create type (you could register a custom value creator):~n"
+           "~.0p~n", [Unknown]),
     throw(function_clause).
 
 %% @doc creates a record value
@@ -269,7 +283,7 @@ custom_value_creator({Module, Fun, Arity} = _Creator, Type, Size, ParseState) ->
     case tester_parse_state:lookup_type({'fun', Module,
                                          Fun, Arity},
                                         ParseState) of
-        {value, {union_fun, FunTypes}} ->
+        {value, {var_type, [], {union_fun, FunTypes}}} ->
             {'fun', ArgType, _ResultType} = util:randomelem(FunTypes),
             Args = try {value, tester_value_creator:create_value(ArgType, Size, ParseState)}
                    catch
