@@ -4,7 +4,7 @@ scalaris-examples-wiki (0.7.1+svn-1) unstable; urgency=low
 
  -- Nico Kruber <kruber@zib.de>  Mon, 29 Sep 2014 17:00:00 +0200
 
-scalaris (0.7.1-1) stable; urgency=low
+scalaris-examples-wiki (0.7.1-1) stable; urgency=low
 
   * partly supported by the EU project IES Cities http://iescities.eu/
     and the EIT ICT Labs project MCData
