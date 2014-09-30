@@ -2,7 +2,7 @@ scalaris-examples-wiki (0.7.1+svn-1) unstable; urgency=low
 
   * svn snapshot from trunk
 
- -- Nico Kruber <kruber@zib.de>  Mon, 29 Sep 2014 17:00:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Mon, 30 Sep 2014 17:10:00 +0200
 
 scalaris-examples-wiki (0.7.1-1) stable; urgency=low
 
@@ -13,6 +13,8 @@ scalaris-examples-wiki (0.7.1-1) stable; urgency=low
     - fix ARTICLE_COUNT partitioning with hashes
   * Bugs:
     - fix numerous bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 30 Sep 2014 17:00:00 +0200
 
 scalaris-examples-wiki (0.7.0-1) stable; urgency=low
 
