@@ -69,7 +69,7 @@ For instructions on switching the database backend to tokyocabinet see [Tokyocab
 
 == Prebuild packages ==
 
-We build RPM and DEB packages for all tagged Scalaris versions as well as snapshots of svn trunk and provide them using the Open Build Service. The latest stable version is available at http://download.opensuse.org/repositories/home:/scalaris/. The latest svn snapshot as well as archives of previous versions are available in their respective folders below http://download.opensuse.org/repositories/home:/scalaris:/.
+We build RPM and DEB packages for the newest tagged Scalaris version as well as periodic snapshots of svn trunk and provide them using the Open Build Service. The latest stable version is available at http://download.opensuse.org/repositories/home:/scalaris/. The latest svn snapshot is available at http://download.opensuse.org/repositories/home:/scalaris:/svn/.
 
 Available packages are listed in the following table:
 
