@@ -10,6 +10,8 @@ scalaris-bindings (0.7.1-1) stable; urgency=low
   * Bugs:
     - fix numerous bugs
 
+ -- Nico Kruber <kruber@zib.de>  Mon, 30 Sep 2014 17:00:00 +0200
+
 scalaris-bindings (0.7.0-1) stable; urgency=low
 
   * API:
