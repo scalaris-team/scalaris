@@ -1,0 +1,14 @@
+1) download & extract the new tomcat (binary distribution)
+2) remove <new-tomcat-dir>/webapps/*
+3) move to new tomcat-dir:
+<old-tomcat-dir>/webapps/*
+<old-tomcat-dir>/.gitignore
+<old-tomcat-dir>/logs/.gitignore
+<old-tomcat-dir>/work/.gitignore
+4) in <new-tomcat-dir>/conf/server.xml:
+4a) search for the active "Connector" tag and add the following to its properties:
+URIEncoding="UTF-8"
+-> sets default parameter encoding to UTF-8 (required by the wiki app)
+maxHttpHeaderSize="262144"
+-> support redirect URLs with a lot of logged involved and failed keys
+5) replace <old-tomcat-dir> with <new-tomcat-dir>

@@ -1,0 +1,31 @@
+module scalaris 0.7.1;
+
+require {
+        attribute port_type;
+        attribute file_type;
+        type initrc_var_log_t;
+        type rabbitmq_beam_t;
+        type var_t;
+        type var_log_t;
+        type initrc_var_log_t;
+        type http_port_t;
+        class tcp_socket { name_bind name_connect };
+        class dir { getattr search read write add_name create };
+        class file { getattr setattr read write open create };
+}
+
+type scalaris_port_t, port_type;
+type scalaris_file_t, file_type;
+
+#============= rabbitmq_beam_t ==============
+allow rabbitmq_beam_t scalaris_port_t:tcp_socket name_bind;
+allow rabbitmq_beam_t scalaris_port_t:tcp_socket name_connect;
+
+allow rabbitmq_beam_t initrc_var_log_t:dir getattr;
+allow rabbitmq_beam_t var_t:dir read;
+allow rabbitmq_beam_t var_log_t:dir { getattr search read write add_name create };
+allow rabbitmq_beam_t var_log_t:file { getattr read write open create };
+allow rabbitmq_beam_t initrc_var_log_t:dir { getattr search read write add_name create };
+allow rabbitmq_beam_t initrc_var_log_t:file { getattr read write open create };
+allow rabbitmq_beam_t scalaris_file_t:dir { getattr search read write add_name create };
+allow rabbitmq_beam_t scalaris_file_t:file { getattr setattr read write open create };

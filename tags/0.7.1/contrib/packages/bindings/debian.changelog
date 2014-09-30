@@ -1,0 +1,137 @@
+scalaris-bindings (0.7.1-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+    and the EIT ICT Labs project MCData
+  * Packaging:
+    - add support for new distribution versions
+    - include daemon for monitoring Scalaris through JMX
+  * API:
+    - Java-API: integrate new OtpErlang library (1.5.10 from Erlang 17.3)
+  * Bugs:
+    - fix numerous bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 30 Sep 2014 17:00:00 +0200
+
+scalaris-bindings (0.7.0-1) stable; urgency=low
+
+  * API:
+    - Java-API: integrate new OtpErlang library (1.5.9 from Erlang 17.0)
+  * Bugs:
+    - fix numerous more (less severe) bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 28 Apr 2014 12:00:00 +0200
+
+scalaris-bindings (0.6.1-1) stable; urgency=low
+
+  * Packaging:
+    - add ArchLinux ruby API packages
+  * API:
+    - Java-API: add Maven build support
+    - Java-API: add CircularByteArrayOutputStream#clear()
+    - Java-API: fix ConnectionPool#getConnection(timeout) throwing
+                IllegalMonitorStateException if a single ConnectionPool is used
+                by multiple threads and no more connections are available
+    - Java-API: add a "-monitor" command line parameter
+    - api_monitor: return the latency and stddev values of the micro-benchmark
+                   executed by monitor_perf for node and service performance
+  * Bugs:
+    - fix some more (less severe) bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 11 Oct 2013 15:00:00 +0200
+
+scalaris-bindings (0.6.0-1) stable; urgency=low
+
+  * Packaging:
+    - add ArchLinux packages
+    - add support for new distribution versions
+  * API:
+    - no more timeouts in client APIs
+    - Java-API: re-worked the request and result list handling
+      -> move result processing to the operation classes
+    - Java-API: better support for custom operations
+    - Java-API: support the new partial reads:
+                ReadRandomFromListOp and ReadSublistOp
+    - Java-API: compile with "vars" debug info
+    - Java-API: integrate new OtpErlang library (1.5.8 from R16B) with fixed
+                support for compressed binaries
+    - Java-API: add back-ports from the Wiki on Scalaris demonstrator:
+      * list-change operations: ScalarisChangeListOp and
+                                ScalarisListAppendRemoveOp
+      * MultiMap classes are now in de.zib.tools
+      * CircularByteArrayOutputStream
+    - Java-API: fix hostname issues with Erlang and Java
+    - Java-API: slightly changed the delete API
+    - JSON-API: add API for auto-scale requests
+    - Python-API: add API for auto-scale requests
+    - Python-API: use default socket timeout
+    - Ruby-API: use default socket timeout
+    - all APIs: support lists of composite types
+  * Infrastructure:
+    - add a daemon to monitor Scalaris via JMX
+    - support for distributions with python3 available as "python" and
+      python2 as "python2"
+    - support for Ruby 1.9
+  * Bugs:
+    - use /bin/bash instead of /bin/sh which may not result in a bash session
+    - fix numerous other bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 23:20:13 +0200
+
+scalaris-bindings (0.5.0-1) stable; urgency=low
+  * API:
+    - allow Scalaris monitoring via JMX through the Java API
+    - added an executor-service to the Java-API (de.zib.scalaris.executor.*)
+    - added a node discovery daemon to the Java-API
+    - allow compressed communication between the Java-API and Erlang for
+      increased performance, especially if the two are on separate nodes
+    - added VM management support to the JSON- and Python-API
+    - added transaction log filtering to the Java-API, i.e. only sent the
+      needed parts of the tlog back to Erlang and re-combine the result
+    - fixed api_tx:req_list_commit_each/1 not running requests in parallel
+      -> do not assure any order of requests, even if on same key!
+  * Bugs:
+    - fixed numerous bugs
+
+ -- Nico Kruber <kruber@zib.de>  Thu, 11 Oct 2012 12:30:00 +0200
+
+scalaris-bindings (0.4.1-1) stable; urgency=low
+
+  * Packaging:
+    - install rubygem dependencies in Debian postinstall scripts for Ruby API
+
+ -- Nico Kruber <kruber@zib.de>  Thu, 22 Mar 2012 10:51:00 +0100
+
+scalaris-bindings (0.4.0-1) stable; urgency=low
+
+  * API:
+    - new functions for incremental data change:
+      test_and_set: check for a provided old value before setting a new one
+      add_on_nr: increment a numeric value
+      add_del_on_list: append or delete entries from a list value
+    - added VM API to manage Scalaris nodes inside an Erlang virtual machine
+    - added monitoring API to retrieve some live metrics
+    - added a connection pool convenience class (Java, Python)
+  * Documentation:
+    - updated documentation to extended APIs
+  * Bugs:
+    - fixed numerous bugs
+
+ -- Nico Kruber <kruber@zib.de>  Wed, 25 Jan 2012 00:48:00 +0100
+
+scalaris-bindings (0.3.0-1) stable; urgency=low
+
+  * API
+    - new API with interoperable bindings to Java, Python, Ruby, and JSON
+    - support for several data types, including strings, integers, JSON
+      objects, binary objects.
+    - new transaction interface with support for bundled requests for better
+      latency.
+  * Tests
+    - added numerous unittests
+    - added language-binding interoperability tests
+  * Documentation
+    - extended, but - as always - by far not enough...
+  * Bugs
+    - fixed countless bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 15 Jul 2011 17:01:00 +0200

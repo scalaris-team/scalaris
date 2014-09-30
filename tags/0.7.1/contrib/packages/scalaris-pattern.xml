@@ -1,0 +1,27 @@
+<!-- See http://en.opensuse.org/Build_Service_Tutorial#Create_Patterns -->
+<!-- See https://github.com/openSUSE/libzypp/blob/master/zypp/parser/yum/schema/patterns.rng -->
+
+<pattern
+ xmlns="http://novell.com/package/metadata/suse/pattern"
+ xmlns:rpm="http://linux.duke.edu/metadata/rpm">
+    <name>Scalaris</name>
+    <summary>Scalaris, a distributed key-value store</summary>
+    <description>Scalaris is a scalable, transactional, distributed key-value store. It can be used for building scalable Web 2.0 services.
+
+Scalaris uses a structured overlay with a non-blocking Paxos commit protocol for transaction processing with strong consistency over replicas. Scalaris is implemented in Erlang.</description>
+    <uservisible/>
+    <category lang="en">Database</category>
+    <category lang="de">Datenbank</category>
+    <rpm:requires>
+      <rpm:entry name="scalaris"/>
+    </rpm:requires>
+    <rpm:recommends>
+      <rpm:entry name="scalaris-java"/>
+      <rpm:entry name="python-scalaris"/>
+      <rpm:entry name="python3-scalaris"/>
+      <rpm:entry name="ruby-scalaris"/>
+    </rpm:recommends>
+    <rpm:suggests>
+      <rpm:entry name="scalaris-doc"/>
+    </rpm:suggests>
+</pattern>

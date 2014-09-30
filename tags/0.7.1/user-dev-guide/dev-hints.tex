@@ -1,0 +1,70 @@
+\chapter{General Hints}
+
+\section{Coding Guidelines}
+
+\begin{itemize}
+\item Keep the code short
+\item Use \erlmodule{gen\_component} to implement additional processes
+\item Don't use receive by yourself (Exception: to implement single threaded
+  user API calls (cs\_api, yaws\_calls, etc)
+\item Don't use \erlfun{erlang}{now}{/0}, \erlfun{erlang}{send\_after}{/3},
+  \code{receive after} etc. in performance critical code, consider
+  using \erlmodule{msg\_delay} instead.
+\item Don't use \erlfun{timer}{tc}{/3} as it catches exceptions. Use
+  \erlfun{util}{tc}{/3} instead.
+\end{itemize}
+
+\section{Testing Your Modifications and Extensions}
+
+\begin{itemize}
+\item Run the testsuites using \code{make test}
+\item Run the java api test using \code{make java-test}
+      (\scalaris{} output will be printed if a test fails; if you want to see
+      it during the tests, start a \code{bin/firstnode.sh} and run the tests by
+      \code{cd java; ant test})
+\item Run the Ruby client by starting \scalaris{} and running
+      \code{cd contrib; ./jsonrpc.rb}
+\end{itemize}
+
+\section{Help with Digging into the System}
+\label{sec:digging}
+
+\begin{itemize}
+\item use \erlfun{ets}{i}{/0,1} to get details on the local state of some
+      processes
+\item consider changing pdb.erl to use ets instead of erlang:put/get
+\item Have a look at strace -f -p PID of beam process
+\item Get message statistics via the Web-interface
+\item enable/disable tracing for certain modules
+\item Trace messages using the \erlmodule{trace\_mpath} module
+%% \item enable gen-component profiling and read the collected data using
+%%
+%%    \code{lists:reverse(lists:keysort(2,ets:tab2list(profiling))).}
+%%
+%%    (Has the limitation that it measures using absolute time, maybe the data
+%%    is more ok, when using -smp disable? ...)
+\item Use etop and look at the total memory size and atoms generated
+\item send processes sleep or kill messages to test certain behaviour (see
+  \erlmodule{gen\_component}.erl)
+\item use \code{admin:number_of_nodes().}
+\item use \code{admin:check_ring().}
+\end{itemize}
+
+%% \section{General Erlang server loop}
+%%
+%% Servers in Erlang often use the following structure to maintain a state
+%% while processing received messages:
+%%
+%% \lstset{language=erlang}
+%% \begin{lstlisting}
+%% loop(State) ->
+%%   receive
+%%     Message ->
+%%       State1 = f(State),
+%%       loop(State1)
+%%   end.
+%% \end{lstlisting}
+%%
+%% The server runs an endless loop, that waits for a message, processes it and
+%% calls itself using tail-recursion in each branch. The loop works on a
+%% \code{State}, which can be modified when a message is handled.

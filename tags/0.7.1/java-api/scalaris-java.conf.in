@@ -1,0 +1,124 @@
+#  Copyright 2007-2011 Zuse Institute Berlin
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+# sample configuration file for the scalaris java client start script
+# save file to @sysconfdir@/scalaris/scalaris-java.conf or ~/.scalaris/scalaris-java.conf
+
+# 1. rpm_mode
+#
+#  Specifies:
+#
+#      If in rpm mode system tools will be used to build the classpath and
+#      set up the java virtual machine.
+#
+#  Type of value:
+#
+#      boolean
+#
+#  Default value:
+#
+#      false
+#
+#  Effect if unset:
+#
+#      Start script builds the classpath based on the libraries provided in
+#      SCALARIS_JAVA_HOME.
+#
+rpm_mode=true
+
+# 2. SCALARIS_JAVA_HOME
+#
+#  Specifies:
+#
+#      The directory of the scalaris.jar file to use.
+#      SCALARIS_JAVA_HOME/lib provides some needed libraries.
+#
+#  Type of value:
+#
+#      Path name
+#
+#  Default value:
+#
+#      unset
+#
+#  Effect if unset:
+#
+#      Start script will set the value to the directory it is located in.
+#
+SCALARIS_JAVA_HOME="@datarootdir@/java/scalaris"
+
+# 3. OPT_JAR_LIST
+#
+#  Specifies:
+#
+#      Additional libraries to add to the classpath.
+#
+#  Type of value:
+#
+#      list of names of jar files (without extension)
+#
+#  Default value:
+#
+#      empty
+#
+#  Effect if unset:
+#
+#      Start script will set the value to the directory it is located in.
+#
+OPT_JAR_LIST=
+
+# 4. LOCALCLASSPATH
+#
+#  Specifies:
+#
+#      Classpath to prepend to the path the start script sets up.
+#      (only used if not in rpm_mode)
+#
+#  Type of value:
+#
+#      java classpath
+#
+#  Default value:
+#
+#      empty
+#
+#  Notes:
+#      The following classpath will be set up by the start script if not in rpm_mode:
+#      $SCALARIS_JAVA_HOME/scalaris.jar:$SCALARIS_JAVA_HOME/lib/jakarta-commons-cli-1.1.jar:$SCALARIS_JAVA_HOME/lib/OtpErlang-1.4.jar
+LOCALCLASSPATH=
+
+# 4. SCALARIS_JAVA_CONFIG
+#
+#  Specifies:
+#
+#      Name of the config file to load (contains properties such as the node
+#      name to connect to).
+#
+#  Type of value:
+#
+#      file name (including path)
+#
+#  Default value:
+#
+#      "scalaris.properties"
+#      (set by the java classes)
+#
+#  Effect if unset:
+#
+#      The de.zib.scalaris.ConnectionFactory class will try to find the
+#      default file at the same location where the jar file is located.
+#      If no file exists, default values are used - see 
+#      de.zib.scalaris.ConnectionFactory::ConnectionFactory() for more details.
+#
+SCALARIS_JAVA_CONFIG="@sysconfdir@/scalaris/scalaris.properties"

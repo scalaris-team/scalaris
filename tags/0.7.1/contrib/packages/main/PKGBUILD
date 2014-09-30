@@ -1,0 +1,32 @@
+# Maintainer: Nico Kruber <kruber at zib dot de>
+# Contributor: Roman Parykin <donderom at ymail dot com>
+pkgname=scalaris
+pkgver=0.7.1
+pkgrel=1
+pkgdesc="A scalable, transactional, distributed key-value store."
+arch=('i686' 'x86_64')
+url="http://code.google.com/p/scalaris/"
+license=('Apache')
+depends=('openssl' 'erlang>=R13B01' 'util-linux>=2.23' 'systemd')
+makedepends=('screen')
+optdepends=('tokyocabinet: storage on disk'
+            'screen: scalaris daemon with screen')
+backup=('etc/conf.d/scalaris' 'etc/conf.d/scalaris-first' 'etc/scalaris/scalaris.local.cfg' 'etc/scalaris/scalarisctl.conf')
+source=($pkgname-$pkgver.tar.gz)
+md5sums=('f188e12f4cf893022a87a1b29971aa81')
+install=install
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+              --with-systemd
+  make
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  make DESTDIR="$pkgdir/" install
+  
+  # put the LICENSE file to the licenses
+  install -D -m644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

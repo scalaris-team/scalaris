@@ -1,0 +1,180 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <link rel='shortcut icon' type='image/x-icon' href='/favicon.ico' />
+<erl>
+out(Arg) ->
+    {header, {cache_control, "no-cache"}}.
+</erl>
+    <title>Scalaris Management Interface</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  <!--[if lte IE 5.5999]>
+    <style type="text/css">@import url(ie55-.css);</style>
+  <![endif]-->
+    <script language="javascript" type="text/javascript" src="flot/jquery.min.js"></script>
+    <script language="javascript" type="text/javascript" src="tablesort/jquery.tablesorter.min.js"></script>
+    <link rel="stylesheet" href="tablesort/blue/style.css" type="text/css"/>
+    <script language="javascript" type="text/javascript">
+        $(document).ready(function() {
+            $("table").tablesorter();
+        });
+    </script>
+  </head>
+  <body>
+
+    <div class="menubar">
+      <div class="nothighlighted">
+        <h2>Scalaris</h2>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="index.yaws">Home</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="ring.yaws">Ring</a>
+      </div>
+
+<erl>
+out(Arg) ->
+    case whereis(mgmt_server) of
+        undefined -> {html, ""};
+        _ ->
+            {html,
+"      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
+      </div>
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
+      </div>" ++
+    case config:read(dc_clustering_enable) of
+        true -> "
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"dc.yaws\">Datacenter Clusters Map</a>
+      </div>
+";
+        _ -> ""
+    end ++ "
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"bench.yaws\">Benchmarks</a>
+      </div>
+"}
+    end.
+</erl>
+
+      <div class="nothighlighted">
+        <a class="menua" href="gossip.yaws">Gossip values</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_client.yaws">Client Monitor</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_ring.yaws">Ring Monitor</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="documentation.yaws">Docu</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="debug.yaws">Debug</a>
+      </div>
+      <div class="highlightedlast">
+        <a class="menua" href="logger.yaws">Message Stats</a>
+      </div>
+    </div><div class="middle">
+      <div class="middleleft">
+<h2>Message Statistics</h2>
+
+<erl>
+make_footer(Start, TotalBytes, TotalCount) ->
+    [{tr, [],
+       [
+         {td, [], {p, [], "Total"}},
+         {td, [], io_lib:format("~15.10B", [TotalBytes])},
+         {td, [], io_lib:format("~15.10B", [TotalCount])},
+         {td, [], io_lib:format("~15.3f", [TotalBytes / timer:now_diff(erlang:now(), Start) * 1000000.0])},
+         {td, [], io_lib:format("~15.3f", [TotalCount / timer:now_diff(erlang:now(), Start) * 1000000.0])},
+         {td, [], io_lib:format("~15.3f", [TotalBytes / TotalCount])},
+         {td, [], io_lib:format("~15.3f", [100.0])},
+         {td, [], io_lib:format("~15.3f", [100.0])}
+       ] }
+].
+
+make_table([], _, _, _, _) ->
+    [];
+make_table([{Tag, _} | Rest], Map, Start, TotalBytes, TotalCount) ->
+    {Size, Count} = gb_trees:get(Tag, Map),
+    RealTag = case Tag of
+                {Channel, MsgTag} -> {Channel, util:extint2atom(MsgTag)};
+                MsgTag -> util:extint2atom(MsgTag)
+              end,
+    [{tr, [],
+       [
+         {td, [], {p, [], io_lib:format("~p", [RealTag])}},
+         {td, [], io_lib:format("~15.10B", [Size])},
+         {td, [], io_lib:format("~15.10B", [Count])},
+         {td, [], io_lib:format("~15.3f", [Size / timer:now_diff(erlang:now(), Start) * 1000000.0])},
+         {td, [], io_lib:format("~15.3f", [Count / timer:now_diff(erlang:now(), Start) * 1000000.0])},
+         {td, [], io_lib:format("~15.3f", [Size / Count])},
+         {td, [], io_lib:format("~15.3f", [Size / TotalBytes * 100.0])},
+         {td, [], io_lib:format("~15.3f", [Count / TotalCount * 100.0])}
+       ] }
+       | make_table(Rest, Map, Start, TotalBytes, TotalCount)].
+
+get_totals(none, TotalBytes, TotalCount) ->
+    {TotalBytes, TotalCount};
+get_totals({_Tag, {Size, Count}, Iterator}, TotalBytes, TotalCount) ->
+    get_totals(gb_trees:next(Iterator), Size + TotalBytes, Count + TotalCount).
+
+get_tags(none) ->
+    [];
+get_tags({Tag, {Size, _Count}, Iterator}) ->
+    [{Tag, Size} | get_tags(gb_trees:next(Iterator))].
+
+tree_log_to_table(Map, Start, Heading) ->
+    case gb_trees:size(Map) of
+      0 ->
+        [{h3, [], Heading},
+         {p, [], "No messages logged. Enable logging in <tt>include/scalaris.hrl</tt> (<tt>LOG_MESSAGE</tt> and/or <tt>LOG_MESSAGE_SOCK</tt> macro)."}];
+      _ ->
+        SortedTagList = lists:reverse(lists:keysort(2, get_tags(gb_trees:next(gb_trees:iterator(Map))))),
+        {TotalBytes, TotalCount} = get_totals(gb_trees:next(gb_trees:iterator(Map)), 0, 0),
+        TableHead = {thead, [], [{tr, [],
+          [
+            {th, [], "Message Tag"},
+            {th, [], "Total Size"},
+            {th, [], "Total Count"},
+            {th, [], "Average Byte/s"},
+            {th, [], "Average 1/s"},
+            {th, [], "Average Msg Size"},
+            {th, [], "Percent of Bytes"},
+            {th, [], "Percent of Count"}
+            ]}
+          ]},
+        TableBody = {tbody, [], [make_table(SortedTagList, Map, Start, TotalBytes, TotalCount)]},
+        TableFooter = {tfoot, [], [make_footer(Start, TotalBytes, TotalCount)]},
+        [{h3, [], Heading},
+         {table, [{class, 'tablesorter'}], [TableHead, TableBody, TableFooter]}]
+    end.
+
+out(Arg) ->
+    {Received, Sent, Start} = comm_logger:dump(),
+    {ehtml, [tree_log_to_table(Received, Start, "Received Messages") ++ tree_log_to_table(Sent, Start, "Sent Messages")]}.
+</erl>
+
+<hr />
+<p>Last update:
+<erl>
+ out(Arg) ->
+    {Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
+</erl></p>
+</div>
+<br class="br_class">&nbsp;
+</div>
+<div class="bottom">
+</div>
+</body>
+</html>
