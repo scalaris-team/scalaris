@@ -19,12 +19,15 @@
 -author('kruber@zib.de').
 -vsn('$Id$').
 
+-include("scalaris.hrl").
+
 -export([get_round_trip/2]).
 -export([
          dump/0, dump2/0, dump3/0, dumpX/1, dumpX/2,
          topDumpX/1, topDumpX/3,
          topDumpXEvery/3, topDumpXEvery/5, topDumpXEvery_helper/4
         ]).
+-export([rr_count_old_replicas/2]).
 
 %% @doc Simple round-trip benchmark to an arbitrary gen_component.
 -spec get_round_trip(GPid::comm:mypid(), Iterations::pos_integer()) -> float().
@@ -197,3 +200,67 @@ topDumpXEvery(Keys, ValueFun, IntervalS, Subset, StopAfter)
              is_subtype(ValueFun, fun((atom(), term()) -> term())).
 topDumpXEvery_helper(Keys, ValueFun, Seconds, Subset) ->
     io:format("-----~n~.0p~n", [lists:sublist(topDumpX(Keys, ValueFun, Seconds), Subset)]).
+
+-spec rr_count_old_replicas(Key::?RT:key(), Interval::intervals:interval())
+        -> non_neg_integer().
+rr_count_old_replicas(Key, ReqI) ->
+    NodeDetails = rr_count_old_replicas_nd(Key),
+
+    I = intervals:intersection(ReqI, node_details:get(NodeDetails, my_range)),
+    case intervals:is_empty(I) of
+        true -> 0;
+        false ->
+            DBList = rr_count_old_replicas_data(
+                       node:pidX(node_details:get(NodeDetails, node))),
+            This = comm:this(),
+            lists:foldl(
+              fun({KeyX, VerX}, Acc) ->
+                      _ = [api_dht_raw:unreliable_lookup(K, {?read_op, This, 0, K, ?write})
+                             || K <- ?RT:get_replica_keys(KeyX), K =/= KeyX],
+                      % note: receive wrapped in anonymous functions to allow
+                      %       ?SCALARIS_RECV in multiple receive statements
+                      V1 = fun() ->
+                                   trace_mpath:thread_yield(),
+                                   receive ?SCALARIS_RECV({?read_op_with_id_reply,
+                                                           0, _, ?ok,
+                                                           ?value_dropped, V},
+                                                          V)
+                                   end end(),
+                      V2 = fun() ->
+                                   trace_mpath:thread_yield(),
+                                   receive ?SCALARIS_RECV({?read_op_with_id_reply,
+                                                           0, _, ?ok,
+                                                           ?value_dropped, V},
+                                                          V)
+                                   end end(),
+                      V3 = fun() ->
+                                   trace_mpath:thread_yield(),
+                                   receive ?SCALARIS_RECV({?read_op_with_id_reply,
+                                                           0, _, ?ok,
+                                                           ?value_dropped, V},
+                                                          V)
+                            end end(),
+                      case VerX =:= lists:max([V1, V2, V3]) of
+                          true -> Acc;
+                          false -> Acc + 1
+                      end
+              end, 0, DBList)
+end.
+
+-spec rr_count_old_replicas_nd(Key::?RT:key()) -> node_details:node_details().
+rr_count_old_replicas_nd(Key) ->
+    api_dht_raw:unreliable_lookup(Key, {get_node_details, comm:this(),
+                                        [node, my_range]}),
+    trace_mpath:thread_yield(),
+    receive ?SCALARIS_RECV({get_node_details_response, NodeDetails},% ->
+                           NodeDetails) end.
+
+-spec rr_count_old_replicas_data(Pid::comm:mypid()) -> [{?RT:key(), db_dht:version()}].
+rr_count_old_replicas_data(Pid) ->
+    comm:send(Pid, {unittest_get_bounds_and_data, comm:this(), kv}),
+    trace_mpath:thread_yield(),
+    receive
+        ?SCALARIS_RECV(
+        {unittest_get_bounds_and_data_response, _Bounds, DBList, _Pred, _Succ},% ->
+        DBList)
+    end.

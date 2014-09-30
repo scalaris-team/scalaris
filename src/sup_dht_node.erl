@@ -62,7 +62,6 @@ childs([{DHTNodeGroup, Options}]) ->
             true -> sup:worker_desc(autoscale, autoscale, start_link, [DHTNodeGroup]);
             _ -> []
         end,
-    Cyclon = sup:worker_desc(cyclon, cyclon, start_link, [DHTNodeGroup]),
     DBValCache =
         sup:worker_desc(dht_node_db_cache, dht_node_db_cache, start_link,
                              [DHTNodeGroup]),
@@ -89,6 +88,9 @@ childs([{DHTNodeGroup, Options}]) ->
     RMLeases =
         sup:worker_desc(rm_leases, rm_leases,
                              start_link, [DHTNodeGroup]),
+    LeaseWatcher =
+        sup:worker_desc(lease_watcher, lease_watcher,
+                             start_link, [DHTNodeGroup]),
     RoutingTable =
         sup:worker_desc(routing_table, rt_loop, start_link,
                              [DHTNodeGroup]),
@@ -100,12 +102,8 @@ childs([{DHTNodeGroup, Options}]) ->
     %%         util:sup_supervisor_desc(sup_mr, sup_mr, start_link, [DHTNodeGroup]);
     %%     _ -> []
     %% end,
-    Vivaldi =
-        sup:worker_desc(vivaldi, vivaldi, start_link, [DHTNodeGroup]),
     Monitor =
         sup:worker_desc(monitor, monitor, start_link, [DHTNodeGroup]),
-    MonitorPerf =
-        sup:worker_desc(monitor_perf, monitor_perf, start_link, [DHTNodeGroup]),
     RepUpdate =
         case config:read(rrepair_enabled) of
             true -> sup:worker_desc(rrepair, rrepair, start_link, [DHTNodeGroup]);
@@ -125,17 +123,15 @@ childs([{DHTNodeGroup, Options}]) ->
                     DBValCache,
                     DeadNodeCache,
                     RoutingTable,
-                    Cyclon,
-                    Vivaldi,
                     DC_Clustering,
                     Gossip,
                     SnapshotLeader,
                     SupWPool,
                     WPool,
                     SupDHTNodeCore_AND,
-                    MonitorPerf,
                     RepUpdate,
                     Autoscale,
                     RMLeases,
+                    LeaseWatcher,
                     LBActive
            ]).

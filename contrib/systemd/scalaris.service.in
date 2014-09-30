@@ -1,0 +1,14 @@
+[Unit]
+Description=Scalaris node
+Requires=remote-fs.target
+After=remote-fs.target
+
+[Service]
+EnvironmentFile=@sysconfdir@/conf.d/scalaris
+ExecStart=@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -e "-noshell" $SCALARIS_ADDITIONAL_PARAMETERS start
+ExecStop=@bindir@/scalarisctl -n ${SCALARIS_NODE} -s -e "-noshell" $SCALARIS_ADDITIONAL_PARAMETERS gstop
+
+WorkingDirectory=@localstatedir@/log/scalaris
+
+User=scalaris
+Group=scalaris

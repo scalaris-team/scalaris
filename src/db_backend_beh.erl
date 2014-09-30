@@ -22,7 +22,16 @@
 
 -type db() :: any().
 -type key() :: term(). %% '$end_of_table' is not allowed as key() or else iterations won't work with ets!
--type entry() :: tuple().
+-type entry() :: {key(), term()}
+               | {key(), term(), term()}
+               | {key(), term(), term(), term()}
+               | {key(), term(), term(), term(), term()}
+               | {key(), term(), term(), term(), term(), term()}
+               | {key(), term(), term(), term(), term(), term(), term()}
+               | {key(), term(), term(), term(), term(), term(), term(), term()}
+               | {key(), term(), term(), term(), term(), term(), term(), term(), term()}
+               | {key(), term(), term(), term(), term(), term(), term(), term(), term(), term()}
+               | {key(), term(), term(), term(), term(), term(), term(), term(), term(), term(), term()}.
 -type left_bracket() :: '(' | '['.
 -type right_bracket() :: ')' | ']'.
 -type interval() :: {key()} | all | {left_bracket(), key(), key(), right_bracket()}.

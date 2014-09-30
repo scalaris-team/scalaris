@@ -65,7 +65,9 @@
 -type mt_interval()     :: intervals:interval().
 -type mt_bucket_entry() :: {?RT:key()} | {?RT:key(), any()} | {?RT:key(), any(), any()}. % add more, if needed
 -type mt_bucket()       :: [mt_bucket_entry()].
--type mt_size()         :: {InnerNodes::non_neg_integer(), Leafs::non_neg_integer()}.
+-type mt_size()         :: {InnerNodes::non_neg_integer(),
+                            LeafNodes::non_neg_integer(),
+                            Items::non_neg_integer()}.
 -type hash_fun()        :: fun((binary()) -> binary()).
 -type inner_hash_fun()  :: fun(([mt_node_key(),...]) -> mt_node_key()).
 
@@ -196,7 +198,8 @@ get_childs({_H, _Cnt, _LCnt, _Bkt, _I, Childs}) -> Childs.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc returns number of items in a bucket / returns 0 if requested node is not a leaf node
+%% @doc Returns the number of items in a bucket or 0 if the given node is not a
+%%     leaf node.
 -spec get_item_count(merkle_tree() | mt_node()) -> non_neg_integer().
 get_item_count({merkle_tree, _, Root}) -> get_item_count(Root);
 get_item_count({_H, Count, _LCnt, _Bkt, _I, _CL = []}) -> Count;
@@ -286,8 +289,8 @@ insert_to_node(Key, CheckKey, {Hash, Count, LeafCount, [], Interval, Childs = [_
                  Params::mt_config_params()) -> MerkleTree::merkle_tree().
 bulk_build(I, KeyList, Params) ->
     Config = build_config(Params),
-    {merkle_tree, Config,
-     hd(build_childs([{I, length(KeyList), KeyList}], Config, []))}.
+    [Root] = build_childs([{I, length(KeyList), KeyList}], Config, []),
+    {merkle_tree, Config, Root}.
 
 %% @doc Builds a merkle node from the given KeyList assuming that the current
 %%      node needs to be split because the KeyList is larger than
@@ -396,27 +399,28 @@ node_size({_H, Count, _LCnt, _Bkt, _I, _CL = [_|_]}) -> Count.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc Returns a tuple with number of inner nodes and leaf nodes.
+% @doc Returns a triple with number of inner nodes, leaf nodes and hashed items.
 -spec size_detail(merkle_tree()) -> mt_size().
 size_detail({merkle_tree, _, Root}) ->
-    Result = {_Inner, _Leafs} = size_detail_node([Root], 0, 0),
+    Result = {_Inner, _Leafs, _Items} = size_detail_node([Root], 0, 0, 0),
     ?DBG_ASSERT(get_leaf_count(Root) =:= -1 orelse _Leafs =:= get_leaf_count(Root)),
     Result.
 
 -spec size_detail_node([mt_node() | [mt_node()]], InnerNodes::non_neg_integer(),
-                       Leafs::non_neg_integer()) -> mt_size().
-size_detail_node([{_H, _Cnt, _LCnt, _Bkt, _I, Childs = [_|_]} | R], Inner, Leafs) ->
-    size_detail_node([Childs | R], Inner + 1, Leafs);
-size_detail_node([{_H, _Cnt, _LCnt, _Bkt, _I, _Childs = []} | R], Inner, Leafs) ->
-    size_detail_node(R, Inner, Leafs + 1);
-size_detail_node([], InnerNodes, Leafs) ->
-    {InnerNodes, Leafs};
-size_detail_node([[{_H, _Cnt, _LCnt, _Bkt, _I, Childs = [_|_]} | R1] | R2], Inner, Leafs) ->
-    size_detail_node([Childs, R1 | R2], Inner + 1, Leafs);
-size_detail_node([[{_H, _Cnt, _LCnt, _Bkt, _I, _Childs = []} | R1] | R2], Inner, Leafs) ->
-    size_detail_node([R1 | R2], Inner, Leafs + 1);
-size_detail_node([[] | R2], Inner, Leafs) ->
-    size_detail_node(R2, Inner, Leafs).
+                       Leafs::non_neg_integer(), Items::non_neg_integer())
+        -> mt_size().
+size_detail_node([{_H, _Cnt, _LCnt, _Bkt, _I, Childs = [_|_]} | R], Inner, Leafs, Items) ->
+    size_detail_node([Childs | R], Inner + 1, Leafs, Items);
+size_detail_node([{_H, Cnt, _LCnt, _Bkt, _I, _Childs = []} | R], Inner, Leafs, Items) ->
+    size_detail_node(R, Inner, Leafs + 1, Items + Cnt);
+size_detail_node([], InnerNodes, Leafs, Items) ->
+    {InnerNodes, Leafs, Items};
+size_detail_node([[{_H, _Cnt, _LCnt, _Bkt, _I, Childs = [_|_]} | R1] | R2], Inner, Leafs, Items) ->
+    size_detail_node([Childs, R1 | R2], Inner + 1, Leafs, Items);
+size_detail_node([[{_H, Cnt, _LCnt, _Bkt, _I, _Childs = []} | R1] | R2], Inner, Leafs, Items) ->
+    size_detail_node([R1 | R2], Inner, Leafs + 1, Items + Cnt);
+size_detail_node([[] | R2], Inner, Leafs, Items) ->
+    size_detail_node(R2, Inner, Leafs, Items).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

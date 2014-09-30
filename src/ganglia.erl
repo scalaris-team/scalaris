@@ -41,7 +41,7 @@
                    {ganglia_periodic} |
                    {ganglia_dht_load_aggregation, DHTNode :: pid(), AggId :: non_neg_integer(), message()} |
                    {ganglia_vivaldi_confidence, pid(), message()} |
-                   {crash, PID :: pid(), {ganglia, AggId :: non_neg_integer()}}.
+                   {crash, PID::comm:mypid(), Reason::fd:reason(), {ganglia, AggId::non_neg_integer()}}.
 
 -spec start_link(pid_groups:groupname()) -> {ok, pid()}.
 start_link(ServiceGroup) ->
@@ -89,7 +89,11 @@ on({ganglia_dht_load_aggregation, PID, AggId, Msg}, State) ->
 %% @doc handler for messages from failure detector
 %%     if a node crashes before sending out the load data
 %%     we ignore its load information
-on({crash, _PID, {ganglia, AggId}}, State) ->
+on({crash, PID, jump, Cookie}, State) ->
+    % subscribe again (subscription was removed at fd)
+    fd:subscribe(PID, Cookie),
+    State;
+on({crash, _PID, _Reason, {ganglia, AggId}}, State) ->
     ?TRACE("Node failed~n",[]),
     CurAggId = get_agg_id(State),
     if
@@ -99,28 +103,6 @@ on({crash, _PID, {ganglia, AggId}}, State) ->
         true ->
             State
     end;
-
-%% @doc receives requested latency and transactions/s
-%%     rrd data from the monitor and sends it to Ganglia
-on({get_rrds_response, Response}, State) ->
-    RRDMetrics =
-        case Response of
-            [{_,_, undefined}] -> [];
-            [{_, _, RRD}] ->
-                case rrd:dump(RRD) of
-                    [H | _] ->
-                    {From_, To_, Value} = H,
-                        Diff_in_s = timer:now_diff(To_, From_) div 1000000,
-                        {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
-                        AvgPerS = Count / Diff_in_s,
-                        Avg = Sum / Count,
-                        [{both, "tx latency", "float", Avg, "ms"},
-                         {both, "transactions/s", "float", AvgPerS, "1/s"}];
-                    _ -> []
-                end
-        end,
-    gmetric(RRDMetrics),
-    State;
 
 %% @doc handler for messages from the vivaldi process
 %%     reporting its confidence
@@ -169,14 +151,30 @@ send_message_metrics() ->
     traverse(sent, gb_trees:iterator(Sent)),
     ok.
 
+%% @doc Sends latency and transactions/s rrd data from the monitor to Ganglia
 -spec send_rrd_metrics() -> ok.
 send_rrd_metrics() ->
     case pid_groups:pid_of("clients_group", monitor) of
         failed -> ok;
         ClientMonitor ->
-            %% Request statistics in RRD (Load, Latency)
-            comm:send_local(ClientMonitor, {get_rrds, [{api_tx, 'req_list'}], comm:this()})
-    end.
+            RRDMetrics = case monitor:get_rrds(ClientMonitor, [{api_tx, 'req_list'}]) of
+                             [{_,_, undefined}] -> [];
+                             [{_, _, RRD}] ->
+                                 case rrd:dump(RRD) of
+                                     [H | _] ->
+                                         {From_, To_, Value} = H,
+                                         Diff_in_s = timer:now_diff(To_, From_) div 1000000,
+                                         {Sum, _Sum2, Count, _Min, _Max, _Hist} = Value,
+                                         AvgPerS = Count / Diff_in_s,
+                                         Avg = Sum / Count,
+                                         [{both, "tx latency", "float", Avg, "ms"},
+                                          {both, "transactions/s", "float", AvgPerS, "1/s"}];
+                                     _ -> []
+                                 end
+                         end,
+            gmetric(RRDMetrics)
+    end,
+    ok.
 
 -spec send_vivaldi_errors() -> ok.
 send_vivaldi_errors() ->
@@ -186,10 +184,10 @@ send_vivaldi_errors() ->
                         X -> X
                     end,
     lists:foreach(fun (Group) ->
-                          PID = pid_groups:pid_of(Group, vivaldi),
+                          PID = pid_groups:pid_of(Group, gossip),
                           Envelope = comm:reply_as(comm:this(), 3,
                                                    {ganglia_vivaldi_confidence, Group, '_'}),
-                          comm:send_local(PID, {get_coordinate, Envelope})
+                          comm:send_local(PID, {cb_msg, {gossip_vivaldi, default}, {get_coordinate, Envelope}})
                   end, DHTNodeGroups),
     ok.
 

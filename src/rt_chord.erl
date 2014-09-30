@@ -96,8 +96,8 @@ init_stabilize(Neighbors, RT) ->
 
 %% userdevguide-begin rt_chord:filter_dead_node
 %% @doc Removes dead nodes from the routing table.
--spec filter_dead_node(rt(), comm:mypid()) -> rt().
-filter_dead_node(RT, DeadPid) ->
+-spec filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
+filter_dead_node(RT, DeadPid, _Reason) ->
     DeadIndices = [Index || {Index, Node}  <- gb_trees:to_list(RT),
                             node:same_process(Node, DeadPid)],
     lists:foldl(fun(Index, Tree) -> gb_trees:delete(Index, Tree) end,
@@ -146,6 +146,25 @@ get_split_key(Begin, _End, {Num, _Denom}) when Num == 0 -> Begin;
 get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
 get_split_key(Begin, End, {Num, Denom}) ->
     normalize(Begin + trunc(get_range(Begin, End) * Num) div Denom).
+
+%% @doc Splits the range between Begin and End into up to Parts equal parts and
+%%      returning the according split keys.
+-spec get_split_keys(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                     Parts::pos_integer()) -> [key()].
+get_split_keys(Begin, End, Parts) ->
+    lists:reverse(get_split_keys_helper(Begin, End, Parts, [])).
+
+-spec get_split_keys_helper(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                            Parts::pos_integer(), Acc::[key()]) -> [key()].
+get_split_keys_helper(_Begin, _End, 1, Acc) ->
+    Acc;
+get_split_keys_helper(Begin, End, Parts, Acc) ->
+    SplitKey = get_split_key(Begin, End, {1, Parts}),
+    if SplitKey =:= Begin ->
+           get_split_keys_helper(Begin, End, Parts - 1, Acc);
+       true ->
+           get_split_keys_helper(SplitKey, End, Parts - 1, [SplitKey | Acc])
+    end.
 
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and
 %%      calculates a random key in this range. Fails with an exception if there
@@ -226,17 +245,15 @@ stabilize(Neighbors, RT, Index, Node) ->
              NewNeighbors::nodelist:neighborhood())
         -> {ok | trigger_rebuild, rt()}.
 update(OldRT, OldNeighbors, NewNeighbors) ->
-    OldPred = nodelist:pred(OldNeighbors),
     NewPred = nodelist:pred(NewNeighbors),
     OldSucc = nodelist:succ(OldNeighbors),
     NewSucc = nodelist:succ(NewNeighbors),
     NewNodeId = nodelist:nodeid(NewNeighbors),
-    % if only the ID of a succ or pred changed but both are still the same
-    % process, only re-build if the new node ID is not between Pred and Succ
-    % any more (which should not happen since this must come from a slide!)
-    % if not rebuild, update the node IDs though
-    case node:same_process(OldPred, NewPred) andalso
-             node:same_process(OldSucc, NewSucc) andalso
+    % only re-build if a new successor occurs or the new node ID is not between
+    % Pred and Succ any more (which should not happen since this must come from
+    % a slide!)
+    % -> if not rebuilding, update the node IDs though
+    case node:same_process(OldSucc, NewSucc) andalso
              intervals:in(NewNodeId, node:mk_interval_between_nodes(NewPred, NewSucc)) of
         true ->
             NewRT = gb_trees:map(
@@ -414,11 +431,12 @@ empty_ext(_Neighbors) -> gb_trees:empty().
 %%      proper next hop.
 %%      Note, that this code will be called from the dht_node process and
 %%      it will thus have an external_rt!
--spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
+-spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
 next_hop(State, Id) ->
     Neighbors = dht_node_state:get(State, neighbors),
     case intervals:in(Id, nodelist:succ_range(Neighbors)) of
-        true -> node:pidX(nodelist:succ(Neighbors));
+        true ->
+            {succ, node:pidX(nodelist:succ(Neighbors))};
         _ ->
             % check routing table:
             RT = dht_node_state:get(State, rt),
@@ -439,7 +457,7 @@ next_hop(State, Id) ->
                         % check neighborhood:
                         nodelist:largest_smaller_than(Neighbors, Id, NodeRT)
                 end,
-            node:pidX(FinalNode)
+            {other, node:pidX(FinalNode)}
     end.
 %% userdevguide-end rt_chord:next_hop
 
@@ -449,6 +467,8 @@ export_rt_to_dht_node(RT, Neighbors) ->
     Id = nodelist:nodeid(Neighbors),
     Pred = nodelist:pred(Neighbors),
     Succ = nodelist:succ(Neighbors),
+    % always include the pred and succ in the external representation
+    % note: we are subscribed at the RM for changes to these nodes
     Tree = gb_trees:enter(node:id(Succ), Succ,
                           gb_trees:enter(node:id(Pred), Pred, gb_trees:empty())),
     util:gb_trees_foldl(fun (_K, V, Acc) ->

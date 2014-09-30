@@ -42,12 +42,11 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_new(intervals:key(), intervals:key()) -> boolean().
+-spec prop_new(intervals:key(), intervals:key()) -> true.
 prop_new(L, R) ->
     I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, 400, uniform, [{output, list_keytpl}]),
@@ -69,7 +68,7 @@ tester_new(_) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec prop_lookup(intervals:key(), intervals:key()) -> boolean().    
+-spec prop_lookup(intervals:key(), intervals:key()) -> true.
 prop_lookup(L, R) ->    
     I = unittest_helper:build_interval(L, R),
     DB = db_generator:get_db(I, 400, uniform, [{output, list_keytpl}]),

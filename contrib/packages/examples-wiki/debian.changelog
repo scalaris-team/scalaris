@@ -1,3 +1,13 @@
+scalaris-examples-wiki (0.7.1-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+    and the EIT ICT Labs project MCData
+  * Demonstrator "Wiki on Scalaris":
+    - fix storing template back-links for magic words
+    - fix ARTICLE_COUNT partitioning with hashes
+  * Bugs:
+    - fix numerous bugs
+
 scalaris-examples-wiki (0.7.0-1) stable; urgency=low
 
   * Demonstrator "Wiki on Scalaris"

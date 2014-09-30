@@ -26,44 +26,58 @@
 -include("scalaris.hrl").
 -include("unittest.hrl").
 
+groups() ->
+    [{hand_written_tests, [sequence], [
+                                       read,
+                                       write,
+                                       delete,
+                                       get_load_and_middle,
+                                       split_data,
+                                       update_entries,
+                                       changed_keys,
+                                       various_tests
+                                      ]},
+     {tester_tests, [sequence], [
+                                 tester_new, tester_set_entry, tester_update_entry,
+                                 tester_delete_entry1, tester_delete_entry2,
+                                 tester_write,
+                                 tester_delete, tester_add_data,
+                                 tester_get_entries2, tester_get_entries3_1,
+                                 tester_get_entries3_2,
+                                 tester_get_load2,
+                                 tester_split_data, tester_update_entries,
+                                 tester_delete_entries1, tester_delete_entries2,
+                                 tester_changed_keys_get_entry,
+                                 tester_changed_keys_set_entry,
+                                 tester_changed_keys_update_entry,
+                                 tester_changed_keys_delete_entry,
+                                 tester_changed_keys_read,
+                                 tester_changed_keys_write,
+                                 tester_changed_keys_delete,
+                                 tester_changed_keys_get_entries2,
+                                 tester_changed_keys_get_entries4,
+                                 tester_get_chunk_precond,
+                                 tester_get_chunk4,
+                                 tester_get_split_key5,
+                                 tester_changed_keys_update_entries,
+                                 tester_changed_keys_delete_entries1,
+                                 tester_changed_keys_delete_entries2,
+                                 tester_changed_keys_get_load,
+                                 tester_changed_keys_get_load2,
+                                 tester_changed_keys_split_data1,
+                                 tester_changed_keys_split_data2,
+                                 tester_changed_keys_get_data,
+                                 tester_changed_keys_add_data,
+                                 tester_changed_keys_check_db,
+                                 tester_changed_keys_mult_interval,
+                                 tester_stop_record_changes]}].
+
 all() ->
-    [read, write,
-     delete, get_load_and_middle, split_data, update_entries,
-     changed_keys, various_tests,
-     % random tester functions:
-     tester_new, tester_set_entry, tester_update_entry,
-     tester_delete_entry1, tester_delete_entry2,
-     tester_write,
-     tester_delete, tester_add_data,
-     tester_get_entries2, tester_get_entries3_1, tester_get_entries3_2,
-     tester_get_load2,
-     tester_split_data, tester_update_entries,
-     tester_delete_entries1, tester_delete_entries2,
-     tester_changed_keys_get_entry,
-     tester_changed_keys_set_entry,
-     tester_changed_keys_update_entry,
-     tester_changed_keys_delete_entry,
-     tester_changed_keys_read,
-     tester_changed_keys_write,
-     tester_changed_keys_delete,
-     tester_changed_keys_get_entries2,
-     tester_changed_keys_get_entries4,
-     tester_get_chunk_precond,
-     tester_get_chunk4,
-     tester_get_split_key5,
-     tester_changed_keys_update_entries,
-     tester_changed_keys_delete_entries1,
-     tester_changed_keys_delete_entries2,
-     tester_changed_keys_get_load,
-     tester_changed_keys_get_load2,
-     tester_changed_keys_split_data1,
-     tester_changed_keys_split_data2,
-     tester_changed_keys_get_data,
-     tester_changed_keys_add_data,
-     tester_changed_keys_check_db,
-     tester_changed_keys_mult_interval,
-     tester_stop_record_changes
+    [
+     {group, hand_written_tests},
+     {group, tester_tests}
     ].
+
 
 suite() -> [ {timetrap, {seconds, 15}} ].
 
@@ -85,16 +99,19 @@ rw_suite_runs(Desired) ->
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
     Config3 = unittest_helper:start_minimal_procs(Config2, [], false),
-    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
-    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
+    tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
+    tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
     Config3.
 
 end_per_suite(Config) ->
-    tester:unregister_type_checker({typedef, intervals, interval}),
-    tester:unregister_value_creator({typedef, intervals, interval}),
+    tester:unregister_type_checker({typedef, intervals, interval, []}),
+    tester:unregister_value_creator({typedef, intervals, interval, []}),
     unittest_helper:stop_minimal_procs(Config),
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
+
+init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 -define(db_equals_pattern(Actual, ExpectedPattern),
         % wrap in function so that the internal variables are out of the calling function's scope

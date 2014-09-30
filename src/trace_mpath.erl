@@ -164,10 +164,14 @@ infected() ->
 -spec clear_infection() -> ok.
 clear_infection() ->
     case erlang:erase(trace_mpath) of
-        undefined -> ok;
-        PState    -> erlang:put(trace_mpath_bak, PState),
-                     ok
-    end.
+        undefined ->
+            %% remove _bak entry as otherwise an old _bak may be
+            %% restored in restore_infection
+            erlang:erase(trace_mpath_bak);
+        PState    ->
+            erlang:put(trace_mpath_bak, PState)
+    end,
+    ok.
 
 -spec restore_infection() -> ok.
 restore_infection() ->
@@ -512,6 +516,9 @@ get_msg_tag(Msg) ->
         ?send_to_group_member_atom ->
             {?send_to_group_member_atom, _PidName, EmbeddedMsg} = Msg,
             {send_to_group_member, get_msg_tag(EmbeddedMsg)};
+        ?send_to_registered_proc_atom ->
+            {?send_to_registered_proc_atom, _PidName, EmbeddedMsg} = Msg,
+            {send_to_registered_proc, get_msg_tag(EmbeddedMsg)};
         TagX when TagX =:= ?lookup_aux_atom orelse
                       TagX =:= ?lookup_fin_atom ->
             {TagX, _Key, _Hops, WrappedMsg} = Msg,

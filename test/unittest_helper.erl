@@ -35,7 +35,8 @@
          init_per_suite/1, end_per_suite/1,
          create_ct_all/1, create_ct_groups/2,
          init_per_group/2, end_per_group/2,
-         get_ring_data/0, print_ring_data/0,
+         get_ring_data/1, print_ring_data/0,
+         print_proto_sched_stats/0,
          macro_equals/5, macro_compare/7,
          macro_equals_failed/6,
          expect_no_message_timeout/1,
@@ -46,7 +47,7 @@
          db_entry_not_null/1, scrub_data/1]).
 
 -ifdef(with_export_type_support).
--export_type([process_info/0, kv_opts/0]).
+-export_type([process_info/0, kv_opts/0, ring_data/1]).
 -endif.
 
 -include("scalaris.hrl").
@@ -251,7 +252,7 @@ stop_ring(Pid) ->
             catch exit(Pid, kill),
             util:wait_for_process_to_die(Pid),
             stop_pid_groups(),
-            _ = inets:stop(),
+            sup_scalaris:stop_first_services(),
             ct:pal("unittest_helper:stop_ring done."),
             ok
         end
@@ -519,10 +520,10 @@ init_per_suite(Config) ->
 %%      of processes which are now running but haven't been running before.
 %%      Thus allows a clean start of succeeding test suites.
 %%      Prints information about the processes that have been killed.
--spec end_per_suite(Config) -> Config when is_subtype(Config, kv_opts()).
+-spec end_per_suite(Config::kv_opts()) -> ok.
 -ifdef(have_cthooks_support).
-end_per_suite(Config) ->
-    Config.
+end_per_suite(_Config) ->
+    ok.
 -else.
 end_per_suite(Config) ->
     ct:pal("Stopping unittest ~p~n", [ct:get_status()]),
@@ -530,11 +531,10 @@ end_per_suite(Config) ->
     % the following might still be running in case there was no ring:
     error_logger:tty(false),
     randoms:stop(),
-    _ = inets:stop(),
     error_logger:tty(true),
     {processes, OldProcesses} = lists:keyfind(processes, 1, Config),
     kill_new_processes(OldProcesses),
-    Config.
+    ok.
 -endif.
 
 -type ct_group_props() ::
@@ -574,14 +574,18 @@ end_per_group(_Group, Config) ->
             {return_group_result, failed}
     end.
 
--spec get_ring_data() -> [{pid(),
-                           {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()},
-                           db_dht:db_as_list(),
-                           {pred, comm:erl_local_pid_plain()},
-                           {succ, comm:erl_local_pid_plain()},
-                           ok | timeout}] |
-                         {exception, Level::throw | error | exit, Reason::term(), Stacktrace::term()}.
-get_ring_data() ->
+-type ring_data(DBType) ::
+          [{pid(),
+            {intervals:left_bracket(), intervals:key(), intervals:key(), intervals:right_bracket()},
+            DBType,
+            {pred, comm:erl_local_pid_plain()},
+            {succ, comm:erl_local_pid_plain()},
+            ok | timeout}] |
+          {exception, Level::throw | error | exit, Reason::term(), Stacktrace::term()}.
+
+-spec get_ring_data(full) -> ring_data(db_dht:db_as_list());
+                   (kv) -> ring_data([{?RT:key(), db_dht:version()}]).
+get_ring_data(Type) ->
     Self = self(),
     erlang:spawn(
       fun() ->
@@ -594,7 +598,7 @@ get_ring_data() ->
                         end,
                         [begin
                              comm:send_local(DhtNode,
-                                             {unittest_get_bounds_and_data, comm:this()}),
+                                             {unittest_get_bounds_and_data, comm:this(), Type}),
                              receive
                                  {unittest_get_bounds_and_data_response, Bounds, Data, Pred, Succ} ->
                                      {DhtNode, Bounds, Data,
@@ -602,7 +606,7 @@ get_ring_data() ->
                                       {succ, comm:make_local(node:pidX(Succ))}, ok}
                              % we are in a separate process, any message in the
                              % message box should not influence the calling process
-                                 after 500 -> {DhtNode, empty, [], {pred, null}, {succ, null}, timeout}
+                                 after 750 -> {DhtNode, empty, [], {pred, null}, {succ, null}, timeout}
                              end
                          end || DhtNode <- DHTNodes]),
                   Self ! {data, Data}
@@ -621,8 +625,13 @@ get_ring_data() ->
 
 -spec print_ring_data() -> ok.
 print_ring_data() ->
-    DataAll = get_ring_data(),
+    DataAll = get_ring_data(full),
     ct:pal("Scalaris ring data:~n~.0p~n", [DataAll]).
+
+-spec print_proto_sched_stats() -> ok.
+print_proto_sched_stats() ->
+    ct:pal("Proto scheduler stats: ~.2p",
+           [proto_sched:info_shorten_messages(proto_sched:get_infos(), 200)]).
 
 -spec macro_equals(Actual::any(), ExpectedVal::any(), ActualStr::string(),
                    ExpectedStr::string(), Note::term()) -> true | no_return().
@@ -677,7 +686,7 @@ check_ring_data() ->
 -spec check_ring_data(Timeout::pos_integer(), Retries::non_neg_integer()) -> boolean().
 check_ring_data(Timeout, Retries) ->
     Data = lists:append(
-             [Data || {_Pid, _Interval, Data, {pred, _PredPid}, {succc, _SuccPid}, _Result} <- get_ring_data()]),
+             [Data || {_Pid, _Interval, Data, {pred, _PredPid}, {succc, _SuccPid}, _Result} <- get_ring_data(full)]),
     case Retries < 1 of
         true ->
             check_ring_data_all(Data, true);

@@ -128,8 +128,7 @@ first_ip() ->
     {ok, HostEntry} = inet:gethostbyname(Hostname),
     erlang:hd(HostEntry#hostent.h_addr_list).
 
-%% @doc Checks whether config parameters of the cyclon process exist and are
-%%      valid.
+%% @doc Checks whether config parameters exist and are valid.
 -spec check_config() -> boolean().
 check_config() ->
     config:cfg_is_port(port) and

@@ -40,10 +40,10 @@
 
 %% Defines the number of directories
 %% e.g. 1 implies a central directory
--define(NUM_DIRECTORIES, 1).
+-define(NUM_DIRECTORIES, 2).
 
-%-define(TRACE(X,Y), ok).
--define(TRACE(X,Y), io:format(X,Y)).
+-define(TRACE(X,Y), ok).
+%-define(TRACE(X,Y), io:format(X,Y)).
 
 -type directory_name() :: string().
 
@@ -109,7 +109,9 @@ handle_msg({publish_trigger}, State) ->
       _ ->
           % get && perform transfer() without overloading
           Schedule = State#state.schedule,
-          perform_transfer(Schedule),
+          %% transfer (balance) up to MaxTransfer nodes
+          MaxTransfer = config:read(lb_active_directories_max_transfer),
+          perform_transfer(Schedule, 0, MaxTransfer),
           % post_load()
           % request dht load to post it in the directory afterwards
           request_dht_load(),
@@ -121,7 +123,7 @@ handle_msg({post_load, LoadInfo}, State) ->
     ?TRACE("Posting load ~p~n", [LoadInfo]),
     Directory = get_random_directory(),
     DirKey = Directory#directory.name,
-    post_load_to_directory(LoadInfo, DirKey),
+    post_load_to_directory(LoadInfo, DirKey, 0),
     %% TODO Emergency Threshold has been already checked at the node overloaded...
 %%     EmergencyThreshold = State#state.threshold_emergency,
 %%     case lb_info:get_load(LoadInfo) > EmergencyThreshold of
@@ -159,10 +161,10 @@ handle_msg({get_state_response, MyRange}, State) ->
     Directories = get_all_directory_keys(),
     MyDirectories = [int_to_str(Dir) || Dir <- Directories, intervals:in(Dir, MyRange)],
     ?TRACE("~p: I am responsible for ~p~n", [self(), MyDirectories]),
-    State#state{my_dirs = MyDirectories};
+    State#state{my_dirs = MyDirectories, schedule = []};
 
-handle_msg(Msg, State) ->
-    ?TRACE("Unknown message: ~p~n", [Msg]),
+handle_msg(_Msg, State) ->
+    ?TRACE("Unknown message: ~p~n", [_Msg]),
     State.
 
 %%%%%%%%%%%%%%%%%% DHT Node interaction %%%%%%%%%%%%%%%%%%%%%%%
@@ -172,7 +174,10 @@ handle_msg(Msg, State) ->
 handle_dht_msg({lb_active, request_load, ReplyPid}, DhtState) ->
     NodeDetails = dht_node_state:details(DhtState),
     LoadInfo = lb_info:new(NodeDetails),
-    comm:send_local(ReplyPid, {post_load, LoadInfo}),
+    case lb_info:is_valid(LoadInfo) of
+        true -> comm:send_local(ReplyPid, {post_load, LoadInfo});
+        _ -> ok
+    end,
     DhtState;
 
 %% This handler is for requesting load information from the succ of
@@ -180,11 +185,14 @@ handle_dht_msg({lb_active, request_load, ReplyPid}, DhtState) ->
 handle_dht_msg({lb_active, before_jump, HeavyNode, LightNode}, DhtState) ->
     NodeDetails = dht_node_state:details(DhtState),
     LightNodeSucc = lb_info:new(NodeDetails),
-    lb_active:balance_nodes(HeavyNode, LightNode, LightNodeSucc, []),
+    case lb_info:is_valid(LightNodeSucc) of
+        true -> lb_active:balance_nodes(HeavyNode, LightNode, LightNodeSucc, []);
+        _ -> ok
+    end,
     DhtState;
 
-handle_dht_msg(Msg, DhtState) ->
-    ?TRACE("Unknown message: ~p~n", [Msg]),
+handle_dht_msg(_Msg, DhtState) ->
+    ?TRACE("Unknown message: ~p~n", [_Msg]),
     DhtState.
 
 %%%%%%%%%%%%%%%%% Directory Management %%%%%%%%%%%%%%%
@@ -199,7 +207,7 @@ manage_directories([DirKey | Other], Schedule) ->
     manage_directories(Other, Schedule ++ DirSchedule).
 
 -spec directory_routine(directory_name(), periodic | emergency, schedule()) -> schedule().
-directory_routine(DirKey, Type, Schedule) ->
+directory_routine(DirKey, _Type, Schedule) ->
     %% Because of the lack of virtual servers/nodes, the load
     %% balancing is differs from the paper here. We try to
     %% balance the most loaded node with the least loaded
@@ -207,44 +215,31 @@ directory_routine(DirKey, Type, Schedule) ->
     %% TODO Some preference should be given to neighboring
     %%      nodes to avoid too many jumps.
     {_TLog, Directory} = get_directory(DirKey),
+    clear_directory(Directory, 0),
     case dir_is_empty(Directory) of
         true -> Schedule;
         false ->
             Pool = Directory#directory.pool,
-            AvgUtil = gb_sets:fold(fun(El, Acc) -> Acc + lb_info:get_load(El) end, 0, Pool) / gb_sets:size(Pool),
-            {LowerBound, UpperBound} = case Type of
-                    periodic ->
-                        %% clear directory only for periodic
-                        %NewDirectory = dir_clear_load(Directory),
-                        clear_directory(Directory),
-                        %% TODO calculate threshold according to metric
-                        %% From paper:
-                        %(1 + AvgUtil) / 2;
-                        %% Karger style:
-                        {0.75 * AvgUtil, 1.25 * AvgUtil}
-%%                     emergency ->
-%%                         %% from paper:
-%%                         %1.0
-%%                         %% Gossip: max value
-%%                         AvgUtil * 10 %% TODO
-                end,
-            ?TRACE("Threshold: ~p~n", [{LowerBound, UpperBound}]),
-            LightNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) =< LowerBound end, Pool),
-            HeavyNodes = gb_sets:filter(fun(El) -> lb_info:get_load(El) >= UpperBound end, Pool),
-            ScheduleNew = find_matches(LightNodes, HeavyNodes, []),
+            ScheduleNew = find_matches(Pool, []),
             ?TRACE("New schedule: ~p~n", [ScheduleNew]),
             ScheduleNew
     end.
 
--spec find_matches(gb_sets:set(lb_info:lb_info()), gb_sets:set(lb_info:lb_info()), schedule()) -> schedule().
-find_matches(LightNodes, HeavyNodes, Result) ->
-    case gb_sets:size(LightNodes) > 0 andalso gb_sets:size(HeavyNodes) > 0 of
+-spec find_matches(gb_sets:set(lb_info:lb_info()), schedule()) -> schedule().
+find_matches(Nodes, Result) ->
+    case gb_sets:size(Nodes) >= 2 of
         true ->
-            {LightNode, LightNodes2} = gb_sets:take_smallest(LightNodes),
-            {HeavyNode, HeavyNodes2} = gb_sets:take_largest(HeavyNodes),
-            find_matches(LightNodes2, HeavyNodes2, [#reassign{light = LightNode, heavy = HeavyNode} | Result]);
+            {LightNode, NodesNew} = gb_sets:take_smallest(Nodes),
+            {HeavyNode, NodesNew2} = gb_sets:take_largest(NodesNew),
+            Epsilon = 0.24,
+            case lb_info:get_load(LightNode) =< Epsilon * lb_info:get_load(HeavyNode) of
+                true ->
+                    find_matches(NodesNew2, [#reassign{light = LightNode, heavy = HeavyNode} | Result]);
+                _ ->
+                    find_matches(NodesNew2, Result)
+            end;
         false ->
-            %% TODO we want to have the heaviest load first, this could be more efficient...
+            %% return the result with the best match first
             lists:reverse(Result)
     end.
 
@@ -270,25 +265,31 @@ get_random_directory() ->
         _    -> RandDir2
     end.
 
--spec post_load_to_directory(lb_info:lb_info(), directory_name()) -> ok.
-post_load_to_directory(Load, DirKey) ->
+-spec post_load_to_directory(lb_info:lb_info(), directory_name(), non_neg_integer()) -> ok.
+post_load_to_directory(Load, DirKey, Retries) ->
     {TLog, Dir} = get_directory(DirKey),
     DirNew = dir_add_load(Load, Dir),
     case set_directory(TLog, DirNew) of
         ok -> ok;
-        failed -> 
-            wait_randomly(),
-            post_load_to_directory(Load, DirKey)
+        failed ->
+            if Retries < 5 ->
+                    wait_randomly(),
+                    post_load_to_directory(Load, DirKey, Retries + 1);
+               true -> ok
+            end
     end.
 
--spec clear_directory(directory()) -> ok.
-clear_directory(Directory) ->
+-spec clear_directory(directory(), non_neg_integer()) -> ok.
+clear_directory(Directory, Retries) ->
     DirNew = dir_clear_load(Directory),
     case set_directory(api_tx:new_tlog(), DirNew) of
         ok -> ok;
         failed ->
-            wait_randomly(),
-            clear_directory(Directory)
+            if Retries < 5 ->
+                    wait_randomly(),
+                    clear_directory(Directory, Retries + 1);
+               true -> ok
+            end
     end.
 
 -spec get_directory(directory_name()) -> {tx_tlog:tlog(), directory()}.
@@ -337,19 +338,21 @@ dir_is_empty(Directory) ->
 
 %%%%%%%%%%%%%% Reassignments %%%%%%%%%%%%%%%%%%%%%
 
--spec perform_transfer(schedule()) -> ok.
-perform_transfer([]) ->
+-spec perform_transfer(schedule(), non_neg_integer(), pos_integer()) -> ok.
+perform_transfer([], _, _) ->
     ok;
-perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other]) ->
+perform_transfer(_, MaxTransfer, MaxTransfer) ->
+    ok;
+perform_transfer([#reassign{light = LightNode, heavy = HeavyNode} | Other], Transferred, MaxTransfer) ->
     ?TRACE("~p: Reassigning ~p (light: ~p) and ~p (heavy: ~p)~n", [?MODULE, lb_info:get_node(LightNode), lb_info:get_load(LightNode), lb_info:get_node(HeavyNode), lb_info:get_load(HeavyNode)]),
     case lb_info:neighbors(HeavyNode, LightNode) of
-        true -> 
+        true ->
             lb_active:balance_nodes(HeavyNode, LightNode, []);
         false -> %% send message to succ of LightNode to get his load
             LightNodeSucc = lb_info:get_succ(LightNode),
             comm:send(node:pidX(LightNodeSucc), {lb_active, before_jump, HeavyNode, LightNode})
     end,
-    perform_transfer(Other).
+    perform_transfer(Other, Transferred + 1, MaxTransfer).
 
 %%%%%%%%%%%%
 %% Helpers
@@ -375,7 +378,6 @@ wait_randomly() ->
 
 -spec trigger(trigger()) -> ok.
 trigger(Trigger) ->
-    %Interval = config:read(lb_active_interval),
     Interval =
         case Trigger of
             publish_trigger -> config:read(lb_active_directories_publish_interval);
@@ -389,9 +391,11 @@ get_web_debug_kv(State) ->
 
 -spec check_config() -> boolean().
 check_config() ->
-    config:cfg_is_integer(lb_active_directories_publish_interval) andalso
-    config:cfg_is_greater_than(lb_active_directories_publish_interval, 1000) andalso
-    config:cfg_is_integer(lb_active_directories_directory_interval) andalso
-    config:cfg_is_greater_than(lb_active_directories_directory_interval, 1000) andalso
-    % emergency treshold
-    true.
+    config:cfg_is_integer(lb_active_directories_publish_interval) and
+    config:cfg_is_greater_than(lb_active_directories_publish_interval, 1000) and
+
+    config:cfg_is_integer(lb_active_directories_directory_interval) and
+    config:cfg_is_greater_than(lb_active_directories_directory_interval, 1000) and
+
+    config:cfg_is_integer(lb_active_directories_max_transfer) and
+    config:cfg_is_greater_than(lb_active_directories_max_transfer, 0).

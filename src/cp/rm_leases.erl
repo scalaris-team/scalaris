@@ -38,14 +38,14 @@
 -type state() :: #state{}.
 
 %% gen_component functions
-%% @doc Starts the failure detector server
+%% @doc Starts the ring maintenence process
 -spec start_link(pid_groups:groupname()) -> {ok, pid()} | ignore.
-start_link(ServiceGroup) ->
+start_link(DHTNodeGroup) ->
     case config:read(leases) of
         true ->
             gen_component:start_link(?MODULE, fun ?MODULE:on/2, [],
                                      [{wait_for_init}, {erlang_register, ?MODULE},
-                                      {pid_groups_join_as, ServiceGroup, ?MODULE}]);
+                                      {pid_groups_join_as, DHTNodeGroup, ?MODULE}]);
         _ ->
             ignore
     end.

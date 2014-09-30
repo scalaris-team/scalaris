@@ -248,10 +248,7 @@ replace(MyCache, _MyCacheSize, ReceivedCache, SendCache, TargetSize) ->
 %%      already has!
 -spec add_node(Node::node:node_type(), Age::age(), Cache::cache()) -> NewCache::cache().
 add_node(Node, Age, Cache) ->
-    case contains_node(Node, Cache) of
-        true  -> [{Node, Age} | remove_node(Node, Cache)];
-        false -> [{Node, Age} | Cache]
-    end.
+    [{Node, Age} | remove_node(Node, Cache)].
 
 %% @doc Removes any element with the given Node from the Cache.
 -spec remove_node(Node::node:node_type(), Cache::cache()) -> NewCache::cache().
@@ -266,6 +263,6 @@ trim(Cache, TargetSize) ->
 
 %% @doc Returns a list of keys (ages) and string values (nodes) for debug output
 %%      used in the web interface.
--spec debug_format_by_age(Cache::cache()) -> KeyValueList::[{Age::age(), Node::string()}].
+-spec debug_format_by_age(Cache::cache()) -> KeyValueList::[{Age::string(), Node::string()}].
 debug_format_by_age(Cache) ->
-    [{Age, webhelpers:safe_html_string("~p", [Node])} || {Node, Age} <- Cache].
+    [{integer_to_list(Age), webhelpers:safe_html_string("~p", [Node])} || {Node, Age} <- Cache].

@@ -30,7 +30,7 @@
                    state_get_last_pong/1, state_set_last_pong/2,
                    state_get_crashed_after/1, state_set_crashed_after/2,
                    state_get_table/1,
-                   state_get_monitors/1, state_set_monitors/2
+                   state_get_monitor_tab/1%, state_set_monitor_tab/2
                   ]}).
 
 -compile({inline, [rempid_get_rempid/1,
@@ -68,9 +68,9 @@
        [rempid()],  %% subscribed rem. pids + ref counting
        erlang_timestamp(),  %% local time of last pong arrival
        erlang_timestamp(),  %% remote is crashed if no pong arrives until this
-       pdb:tableid(),       %% ets table name
+       LocalSubscriberTab::pdb:tableid(),
        %% locally erlang:monitored() pids for a remote hbs:
-       [{comm:mypid(), reference()}]
+       MonitorTab::pdb:tableid()
      }).
 
 -define(SEND_OPTIONS, [{channel, prio}]).
@@ -89,7 +89,8 @@ start_link(ServiceGroup, RemotePid) ->
 -spec init(pid() | comm:mypid()) -> state().
 init(RemotePid) ->
     ?TRACE("fd_hbs init: RemotePid ~p~n", [RemotePid]),
-    TableName = pdb:new(?MODULE, [set]), %% debugging: ++ [protected]),
+    LocalSubscriberTab = pdb:new(?MODULE, [set]), %% debugging: ++ [protected]),
+    MonitorTab = pdb:new(?MODULE, [set]), %% debugging: ++ [protected]),
     RemoteFDPid = comm:get(fd, RemotePid),
     comm:send(RemoteFDPid,
               {subscribe_heartbeats, comm:this(), RemotePid},
@@ -105,7 +106,7 @@ init(RemotePid) ->
               _RemotePids = [],
               _LastPong = Now,
               _CrashedAfter = util:time_plus_ms(Now, delayfactor() * failureDetectorInterval()),
-              TableName).
+              LocalSubscriberTab, MonitorTab).
 
 -spec on(comm:message(), state()) -> state() | kill.
 on({add_subscriber, Subscriber, WatchedPid, Cookie} = _Msg, State) ->
@@ -171,7 +172,7 @@ on({add_watching_of, WatchedPid} = _Msg, State) ->
 on({del_watching_of, WatchedPid} = _Msg, State) ->
     ?TRACE("fd_hbs del_watching_of ~.0p~n", [_Msg]),
     %% request from remote fd_hbs: no longer watch a pid locally
-    state_del_monitor(State, WatchedPid);
+    element(2, state_del_monitor(State, WatchedPid));
 
 on({update_remote_hbs_to, Pid}, State) ->
     ?TRACE("fd_hbs update_remote_hbs_to ~p~n", [Pid]),
@@ -222,7 +223,7 @@ on({periodic_alive_check}, State) ->
                            + failureDetectorInterval() div 3))},
       ?SEND_OPTIONS ++ [{shepherd, shepherd_new(0)}]),
     NewState = case 0 < timer:now_diff(Now, CrashedAfter) of
-                   true -> report_crash(State);
+                   true -> report_connection_crash(State);
                    false -> State
     end,
     %% trigger next timeout
@@ -253,11 +254,62 @@ on({send_retry, {send_error, Target, Message, _Reason} = Err, Count}, State) ->
             log:log(warn, "[ FD ] Sending ~.0p failed 3 times. "
                     "Report target ~.0p as crashed.~n", [Message, Target]),
             %% report whole node as crashed, when not reachable via tcp:
-            report_crash(State)
+            report_connection_crash(State)
     end;
 
-on({crashed, WatchedPid, Warn}, State) ->
+on({crashed, WatchedPid, Reason}, State) ->
     ?TRACE("fd_hbs crashed ~p~n", [WatchedPid]),
+    report_crashed_remote_pid(State, WatchedPid, Reason, warn);
+
+on({report_crashed, WatchedPids, Reason}, State) ->
+    ?TRACE("fd_hbs report crashed ~p~n", [WatchedPids]),
+    lists:foldl(fun(WatchedPid, StateX) ->
+                        report_crashed_remote_pid(StateX, WatchedPid, Reason,
+                                                  nowarn)
+                end, State, WatchedPids);
+
+on({report_crash, LocalPids, Reason}, State) when is_list(LocalPids) ->
+    ?TRACE("fd_hbs crash reported ~.0p, ~.0p with reason ~.0p~n",
+           [WatchedPid, pid_groups:group_and_name_of(WatchedPid), Reason]),
+    % similar to 'DOWN' report below
+    {WatchedPids, State1} =
+        lists:foldl(
+          fun(LocalPid, {WatchedPidsX, StateX}) ->
+                  GlobalPid = comm:make_global(LocalPid),
+                  %% delete WatchedPid and MonRef locally (if existing)
+                  case state_del_monitor(StateX, GlobalPid) of
+                      {true, StateX1} -> {[GlobalPid | WatchedPidsX], StateX1};
+                      {false, StateX1} -> {WatchedPidsX, StateX1}
+                  end
+          end, {[], State}, LocalPids),
+    %% send crash report to remote end.
+    comm:send(state_get_rem_hbs(State),
+              {report_crashed, WatchedPids, Reason},
+              ?SEND_OPTIONS),
+    State1;
+
+on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
+    ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n",
+           [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
+    %% send crash report to remote end.
+    GlobalPid = comm:make_global(WatchedPid),
+    comm:send(state_get_rem_hbs(State),
+              {crashed, GlobalPid, 'DOWN'}, ?SEND_OPTIONS),
+    %% delete WatchedPid and MonRef locally (MonRef is already
+    %% invalid, as Pid crashed)
+    _S1 = element(2, state_del_monitor(State, GlobalPid)).
+
+%% @doc Checks existence and validity of config parameters for this module.
+-spec check_config() -> boolean().
+check_config() ->
+    config:cfg_is_integer(failure_detector_interval) and
+    config:cfg_is_greater_than(failure_detector_interval, 0).
+
+%% @doc Reports a crashed connection to local subscribers.
+%% @private
+-spec report_crashed_remote_pid(state(), WatchedPid::comm:mypid(),
+                                Reason::fd:reason(), warn | nowarn) -> state().
+report_crashed_remote_pid(State, WatchedPid, Reason, Warn) ->
     %% inform all local subscribers
     Subscriptions = state_get_subscriptions(State, WatchedPid),
     %% only there because of delayed demonitoring?
@@ -284,11 +336,11 @@ on({crashed, WatchedPid, Warn}, State) ->
               {_, '$fd_nil'} ->
                   log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p~n",
                             [comm:this(), X, pid_groups:group_and_name_of(X)]),
-                  comm:send_local(X, {crash, WatchedPid});
+                  comm:send_local(X, {crash, WatchedPid, Reason});
               _ ->
                   log:log(debug, "[ FD ~p ] Sending crash to ~.0p/~.0p with ~.0p~n",
                             [comm:this(), X, pid_groups:group_and_name_of(X), Cookie]),
-                  comm:send_local(X, {crash, WatchedPid, Cookie})
+                  comm:send_local(X, {crash, WatchedPid, Reason, Cookie})
           end
           || {X, Cookie} <- Subscriptions ],
     %% delete from remote_pids
@@ -300,36 +352,12 @@ on({crashed, WatchedPid, Warn}, State) ->
                             state_del_entry(StAgg, {Sub, WatchedPid, Cook}),
                         Res
                 end,
-                S1, Subscriptions);
+                S1, Subscriptions).
 
-on({'DOWN', _Monref, process, WatchedPid, unittest_down}, State) ->
-    ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n", [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
-    %% send crash report to remote end.
-    comm:send(state_get_rem_hbs(State),
-              {crashed, comm:make_global(WatchedPid), nowarn}, ?SEND_OPTIONS),
-    %% delete WatchedPid and MonRef locally (MonRef is already
-    %% invalid, as Pid crashed)
-    _S1 = state_del_monitor(State, comm:make_global(WatchedPid));
-
-on({'DOWN', _Monref, process, WatchedPid, _}, State) ->
-    ?TRACE("fd_hbs DOWN reported ~.0p, ~.0p~n", [WatchedPid, pid_groups:group_and_name_of(WatchedPid)]),
-    %% send crash report to remote end.
-    comm:send(state_get_rem_hbs(State),
-              {crashed, comm:make_global(WatchedPid), warn}, ?SEND_OPTIONS),
-    %% delete WatchedPid and MonRef locally (MonRef is already
-    %% invalid, as Pid crashed)
-    _S1 = state_del_monitor(State, comm:make_global(WatchedPid)).
-
-%% @doc Checks existence and validity of config parameters for this module.
--spec check_config() -> boolean().
-check_config() ->
-    config:cfg_is_integer(failure_detector_interval) and
-    config:cfg_is_greater_than(failure_detector_interval, 0).
-
-%% @doc Reports the crash to local subscribers.
+%% @doc Reports a crashed connection to local subscribers.
 %% @private
--spec report_crash(state()) -> kill.
-report_crash(State) ->
+-spec report_connection_crash(state()) -> kill.
+report_connection_crash(State) ->
     RemPids = state_get_rem_pids(State),
     case RemPids of
         [] ->
@@ -344,7 +372,7 @@ report_crash(State) ->
     comm:send_local(FD, {hbs_finished, state_get_rem_hbs(State)}),
     erlang:unlink(FD),
     _ = try
-            lists:foldl(fun(X, S) -> on({crashed, X, warn}, S) end,
+            lists:foldl(fun(X, S) -> on({crashed, X, noconnection}, S) end,
                         State, [ rempid_get_rempid(RemPidEntry)
                                  || RemPidEntry <- state_get_rem_pids(State)])
         catch _:_ -> ignore_exception
@@ -371,10 +399,12 @@ trigger_delayed_del_watching(RemPidEntry) ->
     E1 = rempid_set_last_modified(RemPidEntry, Time),
     rempid_set_pending_demonitor(E1, true).
 
--spec state_new(comm:mypid(), [rempid()],
-                erlang_timestamp(), erlang_timestamp(), pdb:tableid()) -> state().
-state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter, Table) ->
-    {RemoteHBS, RemotePids, LastPong, CrashedAfter, Table, []}.
+-spec state_new(RemoteHBS::comm:mypid(), RemotePids::[rempid()],
+                LastPong::erlang_timestamp(), CrashedAfter::erlang_timestamp(),
+                LocalSubscriberTab::pdb:tableid(),
+                MonitorTab::pdb:tableid()) -> state().
+state_new(RemoteHBS, RemotePids, LastPong, CrashedAfter, LocalSubscriberTab, MonitorTab) ->
+    {RemoteHBS, RemotePids, LastPong, CrashedAfter, LocalSubscriberTab, MonitorTab}.
 
 -spec state_get_rem_hbs(state())    -> comm:mypid().
 state_get_rem_hbs(State)            -> element(1, State).
@@ -394,10 +424,10 @@ state_get_crashed_after(State)      -> element(4, State).
 state_set_crashed_after(State, Val) -> setelement(4, State, Val).
 -spec state_get_table(state()) -> pdb:tableid().
 state_get_table(State)              -> element(5, State).
--spec state_get_monitors(state())   -> [{comm:mypid(), reference()}].
-state_get_monitors(State)           -> element(6, State).
--spec state_set_monitors(state(), [{comm:mypid(), reference()}]) -> state().
-state_set_monitors(State, Val)      -> setelement(6, State, Val).
+-spec state_get_monitor_tab(state())-> pdb:tableid().
+state_get_monitor_tab(State)        -> element(6, State).
+%% -spec state_set_monitor_tab(state(), pdb:tableid()) -> state().
+%% state_set_monitor_tab(State, Val)   -> setelement(6, State, Val).
 
 -spec state_add_entry(state(), {pid(), comm:mypid(), fd:cookie()}) -> state().
 state_add_entry(State, {Subscriber, WatchedPid, Cookie}) ->
@@ -539,19 +569,34 @@ state_del_watched_pid(State, WatchedPid, Subscriber) ->
 
 -spec state_add_monitor(state(), comm:mypid()) -> state().
 state_add_monitor(State, WatchedPid) ->
+    Table = state_get_monitor_tab(State),
+    CountKey = {'$monitor_count', WatchedPid},
+    X = case pdb:get(CountKey, Table) of
+            undefined                        -> 1;
+            {CountKey, I} when is_integer(I) -> I + 1
+        end,
+    pdb:set({CountKey, X}, Table),
     MonRef = erlang:monitor(process, comm:make_local(comm:get_plain_pid(WatchedPid))),
-    state_set_monitors(
-      State, [{WatchedPid, MonRef} | state_get_monitors(State)]).
+    pdb:set({{'$monitor', WatchedPid}, MonRef}, Table),
+    State.
 
--spec state_del_monitor(state(), comm:mypid()) -> state().
+-spec state_del_monitor(state(), comm:mypid()) -> {Found::boolean(), state()}.
 state_del_monitor(State, WatchedPid) ->
-    Monitors = state_get_monitors(State),
-    case lists:keytake(WatchedPid, 1, Monitors) of
-        {value, {WatchedPid, MonRef}, RestMonitors} ->
-            erlang:demonitor(MonRef),
-            state_set_monitors(State, RestMonitors);
-        false -> State
-    end.
+    Table = state_get_monitor_tab(State),
+    CountKey = {'$monitor_count', WatchedPid},
+    Found = case pdb:take(CountKey, Table) of
+                undefined ->
+                    false;
+                {CountKey, 1} ->
+                    MonKey = {'$monitor', WatchedPid},
+                    {MonKey, MonRef} = pdb:take(MonKey, Table),
+                    erlang:demonitor(MonRef),
+                    true;
+                {CountKey, X} when is_integer(X) andalso X > 1 ->
+                    pdb:set({CountKey, X - 1}, Table),
+                    true
+            end,
+    {Found, State}.
 
 -spec rempid_new(comm:mypid()) -> rempid().
 rempid_new(Pid) ->

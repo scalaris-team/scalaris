@@ -58,10 +58,7 @@ get_number_of_samples_remote(SourcePid, Connection) ->
     SPid = comm:reply_as(self(), 3,
                          {join, ?MODULE, '_',
                           {get_samples, SourcePid, Connection}}),
-    GossipPid = pid_groups:get_my(gossip),
-    Msg = {get_values_best, {gossip_load, default}, SPid},
-    ?TRACE_SEND(GossipPid, Msg),
-    comm:send_local(GossipPid, Msg).
+    gossip_load:get_values_best([{source_pid, SPid}]).
 
 %% @doc Creates a join operation if a node would join at my node with the
 %%      given key. This will simulate the join operation and return a lb_op()
@@ -76,10 +73,7 @@ create_join(DhtNodeState, SelectedKey, SourcePid, Conn) ->
             SPid = comm:reply_as(self(), 3,
                                  {join, ?MODULE, '_',
                                   {create_join2, SelectedKey, SourcePid, Conn}}),
-            GossipPid = pid_groups:get_my(gossip),
-            Msg = {get_values_best, {gossip_load, default}, SPid},
-            ?TRACE_SEND(GossipPid, Msg),
-            comm:send_local(GossipPid, Msg);
+            gossip_load:get_values_best([{source_pid, SPid}]);
         _ ->
             % postpone message:
             Msg = {join, get_candidate, SourcePid, SelectedKey, ?MODULE, Conn},
@@ -137,10 +131,7 @@ create_join2(DhtNodeState, SelectedKey, SourcePid, BestValues, Conn) ->
             SPid = comm:reply_as(self(), 3,
                                  {join, ?MODULE, '_',
                                   {create_join2, SelectedKey, SourcePid, Conn}}),
-            GossipPid = pid_groups:get_my(gossip),
-            Msg = {get_values_best, {gossip_load, default}, SPid},
-            ?TRACE_SEND(GossipPid, Msg),
-            _ = comm:send_local_after(100, GossipPid, Msg),
+            gossip_load:get_values_best([{source_pid, SPid}, {send_after, 100}]),
             DhtNodeState
     end.
 
@@ -209,10 +200,7 @@ create_join3(DhtNodeState, SelectedKey, SourcePid, SplitKey0, Conn) ->
             SPid = comm:reply_as(self(), 3,
                                  {join, ?MODULE, '_',
                                   {create_join2, SelectedKey, SourcePid, Conn}}),
-            GossipPid = pid_groups:get_my(gossip),
-            Msg = {get_values_best, {gossip_load, default}, SPid},
-            ?TRACE_SEND(GossipPid, Msg),
-            _ = comm:send_local_after(100, GossipPid, Msg),
+            gossip_load:get_values_best([{source_pid, SPid}, {send_after, 100}]),
             ok
     end,
     DhtNodeState.

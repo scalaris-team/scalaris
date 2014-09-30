@@ -26,19 +26,26 @@
 -include("scalaris.hrl").
 -include("unittest.hrl").
 
+groups() ->
+    [{tester_tests, [sequence],
+      [tester_new0, tester_new9,
+       tester_set_get_pred,
+       tester_set_get_predlist,
+       tester_set_get_node,
+       tester_set_get_my_range,
+       tester_set_get_succ,
+       tester_set_get_succlist,
+       tester_set_get_load,
+       tester_set_get_hostname,
+       tester_set_get_rt_size,
+       tester_set_get_message_log,
+       tester_set_get_memory]}
+    ].
+
 all() ->
-    [tester_new0, tester_new9,
-     tester_set_get_pred,
-     tester_set_get_predlist,
-     tester_set_get_node,
-     tester_set_get_my_range,
-     tester_set_get_succ,
-     tester_set_get_succlist,
-     tester_set_get_load,
-     tester_set_get_hostname,
-     tester_set_get_rt_size,
-     tester_set_get_message_log,
-     tester_set_get_memory].
+    [
+     {group, tester_tests}
+    ].
 
 suite() ->
     [
@@ -51,8 +58,11 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
+
+init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
 -spec safe_compare(NodeDetails::node_details:node_details(),
                    Tag::node_details:node_details_name(),

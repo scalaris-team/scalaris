@@ -114,7 +114,7 @@ join_as_first(Id, IdVersion, _Options) ->
             [self(), Id, IdVersion]),
     Me = node:new(comm:this(), Id, IdVersion),
     % join complete, State is the first "State"
-    finish_join(Me, Me, Me, db_dht:new(), msg_queue:new()).
+    finish_join(Me, Me, Me, db_dht:new(), msg_queue:new(), []).
 %% userdevguide-end dht_node_join:join_as_first
 
 %% userdevguide-begin dht_node_join:join_as_other
@@ -445,8 +445,10 @@ process_join_state({join, join_response, Succ, Pred, MoveId, CandId, TargetId, N
                             rm_loop:notify_new_succ(node:pidX(Pred), Me),
                             rm_loop:notify_new_pred(node:pidX(Succ), Me),
 
+                            JoinOptions = get_join_options(JoinState),
+
                             finish_join_and_slide(Me, Pred, Succ, db_dht:new(),
-                                                  QueuedMessages, MoveId, NextOp)
+                                                  QueuedMessages, MoveId, NextOp, JoinOptions)
                     end
             end
     end,
@@ -502,18 +504,20 @@ process_join_state({web_debug_info, Requestor} = _Msg,
     comm:send_local(Requestor, {web_debug_info_reply, KeyValueList}),
     State;
 
-process_join_state({?lookup_aux, Key, Hops, Msg} = FullMsg, {join, JoinState, _QueuedMessages} = State) ->
+process_join_state({?lookup_aux, Key, Hops, Msg} = FullMsg,
+                   {join, JoinState, _QueuedMessages} = State) ->
     case get_connections(JoinState) of
         [] ->
             _ = comm:send_local_after(100, self(), FullMsg),
             ok;
         [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:
-            Self = comm:reply_as(self(), 3, {join, send_failed, '_', []}),
+            Self = comm:reply_as(self(), 2, {join, '_', []}),
             comm:send(Pid, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
     State;
-process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, Hops, Msg}, _Reason}, FailedPids}, {join, JoinState, _QueuedMessages} = State) ->
+process_join_state({join, {send_error, Target, {?lookup_aux, Key, Hops, Msg}, _Reason},
+                    FailedPids}, {join, JoinState, _QueuedMessages} = State) ->
     Connections = get_connections(JoinState),
     case lists:dropwhile(fun({_, Pid}) -> lists:member(Pid, FailedPids) end, Connections) of
         [] ->
@@ -521,15 +525,35 @@ process_join_state({join, send_failed, {send_error, Target, {?lookup_aux, Key, H
             ok;
         [{_, Pid} | _] ->
             % integrate the list of processes for which the send previously failed:
-            Self = comm:reply_as(self(), 3, {join, send_failed, '_', [Target | FailedPids]}),
+            Self = comm:reply_as(self(), 2, {join, '_', [Target | FailedPids]}),
             comm:send(Pid, {?lookup_aux, Key, Hops + 1, Msg}, [{shepherd, Self}])
     end,
+    State;
+process_join_state({join, {send_error, Target, {get_dht_nodes, _This}, _Reason},
+                    FailedPids}, State) ->
+    KnownHosts = config:read(known_hosts),
+    NextHost = case lists:dropwhile(fun(Pid) ->
+                                            lists:member(Pid, FailedPids)
+                                    end, KnownHosts) of
+                   [] -> util:randomelem(KnownHosts);
+                   [X | _] -> X
+               end,
+    % integrate the list of processes for which the send previously failed:
+    Self = comm:reply_as(self(), 2, {join, '_', [Target | FailedPids]}),
+    ?TRACE_SEND(NextHost, {get_dht_nodes, comm:this()}),
+    comm:send(NextHost, {get_dht_nodes, comm:this()}, [{shepherd, Self}]),
     State;
 
 % do not queue rm_trigger to prevent its infection with msg_queue:send/1
 process_join_state({rm, trigger} = _Msg, State) ->
     ?TRACE_JOIN1(_Msg, element(2, State)),
     rm_loop:send_trigger(),
+    State;
+
+% do not queue rm_trigger to prevent its infection with msg_queue:send/1
+process_join_state({move, check_for_timeouts} = _Msg, State) ->
+    ?TRACE_JOIN1(_Msg, element(2, State)),
+    dht_node_move:send_trigger(),
     State;
 
 % Catch all other messages until the join procedure is complete
@@ -567,7 +591,7 @@ process_join_msg({join, join_request, NewPred, CandId, MaxTransportEntries} = _M
             MoveFullId = uid:get_global_uid(),
             State1 = dht_node_move:exec_setup_slide_not_found(
                        Command, State, MoveFullId, NewPred, TargetId, join,
-                       MaxTransportEntries, null, nomsg, {none}),
+                       MaxTransportEntries, null, nomsg, {none}, false),
             % set up slide, now send join_response:
             MyOldPred = dht_node_state:get(State1, pred),
             % no need to tell the ring maintenance -> the other node will trigger an update
@@ -616,6 +640,8 @@ process_join_msg({join, get_number_of_samples_timeout, _Conn, _JoinId} = _Msg, S
     State;
 process_join_msg({join, join_request_timeout, _Timeouts, _CandId, _JoinId} = _Msg, State) ->
     State;
+process_join_msg({join, {send_error, _Target, _Msg, _Reason}, _FailedPids}, State) ->
+    State;
 % messages send by the passive load balancing module
 % -> forward to the module
 process_join_msg({join, LbPsv, Msg, LbPsvState} = _Msg, State) ->
@@ -643,11 +669,12 @@ call_lb_psv(LbPsv, Function, Parameters)
 -spec get_known_nodes(JoinUUId::pos_integer()) -> ok.
 get_known_nodes(JoinUUId) ->
     KnownHosts = config:read(known_hosts),
-    % contact all known VMs
+    % contact a subset of at most 3 random known VMs
+    Self = comm:reply_as(self(), 2, {join, '_', []}),
     _ = [begin
             ?TRACE_SEND(Host, {get_dht_nodes, comm:this()}),
-            comm:send(Host, {get_dht_nodes, comm:this()})
-         end || Host <- KnownHosts],
+            comm:send(Host, {get_dht_nodes, comm:this()}, [{shepherd, Self}])
+         end || Host <- util:random_subset(3, KnownHosts)],
     % also try to get some nodes from the current erlang VM:
     OwnServicePerVm = pid_groups:find_a(service_per_vm),
     ?TRACE_SEND(OwnServicePerVm, {get_dht_nodes, comm:this()}),
@@ -922,17 +949,22 @@ try_next_candidate(JoinState) ->
 %% @doc Finishes the join and sends all queued messages.
 -spec finish_join(Me::node:node_type(), Pred::node:node_type(),
                   Succ::node:node_type(), DB::db_dht:db(),
-                  QueuedMessages::msg_queue:msg_queue())
+                  QueuedMessages::msg_queue:msg_queue(),
+                  JoinOptions::[tuple()])
         -> dht_node_state:state().
-finish_join(Me, Pred, Succ, DB, QueuedMessages) ->
-    RMState = rm_loop:init(Me, Pred, Succ),
+finish_join(Me, Pred, Succ, DB, QueuedMessages, JoinOptions) ->
+    %% get old rt loop subscribtion table (if available)
+    MoveState = proplists:get_value(move_state, JoinOptions, []),
+    OldSubscrTable = proplists:get_value(subscr_table, MoveState, null),
+    RMState = rm_loop:init(Me, Pred, Succ, OldSubscrTable),
     Neighbors = rm_loop:get_neighbors(RMState),
     % wait for the ring maintenance to initialize and tell us its table ID
     rt_loop:activate(Neighbors),
-    cyclon:activate(),
-    vivaldi:activate(),
-    dc_clustering:activate(),
-    gossip:activate(nodelist:node_range(Neighbors)),
+    if MoveState =:= [] ->
+           dc_clustering:activate(),
+           gossip:activate(Neighbors);
+       true -> ok
+    end,
     dht_node_reregister:activate(),
     msg_queue:send(QueuedMessages),
     NewRT_ext = ?RT:empty_ext(Neighbors),
@@ -952,14 +984,20 @@ reject_join_response(Succ, _Pred, MoveId, _CandId) ->
 -spec finish_join_and_slide(Me::node:node_type(), Pred::node:node_type(),
                             Succ::node:node_type(), DB::db_dht:db(),
                             QueuedMessages::msg_queue:msg_queue(),
-                            MoveId::slide_op:id(), NextOp::slide_op:next_op())
+                            MoveId::slide_op:id(), NextOp::slide_op:next_op(),
+                            JoinOptions::[tuple()])
         -> {'$gen_component', [{on_handler, Handler::gen_component:handler()}],
             State::dht_node_state:state()}.
-finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId, NextOp) ->
-    State = finish_join(Me, Pred, Succ, DB, QueuedMessages),
+finish_join_and_slide(Me, Pred, Succ, DB, QueuedMessages, MoveId, NextOp, JoinOptions) ->
+    State = finish_join(Me, Pred, Succ, DB, QueuedMessages, JoinOptions),
+    {SourcePid, Tag} =
+        case lists:keyfind(jump, 1, JoinOptions) of
+            {jump, JumpTag, Pid} -> {Pid, JumpTag};
+            _ -> {null, join}
+        end,
     State1 = dht_node_move:exec_setup_slide_not_found(
-               {ok, {join, 'rcv'}}, State, MoveId, Succ, node:id(Me), join,
-               unknown, null, nomsg, NextOp),
+               {ok, {join, 'rcv'}}, State, MoveId, Succ, node:id(Me), Tag,
+               unknown, SourcePid, nomsg, NextOp, false),
     gen_component:change_handler(State1, fun dht_node:on/2).
 %% userdevguide-end dht_node_join:finish_join
 

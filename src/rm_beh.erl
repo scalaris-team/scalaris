@@ -38,7 +38,7 @@
         -> {ChangeReason::rm_loop:reason(), state()} | unknown_event.
 -callback zombie_node(State::state(), Node::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
--callback crashed_node(State::state(), DeadPid::comm:mypid())
+-callback crashed_node(State::state(), DeadPid::comm:mypid(), Reason::fd:reason())
         -> {ChangeReason::rm_loop:reason(), state()}.
 -callback new_pred(State::state(), NewPred::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
@@ -50,6 +50,8 @@
         -> {ChangeReason::rm_loop:reason(), state()}.
 -callback remove_succ(State::state(), OldSucc::node:node_type(),
                       SuccsSucc::node:node_type())
+        -> {ChangeReason::rm_loop:reason(), state()}.
+-callback remove_node(State::state(), NodePid::comm:mypid())
         -> {ChangeReason::rm_loop:reason(), state()}.
 -callback update_node(State::state(), NewMe::node:node_type())
         -> {ChangeReason::rm_loop:reason(), state()}.
@@ -67,7 +69,7 @@ behaviour_info(callbacks) ->
      {get_neighbors, 1},
      {init_first, 0}, {init, 3}, {trigger_action, 1}, {handle_custom_message, 2},
      {trigger_interval, 0},
-     {zombie_node, 2}, {crashed_node, 2},
+     {zombie_node, 2}, {crashed_node, 3},
      {new_pred, 2}, {new_succ, 2},
      {leave, 1},
      {remove_pred, 3}, {remove_succ, 3}, {update_node, 2},

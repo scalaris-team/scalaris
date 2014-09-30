@@ -25,8 +25,7 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 init_per_group(graceful_leave_load, _Config) ->
     % TODO: occasionally the bench server (as a Scalaris client) hangs because
@@ -141,6 +140,7 @@ add_3_rm_3_data(Config, Incremental) ->
     unittest_helper:make_ring(1, [{config, [{move_max_transport_entries, 25},
                                             {move_use_incremental_slides, Incremental},
                                             {log_path, PrivDir},
+                                            {monitor_perf_interval, 0},
                                             {rrepair_after_crash, false}
                                            | join_parameters_list()]}]),
 
@@ -283,7 +283,7 @@ reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(
                 send_error ->
                     comm:send(node:pidX(Succ), {move, {send_error, comm:this(), Msg, unittest}, MoveId});
                 crash ->
-                    comm:send(node:pidX(Succ), {crash, comm:this(), {move, MoveId}});
+                    comm:send(node:pidX(Succ), {crash, comm:this(), 'DOWN', {move, MoveId}});
                 abort ->
                     dht_node_join:reject_join_response(Succ, Pred, MoveId, CandId)
             end;
@@ -304,7 +304,7 @@ reply_to_join_response(Msg, State, Reason) when is_tuple(State) andalso element(
                 abort ->
                     dht_node_join:reject_join_response(Succ, Pred, MoveId, CandId);
                 crash ->
-                    comm:send(node:pidX(Succ), {crash, comm:this(), {move, MoveId}})
+                    comm:send(node:pidX(Succ), {crash, comm:this(), 'DOWN', {move, MoveId}})
             end;
         _ -> ok
     end,

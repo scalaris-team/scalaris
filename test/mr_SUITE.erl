@@ -24,15 +24,7 @@
 
 %% no proto scheduler for this suite
 -define(proto_sched(_Action), ok).
--define(proto_sched2(Action, Arg),
-        fun() ->
-                case Action of
-                    setup ->
-                        ok;
-                    cleanup ->
-                        [util:wait_for_process_to_die(Pid) || Pid <- Arg]
-                end
-        end()).
+-define(proto_sched2(Action, Arg), proto_sched2_fun(Action, Arg)).
 
 -include("mr_SUITE.hrl").
 
@@ -40,6 +32,14 @@ all() ->
     tests_avail() ++ [test_join, test_leave].
 
 suite() -> [ {timetrap, {seconds, 15}} ].
+
+-spec proto_sched2_fun(setup, ThreadNum::pos_integer()) -> ok;
+                      (cleanup, PIDs::[pid() | atom()]) -> ok.
+proto_sched2_fun(setup, _Arg) ->
+    ok;
+proto_sched2_fun(cleanup, Arg) ->
+    _ = [util:wait_for_process_to_die(Pid) || Pid <- Arg],
+    ok.
 
 test_join(_Config) ->
     Pids = pid_groups:find_all(dht_node),

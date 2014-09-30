@@ -28,7 +28,8 @@
 
 all() ->
     [tester_client_key_to_binary, tester_hash_key,
-     next_hop, next_hop2, tester_get_split_key, tester_get_split_key_half,
+     next_hop, next_hop2,
+     tester_get_split_key, tester_get_split_key_half,
      additional_tests].
 
 suite() ->
@@ -42,8 +43,7 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     unittest_helper:stop_minimal_procs(Config),
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 %% @doc Returns whether the default routing table from ?RT has chord-like keys.
 -spec default_rt_has_chord_keys() -> boolean().
@@ -156,11 +156,12 @@ prop_get_split_key_half(Begin, End_) ->
         
         end,
     ?equals_w_note(intervals:in(SplitKey, I), true,
-                   io_lib:format("SplitKey: ~.0p", [SplitKey])),
+                   {"SplitKey", SplitKey}),
 
     call_helper_fun(check_split_key_half, [Begin, End, SplitKey]).
 
 tester_get_split_key_half(_Config) ->
+    prop_get_split_key_half(?MINUS_INFINITY, plus_infinity),
     tester:test(?MODULE, prop_get_split_key_half, 2, 10000, [{threads, 2}]).
 
 -spec prop_get_split_key(Begin::?RT:key(), End::?RT:key() | plus_infinity, SplitFracA::1..100, SplitFracB::0..100) -> true.
@@ -190,7 +191,7 @@ prop_get_split_key(Begin, End_, SplitFracA, SplitFracB) ->
                 
                 end,
             ?equals_w_note(intervals:in(SplitKey, I), true,
-                           io_lib:format("SplitKey: ~.0p", [SplitKey])),
+                           {"SplitKey", SplitKey}),
             call_helper_fun(check_split_key, [Begin, End, SplitKey, SplitFraction])
     end,
     true.

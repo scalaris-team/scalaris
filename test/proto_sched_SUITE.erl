@@ -47,6 +47,7 @@ groups() ->
         basic_cleanup_DOWN_interplay,
         basic_cleanup_send_interplay,
         basic_thread_yield_outside_proto_sched,
+        basic_slow_msg_handler,
         basic_bench_increment%,
 %%        basic_start_bench_and_kill_it
       ]},
@@ -82,8 +83,7 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
@@ -92,7 +92,7 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(4, [{config, [{log_path, PrivDir}]}]),
@@ -106,10 +106,15 @@ end_per_testcase(_TestCase, Config) ->
 basic_empty_sched(_Config) ->
     %% an empty thread should be a valid run
     proto_sched:thread_num(1),
+    ?ASSERT(not proto_sched:infected()),
     proto_sched:thread_begin(),
+    ?ASSERT(proto_sched:infected()),
     proto_sched:thread_end(),
+    ?ASSERT(not proto_sched:infected()),
     proto_sched:wait_for_end(),
+    ?ASSERT(not proto_sched:infected()),
     log:log("~.0p", [proto_sched:get_infos()]),
+    ?ASSERT(not proto_sched:infected()),
     %% TODO: check statistics
     proto_sched:cleanup().
 
@@ -340,7 +345,7 @@ basic_cleanup_DOWN_interplay(_Config) ->
     %% 'DOWN' reports, so it had to be separated in a separate record field
     proto_sched:thread_num(1),
     Parent = self(),
-    Child =
+    _Child =
         spawn(fun() ->
                       proto_sched:thread_begin(),
                       ?TRACE("Sending parent", []),
@@ -365,7 +370,7 @@ basic_cleanup_send_interplay(_Config) ->
     %% 'DOWN' reports, so it had to be separated in a separate record field
     proto_sched:thread_num(1),
     Parent = self(),
-    Child =
+    _Child =
         spawn(fun() ->
                       proto_sched:thread_begin(),
                       ?TRACE("Sending parent", []),
@@ -393,6 +398,17 @@ basic_thread_yield_outside_proto_sched(_Config) ->
     %% a thread_yield outside a proto_sched is prohibited.
     ?expect_exception(proto_sched:thread_yield(),
                       throw, 'yield_outside_thread_start_thread_end').
+
+basic_slow_msg_handler(_Config) ->
+    %% keep exec token longer than a second. This should raise a
+    %% warning from proto_sched (some output).
+    proto_sched:thread_num(1),
+    proto_sched:thread_begin(),
+    timer:sleep(2000),
+    proto_sched:thread_end(),
+    proto_sched:cleanup(),
+    ok.
+
 
 basic_bench_increment(_Config) ->
     %% let run a short bench:increment with proto_sched
@@ -434,6 +450,7 @@ kv_on_cseq_read(_I) ->
     proto_sched:thread_begin(_I),
     kv_on_cseq:read("a"),
     proto_sched:thread_end(_I),
+    ?ASSERT(not proto_sched:infected()),
     proto_sched:wait_for_end(_I),
     _Infos = proto_sched:get_infos(_I),
     log:log("~.0p", [proto_sched:get_infos(_I)]),

@@ -89,8 +89,8 @@ update(_OldRT, _OldNeighbors, NewNeighbors) ->
 %% userdevguide-begin rt_simple:filter_dead_node
 %% @doc Removes dead nodes from the routing table (rely on periodic
 %%      stabilization here).
--spec filter_dead_node(rt(), comm:mypid()) -> rt().
-filter_dead_node(RT, _DeadPid) -> RT.
+-spec filter_dead_node(rt(), DeadPid::comm:mypid(), Reason::fd:reason()) -> rt().
+filter_dead_node(RT, _DeadPid, _Reason) -> RT.
 %% userdevguide-end rt_simple:filter_dead_node
 
 %% userdevguide-begin rt_simple:to_pid_list
@@ -134,6 +134,25 @@ get_split_key(Begin, _End, {Num, _Denom}) when Num == 0 -> Begin;
 get_split_key(_Begin, End, {Num, Denom}) when Num == Denom -> End;
 get_split_key(Begin, End, {Num, Denom}) ->
     normalize(Begin + trunc(get_range(Begin, End) * Num) div Denom).
+
+%% @doc Splits the range between Begin and End into up to Parts equal parts and
+%%      returning the according split keys.
+-spec get_split_keys(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                     Parts::pos_integer()) -> [key()].
+get_split_keys(Begin, End, Parts) ->
+    lists:reverse(get_split_keys_helper(Begin, End, Parts, [])).
+
+-spec get_split_keys_helper(Begin::key(), End::key() | ?PLUS_INFINITY_TYPE,
+                            Parts::pos_integer(), Acc::[key()]) -> [key()].
+get_split_keys_helper(_Begin, _End, 1, Acc) ->
+    Acc;
+get_split_keys_helper(Begin, End, Parts, Acc) ->
+    SplitKey = get_split_key(Begin, End, {1, Parts}),
+    if SplitKey =:= Begin ->
+           get_split_keys_helper(Begin, End, Parts - 1, Acc);
+       true ->
+           get_split_keys_helper(SplitKey, End, Parts - 1, [SplitKey | Acc])
+    end.
 
 %% @doc Gets input similar to what intervals:get_bounds/1 returns and
 %%      calculates a random key in this range. Fails with an exception if there
@@ -244,8 +263,13 @@ empty_ext(Neighbors) -> empty(Neighbors).
 
 %% userdevguide-begin rt_simple:next_hop
 %% @doc Returns the next hop to contact for a lookup.
--spec next_hop(dht_node_state:state(), key()) -> comm:mypid().
-next_hop(State, _Key) -> node:pidX(dht_node_state:get(State, succ)).
+-spec next_hop(dht_node_state:state(), key()) -> {succ | other, comm:mypid()}.
+next_hop(State, Key) ->
+    Neighbors = dht_node_state:get(State, neighbors),
+    case intervals:in(Key, nodelist:succ_range(Neighbors)) of
+        true -> {succ,  node:pidX(nodelist:succ(Neighbors))};
+        _    -> {other, node:pidX(nodelist:succ(Neighbors))}
+    end.
 %% userdevguide-end rt_simple:next_hop
 
 %% userdevguide-begin rt_simple:export_rt_to_dht_node

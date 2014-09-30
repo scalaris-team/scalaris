@@ -55,7 +55,7 @@
     {dc_reset_trigger} | %% just for periodic wake up
     {start_clustering_shuffle} | %% start a single clustering shuffle
     {reset_clustering} | %% get the own vivaldi coordinate and reset
-    {vivaldi_get_coordinate_response, vivaldi:network_coordinate(), vivaldi:error()} |
+    {vivaldi_get_coordinate_response, gossip_vivaldi:network_coordinate(), gossip_vivaldi:est_error()} |
     {cy_cache, [node:node_type()]} |
     {clustering_shuffle, comm:mypid(), dc_centroids:centroids(), non_neg_integer()} |
     {clustering_shuffle_reply, comm:mypid(), dc_centroids:centroids(), non_neg_integer()} |
@@ -75,7 +75,7 @@ activate() ->
             ignore
     end.
 
-%% @doc Deactivates the cyclon process.
+%% @doc Deactivates the clustering process.
 -spec deactivate() -> ok | ignore.
 deactivate() ->
     case config:read(dc_clustering_enable) of
@@ -197,7 +197,7 @@ on_active({dc_trigger}, State) ->
 
 on_active({start_clustering_shuffle}, State) ->
     % start new clustering shuffle -> gossip communication
-    cyclon:get_subset_rand(1),
+    gossip_cyclon:get_subset_rand(1),
     State;
 
 on_active({dc_reset_trigger}, State) ->
@@ -206,7 +206,7 @@ on_active({dc_reset_trigger}, State) ->
 
 % ask vivaldi for network coordinate
 on_active({reset_clustering}, State) ->
-    vivaldi:get_coordinate(),
+    gossip_vivaldi:get_coordinate(),
     State;
 
 % reset the local state and start a new epoche
@@ -320,7 +320,7 @@ handle_shuffle(#state_active{
 
     {NewEpoch, NewCentroids} =
     if Epoch < RemoteEpoch -> % reset and merge remote information
-            vivaldi:get_coordinate(),
+            gossip_vivaldi:get_coordinate(),
             {RemoteEpoch, []}
             ;
         Epoch > RemoteEpoch -> % ignore remote information, keep talking

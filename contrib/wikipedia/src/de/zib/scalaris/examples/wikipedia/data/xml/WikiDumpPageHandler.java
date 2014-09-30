@@ -136,7 +136,7 @@ public abstract class WikiDumpPageHandler extends WikiDumpHandler {
                             MyWikiModel.normaliseName(cat_raw));
                     newCategories.put1(category, normTitle);
                 }
-                for (String tpl_raw: wikiModel.getTemplates()) {
+                for (String tpl_raw: wikiModel.getTemplatesNoMagicWords()) {
                     NormalisedTitle template = new NormalisedTitle(
                             MyNamespace.TEMPLATE_NAMESPACE_KEY,
                             MyWikiModel.normaliseName(tpl_raw));

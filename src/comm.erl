@@ -35,7 +35,7 @@
 
 %% Sending messages
 -export([send/2, send/3, send_local/2, send_local_after/3,
-         forward_to_group_member/2]).
+         forward_to_group_member/2, forward_to_registered_proc/2]).
 
 %% Pid manipulation
 -export([make_global/1, make_local/1]).
@@ -52,13 +52,11 @@
 -export([init_and_wait_for_valid_pid/0]).
 
 -ifdef(with_export_type_support).
--export_type([message/0, group_message/0, msg_tag/0, mypid/0,
-              erl_local_pid/0, erl_local_pid_with_reply_as/0,
+-export_type([message/0, group_message/0, msg_tag/0,
+              mypid/0, mypid_plain/0,
+              erl_local_pid/0, erl_local_pid_plain/0,
+              erl_local_pid_with_reply_as/0,
               send_options/0, channel/0]).
-% for comm_layer and tester_scheduler
--export_type([erl_local_pid_plain/0]).
-% for tester_scheduler
--export_type([mypid_plain/0]).
 -endif.
 
 -type msg_tag() :: atom() | byte(). %% byte() in case of compact external atoms. See include/atom_ext.hrl
@@ -104,7 +102,7 @@
 
 -ifdef(forward_or_recursive_types_are_not_allowed).
 % define 3 levels of recursion manually:
--define(GROUP_MESSAGE(MSG), {?send_to_group_member, atom(), MSG}).
+-define(GROUP_MESSAGE(MSG), {?send_to_group_member | ?send_to_registered_proc, atom(), MSG}).
 -type group_message() ::
         ?GROUP_MESSAGE(message()) |
         ?GROUP_MESSAGE(?GROUP_MESSAGE(message())) |
@@ -112,7 +110,7 @@
 -type group_message4() ::
         ?GROUP_MESSAGE(?GROUP_MESSAGE(?GROUP_MESSAGE(?GROUP_MESSAGE(message())))).
 -else.
--type group_message() :: {?send_to_group_member, atom(), message() | group_message()}.
+-type group_message() :: {?send_to_group_member | ?send_to_registered_proc, atom(), message() | group_message()}.
 -endif.
 
 -type send_options() :: [{shepherd, Pid::erl_local_pid()} |
@@ -212,6 +210,7 @@ send_local(Pid, Msg) ->
                     true ->
                         LogEpidemicMsg = trace_mpath:epidemic_reply_msg(
                                            Logger, self(), RealPid, RealMsg),
+                        ?SEND_LOCAL_CHECK_PID(RealPid, LogEpidemicMsg),
                         RealPid ! LogEpidemicMsg
                 end
         end,
@@ -219,7 +218,7 @@ send_local(Pid, Msg) ->
 
 %% @doc Sends a message to a local process given by its local pid
 %%      (as returned by self()) after the given delay in milliseconds.
--spec send_local_after(Delay::non_neg_integer(), erl_local_pid(), message() | group_message()) -> reference().
+-spec send_local_after(Delay::0..4294967295, erl_local_pid(), message() | group_message()) -> reference().
 send_local_after(Delay, Pid, Msg) ->
     {RealPid, RealMsg} = unpack_cookie(Pid, Msg),
     case erlang:get(trace_mpath) of
@@ -319,6 +318,9 @@ get_msg_tag({Msg, _Cookie})
 get_msg_tag({?send_to_group_member, _ProcessName, Msg})
   when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
     get_msg_tag(Msg);
+get_msg_tag({?send_to_registered_proc, _ProcessName, Msg})
+  when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
+    get_msg_tag(Msg);
 get_msg_tag(Msg)
   when is_tuple(Msg) andalso (is_atom(erlang:element(1, Msg)) orelse is_integer(erlang:element(1, Msg))) ->
     erlang:element(1, Msg).
@@ -348,7 +350,13 @@ pack_group_member(Msg, [] = Opts)                      -> {Msg, Opts};
 pack_group_member(Msg, [{shepherd, _Shepherd}] = Opts) -> {Msg, Opts};
 pack_group_member(Msg, Opts)                           ->
     case lists:keytake(group_member, 1, Opts) of
-        false                                   -> {Msg, Opts};
+        false ->
+            case lists:keytake(registered_proc, 1, Opts) of
+                false ->
+                    {Msg, Opts};
+                {value, {registered_proc, Process}, Opts2} ->
+                    {{?send_to_registered_proc, Process, Msg}, Opts2}
+            end;
         {value, {group_member, Process}, Opts2} ->
             {{?send_to_group_member, Process, Msg}, Opts2}
     end.
@@ -358,10 +366,19 @@ pack_group_member(Msg, Opts)                           ->
 %%            happen during node leave operations).
 -spec forward_to_group_member(atom(), message()) -> ok.
 forward_to_group_member(Processname, Msg) ->
-    Pid = pid_groups:get_my(Processname),
-    case Pid of
+    case pid_groups:get_my(Processname) of
         failed -> ok;
-        _      -> comm:send_local(Pid, Msg)
+        Pid    -> comm:send_local(Pid, Msg)
+    end.
+
+%% @doc Forwards a message to a registered process.
+%%      NOTE: Does _not_ warn if the process does not exist (should only
+%%            happen during node leave operations).
+-spec forward_to_registered_proc(atom(), message()) -> ok.
+forward_to_registered_proc(Processname, Msg) ->
+    case whereis(Processname) of
+        undefined            -> ok;
+        Pid when is_pid(Pid) -> comm:send_local(Pid, Msg)
     end.
 
 %% @doc Initializes the comm layer by sending a message to known_hosts. A

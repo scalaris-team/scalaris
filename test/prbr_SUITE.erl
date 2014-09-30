@@ -1,4 +1,4 @@
-%% @copyright 2012, 2013 Zuse Institute Berlin
+%% @copyright 2012, 2013, 2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -39,13 +39,12 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         rbr_concurrency_kv ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Size = randoms:rand_uniform(3, 14),
@@ -54,7 +53,7 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:check_ring_size_fully_joined(Size),
             Config;
         rbr_concurrency_leases ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Size = 1, %% larger rings not supported by leases yet,
@@ -65,7 +64,7 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:check_ring_size_fully_joined(Size),
             Config;
         rbr_consistency ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring_with_ids(?RT:get_replica_keys(rt_SUITE:number_to_key(0)),
@@ -75,7 +74,7 @@ init_per_testcase(TestCase, Config) ->
 
             Config;
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             Size = randoms:rand_uniform(1, 9),
@@ -211,7 +210,7 @@ rbr_consistency(_Config) ->
     %% perform read in all quorum permutations
     %% (intercept read on a single dht node)
     %% output must be the old value or the new value
-    %% if the new value was seen once, the old must not be readable again
+    %% if the new value was seen once, the old must not be readable again.
 
     Nodes = pid_groups:find_all(dht_node),
     Key = "a",
@@ -222,6 +221,9 @@ rbr_consistency(_Config) ->
     %% select a replica
     Replicas = ?RT:get_replica_keys(?RT:hash_key(Key)),
 
+%%    print modified rbr entries
+%%    api_tx_proto_sched_SUITE:rbr_invariant(a,b,c),
+
     _ = [ begin
               New = N+100,
               Old = case N of
@@ -230,6 +232,9 @@ rbr_consistency(_Config) ->
                     end,
 
               modify_rbr_at_key(R, N+100),
+              %% ct:pal("After modification:"),
+              %% print modified rbr entries
+              %% api_tx_proto_sched_SUITE:rbr_invariant(a,b,c),
 
               %% intercept and drop a message at r1
               _ = lists:foldl(read_quorum_without(Key), {Old, New}, Nodes),
@@ -241,6 +246,10 @@ rbr_consistency(_Config) ->
 tester_type_check_rbr(_Config) ->
     Count = 250,
     config:write(no_print_ring_data, true),
+
+    tester:register_value_creator({typedef, prbr, write_filter, []},
+                                  prbr, tester_create_write_filter, 1),
+
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {txid_on_cseq,
@@ -280,15 +289,21 @@ tester_type_check_rbr(_Config) ->
              {cc_abort_read, 3},  %% cannot create funs
              {cc_abort_write, 3}  %% cannot create funs
            ]},
+          {pr,
+           [
+           ],
+           []},
           {prbr,
-           [ {on, 2},       %% sends messages
-             {get_load, 1}, %% needs valid tid()
-             {set_entry, 2} %% needs valid tid()
+           [ {on, 2},          %% sends messages
+             {get_load, 1},    %% needs valid tid()
+             {set_entry, 2}   %% needs valid tid()
           ],
            [ {msg_read_reply, 5},  %% sends messages
              {msg_write_reply, 5}, %% sends messages
              {msg_write_deny, 4},  %% sends messages
-             {get_entry, 2}        %% needs valid tid()
+             {get_entry, 2},        %% needs valid tid()
+             {tab2list, 1},    %% needs valid tid()
+             {tab2list_raw, 1} %% needs valid tid()
             ]},
           {rbrcseq,
            [ {on, 2},          %% sends messages
@@ -303,35 +318,49 @@ tester_type_check_rbr(_Config) ->
            [ {inform_client, 2}, %% cannot create valid envelopes
              {get_entry, 2},     %% needs valid tid()
              {set_entry, 2},     %% needs valid tid()
+             {add_read_reply, 6},%% needs client_value matching db_type
              {add_write_reply, 3}%% needs valid entry()
            ]
           }
         ],
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_value_creator({typedef, prbr, write_filter, []}),
+
     true.
 
 modify_rbr_at_key(R, N) ->
     %% get a valid round number
-    %% let fill in whether lookup was consistent
-    LookupReadEnvelope = dht_node_lookup:envelope(
-                       4,
-                       {prbr, read, kv, '_', comm:this(),
-                        R, unittest_rbr_consistency1,
-                        fun prbr:noop_read_filter/1}),
-    comm:send_local(pid_groups:find_a(dht_node),
-                    {?lookup_aux, R, 0, LookupReadEnvelope}),
-    receive
-        {read_reply, _, AssignedRound, _, _} ->
-            ok
-    end,
+
+    %% we ask all replicas to not get an outdated round number (select
+    %% the highest one.
+
+    Rounds = [ begin
+                   %% let fill in whether lookup was consistent
+                   LookupReadEnvelope = dht_node_lookup:envelope(
+                                          4,
+                                          {prbr, read, kv, '_', comm:this(),
+                                           Repl, unittest_rbr_consistency1_id,
+                                           fun prbr:noop_read_filter/1}),
+                   comm:send_local(pid_groups:find_a(dht_node),
+                                   {?lookup_aux, Repl, 0, LookupReadEnvelope}),
+                   receive
+                       {read_reply, _, AssignedRound, _, _} ->
+                           AssignedRound
+                   end
+               end || Repl <- ?RT:get_replica_keys(R) ],
+    HighestRound = lists:max(Rounds),
+
     %% perform a write
     %% let fill in whether lookup was consistent
     LookupWriteEnvelope = dht_node_lookup:envelope(
                             4,
                             {prbr, write, kv, '_', comm:this(),
-                             R, AssignedRound, {[], false, N+1, N}, null,
+                             R, HighestRound,
+                             {[], false, _Version = N-100, _Value = N},
+                             null,
                              fun prbr:noop_write_filter/3}),
+    %% modify the replica at key R, therefore we use a lookup...
     comm:send_local(pid_groups:find_a(dht_node),
                     {?lookup_aux, R, 0, LookupWriteEnvelope}),
     receive
@@ -356,19 +385,22 @@ drop_prbr_read_request(Client, Tag) ->
     end.
 
 read_quorum_without(Key) ->
-    fun (X, {Old, New}) ->
+    fun (ExcludedDHTNode, {Old, New}) ->
             gen_component:bp_set_cond(
-              X,
+              ExcludedDHTNode,
               drop_prbr_read_request(self(), drop_prbr_read),
               drop_prbr_read),
 
             {ok, Val} = kv_on_cseq:read(Key),
+            %% ct:pal("Old: ~p, Val: ~p New: ~p", [Old, Val, New]),
             receive
                 {drop_prbr_read, done} ->
-                    gen_component:bp_del(X, drop_prbr_read),
+                    gen_component:bp_del(ExcludedDHTNode, drop_prbr_read),
                     ok
             end,
             cleanup({drop_prbr_read, done}),
+            %% print modified rbr entries:
+            %% api_tx_proto_sched_SUITE:rbr_invariant(a,b,c),
             case Val of
                 Old ->
                     {Old, New}; %% valid for next read

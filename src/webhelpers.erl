@@ -76,7 +76,7 @@ delete_key(Key, Timeout) ->
     util:tc(api_rdht, delete, [Key, Timeout]).
 
 %%%--------------------------Vivaldi-Map------------------------------
--spec getVivaldiMap() -> [{{comm:mypid(), node_details:hostname()}, vivaldi:network_coordinate()}].
+-spec getVivaldiMap() -> [{{comm:mypid(), node_details:hostname()}, gossip_vivaldi:network_coordinate()}].
 getVivaldiMap() ->
     Nodes = [{
                 node:pidX(node_details:get(Node, node))
@@ -87,12 +87,13 @@ getVivaldiMap() ->
     _ = [erlang:spawn(
            fun() ->
                    SourcePid = comm:reply_as(This, 2, {webhelpers, '_', Pid}),
-                   comm:send(Pid, {get_coordinate, SourcePid}, [{group_member, vivaldi}])
+                   comm:send(Pid, {cb_msg, {gossip_vivaldi, default}, {get_coordinate, SourcePid}}, [{group_member, gossip}])
            end) || Pid <- NodePids],
     lists:zip(Nodes, get_vivaldi(NodePids, [], 0))
     .
 
--spec get_vivaldi(Pids::[comm:mypid()], [vivaldi:network_coordinate()], TimeInMS::non_neg_integer()) -> [vivaldi:network_coordinate()].
+-spec get_vivaldi(Pids::[comm:mypid()], [gossip_vivaldi:network_coordinate()],
+                  TimeInMS::non_neg_integer()) -> [gossip_vivaldi:network_coordinate()].
 get_vivaldi([], Coords, _TimeInS) -> Coords;
 get_vivaldi(Pids, Coords, TimeInMS) ->
     Continue =
@@ -142,13 +143,13 @@ color(Pid) ->
     .
 
 % @doc Get a string representation for a vivaldi coordinate
--spec format_coordinate([vivaldi:network_coordinate(),...]) -> string().
+-spec format_coordinate([gossip_vivaldi:network_coordinate(),...]) -> string().
 format_coordinate([X,Y]) ->
     io_lib:format("[~p,~p]", [X,Y]).
 
 % @doc Format Nodes as returned by getVivaldiMap() into JSON.
 -spec format_nodes([{{comm:mypid(), node_details:hostname()}
-                     , vivaldi:network_coordinate()}]) -> string().
+                     , gossip_vivaldi:network_coordinate()}]) -> string().
 format_nodes(Nodes) ->
     % order nodes according to their datacenter (designated by color)
     NodesTree = lists:foldl(
@@ -176,7 +177,7 @@ format_nodes(Nodes) ->
                 NodeString ++ Sep ++ Acc
     end, "", NodesTree) ++ "]".
 %%%--------------------------DC Clustering------------------------------
--spec getDCClustersAndNodes() -> {[{comm:mypid(), vivaldi:network_coordinate()}],
+-spec getDCClustersAndNodes() -> {[{comm:mypid(), gossip_vivaldi:network_coordinate()}],
         dc_centroids:centroids(), non_neg_integer(), float()} | disabled.
 getDCClustersAndNodes() ->
     case config:read(dc_clustering_enable) of
@@ -434,8 +435,8 @@ getRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Items"}}},
                   {td, [], io_lib:format("~p", [statistics:get_total_load(load, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load, RealRing))])}
                  ]
                 },
                 %% load
@@ -443,8 +444,8 @@ getRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Load"}}},
                   {td, [], io_lib:format("-", [])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load2, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load2, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load2, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load2, RealRing))])}
                  ]
                 },
                 %% requests
@@ -452,8 +453,8 @@ getRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Requests"}}},
                   {td, [], io_lib:format("~p", [statistics:get_total_load(load3, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load3, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load3, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load3, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load3, RealRing))])}
                  ]
                 }
                ]
@@ -560,8 +561,8 @@ getIndexedRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Items"}}},
                   {td, [], io_lib:format("~p", [statistics:get_total_load(load, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load, RealRing))])}
                  ]
                 },
                 %% load
@@ -569,8 +570,8 @@ getIndexedRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Load"}}},
                   {td, [], io_lib:format("-", [])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load2, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load2, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load2, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load2, RealRing))])}
                  ]
                 },
                 %% requests
@@ -578,8 +579,8 @@ getIndexedRingRendered() ->
                  [
                   {td, [{bgcolor, "#000099"}], {strong, [], {font, [{color, "white"}], "Requests"}}},
                   {td, [], io_lib:format("~p", [statistics:get_total_load(load3, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_average_load(load3, RealRing)])},
-                  {td, [], io_lib:format("~p", [statistics:get_load_std_deviation(load3, RealRing)])}
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_average_load(load3, RealRing))])},
+                  {td, [], io_lib:format("~p", [erlang:round(statistics:get_load_std_deviation(load3, RealRing))])}
                  ]
                 }
                ]
@@ -681,7 +682,7 @@ renderIndexedRing({failed, Pid}) ->
 getGossip() ->
     GossipPids = pid_groups:find_all(gossip),
     [begin
-         comm:send_local(Pid, {get_values_best, {gossip_load, default}, self()}),
+         comm:send_local(Pid, {cb_msg, {gossip_load, default}, {gossip_get_values_best, self()}}),
          trace_mpath:thread_yield(),
          receive
              ?SCALARIS_RECV(
@@ -812,9 +813,10 @@ getMonitorClientData() ->
                                           [Time, Avg, Avg - Min, Max - Avg]
                                   end, AvgMsD, MinMsD, MaxMsD),
 
+    VMMonitor = pid_groups:pid_of("basic_services", monitor),
     MemMonKeys = [{monitor_perf, X} || X <- [mem_total, mem_processes, mem_system,
                                              mem_atom, mem_binary, mem_ets]],
-    case statistics:getGaugeMonitorStats(ClientMonitor, MemMonKeys, list, 1024.0 * 1024.0) of
+    case statistics:getGaugeMonitorStats(VMMonitor, MemMonKeys, list, 1024.0 * 1024.0) of
         [] -> MemTotalD = MemProcD = MemSysD = MemAtomD = MemBinD = MemEtsD = [];
         [{monitor_perf, mem_total, MemTotalD},
          {monitor_perf, mem_processes, MemProcD},
@@ -827,7 +829,7 @@ getMonitorClientData() ->
     IOMonKeys = [{monitor_perf, X} || X <- [%rcv_count,
                                             rcv_bytes, %send_count,
                                             send_bytes]],
-    case statistics:getGaugeMonitorStats(ClientMonitor, IOMonKeys, list, 1) of
+    case statistics:getGaugeMonitorStats(VMMonitor, IOMonKeys, list, 1) of
         [] -> %RcvCntD0 = SendCntD0 =
             RcvBytesD0 = SendBytesD0 = [];
         [%{monitor_perf, rcv_count, RcvCntD0},
@@ -881,19 +883,18 @@ get_diff_data([_TimeLast, ValueLast], [Cur = [TimeCur, ValueCur] | Rest])
 
 -spec getMonitorRingData() -> [html_type()].
 getMonitorRingData() ->
-    Monitor = pid_groups:find_a(monitor_perf),
-    case Monitor of
+    case pid_groups:pid_of("basic_services", monitor) of
         failed ->
             Prefix = {p, [], "NOTE: no monitor_perf in this VM"},
             DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
         Monitor ->
             Prefix = [],
-            ReqKeys = [{monitor_perf, 'read_read'}, {dht_node, 'lookup_hops'}, {api_tx, 'req_list'}],
+            ReqKeys = [{monitor_perf, 'agg_read_read'}, {dht_node, 'agg_lookup_hops'}, {api_tx, 'agg_req_list'}],
             case statistics:getTimingMonitorStats(Monitor, ReqKeys, list) of
                 [] -> DataRR = DataLH = DataTX = {[], [], [], [], [], [], []}, ok;
-                [{monitor_perf, 'read_read', DataRR},
-                 {dht_node, 'lookup_hops', DataLH},
-                 {api_tx, 'req_list', DataTX}] -> ok
+                [{monitor_perf, 'agg_read_read', DataRR},
+                 {dht_node, 'agg_lookup_hops', DataLH},
+                 {api_tx, 'agg_req_list', DataTX}] -> ok
             end
     end,
     {_RRCountD, _RRCountPerSD, RRAvgMsD, RRMinMsD, RRMaxMsD, RRStddevMsD, _RRHistMsD} = DataRR,

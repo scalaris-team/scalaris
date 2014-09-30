@@ -45,12 +45,17 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
+
+init_per_group(Group, Config) ->
+    unittest_helper:init_per_group(Group, Config).
+
+end_per_group(Group, Config) ->
+    unittest_helper:end_per_group(Group, Config).
 
 init_per_testcase(_TestCase, Config) ->
-    unittest_helper:make_ring(
-      ?NO_OF_NODES,
+    unittest_helper:make_ring_with_ids(
+      [?MINUS_INFINITY],
       [{config, [
                  {monitor_perf_interval, 0},  % deactivate monitor_perf
                  {gossip_load_interval, 100}, % truncated to 0, i.e. immediate delivery
@@ -60,6 +65,7 @@ init_per_testcase(_TestCase, Config) ->
                  {gossip_log_level_error, error}
                 ]
        }]),
+    api_vm:add_nodes(?NO_OF_NODES-1),
     unittest_helper:wait_for_stable_ring_deep(),
     Config.
 
@@ -76,12 +82,12 @@ test_no_load(_Config) ->
 
     % get values from gossiping (after round finishes)
     wait_n_rounds(1),
-    send2gossip({get_values_best, {gossip_load,default}, self()}, 0),
+    send2gossip({cb_msg, {gossip_load, default}, {gossip_get_values_all, self()}}, 1),
 
     %                 {load_info, avg, stddev, size_ldr, size_kr, minLoad, maxLoad, merged}
     LoadInfoExpected ={load_info, 0.0, 0.0, 5.0, 5.0, 0, 0, whatever, []},
-    receive {gossip_get_values_best_response, LoadInfo} ->
-            ?compare(fun compare/2, LoadInfo, LoadInfoExpected)
+    receive {gossip_get_values_all_response, {PrevLoadInfo, _, _}} ->
+            ?compare(fun compare/2, PrevLoadInfo, LoadInfoExpected)
     end.
 
 
@@ -101,11 +107,11 @@ test_load(_Config) ->
 
     % get values from gossiping (after round finishes)
     % first round might be interrupted by node joins, thus wait two rounds
-    wait_n_rounds(2),
-    send2gossip({get_values_best, {gossip_load,default}, self()}, 0),
+    wait_n_rounds(1),
+    send2gossip({cb_msg, {gossip_load, default}, {gossip_get_values_all, self()}}, 1),
 
-    receive {gossip_get_values_best_response, LoadInfo} ->
-                ?compare(fun compare/2, LoadInfo, LoadInfoExpected)
+    receive {gossip_get_values_all_response, {PrevLoadInfo, _, _}} ->
+                ?compare(fun compare/2, PrevLoadInfo, LoadInfoExpected)
     end.
 
 
@@ -157,7 +163,7 @@ test_request_histogram2(_Config) ->
 send2gossip(Msg, Delay) ->
     Group = pid_groups:group_with(gossip),
     Pid = pid_groups:pid_of(Group, gossip),
-    comm:send_local_after(Delay, Pid, Msg).
+    msg_delay:send_local(Delay, Pid, Msg).
 
 %% @doc Waits n rounds, pulling the web_debug_info every second.
 -spec wait_n_rounds(NoOfRounds::pos_integer()) -> ok.
@@ -179,7 +185,7 @@ wait_for_round(TargetRound) ->
 %% @doc Get the current round (with one second delay).
 -spec get_current_round() -> non_neg_integer().
 get_current_round() ->
-    send2gossip({web_debug_info, self()}, 1000),
+    send2gossip({web_debug_info, self()}, 1),
     receive {web_debug_info_reply, KeyValueList} ->
         case lists:keyfind("cur_round", 1, KeyValueList) of
             {"cur_round", Round} -> Round;

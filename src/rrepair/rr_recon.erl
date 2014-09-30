@@ -29,7 +29,7 @@
 -export([map_key_to_interval/2, map_key_to_quadrant/2, map_interval/2,
          quadrant_intervals/0]).
 -export([get_chunk_kv/1, get_chunk_kvv/1, get_chunk_filter/1]).
-%-export([compress_kv_list/4, calc_signature_size_1_to_n/3, calc_signature_size_n_pair/3]).
+%-export([compress_kv_list/4, calc_signature_size_1_to_n/3, calc_signature_size_nm_pair/4]).
 
 %export for testing
 -export([find_sync_interval/2, quadrant_subints_/3, key_dist/2]).
@@ -69,7 +69,9 @@
                           sync_finished_remote. %client-side shutdown by merkle-tree recon initiator
 
 -type db_chunk_kv()    :: [{?RT:key(), db_dht:version()}].
+-type 'db_chunk_kv+'() :: [{?RT:key(), db_dht:version()},...].
 -type db_chunk_kvv()   :: [{?RT:key(), db_dht:version(), db_dht:value()}].
+-type 'db_chunk_kvv+'():: [{?RT:key(), db_dht:version(), db_dht:value()},...].
 
 -type signature_size() :: 1..160. % upper bound of 160 (SHA-1) to also limit testing
 -type kv_tree()        :: gb_trees:tree(KeyBin::bitstring(), VersionShort::non_neg_integer()).
@@ -182,7 +184,7 @@
     {resolve, {get_chunk_response, {intervals:interval(), db_chunk_kvv()}}} |
     % internal
     {shutdown, exit_reason()} |
-    {crash, DeadPid::comm:mypid()} |
+    {crash, DeadPid::comm:mypid(), Reason::fd:reason()} |
     {'DOWN', MonitorRef::reference(), process, Owner::pid(), Info::any()}
     .
 
@@ -300,16 +302,16 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
 
     {ToSend1, ToReq1, OtherDBChunk1} =
         get_full_diff(DBList, OtherDBChunk, ToSend, ToReq, SigSize, VSize),
+    ?DBG_ASSERT2(length(ToSend1) =:= length(lists:ukeysort(1, ToSend1)),
+                 {non_unique_send_list, ToSend, ToSend1}),
+    ?DBG_ASSERT2(length(ToReq1) =:= length(lists:usort(ToReq1)),
+                 {non_unique_req_list, ToReq1}),
 
-    %if rest interval is non empty start another sync
-    SID = rr_recon_stats:get(session_id, Stats),
+    %if rest interval is non empty get another chunk
     SyncFinished = intervals:is_empty(RestI),
-    if not SyncFinished ->
-           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve);
-       true -> ok
-    end,
     Params1 = Params#trivial_recon_struct{db_chunk = OtherDBChunk1},
     if SyncFinished ->
+           SID = rr_recon_stats:get(session_id, Stats),
            ?TRACE("Reconcile Trivial Session=~p ; ToSend=~p ; ToReq=~p",
                   [SID, length(ToSend1), length(ToReq1)]),
            NewStats =
@@ -351,6 +353,7 @@ on({resolve, {get_chunk_response, {RestI, DBList}}} = _Msg,
                     State#rr_recon_state{stats = NewStats2, params = Params2,
                                          to_resolve = {[], []}});
        true ->
+           send_chunk_req(DhtNodePid, self(), RestI, RestI, get_max_items(), resolve),
            State#rr_recon_state{params = Params1,
                                 to_resolve = {ToSend1, ToReq1}}
     end;
@@ -385,8 +388,8 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                   {BuildTime, {DBChunk, SigSize, VSize}} =
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
-                                        NewKVList, bloom:item_count(BF),
-                                        FullDiffSize, get_p1e())
+                                        NewKVList, FullDiffSize,
+                                        bloom:item_count(BF), get_p1e())
                               end),
                   
                   send(DestReconPid,
@@ -417,7 +420,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList}}} = _Msg,
               end,
     build_struct(DBList, MySyncI, RestI, State);
 
-on({crash, _Pid} = _Msg, State) ->
+on({crash, _Pid, _Reason} = _Msg, State) ->
     ?TRACE1(_Msg, State),
     shutdown(recon_node_crash, State);
 
@@ -452,6 +455,8 @@ on({resolve_req, BinKeys, SigSize} = _Msg,
                 SID = rr_recon_stats:get(session_id, Stats),
                 ?TRACE("Resolve Trivial Session=~p ; ToSend=~p",
                        [SID, length(ReqKeys)]),
+                ?DBG_ASSERT2(length(ReqKeys) =:= length(lists:usort(ReqKeys)),
+                             {non_unique_send_list, ReqKeys}),
                 % note: the resolve request is counted at the initiator and
                 %       thus from_my_node must be set accordingly on this node!
                 send_local(OwnerL, {request_resolve, SID,
@@ -482,8 +487,13 @@ on({resolve_req, DBChunk, SigSize, VSize, DestReconPid} = _Msg,
                 SID = rr_recon_stats:get(session_id, Stats),
                 {ToSendKeys1, ToReq1, DBChunkTree1} =
                     get_part_diff(KVList, DBChunkTree, [], [], SigSize, VSize),
+
                 ?TRACE("Resolve Bloom Session=~p ; ToSend=~p ; ToReq=~p",
                        [SID, length(ToSendKeys1), length(ToReq1)]),
+                ?DBG_ASSERT2(length(ToSendKeys1) =:= length(lists:usort(ToSendKeys1)),
+                             {non_unique_send_list, ToSendKeys1}),
+                ?DBG_ASSERT2(length(ToReq1) =:= length(lists:usort(ToReq1)),
+                             {non_unique_req_list, ToReq1}),
                 
                 % note: the resolve request was counted at the initiator and
                 %       thus from_my_node must be 0 on this node!
@@ -779,16 +789,23 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% @doc Calculates the minimum number of bits needed to have a hash collision
-%%      probability of P1E, given we compare N hashes pairwise with each other.
--spec calc_signature_size_n_pair(N::non_neg_integer(), P1E::float(),
-                                 MaxSize::signature_size())
+%%      probability of P1E, given we compare N hashes with M other hashes
+%%      pairwise with each other (hashes in M being part of hashes in N or the
+%%      other way around, depending on which is greater).
+-spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
+                                  P1E::float(), MaxSize::signature_size())
         -> SigSize::signature_size().
-calc_signature_size_n_pair(0, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(0, _, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_n_pair(1, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(_, 0, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_n_pair(N, P1E, MaxSize) when P1E > 0 ->
-    erlang:min(MaxSize, erlang:max(1, util:ceil(util:log2(N * (N - 1) / P1E) - 1))).
+calc_signature_size_nm_pair(1, 1, P1E, _MaxSize) when P1E > 0 ->
+    1;
+calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso M =< N ->
+    erlang:min(MaxSize,
+               erlang:max(1, util:ceil(util:log2((2*N*M - M*M - M) / P1E) - 1)));
+calc_signature_size_nm_pair(N, M, P1E, MaxSize) when M > N ->
+    calc_signature_size_nm_pair(M, N, P1E, MaxSize).
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
@@ -818,22 +835,38 @@ decompress_kv_list(Bin, Tree, SigSize, VSize) ->
 %%      and returns them as FBItems. ReqItems contains items in the tree but
 %%      where the version in MyEntries is older than the one in the tree.
 -spec get_full_diff
-        (MyEntries::db_chunk_kvv(), MyIOtherKvTree::kv_tree(),
+        (MyEntries::[], MyIOtherKvTree::kv_tree(),
+         AccFBItems::FBItems, AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VSize::signature_size())
+        -> {FBItems::FBItems, ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}
+            when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
+        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kv_tree(),
          AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
          SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()};
-        (MyEntries::db_chunk_kv(), MyIOtherKvTree::kv_tree(),
+        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kv_tree(),
          AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
          SigSize::signature_size(), VSize::signature_size())
         -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
 get_full_diff(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize, VSize) ->
     get_full_diff_(MyEntries, MyIOtKvTree, FBItems, ReqItems, SigSize,
                   util:pow(2, VSize)).
-    
--spec get_full_diff_(MyEntries::db_chunk_kvv(), MyIOtherKvTree::kv_tree(),
-                     AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
-                     SigSize::signature_size(), VMod::pos_integer())
--> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
+
+%% @doc Helper for get_full_diff/6.
+-spec get_full_diff_
+        (MyEntries::[], MyIOtherKvTree::kv_tree(),
+         AccFBItems::FBItems, AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VMod::pos_integer())
+        -> {FBItems::FBItems, ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}
+            when is_subtype(FBItems, rr_resolve:kvv_list() | [?RT:key()]);
+        (MyEntries::'db_chunk_kvv+'(), MyIOtherKvTree::kv_tree(),
+         AccFBItems::rr_resolve:kvv_list(), AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VMod::pos_integer())
+        -> {FBItems::rr_resolve:kvv_list(), ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()};
+        (MyEntries::'db_chunk_kv+'(), MyIOtherKvTree::kv_tree(),
+         AccFBItems::[?RT:key()], AccReqItems::[?RT:key()],
+         SigSize::signature_size(), VMod::pos_integer())
+        -> {FBItems::[?RT:key()], ReqItems::[?RT:key()], MyIOtherKvTree::kv_tree()}.
 get_full_diff_([], MyIOtKvTree, FBItems, ReqItems, _SigSize, _VMod) ->
     {FBItems, ReqItems, MyIOtKvTree};
 get_full_diff_([Tpl | Rest], MyIOtKvTree, FBItems, ReqItems, SigSize, VMod) ->
@@ -1154,8 +1187,9 @@ merkle_resolve_add_leaf_hash(LeafNode, SigSize0, HashesReply) ->
     % TODO: make extra version binary for better compression (?)
     % TODO: use formulae of compress_kv_list_p1e/4 for the version size (?) - have to have the same info on the other node!
     Bucket = merkle_tree:get_bucket(LeafNode),
-    BucketSize = length(Bucket),
+    BucketSize = merkle_tree:get_item_count(LeafNode),
     ?DBG_ASSERT(BucketSize < 255),
+    ?DBG_ASSERT(BucketSize =:= length(Bucket)),
     HashesReply1 = <<HashesReply/bitstring, BucketSize:8>>,
 
     % note: we can reach the best compression if values and versions align to
@@ -1231,6 +1265,8 @@ merkle_resolve_leaves_noninit([], HashesReply, DestRRPid, Stats, OwnerL, ToSend,
     % resolve items from inner-leaf comparisons with leaf-hash matches as key_upd:
     KeyUpdResReqs =
         if ToSend =/= [] ->
+               ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
+                            {non_unique_send_list, ToSend}),
                send_local(OwnerL, {request_resolve, SID,
                                    {key_upd_send, DestRRPid, ToSend, []},
                                    [{from_my_node, 1},
@@ -1279,6 +1315,10 @@ merkle_resolve(DestRRPid, Stats, OwnerL, ToSend, ToReq, ToResolve,
     %       thus from_my_node must be set accordingly on this node!
     KeyUpdResReqs =
         if ToSend =/= [] orelse ToReq =/= [] ->
+               ?DBG_ASSERT2(length(ToSend) =:= length(lists:usort(ToSend)),
+                            {non_unique_send_list, ToSend}),
+               ?DBG_ASSERT2(length(ToReq) =:= length(lists:usort(ToReq)),
+                            {non_unique_req_list, ToReq}),
                send_local(OwnerL, {request_resolve, SID,
                                    {key_upd_send, DestRRPid, ToSend, ToReq},
                                    [{from_my_node, ?IIF(Initiator, 1, 0)},
@@ -1577,12 +1617,17 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% @doc Creates a compressed key-value list comparing every item in Items
+%%      (at most ItemCount) with OtherItemCount other items and expecting at
+%%      most min(ItemCount, OtherItemCount) version comparisons.
+%%      Sets the bit sizes to have an error below P1E.
 -spec compress_kv_list_p1e(Items::db_chunk_kv(), ItemCount::non_neg_integer(),
-                           VCompareCount::non_neg_integer(), P1E::float())
+                           OtherItemCount::non_neg_integer(), P1E::float())
         -> {DBChunk::bitstring(), SigSize::signature_size(), VSize::signature_size()}.
-compress_kv_list_p1e(DBItems, ItemCount, VCompareCount, P1E) ->
+compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
+    VCompareCount = erlang:min(ItemCount, OtherItemCount),
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize0 = calc_signature_size_n_pair(ItemCount, P1E, 128),
+    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E, 128),
     % note: we have n one-to-one comparisons, assuming the probability of a
     %       failure in a single one-to-one comparison is p, the overall
     %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)

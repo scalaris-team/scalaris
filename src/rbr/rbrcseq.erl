@@ -57,10 +57,10 @@
                   non_neg_integer(), %% period of next retriggering
                   ?RT:key(), %% key
                   comm:erl_local_pid(), %% client
-                  prbr:r_with_id(), %% my round
+                  pr:pr(), %% my round
                   non_neg_integer(), %% number of acks
                   non_neg_integer(), %% number of denies
-                  prbr:r_with_id(), %% highest seen round in replies
+                  pr:pr(), %% highest accepted write round in replies
                   any(), %% value of highest seen round in replies
                   any(), %% filter (read) or tuple of filters (write)
                   non_neg_integer() %% number of newest replies
@@ -147,7 +147,7 @@ qwrite(CSeqPidName, Client, Key, CC, Value) ->
                   comm:erl_local_pid(),
                   ?RT:key(),
                   fun ((any(), any(), any()) -> {boolean(), any()}), %% CC (Content Check)
-                  client_value(), prbr:r_with_id(),
+                  client_value(), pr:pr(),
                   client_value() | prbr_bottom) -> ok.
 qwrite_fast(CSeqPidName, Client, Key, CC, Value, Round, OldVal) ->
     RF = fun prbr:noop_read_filter/1,
@@ -177,7 +177,7 @@ qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
     Pid = pid_groups:find_a(CSeqPidName),
     comm:send_local(Pid, {qwrite, Client,
                           Key, {ReadFilter, ContentCheck, WriteFilter},
-                          Value, _RetriggerAfter = 2}),
+                          Value, _RetriggerAfter = 20}),
     %% the process will reply to the client directly
     ok.
 
@@ -187,14 +187,14 @@ qwrite(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
              fun ((any()) -> any()), %% read filter
              fun ((any(), any(), any()) -> {boolean(), any()}), %% content check
              fun ((any(), any(), any()) -> any()), %% write filter
-             client_value(), prbr:r_with_id(), client_value() | prbr_bottom)
+             client_value(), pr:pr(), client_value() | prbr_bottom)
             -> ok.
 qwrite_fast(CSeqPidName, Client, Key, ReadFilter, ContentCheck,
             WriteFilter, Value, Round, OldValue) ->
     Pid = pid_groups:find_a(CSeqPidName),
     comm:send_local(Pid, {qwrite_fast, Client,
                           Key, {ReadFilter, ContentCheck, WriteFilter},
-                          Value, _RetriggerAfter = 2, Round, OldValue}),
+                          Value, _RetriggerAfter = 20, Round, OldValue}),
     %% the process will reply to the client directly
     ok.
 
@@ -267,11 +267,11 @@ on({qread, Client, Key, ReadFilter, RetriggerAfter}, State) ->
 %%                  -> trigger write_through to stabilize an open consens
 %%               otherwise just register the reply.
 on({qread_collect,
-    {read_reply, Cons, MyRwithId, Val, AckRound}}, State) ->
+    {read_reply, Cons, MyRwithId, Val, SeenWriteRound}}, State) ->
     ?TRACE("rbrcseq:on qread_collect read_reply MyRwithId: ~p~n", [MyRwithId]),
     %% collect a majority of answers and select that one with the highest
     %% round number.
-    {_Round, ReqId} = prbr:r_with_id_get_id(MyRwithId),
+    {_Round, ReqId} = pr:get_id(MyRwithId),
     Entry = get_entry(ReqId, tablename(State)),
     _ = case Entry of
         undefined ->
@@ -279,17 +279,16 @@ on({qread_collect,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            {Done, NewEntry} =
-                add_read_reply(Entry, MyRwithId, Val, AckRound, Cons),
-            case Done of
-                false ->
+            case add_read_reply(Entry, db_selector(State), MyRwithId,
+                               Val, SeenWriteRound, Cons) of
+                {false, NewEntry} ->
                     set_entry(NewEntry, tablename(State)),
                     State;
-                true ->
+                {true, NewEntry} ->
                     inform_client(qread_done, NewEntry),
                     ?PDB:delete(ReqId, tablename(State)),
                     State;
-                write_through ->
+                {write_through, NewEntry} ->
                     %% in case a consensus was started, but not yet finished,
                     %% we first have to finish it
 
@@ -406,10 +405,9 @@ on({qread_write_through_collect, ReqId,
         _ ->
             ?TRACE("rbrcseq:on qread_write_through_collect Client: ~p~n", [entry_client(Entry)]),
             %% log:pal("Collect reply ~p ~p~n", [ReqId, Round]),
-            {Done, NewEntry} = add_write_reply(Entry, Round, Cons),
-            case Done of
-                false -> set_entry(NewEntry, tablename(State));
-                true ->
+            case add_write_reply(Entry, Round, Cons) of
+                {false, NewEntry} -> set_entry(NewEntry, tablename(State));
+                {true, NewEntry} ->
                     ?TRACE("rbrcseq:on qread_write_through_collect infcl: ~p~n", [entry_client(Entry)]),
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
                     inform_client(qwrite_done, ReplyEntry),
@@ -594,10 +592,9 @@ on({qwrite_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            {Done, NewEntry} = add_write_reply(Entry, Round, Cons),
-            case Done of
-                false -> set_entry(NewEntry, tablename(State));
-                true ->
+            case add_write_reply(Entry, Round, Cons) of
+                {false, NewEntry} -> set_entry(NewEntry, tablename(State));
+                {true, NewEntry} ->
                     ReplyEntry = entry_set_my_round(NewEntry, NextRound),
                     inform_client(qwrite_done, ReplyEntry),
                     ?PDB:delete(ReqId, tablename(State))
@@ -619,11 +616,10 @@ on({qwrite_collect, ReqId,
             %% outdated as all replies run through the same process.
             State;
         _ ->
-            {Done, NewEntry} = add_write_deny(Entry, NewerRound, Cons),
-            case Done of
-                false -> set_entry(NewEntry, TableName),
-                         State;
-                true ->
+            case add_write_deny(Entry, NewerRound, Cons) of
+                {false, NewEntry} -> set_entry(NewEntry, TableName),
+                                     State;
+                {true, NewEntry} ->
                     %% retry
                     %% log:pal("Concurrency detected, retrying~n"),
 
@@ -640,12 +636,20 @@ on({qwrite_collect, ReqId,
 %% comm:local_send_after() with a random delay.
 %% TODO: random is not allowed for proto_sched reproducability...
                     %% log:log("Concurrency retry"),
-                    case randoms:rand_uniform(1,4) of
+                    UpperLimit = case proto_sched:infected() of
+                                     true -> 3;
+                                     false -> 4
+                                 end,
+                    case randoms:rand_uniform(1, UpperLimit) of
                         1 ->
                             retrigger(NewEntry, TableName, noincdelay),
                             %% delete of entry is done in retrigger!
                             State;
                         2 ->
+                            NewReq = req_for_retrigger(NewEntry, noincdelay),
+                            ?PDB:delete(element(1, NewEntry), TableName),
+                            gen_component:post_op(NewReq, State);
+                        3 ->
                             NewReq = req_for_retrigger(NewEntry, noincdelay),
                             %% TODO: maybe record number of retries
                             %% and make timespan chosen from
@@ -654,11 +658,7 @@ on({qwrite_collect, ReqId,
                                   10 + randoms:rand_uniform(1,90), self(),
                                   NewReq),
                             ?PDB:delete(element(1, NewEntry), TableName),
-                            State;
-                        3 ->
-                            NewReq = req_for_retrigger(NewEntry, noincdelay),
-                            ?PDB:delete(element(1, NewEntry), TableName),
-                            gen_component:post_op(NewReq, State)
+                            State
                     end
             end
     end
@@ -698,11 +698,7 @@ on({next_period, NewPeriod}, State) ->
     %% scan for open requests older than NewPeriod and initiate
     %% retriggering for them
     Table = tablename(State),
-    _ = [ begin
-              log:pal("Retrigger in period ~p caused by timeout for ~.0p~n",
-                     [NewPeriod, X]),
-              retrigger(X, Table, incdelay)
-          end
+    _ = [ retrigger(X, Table, incdelay)
           || X <- ?PDB:tab2list(Table), is_tuple(X),
              13 =:= erlang:tuple_size(X), NewPeriod > element(4, X) ],
 
@@ -727,21 +723,22 @@ req_for_retrigger(Entry, IncDelay) ->
                          incdelay -> erlang:max(1, (entry_retrigger(Entry) - entry_period(Entry)) + 1);
                          noincdelay -> entry_retrigger(Entry)
                      end,
-    case erlang:tuple_size(Entry) of
-        13 when is_tuple(element(12, Entry)) -> %% write request
-            {qwrite, entry_client(Entry),
-             entry_key(Entry), entry_filters(Entry),
-             entry_val(Entry),
-             RetriggerDelay};
-        13 -> %% read request
-            {qread, entry_client(Entry),
-             entry_key(Entry), entry_filters(Entry),
-             RetriggerDelay}
+    ?ASSERT(erlang:tuple_size(Entry) =:= 13),
+    if is_tuple(element(12, Entry)) -> %% write request
+           {qwrite, entry_client(Entry),
+            entry_key(Entry), entry_filters(Entry),
+            entry_val(Entry),
+            RetriggerDelay};
+       true -> %% read request
+           {qread, entry_client(Entry),
+            entry_key(Entry), entry_filters(Entry),
+            RetriggerDelay}
     end.
 
 -spec retrigger(entry(), ?PDB:tableid(), incdelay|noincdelay) -> ok.
 retrigger(Entry, TableName, IncDelay) ->
     Request = req_for_retrigger(Entry, IncDelay),
+    log:log("Retrigger caused by timeout or concurrency for ~.0p~n", [Request]),
     comm:send_local(self(), Request),
     ?PDB:delete(element(1, Entry), TableName).
 
@@ -759,16 +756,16 @@ set_entry(NewEntry, TableName) ->
                      non_neg_integer())
                     -> entry().
 entry_new_read(Debug, ReqId, Key, Client, Period, Filter, RetriggerAfter) ->
-    {ReqId, Debug, Period, Period + RetriggerAfter, Key, Client,
-     _MyRound = {0, 0}, _NumAcked = 0,
-     _NumDenied = 0, _AckRound = {0, 0}, _AckVal = 0, Filter, 0}.
+    {ReqId, Debug, Period, Period + RetriggerAfter + 20, Key, Client,
+     _MyRound = pr:new(0, 0), _NumAcked = 0,
+     _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), _AckVal = 0, Filter, 0}.
 
 -spec entry_new_write(any(), any(), ?RT:key(), comm:erl_local_pid(),
                       non_neg_integer(), tuple(), any(), non_neg_integer())
                      -> entry().
 entry_new_write(Debug, ReqId, Key, Client, Period, Filters, Value, RetriggerAfter) ->
     {ReqId, Debug, Period, Period + RetriggerAfter, Key, Client,
-     _MyRound = {0, 0}, _NumAcked = 0, _NumDenied = 0, _AckRound = {0, 0}, Value, Filters, 0}.
+     _MyRound = pr:new(0, 0), _NumAcked = 0, _NumDenied = 0, _SeenWriteRound = pr:new(0, 0), Value, Filters, 0}.
 
 -spec entry_reqid(entry())        -> any().
 entry_reqid(Entry)                -> element(1, Entry).
@@ -780,9 +777,9 @@ entry_retrigger(Entry)            -> element(4, Entry).
 entry_key(Entry)                  -> element(5, Entry).
 -spec entry_client(entry())       -> comm:erl_local_pid().
 entry_client(Entry)               -> element(6, Entry).
--spec entry_my_round(entry())     -> prbr:r_with_id().
+-spec entry_my_round(entry())     -> pr:pr().
 entry_my_round(Entry)             -> element(7, Entry).
--spec entry_set_my_round(entry(), prbr:r_with_id()) -> entry().
+-spec entry_set_my_round(entry(), pr:pr()) -> entry().
 entry_set_my_round(Entry, Round)  -> setelement(7, Entry, Round).
 -spec entry_num_acks(entry())     -> non_neg_integer().
 entry_num_acks(Entry)             -> element(8, Entry).
@@ -796,9 +793,9 @@ entry_num_denies(Entry)           -> element(9, Entry).
 entry_inc_num_denies(Entry) -> setelement(9, Entry, element(9, Entry) + 1).
 -spec entry_set_num_denies(entry(), non_neg_integer()) -> entry().
 entry_set_num_denies(Entry, Val) -> setelement(9, Entry, Val).
--spec entry_latest_seen(entry())  -> prbr:r_with_id().
+-spec entry_latest_seen(entry())  -> pr:pr().
 entry_latest_seen(Entry)          -> element(10, Entry).
--spec entry_set_latest_seen(entry(), prbr:r_with_id()) -> entry().
+-spec entry_set_latest_seen(entry(), pr:pr()) -> entry().
 entry_set_latest_seen(Entry, Round) -> setelement(10, Entry, Round).
 -spec entry_val(entry())           -> any().
 entry_val(Entry)                   -> element(11, Entry).
@@ -813,10 +810,11 @@ entry_inc_num_newest(Entry)        -> setelement(13, Entry, 1 + element(13, Entr
 -spec entry_num_newest(entry())    -> non_neg_integer().
 entry_num_newest(Entry)            -> element(13, Entry).
 
--spec add_read_reply(entry(), prbr:r_with_id(), client_value(),
-                     prbr:r_with_id(), Consistency::boolean())
+-spec add_read_reply(entry(), dht_node_state:db_selector(),
+                     pr:pr(), client_value(),
+                     pr:pr(), Consistency::boolean())
                     -> {Done::boolean() | write_through, entry()}.
-add_read_reply(Entry, AssignedRound, Val, AckRound, _Cons) ->
+add_read_reply(Entry, DBSelector, AssignedRound, Val, SeenWriteRound, _Cons) ->
     %% either decide on a majority of consistent replies, than we can
     %% just take the newest consistent value and do not need a
     %% write_through?
@@ -824,32 +822,79 @@ add_read_reply(Entry, AssignedRound, Val, AckRound, _Cons) ->
     %% Otherwise we decide on a consistent quorum (a majority agrees
     %% on the same version). We ensure this by write_through on odd
     %% cases.
-    
     RLatestSeen = entry_latest_seen(Entry),
     E1 =
-        if AckRound > RLatestSeen ->
-                T1 = entry_set_latest_seen(Entry, AckRound),
+        if SeenWriteRound > RLatestSeen ->
+                T1 = entry_set_latest_seen(Entry, SeenWriteRound),
                 T2 = entry_set_num_newest(T1, 1),
                 entry_set_val(T2, Val);
-           AckRound =:= RLatestSeen ->
-                entry_inc_num_newest(Entry);
+           SeenWriteRound =:= RLatestSeen ->
+                %% if this happens, consistency is probably broken by
+                %% too weak (wrong) content checks...?
+                
+                %% unfortunately the following statement is not always
+                %% true: As we also update parts of the value (set
+                %% write lock) it can happen that the write lock is
+                %% set on a quorum inluding an outdated replica, which
+                %% can store a different value than the replicas
+                %% up-to-date. This is not a consistency issue, as the
+                %% tx write the new value to the entry.  But what in
+                %% case of rollback? We cannot safely restore the
+                %% latest value then by just removing the write_lock,
+                %% but would have to actively write the former value!
+
+                %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
+                %%    {collected_different_values_with_same_round,
+                %%     Val, entry_val(Entry), proto_sched:get_infos()}),
+
+                %% We use a user defined value selector to chose which
+                %% value is newer. If a data type (leases for example)
+                %% only allows consistent values at any time, this
+                %% callback can check for violation by checking
+                %% equality of all replicas. If a data type allows
+                %% partial write access (like kv_on_cseq for its
+                %% locks) we need an ordering of the values, as it
+                %% might be the case, that a writelock which was set
+                %% on an outdated replica had to be rolled back. Then
+                %% replicas with newest paxos time stamp may exist
+                %% with differing value and we habe to chose that one
+                %% with the highest version number for a quorum read.
+
+                %% ?DBG_ASSERT2(Val =:= entry_val(Entry),
+                %%    {collected_different_values_with_same_round,
+                %%     Val, entry_val(Entry), proto_sched:get_infos()}),
+                T1 = case entry_val(Entry) of
+                         Val -> Entry;
+                         DifferingVal ->
+                             DataType = get_data_type(DBSelector),
+                             NewVal = DataType:max(Val, DifferingVal),
+                             entry_set_val(Entry, NewVal)
+                     end,
+                entry_inc_num_newest(T1);
            true -> Entry
     end,
     MyRound = erlang:max(entry_my_round(E1), AssignedRound),
     E2 = entry_set_my_round(E1, MyRound),
     E3 = entry_inc_num_acks(E2),
+    E3NumAcks = entry_num_acks(E3),
     Done =
-        case 3 =< entry_num_acks(E3) of
-            true ->
-                case entry_num_newest(E3) of
-                    1 -> write_through;
-                    _ -> true
-                end;
-            false -> false
+%%         case entry_num_newest(E3) of
+%%             E3NumAcks when 3 =< E3NumAcks -> %% we have three acks
+%%                 true; %% done
+%%             E3NumAcks -> false;
+%%             _ -> write_through %% 1 or 2 outdated replicas, so write_through
+%%         end,
+        if 3 =< E3NumAcks ->
+               %% we have three acks
+               case entry_num_newest(E3) of
+                   E3NumAcks -> true; %% done
+                   _ -> write_through
+               end;
+           true -> false
         end,
      {Done, E3}.
 
--spec add_write_reply(entry(), prbr:r_with_id(), Consistency::boolean())
+-spec add_write_reply(entry(), pr:pr(), Consistency::boolean())
                      -> {Done::boolean(), entry()}.
 add_write_reply(Entry, Round, _Cons) ->
     E1 =
@@ -868,7 +913,7 @@ add_write_reply(Entry, Round, _Cons) ->
     Done = (3 =< entry_num_acks(E2)),
     {Done, E2}.
 
--spec add_write_deny(entry(), prbr:r_with_id(), Consistency::boolean())
+-spec add_write_deny(entry(), pr:pr(), Consistency::boolean())
                     -> {Done::boolean(), entry()}.
 add_write_deny(Entry, Round, _Cons) ->
     E1 =
@@ -914,3 +959,17 @@ db_selector(State) -> element(2, State).
 period(State) -> element(3, State).
 -spec set_period(state(), non_neg_integer()) -> state().
 set_period(State, Val) -> setelement(3, State, Val).
+
+%% @doc determine from which module M to call M:max(A,B) to compare values
+-spec get_data_type(dht_node_state:db_selector())
+                   -> kv_on_cseq | l_on_cseq | tx_id_on_cseq
+                          | util. %% default max function
+get_data_type(kv) ->
+    kv_on_cseq;
+get_data_type(_) ->
+    %% in practice this decision only happens for the kv data type.
+    %% for the others we have to set it for the tester.  if no special
+    %% comparision needed, we can use the standard one (util)
+    %% leases_1-4 -> l_on_cseq
+    %% txid_1-4 -> tx_id_on_cseq
+    util.

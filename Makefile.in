@@ -22,7 +22,7 @@ MAKE = make
 PYTHON2=@PYTHON2@
 PYTHON3=@PYTHON3@
 VERSION=@PACKAGE_VERSION@
-OTP_ERLANG_VERSION=1.5.9
+OTP_ERLANG_VERSION=1.5.10
 COMMONS_CLI_VERSION=1.2
 
 .PHONY: all compile test test-vts java java-test java-bench java-* python python-compile python-clean python-test python-bench python-doc-html python-doc-pdf python3 python3-convert python3-compile python3-clean python3-test python3-bench ruby-test interop-test dist-clean clean erlang-clean tags-clean docs svn dialyzer dialyzer-all rrd-init install install-all install-erlang install-java install-docs install-java-doc install-python-doc-html install-python-doc-pdf install-ruby install-python install-python3 test-clean %_SUITE %_SUITE-dialyzer
@@ -33,6 +33,9 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 prefix = @prefix@
 exec_prefix = @exec_prefix@
 datarootdir = @datarootdir@
+bindir = @bindir@
+sysconfdir = @sysconfdir@
+localstatedir = @localstatedir@
 
 # /bin
 BINDIR = $(DESTDIR)@bindir@
@@ -42,6 +45,10 @@ SBINDIR = $(DESTDIR)@sbindir@
 ETCDIR = $(DESTDIR)@sysconfdir@/scalaris
 # /etc/init.d/
 INITDIR = $(DESTDIR)@sysconfdir@/init.d
+# /etc/conf.d
+SYSTEMD_CONFDIR = $(DESTDIR)@sysconfdir@/conf.d
+# /usr/lib/systemd/system
+SYSTEMD_UNITDIR = $(DESTDIR)@SYSTEMD_UNITDIR@
 # /lib/scalaris/
 SCALARISDIR = $(DESTDIR)@libdir@/scalaris
 # /lib/scalaris/ebin
@@ -67,9 +74,40 @@ PYTHON3SITELIBDIR=$(DESTDIR)@PYTHON3SITELIBDIR@
 SOURCEPATHS_ERL=src/* src/*/* include/* test/* contrib/log4erl/src/* contrib/yaws/src/*
 
 # libraries needed to build a plt suitable for the dialyzer target
-DIALYZER_PLT_LIBS=$(ERL_LIB_DIR)/common_test-*/ebin $(ERL_LIB_DIR)/compiler-*/ebin $(ERL_LIB_DIR)/crypto-*/ebin $(ERL_LIB_DIR)/debugger-*/ebin $(ERL_LIB_DIR)/edoc-*/ebin $(ERL_LIB_DIR)/erts-*/ebin $(ERL_LIB_DIR)/et-*/ebin $(ERL_LIB_DIR)/gs-*/ebin $(ERL_LIB_DIR)/hipe-*/ebin $(ERL_LIB_DIR)/inets-*/ebin $(ERL_LIB_DIR)/kernel-*/ebin $(ERL_LIB_DIR)/mnesia-*/ebin $(ERL_LIB_DIR)/observer-*/ebin $(ERL_LIB_DIR)/os_mon-*/ebin $(ERL_LIB_DIR)/public_key-*/ebin/ $(ERL_LIB_DIR)/runtime_tools-*/ebin $(ERL_LIB_DIR)/sasl-*/ebin $(ERL_LIB_DIR)/snmp-*/ebin $(ERL_LIB_DIR)/ssh-*/ebin $(ERL_LIB_DIR)/ssl-*/ebin $(ERL_LIB_DIR)/stdlib-*/ebin $(ERL_LIB_DIR)/syntax_tools-*/ebin $(ERL_LIB_DIR)/test_server-*/ebin/ $(ERL_LIB_DIR)/tools-*/ebin $(ERL_LIB_DIR)/webtool-*/ebin $(ERL_LIB_DIR)/wx-*/ebin $(ERL_LIB_DIR)/xmerl-*/ebin contrib/log4erl/ebin contrib/yaws/ebin
+# (only add them if they are available (via wildcard call which
+# results in nothing when no match exists))
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/common_test-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/compiler-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/crypto-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/debugger-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/edoc-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/erts-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/et-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/gs-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/hipe-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/inets-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/kernel-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/mnesia-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/observer-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/os_mon-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/public_key-*/ebin/)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/runtime_tools-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/sasl-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/snmp-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/ssh-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/ssl-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/stdlib-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/syntax_tools-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/test_server-*/ebin/)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/tools-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/webtool-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/wx-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard $(ERL_LIB_DIR)/xmerl-*/ebin)
+DIALYZER_PLT_LIBS += $(wildcard contrib/log4erl/ebin)
+DIALYZER_PLT_LIBS += $(wildcard contrib/yaws/ebin)
+
 #DIALYZER_PLT_LIBS=$(DIALYZER_PLT_LIBS) $(ERL_LIB_DIR)/gs-*/contribs/ebin $(ERL_LIB_DIR)/wx-*/examples/*
-DIALYZER_FLAGS ?= 
+DIALYZER_FLAGS ?=
 
 SCALARIS_CT_NAME ?= ct@127.0.0.1
 # for java-test and java-bench:
@@ -100,7 +138,7 @@ contrib/log4erl/src/log4erl_parser.erl: contrib/log4erl/src/log4erl_parser.yrl
 contrib/log4erl/src/log4erl_lex.erl: contrib/log4erl/src/log4erl_lex.xrl
 	cd contrib/log4erl/src && $(ERL) -noinput -noshell -s leex file log4erl_lex.xrl -s init stop
 
-test-all: all_TESTS java-test python-test ruby-test interop-test 
+test-all: all_TESTS java-test python-test ruby-test interop-test
 
 test: compile
 	@RUN_TEST@ $(UNITTESTARGS) -name $(SCALARIS_CT_NAME) @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -spec test/scalaris.runtests-default.cfg @CTHOOKS_FLAGS@ -noshell | tee ct.log ; \
@@ -132,7 +170,7 @@ test-vts: compile
 	@RUN_TEST@ @ERLANG_TOKE_FLAGS@ -pa `pwd`/ebin `pwd`/test `pwd`/contrib/yaws/ebin `pwd`/contrib/log4erl/ebin -dir . -cover test/scalaris.coverspec -vts -browser @BROWSER@ @CTHOOKS_FLAGS@
 
 test-clean:
-	-rm -rf ct_run.*@* ct.log ct_*_SUITE.log index.html all_runs.html variables-*@* \
+	-rm -rf ct_run.*@* ct.log ct-skipped.log ct_*_SUITE.log index.html all_runs.html variables-*@* \
             result_increment_10_1000.txt result_increment_1_10000.txt \
             result_read_10_10000.txt result_read_1_100000.txt \
             data/ct*@*
@@ -579,7 +617,12 @@ install-python-doc-pdf: python-doc-pdf
 
 install-docs: install-doc install-java-doc
 
-install-java: java
+contrib/init.d/scalaris-first-monitor: contrib/init.d/scalaris-monitor
+	sed -e 's|initd.conf|initd-first.conf|g' \
+	    -e 's|Provides:          scalaris-monitor|Provides:          scalaris-first-monitor|g' \
+	    $${srcdir}$< > $@
+
+install-java: java contrib/init.d/scalaris-first-monitor
 	install -d $(JAVADIR)/scalaris
 	install -d $(JAVADIR)/scalaris/lib
 	install -m 644 -t $(JAVADIR)/scalaris \
@@ -594,15 +637,55 @@ install-java: java
 	install -m 644 -t $(ETCDIR) \
 	           java-api/scalaris-java.conf.sample
 	install -m 644 -t $(ETCDIR) \
-	           java-api/scalaris.properties 
+	           java-api/scalaris.properties
 	install -d $(BINDIR)
 	install -m 755 -t $(BINDIR) \
 	           java-api/scalaris
 	install -d $(INITDIR)
 	install -m 744 -t $(INITDIR) \
-	           contrib/init.d/scalaris-monitor
+	           contrib/init.d/scalaris-monitor \
+	           contrib/init.d/scalaris-first-monitor
 
-install-erlang: compile
+contrib/init.d/scalaris-first: contrib/init.d/scalaris
+	sed -e 's|initd.conf|initd-first.conf|g' \
+	    -e 's|Provides:          scalaris|Provides:          scalaris-first|g' \
+	    $${srcdir}$< > $@
+
+install-initd: contrib/init.d/scalaris-first
+	install -d $(ETCDIR)
+	install -m 644 -t $(ETCDIR) \
+	           contrib/init.d/initd.conf \
+	           contrib/init.d/initd-first.conf
+	install -d $(INITDIR)
+	install -m 744 -t $(INITDIR) \
+	           contrib/init.d/scalaris \
+	           contrib/init.d/scalaris-first
+	install -d $(SBINDIR)
+	ln -sf @sysconfdir@/init.d/scalaris $(SBINDIR)/rcscalaris
+
+contrib/systemd/scalaris.service: contrib/systemd/scalaris.service.in Makefile
+	sed -e 's|@bindir[@]|$(bindir)|g' \
+	    -e 's|@sysconfdir[@]|$(sysconfdir)|g' \
+	    -e 's|@localstatedir[@]|$(localstatedir)|g' \
+	    -e 's|Description=Scalaris node|Description=Scalaris management server and first node|g' \
+	    $${srcdir}$@.in > $@
+
+contrib/systemd/scalaris-first.service: contrib/systemd/scalaris.service
+	sed -e 's|conf.d/scalaris|conf.d/scalaris-first|g' \
+	    $${srcdir}$< > $@
+
+install-systemd: contrib/systemd/scalaris.service contrib/systemd/scalaris-first.service
+	install -d $(SYSTEMD_CONFDIR)
+	install -m 644 contrib/systemd/scalaris.conf \
+	           $(SYSTEMD_CONFDIR)/scalaris
+	install -m 644 contrib/systemd/scalaris-first.conf \
+	           $(SYSTEMD_CONFDIR)/scalaris-first
+	install -d $(SYSTEMD_UNITDIR)
+	install -m 644 -t $(SYSTEMD_UNITDIR) \
+	           contrib/systemd/scalaris.service \
+	           contrib/systemd/scalaris-first.service
+
+install-erlang: compile @INSTALL_INIT@
 	install -d $(BEAMDIR)
 	install -m 644 -t $(BEAMDIR) \
 	           ebin/*.beam
@@ -610,19 +693,13 @@ install-erlang: compile
 	install -m 644 -t $(ETCDIR) \
 	           bin/scalarisctl.conf \
 	           bin/scalaris.cfg \
-	           bin/scalaris.local.cfg.example \
-	           contrib/init.d/initd.conf
+	           bin/scalaris.local.cfg.example
 	if [ -f bin/scalaris.local.cfg ]; then \
 	  install -m 644 -t $(ETCDIR) \
 	           bin/scalaris.local.cfg; \
 	else \
 	  touch $(ETCDIR)/scalaris.local.cfg ; \
 	fi
-	install -d $(INITDIR)
-	install -m 744 -t $(INITDIR) \
-	           contrib/init.d/scalaris
-	install -d $(SBINDIR)
-	ln -sf @sysconfdir@/init.d $(SBINDIR)/rcscalaris
 	install -d $(DOCROOTDIR) \
 	           $(DOCROOTDIR)/api \
 	           $(DOCROOTDIR)/flot \

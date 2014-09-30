@@ -23,6 +23,7 @@
 
 -export([create/2, add/2, add/3, get_data/1, get_size/1, merge/2,
          get_num_elements/1, get_num_inserts/1]).
+-export([merge_weighted/3, normalize_count/2]).
 -export([foldl_until/2, foldr_until/2]).
 -export([is_histogram/1]).
 
@@ -80,18 +81,31 @@ get_num_elements({Histogram, _BaseKey}) ->
 get_num_inserts({Histogram, _BaseKey}) ->
     histogram:get_num_inserts(Histogram).
 
-%% @doc: Merges the given two histograms by adding every data point of Hist2
+%% @doc Merges the given two histograms by adding every data point of
+%%      Hist2 to Hist1
 -spec merge(Hist1::histogram(), Hist2::histogram()) -> histogram().
 merge(Hist1, Hist2) ->
+    merge_weighted(Hist1, Hist2, 1).
+
+%% @doc Merges Hist2 into Hist1 and applies a weight to the Count of Hist2
+-spec merge_weighted(Hist1::histogram(), Hist2::histogram(), Weight::pos_integer()) -> histogram().
+merge_weighted({Histogram1, BaseKey}, {Histogram2, BaseKey}, Weight) ->
+    {histogram:merge_weighted(Histogram1, Histogram2, Weight), BaseKey};
+merge_weighted(Hist1, Hist2, Weight) ->
     case get_size(Hist1) of
         0 -> Hist1;
         _ ->
             DataHist2 = get_data(Hist2),
             lists:foldl(fun({Value, Count}, Hist) ->
-                                add(Value, Count, Hist)
+                                add(Value, Count*Weight, Hist)
                         end,
                         Hist1, DataHist2)
     end.
+
+%% @doc Normalizes the Count by a normalization constant N
+-spec normalize_count(N::pos_integer(), Histogram::histogram()) -> histogram().
+normalize_count(N, {Histogram, BaseKey}) ->
+    {histogram:normalize_count(N, Histogram), BaseKey}.
 
 %% @doc Traverses the histogram until TargetCount entries have been found
 %%      and returns the value at this position.

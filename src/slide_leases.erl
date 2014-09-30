@@ -34,7 +34,8 @@
          update_rcv_data1/3, update_rcv_data2/3,
          prepare_send_delta1/3, prepare_send_delta2/3,
          finish_delta1/3, finish_delta2/3,
-         finish_delta_ack1/3, finish_delta_ack2/4]).
+         finish_delta_ack1/3, finish_delta_ack2/4,
+         abort_slide/4]).
 
 % for tester
 -export([tester_create_dht_node_state/0]).
@@ -204,7 +205,7 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
     case find_lease(State, SlideOp, passive) of
         {ok, Lease} ->
             Owner = l_on_cseq:get_owner(Lease),
-            l_on_cseq:lease_send_lease_to_node(Owner, Lease),
+            l_on_cseq:lease_send_lease_to_node(Owner, Lease, active),
             State1 = lease_list:remove_lease_from_dht_node_state(Lease, State, passive),
             {ok, State1, SlideOp, NextOpMsg};
         error ->
@@ -212,6 +213,16 @@ finish_delta_ack2(State, SlideOp, NextOpMsg, Msg) ->
             % @todo
             error
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% @doc Executed when aborting the given slide operation (assumes the SlideOp
+%%      has already been set up).
+-spec abort_slide(State::dht_node_state:state(), SlideOp::slide_op:slide_op(),
+                  Reason::dht_node_move:abort_reason(), MoveMsgTag::atom())
+        -> dht_node_state:state().
+abort_slide(State, _SlideOp, _Reason, _MoveMsgTag) ->
+    State.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

@@ -38,8 +38,7 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 init_per_testcase(_TestCase, Config) ->
     % stop ring from previous test case (it may have run into a timeout)
@@ -88,7 +87,7 @@ change_id_and_check(OldId, NewId) ->
                         fun(Pid, Tag, OldNeighbors, NewNeighbors, _Reason) ->
                                 comm:send_local(Pid, {rm_changed, Tag, OldNeighbors, NewNeighbors})
                         end, inf}),
-    comm:send(DhtNode, {rm, update_id, NewId}),
+    comm:send(DhtNode, {rm, update_my_id, NewId}),
     comm:send(DhtNode, {rm, unsubscribe, self(), rm_SUITE}),
     
     % check that the new ID has been set:

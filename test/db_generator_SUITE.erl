@@ -38,22 +38,21 @@ suite() ->
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
-    tester:register_type_checker({typedef, intervals, interval}, intervals, is_well_formed),
-    tester:register_type_checker({typedef, intervals, continuous_interval}, intervals, is_continuous),
-    tester:register_value_creator({typedef, random_bias, generator},
+    tester:register_type_checker({typedef, intervals, interval, []}, intervals, is_well_formed),
+    tester:register_type_checker({typedef, intervals, continuous_interval, []}, intervals, is_continuous),
+    tester:register_value_creator({typedef, random_bias, generator, []},
                                   random_bias, tester_create_generator, 3),
-    tester:register_value_creator({typedef, intervals, interval}, intervals, tester_create_interval, 1),
-    tester:register_value_creator({typedef, intervals, continuous_interval}, intervals, tester_create_continuous_interval, 4),
+    tester:register_value_creator({typedef, intervals, interval, []}, intervals, tester_create_interval, 1),
+    tester:register_value_creator({typedef, intervals, continuous_interval, []}, intervals, tester_create_continuous_interval, 4),
     Config2.
 
 end_per_suite(Config) ->
-    tester:unregister_value_creator({typedef, random_bias, generator}),
-    tester:unregister_value_creator({typedef, intervals, interval}),
-    tester:unregister_value_creator({typedef, intervals, continuous_interval}),
-    tester:unregister_type_checker({typedef, intervals, interval}),
-    tester:unregister_type_checker({typedef, intervals, continuous_interval}),
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    tester:unregister_value_creator({typedef, random_bias, generator, []}),
+    tester:unregister_value_creator({typedef, intervals, interval, []}),
+    tester:unregister_value_creator({typedef, intervals, continuous_interval, []}),
+    tester:unregister_type_checker({typedef, intervals, interval, []}),
+    tester:unregister_type_checker({typedef, intervals, continuous_interval, []}),
+    unittest_helper:end_per_suite(Config).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -82,7 +81,7 @@ prop_get_db3_(Interval, ItemCount, Distribution) ->
              ?equals(length(Result), ItemCount)).
 
 -spec prop_get_db4(I::intervals:continuous_interval(), ItemCount::1..1000,
-                   db_generator:db_distribution(), Options::[db_generator:option()]) -> boolean().
+                   db_generator:db_distribution(), Options::[db_generator:option()]) -> true.
 prop_get_db4(Interval, ItemCount0, Distribution0 = {non_uniform, RanGen}, Options) ->
     ItemCount = erlang:min(ItemCount0, random_bias:numbers_left(RanGen)),
     prop_get_db4_(Interval, ItemCount, db_generator:feeder_fix_rangen(Distribution0, ItemCount), Options);
@@ -91,7 +90,7 @@ prop_get_db4(Interval, ItemCount, Distribution, Options) ->
 
 
 -spec prop_get_db4_(I::intervals:continuous_interval(), ItemCount::1..1000,
-                    db_generator:db_distribution(), Options::[db_generator:option()]) -> boolean().
+                    db_generator:db_distribution(), Options::[db_generator:option()]) -> true.
 prop_get_db4_(Interval, ItemCount, Distribution, Options) ->
     Result = db_generator:get_db(Interval, ItemCount, Distribution, Options),
     case proplists:get_value(output, Options, list_key) of

@@ -180,7 +180,8 @@ del_node({Id, Pid, _Type, _}, Graceful) ->
             supervisor:delete_child(main_sup, Id)
     end.
 
-%% @doc Contact mgmt server and check that each node's successor is correct.
+%% @doc Contact mgmt server and check that each node's successor and predecessor
+%%      are correct.
 -spec check_ring() -> {error, string()} | ok.
 check_ring() ->
     Nodes = statistics:get_ring_details(),
@@ -191,18 +192,23 @@ check_ring() ->
 
 -spec check_ring_foldl(NodeState::statistics:ring_element(),
                        Acc::first | ?RT:key())
-        -> first | {error, Reason::string()} | ?RT:key().
+        -> first | {error, Reason::string()} | {Pred::?RT:key(), PredsSucc::?RT:key()}.
 check_ring_foldl({ok, NodeDetails}, first) ->
-    node:id(node_details:get(NodeDetails, succ));
+    {node:id(node_details:get(NodeDetails, node)),
+     node:id(node_details:get(NodeDetails, succ))};
 check_ring_foldl(_, {error, Message}) ->
     {error, Message};
-check_ring_foldl({ok, NodeDetails}, PredsSucc) ->
+check_ring_foldl({ok, NodeDetails}, {Pred, PredsSucc}) ->
+    MyPredId = node:id(node_details:get(NodeDetails, pred)),
     MyId = node:id(node_details:get(NodeDetails, node)),
     if
-        MyId =:= PredsSucc ->
-            node:id(node_details:get(NodeDetails, succ));
+        MyId =/= PredsSucc ->
+            {error, lists:flatten(io_lib:format("MyID ~p didn't match preds succ ~p", [MyId, PredsSucc]))};
+        MyPredId =/= Pred ->
+            {error, lists:flatten(io_lib:format("MyPredID ~p didn't match preds id ~p", [MyPredId, Pred]))};
         true ->
-            {error, lists:flatten(io_lib:format("MyID ~p didn't match preds succc ~p", [MyId, PredsSucc]))}
+            {node:id(node_details:get(NodeDetails, node)),
+             node:id(node_details:get(NodeDetails, succ))}
     end;
 check_ring_foldl({failed, _}, Previous) ->
     Previous.
@@ -398,12 +404,13 @@ nodes() ->
 -spec print_ages() -> ok.
 print_ages() ->
     mgmt_server:node_list(),
-    _ = begin 
+    _ = begin
             trace_mpath:thread_yield(),
             receive
                 ?SCALARIS_RECV(
                    {get_list_response, List}, %% ->
-                   [ comm:send(Node, {get_ages, self()}, [{group_member, cyclon}]) || Node <- List ]
+                   [ comm:send(Node, {cb_msg, {gossip_cyclon, default}, {get_ages, self()}},
+                               [{group_member, gossip}]) || Node <- List ]
                   )
                 end
         end,

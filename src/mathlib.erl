@@ -25,7 +25,7 @@
          nearestCentroid/2,
         aggloClustering/2]).
 
--export([factorial/1, binomial_coeff/2]).
+-export([factorial/1, binomial_coeff/2, gcd/2]).
 
 %% for type_check_SUITE
 -export([binomial_coeff_feeder/2,
@@ -204,3 +204,8 @@ factorial_feeder(N, Acc) -> {N, Acc}.
 factorial(0, Acc) -> Acc;
 factorial(N, Acc) ->
     factorial(N - 1, N * Acc).
+
+%% @doc Calculates the greatest common divisor of two integers.
+-spec gcd(non_neg_integer(), non_neg_integer()) -> non_neg_integer().
+gcd(A, 0) -> A;
+gcd(A, B) -> gcd(B, A rem B).

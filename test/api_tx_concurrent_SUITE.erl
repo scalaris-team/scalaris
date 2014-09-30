@@ -1,4 +1,4 @@
-%  @copyright 2008-2012 Zuse Institute Berlin
+%  @copyright 2008-2014 Zuse Institute Berlin
 %
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 all() ->
     [increment_test_2, increment_test_4, increment_test_8].
 
-suite() -> [ {timetrap, {seconds, 120}} ].
+suite() -> [ {timetrap, {seconds, 620}} ].
 
 init_per_suite(Config) ->
     Config2 = unittest_helper:init_per_suite(Config),
@@ -37,8 +37,7 @@ init_per_suite(Config) ->
     Config2.
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 inc(Key) ->
     {TLog1, [ReadResult]} = api_tx:req_list([{read, Key}]),
@@ -71,7 +70,7 @@ increment_test_n(_Config, N) ->
     ?equals(api_tx:write("i", 0), {ok}),
 
     Self = self(),
-    Count = 100,
+    Count = 200 div N,
     _ = [ spawn(api_tx_concurrent_SUITE, process, [Self, Key, Count])
           || _ <- lists:seq(1, N) ],
 

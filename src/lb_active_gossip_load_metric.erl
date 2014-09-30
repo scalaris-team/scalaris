@@ -22,7 +22,7 @@
 
 -spec get_load(node_details:node_details()) -> gossip_load_beh:load().
 get_load(_NodeDetails) ->
-    lb_active:get_load_metric().
+    lb_stats:get_load_metric().
 
 -spec init_histo(node_details:node_details(), NumberOfBuckets::pos_integer())
                     -> gossip_load:histogram().
@@ -39,6 +39,6 @@ get_load_for_interval(BucketInterval, MyRange) ->
     case intervals:is_empty(Intersection) of
         true -> unknown;
         false ->
-            Load = lb_active:get_load_metric(),
+            Load = lb_stats:default_value(lb_stats:get_load_metric()),
             {float(Load), 1.0}
     end.

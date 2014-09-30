@@ -1,4 +1,4 @@
-%% @copyright 2012-2013 Zuse Institute Berlin
+%% @copyright 2012-2014 Zuse Institute Berlin
 
 %   Licensed under the Apache License, Version 2.0 (the "License");
 %   you may not use this file except in compliance with the License.
@@ -91,8 +91,7 @@ init_per_suite(Config) ->
     unittest_helper:init_per_suite(Config).
 
 end_per_suite(Config) ->
-    _ = unittest_helper:end_per_suite(Config),
-    ok.
+    unittest_helper:end_per_suite(Config).
 
 init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
@@ -101,7 +100,7 @@ end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 init_per_testcase(TestCase, Config) ->
     case TestCase of
         test_garbage_collector ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
@@ -109,7 +108,7 @@ init_per_testcase(TestCase, Config) ->
             unittest_helper:check_ring_size_fully_joined(4),
             Config;
         _ ->
-            %% stop ring from previous test case (it may have run into a timeout
+            %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
             unittest_helper:make_ring(4, [{config, [{log_path, PrivDir},
@@ -125,6 +124,9 @@ end_per_testcase(_TestCase, Config) ->
 tester_type_check_l_on_cseq(_Config) ->
     Count = 500,
     config:write(no_print_ring_data, true),
+    tester:register_value_creator({typedef, prbr, write_filter, []},
+                                  prbr, tester_create_write_filter, 1),
+
     %% [{modulename, [excludelist = {fun, arity}]}]
     Modules =
         [ {l_on_cseq,
@@ -136,11 +138,12 @@ tester_type_check_l_on_cseq(_Config) ->
              {lease_takeover_after, 3}, %% sends messages
              {lease_split, 5}, %% sends messages
              {lease_merge, 3}, %% sends messages
-             {lease_send_lease_to_node, 2}, %% sends messages
+             {lease_send_lease_to_node, 3}, %% sends messages
              {lease_split_and_change_owner, 6}, %% sends messages
              {id, 1}, %% todo
              {split_range, 1}, %% todo
              {unittest_lease_update, 3}, %% only for unittests
+             {unittest_clear_lease_list, 1}, %% only for unittests
              {disable_lease, 2}, %% requires dht_node_state
              {on, 2}, %% cannot create dht_node_state (reference for bulkowner)
              {get_pretty_timeout, 1}, %% cannot create valid timestamps
@@ -178,6 +181,7 @@ tester_type_check_l_on_cseq(_Config) ->
     pid_groups:join(pid_groups:group_with(dht_node)),
     _ = [ tester:type_check_module(Mod, Excl, ExclPriv, Count)
           || {Mod, Excl, ExclPriv} <- Modules ],
+    tester:unregister_value_creator({typedef, prbr, write_filter, []}),
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

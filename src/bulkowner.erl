@@ -70,22 +70,24 @@ issue_send_reply(Id, Target, Msg, Parents) ->
     comm:send_local(DHTNode, {bulkowner, reply, Id, Target, Msg, Parents}).
 
 -spec issue_bulk_distribute(ID::uid:global_uid(), atom(), pos_integer(),
-                           comm:message(), [{string(), term()}] | {ets, ets:tab()}) -> ok.
+                           comm:message(), [{?RT:key(), string(), term()}] | {ets, ets:tab()}) -> ok.
 issue_bulk_distribute(Id, Proc, Pos, Msg, Data) ->
     issue_bulk_distribute(Id, Proc, Pos, Msg, Data, intervals:all()).
 
 -spec issue_bulk_distribute(ID::uid:global_uid(), atom(), pos_integer(),
-                           comm:message(), [{string(), term()}] | {ets, ets:tab()},
+                           comm:message(), [{?RT:key(), string(), term()}] | {ets, ets:tab()},
                            intervals:interval()) -> ok.
 issue_bulk_distribute(Id, Proc, Pos, Msg, Data, Interval) ->
     DHTNode = pid_groups:find_a(dht_node),
     comm:send_local(DHTNode, {bulkowner, start, Id, Interval, {bulk_distribute, Proc,
                                                         Pos, Msg, Data}}).
 
--spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message(),
+-spec send_reply(Id::uid:global_uid(), Target::comm:mypid(), Msg::comm:message() | comm:group_message(),
                  Parents::[comm:mypid()], Shepherd::comm:erl_local_pid()) -> ok.
 send_reply(Id, Target, {?send_to_group_member, Proc, Msg}, [], Shepherd) ->
     comm:send(Target, {bulkowner, reply, Id, Msg}, [{shepherd, Shepherd}, {group_member, Proc}]);
+send_reply(Id, Target, {?send_to_registered_proc, Proc, Msg}, [], Shepherd) ->
+    comm:send(Target, {bulkowner, reply, Id, Msg}, [{shepherd, Shepherd}, {registered_proc, Proc}]);
 send_reply(Id, Target, Msg, [], Shepherd) ->
     comm:send(Target, {bulkowner, reply, Id, Msg}, [{shepherd, Shepherd}]);
 send_reply(Id, Target, Msg, [Parent | Rest], Shepherd) ->
@@ -281,6 +283,14 @@ on({bulkowner, reply_process_all, Id}, State) ->
                                             element(2, Msg1) =/= Proc]),
             Msgs1 = [Msg1 || {?send_to_group_member, _Proc, Msg1} <- Msgs],
             comm:forward_to_group_member(
+              Proc, {bulkowner, gather, Id, Target, Msgs1, Parents});
+        [{?send_to_registered_proc, Proc, _Msg} | _] ->
+            %% all messages must have the same type:
+            ?DBG_ASSERT([] =:= [Msg1 || Msg1 <- Msgs,
+                                        element(1, Msg1) =/= ?send_to_registered_proc orelse
+                                            element(2, Msg1) =/= Proc]),
+            Msgs1 = [Msg1 || {?send_to_registered_proc, _Proc, Msg1} <- Msgs],
+            comm:forward_to_registered_proc(
               Proc, {bulkowner, gather, Id, Target, Msgs1, Parents})
     end,
     State;
@@ -331,6 +341,10 @@ handle_delivery({?send_to_group_member, Proc, Msg1}, MyRange, Id, Parents, State
     comm:forward_to_group_member(
       Proc, {bulkowner, deliver, Id, MyRange, Msg1, Parents}),
     State;
+handle_delivery({?send_to_registered_proc, Proc, Msg1}, MyRange, Id, Parents, State) ->
+    comm:forward_to_registered_proc(
+      Proc, {bulkowner, deliver, Id, MyRange, Msg1, Parents}),
+    State;
 handle_delivery({do_snapshot, _SnapNo, _Leader} = Msg, _MyRange, _Id, _Parents, State) ->
     gen_component:post_op(Msg, State);
 handle_delivery(MrMsg , MyRange, _Id, _Parents, State) when mr =:= element(1, MrMsg) ->
@@ -340,8 +354,8 @@ handle_delivery(Msg, _MyRange, _Id, _Parents, State) ->
             [pid_groups:pid_to_name(self()), Msg]),
     State.
 
--spec get_range_data({ets, db_ets:db()} | [{nonempty_string(), term()},...],
-                     intervals:interval()) -> [{nonempty_string(), term()}].
+-spec get_range_data({ets, db_ets:db()} | [{?RT:key(), nonempty_string(), term()},...],
+                     intervals:interval()) -> [{?RT:key(), nonempty_string(), term()}].
 get_range_data({ets, ETS}, Range) ->
     lists:foldl(fun(Interval, Acc1) ->
                     db_ets:foldl(ETS,

@@ -161,7 +161,6 @@ check_config() ->
           end || X  <- [ fun log:check_config/0,
                          fun sup_scalaris:check_config/0,
                          fun sup_dht_node_core:check_config/0,
-                         fun cyclon:check_config/0,
                          fun acceptor:check_config/0,
                          fun learner:check_config/0,
                          fun rdht_tx:check_config/0,
@@ -170,7 +169,6 @@ check_config() ->
                          fun ?RT:check_config/0,
                          fun rt_loop:check_config/0,
                          fun tx_tm_rtm:check_config/0,
-                         fun vivaldi:check_config/0,
                          fun vivaldi_latency:check_config/0,
                          fun ?RM:check_config/0,
                          fun fd_hbs:check_config/0,
@@ -197,7 +195,9 @@ check_config() ->
                          fun autoscale_server:check_config/0,
                          fun cloud_local:check_config/0,
                          fun cloud_ssh:check_config/0,
-                         fun lb_active:check_config/0
+                         fun lb_active:check_config/0,
+                         fun gossip_cyclon:check_config/0,
+                         fun gossip_vivaldi:check_config/0
                        ]],
     lists:foldl(fun(A,B) -> A and B end, true, Checks).
 

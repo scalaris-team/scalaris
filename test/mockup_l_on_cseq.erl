@@ -31,15 +31,9 @@
 -export([create_two_adjacent_leases/0]).
 -export([create_lease/2]).
 
-%
--export([get_renewal_counter/0]).
-
--record(mock_state, {
-          renewal_enabled      = ?required(mock_state, renewal_enabled     ) :: boolean(),
-          renewal_counter      = ?required(mock_state, renewal_counter     ) :: non_neg_integer()
-         }).
-
--type mock_state_t() :: #mock_state{}.
+% public api
+-export([get_renewal_counter/0, get_lease_list/0,
+         set_message_filter/2, reset_message_filter/0]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % public API
@@ -57,7 +51,7 @@ create_two_adjacent_leases() ->
     ct:pal("mock leases~n~w~n~w~n", [L1, L2]),
     {L1, L2}.
 
--spec create_lease(?RT:key(), ?RT:key()) -> {l_on_cseq:lease_t(), l_on_cseq:lease_t()}.
+-spec create_lease(?RT:key(), ?RT:key()) -> l_on_cseq:lease_t().
 create_lease(From, To) ->
     L = l_on_cseq:unittest_create_lease_with_range(From, To),
     Range = node:mk_interval_between_ids(From, To),
@@ -88,46 +82,96 @@ get_renewal_counter() ->
              Counter
     end.
 
+-spec get_lease_list() -> lease_list:lease_list().
+get_lease_list() ->
+    comm:send_local(get_mock_pid(), {get, lease_list, self()}),
+    receive
+        {get_response, List} ->
+             List
+    end.
+
+-spec set_message_filter(F::fun((comm:message()) -> boolean()),
+                         Owner::comm:mypid()) -> ok.
+set_message_filter(F, Owner) ->
+    comm:send_local(get_mock_pid(), {set_message_filter, F, Owner, self()}),
+    receive
+        {set_message_filter_response} ->
+             ok
+    end.
+
+-spec reset_message_filter() -> ok.
+reset_message_filter() ->
+    comm:send_local(get_mock_pid(), {reset_message_filter, self()}),
+    receive
+        {reset_message_filter_response} ->
+             ok
+    end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Message Loop
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
--spec on(comm:message(), {dht_node_state:state(), mock_state_t()}) ->
-                {dht_node_state:state(), mock_state_t()} | kill.
+-spec on(comm:message(), dht_node_state:state()) ->
+                dht_node_state:state() | kill.
 % get renewal counter
-on({get_renewal_counter, Pid},
-   {State, MockState}) ->
+on({get_renewal_counter, Pid}, State) ->
     comm:send_local(Pid,
                     {get_renewal_counter_response,
-                     get_renewal_counter(MockState)}),
-    {State, MockState};
+                     erlang:get(renewal_counter)}),
+    State;
 
-% intercept renews
-on({l_on_cseq, renew, _OldLease, _Mode} = Msg,
-   {State, MockState}) ->
-    {l_on_cseq:on(Msg, State), increment_renewal_counter(MockState)};
+on({set_message_filter, F, Owner, Pid}, State) ->
+    erlang:put(message_filter, F),
+    erlang:put(owner, Owner),
+    comm:send_local(Pid, {set_message_filter_response}),
+    State;
 
-% Lease management messages (see l_on_cseq.erl)
-on(Msg, {State, MockState}) when l_on_cseq =:= element(1, Msg) ->
-    {l_on_cseq:on(Msg, State), MockState}.
+on({reset_message_filter, Pid}, State) ->
+    erlang:put(message_filter, fun(_Msg) -> false end),
+    erlang:put(owner, undefined),
+    comm:send_local(Pid, {reset_message_filter_response}),
+    State;
+
+% get from dht_node_state
+on({get, Key, Pid}, State) ->
+    comm:send_local(Pid,
+                    {get_response,
+                     dht_node_state:get(State, Key)}),
+    State;
+
+% intercept l_on_cseq messages
+on(Msg, State) when element(1, Msg) =:= l_on_cseq ->
+    Filter = erlang:get(message_filter),
+    Intercept = Filter(Msg),
+    if
+        Intercept ->
+            intercept_message(Msg, State);
+        true ->
+            case Msg of
+                % intercept renew
+                {l_on_cseq, renew, _OldLease, _Mode} ->
+                    increment_renewal_counter(),
+                    l_on_cseq:on(Msg, State);
+                _ ->
+                    l_on_cseq:on(Msg, State)
+            end
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Init
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec init({}) -> {dht_node_state:state(), mock_state_t()}.
+-spec init({}) -> dht_node_state:state().
 init({}) ->
     DHTNodeGrp = pid_groups:group_with(dht_node),
     pid_groups:join_as(DHTNodeGrp, ?MODULE),
     ct:log("mock_l_on_cseq running on ~w~n", [self()]),
-    {dht_node_state:new(rt_external_rt, rm_loop_state, dht_db), new_mock_state()}.
+    erlang:put(message_filter, fun(_Msg) -> false end),
+    erlang:put(renewal_counter, 0),
+    dht_node_state:new(rt_external_rt, rm_loop_state, dht_db).
 
 -spec start_link() -> {ok, pid()}.
 start_link() ->
     gen_component:start_link(?MODULE, fun ?MODULE:on/2, {}, [{wait_for_init}]).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% mock_state
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Helper
@@ -137,15 +181,13 @@ start_link() ->
 get_mock_pid() ->
     pid_groups:find_a(?MODULE).
 
--spec new_mock_state() -> mock_state_t().
-new_mock_state() ->
-    #mock_state{renewal_enabled = true,
-                renewal_counter = 0}.
+-spec increment_renewal_counter() -> ok.
+increment_renewal_counter() ->
+    erlang:put(renewal_counter, erlang:get(renewal_counter) + 1).
 
--spec increment_renewal_counter(mock_state_t()) -> mock_state_t().
-increment_renewal_counter(#mock_state{renewal_counter=Counter} = MockState) ->
-    MockState#mock_state{renewal_counter = Counter+1}.
-
--spec get_renewal_counter(mock_state_t()) -> non_neg_integer().
-get_renewal_counter(#mock_state{renewal_counter=Counter}) ->
-    Counter.
+-spec intercept_message(comm:message(), dht_node_state:state()) ->
+                dht_node_state:state().
+intercept_message(Msg, State) ->
+    Owner = erlang:get(owner),
+    comm:send_local(Owner, {intercepted_message, Msg}),
+    State.
