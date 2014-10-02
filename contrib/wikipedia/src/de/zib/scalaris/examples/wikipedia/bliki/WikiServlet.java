@@ -76,6 +76,7 @@ import de.zib.scalaris.examples.wikipedia.data.xml.WikiDump;
 import de.zib.scalaris.examples.wikipedia.plugin.PluginClassLoader;
 import de.zib.scalaris.examples.wikipedia.plugin.WikiEventHandler;
 import de.zib.scalaris.examples.wikipedia.plugin.WikiPlugin;
+import de.zib.scalaris.examples.wikipedia.tomcat.URLParamEncoder;
 import de.zib.tools.CircularByteArrayOutputStream;
 
 /**
@@ -841,7 +842,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
             redirectUrl0.append(URLEncoder.encode(MAIN_PAGE, "UTF-8"));
             redirectUrl0.append("&random_times=" + StringUtils.join(times, "%2C"));
             redirectUrl0.append("&involved_keys=" + URLEncoder.encode(StringUtils.join(page.getInvolvedKeys(), " # "), "UTF-8"));
-            redirectUrl0.append("&notice=" + URLEncoder.encode("error: can not view random page: <pre>" + result.message + "</pre>", "UTF-8"));
+            redirectUrl0.append("&notice=" + URLParamEncoder.encode("error: can not view random page: <pre>" + result.message + "</pre>"));
             redirectUrl = "http://" + Options.getInstance().SERVERNAME
                     + Options.getInstance().SERVERPATH
                     + response.encodeRedirectURL(redirectUrl0.toString())
