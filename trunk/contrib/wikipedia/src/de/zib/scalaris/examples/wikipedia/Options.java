@@ -218,7 +218,19 @@ public class Options {
      * 
      * @author Nico Kruber, kruber@zib.de
      */
-    public static class APPEND_INCREMENT implements Optimisation {
+    public static interface IAppendIncrement {
+    }
+
+    /**
+     * Indicates that the new append and increment operations of Scalaris should
+     * be used, i.e.
+     * {@link de.zib.scalaris.Transaction#addDelOnList(String, java.util.List, java.util.List)}
+     * and {@link de.zib.scalaris.Transaction#addOnNr(String, Object)}.
+     * 
+     * @author Nico Kruber, kruber@zib.de
+     */
+    public static class APPEND_INCREMENT implements Optimisation,
+            IAppendIncrement {
         @Override
         public String toString() {
             return "APPEND_INCREMENT";
@@ -291,7 +303,7 @@ public class Options {
      * @author Nico Kruber, kruber@zib.de
      */
     public static abstract class APPEND_INCREMENT_BUCKETS implements
-            Optimisation, IBuckets {
+            Optimisation, IAppendIncrement, IBuckets {
         final protected int buckets;
         
         /**
@@ -440,7 +452,7 @@ public class Options {
      * @author Nico Kruber, kruber@zib.de
      */
     public static abstract class APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY
-            implements Optimisation, IReadBuckets {
+            implements Optimisation, IAppendIncrement, IReadBuckets {
         final protected int readBuckets;
         final protected int writeBuckets;
         
@@ -577,7 +589,7 @@ public class Options {
      * @author Nico Kruber, kruber@zib.de
      */
     public static abstract class APPEND_INCREMENT_BUCKETS_WITH_WCACHE implements
-            Optimisation, IReadBuckets {
+            Optimisation, IAppendIncrement, IReadBuckets {
         final protected int readBuckets;
         final protected int writeBuckets;
 
