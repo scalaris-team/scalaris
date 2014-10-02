@@ -353,6 +353,7 @@ public abstract class WikiServlet<Connection> extends HttpServlet implements
         
         Connection connection = getConnection(request);
         if (connection == null) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             showEmptyPage(request, response, connection, new WikiPageBean(serviceUser, startTime)); // should forward to another page
             return; // return just in case
         }
