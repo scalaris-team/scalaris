@@ -13,9 +13,13 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-require 'rubygems'
-gem 'json', '>=1.4.1'
-require 'json'
+begin
+  require 'json'
+rescue LoadError => e
+  require 'rubygems'
+  gem 'json', '>=1.4.1'
+  require 'json'
+end
 require 'net/http'
 require 'base64'
 require 'open-uri'
