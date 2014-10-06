@@ -135,7 +135,6 @@ Requires:   ruby(release) >= 1.8
 %else
 Requires:   ruby(abi) >= 1.8
 %endif
-Requires:   rubygems
 Requires:   rubygem-json >= 1.4.1
 
 %description -n ruby-scalaris
