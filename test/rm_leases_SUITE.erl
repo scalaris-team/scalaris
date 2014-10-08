@@ -27,11 +27,17 @@
 -include("client_types.hrl").
 
 groups() ->
-    [{tester_tests, [sequence], [
-                                 tester_type_check_rm_leases
+    [{tester_tests,  [sequence], [
+                                  tester_type_check_rm_leases
                               ]},
-     {kill_tests, [sequence], [
-                               test_single_kill
+     {kill_tests,    [sequence], [
+                                  test_single_kill,
+                                  test_double_kill
+                               ]},
+     {add_tests,     [sequence], [
+                                  test_single_add,
+                                  test_double_add,
+                                  test_triple_add
                                ]},
      {rm_loop_tests, [sequence], [
                                   propose_new_neighbor
@@ -41,16 +47,15 @@ groups() ->
 all() ->
     [
      {group, tester_tests},
-     {group, kill_tests}%,
-     %{group, rm_loop_tests} % TODO: add checks to test
+     {group, kill_tests},
+     {group, add_tests},
+     {group, rm_loop_tests}
      ].
 
-suite() -> [ {timetrap, {seconds, 400}} ].
+suite() -> [ {timetrap, {seconds, 40}} ].
 
 group(tester_tests) ->
     [{timetrap, {seconds, 400}}];
-group(kill_tests) ->
-    [{timetrap, {seconds, 40}}];
 group(_) ->
     suite().
 
@@ -88,7 +93,8 @@ tester_type_check_rm_leases(_Config) ->
         [ {rm_leases,
            [
             {start_link, 1},
-            {on, 2}
+            {on, 2},
+            {get_takeovers, 1} %% sends messages
            ],
            [
             {compare_and_fix_rm_with_leases, 1}, %% cannot create dht_node_state (reference for bulkowner)
@@ -112,6 +118,41 @@ test_single_kill(_Config) ->
 %    log:log("join nodes", []),
     log:log("kill nodes", []),
     synchronous_kill(4, 3),
+    %timer:sleep(5000), % enable to see rest of protocol
+    ok.
+
+test_double_kill(_Config) ->
+%    log:log("join nodes", []),
+    log:log("kill nodes", []),
+    synchronous_kill(4, 2),
+    %timer:sleep(5000), % enable to see rest of protocol
+    ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% add unit tests
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+test_single_add(_Config) ->
+%    log:log("join nodes", []),
+    log:log("add nodes", []),
+    synchronous_add(4, 5),
+    %timer:sleep(5000), % enable to see rest of protocol
+    ok.
+
+test_double_add(_Config) ->
+%    log:log("join nodes", []),
+    log:log("add nodes", []),
+    synchronous_add(4, 6),
+    %timer:sleep(5000), % enable to see rest of protocol
+    ok.
+
+test_triple_add(_Config) ->
+%    log:log("join nodes", []),
+    log:log("add nodes", []),
+    synchronous_add(4, 7),
     %timer:sleep(5000), % enable to see rest of protocol
     ok.
 
@@ -144,8 +185,27 @@ propose_new_neighbor(_Config) ->
     {ok, Lease} = l_on_cseq:read(LeaseId),
     Result = {qread_done, fake_reqid, fake_round, Lease},
     Msg = {read_after_rm_change, PredRange, Result},
-    comm:send_local(RMLeasesPid, Msg),
-    timer:sleep(15000),
+    TakeoversBefore = rm_leases:get_takeovers(RMLeasesPid),
+    ct:pal("+wait_for_messages_after ~w", [gb_trees:to_list(TakeoversBefore)]),
+    wait_for_messages_after(RMLeasesPid, [get_node_for_new_neighbor], 
+                            fun () -> 
+                                    comm:send_local(RMLeasesPid, Msg) 
+                            end),
+    ct:pal("-wait_for_messages_after ~w", [gb_trees:to_list(TakeoversBefore)]),
+
+
+    AllRMMsgs = [read_after_rm_change, takeover_after_rm_change, 
+                 merge_after_rm_change, merge_after_leave, 
+                 get_node_for_new_neighbor, get_takeovers],
+    ct:pal("+test_quiescence"),
+    test_quiescence(RMLeasesPid, AllRMMsgs, 100),
+    ct:pal("-test_quiescence"),
+    TakeoversBefore = rm_leases:get_takeovers(RMLeasesPid),
+
+    %es sollte wieder ruhe eintreten
+    %    - takeovers vorher und hinterher leer!
+
+    %timer:sleep(15000),
     ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -184,12 +244,70 @@ check_ring_state(TargetSize) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-synchronous_kill(_Current, TargetSize) ->
+synchronous_kill(Current, Current) ->
+    ok;
+synchronous_kill(Current, _TargetSize) ->
     api_vm:kill_nodes(1),
     ct:pal("wait for ring size"),
-    lease_helper:wait_for_ring_size(TargetSize),
+    lease_helper:wait_for_ring_size(Current - 1),
     ct:pal("wait for correct ring"),
     lease_helper:wait_for_correct_ring(),
     ct:pal("wait for correct leases"),
-    lease_helper:wait_for_correct_leases(TargetSize).
+    lease_helper:wait_for_correct_leases(Current - 1).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% add helper
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+synchronous_add(Current, Current) ->
+    ok;
+synchronous_add(Current, _TargetSize) ->
+    ct:pal("================================== adding node ========================"),
+    api_vm:add_nodes(1),
+    ct:pal("wait for ring size"),
+    lease_helper:wait_for_ring_size(Current + 1),
+    ct:pal("wait for correct ring"),
+    lease_helper:wait_for_correct_ring(),
+    ct:pal("wait for correct leases"),
+    lease_helper:wait_for_correct_leases(Current + 1),
+    ct:pal("================================== adding node done ========================").
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% intercepting and blocking
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+wait_for_messages_after(Pid, Msgs, F) ->
+    gen_component:bp_set_cond(Pid, watch_for_msgs_filter(self(), Msgs), wait_for_message),
+    F(),
+    receive
+        {saw_message, _Msg} ->
+            gen_component:bp_del(Pid, wait_for_message)
+    end,
+    ok.
+
+test_quiescence(Pid, Msgs, Timeout) ->
+    gen_component:bp_set_cond(Pid, watch_for_msgs_filter(self(), Msgs), test_quiescence),
+    receive
+        {saw_message, Msg} ->
+            gen_component:bp_del(Pid, test_quiescence),
+            ?ct_fail("expected quiescence, but got ~w", [Msg])
+        after Timeout ->
+                gen_component:bp_del(Pid, test_quiescence),
+                ok
+    end.
+
+watch_for_msgs_filter(Pid, Msgs) ->
+    fun (Message, _State) ->
+            %ct:pal("saw ~w~n~w~n~w~n", [Message, lists:member(Message, Msgs), Msgs]),
+            case lists:member(element(1, Message), Msgs) of
+                true ->
+                    comm:send_local(Pid, {saw_message, Message}),
+                    false;
+                _ ->
+                    false
+            end
+    end.

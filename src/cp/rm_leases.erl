@@ -30,6 +30,9 @@
 %% rm subscriptions
 -export([rm_filter/3, rm_exec/5]).
 
+% for unit tests
+-export([get_takeovers/1]).
+
 -record(state, {
           takeovers     = ?required(state, takeovers) :: gb_trees:tree(?RT:key(),
                                                                        l_on_cseq:lease_t())
@@ -53,33 +56,6 @@ start_link(DHTNodeGroup) ->
 %% @doc Initialises the module with an empty state.
 -spec init([]) -> state().
 init([]) ->
-    FilterFun = fun (Old, New, Reason) ->
-                        OldRange = nodelist:node_range(Old),
-                        NewRange = nodelist:node_range(New),
-                        %case OldRange =/= NewRange of
-                        %    true ->
-                        %        log:log("the range has changed: ~w -> ~w (~w)",
-                        %                [OldRange, NewRange, Reason]);
-                        %    false ->
-                        %        ok
-                        %end,
-                        case Reason of
-                            {slide_finished, _} ->
-                                false;
-                            {add_subscriber} ->
-                                false;
-                            {node_crashed, _} ->
-                                OldRange =/= NewRange;
-                            {node_discovery} ->
-                                OldRange =/= NewRange;
-                            {graceful_leave, _PredOrSucc, _Node} -> % @todo ?
-                                false;
-                            {update_id_failed} -> % @todo ?
-                                false;
-                            {unknown} -> % @todo ?
-                                false
-                        end
-                end,
     rm_loop:subscribe(self(), ?MODULE,
                       fun ?MODULE:rm_filter/3,
                       fun ?MODULE:rm_exec/5, inf),
@@ -93,6 +69,13 @@ init([]) ->
 rm_filter(Old, New, Reason) ->
     OldRange = nodelist:node_range(Old),
     NewRange = nodelist:node_range(New),
+    %case OldRange =/= NewRange of
+    %    true ->
+    %        log:log("the range has changed: ~w -> ~w (~w)",
+    %                [OldRange, NewRange, Reason]);
+    %    false ->
+    %        ok
+    %end,
     case Reason of
         {slide_finished, _} ->
             false;
@@ -172,7 +155,7 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
                 _ ->
                     propose_new_neighbors(l_on_cseq:get_owner(L)),
                     %log:log("unknown error in takeover_after_rm_change ~w", [Error]),
-                    State
+                    remove_takeover(State, L)
             end;
         {takeover, success, L2} ->
             log:log("takeover_after_rm_change success"),
@@ -185,12 +168,16 @@ on({takeover_after_rm_change, _Lease, Result}, State) ->
             ActiveLease = lease_list:get_active_lease(LeaseList),
             Pid = comm:reply_as(self(), 4, {merge_after_rm_change, L2, ActiveLease, '_'}),
             l_on_cseq:lease_merge(L2, ActiveLease, Pid),
-            State
+            remove_takeover(State, L2)
     end;
 
 on({merge_after_rm_change, _L2, _ActiveLease, Result}, State) ->
     log:log("merge after rm_change: ~w", [Result]),
-    State;
+    case Result of
+        % will always succeed (eventually)
+        {merge, success, __L2, _L1} ->
+            State
+    end;
 
 on({merge_after_leave, _NewLease, _OldLease, Result}, State) ->
     log:log("merge after finish done: ~w", [Result]),
@@ -198,6 +185,10 @@ on({merge_after_leave, _NewLease, _OldLease, Result}, State) ->
 
 on({get_node_for_new_neighbor, {get_state_response, Node}}, State) ->
     rm_loop:propose_new_neighbors([Node]),
+    State;
+
+on({get_takeovers, Pid}, #state{takeovers=Takeovers} = State) ->
+    comm:send(Pid, {get_takeovers_response, Takeovers}),
     State.
 
 -spec compare_and_fix_rm_with_leases(state()) -> state().
@@ -222,6 +213,20 @@ compare_and_fix_rm_with_leases(State) ->
             %#op{missing_range = MissingRange, found_leases = []};
             State
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% public helper functions
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec get_takeovers(comm:erl_local_pid()) -> gb_trees:tree().
+get_takeovers(RMLeasesPid) ->
+    comm:send_local(RMLeasesPid, {get_takeovers, comm:this()}),
+    receive
+        {get_takeovers_response, TakeOvers} ->
+            TakeOvers
+    end.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % state management
