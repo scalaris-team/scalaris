@@ -219,7 +219,8 @@ compare_and_fix_rm_with_leases(State) ->
 % public helper functions
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
--spec get_takeovers(comm:erl_local_pid()) -> gb_trees:tree().
+-spec get_takeovers(comm:erl_local_pid()) -> 
+                           gb_trees:tree(?RT:key(), l_on_cseq:lease_t()).
 get_takeovers(RMLeasesPid) ->
     comm:send_local(RMLeasesPid, {get_takeovers, comm:this()}),
     receive
