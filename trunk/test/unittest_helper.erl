@@ -129,13 +129,8 @@ prepare_config_helper([Option | Rest], OldConfigFound, OldOptions) ->
 -spec get_evenly_spaced_keys(N::pos_integer()) -> list(?RT:key()).
 get_evenly_spaced_keys(4) ->
     ?RT:get_replica_keys(rt_SUITE:number_to_key(0));
-get_evenly_spaced_keys(X) when (X rem 4 =:= 0) andalso X > 4 ->
-    Ids = lists:sort(?RT:get_replica_keys(rt_SUITE:number_to_key(0))),
-    [First, Second, _Third, _Fourth] = Ids,
-    SplitKeys = ?RT:get_split_keys(First, Second, X div 4),
-    lists:sort(lists:flatten([Ids,
-                              [?RT:get_replica_keys(Key) || Key <- SplitKeys]
-                             ])).
+get_evenly_spaced_keys(N) ->
+    [?MINUS_INFINITY | ?RT:get_split_keys(?MINUS_INFINITY, ?PLUS_INFINITY, N)].
 
 %% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
 -spec make_ring_with_ids([?RT:key()] | fun(() -> [?RT:key()])) -> pid().
