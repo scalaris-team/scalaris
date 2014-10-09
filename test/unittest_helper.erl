@@ -24,6 +24,7 @@
 -define(TRACE_RING_DATA(), ok).
 
 -export([get_scalaris_port/0, get_yaws_port/0,
+         get_evenly_spaced_keys/1,
          make_ring_with_ids/1, make_ring_with_ids/2, make_ring/1, make_ring/2,
          stop_ring/0, stop_ring/1,
          stop_pid_groups/0,
@@ -123,6 +124,18 @@ prepare_config_helper([Option | Rest], OldConfigFound, OldOptions) ->
             X                -> {X, OldConfigFound}
         end,
     prepare_config_helper(Rest, ConfigFound, [NewOption | OldOptions]).
+
+%% @doc Create N evenly spaced keys.
+-spec get_evenly_spaced_keys(N::pos_integer()) -> list(?RT:key()).
+get_evenly_spaced_keys(4) ->
+    ?RT:get_replica_keys(rt_SUITE:number_to_key(0));
+get_evenly_spaced_keys(X) when (X rem 4 =:= 0) andalso X > 4 ->
+    Ids = lists:sort(?RT:get_replica_keys(rt_SUITE:number_to_key(0))),
+    [First, Second, _Third, _Fourth] = Ids,
+    SplitKeys = ?RT:get_split_keys(First, Second, X div 4),
+    lists:sort(lists:flatten([Ids,
+                              [?RT:get_replica_keys(Key) || Key <- SplitKeys]
+                             ])).
 
 %% @doc Creates a ring with the given IDs (or IDs returned by the IdFun).
 -spec make_ring_with_ids([?RT:key()] | fun(() -> [?RT:key()])) -> pid().
