@@ -591,7 +591,7 @@ test_takeover_helper(_Config, ModifyF, WaitF) ->
     pid_groups:join(pid_groups:group_of(DHTNode)),
 
     % intercept lease renew
-    {l_on_cseq, renew, Old, _Mode} = intercept_lease_renew(DHTNode),
+    {l_on_cseq, renew, Old, _Mode} = lease_helper:intercept_lease_renew(DHTNode),
     %OriginalOwner = l_on_cseq:get_owner(Old),
     ct:pal("takeover: old lease ~p", [Old]),
     Id = l_on_cseq:get_id(Old),
@@ -654,7 +654,7 @@ test_handover_helper(_Config, ModifyF, WaitF) ->
     pid_groups:join(pid_groups:group_of(DHTNode)),
 
     % intercept lease renew
-    {l_on_cseq, renew, Old, _Mode} = intercept_lease_renew(DHTNode),
+    {l_on_cseq, renew, Old, _Mode} = lease_helper:intercept_lease_renew(DHTNode),
     Id = l_on_cseq:get_id(Old),
     % now we update the lease
     New = ModifyF(Old),
@@ -672,7 +672,7 @@ test_handover_helper(_Config, ModifyF, WaitF) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 test_split_prepare(DHTNode) ->
     % intercept lease renew
-    {l_on_cseq, renew, _Old, _Mode} = intercept_lease_renew(DHTNode),
+    {l_on_cseq, renew, _Old, _Mode} = lease_helper:intercept_lease_renew(DHTNode),
     % prepeare split
     comm:send_local(DHTNode, {get_state, comm:this(), lease_list}),
     L = receive
@@ -839,7 +839,7 @@ test_renew_helper(_Config, ModifyF, WaitF) ->
     pid_groups:join(pid_groups:group_with(dht_node)),
 
     % intercept lease renew
-    M = {l_on_cseq, renew, Old, _Mode} = intercept_lease_renew(DHTNode),
+    M = {l_on_cseq, renew, Old, _Mode} = lease_helper:intercept_lease_renew(DHTNode),
     Id = l_on_cseq:get_id(Old),
     % now we update the lease
     New = ModifyF(Old),
@@ -964,7 +964,7 @@ wait_for_number_of_leases(Nr) ->
 
 watch_message(Pid, Message) ->
     gen_component:bp_set_cond(Pid, block_message(self(), Message), watch_message),
-    comm:send_local(Pid, Message),
+    comm:send(Pid, Message),
     receive
         {saw_message} ->
             _ = gen_component:bp_step(Pid),
@@ -979,18 +979,6 @@ intercept_split_request(DHTNode) ->
 intercept_split_reply(DHTNode, StepTag) ->
     % we wait for the next periodic trigger
     gen_component:bp_set_cond(DHTNode, block_split_reply(self(), StepTag), StepTag).
-
-intercept_lease_renew(DHTNode) ->
-    %DHTNode = pid_groups:find_a(dht_node),
-    % we wait for the next periodic trigger
-    gen_component:bp_set_cond(DHTNode, block_renew(self()), block_renew),
-    Msg = receive
-              M = {l_on_cseq, renew, _Lease, _Mode} ->
-                  M
-          end,
-    gen_component:bp_set_cond(DHTNode, block_trigger(self()), block_trigger),
-    gen_component:bp_del(DHTNode, block_renew),
-    Msg.
 
 block_message(Pid, WatchedMessage) ->
     fun (Message, _State) ->
@@ -1018,28 +1006,6 @@ block_split_reply(Pid, StepTag) ->
     fun (Message, _State) ->
             case Message of
                 {l_on_cseq, StepTag, _Lease, _R1, _R2, _Keep, _ReplyTo, _PostAux, _Resp} ->
-                    comm:send_local(Pid, Message),
-                    drop_single;
-                _ ->
-                    false
-            end
-    end.
-
-block_renew(Pid) ->
-    fun (Message, _State) ->
-            case Message of
-                {l_on_cseq, renew, _Lease, _Mode} ->
-                    comm:send_local(Pid, Message),
-                    drop_single;
-                _ ->
-                    false
-            end
-    end.
-
-block_trigger(Pid) ->
-    fun (Message, _State) ->
-            case Message of
-                {l_on_cseq, renew_leases} ->
                     comm:send_local(Pid, Message),
                     drop_single;
                 _ ->
