@@ -27,19 +27,22 @@
 -include("client_types.hrl").
 
 groups() ->
-    [{tester_tests,  [sequence], [
+    [{tester_tests,   [sequence], [
                                   tester_type_check_rm_leases
                               ]},
-     {kill_tests,    [sequence], [
+     {kill_tests,     [sequence], [
                                   test_single_kill,
                                   test_double_kill
                                ]},
-     {add_tests,     [sequence], [
+     {add_tests,      [sequence], [
                                   test_single_add,
                                   test_double_add,
                                   test_triple_add
                                ]},
-     {rm_loop_tests, [sequence], [
+     {partition_tests,[sequence], [
+                                   test_network_partition
+                               ]},
+     {rm_loop_tests,  [sequence], [
                                   propose_new_neighbor
                                  ]}
     ].
@@ -49,12 +52,15 @@ all() ->
      {group, tester_tests},
      {group, kill_tests},
      {group, add_tests},
-     {group, rm_loop_tests}
+     {group, rm_loop_tests},
+     {group, partition_tests}
      ].
 
 suite() -> [ {timetrap, {seconds, 40}} ].
 
 group(tester_tests) ->
+    [{timetrap, {seconds, 400}}];
+group(partition_tests) ->
     [{timetrap, {seconds, 400}}];
 group(_) ->
     suite().
@@ -69,13 +75,22 @@ init_per_group(Group, Config) -> unittest_helper:init_per_group(Group, Config).
 
 end_per_group(Group, Config) -> unittest_helper:end_per_group(Group, Config).
 
+
 init_per_testcase(TestCase, Config) ->
     case TestCase of
+        test_network_partition ->
+            %% stop ring from previous test case (it may have run into a timeout)
+            unittest_helper:stop_ring(),
+            {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
+            Ids = unittest_helper:get_evenly_spaced_keys(8),
+            unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
+                                                               {leases, true}]}]),
+            Config;
         _ ->
             %% stop ring from previous test case (it may have run into a timeout)
             unittest_helper:stop_ring(),
             {priv_dir, PrivDir} = lists:keyfind(priv_dir, 1, Config),
-            Ids = ?RT:get_replica_keys(rt_SUITE:number_to_key(0)),
+            Ids = unittest_helper:get_evenly_spaced_keys(4),
             unittest_helper:make_ring_with_ids(Ids, [{config, [{log_path, PrivDir},
                                                                {leases, true}]}]),
             Config
@@ -170,24 +185,12 @@ propose_new_neighbor(_Config) ->
     DHTNodePid = pid_groups:pid_of(MainNode, dht_node),
 
     % fake death
-    comm:send_local(DHTNodePid, {get_state, comm:this(), neighbors}),
-    Neighbors = receive
-        {get_state_response, Neighbors2} -> Neighbors2
-    end,
-    % @todo could add fake node??!
-    PredNode = nodelist:pred(Neighbors),
-    PredPid = node:pidX(PredNode),
-    comm:send(PredPid, {get_state, comm:this(), my_range}),
-    PredRange = receive
-        {get_state_response, PredRange2} -> PredRange2
-    end,
-    LeaseId = l_on_cseq:id(PredRange),
-    {ok, Lease} = l_on_cseq:read(LeaseId),
+    {_Pred, PredRange, Lease} = get_pred_info(DHTNodePid),
     Result = {qread_done, fake_reqid, fake_round, Lease},
     Msg = {read_after_rm_change, PredRange, Result},
     TakeoversBefore = rm_leases:get_takeovers(RMLeasesPid),
     ct:pal("+wait_for_messages_after ~w", [gb_trees:to_list(TakeoversBefore)]),
-    wait_for_messages_after(RMLeasesPid, [get_node_for_new_neighbor], 
+    wait_for_messages_after(RMLeasesPid, [merge_after_rm_change], %get_node_for_new_neighbor], 
                             fun () -> 
                                     comm:send_local(RMLeasesPid, Msg) 
                             end),
@@ -201,12 +204,89 @@ propose_new_neighbor(_Config) ->
     test_quiescence(RMLeasesPid, AllRMMsgs, 100),
     ct:pal("-test_quiescence"),
     TakeoversBefore = rm_leases:get_takeovers(RMLeasesPid),
-
-    %es sollte wieder ruhe eintreten
-    %    - takeovers vorher und hinterher leer!
-
-    %timer:sleep(15000),
     ok.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% network partition unit tests
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_network_partition(_Config) ->
+    % we create a ring with 8 nodes. For the odd nodes, we stop lease
+    % renewal and for the leases to time out. After that, we propose
+    % to the first (even) node to takeover the last (odd) node.
+
+    DHTNodes = pid_groups:find_all(dht_node),
+    IdsAndNodes = lists:sort( 
+        [ 
+          begin
+              comm:send_local(Node, {get_state, comm:this(), [node_id]}), 
+              receive 
+                  {get_state_response, [{node_id, Id}]} ->
+                      {Id, Node}
+              end
+          end
+          || Node <- DHTNodes]),
+    OddNodes = iterate_even_odd(IdsAndNodes, 
+                                fun(Val, Even) -> 
+                                        case Even of
+                                            true ->
+                                                ok;
+                                            false ->
+                                                {val, Val}
+                                        end
+                                end),
+    DHTNodePid = hd(DHTNodes),
+
+    % stop odd nodes
+    [lease_helper:intercept_lease_renew(Node) || {_Id, Node} <- OddNodes],
+    lease_helper:wait_for_number_of_valid_active_leases(4),
+
+    RMLeasesPid = pid_groups:pid_of(pid_groups:group_of(DHTNodePid), rm_leases),
+
+    % propose takeover
+    {_Pred, PredRange, Lease} = get_pred_info(DHTNodePid),
+    Result = {qread_done, fake_reqid, fake_round, Lease},
+    Msg = {read_after_rm_change, PredRange, Result},
+    %comm:send_local(RMLeasesPid, Msg),
+
+    % what do we expect to happen? takeover and merge should succeed
+    wait_for_messages_after(RMLeasesPid, [merge_after_rm_change], 
+                            fun () -> 
+                                    comm:send_local(RMLeasesPid, Msg) 
+                            end),
+    ok.
+
+iterate_even_odd(L, F) ->
+    iterate_even_odd1(L, F, true, []).
+
+iterate_even_odd1([], _F, _Flag, Acc) ->
+    Acc;
+iterate_even_odd1([Val|Rest], F, Even, Acc) ->
+    case F(Val, Even) of
+        {val, Value} ->
+            iterate_even_odd1(Rest, F, not Even, [Value|Acc]);
+        _ ->
+            iterate_even_odd1(Rest, F, not Even, Acc)
+    end.
+            
+get_pred_info(Pid) ->
+    comm:send_local(Pid, {get_state, comm:this(), neighbors}),
+    Neighbors = receive
+        {get_state_response, Neighbors2} -> Neighbors2
+    end,
+    % @todo could add fake node??!
+    PredNode = nodelist:pred(Neighbors),
+    PredPid = node:pidX(PredNode),
+    comm:send(PredPid, {get_state, comm:this(), my_range}),
+    PredRange = receive
+        {get_state_response, PredRange2} -> PredRange2
+    end,
+    LeaseId = l_on_cseq:id(PredRange),
+    {ok, Lease} = l_on_cseq:read(LeaseId),
+    {PredPid, PredRange, Lease}.
+
+    
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
