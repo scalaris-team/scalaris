@@ -964,7 +964,7 @@ wait_for_number_of_leases(Nr) ->
 
 watch_message(Pid, Message) ->
     gen_component:bp_set_cond(Pid, block_message(self(), Message), watch_message),
-    comm:send(Pid, Message),
+    comm:send_local(Pid, Message),
     receive
         {saw_message} ->
             _ = gen_component:bp_step(Pid),
