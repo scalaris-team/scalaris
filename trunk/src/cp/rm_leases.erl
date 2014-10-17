@@ -108,13 +108,21 @@ on({rm_change, OldRange, NewRange}, State) ->
     log:log("state: ~w", [State]),
     compare_and_fix_rm_with_leases(State);
 
-on({read_after_rm_change, _MissingRange, Result}, State) ->
+on({read_after_rm_change, MissingRange, Result}, State) ->
     log:log("read_after_rm_change ~w", [Result]),
     case Result of
         {qread_done, _ReqId, _Round, Lease} ->
-            Pid = comm:reply_as(self(), 3, {takeover_after_rm_change, Lease, '_'}),
-            l_on_cseq:lease_takeover(Lease, Pid),
-            add_takeover(State, Lease);
+            case l_on_cseq:is_live_aux_field(Lease) of
+                true ->
+                    Pid = comm:reply_as(self(), 3, {takeover_after_rm_change, Lease, '_'}),
+                    l_on_cseq:lease_takeover(Lease, Pid),
+                    add_takeover(State, Lease);
+                false ->
+                    log:log("the proposed range is marked as dead %w", [MissingRange]),
+                    log:log("the qread result is %w", [Result]),
+                    % @todo tell rm to ignore range, because it was merged?
+                    State
+            end;
         _ ->
             log:log("not so well-formed qread-response"),
             State
