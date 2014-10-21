@@ -7,9 +7,9 @@ pkgdesc="Bindings and clients for Scalaris."
 arch=('i686' 'x86_64')
 url="http://code.google.com/p/scalaris/"
 license=('Apache')
-depends=('java-environment>=1.6.0' 'python2>=2.6' 'python>=3.0' 'ruby>=1.8')
-makedepends=('apache-ant' 'glib2' 'erlang>=R13B01')
-optdepends=('java-environment: Java API and client'
+depends=('java-runtime>=1.6.0' 'python2>=2.6' 'python>=3.0' 'ruby>=1.8')
+makedepends=('java-environment>=1.6.0' 'apache-ant' 'glib2' 'erlang>=R13B01')
+optdepends=('java-runtime: Java API and client'
             'python2: Python2 API and client'
             'python: Python3 API and client'
             'ruby: Ruby API and client')
