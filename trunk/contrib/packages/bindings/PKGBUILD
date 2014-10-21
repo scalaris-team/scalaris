@@ -20,6 +20,7 @@ md5sums=('f188e12f4cf893022a87a1b29971aa81')
 build() {
   # set JAVA_HOME for ant:
   source /etc/profile.d/jre.sh
+  export JAVA_HOME=/usr/lib/jvm/default
   RUBY_SITELIB=$(ruby -rrbconfig -e 'puts RbConfig::CONFIG["sitelibdir"]')
   cd "$srcdir/$pkgname-$pkgver"
   ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
