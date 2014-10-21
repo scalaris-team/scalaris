@@ -547,6 +547,9 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
     % @todo if success update lease in State
     log:pal("merge step2 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
+        unexpected_range ->
+            % give up, there was probably a concurrent merge
+            State;
         unexpected_timeout ->
             % retry
             gen_component:post_op({l_on_cseq, merge_reply_step1, L2, ReplyTo,
