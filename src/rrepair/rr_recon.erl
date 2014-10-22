@@ -1640,8 +1640,8 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     {SigSize, VSize} = align_bitsize(SigSize0, VSize0),
     DBChunkBin = compress_kv_list(DBItems, <<>>, SigSize, VSize),
     % debug compressed and uncompressed sizes:
-    ?TRACE("SigSize: ~p, VSize: ~p, ChunkSize: ~p / ~p bits",
-            [SigSize, VSize, erlang:bit_size(DBChunkBin),
+    ?TRACE("SigSize: (~B -> ~B), VSize: (~B -> ~B), ChunkSize: ~p / ~p bits",
+            [SigSize0, SigSize, VSize0, VSize, erlang:bit_size(DBChunkBin),
              erlang:bit_size(
                  erlang:term_to_binary(DBChunkBin,
                                        [{minor_version, 1}, {compressed, 2}]))]),
@@ -1653,11 +1653,15 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     when is_subtype(SigSize, pos_integer()),
          is_subtype(VSize, pos_integer()).
 align_bitsize(SigSize0, VSize0) ->
-    FullKVSize0 = SigSize0 + VSize0,
-    FullKVSize = bloom:resize(FullKVSize0, 8),
-    VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
-    SigSize = FullKVSize - VSize,
-    {SigSize, VSize}.
+    case config:read(rr_align_to_bytes) of
+        false -> {SigSize0, VSize0};
+        _     ->
+            FullKVSize0 = SigSize0 + VSize0,
+            FullKVSize = bloom:resize(FullKVSize0, 8),
+            VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
+            SigSize = FullKVSize - VSize,
+            {SigSize, VSize}
+    end.
 
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
                          DestI::intervals:non_empty_interval(), db_chunk_kv(),
