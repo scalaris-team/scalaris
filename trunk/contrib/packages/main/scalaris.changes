@@ -1,4 +1,24 @@
 -------------------------------------------------------------------
+Mon Otc 22 16:15:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.2
+  (partly supported by the EU project IES Cities http://iescities.eu/
+  and the EIT ICT Labs project MCData)
+  * Packaging:
+    - fix ArchLinux packages with newest Java versions
+  * Demonstrator "Wiki on Scalaris":
+    - fix the separate count key optimisation not using Scalaris' increment
+      operation
+  * Business Logic:
+    - rrepair: let the trivial algorithm assume the worst case in order to always
+               meet the configured "recon probability of one error" (p1e)
+    - rrepair: fix the trivial algorithm having an effectively doubled p1e
+    - rrepair: fix the bloom algorithm having an effectively tripled p1e
+    - rrepair: allow disabling byte-alignment
+  * Bugs:
+    - fix a few minor bugs
+
+-------------------------------------------------------------------
 Mon Sep 29 15:00:00 UTC 2014 - kruber@zib.de
 
 - Scalaris 0.7.1

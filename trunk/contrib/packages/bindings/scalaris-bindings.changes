@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Mon Otc 22 16:15:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.2
+  (partly supported by the EU project IES Cities http://iescities.eu/
+  and the EIT ICT Labs project MCData)
+  * Packaging:
+    - fix ArchLinux packages with newest Java versions
+
+-------------------------------------------------------------------
 Mon Sep 29 15:00:00 UTC 2014 - kruber@zib.de
 
 - Scalaris 0.7.1
