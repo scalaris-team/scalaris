@@ -300,8 +300,8 @@ on({l_on_cseq, renew_reply, {qwrite_done, _ReqId, Round, Value}, _New, Mode}, St
                                               Mode, renew);
 
 on({l_on_cseq, renew_reply,
-    {qwrite_deny, _ReqId, Round, Value, {content_check_failed, Reason}}, New, Mode},
-   State) ->
+    {qwrite_deny, _ReqId, Round, Value, {content_check_failed, {Reason, _Current, _Next}}}, 
+    New, Mode}, State) ->
     % @todo retry
     log:pal("renew denied: ~p~nVal: ~p~nNew: ~p~n~p~n", [Reason, Value, New, Mode]),
     log:pal("id: ~p~n", [dht_node_state:get(State, node_id)]),
@@ -428,7 +428,7 @@ on({l_on_cseq, handover_reply, {qwrite_done, _ReqId, _Round, Value}, ReplyTo,
     lease_list:update_lease_in_dht_node_state(Value, State, passive, handover);
 
 on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
-                                {content_check_failed, Reason}},
+                                {content_check_failed, {Reason, _Current, _Next}}},
     ReplyTo, NewOwner, New}, State) ->
     log:log("handover denied: ~p ~p ~p~n", [Reason, Value, New]),
     case Reason of
@@ -480,7 +480,8 @@ on({l_on_cseq, takeover_reply, ReplyTo,
     lease_list:update_lease_in_dht_node_state(Value, State, passive, takeover);
 
 on({l_on_cseq, takeover_reply, ReplyTo,
-    {qwrite_deny, _ReqId, _Round, Value, Reason}}, State) ->
+    {qwrite_deny, _ReqId, _Round, Value, 
+     {content_check_failed, {Reason, _Current, _Next}}}}, State) ->
     log:log("takeover failed ~p ~p~n", [Value, Reason]),
     comm:send_local(ReplyTo, {takeover, failed, Value, Reason}),
     State;
@@ -502,7 +503,8 @@ on({l_on_cseq, merge, L1 = #lease{id=Id, epoch=OldEpoch}, L2, ReplyTo}, State) -
     State;
 
 on({l_on_cseq, merge_reply_step1, L2, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, Reason}}}, State) ->
+    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
+                                      {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step1 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
@@ -543,9 +545,9 @@ on({l_on_cseq, merge_reply_step1, L2 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
 
 on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
     {qwrite_deny, _ReqId, Round, L2,
-     {content_check_failed, Reason}}}, State) ->
+     {content_check_failed, {Reason, Current, Next}}}}, State) ->
     % @todo if success update lease in State
-    log:pal("merge step2 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
+    log:pal("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, Current, Next]),
     case Reason of
         unexpected_range ->
             % give up, there was probably a concurrent merge
@@ -583,7 +585,8 @@ on({l_on_cseq, merge_reply_step2, L1 = #lease{id=Id,epoch=OldEpoch}, ReplyTo,
                                               merge_reply_step2);
 
 on({l_on_cseq, merge_reply_step3, L2, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, Reason}}}, State) ->
+    {qwrite_deny, _ReqId, Round, L1, {content_check_failed, 
+                                      {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step3 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     case Reason of
@@ -629,7 +632,8 @@ on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
                                               merge_reply_step3);
 
 on({l_on_cseq, merge_reply_step4, L1, ReplyTo,
-    {qwrite_deny, _ReqId, Round, L2, {content_check_failed, Reason}}}, State) ->
+    {qwrite_deny, _ReqId, Round, L2, {content_check_failed, 
+                                      {Reason, _Current, _Next}}}}, State) ->
     % @todo if success update lease in State
     log:pal("merge step4 failed~n~w~n~w~n~w~n", [Reason, L1, L2]),
     % retry?
@@ -711,7 +715,8 @@ on({l_on_cseq, split_reply_step1, L2=#lease{id=Id,epoch=OldEpoch}, R1, R2,
     end;
 
 on({l_on_cseq, split_reply_step2, L1, R1, R2, Keep, ReplyTo, PostAux,
-    {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, Reason}}}, State) ->
+    {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, 
+                                       {Reason, _Current, _Next}}}}, State) ->
     log:pal("split second step failed: ~p~n", [Reason]),
     case Reason of
         lease_does_not_exist -> comm:send_local(ReplyTo, {split, fail, L2}), State; %@todo
@@ -768,7 +773,8 @@ on({l_on_cseq, split_reply_step2,
     lease_list:update_lease_in_dht_node_state(L2, State, active, split_reply_step2);
 
 on({l_on_cseq, split_reply_step3, L2, R1, R2, Keep, ReplyTo, PostAux,
-    {qwrite_deny, _ReqId, _Round, L1, {content_check_failed, Reason}}}, State) ->
+    {qwrite_deny, _ReqId, _Round, L1, {content_check_failed, 
+                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo
     log:pal("split third step failed: ~p~n", [Reason]),
     case Reason of
@@ -833,7 +839,8 @@ on({l_on_cseq, split_reply_step4, L1, _R1, _R2, _Keep, ReplyTo, _PostAux,
     lease_list:update_lease_in_dht_node_state(L2, State, active, split_reply_step4);
 
 on({l_on_cseq, split_reply_step4, L1, R1, R2, Keep, ReplyTo, PostAux,
-    {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, Reason}}}, State) ->
+    {qwrite_deny, _ReqId, _Round, L2, {content_check_failed, 
+                                       {Reason, _Current, _Next}}}}, State) ->
     % @todo
     log:pal("split fourth step: ~p~n", [Reason]),
     case Reason of
@@ -904,31 +911,33 @@ on({l_on_cseq, renew_leases}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -spec generic_content_check(lease_t(), lease_t(), atom()) ->
-    fun ((any(), any(), any()) -> {boolean(), generic_failed_reason() | null}). %% content check
+    fun ((any(), any(), any()) 
+         -> {boolean(), 
+             {generic_failed_reason(), lease_t() | pbr_bottom, lease_t()} | null}). %% content check
 generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange,
                              epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
                      New, Writer) ->
-    fun (prbr_bottom, _WriteFilter, _Next) ->
-            {false, lease_does_not_exist};
-        (Current, _WriteFilter, _Next) when Current =:= New ->
-            log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", [Current, _Next, Old, New, Writer]),
+    fun (prbr_bottom, _WriteFilter, Next) ->
+            {false, {lease_does_not_exist, pbr_bottom, Next}};
+        (Current, _WriteFilter, Next) when Current =:= New ->
+            log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", [Current, Next, Old, New, Writer]),
             {true, null};
-        (#lease{id = Id0}, _, _)    when Id0 =/= OldId->
-            {false, unexpected_id};
-        (#lease{owner = O0}, _, _)    when O0 =/= OldOwner->
-            {false, unexpected_owner};
-        (#lease{aux = Aux0}, _, _)    when Aux0 =/= OldAux->
-            {false, unexpected_aux};
-        (#lease{range = R0}, _, _)    when R0 =/= OldRange->
-            {false, unexpected_range};
-        (#lease{timeout = T0}, _, _)                   when T0 =/= OldTimeout->
-            {false, unexpected_timeout};
-        (#lease{epoch = E0}, _, _)                     when E0 =/= OldEpoch ->
-            {false, unexpected_epoch};
-        (#lease{version = V0}, _, _)                   when V0 =/= OldVersion->
-            {false, unexpected_version};
-        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
-            {false, timeout_is_not_newer_than_current_lease};
+        (#lease{id = Id0} = Current, _, Next)    when Id0 =/= OldId->
+            {false, {unexpected_id, Current, Next}};
+        (#lease{owner = O0} = Current, _, Next)    when O0 =/= OldOwner->
+            {false, {unexpected_owner, Current, Next}};
+        (#lease{aux = Aux0} = Current, _, Next)    when Aux0 =/= OldAux->
+            {false, {unexpected_aux, Current, Next}};
+        (#lease{range = R0} = Current, _, Next)    when R0 =/= OldRange->
+            {false, {unexpected_range, Current, Next}};
+        (#lease{timeout = T0} = Current, _, Next)                   when T0 =/= OldTimeout->
+            {false, {unexpected_timeout, Current, Next}};
+        (#lease{epoch = E0} = Current, _, Next)                     when E0 =/= OldEpoch ->
+            {false, {unexpected_epoch, Current, Next}};
+        (#lease{version = V0} = Current, _, Next)                   when V0 =/= OldVersion->
+            {false, {unexpected_version, Current, Next}};
+        (#lease{timeout = T0} = Current, _, #lease{timeout = T1} = Next)  when not (T0 < T1)->
+            {false, {timeout_is_not_newer_than_current_lease, Current, Next}};
         (_, _, _) ->
             {true, null}
     end.
