@@ -790,22 +790,20 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 
 %% @doc Calculates the minimum number of bits needed to have a hash collision
 %%      probability of P1E, given we compare N hashes with M other hashes
-%%      pairwise with each other (hashes in M being part of hashes in N or the
-%%      other way around, depending on which is greater).
+%%      pairwise with each other (assuming the worst case, i.e. we have M+N
+%%      hashes).
 -spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
                                   P1E::float(), MaxSize::signature_size())
         -> SigSize::signature_size().
-calc_signature_size_nm_pair(0, _, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(0, 0, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_nm_pair(_, 0, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(0, 1, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_nm_pair(1, 1, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(1, 0, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso M =< N ->
+calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 ->
     erlang:min(MaxSize,
-               erlang:max(1, util:ceil(util:log2((2*N*M - M*M - M) / P1E) - 1)));
-calc_signature_size_nm_pair(N, M, P1E, MaxSize) when M > N ->
-    calc_signature_size_nm_pair(M, N, P1E, MaxSize).
+               erlang:max(1, util:ceil(util:log2((M+N)*(M+N-1) / P1E) - 1))).
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
