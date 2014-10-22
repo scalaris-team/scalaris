@@ -1640,8 +1640,8 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     {SigSize, VSize} = align_bitsize(SigSize0, VSize0),
     DBChunkBin = compress_kv_list(DBItems, <<>>, SigSize, VSize),
     % debug compressed and uncompressed sizes:
-    ?TRACE("SigSize: (~B -> ~B), VSize: (~B -> ~B), ChunkSize: ~p / ~p bits",
-            [SigSize0, SigSize, VSize0, VSize, erlang:bit_size(DBChunkBin),
+    ?TRACE("~B vs. ~B items, SigSize: (~B -> ~B), VSize: (~B -> ~B), ChunkSize: ~p / ~p bits",
+            [ItemCount, OtherItemCount, SigSize0, SigSize, VSize0, VSize, erlang:bit_size(DBChunkBin),
              erlang:bit_size(
                  erlang:term_to_binary(DBChunkBin,
                                        [{minor_version, 1}, {compressed, 2}]))]),
