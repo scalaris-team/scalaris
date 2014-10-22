@@ -460,14 +460,13 @@ on({l_on_cseq, handover_reply, {qwrite_deny, _ReqId, _Round, Value,
 % lease takeover
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion}, 
+on({l_on_cseq, takeover, Old = #lease{id=Id, epoch=OldEpoch}, 
     ReplyTo}, State) ->
     New = Old#lease{epoch   = OldEpoch + 1,
                     version = 0,
                     owner   = comm:this(),
                     timeout = new_timeout()},
     ContentCheck = generic_content_check(Old, New, takeover),
-    %ContentCheck = is_valid_takeover(OldEpoch, OldVersion),
     Self = comm:reply_as(self(), 4, {l_on_cseq, takeover_reply, ReplyTo, '_'}),
     update_lease(Id, Self, ContentCheck, Old, New, State),
     State;
@@ -993,56 +992,6 @@ is_valid_update(CurrentEpoch, CurrentVersion) ->
 %                andalso (Current#lease.timeout < Next#lease.timeout)
 %                andalso (os:timestamp() <  Next#lease.timeout),
 %            {Res, null}
-%    end.
-
-%-spec is_valid_takeover(non_neg_integer(), non_neg_integer()) ->
-%    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
-%is_valid_takeover(Epoch, Version) ->
-%    MyDHTNode = comm:make_global(pid_groups:get_my(dht_node)),
-%    % standard_check: serialization
-%    fun (#lease{epoch=Value}, _, _) when Value =/= Epoch ->
-%            {false, epoch_or_version_mismatch};
-%        (#lease{version=Value}, _, _) when Value =/= Version ->
-%            {false, epoch_or_version_mismatch};
-%    % standard_check: update epoch or version
-%        (#lease{epoch=CurrentEpoch, version=CurrentVersion},
-%         _,
-%         #lease{epoch=NextEpoch, version=NextVersion})
-%          when not (((CurrentEpoch + 1 =:= NextEpoch) andalso (NextVersion =:= 0)) orelse
-%                    ((CurrentEpoch =:= NextEpoch) andalso (CurrentVersion+1 =:= NextVersion))) ->
-%            {false, epoch_or_version_mismatch};
-%    % check that epoch increases
-%        (#lease{epoch=CurrentEpoch},
-%         _,
-%         #lease{epoch=NextEpoch}) when CurrentEpoch + 1 =/= NextEpoch ->
-%            {false, epoch_or_version_mismatch};
-%   % check that next owner is my dht_node
-%        (_, _, #lease{owner=NextOwner}) when NextOwner =/= MyDHTNode ->
-%            {false, unexpected_new_owner};
-%   % check that the owner actually changed
-%        (#lease{owner=CurrentOwner}, _, #lease{owner=NextOwner}) when CurrentOwner =:= NextOwner ->
-%            {false, unexpected_new_owner};
-%   % check that the range didn't change
-%        (#lease{range=CurrentRange}, _, #lease{range=NextRange}) when CurrentRange =/= NextRange ->
-%            {false, unexpected_new_range};
-%   % check that aux didn't change
-%        (#lease{aux=CurrentAux}, _, #lease{aux=NextAux}) when CurrentAux =/= NextAux ->
-%            {false, unexpected_new_aux};
-%   % check that aux timeout increased
-%        (#lease{timeout=CurrentTimeout}, _, #lease{timeout=NextTimeout})
-%          when CurrentTimeout >= NextTimeout ->
-%            {false, unexpected_new_timeout};
-%        (Current, _WriteFilter, #lease{timeout=NextTimeout}) ->
-%            Timestamp = os:timestamp(),
-%            IsValid = is_valid(Current),
-%            if
-%                Timestamp >= NextTimeout ->
-%                    {false, unexpected_new_timeout};
-%                IsValid ->
-%                    {false, lease_is_still_valid};
-%                true ->
-%                    {true, null}
-%            end
 %    end.
 
 -spec is_valid_split_step1() ->
