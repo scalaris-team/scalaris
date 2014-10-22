@@ -128,7 +128,7 @@ prepare_config_helper([Option | Rest], OldConfigFound, OldOptions) ->
 %% @doc Create N evenly spaced keys.
 -spec get_evenly_spaced_keys(N::pos_integer()) -> list(?RT:key()).
 get_evenly_spaced_keys(4) ->
-    ?RT:get_replica_keys(rt_SUITE:number_to_key(0));
+    ?RT:get_replica_keys(?MINUS_INFINITY);
 get_evenly_spaced_keys(N) ->
     [?MINUS_INFINITY | ?RT:get_split_keys(?MINUS_INFINITY, ?PLUS_INFINITY, N)].
 
