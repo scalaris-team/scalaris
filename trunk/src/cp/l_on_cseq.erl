@@ -517,6 +517,18 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
     % @todo if success update lease in State
     log:pal("merge step2 failed~n~w~n~w~n~w~n~w~n~w~n", [Reason, L1, L2, Current, Next]),
     case Reason of
+        %lease_does_not_exist ->
+        %    % cannot happen
+        %    State;
+        %unexpected_id ->
+        %    % cannot happen
+        %    State;
+        unexpected_owner ->
+            % give up, there was probably a concurrent merge
+            State;
+        unexpected_aux ->
+            % give up, there was probably a concurrent merge
+            State;
         unexpected_range ->
             % give up, there was probably a concurrent merge
             State;
@@ -525,6 +537,16 @@ on({l_on_cseq, merge_reply_step2, L1, ReplyTo,
             gen_component:post_op({l_on_cseq, merge_reply_step1, L2, ReplyTo,
                                    {qwrite_done, fake_reqid, fake_round, L1}},
                                   lease_list:update_next_round(l_on_cseq:get_id(L2), Round, State));
+        %unexpected_epoch ->
+        %    % cannot happen
+        %    gen_component:post_op({l_on_cseq, merge_reply_step1, L2, ReplyTo,
+        %                           {qwrite_done, fake_reqid, fake_round, L1}},
+        %                          lease_list:update_next_round(l_on_cseq:get_id(L2), Round, State));
+        %unexpected_version ->
+        %    % cannot happen
+        %    gen_component:post_op({l_on_cseq, merge_reply_step1, L2, ReplyTo,
+        %                           {qwrite_done, fake_reqid, fake_round, L1}},
+        %                          lease_list:update_next_round(l_on_cseq:get_id(L2), Round, State));
         timeout_is_not_newer_than_current_lease ->
             % retry
             gen_component:post_op({l_on_cseq, merge_reply_step1, L2, ReplyTo,
