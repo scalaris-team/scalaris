@@ -21,6 +21,11 @@ else
   result=$?
 fi
 
+if ! diff -q checkout.sh ${folder}/contrib/packages/examples-wiki/checkout.sh > /dev/null ; then
+  echo "checkout-script changed - re-run ./checkout.sh"
+  cp ${folder}/contrib/packages/examples-wiki/checkout.sh ./ ; exit 1
+fi
+
 package_folder="./packaging"
 
 if [ ! -d ${package_folder} ]; then
