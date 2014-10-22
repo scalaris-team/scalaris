@@ -87,7 +87,7 @@ new_p1e(MaxItems, P1E) ->
 
 %% @doc Creates a new bloom filter with the given hash function set
 %%      based on the given probability of a single false positive (P1E, i.e.
-%%      false positive absolute count
+%%      false positive absolute count)
 -spec new_p1e(MaxItems::non_neg_integer(), P1E::float(), ?REP_HFS:hfs())
         -> bloom_filter().
 new_p1e(_MaxItems = 0, _P1E, Hfs) ->
