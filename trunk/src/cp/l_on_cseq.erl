@@ -104,41 +104,10 @@
                                | unexpected_version
                                | timeout_is_not_newer_than_current_lease.
 
-%-type renewal_failed_reason() :: lease_does_not_exist
-%                               | unexpected_owner
-%                               | unexpected_aux
-%                               | unexpected_range
-%                               | unexpected_epoch
-%                               | unexpected_version
-%                               | timeout_is_not_newer_than_current_lease.
-
 -type update_failed_reason() :: lease_does_not_exist
                               | epoch_or_version_mismatch.
 
 -type split_step1_failed_reason() :: lease_already_exists.
-%-type split_step2_failed_reason() :: lease_does_not_exist
-%                                   | epoch_or_version_mismatch
-%                                   | owner_changed
-%                                   | range_unchanged
-%                                   | aux_unchanged
-%                                   | timeout_is_not_newer_than_current_lease
-%                                   | timeout_is_not_in_the_future.
-%
-%-type split_step3_failed_reason() :: lease_does_not_exist
-%                                   | epoch_or_version_mismatch
-%                                   | owner_changed
-%                                   | range_changed
-%                                   | aux_unchanged
-%                                   | timeout_is_not_newer_than_current_lease
-%                                   | timeout_is_not_in_the_future.
-%
-%-type split_step4_failed_reason() :: lease_does_not_exist
-%                                   | epoch_or_version_mismatch
-%                                   | owner_changed
-%                                   | range_changed
-%                                   | aux_unchanged
-%                                   | timeout_is_not_newer_than_current_lease
-%                                   | timeout_is_not_in_the_future.
 
 -spec delta() -> pos_integer().
 delta() -> 10.
@@ -941,26 +910,6 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
             {true, null}
     end.
 
-%-spec is_valid_renewal(lease_t()) ->
-%    fun ((any(), any(), any()) -> {boolean(), renewal_failed_reason() | null}). %% content check
-%is_valid_renewal(#lease{owner=OldOwner,aux = OldAux,range=OldRange,
-%                        epoch=OldEpoch,version=OldVersion}) ->
-%    fun (prbr_bottom, _WriteFilter, _Next) ->
-%            {false, lease_does_not_exist};
-%        (#lease{owner = O0}, _, _)    when O0 =/= OldOwner->
-%            {false, unexpected_owner};
-%        (#lease{aux = Aux0}, _, _)    when Aux0 =/= OldAux->
-%            {false, unexpected_aux};
-%        (#lease{range = R0}, _, _)    when R0 =/= OldRange->
-%            {false, unexpected_range};
-%        (#lease{epoch = E0}, _, _)                     when E0 =/= OldEpoch ->
-%            {false, unexpected_epoch};
-%        (#lease{version = V0}, _, _)                   when V0 =/= OldVersion->
-%            {false, unexpected_version};
-%        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
-%            {false, timeout_is_not_newer_than_current_lease}
-%    end.
-
 -spec is_valid_update(non_neg_integer(), non_neg_integer()) ->
     fun ((any(), any(), any()) -> {boolean(), update_failed_reason() | null}). %% content check
 is_valid_update(CurrentEpoch, CurrentVersion) ->
@@ -974,26 +923,6 @@ is_valid_update(CurrentEpoch, CurrentVersion) ->
             {true, null}
     end.
 
-%(prbr_bottom, _WriteFilter, _Next) ->
-%            {false, lease_does_not_exist};
-
-
-%-spec is_valid_handover(non_neg_integer(), non_neg_integer()) ->
-%    fun ((any(), any(), any()) -> {boolean(), null}). %% content check
-%is_valid_handover(Epoch, Version) ->
-%    fun (Current, _WriteFilter, Next) ->
-%            Res = standard_check(Current, Next, Epoch, Version)
-%            %% checks for debugging
-%                andalso (Current#lease.epoch+1 == Next#lease.epoch)
-%                andalso (Current#lease.owner == comm:make_global(pid_groups:get_my(dht_node)))
-%                andalso (Current#lease.owner =/= Next#lease.owner)
-%                andalso (Current#lease.range == Next#lease.range)
-%                andalso (Current#lease.aux == Next#lease.aux)
-%                andalso (Current#lease.timeout < Next#lease.timeout)
-%                andalso (os:timestamp() <  Next#lease.timeout),
-%            {Res, null}
-%    end.
-
 -spec is_valid_split_step1() ->
     fun ((any(), any(), any()) -> {boolean(), split_step1_failed_reason() | null}). %% content check
 is_valid_split_step1() ->
@@ -1005,94 +934,6 @@ is_valid_split_step1() ->
                     {false, lease_already_exists}
             end
     end.
-
-%-spec is_valid_split_step2(non_neg_integer(), non_neg_integer()) ->
-%    fun ((any(), any(), any()) -> {boolean(), split_step2_failed_reason() | null}). %% content check
-%is_valid_split_step2(CurrentEpoch, CurrentVersion) ->
-%    This = comm:make_global(pid_groups:get_my(dht_node)),
-%    fun (prbr_bottom, _WriteFilter, _Next) ->
-%            {false, lease_does_not_exist};
-%        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
-%            {false, owner_changed};
-%        (#lease{owner = O0}, _, _)                     when O0 =/= This->
-%            {false, owner_changed};
-%        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =:= Aux1->
-%            {false, aux_unchanged};
-%        (#lease{range = R0}, _, #lease{range = R1})    when R0 =:= R1->
-%            {false, range_unchanged};
-%        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
-%            {false, epoch_or_version_mismatch};
-%        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
-%            {false, epoch_or_version_mismatch};
-%        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
-%            {false, timeout_is_not_newer_than_current_lease};
-%        (_Current, _WriteFilter, Next) ->
-%            case (os:timestamp() <  Next#lease.timeout) of
-%                false ->
-%                    {false, timeout_is_not_in_the_future};
-%                true ->
-%                    {true, null}
-%            end
-%    end.
-%
-%-spec is_valid_split_step3(lease_t()) ->
-%    fun ((any(), any(), any()) -> {boolean(), split_step3_failed_reason() | null}). %% content check
-%is_valid_split_step3(#lease{owner=OldOwner,aux = OldAux,range=OldRange,
-%                        epoch=OldEpoch,version=OldVersion}) ->
-%    This = comm:make_global(pid_groups:get_my(dht_node)),
-%    fun  (prbr_bottom, _WriteFilter, _Next) ->
-%            {false, lease_does_not_exist};
-%        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
-%            {false, owner_changed};
-%        (#lease{owner = O0}, _, _)                     when O0 =/= This->
-%            {false, owner_changed};
-%        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =:= Aux1->
-%            {false, aux_unchanged};
-%        (#lease{range = R0}, _, #lease{range = R1})    when R0 =/= R1->
-%            {false, range_changed};
-%        (#lease{epoch = E0}, _, _)                     when E0 =/= OldEpoch ->
-%            {false, epoch_or_version_mismatch};
-%        (#lease{version = V0}, _, _)                   when V0 =/= OldVersion->
-%            {false, epoch_or_version_mismatch};
-%        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
-%            {false, timeout_is_not_newer_than_current_lease};
-%        (_Current, _WriteFilter, Next) ->
-%            case (os:timestamp() <  Next#lease.timeout) of
-%                false ->
-%                    {false, timeout_is_not_in_the_future};
-%                true ->
-%                    {true, null}
-%            end
-%    end.
-%
-%-spec is_valid_split_step4(non_neg_integer(), non_neg_integer()) ->
-%    fun ((any(), any(), any()) -> {boolean(), split_step4_failed_reason() | null}). %% content check
-%is_valid_split_step4(CurrentEpoch, CurrentVersion) ->
-%    This = comm:make_global(pid_groups:get_my(dht_node)),
-%    fun (prbr_bottom, _WriteFilter, _Next) ->
-%            {false, lease_does_not_exist};
-%        (#lease{owner = O0}, _, #lease{owner = O1})    when O0 =/= O1->
-%            {false, owner_changed};
-%        (#lease{owner = O0}, _, _)                     when O0 =/= This->
-%            {false, owner_changed};
-%        (#lease{aux = Aux0}, _, #lease{aux = Aux1})    when Aux0 =:= Aux1->
-%            {false, aux_unchanged};
-%        (#lease{range = R0}, _, #lease{range = R1})    when R0 =/= R1->
-%            {false, range_changed};
-%        (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
-%            {false, epoch_or_version_mismatch};
-%        (#lease{version = V0}, _, _)                   when V0 =/= CurrentVersion->
-%            {false, epoch_or_version_mismatch};
-%        (#lease{timeout = T0}, _, #lease{timeout = T1})  when not (T0 < T1)->
-%            {false, timeout_is_not_newer_than_current_lease};
-%        (_Current, _WriteFilter, Next) ->
-%            case (os:timestamp() <  Next#lease.timeout) of
-%                false ->
-%                    {false, timeout_is_not_in_the_future};
-%                true ->
-%                    {true, null}
-%            end
-%    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
