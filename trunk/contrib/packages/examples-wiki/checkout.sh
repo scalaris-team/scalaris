@@ -21,11 +21,6 @@ else
   result=$?
 fi
 
-if ! diff -q checkout.sh ${folder}/contrib/packages/examples-wiki/checkout.sh > /dev/null ; then
-  echo "checkout-script changed - re-run ./checkout.sh"
-  cp ${folder}/contrib/packages/examples-wiki/checkout.sh ./ ; exit 1
-fi
-
 package_folder="./packaging"
 
 if [ ! -d ${package_folder} ]; then
@@ -36,6 +31,11 @@ else
   echo "update ${package_url} -> ${package_folder} ..."
   svn update ${package_folder}
   result=$?
+fi
+
+if ! diff -q checkout.sh ${package_folder}/checkout.sh > /dev/null ; then
+  echo "checkout-script changed - re-run ./checkout.sh"
+  cp ${package_folder}/checkout.sh ./ ; exit 1
 fi
 
 if [ ${result} -eq 0 ]; then
