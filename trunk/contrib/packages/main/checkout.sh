@@ -20,6 +20,11 @@ else
   result=$?
 fi
 
+if ! diff -q checkout.sh ${folder}/contrib/packages/main/checkout.sh > /dev/null ; then
+  echo "checkout-script changed - re-run ./checkout.sh"
+  cp ${folder}/contrib/packages/main/checkout.sh ./ ; exit 1
+fi
+
 if [ ${result} -eq 0 ]; then
   echo -n "get svn revision ..."
   revision=`svn info ${folder} --xml | grep revision | cut -d '"' -f 2 | head -n 1`
