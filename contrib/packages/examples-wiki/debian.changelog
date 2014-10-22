@@ -2,7 +2,19 @@ scalaris-examples-wiki (0.7.2+svn-1) unstable; urgency=low
 
   * svn snapshot from trunk
 
- -- Nico Kruber <kruber@zib.de>  Mon, 30 Sep 2014 17:10:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Mon, 22 Oct 2014 18:15:00 +0200
+
+scalaris-examples-wiki (0.7.2-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+    and the EIT ICT Labs project MCData
+  * Demonstrator "Wiki on Scalaris":
+    - fix the separate count key optimisation not using Scalaris' increment
+      operation
+  * Bugs:
+    - fix a few minor bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 22 Oct 2014 18:15:00 +0200
 
 scalaris-examples-wiki (0.7.1-1) stable; urgency=low
 
