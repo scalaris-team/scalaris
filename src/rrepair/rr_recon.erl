@@ -1624,12 +1624,15 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
         -> {DBChunk::bitstring(), SigSize::signature_size(), VSize::signature_size()}.
 compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     VCompareCount = erlang:min(ItemCount, OtherItemCount),
+    % reduce P1E for the two parts here (key and version comparison)
+    % the optimum is near b = 0.5, depending on ItemCount, OtherItemCount and P1E
+    B = 0.5, A = 1 - B,
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E, 128),
+    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
     % note: we have n one-to-one comparisons, assuming the probability of a
     %       failure in a single one-to-one comparison is p, the overall
     %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
-    VP = 1 - math:pow(1 - P1E, 1 / erlang:max(1, VCompareCount)),
+    VP = 1 - math:pow(1 - B * P1E, 1 / erlang:max(1, VCompareCount)),
     VSize0 = erlang:max(get_min_version_bits(),
                         calc_signature_size_1_to_n(1, VP, 128)),
     % note: we can reach the best compression if values and versions align to
