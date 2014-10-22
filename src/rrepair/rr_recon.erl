@@ -389,7 +389,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        bloom:item_count(BF), get_p1e())
+                                        bloom:item_count(BF), 0.5 * get_p1e())
                               end),
                   
                   send(DestReconPid,
@@ -1681,7 +1681,7 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     ?DBG_ASSERT(not intervals:is_empty(I)),
     P1E = get_p1e(),
     ElementNum = length(DBItems),
-    BF0 = bloom:new_p1e(ElementNum, P1E),
+    BF0 = bloom:new_p1e(ElementNum, 0.5 * P1E),
     BF = bloom:add_list(BF0, DBItems),
     #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginSync) ->
