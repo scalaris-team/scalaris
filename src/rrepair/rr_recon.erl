@@ -1679,9 +1679,7 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
     ?DBG_ASSERT(not intervals:is_empty(I)),
-    P1E = get_p1e(),
-    ElementNum = length(DBItems),
-    BF0 = bloom:new_p1e(ElementNum, 0.5 * P1E),
+    BF0 = bloom:new_p1e(length(DBItems), 0.5 * get_p1e()),
     BF = bloom:add_list(BF0, DBItems),
     #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginSync) ->
