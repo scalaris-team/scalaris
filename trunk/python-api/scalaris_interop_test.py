@@ -19,25 +19,29 @@ import sys
 def read_or_write(sc, key, value, mode):
     try:
         if (mode == 'read'):
-            print 'read(' + key + ')'
-            print '  expected: ' + repr(value)
             actual = sc.read(key)
-            print '  read raw: ' + repr(actual)
             # if the expected value is a list, the returned value could by (mistakenly) a string if it is a list of integers
             # -> convert such a string to a list
             if (type(value).__name__=='list'):
                 try:
                     actual = scalaris.str_to_list(actual)
                 except:
-                    print 'fail'
-                    return 1
-            print '   read py: ' + repr(actual)
+                    pass # will fail the comparison anyway
             if (actual == value):
-                print 'ok'
-                return 0
+                out = sys.stdout
+                result = 0
+                result_str = 'ok'
             else:
-                print 'fail'
-                return 1
+                out = sys.stderr
+                result = 1
+                result_str = 'fail'
+
+            print >> out, 'read(' + key + ')'
+            print >> out, '  expected: ' + repr(value)
+            print >> out, '  read raw: ' + repr(actual)
+            print >> out, '   read py: ' + repr(actual)
+            print >> out, result_str
+            return result
         elif (mode == 'write'):
             print 'write(' + key + ', ' + repr(value) + ')'
             sc.write(key, value)
