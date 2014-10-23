@@ -129,7 +129,7 @@ post_end_per_testcase(TC, Config, Return, State) when is_record(State, state) ->
                 true -> ok;
                 _ -> unittest_helper:print_ring_data()
             end,
-            unittest_helper:print_proto_sched_stats(),
+            catch unittest_helper:print_proto_sched_stats(),
             catch tester_global_state:log_last_calls(),
             Suite = State#state.suite,
             try Suite:end_per_testcase(TC, Config)

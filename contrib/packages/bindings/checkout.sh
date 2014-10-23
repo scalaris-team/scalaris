@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.7.1"
+SCALARIS_VERSION="0.7.2"
 date=`date +"%Y%m%d"`
 name="scalaris-bindings" # folder base name (without version)
 #url="http://scalaris.googlecode.com/svn/trunk/"
@@ -19,6 +19,11 @@ else
   echo "update ${url} -> ${folder} ..."
   svn update ${folder}
   result=$?
+fi
+
+if ! diff -q checkout.sh ${folder}/contrib/packages/bindings/checkout.sh > /dev/null ; then
+  echo "checkout-script changed - re-run ./checkout.sh"
+  cp ${folder}/contrib/packages/bindings/checkout.sh ./ ; exit 1
 fi
 
 if [ ${result} -eq 0 ]; then

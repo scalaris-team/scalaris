@@ -30,7 +30,8 @@
          wait_for_ring_size/1,
          wait_for_correct_ring/0,
          print_all_active_leases/0,
-         print_all_passive_leases/0
+         print_all_passive_leases/0,
+         intercept_lease_renew/1
         ]).
 
 -spec wait_for_correct_leases(pos_integer()) -> ok.
@@ -54,6 +55,14 @@ wait_for_correct_ring() ->
                        Res = admin:check_ring_deep(),
                        ct:pal("<-admin:check_ring_deep()"),
                        Res == ok
+             end).
+
+-spec wait_for_number_of_valid_active_leases(pos_integer()) -> ok.
+wait_for_number_of_valid_active_leases(Count) ->
+    wait_for(fun () ->
+                     AllLeases = get_all_leases(),
+                     ActiveLeases = [ lease_list:get_active_lease(LL) || LL <- AllLeases ],
+                     Count =:= length(lists:filter(fun l_on_cseq:is_valid/1, ActiveLeases))
              end).
 
 -spec print_all_active_leases() -> ok.
@@ -93,6 +102,47 @@ get_dht_node_state(Pid, What) ->
         {get_state_response, Data} ->
             Data
     end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% message blocking
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+-spec intercept_lease_renew(comm:erl_local_pid_plain()) -> comm:message().
+intercept_lease_renew(DHTNode) ->
+    %DHTNode = pid_groups:find_a(dht_node),
+    % we wait for the next periodic trigger
+    gen_component:bp_set_cond(DHTNode, block_renew(self()), block_renew),
+    Msg = receive
+              M = {l_on_cseq, renew, _Lease, _Mode} ->
+                  M
+          end,
+    gen_component:bp_set_cond(DHTNode, block_trigger(self()), block_trigger),
+    gen_component:bp_del(DHTNode, block_renew),
+    Msg.
+
+block_renew(Pid) ->
+    fun (Message, _State) ->
+            case Message of
+                {l_on_cseq, renew, _Lease, _Mode} ->
+                    comm:send_local(Pid, Message),
+                    drop_single;
+                _ ->
+                    false
+            end
+    end.
+
+block_trigger(Pid) ->
+    fun (Message, _State) ->
+            case Message of
+                {l_on_cseq, renew_leases} ->
+                    comm:send_local(Pid, Message),
+                    drop_single;
+                _ ->
+                    false
+            end
+    end.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %

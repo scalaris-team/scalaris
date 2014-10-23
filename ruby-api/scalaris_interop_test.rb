@@ -23,10 +23,7 @@ end
 def read_or_write(sc, key, value, mode, binary = false)
   begin
     if (mode == :read)
-      puts 'read(' + key.to_s + ')'
-      puts '  expected: ' + value.inspect
       actual = sc.read(key)
-      puts '  read raw: ' + actual.inspect
       # if the expected value is a list, the returned value could by (mistakenly) a string if it is a list of integers
       # -> convert such a string to a list
       if value.is_a?(Array)
@@ -37,14 +34,22 @@ def read_or_write(sc, key, value, mode, binary = false)
             return 1
         end
       end
-      puts '   read rb: ' + actual.inspect
       if (actual == value)
-        puts 'ok'
-        return 0
+        out = $stdout
+        result = 0
+        result_str = 'ok'
       else
-        puts 'fail'
-        return 1
+        out = $stderr
+        result = 1
+        result_str = 'fail'
       end
+
+      out.puts 'read(' + key.to_s + ')'
+      out.puts '  expected: ' + value.inspect
+      out.puts '  read raw: ' + actual.inspect
+      out.puts '   read rb: ' + actual.inspect
+      out.puts result_str
+      return result
     elsif (mode == :write)
       puts 'write(' + key.to_s + ', ' + value.to_s + ')'
       sc.write(key, value, binary)

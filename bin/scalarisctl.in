@@ -98,9 +98,10 @@ usage(){
     echo ""
     echo "    list        - list locally running Erlang VMs"
     echo "    debug       - connect to a running node via an Erlang shell"
-    echo "    dbg-check-ring <ring-size> <timeout>"
-    echo "                - checks whether Scalaris has <ring-size> nodes and the"
-    echo "                  ring maintenance has settled (requires a mgmt_server)"
+    echo "    dbg-check-ring <ring-size> <attempts>"
+    echo "                - checks (up to) <attempts> times whether Scalaris has"
+    echo "                  <ring-size> nodes and the ring maintenance has settled"
+    echo "                  (requires a mgmt_server)"
     echo ""
     exit $1
 }
@@ -772,7 +773,7 @@ dbg_check_ring(){
   exp_nodes=$1
   max_tries=$2
   try=1
-  while [ $try -lt $max_tries ] ; do
+  while [ $try -le $max_tries ] ; do
     scalaris_nodes_count_actual="$(scalariscall "Res = rpc:call('$NODE_NAME', admin, number_of_nodes, []), case Res of ${exp_nodes} -> halt(0); _ -> io:format(\"~p~n\", [Res]), halt(1) end.")"
     if [ $? -eq 0 ] ; then
       scalaris_check_ring="$(scalariscall "Res = rpc:call('$NODE_NAME', admin, check_ring_deep, []), case Res of ok -> halt(0); _ -> io:format(\"~p~n\", [Res]), halt(1) end.")"
@@ -784,7 +785,7 @@ dbg_check_ring(){
     try=$((10#$try + 1))
     sleep 1
 
-    if [ $try -eq $max_tries ] ; then
+    if [ $try -gt $max_tries ] ; then
       echo "ERROR: Failed to verify a total of ${exp_nodes} scalaris node(s) at node ${NODE_NAME}"
       echo "       (result: ${scalaris_nodes_count_actual})."
       if [ -n "$scalaris_check_ring" ] ; then

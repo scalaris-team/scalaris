@@ -15,6 +15,7 @@
  */
 package de.zib.scalaris;
 
+import java.io.PrintStream;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -145,42 +146,48 @@ public class InterOpTest {
         try {
             switch (mode) {
                 case READ:
-                    System.out.println("read(" + key + ")");
-                    final ErlangValue result = sc.read(key);
-                    System.out.println("  expected: " + valueToStr(value));
-                    System.out.println("  read raw: " + result.value().toString());
-
+                    final ErlangValue actual = sc.read(key);
                     Object jresult = null;
                     if (value instanceof Boolean) {
-                        jresult = result.boolValue();
+                        jresult = actual.boolValue();
                     } else if (value instanceof Integer) {
-                        jresult = result.intValue();
+                        jresult = actual.intValue();
                     } else if (value instanceof Long) {
-                        jresult = result.longValue();
+                        jresult = actual.longValue();
                     } else if (value instanceof BigInteger) {
-                        jresult = result.bigIntValue();
+                        jresult = actual.bigIntValue();
                     } else if (value instanceof Double) {
-                        jresult = result.doubleValue();
+                        jresult = actual.doubleValue();
                     } else if (value instanceof String) {
-                        jresult = result.stringValue();
+                        jresult = actual.stringValue();
                     } else if (value instanceof byte[]) {
-                        jresult = result.binaryValue();
+                        jresult = actual.binaryValue();
                     } else if (value instanceof List<?>) {
-                        jresult = result.listValue();
+                        jresult = actual.listValue();
                     } else if (value instanceof Map<?, ?>) {
-                        jresult = result.jsonValue();
+                        jresult = actual.jsonValue();
                     } else {
-                        jresult = result.value();
+                        jresult = actual.value();
+                    }
+                    PrintStream out;
+                    int result;
+                    String resultStr;
+                    if (compare(jresult, value)) {
+                        out = System.out;
+                        result = 0;
+                        resultStr = "ok";
+                    } else {
+                        out = System.err;
+                        result = 1;
+                        resultStr = "fail";
                     }
 
-                    System.out.println(" read java: " + valueToStr(jresult));
-                    if (compare(jresult, value)) {
-                        System.out.println("ok");
-                        return 0;
-                    } else {
-                        System.out.println("fail");
-                        return 1;
-                    }
+                    out.println("read(" + key + ")");
+                    out.println("  expected: " + valueToStr(value));
+                    out.println("  read raw: " + actual.value().toString());
+                    out.println(" read java: " + valueToStr(jresult));
+                    out.println(resultStr);
+                    return result;
                 case WRITE:
                     System.out.println("write(" + key + ", " + valueToStr(value) + ")");
                     sc.write(key, value);

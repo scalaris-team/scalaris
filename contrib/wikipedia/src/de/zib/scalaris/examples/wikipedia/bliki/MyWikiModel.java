@@ -208,6 +208,7 @@ public class MyWikiModel extends WikiModel {
         SPECIAL_PREFIX.put("de", "Spezial");
         SPECIAL_PREFIX.put("bar", "Spezial");
         SPECIAL_PREFIX.put("es", "Especial");
+        SPECIAL_PREFIX.put("pl", "Specjalna");
         // BEWARE: include normalised page titles!
 
         EnumMap<SpecialPage, String> SPECIAL_SUFFIX_EN = new EnumMap<SpecialPage, String>(SpecialPage.class);
