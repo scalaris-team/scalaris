@@ -1055,7 +1055,7 @@ prop_jump_slide(TargetKey) ->
     %% get a random node
     JumpingNode = util:randomelem(DhtNodes),
     %% check if we chose a valid key
-    InvalidTarget = key_taken_as_node_id(TargetKey),
+    InvalidTarget = key_taken_as_node_id(TargetKey, JumpingNode),
     perform_jump(JumpingNode, TargetKey, InvalidTarget),
     true.
 
@@ -1095,7 +1095,7 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
        InvalidTarget ->
             ?equals(Result, ok),
             %% check if the invalid target is really taken by another node
-            ?assert(key_taken_as_node_id(TargetKey)),
+            ?assert(key_taken_as_node_id(TargetKey, JumpingNode)),
             %% and that it is different from ours
             comm:send_local(JumpingNode, {get_state, comm:this(), node_id}),
             MyId = fun() -> receive ?SCALARIS_RECV({get_state_response, Id}, Id) end end(),
@@ -1104,10 +1104,11 @@ perform_jump(JumpingNode, TargetKey, InvalidTarget) ->
             ?equals(Result, ok)
     end.
 
--spec key_taken_as_node_id(?RT:key()) -> boolean().
-key_taken_as_node_id(Key) ->
+-spec key_taken_as_node_id(?RT:key(), JumpingNode::comm:erl_local_pid()) -> boolean().
+key_taken_as_node_id(Key, JumpingNode) ->
     DhtNodes = pid_groups:find_all(dht_node),
-    lists:any(fun(Node) ->
+    lists:any(fun(Node) when Node =:= JumpingNode -> false;
+                 (Node) ->
                 %% get node information
                 comm:send_local(Node, {get_state, comm:this(), node_id}),
                 NodeId = fun() -> receive ?SCALARIS_RECV({get_state_response, Id}, Id) end end(),

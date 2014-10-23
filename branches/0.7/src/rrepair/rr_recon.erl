@@ -389,7 +389,7 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        bloom:item_count(BF), get_p1e())
+                                        bloom:item_count(BF), 0.5 * get_p1e())
                               end),
                   
                   send(DestReconPid,
@@ -790,22 +790,20 @@ shutdown(Reason, #rr_recon_state{ownerPid = OwnerL, stats = Stats,
 
 %% @doc Calculates the minimum number of bits needed to have a hash collision
 %%      probability of P1E, given we compare N hashes with M other hashes
-%%      pairwise with each other (hashes in M being part of hashes in N or the
-%%      other way around, depending on which is greater).
+%%      pairwise with each other (assuming the worst case, i.e. we have M+N
+%%      hashes).
 -spec calc_signature_size_nm_pair(N::non_neg_integer(), M::non_neg_integer(),
                                   P1E::float(), MaxSize::signature_size())
         -> SigSize::signature_size().
-calc_signature_size_nm_pair(0, _, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(0, 0, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_nm_pair(_, 0, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(0, 1, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_nm_pair(1, 1, P1E, _MaxSize) when P1E > 0 ->
+calc_signature_size_nm_pair(1, 0, P1E, _MaxSize) when P1E > 0 ->
     1;
-calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 andalso M =< N ->
+calc_signature_size_nm_pair(N, M, P1E, MaxSize) when P1E > 0 ->
     erlang:min(MaxSize,
-               erlang:max(1, util:ceil(util:log2((2*N*M - M*M - M) / P1E) - 1)));
-calc_signature_size_nm_pair(N, M, P1E, MaxSize) when M > N ->
-    calc_signature_size_nm_pair(M, N, P1E, MaxSize).
+               erlang:max(1, util:ceil(util:log2((M+N)*(M+N-1) / P1E) - 1))).
 
 %% @doc Transforms a list of key and version tuples (with unique keys), into a
 %%      compact binary representation for transfer.
@@ -1626,12 +1624,15 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
         -> {DBChunk::bitstring(), SigSize::signature_size(), VSize::signature_size()}.
 compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     VCompareCount = erlang:min(ItemCount, OtherItemCount),
+    % reduce P1E for the two parts here (key and version comparison)
+    % the optimum is near b = 0.5, depending on ItemCount, OtherItemCount and P1E
+    B = 0.5, A = 1 - B,
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
-    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, P1E, 128),
+    SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
     % note: we have n one-to-one comparisons, assuming the probability of a
     %       failure in a single one-to-one comparison is p, the overall
     %       p1e = 1 - (1-p)^n  <=>  p = 1 - (1 - p1e)^(1/n)
-    VP = 1 - math:pow(1 - P1E, 1 / erlang:max(1, VCompareCount)),
+    VP = 1 - math:pow(1 - B * P1E, 1 / erlang:max(1, VCompareCount)),
     VSize0 = erlang:max(get_min_version_bits(),
                         calc_signature_size_1_to_n(1, VP, 128)),
     % note: we can reach the best compression if values and versions align to
@@ -1639,8 +1640,8 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     {SigSize, VSize} = align_bitsize(SigSize0, VSize0),
     DBChunkBin = compress_kv_list(DBItems, <<>>, SigSize, VSize),
     % debug compressed and uncompressed sizes:
-    ?TRACE("SigSize: ~p, VSize: ~p, ChunkSize: ~p / ~p bits",
-            [SigSize, VSize, erlang:bit_size(DBChunkBin),
+    ?TRACE("~B vs. ~B items, SigSize: (~B -> ~B), VSize: (~B -> ~B), ChunkSize: ~p / ~p bits",
+            [ItemCount, OtherItemCount, SigSize0, SigSize, VSize0, VSize, erlang:bit_size(DBChunkBin),
              erlang:bit_size(
                  erlang:term_to_binary(DBChunkBin,
                                        [{minor_version, 1}, {compressed, 2}]))]),
@@ -1652,11 +1653,15 @@ compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     when is_subtype(SigSize, pos_integer()),
          is_subtype(VSize, pos_integer()).
 align_bitsize(SigSize0, VSize0) ->
-    FullKVSize0 = SigSize0 + VSize0,
-    FullKVSize = bloom:resize(FullKVSize0, 8),
-    VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
-    SigSize = FullKVSize - VSize,
-    {SigSize, VSize}.
+    case config:read(rr_align_to_bytes) of
+        false -> {SigSize0, VSize0};
+        _     ->
+            FullKVSize0 = SigSize0 + VSize0,
+            FullKVSize = bloom:resize(FullKVSize0, 8),
+            VSize = VSize0 + ((FullKVSize - FullKVSize0) div 2),
+            SigSize = FullKVSize - VSize,
+            {SigSize, VSize}
+    end.
 
 -spec build_recon_struct(method(), OldSyncStruct::sync_struct() | {},
                          DestI::intervals:non_empty_interval(), db_chunk_kv(),
@@ -1674,9 +1679,7 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
     ?DBG_ASSERT(not intervals:is_empty(I)),
-    P1E = get_p1e(),
-    ElementNum = length(DBItems),
-    BF0 = bloom:new_p1e(ElementNum, P1E),
+    BF0 = bloom:new_p1e(length(DBItems), 0.5 * get_p1e()),
     BF = bloom:add_list(BF0, DBItems),
     #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginSync) ->

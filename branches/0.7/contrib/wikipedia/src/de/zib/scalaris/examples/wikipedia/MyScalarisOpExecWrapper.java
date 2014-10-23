@@ -7,11 +7,11 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Random;
 
-import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY;
 import de.zib.scalaris.examples.wikipedia.Options.APPEND_INCREMENT_BUCKETS_WITH_WCACHE_ADDONLY_RANDOM;
+import de.zib.scalaris.examples.wikipedia.Options.IAppendIncrement;
 import de.zib.scalaris.examples.wikipedia.Options.IBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.IReadBuckets;
 import de.zib.scalaris.examples.wikipedia.Options.Optimisation;
@@ -109,9 +109,7 @@ public class MyScalarisOpExecWrapper {
     public <T extends Number, U> void addIncrement(final ScalarisOpType opType,
             final String key, final T toAdd, final U belongsTo) {
         final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(opType);
-        if (optimisation instanceof APPEND_INCREMENT) {
-            executor.addOp(new ScalarisIncrementOp2<T>(key, toAdd));
-        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+        if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
             final APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
             final String key2 = key + optimisation2.getBucketString(belongsTo);
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
@@ -123,6 +121,8 @@ public class MyScalarisOpExecWrapper {
             final APPEND_INCREMENT_BUCKETS_WITH_WCACHE optimisation2 = (APPEND_INCREMENT_BUCKETS_WITH_WCACHE) optimisation;
             final String key2 = key + optimisation2.getWriteBucketString(belongsTo);
             executor.addOp(new ScalarisIncrementOp2<T>(key2, toAdd));
+        } else if (optimisation instanceof IAppendIncrement) {
+            executor.addOp(new ScalarisIncrementOp2<T>(key, toAdd));
         } else {
             executor.addOp(new ScalarisIncrementOp1<T>(key, toAdd));
         }
@@ -158,10 +158,7 @@ public class MyScalarisOpExecWrapper {
         if (countKey != null && countOptimisation != null) {
             // separate optimisation for the count key
             int countInc = toAdd.size() - toRemove.size();
-            if (countOptimisation instanceof APPEND_INCREMENT) {
-                executor.addOp(new ScalarisIncrementOp1<Integer>(countKey, countInc));
-            } else {
-                assert(countOptimisation instanceof IBuckets);
+            if (countOptimisation instanceof IBuckets) {
                 Random rand = new Random();
                 String bucketStr;
                 if (countOptimisation instanceof IReadBuckets) {
@@ -175,16 +172,22 @@ public class MyScalarisOpExecWrapper {
                 } else {
                     throw new RuntimeException("unsupported optimisation: " + countOptimisation);
                 }
-                executor.addOp(new ScalarisIncrementOp1<Integer>(countKey + bucketStr, countInc));
+                if (countOptimisation instanceof IAppendIncrement) {
+                    executor.addOp(new ScalarisIncrementOp2<Integer>(countKey + bucketStr, countInc));
+                } else {
+                    executor.addOp(new ScalarisIncrementOp1<Integer>(countKey + bucketStr, countInc));
+                }
+            } else if (countOptimisation instanceof IAppendIncrement) {
+                executor.addOp(new ScalarisIncrementOp2<Integer>(countKey, countInc));
+            } else {
+                executor.addOp(new ScalarisIncrementOp1<Integer>(countKey, countInc));
             }
             // prevent the code below to write to a counter:
             countKey = null;
         }
         
         final Optimisation optimisation = Options.getInstance().OPTIMISATIONS.get(opType);
-        if (optimisation instanceof APPEND_INCREMENT) {
-            executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, toAdd, toRemove, countKey));
-        } else if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
+        if (optimisation instanceof APPEND_INCREMENT_BUCKETS) {
             final APPEND_INCREMENT_BUCKETS optimisation2 = (APPEND_INCREMENT_BUCKETS) optimisation;
             final HashMap<String, String> countKeys = new HashMap<String, String>(toAdd.size() + toRemove.size());
             final LinkedMultiHashMap<String, T> kvAdd = new LinkedMultiHashMap<String, T>();
@@ -277,6 +280,8 @@ public class MyScalarisOpExecWrapper {
                 }
                 executor.addOp(new ScalarisListAppendRemoveOp2<Object>(key2, toAdd2, toRemove2, entry.getValue()));
             }
+        } else if (optimisation instanceof IAppendIncrement) {
+            executor.addOp(new ScalarisListAppendRemoveOp2<T>(key, toAdd, toRemove, countKey));
         } else {
             executor.addOp(new ScalarisListAppendRemoveOp1<T>(key, toAdd, toRemove, countKey));
         }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCALARIS_VERSION="0.7.1"
+SCALARIS_VERSION="0.7.2"
 date=`date +"%Y%m%d"`
 name="scalaris-examples-wiki" # folder base name (without version)
 #url="http://scalaris.googlecode.com/svn/trunk/contrib/wikipedia"
@@ -33,6 +33,11 @@ else
   echo "update ${package_url} -> ${package_folder} ..."
   svn update ${package_folder}
   result=$?
+fi
+
+if ! diff -q checkout.sh ${package_folder}/checkout.sh > /dev/null ; then
+  echo "checkout-script changed - re-run ./checkout.sh"
+  cp ${package_folder}/checkout.sh ./ ; exit 1
 fi
 
 if [ ${result} -eq 0 ]; then
