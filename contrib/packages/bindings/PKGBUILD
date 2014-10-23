@@ -1,7 +1,7 @@
 # Maintainer: Nico Kruber <kruber at zib dot de>
 
 pkgname=scalaris-bindings
-pkgver=0.7.2+svn
+pkgver=0.7.2
 pkgrel=1
 pkgdesc="Bindings and clients for Scalaris."
 arch=('i686' 'x86_64')

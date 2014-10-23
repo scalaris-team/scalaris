@@ -1,9 +1,3 @@
-scalaris-bindings (0.7.2+svn-1) unstable; urgency=low
-
-  * svn snapshot from trunk
-
- -- Nico Kruber <kruber@zib.de>  Mon, 22 Oct 2014 18:15:00 +0200
-
 scalaris-bindings (0.7.2-1) stable; urgency=low
 
   * partly supported by the EU project IES Cities http://iescities.eu/
@@ -11,7 +5,7 @@ scalaris-bindings (0.7.2-1) stable; urgency=low
   * Packaging:
     - fix ArchLinux packages with newest Java versions
 
- -- Nico Kruber <kruber@zib.de>  Mon, 22 Oct 2014 18:15:00 +0200
+ -- Nico Kruber <kruber@zib.de>  Mon, 23 Oct 2014 18:15:00 +0200
 
 scalaris-bindings (0.7.1-1) stable; urgency=low
 
