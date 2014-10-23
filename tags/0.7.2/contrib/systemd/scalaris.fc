@@ -1,0 +1,1 @@
+/var/lib/scalaris(/.*)?  gen_context(system_u:object_r:scalaris_file_t,s0)

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bp:blueprint xmlns:bp="http://www.4caast.eu/blueprint" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:metering="http://www.4caast.eu/metering"
+  xmlns:monitoring="http://www.4caast.eu/MonitoringSchema"
+  xsi:schemaLocation="http://www.4caast.eu/blueprint blueprint_template_v01.xsd
+  http://www.4caast.eu/metering MeteringSchema_v03.xsd
+  http://www.4caast.eu/MonitoringSchema MonitoringSchema_v01.xsd
+  ">
+  <bp:basic_properties_section>
+    <bp:blueprint_id>Scalaris-Blueprint</bp:blueprint_id>
+    <bp:blueprint_name>Scalaris-Blueprint</bp:blueprint_name>
+    <bp:description>
+      Blueprint of Scalaris, a transactional distributed key-value store.
+    </bp:description>
+    <bp:ownership>
+      <bp:name>Zuse Institute Berlin</bp:name>
+      <bp:uri>http://www.zib.de</bp:uri>
+    </bp:ownership>
+    <bp:version>3</bp:version>
+    <bp:release_date>2013-07-04</bp:release_date>
+    <bp:isProduct>true</bp:isProduct>
+    <bp:status>unresolved</bp:status>
+    <bp:ext_property>
+      <bp:p_name>metering</bp:p_name>
+      <metering:metering_section xmlns:metering="http://www.4caast.eu/MeteringSchema">
+        <metering:metering_instructions_time>
+          <metering:id>de.zib.scalaris.hours_used</metering:id>
+          <metering:unit>Hour</metering:unit>
+          <metering:unit_label>Hours the service is used</metering:unit_label>
+        </metering:metering_instructions_time>
+        <metering:metering_instructions_quantity>
+          <metering:id>de.zib.scalaris.memory_used</metering:id>
+          <metering:unit>MB</metering:unit>
+          <metering:unit_label>MB used</metering:unit_label>
+        </metering:metering_instructions_quantity>
+      </metering:metering_section>
+    </bp:ext_property>
+    <bp:ext_property>
+      <bp:p_name>monitoring</bp:p_name>
+      <monitoring:monitoring_section>
+        <monitoring:monitoring_instruction>
+          <monitoring:id>ScalarisNode_CurLatencyAvg</monitoring:id>
+          <monitoring:metric>Load average for the last minute<!-- well, not really but there's not much of a choice! --></monitoring:metric>
+          <monitoring:unit>Millisecond</monitoring:unit>
+          <monitoring:unit_label>Average latency of transactions at the node</monitoring:unit_label>
+        </monitoring:monitoring_instruction>
+        <monitoring:monitoring_instruction>
+          <monitoring:id>ScalarisService_CurLatencyAvg</monitoring:id>
+          <monitoring:metric>Load average for the last minute<!-- well, not really but there's not much of a choice! --></monitoring:metric>
+          <monitoring:unit>Millisecond</monitoring:unit>
+          <monitoring:unit_label>Average latency of transactions aggregated over the whole system</monitoring:unit_label>
+        </monitoring:monitoring_instruction>
+        <monitoring:monitoring_instruction>
+          <monitoring:id>ScalarisService_LoadEstimate</monitoring:id>
+          <monitoring:metric>Physical memory</monitoring:metric>
+          <monitoring:unit>Count</monitoring:unit>
+          <monitoring:unit_label>Number of overall stored items (estimate)</monitoring:unit_label>
+        </monitoring:monitoring_instruction>
+      </monitoring:monitoring_section>
+    </bp:ext_property>
+  </bp:basic_properties_section>
+
+  <bp:offering_section>
+    <bp:offering>
+      <bp:offering_id>Scalaris</bp:offering_id>
+      <bp:resource_name>Scalaris key-value store</bp:resource_name>
+      <bp:resource_type>Database</bp:resource_type>
+      <bp:structural_interface>https://code.google.com/p/scalaris/</bp:structural_interface>
+      <bp:range_of_instance>
+        <bp:minimum>1</bp:minimum>
+        <bp:maximum>9999</bp:maximum>
+      </bp:range_of_instance>
+    </bp:offering>
+  </bp:offering_section>
+
+  <bp:deployment_artefact_section>
+    <bp:deployment_artefact>
+      <bp:artefact_id>scalaris-node-packages</bp:artefact_id>
+      <bp:artefact_name>scalaris node binary packages</bp:artefact_name>
+      <bp:artefact_type>binaries</bp:artefact_type>
+      <bp:artefact_location>http://download.opensuse.org/repositories/home:/scalaris/</bp:artefact_location>
+    </bp:deployment_artefact>
+  </bp:deployment_artefact_section>
+</bp:blueprint>

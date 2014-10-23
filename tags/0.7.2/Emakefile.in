@@ -1,0 +1,86 @@
+% behaviors first - otherwise there are compile warnings
+{["src/cloud_beh.erl",
+  "src/db_backend_beh.erl",
+  "src/gen_component.erl",
+  "src/gossip_beh.erl",
+  "src/gossip_load_beh.erl",
+  "src/lb_active_beh.erl",
+  "src/lb_psv_beh.erl",
+  "src/pdb_beh.erl",
+  "src/rm_beh.erl",
+  "src/rrepair/hfs_beh.erl",
+  "src/rt_beh.erl",
+  "src/slide_beh.erl",
+  "src/transactions/tx_op_beh.erl"],
+ [debug_info,
+  inline_list_funcs,
+  warn_exported_vars,
+  warn_missing_spec,
+  warn_untyped_record,
+  warn_unused_import,
+  {outdir, "ebin"},
+  {i, "include"},
+  {i, "contrib/yaws/include"},
+  {i, "contrib/log4erl/include"}
+  @EMAKEFILEDEFINES@
+  @HAVE_YAWS_SENDFILE@
+ ]}.
+% now the source and all of its sub-directories:
+{["src/*",
+  "src/comm_layer/*",
+  "src/cp/*",
+  "src/json/*",
+  "src/paxos/*",
+  "src/pubsub/*",
+  "src/rbr/*",
+  "src/rrepair/*",
+  "src/simulation/*",
+  "src/transactions/*",
+  "src/tx/*"],
+ [debug_info,
+  inline_list_funcs,
+  warn_exported_vars,
+  warn_missing_spec,
+  warn_untyped_record,
+  warn_unused_import,
+  {outdir, "ebin"},
+  {i, "ebin"},
+  {i, "include"},
+  {i, "contrib/yaws/include"},
+  {i, "contrib/log4erl/include"}
+  @EMAKEFILEDEFINES@
+  @HAVE_YAWS_SENDFILE@
+ ]}.
+% unit tests:
+{"test/*",
+ [debug_info,
+  inline_list_funcs,
+  warn_exported_vars,
+  warn_missing_spec,
+  warn_untyped_record,
+  warn_unused_import,
+  {outdir, "test"},
+  {i, "include"}
+  @EMAKEFILEDEFINES@
+ ]}.
+% contributing libraries:
+{"contrib/log4erl/src/*",
+ [debug_info,
+  inline_list_funcs,
+  nowarn_obsolete_guard,
+  nowarn_unused_function,
+  nowarn_unused_vars,
+  {outdir, "contrib/log4erl/ebin/"},
+  {i, "contrib/log4erl/include"}
+ ]}.
+{"contrib/yaws/src/*",
+ [debug_info,
+  inline_list_funcs,
+  nowarn_obsolete_guard,
+  nowarn_unused_function,
+  nowarn_unused_vars,
+  {outdir, "contrib/yaws/ebin/"},
+  {i, "contrib/yaws/include"}
+  @HAVE_YAWS_SENDFILE@
+ ]}.
+@EMAKEFILECOMPILECOMPAT@

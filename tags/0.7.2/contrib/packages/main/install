@@ -1,0 +1,11 @@
+post_install() {
+	getent group scalaris &>/dev/null || groupadd -r scalaris
+	getent passwd scalaris &>/dev/null || mkdir -p /var/lib/scalaris && useradd -r -g scalaris -d /var/lib/scalaris -M -s /bin/false -c "user for scalaris" scalaris && chown scalaris:scalaris /var/lib/scalaris
+	true
+}
+
+post_remove() {
+	getent passwd scalaris &>/dev/null && userdel scalaris
+	getent group scalaris &>/dev/null && groupdel scalaris
+	true
+}

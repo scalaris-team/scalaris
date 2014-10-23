@@ -1,0 +1,158 @@
+#!/bin/bash
+
+### BEGIN INIT INFO
+# Provides:          scalaris-monitor
+# Required-Start:    $network $remote_fs scalaris
+# Required-Stop:     $network $remote_fs scalaris
+# Default-Start:     3 5
+# Default-Stop:
+# Short-Description: JMX monitor for a Scalaris node
+# Description:       Provides a small Java service exposing monitoring stats via JMX for a Scalaris node. http://code.google.com/p/scalaris/
+### END INIT INFO
+
+# Source function library.
+if [ -e /lib/lsb/init-functions ]; then
+    . /lib/lsb/init-functions
+else
+    . /etc/init.d/functions
+fi
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+SUDO=@SUDO@
+RUNUSER=@RUNUSER@
+
+# Source config.
+if [ -e @sysconfdir@/scalaris/initd.conf ]; then
+    . @sysconfdir@/scalaris/initd.conf
+fi
+
+SCALARIS_NODE=${SCALARIS_NODE-"node"}
+
+SCALARIS_USER=scalaris
+
+PID_DS="@localstatedir@/run/scalaris-monitor_${SCALARIS_NODE}.pid"
+
+LOG_DS="@localstatedir@/log/scalaris/initd-monitor_${SCALARIS_NODE}.log"
+
+SCALARISMON="@bindir@/scalaris --jvmopts \"-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=14193 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dscalaris.client.name=scalaris_monitor\" -jmx ${SCALARIS_NODE}"
+
+# For SELinux we need to use 'runuser' not 'sudo'
+if [ -n "$RUNUSER" -a -x "$RUNUSER" ]; then
+    SU="$RUNUSER"
+    SU_CMD="$RUNUSER $SCALARIS_USER -s /bin/bash -c"
+else
+    SU="$SUDO"
+    SU_CMD="$SUDO -u $SCALARIS_USER /bin/bash -c"
+fi
+
+start() {
+    if [ -f "$PID_DS" ]; then
+        PROCPID=`cat $PID_DS`
+        if [ -e "/proc/$PROCPID" ];then
+            echo "Scalaris monitor for \"${SCALARIS_NODE}\" already started"
+            return 0
+        fi
+    fi
+
+    echo >> "$LOG_DS"
+    date >> "$LOG_DS"
+    echo -e "Starting Scalaris monitor for \"${SCALARIS_NODE}\"...\n\n" >> "$LOG_DS"
+    echo -n "Starting Scalaris monitor for \"${SCALARIS_NODE}\"... "
+    $SU_CMD "$SCALARISMON" >> "$LOG_DS" 2>&1 &
+    PROCPID=$!
+    echo $PROCPID > "$PID_DS"
+    sleep 1s
+
+    if [ -e "/proc/$PROCPID" ]; then
+        echo "success"
+    else
+        echo "failed"
+        return 1
+    fi
+
+    return 0
+}
+
+stop() {
+    result=0
+    if [ -f "$PID_DS" ]; then
+        echo -n "Stopping Scalaris monitor for \"${SCALARIS_NODE}\"... "
+        killproc -p "$PID_DS" "$SU"
+        result=$?
+        if [ $result -eq 0 ]; then
+            rm -f "$PID_DS"
+            echo "success"
+        else
+            echo "failed"
+        fi
+    else
+        echo "Scalaris monitor for \"${SCALARIS_NODE}\" has not been running"
+    fi
+
+    return $result
+}
+
+status() {
+    if [ -f "$PID_DS" ]; then
+        PROCPID=`cat $PID_DS`
+        if [ ! -e "/proc/$PROCPID" ];then
+            echo "Scalaris monitor for \"${SCALARIS_NODE}\" has crashed"
+            return 1 # program is dead and /var/run pid file exists
+        else
+            echo "Scalaris monitor for \"${SCALARIS_NODE}\" is running"
+            return 0
+        fi
+    else
+        echo "Scalaris monitor for \"${SCALARIS_NODE}\" is not running"
+        return 3 # program is not running
+    fi
+}
+
+restart() {
+    stop && sleep 1 && start
+    return $?
+}
+
+# See how we were called.
+case "$1" in
+    start)
+        start
+        result=$?
+        ;;
+    stop)
+        stop
+        result=$?
+        ;;
+    restart)
+        restart
+        result=$?
+        ;;
+    try-restart)
+        ## Stop the service and if this succeeds (i.e. the
+        ## service was running before), start it again.
+        if [ `$0 status >/dev/null` ]; then
+          $0 restart
+          result=$?
+        else
+          result=0
+        fi
+        ;;
+    reload)
+        result=3
+        ;;
+    force-reload)
+        restart
+        result=$?
+        ;;
+    status)
+        status
+        result=$?
+        ;;
+    *)
+        echo -e "Usage: $0 {start|stop|restart|try-restart|reload|force-reload|status}\n"
+        result=1
+        ;;
+esac
+
+exit $result

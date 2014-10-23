@@ -1,0 +1,164 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+    <link rel='shortcut icon' type='image/x-icon' href='/favicon.ico' />
+<erl>
+out(Arg) ->
+    {header, {cache_control, "no-cache"}}.
+</erl>
+    <title>Scalaris Management Interface</title>
+    <link rel="stylesheet" type="text/css" href="main.css">
+  <!--[if lte IE 5.5999]>
+    <style type="text/css">@import url(ie55-.css);</style>
+  <![endif]-->
+  </head>
+  <body>
+
+    <div class="menubar">
+      <div class="nothighlighted">
+	    <h2>Scalaris</h2>
+	  </div>
+      <div class="nothighlighted">
+	    <a class="menua" href="index.yaws">Home</a>
+	  </div>
+      <div class="nothighlighted">
+        <a class="menua" href="ring.yaws">Ring</a>
+      </div>
+
+<erl>
+out(Arg) ->
+    case whereis(mgmt_server) of
+        undefined -> {html, ""};
+        _ ->
+            {html,
+"      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"indexed-ring.yaws\">Indexed Ring</a>
+      </div>
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"vivaldi.yaws\">Vivaldi Map</a>
+      </div>" ++ 
+    case config:read(dc_clustering_enable) of
+        true -> "
+      <div class=\"nothighlighted\">
+        <a class=\"menua\" href=\"dc.yaws\">Datacenter Clusters Map</a>
+      </div>
+";
+        _ -> ""
+    end ++ "
+      <div class=\"highlighted\">
+        <a class=\"menua\" href=\"bench.yaws\">Benchmarks</a>
+      </div>
+"}
+    end.
+</erl>
+
+      <div class="nothighlighted">
+        <a class="menua" href="gossip.yaws">Gossip values</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_client.yaws">Client Monitor</a>
+      </div>
+      <div class="nothighlighted">
+        <a class="menua" href="monitor_ring.yaws">Ring Monitor</a>
+      </div>
+	  <div class="nothighlighted">
+	    <a class="menua" href="documentation.yaws">Docu</a>
+	  </div>
+      <div class="nothighlighted">
+        <a class="menua" href="debug.yaws">Debug</a>
+      </div>
+	  <div class="nothighlightedlast">
+	    <a class="menua" href="logger.yaws">Message Stats</a>
+	  </div>
+    </div><div class="middle">
+      <div class="middleleft">
+
+<h2>Benchmarks</h2>
+
+<form method="post" action="/bench.yaws">
+
+<table width="400">
+<tr>
+<td>Threads per VM:</td><td><input name="tpm" size="2" value="10" /></td>
+</tr>
+<tr>
+<td>Iterations per Thread:</td><td><input name="iter" size="5" value="1000" /></td>
+</tr>
+<tr>
+<td>Benchmark:</td><td>
+<select name="bench" size="3">
+ <option value="increment" selected="selected">Increment</option>
+ <option value="quorum_read">Quorum Read</option>
+ <option value="read_read">Read-Read</option>
+</select>
+</td>
+</tr>
+</table>
+
+<p><input type="submit" value="Run"/> | <a href="/bench.yaws">Reset</a></p>
+</form>
+
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    if
+   	  IsPost ->
+        case {postvar(A, "tpm"),postvar(A, "iter")} of
+          {{ok, TpmStr},{ok, IterStr}} ->
+            try {erlang:list_to_integer(TpmStr), erlang:list_to_integer(IterStr)} of
+              {Tpm, Iter} ->
+                Result = case postvar(A,"bench") of
+                    {ok, "increment"} ->
+                      io_lib:format("~p", [bench:increment_o(Tpm, Iter, [])]);
+                    {ok, "quorum_read"} ->
+                      io_lib:format("~p", [bench:quorum_read_o(Tpm, Iter, [])]);
+                    {ok, "read_read"} ->
+                      io_lib:format("~p", [bench:read_read_o(Tpm, Iter, [])]);
+                    _ ->
+                      "<div style='color: red;'>Please select a benchmark</div>"
+                  end,
+                {ehtml, {pre, [], Result}}
+            catch error:badarg ->
+              {ehtml, {pre, [], "<div style='color: red;'>Integer numbers required for 'Threads per VM' and 'Iterations'</div>"}}
+            end;
+          _ ->
+            {ehtml, {pre, [], "<div style='color: red;'>Missing required input: Need a 'Threads per VM' and 'Iterations'</div>"}}
+        end;
+    true ->
+      {ehtml,{pre, [], ""}}
+    end.
+</erl>
+
+
+
+<h2>Args</h2>
+<erl>
+out(A) ->
+    IsPost = webhelpers:isPost(A),
+    case IsPost of
+      true ->
+        {ehtml, {pre, [], io_lib:format("GET:~p~nPOST:~p", [yaws_api:parse_query(A), yaws_api:parse_post(A)])}};
+      false ->
+        {ehtml, {pre, [], io_lib:format("GET:~p", [yaws_api:parse_query(A)])}}
+    end.
+</erl>
+
+<hr />
+<p>Last update:
+<erl>
+ out(Arg) ->
+	{Date, {Hour, Minute, Second}} = calendar:local_time(),
+    {html, io_lib:format("~2..0B:~2..0B:~2..0B", [Hour, Minute, Second])}.
+</erl></p>
+</div>
+<br class="br_class">&nbsp;
+</div>
+<div class="bottom">
+</div>
+</body>
+</html>

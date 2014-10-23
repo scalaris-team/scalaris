@@ -1,0 +1,10 @@
+<erl>
+out(Arg) ->
+    Nodes = webhelpers:getVivaldiMap(),
+    NodesJSON = webhelpers:format_nodes(Nodes),
+
+    {html, io_lib:format("{
+        \"nodes\":~s
+    }",[NodesJSON])}
+    .
+</erl>

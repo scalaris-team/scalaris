@@ -1,0 +1,29 @@
+% port(s) for incoming communications, try one in this range
+{port, <%=@scalaris_port%>}.
+
+% http web server port for debug interface, JSON interface
+{yaws_port, <%=@scalaris_port_web%>}.
+
+{first, <%=@scalaris_start_first%>}.
+{start_mgmt_server, <%=@scalaris_start_mgmt_server%>}.
+
+% Insert the appropriate IP-addresses for your setup
+% as comma separated integers:
+% IP Address, Port, and label of the boot server
+{mgmt_server, {{<%=@scalaris_mgmt_server["ip4"].gsub('.', ',')%>},<%=@scalaris_mgmt_server["port"]%>,mgmt_server}}.
+
+% IP Address, Port, and label of a node which is already in the system
+{known_hosts, [<%=@scalaris_known_hosts.map {|host| "{{" + host["ip4"].gsub('.', ',') + "}," + host["port"].to_s + ",service_per_vm}"}.join(", ")%>]}.
+
+% how many scalaris nodes per vm
+{nodes_per_vm, <%=@scalaris_nodes_per_vm%>}.
+
+% the maximum size of a post request for the JSON-RPC
+% (either a number of bytes, or nolimit)
+{yaws_max_post_data, <%=@scalaris_max_json_req_size%>}.
+
+% Allows to restrict access to the web debug interface (including the JSON-RPC!).
+% Expects a list of {"User", "Password"} tuples.
+% Note: This will effectively disable the JSON-RPC including the Python and Ruby
+%       APIs as they are not prepared to handle authentication yet.
+{yaws_auth, [ <% @scalaris_users.each do |usr_pwd| puts "{ \"" + usr_pwd["user"] + "\", \"" + usr_pwd["password"] + "\" }" end -%> ]}.

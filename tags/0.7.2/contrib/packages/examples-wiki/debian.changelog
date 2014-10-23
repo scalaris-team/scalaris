@@ -1,0 +1,113 @@
+scalaris-examples-wiki (0.7.2-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+    and the EIT ICT Labs project MCData
+  * Demonstrator "Wiki on Scalaris":
+    - fix the separate count key optimisation not using Scalaris' increment
+      operation
+  * Bugs:
+    - fix a few minor bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 23 Oct 2014 18:15:00 +0200
+
+scalaris-examples-wiki (0.7.1-1) stable; urgency=low
+
+  * partly supported by the EU project IES Cities http://iescities.eu/
+    and the EIT ICT Labs project MCData
+  * Demonstrator "Wiki on Scalaris":
+    - fix storing template back-links for magic words
+    - fix ARTICLE_COUNT partitioning with hashes
+  * Bugs:
+    - fix numerous bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 30 Sep 2014 17:00:00 +0200
+
+scalaris-examples-wiki (0.7.0-1) stable; urgency=low
+
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/
+     and Contrail http://contrail-project.eu):
+    - add support for reading 7z dumps
+  * Bugs:
+    - fix numerous more (less severe) bugs
+
+ -- Nico Kruber <kruber@zib.de>  Mon, 28 Apr 2014 12:00:00 +0200
+
+scalaris-examples-wiki (0.6.0-1) stable; urgency=low
+
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
+    - separate list counters from their list partitions for a better data layout
+    - fix high memory use of the Scalaris import if the import is slow
+    - use tomcat 7.0.42
+  * Bugs:
+    - fix some more (less severe) bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 11 Oct 2013 15:00:00 +0200
+
+scalaris-examples-wiki (0.6.0-1) stable; urgency=low
+
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
+    - allow monitoring via JMX in the FourCaastMonitoringPlugin
+    - support for getting random articles via the new partial read op
+    - new optimisation scheme "Buckets with Write Cache" - uses a single big
+      list to read from and the rest of the buckets to write to
+    - improve import and dump-processing (faster, more memory-efficient)
+    - add on-the-fly conversion to the different optimisation schemes during
+      import (only one prepared DB dump needed now)
+    - several UI enhancements and rendering fixes
+    - update bliki lib (includes code ported to upstream)
+    - add auto-import ability
+    - use tomcat 7.0.33
+  * Bugs:
+    - fix numerous bugs
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 16 Aug 2013 23:20:13 +0200
+
+scalaris-examples-wiki (0.5.0-1) stable; urgency=low
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/):
+    - allow different partitioned data models for better performance and
+      scalability
+    - allow logging of user requests
+    - added support for checking whether another article exists (approximate)
+      -> show link colours based on this check
+    - added check for bad page titles
+    - allow SERVERNAME and SERVERPATH in config for setups with load
+      balancers
+    - reduced memory footprint of Wiki data in Scalaris
+    - support for newer wiki xml dumps
+    - added support for using a MediaWiki-like SQLite-DB backend for e.g.
+      filtering
+    - improved overall performance
+    - several rendering fixes
+  * Bugs:
+    - fixed numerous bugs
+
+ -- Nico Kruber <kruber@zib.de>  Thu, 11 Oct 2012 12:30:00 +0200
+
+scalaris-examples-wiki (0.4.1-1) stable; urgency=low
+
+  * no changes recorded
+
+ -- Nico Kruber <kruber@zib.de>  Thu, 22 Mar 2012 10:51:00 +0100
+
+scalaris-examples-wiki (0.4.0-1) stable; urgency=low
+
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/):
+    - improved performance of page edits
+    - improved performance of Wikipedia dump loading
+    - several rendering fixes
+  * Bugs:
+    - fixed numerous bugs
+
+ -- Nico Kruber <kruber@zib.de>  Wed, 25 Jan 2012 00:48:00 +0100
+
+scalaris-examples-wiki (0.3.0-1) stable; urgency=low
+
+  * Demonstrator
+    - added Wikipedia-hosting using Scalaris as demonstrator application
+
+ -- Nico Kruber <kruber@zib.de>  Fri, 15 Jul 2011 17:01:00 +0200

@@ -1,0 +1,114 @@
+-------------------------------------------------------------------
+Mon Otc 23 16:15:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.2
+  (partly supported by the EU project IES Cities http://iescities.eu/
+  and the EIT ICT Labs project MCData)
+  * Demonstrator "Wiki on Scalaris":
+    - fix the separate count key optimisation not using Scalaris' increment
+      operation
+  * Bugs:
+    - fix a few minor bugs
+
+-------------------------------------------------------------------
+Mon Sep 29 15:00:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.1
+  (partly supported by the EU project IES Cities http://iescities.eu/
+  and the EIT ICT Labs project MCData)
+  * Demonstrator "Wiki on Scalaris":
+    - fix storing template back-links for magic words
+    - fix ARTICLE_COUNT partitioning with hashes
+  * Bugs:
+    - fix numerous bugs
+
+-------------------------------------------------------------------
+Mon Apr 28 10:00:00 UTC 2014 - kruber@zib.de
+
+- Scalaris 0.7.0
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/
+     and Contrail http://contrail-project.eu):
+    - add support for reading 7z dumps
+  * Bugs:
+    - fix numerous more (less severe) bugs
+
+-------------------------------------------------------------------
+Fri Oct 11 13:00:00 UTC 2013 - kruber@zib.de
+
+- Scalaris 0.6.1
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
+    - separate list counters from their list partitions for a better data layout
+    - fix high memory use of the Scalaris import if the import is slow
+    - use tomcat 7.0.42
+  * Bugs:
+    - fix some more (less severe) bugs
+
+-------------------------------------------------------------------
+Fri Aug 16 21:20:13 UTC 2013 - kruber@zib.de
+
+- Scalaris 0.6.0 (codename "Conus scalaris")
+  * Demonstrator "Wiki on Scalaris" (supported by 4CaaSt http://www.4caast.eu/
+                                     and Contrail http://contrail-project.eu):
+    - allow monitoring via JMX in the FourCaastMonitoringPlugin
+    - support for getting random articles via the new partial read op
+    - new optimisation scheme "Buckets with Write Cache" - uses a single big
+      list to read from and the rest of the buckets to write to
+    - improve import and dump-processing (faster, more memory-efficient)
+    - add on-the-fly conversion to the different optimisation schemes during
+      import (only one prepared DB dump needed now)
+    - several UI enhancements and rendering fixes
+    - update bliki lib (includes code ported to upstream)
+    - add auto-import ability
+    - use tomcat 7.0.33
+  * Bugs:
+    - fix numerous bugs
+
+-------------------------------------------------------------------
+Thu Oct 11 10:30:00 UTC 2012 - kruber@zib.de
+
+- Scalaris 0.5.0 (codename "Saperda scalaris")
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/):
+    - allow different partitioned data models for better performance and
+      scalability
+    - allow logging of user requests
+    - added support for checking whether another article exists (approximate)
+      -> show link colours based on this check
+    - added check for bad page titles
+    - allow SERVERNAME and SERVERPATH in config for setups with load
+      balancers
+    - reduced memory footprint of Wiki data in Scalaris
+    - support for newer wiki xml dumps
+    - added support for using a MediaWiki-like SQLite-DB backend for e.g.
+      filtering
+    - improved overall performance
+    - several rendering fixes
+  * Bugs:
+    - fixed numerous bugs
+
+-------------------------------------------------------------------
+Thu Mar 22 09:51:00 UTC 2012 - kruber@zib.de
+
+- Scalaris 0.4.1
+  * no changes recorded
+
+-------------------------------------------------------------------
+Wed Jan 24 23:48:00 UTC 2012 - kruber@zib.de
+
+- Scalaris 0.4.0 (codename "Pomacea scalaris")
+  * Demonstrator "Wiki on Scalaris"
+    (supported by 4CaaSt http://www.4caast.eu/):
+    - improved performance of page edits
+    - improved performance of Wikipedia dump loading
+    - several rendering fixes
+  * Bugs:
+    - fixed numerous bugs
+
+-------------------------------------------------------------------
+Fri Jul 15 15:01:00 UTC 2011 - kruber@zib.de
+
+- Scalaris 0.3.0 (codename "Rhinechis Scalaris")
+  * Demonstrator
+    - added Wikipedia-hosting using Scalaris as demonstrator application
