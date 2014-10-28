@@ -54,7 +54,11 @@ BuildRequires:  erlang >= R13B01
 BuildRequires:  pkg-config
 %if 0%{?suse_version} >= 1110 || 0%{?sles_version} >= 11 
 %define with_python 1
+%if 0%{?suse_version} == 1315
+%define with_python_doc_html 0
+%else
 %define with_python_doc_html 1
+%endif
 %define with_python_doc_pdf 1
 %if 0%{?suse_version} > 1220
 %define with_python_doc_pdf 0
