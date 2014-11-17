@@ -774,7 +774,7 @@ tester_type_check_util(_Config) ->
            ],
            [ {lists_partition3, 5}, %% cannot create funs; tested via feeder
              {lists_remove_at_indices, 4}, %% indices must exist in list
-             {shuffle_helper,4}, %% badarg error? why?
+             {shuffle_helperA,2}, %% preconds must be fulfilled
              {gb_trees_largest_smaller_than_iter,3}, %% err: function_clause
              {'=:<_lists', 2}, %% need equal length lists
              {ssplit_unique_helper, 5}, %% needs fun
