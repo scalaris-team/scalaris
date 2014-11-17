@@ -27,7 +27,7 @@
 
 -include("scalaris.hrl").
 
--export([new_fpr/2, new_fpr/3, new_bpi/3, new_p1e/2, new_p1e/3,
+-export([new_fpr/2, new_fpr/3, new_bpi/3,
          add/2, add_list/2, is_element/2, item_count/1]).
 -export([equals/2, join/2, print/1]).
 
@@ -74,26 +74,6 @@ new_fpr(MaxItems, FPR) ->
 new_fpr(MaxItems, FPR, Hfs) ->
     Size = calc_least_size(MaxItems, FPR, ?REP_HFS:size(Hfs)),
     new_(Size, Hfs).
-
-%% @doc Creates a new bloom filter with the default (optimal) hash function set
-%%      based on the given probability of a single false positive (P1E, i.e.
-%%      false positive absolute count).
--spec new_p1e(MaxItems::non_neg_integer(), P1E::float()) -> bloom_filter().
-new_p1e(_MaxItems = 0, _P1E) ->
-    Hfs = ?REP_HFS:new(1),
-    new_(8, Hfs);
-new_p1e(MaxItems, P1E) ->
-    new_fpr(MaxItems, _FPR = P1E / MaxItems).
-
-%% @doc Creates a new bloom filter with the given hash function set
-%%      based on the given probability of a single false positive (P1E, i.e.
-%%      false positive absolute count)
--spec new_p1e(MaxItems::non_neg_integer(), P1E::float(), ?REP_HFS:hfs())
-        -> bloom_filter().
-new_p1e(_MaxItems = 0, _P1E, Hfs) ->
-    new_(8, Hfs);
-new_p1e(MaxItems, P1E, Hfs) ->
-    new_fpr(MaxItems, _FPR = P1E / MaxItems, Hfs).
 
 %% @doc Creates a new bloom filter with the given hash function set and a fixed
 %%      number of bits per item.

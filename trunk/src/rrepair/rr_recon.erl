@@ -1679,7 +1679,13 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     % note: for bloom, parameters don't need to match (only one bloom filter at
     %       the non-initiator is created!) - use our own parameters
     ?DBG_ASSERT(not intervals:is_empty(I)),
-    BF0 = bloom:new_p1e(length(DBItems), 0.5 * get_p1e()),
+    MaxItems = length(DBItems),
+    % FPR is a single comparison's failure probability
+    % * assume the other node executes MaxItems number of checks, too
+    % * assume the worst case, e.g. the other node has only items not in BF and
+    %   we need to account for the false positive probability
+    FP = 1 - math:pow(1 - 0.5 * get_p1e(), 1 / erlang:max(MaxItems, 1)),
+    BF0 = bloom:new_fpr(MaxItems, FP),
     BF = bloom:add_list(BF0, DBItems),
     #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
 build_recon_struct(merkle_tree, _OldSyncStruct = {}, I, DBItems, Params, _BeginSync) ->
