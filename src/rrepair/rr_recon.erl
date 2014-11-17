@@ -146,6 +146,11 @@
          }).
 -type state() :: #rr_recon_state{}.
 
+% Optimum for reducing P1E for the two parts: key and version comparison (factor B for the latter)
+-define(TRIVIAL_B, 0.5).
+% Optimum for reducing P1E for the two parts: bloom and trivial RC (factor B for the latter)
+-define(BLOOM_B, 0.5809402158035948). % 2*math:log(2) / (1+2*math:log(2))
+
 % keep in sync with check_node/2
 -define(recon_ok,                       1). % match
 -define(recon_fail_stop_leaf,           2). % mismatch, sending node has leaf node
@@ -385,11 +390,12 @@ on({reconcile, {get_chunk_response, {RestI, DBList0}}} = _Msg,
            if FullDiffSize > 0 ->
                   % start resolve similar to a trivial recon but using the full diff!
                   % (as if non-initiator in trivial recon)
+                  % NOTE: reduce P1E for the two parts here (bloom and trivial RC)
                   {BuildTime, {DBChunk, SigSize, VSize}} =
                       util:tc(fun() ->
                                       compress_kv_list_p1e(
                                         NewKVList, FullDiffSize,
-                                        bloom:item_count(BF), 0.5 * get_p1e())
+                                        bloom:item_count(BF), ?BLOOM_B * get_p1e())
                               end),
                   
                   send(DestReconPid,
@@ -1625,8 +1631,7 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
 compress_kv_list_p1e(DBItems, ItemCount, OtherItemCount, P1E) ->
     VCompareCount = erlang:min(ItemCount, OtherItemCount),
     % reduce P1E for the two parts here (key and version comparison)
-    % the optimum is near b = 0.5, depending on ItemCount, OtherItemCount and P1E
-    B = 0.5, A = 1 - B,
+    B = ?TRIVIAL_B, A = 1 - ?TRIVIAL_B,
     % cut off at 128 bit (rt_chord uses md5 - must be enough for all other RT implementations, too)
     SigSize0 = calc_signature_size_nm_pair(ItemCount, OtherItemCount, A * P1E, 128),
     % note: we have n one-to-one comparisons, assuming the probability of a
@@ -1680,11 +1685,12 @@ build_recon_struct(bloom, _OldSyncStruct = {}, I, DBItems, _Params, true) ->
     %       the non-initiator is created!) - use our own parameters
     ?DBG_ASSERT(not intervals:is_empty(I)),
     MaxItems = length(DBItems),
-    % FPR is a single comparison's failure probability
+    % FP is a single comparison's failure probability
     % * assume the other node executes MaxItems number of checks, too
     % * assume the worst case, e.g. the other node has only items not in BF and
     %   we need to account for the false positive probability
-    FP = 1 - math:pow(1 - 0.5 * get_p1e(), 1 / erlang:max(MaxItems, 1)),
+    % NOTE: reduce P1E for the two parts here (bloom and trivial RC)
+    FP = 1 - math:pow(1 - (1 - ?BLOOM_B) * get_p1e(), 1 / erlang:max(MaxItems, 1)),
     BF0 = bloom:new_fpr(MaxItems, FP),
     BF = bloom:add_list(BF0, DBItems),
     #bloom_recon_struct{interval = I, reconPid = comm:this(), bloom = BF};
