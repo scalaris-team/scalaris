@@ -31,9 +31,9 @@
          add/2, add_list/2, is_element/2, item_count/1]).
 -export([equals/2, join/2, print/1]).
 
--export([calc_HF_num/1, calc_HF_num/2, calc_HF_numEx/2,
-         calc_least_size/2,
-         calc_FPR/2, calc_FPR/3]).
+-export([calc_HF_num/2, calc_HF_numEx/2,
+         calc_least_size/3,
+         calc_FPR/3]).
 
 % for tests:
 -export([get_property/2]).
@@ -72,7 +72,7 @@ new_fpr(MaxItems, FPR) ->
 -spec new_fpr(MaxItems::non_neg_integer(), FPR::float(), ?REP_HFS:hfs())
         -> bloom_filter().
 new_fpr(MaxItems, FPR, Hfs) ->
-    Size = resize(calc_least_size(MaxItems, FPR), 8),
+    Size = resize(calc_least_size(MaxItems, FPR, ?REP_HFS:size(Hfs)), 8),
     new_(Size, Hfs).
 
 %% @doc Creates a new bloom filter with the default (optimal) hash function set
@@ -324,62 +324,62 @@ check_Bits(_, []) ->
     true.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Common bloom filter calculations
-%
-%       Definitions:
-%       N=BF maximum element number
-%       M=BF bit size
-%       C=Compression Rate M/N
-%       E=FPR 0<=E<=1 (FPR=false-positive rate)
-%       k=Number of hash functions
+%% Common bloom filter calculations
+%%
+%%       Definitions:
+%%       N  = BF maximum number of elements
+%%       M  = BF bit size
+%%       FP = probability of a false positive, 0<=FP<=1 (also: FPR)
+%%       k  = number of hash functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc  Calculates optimal number of hash functions for
-%       an M-bit large BloomFilter with a maximum of N Elements.
--spec calc_HF_num(pos_integer(), non_neg_integer()) -> pos_integer().
-calc_HF_num(M, N) ->
-    calc_HF_num(util:ceil(M / erlang:max(N, 1))).
-
-% @doc Calculates optimal number of hash functions for
-%      a given compression rate of C.
--spec calc_HF_num(pos_integer()) -> pos_integer().
-calc_HF_num(C) when C > 0 ->
-    K = C * math:log(2),
-    K_Min = util:floor(K),
-    K_Max = util:ceil(K),
-    A = calc_FPR(C, K_Max),
-    B = calc_FPR(C, K_Min),
-    case erlang:min(A, B) of
-        A -> K_Max;
-        B -> K_Min
-    end.
-
-% @doc Calculates opt. number of hash functions to
-%      code N elements into a bloom filter with false positive rate of FPR.
--spec calc_HF_numEx(non_neg_integer(), float()) -> pos_integer().
-calc_HF_numEx(N, FPR) ->
-    M = calc_least_size(N, FPR),
+%% @doc Calculates the optimal number of hash functions for a bloom filter
+%%      with N elements and a false positive probability FP.
+-spec calc_HF_numEx(N::non_neg_integer(), FP::float()) -> pos_integer().
+calc_HF_numEx(N, FP) ->
+    M = calc_least_size_opt(N, FP),
     calc_HF_num(M, N).
 
-% @doc  Calculates leasts bit size of a bloom filter
-%       with a bounded false-positive rate FPR up to N-Elements.
--spec calc_least_size(non_neg_integer(), float()) -> pos_integer().
-calc_least_size(_, FPR) when FPR == 0 -> 1;
-calc_least_size(0, _) -> 1;
-calc_least_size(N, FPR) ->
-    util:ceil((N * util:log2(math:exp(1)) * util:log2(1 / FPR))).
+%% @doc Calculates optimal number of hash functions for
+%%      an M-bit large BloomFilter with a maximum of N Elements.
+-spec calc_HF_num(M::non_neg_integer(), N::non_neg_integer()) -> K::pos_integer().
+calc_HF_num(M, N) ->
+    K = math:log(2) * M / erlang:max(N, 1),
+    K_Min = util:floor(K),
+    K_Max = util:ceil(K),
+    FP_Min = calc_FPR(M, N, K_Min),
+    FP_Max = calc_FPR(M, N, K_Max),
+    if FP_Min =< FP_Max -> K_Min;
+       true             -> K_Max
+    end.
 
-% @doc  Calculates FPR for an M-bit large bloom_filter with K Hashfuntions
-%       and a maximum of N elements.
-%       FPR = (1-e^(-kn/m))^k
-%       M = number of BF-Bits
--spec calc_FPR(pos_integer(), pos_integer(), pos_integer()) -> float().
+%% @doc Calculates the number of bits needed by a bloom filter to have a false
+%%      positive probability of FP using up to N elements and the optimal
+%%      number of hash functions K = ln(2)*M/N.
+%%      M = N * log_2(1/FP) / ln(2) = - N * log_2(FP) / ln(2)
+-spec calc_least_size_opt(N::non_neg_integer(), FP::float()) -> M::non_neg_integer().
+calc_least_size_opt(_N, FP) when FP == 0 -> 1;
+calc_least_size_opt(0, _FP) -> 1;
+calc_least_size_opt(N, FP) ->
+    util:ceil(- N * util:log2(FP) / math:log(2)).
+
+%% @doc Calculates the number of bits needed by a bloom filter to have a false
+%%      positive probability of FP using K hash functions and up to N-Elements.
+%%      M = 1/(1-(1-(FP)^(1/K))^(1/(KN)))
+-spec calc_least_size(N::non_neg_integer(), FP::float(), K::pos_integer())
+        -> M::non_neg_integer().
+calc_least_size(0, FP, _K) when FP == 0 -> 1;
+calc_least_size(0, _FP, _K) -> 1;
+calc_least_size(N, FP, K) ->
+    util:ceil(1 / (1 - (math:pow(1 - math:pow(FP, 1 / K), 1 / (K * N))))).
+
+%% @doc Calculates FP for an M-bit large bloom filter with K hash funtions
+%%      and a maximum number of N elements.
+%%      FP = (1-(1-1/M)^(K*N))^K
+-spec calc_FPR(M::pos_integer(), N::pos_integer(), K::pos_integer())
+        -> FP::float().
 calc_FPR(M, N, K) ->
-    math:pow(1 - math:exp((-K * N) / M), K).
-
--spec calc_FPR(pos_integer(), pos_integer()) -> float().
-calc_FPR(C, K) ->
-    math:pow(1 - math:exp(-K / C), K).
+    math:pow(1 - math:pow(1 - 1/M, K * N), K).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% helper functions
