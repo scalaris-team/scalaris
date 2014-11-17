@@ -423,13 +423,14 @@ pop_randomelem(List, Size) ->
 %% @doc Returns a random subset of Size elements from the given list.
 -spec random_subset(Size::pos_integer(), [T]) -> [T]
     when is_subtype(T, any()).
-random_subset(0, _List) ->
-    % having this special case here prevents unnecessary calls to erlang:length()
-    [];
+random_subset(0, _List) -> [];
+random_subset(_Size, []) -> [];
 random_subset(_Size, [X]) -> [X];
-random_subset(Size, List) ->
-    ListSize = length(List),
-    shuffle_helper(List, [], Size, ListSize).
+random_subset(Size0, List) ->
+    A = array:fix(array:from_list(List)),
+    Size = erlang:min(Size0, array:size(A)),
+    A2 = shuffle_helperA(A, Size - 1),
+    array:to_list(array:resize(Size, A2)).
 
 %% @doc Fisher-Yates shuffling for lists.
 -spec shuffle([T]) -> [T]
@@ -437,20 +438,24 @@ random_subset(Size, List) ->
 shuffle([]) -> [];
 shuffle([X]) -> [X];
 shuffle(List) ->
-    ListSize = length(List),
-    shuffle_helper(List, [], ListSize, ListSize).
+    A = array:fix(array:from_list(List)),
+    A2 = shuffle_helperA(A, array:size(A) - 1),
+    array:to_list(A2).
 
 %% @doc Fisher-Yates shuffling for lists helper function: creates a shuffled
 %%      list of length ShuffleSize.
--spec shuffle_helper(List::[T], AccResult::[T], ShuffleSize::non_neg_integer(), ListSize::non_neg_integer()) -> [T]
+%%      PreCond: a non-empty array, ShuffleSize &lt; size(Array)
+-spec shuffle_helperA(array:array(T), ShuffleSize::non_neg_integer())
+        -> array:array(T)
     when is_subtype(T, any()).
-shuffle_helper([_|_] = _List, Acc, 0, _ListSize) ->
-    Acc;
-shuffle_helper([_|_] = List, Acc, Size, ListSize) ->
-    {Leading, [H | T]} = lists:split(randoms:rand_uniform(0, ListSize), List),
-    shuffle_helper(lists:append(Leading, T), [H | Acc], Size - 1, ListSize - 1);
-shuffle_helper([], Acc, _Size, _ListSize) ->
-    Acc.
+shuffle_helperA(Array, 0) ->
+    Array;
+shuffle_helperA(Array, N1) ->
+    E1 = array:get(N1, Array),
+    N2 = randoms:rand_uniform(0, N1),
+    E2 = array:get(N2, Array),
+    A2 = array:set(N1, E2, array:set(N2, E1, Array)),
+    shuffle_helperA(A2, N1 - 1).
 
 %% @doc Find the largest key in GBTree that is smaller than Key.
 %%      Note: gb_trees offers only linear traversal or lookup of exact keys -
