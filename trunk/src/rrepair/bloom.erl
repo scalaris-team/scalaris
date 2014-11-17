@@ -72,7 +72,7 @@ new_fpr(MaxItems, FPR) ->
 -spec new_fpr(MaxItems::non_neg_integer(), FPR::float(), ?REP_HFS:hfs())
         -> bloom_filter().
 new_fpr(MaxItems, FPR, Hfs) ->
-    Size = resize(calc_least_size(MaxItems, FPR, ?REP_HFS:size(Hfs)), 8),
+    Size = calc_least_size(MaxItems, FPR, ?REP_HFS:size(Hfs)),
     new_(Size, Hfs).
 
 %% @doc Creates a new bloom filter with the default (optimal) hash function set
@@ -100,14 +100,16 @@ new_p1e(MaxItems, P1E, Hfs) ->
 -spec new_bpi(MaxItems::non_neg_integer(), BitsPerItem::float(), ?REP_HFS:hfs())
         -> bloom_filter().
 new_bpi(MaxItems, BitPerItem, Hfs) ->
-    new_(resize(util:ceil(BitPerItem * MaxItems), 8), Hfs).
+    new_(util:ceil(BitPerItem * MaxItems), Hfs).
 
 %% @doc Creates a new bloom filter.
 -spec new_(BitSize::pos_integer(), ?REP_HFS:hfs()) -> bloom_filter().
 new_(BitSize, Hfs) when (BitSize rem 8) =:= 0 ->
     #bloom{size = BitSize, hfs = Hfs, items_count = 0};
 new_(BitSize, Hfs) ->
-    new_(resize(BitSize, 8), Hfs).
+    NewSize = resize(BitSize, 8),
+    ?DBG_ASSERT((NewSize rem 8) =:= 0),
+    #bloom{size = NewSize, hfs = Hfs, items_count = 0}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
