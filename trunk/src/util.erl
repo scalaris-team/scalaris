@@ -29,7 +29,8 @@
 -export([escape_quotes/1,
          min/2, max/2, log/2, log2/1, ceil/1, floor/1,
          logged_exec/1,
-         randomelem/1, randomelem_and_length/1, pop_randomelem/1, pop_randomelem/2,
+         randomelem/1, randomelem_and_length/1,
+         pop_randomelem/1, pop_randomelem/2, pop_randomsubset/2,
          get_stacktrace/0, get_linetrace/0, get_linetrace/1,
          do_throw/1,
          extract_from_list_may_not_exist/2,
@@ -412,13 +413,31 @@ pop_randomelem(List) ->
 %%      list and returns the resulting list and the removed element.
 %%      If Size is 0, the first element will be popped.
 %%      Size must not exceed the length of the list!
--spec pop_randomelem(List::[X,...], Size::non_neg_integer()) -> {NewList::[X], PoppedElement::X}
+-spec pop_randomelem(List::[X,...], Size::non_neg_integer())
+        -> {NewList::[X], PoppedElement::X}
     when is_subtype(X, any()).
 pop_randomelem([X | TL], 0) -> {TL, X};
 pop_randomelem([X | TL], 1) -> {TL, X};
 pop_randomelem(List, Size) ->
     {Leading, [H | T]} = lists:split(randoms:rand_uniform(0, Size), List),
     {lists:append(Leading, T), H}.
+
+%% @doc Removes a random subset of Size elements from the given list and returns
+%%      the resulting list and the removed subset.
+%%      If Size is larger than the list length, all elements will be returned
+%%      (in random order).
+-spec pop_randomsubset(Size::pos_integer(), [X])
+        -> {NewList::[X], PoppedSet::[X]}
+    when is_subtype(X, any()).
+pop_randomsubset(0, List) -> {List, []};
+pop_randomsubset(_Size, []) -> {[], []};
+pop_randomsubset(_Size, [X]) -> {[], [X]};
+pop_randomsubset(Size0, List) ->
+    A = array:fix(array:from_list(List)),
+    Size = erlang:min(Size0, array:size(A)),
+    LNew = array:to_list(shuffle_helperA(A, Size - 1)),
+    {PoppedSet, Rest} = lists:split(Size, LNew),
+    {Rest, PoppedSet}.
 
 %% @doc Returns a random subset of Size elements from the given list.
 -spec random_subset(Size::pos_integer(), [T]) -> [T]
