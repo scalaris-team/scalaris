@@ -116,8 +116,9 @@ get_db(Interval, ItemCount, Distribution, Options) ->
          Acc::[result_kv()], OutputType::list_key_val) -> [result_kv()].
 gen_random([], Acc, _) -> Acc;
 gen_random([{I, Add} | R], Acc, OutputType) ->
-    ToAdd = gen_random_gb_sets(intervals:get_bounds(I), Add, OutputType,
-                               gb_sets:empty(), 0),
+    SimpleI = intervals:get_bounds(I),
+    ToAdd0 = gb_sets:from_list(?RT:get_random_in_interval(SimpleI, Add)),
+    ToAdd = gen_random_gb_sets(SimpleI, Add - gb_sets:size(ToAdd0), OutputType, ToAdd0, 1),
     gen_random(R, lists:append(ToAdd, Acc), OutputType).
 
 -spec gen_random_gb_sets
