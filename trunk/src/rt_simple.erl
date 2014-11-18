@@ -158,23 +158,36 @@ get_split_keys_helper(Begin, End, Parts, Acc) ->
 %%      calculates a random key in this range. Fails with an exception if there
 %%      is no key.
 -spec get_random_in_interval(intervals:simple_interval2()) -> key().
-get_random_in_interval({LBr, L, R, RBr}) ->
+get_random_in_interval(I) ->
+    hd(get_random_in_interval(I, 1)).
+
+%% @doc Gets input similar to what intervals:get_bounds/1 returns and
+%%      calculates Count number of random keys in this range (duplicates may
+%%      exist!). Fails with an exception if there is no key.
+-spec get_random_in_interval(intervals:simple_interval2(), Count::pos_integer()) -> [key(),...].
+get_random_in_interval({LBr, L, R, RBr}, Count) ->
     case intervals:wraps_around(LBr, L, R, RBr) of
-        false -> normalize(get_random_in_interval2(LBr, L, R, RBr));
-        true  -> normalize(get_random_in_interval2(LBr, L, ?PLUS_INFINITY + R, RBr))
+        false -> [normalize(Key) || Key <- get_random_in_interval2(LBr, L, R, RBr, Count)];
+        true  -> [normalize(Key) || Key <- get_random_in_interval2(LBr, L, ?PLUS_INFINITY + R, RBr, Count)]
     end.
 
 % TODO: return a failure constant if the interval is empty? (currently fails with an exception)
 -spec get_random_in_interval2(intervals:left_bracket(), key(), non_neg_integer(),
-                              intervals:right_bracket()) -> non_neg_integer().
-get_random_in_interval2('[', L, R, ')') ->
-    randoms:rand_uniform(L, R);
-get_random_in_interval2('(', L, R, ')') ->
-    randoms:rand_uniform(L + 1, R);
-get_random_in_interval2('(', L, R, ']') ->
-    randoms:rand_uniform(L + 1, R + 1);
-get_random_in_interval2('[', L, R, ']') ->
-    randoms:rand_uniform(L, R + 1).
+                              intervals:right_bracket(), Count::pos_integer()) -> [non_neg_integer()].
+get_random_in_interval2('(', L, R, ']', Count) ->
+    L2 = L + 1,
+    R2 = R + 1,
+    util:for_to_ex(1, Count, fun(_) -> randoms:rand_uniform(L2, R2) end);
+get_random_in_interval2('[', L, R, ')', Count) ->
+    util:for_to_ex(1, Count, fun(_) -> randoms:rand_uniform(L, R) end);
+get_random_in_interval2('[', X, X, ']', Count) ->
+    lists:duplicate(Count, X);
+get_random_in_interval2('[', L, R, ']', Count) ->
+    R2 = R + 1,
+    util:for_to_ex(1, Count, fun(_) -> randoms:rand_uniform(L, R2) end);
+get_random_in_interval2('(', L, R, ')', Count) ->
+    L2 = L + 1,
+    util:for_to_ex(1, Count, fun(_) -> randoms:rand_uniform(L2, R) end).
 
 %% userdevguide-begin rt_simple:get_replica_keys
 %% @doc Returns the replicas of the given key.
