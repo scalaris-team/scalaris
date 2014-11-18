@@ -446,7 +446,7 @@ p_gen_kvv_feeder(EDist0, Keys0, _WrongKeyCount, FType, FDest, FCount) ->
                 failure_dest(), FailCount::non_neg_integer()) -> {db_dht:db_as_list(), db_status()}.
 p_gen_kvv(random, Keys, KeyCount, FType, FDest, FCount) ->
     ?DBG_ASSERT(length(Keys) =:= length(lists:usort(Keys))), % unique keys
-    {FKeys, GoodKeys} = select_random_keys(Keys, KeyCount, FCount, []),
+    {GoodKeys, FKeys} = util:pop_randomsubset(FCount, Keys),
     GoodDB = lists:append([get_rep_group(Key) || Key <- GoodKeys]),
     {DB, O} = lists:foldl(fun(FKey, {AccAll, Out}) ->
                                   {RList, NewOut} = get_failure_rep_group(FKey, FType, FDest),
@@ -591,15 +591,6 @@ get_error_key(Key, RepKeys, Dest) ->
             FailureCount::non_neg_integer(), FailAcc::[?RT:key()]}.
 select_random_keys_feeder(Keys, _KeysLen, FailureCount, Acc) ->
     {Keys, erlang:length(Keys), FailureCount, Acc}.
-
--spec select_random_keys([Keys::?RT:key()], KeysLen::non_neg_integer(),
-                         FailureCount::non_neg_integer(), FailAcc::[?RT:key()])
-        -> {Fail::[?RT:key()], Rest::[?RT:key()]}.
-select_random_keys(RestKeys, _KeysLen, 0, Acc) ->  {Acc, RestKeys};
-select_random_keys([] = Keys, 0, _Count, Acc) ->  {Acc, Keys};
-select_random_keys([_|_] = Keys, KeysLen, Count, Acc) ->
-    {NewKeys, FRep} = util:pop_randomelem(Keys, KeysLen),
-    select_random_keys(NewKeys, KeysLen - 1, Count - 1, [FRep | Acc]).
 
 -spec get_node_list() -> [comm:mypid()].
 get_node_list() ->
