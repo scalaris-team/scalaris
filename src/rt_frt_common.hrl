@@ -294,6 +294,13 @@ get_split_keys(Begin, End, Parts) ->
 get_random_in_interval(SimpleI) ->
     rt_chord:get_random_in_interval(SimpleI).
 
+%% @doc Gets input similar to what intervals:get_bounds/1 returns and
+%%      calculates Count number of random keys in this range (duplicates may
+%%      exist!). Fails with an exception if there is no key.
+-spec get_random_in_interval(intervals:simple_interval2(), Count::pos_integer()) -> [key(),...].
+get_random_in_interval(SimpleI, Count) ->
+    rt_chord:get_random_in_interval(SimpleI, Count).
+
 %% userdevguide-begin rt_frtchord:get_replica_keys
 %% @doc Returns the replicas of the given key.
 -spec get_replica_keys(key()) -> [key()].
