@@ -444,7 +444,10 @@ tester_type_check_rrepair(_Config) ->
           {hfs_lhsp,
            [ {new, 2}, %% tested via feeder
              {apply_val, 3} %% tested via feeder
-           ], []},
+           ],
+           [ {apply_val_helper, 3}, %% tested via feeder
+             {apply_val_rem_helper, 4} %% tested via feeder
+           ]},
           {rr_recon,
            [
              {on, 2}, %% tries to send messages, needs valid state with pid

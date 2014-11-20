@@ -52,7 +52,7 @@
 % API functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% @doc returns a new lhsp hfs with default functions
+%% @doc returns a new lhsp hfs with default functions
 -spec new(pos_integer()) -> hfs().
 new(HFCount) ->
     new([fun erlang:adler32/1, fun erlang:md5/1], HFCount).
@@ -72,22 +72,64 @@ apply_val({hfs_lhsp, K, H1, H2}, Val) ->
     ValBin = erlang:term_to_binary(Val),
     HV1 = hash_value(ValBin, H1),
     HV2 = hash_value(ValBin, H2),
-    util:for_to_ex(0, K - 1, fun(I) -> HV1 + I * HV2 end).
+    apply_val_helper(K - 1, HV2, [HV1]).
 
-% @doc Applies Val to all hash functions in container HC and returns only remainders
--spec apply_val_rem(hfs(), itemKey(), pos_integer()) -> [non_neg_integer(),...].
+-compile({nowarn_unused_function, apply_val_helper_feeder/3}).
+
+-spec apply_val_helper_feeder(
+        Hf_count::1..100, HashValue2::non_neg_integer(), Acc::Hashes)
+        -> {Hf_count::1..100, HashValue2::non_neg_integer(), Acc::Hashes}
+        when is_subtype(Hashes, [non_neg_integer(),...]).
+apply_val_helper_feeder(HF_count, HV2, Acc) ->
+    {HF_count, HV2, Acc}.
+
+%% @doc Helper for apply_val/2.
+-spec apply_val_helper(Hf_count::pos_integer(), HashValue2::non_neg_integer(),
+                       Acc::Hashes) -> Hashes
+        when is_subtype(Hashes, [non_neg_integer(),...]).
+apply_val_helper(0, _HV2, Acc) ->
+    Acc;
+apply_val_helper(N, HV2, [H|_] = L) ->
+    apply_val_helper(N - 1, HV2, [H + HV2 | L]).
+
+%% @doc Applies Val to all hash functions in container HC and returns only
+%%      remainders of divisions by Rem.
+-spec apply_val_rem(HC::hfs(), Val::itemKey(), Rem::pos_integer())
+        -> [non_neg_integer(),...].
 apply_val_rem({hfs_lhsp, K, H1, H2}, Val, Rem) ->
     ValBin = erlang:term_to_binary(Val),
-    HV1 = hash_value(ValBin, H1),
-    HV2 = hash_value(ValBin, H2),
-    util:for_to_ex(0, K - 1, fun(I) -> (HV1 + I * HV2) rem Rem end).
+    HV1 = hash_value(ValBin, H1) rem Rem,
+    HV2 = hash_value(ValBin, H2) rem Rem,
+    apply_val_rem_helper(K - 1, HV2, Rem, [HV1]).
+
+-compile({nowarn_unused_function, apply_val_rem_helper_feeder/4}).
+
+-spec apply_val_rem_helper_feeder(
+        Hf_count::1..100, HashValue2::non_neg_integer(), Rem::pos_integer(),
+        Acc::Hashes)
+        -> {Hf_count::1..100, HashValue2::non_neg_integer(), Rem::pos_integer(),
+            Acc::Hashes}
+        when is_subtype(Hashes, [non_neg_integer(),...]).
+apply_val_rem_helper_feeder(HF_count, HV2, Rem, Acc) ->
+    {HF_count, HV2, Rem, Acc}.
+
+%% @doc Helper for apply_val_rem/3.
+-spec apply_val_rem_helper(Hf_count::pos_integer(), HashValue2::non_neg_integer(),
+                           Rem::pos_integer(), Acc::Hashes) -> Hashes
+        when is_subtype(Hashes, [non_neg_integer(),...]).
+apply_val_rem_helper(0, _HV2, _Rem, Acc) ->
+    Acc;
+apply_val_rem_helper(N, HV2, Rem, [H|_] = L) ->
+    apply_val_rem_helper(N - 1, HV2, Rem, [(H + HV2) rem Rem | L]).
 
 -spec apply_val_feeder(hfs(), pos_integer(), itemKey())
         -> {hfs(), pos_integer(), itemKey()}.
 apply_val_feeder({hfs_lhsp, K, H1, H2}, I, Val) ->
     {{hfs_lhsp, K, H1, H2}, erlang:min(K, I), Val}.
     
-% @doc Apply hash function I to given value; I = 1..hfs_size
+%% @doc Apply hash function I to given value; I = 1..hfs_size.
+%%      NOTE: When multiple different I are needed, prefer apply_val/2 since
+%%            that function is faster.
 -spec apply_val(hfs(), pos_integer(), itemKey()) -> non_neg_integer().
 apply_val({hfs_lhsp, K, H1, H2}, I, Val) when I =< K ->
     ValBin = erlang:term_to_binary(Val),
@@ -95,7 +137,7 @@ apply_val({hfs_lhsp, K, H1, H2}, I, Val) when I =< K ->
     HV2 = hash_value(ValBin, H2),
     HV1 + (I - 1) * HV2.
 
-% @doc Returns number of hash functions in the container
+%% @doc Returns number of hash functions in the container
 -spec size(hfs()) -> pos_integer().
 size({hfs_lhsp, K, _, _}) ->
     K.
