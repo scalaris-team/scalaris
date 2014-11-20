@@ -40,8 +40,7 @@ groups() ->
                                   test_triple_add
                                ]},
      {partition_tests,[sequence], [
-                                   test_network_partition,
-                                   test_crash_recovery
+                                   test_network_partition
                                ]},
      {rm_loop_tests,  [sequence], [
                                   propose_new_neighbor
@@ -258,32 +257,6 @@ test_network_partition(_Config) ->
                                     comm:send_local(RMLeasesPid, Msg) 
                             end),
     ok.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
-% crash recovery test
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-test_crash_recovery(_Config) ->
-    % we create a ring with four nodes. We stop lease renewal on all
-    % nodes and wait for the leases to timeout.
-    DHTNodes = pid_groups:find_all(dht_node),
-
-    % stop all nodes
-    ct:pal("cr: stop all nodes"),
-    [lease_helper:intercept_lease_renew(Node) || Node <- DHTNodes],
-    lease_helper:wait_for_number_of_valid_active_leases(0),
-    [gen_component:bp_del(Node, block_trigger) || Node <- DHTNodes],
-
-
-    % trigger renewal on all nodes
-    ct:pal("cr: renew all nodes ~p", [DHTNodes]),
-    [ comm:send_local(Node, {l_on_cseq, renew_leases}) || Node <- DHTNodes],
-    
-    % wait for leases to reappear
-    ct:pal("cr: wait for leases to reappear"),
-    lease_helper:wait_for_number_of_valid_active_leases(4).
-
 
 iterate_even_odd(L, F) ->
     iterate_even_odd1(L, F, true, []).
