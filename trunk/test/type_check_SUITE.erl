@@ -431,7 +431,6 @@ tester_type_check_rrepair(_Config) ->
              {fill_wiki, 2}, %% no (suitable) wiki file to import
              {gen_kvv, 3}, %% tested via feeder
              {p_gen_kvv, 6}, %% tested via feeder
-             {select_random_keys, 4}, %% tested via feeder
 
              {gen_random, 3}, %% needs feeder
              {gen_random_gb_sets, 5}, %% needs feeder

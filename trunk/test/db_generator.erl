@@ -585,14 +585,6 @@ get_error_key(Key, RepKeys, Dest) ->
         QList -> rr_recon:map_key_to_quadrant(Key, util:randomelem(QList))
     end.
 
--compile({nowarn_unused_function, {select_random_keys_feeder, 4}}).
--spec select_random_keys_feeder([Keys::?RT:key()], KeysLen::non_neg_integer(),
-                                FailureCount::non_neg_integer(), FailAcc::[?RT:key()])
-        -> {[Keys::?RT:key()], KeysLen::non_neg_integer(),
-            FailureCount::non_neg_integer(), FailAcc::[?RT:key()]}.
-select_random_keys_feeder(Keys, _KeysLen, FailureCount, Acc) ->
-    {Keys, erlang:length(Keys), FailureCount, Acc}.
-
 -spec get_node_list() -> [comm:mypid()].
 get_node_list() ->
     mgmt_server:node_list(),
