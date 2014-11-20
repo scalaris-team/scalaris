@@ -366,6 +366,10 @@ on({get_state, Pid, Which}, State) when is_list(Which) ->
 on({get_state, Pid, Which}, State) when is_atom(Which) ->
     comm:send(Pid, {get_state_response, dht_node_state:get(State, Which)}),
     State;
+on({set_state, Pid, F}, State) when is_function(F) -> %% only for unit-tests
+    NewState = F(State),
+    comm:send(Pid, {set_state_response, NewState}),
+    NewState;
 on({get_node_details, Pid}, State) ->
     comm:send(Pid, {get_node_details_response, dht_node_state:details(State)}),
     State;
