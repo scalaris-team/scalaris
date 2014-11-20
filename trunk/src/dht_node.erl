@@ -366,7 +366,8 @@ on({get_state, Pid, Which}, State) when is_list(Which) ->
 on({get_state, Pid, Which}, State) when is_atom(Which) ->
     comm:send(Pid, {get_state_response, dht_node_state:get(State, Which)}),
     State;
-on({set_state, Pid, F}, State) when is_function(F) -> %% only for unit-tests
+on({set_state, Pid, F}, State) when is_function(F) ->
+    ?DBG_ASSERT(util:is_unit_test()), % may only be used in unit-tests
     NewState = F(State),
     comm:send(Pid, {set_state_response, NewState}),
     NewState;
