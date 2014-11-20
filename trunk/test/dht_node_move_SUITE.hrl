@@ -769,7 +769,7 @@ wait(Pid, Tag) ->
 continue(Pid) ->
     gen_component:bp_cont(Pid).
 
--spec proto_sched_callback_fun() -> proto_sched:callback_on_deliver().
+-spec proto_sched_callback_fun() -> proto_sched:callback_on_msg().
 proto_sched_callback_fun() ->
     This = self(),
     fun(_From, _To, Msg) ->
@@ -849,7 +849,8 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
                       set_breakpoint(PidLocal1, slide1),
                       ?IIF(PidLocal1 =/= PidLocal2, set_breakpoint(PidLocal2, slide2), ok);
                   true  ->
-                      proto_sched:register_callback(proto_sched_callback_fun())
+                      proto_sched:register_callback(
+                        proto_sched_callback_fun(), on_deliver)
               end,
               %% send out slides
               comm:send(node:pidX(Node1), {move, start_slide, Direction1, TargetId1, {slide1, Direction1, Tag1}, comm:this()}),

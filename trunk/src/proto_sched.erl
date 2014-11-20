@@ -114,7 +114,7 @@
 -export([thread_yield/0]).
 
 -export([get_infos/0, get_infos/1, info_shorten_messages/2]).
--export([register_callback/1, register_callback/2]).
+-export([register_callback/2, register_callback/3]).
 -export([infected/0]).
 -export([clear_infection/0, restore_infection/0]).
 -export([wait_for_end/0, wait_for_end/1]).
@@ -143,7 +143,7 @@
 -ifdef(with_export_type_support).
 -export_type([logger/0]).
 -export_type([passed_state/0]).
--export_type([callback_on_deliver/0]).
+-export_type([callback_on_msg/0]).
 -endif.
 
 -type queue_key()        :: {Src :: comm:mypid(), Dest :: comm:mypid()}.
@@ -151,7 +151,7 @@
 -type msg_queues()       :: [queue_key()].
 -type msg_delay_queues() :: [delay_queue_key()].
 
--type callback_on_deliver() ::
+-type callback_on_msg() ::
         fun((Src::comm:mypid(), Dest::comm:mypid(), Msg::comm:message()) -> ok).
 
 -record(state,
@@ -174,8 +174,10 @@
          :: [send_event()], %% delivered messages in reverse order
          nums_chosen_from        = ?required(state, nums_chosen_from)
          :: [pos_integer()], %% #possibilities for each delivered msg in reverse order
+         callback_on_send        = ?required(state, callback_on_send)
+         :: callback_on_msg(),
          callback_on_deliver     = ?required(state, callback_on_deliver)
-         :: callback_on_deliver(),
+         :: callback_on_msg(),
          thread_num              = ?required(state, thread_num)
          :: non_neg_integer(),
          threads_registered      = ?required(state, threads_registered)
@@ -262,17 +264,19 @@ start(TraceId, Logger) ->
     PState = passed_state_new(TraceId, Logger),
     own_passed_state_put(PState).
 
--spec register_callback(CallbackFun::callback_on_deliver()) -> ok | failed.
-register_callback(CallbackFun) ->
-    register_callback(CallbackFun, default).
+-spec register_callback(CallbackFun::callback_on_msg(), on_send | on_deliver)
+        -> ok | failed.
+register_callback(CallbackFun, OnX) ->
+    register_callback(CallbackFun, OnX, default).
 
--spec register_callback(CallbackFun::callback_on_deliver(), trace_id()) -> ok | failed.
-register_callback(CallbackFun, TraceId) ->
+-spec register_callback(CallbackFun::callback_on_msg(), on_send | on_deliver,
+                        trace_id()) -> ok | failed.
+register_callback(CallbackFun, OnX, TraceId) ->
     %% clear infection
     clear_infection(),
     %% register the callback function
     LoggerPid = pid_groups:find_a(proto_sched),
-    comm:send_local(LoggerPid, {register_callback, CallbackFun, TraceId, comm:this()}),
+    comm:send_local(LoggerPid, {register_callback, CallbackFun, OnX, TraceId, comm:this()}),
     %% restore infection
     restore_infection(),
     receive
@@ -435,6 +439,10 @@ on({log_send, _Time, TraceId, From, To, UMsg, LorG}, State) ->
                    {TraceId, OldTrace} ->
                        add_message(From, To, UMsg, LorG, OldTrace)
                end,
+    %% call the callback function (if any)
+    CallbackFun = TmpEntry#state.callback_on_send,
+    ?TRACE("executing callback function ~p.", [CallbackFun]),
+    CallbackFun(From, To, UMsg),
     case TmpEntry#state.status of
         new ->
             %% still waiting for all threads to join
@@ -614,8 +622,9 @@ on({send_error, Pid, Msg, _Reason} = _ShepherdMsg, State) ->
             end
     end;
 
-on({register_callback, CallbackFun, TraceId, Client}, State) ->
-    ?TRACE("proto_sched:on({register_callback, ~p, ~p, ~p}).", [CallbackFun, TraceId, Client]),
+on({register_callback, CallbackFun, OnX, TraceId, Client}, State) ->
+    ?TRACE("proto_sched:on({register_callback, ~p, ~p, ~p, ~p}).",
+           [CallbackFun, OnX, TraceId, Client]),
     ?DBG_ASSERT2(not infected(), infected_in_on_handler),
     case lists:keyfind(TraceId, 1, State) of
         false ->
@@ -623,7 +632,13 @@ on({register_callback, CallbackFun, TraceId, Client}, State) ->
             State;
         {TraceId, TraceEntry} ->
             comm:send(Client, {register_callback_reply, ok}),
-            NewEntry = TraceEntry#state{callback_on_deliver = CallbackFun},
+            NewEntry =
+                case OnX of
+                    on_send ->
+                        TraceEntry#state{callback_on_send = CallbackFun};
+                    on_deliver ->
+                        TraceEntry#state{callback_on_deliver = CallbackFun}
+                end,
             lists:keyreplace(TraceId, 1, State, {TraceId, NewEntry})
     end;
 
@@ -812,6 +827,7 @@ new(TraceId) ->
             num_delivered_msgs = 0,
             delivered_msgs = [],
             nums_chosen_from = [],
+            callback_on_send = fun(_From, _To, _Msg) -> ok end,
             callback_on_deliver = fun(_From, _To, _Msg) -> ok end,
             thread_num = 0,
             threads_registered = 0,

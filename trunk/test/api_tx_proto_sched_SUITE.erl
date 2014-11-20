@@ -122,7 +122,7 @@ concurrent_2(_Config) ->
     case tx_tm:is_txnew_enabled() of
         true ->
             proto_sched:register_callback(
-              fun api_tx_proto_sched_SUITE:rbr_invariant/3);
+              fun api_tx_proto_sched_SUITE:rbr_invariant/3, on_deliver);
         _ -> ok
     end,
     F = fun(_X, 0) -> {ok};
@@ -163,6 +163,7 @@ concurrent_2(_Config) ->
     ok.
 
 %% callback function for proto_sched
+-spec rbr_invariant(Src::comm:mypid(), Dest::comm:mypid(), Msg::comm:message()) -> ok.
 rbr_invariant(_From, _To, _Msg) ->
     %% we are a callback function, which is not infected!
     %% we are executed in the context of proto_sched and are allowed
