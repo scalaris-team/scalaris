@@ -781,9 +781,10 @@ proto_sched_callback_fun() ->
     end.
 
 receive_result() ->
-    trace_mpath:thread_yield(),
+    % do not use SCALARIS_RECV since we receive messages from proto_sched
+    % callbacks and we must not interfere with proto_sched here!
     receive
-        ?SCALARIS_RECV(X, X)
+        X -> X
     end.
 
 %% check for interleaving of slides using
@@ -879,11 +880,16 @@ slide_simultaneously(DhtNode, {SlideConf1, SlideConf2} = _Action, VerifyFun) ->
                   end,
               Result1 = ReceiveResultFun(),
               Result2 = ReceiveResultFun(),
-              ct:pal("Result1: ~p,~nResult2: ~p", [Result1, Result2]),
+              % NOTE: must check interleaving inside proto_sched for
+              %       slide_interleaving() to be able to distinguish between
+              %       proto_sched and non-proto_sched runs
+              Interleaving = slide_interleaving(),
+              ct:pal("Result1: ~p,~nResult2: ~p~nInterleaving: ~p",
+                     [Result1, Result2, Interleaving]),
               ?proto_sched(stop),
               _ = get_predspred_pred_node_succ(DhtNode),
               ct:pal("checked pred/succ info"),
-              VerifyFun(Result1, Result2, slide_interleaving()),
+              VerifyFun(Result1, Result2, Interleaving),
               timer:sleep(10)
           end || Slide1 <- SlideVariations1, Slide2 <- SlideVariations2],
     ok.
