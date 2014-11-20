@@ -28,7 +28,8 @@
 
 groups() ->
     [{crash_recovery_tests,[sequence], [
-                                        test_crash_recovery
+                                        test_crash_recovery,
+                                        test_crash_recovery_one_dead_node
                                        ]}
     ].
 
@@ -77,6 +78,34 @@ end_per_testcase(_TestCase, Config) ->
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 test_crash_recovery(_Config) ->
+    % do nothing
+    F = fun(_DHTNodes) ->
+                ok
+        end,
+
+    generic_crash_recovery_test(F, 4).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% crash recovery test with one node blocking prbr-messages
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_crash_recovery_one_dead_node(_Config) ->
+    % delete the lease dbs on the first node
+    F = fun(DHTNodes) ->
+                % drop the four lease_dbs on the first node
+                erase_lease_dbs(hd(DHTNodes))
+        end,
+
+    generic_crash_recovery_test(F, 3).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% generic crash recovery test
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+generic_crash_recovery_test(DoBadThings, ExpectedLeases) ->
     % we create a ring with four nodes. We stop lease renewal on all
     % nodes and wait for the leases to timeout.
     DHTNodes = pid_groups:find_all(dht_node),
@@ -87,6 +116,8 @@ test_crash_recovery(_Config) ->
     lease_helper:wait_for_number_of_valid_active_leases(0),
     [gen_component:bp_del(Node, block_trigger) || Node <- DHTNodes],
 
+    % do bad things
+    DoBadThings(DHTNodes),
 
     % trigger renewal on all nodes
     ct:pal("cr: renew all nodes ~p", [DHTNodes]),
@@ -94,4 +125,26 @@ test_crash_recovery(_Config) ->
     
     % wait for leases to reappear
     ct:pal("cr: wait for leases to reappear"),
-    lease_helper:wait_for_number_of_valid_active_leases(4).
+    lease_helper:wait_for_number_of_valid_active_leases(ExpectedLeases).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% functions manipulating the node state
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+erase_lease_dbs(Node) ->
+    F = fun(State) ->
+                State1 = dht_node_state:set_prbr_state(State , leases_1, prbr:init(lease_db1)),
+                State2 = dht_node_state:set_prbr_state(State1, leases_1, prbr:init(lease_db1)),
+                State3 = dht_node_state:set_prbr_state(State2, leases_1, prbr:init(lease_db1)),
+                State4 = dht_node_state:set_prbr_state(State3, leases_1, prbr:init(lease_db1)),
+                State4
+        end,
+    change_node_state(Node, F).
+
+change_node_state(Node, F) ->
+    comm:send_local(Node, {set_state, comm:this(), F}),
+    receive
+        {set_state_response, _NewState} ->
+            ok
+    end.
