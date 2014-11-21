@@ -44,6 +44,9 @@
 %% let fetch the number of DB entries
 -export([get_load/1]).
 
+%% only for unittests
+-export([tab2list_raw_unittest/1]).
+
 -ifdef(with_export_type_support).
 -export_type([message/0]).
 -export_type([state/0]).
@@ -198,6 +201,11 @@ tab2list(State) ->
     %% without prbr own data
     Entries = tab2list_raw(State),
     [ {element(1,X), element(4,X)} || X <- Entries].
+
+-spec tab2list_raw_unittest(state()) -> [entry()].
+tab2list_raw_unittest(State) ->
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
+    tab2list_raw(State).
 
 -spec tab2list_raw(state()) -> [entry()].
 tab2list_raw(State) ->
