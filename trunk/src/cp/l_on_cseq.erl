@@ -119,7 +119,9 @@
 delta() -> 10.
 
 -spec unittest_get_delta() -> pos_integer().
-unittest_get_delta() -> delta().
+unittest_get_delta() -> 
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
+    delta().
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -203,6 +205,7 @@ disable_lease(State, Lease) ->
 % for unit tests
 -spec unittest_lease_update(lease_t(), lease_t(), active | passive) -> ok | failed.
 unittest_lease_update(Old, New, Mode) ->
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     comm:send_local(pid_groups:get_my(dht_node),
                     {l_on_cseq, unittest_update, Old, New, Mode, self()}),
     trace_mpath:thread_yield(),
@@ -218,6 +221,7 @@ unittest_lease_update(Old, New, Mode) ->
 
 -spec unittest_clear_lease_list(Pid::comm:erl_local_pid()) -> ok.
 unittest_clear_lease_list(Pid) ->
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     comm:send_local(Pid,
                     {l_on_cseq, unittest_clear_lease_list, comm:this()}),
     trace_mpath:thread_yield(),
@@ -337,6 +341,7 @@ on({l_on_cseq, send_lease_to_node, Lease, Mode}, State) ->
 on({l_on_cseq, unittest_update,
     Old = #lease{id=Id, epoch=OldEpoch,version=OldVersion},
     New, Mode, Caller}, State) ->
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     %% io:format("renew ~p~n", [Old]),
     ContentCheck = is_valid_update(OldEpoch, OldVersion),
     DB = get_db_for_id(Id),
@@ -348,6 +353,7 @@ on({l_on_cseq, unittest_update,
 
 on({l_on_cseq, unittest_update_reply, {qwrite_done, _ReqId, _Round, Value},
     Old, New, Mode, Caller}, State) ->
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     %% io:format("successful update~n", []),
     comm:send_local(Caller, {l_on_cseq, unittest_update_success, Old, New}),
     lease_list:update_lease_in_dht_node_state(Value, State, Mode, unittest);
@@ -355,8 +361,9 @@ on({l_on_cseq, unittest_update_reply, {qwrite_done, _ReqId, _Round, Value},
 on({l_on_cseq, unittest_update_reply,
     {qwrite_deny, _ReqId, _Round, _Value, {content_check_failed, _Reason}},
     Old, New, _Mode, Caller}, State) ->
-   comm:send_local(Caller, {l_on_cseq, unittest_update_failed, Old, New}),
-   State;
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
+    comm:send_local(Caller, {l_on_cseq, unittest_update_failed, Old, New}),
+    State;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -364,7 +371,8 @@ on({l_on_cseq, unittest_update_reply,
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 on({l_on_cseq, unittest_clear_lease_list, Pid}, State) ->
-  comm:send(Pid, {l_on_cseq, unittest_clear_lease_list_success}),
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
+    comm:send(Pid, {l_on_cseq, unittest_clear_lease_list_success}),
     dht_node_state:set_lease_list(State, lease_list:empty());
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -992,7 +1000,7 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
     fun ((Current::lease_t(), WriteFilter::prbr:write_filter(), Next::lease_t()) -> 
                 {Result::boolean(), update_failed_reason() | null}). %% content check
 is_valid_update(CurrentEpoch, CurrentVersion) ->
-    ?DBG_ASSERT(util:is_unit_test()), % may only be used in unit-tests
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     fun (#lease{epoch = E0}, _, _)                     when E0 =/= CurrentEpoch ->
             %% log:pal("is_valid_update: expected ~p, got ~p", [CurrentEpoch, E0]),
             {false, epoch_or_version_mismatch};
@@ -1083,6 +1091,7 @@ add_first_lease_to_db(Id, State) ->
 
 -spec unittest_create_lease(?RT:key()) -> lease_t().
 unittest_create_lease(Id) ->
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     #lease{id      = Id,
            epoch   = 1,
            owner   = comm:this(),
@@ -1094,6 +1103,7 @@ unittest_create_lease(Id) ->
 
 -spec unittest_create_lease_with_range(?RT:key(), ?RT:key()) -> lease_t().
 unittest_create_lease_with_range(From, To) ->
+    ?ASSERT(util:is_unittest()), % may only be used in unit-tests
     Range = node:mk_interval_between_ids(From, To),
     Id = id(Range),
     #lease{id      = Id,
