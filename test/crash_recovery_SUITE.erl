@@ -29,8 +29,8 @@
 groups() ->
     [{crash_recovery_tests,[sequence], [
                                         test_crash_recovery,
-                                        test_crash_recovery_one_dead_node
-                                       ]}
+                                        test_crash_recovery_one_new_node,
+                                        test_crash_recovery_one_outdated_node]}
     ].
 
 all() ->
@@ -87,10 +87,10 @@ test_crash_recovery(_Config) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-% crash recovery test with one node blocking prbr-messages
+% crash recovery test with one 'new' node 
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-test_crash_recovery_one_dead_node(_Config) ->
+test_crash_recovery_one_new_node(_Config) ->
     % delete the lease dbs on the first node
     F = fun(DHTNodes) ->
                 % drop the four lease_dbs on the first node
@@ -98,6 +98,20 @@ test_crash_recovery_one_dead_node(_Config) ->
         end,
 
     generic_crash_recovery_test(F, 3).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% crash recovery test with one node having outdated data
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+test_crash_recovery_one_outdated_node(_Config) ->
+    % delete the lease dbs on the first node
+    F = fun(DHTNodes) ->
+                % manipulate rounds on the first node
+                change_lease_replicas(hd(DHTNodes))
+        end,
+
+    generic_crash_recovery_test(F, 4).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -142,9 +156,43 @@ erase_lease_dbs(Node) ->
         end,
     change_node_state(Node, F).
 
+
+change_lease_replicas(Node) ->
+    F = fun(State) ->
+                reset_read_and_write_rounds(State, leases_1, lease_db1),
+                reset_read_and_write_rounds(State, leases_2, lease_db2),
+                reset_read_and_write_rounds(State, leases_3, lease_db3),
+                reset_read_and_write_rounds(State, leases_4, lease_db4),
+                State
+        end,
+    change_node_state(Node, F).
+
 change_node_state(Node, F) ->
     comm:send_local(Node, {set_state, comm:this(), F}),
     receive
         {set_state_response, _NewState} ->
             ok
     end.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% functions manipulating prbr state
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+reset_read_and_write_rounds(State, DBName, PRBRName) ->
+    LeaseDB = dht_node_state:get_prbr_state(State, DBName),
+    ct:pal("LeaseDB ~p", [LeaseDB]),
+    [ 
+      prbr:set_entry({Key, 
+                      {ReadRound, ReadClientId, ReadWriteFilter}, 
+                      {WriteRound, WriteClientId, WriteWriteFilter}, 
+                      unittest_crash_recovery}, LeaseDB)
+
+      || {Key, 
+          {ReadRound, ReadClientId, ReadWriteFilter}, 
+          {WriteRound, WriteClientId, WriteWriteFilter},
+          Value} 
+             <- prbr:tab2list_raw_unittest(LeaseDB)],
+    ok.
