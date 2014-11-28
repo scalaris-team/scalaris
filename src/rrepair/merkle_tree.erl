@@ -371,7 +371,7 @@ gen_hash_node({_OldHash, Count, _LCnt, Bucket, Interval, [] = Childs},
 %% @doc Hashes an inner node based on its childrens' hashes.
 -spec run_inner_hf([mt_node(),...], InnerHf::inner_hash_fun()) -> mt_node_key().
 run_inner_hf(Childs, InnerHf) ->
-    (InnerHf([get_hash(C) || C <- Childs]) bsr 1) bsl 1.
+    InnerHf([get_hash(C) || C <- Childs]).
 
 %% @doc Hashes a leaf with the given (sorted!) bucket.
 -spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun())
@@ -384,7 +384,7 @@ run_leaf_hf(Bucket, I, LeafHf) ->
     Hash = LeafHf(BinBucket),
     Size = erlang:bit_size(Hash),
     <<SmallHash:Size/integer-unit:1>> = Hash,
-    (SmallHash bsl 1) bor 1.
+    SmallHash.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
