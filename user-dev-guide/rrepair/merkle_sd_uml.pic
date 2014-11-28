@@ -60,17 +60,14 @@ comment(BB,BB_MISMATCHES,0.00 right 0.175, wid 1.6 ht 0.45 \
         "compare hashes,"\
         "store mismatches");
 #step();
-#comment(BB,MISMATCHES,0.90 left 0.6, wid 2.325 ht 1.1 \
+#comment(BB,MISMATCHES,0.90 left 0.6, wid 2.325 ht 0.66 \
 #        "\*x\sb1\eb) leaf\sbA\eb-inner\sbB\eb, leaf\sbA\eb\moinner\sbB\eb"\
 #        "\*x\sb2\eb) leaf\sbA\eb-inner\sbB\eb, leaf\sbA\eb\nminner\sbB\eb"\
-#        "\*y) leaf\sbA\eb-leaf\sbB\eb                      \sb \eb"\
-#        "\*z\sb1\eb) inner\sbA\eb-leaf\sbB\eb, leaf\sbB\eb\moinner\sbA\eb"\
-#        "\*z\sb2\eb) inner\sbA\eb-leaf\sbB\eb, leaf\sbB\eb\nminner\sbA\eb");
+#        "\*y) leaf\sbB\eb                                ");
 rmessage(BB,AA,"check_nodes_response(Flags, MaxLeafs\sbB\eb)");
-comment(BB,MISMATCHES,0.39 left 0.25, wid 3.2 ht 0.66 \
-        "\bu leaf\sbA\eb-leaf\sbB\eb (\*y)                                     \sb \eb"\
-        "\bu leaf\sbA\eb-inner\sbB\eb: leaf\sbA\eb\moi\sbB\eb (\*x\sb1\eb), leaf\sbA\eb\nmi\sbB\eb (\*x\sb2\eb)"\
-        "\bu inner\sbA\eb-leaf\sbB\eb: leaf\sbB\eb\moi\sbA\eb (\*z\sb1\eb), leaf\sbB\eb\nmi\sbA\eb (\*z\sb2\eb)");
+comment(BB,MISMATCHES,0.39 left 0.25, wid 3.2 ht 0.45 \
+        "\bu leaf\sbB\eb (\*y)                                               "\
+        "\bu leaf\sbA\eb-inner\sbB\eb: leaf\sbA\eb\moi\sbB\eb (\*x\sb1\eb), leaf\sbA\eb\nmi\sbB\eb (\*x\sb2\eb)");
 step();
 comment(AA,AA_MISMATCHES,0.00 left 0.175, wid 1.8 ht 0.625 \
         "calc. new HashSize,"\
@@ -90,14 +87,14 @@ comment(BB,BB_RESOLVE1,-0.09 right 0.175, wid 1.4 ht 0.225 \
         "\*d\sb1\eb := \*D \mo \*x\sb1\eb");
 message(BB,B,"request_resolve(\*d\sb1\eb)");
 active(B);
-message(BB,AA,"resolve_req(CKV(\*y, \*z\sb1,2\eb))");
+message(BB,AA,"resolve_req(CKV(\*y))");
 inactive(BB);
 active(AA);
 begin_frame(B,F,"key_upd_s");
 end_frame(B,F);
-comment(AA,AA_RESOLVE1A,0.00 right 0.175, wid 2.8 ht 0.45 \
-        "\*d\sb2\eb := \*D \ Reg(A,B) \mo CKV(\*y, \*z\sb1,2\eb)"\
-        "\*d\sb3\eb := Reg(A,B) \mo CKV(\*y, \*z\sb1,2\eb)     ");
+comment(AA,AA_RESOLVE1A,0.00 right 0.175, wid 2.6 ht 0.45 \
+        "\*d\sb2\eb := \*D \ Reg(A,B) \mo CKV(\*y)"\
+        "\*d\sb3\eb := Reg(A,B) \mo CKV(\*y)     ");
 message(AA,A,"request_resolve(\*d\sb2\eb)");
 inactive(B);
 active(A);
@@ -111,8 +108,8 @@ message(AA,BB,"resolve_req(CKV(\*x\sb2\eb), CK(\*d\sb3\eb))");
 inactive(A);
 inactive(AA); active(BB);
 comment(BB,BB_RESOLVE2,0.0 right 0.175, wid 2.45 ht 0.45 \
-        "\*d\sb4\eb := \*D \ Reg(A,B) \mo CKV(\*x\sb2\eb)"\
-        "\*d\sb5\eb := Reg(A,B) \mo CKV(\*x\sb2\eb)     ");
+        "\*d\sb4\eb := \*D \ Reg(B,A) \mo CKV(\*x\sb2\eb)"\
+        "\*d\sb5\eb := Reg(B,A) \mo CKV(\*x\sb2\eb)     ");
 step();
 comment(BB,RESOLVE_CK,0.8 left 0.75, wid 2.25 ht 0.225 \
         "decode compressed keys");
