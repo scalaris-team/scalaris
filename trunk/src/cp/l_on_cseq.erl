@@ -27,6 +27,13 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
+-define(WARN(BOOL, BOOL2, TEXT), 
+        if
+            BOOL andalso not (BOOL2) ->
+                log:log("loncq: " ++ TEXT);
+            true -> ok
+        end).
+
 -export([read/1, read/2]).
 %%-export([write/2]).
 
@@ -965,20 +972,20 @@ on({l_on_cseq, renew_leases}, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % @doc generic content check. used for almost all qwrite operations
--spec generic_content_check(lease_t(), lease_t(), atom()) -> 
+-spec generic_content_check_(lease_t(), lease_t(), atom()) -> 
                                    content_check_t(). %% content check
-generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange,
+generic_content_check_(#lease{id=OldId,owner=_OldOwner,aux = OldAux,range=OldRange,
                              epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
                      New, Writer) ->
-    fun (prbr_bottom, _WriteFilter, Next) ->
+    fun(prbr_bottom, _WriteFilter, Next) ->
             {false, {lease_does_not_exist, pbr_bottom, Next}};
         (Current, _WriteFilter, Next) when Current =:= New ->
             log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", [Current, Next, Old, New, Writer]),
             {true, null};
         (#lease{id = Id0} = Current, _, Next)    when Id0 =/= OldId->
             {false, {unexpected_id, Current, Next}};
-        (#lease{owner = O0} = Current, _, Next)    when O0 =/= OldOwner->
-            {false, {unexpected_owner, Current, Next}};
+        %(#lease{owner = O0} = Current, _, Next)    when O0 =/= OldOwner->
+        %    {false, {unexpected_owner, Current, Next}};
         (#lease{aux = Aux0} = Current, _, Next)    when Aux0 =/= OldAux->
             {false, {unexpected_aux, Current, Next}};
         (#lease{range = R0} = Current, _, Next)    when R0 =/= OldRange->
@@ -994,6 +1001,80 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
         (_, _, _) ->
             {true, null}
     end.
+
+% @doc generic content check. used for almost all qwrite operations
+-spec generic_content_check(lease_t(), lease_t(), atom()) -> 
+                                   content_check_t(). %% content check
+generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange,
+                             epoch=OldEpoch,version=OldVersion,timeout=OldTimeout} = Old,
+                     #lease{id=NewId,owner=NewOwner,aux = NewAux,range=NewRange,
+                             epoch=NewEpoch,version=NewVersion,timeout=NewTimeout} = New, Writer) ->
+    fun(Current, _WriteFilter, Next) ->
+            case Current of
+                % check for prbr_bottom 
+                {prbr_bottom, _WriteFilter, _Next} ->
+                    {false, {lease_does_not_exist, pbr_bottom, Next}};
+                % check for re-write
+                New -> % Current =:= New
+                    log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", 
+                            [Current, Next, Old, New, Writer]),
+                    {true, null};
+                % check that epoch and version match with Old
+                #lease{epoch = E0, version = V0} when  E0 =:= OldEpoch andalso V0 =:= OldVersion ->
+                    % @todo sanity check with warnings: protocol was implemented correctly
+                    EpochUpdate = (NewEpoch =:= OldEpoch + 1) andalso (NewVersion =:= 0),
+                    VersionUpdate = (NewEpoch =:= OldEpoch) andalso (NewVersion =:= OldVersion + 1),
+                    % check for correct epoch/version handling
+                    ?WARN(OldEpoch =:= NewEpoch, 
+                          OldVersion + 1 =:= NewVersion,
+                         "the version has to increase by one"),
+                    ?WARN(OldEpoch + 1 =:= NewEpoch, 
+                          0 =:= NewVersion,
+                         "the version has to be zero after an epoch update"),
+                    % check that the id does not change
+                    ?WARN(OldId =/= NewId, false, "the id may never change"),
+                    % check for correct behavior for the remaining fields
+                    ?WARN(OldOwner =/= NewOwner, 
+                          EpochUpdate, 
+                          "the owner changed without an epoch update"),
+                    ?WARN(OldRange =/= NewRange, 
+                         EpochUpdate,
+                         "the range changed without an epoch update"),
+                    ?WARN(OldAux =/= NewAux, 
+                         EpochUpdate,
+                         "the aux changed without an epoch update"),
+                    ?WARN(OldTimeout =/= NewTimeout, 
+                         VersionUpdate,
+                         "the timeout changed without a version update"),
+                    ?WARN(OldTimeout =/= NewTimeout, 
+                         OldTimeout < NewTimeout,
+                         "the timeout changed without a version update"),
+                    {true, null};
+                % epoch and/or version did not match: give useful error message
+                #lease{id = Id0, epoch = E0, owner = O0, range = R0, aux = Aux0, 
+                       version = V0, timeout = T0} ->
+                    if
+                        Id0 =/= OldId ->
+                            {false, {unexpected_id, Current, Next}};
+                        % @todo remove owner check
+                        O0 =/= OldOwner->
+                            {false, {unexpected_owner, Current, Next}};
+                        Aux0 =/= OldAux ->
+                            {false, {unexpected_aux, Current, Next}};
+                        R0 =/= OldRange ->
+                            {false, {unexpected_range, Current, Next}};
+                        T0 =/= OldTimeout ->
+                            {false, {unexpected_timeout, Current, Next}};
+                        E0 =/= OldEpoch ->
+                            {false, {unexpected_epoch, Current, Next}};
+                        V0 =/= OldVersion ->
+                            {false, {unexpected_version, Current, Next}};
+                        not (T0 < NewTimeout) ->
+                            {false, {timeout_is_not_newer_than_current_lease, Current, Next}}
+                    end
+            end
+    end.
+                            
 
 % @doc only for unittests
 -spec is_valid_update(non_neg_integer(), non_neg_integer()) ->
@@ -1170,7 +1251,14 @@ set_range(L, Range) -> L#lease{range=Range}.
 
 -spec is_valid(lease_t()) -> boolean().
 is_valid(L) ->
-    os:timestamp() <  L#lease.timeout.
+    case L of
+        empty ->
+            %% should not happen but it does
+            log:log("loncq: you are calling is_valid on an empty lease~n"),
+            false;
+        _ ->
+            os:timestamp() <  L#lease.timeout
+    end.
 
 -spec has_timed_out(lease_t()) -> boolean().
 has_timed_out(L) ->
