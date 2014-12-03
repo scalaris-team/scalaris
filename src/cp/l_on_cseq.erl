@@ -28,15 +28,16 @@
 -include("record_helpers.hrl").
 
 -define(WARN(BOOL, BOOL2, TEXT),
-        begin
-            UnitTest = util:is_unittest(),
-            if
-                BOOL andalso not (BOOL2) andalso UnitTest ->
-                    ct:fail("loncq: " ++ TEXT);
-                BOOL andalso not (BOOL2) ->
-                    log:log("loncq: " ++ TEXT);
-                true -> ok
-            end
+        if
+            (BOOL) andalso not (BOOL2) ->
+                case util:is_unittest() of
+                    true ->
+                        ct:fail("loncq: " ++ TEXT);
+                    false ->
+                        log:log("loncq: " ++ TEXT)
+                end;
+            true ->
+                ok
         end).
 
 -export([read/1, read/2]).
