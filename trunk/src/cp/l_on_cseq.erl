@@ -27,7 +27,7 @@
 -include("scalaris.hrl").
 -include("record_helpers.hrl").
 
--define(WARN(BOOL, BOOL2, TEXT), 
+-define(WARN(BOOL, BOOL2, TEXT),
         if
             BOOL andalso not (BOOL2) ->
                 log:log("loncq: " ++ TEXT);
@@ -1019,7 +1019,20 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                     log:pal("re-write in CC:~n~w~n~w~n~w~n~w~n~w~n", 
                             [Current, Next, Old, New, Writer]),
                     {true, null};
+                % special case for renew after crash-recovery
+                #lease{epoch = E0, owner = O0, version = V0} 
+                  when E0 =:= OldEpoch andalso V0 =:= OldVersion andalso O0 =/= OldOwner
+                       andalso Writer =:= renew ->
+                       % after a crash the logical owner should not
+                       % have changed. however its pid will have
+                       % changed. this special case checks that epoch
+                       % and version are correctly guessed, but the
+                       % owner is wrong. in addition, we require that
+                       % this is a renew.
+                    log:log("loncq: this has to be a renew after a recovery"),
+                    {true, null};
                 % check that epoch and version match with Old
+                % we only warn/fail if the remaining fields do not match
                 #lease{epoch = E0, version = V0} when  E0 =:= OldEpoch andalso V0 =:= OldVersion ->
                     % @todo sanity check with warnings: protocol was implemented correctly
                     EpochUpdate = (NewEpoch =:= OldEpoch + 1) andalso (NewVersion =:= 0),
@@ -1030,25 +1043,34 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                          "the version has to increase by one"),
                     ?WARN(OldEpoch + 1 =:= NewEpoch, 
                           0 =:= NewVersion,
-                         "the version has to be zero after an epoch update"),
+                         "the version has to be zero after an epoch update: " 
+                             ++ atom_to_list(Writer)),
                     % check that the id does not change
-                    ?WARN(OldId =/= NewId, false, "the id may never change"),
+                    ?WARN(OldId =/= NewId, 
+                          false, 
+                          "the id may never change: " 
+                              ++ atom_to_list(Writer)),
                     % check for correct behavior for the remaining fields
                     ?WARN(OldOwner =/= NewOwner, 
                           EpochUpdate, 
-                          "the owner changed without an epoch update"),
+                          "the owner changed without an epoch update: " 
+                              ++ atom_to_list(Writer)),
                     ?WARN(OldRange =/= NewRange, 
                          EpochUpdate,
-                         "the range changed without an epoch update"),
+                         "the range changed without an epoch update: " 
+                             ++ atom_to_list(Writer)),
                     ?WARN(OldAux =/= NewAux, 
                          EpochUpdate,
-                         "the aux changed without an epoch update"),
+                         "the aux changed without an epoch update: " 
+                             ++ atom_to_list(Writer)),
                     ?WARN(OldTimeout =/= NewTimeout, 
-                         VersionUpdate,
-                         "the timeout changed without a version update"),
+                         VersionUpdate orelse EpochUpdate,
+                         "the timeout changed without a version update: " 
+                             ++ atom_to_list(Writer)),
                     ?WARN(OldTimeout =/= NewTimeout, 
                          OldTimeout < NewTimeout,
-                         "the timeout changed without a version update"),
+                         "the new timeout is not newer than the old: " 
+                             ++ atom_to_list(Writer)),
                     {true, null};
                 % epoch and/or version did not match: give useful error message
                 #lease{id = Id0, epoch = E0, owner = O0, range = R0, aux = Aux0, 
@@ -1056,8 +1078,7 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                     if
                         Id0 =/= OldId ->
                             {false, {unexpected_id, Current, Next}};
-                        % @todo remove owner check
-                        O0 =/= OldOwner->
+                        O0 =/= OldOwner ->
                             {false, {unexpected_owner, Current, Next}};
                         Aux0 =/= OldAux ->
                             {false, {unexpected_aux, Current, Next}};
@@ -1068,9 +1089,9 @@ generic_content_check(#lease{id=OldId,owner=OldOwner,aux = OldAux,range=OldRange
                         E0 =/= OldEpoch ->
                             {false, {unexpected_epoch, Current, Next}};
                         V0 =/= OldVersion ->
-                            {false, {unexpected_version, Current, Next}};
-                        not (T0 < NewTimeout) ->
-                            {false, {timeout_is_not_newer_than_current_lease, Current, Next}}
+                            {false, {unexpected_version, Current, Next}}%;
+                        %not (T0 < NewTimeout) ->
+                        %    {false, {timeout_is_not_newer_than_current_lease, Current, Next}}
                     end
             end
     end.
