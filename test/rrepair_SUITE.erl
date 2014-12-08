@@ -213,7 +213,8 @@ prop_merkle_compress_hashlist(Nodes0, SigSize) ->
                      {nil, Count, LeafCount, Bucket, Interval, ChildList} ->
                          {randoms:getRandomInt(), Count, LeafCount, Bucket,
                           Interval, ChildList};
-                     _ -> N
+                     {_Hash, _Cnt, _LCnt, _Bucket, _Interval, _ChildList} ->
+                         N
                  end
              end || N <- Nodes0],
     Bin = rr_recon:merkle_compress_hashlist(Nodes, <<>>, SigSize),
