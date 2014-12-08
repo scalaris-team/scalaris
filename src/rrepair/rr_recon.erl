@@ -1117,7 +1117,7 @@ p_process_tree_cmp_result(<<>>, [], _SigSize, MerkleSyncIn, Stats, RestTreeAcc,
 p_process_tree_cmp_result(<<?recon_ok:3, TR/bitstring>>, [Node | TN], SigSize, MerkleSyncIn,
                           Stats, RestTreeAcc, MerkleSyncAcc,
                           AccMLC, AccCmp) ->
-    Skipped = merkle_tree:size(Node),
+    Skipped = merkle_tree:size(Node) - 1,
     NStats = rr_recon_stats:inc([{tree_compareSkipped, Skipped}], Stats),
     p_process_tree_cmp_result(TR, TN, SigSize, MerkleSyncIn, NStats,
                               RestTreeAcc, MerkleSyncAcc, AccMLC, AccCmp + 1);
@@ -1606,7 +1606,7 @@ art_get_sync_leaves([Node | Rest], Art, ToSyncAcc, NCompAcc, NSkipAcc, NLSyncAcc
     IsLeaf = merkle_tree:is_leaf(Node),
     case art:lookup(Node, Art) of
         true ->
-            NSkip = NSkipAcc + ?IIF(IsLeaf, 0, merkle_tree:size(Node)),
+            NSkip = NSkipAcc + ?IIF(IsLeaf, 0, merkle_tree:size(Node) - 1),
             art_get_sync_leaves(Rest, Art, ToSyncAcc, NComp, NSkip, NLSyncAcc);
         false ->
             if IsLeaf ->
