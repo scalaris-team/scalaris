@@ -133,9 +133,7 @@ new(I) ->
 %%      e.g. [{branch_factor, 32}, {bucket_size, 16}]
 -spec new(mt_interval(), mt_config_params()) -> merkle_tree().
 new(I, ConfParams) ->
-    Config = build_config(ConfParams),
-    [Root] = build_childs([{I, 0, []}], Config, []),
-    gen_hash({merkle_tree, Config, Root}).
+    new(I, [], ConfParams).
 
 %% @doc Creates a new empty merkle tree with the given params and interval and
 %%      inserts entries from EntryList.
@@ -256,7 +254,7 @@ insert(Key, {merkle_tree, Config = #mt_config{keep_bucket = true}, Root} = Tree)
         -> NewNode::mt_node().
 insert_to_node(Key, _CheckKey, {_H, Count, LeafCount = 1, Bucket, Interval, []} = N, Config)
   when Count >= 0 andalso Count < Config#mt_config.bucket_size ->
-    case lists:member(Key, Bucket) of
+    case lists:keymember(element(1, Key), 1, Bucket) of
         false -> {nil, Count + 1, LeafCount, [Key | Bucket], Interval, []};
         _     -> N
     end;
@@ -289,7 +287,8 @@ insert_to_node(Key, CheckKey, {Hash, Count, LeafCount, [], Interval, Childs = [_
 %%      values yet (use gen_hash/1 for that).
 -spec bulk_build(Interval::mt_interval(), KeyList::mt_bucket(),
                  Params::mt_config_params()) -> MerkleTree::merkle_tree().
-bulk_build(I, KeyList, Params) ->
+bulk_build(I, KeyList0, Params) ->
+    KeyList = lists:ukeysort(1, KeyList0),
     Config = build_config(Params),
     [Root] = build_childs([{I, length(KeyList), KeyList}], Config, []),
     {merkle_tree, Config, Root}.
@@ -322,8 +321,8 @@ build_childs([{Interval, Count, Bucket} | T], Config, Acc) ->
                   {nil, Count, 1, Bucket, Interval, []};
               true ->
                   % need to hash here since we won't keep the bucket!
-                  Hash = run_leaf_hf(lists:ukeysort(1, Bucket), Interval,
-                                     Config#mt_config.leaf_hf),
+                  Bucket1 = lists:keysort(1, Bucket),
+                  Hash = run_leaf_hf(Bucket1, Interval, Config#mt_config.leaf_hf),
                   {Hash, Count, 1, [], Interval, []}
            end,
     build_childs(T, Config, [Node | Acc]);
@@ -367,7 +366,7 @@ gen_hash_node({Hash, _Cnt, _LCnt = 1, _Bkt, _I, []} = N, _InnerHf,
 gen_hash_node({_OldHash, Count, _LCnt, Bucket, Interval, [] = Childs},
               _InnerHf, LeafHf, true, CleanBuckets) ->
     % leaf node, no bucket contents, keep_bucket true
-    Bucket1 = lists:ukeysort(1, Bucket),
+    Bucket1 = lists:keysort(1, Bucket),
     Hash = run_leaf_hf(Bucket1, Interval, LeafHf),
     {Hash, Count, 1, ?IIF(CleanBuckets, [], Bucket1), Interval, Childs}.
 
@@ -380,6 +379,7 @@ run_inner_hf(Childs, InnerHf) ->
 -spec run_leaf_hf(mt_bucket(), intervals:interval(), LeafHf::hash_fun())
         -> mt_node_key().
 run_leaf_hf(Bucket, I, LeafHf) ->
+    ?DBG_ASSERT(lists:ukeysort(1, Bucket) =:= Bucket),
     BinBucket = case Bucket of
                     [_|_] -> term_to_binary(Bucket);
                     []    -> term_to_binary({0, I})
