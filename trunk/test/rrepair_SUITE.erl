@@ -210,10 +210,10 @@ prop_merkle_compress_hashlist(Nodes0, SigSize) ->
     % let it crash if the format of a merkle tree node changes
     Nodes = [begin
                  case N of
-                     {nil, Count, LeafCount, Bucket, Interval, ChildList} ->
-                         {randoms:getRandomInt(), Count, LeafCount, Bucket,
+                     {nil, Count, LeafCount, ItemCount, Bucket, Interval, ChildList} ->
+                         {randoms:getRandomInt(), Count, LeafCount, ItemCount, Bucket,
                           Interval, ChildList};
-                     {_Hash, _Cnt, _LCnt, _Bucket, _Interval, _ChildList} ->
+                     {_Hash, _Cnt, _LCnt, _ICnt, _Bucket, _Interval, _ChildList} ->
                          N
                  end
              end || N <- Nodes0],
